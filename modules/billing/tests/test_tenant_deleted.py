@@ -11,7 +11,8 @@ import pytest
 from fake_provider import FakeProvider
 from helpers import make_plan, make_sub, make_tenant
 from simple_module_db import finalize_session
-from sm_billing.constants import SubscriptionStatus
+from sm_billing.constants import PROVIDER_LIVE_STATUSES, SubscriptionStatus
+from sm_billing.contracts.provider import CheckoutSnapshot
 from sm_billing.lifecycle import tenant_service
 from sm_billing.models import Customer, Subscription
 from sm_billing.reconcile import reconcile
@@ -88,11 +89,64 @@ async def test_a_second_event_cancels_nothing_twice(app, fake):
     assert len(fake.called("cancel_now")) == 1
 
 
-async def test_already_canceled_at_the_provider_is_not_canceled_again(app, fake):
-    tenant_id = await _paying_tenant(app, fake, status="canceled")
+@pytest.mark.parametrize("status", ["canceled", "incomplete_expired"])
+async def test_an_ended_subscription_is_not_canceled_again(app, fake, status):
+    tenant_id = await _paying_tenant(app, fake, status=status)
     await _delete(app, tenant_id)
     assert fake.called("cancel_now") == []
     assert (await _sub(app, tenant_id)).status == SubscriptionStatus.CANCELED
+
+
+@pytest.mark.parametrize("status", sorted(PROVIDER_LIVE_STATUSES))
+async def test_every_live_status_is_canceled(app, fake, status):
+    """The same set ``StripeProvider.live_subscription_ids`` filters on."""
+    tenant_id = await _paying_tenant(app, fake, status=status)
+    await _delete(app, tenant_id)
+    assert fake.called("cancel_now") == [{"subscription_id": "sub_1"}]
+
+
+async def test_a_local_only_row_still_cancels_the_customers_subscriptions(app, fake):
+    tenant_id = await _paying_tenant(app, fake, sid=None)
+    fake.live["cus_1"] = ["sub_unmirrored"]
+    await _delete(app, tenant_id)
+    assert fake.called("expire_checkout") == [{"session_id": "cs_open"}]
+    assert fake.called("cancel_now") == [{"subscription_id": "sub_unmirrored"}]
+    assert fake.called("fetch_subscription") == []  # nothing mirrored to resync
+    assert (await _sub(app, tenant_id)).status == SubscriptionStatus.CANCELED
+
+
+async def _checkout_id(app, tenant_id: str) -> str | None:
+    async with app.state.sm.db.session_factory() as session:
+        return (await session.get(Customer, tenant_id)).checkout_session_id
+
+
+@pytest.mark.parametrize("status", ["complete", "expired"])
+async def test_a_checkout_that_cannot_be_paid_any_more_is_forgotten(app, fake, status):
+    tenant_id = await _paying_tenant(app, fake)
+    fake.fail.add("expire_checkout")
+    fake.checkouts["cs_open"] = CheckoutSnapshot("cs_open", None, tenant_id, "cus_1", status)
+    await _delete(app, tenant_id)
+    assert await _checkout_id(app, tenant_id) is None
+    assert fake.called("cancel_now") == [{"subscription_id": "sub_1"}]
+
+
+@pytest.mark.parametrize("status", ["open", None])
+async def test_a_checkout_still_open_is_kept_and_retried(app, fake, caplog, status):
+    tenant_id = await _paying_tenant(app, fake)
+    fake.fail.add("expire_checkout")
+    fake.checkouts["cs_open"] = CheckoutSnapshot("cs_open", None, tenant_id, "cus_1", status)
+    with caplog.at_level("WARNING"):
+        await _delete(app, tenant_id)
+    assert await _checkout_id(app, tenant_id) == "cs_open"
+    assert any("deleted tenant" in r.message for r in caplog.records)
+    # The expiry failure did not hold up the cancel.
+    assert fake.called("cancel_now") == [{"subscription_id": "sub_1"}]
+    assert (await _sub(app, tenant_id)).status == SubscriptionStatus.CANCELED
+
+    fake.fail.clear()
+    assert (await reconcile(app)).errors == []
+    assert await _checkout_id(app, tenant_id) is None
+    assert len(fake.called("cancel_now")) == 1
 
 
 async def test_a_live_subscription_not_mirrored_yet_is_canceled_too(app, fake):

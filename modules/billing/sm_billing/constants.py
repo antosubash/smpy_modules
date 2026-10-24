@@ -92,6 +92,14 @@ ENTITLED_STATUSES: Final = frozenset(
     {SubscriptionStatus.TRIALING, SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE}
 )
 
+#: Provider statuses of a subscription that still bills, grants access or can
+#: still be paid or resumed. The one set behind both "a second checkout would
+#: double-charge" (``live_subscription_ids``) and "deleting the tenant must
+#: cancel this" (``teardown``); only ``canceled`` and ``incomplete_expired`` end.
+PROVIDER_LIVE_STATUSES: Final = frozenset(
+    {"trialing", "active", "past_due", "unpaid", "incomplete", "paused"}
+)
+
 #: Stripe statuses we fold onto ours (``incomplete_expired`` never paid).
 STRIPE_STATUS_MAP: Final = {
     "trialing": SubscriptionStatus.TRIALING,

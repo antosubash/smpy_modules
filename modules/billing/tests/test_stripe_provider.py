@@ -287,10 +287,13 @@ async def test_live_subscription_ids_filters_ended(provider):
             {"id": "sub_b", "object": "subscription", "status": "canceled"},
             {"id": "sub_c", "object": "subscription", "status": "past_due"},
             {"id": "sub_d", "object": "subscription", "status": "incomplete_expired"},
+            {"id": "sub_e", "object": "subscription", "status": "paused"},
+            {"id": "sub_f", "object": "subscription", "status": "incomplete"},
         ],
     }
     provider._v1.subscriptions = _Recorder(provider.calls, "subscriptions", listing)
-    assert await provider.live_subscription_ids("cus_1") == ["sub_a", "sub_c"]
+    # The one set teardown cancels too (constants.PROVIDER_LIVE_STATUSES).
+    assert await provider.live_subscription_ids("cus_1") == ["sub_a", "sub_c", "sub_e", "sub_f"]
     name, _, params = provider.calls[-1]
     assert name == "subscriptions.list_async"
     assert params == {"customer": "cus_1", "status": "all", "limit": 100}

@@ -190,9 +190,13 @@ the `csrf_token` prop.
   and `billing_webhook_event` stay, and the customer row is what maps Stripe's
   late `customer.subscription.deleted` back to them. If Stripe fails, the
   delete still stands; the error is logged and the next reconcile cancels it.
-  Under the `manual` provider nothing reaches Stripe: a subscription that was
-  never at a provider is marked canceled, and one that was is logged for you to
-  cancel there. On a framework older than 0.0.38 there is no event and no
-  delete, so billing subscribes to nothing.
+  The Checkout session id is forgotten only once Stripe says the session is no
+  longer open. "Live" means trialing, active, past_due, unpaid, incomplete or
+  paused: the same set that makes checkout answer `already_subscribed`.
+  A subscription that was never at a provider is marked canceled, and the
+  customer's Stripe subscriptions, if it has any, are still canceled. Under the
+  `manual` provider nothing reaches Stripe, and a tenant with a Stripe customer
+  is logged for you to cancel there. On a framework older than 0.0.38 there is
+  no event and no delete, so billing subscribes to nothing.
 - **Not in v1:** per-tenant limit overrides, coupons, usage metering, more
   than one subscription per tenant, and translated UI text.

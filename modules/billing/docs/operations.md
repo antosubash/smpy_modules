@@ -198,7 +198,11 @@ and so that Stripe's own `customer.subscription.deleted` webhook still maps to
 them. If Stripe is unreachable at that moment the delete is not held up: the
 log says `could not cancel the subscription of deleted tenant`, and the next
 reconcile (the scheduled one, or `smpy billing reconcile`) cancels it — a
-reconcile never re-applies a subscription whose organisation is gone. Under the
+reconcile never re-applies a subscription whose organisation is gone. An open
+Checkout session that cannot be expired stays recorded, and the reconcile
+retries it, unless Stripe reports it already completed or expired. "Still
+bills" means trialing, active, past_due, unpaid, incomplete or paused: the
+same statuses that make a new checkout answer "already subscribed". Under the
 `manual` provider nothing reaches Stripe; a log line asks you to cancel there
 if the organisation had a Stripe subscription from before the switch.
 

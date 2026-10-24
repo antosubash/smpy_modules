@@ -18,7 +18,7 @@ from typing import Any
 
 import stripe
 
-from sm_billing.constants import CHECKOUT_COMPLETED, PROVIDER_STRIPE
+from sm_billing.constants import CHECKOUT_COMPLETED, PROVIDER_LIVE_STATUSES, PROVIDER_STRIPE
 from sm_billing.contracts.provider import (
     CheckoutSession,
     CheckoutSnapshot,
@@ -30,8 +30,6 @@ from sm_billing.contracts.provider import (
 )
 
 _SUBSCRIPTION_EVENTS = ("customer.subscription.",)
-# Still billing or granting access — a second checkout would double-charge.
-_LIVE_STATUSES = frozenset({"active", "trialing", "past_due", "unpaid"})
 
 
 def _ts(value: Any) -> datetime | None:
@@ -134,7 +132,9 @@ class StripeProvider:
     async def live_subscription_ids(self, customer_id: str) -> list[str]:
         params = {"customer": customer_id, "status": "all", "limit": 100}
         listing = await self._call(self._v1.subscriptions.list_async, params=params)
-        return [s["id"] for s in listing.get("data", []) if s.get("status") in _LIVE_STATUSES]
+        return [
+            s["id"] for s in listing.get("data", []) if s.get("status") in PROVIDER_LIVE_STATUSES
+        ]
 
     async def portal_url(self, customer_id: str, return_url: str) -> str:
         params = {"customer": customer_id, "return_url": return_url}
@@ -209,6 +209,7 @@ class StripeProvider:
             subscription_id=_id(session.get("subscription")),
             tenant_id=session.get("client_reference_id"),
             customer_id=_id(session.get("customer")),
+            status=session.get("status"),
         )
 
     async def verify_price(self, price_id: str) -> PriceInfo:

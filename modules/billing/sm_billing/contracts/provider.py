@@ -47,6 +47,8 @@ class CheckoutSnapshot:
     #: ``client_reference_id``: the tenant that opened the session.
     tenant_id: str | None
     customer_id: str | None
+    #: ``open`` / ``complete`` / ``expired``; only an open one can still be paid.
+    status: str | None = None
 
 
 @dataclass(frozen=True)
