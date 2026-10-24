@@ -36,7 +36,7 @@ async def run(app: FastAPI) -> None:
     from sm_billing.providers.factory import install_provider
 
     install_provider(services)
-    services.stored_seen = {f: getattr(services.settings, f) for f in live.LOOP_FIELDS}
+    services.stored_seen = {f: getattr(services.settings, f) for f in live.FOLLOWED_FIELDS}
     start_reconcile(app)
     start_usage_sweeper(app)
 

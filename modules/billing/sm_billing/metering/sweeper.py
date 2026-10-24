@@ -12,12 +12,18 @@ pick the same hold. The guard is the claim, as in the reconcile scheduler:
 the row for exactly one of them, and only that one lowers the gauge. The
 others match no row and move on, so a hold is released once.
 
-**Retention.** Once a day per process, ledger rows recorded more than
-``usage_event_retention_days`` ago (``0`` keeps them forever) and holds
-settled more than ``SETTLED_HOLD_DAYS`` ago are deleted. The counter and
-gauge rollups are never purged. Two instances purging at once delete the
-same rows; the second finds nothing. A purged event frees its idempotency
-key, which is why the retention is far longer than any retry.
+**Retention.** Once a day per process, ``metering.retention.purge`` deletes
+ledger charges recorded more than ``usage_event_retention_days`` ago (``0``
+keeps them forever) together with their refunds, and holds settled more than
+30 days ago, in bounded batches; a purge the batch budget cut short carries
+on next tick. The counter and gauge rollups are never purged. A purged event
+frees its idempotency key, which is why the retention is far longer than any
+retry.
+
+**Live settings.** Before each tick the loop re-reads the stored settings
+(``live.ensure_current``, which follows the ``usage_*`` fields), so an
+interval or retention saved on another worker applies here from the next
+tick, and ``0`` saved anywhere idles every loop.
 """
 
 from __future__ import annotations
@@ -29,12 +35,12 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
-from simple_module_db import finalize_session, mark_written
-from sqlalchemy import delete, select
+from sqlalchemy import select
 
 from sm_billing import constants as c
 from sm_billing.contracts.metering import HoldStatus
-from sm_billing.models import UsageEvent, UsageHold
+from sm_billing.metering.retention import purge
+from sm_billing.models import UsageHold
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -45,8 +51,6 @@ logger = logging.getLogger("simple_module.billing.usage_sweeper")
 
 #: Holds expired per tick at most; the next tick takes the rest.
 BATCH = 500
-#: Released and expired holds are kept this long, for the admin screens.
-SETTLED_HOLD_DAYS = 30
 PURGE_EVERY = timedelta(days=1)
 #: How often an idle loop (interval 0) looks at the setting again.
 IDLE_SECONDS = 60
@@ -55,6 +59,13 @@ IDLE_SECONDS = 60
 async def _sleep(seconds: float) -> None:
     """``asyncio.sleep``, behind a seam tests replace."""
     await asyncio.sleep(seconds)
+
+
+async def _refresh(app: FastAPI) -> None:
+    """Follow settings saved on another worker (the ``usage_*`` fields too)."""
+    from sm_billing import live
+
+    await live.ensure_current(app)
 
 
 @dataclass
@@ -81,31 +92,6 @@ async def expire_due(usage: UsageService, *, limit: int = BATCH) -> int:
     return expired
 
 
-async def purge(usage: UsageService, retention_days: int) -> tuple[int, int]:
-    """Delete old ledger rows and settled holds; ``(events, holds)`` deleted."""
-    now = usage.now()
-    holds_before = now - timedelta(days=SETTLED_HOLD_DAYS)
-    async with usage.session_factory() as session:
-        events = 0
-        if retention_days > 0:
-            result = await session.execute(
-                delete(UsageEvent).where(
-                    UsageEvent.recorded_at < now - timedelta(days=retention_days)
-                )
-            )
-            events = result.rowcount  # ty: ignore[unresolved-attribute] - CursorResult
-        settled = (HoldStatus.RELEASED.value, HoldStatus.EXPIRED.value)
-        result = await session.execute(
-            delete(UsageHold).where(
-                UsageHold.status.in_(settled), UsageHold.settled_at < holds_before
-            )
-        )
-        holds = result.rowcount  # ty: ignore[unresolved-attribute] - CursorResult
-        mark_written(session)
-        await finalize_session(session)
-    return int(events or 0), int(holds or 0)
-
-
 class UsageSweeper:
     """Owns the sweep task; shaped like ``ReconcileScheduler``."""
 
@@ -126,9 +112,10 @@ class UsageSweeper:
         report = SweepReport(expired=await expire_due(usage))
         now = usage.now()
         if self._purged_at is None or now - self._purged_at >= PURGE_EVERY:
-            self._purged_at = now
-            retention = settings.usage_event_retention_days
-            report.events_purged, report.holds_purged = await purge(usage, retention)
+            purged = await purge(usage, settings.usage_event_retention_days)
+            report.events_purged, report.holds_purged = purged.events, purged.holds
+            if purged.done:  # else the next tick carries on with the backlog
+                self._purged_at = now
         return report
 
     async def _run(self, app: FastAPI) -> None:
@@ -137,6 +124,7 @@ class UsageSweeper:
             try:
                 interval = getattr(app.state, c.PACKAGE).settings.usage_sweep_interval_seconds
                 await _sleep(interval or IDLE_SECONDS)
+                await _refresh(app)
                 if not getattr(app.state, c.PACKAGE).settings.usage_sweep_interval_seconds:
                     continue
                 report = await self.tick(app)

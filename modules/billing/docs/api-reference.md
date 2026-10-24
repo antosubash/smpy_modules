@@ -100,7 +100,10 @@ It charges `qty` (default 1) of a registered counter meter to the request's
 tenant before the handler runs. A refusal is 402
 `{"detail": "quota_exceeded", "meter", "limit", "used", "requested", "resets_at"}`.
 The charge is refunded **only when the handler raises**; a handler that returns
-an error response keeps it.
+an error response keeps it. The dependency is function-scoped
+(`Depends(..., scope="function")`, FastAPI 0.121+, billing's floor), so it
+exits when the handler returns: a failure delivering the response afterwards
+(the client disconnected) is not the handler's and refunds nothing.
 
 **One `Idempotency-Key` per operation: the handler runs at most once per key.**
 A replay never reaches the handler, so one unit of quota cannot buy repeated

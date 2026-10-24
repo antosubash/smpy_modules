@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+
 import pytest
 from quota_helpers import PREFIX, route
 from sm_billing.metering.deps import RequiresQuota
@@ -95,3 +97,48 @@ def test_bad_arguments_fail_at_definition():
         RequiresQuota(METER, 0)
     with pytest.raises(ValueError):
         RequiresQuota("")
+
+
+async def _send_fails_on_body(app, client, path: str) -> list[str]:
+    """Drive ``path`` straight through ASGI with a ``send`` that breaks on the
+    body, as a client that disconnects mid-delivery does. Returns the message
+    types that went out."""
+    cookie = client.build_request("GET", path).headers["cookie"]  # what httpx would send
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "http",
+        "path": path,
+        "raw_path": path.encode(),
+        "query_string": b"",
+        "root_path": "",
+        "headers": [(b"host", b"testserver"), (b"cookie", cookie.encode())],
+        "client": ("127.0.0.1", 1234),
+        "server": ("testserver", 80),
+    }
+    sent: list[str] = []
+
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message):
+        sent.append(message["type"])
+        if message["type"] == "http.response.body":
+            raise OSError("client went away")
+
+    with contextlib.suppress(OSError):
+        await app(scope, receive, send)
+    return sent
+
+
+async def test_a_failed_delivery_after_success_is_not_refunded(quota_app, owner, runs):
+    factory = quota_app.state.sm.db.session_factory
+    sent = await _send_fails_on_body(quota_app, owner, f"{PREFIX}/count")
+    assert runs == [1] and "http.response.start" in sent
+    assert await events(factory, owner.tenant_id, kind="consume") == 1
+    assert await events(factory, owner.tenant_id, kind="refund") == 0  # the work was done
+    # A handler that raises is still refunded.
+    assert (await owner.get(f"{PREFIX}/count-boom")).status_code == 418
+    assert await events(factory, owner.tenant_id, kind="refund") == 1

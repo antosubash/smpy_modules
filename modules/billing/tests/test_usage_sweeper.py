@@ -8,8 +8,9 @@ from datetime import timedelta
 import pytest
 from sm_billing.constants import PACKAGE, USAGE_STATE_ATTR
 from sm_billing.metering import sweeper
-from sm_billing.metering.sweeper import UsageSweeper, expire_due, purge
-from usage_helpers import GAUGE, METER, Clock, events, gauge_service, hold_statuses, in_use
+from sm_billing.metering.retention import Purged
+from sm_billing.metering.sweeper import UsageSweeper, expire_due
+from usage_helpers import GAUGE, Clock, gauge_service, hold_statuses, in_use
 from usage_helpers import seed_limits as seed
 
 
@@ -62,22 +63,6 @@ async def test_an_extended_hold_is_not_expired(factory, usage, clock):
     assert await usage.expire(hold.id) is False  # not lapsed: the guard says no
 
 
-async def test_purge_drops_old_ledger_rows_and_settled_holds(factory, usage, clock):
-    tenant = await seed(factory, {})
-    await usage.consume(tenant, METER, 1, "old", source="t")
-    old = await usage.reserve(tenant, GAUGE, 1, "old", source="t")
-    await usage.release(old.id)
-    await usage.reserve(tenant, GAUGE, 1, "live", source="t")
-    clock.now += timedelta(days=31)
-    await usage.consume(tenant, METER, 1, "new", source="t")
-    assert await purge(usage, retention_days=400) == (0, 1)
-    assert await hold_statuses(factory, tenant) == ["held"]  # live holds stay
-    clock.now += timedelta(days=380)
-    assert await purge(usage, retention_days=0) == (0, 0)  # 0 keeps the ledger
-    assert await purge(usage, retention_days=400) == (1, 0)
-    assert await events(factory, tenant) == 1
-
-
 async def test_tick_purges_once_a_day(app, factory, clock, monkeypatch):
     usage = gauge_service(factory, clock)
     monkeypatch.setattr(app.state, USAGE_STATE_ATTR, usage)
@@ -85,7 +70,7 @@ async def test_tick_purges_once_a_day(app, factory, clock, monkeypatch):
 
     async def counting(_usage, days):
         calls.append(days)
-        return 0, 0
+        return Purged()
 
     monkeypatch.setattr(sweeper, "purge", counting)
     sweep = UsageSweeper()

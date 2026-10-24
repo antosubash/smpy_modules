@@ -10,7 +10,10 @@ service's own short transaction. Refused → 402 ``quota_exceeded`` with
 ``meter``, ``limit``, ``used``, ``requested`` and ``resets_at``.
 
 **Refunds only when the handler raises.** A handler that *returns* an error
-response keeps the charge, the same rule ``get_db`` uses for rolling back.
+response keeps the charge, the same rule ``get_db`` uses for rolling back. The
+dependency is function-scoped, so it exits when the handler returns: a failure
+delivering the response afterwards (the client disconnected) is not the
+handler's and refunds nothing.
 
 **One ``Idempotency-Key`` per operation; the handler runs at most once per
 key.** A replay never reaches the handler — otherwise one unit of quota would
@@ -117,4 +120,8 @@ def RequiresQuota(  # noqa: N802 - reads like the framework's RequiresPermission
                 logger.exception("billing: refund failed tenant=%s meter=%s", tenant_id, meter)
             raise
 
-    return Depends(requires_quota)
+    # ``scope="function"`` (FastAPI >= 0.121, hence billing's floor): the code
+    # after ``yield`` runs when the handler returns, before the response is
+    # sent. Request-scoped, an error while *sending* (a client that went away)
+    # would be thrown in here too and refund work that was already done.
+    return Depends(requires_quota, scope="function")
