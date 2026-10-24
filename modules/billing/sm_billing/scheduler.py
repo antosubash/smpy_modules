@@ -45,6 +45,7 @@ from sm_billing import live
 from sm_billing.contracts.provider import ProviderError
 from sm_billing.models import Subscription
 from sm_billing.reconcile import ReconcileReport, reconcile_one
+from sm_billing.sweep import Budget, sweep_deleted_tenants
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -187,6 +188,11 @@ async def reconcile_stale(
             report.pushed += int(pushed)
             pause, provider_errors = PACE_SECONDS, 0
         await _pause(pause)
+    if not report.skipped:  # deleted tenants left with something at the provider
+        budget = Budget(
+            _pause, PACE_SECONDS, MAX_BACKOFF_SECONDS, MAX_PROVIDER_ERRORS, pause, provider_errors
+        )
+        await sweep_deleted_tenants(app, report, attempted={r[1] for r in rows}, budget=budget)
     return report
 
 
@@ -216,12 +222,14 @@ class ReconcileScheduler:
             try:
                 await asyncio.sleep(interval.total_seconds())
                 report = await reconcile_stale(app, interval, self._failing)
-                if report.synced or report.errors:
+                if report.synced or report.errors or report.torn_down:
                     logger.info(
-                        "billing: scheduled reconcile synced %d, pushed %d, failed %d",
+                        "billing: scheduled reconcile synced %d, pushed %d, failed %d, "
+                        "tore down %d deleted tenant(s)",
                         report.synced,
                         report.pushed,
                         len(report.errors),
+                        report.torn_down,
                     )
             except asyncio.CancelledError:
                 raise

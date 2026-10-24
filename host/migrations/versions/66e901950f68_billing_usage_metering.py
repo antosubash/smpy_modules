@@ -1,7 +1,7 @@
 """billing: usage ledger and per-period counters (#99)
 
 Revision ID: 66e901950f68
-Revises: 9d83e789a5b4
+Revises: f4d2d2e73dc9
 Create Date: 2026-10-24 12:15:33.414012
 
 ``billing_usage_event`` is the append-only metering ledger (its unique key
@@ -22,7 +22,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '66e901950f68'
-down_revision: str | None = '9d83e789a5b4'
+down_revision: str | None = 'f4d2d2e73dc9'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

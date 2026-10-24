@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
+from sm_billing.constants import PROVIDER_CHECKOUT_BLOCKING_STATUSES
 from sm_billing.contracts.provider import (
     CheckoutSession,
     CheckoutSnapshot,
     InvalidWebhookSignature,
     PriceInfo,
     ProviderError,
+    ProviderNotFound,
     SubscriptionSnapshot,
     WebhookEvent,
 )
@@ -30,12 +32,16 @@ class FakeProvider:
     events: dict[str, WebhookEvent] = field(default_factory=dict)
     calls: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
     fail: set[str] = field(default_factory=set)
+    #: Methods that answer "no such object" (Stripe ``resource_missing``).
+    missing: set[str] = field(default_factory=set)
     live: dict[str, list[str]] = field(default_factory=dict)
     _customers: int = 0
     _sessions: int = 0
 
     def _record(self, method: str, **kw: Any) -> None:
         self.calls.append((method, kw))
+        if method in self.missing:
+            raise ProviderNotFound(f"{method}: no such object")
         if method in self.fail:
             raise ProviderError(f"{method} failed")
 
@@ -55,8 +61,11 @@ class FakeProvider:
     async def expire_checkout(self, session_id: str) -> None:
         self._record("expire_checkout", session_id=session_id)
 
-    async def live_subscription_ids(self, customer_id: str) -> list[str]:
-        self._record("live_subscription_ids", customer_id=customer_id)
+    async def live_subscription_ids(
+        self, customer_id: str, statuses: frozenset[str] = PROVIDER_CHECKOUT_BLOCKING_STATUSES
+    ) -> list[str]:
+        """``live`` as scripted: the test already chose which ids are live."""
+        self._record("live_subscription_ids", customer_id=customer_id, statuses=statuses)
         return self.live.get(customer_id, [])
 
     async def portal_url(self, customer_id: str, return_url: str) -> str:
@@ -73,6 +82,13 @@ class FakeProvider:
 
     async def cancel_at_period_end(self, subscription_id: str) -> None:
         self._record("cancel_at_period_end", subscription_id=subscription_id)
+
+    async def cancel_now(self, subscription_id: str) -> None:
+        """Records the call and, like Stripe, leaves the subscription canceled."""
+        self._record("cancel_now", subscription_id=subscription_id)
+        snap = self.snapshots.get(subscription_id)
+        if snap is not None:
+            self.snapshots[subscription_id] = replace(snap, status="canceled")
 
     def parse_webhook(self, body: bytes, headers: Mapping[str, str]) -> WebhookEvent:
         if headers.get(SIGNATURE_HEADER) != GOOD_SIGNATURE:

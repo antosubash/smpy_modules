@@ -7,8 +7,8 @@ filters on it. Nothing billing-specific is added to ``tenants_tenant``.
 
 ``tenant_id`` is a plain string, not a foreign key: each module owns its own
 ``MetaData``, so a cross-module FK cannot resolve (``tenants`` stores
-``user_id`` the same way). Deleting a tenant therefore leaves its billing rows
-behind — see the README's tenant-deletion note.
+``user_id`` the same way). Deleting a tenant keeps its billing rows, for audit:
+``sm_billing.teardown`` cancels the subscription and leaves them ``canceled``.
 """
 
 from __future__ import annotations
@@ -73,6 +73,13 @@ class Customer(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]
     # The one open Checkout session, expired when a new one is started so two
     # tabs cannot both be paid into two subscriptions.
     checkout_session_id: str | None = Field(default=None, max_length=255)
+    # Set once the tenant was deleted and everything it had at the provider was
+    # canceled (``sm_billing.teardown``): the reconcile sweep skips it from then on.
+    teardown_done_at: datetime | None = Field(default=None, sa_column=_tz_column())
+    # The sweep's backoff for a teardown that keeps failing: failures so far,
+    # and when the next attempt is due (``sm_billing.sweep``).
+    teardown_attempts: int = Field(default=0)
+    teardown_next_attempt_at: datetime | None = Field(default=None, sa_column=_tz_column())
 
 
 class Subscription(Base, AuditMixin, table=True):  # ty: ignore[unsupported-base]

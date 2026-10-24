@@ -9,6 +9,7 @@ from api_helpers import arm_csrf, create_tenant
 from fake_provider import FakeProvider
 from simple_module_db import finalize_session
 from sm_billing.admin import assign
+from sm_billing.constants import PROVIDER_CHECKOUT_BLOCKING_STATUSES
 from sm_billing.models import Customer
 from sm_billing.resolve import subscription_for
 from sm_billing.schemas import AssignIn
@@ -76,6 +77,21 @@ async def test_checkout_refused_when_provider_has_live_subscription(app, user_cl
         await arm_csrf(owner)
         response = await owner.post("/api/billing/checkout", json={"plan_id": team})
         assert (response.status_code, response.json()["detail"]) == (409, "already_subscribed")
+
+
+async def test_a_failed_first_payment_can_check_out_again(app, user_client, fake):
+    """``incomplete`` blocks neither side: change-plan has nothing to change,
+    so checkout must stay open (``test_stripe_listing`` covers the filter)."""
+    team = await _team(app)
+    async with user_client("owner@x.io") as (owner, _):
+        tenant = await create_tenant(owner)
+        await _subscribe(app, tenant["id"], team, status="incomplete")
+        await arm_csrf(owner)
+        response = await owner.post("/api/billing/checkout", json={"plan_id": team})
+        assert response.status_code == 200, response.text
+    statuses = fake.called("live_subscription_ids")[-1]["statuses"]
+    assert statuses == PROVIDER_CHECKOUT_BLOCKING_STATUSES
+    assert "incomplete" not in statuses
 
 
 async def test_new_checkout_expires_the_previous_session(app, user_client, fake):

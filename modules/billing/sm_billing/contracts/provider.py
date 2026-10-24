@@ -13,9 +13,17 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol, runtime_checkable
 
+from sm_billing.constants import PROVIDER_CHECKOUT_BLOCKING_STATUSES
+
 
 class ProviderError(Exception):
     """The provider refused or failed a call (network, auth, unknown object)."""
+
+
+class ProviderNotFound(ProviderError):  # noqa: N818 - reads as the condition
+    """The provider cannot see the object the call named (Stripe
+    ``resource_missing``). Not proof it is gone: Stripe answers the same for an
+    object of another account or test/live mode, so callers retry it."""
 
 
 class InvalidWebhookSignature(ProviderError):  # noqa: N818 - reads as the condition
@@ -47,6 +55,8 @@ class CheckoutSnapshot:
     #: ``client_reference_id``: the tenant that opened the session.
     tenant_id: str | None
     customer_id: str | None
+    #: ``open`` / ``complete`` / ``expired``; only an open one can still be paid.
+    status: str | None = None
 
 
 @dataclass(frozen=True)
@@ -108,8 +118,16 @@ class BillingProvider(Protocol):
         """Close an open Checkout session so it can no longer be paid."""
         ...
 
-    async def live_subscription_ids(self, customer_id: str) -> list[str]:
-        """The customer's subscriptions that still bill or grant access."""
+    async def live_subscription_ids(
+        self,
+        customer_id: str,
+        statuses: frozenset[str] = PROVIDER_CHECKOUT_BLOCKING_STATUSES,
+    ) -> list[str]:
+        """Every one of the customer's subscriptions whose status is in ``statuses``.
+
+        The default answers checkout's "already subscribed"; deleting a tenant
+        passes ``PROVIDER_CANCELABLE_STATUSES``. All of them, however many pages.
+        """
         ...
 
     async def portal_url(self, customer_id: str, return_url: str) -> str: ...
@@ -119,6 +137,10 @@ class BillingProvider(Protocol):
     async def set_quantity(self, subscription_id: str, quantity: int) -> None: ...
 
     async def cancel_at_period_end(self, subscription_id: str) -> None: ...
+
+    async def cancel_now(self, subscription_id: str) -> None:
+        """End the subscription immediately; no further invoices."""
+        ...
 
     def parse_webhook(self, body: bytes, headers: Mapping[str, str]) -> WebhookEvent: ...
 
