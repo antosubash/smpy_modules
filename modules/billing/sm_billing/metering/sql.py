@@ -24,10 +24,10 @@ import sqlite3
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import case, update
+from sqlalchemy import case, func, select, update
 from sqlalchemy.dialects import postgresql, sqlite
 
-from sm_billing.models import UsageEvent, UsagePeriod
+from sm_billing.models import Subscription, UsageEvent, UsagePeriod
 
 _INSERTS = {"postgresql": postgresql.insert, "sqlite": sqlite.insert}
 # RETURNING arrived in 3.35, as did ON CONFLICT … DO UPDATE … WHERE with it.
@@ -81,7 +81,7 @@ def upsert_period(
         tenant_id=tenant_id,
         meter=meter,
         period_start=period[0],
-        period_end=period[1],
+        period_end=_stored_end(tenant_id, period),
         used=qty,
         updated_at=now,
     )
@@ -95,6 +95,29 @@ def upsert_period(
         },
         where=None if limit is None else total <= limit,
     ).returning(table.c.used)
+
+
+def _stored_end(tenant_id: str, period: tuple[datetime, datetime]) -> Any:
+    """The end to store: ``period``'s, or the subscription's if it is later.
+
+    ``period`` was resolved in an earlier read, so a sync that extended the
+    period since (same start, later end) and found no row to extend yet
+    would otherwise leave a first row with the stale end. Read in the same
+    statement as the write, under ``FOR SHARE`` on Postgres: a sync whose
+    subscription update is in flight is waited for (it then updates the
+    subscription row before ``extend_rollups``), and a sync that starts after
+    this read waits for this write to commit, then extends the row. SQLite
+    ignores the lock clause; its single writer already orders the two.
+    """
+    start, end = period
+    sub_end = Subscription.current_period_end
+    later = (
+        select(case((sub_end > end, sub_end), else_=end))
+        .where(Subscription.tenant_id == tenant_id, Subscription.current_period_start == start)
+        .with_for_update(read=True)
+        .scalar_subquery()
+    )
+    return func.coalesce(later, end)
 
 
 def _later_end(table: Any, end: Any) -> Any:
