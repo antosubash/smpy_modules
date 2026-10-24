@@ -1,7 +1,7 @@
 """records type public submissions
 
 Revision ID: d6c76536d36d
-Revises: f4d2d2e73dc9
+Revises: 66e901950f68
 Create Date: 2026-10-24 14:43:05.163109
 
 ``records_type.public_submissions`` (#101): whether, and how, a record type
@@ -23,7 +23,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "d6c76536d36d"
-down_revision: str | None = "f4d2d2e73dc9"
+down_revision: str | None = "66e901950f68"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
