@@ -252,6 +252,7 @@ async def import_records(
         settings=settings,
         errors=errors,
         stop_on_error=stop_early,
+        match_by=options.match_by,
     )
     if stop_early and errors:
         _refuse(options, tally, errors, started)

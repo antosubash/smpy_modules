@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records._text import NUL_PROBLEM, has_nul
 from sm_records.models import RecordType, RecordTypeRevision
 from sm_records.public_submissions.config import FIELD, settle
-from sm_records.public_submissions.spec import inject
+from sm_records.public_submissions.spec import INTERNAL, inject
 from sm_records.schema.fields import FieldDefinition, FieldSchemaError, validate_fields
 from sm_records.schema.types import FieldType
 from sm_records.services._common import type_id_map, utcnow
@@ -161,6 +161,11 @@ def check_pointers(
                 f"{name} {value!r} is not a field of this type",
                 [{"field": name, "message": f"{value!r} is not a declared field"}],
             )
+        if field.system == INTERNAL:
+            # Its value is half of every link a subscriber is sent; as a title
+            # or a slug it would be on every list row and in every export.
+            problem = f"{value!r} is an internal system field and cannot be used as {name}"
+            raise ValidationFailed(problem, [{"field": name, "message": problem}])
         allowed = _POINTER_TYPES[name]
         if field.type not in allowed:
             kinds = sorted(member.value for member in allowed)

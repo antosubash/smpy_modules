@@ -60,6 +60,17 @@ export function editableFields<T extends Pick<FieldDef, 'system'>>(fields: T[]):
   return fields.filter((field) => !isSystemField(field));
 }
 
+/** A payload with its `internal` system values (`sm_nonce`) left out — for
+ *  showing a revision's snapshot. The stored history is not touched. */
+export function withoutInternal(
+  data: Record<string, unknown>,
+  fields: Pick<FieldDef, 'key' | 'system'>[],
+): Record<string, unknown> {
+  const hidden = new Set(fields.filter((f) => f.system === 'internal').map((f) => f.key));
+  if (hidden.size === 0) return data;
+  return Object.fromEntries(Object.entries(data).filter(([key]) => !hidden.has(key)));
+}
+
 /** Required ordinary fields with no default that a visitor is not given —
  *  the server refuses to enable a form that leaves one out (design §3.3). */
 export function missingRequired(fields: FieldDef[], publicFields: string[]): string[] {

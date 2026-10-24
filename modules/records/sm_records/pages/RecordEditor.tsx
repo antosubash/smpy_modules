@@ -169,14 +169,17 @@ function RecordEditor({
             />
           )}
 
-          {current && type.translatable && contentLocales.length > 1 && (
-            <RecordTranslations
-              typeKey={type.key}
-              record={current}
-              locales={contentLocales}
-              translations={withCurrentPatched(translations ?? [], current)}
-            />
-          )}
+          {current &&
+            type.translatable &&
+            contentLocales.length > 1 &&
+            type.public_submissions?.kind !== 'subscription' && (
+              <RecordTranslations
+                typeKey={type.key}
+                record={current}
+                locales={contentLocales}
+                translations={withCurrentPatched(translations ?? [], current)}
+              />
+            )}
 
           {unplaceable.length > 0 && (
             <ul
@@ -260,6 +263,7 @@ function RecordEditor({
               typeKey={type.key}
               uuid={current.uuid}
               currentVersion={current.version}
+              fields={type.fields}
               onRestored={applyRestored}
             />
           )}

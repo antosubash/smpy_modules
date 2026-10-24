@@ -83,6 +83,7 @@ async def validate_rows(
     settings: RecordsSettings,
     errors: list[ImportRowError],
     stop_on_error: bool = False,
+    match_by: str = MATCH_UUID,
 ) -> list[tuple[ImportRow, Envelope]]:
     """Validate every row against the *current* schema, writing nothing.
 
@@ -100,6 +101,7 @@ async def validate_rows(
     still going to be written.
     """
     types = await type_id_map(db)
+    previous = await _stored_system(db, rtype, rows, defs=defs, match_by=match_by)
     out: list[tuple[ImportRow, Envelope]] = []
     for row in rows:
         reserved = refuses_orphaned(row)
@@ -109,8 +111,12 @@ async def validate_rows(
                 break
             continue
         try:
+            # What the write will see: the stored system values carried over
+            # (``_payload.carry_system``), so planning neither fails a required
+            # one the file left out nor calls an unchanged row changed (#101).
+            data = _payload.carry_system(defs, row.data, previous.get(row.number))
             values, stored = _payload.validate(
-                rtype, defs, row.data, max_payload_bytes=settings.max_payload_bytes
+                rtype, defs, data, max_payload_bytes=settings.max_payload_bytes
             )
             await _relations.check_targets(db, defs, values, types)
             envelope = envelope_for(row)
@@ -129,6 +135,27 @@ async def validate_rows(
         row.values, row.stored = values, stored
         out.append((row, envelope))
     return out
+
+
+async def _stored_system(
+    db: AsyncSession,
+    rtype: RecordType,
+    rows: Sequence[ImportRow],
+    *,
+    defs: list[FieldDefinition],
+    match_by: str,
+) -> dict[int, dict]:
+    """``{row number: stored payload}`` for the rows whose system values carry.
+
+    Only on a type with system fields, and only under ``match_by=uuid``: the
+    other match keys are read off the *validated* values, so they cannot be
+    resolved before validation, and a row matched by them starts with no
+    system values — as a create does. One batched lookup, as ``plan_rows``'.
+    """
+    if match_by != MATCH_UUID or not any(field.system for field in defs):
+        return {}
+    found = await resolve_matches(db, rtype, rows, match_by=MATCH_UUID, defs=defs)
+    return {n: dict(r.data or {}) for n, r in found.items() if r.type_id == rtype.id}
 
 
 async def plan_rows(
