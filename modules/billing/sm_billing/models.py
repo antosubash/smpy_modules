@@ -139,6 +139,8 @@ class UsageEvent(Base, table=True):  # ty: ignore[unsupported-base]
             "tenant_id", "meter", "idempotency_key", name="uq_billing_usage_event_key"
         ),
         Index("ix_billing_usage_event_occurred", "tenant_id", "meter", "occurred_at"),
+        # The retention purge (``metering.sweeper``) deletes by server time.
+        Index("ix_billing_usage_event_recorded", "recorded_at"),
     )
 
     # BIGINT on Postgres; SQLite only autoincrements an ``INTEGER PRIMARY KEY``.
@@ -180,3 +182,48 @@ class UsagePeriod(Base, table=True):  # ty: ignore[unsupported-base]
     period_end: datetime = Field(sa_column=_tz_column(nullable=False))
     used: int = Field(default=0, sa_column=_bigint(server_default="0"))
     updated_at: datetime = Field(default_factory=_utcnow, sa_column=_tz_column(nullable=False))
+
+
+class UsageGauge(Base, table=True):  # ty: ignore[unsupported-base]
+    """A gauge's current level: what the tenant's live holds add up to.
+
+    Moved only by ``metering.hold_sql``'s conditional upsert (reserve) and the
+    guarded settle (release, expiry), so it never passes the plan's limit. A
+    bug that bypassed the service would make it drift; the admin recount
+    rebuilds it from the holds.
+    """
+
+    __tablename__ = "billing_usage_gauge"
+
+    tenant_id: str = Field(primary_key=True, max_length=_TENANT_ID_LEN)
+    meter: str = Field(primary_key=True, max_length=64)
+    in_use: int = Field(default=0, sa_column=_bigint(server_default="0"))
+    updated_at: datetime = Field(default_factory=_utcnow, sa_column=_tz_column(nullable=False))
+
+
+class UsageHold(Base, table=True):  # ty: ignore[unsupported-base]
+    """One reservation against a gauge: ``held`` until committed, released or expired.
+
+    ``id`` is the handle callers get back. A ``held`` row lapses at
+    ``expires_at`` (the sweeper expires it and returns the capacity); a
+    ``committed`` one stays counted with no expiry until it is released.
+    """
+
+    __tablename__ = "billing_usage_hold"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "meter", "idempotency_key", name="uq_billing_usage_hold_key"),
+        Index("ix_billing_usage_hold_due", "status", "expires_at"),
+        Index("ix_billing_usage_hold_meter", "tenant_id", "meter", "status"),
+    )
+
+    id: str = Field(primary_key=True, max_length=32)
+    tenant_id: str = Field(max_length=_TENANT_ID_LEN)
+    meter: str = Field(max_length=64)
+    quantity: int = Field(sa_column=_bigint())
+    status: str = Field(max_length=16)
+    idempotency_key: str = Field(max_length=128)
+    expires_at: datetime | None = Field(default=None, sa_column=_tz_column())
+    created_at: datetime = Field(default_factory=_utcnow, sa_column=_tz_column(nullable=False))
+    # When it was released or expired; the purge drops settled rows after 30 days.
+    settled_at: datetime | None = Field(default=None, sa_column=_tz_column())
+    source: str = Field(max_length=64)

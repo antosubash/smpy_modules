@@ -18,6 +18,9 @@ ACTOR_MAX = 255
 # Far past any plan limit (int4), well inside the BIGINT counter: a larger
 # quantity is a bug in the caller, not a reason for a database error.
 QTY_MAX = 2**53
+# A hold meant to outlive a month is a ``commit``, not a TTL.
+TTL_MAX = 30 * 24 * 3600
+HOLD_ID_MAX = 32
 
 
 def check_text(name: str, value: str, maximum: int) -> None:
@@ -51,3 +54,14 @@ def check_adjust(
         raise ValueError("reason is required")
     check_text("tenant_id", tenant_id, TENANT_MAX)
     check_text("meter", meter, METER_MAX)
+
+
+def check_ttl(ttl: int) -> int:
+    """A hold's TTL in whole seconds."""
+    if isinstance(ttl, bool) or not isinstance(ttl, int) or not 1 <= ttl <= TTL_MAX:
+        raise ValueError(f"ttl must be an integer from 1 to {TTL_MAX} seconds")
+    return ttl
+
+
+def check_hold_id(hold_id: str) -> None:
+    check_text("hold_id", hold_id, HOLD_ID_MAX)

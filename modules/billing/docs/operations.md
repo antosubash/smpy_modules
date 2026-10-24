@@ -51,6 +51,9 @@ environment variables — an `SM_BILLING_*` line does nothing.
 | `stripe_webhook_secret` | — | `whsec_…`, same storage. |
 | `return_base_url` | — | `https://app.example.com`. Origin for Checkout/portal return links. Blank uses the request's host — set it behind a proxy. |
 | `reconcile_interval_minutes` | `0` | Run [reconcile](#reconcile) inside the app every N minutes over subscriptions not synced for N minutes. `0` is off. Takes effect on save: the loop starts, stops or re-times itself. `60` suits most deployments. |
+| `usage_hold_ttl_seconds` | `900` | Default TTL of a usage hold when neither its meter nor the caller sets one (at least 30). A holder that crashes gives its slot back once the hold lapses. Read per call. |
+| `usage_sweep_interval_seconds` | `60` | Seconds between sweeps that expire lapsed holds (every instance sweeps; the guarded transition releases each hold once). `0` turns it off. Read every tick. |
+| `usage_event_retention_days` | `400` | The daily purge drops ledger rows older than this, and settled holds older than 30 days. `0` keeps the ledger. Counters and gauges are never purged. A purged row frees its idempotency key. |
 
 > **Rotating the app's `secret_key` makes stored Stripe secrets unreadable.**
 > Billing then falls back to `manual` at startup and the connection screen

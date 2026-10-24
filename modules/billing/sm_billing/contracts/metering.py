@@ -22,10 +22,47 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from typing import TYPE_CHECKING, ClassVar, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from contextlib import AbstractAsyncContextManager
+
     from sqlalchemy.ext.asyncio import AsyncSession
+
+
+class MeterKind(StrEnum):
+    """A counter resets every billing period; a gauge is a level held by holds."""
+
+    COUNTER = "counter"
+    GAUGE = "gauge"
+
+
+@dataclass(frozen=True)
+class MeterDefinition:
+    """A meter a consumer registered on ``app.state.billing_meters``.
+
+    ``key`` is the ``Plan.limits`` key. ``label_key`` is an i18n key in the
+    *consumer's* catalogue. ``hold_ttl_seconds`` (gauges) is the default TTL of
+    a hold on this meter; without it the ``usage_hold_ttl_seconds`` setting.
+    """
+
+    key: str
+    kind: MeterKind
+    unit: str = "count"
+    label_key: str = ""
+    hold_ttl_seconds: int | None = None
+
+
+class HoldStatus(StrEnum):
+    HELD = "held"
+    COMMITTED = "committed"
+    RELEASED = "released"
+    EXPIRED = "expired"
+
+
+#: The statuses whose quantity counts toward the gauge.
+LIVE_HOLD_STATUSES = frozenset({HoldStatus.HELD, HoldStatus.COMMITTED})
 
 
 @dataclass(frozen=True)
@@ -70,6 +107,58 @@ class Refunded:
     replayed: bool = True
 
     ok: ClassVar[bool] = False
+
+
+@dataclass(frozen=True)
+class Hold:
+    """A reservation against a gauge; ``id`` is the handle for the calls after.
+
+    ``ok`` is whether it still counts (``held`` or ``committed``): a replayed
+    key whose hold was since released or expired comes back not ``ok``.
+    """
+
+    id: str
+    tenant_id: str
+    meter: str
+    quantity: int
+    status: str
+    expires_at: datetime | None
+    replayed: bool = False
+
+    @property
+    def ok(self) -> bool:
+        return self.status in LIVE_HOLD_STATUSES
+
+
+class UnknownMeterError(LookupError):
+    """The meter is not registered (or is the other kind): a programming error."""
+
+
+class HoldNotFound(LookupError):  # noqa: N818 - reads as the condition
+    """No hold has this id. Billing maps it to 404 ``hold_not_found``."""
+
+
+class HoldExpired(Exception):  # noqa: N818 - reads as the condition
+    """The hold no longer counts (``status``: expired or released), so it
+    cannot be committed or extended. Billing maps it to 409 ``hold_expired``."""
+
+    def __init__(self, hold_id: str, status: str) -> None:
+        super().__init__(f"hold {hold_id} is {status}")
+        self.hold_id = hold_id
+        self.status = status
+
+
+class QuotaExceededError(Exception):
+    """Raised where an outcome cannot be returned (``holding``, ``RequiresQuota``).
+
+    Billing maps it to 402 ``quota_exceeded`` with the meter, limit, used,
+    requested and (counters) ``resets_at``.
+    """
+
+    def __init__(self, meter: str, outcome: Exceeded) -> None:
+        super().__init__(f"{meter}: {outcome.used} + {outcome.requested} > {outcome.limit}")
+        self.meter = meter
+        self.outcome = outcome
 
 
 class IdempotencyConflict(Exception):  # noqa: N818 - reads as the condition
@@ -145,5 +234,61 @@ class UsageMeter(Protocol):
         counted against. ``False`` when there is nothing (left) to reverse."""
         ...
 
+    async def reserve(
+        self,
+        tenant_id: str,
+        meter: str,
+        qty: int,
+        idempotency_key: str,
+        *,
+        source: str,
+        ttl: int | None = None,
+    ) -> Hold | Exceeded:
+        """Hold ``qty`` of a gauge, atomically within its limit, for ``ttl``
+        seconds (default: the meter's, else the setting). Always its own
+        transaction: the hold must be visible to other requests at once."""
+        ...
 
-__all__ = ["Allowed", "Exceeded", "IdempotencyConflict", "Refunded", "UsageMeter"]
+    async def commit(self, hold_id: str) -> Hold:
+        """Keep the hold with no expiry (counted until released). Idempotent;
+        ``HoldExpired`` once it expired or was released."""
+        ...
+
+    async def release(self, hold_id: str) -> bool:
+        """Return the capacity. ``False`` if it was settled already."""
+        ...
+
+    async def extend(self, hold_id: str, ttl: int) -> Hold:
+        """Push a held hold's expiry to ``ttl`` seconds from now (a heartbeat)."""
+        ...
+
+    def holding(
+        self,
+        tenant_id: str,
+        meter: str,
+        qty: int,
+        idempotency_key: str,
+        *,
+        source: str,
+        ttl: int | None = None,
+    ) -> AbstractAsyncContextManager[Hold]:
+        """``reserve`` on entry (``QuotaExceededError`` when refused) and
+        ``release`` on exit, raised or not."""
+        ...
+
+
+__all__ = [
+    "Allowed",
+    "Exceeded",
+    "Hold",
+    "HoldExpired",
+    "HoldNotFound",
+    "HoldStatus",
+    "IdempotencyConflict",
+    "MeterDefinition",
+    "MeterKind",
+    "QuotaExceededError",
+    "Refunded",
+    "UnknownMeterError",
+    "UsageMeter",
+]
