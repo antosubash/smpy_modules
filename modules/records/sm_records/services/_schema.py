@@ -234,7 +234,9 @@ async def write_type_row(
             fields if fields is not None else list(rtype.fields or []),
             changes.get("is_public", rtype.is_public),
         )
-        if settled != rtype.public_submissions:
+        # Also when the caller sent one: ``settled`` is pruned, and may equal
+        # the stored config while the sent one (with a stale key) does not.
+        if FIELD in changes or settled != rtype.public_submissions:
             changes[FIELD] = settled
     for name, value in changes.items():
         setattr(rtype, name, value)

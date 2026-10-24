@@ -95,15 +95,11 @@ async def check_change(db: AsyncSession, rtype: RecordType, changes: dict[str, A
         # record created between this count and the commit would be a
         # subscriber with no address.
         await lock_type(db, rtype)
-    if (
-        before is None
-        and after == KIND_SUBSCRIPTION
-        and await record_count(db, rtype, include_deleted=True)
-    ):
-        raise Conflict(
-            "only a type with no records can become a newsletter list: every "
-            "subscriber needs an address, and the records already stored have none"
-        )
+        if await record_count(db, rtype, include_deleted=True):
+            raise Conflict(
+                "only a type with no records can become a newsletter list: every "
+                "subscriber needs an address, and the records already stored have none"
+            )
     return before is None and after is not None
 
 

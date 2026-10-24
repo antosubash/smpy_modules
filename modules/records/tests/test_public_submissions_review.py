@@ -14,7 +14,7 @@ from sm_records.tenancy import tenant_scope
 
 from tests.app_harness import ADMIN, field, roles
 from tests.io_helpers import export_text, post_import
-from tests.public_submissions_support import API, create, update
+from tests.public_submissions_support import API, create, form_config, update
 
 SUBSCRIBER = {"sm_email": "ada@x.io", "sm_status": "confirmed", "sm_nonce": "a" * 32}
 
@@ -102,3 +102,12 @@ async def test_a_newsletter_record_is_not_translated(client, records_app):
                 await service.create_translation(
                     db, rtype, source, locale="de", settings=app.state.sm_records.settings
                 )
+
+
+async def test_a_pruned_config_equal_to_the_stored_one_is_saved_pruned(client):
+    assert (await create(client)).status_code == 201
+    sent = form_config(public_fields=["name", "email", "message", "ghost"])
+    resp = await update(client, "contact", public_submissions=sent)
+    assert resp.status_code == 200, resp.text
+    got = (await client.get(f"{API}/contact", headers=roles(ADMIN))).json()
+    assert got["public_submissions"]["public_fields"] == ["name", "email", "message"]
