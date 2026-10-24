@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from typing import Any, NamedTuple
 
+from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.base import NO_VALUE
 
 from sm_records.models import RecordType
 from sm_records.schema.compile import from_stored
@@ -37,6 +39,14 @@ class Prepared(NamedTuple):
     values: dict[str, Any]
     stored: dict[str, Any]
     types: dict[str, int]
+
+
+def _loaded_schema_version(rtype: RecordType) -> int | None:
+    """``rtype.schema_version`` as this session holds it, or ``None`` when it
+    is not loaded (an expired attribute would be a lazy load, which an async
+    session cannot do) — the lock then checks nothing extra."""
+    value = inspect(rtype).attrs.schema_version.loaded_value
+    return None if value is NO_VALUE else int(value)
 
 
 async def prepare(
@@ -71,12 +81,14 @@ async def prepare(
     merged *before* validation, so they are checked like any value and a
     required one (a newsletter's ``sm_email``) is satisfied by them.
     """
+    # The schema this write validates against, compared again under the lock.
+    validated_against = _loaded_schema_version(rtype)
     defs = _payload.field_defs(rtype)
     data = _payload.carry_system(defs, data, previous, system)
     values, stored = _payload.validate(
         rtype, defs, data, max_payload_bytes=settings.max_payload_bytes
     )
-    await _claims.lock_type(db, rtype)
+    await _claims.lock_type(db, rtype, schema_version=validated_against)
     types = await type_id_map(db)
     await _relations.check_targets(db, defs, values, types)
     await _claims.ensure_unique(

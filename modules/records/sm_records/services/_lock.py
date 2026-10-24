@@ -62,7 +62,9 @@ _LOCK_NOT_AVAILABLE = "55P03"
 """Postgres' SQLSTATE for a ``NOWAIT`` lock somebody else holds."""
 
 
-async def _lock_one(db: AsyncSession, rtype: Locked, *, nowait: bool = False) -> None:
+async def _lock_one(
+    db: AsyncSession, rtype: Locked, *, nowait: bool = False, schema_version: int | None = None
+) -> None:
     if db.get_bind().dialect.name == "sqlite":
         # The tenant said explicitly: this is DML, which no tenant filter
         # reaches (tenancy design §E).
@@ -73,12 +75,12 @@ async def _lock_one(db: AsyncSession, rtype: Locked, *, nowait: bool = False) ->
                 sa_update(RecordType)
                 .where(RecordType.id == rtype.id, RecordType.tenant_id == bound_tenant())
                 .values(version=RecordType.version, updated_at=RecordType.updated_at)
-                .returning(RecordType.id, RecordType.collection)
+                .returning(RecordType.id, RecordType.collection, RecordType.schema_version)
             )
         ).first()
     else:
         stmt = (
-            select(RecordType.id, RecordType.collection)
+            select(RecordType.id, RecordType.collection, RecordType.schema_version)
             .where(RecordType.id == rtype.id)
             .with_for_update(nowait=nowait)
         )
@@ -102,9 +104,16 @@ async def _lock_one(db: AsyncSession, rtype: Locked, *, nowait: bool = False) ->
             f"record type {rtype.key!r} moved to another collection while this write "
             "was waiting for it; nothing was written — send the request again"
         )
+    if schema_version is not None and found[2] != schema_version:
+        raise Conflict(
+            f"the schema of record type {rtype.key!r} changed while this write was "
+            "waiting for it; nothing was written — reload and send the request again"
+        )
 
 
-async def lock_types(db: AsyncSession, rtypes: Iterable[Locked]) -> None:
+async def lock_types(
+    db: AsyncSession, rtypes: Iterable[Locked], *, schema_versions: dict[int, int] | None = None
+) -> None:
     """Lock several types, **in ascending id order**, re-reading each one's
     ``collection`` — the one locking protocol of this module (#82).
 
@@ -133,13 +142,16 @@ async def lock_types(db: AsyncSession, rtypes: Iterable[Locked]) -> None:
     ceiling = max(held, default=None)
     for type_id in sorted(wanted):
         late = ceiling is not None and type_id < ceiling and type_id not in held
-        await _lock_one(db, wanted[type_id], nowait=late)
+        expected = (schema_versions or {}).get(type_id)
+        await _lock_one(db, wanted[type_id], nowait=late, schema_version=expected)
         # Read again after the statement: the first lock of a transaction is
         # what begins it, so the set has to be the new transaction's.
         _held(db).add(type_id)
 
 
-async def lock_type(db: AsyncSession, rtype: RecordType) -> None:
+async def lock_type(
+    db: AsyncSession, rtype: RecordType, *, schema_version: int | None = None
+) -> None:
     """Serialise writes of one type — the mitigation design §7.8 names.
 
     The ``unique`` check is check-then-act, so two concurrent creates carrying
@@ -180,5 +192,12 @@ async def lock_type(db: AsyncSession, rtype: RecordType) -> None:
     returns the latest row version on Postgres; on SQLite the write lock is
     exclusive, and a snapshot older than the move cannot take it at all), and
     a disagreement is a ``409`` the caller can simply retry.
+
+    **A record write also passes the ``schema_version`` it validated against**
+    (#101): it validates before it takes the lock, so a schema change that
+    commits in between — a type made a newsletter, whose required ``sm_email``
+    the payload never had — would otherwise be written past. A mismatch is the
+    same retryable ``409``.
     """
-    await lock_types(db, [rtype])
+    versions = None if schema_version is None else {int(rtype.id): schema_version}
+    await lock_types(db, [rtype], schema_versions=versions)
