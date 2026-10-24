@@ -66,7 +66,7 @@ async function mountForm() {
 }
 
 describe('useRecordForm raw editor and system fields (#101)', () => {
-  it('a reset in raw mode never puts an internal value in the raw text', async () => {
+  it('a reset in raw mode never puts a system value in the raw text', async () => {
     const form = await mountForm();
     await act(async () => form().toggleRaw());
     expect(form().raw).toBe(true);
@@ -75,8 +75,9 @@ describe('useRecordForm raw editor and system fields (#101)', () => {
     const text = form().rawText;
     expect(text).not.toContain('sm_nonce');
     expect(text).not.toContain('secret-nonce');
-    expect(JSON.parse(text)).toMatchObject({ name: 'Grace' });
-    // Showing the stored readonly values is not an edit.
+    // Nor a readonly one: the text matches what toggling into raw mode shows.
+    expect(text).not.toContain('sm_submitted_at');
+    expect(JSON.parse(text)).toEqual({ name: 'Grace' });
     expect(form().dirty).toBe(false);
   });
 

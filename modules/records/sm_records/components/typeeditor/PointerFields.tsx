@@ -42,8 +42,11 @@ export function PointerFields({
   // a `json` display field or a `boolean` slug field meant a 422 on save at
   // best, and — before the server checked — every record titled `{'a': 1}`
   // or slugged `true`.
-  const displayChoices = fields.filter((f) => displayFieldAllowed(f.type));
-  const slugChoices = fields.filter((f) => slugFieldAllowed(f.type));
+  // Never an `internal` system field (`sm_nonce`, #101): it is half of every
+  // link a subscriber is sent, and the server refuses it as either pointer.
+  const pointable = fields.filter((f) => f.system !== 'internal');
+  const displayChoices = pointable.filter((f) => displayFieldAllowed(f.type));
+  const slugChoices = pointable.filter((f) => slugFieldAllowed(f.type));
   const empty = fields.length === 0;
 
   // A pointer's target can stop being allowed out from under it — its type

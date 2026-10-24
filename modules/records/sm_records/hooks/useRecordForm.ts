@@ -17,7 +17,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { humanizeDryRunMessage } from '../utils/dry-run-messages';
 import { displayFieldKey } from '../utils/errors-display';
 import { keys, useT } from '../utils/i18n';
-import { editableFields, withoutInternal, withoutSystem } from '../utils/public-submissions';
+import { editableFields, withoutSystem } from '../utils/public-submissions';
 import { asObject, baselineOf, pretty, stable } from '../utils/record-form-helpers';
 import type { RecordRead, TypeRead, ValidationError } from '../utils/types';
 import { buildValidator } from '../utils/validation';
@@ -51,10 +51,10 @@ export function useRecordForm(
   // re-derive it from whatever the next response actually says.
   const [invalidErrors, setInvalidErrors] = useState<ValidationError[]>(record?.invalid ?? []);
   const [raw, setRaw] = useState(false);
-  // `sm_nonce` and the other `internal` values never reach the raw editor;
-  // the `readonly` ones (`sm_submitted_at`, …) show, as the record stores them.
+  // The server's own values (`sm_nonce` above all) never reach the raw
+  // editor — the same text `toggleRaw` builds, which walks only `fields`.
   const [rawText, setRawText] = useState(() =>
-    pretty(seedData && withoutInternal(seedData, type.fields)),
+    pretty(seedData && withoutSystem(seedData, type.fields)),
   );
   const [rawError, setRawError] = useState<string | null>(null);
   const [baseline, setBaseline] = useState(() => baselineOf(fields, record?.data ?? null));
@@ -143,7 +143,7 @@ export function useRecordForm(
     (next: RecordRead) => {
       setValues(toFormValues(fields, next.data));
       setOriginal(next.data);
-      setRawText(pretty(withoutInternal(next.data, type.fields)));
+      setRawText(pretty(withoutSystem(next.data, type.fields)));
       setClientErrors({});
       setServerErrors([]);
       setInvalidErrors(next.invalid ?? []);
