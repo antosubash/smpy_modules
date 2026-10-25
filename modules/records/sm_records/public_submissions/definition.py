@@ -105,13 +105,9 @@ def _shown(
     return fields, consent
 
 
-def form_digest(rtype: RecordType, settings: RecordsSettings, locale: str | None) -> str:
-    """A digest of everything the visitor is shown in ``locale``: the schema
-    version, every public field as rendered, and the consent box with its
-    text. The form token carries it, so a form loaded before *any* of that
-    changed — a reworded consent text included, which bumps no schema
-    version — is ``form_changed`` rather than consent to words never seen."""
-    fields, consent = _shown(rtype, settings, locale)
+def _digest(
+    rtype: RecordType, fields: list[SubmissionField], consent: SubmissionConsent | None
+) -> str:
     shown = {
         "schema_version": rtype.schema_version,
         "fields": [entry.model_dump(mode="json") for entry in fields],
@@ -119,6 +115,16 @@ def form_digest(rtype: RecordType, settings: RecordsSettings, locale: str | None
     }
     raw = json.dumps(shown, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(raw.encode()).hexdigest()[:DIGEST_LEN]
+
+
+def form_digest(rtype: RecordType, settings: RecordsSettings, locale: str | None) -> str:
+    """A digest of everything the visitor is shown in ``locale``: the schema
+    version, every public field as rendered, and the consent box with its
+    text. The form token carries it, so a form loaded before *any* of that
+    changed -- a reworded consent text included, which bumps no schema
+    version -- is ``form_changed`` rather than consent to words never seen."""
+    fields, consent = _shown(rtype, settings, locale)
+    return _digest(rtype, fields, consent)
 
 
 def definition(
@@ -130,7 +136,7 @@ def definition(
     locale: str | None,
 ) -> SubmissionDefinition:
     fields, consent = _shown(rtype, settings, locale)
-    digest = form_digest(rtype, settings, locale)
+    digest = _digest(rtype, fields, consent)
     return SubmissionDefinition(
         kind=(rtype.public_submissions or {})["kind"],
         schema_version=rtype.schema_version,

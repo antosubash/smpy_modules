@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from simple_module_hosting.csrf import CSRF_HEADER
+from sm_records.models import RecordType
+from sqlalchemy import select
 
-from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, ROLE_VIEWER, roles
+from tests.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, ROLE_VIEWER, roles, seed_record
 from tests.csrf_support import _token
 from tests.public_submissions_support import API, update
 from tests.public_submissions_support import create as create_type
@@ -157,3 +159,17 @@ async def test_the_actions_need_the_csrf_token(session_client):
     url = _action("contact", created.json()["uuid"], "spam")
     assert (await session_client.post(url, headers=roles(ADMIN))).status_code == 403
     assert (await session_client.post(url, headers=headers)).status_code == 200
+
+
+async def test_spam_still_trashes_a_record_that_fails_its_schema(site):
+    """A record no longer valid under its type (a forced change) cannot take
+    the spam mark — a write — but is still moved to the trash."""
+    await contact_type(site)
+    async with site.db_state.session_factory() as session:
+        stmt = select(RecordType).where(RecordType.key == "contact")
+        rtype = (await session.execute(stmt)).scalar_one()
+    record = await seed_record(site.db_state, rtype, {"email": "not-an-email"}, uuid="d" * 32)
+    spam = await site.post(_action("contact", record.uuid, "spam"), headers=roles(ADMIN))
+    assert spam.status_code == 200, spam.text
+    assert spam.json()["is_deleted"] is True
+    assert spam.json()["data"].get("sm_spam") is None, "the mark was skipped, the trash was not"

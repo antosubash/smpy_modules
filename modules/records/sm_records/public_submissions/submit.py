@@ -155,17 +155,20 @@ async def submit(
     await abuse.hit(
         request, abuse.rate_key(tenant, f"ip={ip}"), settings.public_submissions_rate_per_ip
     )
-    await abuse.hit(
-        request,
-        abuse.rate_key(tenant, f"type={type_key[:100]}"),
-        settings.public_submissions_type_rate,
-    )
     if body.hp.strip():
         logger.info(
             "records.public_submissions.honeypot_dropped", extra={"type_key": type_key[:100]}
         )
         return
     rtype = await _check_token(request, db, type_key, body, settings)
+    # After the token: only a form this host signed counts against the type's
+    # budget, so a flood of forged posts cannot use it up (or mint a counter
+    # per invented type key) and lock real visitors out.
+    await abuse.hit(
+        request,
+        abuse.rate_key(tenant, f"type={rtype.key}"),
+        settings.public_submissions_type_rate,
+    )
     data = visitor_data(rtype, body.data)
     if (rtype.public_submissions.get("consent") or {}).get("required") and not body.consent:
         raise SubmissionRefused(

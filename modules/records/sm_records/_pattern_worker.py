@@ -128,7 +128,7 @@ class PatternPool:
         except TimeoutError:
             raise PoolBusy("every pattern worker is busy") from None
         try:
-            worker = self._idle.pop() if self._idle else await _Worker.start()
+            worker = await self._take()
             try:
                 result = await asyncio.wait_for(worker.run(checks), budget)
             except TimeoutError:
@@ -146,6 +146,20 @@ class PatternPool:
             return result
         finally:
             self._slots.release()
+
+    async def _take(self) -> _Worker:
+        """An idle worker that is still alive, else a fresh one. One that died
+        between requests (OOM-killed, signalled) would otherwise fail the next
+        write for a reason that has nothing to do with it."""
+        while self._idle:
+            worker = self._idle.pop()
+            if worker.proc.returncode is None:
+                return worker
+            await worker.kill()
+        try:
+            return await _Worker.start()
+        except OSError as exc:
+            raise WorkerFailed(str(exc)) from exc
 
     async def close(self) -> None:
         workers, self._idle = self._idle, []

@@ -11,6 +11,7 @@ would tell every subscriber the visitor's message changed.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,10 +20,12 @@ from sm_records import events
 from sm_records.models import Record, RecordType
 from sm_records.services import records as record_service
 from sm_records.services._payload import field_defs
-from sm_records.services.errors import Conflict
+from sm_records.services.errors import Conflict, ValidationFailed
 from sm_records.settings import RecordsSettings
 
-__all__ = ["system_update"]
+__all__ = ["system_update", "try_system_update"]
+
+logger = logging.getLogger(__name__)
 
 
 def _ordinary(rtype: RecordType, record: Record) -> dict[str, Any]:
@@ -64,3 +67,33 @@ async def system_update(
                 raise
             await db.refresh(record)
     raise AssertionError("unreachable")  # pragma: no cover
+
+
+async def try_system_update(
+    db: AsyncSession,
+    rtype: RecordType,
+    record: Record,
+    values: dict[str, Any],
+    *,
+    settings: RecordsSettings,
+) -> Record:
+    """:func:`system_update`, for a mark that must not block what it marks.
+
+    A record that no longer satisfies its type's schema (a forced restrictive
+    change) cannot take *any* write until an admin edits it, and a system
+    write is a write. The spam verdict, the not-spam clearing and the
+    delivery mark are bookkeeping: refused here, they are logged and skipped
+    — the record is still trashed, restored or mailed, and the outbox does not
+    retry a mail it already sent. Nothing was written when validation refused.
+    """
+    try:
+        return await system_update(db, rtype, record, values, settings=settings)
+    except ValidationFailed as exc:
+        logger.warning(
+            "records: %s record %s no longer matches its schema; %s not recorded (%s)",
+            rtype.key,
+            record.uuid,
+            ", ".join(values),
+            exc.detail,
+        )
+        return record

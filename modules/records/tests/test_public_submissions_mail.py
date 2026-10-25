@@ -159,7 +159,7 @@ async def test_a_retry_mails_only_the_recipients_not_reached(site):
 
 
 async def test_a_failed_mark_does_not_mail_everyone_again(site, monkeypatch):
-    from sm_records.public_submissions import delivery
+    from sm_records.public_submissions import system as delivery
 
     transport = _durable(site)
     await contact_type(site, notify_to=["a@example.org", "b@example.org"])

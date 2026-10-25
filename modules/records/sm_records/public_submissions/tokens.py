@@ -91,7 +91,10 @@ def verify_form(
     now: float | None = None,
 ) -> FormToken:
     """The token's claims, once its MAC and its age check out."""
-    parts = token.split(".") if isinstance(token, str) else []
+    # ASCII only: ``int()`` rejects what ``isdigit()`` accepts ("\u00b2"), and
+    # ``hmac.compare_digest`` raises ``TypeError`` on a non-ASCII ``str`` -- either
+    # would be a 500 for an anonymous caller instead of ``form_expired``.
+    parts = token.split(".") if isinstance(token, str) and token.isascii() else []
     if len(parts) != 4 or not parts[0].isalnum() or not parts[1].isdigit():
         raise TokenError("malformed form token")
     digest, issued, nonce, mac = parts[0], int(parts[1]), parts[2], parts[3]

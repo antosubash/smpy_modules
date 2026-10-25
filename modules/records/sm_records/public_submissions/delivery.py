@@ -57,7 +57,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records import events
 from sm_records.models import Record, RecordType, SubmissionDelivery
 from sm_records.public_submissions.mail import notification
-from sm_records.public_submissions.system import system_update
+from sm_records.public_submissions.system import try_system_update
 from sm_records.services._common import utcnow
 from sm_records.services.errors import NotFound
 from sm_records.services.records import get_record
@@ -223,8 +223,10 @@ async def deliver(
     factory: SessionFactory,
 ) -> None:
     """Mail every recipient this attempt has not reached, then mark the record
-    notified. A failed send raises; the recipients before it stay sent."""
+    notified. A failed send is raised once every recipient has been tried; the
+    ones that went through stay sent."""
     tenant, attempt, busy = rtype.tenant_id, attempt_of(due), False
+    failure: Exception | None = None
     for to in (rtype.public_submissions or {}).get("notify_to", []):
         slot = Slot(tenant, record.uuid, attempt, to)
         state, token = await claim(factory, slot)
@@ -232,7 +234,15 @@ async def deliver(
             busy = busy or state == "busy"
             continue
         message = notification(rtype, record, to=to, base_url=due.base_url, locale=due.locale)
-        await _send_one(factory, slot, token, sender, message)
+        try:
+            await _send_one(factory, slot, token, sender, message)
+        except Exception as exc:
+            # One address the transport refuses must not keep the recipients
+            # after it from ever being mailed: carry on, then fail the attempt.
+            logger.warning("records: mailing %s for %s failed: %s", to, record.uuid, exc)
+            failure = failure or exc
+    if failure is not None:
+        raise failure
     if busy:
         raise DeliveryInProgress(f"another worker is still mailing submission {record.uuid}")
-    await system_update(db, rtype, record, {"sm_notified_at": utcnow()}, settings=settings)
+    await try_system_update(db, rtype, record, {"sm_notified_at": utcnow()}, settings=settings)

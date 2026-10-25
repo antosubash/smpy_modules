@@ -21,7 +21,7 @@ from sm_records.models import Record, RecordType
 from sm_records.public_submissions import abuse
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.mail_runner import queue_notification
-from sm_records.public_submissions.system import system_update
+from sm_records.public_submissions.system import try_system_update
 from sm_records.services import records as record_service
 from sm_records.settings import RecordsSettings
 from sm_records.tenancy import bound_tenant
@@ -60,7 +60,7 @@ async def mark_spam(
     roles: list[str],
 ) -> Record:
     require_form(rtype)
-    record = await system_update(db, rtype, record, {"sm_spam": "manual"}, settings=settings)
+    record = await try_system_update(db, rtype, record, {"sm_spam": "manual"}, settings=settings)
     await record_service.soft_delete_record(
         db, rtype, record, actor=actor, settings=settings, roles=roles
     )
@@ -80,6 +80,6 @@ async def mark_not_spam(
     if not record.is_deleted:
         raise SubmissionRefused("not_in_trash", "only a submission in the trash can be not spam")
     record = await record_service.restore_record(db, rtype, record, settings=settings, actor=actor)
-    record = await system_update(db, rtype, record, {"sm_spam": None}, settings=settings)
+    record = await try_system_update(db, rtype, record, {"sm_spam": None}, settings=settings)
     await queue_notification(db, app, rtype, record)
     return record
