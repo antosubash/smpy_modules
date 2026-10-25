@@ -165,7 +165,7 @@ async def submit(
     await abuse.hit(
         request, abuse.rate_key(tenant, f"ip={ip}"), settings.public_submissions_rate_per_ip
     )
-    if str(body.hp or "").strip():
+    if body.hp.strip():
         logger.info(
             "records.public_submissions.honeypot_dropped", extra={"type_key": type_key[:100]}
         )

@@ -190,7 +190,9 @@ async def test_the_fresh_form_after_form_changed_can_be_sent_at_once(site):
 
 async def test_an_odd_honeypot_or_deeply_nested_value_is_no_500(site):
     await contact_type(site)
-    assert (await send(site, hp={"x": 1})).status_code == 202, "a non-string trap is still a trap"
+    for odd in (0, [], {"x": 1}):
+        assert (await send(site, hp=odd)).status_code == 202
+    assert await records_of(site) == [], "a non-string value in the trap is a bot, whatever it is"
     deep: object = "http://x.example"
     for _ in range(2000):
         deep = [deep]

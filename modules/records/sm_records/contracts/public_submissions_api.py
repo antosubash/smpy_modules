@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_validator
 from sqlmodel import Field, SQLModel
 
 __all__ = [
@@ -66,15 +66,24 @@ class SubmitBody(SQLModel):
 
     data: dict[str, Any] = Field(default_factory=dict)
     token: str = Field(default="", max_length=MAX_TOKEN_LEN)
-    hp: Any = ""
+    hp: str = ""
     """The honeypot: a hidden input a person never fills in. Unbounded on
     purpose (the body cap bounds it): a length refusal would tell a bot it was
-    caught, where any value is the same silent 202."""
+    caught, where any value is the same silent 202. A non-string (a bot
+    guessing at JSON) is coerced to text rather than refused with a 422, which
+    would equally tell it so; ``null`` is the empty trap."""
     consent: bool = False
     block: str | None = Field(default=None, max_length=100)
     """A hint naming the page block that sent it (``sm_source_block``)."""
     locale: str | None = Field(default=None, max_length=16)
     """The page's language (``sm_locale``, and the consent text's)."""
+
+    @field_validator("hp", mode="before")
+    @classmethod
+    def _text_trap(cls, value: Any) -> Any:
+        if value is None or isinstance(value, str):
+            return value or ""
+        return repr(value)
 
 
 class SubmissionAccepted(SQLModel):
