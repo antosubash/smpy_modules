@@ -7,6 +7,7 @@ import asyncio
 import time
 
 import pytest
+from sm_records import _pattern_worker
 from sm_records.public_submissions import patterns
 
 from tests.app_harness import ADMIN, field, roles
@@ -84,4 +85,4 @@ async def test_eighty_backtracking_fields_are_refused_fast_and_the_loop_stays_fr
 async def test_without_patterns_no_worker_is_started(site):
     await _patterned(site, "plain", "")
     assert (await send(site, "plain", data={"name": "x"})).status_code == 202
-    assert getattr(site.app.state, "sm_records_pattern_pool", None) is None
+    assert not _pattern_worker.started()

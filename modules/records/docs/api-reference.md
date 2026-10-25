@@ -363,6 +363,16 @@ Each entry of `fields`:
 | `number`, `integer` | `min` (number), `max` (number) |
 | everything else | none — any key is a `422` |
 
+A `pattern` is a Python `re` pattern with `re`'s meaning, searched (not
+anchored unless it says so). Values a write sends are matched in a worker
+process under a deadline — never on the server's event loop, so a pattern
+that backtracks badly costs that write a `422` (`__root__`: "took too long to
+check") rather than stalling the server: two seconds per write, and for an
+import or a schema preview one batch of two seconds plus a little per value,
+at most ten. Reads never match a pattern: the lenient read returns the stored
+string either way, and a record's `invalid` list reports a pattern only when
+it was checked in that request.
+
 **Options**, by type:
 
 | Type | Allowed keys |
@@ -1435,15 +1445,23 @@ request: through the outbox when the host has a durable transport
 sent only when the host's mail sender delivers email and `public_base_url`
 is set; otherwise the record stands and `sm_notified_at` stays `null`.
 Each recipient of one delivery attempt is claimed in the internal
-`records_submission_delivery` table before it is mailed, so a retry never
-mails a recipient whose send was recorded and two workers never both send;
-a claim left by a crashed worker is retried once it is ten minutes old. A
-*Resend* is a new attempt and reaches everyone again.
+`records_submission_delivery` table before it is mailed, with an ownership
+token: a retry never mails a recipient whose send was recorded, two workers
+never both send, and a worker that stalled past its claim can neither release
+nor complete its successor's. A claim left by a crashed worker is taken over
+once it is ten minutes old; one send may take at most 60 seconds. A *Resend*
+is a new attempt and reaches everyone again. **One window remains**: a message
+the mail server accepted, followed by a crash before the send is recorded, is
+sent again by whoever takes the claim over — SMTP cannot be made exactly-once.
 
-**Field patterns** keep Python `re`'s meaning on this path too. A visitor's
-values are matched in a worker process, never on the server's event loop,
-with one half-second budget for the whole submission; a submission that runs
-out of it is a `422 invalid` (`__root__`: "took too long to check").
+**Field patterns** keep Python `re`'s meaning. A visitor's values are
+matched in a worker process, never on the server's event loop, with one
+half-second budget for the whole submission; a submission that runs out of
+it is a `422 invalid` (`__root__`: "took too long to check"). The same holds
+for every authenticated write — creates, updates, translations, revision
+restores, bulk actions (two seconds per write) and imports and schema
+previews (one batch, two seconds plus a little per value, at most ten). See
+[Field definitions](#field-definitions).
 
 Three admin actions sit under the record, need `records.edit` and the
 type's `allowed_roles`, and refuse a type that is not a contact form with

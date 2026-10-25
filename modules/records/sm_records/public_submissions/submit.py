@@ -45,7 +45,7 @@ from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.mail_runner import queue_notification
 from sm_records.public_submissions.patterns import check_patterns
 from sm_records.public_submissions.tokens import TokenError, host_secret, ip_hash, verify_form
-from sm_records.schema._text_checks import patterns_prechecked
+from sm_records.schema._text_checks import checked
 from sm_records.schema.types import FieldType
 from sm_records.services import records as record_service
 from sm_records.services._payload import field_defs
@@ -174,12 +174,12 @@ async def submit(
             errors=[{"field": "consent", "message": "required"}],
         )
     # Off the event loop, under one deadline for the whole submission; the
-    # write below then skips the patterns it would otherwise match again.
-    await check_patterns(request.app, rtype, data)
+    # write below validates with these verdicts instead of matching again.
+    verdicts = await check_patterns(rtype, data)
     limit = settings.public_submissions_max_links
     spam = bool(limit) and abuse.count_links(data) > limit
     try:
-        with patterns_prechecked():
+        with checked(verdicts):
             record = await record_service.create_record(
                 db,
                 rtype,

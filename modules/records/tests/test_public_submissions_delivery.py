@@ -15,7 +15,7 @@ from sm_records.public_submissions import delivery
 from sm_records.public_submissions.mail_runner import HANDLER_NAME, NotificationDue
 from sm_records.services._common import utcnow
 from sm_records.tenancy import tenant_scope
-from sqlalchemy import update
+from sqlalchemy import select, update
 
 from tests.app_harness import ADMIN, roles
 from tests.pg_support import USING_POSTGRES
@@ -101,9 +101,9 @@ async def test_a_live_claim_blocks_and_an_expired_one_is_taken_over(site):
     (event,) = transport.events
     factory = site.db_state.session_factory
     with tenant_scope("default"):
-        args = (factory, "default", event.uuid, event.attempt, "alice@example.org")
-        assert await delivery.claim(*args) == "claimed"
-        assert await delivery.claim(*args) == "busy", "a second worker keeps its hands off"
+        slot = delivery.Slot("default", event.uuid, event.attempt, "alice@example.org")
+        assert (await delivery.claim(factory, slot))[0] == "claimed"
+        assert await delivery.claim(factory, slot) == ("busy", None), "hands off a live claim"
         with pytest.raises(delivery.DeliveryInProgress):
             await _run(site, event)
         assert _to(site) == [] and (await records_of(site))[0]["data"]["sm_notified_at"] is None
@@ -126,6 +126,54 @@ async def test_two_workers_racing_for_one_recipient_send_once(site):
     (event,) = transport.events
     factory = site.db_state.session_factory
     with tenant_scope("default"):
-        args = (factory, "default", event.uuid, event.attempt, "alice@example.org")
-        results = await asyncio.gather(*(delivery.claim(*args) for _ in range(5)))
-    assert sorted(results) == ["busy"] * 4 + ["claimed"]
+        slot = delivery.Slot("default", event.uuid, event.attempt, "alice@example.org")
+        results = await asyncio.gather(*(delivery.claim(factory, slot) for _ in range(5)))
+    assert sorted(state for state, _ in results) == ["busy"] * 4 + ["claimed"]
+
+
+async def _age(factory) -> None:
+    stale = utcnow() - delivery.LEASE - timedelta(seconds=1)
+    session = factory()
+    await session.execute(update(SubmissionDelivery).values(claimed_at=stale))
+    await events.commit(session)
+    await session.close()
+
+
+async def test_a_stale_owner_can_neither_release_nor_complete_its_successors_claim(site):
+    factory = site.db_state.session_factory
+    slot = delivery.Slot("default", "c" * 32, "attempt-1", "alice@example.org")
+    with tenant_scope("default"):
+        state, stale = await delivery.claim(factory, slot)
+        assert state == "claimed" and stale
+        assert await delivery.claim(factory, slot) == ("busy", None), "no takeover before expiry"
+        await _age(factory)
+        state, fresh = await delivery.claim(factory, slot)
+        assert state == "claimed" and fresh != stale, "taken over once the lease expired"
+        assert await delivery.release(factory, slot, stale) is False
+        assert await delivery.claim(factory, slot) == ("busy", None), "the successor still holds it"
+        assert await delivery.mark_sent(factory, slot, stale) is False
+        session = factory()
+        row = (await session.execute(select(SubmissionDelivery))).scalar_one()
+        assert row.sent_at is None and row.claim_token == fresh
+        await session.close()
+        assert await delivery.mark_sent(factory, slot, fresh) is True
+        assert await delivery.claim(factory, slot) == ("sent", None)
+
+
+async def test_a_send_that_hangs_is_cut_off_and_released(site, monkeypatch):
+    monkeypatch.setattr(delivery, "SEND_TIMEOUT", timedelta(seconds=0.05))
+    transport = _durable(site)
+    await contact_type(site, notify_to=["alice@example.org"])
+    await send(site)
+    (event,) = transport.events
+
+    async def hang(message) -> None:
+        await asyncio.sleep(5)
+
+    real = site.outbox.send
+    site.outbox.send = hang  # type: ignore[method-assign]
+    with pytest.raises(TimeoutError):
+        await _run(site, event)
+    site.outbox.send = real  # type: ignore[method-assign]
+    await _run(site, event)
+    assert _to(site) == ["alice@example.org"], "the released claim is retried at once"

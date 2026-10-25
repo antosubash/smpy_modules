@@ -31,6 +31,7 @@ def upgrade() -> None:
     sa.Column('attempt', sa.String(length=64), nullable=False),
     sa.Column('recipient', sa.String(length=320), nullable=False),
     sa.Column('claimed_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('claim_token', sa.String(length=32), nullable=True),
     sa.Column('sent_at', sa.DateTime(timezone=True), nullable=True),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_records_submission_delivery')),
     sa.UniqueConstraint('tenant_id', 'record_uuid', 'attempt', 'recipient', name='uq_records_submission_delivery_claim')

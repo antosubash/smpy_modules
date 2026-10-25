@@ -17,7 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import events
 from sm_records.models import Record, RecordType
-from sm_records.schema._text_checks import patterns_prechecked
 from sm_records.services import records as record_service
 from sm_records.services._payload import field_defs
 from sm_records.services.errors import Conflict
@@ -50,9 +49,7 @@ async def system_update(
     """
     for attempt in (1, 2):
         try:
-            # The ordinary values go back unchanged — they were validated when
-            # they were written — so no pattern is matched again on the loop.
-            with events.muted(db), patterns_prechecked():
+            with events.muted(db):
                 return await record_service.update_record(
                     db,
                     rtype,

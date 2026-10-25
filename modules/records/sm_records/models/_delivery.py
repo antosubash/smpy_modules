@@ -42,4 +42,6 @@ class SubmissionDelivery(Base, MultiTenantMixin, table=True):  # ty: ignore[unsu
     is a new attempt that reaches everyone again."""
     recipient: str = Field(max_length=320)
     claimed_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
+    claim_token: str | None = Field(default=None, max_length=32)
+    """Who holds the claim: release and "sent" are conditional on it."""
     sent_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))

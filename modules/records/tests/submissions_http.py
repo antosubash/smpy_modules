@@ -16,8 +16,8 @@ from typing import Any
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from simple_module_core.mail import MailMessage, install_mail_sender
-from sm_records import constants
-from sm_records.public_submissions import mail_runner, patterns
+from sm_records import _pattern_worker, constants
+from sm_records.public_submissions import mail_runner
 from sm_records.settings import RecordsSettings
 
 from tests.app_harness import ADMIN, build_app, roles
@@ -75,7 +75,7 @@ async def site(tmp_path) -> AsyncIterator[AsyncClient]:
             await mail_runner.drain()
     finally:
         install_mail_sender(None)
-        await patterns.close(app)
+        await _pattern_worker.close()
         await db_state.engine.dispose()
 
 

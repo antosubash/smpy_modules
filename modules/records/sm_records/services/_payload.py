@@ -24,6 +24,7 @@ from sm_records.constants import (
     ORPHANED_KEY,
 )
 from sm_records.models import Record, RecordType
+from sm_records.schema._text_checks import reading
 from sm_records.schema.compile import (
     PayloadValidationError,
     from_stored,
@@ -253,7 +254,9 @@ def read_view(
     if with_invalid:
         model = get_model(rtype.key, rtype.schema_version, defs, type_id=rtype.id)
         try:
-            _validate_payload(model, view)
+            # A read: no unbounded match on the loop (``_text_checks.reading``).
+            with reading():
+                _validate_payload(model, view)
         except PayloadValidationError as exc:
             invalid = exc.errors
     return {

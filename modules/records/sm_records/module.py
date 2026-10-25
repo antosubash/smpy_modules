@@ -233,10 +233,10 @@ class RecordsModule(ModuleBase):
         await boot.startup(self, app)
 
     async def on_shutdown(self, app: FastAPI) -> None:
-        """Stop the pattern-check workers of website submissions (#101)."""
-        from sm_records.public_submissions import patterns
+        """Stop the pattern-check workers (``sm_records._pattern_worker``)."""
+        from sm_records import _pattern_worker
 
-        await patterns.close(app)
+        await _pattern_worker.close()
 
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
         """The outbox handler that mails a website submission's notification
