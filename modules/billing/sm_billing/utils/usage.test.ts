@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { describeError } from './api';
 import {
+  adjustDefault,
   formatBytes,
   formatQuantity,
   kindLabel,
@@ -76,5 +77,19 @@ describe('quota_exceeded', () => {
       resets_at: null,
     });
     expect(message).toBe('jobs.concurrent limit reached (2/2).');
+  });
+});
+
+describe('adjustDefault', () => {
+  const counters = [{ key: 'ai.requests' }, { key: 'demo.exports' }];
+
+  it("opens on the drawer's meter when it is a counter", () => {
+    expect(adjustDefault(counters, 'demo.exports')).toBe('demo.exports');
+  });
+
+  it('falls back to the first counter for a gauge or no meter', () => {
+    expect(adjustDefault(counters, 'demo.jobs')).toBe('ai.requests');
+    expect(adjustDefault(counters, '')).toBe('ai.requests');
+    expect(adjustDefault([], 'demo.jobs')).toBe('');
   });
 });
