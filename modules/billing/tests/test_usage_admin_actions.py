@@ -59,10 +59,23 @@ async def test_adjust_is_ledgered_with_reason_and_actor(app, admin, tenant):
         {"meter": COUNTER, "quantity": 1},
         {"meter": COUNTER, "quantity": 0, "reason": "zero"},
         {"meter": COUNTER, "quantity": 1, "reason": "x" * 501},
+        # Not integers: a bool, a fraction.
+        {"meter": COUNTER, "quantity": True, "reason": "r"},
+        {"meter": COUNTER, "quantity": 1.5, "reason": "r"},
     ],
 )
 async def test_adjust_needs_a_reason_and_a_quantity(app, admin, tenant, body):
     response = await admin.post(f"{ADMIN}/{tenant}/adjust", json=body)
+    assert response.status_code == 422
+    assert await _events(app, tenant) == []
+
+
+async def test_adjust_refuses_a_non_finite_quantity(app, admin, tenant):
+    """``-1e400`` parses to ``-inf``, which used to reach ``int()`` and 500."""
+    body = f'{{"meter": "{COUNTER}", "quantity": -1e400, "reason": "r"}}'
+    response = await admin.post(
+        f"{ADMIN}/{tenant}/adjust", content=body, headers={"content-type": "application/json"}
+    )
     assert response.status_code == 422
     assert await _events(app, tenant) == []
 

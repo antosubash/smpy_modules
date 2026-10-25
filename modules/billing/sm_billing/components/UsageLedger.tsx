@@ -90,7 +90,7 @@ export function UsageLedger({ ledger, failed, kind, onKind, onPage }: Props) {
                     </div>
                   </TableCell>
                   <TableCell className="text-xs">
-                    {event.reason && <div className="max-w-56 break-words">{event.reason}</div>}
+                    {event.reason && <div className="max-w-56 wrap-anywhere">{event.reason}</div>}
                     {event.actor && (
                       <div className="text-muted-foreground">
                         {`${t(c.actor)} `}

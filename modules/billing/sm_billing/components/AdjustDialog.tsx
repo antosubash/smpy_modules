@@ -26,6 +26,8 @@ interface Props {
   initialMeter: string;
   busy: boolean;
   onClose: () => void;
+  /** Where focus goes when the dialog closes (``useReturnFocus``). */
+  onCloseAutoFocus?: (event: Event) => void;
   onSubmit: (meter: string, quantity: number, reason: string) => void;
 }
 
@@ -33,7 +35,15 @@ interface Props {
  * A signed correction to this period's counter, with a required reason —
  * both are recorded on the ledger's ``adjust`` row with the acting admin.
  */
-export function AdjustDialog({ open, meters, initialMeter, busy, onClose, onSubmit }: Props) {
+export function AdjustDialog({
+  open,
+  meters,
+  initialMeter,
+  busy,
+  onClose,
+  onCloseAutoFocus,
+  onSubmit,
+}: Props) {
   const { t } = useT();
   const c = keys.billing.admin_usage.adjust;
   const [meter, setMeter] = useState(initialMeter);
@@ -60,7 +70,7 @@ export function AdjustDialog({ open, meters, initialMeter, busy, onClose, onSubm
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>
             {t(c.title, { meter: shown ? meterLabel(shown.label_key, shown.key) : meter })}
@@ -109,12 +119,14 @@ export function AdjustDialog({ open, meters, initialMeter, busy, onClose, onSubm
               </p>
             </div>
           </div>
-          <div className="space-y-1.5">
+          <div className="min-w-0 space-y-1.5">
             <Label htmlFor="adjust-reason">{t(c.reason)}</Label>
             <Textarea
               id="adjust-reason"
               value={reason}
               maxLength={REASON_MAX}
+              // An unbroken string must wrap, not widen the auto-sized field.
+              className="max-h-48 wrap-anywhere"
               placeholder={t(c.reason_placeholder)}
               aria-invalid={tried && !reasonOk}
               onChange={(e) => setReason(e.target.value)}

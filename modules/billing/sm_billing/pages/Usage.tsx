@@ -11,6 +11,7 @@ import { ProviderFallbackBanner } from '../components/ProviderFallbackBanner';
 import { UsageDetail } from '../components/UsageDetail';
 import { UsageFilters, type UsageFilterValues } from '../components/UsageFilters';
 import { UsageTable } from '../components/UsageTable';
+import { useReturnFocus } from '../hooks/useReturnFocus';
 import { keys, useT } from '../utils/i18n';
 import type { AdminCommon, MeterInfo, Paged, UsageRow } from '../utils/types';
 
@@ -40,6 +41,7 @@ function Usage() {
     props: Props;
   }>().props as unknown as Props;
   const [open, setOpen] = useState<UsageRow | null>(null);
+  const drawerFocus = useReturnFocus();
 
   const visit = (next: UsageFilterValues, page = 1) =>
     router.get(VIEW_URL, query(next, page), { preserveScroll: true, preserveState: true });
@@ -65,7 +67,13 @@ function Usage() {
               description={filtered ? t(c.empty_filtered) : t(c.empty_none)}
             />
           ) : (
-            <UsageTable rows={usage.items} onOpen={setOpen} />
+            <UsageTable
+              rows={usage.items}
+              onOpen={(row) => {
+                drawerFocus.remember();
+                setOpen(row);
+              }}
+            />
           )}
           <PaginationBar
             page={usage.page}
@@ -82,6 +90,7 @@ function Usage() {
         csrf={csrf_token}
         canManage={can_manage}
         onClose={() => setOpen(null)}
+        onCloseAutoFocus={drawerFocus.onCloseAutoFocus}
         onChanged={reload}
       />
     </>

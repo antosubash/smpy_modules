@@ -7,10 +7,11 @@ the ``*In`` models only.
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, StrictInt, field_validator
 
 from sm_billing.metering.validate import METER_MAX, QTY_MAX
 
@@ -110,8 +111,18 @@ class AdjustIn(BaseModel):
     """An operator's signed correction to a counter's current period."""
 
     meter: str = Field(min_length=1, max_length=METER_MAX)
-    quantity: int = Field(ge=-QTY_MAX, le=QTY_MAX)
+    # Strict: a JSON bool or float (1.0, -Infinity) is not a quantity.
+    quantity: StrictInt = Field(ge=-QTY_MAX, le=QTY_MAX)
     reason: str = Field(max_length=REASON_MAX)
+
+    @field_validator("quantity", mode="before")
+    @classmethod
+    def _finite(cls, value: object) -> object:
+        # ``-1e400`` parses to ``-inf``; the 422 echoes its input, which JSON
+        # cannot encode, so it would be a 500. Refuse it as its text.
+        if isinstance(value, float) and not math.isfinite(value):
+            return str(value)
+        return value
 
     @field_validator("quantity")
     @classmethod
