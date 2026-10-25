@@ -158,4 +158,4 @@ async def test_a_section_sees_only_the_bound_tenant(tmp_path):
             assert await notes(mt) == {"welcome": {"text": "a"}}
         with tenant_context("globex"):
             assert await notes(mt) == {"welcome": {"text": "b2"}}
-        assert {c[1] for c in section.calls} == {"acme"}
+        assert {c[1] for c in section.calls if c[0] != "validate"} == {"acme"}

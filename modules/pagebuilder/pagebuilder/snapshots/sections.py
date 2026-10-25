@@ -33,7 +33,7 @@ from pagebuilder.contracts.bundle import (
 )
 from pagebuilder.snapshots.assets import from_sentinels, to_sentinels
 from pagebuilder.snapshots.files import tree_size
-from pagebuilder.snapshots.manifest import PAGEBUILDER_SECTION
+from pagebuilder.snapshots.manifest import PAGEBUILDER_SECTION, check_manifest
 from pagebuilder.snapshots.validate import BundleError
 
 if TYPE_CHECKING:
@@ -115,6 +115,21 @@ def validate_sections(
                 dir=dest / section.name, version=entry["version"], media_names=media_names
             )
         )
+
+
+def revalidate(
+    manifest: dict[str, Any], registry: SectionRegistry, bundle_dir: Path, index: dict[str, Any]
+) -> None:
+    """Hold a stored bundle to the sections this host has *now*. Sync; raises ``BundleError``.
+
+    Upload validated it against the registry of that moment, which is not the
+    one a restore runs under: a module disabled since then leaves a
+    ``required`` section nothing can restore (refused, never a pagebuilder-only
+    restore), and a module enabled since then would otherwise plan and apply
+    files its ``validate`` never saw. Run before staging and again at approval.
+    """
+    check_manifest(manifest, registry.readable())
+    validate_sections(manifest, registry, bundle_dir, index)
 
 
 def _restore_context(

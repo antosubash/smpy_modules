@@ -17,6 +17,7 @@ pagebuilder's part back too, and the import stays pending.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import shutil
 from datetime import UTC, datetime
@@ -34,7 +35,7 @@ from pagebuilder.snapshots.manifest import PAGEBUILDER_SECTION
 from pagebuilder.snapshots.match import RestoreConflictError, match_live
 from pagebuilder.snapshots.media_match import preview_urls
 from pagebuilder.snapshots.plan import build_plan, read_documents
-from pagebuilder.snapshots.sections import apply_sections, plan_sections, present
+from pagebuilder.snapshots.sections import apply_sections, plan_sections, present, revalidate
 from pagebuilder.snapshots.validate import BundleError
 
 _PRE_RESTORE_NOTE = "Automatic snapshot taken before restoring"
@@ -76,9 +77,10 @@ class RestoreMixin(HostBase):
         # declines to reuse, telling an approver a page is unchanged while
         # its image is about to change underneath them.
         name_to_url = await preview_urls(self.db, self.settings, rows)
+        manifest = snapshot.manifest or {}
         try:
+            await self._revalidate(snapshot)
             plan = await build_plan(self.db, bundle, name_to_url)
-            manifest = snapshot.manifest or {}
             plan |= await plan_sections(self.db, self.sections, manifest, bundle, name_to_url)
         except (RestoreConflictError, BundleError) as exc:
             raise _refusal(exc) from exc
@@ -118,6 +120,16 @@ class RestoreMixin(HostBase):
         await self.db.flush()
         return staged
 
+    async def _revalidate(self, snapshot: ContentSnapshot) -> None:
+        """Hold the bundle to the sections registered *now* (see ``revalidate``)."""
+        await asyncio.to_thread(
+            revalidate,
+            snapshot.manifest or {},
+            self.sections,
+            self.dir_for(snapshot.id),
+            self._index_for(snapshot.id),
+        )
+
     async def _recheck(self, snapshot: ContentSnapshot) -> None:
         """Re-run every matcher, so a refusal at approval writes nothing.
 
@@ -126,6 +138,7 @@ class RestoreMixin(HostBase):
         bundle = self.dir_for(snapshot.id)
         manifest = snapshot.manifest or {}
         try:
+            await self._revalidate(snapshot)
             documents = await read_documents(bundle)
             await match_live(self.db, documents.pages)
             if present(manifest, self.sections):

@@ -13,8 +13,12 @@ Pagebuilder then calls the section at four points:
 * **capture** — every snapshot (manual and ``pre_restore``), after pagebuilder's
   own documents. Write files under ``ctx.dir`` only.
 * **validate** — on upload, in the extraction thread, before the bundle is
-  accepted. Raise ``ctx.invalid(...)`` for anything apply could not survive;
-  that is a 422 and the upload is discarded.
+  accepted, and again (off the event loop) before every plan — a bundle
+  stored while this module was absent is held to it once it is enabled.
+  Raise ``ctx.invalid(...)`` for anything apply could not survive; that is a
+  422 and the upload, or the restore, is refused. Must not touch the database.
+  File access goes through ``ctx.read_json``, which refuses any name that
+  leaves ``ctx.dir`` (absolute, ``..``, symlinks).
 * **plan** — when a restore is staged, and again at approval. Read-only.
   Raise ``ctx.conflict(...)`` for what cannot be applied; that is a 409 and
   nothing is written.
@@ -91,9 +95,9 @@ class CaptureContext(_Bound):
 
     def write_json(self, relative: str, payload: Any) -> int:
         """Write *payload* under ``dir`` the way every bundle document is written."""
-        from pagebuilder.snapshots.files import write_json
+        from pagebuilder.snapshots.files import inside, write_json
 
-        return write_json(self.dir / relative, payload)
+        return write_json(inside(self.dir, relative), payload)
 
 
 @dataclass(frozen=True)
@@ -111,9 +115,13 @@ class ValidateContext:
         return BundleError(message)
 
     def read_json(self, relative: str) -> Any:
-        """Parse a document under ``dir``; bad JSON is :meth:`invalid`."""
+        """Parse a document under ``dir``; bad JSON or an unsafe name is :meth:`invalid`."""
+        from pagebuilder.snapshots.files import UnsafeBundlePathError, inside
+
         try:
-            return json.loads((self.dir / relative).read_text())
+            return json.loads(inside(self.dir, relative).read_text())
+        except UnsafeBundlePathError as exc:
+            raise self.invalid(str(exc)) from exc
         except (OSError, json.JSONDecodeError) as exc:
             raise self.invalid(f"{self.dir.name}/{relative} is not readable JSON") from exc
 
@@ -142,8 +150,14 @@ class RestoreContext(_Bound):
         return RestoreConflictError(message)
 
     def read_json(self, relative: str, default: Any = None) -> Any:
-        """A document under ``dir`` (already validated), or *default* if absent."""
-        path = self.dir / relative
+        """A document under ``dir`` (already validated), or *default* if absent.
+
+        An unsafe name raises ``UnsafeBundlePathError`` (a ``ValueError``), which
+        aborts the restore.
+        """
+        from pagebuilder.snapshots.files import inside
+
+        path = inside(self.dir, relative)
         return json.loads(path.read_text()) if path.is_file() else default
 
 

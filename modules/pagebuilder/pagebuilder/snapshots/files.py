@@ -51,6 +51,41 @@ def write_json(path: Path, payload: Any) -> int:
     return len(data)
 
 
+class UnsafeBundlePathError(ValueError):
+    """A section path helper was handed a name that leaves its directory."""
+
+
+def inside(directory: Path, relative: str) -> Path:
+    """``directory / relative``, refused unless it stays inside *directory*.
+
+    The guard behind every file helper a contributed section gets (#80): an
+    absolute name, a ``..`` or empty component, a backslash, or any symlink
+    between *directory* and the target is refused, and so is anything that
+    resolves outside *directory* — so neither a buggy contributor nor a
+    crafted bundle reads or writes another section's files, or the host's.
+    """
+    parts = relative.split("/")
+    if (
+        not relative
+        or "\\" in relative
+        or "\x00" in relative
+        or relative.startswith("/")
+        or ":" in parts[0]
+        or any(part in ("", ".", "..") for part in parts)
+    ):
+        raise UnsafeBundlePathError(f"unsafe section path: {relative!r}")
+    target = directory / relative
+    current = directory
+    for part in parts:
+        current = current / part
+        if current.is_symlink():
+            raise UnsafeBundlePathError(f"section path goes through a symlink: {relative!r}")
+    root = directory.resolve()
+    if not target.resolve().is_relative_to(root) or directory.is_symlink():
+        raise UnsafeBundlePathError(f"section path resolves outside its directory: {relative!r}")
+    return target
+
+
 def tree_size(directory: Path) -> int:
     """Total bytes of every file under *directory* (0 when it does not exist)."""
     if not directory.is_dir():
