@@ -13,7 +13,6 @@ resurrect something an editor binned.
 from __future__ import annotations
 
 import asyncio
-import json
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -23,7 +22,6 @@ from simple_module_db import current_tenant_id
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from pagebuilder import locales
 from pagebuilder.layout_service import LayoutService
 from pagebuilder.media_files import (
     legacy_media_url,
@@ -35,6 +33,7 @@ from pagebuilder.models import NOT_TRASHED, MediaAsset, Page, PageRedirect
 from pagebuilder.settings import PagebuilderSettings
 from pagebuilder.snapshots.assets import bundle_names, to_sentinels
 from pagebuilder.snapshots.blobs import BlobStore
+from pagebuilder.snapshots.files import page_filename, write_json
 from pagebuilder.snapshots.format import (
     LAYOUT_NAME,
     MANIFEST_NAME,
@@ -45,6 +44,8 @@ from pagebuilder.snapshots.format import (
 )
 from pagebuilder.snapshots.manifest import manifest_header
 from pagebuilder.snapshots.pages import MEDIA_FIELDS, page_to_payload
+from pagebuilder.snapshots.registry import SectionRegistry
+from pagebuilder.snapshots.sections import capture_sections
 
 
 @dataclass
@@ -52,41 +53,6 @@ class CaptureResult:
     manifest: dict[str, Any]
     media: list[dict[str, Any]] = field(default_factory=list)
     size_bytes: int = 0
-
-
-def _safe(segment: str) -> str:
-    """*segment* with path separators neutralised.
-
-    Slugs and locales are URL segments, but a separator sneaking into one
-    would silently write outside ``pages/`` — so they are replaced rather
-    than trusted. The authoritative values are inside the document either way.
-    """
-    return segment.replace("/", "_").replace(chr(92), "_")
-
-
-def page_filename(slug: str, locale: str) -> str:
-    """Filename for a page document, unique across languages.
-
-    The default locale keeps the bare ``{slug}.json`` it has always had, so a
-    monolingual site's bundle is byte-for-byte what earlier builds wrote and
-    its diffs stay readable. Every other language is prefixed, because two
-    languages may legitimately both publish ``about`` and one file cannot hold
-    both — without the prefix the second page written would silently replace
-    the first, losing a whole document with nothing in the manifest to say so.
-    """
-    stem = _safe(slug)
-    return f"{stem}.json" if locales.is_default(locale) else f"{_safe(locale)}__{stem}.json"
-
-
-def _write_json(path: Path, payload: Any) -> int:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    # Sorted keys and a trailing newline so two captures of unchanged content
-    # produce byte-identical files — the round-trip test depends on it, and so
-    # does a readable diff when a bundle is committed.
-    text = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
-    data = text.encode("utf-8")
-    path.write_bytes(data)
-    return len(data)
 
 
 async def _media_maps(
@@ -144,9 +110,7 @@ async def _capture_pages(
         payload = page_to_payload(page, parent_slug)
         for key in ("draft_data", "published_data", *MEDIA_FIELDS):
             payload[key] = to_sentinels(payload[key], url_to_name)
-        documents.append(
-            (dest / PAGES_DIR / page_filename(page.slug, page.locale), payload)
-        )
+        documents.append((dest / PAGES_DIR / page_filename(page.slug, page.locale), payload))
         entries.append(
             {
                 "slug": page.slug,
@@ -160,7 +124,7 @@ async def _capture_pages(
     # serialize + write per page, unbounded by the number of pages. The ORM
     # work above has to stay on the loop, so only the writes are offloaded.
     written = await asyncio.to_thread(
-        lambda: sum(_write_json(path, payload) for path, payload in documents)
+        lambda: sum(write_json(path, payload) for path, payload in documents)
     )
     return entries, written
 
@@ -173,7 +137,7 @@ async def _capture_layout(
         "header_data": to_sentinels(layout.header_data, url_to_name),
         "footer_data": to_sentinels(layout.footer_data, url_to_name),
     }
-    written = _write_json(dest / LAYOUT_NAME, payload)
+    written = write_json(dest / LAYOUT_NAME, payload)
     counts = {
         "header": len(payload["header_data"].get("content", []) or []),
         "footer": len(payload["footer_data"].get("content", []) or []),
@@ -195,7 +159,7 @@ async def _capture_redirects(db: AsyncSession, dest: Path) -> tuple[int, int]:
         {"from_slug": from_slug, "locale": locale, "to_slug": to_slug}
         for from_slug, locale, to_slug in result
     ]
-    return len(rows), _write_json(dest / REDIRECTS_NAME, rows)
+    return len(rows), write_json(dest / REDIRECTS_NAME, rows)
 
 
 def _capture_media(
@@ -234,7 +198,7 @@ def _capture_media(
         }
         rows.append({"bundle_name": bundle_name, **index[bundle_name]})
 
-    total += _write_json(dest / MEDIA_DIR / MEDIA_INDEX_NAME, index)
+    total += write_json(dest / MEDIA_DIR / MEDIA_INDEX_NAME, index)
     return rows, missing, total
 
 
@@ -243,6 +207,7 @@ async def capture(
     settings: PagebuilderSettings,
     dest: Path,
     blobs: BlobStore,
+    sections: SectionRegistry | None = None,
 ) -> CaptureResult:
     """Write the live site into *dest* as a bundle directory.
 
@@ -268,20 +233,26 @@ async def capture(
         _capture_media, dest, blobs, settings, assets
     )
     missing = sorted(missing + vanished)
+    # After pagebuilder's own documents, so the url -> name map is complete (#80).
+    contributed, contributed_bytes = await capture_sections(
+        db, sections or SectionRegistry(), dest, url_to_name
+    )
 
+    counts = {"pages": len(pages), "redirects": redirect_count, "media": len(media_rows)}
+    header = manifest_header(current_tenant_id.get())
+    # Every section's entry carries its counts (minor 2); the top-level
+    # `counts` stays for every reader written before there were sections.
+    header["contents"][0]["counts"] = dict(counts)
+    header["contents"] += contributed
     manifest = {
-        **manifest_header(current_tenant_id.get()),
+        **header,
         "pages": pages,
         "layout": layout_counts,
-        "counts": {
-            "pages": len(pages),
-            "redirects": redirect_count,
-            "media": len(media_rows),
-        },
+        "counts": counts,
         "missing_media": missing,
     }
     # Written last: a bundle interrupted mid-capture then has no manifest and
     # is self-evidently incomplete rather than plausibly whole.
-    size = pages_bytes + layout_bytes + redirect_bytes + media_bytes
-    size += _write_json(dest / MANIFEST_NAME, manifest)
+    size = pages_bytes + layout_bytes + redirect_bytes + media_bytes + contributed_bytes
+    size += write_json(dest / MANIFEST_NAME, manifest)
     return CaptureResult(manifest=manifest, media=media_rows, size_bytes=size)

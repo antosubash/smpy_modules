@@ -39,6 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from pagebuilder.models import ImportStatus, Page, PageRedirect, PendingImport
+from pagebuilder.snapshots.manifest import PAGEBUILDER_SECTION
 from pagebuilder.snapshots.pages import as_utc, page_identity
 
 APPLIED_KEY = "applied"
@@ -68,7 +69,14 @@ async def _slugs_of(db: AsyncSession, page: Page) -> set[str]:
 
 
 def _recorded(applied: Any, page: Page) -> str | None:
-    """The outcome an import recorded for *page*, by identity."""
+    """The outcome an import recorded for *page*, by identity.
+
+    Keyed by section since #80 (``{"pagebuilder": {...}, "news": {...}}``);
+    rows approved before that hold pagebuilder's lists at the top level, and
+    never a ``pagebuilder`` key, so the two shapes cannot be confused.
+    """
+    if isinstance(applied, dict) and PAGEBUILDER_SECTION in applied:
+        applied = applied[PAGEBUILDER_SECTION]
     if not isinstance(applied, dict):
         return None
     identity = page_identity(page)

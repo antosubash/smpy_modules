@@ -31,4 +31,5 @@ def get_snapshot_service(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> SnapshotService:
-    return SnapshotService(db, request.app.state.pagebuilder.settings)
+    services = request.app.state.pagebuilder
+    return SnapshotService(db, services.settings, services.bundle_sections)

@@ -31,9 +31,10 @@ silently overwriting, moving or deleting a page nobody asked about. That is a
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from datetime import datetime
+from typing import Any, Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
@@ -46,9 +47,21 @@ class RestoreConflictError(Exception):
     """A bundle that cannot land on this site as it stands; fit to show a user."""
 
 
+class Identified(Protocol):
+    """What the matcher needs of a live row: a page, or another module's
+    row with the same identity problem (a slug unique per locale, a
+    translation group, renames, trashed rows that still hold a slug)."""
+
+    id: Any
+    slug: str
+    locale: str
+    translation_group: Any
+    deleted_at: datetime | None
+
+
 @dataclass
-class PageMatch:
-    rows: dict[PageKey, Page] = field(default_factory=dict)
+class IdentityMatch[Row: Identified]:
+    rows: dict[PageKey, Row] = field(default_factory=dict)
     """Bundle key → the live row it overwrites."""
 
     creates: list[PageKey] = field(default_factory=list)
@@ -58,7 +71,7 @@ class PageMatch:
     """Bundle key → the matched row's slug today, where it differs from the
     bundle's. The restore moves the row back and redirects the newer slug."""
 
-    untouched: list[Page] = field(default_factory=list)
+    untouched: list[Row] = field(default_factory=list)
     """Live rows nothing in the bundle claims, trashed ones included."""
 
     by_slug: set[PageKey] = field(default_factory=set)
@@ -102,7 +115,7 @@ class PageMatch:
             temps[key] = slug
         return temps
 
-    def rename_redirects(self) -> dict[PageKey, Page]:
+    def rename_redirects(self) -> dict[PageKey, Row]:
         """``(locale, retired slug)`` → page, for every row the restore moves back.
 
         A retired slug that another page takes over in this same restore — two
@@ -121,18 +134,28 @@ def _group(payload: dict[str, Any]) -> str | None:
     return group if isinstance(group, str) and group else None
 
 
-def match_pages(bundled: dict[PageKey, dict[str, Any]], pages: Iterable[Page]) -> PageMatch:
-    """Pair every bundle page with the live row it restores onto.
+PageMatch = IdentityMatch[Page]
 
-    *pages* is every page of the tenant, trashed included: a trashed page still
-    holds both its slug and its group in the unique indexes, and restoring
-    content onto it revives it. One-to-one by construction — a row claimed by
-    its group is never also claimed by another document's slug.
+
+def match_by_identity[Row: Identified](
+    bundled: Mapping[PageKey, dict[str, Any]],
+    rows: Iterable[Row],
+    *,
+    noun: str = "page",
+) -> IdentityMatch[Row]:
+    """Pair every bundled document with the live row it restores onto.
+
+    *bundled* is keyed by ``(locale, slug)``. *rows* is every row of the
+    tenant, trashed included: a trashed row still holds both its slug and its
+    group in the unique indexes, and restoring content onto it revives it.
+    One-to-one by construction — a row claimed by its group is never also
+    claimed by another document's slug. *noun* names the rows in a conflict
+    message. Public as ``pagebuilder.contracts.bundle.match_by_identity``.
     """
-    pages = list(pages)
+    pages = list(rows)
     by_group = {(page.translation_group, page.locale): page for page in pages}
     by_slug = {(page.locale, page.slug): page for page in pages}
-    match = PageMatch()
+    match: IdentityMatch[Row] = IdentityMatch()
     claimed: set[int | None] = set()
 
     groups: dict[tuple[str, str], PageKey] = {}
@@ -145,7 +168,7 @@ def match_pages(bundled: dict[PageKey, dict[str, Any]], pages: Iterable[Page]) -
             # second document in one group and language has no row to land on.
             other = groups[(group, key[0])]
             raise RestoreConflictError(
-                f"/{other[1]} and /{key[1]} ({key[0]}) are the same page in this snapshot"
+                f"/{other[1]} and /{key[1]} ({key[0]}) are the same {noun} in this snapshot"
             )
         groups[(group, key[0])] = key
         page = by_group.get((group, key[0]))
@@ -169,15 +192,19 @@ def match_pages(bundled: dict[PageKey, dict[str, Any]], pages: Iterable[Page]) -
         key = (page.locale, page.slug)
         if key in bundled:
             raise RestoreConflictError(
-                f"/{page.slug} ({page.locale}) now belongs to a different page than the "
-                "one this snapshot restores there — rename or purge that page first"
+                f"/{page.slug} ({page.locale}) now belongs to a different {noun} than the "
+                f"one this snapshot restores there — rename or purge that {noun} first"
             )
     match.renames = {key: page.slug for key, page in match.rows.items() if page.slug != key[1]}
     return match
 
 
+match_pages = match_by_identity
+"""The page matcher's original name, kept for its callers."""
+
+
 async def match_live(db: AsyncSession, bundled: dict[PageKey, dict[str, Any]]) -> PageMatch:
-    """:func:`match_pages` against this tenant's pages as they are right now.
+    """:func:`match_by_identity` against this tenant's pages as they are right now.
 
     The plan's preflight, and run again at approval rather than trusted from
     the staged plan: pages are renamed, created and purged between staging and

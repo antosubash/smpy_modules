@@ -18,17 +18,21 @@ Two version numbers, deliberately:
 
 ``contents`` lists the bundle's sections. Pagebuilder's own documents are the
 ``pagebuilder`` section and keep the root-level paths they have always had.
-Another module contributing to a bundle (#80 — not built) would add a section
-of its own whose files live under ``<section>/``, and mark it ``required`` if
-restoring the bundle without it would leave a site incoherent. A reader
-refuses a required section it does not know and ignores an optional one, so
-a bundle can grow without every older host refusing it.
+Another module contributes a section of its own through
+:mod:`pagebuilder.contracts.bundle` (#80); its files live under
+``<section>/``, and it is ``required`` if restoring the bundle without it would
+leave a site incoherent. A reader refuses a required section it does not know
+and ignores an optional one — extracted and kept, never read — so a bundle can
+grow without every older host refusing it. Which sections a reader *knows* is
+the host's business: the table is a parameter of :func:`check_manifest`, built
+from the sections registered on the app, with pagebuilder's always in it.
 """
 
 from __future__ import annotations
 
 import importlib.metadata
 import re
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -50,16 +54,17 @@ FORMAT_NAME = "simple-module.content-bundle"
 mistaken for one. Absent from bundles written before the manifest was
 versioned; present, it must match."""
 
-FORMAT_MINOR = 1
+FORMAT_MINOR = 2
 """Minor 1 added ``format``, ``format_minor``, ``source``, ``tenant`` and
-``contents`` to the manifest. Nothing else in the bundle changed."""
+``contents`` to the manifest. Minor 2 added ``contents[].counts`` and sections
+contributed by other modules (#80). A minor-1 reader already ignores an
+optional section it does not know, so neither change needed a major."""
 
 PAGEBUILDER_SECTION = "pagebuilder"
 PAGEBUILDER_SECTION_VERSION = 1
-_SECTION_VERSIONS: dict[str, frozenset[int]] = {
-    PAGEBUILDER_SECTION: frozenset({PAGEBUILDER_SECTION_VERSION})
-}
-"""The sections this build restores, and which of their versions."""
+_PAGEBUILDER_VERSIONS = frozenset({PAGEBUILDER_SECTION_VERSION})
+"""Which versions of its own section this build restores. Every other known
+section, and its versions, comes from the caller (:func:`check_manifest`)."""
 
 PAGEBUILDER_PATHS = (LAYOUT_NAME, REDIRECTS_NAME, f"{PAGES_DIR}/", f"{MEDIA_DIR}/")
 """Every root-level path pagebuilder reads. A file in a bundle belongs to
@@ -78,7 +83,7 @@ RESERVED_SECTION_NAMES = frozenset(
 """Names no other section may take. A section's files live under
 ``<section>/``, so one named ``pages`` would have its files read as pages."""
 
-_SECTION_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+SECTION_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _PACKAGE = "simple_module_pagebuilder"
 
 
@@ -153,11 +158,13 @@ def _check_path(section: str, path: str) -> None:
         raise BundleError(f"section {section!r} declares an unsafe path: {path!r}")
 
 
-def _check_section(entry: Any, seen: set[str]) -> None:
+def _check_section(
+    entry: Any, seen: set[str], known_sections: Mapping[str, frozenset[int]]
+) -> None:
     if not isinstance(entry, dict):
         raise BundleError("manifest contents entry is not an object")
     name = entry.get("section")
-    if not isinstance(name, str) or not _SECTION_NAME.match(name):
+    if not isinstance(name, str) or not SECTION_NAME.match(name):
         raise BundleError(f"manifest contents entry has no valid section name: {name!r}")
     if name in seen:
         raise BundleError(f"manifest lists section {name!r} twice")
@@ -174,30 +181,45 @@ def _check_section(entry: Any, seen: set[str]) -> None:
     for path in paths:
         _check_path(name, path)
 
-    known = _SECTION_VERSIONS.get(name)
-    if known is None:
-        if required:
-            raise BundleError(
-                f"bundle requires the {name!r} section, which this host cannot restore"
-            )
-        # Ignored, but confined: a section that claimed pagebuilder's paths
+    if name == PAGEBUILDER_SECTION:
+        known: frozenset[int] | None = _PAGEBUILDER_VERSIONS
+        stray = [p for p in paths if p not in PAGEBUILDER_PATHS]
+        if stray:
+            raise BundleError(f"the pagebuilder section claims paths it does not own: {stray}")
+    else:
+        # Known or not, confined: a section that claimed pagebuilder's paths
         # would have its files read as pages.
         if name in RESERVED_SECTION_NAMES:
             raise BundleError(f"section name {name!r} is reserved for pagebuilder")
         stray = [p for p in paths if not p.startswith(f"{name}/")]
         if stray:
             raise BundleError(f"section {name!r} claims paths outside {name}/: {stray}")
+        known = known_sections.get(name)
+    counts = entry.get("counts", {})
+    if not isinstance(counts, dict) or not all(
+        isinstance(v, int) and not isinstance(v, bool) for v in counts.values()
+    ):
+        raise BundleError(f"section {name!r} has counts that are not integers")
+    if known is None:
+        if required:
+            raise BundleError(
+                f"bundle requires the {name!r} section, which this host cannot restore"
+            )
         return
-    if name == PAGEBUILDER_SECTION:
-        stray = [p for p in paths if p not in PAGEBUILDER_PATHS]
-        if stray:
-            raise BundleError(f"the pagebuilder section claims paths it does not own: {stray}")
+    # Refused rather than skipped (#80 Q1), even for an optional section: a
+    # restore that silently left out the content the operator expected is
+    # worse than one that says to upgrade first.
     if version not in known:
         raise BundleError(f"unsupported version {version} of the {name!r} section")
 
 
-def check_manifest(payload: Any) -> dict[str, Any]:
+def check_manifest(
+    payload: Any, known: Mapping[str, frozenset[int]] | None = None
+) -> dict[str, Any]:
     """Validate *payload* as a manifest; return it with its major filled in.
+
+    *known* maps each contributed section this host restores to the versions
+    it reads (``SectionRegistry.readable()``); pagebuilder's own is implied.
 
     Raises :class:`BundleError` — a 422 at the upload boundary — for anything
     this build cannot honestly restore. A manifest without ``contents`` (every
@@ -215,7 +237,7 @@ def check_manifest(payload: Any) -> dict[str, Any]:
             raise BundleError("manifest contents is not a list")
         seen: set[str] = set()
         for entry in contents:
-            _check_section(entry, seen)
+            _check_section(entry, seen, known or {})
         if PAGEBUILDER_SECTION not in seen:
             raise BundleError("bundle has no pagebuilder section to restore")
     return {**payload, "format_version": major}
