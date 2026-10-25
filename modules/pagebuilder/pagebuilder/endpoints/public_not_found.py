@@ -13,17 +13,17 @@ happens to ship.
 
 from __future__ import annotations
 
-from typing import Final
+from typing import Any, Final
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from simple_module_hosting._error_handlers import _wants_json as _framework_wants_json
 from simple_module_hosting.inertia_deps import InertiaDep
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from pagebuilder import public_cache
+from pagebuilder import public_cache, site_nav
 from pagebuilder.html_lang import set_html_lang
-from pagebuilder.layout_service import public_layout_props
-from pagebuilder.models import Layout
+from pagebuilder.layout_service import LayoutService, public_layout_props
 from pagebuilder.public_copy import public_copy
 from pagebuilder.settings import PagebuilderSettings
 from pagebuilder.site_nav import SiteNav
@@ -60,24 +60,24 @@ async def render_not_found(
     settings: PagebuilderSettings,
     *,
     locale: str,
-    layout: Layout | None,
-    nav: SiteNav | None,
+    db: AsyncSession | None,
 ) -> Response:
-    """The 404, in ``locale``, framed by ``layout`` when there is a tenant.
+    """The 404, in ``locale``, framed by the tenant's layout when there is one.
 
-    ``layout`` and ``nav`` are ``None`` for a request that resolved no tenant:
-    the page then renders with the default branding and no header or footer,
-    never another site's.
+    ``db`` is ``None`` for a request that resolved no tenant: the page then
+    renders with the default branding and no header or footer, never another
+    site's. The layout and nav are read only when the page is rendered, so a
+    JSON caller costs no queries.
     """
     response: Response
     if wants_json(request):
         response = JSONResponse({"detail": NOT_FOUND_DETAIL}, status_code=404)
     else:
-        frame = (
-            public_layout_props(layout)
-            if layout is not None
-            else {"layout_header": None, "layout_footer": None}
-        )
+        frame: dict[str, Any] = {"layout_header": None, "layout_footer": None}
+        nav: SiteNav | None = None
+        if db is not None:
+            frame = public_layout_props(await LayoutService(db).get())
+            nav = await site_nav.site_nav(db, settings.public_route_prefix, locale)
         response = await inertia.render(
             PAGE_NOT_FOUND,
             {

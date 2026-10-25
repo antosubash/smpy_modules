@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 let shared: Record<string, unknown> = {};
 vi.mock('@inertiajs/react', () => ({
-  usePage: () => ({ props: shared }),
+  usePage: () => ({ props: shared, url: '/p/printed?x=1' }),
   Head: () => null,
   Link: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...rest}>
@@ -72,6 +72,11 @@ describe('PublicShell', () => {
     const back = bar?.querySelector('a');
     expect(back?.getAttribute('href')).toBe('/pagebuilder/7/edit');
     expect(back?.textContent).toBe('Back to editor');
+  });
+
+  it("prints the current Inertia page's absolute address", () => {
+    const printed = mount().querySelector('.pb-print-url')?.textContent ?? '';
+    expect(printed).toBe(new URL('/p/printed?x=1', window.location.origin).href);
   });
 
   it('renders no header or footer without a layout', () => {

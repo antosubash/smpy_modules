@@ -32,7 +32,7 @@ from pagebuilder.og_image import og_image
 from pagebuilder.public_copy import public_copy
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
-from pagebuilder.tenancy import bind_public, bind_public_viewer, vary_on_tenant
+from pagebuilder.tenancy import bind_public_viewer, vary_on_tenant
 
 _PAGE_PUBLIC = "PageBuilder/PublicPage"
 
@@ -133,14 +133,7 @@ async def render_public_page(
             # A 301 is cacheable by default; key it on what picks the tenant.
             return vary_on_tenant(RedirectResponse(target, status_code=301), request)
         # Unknown, draft, trashed or not yet live: one answer for all (#89).
-        return await render_not_found(
-            request,
-            inertia,
-            settings,
-            locale=locale,
-            layout=await LayoutService(db).get(),
-            nav=await site_nav.site_nav(db, settings.public_route_prefix, locale),
-        )
+        return await render_not_found(request, inertia, settings, locale=locale, db=db)
 
     layout = await LayoutService(db).get()
     nav = await site_nav.site_nav(db, settings.public_route_prefix, page.locale)
@@ -235,13 +228,13 @@ def locale_router(locale: str) -> APIRouter:
         inertia: InertiaDep,
         db: AsyncSession = Depends(get_db),
         settings: PagebuilderSettings = Depends(get_settings),
+        # The router-level dependency, repeated to read its value: FastAPI
+        # caches a dependency per request, so it runs (and binds) once.
         tenant: str | None = Depends(bind_public_viewer),
     ) -> Response:
         """A published page at this module's own address, in one language."""
         if tenant is None:
-            return await render_not_found(
-                request, inertia, settings, locale=locale, layout=None, nav=None
-            )
+            return await render_not_found(request, inertia, settings, locale=locale, db=None)
         return await render_public_page(slug, request, inertia, db, settings, locale=locale)
 
     return router
@@ -258,10 +251,20 @@ def default_locale_alias_router(settings: PagebuilderSettings) -> APIRouter:
     problem the whole prefix scheme exists to avoid. A 301 is the third option
     and the only good one.
     """
-    router = APIRouter(dependencies=[Depends(bind_public)])
+    router = APIRouter(dependencies=[Depends(bind_public_viewer)])
 
     @router.api_route("/{slug}", methods=["GET", "HEAD"], response_model=None)
-    async def redirect_to_unprefixed(slug: str) -> RedirectResponse:
+    async def redirect_to_unprefixed(
+        slug: str,
+        request: Request,
+        inertia: InertiaDep,
+        tenant: str | None = Depends(bind_public_viewer),
+    ) -> Response:
+        if tenant is None:
+            # The same layout-less 404 as `/p/x` without a tenant (#89).
+            return await render_not_found(
+                request, inertia, settings, locale=settings.default_content_locale, db=None
+            )
         return RedirectResponse(
             f"{settings.public_route_prefix.rstrip('/')}/{slug}", status_code=301
         )

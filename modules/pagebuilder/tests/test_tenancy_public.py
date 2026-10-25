@@ -158,3 +158,15 @@ async def test_no_tenant_gets_the_404_page_without_any_sites_layout(
     assert body["props"]["site_nav"] is None
     assert response.headers["Cache-Control"].endswith("no-store")
     assert reads == []
+
+
+@pytest.mark.unbound_tenant
+async def test_no_tenant_on_the_default_locale_alias_is_the_same_404(tmp_path) -> None:
+    """``/en/p/x`` answers like ``/p/x`` when no tenant resolved: the branded,
+    layout-less 404, not a redirect and not the host's error page (#89)."""
+    bilingual = {"content_locales": ["en", "de"], "default_content_locale": "en"}
+    async for client in multi_client(tmp_path, inject_user=False, settings=bilingual):
+        response = await client.get("/en/p/x", headers=INERTIA, follow_redirects=False)
+        assert response.status_code == 404
+        assert response.json()["component"] == "PageBuilder/PublicNotFound"
+        assert response.json()["props"]["layout_header"] is None

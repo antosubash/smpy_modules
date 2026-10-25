@@ -33,9 +33,11 @@ export interface PublicCopy {
   not_found: { title: string; body: string; home: string };
 }
 
-/** The document's own address, printed in place of the site chrome. */
-function currentUrl(): string {
-  return typeof window === 'undefined' ? '' : window.location.href;
+/** The document's own address, printed in place of the site chrome. Built
+ * from Inertia's page `url`, which changes with every visit and re-renders
+ * this, rather than read once from `window.location`. */
+function absoluteUrl(path: string): string {
+  return typeof window === 'undefined' ? path : new URL(path, window.location.origin).href;
 }
 
 /**
@@ -72,7 +74,8 @@ export function PublicShell({
   //
   // `designPack` is not on the published SharedProps type yet; the cast goes
   // away when the framework release carrying it lands.
-  const { branding } = usePage<{ props: SharedProps }>().props as unknown as SharedProps;
+  const inertiaPage = usePage<{ props: SharedProps }>();
+  const { branding } = inertiaPage.props as unknown as SharedProps;
   const designPack = (branding as unknown as { designPack?: string | null })?.designPack;
   const layoutConfig = getLayoutPuckConfig();
   const rootClass = ['pb-public flex min-h-dvh flex-col', designPack && `${designPack}-root`]
@@ -111,7 +114,7 @@ export function PublicShell({
           </header>
         )}
         <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
-          <p className="pb-print-url">{currentUrl()}</p>
+          <p className="pb-print-url">{absoluteUrl(inertiaPage.url ?? '')}</p>
           {children}
         </main>
         {layout_footer && (
