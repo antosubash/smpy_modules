@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import events
@@ -62,10 +63,16 @@ async def system_update(
                     settings=settings,
                     system=values,
                 )
-        except Conflict:
+        except Conflict as conflict:
             if attempt == 2:
                 raise
-            await db.refresh(record)
+            try:
+                await db.refresh(record)
+            except InvalidRequestError:
+                # Gone from under us — trashed or purged by a concurrent
+                # request (the soft-delete filter hides it from a refresh):
+                # the original 409, not a 500.
+                raise conflict from None
     raise AssertionError("unreachable")  # pragma: no cover
 
 

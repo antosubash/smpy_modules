@@ -777,7 +777,9 @@
         "manual": "von Hand markiert"
       },
       "not_sent": "Benachrichtigung nicht gesendet",
-      "failed": "Das hat nicht geklappt: {message}"
+      "failed": "Das hat nicht geklappt: {message}",
+      "rate_limited": "Die Benachrichtigung wurde gerade erneut gesendet. Versuchen Sie es in einer Minute noch einmal.",
+      "stale": "Diese Einsendung wurde in einem anderen Tab oder Fenster geändert. Laden Sie die Seite neu und versuchen Sie es noch einmal."
     },
     "mail": {
       "notify": {

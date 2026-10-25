@@ -777,7 +777,9 @@
         "manual": "marked by hand"
       },
       "not_sent": "Notification not sent",
-      "failed": "That didn't work: {message}"
+      "failed": "That didn't work: {message}",
+      "rate_limited": "The notification was just sent again. Try again in a minute.",
+      "stale": "This submission changed in another tab or window. Reload the page and try again."
     },
     "mail": {
       "notify": {

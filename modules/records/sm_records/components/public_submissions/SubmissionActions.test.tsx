@@ -14,6 +14,8 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { SubmissionActions } = await import('./SubmissionActions');
 const { SubmissionPanel } = await import('./SubmissionPanel');
+const { toast } = await import('sonner');
+const { ApiError } = await import('../../utils/api');
 
 function type(notifyTo: string[] = ['ops@example.org'], kind = 'form'): TypeRead {
   return {
@@ -36,6 +38,34 @@ function type(notifyTo: string[] = ['ops@example.org'], kind = 'form'): TypeRead
 function record(data: Record<string, unknown>, isDeleted = false): RecordRead {
   return { uuid: 'r1', is_deleted: isDeleted, data } as unknown as RecordRead;
 }
+
+describe("SubmissionActions — refusals in the admin's language", () => {
+  it("says the resend limit and a stale record in its own words, not the server's", async () => {
+    api.resendNotification.mockRejectedValueOnce(
+      new ApiError(429, { detail: 'too many submissions' }, 'too many submissions'),
+    );
+    api.markNotSpam.mockRejectedValueOnce(new ApiError(404, { detail: 'no record' }, 'no record'));
+    const view = await mount(
+      <SubmissionActions type={type()} record={record({})} onChanged={vi.fn()} />,
+    );
+    await click(view.button('Resend notification'));
+    await settle();
+    expect(toast.error).toHaveBeenLastCalledWith(
+      'The notification was just sent again. Try again in a minute.',
+    );
+    await view.render(
+      <SubmissionActions
+        type={type()}
+        record={record({ sm_spam: 'manual' }, true)}
+        onChanged={vi.fn()}
+      />,
+    );
+    await click(view.button('Not spam'));
+    await settle();
+    expect(String(vi.mocked(toast.error).mock.lastCall?.[0])).toContain('Reload the page');
+    await view.unmount();
+  });
+});
 
 describe('SubmissionActions', () => {
   beforeEach(() => {

@@ -1,8 +1,9 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { ApiError } from '../../utils/api';
 import { markNotSpam, markSpam, resendNotification } from '../../utils/api-submissions';
-import { keys, useT } from '../../utils/i18n';
+import { keys, type Translate, useT } from '../../utils/i18n';
 import type { RecordRead, TypeRead } from '../../utils/types';
 import { ConfirmDialog } from '../ConfirmDialog';
 
@@ -13,8 +14,14 @@ const REASONS: Record<SpamReason, string> = {
   manual: keys.records.public_submissions.actions.spam_reason.manual,
 };
 
-function message(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+/** What to tell the admin, in their language. The server's `detail` is
+ *  English; the two refusals an editor meets in practice get a sentence of
+ *  their own, and anything else is quoted after a translated lead-in. */
+function explain(t: Translate, err: unknown): string {
+  const a = keys.records.public_submissions.actions;
+  if (err instanceof ApiError && err.status === 429) return t(a.rate_limited);
+  if (err instanceof ApiError && (err.status === 404 || err.status === 409)) return t(a.stale);
+  return t(a.failed, { message: err instanceof Error ? err.message : String(err) });
 }
 
 /**
@@ -49,7 +56,7 @@ export function SubmissionActions({
       await resendNotification(type.key, record.uuid);
       toast.success(t(a.resent));
     } catch (err) {
-      toast.error(t(a.failed, { message: message(err) }));
+      toast.error(explain(t, err));
     } finally {
       setBusy(false);
     }
@@ -61,7 +68,7 @@ export function SubmissionActions({
       onChanged(await markNotSpam(type.key, record.uuid));
       toast.success(t(a.not_spam_done));
     } catch (err) {
-      toast.error(t(a.failed, { message: message(err) }));
+      toast.error(explain(t, err));
     } finally {
       setBusy(false);
     }
@@ -104,7 +111,12 @@ export function SubmissionActions({
         confirmLabel={t(a.spam)}
         destructive
         onConfirm={async () => {
-          onChanged(await markSpam(type.key, record.uuid));
+          try {
+            onChanged(await markSpam(type.key, record.uuid));
+          } catch (err) {
+            // The dialog shows the message; make it the translated one.
+            throw new Error(explain(t, err));
+          }
           toast.success(t(a.spam_done));
         }}
       />

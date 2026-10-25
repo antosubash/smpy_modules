@@ -183,3 +183,26 @@ async def test_not_spam_is_only_for_a_submission_kept_as_spam(site):
     assert deleted.status_code == 204
     resp = await site.post(_action("contact", uuid, "not-spam"), headers=roles(ADMIN))
     assert (resp.status_code, resp.json()["code"]) == (409, "not_in_trash")
+
+
+async def test_a_record_trashed_under_a_racing_spam_is_a_409_not_a_500(monkeypatch):
+    """A concurrent Mark as spam trashed the row: the version conflict's
+    reload cannot see it, and the answer is the conflict, not a crash."""
+    from types import SimpleNamespace
+
+    import pytest
+    from sm_records.public_submissions import system
+    from sm_records.services.errors import Conflict
+    from sqlalchemy.exc import InvalidRequestError
+
+    async def stale(*args, **kwargs):
+        raise Conflict("record changed")
+
+    async def gone(record):
+        raise InvalidRequestError("Could not refresh instance")
+
+    monkeypatch.setattr(system.record_service, "update_record", stale)
+    monkeypatch.setattr(system, "_ordinary", lambda rtype, record: {})
+    db = SimpleNamespace(refresh=gone, info={})
+    with pytest.raises(Conflict):
+        await system.system_update(db, None, SimpleNamespace(version=1), {}, settings=None)
