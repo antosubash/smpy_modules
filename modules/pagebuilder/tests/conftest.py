@@ -23,7 +23,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, FastAPI
 from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
 from pagebuilder.module import PagebuilderModule
@@ -44,8 +44,8 @@ from pg_support import arm_reset, make_db_state
 from settings.module_registry import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_inertia import InertiaConfig, inertia_dependency_factory
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from stub_auth import _stub_user, _StubAuthMiddleware
 
 _SESSION_SECRET = "pagebuilder-tests-secret"
 
@@ -70,36 +70,6 @@ def _arm_database_reset():
 PNG_BYTES = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + b"\x00" * 16
 
 
-def _stub_user(roles: tuple[str, ...] = ("admin",)) -> SimpleNamespace:
-    return SimpleNamespace(
-        id="test-user",
-        email="test@example.com",
-        name="Test User",
-        roles=list(roles),
-    )
-
-
-class _StubAuthMiddleware(BaseHTTPMiddleware):
-    """Populate ``request.state.user`` the way the host's auth middleware would.
-
-    Production runs ``simple_module_auth``'s session middleware before
-    every request and stashes a ``UserContext`` on ``request.state``.
-    The pagebuilder test harness doesn't mount that middleware, so we
-    drop a minimal stand-in here whenever a fixture wants requests to
-    look authenticated. Without it, ``simple_module_hosting``'s
-    ``RequiresPermission`` would 401 every protected endpoint.
-    """
-
-    def __init__(self, app: Any, user: Any) -> None:
-        super().__init__(app)
-        self._user = user
-
-    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
-        if "x-test-anonymous" not in request.headers:
-            request.state.user = self._user
-        return await call_next(request)
-
-
 async def _build_app(
     tmp_path,
     *,
@@ -110,7 +80,8 @@ async def _build_app(
     role_map: dict[str, list[str]] | None = None,
     settings: dict[str, Any] | None = None,
 ) -> tuple[FastAPI, Callable[[], Awaitable[None]]]:
-    (media_root := tmp_path / "media").mkdir(parents=True, exist_ok=True)
+    media_root = tmp_path / "media"
+    media_root.mkdir(parents=True, exist_ok=True)
 
     module = PagebuilderModule()
     # Pre-seed module settings so the register_* hooks below see the

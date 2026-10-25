@@ -67,8 +67,9 @@ test: test-py test-js
 
 # pytest-xdist workers per suite: `auto` (one per core) unless PYTEST_WORKERS
 # says otherwise — `PYTEST_WORKERS=8 make test-py` on a shared machine, `0` to
-# run serially. Each suite is still its own process, one after another.
-PYTEST_WORKERS ?= auto
+# run serially; set but empty counts as unset. Each suite is still its own
+# process, one after another.
+PYTEST_WORKERS := $(or $(PYTEST_WORKERS),auto)
 
 test-py:
 	uv run pytest -n $(PYTEST_WORKERS) host/tests scripts/tests

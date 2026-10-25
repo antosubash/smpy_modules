@@ -93,7 +93,7 @@ def _copy_of_the_tree(tmp_path: Path) -> Path:
     for path in [SCRIPT, *_manifests(REPO)]:
         target = root / path.relative_to(REPO)
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(path.read_text())
+        target.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
     return root
 
 

@@ -52,7 +52,9 @@ from typing import Any
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
 from sqlalchemy import MetaData, text
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool, StaticPool
 
 ENV_VAR = "SM_TEST_DATABASE_URL"
 """The name every module in this repo agrees on."""
@@ -86,8 +88,6 @@ def _worker_url(url: str) -> str:
     it runs later. The legacy alias, which the plugin never rewrites, gets it
     too.
     """
-    from sqlalchemy.engine import make_url
-
     worker = os.environ.get("PYTEST_XDIST_WORKER", "")
     parsed = make_url(url)
     if not worker or not url.startswith("postgresql") or not parsed.database:
@@ -100,9 +100,6 @@ def _worker_url(url: str) -> str:
 
 
 async def _create_database_if_missing(server_url: str, name: str) -> None:
-    from sqlalchemy.ext.asyncio import create_async_engine
-    from sqlalchemy.pool import NullPool
-
     engine = create_async_engine(server_url, poolclass=NullPool, isolation_level="AUTOCOMMIT")
     try:
         async with engine.connect() as conn:
