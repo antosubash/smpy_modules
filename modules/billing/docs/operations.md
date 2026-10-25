@@ -199,7 +199,9 @@ are safe: a conditional `UPDATE` on the hold's status moves it for one of
 them, and only that one lowers the gauge. There is no lease or leader
 election. The loop re-reads the `usage_*` settings from the database before
 every tick, so a value saved on one worker reaches all of them; `0` idles
-every loop (only for a host that runs the sweep elsewhere). A failed tick is
+every loop (only for a host that runs the sweep elsewhere). The loop also
+runs the ledger purge below, so `0` stops that too: nothing else purges the
+ledger. A failed tick is
 logged as `billing.usage_sweeper.tick_failed` and the loop carries on. While
 the sweep is off or behind, a lapsed hold still counts against its gauge; a
 late `commit` or `extend` on it expires it on the spot.

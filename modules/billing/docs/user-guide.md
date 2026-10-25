@@ -146,8 +146,11 @@ reached**), and **Resets {date}** for a per-period counter or **In use now**
 for a gauge, which never resets. Everyone who can see the Billing page sees
 the card. The card is hidden when nothing is metered.
 
-When the organisation reaches a limit, the feature refuses the request and
-says so, for example "AI requests limit reached (10/10); resets 1 Nov 2026."
+When the organisation reaches a limit, the metered feature refuses the
+request (HTTP 402 `quota_exceeded`, carrying the meter, the limit, what was
+used and when it resets). The wording is up to the module that meters the
+feature; billing's `utils/quotaError.ts` helper, which a module can copy,
+says for example "AI requests limit reached (10/10); resets 1 Nov 2026."
 Usage starts again from zero when the period renews; a gauge frees up as
 running work finishes. Upgrading to a plan with a higher limit applies at
 once; a downgrade below what is already used refuses further use for the

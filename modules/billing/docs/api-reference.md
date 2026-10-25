@@ -414,7 +414,7 @@ Handled events: `checkout.session.completed` and
 |---|---|---|---|
 | `tenant_required` | 403 | tenant API | no active organisation in the session |
 | `tenant_owner_required` | 403 | tenant API | only the owner may do this |
-| `forbidden` | 403 | status, portal | missing `billing.view` / `billing.manage` (other routes return the framework's own 403) |
+| `forbidden` | 403 | status, usage, portal | missing `billing.view` / `billing.manage` (other routes return the framework's own 403) |
 | `checkout_unavailable` | 409 | tenant API | manual provider: nothing to pay through |
 | `already_subscribed` | 409 | checkout | a live subscription exists |
 | `no_subscription` | 409 | change-plan | nothing to change yet |
