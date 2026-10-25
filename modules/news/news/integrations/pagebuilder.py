@@ -166,7 +166,10 @@ def register_bundle_section(app: Any) -> bool:
     """
     if not available():
         return False
-    from pagebuilder.contracts import bundle
+    try:
+        from pagebuilder.contracts import bundle
+    except ImportError:  # a pagebuilder older than the extra's floor: no bundle contract
+        return False
 
     from news.integrations.bundle import NewsBundleSection
 

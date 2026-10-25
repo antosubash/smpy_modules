@@ -163,6 +163,7 @@ def write_article(article: NewsArticle, doc: dict[str, Any]) -> None:
     """
     if "status" in doc:
         article.status = ArticleStatus(doc["status"])
+        article.rejection_note = None  # not carried; a stale banner must not outlive the content
     for field in ARTICLE_FIELDS:
         # A document without a group keeps the row's own (a new row has one).
         if field in doc and not (field == "translation_group" and not doc[field]):

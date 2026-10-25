@@ -20,6 +20,20 @@ def test_nothing_registers_without_pagebuilder(monkeypatch) -> None:
     assert pb.register_bundle_section(SimpleNamespace(state=SimpleNamespace())) is False
 
 
+def test_a_pagebuilder_without_the_bundle_contract_registers_nothing(monkeypatch) -> None:
+    import builtins
+
+    real_import = builtins.__import__
+
+    def without_contract(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "pagebuilder.contracts" and "bundle" in (fromlist or ()):
+            raise ImportError("cannot import name 'bundle'")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", without_contract)
+    assert pb.register_bundle_section(SimpleNamespace(state=SimpleNamespace())) is False
+
+
 def test_nothing_registers_where_pagebuilder_is_installed_but_not_mounted() -> None:
     assert pb.register_bundle_section(SimpleNamespace(state=SimpleNamespace())) is False
 

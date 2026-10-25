@@ -171,6 +171,10 @@ async def test_a_category_respelling_outside_the_bundle_is_disclosed(tmp_path):
         applied = await approve(client, staged.json()["id"])
 
         assert applied.json()["sections"]["news"]["category_respelled"] == 1
+        # The bundled article's category changed only by case: still overwritten,
+        # in the plan and in the apply's count alike.
+        assert plan_lines(staged.json()["plan"])["overwritten"]["count"] == 1
+        assert applied.json()["sections"]["news"]["overwritten"] == 1
         audit = await _stored(client, staged.json()["id"])
         assert [i["id"] for i in audit["applied"]["news"]["category_respelled"]] == [outside.id]
         async with session(client) as db:

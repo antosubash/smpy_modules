@@ -31,17 +31,14 @@ from news.models import (
 )
 
 
-async def _articles(
-    db: AsyncSession, prep: Prepared
-) -> tuple[dict[ArticleKey, NewsArticle], list[ArticleKey]]:
+async def _articles(db: AsyncSession, prep: Prepared) -> dict[ArticleKey, NewsArticle]:
     """Write every bundled article onto the row ``match_by_identity`` chose.
 
-    Returns ``({key: row}, overwritten keys)``. Rows that move go through a
-    scratch slug first, flushed, so two articles swapping addresses never
-    collide. ``locale`` goes to the constructor and is never written after.
+    Rows that move go through a scratch slug first, flushed, so two articles
+    swapping addresses never collide. ``locale`` goes to the constructor and
+    is never written after.
     """
     match = prep.match
-    overwritten = [key for key in sorted(match.rows) if prep.changed(key)]
     if match.renames:
         for key, temp in match.temp_slugs().items():
             match.rows[key].slug = temp
@@ -56,7 +53,7 @@ async def _articles(
         write_article(by_key[key], dict(match.writable(key, prep.articles[key])))
         db.add(by_key[key])
     await db.flush()
-    return by_key, overwritten
+    return by_key
 
 
 async def _links(
@@ -121,10 +118,13 @@ async def _redirects(
 async def apply(ctx: RestoreContext) -> SectionApplied:
     """Restore the section; the audit record keeps identities and counts, never slugs."""
     prep = await prepare(ctx)
-    respelled = prep.respelled()  # before the upsert renames the categories
+    # Both before the upsert: a category renamed by case also re-spells the
+    # loaded rows in the session, which would hide that change from `changed`.
+    respelled = prep.respelled()
+    overwritten = [key for key in sorted(prep.match.rows) if prep.changed(key)]
     await taxonomy.upsert(ctx.db, NewsCategory, prep.categories, prep.category_rows)
     tags, moved = await taxonomy.upsert(ctx.db, NewsTag, prep.tags, prep.tag_rows)
-    by_key, overwritten = await _articles(ctx.db, prep)
+    by_key = await _articles(ctx.db, prep)
     await _links(ctx.db, prep, by_key, tags)
     kept = await _redirects(ctx.db, prep, by_key)
     tags_dropped = prep.dropped_tag_redirects()

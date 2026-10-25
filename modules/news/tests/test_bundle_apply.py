@@ -200,6 +200,18 @@ async def test_an_unresolvable_redirect_is_dropped_and_reported(tmp_path):
         assert applied.json()["sections"]["news"]["redirects_dropped"] == 1
 
 
+async def test_a_restore_clears_a_stale_rejection_note(tmp_path):
+    async with bundle_host(tmp_path) as client:
+        row = await article(client, "launch", title="Original")
+        snapshot = await take(client)
+        await _update(client, NewsArticle, row.id, rejection_note="Fix the intro", title="Edited")
+
+        await restore(client, snapshot["id"])
+
+        live = (await _articles(client))[("en", "launch")]
+        assert (live.title, live.rejection_note) == ("Original", None)
+
+
 async def test_an_absent_field_leaves_the_live_value(tmp_path):
     async with bundle_host(tmp_path) as client:
         row = await article(client, "launch", author="Snapshot Author", title="Original")
