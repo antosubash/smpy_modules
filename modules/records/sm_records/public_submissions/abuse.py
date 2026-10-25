@@ -137,11 +137,17 @@ async def hit(request: Request, key: str, rate: str) -> None:
 
 
 def count_links(values: Any) -> int:
-    """How many links the visitor's text holds, across every value."""
-    if isinstance(values, str):
-        return len(_LINK_RE.findall(values))
-    if isinstance(values, dict):
-        return sum(count_links(value) for value in values.values())
-    if isinstance(values, (list, tuple)):
-        return sum(count_links(value) for value in values)
-    return 0
+    """How many links the visitor's text holds, across every value.
+
+    Iterative: the body is attacker-shaped JSON, and a value nested a few
+    hundred levels deep would exhaust the recursion limit (a 500) here."""
+    total, stack = 0, [values]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, str):
+            total += len(_LINK_RE.findall(item))
+        elif isinstance(item, dict):
+            stack.extend(item.values())
+        elif isinstance(item, (list, tuple)):
+            stack.extend(item)
+    return total

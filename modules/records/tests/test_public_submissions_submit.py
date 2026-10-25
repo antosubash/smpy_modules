@@ -178,6 +178,26 @@ async def test_a_form_loaded_before_a_schema_change_is_form_changed(site):
     assert (await send(site, token=body["definition"]["token"])).status_code == 202
 
 
+async def test_the_fresh_form_after_form_changed_can_be_sent_at_once(site):
+    """The visitor already spent the fill time on the old form."""
+    configure(site, public_submissions_min_fill_seconds=3)
+    await contact_type(site)
+    stale = sign_form(SECRET, "default", "contact", "0" * 16, now=time.time() - 10)
+    changed = await send(site, token=stale)
+    assert changed.json()["code"] == "form_changed"
+    assert (await send(site, token=changed.json()["definition"]["token"])).status_code == 202
+
+
+async def test_an_odd_honeypot_or_deeply_nested_value_is_no_500(site):
+    await contact_type(site)
+    assert (await send(site, hp={"x": 1})).status_code == 202, "a non-string trap is still a trap"
+    deep: object = "http://x.example"
+    for _ in range(2000):
+        deep = [deep]
+    resp = await send(site, data={"name": "A", "email": "a@b.org", "message": deep})
+    assert resp.status_code == 422, resp.text
+
+
 async def test_a_reworded_consent_text_is_form_changed(site):
     """The consent text bumps no schema version, yet a visitor who ticked the
     box agreed to the words they saw — not to the new ones."""

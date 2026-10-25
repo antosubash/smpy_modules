@@ -134,6 +134,7 @@ def definition(
     secret: str,
     tenant: str,
     locale: str | None,
+    issued: float | None = None,
 ) -> SubmissionDefinition:
     fields, consent = _shown(rtype, settings, locale)
     digest = _digest(rtype, fields, consent)
@@ -142,5 +143,5 @@ def definition(
         schema_version=rtype.schema_version,
         fields=fields,
         consent=consent,
-        token=sign_form(secret, tenant, rtype.key, digest),
+        token=sign_form(secret, tenant, rtype.key, digest, now=issued),
     )

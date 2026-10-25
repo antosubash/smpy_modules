@@ -40,7 +40,8 @@ SUBMISSION_ROWS: Final[tuple[tuple[int, str, str], ...]] = (
     ),
     (
         409,
-        "*Submissions* — a `unique` value already claimed",
+        "*Submissions* — a `unique` value already claimed (a field visitors fill cannot be "
+        "unique; a non-public one with a default can collide)",
         '`{"detail", "code": "conflict"}`',
     ),
     (

@@ -66,7 +66,7 @@ class SubmitBody(SQLModel):
 
     data: dict[str, Any] = Field(default_factory=dict)
     token: str = Field(default="", max_length=MAX_TOKEN_LEN)
-    hp: str = ""
+    hp: Any = ""
     """The honeypot: a hidden input a person never fills in. Unbounded on
     purpose (the body cap bounds it): a length refusal would tell a bot it was
     caught, where any value is the same silent 202."""

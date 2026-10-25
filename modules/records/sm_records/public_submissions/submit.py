@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import hmac
 import logging
+import time
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -134,7 +135,16 @@ async def _check_token(
         raise SubmissionRefused("form_expired", f"{exc}; load the form again") from exc
     rtype = await accepting_type(db, type_key)
     if not hmac.compare_digest(token.digest, form_digest(rtype, settings, body.locale)):
-        fresh = definition(rtype, settings, secret=secret, tenant=tenant, locale=body.locale)
+        # Issued as if loaded ``min_fill`` ago: the visitor has spent that long
+        # on the form already, and the resend must not be ``form_expired``.
+        fresh = definition(
+            rtype,
+            settings,
+            secret=secret,
+            tenant=tenant,
+            locale=body.locale,
+            issued=time.time() - settings.public_submissions_min_fill_seconds,
+        )
         raise SubmissionRefused(
             "form_changed",
             "this form changed after it was loaded; check it and send it again",
@@ -155,7 +165,7 @@ async def submit(
     await abuse.hit(
         request, abuse.rate_key(tenant, f"ip={ip}"), settings.public_submissions_rate_per_ip
     )
-    if body.hp.strip():
+    if str(body.hp or "").strip():
         logger.info(
             "records.public_submissions.honeypot_dropped", extra={"type_key": type_key[:100]}
         )
