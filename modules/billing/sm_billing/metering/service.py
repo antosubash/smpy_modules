@@ -133,8 +133,9 @@ class UsageService(HoldsMixin):
         }
 
     @staticmethod
-    def _counter(event: dict, period: tuple[datetime, datetime], limit: int | None) -> Apply:
+    def _counter(event: dict, res: _Resolved, limit: int | None) -> Apply:
         """Claim the key, then move the counter (within ``limit``)."""
+        period = res.period
 
         async def apply(session: AsyncSession) -> Counted | str | None:
             dialect = session.get_bind().dialect.name
@@ -142,11 +143,12 @@ class UsageService(HoldsMixin):
             if claimed.scalar_one_or_none() is None:
                 return _REPLAY
             fields = {"tenant_id": event["tenant_id"], "meter": event["meter"]}
+            fields["provider"] = res.provider
             qty, now = event["quantity"], event["recorded_at"]
             if limit is not None and qty > limit:
                 # Only a credited (negative) counter can fit it; never insert.
                 stmt = sql.add_within_limit(
-                    **fields, start=period[0], qty=qty, limit=limit, now=now
+                    **fields, start=period[0], end=period[1], qty=qty, limit=limit, now=now
                 )
             else:
                 stmt = sql.upsert_period(
@@ -160,7 +162,7 @@ class UsageService(HoldsMixin):
 
     async def _count(self, event: dict, res: _Resolved, limit, db) -> Outcome:
         tenant_id, meter = event["tenant_id"], event["meter"]
-        outcome = await run_write(self._factory, db, self._counter(event, res.period, limit))
+        outcome = await run_write(self._factory, db, self._counter(event, res, limit))
         if isinstance(outcome, Counted):
             return Allowed(outcome.used, res.limit, res.period[1])
         if outcome == _REPLAY:
@@ -273,5 +275,5 @@ class UsageService(HoldsMixin):
             actor=actor,
             reason=reason.strip(),
         )
-        outcome = await run_write(self._factory, None, self._counter(event, res.period, None))
+        outcome = await run_write(self._factory, None, self._counter(event, res, None))
         return outcome.used

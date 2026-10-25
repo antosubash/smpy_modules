@@ -40,6 +40,7 @@ _PAGE_BILLING: Final = f"{MODULE_NAME}/Billing"
 _PAGE_PLANS: Final = f"{MODULE_NAME}/Plans"
 _PAGE_SUBSCRIPTIONS: Final = f"{MODULE_NAME}/Subscriptions"
 _PAGE_CONNECTION: Final = f"{MODULE_NAME}/Connection"
+_PAGE_USAGE: Final = f"{MODULE_NAME}/Usage"
 
 # ── Menu ─────────────────────────────────────────────────────────────
 MENU_LABEL: Final = "Billing"

@@ -54,7 +54,12 @@ export async function clickAndConfirm(
  */
 export async function moduleCsrfHeader(
   page: Page,
-  view: '/admin/news/' | '/admin/records/' | '/pagebuilder/' | '/ai/' = '/admin/news/',
+  view:
+    | '/admin/news/'
+    | '/admin/records/'
+    | '/pagebuilder/'
+    | '/ai/'
+    | '/admin/billing/usage' = '/admin/news/',
 ): Promise<Record<string, string>> {
   const html = await (await page.request.get(view)).text();
   const json = html.match(/<script data-page="app" type="application\/json">([^<]*)<\/script>/);

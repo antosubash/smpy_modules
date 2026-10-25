@@ -1,6 +1,7 @@
 /** fetch wrapper for the billing API: JSON in/out, CSRF header, readable errors. */
 
 import { keys, translate } from './i18n';
+import { quotaMessage } from './quotaError';
 
 const CSRF_HEADER = 'X-CSRF-Token';
 
@@ -40,6 +41,10 @@ const MESSAGES: Record<string, string> = {
   price_taken: keys.billing.errors.price_taken,
   price_not_found: keys.billing.errors.price_not_found,
   invalid_return_url: keys.billing.errors.invalid_return_url,
+  unknown_meter: keys.billing.errors.unknown_meter,
+  hold_not_found: keys.billing.errors.hold_not_found,
+  hold_expired: keys.billing.errors.hold_expired,
+  usage_busy: keys.billing.errors.usage_busy,
 };
 
 export function describeError(detail: string, body: Record<string, unknown> = {}): string {
@@ -51,6 +56,7 @@ export function describeError(detail: string, body: Record<string, unknown> = {}
       over,
     });
   }
+  if (detail === 'quota_exceeded') return quotaMessage(body);
   if (detail === 'validation_error' && typeof body.message === 'string') return body.message;
   if (detail === 'price_mismatch')
     return translate(keys.billing.errors.price_mismatch, {

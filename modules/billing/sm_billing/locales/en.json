@@ -3,7 +3,8 @@
     "aria_label": "Billing administration",
     "subscriptions": "Subscriptions",
     "plans": "Plans",
-    "connection": "Stripe connection"
+    "connection": "Stripe connection",
+    "usage": "Usage"
   },
   "page": {
     "title": "Billing",
@@ -43,6 +44,23 @@
     "ends_on": "Ends on",
     "renews_on": "Renews on",
     "manage_portal": "Manage payment & invoices"
+  },
+  "usage": {
+    "title": "Usage",
+    "description": "What your organisation has used, against your plan's limits.",
+    "unlimited": "Unlimited",
+    "of_limit": "{used} of {limit}",
+    "used_no_limit": "{used} used",
+    "resets_on": "Resets {date}",
+    "in_use": "In use now",
+    "over_limit": "Limit reached",
+    "near_limit": "Almost at the limit"
+  },
+  "units": {
+    "count": "{value}",
+    "tokens": "{value} tokens",
+    "ms": "{value} ms",
+    "bytes": "{value}"
   },
   "plan_card": {
     "current": "Current plan",
@@ -200,6 +218,104 @@
     "assign_plan": "Assign plan",
     "resync": "Resync"
   },
+  "admin_usage": {
+    "head_title": "Billing usage",
+    "description": "What each organisation used, against its plan's limits.",
+    "filters": {
+      "meter": "Meter",
+      "all_meters": "All meters",
+      "search": "Organisation",
+      "search_placeholder": "Name, slug or ID",
+      "submit": "Search",
+      "over": "Over 80%",
+      "period": "Period",
+      "current": "Current period",
+      "previous": "Previous period"
+    },
+    "columns": {
+      "organisation": "Organisation",
+      "meter": "Meter",
+      "used": "Used",
+      "limit": "Limit",
+      "percent": "Used %",
+      "period": "Period",
+      "actions": "Actions"
+    },
+    "kind": {
+      "counter": "Counter",
+      "gauge": "Gauge"
+    },
+    "unregistered": "Not registered",
+    "no_period": "Never resets",
+    "details": "Details",
+    "empty_title": "No usage",
+    "empty_filtered": "No organisation matches these filters.",
+    "empty_none": "No organisation has used a metered feature yet.",
+    "detail": {
+      "title": "Usage of {name}",
+      "description": "The ledger explains every change to the counters; holds make up the gauges."
+    },
+    "ledger": {
+      "title": "Ledger",
+      "kind_filter": "Kind",
+      "all_kinds": "All kinds",
+      "time": "Time",
+      "meter": "Meter",
+      "kind": "Kind",
+      "quantity": "Quantity",
+      "source": "Source",
+      "actor": "By",
+      "reason": "Reason",
+      "empty": "No ledger entries.",
+      "loading": "Loading…",
+      "load_failed": "Could not load this. Change a filter or try again."
+    },
+    "kinds": {
+      "consume": "Consumed",
+      "record": "Recorded",
+      "refund": "Refunded",
+      "adjust": "Adjusted"
+    },
+    "holds": {
+      "title": "Open holds",
+      "meter": "Meter",
+      "quantity": "Quantity",
+      "status": "Status",
+      "expires": "Expires",
+      "source": "Source",
+      "never": "Never (committed)",
+      "empty": "No open holds.",
+      "truncated": "Showing the newest {count} holds only.",
+      "release": "Release",
+      "released": "Hold released",
+      "already_settled": "That hold was already settled."
+    },
+    "hold_status": {
+      "held": "Held",
+      "committed": "Committed",
+      "released": "Released",
+      "expired": "Expired"
+    },
+    "recount": {
+      "action": "Recount {meter}",
+      "done": "{meter} recounted: {value} in use."
+    },
+    "adjust": {
+      "action": "Adjust",
+      "title": "Adjust {meter}",
+      "description": "Correct this period's counter. The change is recorded in the ledger with your reason.",
+      "meter": "Meter",
+      "quantity": "Quantity",
+      "quantity_hint": "Negative to credit, positive to charge.",
+      "quantity_invalid": "Enter a whole number other than 0.",
+      "reason": "Reason",
+      "reason_placeholder": "Why this correction is needed",
+      "reason_required": "A reason is required.",
+      "cancel": "Cancel",
+      "submit": "Record adjustment",
+      "done": "{meter} adjusted: {used} used."
+    }
+  },
   "assign": {
     "title": "Assign a plan to {name}",
     "description": "“Unpaid” suspends the organisation; any other status lifts a suspension billing made.",
@@ -264,7 +380,13 @@
     "plan_key_immutable": "A plan key cannot change once created.",
     "price_taken": "Another plan already uses that Stripe price.",
     "price_not_found": "Stripe has no price with that ID.",
-    "invalid_return_url": "The return URL must be an http(s) origin like https://app.example.com."
+    "invalid_return_url": "The return URL must be an http(s) origin like https://app.example.com.",
+    "quota_exceeded": "{meter} limit reached ({used}/{limit}); resets {date}.",
+    "quota_exceeded_gauge": "{meter} limit reached ({used}/{limit}).",
+    "unknown_meter": "That meter is not registered for this action.",
+    "hold_not_found": "That hold no longer exists.",
+    "hold_expired": "That hold has already expired.",
+    "usage_busy": "Usage is being updated — try again in a moment."
   },
   "menu": {
     "billing": "Billing"

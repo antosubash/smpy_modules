@@ -98,6 +98,14 @@ uv run python scripts/set_setting.py sm_records \
   max_count 32 \
   preview_sync_limit 3
 
+# Usage for the admin Usage tab to show (`billing-usage.spec.ts`): three
+# consumes of the demo host's `demo.exports` counter and three holds on its
+# `demo.jobs` gauge (`host/demo_meters.py`), for the single-tenant host's
+# `default` tenant. Through billing's service API, not SQL, and keyed, so a
+# rerun counts nothing twice. A multi-tenant run gets the same rows; its spec
+# meters an organisation of its own.
+uv run python scripts/seed_usage.py
+
 # Multi-tenant runs only (E2E_MULTI_TENANT=1 → SM_MULTI_TENANT=true): resolve
 # the tenant from the host, so `<slug>.localhost` addresses an organisation's
 # public site the way an anonymous visitor would reach it. A spec names the

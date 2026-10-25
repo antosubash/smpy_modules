@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sm_billing.metering.periods import current_period
+from sm_billing.metering.periods import as_utc, current_period, provider_period
 from sm_billing.resolve import effective_plan
 
 if TYPE_CHECKING:
@@ -30,6 +30,8 @@ DEFAULT_HOLD_TTL = 900
 class Resolved:
     limit: int | None
     period: tuple[datetime, datetime]
+    #: ``period`` is the subscription's own, not the calendar fallback.
+    provider: bool = False
 
 
 def _utcnow() -> datetime:
@@ -83,5 +85,6 @@ class MeteringCore:
         async with self._reader(db) as session:
             plan, sub = await effective_plan(session, tenant_id)
             period = current_period(sub, now)
+            provider = provider_period(sub, as_utc(now)) is not None
         value = plan.limits.get(meter)
-        return Resolved(None if value is None else int(value), period)
+        return Resolved(None if value is None else int(value), period, provider)

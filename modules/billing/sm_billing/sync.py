@@ -11,11 +11,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from simple_module_db import mark_written
 from sqlalchemy import select
 from tenants.models import Tenant
 
 from sm_billing.constants import ENTITLED_STATUSES, STRIPE_STATUS_MAP, SubscriptionStatus
 from sm_billing.lifecycle import apply_lifecycle
+from sm_billing.metering.sql import extend_rollups
 from sm_billing.models import Customer, Subscription
 from sm_billing.plans import PlanService
 
@@ -54,6 +56,24 @@ async def _link_customer(db: AsyncSession, tenant_id: str, customer_id: str | No
     elif customer.provider_customer_id != customer_id:
         customer.provider_customer_id = customer_id
         customer.provider = provider
+
+
+async def _follow_period_end(db: AsyncSession, tenant_id: str, sub: Subscription):
+    """A provider that moves a period's end (same start) moves its usage
+    counters' stored end too, in this transaction: the stored end stays the
+    period's real end, which is how the next period's "previous" finds it.
+    Lapsed or not; which rows are the period's is ``extend_rollups``' rule."""
+    if sub.current_period_start is None or sub.current_period_end is None:
+        return
+    await db.execute(
+        extend_rollups(
+            tenant_id=tenant_id,
+            start=sub.current_period_start,
+            end=sub.current_period_end,
+            entitled=sub.status in ENTITLED_STATUSES,
+        )
+    )
+    mark_written(db)
 
 
 async def apply_snapshot(
@@ -108,7 +128,12 @@ async def apply_snapshot(
     sub.current_period_end = snap.current_period_end
     sub.cancel_at_period_end = snap.cancel_at_period_end
     sub.synced_at = datetime.now(UTC)
+    # Subscription first, rollups second: the same lock order as a consume
+    # (its insert reads the subscription row FOR SHARE, then writes the
+    # rollup), so the two wait on each other instead of deadlocking, and a
+    # consume that has not inserted yet waits for this period end.
     await db.flush()
+    await _follow_period_end(db, tenant_id, sub)
     await apply_lifecycle(db, app, sub)
     return sub
 

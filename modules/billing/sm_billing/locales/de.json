@@ -3,7 +3,8 @@
     "aria_label": "Abrechnungsverwaltung",
     "subscriptions": "Abonnements",
     "plans": "Tarife",
-    "connection": "Stripe-Verbindung"
+    "connection": "Stripe-Verbindung",
+    "usage": "Verbrauch"
   },
   "page": {
     "title": "Abrechnung",
@@ -43,6 +44,23 @@
     "ends_on": "Endet am",
     "renews_on": "Verlängert sich am",
     "manage_portal": "Zahlung und Rechnungen verwalten"
+  },
+  "usage": {
+    "title": "Verbrauch",
+    "description": "Was Ihre Organisation verbraucht hat, gemessen an den Grenzen Ihres Tarifs.",
+    "unlimited": "Unbegrenzt",
+    "of_limit": "{used} von {limit}",
+    "used_no_limit": "{used} verbraucht",
+    "resets_on": "Wird am {date} zurückgesetzt",
+    "in_use": "Derzeit belegt",
+    "over_limit": "Grenze erreicht",
+    "near_limit": "Fast an der Grenze"
+  },
+  "units": {
+    "count": "{value}",
+    "tokens": "{value} Tokens",
+    "ms": "{value} ms",
+    "bytes": "{value}"
   },
   "plan_card": {
     "current": "Aktueller Tarif",
@@ -200,6 +218,104 @@
     "assign_plan": "Tarif zuweisen",
     "resync": "Neu synchronisieren"
   },
+  "admin_usage": {
+    "head_title": "Abrechnung – Verbrauch",
+    "description": "Was jede Organisation verbraucht hat, gemessen an den Grenzen ihres Tarifs.",
+    "filters": {
+      "meter": "Zähler",
+      "all_meters": "Alle Zähler",
+      "search": "Organisation",
+      "search_placeholder": "Name, Kürzel oder ID",
+      "submit": "Suchen",
+      "over": "Über 80 %",
+      "period": "Zeitraum",
+      "current": "Aktueller Zeitraum",
+      "previous": "Vorheriger Zeitraum"
+    },
+    "columns": {
+      "organisation": "Organisation",
+      "meter": "Zähler",
+      "used": "Verbraucht",
+      "limit": "Grenze",
+      "percent": "Verbraucht %",
+      "period": "Zeitraum",
+      "actions": "Aktionen"
+    },
+    "kind": {
+      "counter": "Zähler",
+      "gauge": "Pegel"
+    },
+    "unregistered": "Nicht registriert",
+    "no_period": "Wird nie zurückgesetzt",
+    "details": "Details",
+    "empty_title": "Kein Verbrauch",
+    "empty_filtered": "Keine Organisation entspricht diesen Filtern.",
+    "empty_none": "Noch keine Organisation hat eine gemessene Funktion genutzt.",
+    "detail": {
+      "title": "Verbrauch von {name}",
+      "description": "Das Journal erklärt jede Änderung an den Zählern; Reservierungen bilden die Pegel."
+    },
+    "ledger": {
+      "title": "Journal",
+      "kind_filter": "Art",
+      "all_kinds": "Alle Arten",
+      "time": "Zeit",
+      "meter": "Zähler",
+      "kind": "Art",
+      "quantity": "Menge",
+      "source": "Quelle",
+      "actor": "Von",
+      "reason": "Grund",
+      "empty": "Keine Journaleinträge.",
+      "loading": "Wird geladen…",
+      "load_failed": "Konnte nicht geladen werden. Ändern Sie einen Filter oder versuchen Sie es erneut."
+    },
+    "kinds": {
+      "consume": "Verbraucht",
+      "record": "Erfasst",
+      "refund": "Erstattet",
+      "adjust": "Korrigiert"
+    },
+    "holds": {
+      "title": "Offene Reservierungen",
+      "meter": "Zähler",
+      "quantity": "Menge",
+      "status": "Status",
+      "expires": "Läuft ab",
+      "source": "Quelle",
+      "never": "Nie (bestätigt)",
+      "empty": "Keine offenen Reservierungen.",
+      "truncated": "Nur die neuesten {count} Reservierungen werden angezeigt.",
+      "release": "Freigeben",
+      "released": "Reservierung freigegeben",
+      "already_settled": "Diese Reservierung war bereits abgeschlossen."
+    },
+    "hold_status": {
+      "held": "Reserviert",
+      "committed": "Bestätigt",
+      "released": "Freigegeben",
+      "expired": "Abgelaufen"
+    },
+    "recount": {
+      "action": "{meter} neu zählen",
+      "done": "{meter} neu gezählt: {value} belegt."
+    },
+    "adjust": {
+      "action": "Korrigieren",
+      "title": "{meter} korrigieren",
+      "description": "Korrigiert den Zähler dieses Zeitraums. Die Änderung wird mit Ihrem Grund im Journal festgehalten.",
+      "meter": "Zähler",
+      "quantity": "Menge",
+      "quantity_hint": "Negativ für eine Gutschrift, positiv für eine Belastung.",
+      "quantity_invalid": "Geben Sie eine ganze Zahl ungleich 0 ein.",
+      "reason": "Grund",
+      "reason_placeholder": "Warum diese Korrektur nötig ist",
+      "reason_required": "Ein Grund ist erforderlich.",
+      "cancel": "Abbrechen",
+      "submit": "Korrektur erfassen",
+      "done": "{meter} korrigiert: {used} verbraucht."
+    }
+  },
   "assign": {
     "title": "{name} einen Tarif zuweisen",
     "description": "„Unbezahlt“ sperrt die Organisation; jeder andere Status hebt eine von der Abrechnung verhängte Sperre auf.",
@@ -264,7 +380,13 @@
     "plan_key_immutable": "Der Schlüssel eines Tarifs kann nach dem Erstellen nicht mehr geändert werden.",
     "price_taken": "Ein anderer Tarif verwendet diesen Stripe-Preis bereits.",
     "price_not_found": "Stripe kennt keinen Preis mit dieser ID.",
-    "invalid_return_url": "Die Rückkehr-URL muss ein http(s)-Ursprung wie https://app.example.com sein."
+    "invalid_return_url": "Die Rückkehr-URL muss ein http(s)-Ursprung wie https://app.example.com sein.",
+    "quota_exceeded": "Grenze für {meter} erreicht ({used}/{limit}); wird am {date} zurückgesetzt.",
+    "quota_exceeded_gauge": "Grenze für {meter} erreicht ({used}/{limit}).",
+    "unknown_meter": "Dieser Zähler ist für diese Aktion nicht registriert.",
+    "hold_not_found": "Diese Reservierung existiert nicht mehr.",
+    "hold_expired": "Diese Reservierung ist bereits abgelaufen.",
+    "usage_busy": "Der Verbrauch wird gerade aktualisiert – versuchen Sie es gleich noch einmal."
   },
   "menu": {
     "billing": "Abrechnung"
