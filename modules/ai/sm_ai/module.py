@@ -86,6 +86,15 @@ class AiModule(ModuleBase):
 
         crypto.set_secret_provider(_live_secret)
 
+    async def on_startup(self, app: FastAPI) -> None:
+        """Register ``ai.requests`` with billing's meter registry, if billing runs.
+
+        Billing is optional: without it nothing is metered (see ``metering``).
+        """
+        from sm_ai import metering
+
+        metering.register_meter(app)
+
     def locale_dirs(self) -> dict[str, Path]:
         """Console strings, resolved through the package so a wheel install works."""
         base = Path(str(importlib.resources.files(__package__) / "locales"))

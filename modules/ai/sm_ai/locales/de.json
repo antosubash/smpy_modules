@@ -47,6 +47,13 @@
     "csrf_failed": "Das Sicherheitstoken dieser Seite ist veraltet. Laden Sie die Seite neu und versuchen Sie es erneut – Ihre Änderungen bleiben auf dieser Seite erhalten, bis Sie sie verlassen.",
     "request_failed": "Anfrage fehlgeschlagen ({status} {statusText})"
   },
+  "meters": {
+    "requests": "KI-Anfragen"
+  },
+  "quota": {
+    "exceeded": "Grenze für {meter} erreicht ({used}/{limit}); wird am {date} zurückgesetzt.",
+    "exceeded_no_reset": "Grenze für {meter} erreicht ({used}/{limit})."
+  },
   "menu": {
     "ai": "KI"
   }

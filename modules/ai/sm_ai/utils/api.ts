@@ -2,6 +2,7 @@
 
 import { csrfHeaders, isCsrfRefusal } from './csrf';
 import { keys, translate } from './i18n';
+import { isQuotaExceeded, quotaMessage } from './quotaError';
 
 export type AiSettingsOut = {
   chat_providers: string[];
@@ -54,12 +55,16 @@ const BASE = '/api/ai';
 
 /** Turn a failed response into something worth showing a person — our own
  * JSON `detail` when present, the status line otherwise (never raw HTML).
+ * Billing's 402 `quota_exceeded` reads as the translated quota message.
  * FastAPI 422s carry a Pydantic error array; render it as "field: message"
  * lines instead of dumping the serialized structure into a toast. */
 async function errorFrom(response: Response): Promise<Error> {
   const text = await response.text();
   try {
-    const detail = (JSON.parse(text) as { detail?: unknown }).detail;
+    const body = JSON.parse(text) as Record<string, unknown>;
+    // Billing's 402 for a route metered with RequiresAiRequest.
+    if (isQuotaExceeded(response.status, body)) return new Error(quotaMessage(body));
+    const detail = body.detail;
     if (isCsrfRefusal(response.status, detail))
       return new Error(translate(keys.ai.api.csrf_failed));
     if (typeof detail === 'string') return new Error(detail);

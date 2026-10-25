@@ -52,6 +52,34 @@ vector width. All errors subclass `AiError`.
 > The import package is `sm_ai`, not `ai` — the bare name belongs to another
 > PyPI project and would collide in hosts that install it.
 
+## Usage metering
+
+With the `billing` module installed, every AI request a consumer serves can
+count against the organisation's plan as the `ai.requests` meter, a counter
+that resets each billing period. Without billing nothing is metered or
+limited, and nothing is imported: ai has no dependency on billing.
+
+On startup the module registers `ai.requests` with billing's meter registry,
+so the plan editor suggests it (absent is unlimited, `0` forbids). The
+module serves no chat of its own, so the consumer guards the route that
+calls the model:
+
+```python
+from sm_ai.contracts import RequiresAiRequest, resolve_model
+
+@router.post("/summarise", dependencies=[RequiresAiRequest()])
+async def summarise(...):
+    result = await agent.run(text, model=resolve_model())
+```
+
+It is billing's `RequiresQuota("ai.requests")`: past the limit the route
+answers 402 `quota_exceeded`, and the charge is refunded only when the
+handler **raises**, so let a provider error propagate rather than return an
+error response. A streaming response is charged when the handler returns it;
+a failure mid-stream refunds nothing. `utils/quotaError.ts` turns the 402
+into a translated message, and this module's API client uses it. See
+[the API reference](docs/api-reference.md#usage-metering-requiresairequest).
+
 ## Settings
 
 Two slots — chat and embeddings — each with provider (`anthropic`, `openai`,
