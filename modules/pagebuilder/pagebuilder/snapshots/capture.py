@@ -235,7 +235,7 @@ async def capture(
     missing = sorted(missing + vanished)
     # After pagebuilder's own documents, so the url -> name map is complete (#80).
     contributed, contributed_bytes = await capture_sections(
-        db, sections or SectionRegistry(), dest, url_to_name
+        db, sections if sections is not None else SectionRegistry(), dest, url_to_name
     )
 
     counts = {"pages": len(pages), "redirects": redirect_count, "media": len(media_rows)}

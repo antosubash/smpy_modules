@@ -55,6 +55,12 @@ def test_a_section_must_read_what_it_writes():
         SectionRegistry().register(_section(required="yes"))
 
 
+@pytest.mark.parametrize("keys", [None, ["notes"], {"notes": 1}])
+def test_count_label_keys_must_map_kinds_to_keys(keys):
+    with pytest.raises(ValueError, match="count_label_keys"):
+        SectionRegistry().register(_section(count_label_keys=keys))
+
+
 def test_sections_run_in_name_order():
     registry = SectionRegistry()
     for name in ("zebra", "alpha", "news"):

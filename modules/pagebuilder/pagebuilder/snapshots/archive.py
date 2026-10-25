@@ -167,7 +167,7 @@ def read_zip(
     manifest_path = dest / MANIFEST_NAME
     if not manifest_path.is_file():
         raise BundleError("bundle has no manifest.json")
-    registry = sections or SectionRegistry()
+    registry = sections if sections is not None else SectionRegistry()
     manifest = check_manifest(load_document(manifest_path, MANIFEST_NAME), registry.readable())
     check_members(manifest, members)
 

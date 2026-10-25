@@ -97,6 +97,7 @@ async def capture_sections(
         )
         ctx.check_tenant()
         result = await section.capture(ctx)
+        ctx.check_tenant()  # and after: a section must not leave another tenant bound
         counts = dict(result.counts)
         # Checked here, not trusted: upload refuses non-integer counts, so a
         # contributor that wrote one would make its own snapshot unrestorable.
@@ -218,7 +219,9 @@ async def plan_sections(
     tenant = _tenant() if known else ""
     for section, entry in known:
         ctx = _restore_context(db, section, entry, bundle_dir, name_to_url, tenant)
-        sections.append(_plan_entry(section, entry["version"], await section.plan(ctx)))
+        plan = await section.plan(ctx)
+        ctx.check_tenant()
+        sections.append(_plan_entry(section, entry["version"], plan))
     carried = {entry["section"] for entry in _contributed(manifest)}
     return {
         "sections": sections,
@@ -253,6 +256,7 @@ async def apply_sections(
     for section, entry in known:
         ctx = _restore_context(db, section, entry, bundle_dir, name_to_url, tenant)
         result = await section.apply(ctx)
+        ctx.check_tenant()
         outcome[section.name] = {"counts": dict(result.counts), "applied": dict(result.applied)}
     await db.flush()
     return outcome

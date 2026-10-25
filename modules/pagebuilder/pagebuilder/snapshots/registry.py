@@ -11,7 +11,7 @@ this is the store behind it.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from typing import TYPE_CHECKING
 
 from pagebuilder.snapshots.manifest import RESERVED_SECTION_NAMES, SECTION_NAME
@@ -41,6 +41,11 @@ class SectionRegistry:
             raise ValueError(f"bundle section {name!r} has a non-boolean 'required'")
         if not isinstance(getattr(section, "label_key", None), str):
             raise ValueError(f"bundle section {name!r} has no label_key")
+        keys = getattr(section, "count_label_keys", None)
+        if not isinstance(keys, Mapping) or not all(
+            isinstance(k, str) and isinstance(v, str) for k, v in keys.items()
+        ):
+            raise ValueError(f"bundle section {name!r} needs count_label_keys: {{kind: key}}")
         for method in ("capture", "validate", "plan", "apply"):
             if not callable(getattr(section, method, None)):
                 raise ValueError(f"bundle section {name!r} has no {method}() method")

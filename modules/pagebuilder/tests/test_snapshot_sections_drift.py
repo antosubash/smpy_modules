@@ -16,12 +16,14 @@ from pagebuilder.contracts.bundle import (
     CaptureContext,
     RestoreContext,
     SectionCapture,
+    TenantMismatchError,
     ValidateContext,
     register_section,
 )
 from pagebuilder.snapshots import restore as restore_module
 from pagebuilder.snapshots.files import UnsafeBundlePathError
 from pagebuilder.snapshots.validate import BundleError
+from simple_module_db import current_tenant_id
 
 _SNAPSHOTS = "/api/pagebuilder/snapshots"
 _PENDING = "/api/pagebuilder/imports/pending"
@@ -129,6 +131,27 @@ async def test_a_contributor_crashing_in_validate_is_a_422(tmp_path):
         refused = await client.post(f"{_SNAPSHOTS}/upload", files={"file": ("b.zip", data)})
         assert refused.status_code == 422
         assert "'notes' section is malformed" in refused.json()["detail"]
+
+
+async def test_a_section_that_leaves_another_tenant_bound_fails_closed(tmp_path):
+    section = NotesSection()
+    original = section.apply
+    tokens = []
+
+    async def rebinding(ctx):
+        result = await original(ctx)
+        tokens.append(current_tenant_id.set("globex"))
+        return result
+
+    section.apply = rebinding
+    async for client in notes_client(tmp_path, section):
+        snapshot = await _take(client)
+        staged = await client.post(f"{_SNAPSHOTS}/{snapshot['id']}/restore")
+        # The request runs in a copy of this context, so the rebinding stays there.
+        with pytest.raises(TenantMismatchError):
+            await client.post(f"/api/pagebuilder/imports/{staged.json()['id']}/approve")
+        assert tokens
+        assert (await client.get(_PENDING)).json()["id"] == staged.json()["id"]
 
 
 async def test_non_integer_counts_fail_the_capture(tmp_path):
