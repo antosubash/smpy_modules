@@ -114,7 +114,8 @@ export function PublicShell({
           </header>
         )}
         <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
-          <p className="pb-print-url">{absoluteUrl(inertiaPage.url ?? '')}</p>
+          {/* A draft's URL is the private admin one; print none rather than leak it. */}
+          {!preview && <p className="pb-print-url">{absoluteUrl(inertiaPage.url ?? '')}</p>}
           {children}
         </main>
         {layout_footer && (
