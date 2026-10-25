@@ -15,6 +15,10 @@ module exposes:
   tenant through `TenantService.set_status`. When payment recovers, billing
   reactivates it. A tenant that an admin suspended by hand is never
   reactivated by billing.
+- **Usage metering.** Billing installs a `UsageMeter` as
+  `app.state.billing_usage`: race-safe, idempotent per-period counters and
+  gauge holds, enforced against the plan's limits (see *Usage metering*
+  below).
 - **Events.** On `MembershipAdded` and `MembershipRemoved`, billing keeps the
   Stripe quantity of a per-seat plan equal to the member count. On
   `TenantDeleted` it cancels the tenant's subscription at Stripe (see
@@ -23,8 +27,9 @@ module exposes:
 **Full documentation** lives in [`docs/`](docs/index.md):
 [user guide](docs/user-guide.md) (admin screens and the owner's Billing page),
 [API reference](docs/api-reference.md) (endpoints, errors, gating a feature on
-a plan), [operations](docs/operations.md) (install, Stripe setup,
-reconcile, troubleshooting) and [architecture](docs/architecture.md).
+a plan, metering usage), [operations](docs/operations.md) (install, Stripe
+setup, reconcile, the usage sweeper, troubleshooting) and
+[architecture](docs/architecture.md).
 
 ## Install
 
@@ -32,14 +37,23 @@ reconcile, troubleshooting) and [architecture](docs/architecture.md).
 pip install simple_module_billing
 ```
 
-The package depends on `simple_module_tenants>=0.0.36`. The host has to run
+The package depends on `simple_module_tenants>=0.0.36` and `fastapi>=0.121`
+(for the function-scoped `RequiresQuota` dependency). The host has to run
 with `SM_MULTI_TENANT=true`, because the tenant billing screen needs an active
 organisation. Billing ships SQLModel tables but no migrations. Autogenerate a
 revision in the host and give its first revision
-`branch_labels = ("billing",)`, so the module can be removed on its own with
-`alembic downgrade billing@base`. Autogenerate again after upgrading billing,
-since a release can add a column (`billing_customer.teardown_done_at` and two backoff columns, after
-0.0.11).
+`branch_labels = ("billing",)`. The label only names the revision:
+`alembic downgrade billing@base` walks every revision beneath it, not billing
+alone. Autogenerate again after upgrading billing, since a release can add a
+column or a table (`billing_customer.teardown_done_at` and two backoff columns
+after 0.0.11; the four `billing_usage_*` tables,
+`billing_subscription.current_period_start` and
+`billing_usage_period.provider_period` with usage metering).
+
+The database must be Postgres or SQLite 3.35 or newer: usage metering
+enforces limits with `INSERT … ON CONFLICT … DO UPDATE … WHERE … RETURNING`,
+and startup refuses anything else. Nothing else is needed (no Redis): the
+counters live in the database.
 
 On first start, billing seeds a free default plan (`free`). It is idempotent,
 so a fresh install entitles every tenant before an admin has opened the plan
@@ -83,6 +97,59 @@ Consumers ask the `tenants` protocol and never import billing:
 ```python
 limit = await request.app.state.tenants.entitlements.limit(tenant_id, "storage.gb")
 ```
+
+### Usage metering
+
+For limits that are *used up* per billing period (API calls, AI tokens,
+exports) or *held* at once (concurrent jobs), a module registers a meter and
+counts against it. The meter key is a `Plan.limits` key, set per plan in the
+plan editor, which suggests every registered meter. An absent key is
+unlimited and `0` forbids.
+
+```python
+# In your module's on_startup: no billing import.
+reg = getattr(app.state, "billing_meters", None)
+if reg is not None:
+    reg.define(key="ai.requests", kind="counter", label_key="ai.meters.requests")
+
+# On a route: charge 1 per request, answer 402 quota_exceeded when used up.
+from sm_billing.metering.deps import RequiresQuota
+
+@router.post("/chat", dependencies=[RequiresQuota("ai.requests")])
+async def chat(...): ...
+
+# Or directly; None means billing is not installed, so nothing is limited.
+usage = getattr(request.app.state, "billing_usage", None)
+if usage is not None:
+    outcome = await usage.consume(tenant_id, "ai.requests", 1, job_id, source="ai")
+    if not outcome.ok:
+        ...
+```
+
+- **Counters** reset each billing period: the Stripe period when there is
+  one, else the UTC calendar month. `consume` checks and counts in one
+  statement, `record` counts after the fact, `refund` reverses a call, `check`
+  is an advisory read.
+- **Gauges** are levels held by holds: `reserve`, `commit`, `release`,
+  `extend` and `async with usage.holding(...)`. A hold that is neither
+  committed nor extended lapses after its TTL, and the hold sweeper returns
+  its capacity.
+- **Idempotent.** Every call carries a key; a replay is never counted twice,
+  and a key reused for a different call is a 409. With `RequiresQuota`, a
+  replayed `Idempotency-Key` never re-runs the handler. The charge is refunded
+  only when the handler raises.
+- **Race-safe** on Postgres and SQLite: concurrent calls against limit N
+  admit exactly N. Each write is its own short transaction, finished with
+  `finalize_session`. `db=` joins the caller's transaction instead; pass it
+  only when the rest of that transaction is short, because the counter's row
+  lock is held until it commits.
+
+Organisations see a **Usage** card on `/billing/`; platform admins get a
+**Usage** tab (`/admin/billing/usage`) with filters, a per-organisation
+ledger and open holds, and **Release**, **Recount** and **Adjust** (with a
+required reason). The protocol is `sm_billing.contracts.metering`; upstream
+issue antosubash/simple_module_python#616 tracks moving it into the
+framework.
 
 ### Providers
 
@@ -174,11 +241,13 @@ to have the app do it on a schedule, safely across several instances — see
 |---|---|
 | `GET /billing/` | Tenant screen: current plan, seats, plan picker, portal |
 | `GET /api/billing/status` | Plan, subscription, seats, provider |
+| `GET /api/billing/usage` | The organisation's meters: used, limit, when each counter resets |
 | `POST /api/billing/checkout` `{plan_id, interval}` | Returns a Checkout `{url}` (first paid plan only) |
 | `POST /api/billing/portal` | Returns a Customer Portal `{url}` |
 | `POST /api/billing/change-plan` `{plan_id, interval}` | Paid → paid with proration; paid → free cancels at period end. Returns 409 `too_many_members` if the target's seats are fewer than those in use. |
-| `/admin/billing/plans`, `/subscriptions`, `/connection` | Admin screens |
+| `/admin/billing/plans`, `/subscriptions`, `/connection`, `/usage` | Admin screens |
 | `/api/billing/admin/plans` … `/subscriptions/{tenant_id}/assign` … `/connection` | Admin API |
+| `/api/billing/admin/usage` … `/{tenant_id}/events`, `/holds`, `/adjust`, `/recount`, `/holds/{hold_id}/release` | Admin usage API (reads `billing.platform.view`, writes `billing.platform.manage`) |
 | `POST /billing/webhooks/stripe` | Public. The signature is the authentication. |
 
 Every API mutation needs the `X-CSRF-Token` header, which views expose as
@@ -210,11 +279,11 @@ the `csrf_token` prop.
   `manual` provider nothing reaches Stripe, and a tenant with a Stripe customer
   is logged for you to cancel there. On a framework older than 0.0.38 there is
   no event and no delete, so billing subscribes to nothing.
-- **Usage metering is in progress (#99).** Per-period counters and their
-  ledger ship as `app.state.billing_usage` (see `docs/api-reference.md`),
-  with gauge holds (`reserve`/`commit`/`release`/`extend`/`holding`), the
-  hold sweeper, the meter registry (`app.state.billing_meters`) and the
-  `RequiresQuota` dependency (`sm_billing.metering.deps`, 402
-  `quota_exceeded`). The usage screens and their docs follow.
-- **Not in v1:** per-tenant limit overrides, coupons, more
-  than one subscription per tenant, and translated UI text.
+- **Usage metering (v1).** No module in this repo meters anything yet (the
+  `ai` module's `ai.requests` is the planned first consumer; the demo host
+  registers `demo.exports` and `demo.jobs`). Not in v1: storing the first
+  response for a replayed `Idempotency-Key` (the replay gets 409
+  `idempotency_replay`), reporting usage to Stripe metered prices, threshold
+  events or emails, and an audit trail of refused calls (they are logged).
+- **Not in v1:** per-tenant limit overrides, coupons, and more
+  than one subscription per tenant. The UI ships in English and German.

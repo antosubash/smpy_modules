@@ -28,6 +28,10 @@
    After upgrading billing, autogenerate again: a release can add a column
    (the first release after 0.0.11 adds `billing_customer.teardown_done_at` and two backoff columns,
    for the deleted-tenant sweep), and billing reads it on every reconcile.
+   Usage metering adds four tables (`billing_usage_event`,
+   `billing_usage_period`, `billing_usage_gauge`, `billing_usage_hold`), the
+   nullable `billing_subscription.current_period_start` and
+   `billing_usage_period.provider_period`; all additive.
 
    The `billing` branch label names the revision; it does **not** make
    `alembic downgrade billing@base` remove billing alone. Autogenerate chains
@@ -35,8 +39,11 @@
    beneath it. Upstream #333 was closed in 0.0.36 as a docs correction, not a
    behaviour change (antosubash/simple_module_python#333).
 4. Start the app. On every startup billing seeds a free **Free** plan if no
-   default plan exists, builds the configured provider, and installs itself as
-   `app.state.tenants.entitlements`.
+   default plan exists, builds the configured provider, installs itself as
+   `app.state.tenants.entitlements`, installs the usage meter as
+   `app.state.billing_usage` and starts the hold sweeper. Startup fails on a
+   database other than Postgres or SQLite 3.35+, which metering cannot
+   enforce on.
 
 ## Settings
 
@@ -53,7 +60,7 @@ environment variables — an `SM_BILLING_*` line does nothing.
 | `reconcile_interval_minutes` | `0` | Run [reconcile](#reconcile) inside the app every N minutes over subscriptions not synced for N minutes. `0` is off. Takes effect on save: the loop starts, stops or re-times itself. `60` suits most deployments. |
 | `usage_hold_ttl_seconds` | `900` | Default TTL of a usage hold when neither its meter nor the caller sets one (at least 30). A holder that crashes gives its slot back once the hold lapses. Read per call. |
 | `usage_sweep_interval_seconds` | `60` | Seconds between sweeps that expire lapsed holds (every instance sweeps; the guarded transition releases each hold once). `0` turns it off. Re-read from the database before every tick, so a value saved on one worker reaches all of them. |
-| `usage_event_retention_days` | `400` | The daily purge drops ledger charges older than this together with their refunds (by the charge's age, so a key is never left with only its refund; a refund goes only while its selected charge row is still there, so a stale batch on another instance never takes a newer call's refund), and settled holds older than 30 days. It deletes in batches of 1,000 rows per transaction, at most 20 per table per tick, and carries a backlog over to the next ticks, so SQLite's write lock is never held for long. `0` keeps the ledger. Counters and gauges are never purged. A purged key is forgotten whole and can be used again. |
+| `usage_event_retention_days` | `400` | The daily purge drops ledger charges older than this together with their refunds (by the charge's age, so a key is never left with only its refund; a refund goes only while its selected charge row is still there, so a stale batch on another instance never takes a newer call's refund), and settled holds older than 30 days. Each transaction deletes up to 1,000 charges plus their refunds (so up to about 2,000 ledger rows), or up to 1,000 settled holds, with at most 20 purge write transactions per table per tick, and carries a backlog over to the next ticks, so SQLite's write lock is never held for long. `0` keeps the ledger. Counters and gauges are never purged. A purged key is forgotten whole and can be used again. |
 
 > **Rotating the app's `secret_key` makes stored Stripe secrets unreadable.**
 > Billing then falls back to `manual` at startup and the connection screen
@@ -172,6 +179,77 @@ Prefer an external scheduler (cron, a Kubernetes CronJob)? Leave the setting at
 rows are unprocessed, and whether the scheduled reconcile is running. An old
 "oldest sync" with the loop off, or any unprocessed webhook, is worth a look.
 
+## Usage metering
+
+Modules that meter usage register their meters and call
+`app.state.billing_usage` (see the [API reference](api-reference.md#metering-usage-from-another-module));
+limits are set per plan in the plan editor, and the admin **Usage** tab shows
+them. There is nothing to configure beyond the three `usage_*` settings
+above. The protocol lives in `sm_billing.contracts.metering` for now;
+upstream issue antosubash/simple_module_python#616 tracks moving it next to
+`EntitlementProvider` in the framework's `tenants.contracts`, so consumers
+could type against the framework instead.
+
+### The hold sweeper
+
+Every instance runs a loop (`metering/sweeper.py`) that, every
+`usage_sweep_interval_seconds`, expires up to 500 holds that are `held` past
+their expiry and returns their capacity. Two instances picking the same hold
+are safe: a conditional `UPDATE` on the hold's status moves it for one of
+them, and only that one lowers the gauge. There is no lease or leader
+election. The loop re-reads the `usage_*` settings from the database before
+every tick, so a value saved on one worker reaches all of them; `0` idles
+every loop (only for a host that runs the sweep elsewhere). The loop also
+runs the ledger purge below, so `0` stops that too: nothing else purges the
+ledger. A failed tick is
+logged as `billing.usage_sweeper.tick_failed` and the loop carries on. While
+the sweep is off or behind, a lapsed hold still counts against its gauge; a
+late `commit` or `extend` on it expires it on the spot.
+
+A job that outlives its hold's TTL without `extend` loses its slot. Give a
+long-running meter a `hold_ttl_seconds` that covers it, or heartbeat with
+`extend`.
+
+### Ledger retention
+
+Once a day per process, the same loop deletes ledger charges recorded more
+than `usage_event_retention_days` ago (by the server-side `recorded_at`)
+together with their refunds, and released or expired holds settled more than
+30 days ago. Each ledger transaction selects up to 1,000 charges and deletes
+them with their refunds, so up to about 2,000 rows; each hold transaction
+deletes up to 1,000 settled holds. At most 20 purge write transactions run per
+table per tick; a backlog (after an outage, or after lowering the
+retention) carries over to later ticks. The per-period counters and the
+gauges are **never** purged, so the usage screens keep their history. A
+purged key is forgotten whole and could be counted again, which is why the
+retention (400 days by default) is far longer than any retry. `0` keeps the
+ledger forever.
+
+### SQLite: `usage_busy`
+
+On SQLite there is one writer at a time. A metering write that cannot take
+the write lock answers **503 `usage_busy`** with `Retry-After: 1`: it fails
+closed, counting nothing and admitting nothing. Every metering write can
+meet it: `consume`, `record`, `refund`, `adjust`, the hold calls and recount
+all translate SQLite's "database is locked" the same way. It is most likely
+with `consume(db=…)` or `record(db=…)`, when the caller's own transaction
+read before the metering write and another writer committed in between
+(SQLite's `BUSY_SNAPSHOT`, which `busy_timeout` cannot wait out). An
+own-transaction call starts with a write and waits on `busy_timeout`, but
+under heavy write contention it can still run out of it. Postgres never
+answers `usage_busy`. A deployment that sees it often should move to
+Postgres or stop passing `db=`.
+
+### Why no Redis
+
+The counters and gauges live in the database, enforced by one conditional
+upsert per call (`INSERT … ON CONFLICT DO UPDATE … WHERE used + qty <=
+limit`), so they are exactly as durable and as consistent as the rest of the
+billing data, across any number of instances, with nothing more to run. The
+cost is one short write transaction per metered call. The framework's lease
+backends (Redis or `sm_lease`) are not used: their holders are invisible to
+the ledger and the usage screens.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Check / fix |
@@ -188,11 +266,18 @@ rows are unprocessed, and whether the scheduled reconcile is running. An old
 | "Changing a price that is in use" when editing a plan | a live subscription bills on that price | Create a new plan with the new price; move organisations to it. |
 | Connection screen: "cannot be decrypted" | app `secret_key` changed | Re-enter both Stripe secrets. |
 | Checkout says "already subscribed" but the page shows the free plan | a subscription exists at Stripe the app hasn't recorded | `smpy billing reconcile --tenant ID`. |
+| Startup fails with "billing metering supports postgresql and sqlite" or "needs SQLite >= 3.35" | an unsupported database, or an old SQLite library in the Python build | Use Postgres, or a Python whose `sqlite3.sqlite_version` is 3.35 or newer. |
+| A metered request answers 402 `quota_exceeded` | the organisation used its plan's allowance for the period (or holds its gauge's limit) | **Admin → Billing → Usage**: the row, the ledger, the open holds. Raise the plan's limit, credit with **Adjust**, or **Release** a stuck hold. |
+| A gauge stays full though no job is running | holds left by a crashed job that have not lapsed yet, or a sweep turned off | The drawer's **Open holds**; **Release** them, check `usage_sweep_interval_seconds`. If the level and the holds disagree, **Recount**. |
+| Metered requests answer 503 `usage_busy` | SQLite write contention, most often from `consume(db=…)` / `record(db=…)` | See [SQLite: `usage_busy`](#sqlite-usage_busy). |
+| A metered route answers 409 `idempotency_replay` | the client resent an `Idempotency-Key` whose request already ran | Expected: the work ran once. A client that wants another run sends a new key. |
 
 ## Data and deletion
 
-Billing's tables (`billing_plan`, `billing_customer`, `billing_subscription`,
-`billing_webhook_event`) hold `tenant_id` as a plain column: one module cannot
+Billing's per-organisation tables (`billing_customer`,
+`billing_subscription` and the four `billing_usage_*` tables) hold
+`tenant_id` as a plain column (`billing_plan` is global, and
+`billing_webhook_event` is keyed by the provider's event id): one module cannot
 hold a foreign key into another module's tables, so deleting an organisation
 does not cascade into them.
 
@@ -238,6 +323,11 @@ bills" means any status that has not ended (`canceled`, `incomplete_expired`),
 so `incomplete` and `paused` are canceled too. Under the
 `manual` provider nothing reaches Stripe; a log line asks you to cancel there
 if the organisation had a Stripe subscription from before the switch.
+
+The usage ledger is pruned by the retention above; the usage counters,
+gauges and an organisation's ledger are kept after it is deleted, like the
+other billing rows. Consumers are told to put request or job ids in
+idempotency keys and `source`, never personal data.
 
 `billing_webhook_event` grows by one
 row per delivery; prune processed rows older than Stripe's retry window

@@ -3,8 +3,8 @@
 Two audiences use billing's screens:
 
 - **Platform administrators** (the `admin` role, or `billing.platform.*`
-  permissions) work under **Admin → Access → Billing**: Subscriptions, Plans
-  and Stripe connection.
+  permissions) work under **Admin → Access → Billing**: Subscriptions, Plans,
+  Stripe connection and Usage.
 - **Organisation owners** see a **Billing** entry in the app sidebar for the
   organisation they have selected. Organisation admins can view it; only the
   owner can change it.
@@ -30,6 +30,7 @@ organisations) and **Archived**. **New plan** opens the editor; **Edit** and
 | **Sort order** | Position in the plan picker (lower first). |
 | **Description** | One or two sentences shown on the plan card. |
 | **Limits** | Rows of key and number. `tenants.seats` is the seat limit (members plus pending invitations). **A key you don't add is unlimited; `0` forbids.** Other keys are read by whichever module asks for them. |
+| **Limits** for metered features | A module that meters usage (requests, tokens, running jobs) registers a *meter*, and its key appears among the suggestions. The number is the allowance per billing period for a counter (it resets when the period renews) or the most held at once for a gauge (concurrent jobs, reserved storage). Quantities are in the meter's unit: bytes, tokens or milliseconds, not GB or seconds. As for any limit, no row is unlimited and `0` forbids. |
 | **Features** | Comma-separated feature keys (`sso, audit-log`). A module asks "does this plan have `sso`?". |
 | **Shown to organisations** | Untick to keep a plan off the picker (for plans you assign by hand). |
 | **Default plan for new organisations** | Only a free plan can be the default. |
@@ -77,6 +78,46 @@ member count (and the billed quantity if it differs), and the period end.
 | `incomplete` | Incomplete | the default plan (the first payment never went through) |
 | — | No subscription | the default plan |
 
+## Usage (`/admin/billing/usage`)
+
+One row per organisation and meter, fullest first: **Organisation**,
+**Meter** (with **Counter** or **Gauge**), **Used**, **Limit**, **Used %**
+with a bar, and the **Period** (a gauge **Never resets**). A meter no module
+registers any more is marked **Not registered**. The filters above the table:
+
+- **Meter** — one meter, or **All meters**;
+- **Period** — **Current period** or **Previous period** (the period just
+  before each organisation's current one; counters only);
+- **Organisation** — search by name, slug or ID;
+- **Over 80%** — only rows at 80% of their limit or more.
+
+The numbers are the ones enforcement uses: the plan in force and the
+organisation's own period (its Stripe period, else the calendar month in
+UTC).
+
+**Details** on a row opens a side panel for that organisation:
+
+- **Open holds** — the holds that make up its gauges (a running job, reserved
+  storage) with their quantity, status, expiry (**Never (committed)** once
+  committed) and source. **Release** returns a hold's capacity; one already
+  settled says so. Use it for a slot left behind by a job that died, when
+  waiting for the hold to lapse is too long.
+- **Ledger** — every change to its counters, newest first: time, kind
+  (**Consumed**, **Recorded**, **Refunded**, **Adjusted**), meter, quantity,
+  source, and for an adjustment **By** and **Reason**. Filter it with
+  **Meter** and **Kind**.
+- **Recount {meter}** (one button per gauge) rebuilds the gauge's level from
+  its open holds. Use it when the level and the holds disagree.
+- **Adjust** opens a dialog: pick a counter, enter a signed **Quantity**
+  (negative to credit, positive to charge; a whole number other than 0) and a
+  **Reason**, which is required. **Record adjustment** applies it to the
+  current period and writes it to the ledger with your reason and your user ID.
+  A credit can take the counter below zero, which leaves the organisation
+  that much more than its limit for the rest of the period.
+
+Release, Recount and Adjust need `billing.platform.manage`; the table and the
+panel need `billing.platform.view`.
+
 ## Stripe connection (`/admin/billing/connection`)
 
 - **Webhook endpoint** — the URL to paste into Stripe (copy button).
@@ -97,7 +138,25 @@ screen and also takes effect when saved.
 
 The card at the top shows the plan in force, its status, seats (**3 members**,
 or **2 of 5 seats used** when the plan has a limit), and when it renews or ends.
-Below it, the plan picker lists every visible plan for the chosen billing
+Below it, the **Usage** card (when anything is metered) shows one row per
+metered feature the plan limits or the organisation has used: **3 of 10**
+(or **3 used** with **Unlimited** when the plan sets no limit), a bar that
+turns amber at 90% (**Almost at the limit**) and red at the limit (**Limit
+reached**), and **Resets {date}** for a per-period counter or **In use now**
+for a gauge, which never resets. Everyone who can see the Billing page sees
+the card. The card is hidden when nothing is metered.
+
+When the organisation reaches a limit, the metered feature refuses the
+request (HTTP 402 `quota_exceeded`, carrying the meter, the limit, what was
+used and when it resets). The wording is up to the module that meters the
+feature; billing's `utils/quotaError.ts` helper, which a module can copy,
+says for example "AI requests limit reached (10/10); resets 1 Nov 2026."
+Usage starts again from zero when the period renews; a gauge frees up as
+running work finishes. Upgrading to a plan with a higher limit applies at
+once; a downgrade below what is already used refuses further use for the
+rest of the period and takes nothing back.
+
+Below that, the plan picker lists every visible plan for the chosen billing
 period (**Monthly** / **Yearly**). Each card's button says what it will do:
 
 | Button | Happens |
