@@ -70,43 +70,59 @@ def test_module_version_matches_root_version():
     assert str(root) == str(mod)
 
 
-def _all_manifests() -> list:
-    """Every file a bump rewrites — discovered the same way the script does.
-
-    Listing them individually is what let this test corrupt the tree: it was
-    written when pagebuilder was the only module, so a bump left every *other*
-    module's manifest sitting at the test's throwaway version, and the very
-    next `--check-current` run failed on a tree nobody had edited.
-    """
+def _manifests(root: Path) -> list[Path]:
+    """Every file a bump rewrites — discovered the same way the script does."""
     return [
-        REPO / "pyproject.toml",
-        *sorted((REPO / "modules").glob("*/pyproject.toml")),
-        *sorted((REPO / "modules").glob("*/package.json")),
+        root / "pyproject.toml",
+        *sorted((root / "modules").glob("*/pyproject.toml")),
+        *sorted((root / "modules").glob("*/package.json")),
     ]
 
 
-def test_framework_pins_survive_a_real_bump():
-    """Round-trip a real bump and restore, asserting the pins are unchanged."""
-    manifest = REPO / "modules" / "pagebuilder" / "pyproject.toml"
-    snapshot = {path: path.read_text() for path in _all_manifests()}
-    original = [str(d) for d in tomlkit.parse(snapshot[manifest])["project"]["dependencies"]]
-    try:
-        assert _run("9.9.9").returncode == 0
-        bumped = tomlkit.parse(manifest.read_text())
-        assert str(bumped["project"]["version"]) == "9.9.9"
-        deps = [str(d) for d in bumped["project"]["dependencies"]]
-        assert deps == original
-        assert any(d.startswith("simple_module_core>=") for d in deps)
-        assert not any("simple_module_core==" in d for d in deps)
-    finally:
-        for path, original in snapshot.items():
-            path.write_text(original)
+def _copy_of_the_tree(tmp_path: Path) -> Path:
+    """The script and every manifest it rewrites, copied under ``tmp_path``.
 
-
-def test_a_real_bump_restores_every_module_not_just_the_first():
-    """Guards the fixture above: after the round-trip the tree must be synced.
-
-    Without it, a second module's manifest silently keeps the bumped version.
+    A real bump runs against this copy, never the checkout: the script finds
+    its root from its own path, so the copy is all it sees. Bumping the real
+    tree and restoring it afterwards corrupted it twice — first when the
+    restore listed only pagebuilder's manifest, then under pytest-xdist, where
+    another worker could snapshot the temporary 9.9.9 mid-bump and "restore"
+    it, or a concurrent manifest check could read it.
     """
-    test_framework_pins_survive_a_real_bump()
-    assert _run("--check-current").returncode == 0
+    root = tmp_path / "repo"
+    for path in [SCRIPT, *_manifests(REPO)]:
+        target = root / path.relative_to(REPO)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(path.read_text())
+    return root
+
+
+def _run_in(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    script = root / SCRIPT.relative_to(REPO)
+    return subprocess.run(
+        [sys.executable, str(script), *args], capture_output=True, text=True, cwd=root, check=False
+    )
+
+
+def test_framework_pins_survive_a_real_bump(tmp_path):
+    """A real bump, asserting the pins are unchanged."""
+    root = _copy_of_the_tree(tmp_path)
+    manifest = root / "modules" / "pagebuilder" / "pyproject.toml"
+    original = [str(d) for d in tomlkit.parse(manifest.read_text())["project"]["dependencies"]]
+
+    assert _run_in(root, "9.9.9").returncode == 0
+
+    bumped = tomlkit.parse(manifest.read_text())
+    assert str(bumped["project"]["version"]) == "9.9.9"
+    deps = [str(d) for d in bumped["project"]["dependencies"]]
+    assert deps == original
+    assert any(d.startswith("simple_module_core>=") for d in deps)
+    assert not any("simple_module_core==" in d for d in deps)
+
+
+def test_a_real_bump_moves_every_module_not_just_the_first(tmp_path):
+    """Every manifest the script discovers lands on the new version together."""
+    root = _copy_of_the_tree(tmp_path)
+    assert _run_in(root, "9.9.9").returncode == 0
+    assert _run_in(root, "--check", "9.9.9").returncode == 0
+    assert _run_in(root, "--check-current").returncode == 0
