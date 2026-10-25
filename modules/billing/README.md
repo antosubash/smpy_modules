@@ -284,5 +284,5 @@ the `csrf_token` prop.
   response for a replayed `Idempotency-Key` (the replay gets 409
   `idempotency_replay`), reporting usage to Stripe metered prices, threshold
   events or emails, and an audit trail of refused calls (they are logged).
-- **Not in v1:** per-tenant limit overrides, coupons, more
-  than one subscription per tenant, and translated UI text.
+- **Not in v1:** per-tenant limit overrides, coupons, and more
+  than one subscription per tenant. The UI ships in English and German.
