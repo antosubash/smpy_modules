@@ -118,7 +118,9 @@ async def _redirects(
 
 
 async def apply(ctx: RestoreContext) -> SectionApplied:
+    """Restore the section; the audit record keeps identities and counts, never slugs."""
     prep = await prepare(ctx)
+    respelled = prep.respelled()  # before the upsert renames the categories
     await taxonomy.upsert(ctx.db, NewsCategory, prep.categories, prep.category_rows)
     tags, moved = await taxonomy.upsert(ctx.db, NewsTag, prep.tags, prep.tag_rows)
     by_key, overwritten = await _articles(ctx.db, prep)
@@ -131,10 +133,8 @@ async def apply(ctx: RestoreContext) -> SectionApplied:
     applied: dict[str, list[dict[str, Any]]] = {
         "created": [identity(by_key[key]) for key in sorted(prep.match.creates)],
         "overwritten": [identity(by_key[key]) for key in overwritten],
-        "redirects_dropped": [
-            {"locale": r["locale"], "from_slug": r["from_slug"]} for r in prep.dropped_redirects()
-        ],
-        "tag_redirects_dropped": [{"from_slug": r["from_slug"]} for r in tags_dropped],
+        # Articles outside the bundle whose category spelling the restore changed.
+        "category_respelled": [identity(row) for row in respelled],
     }
     return SectionApplied(
         counts={
@@ -144,6 +144,8 @@ async def apply(ctx: RestoreContext) -> SectionApplied:
             "categories": len(prep.categories),
             "tags": len(prep.tags),
             "redirects": kept,
+            "redirects_dropped": len(prep.dropped_redirects()) + len(tags_dropped),
+            "category_respelled": len(respelled),
         },
         applied=applied,
     )

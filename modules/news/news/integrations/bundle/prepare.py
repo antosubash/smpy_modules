@@ -83,6 +83,19 @@ class Prepared:
             if (r["locale"], r["to_slug"]) not in targets or (r["locale"], r["from_slug"]) in held
         ]
 
+    def respelled(self) -> list[NewsArticle]:
+        """Articles the bundle does not carry whose category the restore re-spells.
+
+        A bundled category paired by case only (``updates`` live, ``Updates``
+        bundled) takes the bundle's spelling, and the articles using the old
+        one follow, as the categories screen's rename does — trashed ones too.
+        """
+        old = {row.name for name, row in self.category_rows.items() if row.name != name}
+        return sorted(
+            (row for row in self.match.untouched if row.category in old),
+            key=lambda row: (row.locale, row.slug),
+        )
+
     def dropped_tag_redirects(self) -> list[dict[str, Any]]:
         """Bundle tag redirects whose target will not exist or whose source a tag holds."""
         slugs = self.tag_slugs()

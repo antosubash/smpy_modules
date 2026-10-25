@@ -1198,6 +1198,7 @@
     "revived": "{blocks} · revived from trash",
     "section_denied": "{label} is left out of this restore: restoring it needs {permissions}. The pages restore as usual.",
     "section_omitted": "{label} was left out of this snapshot: whoever took it did not hold {permissions}. It stays as it is here.",
+    "section_redacted": "{label}: only the counts are shown here. Seeing the details needs {permissions}.",
     "site_layout": "Site layout",
     "source_manual": "Taken here",
     "source_pre_restore": "Automatic, before a restore",

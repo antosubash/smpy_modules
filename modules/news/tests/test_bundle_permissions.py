@@ -97,6 +97,8 @@ async def test_a_snapshot_by_a_news_editor_carries_news(tmp_path):
         await article(client, "launch")
         snapshot = await take(client, as_role("pb-news-edit"))
         assert "omitted" not in snapshot["manifest"]
+        # This host's record of what downloading it takes (stored row only).
+        assert snapshot["manifest"]["host_download_permissions"] == {"news": ["news.edit"]}
         assert "articles/launch.json" in news_files(client, snapshot["id"])
 
 

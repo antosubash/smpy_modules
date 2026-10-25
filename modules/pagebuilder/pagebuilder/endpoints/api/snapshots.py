@@ -160,15 +160,20 @@ async def request_restore(
 ) -> PendingImportRead:
     """Stage a restore for approval. Nothing is written to the site here."""
     staged = await service.request_restore(snapshot_id)
-    return PendingImportRead.model_validate(staged)
+    return await service.readable(staged)
 
 
-@router.get("/imports/pending", response_model=PendingImportRead | None)
+@router.get(
+    "/imports/pending",
+    response_model=PendingImportRead | None,
+    dependencies=[require_publish],
+)
 async def get_pending_import(
     service: SnapshotService = Depends(get_snapshot_service),
 ) -> PendingImportRead | None:
+    """The staged restore, its contributed sections redacted for this reader (#80)."""
     staged = await service.pending()
-    return PendingImportRead.model_validate(staged) if staged else None
+    return await service.readable(staged) if staged else None
 
 
 @router.post(
@@ -195,4 +200,4 @@ async def reject_import(
     service: SnapshotService = Depends(get_snapshot_service),
 ) -> PendingImportRead:
     staged = await service.reject(import_id, _actor(), body.note if body else None)
-    return PendingImportRead.model_validate(staged)
+    return await service.readable(staged)

@@ -23,20 +23,18 @@ from bundle_app import (
     take,
 )
 from news.models import NewsArticleRedirect, NewsTag, NewsTagRedirect
-from pagebuilder.models import PendingImport
 from sqlmodel import select
 
 pytestmark = pytest.mark.asyncio
 
 
 async def _restore(client, snapshot_id: int) -> tuple[dict, dict]:
-    """Stage and approve; ``(plan, applied.news)``."""
+    """Stage and approve; ``(plan, the news counts the approval reported)``."""
     staged = await stage(client, snapshot_id)
     assert staged.status_code == 201, staged.text
-    assert (await approve(client, staged.json()["id"])).status_code == 200
-    async with session(client) as db:
-        audit = await db.get(PendingImport, staged.json()["id"])
-    return staged.json()["plan"], audit.plan["applied"]["news"]
+    applied = await approve(client, staged.json()["id"])
+    assert applied.status_code == 200, applied.text
+    return staged.json()["plan"], applied.json()["sections"]["news"]
 
 
 @pytest.mark.parametrize("holder", ["live", "trashed"])
@@ -53,7 +51,7 @@ async def test_a_redirect_from_an_address_an_article_holds_is_dropped(tmp_path, 
         dropped = plan_lines(plan)["redirects_dropped"]
         assert (dropped["count"], dropped["tone"]) == (1, "warning")
         assert [(i["slug"], i["locale"]) for i in dropped["items"]] == [("old", "en")]
-        assert applied["redirects_dropped"] == [{"locale": "en", "from_slug": "old"}]
+        assert applied["redirects_dropped"] == 1
         async with session(client) as db:
             assert (await db.execute(select(NewsArticleRedirect))).scalars().all() == []
 
@@ -97,7 +95,7 @@ async def test_dropped_tag_redirects_are_in_the_plan(tmp_path):
         assert (dropped["count"], dropped["tone"]) == (2, "warning")
         assert sorted(i["slug"] for i in dropped["items"]) == ["gone", "py"]
         assert {i["note_key"] for i in dropped["items"]} == {"news.bundle.plan.tags"}
-        assert applied["tag_redirects_dropped"] == [{"from_slug": "py"}, {"from_slug": "gone"}]
+        assert applied["redirects_dropped"] == 2
         async with session(client) as db:
             rows = (await db.execute(select(NewsTagRedirect))).scalars().all()
         assert [(r.from_slug, r.tag_id) for r in rows] == [("snake", python.id)]

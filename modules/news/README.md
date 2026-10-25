@@ -105,7 +105,11 @@ database export.
 A restore matches each article to a live one by translation group, then by
 address (trashed rows included, which it brings back), moves a renamed article
 back to its snapshot address while keeping a redirect from the newer one, and
-upserts categories and tags by name. It **never deletes**: articles,
+upserts categories and tags by name, compared the way the admin compares
+them (trimmed, case-insensitive). If a category only matches by case, the
+live row takes the bundle's spelling, and so do articles outside the bundle
+that used the old spelling. The plan lists those articles under
+`category_respelled`. It **never deletes**: articles,
 categories and tags the bundle does not carry are kept and listed as
 untouched. The two redirect tables are rebuilt from the bundle, as pages' is.
 A category or tag slug now held by one the bundle does not carry, or an
@@ -120,7 +124,12 @@ Export permissions:
   Otherwise the section is left out, and the manifest's `omitted` list says
   why. Restoring such a bundle leaves every article as it is. The automatic
   `pre_restore` snapshot always carries news;
-- downloading a bundle that carries `news/` needs `news.edit` (403 otherwise);
+- downloading a bundle that carries `news/` needs `news.edit` (403 otherwise).
+  The requirement is recorded on the snapshot, so it still holds if news is
+  later disabled;
+- a staged restore shows article titles and slugs only to readers holding
+  `news.edit`. Others see counts only, and the stored, audited plan never
+  names an article;
 - a restore applies `news/` only if the user who stages it and the approver
   both hold `news.edit` and `news.publish`. Otherwise the pages still restore,
   and the plan (up front, at staging) and the result list news as skipped for

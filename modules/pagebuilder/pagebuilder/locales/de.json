@@ -1198,6 +1198,7 @@
     "revived": "{blocks} · aus dem Papierkorb wiederhergestellt",
     "section_denied": "{label} wird bei dieser Wiederherstellung ausgelassen: Dafür ist {permissions} nötig. Die Seiten werden wie gewohnt wiederhergestellt.",
     "section_omitted": "{label} fehlt in diesem Snapshot: Wer ihn erstellt hat, hatte {permissions} nicht. Hier bleibt alles, wie es ist.",
+    "section_redacted": "{label}: Hier werden nur die Anzahlen gezeigt. Für die Details ist {permissions} nötig.",
     "site_layout": "Website-Layout",
     "source_manual": "Hier erstellt",
     "source_pre_restore": "Automatisch, vor einer Wiederherstellung",

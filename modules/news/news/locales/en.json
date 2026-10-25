@@ -585,7 +585,8 @@
       "untouched": "Articles not in this snapshot (kept)",
       "categories": "Categories",
       "tags": "Tags",
-      "redirects_dropped": "Redirects dropped (their article is gone)"
+      "redirects_dropped": "Redirects dropped (their article is gone)",
+      "category_respelled": "Articles not in this snapshot whose category spelling changes"
     }
   }
 }

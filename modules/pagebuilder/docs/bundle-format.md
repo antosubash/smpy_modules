@@ -172,8 +172,14 @@ top of `pagebuilder.publish` / `pagebuilder.approve`:
   deletes, so the module's content stays as it is. The automatic `pre_restore`
   snapshot has no user behind it and always captures every section.
 - **Download.** Downloading a bundle that carries such a section needs its
-  capture permissions (403 `Permission required: …` otherwise). This can only
-  be checked for sections registered on this host.
+  capture permissions (403 `Permission required: …` otherwise). When a bundle
+  is captured or uploaded, this host writes what each section needs onto the
+  snapshot row (`host_download_permissions` in the *stored* manifest, never in
+  `manifest.json`; a bundle's own copy of the key is ignored). That record
+  still applies after the contributor is disabled. A section the host did not
+  know when the bundle arrived has unknown needs, and **only a holder of
+  `pagebuilder.approve` may download that bundle**. This denies by default, and
+  the same applies to rows from before the record existed.
 - **Restore.** A section is applied only if the user who stages the restore
   holds every apply permission (otherwise the section is not even planned, so
   its rows are not shown) and the approver still does at approval. A skipped
@@ -181,8 +187,20 @@ top of `pagebuilder.publish` / `pagebuilder.approve`:
   missing `permissions`, under `plan.denied` at staging and under
   `denied_sections` in the approve response. The pages restore either way.
   A section left out at staging stays out, even when the approver could apply
-  it. To include it, stage the restore again as someone who holds the
+  it, and approval does not re-plan it, so its rows cannot block the pages with
+  a 409. To include it, stage the restore again as someone who holds the
   permissions.
+- **Reading a staged plan.** A section's plan lines name its rows, so the
+  `PendingImport.plan` column stores only their counts and tones. The column
+  is audited and visible to everyone who can use Import / Export. The items
+  live in a host-side file, `<snapshot_root>/imports/<import id>/sections.json`.
+  Every response that carries a plan (pending import, review screen, staging,
+  reject) puts them back only for a reader who holds the section's capture
+  permissions. Anyone else gets the counts and `redacted: true` with
+  `reason_key` `pagebuilder.plan.section_redacted`. The section's `applied`
+  record holds only identities (id and `created_at`) and counts, and is
+  served as counts to such a reader. `/imports/pending` needs
+  `pagebuilder.publish`.
 
 News asks for `news.edit` to capture and download, and for `news.edit` plus
 `news.publish` to restore.

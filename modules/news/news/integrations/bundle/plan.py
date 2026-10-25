@@ -33,6 +33,7 @@ def plan_lines(prep: Prepared) -> SectionPlan:
         key=lambda row: (row.locale, row.slug),
     )
     # Article redirects carry their language; tag redirects have none.
+    respelled = prep.respelled()
     dropped = [
         PlanItem(title=r["from_slug"], slug=r["from_slug"], locale=r["locale"])
         for r in prep.dropped_redirects()
@@ -59,6 +60,12 @@ def plan_lines(prep: Prepared) -> SectionPlan:
             _KEY + "untouched",
             len(untouched),
             [PlanItem(title=r.title, slug=r.slug, locale=r.locale) for r in untouched],
+        ),
+        PlanLine(
+            _KEY + "category_respelled",
+            len(respelled),
+            [PlanItem(title=r.title, slug=r.slug, locale=r.locale) for r in respelled],
+            "warning" if respelled else None,
         ),
         PlanLine(
             _KEY + "categories",

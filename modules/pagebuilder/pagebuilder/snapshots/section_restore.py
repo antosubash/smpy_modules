@@ -96,10 +96,12 @@ async def plan_sections(
     bundle_dir: Path,
     name_to_url: dict[str, str],
     access: SectionAccess = SYSTEM,
+    left_out: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
     """The plan's ``sections``, ``skipped``, ``absent`` and ``denied`` keys. Writes nothing.
 
-    A section *access* may not apply is not planned at all — its rows are not
+    A section *access* may not apply, or one named in *left_out* (denied
+    when the restore was staged), is not planned at all — its rows are not
     the principal's to see — and is listed under ``denied``. An ``absent``
     section a capture left out for lack of permission says ``omitted``.
 
@@ -111,6 +113,8 @@ async def plan_sections(
     sections, denied = [], []
     tenant = _tenant() if known else ""
     for section, entry in known:
+        if section.name in left_out:
+            continue
         missing = access.missing(section, "apply")
         if missing:
             denied.append(denied_entry(section, missing))

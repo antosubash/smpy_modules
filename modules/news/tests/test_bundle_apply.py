@@ -192,14 +192,12 @@ async def test_an_unresolvable_redirect_is_dropped_and_reported(tmp_path):
         staged = await stage(client, snapshot["id"])
         dropped = _lines(staged.json()["plan"])["redirects_dropped"]
         assert (dropped["count"], dropped["tone"]) == (1, "warning")
-        assert (await approve(client, staged.json()["id"])).status_code == 200
+        applied = await approve(client, staged.json()["id"])
+        assert applied.status_code == 200
 
         assert await _redirects(client) == {("en", "older", row.id)}
-        async with session(client) as db:
-            audit = await db.get(PendingImport, staged.json()["id"])
-        assert audit.plan["applied"]["news"]["redirects_dropped"] == [
-            {"locale": "en", "from_slug": "gone"}
-        ]
+        # Counted, not named: the audit record carries no slugs (#80).
+        assert applied.json()["sections"]["news"]["redirects_dropped"] == 1
 
 
 async def test_an_absent_field_leaves_the_live_value(tmp_path):

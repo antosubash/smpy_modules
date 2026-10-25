@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends
 from simple_module_hosting.inertia_deps import InertiaDep
 from simple_module_inertia import InertiaResponse
 
-from pagebuilder.contracts.schemas import PendingImportRead, SnapshotRead
+from pagebuilder.contracts.schemas import SnapshotRead
 from pagebuilder.deps import get_snapshot_service
 from pagebuilder.snapshots.service import SnapshotService
 
@@ -26,11 +26,16 @@ _PAGE_SNAPSHOTS = "PageBuilder/ContentSnapshots"
 _PAGE_IMPORT_REVIEW = "PageBuilder/ContentImportReview"
 
 
-def _pending_props(staged: object | None) -> dict | None:
-    """A staged import as the screens want it, or ``None`` when nothing waits."""
+async def _pending_props(service: SnapshotService) -> dict | None:
+    """The staged import as the screens want it, or ``None`` when nothing waits.
+
+    Through ``service.readable``, so a contributed section's rows reach only a
+    reader who may see them (#80).
+    """
+    staged = await service.pending()
     if staged is None:
         return None
-    return PendingImportRead.model_validate(staged).model_dump(mode="json")
+    return (await service.readable(staged)).model_dump(mode="json")
 
 
 @router.get("/content", response_model=None)
@@ -52,7 +57,7 @@ async def admin_content(
         _PAGE_SNAPSHOTS,
         {
             "snapshots": snapshots,
-            "pending": _pending_props(await service.pending()),
+            "pending": await _pending_props(service),
         },
     )
 
@@ -65,5 +70,5 @@ async def admin_content_review(
     """The staged restore's plan, for an approver to accept or reject."""
     return await inertia.render(
         _PAGE_IMPORT_REVIEW,
-        {"pending": _pending_props(await service.pending())},
+        {"pending": await _pending_props(service)},
     )

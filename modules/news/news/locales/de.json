@@ -585,7 +585,8 @@
       "untouched": "Artikel, die nicht im Snapshot sind (bleiben erhalten)",
       "categories": "Kategorien",
       "tags": "Schlagwörter",
-      "redirects_dropped": "Verworfene Weiterleitungen (ihr Artikel existiert nicht mehr)"
+      "redirects_dropped": "Verworfene Weiterleitungen (ihr Artikel existiert nicht mehr)",
+      "category_respelled": "Artikel außerhalb des Snapshots, deren Kategorie-Schreibweise sich ändert"
     }
   }
 }
