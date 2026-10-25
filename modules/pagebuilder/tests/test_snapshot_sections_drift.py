@@ -110,11 +110,13 @@ async def test_a_section_enabled_after_staging_is_validated_before_apply(tmp_pat
         assert staged.json()["plan"]["skipped"] == [{"section": "notes", "version": 1}]
         section = NotesSection()
         assert register_section(client._transport.app, section)
+        # Compared, not assumed empty: on Postgres both hosts share one database.
+        before = await notes(client)
 
         refused = await client.post(f"/api/pagebuilder/imports/{staged.json()['id']}/approve")
         assert refused.status_code == 422
         assert [c[0] for c in section.calls] == ["validate"]  # never planned or applied
-        assert await notes(client) == {}
+        assert await notes(client) == before
         assert (await client.get(_PENDING)).json()["id"] == staged.json()["id"]
 
 
