@@ -18,42 +18,24 @@ field type, which is consequently not indexable and therefore not queryable.
 
 from __future__ import annotations
 
-import re
 from typing import Any, Literal
 
 from sqlmodel import Field as SQLField
 from sqlmodel import SQLModel
 
 from sm_records._text import NUL_PROBLEM, has_nul
-from sm_records.constants import MAX_LABEL_LEN, TYPE_KEY_PATTERN
-from sm_records.schema._keys import KEY_RE as _KEY_RE
+from sm_records.constants import MAX_LABEL_LEN
+
+# ``ON_DELETE_*`` are re-exported: callers import them from here, as before
+# the rules moved to ``_field_rules`` for the line cap.
+from sm_records.schema._field_rules import ON_DELETE_CHOICES as ON_DELETE_CHOICES
+from sm_records.schema._field_rules import ON_DELETE_DEFAULT as ON_DELETE_DEFAULT
+from sm_records.schema._field_rules import validate_constraints, validate_options
 from sm_records.schema._keys import FieldSchemaError, validate_key
 from sm_records.schema._keys import require as _require
+from sm_records.schema._text_checks import reading
 from sm_records.schema.compile import PayloadValidationError, coerce_value
 from sm_records.schema.types import NOT_UNIQUE, FieldType, indexable
-
-_TEXT_CONSTRAINTS = frozenset({"min_length", "max_length", "pattern"})
-_NUMERIC_CONSTRAINTS = frozenset({"min", "max"})
-_ALLOWED_CONSTRAINTS: dict[FieldType, frozenset[str]] = {
-    FieldType.TEXT: _TEXT_CONSTRAINTS,
-    FieldType.LONGTEXT: _TEXT_CONSTRAINTS,
-    FieldType.EMAIL: _TEXT_CONSTRAINTS,
-    FieldType.URL: _TEXT_CONSTRAINTS,
-    FieldType.NUMBER: _NUMERIC_CONSTRAINTS,
-    FieldType.INTEGER: _NUMERIC_CONSTRAINTS,
-}
-
-_CHOICE_TYPES = (FieldType.SELECT, FieldType.MULTISELECT)
-_ALLOWED_OPTIONS: dict[FieldType, frozenset[str]] = {
-    FieldType.SELECT: frozenset({"choices"}),
-    FieldType.MULTISELECT: frozenset({"choices"}),
-    FieldType.RELATION: frozenset({"target_type", "many", "on_delete"}),
-}
-
-ON_DELETE_CHOICES = frozenset({"restrict", "set_null", "cascade"})
-ON_DELETE_DEFAULT = "restrict"
-"""``restrict`` by default because a cascade default across a user-defined
-graph deletes content nobody asked to delete. Design §9."""
 
 
 class FieldDefinition(SQLModel):
@@ -84,81 +66,6 @@ class FieldDefinition(SQLModel):
     (``sm_records.public_submissions.spec``), which the server injects and
     writes. Last, and left out of the stored form when unset, so an ordinary
     field's stored dict is exactly what it was before the flag existed."""
-
-
-def _validate_choices(key: str, options: dict[str, Any]) -> None:
-    choices = options.get("choices")
-    _require(isinstance(choices, list) and choices, key, "options.choices must be a non-empty list")
-    seen: set[str] = set()
-    for choice in choices:
-        _require(isinstance(choice, dict), key, "each choice must be an object")
-        value, label = choice.get("value"), choice.get("label")
-        _require(isinstance(value, str) and value, key, "each choice needs a non-empty 'value'")
-        _require(isinstance(label, str) and label, key, "each choice needs a non-empty 'label'")
-        _require(not has_nul(value), key, f"choice value {NUL_PROBLEM}")
-        _require(not has_nul(label), key, f"choice label {NUL_PROBLEM}")
-        _require(value not in seen, key, f"duplicate choice value {value!r}")
-        seen.add(str(value))
-
-
-def _validate_relation(key: str, options: dict[str, Any]) -> None:
-    target = options.get("target_type")
-    _require(isinstance(target, str) and target, key, "options.target_type is required")
-    _require(_KEY_RE.match(str(target)), key, f"options.target_type must match {TYPE_KEY_PATTERN}")
-    _require(isinstance(options.get("many", False), bool), key, "options.many must be a boolean")
-    on_delete = options.get("on_delete", ON_DELETE_DEFAULT)
-    _require(
-        on_delete in ON_DELETE_CHOICES,
-        key,
-        f"options.on_delete must be one of {sorted(ON_DELETE_CHOICES)}",
-    )
-
-
-def _only(key: str, what: str, field_type: FieldType, given: dict, allowed: frozenset) -> None:
-    """Refuse any ``what`` (option, constraint) the field type does not take."""
-    unknown = sorted(set(given) - allowed)
-    _require(
-        not unknown,
-        key,
-        f"unknown {what}(s) {unknown} for a {field_type.value} field"
-        + (f"; allowed: {sorted(allowed)}" if allowed else " (it takes none)"),
-    )
-
-
-def _validate_options(key: str, field_type: FieldType, options: dict[str, Any]) -> None:
-    _only(key, "option", field_type, options, _ALLOWED_OPTIONS.get(field_type, frozenset()))
-    if field_type in _CHOICE_TYPES:
-        _validate_choices(key, options)
-    elif field_type is FieldType.RELATION:
-        _validate_relation(key, options)
-
-
-def _validate_constraints(key: str, field_type: FieldType, constraints: dict[str, Any]) -> None:
-    allowed = _ALLOWED_CONSTRAINTS.get(field_type, frozenset())
-    _only(key, "constraint", field_type, constraints, allowed)
-    for name in ("min_length", "max_length"):
-        value = constraints.get(name)
-        if value is not None:
-            _require(
-                isinstance(value, int) and not isinstance(value, bool) and value >= 0,
-                key,
-                f"constraints.{name} must be a non-negative integer",
-            )
-    if constraints.get("pattern") is not None:
-        pattern = constraints["pattern"]
-        _require(isinstance(pattern, str), key, "constraints.pattern must be a string")
-        try:
-            re.compile(pattern)
-        except re.error as exc:
-            raise FieldSchemaError(key, f"constraints.pattern is not a valid regex: {exc}") from exc
-    for name in ("min", "max"):
-        value = constraints.get(name)
-        if value is not None:
-            _require(
-                isinstance(value, int | float) and not isinstance(value, bool),
-                key,
-                f"constraints.{name} must be a number",
-            )
 
 
 def _validate_flags(field: FieldDefinition) -> None:
@@ -204,7 +111,11 @@ def _validate_default(field: FieldDefinition) -> None:
     if field.default is None:
         return
     try:
-        field.default = coerce_value(field, field.default, required=True)
+        # Never a synchronous pattern match: a stored default was checked when
+        # its schema was saved, and a proposed one is checked by the worker
+        # (``services._patterns.check_defaults``) before it can be stored.
+        with reading():
+            field.default = coerce_value(field, field.default, required=True)
     except PayloadValidationError as exc:
         detail = exc.errors[0]["message"] if exc.errors else str(exc)
         raise FieldSchemaError(field.key, f"default is invalid: {detail}") from exc
@@ -255,8 +166,8 @@ def validate_fields(raw: list[dict[str, Any]], *, on_save: bool = False) -> list
         _require(isinstance(options, dict), key, "options must be an object")
         _require(isinstance(constraints, dict), key, "constraints must be an object")
 
-        _validate_options(key, field_type, options)
-        _validate_constraints(key, field_type, constraints)
+        validate_options(key, field_type, options)
+        validate_constraints(key, field_type, constraints)
         system = entry.get("system")
         _require(system in (None, "readonly", "internal"), key, "system must be readonly/internal")
 

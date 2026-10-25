@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.constants import ORPHANED_KEY
 from sm_records.models import Record, RecordType
+from sm_records.schema._text_checks import checked as patterns_checked
 from sm_records.schema.changes import DRY_RUN_SAMPLE, DryRunReport, FailingRecord, SchemaDiff
 from sm_records.schema.compile import (
     PayloadValidationError,
@@ -38,6 +39,7 @@ from sm_records.schema.fields import FieldDefinition
 from sm_records.schema.types import ChangeClass
 from sm_records.services import _duplicates, _invalid
 from sm_records.services._common import record_count, walk_type
+from sm_records.services._patterns import batch_budget, precheck
 from sm_records.services._payload import field_defs
 from sm_records.settings import RecordsSettings
 
@@ -116,12 +118,16 @@ async def dry_run(
     collector = _duplicates.Collector([old for old, _new in unique_pairs if not old.indexed])
     marker = _invalid.Marker(db, rtype, enabled=mark)
     async for batch in walk_type(db, rtype, batch_size):
-        for record in batch:
+        views = [from_stored(new_defs, _payload_of(record, drop_keys)) for record in batch]
+        # The stored values against the *new* patterns, in a worker under one
+        # budget per batch, never on the loop (``services._patterns``).
+        found = await precheck(new_defs, views, budget=batch_budget(len(views)))
+        for record, view in zip(batch, views, strict=True):
             checked += 1
-            view = from_stored(new_defs, _payload_of(record, drop_keys))
             if collector.active:
                 collector.add(record, view, room=DRY_RUN_SAMPLE)
-            errors = _errors_for(model, view)
+            with patterns_checked(found):
+                errors = _errors_for(model, view)
             marker.judge(record, failed=bool(errors))
             if not errors:
                 continue

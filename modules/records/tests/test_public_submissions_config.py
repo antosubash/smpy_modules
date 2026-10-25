@@ -57,6 +57,14 @@ async def test_a_public_field_must_be_submittable(client):
     assert "json field" in _message(resp)
 
 
+async def test_a_unique_field_cannot_be_public(client):
+    """A duplicate would be a 409 telling a visitor what is already stored."""
+    fields = [*contact_fields(), field("ref", unique=True)]
+    resp = await create(client, fields=fields, config=form_config(public_fields=["ref"]))
+    assert resp.status_code == 422
+    assert "is unique" in _message(resp)
+
+
 async def test_a_system_field_cannot_be_public(client):
     resp = await create(client, config=form_config(public_fields=["sm_ip_hash"]))
     assert resp.status_code == 422

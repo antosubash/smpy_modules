@@ -23,10 +23,10 @@ from sm_records.services._schema import (
     check_pointers,
     check_targets,
     check_type_text,
-    normalise,
     pointers_moved,
     write_type_row,
 )
+from sm_records.services._schema_checked import normalise_checked
 from sm_records.services._type_move import check_target, move_type
 from sm_records.services.errors import Conflict, ValidationFailed
 from sm_records.services.schema_change import apply as apply_schema_change
@@ -171,7 +171,9 @@ async def update_type(
         )
     fields: list[dict[str, Any]] | None = None
     if fields_raw is not None:
-        defs, fields = normalise(fields_raw, settings, kind=submissions.kind_of(rtype, changes))
+        defs, fields = await normalise_checked(
+            fields_raw, settings, kind=submissions.kind_of(rtype, changes)
+        )
         if fields == list(rtype.fields or []):
             # A normalised resend of the same list is not a change: the stored
             # form is the validator's dump, so comparing raw input would make a

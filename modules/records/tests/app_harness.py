@@ -33,6 +33,7 @@ from simple_module_hosting.middleware import (
     TenantMiddleware,
 )
 from simple_module_inertia import InertiaConfig, inertia_dependency_factory
+from sm_records import _pattern_worker
 from sm_records.models import Record, RecordType
 from sm_records.module import RecordsModule
 from sm_records.settings import RecordsSettings
@@ -172,6 +173,7 @@ async def build_app(
 async def records_app(tmp_path) -> AsyncIterator[tuple[FastAPI, Any]]:
     app, db_state = await build_app(tmp_path)
     yield app, db_state
+    await _pattern_worker.close()  # any pattern-check worker this test started
     await db_state.engine.dispose()
 
 

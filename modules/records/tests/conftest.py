@@ -66,6 +66,7 @@ from tests.shared_fixtures import (  # noqa: F401
     racing_db,
     settings,
 )
+from tests.submissions_http import site  # noqa: F401 - website submissions' fixture
 
 
 @pytest.fixture(autouse=True)

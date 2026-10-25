@@ -726,6 +726,7 @@
     "public_fields_help": "Only ticked fields appear on the form, in the order of the field list.",
     "public_fields_none": "This type has no fields yet that a visitor could fill in.",
     "public_field_ineligible": "A {type} field can't be filled in on a website form.",
+    "public_field_unique": "A unique field can't be filled in on a website form: a duplicate would reveal what someone else sent.",
     "public_field_required": "Required with no default: the form can't be turned on without it.",
     "notify_to": "Notify",
     "notify_to_help": "Who gets an email about each submission. One address per line, up to {max}.",
@@ -759,6 +760,34 @@
       "sm_unsubscribed_at": "Unsubscribed at",
       "sm_confirm_sent_at": "Confirmation sent at",
       "sm_consent_ip_hash": "Consent IP hash"
+    },
+    "actions": {
+      "title": "Submission",
+      "resend": "Resend notification",
+      "resent": "The notification will be sent again.",
+      "spam": "Mark as spam",
+      "spam_confirm_title": "Mark this submission as spam?",
+      "spam_confirm_body": "It moves to the trash, and nobody is notified. \"Not spam\" in the trash brings it back.",
+      "spam_done": "Marked as spam and moved to the trash.",
+      "not_spam": "Not spam",
+      "not_spam_done": "Restored. Its notification is on its way.",
+      "is_spam": "Kept as spam ({reason})",
+      "spam_reason": {
+        "links": "too many links",
+        "manual": "marked by hand"
+      },
+      "not_sent": "Notification not sent",
+      "failed": "That didn't work: {message}",
+      "rate_limited": "The notification was just sent again. Try again in a minute.",
+      "stale": "This submission changed in another tab or window. Reload the page and try again."
+    },
+    "mail": {
+      "notify": {
+        "subject": "New {type} submission on {site}",
+        "intro": "Someone sent a new {type} submission through {site}:",
+        "open": "Open it in the console:",
+        "footer": "You get this email because this address is notified of submissions on {site}."
+      }
     }
   }
 }
