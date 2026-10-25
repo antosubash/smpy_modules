@@ -11,9 +11,11 @@ import pytest
 from simple_module_db import finalize_session
 from simple_module_test.database import database_is_postgres
 from sm_billing import sync as sync_module
+from sm_billing.metering.periods import calendar_month
 from test_usage_period_extension import (
     EXTENDED,
     FIRST_END,
+    NOW,
     START,
     _ends,
     _sync,
@@ -101,3 +103,36 @@ async def test_sync_during_a_consume_waits_then_extends_the_row(app, existing):
         await finalize_session(caller)
     await asyncio.wait_for(syncing, 10)
     assert await _ends(app, tenant) == [(EXTENDED, 4 if existing else 3)]
+
+
+@postgres_only
+async def test_consume_during_a_recovery_takes_the_provider_end(app, monkeypatch):
+    """Unpaid -> active, sharing a start with the calendar month: the consume
+    resolved the calendar month while unpaid, then hits the sync's
+    uncommitted activation. It must lock the subscription row whatever its
+    status, wait, and store the provider's end, not the month's."""
+    tenant = await _tenant(app)
+    month = calendar_month(NOW)
+    provider = (month[0], month[0] + timedelta(days=45))
+    await _sync(app, tenant, provider)
+    await _sync(app, tenant, provider, status="unpaid")
+    paused, go = asyncio.Event(), asyncio.Event()
+    follow = sync_module._follow_period_end
+
+    async def follow_then_pause(*args, **kwargs):
+        await follow(*args, **kwargs)
+        paused.set()
+        await go.wait()
+
+    monkeypatch.setattr(sync_module, "_follow_period_end", follow_then_pause)
+    syncing = asyncio.create_task(_sync(app, tenant, provider))
+    await asyncio.wait_for(paused.wait(), 10)
+    consume = asyncio.create_task(
+        service(app, Clock(NOW)).consume(tenant, METER, 1, "k1", source="t")
+    )
+    await asyncio.sleep(0.5)
+    assert not consume.done()  # waiting on the subscription row
+    go.set()
+    await asyncio.wait_for(syncing, 10)
+    assert (await asyncio.wait_for(consume, 10)).ok
+    assert await _ends(app, tenant) == [(provider[1], 1)]

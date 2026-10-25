@@ -163,3 +163,21 @@ async def test_a_lapsed_subscription_never_moves_a_calendar_month(app):
     assert (await service(app, Clock(NOW)).consume(tenant, METER, 1, "k1", source="t")).ok
     await _sync(app, tenant, yearly, status="canceled")
     assert await _ends(app, tenant) == [(month[1], 1)]
+
+
+async def test_a_lapse_still_corrects_the_end_of_its_own_period(app, admin):
+    """Rows written while the subscription was in force are its period's: a
+    lapsed snapshot that moves that period's end moves theirs, so after the
+    recovery they are still "previous"."""
+    tenant = await _tenant(app)
+    await _sync(app, tenant, (START, FIRST_END))
+    assert (
+        await service(app, Clock(START + timedelta(days=1))).consume(
+            tenant, METER, 4, "k1", source="t"
+        )
+    ).ok
+    await _sync(app, tenant, (START, EXTENDED), status="unpaid")
+    assert await _ends(app, tenant) == [(EXTENDED, 4)]
+
+    await _sync(app, tenant, NEXT)  # recovered into the next period
+    assert await _previous(admin) == [(METER, 4, EXTENDED.isoformat()[:16])]

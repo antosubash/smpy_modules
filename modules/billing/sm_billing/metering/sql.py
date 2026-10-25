@@ -24,7 +24,7 @@ import sqlite3
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import case, func, select, update
+from sqlalchemy import and_, case, func, select, update
 from sqlalchemy.dialects import postgresql, sqlite
 
 from sm_billing.constants import ENTITLED_STATUSES
@@ -109,18 +109,20 @@ def _stored_end(tenant_id: str, period: tuple[datetime, datetime]) -> Any:
     subscription row before ``extend_rollups``), and a sync that starts after
     this read waits for this write to commit, then extends the row. SQLite
     ignores the lock clause; its single writer already orders the two.
+
+    Only an entitled subscription's end counts: a lapsed one's start can
+    coincide with a calendar month's, whose end it is not. That test is in
+    the ``CASE``, not the ``WHERE``, so the row is locked whatever its
+    status: a consume that resolved a calendar month while the subscription
+    was unpaid still waits for the sync that makes it active, then takes
+    its end.
     """
     start, end = period
     sub_end = Subscription.current_period_end
+    entitled = Subscription.status.in_(ENTITLED_STATUSES)
     later = (
-        select(case((sub_end > end, sub_end), else_=end))
-        .where(
-            Subscription.tenant_id == tenant_id,
-            Subscription.current_period_start == start,
-            # Only the provider's own period: a lapsed subscription's start
-            # can coincide with a calendar month's, whose end it is not.
-            Subscription.status.in_(ENTITLED_STATUSES),
-        )
+        select(case((and_(entitled, sub_end > end), sub_end), else_=end))
+        .where(Subscription.tenant_id == tenant_id, Subscription.current_period_start == start)
         .with_for_update(read=True)
         .scalar_subquery()
     )
@@ -138,23 +140,25 @@ def _later_end(table: Any, end: Any) -> Any:
     return case((end > table.c.period_end, end), else_=table.c.period_end)
 
 
-def extend_rollups(*, tenant_id: str, start: datetime, end: datetime) -> Any:
+def extend_rollups(
+    *, tenant_id: str, start: datetime, end: datetime, keep_end: datetime | None = None
+) -> Any:
     """Every counter of the tenant's period starting at ``start`` ends at ``end``.
 
     Run by ``sync.apply_snapshot`` when the provider moves a period's end but
     keeps its start, so the stored end stays authoritative: the period after
-    it begins exactly where these rows end.
+    it begins exactly where these rows end. Rows ending at ``keep_end`` are
+    left alone (a lapsed subscription's calendar-month counters).
     """
     table = UsagePeriod.__table__
-    return (
-        update(table)
-        .where(
-            table.c.tenant_id == tenant_id,
-            table.c.period_start == start,
-            table.c.period_end != end,
-        )
-        .values(period_end=end)
+    stmt = update(table).where(
+        table.c.tenant_id == tenant_id,
+        table.c.period_start == start,
+        table.c.period_end != end,
     )
+    if keep_end is not None:
+        stmt = stmt.where(table.c.period_end != keep_end)
+    return stmt.values(period_end=end)
 
 
 def add_within_limit(
