@@ -47,6 +47,9 @@ async def _draft(client: AsyncClient, slug: str = "strict") -> int:
         LATER.date().isoformat(),
         "next tuesday",
     ],
+    # Fixed ids: LATER is read off the clock, and xdist refuses to run when
+    # two workers collect it a second apart under different test names.
+    ids=["int", "ms", "float", "bool", "digits", "naive", "date", "words"],
 )
 @pytest.mark.parametrize("field", ["publish_at", "unpublish_at"])
 async def test_schedule_refuses_anything_but_an_offset_aware_iso_string(
@@ -70,6 +73,7 @@ async def test_schedule_refuses_anything_but_an_offset_aware_iso_string(
         LATER.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
         (LATER + timedelta(hours=2)).isoformat().replace("+00:00", "+02:00"),
     ],
+    ids=["offset", "z", "ms-z", "plus-two"],  # stable across xdist workers, as above
 )
 async def test_schedule_accepts_an_offset_aware_iso_string(
     authed_client: AsyncClient, sent: str

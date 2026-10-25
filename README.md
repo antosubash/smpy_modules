@@ -136,6 +136,14 @@ make e2e         # Playwright against a real browser
 make lint        # ruff, biome, and the repo checks
 ```
 
+The Python suites run on pytest-xdist, one suite after another, each with
+`PYTEST_WORKERS` workers (`auto`, one per core, by default;
+`PYTEST_WORKERS=8 make test-py` on a shared machine, `0` for a serial run).
+With `SM_TEST_DATABASE_URL` set, each worker gets its own Postgres database,
+`<name>_gw0`, `<name>_gw1`, …, created on first use — the role needs
+`CREATEDB`. A test must therefore not write under the working directory or
+share any other state with a test another worker may be running.
+
 The e2e suite needs a browser once: `npx playwright install chromium --with-deps`.
 It resets `host/test.db` on every run and never touches `host/app.db`.
 CI splits it into three `--shard=i/3` jobs, each booting its own host on its

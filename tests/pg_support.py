@@ -64,10 +64,25 @@ SQLITE_URL = "sqlite+aiosqlite:///:memory:"
 
 
 def _resolve_url() -> str:
-    for name in (ENV_VAR, *LEGACY_ENV_VARS):
+    """The test database's URL — this xdist worker's own, under pytest-xdist.
+
+    ``simple_module_test``'s plugin rewrites :data:`ENV_VAR` to
+    ``<database>_gwN`` in every xdist worker before any conftest is imported,
+    creating that database on first use, so N workers never truncate each
+    other's tables. It knows nothing of the legacy alias, so a URL given only
+    that way is copied into :data:`ENV_VAR` and put through the same rewrite.
+    """
+    value = os.environ.get(ENV_VAR, "").strip()
+    if value:
+        return value
+    for name in LEGACY_ENV_VARS:
         value = os.environ.get(name, "").strip()
         if value:
-            return value
+            from simple_module_test.database import isolate_worker_database
+
+            os.environ[ENV_VAR] = value
+            isolate_worker_database()
+            return os.environ[ENV_VAR]
     return ""
 
 

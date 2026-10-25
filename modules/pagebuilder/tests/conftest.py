@@ -110,14 +110,14 @@ async def _build_app(
     role_map: dict[str, list[str]] | None = None,
     settings: dict[str, Any] | None = None,
 ) -> tuple[FastAPI, Callable[[], Awaitable[None]]]:
-    media_root = tmp_path / "media"
-    media_root.mkdir(parents=True, exist_ok=True)
+    (media_root := tmp_path / "media").mkdir(parents=True, exist_ok=True)
 
     module = PagebuilderModule()
     # Pre-seed module settings so the register_* hooks below see the
     # test-override flags instead of scanning env vars.
     module.settings = PagebuilderSettings(
         media_root=media_root,
+        snapshot_root=tmp_path / "snapshots",  # not the cwd's var/: shared by xdist workers
         requires_auth=requires_auth,
         csrf_protect=csrf_protect,
         **(settings or {}),
