@@ -31,6 +31,7 @@ from pagebuilder.media_files import (
 )
 from pagebuilder.models import NOT_TRASHED, MediaAsset, Page, PageRedirect
 from pagebuilder.settings import PagebuilderSettings
+from pagebuilder.snapshots.access import SYSTEM, SectionAccess
 from pagebuilder.snapshots.assets import bundle_names, to_sentinels
 from pagebuilder.snapshots.blobs import BlobStore
 from pagebuilder.snapshots.files import page_filename, write_json
@@ -208,6 +209,7 @@ async def capture(
     dest: Path,
     blobs: BlobStore,
     sections: SectionRegistry | None = None,
+    access: SectionAccess = SYSTEM,
 ) -> CaptureResult:
     """Write the live site into *dest* as a bundle directory.
 
@@ -234,8 +236,9 @@ async def capture(
     )
     missing = sorted(missing + vanished)
     # After pagebuilder's own documents, so the url -> name map is complete (#80).
-    contributed, contributed_bytes = await capture_sections(
-        db, sections if sections is not None else SectionRegistry(), dest, url_to_name
+    # A section *access* may not capture is left out and named in `omitted`.
+    contributed, contributed_bytes, omitted = await capture_sections(
+        db, sections if sections is not None else SectionRegistry(), dest, url_to_name, access
     )
 
     counts = {"pages": len(pages), "redirects": redirect_count, "media": len(media_rows)}
@@ -251,6 +254,8 @@ async def capture(
         "counts": counts,
         "missing_media": missing,
     }
+    if omitted:
+        manifest["omitted"] = omitted
     # Written last: a bundle interrupted mid-capture then has no manifest and
     # is self-evidently incomplete rather than plausibly whole.
     size = pages_bytes + layout_bytes + redirect_bytes + media_bytes + contributed_bytes

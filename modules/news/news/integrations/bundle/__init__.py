@@ -11,6 +11,11 @@ deletes — articles, categories and tags the bundle does not carry are kept.
 Optional (``required: false``): a host without news restores the pages and
 keeps the section unread, and a bundle without it leaves the articles alone.
 
+Permissions: a snapshot a user takes carries the section only if they hold
+``news.edit`` (and only they may download one that does); a restore applies it
+only if the stager and the approver hold ``news.edit`` and ``news.publish``.
+Pages restore regardless; pagebuilder checks, news names the permissions.
+
 Inside the seam on purpose: this package imports :mod:`pagebuilder.contracts`
 at module scope, and is imported only from
 :func:`news.integrations.pagebuilder.register_bundle_section`, so news itself
@@ -32,6 +37,7 @@ from pagebuilder.contracts.bundle import (
     ValidateContext,
 )
 
+from news.constants import PERM_EDIT, PERM_PUBLISH
 from news.integrations.bundle import apply, capture, plan, validate
 
 SECTION = "news"
@@ -43,6 +49,11 @@ class NewsBundleSection:
     readable_versions = frozenset({1})
     required = False
     label_key = "news.bundle.title"
+    capture_permissions = frozenset({PERM_EDIT})
+    """Only someone who can edit articles takes (or downloads) them: a bundle
+    carries drafts and bylines. A system snapshot (``pre_restore``) always does."""
+    apply_permissions = frozenset({PERM_EDIT, PERM_PUBLISH})
+    """Restoring overwrites and publishes articles, so it takes what publishing does."""
     count_label_keys: ClassVar[dict[str, str]] = {
         kind: f"news.bundle.counts.{kind}"
         for kind in ("articles", "categories", "tags", "redirects")

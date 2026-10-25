@@ -22,20 +22,46 @@ from typing import Any
 from fastapi import APIRouter, FastAPI
 from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
+from news.constants import PERM_EDIT, PERM_PUBLISH, PERM_VIEW
 from news.integrations.pagebuilder import register_bundle_section
 from news.models import NewsArticle
 from pagebuilder.module import PagebuilderModule
+from pagebuilder.permissions import ALL_PERMISSIONS as PB_PERMISSIONS
 from pagebuilder.settings import PagebuilderSettings
 from pg_support import make_db_state
 from settings.module_registry import ModuleSettingsRegistry
+from simple_module_core.permissions import PermissionRegistry
 from simple_module_db import tenant_context
 from simple_module_inertia import InertiaConfig, inertia_dependency_factory
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-from stub_auth import StubAuthMiddleware, stub_user
+from stub_auth import stub_user
 
 SNAPSHOTS = "/api/pagebuilder/snapshots"
 PAGES = "/api/pagebuilder/pages"
 PNG_BYTES = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + b"\x00" * 16
+
+
+ROLES = {
+    # Pagebuilder's whole Import / Export, and nothing of news'.
+    "pb": list(PB_PERMISSIONS),
+    "pb-news-edit": [*PB_PERMISSIONS, PERM_VIEW, PERM_EDIT],
+    "pb-news": [*PB_PERMISSIONS, PERM_VIEW, PERM_EDIT, PERM_PUBLISH],
+}
+
+
+def as_role(role: str) -> dict[str, str]:
+    """Headers making a request run as a user holding only *role* (default: admin)."""
+    return {"x-roles": role}
+
+
+class RolesAuth(BaseHTTPMiddleware):
+    """The stub user, with the roles an ``x-roles`` header names (``admin`` otherwise)."""
+
+    async def dispatch(self, request, call_next):  # type: ignore[override]
+        roles = request.headers.get("x-roles", "admin")
+        request.state.user = stub_user(tuple(roles.split(",")))
+        return await call_next(request)
 
 
 class HeaderTenant:
@@ -73,7 +99,10 @@ async def _build(tmp_path: Path, *, news: bool, multi: bool) -> tuple[FastAPI, A
     app.include_router(api)
     app.include_router(views)
     db_state = await make_db_state()
-    app.state.sm = SimpleNamespace(db=db_state)
+    registry = PermissionRegistry()
+    for role, permissions in ROLES.items():
+        registry.map_role(role, permissions)
+    app.state.sm = SimpleNamespace(db=db_state, permissions=registry)
     templates = tmp_path / "templates"
     templates.mkdir(exist_ok=True)
     (templates / "index.html").write_text('<html lang="en"></html>')
@@ -89,7 +118,7 @@ async def _build(tmp_path: Path, *, news: bool, multi: bool) -> tuple[FastAPI, A
             use_flash_errors=True,
         )
     )
-    app.add_middleware(StubAuthMiddleware, user=stub_user(("admin",)))
+    app.add_middleware(RolesAuth)
     app.add_middleware(SessionMiddleware, secret_key="news-bundle-tests")
     if multi:
         from pagebuilder import tenancy

@@ -17,6 +17,7 @@ import shutil
 from pathlib import Path
 
 from fastapi import HTTPException, status
+from simple_module_core.permission_denied import PermissionDenied
 from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
@@ -24,12 +25,14 @@ from sqlmodel import select
 from pagebuilder.media_files import resolve_media_root
 from pagebuilder.models import ContentSnapshot, PendingImport, SnapshotMedia, SnapshotSource
 from pagebuilder.settings import PagebuilderSettings
+from pagebuilder.snapshots.access import SYSTEM, SectionAccess
 from pagebuilder.snapshots.archive import BundleError, index_rows, read_zip, write_zip
 from pagebuilder.snapshots.blobs import BLOBS_DIR, BlobStore, tenant_store
 from pagebuilder.snapshots.capture import capture
 from pagebuilder.snapshots.format import FORMAT_VERSION
 from pagebuilder.snapshots.registry import SectionRegistry
 from pagebuilder.snapshots.restore import RestoreMixin
+from pagebuilder.snapshots.sections import present
 
 _SNAPSHOTS_DIR = "snapshots"
 
@@ -40,10 +43,14 @@ class SnapshotService(RestoreMixin):
         db: AsyncSession,
         settings: PagebuilderSettings,
         sections: SectionRegistry | None = None,
+        access: SectionAccess = SYSTEM,
     ) -> None:
         self.db = db
         self.settings = settings
         self.sections = sections if sections is not None else SectionRegistry()
+        self.access = access
+        """What the acting principal may do with contributed sections; ``SYSTEM``
+        (everything) when no request stands behind the service."""
 
     @property
     def root(self) -> Path:
@@ -81,9 +88,12 @@ class SnapshotService(RestoreMixin):
         self.db.add(snapshot)
         await self.db.flush()
 
+        # `pre_restore` is the system's own snapshot, not the approver's: it
+        # captures every section, so the restore it guards stays reversible.
+        access = SYSTEM if source is SnapshotSource.PRE_RESTORE else self.access
         try:
             result = await capture(
-                self.db, self.settings, self.dir_for(snapshot.id), self.blobs, self.sections
+                self.db, self.settings, self.dir_for(snapshot.id), self.blobs, self.sections, access
             )
             snapshot.manifest = result.manifest
             snapshot.size_bytes = result.size_bytes
@@ -141,8 +151,20 @@ class SnapshotService(RestoreMixin):
         await self.db.flush()
         return snapshot
 
+    def _check_download(self, snapshot: ContentSnapshot) -> None:
+        """403 unless the principal could have captured every section the bundle carries.
+
+        Only sections registered here can be checked — a host without the
+        contributor does not know what its section needs.
+        """
+        for section, _entry in present(snapshot.manifest or {}, self.sections):
+            missing = self.access.missing(section, "capture")
+            if missing:
+                raise PermissionDenied(missing[0])
+
     async def download(self, snapshot_id: int, target: Path) -> int:
         snapshot = await self.get(snapshot_id)
+        self._check_download(snapshot)
         rows = await self.media_rows(snapshot.id)
         try:
             # Off the event loop: DEFLATE over the whole media library.

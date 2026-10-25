@@ -46,6 +46,12 @@ class SectionRegistry:
             isinstance(k, str) and isinstance(v, str) for k, v in keys.items()
         ):
             raise ValueError(f"bundle section {name!r} needs count_label_keys: {{kind: key}}")
+        for stage in ("capture", "apply"):
+            perms = getattr(section, f"{stage}_permissions", frozenset())
+            if isinstance(perms, str) or not all(isinstance(p, str) and p for p in perms):
+                raise ValueError(
+                    f"bundle section {name!r} needs {stage}_permissions as a set of names"
+                )
         for method in ("capture", "validate", "plan", "apply"):
             if not callable(getattr(section, method, None)):
                 raise ValueError(f"bundle section {name!r} has no {method}() method")

@@ -149,3 +149,40 @@ entry is written by pagebuilder:
 A host without the contributor restores the pagebuilder content and reports
 the section as skipped; a bundle without the section (an older one, or one from
 a host without the contributor) leaves that module's content as it is.
+
+#### Permissions
+
+A contributor may name the permissions its section needs, in its own
+vocabulary (`capture_permissions` and `apply_permissions` on `BundleSection`,
+both empty by default). Pagebuilder checks them for the acting user with the
+framework's own permission resolution, the one `RequiresPermission` uses, on
+top of `pagebuilder.publish` / `pagebuilder.approve`:
+
+- **Capture.** A snapshot a user takes leaves the section out unless they hold
+  every capture permission, and records why in a top-level `omitted` list:
+
+  ```json
+  "omitted": [{"section": "news", "label_key": "news.bundle.title",
+               "reason": "permission", "reason_key": "pagebuilder.plan.section_omitted",
+               "permissions": ["news.edit"]}]
+  ```
+
+  A restore of that bundle lists the section under `plan.absent` with
+  `"omitted": true`. That means "not in this bundle", and a restore never
+  deletes, so the module's content stays as it is. The automatic `pre_restore`
+  snapshot has no user behind it and always captures every section.
+- **Download.** Downloading a bundle that carries such a section needs its
+  capture permissions (403 `Permission required: …` otherwise). This can only
+  be checked for sections registered on this host.
+- **Restore.** A section is applied only if the user who stages the restore
+  holds every apply permission (otherwise the section is not even planned, so
+  its rows are not shown) and the approver still does at approval. A skipped
+  section is listed with `reason_key` `pagebuilder.plan.section_denied` and the
+  missing `permissions`, under `plan.denied` at staging and under
+  `denied_sections` in the approve response. The pages restore either way.
+  A section left out at staging stays out, even when the approver could apply
+  it. To include it, stage the restore again as someone who holds the
+  permissions.
+
+News asks for `news.edit` to capture and download, and for `news.edit` plus
+`news.publish` to restore.

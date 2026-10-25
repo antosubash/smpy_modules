@@ -113,6 +113,19 @@ address another article took, refuses the restore (409) before anything is
 written. News applies after pagebuilder, in the same transaction: a failure in
 either rolls both back.
 
+**Permissions.** These are news' own, on top of pagebuilder's Import /
+Export permissions:
+
+- a snapshot carries `news/` only if the user taking it holds `news.edit`.
+  Otherwise the section is left out, and the manifest's `omitted` list says
+  why. Restoring such a bundle leaves every article as it is. The automatic
+  `pre_restore` snapshot always carries news;
+- downloading a bundle that carries `news/` needs `news.edit` (403 otherwise);
+- a restore applies `news/` only if the user who stages it and the approver
+  both hold `news.edit` and `news.publish`. Otherwise the pages still restore,
+  and the plan (up front, at staging) and the result list news as skipped for
+  missing permission.
+
 A host without news restores the pages and keeps the `news/` files unread; a
 bundle written before news joined leaves every article alone. The code is
 `news/integrations/bundle/`, registered from `register_bundle_section` in

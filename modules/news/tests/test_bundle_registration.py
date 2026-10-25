@@ -33,6 +33,8 @@ def test_the_section_satisfies_the_contract() -> None:
         frozenset({1}),
     )
     assert set(section.count_label_keys) == {"articles", "categories", "tags", "redirects"}
+    assert section.capture_permissions == {"news.edit"}
+    assert section.apply_permissions == {"news.edit", "news.publish"}
 
 
 def test_importing_news_does_not_import_the_bundle_section() -> None:

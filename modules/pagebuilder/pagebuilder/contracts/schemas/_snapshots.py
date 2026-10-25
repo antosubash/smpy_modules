@@ -59,4 +59,8 @@ class ImportApplyResponse(BaseModel):
     redirects: int
     redirects_dropped: list[str]
     sections: dict[str, dict[str, int]] = {}
+    denied_sections: list[dict[str, Any]] = []
+    """Contributed sections this restore skipped because the approver (or the
+    stager) lacks the permissions they need: ``{section, label_key,
+    reason_key, permissions}`` (#80)."""
     """Per contributed section (#80), the counts its apply reported."""
