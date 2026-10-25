@@ -154,27 +154,42 @@ async def _reload(db: AsyncSession, record: Record) -> Record:
 
 
 async def _merge_marks(
-    db: AsyncSession, rtype: RecordType, record: Record, values: dict[str, Any]
+    db: AsyncSession,
+    rtype: RecordType,
+    record: Record,
+    values: dict[str, Any],
+    *,
+    ordinary: dict[str, Any] | None = None,
+    version: int | None = None,
 ) -> bool:
     """Compare-and-set the mark keys into the stored payload.
 
     Reads the current payload and version, adds *only* ``values`` (system
     fields — a unique one is refused, since its claim is checked by the
-    ordinary write alone), and writes it back ``WHERE version = <read>`` in
-    this tenant. An indexed key (a subscriber's ``sm_status``) has its index
-    rows rebuilt from the merged payload, so a filter sees the new value.
-    ``False`` when the row moved between the read and the write, or the keys
-    are not allowed. No validation and no revision: nothing but server-owned
-    bookkeeping changes.
+    ordinary write alone) and ``ordinary`` (declared ordinary fields an
+    unsubscribe clears, in the same step), and writes it back ``WHERE version
+    = <read>`` in this tenant. ``version`` pins the read too: a caller that
+    decided the change from the row at that version gets ``False`` if the row
+    has moved since. An indexed key (a subscriber's ``sm_status``) has its
+    index rows rebuilt from the merged payload, so a filter sees the new value.
+    No validation and no revision: nothing but server-owned bookkeeping
+    changes.
     """
-    system = {entry.key: entry for entry in field_defs(rtype) if entry.system}
-    if any(key not in system or system[key].unique for key in values):
+    defs = {entry.key: entry for entry in field_defs(rtype)}
+    ordinary = ordinary or {}
+    if any(key not in defs or not defs[key].system or defs[key].unique for key in values):
+        return False
+    if any(key not in defs or defs[key].system or defs[key].unique for key in ordinary):
         return False
     cls = type(record)
     where = (cls.id == record.id, cls.tenant_id == record.tenant_id)
-    read = select(cls.data, cls.version).where(*where).execution_options(include_deleted=True)
-    current = (await db.execute(read)).one()
-    merged = {**(current.data or {}), **to_jsonable(values)}
+    read = select(cls.data, cls.version).where(*where)
+    if version is not None:
+        read = read.where(cls.version == version)
+    current = (await db.execute(read.execution_options(include_deleted=True))).first()
+    if current is None:
+        return False
+    merged = {**(current.data or {}), **to_jsonable(ordinary), **to_jsonable(values)}
     stmt = (
         update(cls)
         .where(*where, cls.version == current.version)
@@ -185,7 +200,7 @@ async def _merge_marks(
     mark_written(db)
     if result.rowcount != 1:
         return False
-    if any(system[key].indexed for key in values):
+    if any(defs[key].indexed for key in (*values, *ordinary)):
         before = snapshot(record, current.data or {})
         record = await _reload(db, record)
         resolver = TypeIndex(await type_id_map(db))

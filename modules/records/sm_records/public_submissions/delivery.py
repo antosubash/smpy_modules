@@ -224,8 +224,11 @@ async def send_all(
     mark: Callable[[], dict[str, Any]],
 ) -> None:
     """Mail every recipient this attempt has not reached, then write ``mark()``
-    onto the record. A failed send is raised once every recipient has been
-    tried; the ones that went through stay sent."""
+    onto the record. ``messages`` are ``(recipient key, message)``: the key
+    names the recipient in the claims table — the address for staff, a keyed
+    hash for a subscriber — and the message carries the address. A failed
+    send is raised once every recipient has been tried; the ones that went
+    through stay sent."""
     tenant, attempt, busy = rtype.tenant_id, attempt_of(due), False
     failure: Exception | None = None
     for to, message in messages:

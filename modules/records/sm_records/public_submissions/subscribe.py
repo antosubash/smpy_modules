@@ -15,6 +15,10 @@ none               a new record: ``pending`` (``confirmed``     confirmation
 in the trash       restored, then as ``unsubscribed``           confirmation
 =================  ==========================================  ================
 
+Without double opt-in only a **new** address is confirmed at once: one the
+list has seen (unsubscribed, trashed, still pending) takes the pending path
+and its confirmation, so nobody can re-subscribe someone who left.
+
 **Every branch answers the same 202**, and everything that can refuse — the
 address and the visitor's other values, against the schema — is checked
 *before* the lookup, the same way for every state, so no answer depends on
@@ -49,13 +53,13 @@ from sm_records.public_submissions import abuse
 from sm_records.public_submissions.confirmation import queue_confirmation, within_budget
 from sm_records.public_submissions.definition import EMAIL_KEY, consent_text, page_locale
 from sm_records.public_submissions.errors import SubmissionRefused
-from sm_records.public_submissions.system import system_update
 from sm_records.public_submissions.tokens import host_secret, ip_hash
+from sm_records.public_submissions.transition import Change, transition
 from sm_records.schema._text_checks import checked
 from sm_records.services import records as record_service
 from sm_records.services._common import SESSION_HAS_WRITES_KEY, utcnow
 from sm_records.services._payload import carry_system, field_defs, validate
-from sm_records.services.errors import Conflict, ValidationFailed
+from sm_records.services.errors import Conflict, NotFound, ValidationFailed
 from sm_records.settings import RecordsSettings
 from sm_records.tenancy import bound_tenant
 
@@ -145,21 +149,33 @@ async def _write(
     data: dict[str, Any],
     fresh: dict[str, Any],
     settings: RecordsSettings,
-) -> Record | None:
-    """The state machine's write; ``None`` when there is nothing to do."""
+) -> tuple[Record, str | None, bool]:
+    """The state machine's write: ``(record, status before, wrote)``.
+
+    An address the list has seen before goes back to ``pending`` — never
+    straight to ``confirmed``, even without double opt-in: somebody who
+    unsubscribed must confirm again themselves, so an anonymous signup can
+    never put them back on the list. The change is decided from the row as
+    it is when the write lands (:mod:`.transition`)."""
     if existing is None:
-        return await record_service.create_record(
+        record = await record_service.create_record(
             db, rtype, data=data, settings=settings, status=RecordStatus.DRAFT, system=fresh
         )
-    status = (existing.data or {}).get("sm_status")
-    if not existing.is_deleted and status == CONFIRMED:
-        return None
-    if not existing.is_deleted and status == PENDING and fresh["sm_status"] == PENDING:
-        return existing  # no write: the confirmation goes out again
-    record = existing
-    if record.is_deleted:
-        record = await record_service.restore_record(db, rtype, record, settings=settings)
-    return await system_update(db, rtype, record, fresh, settings=settings, data=data)
+        return record, None, True
+    restored = existing.is_deleted
+    if restored:
+        existing = await record_service.restore_record(db, rtype, existing, settings=settings)
+    again = {**fresh, "sm_status": PENDING, "sm_confirmed_at": None}
+
+    def derive(row: Record) -> Change | None:
+        status = (row.data or {}).get("sm_status")
+        if not restored and status in (PENDING, CONFIRMED):
+            return None  # pending: the confirmation goes out again; confirmed: nothing
+        return again, data
+
+    outcome = await transition(db, rtype, existing, derive, settings=settings)
+    before = outcome.before.get("sm_status")
+    return outcome.record, before, outcome.wrote
 
 
 async def _discard(db: AsyncSession) -> None:
@@ -183,17 +199,13 @@ async def signup(
     with checked(verdicts):
         _check(rtype, data, fresh, settings)
         existing = await find(db, rtype, email)
-        before = None if existing is None else (existing.data or {}).get("sm_status")
-        restored = existing is not None and existing.is_deleted
         try:
-            record = await _write(db, rtype, existing, data, fresh, settings)
-        except Conflict:
-            await _discard(db)  # a concurrent signup of the same address won
+            record, before, wrote = await _write(db, rtype, existing, data, fresh, settings)
+        except (Conflict, NotFound):
+            await _discard(db)  # a concurrent signup or admin edit of the address won
             return
-    if record is None:
-        return
     after = (record.data or {}).get("sm_status")
-    if restored or before != after:
+    if wrote:
         events.emit(db, changed(rtype, record, before, after))
     if after == PENDING and await within_budget(request, rtype, email, settings):
         await queue_confirmation(db, request.app, rtype, record)

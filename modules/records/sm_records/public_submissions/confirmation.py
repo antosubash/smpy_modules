@@ -16,12 +16,15 @@ then stays empty, and either the visitor signing up again or an admin's
 
 It goes through the same per-recipient claims as the notification
 (:mod:`.delivery`), so a retry of one attempt never mails the address twice,
-and only to a subscriber who is still ``pending`` when it is built.
+and only to a subscriber who is still ``pending`` when it is built. The claim
+names the subscriber by a keyed hash (:func:`recipient_key`), never by the
+address, and a purge deletes the record's claims with it.
 """
 
 from __future__ import annotations
 
 import hashlib
+import hmac
 import logging
 import time
 import uuid
@@ -44,7 +47,14 @@ from sm_records.public_submissions.tokens import host_secret, public_base_url
 from sm_records.services._common import utcnow
 from sm_records.settings import RecordsSettings
 
-__all__ = ["PENDING", "ConfirmationDue", "message", "queue_confirmation", "within_budget"]
+__all__ = [
+    "PENDING",
+    "ConfirmationDue",
+    "message",
+    "queue_confirmation",
+    "recipient_key",
+    "within_budget",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +115,14 @@ def message(
     return MailMessage(to=str(data.get("sm_email") or ""), subject=subject, text=body)
 
 
+def recipient_key(secret: str, tenant: str, email: str) -> str:
+    """How a subscriber is named in ``records_submission_delivery``: a keyed
+    hash, never the address. A retry of one attempt still finds its claim,
+    and the table holds nothing an erasure has to find by address."""
+    digest = hmac.new(secret.encode(), f"delivery|{tenant}|{email}".encode(), hashlib.sha256)
+    return "h:" + digest.hexdigest()
+
+
 async def _send(
     secret: str,
     db: AsyncSession,
@@ -138,7 +156,7 @@ async def _send(
         due,
         settings,
         factory,
-        [(mail.to, mail)],
+        [(recipient_key(secret, rtype.tenant_id, mail.to), mail)],
         lambda: {"sm_confirm_sent_at": utcnow()},
     )
 

@@ -99,6 +99,7 @@ async def test_an_unsubscribe_reaches_a_record_that_fails_its_schema(newsletter)
     assert resp.json() == {"status": "unsubscribed"}
     data = (await subscriber(newsletter))["data"]
     assert data["sm_status"] == "unsubscribed" and data["sm_consent_at"] is None
+    assert data.get("first_name") is None, "optional values cleared in the same step"
     found = await newsletter.get(
         f"/api/records/types/{LIST}/records?filter=sm_status:eq:unsubscribed",
         headers=roles(ADMIN),

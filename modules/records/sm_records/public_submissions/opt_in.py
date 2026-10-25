@@ -16,16 +16,20 @@ and ``sm_nonce`` rotates, which kills every link minted before. Idempotent.
 The link route answers the same ``200`` whatever happened here, so it is no
 oracle.
 
-Both are system writes (``events.muted``: not a content edit) announced as
-:class:`~sm_records.contracts.events.SubscriptionChanged`. A record that no
-longer satisfies its schema still takes them, through the guarded
-compare-and-set of :func:`~.system.try_system_update` — an unsubscribe in
-particular must never be refused because an admin forced a schema change.
+Both are compare-and-set transitions (:mod:`.transition`): each attempt
+reloads the row and re-checks the nonce and the source status, so a change
+decided from a row that has since moved is decided again, never replayed.
+They are system writes (``events.muted``), announced once, by the request
+that wrote, as :class:`~sm_records.contracts.events.SubscriptionChanged`. A
+record that no longer satisfies its schema still takes them — ordinary values
+cleared in the same step — so an unsubscribe is never refused because an
+admin forced a schema change.
 """
 
 from __future__ import annotations
 
 import secrets
+from collections.abc import Callable
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,7 +40,7 @@ from sm_records.models import Record, RecordType
 from sm_records.public_submissions import links
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.subscribe import CONFIRMED, PENDING, UNSUBSCRIBED, changed
-from sm_records.public_submissions.system import try_system_update
+from sm_records.public_submissions.transition import Change, transition
 from sm_records.services import records as record_service
 from sm_records.services._common import utcnow
 from sm_records.services._payload import field_defs
@@ -62,27 +66,37 @@ async def _subscriber(db: AsyncSession, link: links.Link) -> tuple[RecordType, R
         return None
 
 
+def _expired() -> SubmissionRefused:
+    return SubmissionRefused("link_expired", _EXPIRED)
+
+
 async def confirm(
     db: AsyncSession, secret: str, link: links.Link, settings: RecordsSettings
 ) -> str:
-    """``"confirmed"`` or ``"already_confirmed"``; else ``410 link_expired``."""
+    """``"confirmed"`` or ``"already_confirmed"``; else ``410 link_expired``.
+
+    Decided from the row as it is when the write lands (:mod:`.transition`):
+    an unsubscribe that rotated the nonce in between makes this link expired,
+    and of two confirms only the one that wrote announces it."""
     found = await _subscriber(db, link)
-    if found is None:
-        raise SubmissionRefused("link_expired", _EXPIRED)
+    if found is None or not (found[0].public_submissions or {}).get("enabled"):
+        raise _expired()
     rtype, record = found
-    data = record.data or {}
-    if not (rtype.public_submissions or {}).get("enabled") or not links.matches(
-        secret, link, data.get("sm_nonce")
-    ):
-        raise SubmissionRefused("link_expired", _EXPIRED)
-    status = data.get("sm_status")
-    if status == CONFIRMED:
+
+    def derive(row: Record) -> Change | None:
+        data = row.data or {}
+        if row.is_deleted or not links.matches(secret, link, data.get("sm_nonce")):
+            raise _expired()
+        if data.get("sm_status") == CONFIRMED:
+            return None
+        if data.get("sm_status") != PENDING:
+            raise _expired()
+        return {"sm_status": CONFIRMED, "sm_confirmed_at": utcnow()}, None
+
+    outcome = await transition(db, rtype, record, derive, settings=settings)
+    if not outcome.wrote:
         return "already_confirmed"
-    if status != PENDING:
-        raise SubmissionRefused("link_expired", _EXPIRED)
-    values = {"sm_status": CONFIRMED, "sm_confirmed_at": utcnow()}
-    record = await try_system_update(db, rtype, record, values, settings=settings)
-    events.emit(db, changed(rtype, record, PENDING, CONFIRMED))
+    events.emit(db, changed(rtype, outcome.record, PENDING, CONFIRMED))
     return "confirmed"
 
 
@@ -98,27 +112,37 @@ def _cleared(rtype: RecordType, record: Record) -> dict[str, Any]:
 
 
 async def leave(
-    db: AsyncSession, rtype: RecordType, record: Record, settings: RecordsSettings
+    db: AsyncSession,
+    rtype: RecordType,
+    record: Record,
+    settings: RecordsSettings,
+    *,
+    still: Callable[[Record], bool] | None = None,
 ) -> Record:
-    """Unsubscribe ``record``: the suppression record, consent cleared, the
-    nonce rotated. Nothing to do for one already unsubscribed."""
-    before = (record.data or {}).get("sm_status")
-    if before == UNSUBSCRIBED:
-        return record
-    values = {
-        "sm_status": UNSUBSCRIBED,
-        "sm_unsubscribed_at": utcnow(),
-        "sm_nonce": secrets.token_hex(16),
-        "sm_consent_text": None,
-        "sm_consent_at": None,
-        "sm_consent_ip_hash": None,
-        "sm_confirmed_at": None,
-    }
-    record = await try_system_update(
-        db, rtype, record, values, settings=settings, data=_cleared(rtype, record)
-    )
-    events.emit(db, changed(rtype, record, before, UNSUBSCRIBED))
-    return record
+    """Unsubscribe ``record``: the suppression record, consent and ordinary
+    values cleared, the nonce rotated. Nothing to do for one already
+    unsubscribed — or, with ``still``, for a row it no longer holds for (the
+    link's nonce moved on)."""
+
+    def derive(row: Record) -> Change | None:
+        if (row.data or {}).get("sm_status") == UNSUBSCRIBED or (still and not still(row)):
+            return None
+        values = {
+            "sm_status": UNSUBSCRIBED,
+            "sm_unsubscribed_at": utcnow(),
+            "sm_nonce": secrets.token_hex(16),
+            "sm_consent_text": None,
+            "sm_consent_at": None,
+            "sm_consent_ip_hash": None,
+            "sm_confirmed_at": None,
+        }
+        return values, _cleared(rtype, row)
+
+    outcome = await transition(db, rtype, record, derive, settings=settings)
+    if outcome.wrote:
+        before = outcome.before.get("sm_status")
+        events.emit(db, changed(rtype, outcome.record, before, UNSUBSCRIBED))
+    return outcome.record
 
 
 async def unsubscribe(
@@ -130,5 +154,8 @@ async def unsubscribe(
     if found is None:
         return
     rtype, record = found
-    if links.matches(secret, link, (record.data or {}).get("sm_nonce")):
-        await leave(db, rtype, record, settings)
+
+    def holds(row: Record) -> bool:
+        return not row.is_deleted and links.matches(secret, link, (row.data or {}).get("sm_nonce"))
+
+    await leave(db, rtype, record, settings, still=holds)
