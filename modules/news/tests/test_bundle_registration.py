@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 from bundle_app import bundle_host
+from news import locales as news_locales
 from news.integrations import pagebuilder as pb
 from news.integrations.bundle import NewsBundleSection
 from news.module import NewsModule
@@ -75,5 +76,12 @@ async def test_on_startup_registers_the_section_on_a_pagebuilder_host(tmp_path) 
         assert registry.get("news") is None
         module = NewsModule()
         module.register_settings(app)
-        await module.on_startup(app)
-        assert isinstance(registry.get("news"), NewsBundleSection)
+        try:
+            await module.on_startup(app)
+            assert isinstance(registry.get("news"), NewsBundleSection)
+        finally:
+            # `on_startup` publishes the content languages process-wide
+            # (`news.locales.use`); left behind, every later test in this
+            # worker would mount the viewer for this app's languages only.
+            await module.on_shutdown(app)
+            news_locales.reset()
