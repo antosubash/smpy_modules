@@ -1538,8 +1538,10 @@ MACs compared in constant time. Confirm is
 `{tenant}.{type}.{uuid}.{gate}.{mac}` and does not expire. `gate` covers the
 action, tenant, type, uuid and expiry and is checked before any statement
 runs; `mac` covers the same plus the subscriber's `sm_nonce`. Unsubscribing
-or re-subscribing rotates the nonce, which kills every link sent before;
-rotating `secret_key` kills all of them. **The tenant comes from the link**:
+or re-subscribing rotates the nonce, which kills every link sent before.
+**Rotating the host's `secret_key` invalidates every outstanding confirmation
+and unsubscribe link, and resets the per-address confirmation budget and the
+delivery dedup keys** (both are keyed hashes under it). **The tenant comes from the link**:
 on the apex host, where no tenant resolves, the link binds the tenant it
 names; on a host that resolved another tenant the link is invalid.
 

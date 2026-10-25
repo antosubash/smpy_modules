@@ -264,7 +264,7 @@ async def purge_type_records(db: AsyncSession, rtype: RecordType) -> list[Purged
         )
     )
     uuids = select(cls.uuid).where(cls.type_id == rtype.id, cls.tenant_id == tenant)
-    await forget_deliveries(db, tenant, uuids)
+    await forget_deliveries(db, tenant, uuids, lock=cls.type_id == rtype.id, table=cls)
     await db.execute(sa_delete(cls).where(cls.type_id == rtype.id, cls.tenant_id == tenant))
     await db.flush()
     # Core DML does not fire ``after_flush``, so the request's session would

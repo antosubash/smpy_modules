@@ -98,7 +98,7 @@ async def _purge_ids(db: AsyncSession, rtype: RecordType, ids: list[int]) -> Non
             sa_delete(revision).where(revision.record_id.in_(batch), revision.tenant_id == tenant)
         )
         uuids = select(document.uuid).where(document.id.in_(batch), document.tenant_id == tenant)
-        await forget_deliveries(db, tenant, uuids)
+        await forget_deliveries(db, tenant, uuids, lock=document.id.in_(batch), table=document)
         gone = await db.execute(
             sa_delete(document).where(document.id.in_(batch), document.tenant_id == tenant)
         )
