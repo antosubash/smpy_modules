@@ -72,12 +72,19 @@ test.describe('admin usage tab', () => {
     await adjust.getByRole('button', { name: 'Record adjustment' }).click();
     await expect(page.getByText(new RegExp(`${COUNTER} adjusted: -?\\d+ used\\.`))).toBeVisible();
     await expect(adjust).toBeHidden();
+    // Focus goes back to what opened the dialog, not to the top of the page.
+    await expect(drawer.getByRole('button', { name: 'Adjust' })).toBeFocused();
 
     await drawer.getByLabel('Meter', { exact: true }).selectOption(COUNTER);
     await drawer.getByLabel('Kind').selectOption('adjust');
     const entry = drawer.getByRole('row').filter({ hasText: reason });
     await expect(entry).toContainText('Adjusted');
     await expect(entry).toContainText('-1');
+
+    // Closing the drawer returns focus to the row's Details button.
+    await page.keyboard.press('Escape');
+    await expect(drawer).toBeHidden();
+    await expect(rowFor(GAUGE).getByRole('button', { name: 'Details' })).toBeFocused();
   });
 });
 
