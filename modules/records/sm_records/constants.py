@@ -83,6 +83,7 @@ _PAGE_TYPES: Final = f"{MODULE_NAME}/Types"
 _PAGE_RECORD_LIST: Final = f"{MODULE_NAME}/RecordList"
 _PAGE_RECORD_EDITOR: Final = f"{MODULE_NAME}/RecordEditor"
 _PAGE_TYPE_EDITOR: Final = f"{MODULE_NAME}/TypeEditor"
+_PAGE_SUBMISSION_ACTION: Final = f"{MODULE_NAME}/SubmissionAction"
 
 TYPE_KEY_PATTERN: Final = r"^[a-z][a-z0-9_]*$"
 """A type key or field key: lowercase identifier, URL- and JSON-safe."""
@@ -210,6 +211,11 @@ submit. **Fixed**, unlike the read API's prefix, so it needs no restart and no
 PUBLIC_SUBMISSIONS_ROUTE_METHODS: Final = frozenset({"GET", "POST"})
 """The verbs the submissions exemption covers: the definition is a ``GET`` and
 every submission a ``POST``."""
+
+PUBLIC_SUBMISSIONS_VIEW_PREFIX: Final = "/records/submissions/"
+"""Where a newsletter's confirm and unsubscribe links land (#101): one
+anonymous page per action, outside the console's ``VIEW_PREFIX``. Fixed, like
+the API prefix, and exempted for ``GET`` only — the page posts to the API."""
 
 MAX_LOCALE_LEN: Final = 16
 """``records_record.locale`` width — a BCP 47 tag such as ``pt-BR``."""

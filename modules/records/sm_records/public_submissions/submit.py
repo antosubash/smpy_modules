@@ -12,6 +12,9 @@ The record is always a **draft** (a submission is personal data, and never
 published), written by nobody (``actor=None``), with its ``sm_*`` values
 passed through ``system=``; nothing the visitor sends can reach one.
 
+A newsletter list (``kind: "subscription"``) takes the same checks, then
+branches to :mod:`.subscribe`: one record per address, with a double opt-in.
+
 A **honeypot** hit answers the same 202 as a real submission and stores and
 sends nothing — a bot learns nothing, and a false positive is invisible,
 which is the accepted trade-off. A submission with too many links is
@@ -25,17 +28,18 @@ import hmac
 import logging
 import time
 from typing import Any
-from urllib.parse import urlsplit
 
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import events
 from sm_records.contracts.events import FormSubmitted
+from sm_records.contracts.public_submissions import KIND_SUBSCRIPTION
 from sm_records.contracts.public_submissions_api import SubmitBody
 from sm_records.models import RecordStatus, RecordType
-from sm_records.public_submissions import abuse
+from sm_records.public_submissions import abuse, subscribe
 from sm_records.public_submissions.definition import (
+    EMAIL_KEY,
     accepting_type,
     consent_text,
     definition,
@@ -59,7 +63,6 @@ __all__ = ["submit", "visitor_data"]
 
 logger = logging.getLogger(__name__)
 
-MAX_SOURCE_PAGE = 300
 MAX_USER_AGENT = 256
 
 
@@ -87,11 +90,6 @@ def visitor_data(rtype: RecordType, sent: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _source_page(request: Request) -> str | None:
-    path = urlsplit(request.headers.get("referer") or "").path
-    return path[:MAX_SOURCE_PAGE] or None
-
-
 def _system(
     request: Request, rtype: RecordType, body: SubmitBody, settings: RecordsSettings, spam: bool
 ) -> dict[str, Any]:
@@ -103,7 +101,7 @@ def _system(
     store_agent = settings.public_submissions_store_user_agent
     required = bool((config.get("consent") or {}).get("required"))
     return {
-        "sm_source_page": _source_page(request),
+        "sm_source_page": abuse.source_page(request),
         "sm_source_block": body.block or None,
         "sm_locale": locale,
         "sm_ip_hash": (
@@ -180,7 +178,10 @@ async def submit(
         abuse.rate_key(tenant, f"type={rtype.key}"),
         settings.public_submissions_type_rate,
     )
-    data = visitor_data(rtype, body.data)
+    sent = dict(body.data)
+    newsletter = rtype.public_submissions.get("kind") == KIND_SUBSCRIPTION
+    address = sent.pop(EMAIL_KEY, None) if newsletter else None
+    data = visitor_data(rtype, sent)
     if (rtype.public_submissions.get("consent") or {}).get("required") and not body.consent:
         raise SubmissionRefused(
             "consent_required",
@@ -190,6 +191,9 @@ async def submit(
     # Off the event loop, under one deadline for the whole submission; the
     # write below validates with these verdicts instead of matching again.
     verdicts = await check_patterns(rtype, data)
+    if newsletter:
+        await subscribe.signup(request, db, rtype, data, address, body, settings, verdicts)
+        return
     limit = settings.public_submissions_max_links
     spam = bool(limit) and abuse.count_links(data) > limit
     try:

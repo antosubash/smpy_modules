@@ -56,7 +56,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import events
 from sm_records.models import Record, RecordType, SubmissionDelivery
-from sm_records.public_submissions.mail import notification
 from sm_records.public_submissions.system import try_system_update
 from sm_records.services._common import utcnow
 from sm_records.services.errors import NotFound
@@ -71,10 +70,10 @@ __all__ = [
     "Slot",
     "attempt_of",
     "claim",
-    "deliver",
     "load",
     "mark_sent",
     "release",
+    "send_all",
 ]
 
 logger = logging.getLogger(__name__)
@@ -213,7 +212,7 @@ async def _send_one(
         )
 
 
-async def deliver(
+async def send_all(
     db: AsyncSession,
     rtype: RecordType,
     record: Record,
@@ -221,17 +220,16 @@ async def deliver(
     due: Any,
     settings: RecordsSettings,
     factory: SessionFactory,
+    messages: list[tuple[str, Any]],
+    mark: Callable[[], dict[str, Any]],
 ) -> None:
-    """Mail every recipient this attempt has not reached, then mark the record
-    notified. A failed send is raised once every recipient has been tried; the
-    ones that went through stay sent."""
+    """Mail every recipient this attempt has not reached, then write ``mark()``
+    onto the record. A failed send is raised once every recipient has been
+    tried; the ones that went through stay sent."""
     tenant, attempt, busy = rtype.tenant_id, attempt_of(due), False
     failure: Exception | None = None
-    for to in (rtype.public_submissions or {}).get("notify_to", []):
+    for to, message in messages:
         slot = Slot(tenant, record.uuid, attempt, to)
-        # Built before the claim: a failure here must not leave a claim that
-        # blocks the retry for a whole lease.
-        message = notification(rtype, record, to=to, base_url=due.base_url, locale=due.locale)
         state, token = await claim(factory, slot)
         if state != "claimed" or token is None:
             busy = busy or state == "busy"
@@ -247,4 +245,4 @@ async def deliver(
         raise failure
     if busy:
         raise DeliveryInProgress(f"another worker is still mailing submission {record.uuid}")
-    await try_system_update(db, rtype, record, {"sm_notified_at": utcnow()}, settings=settings)
+    await try_system_update(db, rtype, record, mark(), settings=settings)

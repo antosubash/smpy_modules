@@ -16,6 +16,7 @@ from pydantic import ConfigDict, field_validator
 from sqlmodel import Field, SQLModel
 
 __all__ = [
+    "LinkResult",
     "NotificationQueued",
     "SubmissionAccepted",
     "SubmissionConsent",
@@ -65,6 +66,8 @@ class SubmitBody(SQLModel):
     model_config = ConfigDict(extra="ignore")
 
     data: dict[str, Any] = Field(default_factory=dict)
+    """The public fields' values; on a newsletter list also ``sm_email``, the
+    address (the definition's first field)."""
     token: str = Field(default="", max_length=MAX_TOKEN_LEN)
     hp: str = ""
     """The honeypot: a hidden input a person never fills in. Unbounded on
@@ -94,3 +97,12 @@ class NotificationQueued(SQLModel):
     """``POST …/submission/resend``: the notification will be sent again."""
 
     queued: bool = True
+
+
+class LinkResult(SQLModel):
+    """``POST …/confirm`` and ``…/unsubscribe``: where the subscriber stands.
+
+    Confirm answers ``confirmed`` or ``already_confirmed`` (``410
+    link_expired`` otherwise); unsubscribe always answers ``unsubscribed``."""
+
+    status: Literal["confirmed", "already_confirmed", "unsubscribed"]

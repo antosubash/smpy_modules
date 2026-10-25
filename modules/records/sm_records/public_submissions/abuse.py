@@ -30,17 +30,29 @@ from sm_records.services.errors import NotFound
 from sm_records.services.public import NOT_FOUND
 
 __all__ = [
+    "allow",
     "client_ip",
     "count_links",
     "guard",
     "hit",
     "rate_key",
     "rate_store",
+    "source_page",
+    "switch",
 ]
 
 _JSON: Final = "application/json"
 _LINK_RE: Final = re.compile(r"(?i)\b(?:https?://|www\.)")
 _STORE_ATTR: Final = "sm_records_rate_store"
+
+
+MAX_SOURCE_PAGE: Final = 300
+
+
+def source_page(request: Request) -> str | None:
+    """The path of the page that sent the submission, from the ``Referer``."""
+    path = urlsplit(request.headers.get("referer") or "").path
+    return path[:MAX_SOURCE_PAGE] or None
 
 
 def client_ip(request: Request) -> str:
@@ -114,11 +126,16 @@ def _origin_allowed(request: Request, origin: str) -> bool:
     return sent in {origin_of(item) for item in configured if item}
 
 
+async def switch(request: Request) -> None:
+    """The master switch alone: off, every submission route is the 404."""
+    if not get_settings(request).public_submissions_enabled:
+        raise NotFound(NOT_FOUND)
+
+
 async def guard(request: Request) -> None:
     """Router dependency, after the tenant binding: the switch, then for a
     write the content type and the origin."""
-    if not get_settings(request).public_submissions_enabled:
-        raise NotFound(NOT_FOUND)
+    await switch(request)
     if request.method != "POST":
         return
     media = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
@@ -143,6 +160,16 @@ def rate_store(app: Any) -> WindowStore:
 
 def rate_key(tenant: str, what: str) -> str:
     return f"records:submissions:{tenant}:{what}"
+
+
+async def allow(request: Request, key: str, rate: str) -> bool:
+    """Count one against ``key`` at ``rate``; whether it was still within it.
+    For a limit the caller answers silently (the newsletter's per-address
+    confirmation budget), where :func:`hit` answers ``429``."""
+    spec = parse_rate(rate)
+    if spec is None:
+        return True
+    return bool((await rate_store(request.app).hit(key, spec)).allowed)
 
 
 async def hit(request: Request, key: str, rate: str) -> None:

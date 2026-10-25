@@ -42,11 +42,14 @@ def test_no_registry_is_survivable():
 
 def test_the_construction_time_hook_adds_nothing_for_the_read_api():
     """It cannot: the prefix is not known yet. All the hook adds is the fixed
-    website-submissions prefix (#101), so a future edit that "fills in" the
-    read API's rule here fails."""
+    website-submissions prefixes (#101) — the API and the newsletter's landing
+    pages — so a future edit that "fills in" the read API's rule here fails."""
     registry = PublicRouteRegistry()
     RecordsModule().register_public_routes(registry)
-    assert [rule.pattern for rule in registry.routes] == [constants.PUBLIC_SUBMISSIONS_API_PREFIX]
+    assert [rule.pattern for rule in registry.routes] == [
+        constants.PUBLIC_SUBMISSIONS_API_PREFIX,
+        constants.PUBLIC_SUBMISSIONS_VIEW_PREFIX,
+    ]
 
 
 @pytest.mark.parametrize("method", ["GET", "HEAD"])

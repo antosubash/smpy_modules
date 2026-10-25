@@ -1021,6 +1021,7 @@ they are the only way to observe a write without polling.
 | `RecordTypeDeleted` | `DELETE /types/{key}` | `type_key`, `tenant_id`, `purged` |
 | `RecordTypeMoved` | `PUT /types/{key}` with a changed `collection` | `type_key`, `tenant_id`, `source`, `target`, `moved` |
 | `FormSubmitted` | `POST /api/records/submissions/{type_key}/submit`, beside its `RecordCreated` | `type_key`, `tenant_id`, `uuid`, `spam` |
+| `SubscriptionChanged` | A newsletter signup, re-signup, confirmation or unsubscribe (link or admin) | `type_key`, `tenant_id`, `uuid`, `status_before` (`null` for a new address), `status_after` |
 
 **`tenant_id` is on every event**, second after `type_key`. It was added to
 the contract with multi-tenancy. A type key and a record uuid are unique only
@@ -1383,9 +1384,9 @@ A record type can accept submissions from the website (#101): its
 `enabled` switch ("Accept submissions from the website"), the `public_fields`
 a visitor may fill, the `notify_to` recipients and the `consent` text. **The
 type is the trust anchor**: a form only names a type key, and nothing the
-server relies on comes from it. Today the routes serve the contact-form kind
-(`"form"`); a newsletter list's signup flow is not served yet and answers the
-404 below.
+server relies on comes from it. The routes serve both kinds: a contact form
+(`"form"`) and a newsletter list (`"subscription"`, see
+[Newsletter lists](#newsletter-lists)).
 
 The routes are anonymous, at a **fixed** prefix that is not a setting, and
 exempt from authentication for `GET` and `POST` only:
@@ -1479,6 +1480,87 @@ type's `allowed_roles`, and refuse a type that is not a contact form with
 Every refusal on these routes carries a stable snake_case `code`; the
 *Submissions* rows of the error table list them.
 
+### Newsletter lists
+
+A `"subscription"` type holds one record per address. Its definition's first
+field is `sm_email` (the address input; the key is the system field's own),
+followed by its public fields, and the submit sends the address in
+`data.sm_email`. The address is trimmed and lowercased, then looked up on its
+index, the trash included:
+
+| The address is | Write | Mail |
+|---|---|---|
+| new | a record, `sm_status: "pending"` (`"confirmed"` when `double_opt_in` is off), consent snapshot, a fresh `sm_nonce` | the confirmation |
+| `pending` | none | the confirmation again |
+| `confirmed` | none | **none** |
+| `unsubscribed` | back to `pending`, new consent, a rotated `sm_nonce` | the confirmation |
+| in the trash | restored, then as `unsubscribed` | the confirmation |
+
+**Every case answers the same `202 {"ok": true}`**, and every refusal (a
+malformed address, a value the schema refuses, consent not given) is decided
+before the lookup, the same way for every state — so neither the answer nor
+its code tells a visitor whether an address is on the list. A confirmed
+subscriber is never mailed by a signup, and one address is sent at most
+`public_submissions_confirm_rate_per_email` confirmations (`3/day`, signups
+and admin resends together); past it the signup still answers `202` and
+nothing is sent.
+
+The **confirmation** is sent after the commit, never through the outbox: its
+links are minted when it is built, from the subscriber's current state, so
+nothing secret is stored — and that needs the host's `secret_key`, which an
+outbox worker does not have. It goes through the same per-recipient claims as
+a notification, is written in the subscriber's `sm_locale` (else the host's
+default language), and sets `sm_confirm_sent_at`; a lost one leaves that
+`null`, and signing up again or an admin's *Resend* sends it.
+
+**The links** point at the landing pages on `public_base_url`:
+
+| Method | Path | Answers |
+|---|---|---|
+| `GET` | `/records/submissions/confirm?t=…&l=…` | the *Confirm subscription* page |
+| `GET` | `/records/submissions/unsubscribe?t=…&l=…` | the *Unsubscribe* page |
+| `POST` | `/api/records/submissions/confirm` | `{"status": "confirmed" \| "already_confirmed"}`, or `410 link_expired` |
+| `POST` | `/api/records/submissions/unsubscribe` | always `{"status": "unsubscribed"}` |
+
+A `GET` never changes anything — mail scanners fetch links — and verifies
+nothing: the page shows one button, in the language `l` names, and posts the
+token when it is pressed. Both `POST`s take `{t}` as JSON **or**
+form-encoded, with no origin or content-type check: the signed link is the
+capability. The pages are exempt for `GET` only. Every answer is
+`Cache-Control: no-store`, and the pages ask for no referrer (the header,
+unless the host's security headers override it, and a `<meta
+name="referrer">`).
+
+**The link tokens** are HMAC-SHA256 under `secret_key`, base64url, 128-bit
+MACs compared in constant time. Confirm is
+`{tenant}.{type}.{uuid}.{exp}.{gate}.{mac}`, valid
+`public_submissions_confirm_ttl_hours` (168) after the send; unsubscribe is
+`{tenant}.{type}.{uuid}.{gate}.{mac}` and does not expire. `gate` covers the
+action, tenant, type, uuid and expiry and is checked before any statement
+runs; `mac` covers the same plus the subscriber's `sm_nonce`. Unsubscribing
+or re-subscribing rotates the nonce, which kills every link sent before;
+rotating `secret_key` kills all of them. **The tenant comes from the link**:
+on the apex host, where no tenant resolves, the link binds the tenant it
+names; on a host that resolved another tenant the link is invalid.
+
+**Confirm** moves `pending` to `confirmed` (`sm_confirmed_at`); a second
+click answers `already_confirmed`. An expired or forged link, one for an
+earlier subscription, an unsubscribed or deleted subscriber, or a list
+switched off is `410 link_expired`. **Unsubscribe** keeps the record as a
+suppression record — `sm_email`, `sm_status: "unsubscribed"`,
+`sm_unsubscribed_at` — and clears the consent proof and every ordinary value
+(a required one excepted). It answers the same whatever the link.
+
+On a list, *Resend* sends a `pending` subscriber the confirmation again
+(`409 not_pending` otherwise, `429` past the address's budget), and
+
+| Method | Path | Does |
+|---|---|---|
+| `POST` | `…/records/{uuid}/submission/unsubscribe` | `RecordRead` — what the subscriber's own link does; idempotent |
+
+*Mark as spam* and *Not spam* are contact-form actions (`409 wrong_kind`
+here), and *Unsubscribe* a list's.
+
 ---
 
 ## Error table
@@ -1517,7 +1599,7 @@ kind of route can produce, with the body schema
 | `404` | Unknown type key, unknown uuid, a record in the trash on a non-trash read | `{"detail"}` |
 | `404` | *Public API* — any of: unknown type, non-public type, draft, trashed, unknown uuid; on a multi-tenant host, no tenant resolved (no or malformed `X-Tenant-ID`) | `{"detail": "not found"}` |
 | `404` | A preview job this process does not hold | `{"detail"}` |
-| `404` | *Submissions* — any of: unknown type, a type that does not accept submissions or has them switched off, a newsletter list, `public_submissions_enabled` off; on a multi-tenant host, no tenant resolved | `{"detail": "not found"}` |
+| `404` | *Submissions* — any of: unknown type, a type that does not accept submissions or has them switched off, `public_submissions_enabled` off; on a multi-tenant host, no tenant resolved (a newsletter link binds the tenant it names instead) | `{"detail": "not found"}` |
 | `409` | `expected_version` no longer matches | `{"detail", "current": RecordRead \| TypeRead}` |
 | `409` | A slug or `unique` value already claimed (possibly by a trashed record) | `{"detail"}` |
 | `409` | A delete blocked by `on_delete: restrict` | `{"detail", "total": n, "referrers": [uuid, …], "hidden": n, "more": n}` |
@@ -1531,7 +1613,8 @@ kind of route can produce, with the body schema
 | `409` | A bulk action at least one named record refused | `{"detail", "report": BulkReport}` — nothing was changed |
 | `409` | *Submissions* — a field or the consent text changed after the form was loaded | `{"detail", "code": "form_changed", "definition": SubmissionDefinition}` |
 | `409` | *Submissions* — a `unique` value already claimed (a field visitors fill cannot be unique; a non-public one with a default can collide) | `{"detail", "code": "conflict"}` |
-| `409` | A submission action on a type that is not a contact form, *Not spam* on a record not in the trash as spam, *Resend* on a type that notifies nobody | `{"detail", "code": "wrong_kind" \| "not_in_trash" \| "no_recipients"}` |
+| `409` | A submission action on a type of the wrong kind, *Not spam* on a record not in the trash as spam, *Resend* on a type that notifies nobody or for a subscriber who is not pending | `{"detail", "code": "wrong_kind" \| "not_in_trash" \| "no_recipients" \| "not_pending"}` |
+| `410` | *Submissions* — a newsletter confirm link that has expired, does not verify, names another tenant than the host resolved, or belongs to an earlier subscription (the subscriber unsubscribed, re-subscribed or was deleted, or the list is switched off) | `{"detail", "code": "link_expired"}` — sign up again |
 | `413` | An import body over `max_import_bytes` | `{"detail"}` |
 | `413` | An import file holding more rows than `max_import_rows` | `{"detail"}` — refused before anything is written |
 | `413` | A bulk action naming more than `max_bulk_records` records | `{"detail"}` — refused before a record is touched |
@@ -1548,7 +1631,7 @@ kind of route can produce, with the body schema
 | `422` | `page` outside `1 … 1000000`, `page_size` below 1 | FastAPI validation error |
 | `422` | An empty `uuids` list, or an `action` that is not one of the five | FastAPI validation error |
 | `422` | *Submissions* — a `data` key outside the type's `public_fields`, a required consent not given, or `data` that does not satisfy the schema | `{"detail", "code": "unknown_field" \| "consent_required" \| "invalid", "errors"}` |
-| `429` | *Submissions* — over `public_submissions_rate_per_ip` or `public_submissions_type_rate`; *Resend* more than once a minute for one record | `{"detail", "code": "rate_limited"}` with `Retry-After` |
+| `429` | *Submissions* — over `public_submissions_rate_per_ip` or `public_submissions_type_rate`; *Resend* more than once a minute for one record, or a newsletter confirmation past `public_submissions_confirm_rate_per_email` | `{"detail", "code": "rate_limited"}` with `Retry-After` |
 | `500` | Anything unanticipated on `/api/records/*` | `{"detail": "internal error"}` — always JSON |
 
 Worked examples:

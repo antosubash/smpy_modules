@@ -1,4 +1,5 @@
-"""Admin actions on a website submission (#101): resend, spam, not spam.
+"""Admin actions on a website submission (#101): resend, spam, not spam — and
+on a newsletter list, resend the confirmation and unsubscribe.
 
 Included in the admin ``router`` (``endpoints.api``), so the tenant binding
 and the CSRF check come first; every route here also needs ``records.edit``
@@ -47,9 +48,10 @@ async def resend_notification(
     rtype: RecordType = Depends(load_type),
     db: AsyncSession = Depends(request_db),
 ) -> NotificationQueued:
-    """Send the submission's notification again (at most once a minute)."""
+    """Send the submission's notification again (at most once a minute), or a
+    pending newsletter subscriber's confirmation (within the address's
+    budget)."""
     check_type_roles(request, rtype)
-    actions.require_form(rtype)
     record = await record_service.get_record(db, rtype, uuid)
     await actions.resend(db, request.app, request, rtype, record)
     return NotificationQueued()
@@ -90,4 +92,21 @@ async def mark_not_spam(
     record = await actions.mark_not_spam(
         db, request.app, rtype, record, settings=settings, actor=who
     )
+    return record_read(rtype, record)
+
+
+@router.post("/unsubscribe", response_model=RecordRead)
+async def unsubscribe_subscriber(
+    uuid: str,
+    request: Request,
+    rtype: RecordType = Depends(load_type),
+    db: AsyncSession = Depends(request_db),
+    settings: RecordsSettings = Depends(get_settings),
+) -> RecordRead:
+    """Unsubscribe a newsletter subscriber: the suppression record stays, the
+    consent proof goes, and every link sent before stops working."""
+    check_type_roles(request, rtype)
+    actions.require_subscription(rtype)
+    record = await record_service.get_record(db, rtype, uuid)
+    record = await actions.unsubscribe(db, rtype, record, settings=settings)
     return record_read(rtype, record)

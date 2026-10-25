@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import locales
 from sm_records.constants import LOCALE_PATTERN
-from sm_records.contracts.public_submissions import KIND_FORM
+from sm_records.contracts.public_submissions import KIND_FORM, KIND_SUBSCRIPTION
 from sm_records.contracts.public_submissions_api import (
     SubmissionConsent,
     SubmissionDefinition,
@@ -35,6 +35,7 @@ from sm_records.services.types import get_type
 from sm_records.settings import RecordsSettings
 
 __all__ = [
+    "EMAIL_KEY",
     "accepting_type",
     "consent_text",
     "definition",
@@ -46,10 +47,13 @@ __all__ = [
 _LOCALE_RE = re.compile(LOCALE_PATTERN)
 DIGEST_LEN = 16
 
-ACCEPTED_KINDS = frozenset({KIND_FORM})
-"""The kinds the public routes serve today. A newsletter list's signup flow
-(double opt-in) is not built yet, so its type answers the shared 404 here
-until it is."""
+ACCEPTED_KINDS = frozenset({KIND_FORM, KIND_SUBSCRIPTION})
+"""The kinds the public routes serve: a contact form and a newsletter list."""
+
+EMAIL_KEY = "sm_email"
+"""A newsletter form's address input. Its key is the system field's own: the
+``sm_`` prefix is reserved, so no ordinary field of the list can collide with
+it. The visitor fills it, and the server writes it (``public_submissions.subscribe``)."""
 
 
 async def accepting_type(db: AsyncSession, type_key: str) -> RecordType:
@@ -117,6 +121,9 @@ def _shown(
 ) -> tuple[list[SubmissionField], SubmissionConsent | None]:
     config = rtype.public_submissions or {}
     fields = [_field(entry) for entry in public_fields_of(rtype)]
+    if config.get("kind") == KIND_SUBSCRIPTION:
+        email = next(entry for entry in field_defs(rtype) if entry.key == EMAIL_KEY)
+        fields.insert(0, _field(email))
     consent_cfg = config.get("consent") or {}
     text = consent_text(config, settings, page_locale(locale))
     consent = (
