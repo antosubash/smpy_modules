@@ -17,6 +17,7 @@ FORM_SYSTEM_KEYS = [
     "sm_consent_text",
     "sm_spam",
     "sm_notified_at",
+    "sm_delivery",
 ]
 
 

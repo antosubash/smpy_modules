@@ -122,8 +122,14 @@ def test_allowed_origins_are_origins():
 def test_the_body_ceiling_is_bounded():
     with pytest.raises(ValidationError):
         RecordsSettings(public_submissions_max_body_bytes=100)
-    with pytest.raises(ValidationError, match="max_payload_bytes"):
-        RecordsSettings(public_submissions_max_body_bytes=4096, max_payload_bytes=2048)
+    # A lower ``max_payload_bytes`` is not a conflict (an install with no
+    # submitting type must not be refused for it): it is the ceiling instead.
+    from sm_records._body_limit import BodyLimitMiddleware
+
+    settings = RecordsSettings(max_payload_bytes=64)
+    app = SimpleNamespace(state=SimpleNamespace(sm_records=SimpleNamespace(settings=settings)))
+    scope = {"type": "http", "method": "POST", "path": SUBMIT, "app": app}
+    assert BodyLimitMiddleware(app=None)._limit(scope) == 64  # type: ignore[arg-type]
 
 
 def test_the_environment_is_not_a_source(monkeypatch):

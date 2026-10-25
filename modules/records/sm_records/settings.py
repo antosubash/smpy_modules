@@ -266,6 +266,4 @@ class RecordsSettings(PublicSubmissionsSettings):
                 f"max_indexed_fields_per_type ({self.max_indexed_fields_per_type}) "
                 f"must not exceed max_fields_per_type ({self.max_fields_per_type})"
             )
-        if self.public_submissions_max_body_bytes > self.max_payload_bytes:
-            raise ValueError("public_submissions_max_body_bytes must not exceed max_payload_bytes")
         return self

@@ -24,14 +24,16 @@ perfectly good. Two paths, chosen per write:
 Either way mail goes out only when the sender really delivers
 (``delivers_email``) and ``public_base_url`` is set — the link has to be
 absolute. Otherwise the record stands, a warning is logged and the mark stays
-null. The event carries identifiers, the base URL and a locale: never a field
-value and never a token.
+null. The event carries identifiers, the base URL, a locale and an attempt
+id: never a field value and never a token. A retry of an attempt mails only
+the recipients it has not reached (:mod:`.delivery`).
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from dataclasses import dataclass
 from functools import partial
 from typing import Any, Final
@@ -43,18 +45,15 @@ from simple_module_core.mail import (
     mail_transport_installed,
     resolve_mail_sender,
 )
+from simple_module_db import RequestSession
 from simple_module_db.callbacks import register_on_commit
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from sm_records import constants, events
 from sm_records.models import Record, RecordType
-from sm_records.public_submissions.mail import notification
-from sm_records.public_submissions.system import system_update
+from sm_records.public_submissions.delivery import deliver, load
 from sm_records.public_submissions.tokens import public_base_url
-from sm_records.services._common import mark_written, utcnow
-from sm_records.services.errors import NotFound
-from sm_records.services.records import get_record
-from sm_records.services.types import get_type
+from sm_records.services._common import mark_written
 from sm_records.settings import RecordsSettings
 from sm_records.tenancy import tenant_scope
 
@@ -62,7 +61,6 @@ __all__ = [
     "HANDLER_NAME",
     "MailUnavailable",
     "NotificationDue",
-    "deliver",
     "drain",
     "durable_handler",
     "queue_notification",
@@ -92,6 +90,9 @@ class NotificationDue(Event):
     uuid: str
     base_url: str
     locale: str
+    attempt: str = ""
+    """One delivery attempt: a retry of it skips the recipients it reached
+    (``public_submissions.delivery``); a *Resend* is a new one."""
 
 
 def _ui_locale(app: Any) -> str:
@@ -119,6 +120,7 @@ async def queue_notification(db: AsyncSession, app: Any, rtype: RecordType, reco
         uuid=record.uuid,
         base_url=public_base_url(app),
         locale=_ui_locale(app),
+        attempt=uuid.uuid4().hex,
     )
     bus = db.info.get(events.BUS_KEY)
     if _durable(bus):
@@ -150,31 +152,15 @@ def _can_send(sender: MailSender, due: NotificationDue) -> bool:
     return True
 
 
-async def deliver(
-    db: AsyncSession,
-    rtype: RecordType,
-    record: Record,
-    sender: MailSender,
-    due: NotificationDue,
-    settings: RecordsSettings,
-) -> None:
-    """Send one message per recipient, then mark the record notified."""
-    for to in (rtype.public_submissions or {}).get("notify_to", []):
-        await sender.send(
-            notification(rtype, record, to=to, base_url=due.base_url, locale=due.locale)
-        )
-    await system_update(db, rtype, record, {"sm_notified_at": utcnow()}, settings=settings)
-
-
-async def _load(db: AsyncSession, due: NotificationDue) -> tuple[RecordType, Record] | None:
-    """The type and the live record, or ``None`` when either has gone — a
-    record trashed or purged before its mail went out is not mailed."""
-    try:
-        rtype = await get_type(db, due.type_key)
-        return rtype, await get_record(db, rtype, due.uuid)
-    except NotFound:
-        logger.info("records: %s submission %s is gone; not mailed", due.type_key, due.uuid)
-        return None
+def _independent(db: AsyncSession) -> Any:
+    """Sessions on ``db``'s engine, outside its transaction — for the delivery
+    progress a rollback of ``db`` must not take with it."""
+    bind = db.get_bind()  # the sync Engine, or a Connection the transport opened
+    engine = AsyncEngine(getattr(bind, "engine", bind))
+    sync_class = type(db.sync_session)
+    return lambda: RequestSession(
+        bind=engine, sync_session_class=sync_class, expire_on_commit=False
+    )
 
 
 async def _run(app: Any, due: NotificationDue) -> None:
@@ -186,9 +172,10 @@ async def _run(app: Any, due: NotificationDue) -> None:
     with tenant_scope(due.tenant_id):
         session = app.state.sm.db.session_factory()
         try:
-            loaded = await _load(session, due)
+            loaded = await load(session, due)
             if loaded is not None:
-                await deliver(session, *loaded, sender, due, settings)
+                factory = app.state.sm.db.session_factory
+                await deliver(session, *loaded, sender, due, settings, factory)
                 await events.commit(session)
         except Exception:
             logger.exception(
@@ -226,8 +213,8 @@ def durable_handler(module: Any) -> Any:
             return
         settings = getattr(module, "settings", None) or RecordsSettings()
         with tenant_scope(event.tenant_id):
-            loaded = await _load(ctx.db, event)
+            loaded = await load(ctx.db, event)
             if loaded is not None:
-                await deliver(ctx.db, *loaded, sender, event, settings)
+                await deliver(ctx.db, *loaded, sender, event, settings, _independent(ctx.db))
 
     return send_notification

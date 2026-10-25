@@ -10,6 +10,8 @@ newly ticked field shows on the next page view.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from typing import Any
 
@@ -31,9 +33,10 @@ from sm_records.services.public import NOT_FOUND
 from sm_records.services.types import get_type
 from sm_records.settings import RecordsSettings
 
-__all__ = ["accepting_type", "consent_text", "definition", "page_locale"]
+__all__ = ["accepting_type", "consent_text", "definition", "form_digest", "page_locale"]
 
 _LOCALE_RE = re.compile(LOCALE_PATTERN)
+DIGEST_LEN = 16
 
 ACCEPTED_KINDS = frozenset({KIND_FORM})
 """The kinds the public routes serve today. A newsletter list's signup flow
@@ -86,14 +89,9 @@ def _field(entry: Any) -> SubmissionField:
     )
 
 
-def definition(
-    rtype: RecordType,
-    settings: RecordsSettings,
-    *,
-    secret: str,
-    tenant: str,
-    locale: str | None,
-) -> SubmissionDefinition:
+def _shown(
+    rtype: RecordType, settings: RecordsSettings, locale: str | None
+) -> tuple[list[SubmissionField], SubmissionConsent | None]:
     config = rtype.public_submissions or {}
     by_key = {entry.key: entry for entry in field_defs(rtype) if not entry.system}
     fields = [_field(by_key[key]) for key in config.get("public_fields", []) if key in by_key]
@@ -104,10 +102,39 @@ def definition(
         if consent_cfg.get("required") or text
         else None
     )
+    return fields, consent
+
+
+def form_digest(rtype: RecordType, settings: RecordsSettings, locale: str | None) -> str:
+    """A digest of everything the visitor is shown in ``locale``: the schema
+    version, every public field as rendered, and the consent box with its
+    text. The form token carries it, so a form loaded before *any* of that
+    changed — a reworded consent text included, which bumps no schema
+    version — is ``form_changed`` rather than consent to words never seen."""
+    fields, consent = _shown(rtype, settings, locale)
+    shown = {
+        "schema_version": rtype.schema_version,
+        "fields": [entry.model_dump(mode="json") for entry in fields],
+        "consent": consent.model_dump(mode="json") if consent else None,
+    }
+    raw = json.dumps(shown, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(raw.encode()).hexdigest()[:DIGEST_LEN]
+
+
+def definition(
+    rtype: RecordType,
+    settings: RecordsSettings,
+    *,
+    secret: str,
+    tenant: str,
+    locale: str | None,
+) -> SubmissionDefinition:
+    fields, consent = _shown(rtype, settings, locale)
+    digest = form_digest(rtype, settings, locale)
     return SubmissionDefinition(
-        kind=config["kind"],
+        kind=(rtype.public_submissions or {})["kind"],
         schema_version=rtype.schema_version,
         fields=fields,
         consent=consent,
-        token=sign_form(secret, tenant, rtype.key, rtype.schema_version),
+        token=sign_form(secret, tenant, rtype.key, digest),
     )

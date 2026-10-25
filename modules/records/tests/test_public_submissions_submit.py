@@ -9,7 +9,7 @@ from sm_records.contracts.events import FormSubmitted, RecordCreated
 from sm_records.public_submissions.tokens import sign_form
 
 from tests.app_harness import ADMIN, roles
-from tests.public_submissions_support import update
+from tests.public_submissions_support import form_config, update
 from tests.submissions_http import (
     JSON,
     SUBMISSIONS,
@@ -35,7 +35,7 @@ async def test_the_definition_lists_the_public_fields_only(site):
     assert [f["key"] for f in body["fields"]] == ["name", "email", "message"]
     assert body["fields"][1]["type"] == "email" and body["fields"][0]["required"] is True
     assert body["consent"] == {"required": True, "text": "Einverstanden?"}
-    assert body["token"].startswith(f"{body['schema_version']}.")
+    assert len(body["token"].split(".")) == 4
     assert body["captcha"] is None
 
 
@@ -148,10 +148,10 @@ async def test_an_oversized_body_is_refused_before_it_is_read(site):
 
 
 async def test_a_bad_young_or_old_token_is_form_expired(site):
-    rtype = await contact_type(site)
-    version = rtype["schema_version"]
-    old = sign_form(SECRET, "default", "contact", version, now=time.time() - 8000)
-    other_type = sign_form(SECRET, "default", "other", version)
+    await contact_type(site)
+    digest = "0" * 16
+    old = sign_form(SECRET, "default", "contact", digest, now=time.time() - 8000)
+    other_type = sign_form(SECRET, "default", "other", digest)
     for token in ("garbage", old, other_type, ""):
         resp = await send(site, token=token)
         assert resp.status_code == 400, (token, resp.text)
@@ -174,6 +174,31 @@ async def test_a_form_loaded_before_a_schema_change_is_form_changed(site):
     assert body["code"] == "form_changed"
     assert body["definition"]["schema_version"] == changed.json()["schema_version"]
     assert (await send(site, token=body["definition"]["token"])).status_code == 202
+
+
+async def test_a_reworded_consent_text_is_form_changed(site):
+    """The consent text bumps no schema version, yet a visitor who ticked the
+    box agreed to the words they saw — not to the new ones."""
+    await contact_type(site, consent={"required": True, "text": {"en": "Old words."}})
+    token = (await load(site))["token"]
+    reworded = await update(
+        site,
+        "contact",
+        public_submissions=form_config(
+            enabled=True,
+            notify_to=["ops@example.org"],
+            consent={"required": True, "text": {"en": "New words."}},
+        ),
+    )
+    assert reworded.status_code == 200, reworded.text
+    resp = await send(site, token=token, consent=True)
+    assert (resp.status_code, resp.json()["code"]) == (409, "form_changed")
+    assert resp.json()["definition"]["consent"]["text"] == "New words."
+    assert await records_of(site) == []
+    fresh = resp.json()["definition"]["token"]
+    assert (await send(site, token=fresh, consent=True)).status_code == 202
+    (record,) = await records_of(site)
+    assert record["data"]["sm_consent_text"] == "New words."
 
 
 async def test_a_field_outside_the_allowlist_is_refused(site):

@@ -1415,15 +1415,18 @@ otherwise), an `Origin` — else a `Referer` — that is this host, the host's
 bad_origin`), and a token that verifies, was issued at least
 `public_submissions_min_fill_seconds` and at most
 `public_submissions_token_max_age_seconds` ago (`400 form_expired`). A token
-issued before the type's schema changed is a `409 form_changed` carrying the
-fresh `definition`. The body is capped at `public_submissions_max_body_bytes`
+issued before what the form shows changed — a field, or the consent text in
+the submission's `locale` — is a `409 form_changed` carrying the fresh
+`definition`. The body is capped at `public_submissions_max_body_bytes`
 (`413`); one address may send `public_submissions_rate_per_ip` and one type
 accept `public_submissions_type_rate` (`429` with `Retry-After`).
 `public_submissions_enabled` off turns every route into the 404.
 
-**The form token** is `{schema_version}.{issued}.{nonce}.{mac}`, the MAC an
+**The form token** is `{digest}.{issued}.{nonce}.{mac}`, the MAC an
 HMAC-SHA256 under the host's `secret_key` over the tenant, the type key, the
-schema version, the issue time and the nonce. It is stateless; rotating the
+digest, the issue time and the nonce. `digest` is a SHA-256 prefix of what
+the definition showed: the schema version, the public fields and the consent
+box with its text. It is stateless; rotating the
 secret invalidates outstanding tokens and costs a visitor one reload.
 
 **The notification** goes to each `notify_to` address, never inside the
@@ -1495,7 +1498,7 @@ kind of route can produce, with the body schema
 | `409` | A translation a type or a sibling will not allow | `{"detail"}` |
 | `409` | Turning `translatable` off while records exist in another language | `{"detail"}` |
 | `409` | A bulk action at least one named record refused | `{"detail", "report": BulkReport}` — nothing was changed |
-| `409` | *Submissions* — the type's schema changed after the form was loaded | `{"detail", "code": "form_changed", "definition": SubmissionDefinition}` |
+| `409` | *Submissions* — a field or the consent text changed after the form was loaded | `{"detail", "code": "form_changed", "definition": SubmissionDefinition}` |
 | `409` | *Submissions* — a `unique` value already claimed | `{"detail", "code": "conflict"}` |
 | `409` | A submission action on a type that is not a contact form, *Not spam* on a record outside the trash, *Resend* on a type that notifies nobody | `{"detail", "code": "wrong_kind" \| "not_in_trash" \| "no_recipients"}` |
 | `413` | An import body over `max_import_bytes` | `{"detail"}` |

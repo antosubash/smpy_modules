@@ -8,7 +8,7 @@ reaches ``globex``'s own type and nothing of ``acme``'s.
 ``two_tenants`` (``tests/isolation_support.py``) checks on the way out that
 no ``acme`` row changed, so every case here is also a write-isolation case.
 
-:func:`test_every_route_has_an_isolation_case` is parametrised over the routes
+:func:`test_every_route_has_an_isolation_case` checks every route
 the module really mounts. A new route fails it until somebody writes its
 case — in this file, ``…_io`` or ``…_public`` — and marks it with ``@covers``.
 """
@@ -47,9 +47,12 @@ G = as_(GLOBEX)
 KEYS = ({"key": SECRET}, {"key": NO_KEY})
 
 
-@pytest.mark.parametrize("route", route_table(), ids=lambda r: f"{r[0]} {r[1]}")
-def test_every_route_has_an_isolation_case(route):
-    assert route in COVERED, f"{route} has no tenancy isolation case; add one with @covers"
+def test_every_route_has_an_isolation_case():
+    """Built when the test runs, not at import: ``route_table()`` registers the
+    module's settings, which seals the collection registry, and a test module
+    collected after this one that declares a collection would then raise."""
+    missing = [route for route in route_table() if route not in COVERED]
+    assert not missing, f"{missing} have no tenancy isolation case; add one with @covers"
 
 
 # Every route that resolves a type key, with a body it would accept, so the

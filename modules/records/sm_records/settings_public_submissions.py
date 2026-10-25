@@ -70,7 +70,7 @@ class PublicSubmissionsSettings(BootSettings):
 
     public_submissions_max_body_bytes: int = Field(default=16384, ge=1024)
     """Largest submission body, in bytes — refused with a ``413`` before it is
-    read. At most ``max_payload_bytes``."""
+    read. ``max_payload_bytes`` wins when it is lower."""
 
     public_submissions_allowed_origins: tuple[str, ...] = ()
     """Origins besides this host and the host's ``public_base_url`` that may

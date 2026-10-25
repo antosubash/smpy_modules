@@ -35,7 +35,7 @@ SUBMISSION_ROWS: Final[tuple[tuple[int, str, str], ...]] = (
     ),
     (
         409,
-        "*Submissions* — the type's schema changed after the form was loaded",
+        "*Submissions* — a field or the consent text changed after the form was loaded",
         '`{"detail", "code": "form_changed", "definition": SubmissionDefinition}`',
     ),
     (

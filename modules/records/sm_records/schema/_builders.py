@@ -37,6 +37,7 @@ from sm_records.schema._scalars import (
     to_decimal,
     to_int,
 )
+from sm_records.schema._text_checks import text_check as _text_check
 from sm_records.schema.types import FieldType
 
 MEDIA_MAX_LEN = 500
@@ -57,29 +58,6 @@ def _reject_none(value: Any) -> Any:
     if value is None:
         raise ValueError("this field is required")
     return value
-
-
-def _text_check(constraints: dict[str, Any], *, required: bool = False):
-    minimum = constraints.get("min_length")
-    maximum = constraints.get("max_length")
-    pattern = re.compile(constraints["pattern"]) if constraints.get("pattern") else None
-
-    def check(value: str | None) -> str | None:
-        if value is None:
-            return None
-        # ``required`` alone means "present and not null", which left ``""``
-        # satisfying a field the form marks with an asterisk.
-        if required and not value.strip():
-            raise ValueError("this field is required")
-        if minimum is not None and len(value) < minimum:
-            raise ValueError(f"must be at least {minimum} characters")
-        if maximum is not None and len(value) > maximum:
-            raise ValueError(f"must be at most {maximum} characters")
-        if pattern is not None and not pattern.search(value):
-            raise ValueError(f"must match {pattern.pattern}")
-        return value
-
-    return check
 
 
 def _range_check(constraints: dict[str, Any], cast):

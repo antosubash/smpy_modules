@@ -2,7 +2,7 @@
 
 Every check runs before anything is written, cheapest first: the two rate
 limits, the honeypot, the signed form token, the type (enabled, of a kind
-served), the schema version the visitor saw, the allowlist of fields, the
+served), whether what the visitor saw has changed, the allowlist of fields, the
 consent box. Then the write is ``services.records.create_record`` — the call
 the admin ``POST /records`` makes — so validation, ``unique`` claims, the
 revision, the index rows and ``RecordCreated`` are exactly an admin create's.
@@ -19,6 +19,7 @@ spam* brings it back.
 
 from __future__ import annotations
 
+import hmac
 import logging
 from typing import Any
 from urllib.parse import urlsplit
@@ -35,6 +36,7 @@ from sm_records.public_submissions.definition import (
     accepting_type,
     consent_text,
     definition,
+    form_digest,
     page_locale,
 )
 from sm_records.public_submissions.errors import SubmissionRefused
@@ -127,7 +129,7 @@ async def _check_token(
     except TokenError as exc:
         raise SubmissionRefused("form_expired", f"{exc}; load the form again") from exc
     rtype = await accepting_type(db, type_key)
-    if token.schema_version != rtype.schema_version:
+    if not hmac.compare_digest(token.digest, form_digest(rtype, settings, body.locale)):
         fresh = definition(rtype, settings, secret=secret, tenant=tenant, locale=body.locale)
         raise SubmissionRefused(
             "form_changed",

@@ -160,7 +160,8 @@ class BodyLimitMiddleware:
         if settings is None:
             return None
         # A website submission is anonymous and small: its own, much tighter
-        # ceiling (16 KiB by default, #101), with no envelope headroom.
+        # ceiling (16 KiB by default, #101), with no envelope headroom — and
+        # never above ``max_payload_bytes``, whichever the operator lowered.
         if path.startswith(constants.PUBLIC_SUBMISSIONS_API_PREFIX):
-            return settings.public_submissions_max_body_bytes
+            return min(settings.public_submissions_max_body_bytes, settings.max_payload_bytes)
         return body_ceiling(settings)

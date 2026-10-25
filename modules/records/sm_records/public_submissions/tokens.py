@@ -1,13 +1,14 @@
 """The signed form token, the keyed IP hash, and the two host values they need.
 
-**Form token** — ``{schema_version}.{issued}.{nonce}.{mac}``, where ``mac`` is
+**Form token** — ``{digest}.{issued}.{nonce}.{mac}``, where ``mac`` is
 HMAC-SHA256 under the host's ``secret_key`` over
-``form|tenant|type_key|schema_version|issued|nonce``, base64url. Stateless:
-nothing is stored. It proves the form was loaded from this host, for this
-type in this tenant, at least ``min_fill`` seconds ago and at most ``max_age``
-— and it says which schema the visitor saw, so a form loaded before an edit
-is a ``409 form_changed`` rather than a confusing per-field 422. The version
-is in clear because the caller needs it before comparing; the MAC covers it.
+``form|tenant|type_key|digest|issued|nonce``, base64url. Stateless: nothing
+is stored. It proves the form was loaded from this host, for this type in
+this tenant, at least ``min_fill`` seconds ago and at most ``max_age`` — and
+``digest`` (:func:`~sm_records.public_submissions.definition.form_digest`)
+says exactly what the visitor was shown, so a form loaded before an edit —
+of a field or of the consent text — is a ``409 form_changed``. The digest is
+in clear because the caller compares it; the MAC covers it.
 
 **IP hash** — ``HMAC-SHA256(secret_key, f"{tenant}|{ip}")`` hex. Keyed, so
 enumerating the IPv4 space does not reverse it; per tenant, so two
@@ -44,7 +45,7 @@ class TokenError(ValueError):
 
 @dataclass(frozen=True)
 class FormToken:
-    schema_version: int
+    digest: str
     issued: int
 
 
@@ -71,12 +72,12 @@ def _mac(secret: str, *parts: object) -> str:
 
 
 def sign_form(
-    secret: str, tenant: str, type_key: str, schema_version: int, *, now: float | None = None
+    secret: str, tenant: str, type_key: str, digest: str, *, now: float | None = None
 ) -> str:
     issued = int(time.time() if now is None else now)
     nonce = secrets.token_hex(8)
-    mac = _mac(secret, "form", tenant, type_key, schema_version, issued, nonce)
-    return f"{schema_version}.{issued}.{nonce}.{mac}"
+    mac = _mac(secret, "form", tenant, type_key, digest, issued, nonce)
+    return f"{digest}.{issued}.{nonce}.{mac}"
 
 
 def verify_form(
@@ -91,10 +92,10 @@ def verify_form(
 ) -> FormToken:
     """The token's claims, once its MAC and its age check out."""
     parts = token.split(".") if isinstance(token, str) else []
-    if len(parts) != 4 or not parts[0].isdigit() or not parts[1].isdigit():
+    if len(parts) != 4 or not parts[0].isalnum() or not parts[1].isdigit():
         raise TokenError("malformed form token")
-    version, issued, nonce, mac = int(parts[0]), int(parts[1]), parts[2], parts[3]
-    expected = _mac(secret, "form", tenant, type_key, version, issued, nonce)
+    digest, issued, nonce, mac = parts[0], int(parts[1]), parts[2], parts[3]
+    expected = _mac(secret, "form", tenant, type_key, digest, issued, nonce)
     if not hmac.compare_digest(expected, mac):
         raise TokenError("form token does not verify")
     age = (time.time() if now is None else now) - issued
@@ -102,7 +103,7 @@ def verify_form(
         raise TokenError("form sent too soon after it was loaded")
     if age > max_age:
         raise TokenError("form token has expired")
-    return FormToken(schema_version=version, issued=issued)
+    return FormToken(digest=digest, issued=issued)
 
 
 def ip_hash(secret: str, tenant: str, ip: str) -> str:

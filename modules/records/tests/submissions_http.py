@@ -37,9 +37,10 @@ class Outbox:
     def __init__(self) -> None:
         self.sent: list[MailMessage] = []
         self.fail = False
+        self.fail_for: set[str] = set()
 
     async def send(self, message: MailMessage) -> None:
-        if self.fail:
+        if self.fail or message.to in self.fail_for:
             raise OSError("smtp is down")
         self.sent.append(message)
 

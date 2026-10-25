@@ -59,7 +59,7 @@ async def test_with_an_outbox_the_request_only_enqueues_identifiers(site):
     assert site.outbox.sent == [], "nothing is sent inside the request"
     ((_event, names, payload),) = transport.rows
     assert names == [HANDLER_NAME]
-    assert set(payload) == {"tenant_id", "type_key", "uuid", "base_url", "locale"}
+    assert set(payload) == {"tenant_id", "type_key", "uuid", "base_url", "locale", "attempt"}
     assert "Ada" not in str(payload) and "ada@example.org" not in str(payload)
     assert payload["tenant_id"] == "default" and payload["base_url"] == "https://site.example"
 
@@ -124,3 +124,77 @@ async def test_after_commit_a_send_failure_leaves_the_record_not_sent(site):
     assert (await send(site)).status_code == 202, "a mail failure never fails the submission"
     (record,) = await records_of(site)
     assert record["data"]["sm_notified_at"] is None
+
+
+async def _deliver(site, event) -> None:
+    session = site.db_state.session_factory()
+    try:
+        await _handler(site)(event, DurableContext(db=session, attempt=1))
+        await session.commit()
+    except BaseException:
+        await session.rollback()
+        raise
+    finally:
+        await session.close()
+
+
+async def test_a_retry_mails_only_the_recipients_not_reached(site):
+    transport = _durable(site)
+    await contact_type(site, notify_to=["a@example.org", "b@example.org"])
+    await send(site)
+    ((event, _, _),) = transport.rows
+    site.outbox.fail_for = {"b@example.org"}
+    with pytest.raises(OSError):
+        await _deliver(site, event)
+    assert [m.to for m in site.outbox.sent] == ["a@example.org"]
+    (record,) = await records_of(site)
+    assert record["data"]["sm_notified_at"] is None
+    site.outbox.fail_for = set()
+    await _deliver(site, event)
+    assert [m.to for m in site.outbox.sent] == ["a@example.org", "b@example.org"]
+    (record,) = await records_of(site)
+    assert record["data"]["sm_notified_at"]
+    await _deliver(site, event)
+    assert len(site.outbox.sent) == 2, "a redelivered attempt that finished sends nothing"
+
+
+async def test_a_failed_mark_does_not_mail_everyone_again(site, monkeypatch):
+    from sm_records.public_submissions import delivery
+
+    transport = _durable(site)
+    await contact_type(site, notify_to=["a@example.org", "b@example.org"])
+    await send(site)
+    ((event, _, _),) = transport.rows
+    real = delivery.system_update
+    failed: list[bool] = []
+
+    async def flaky(db, rtype, record, values, *, settings):
+        if "sm_notified_at" in values and not failed:
+            failed.append(True)
+            raise RuntimeError("database went away")
+        return await real(db, rtype, record, values, settings=settings)
+
+    monkeypatch.setattr(delivery, "system_update", flaky)
+    with pytest.raises(RuntimeError):
+        await _deliver(site, event)
+    assert len(site.outbox.sent) == 2
+    await _deliver(site, event)
+    assert len(site.outbox.sent) == 2, "the retry finds both recorded and only marks"
+    (record,) = await records_of(site)
+    assert record["data"]["sm_notified_at"]
+
+
+async def test_a_resend_is_a_new_attempt(site):
+    from tests.app_harness import ADMIN, roles
+
+    transport = _durable(site)
+    await contact_type(site)
+    await send(site)
+    (record,) = await records_of(site)
+    url = f"/api/records/types/contact/records/{record['uuid']}/submission/resend"
+    assert (await site.post(url, headers=roles(ADMIN))).status_code == 202
+    first, second = (row[0] for row in transport.rows)
+    assert first.attempt and second.attempt and first.attempt != second.attempt
+    await _deliver(site, first)
+    await _deliver(site, second)
+    assert len(site.outbox.sent) == 2, "an explicit resend mails the recipient again"
