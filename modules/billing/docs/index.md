@@ -14,14 +14,14 @@ Start with the document that matches what you are trying to do.
 | You are | Read |
 |---|---|
 | A platform administrator setting up plans, or an organisation owner paying for one | [user-guide.md](user-guide.md) |
-| A developer calling the billing API, or gating a feature on a plan | [api-reference.md](api-reference.md) |
+| A developer calling the billing API, gating a feature on a plan, or metering usage | [api-reference.md](api-reference.md) |
 | An operator installing it, connecting Stripe, or answering "why is this organisation suspended?" | [operations.md](operations.md) |
 | A developer changing the module or adding a payment provider | [architecture.md](architecture.md) |
 
 ### [user-guide.md](user-guide.md) — for administrators and owners
 
-The three admin screens (Plans, Subscriptions, Stripe connection) and the
-organisation's Billing page, using the exact UI labels: what each plan field
+The four admin screens (Plans, Subscriptions, Stripe connection, Usage) and
+the organisation's Billing page with its usage card, using the exact UI labels: what each plan field
 means, which combinations the editor refuses and why, what each subscription
 status does to an organisation, and what an owner sees when a payment fails.
 
@@ -30,24 +30,27 @@ status does to an organisation, and what an owner sees when a payment fails.
 Every endpoint under `/api/billing` and `/api/billing/admin`, plus the Stripe
 webhook: method, permission, request and response shapes, and the full error
 table. Also how another module reads a plan's limits and features without
-importing billing.
+importing billing, and how it meters usage (`UsageMeter`, `RequiresQuota`,
+gauge holds).
 
 ### [operations.md](operations.md) — for operators
 
 Installing and migrating, every setting, connecting Stripe step by step
 (including the one Stripe dashboard setting the dunning behaviour depends on),
-running `smpy billing reconcile`, and a troubleshooting table that starts from
-the symptom.
+running `smpy billing reconcile`, the usage hold sweeper and ledger retention,
+and a troubleshooting table that starts from the symptom.
 
 ### [architecture.md](architecture.md) — for maintainers
 
-The four tables, how a webhook becomes local state, the lifecycle rules as a
+The tables, how a webhook becomes local state, the lifecycle rules as a
 table, why plans resolve the way they do, the transaction rules every
-out-of-request write must follow, and how to add a second payment provider.
+out-of-request write must follow, why usage metering is race-safe, and how to
+add a second payment provider.
 
 ## The module in one paragraph
 
-Billing owns four tables keyed by `tenant_id` and changes nothing in `tenants`.
+Billing owns its own tables (plans, plus per-organisation tables keyed by
+`tenant_id`) and changes nothing in `tenants`.
 Plans live in the database, not in Stripe; Stripe price IDs are attached to
 them. A subscription whose status is `trialing`, `active` or `past_due` grants
 its plan; anything else falls back to the free default plan. Webhooks are never
