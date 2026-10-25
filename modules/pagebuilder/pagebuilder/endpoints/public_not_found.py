@@ -17,6 +17,7 @@ from typing import Final
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
+from simple_module_hosting._error_handlers import _wants_json as _framework_wants_json
 from simple_module_hosting.inertia_deps import InertiaDep
 
 from pagebuilder import public_cache
@@ -39,15 +40,18 @@ be hidden behind a cached "missing"."""
 
 
 def wants_json(request: Request) -> bool:
-    """An API-shaped caller that named JSON and not HTML.
+    """Whether this caller gets the JSON body rather than the page.
 
-    The framework's negotiation in miniature: an Inertia visit always gets the
-    page component, and a browser navigation names ``text/html``.
+    Exactly the framework's own error-page negotiation, so one request never
+    sees two error shapes depending on who answered it: an Inertia visit
+    always gets the page, q-values are honoured (``text/html;q=0`` rules the
+    page out; ``application/json, text/html;q=0.5`` prefers JSON), and a
+    browser navigation gets the page. It is a private helper of the
+    framework's, imported rather than copied so the two cannot drift; the
+    framework range (``<0.1``) bounds the exposure, and a test pins the
+    behaviour.
     """
-    if request.headers.get("x-inertia"):
-        return False
-    accept = request.headers.get("accept", "").lower()
-    return "application/json" in accept and "text/html" not in accept
+    return _framework_wants_json(request)
 
 
 async def render_not_found(

@@ -95,10 +95,44 @@ async def test_a_full_document_is_the_page_in_its_language(
     assert '<html lang="en"' in response.text
 
 
-async def test_a_json_caller_still_gets_json(authed_client: AsyncClient) -> None:
-    response = await authed_client.get("/p/nope", headers={"Accept": "application/json"})
+@pytest.mark.parametrize(
+    "accept",
+    [
+        "application/json",
+        # HTML explicitly refused.
+        "application/json, text/html;q=0",
+        # JSON preferred, HTML only a fallback.
+        "application/json, text/html;q=0.5",
+    ],
+)
+async def test_a_json_caller_still_gets_json(authed_client: AsyncClient, accept: str) -> None:
+    """The framework's own negotiation, q-values included (#89 review)."""
+    response = await authed_client.get("/p/nope", headers={"Accept": accept})
     assert response.status_code == 404
     assert response.json() == {"detail": "Page not found"}
+    assert response.headers["Cache-Control"] == "no-store"
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        # What a browser sends on a navigation.
+        {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
+        {"Accept": "*/*"},
+        # An Inertia visit gets the page component whatever its Accept says.
+        {**INERTIA, "Accept": "application/json"},
+        {**INERTIA, "Accept": "application/json, text/html;q=0"},
+    ],
+)
+async def test_a_browser_or_inertia_caller_gets_the_page(
+    authed_client: AsyncClient, headers: dict[str, str]
+) -> None:
+    response = await authed_client.get("/p/nope", headers=headers)
+    assert response.status_code == 404
+    if "X-Inertia" in headers:
+        assert response.json()["component"] == COMPONENT
+    else:
+        assert "text/html" in response.headers["content-type"]
     assert response.headers["Cache-Control"] == "no-store"
 
 
