@@ -60,7 +60,7 @@ environment variables — an `SM_BILLING_*` line does nothing.
 | `reconcile_interval_minutes` | `0` | Run [reconcile](#reconcile) inside the app every N minutes over subscriptions not synced for N minutes. `0` is off. Takes effect on save: the loop starts, stops or re-times itself. `60` suits most deployments. |
 | `usage_hold_ttl_seconds` | `900` | Default TTL of a usage hold when neither its meter nor the caller sets one (at least 30). A holder that crashes gives its slot back once the hold lapses. Read per call. |
 | `usage_sweep_interval_seconds` | `60` | Seconds between sweeps that expire lapsed holds (every instance sweeps; the guarded transition releases each hold once). `0` turns it off. Re-read from the database before every tick, so a value saved on one worker reaches all of them. |
-| `usage_event_retention_days` | `400` | The daily purge drops ledger charges older than this together with their refunds (by the charge's age, so a key is never left with only its refund; a refund goes only while its selected charge row is still there, so a stale batch on another instance never takes a newer call's refund), and settled holds older than 30 days. It deletes in batches of 1,000 rows per transaction, at most 20 per table per tick, and carries a backlog over to the next ticks, so SQLite's write lock is never held for long. `0` keeps the ledger. Counters and gauges are never purged. A purged key is forgotten whole and can be used again. |
+| `usage_event_retention_days` | `400` | The daily purge drops ledger charges older than this together with their refunds (by the charge's age, so a key is never left with only its refund; a refund goes only while its selected charge row is still there, so a stale batch on another instance never takes a newer call's refund), and settled holds older than 30 days. Each transaction deletes up to 1,000 charges plus their refunds (so up to about 2,000 ledger rows), or up to 1,000 settled holds, with at most 20 transactions per table per tick; and carries a backlog over to the next ticks, so SQLite's write lock is never held for long. `0` keeps the ledger. Counters and gauges are never purged. A purged key is forgotten whole and can be used again. |
 
 > **Rotating the app's `secret_key` makes stored Stripe secrets unreadable.**
 > Billing then falls back to `manual` at startup and the connection screen
@@ -213,8 +213,10 @@ long-running meter a `hold_ttl_seconds` that covers it, or heartbeat with
 Once a day per process, the same loop deletes ledger charges recorded more
 than `usage_event_retention_days` ago (by the server-side `recorded_at`)
 together with their refunds, and released or expired holds settled more than
-30 days ago. Deletes go in batches of 1,000 rows per transaction, at most 20
-per table per tick; a backlog (after an outage, or after lowering the
+30 days ago. Each ledger transaction selects up to 1,000 charges and deletes
+them with their refunds, so up to about 2,000 rows; each hold transaction
+deletes up to 1,000 settled holds. At most 20 transactions run per table per
+tick; a backlog (after an outage, or after lowering the
 retention) carries over to later ticks. The per-period counters and the
 gauges are **never** purged, so the usage screens keep their history. A
 purged key is forgotten whole and could be counted again, which is why the
@@ -225,12 +227,15 @@ ledger forever.
 
 On SQLite there is one writer at a time. A metering write that cannot take
 the write lock answers **503 `usage_busy`** with `Retry-After: 1`: it fails
-closed, counting nothing and admitting nothing. In practice only
-`consume(db=…)` meets it, when the caller's own transaction read before the
-metering write and another writer committed in between (SQLite's
-`BUSY_SNAPSHOT`, which `busy_timeout` cannot wait out). The default
-own-transaction calls start with a write and simply wait their turn. Postgres
-never answers `usage_busy`. A deployment that sees it often should move to
+closed, counting nothing and admitting nothing. Every metering write can
+meet it: `consume`, `record`, `refund`, `adjust`, the hold calls and recount
+all translate SQLite's "database is locked" the same way. It is most likely
+with `consume(db=…)` or `record(db=…)`, when the caller's own transaction
+read before the metering write and another writer committed in between
+(SQLite's `BUSY_SNAPSHOT`, which `busy_timeout` cannot wait out). An
+own-transaction call starts with a write and waits on `busy_timeout`, but
+under heavy write contention it can still run out of it. Postgres never
+answers `usage_busy`. A deployment that sees it often should move to
 Postgres or stop passing `db=`.
 
 ### Why no Redis
@@ -262,14 +267,15 @@ the ledger and the usage screens.
 | Startup fails with "billing metering supports postgresql and sqlite" or "needs SQLite >= 3.35" | an unsupported database, or an old SQLite library in the Python build | Use Postgres, or a Python whose `sqlite3.sqlite_version` is 3.35 or newer. |
 | A metered request answers 402 `quota_exceeded` | the organisation used its plan's allowance for the period (or holds its gauge's limit) | **Admin → Billing → Usage**: the row, the ledger, the open holds. Raise the plan's limit, credit with **Adjust**, or **Release** a stuck hold. |
 | A gauge stays full though no job is running | holds left by a crashed job that have not lapsed yet, or a sweep turned off | The drawer's **Open holds**; **Release** them, check `usage_sweep_interval_seconds`. If the level and the holds disagree, **Recount**. |
-| Metered requests answer 503 `usage_busy` | SQLite write contention, usually `consume(db=…)` | See [SQLite: `usage_busy`](#sqlite-usage_busy). |
+| Metered requests answer 503 `usage_busy` | SQLite write contention, most often from `consume(db=…)` / `record(db=…)` | See [SQLite: `usage_busy`](#sqlite-usage_busy). |
 | A metered route answers 409 `idempotency_replay` | the client resent an `Idempotency-Key` whose request already ran | Expected: the work ran once. A client that wants another run sends a new key. |
 
 ## Data and deletion
 
-Billing's tables (`billing_plan`, `billing_customer`, `billing_subscription`,
-`billing_webhook_event` and the four `billing_usage_*` tables) hold
-`tenant_id` as a plain column: one module cannot
+Billing's per-organisation tables (`billing_customer`,
+`billing_subscription` and the four `billing_usage_*` tables) hold
+`tenant_id` as a plain column (`billing_plan` is global, and
+`billing_webhook_event` is keyed by the provider's event id): one module cannot
 hold a foreign key into another module's tables, so deleting an organisation
 does not cascade into them.
 

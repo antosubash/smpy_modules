@@ -120,9 +120,10 @@ async def chat(...): ...
 
 # Or directly; None means billing is not installed, so nothing is limited.
 usage = getattr(request.app.state, "billing_usage", None)
-outcome = await usage.consume(tenant_id, "ai.requests", 1, job_id, source="ai")
-if not outcome.ok:
-    ...
+if usage is not None:
+    outcome = await usage.consume(tenant_id, "ai.requests", 1, job_id, source="ai")
+    if not outcome.ok:
+        ...
 ```
 
 - **Counters** reset each billing period: the Stripe period when there is

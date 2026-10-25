@@ -253,9 +253,12 @@ holds.
   and the write session starts with the `INSERT`, the write lock is taken at
   once; a concurrent writer waits on `busy_timeout` and its statement then
   runs against the committed state, so the `WHERE` sees the first writer's
-  increment. A metering write that still cannot get the lock (in practice
-  only `consume(db=…)`, whose caller read first) fails closed: 503
-  `usage_busy`, nothing counted and nothing admitted.
+  increment. Any metering write that still cannot get the lock fails closed
+  (`tx.run_write` maps SQLite's "database is locked" for every wrapped
+  write): 503 `usage_busy`, nothing counted and nothing admitted. It is most
+  likely with `consume(db=…)` or `record(db=…)`, whose caller read first, but
+  an own-transaction write under heavy contention can also run out of
+  `busy_timeout`.
 - `tests/test_usage_concurrency.py` and `tests/test_usage_hold_races.py` race
   real connections on a file SQLite database and on Postgres; removing the
   upsert's `WHERE`, or the status guard from the settle transition, fails

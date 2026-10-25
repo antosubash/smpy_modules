@@ -84,8 +84,9 @@ Never put personal data in a key or `source`.
 Each call runs in its own short transaction. Pass `db=` only when the business
 write that follows must be atomic with the usage *and* the rest of that
 transaction is short: the counter's row lock is held until the caller commits,
-so every other call for that tenant and meter waits behind it. On SQLite a
-`db=` call can fail closed with 503 `usage_busy` (see the error table).
+so every other call for that tenant and meter waits behind it. On SQLite any
+metering write can fail closed with 503 `usage_busy` (see the error table),
+most often a `db=` call.
 
 ### The protocol and its outcomes
 
@@ -105,8 +106,10 @@ against:
 | `QuotaExceededError(meter, outcome)` | raised where an outcome cannot be returned (`RequiresQuota`, `holding()`): 402 `quota_exceeded` |
 | `HoldNotFound`, `HoldExpired` | 404 `hold_not_found`; 409 `hold_expired` with the hold's `status` |
 
-`ok` is a class flag, so a consumer that imports the types only under
-`TYPE_CHECKING` can still tell the outcomes apart. Bad arguments (a
+Check `outcome.ok` rather than `isinstance`, so a consumer that imports the
+types only under `TYPE_CHECKING` never needs the concrete classes at
+runtime. On `Allowed`, `Exceeded` and `Refunded` it is a class flag; on
+`Hold` it is a property derived from `status`. Bad arguments (a
 non-positive or non-integer `qty`, an empty or over-long key, `meter` or
 `source`, a TTL outside 1 second to 30 days) raise `ValueError`: they are
 bugs in the caller, not refusals.
@@ -177,7 +180,7 @@ For capacity held over time (concurrent jobs, reserved bytes), register a
 | `commit(hold_id)` | keep it with no expiry (stays counted until released); idempotent; `HoldExpired` (409 `hold_expired`) once lapsed or released |
 | `release(hold_id)` | return the capacity; `False` if already settled; `HoldNotFound` (404) for an unknown id |
 | `extend(hold_id, ttl)` | heartbeat: push a held hold's expiry to `ttl` seconds from now |
-| `holding(tenant, meter, qty, key, *, source, ttl=None)` | `async with`: reserve (raises `QuotaExceededError` → 402), release on exit. The block runs at most once per key: a replayed key raises 409 `idempotency_replay` |
+| `holding(tenant, meter, qty, key, *, source, ttl=None)` | `async with`: reserve (raises `QuotaExceededError` → 402), release on exit. The block runs at most once per key: a replayed key whose hold is still live raises 409 `idempotency_replay`; one whose hold was released or expired raises 409 `hold_expired` (with its `status`) |
 
 A hold that is neither committed nor extended lapses, and the sweeper returns
 its capacity. Every call names a meter registered [as above](#registering-a-meter);

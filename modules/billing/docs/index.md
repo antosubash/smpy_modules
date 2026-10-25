@@ -49,7 +49,8 @@ add a second payment provider.
 
 ## The module in one paragraph
 
-Billing owns its tables, all keyed by `tenant_id`, and changes nothing in `tenants`.
+Billing owns its own tables (plans, plus per-organisation tables keyed by
+`tenant_id`) and changes nothing in `tenants`.
 Plans live in the database, not in Stripe; Stripe price IDs are attached to
 them. A subscription whose status is `trialing`, `active` or `past_due` grants
 its plan; anything else falls back to the free default plan. Webhooks are never
