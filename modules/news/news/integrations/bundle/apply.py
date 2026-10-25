@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import redirects
 from news.integrations.bundle import taxonomy
-from news.integrations.bundle.documents import ArticleKey, identity, write_article
+from news.integrations.bundle.documents import ArticleKey, batches, identity, write_article
 from news.integrations.bundle.prepare import Prepared, prepare
 from news.models import (
     NewsArticle,
@@ -70,9 +70,10 @@ async def _links(
     ids = [by_key[key].id for key in carried]
     if not ids:
         return
-    await db.execute(
-        delete(NewsArticleTag).where(NewsArticleTag.article_id.in_(ids))  # ty: ignore[unresolved-attribute]
-    )
+    for chunk in batches(ids):
+        await db.execute(
+            delete(NewsArticleTag).where(NewsArticleTag.article_id.in_(chunk))  # ty: ignore[unresolved-attribute]
+        )
     for key, names in carried.items():
         for name in sorted(set(names)):
             db.add(NewsArticleTag(article_id=by_key[key].id or 0, tag_id=tags[name].id or 0))

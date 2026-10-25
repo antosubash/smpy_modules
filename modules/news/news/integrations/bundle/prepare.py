@@ -35,6 +35,7 @@ from news.integrations.bundle.documents import (
     TAGS_NAME,
     ArticleKey,
     article_doc,
+    batches,
     comparable,
     doc_key,
     normalise_locale,
@@ -146,14 +147,15 @@ def _resolved(ctx: RestoreContext, doc: dict[str, Any]) -> dict[str, Any]:
 async def _links(db: AsyncSession, ids: list[int]) -> dict[int, list[str]]:
     if not ids:
         return {}
-    result = await db.execute(
-        select(NewsArticleTag.article_id, NewsTag.name)
-        .join(NewsTag, NewsTag.id == NewsArticleTag.tag_id)
-        .where(NewsArticleTag.article_id.in_(ids))  # ty: ignore[unresolved-attribute]
-    )
     links: dict[int, list[str]] = defaultdict(list)
-    for article_id, name in result.all():
-        links[article_id].append(name)
+    for chunk in batches(ids):
+        result = await db.execute(
+            select(NewsArticleTag.article_id, NewsTag.name)
+            .join(NewsTag, NewsTag.id == NewsArticleTag.tag_id)
+            .where(NewsArticleTag.article_id.in_(chunk))  # ty: ignore[unresolved-attribute]
+        )
+        for article_id, name in result.all():
+            links[article_id].append(name)
     return links
 
 

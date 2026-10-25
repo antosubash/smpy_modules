@@ -40,7 +40,7 @@ def test_access_uses_the_framework_grant_rules():
     assert SectionAccess(frozenset()).missing(NotesSection(), "apply") == []  # declares none
 
 
-@pytest.mark.parametrize("bad", ["notes.view", [1], {""}])
+@pytest.mark.parametrize("bad", ["notes.view", [1], {""}, 7, None])
 def test_permissions_must_be_a_set_of_names(bad):
     section = NotesSection()
     section.apply_permissions = bad

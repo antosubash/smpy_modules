@@ -14,7 +14,8 @@ revision history, which stays on the host that wrote it.
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from collections.abc import Iterator
+from datetime import UTC, datetime
 from typing import Any
 
 from news import locales
@@ -108,9 +109,20 @@ def article_filename(slug: str, locale: str) -> str:
     return f"{ARTICLES_DIR}/{_segment(locale)}__{stem}.json"
 
 
+IN_BATCH = 500
+"""Ids per ``IN (...)``: well under every driver's bound-parameter limit."""
+
+
+def batches(ids: list[int]) -> Iterator[list[int]]:
+    """*ids* in slices an ``IN`` clause can carry (asyncpg stops at 32767 parameters)."""
+    for start in range(0, len(ids), IN_BATCH):
+        yield ids[start : start + IN_BATCH]
+
+
 def _instant(value: datetime | None) -> str | None:
+    """*value* as an ISO string in UTC, so equal instants spell equally whatever their offset."""
     value = as_utc(value)
-    return value.isoformat() if value is not None else None
+    return value.astimezone(UTC).isoformat() if value is not None else None
 
 
 def parse_instant(raw: Any) -> datetime | None:
