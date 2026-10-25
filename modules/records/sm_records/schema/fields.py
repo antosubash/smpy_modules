@@ -25,11 +25,12 @@ from sqlmodel import SQLModel
 
 from sm_records._text import NUL_PROBLEM, has_nul
 from sm_records.constants import MAX_LABEL_LEN
-from sm_records.schema._field_rules import (
-    ON_DELETE_DEFAULT,
-    validate_constraints,
-    validate_options,
-)
+
+# ``ON_DELETE_*`` are re-exported: callers import them from here, as before
+# the rules moved to ``_field_rules`` for the line cap.
+from sm_records.schema._field_rules import ON_DELETE_CHOICES as ON_DELETE_CHOICES
+from sm_records.schema._field_rules import ON_DELETE_DEFAULT as ON_DELETE_DEFAULT
+from sm_records.schema._field_rules import validate_constraints, validate_options
 from sm_records.schema._keys import FieldSchemaError, validate_key
 from sm_records.schema._keys import require as _require
 from sm_records.schema._text_checks import reading

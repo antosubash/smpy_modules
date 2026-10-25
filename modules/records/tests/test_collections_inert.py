@@ -22,6 +22,11 @@ import subprocess
 import sys
 import textwrap
 
+# At module scope, so the collections are declared at collection time: an
+# app-building test that runs first in the same process seals the registry,
+# and a declaration after that raises.
+from tests.collections_harness import COLLECTION_NAMES
+
 PHASE_4_TABLES = [
     "records_index_bool",
     "records_index_date",
@@ -99,8 +104,6 @@ def test_the_declared_metadata_is_exactly_the_phase_4_tables_plus_the_collection
     """The other half of the property, in *this* process: declaring adds eight
     tables per collection and changes nothing about the eleven."""
     from sm_records.models import Base
-
-    from tests.collections_harness import COLLECTION_NAMES
 
     names = sorted(Base.metadata.tables)
     assert [n for n in names if not n.startswith("records_c_")] == PHASE_4_TABLES
