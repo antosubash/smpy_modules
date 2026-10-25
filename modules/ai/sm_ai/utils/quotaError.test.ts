@@ -18,6 +18,11 @@ const REFUSAL = {
   resets_at: '2026-11-01T00:00:00+00:00',
 };
 
+/** The reset date as the message shows it: formatted in the runner's local
+ * time zone, so the expectation holds under any TZ. */
+const day = (iso: string, locale: string) =>
+  new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(iso));
+
 function flatten(node: Record<string, unknown>, prefix: string, out: Record<string, string>) {
   for (const [name, value] of Object.entries(node)) {
     const key = `${prefix}.${name}`;
@@ -41,7 +46,7 @@ describe('quota_exceeded', () => {
 
   it('names the meter, the numbers and the reset date', () => {
     expect(quotaMessage(REFUSAL, 'en')).toBe(
-      'AI requests limit reached (1/1); resets Nov 1, 2026.',
+      `AI requests limit reached (1/1); resets ${day(REFUSAL.resets_at, 'en')}.`,
     );
   });
 
@@ -56,7 +61,7 @@ describe('quota_exceeded', () => {
 
   it('shows another meter by its key', () => {
     expect(quotaMessage({ ...REFUSAL, meter: 'ai.tokens' }, '')).toBe(
-      'ai.tokens limit reached (1/1); resets Nov 1, 2026.',
+      `ai.tokens limit reached (1/1); resets ${day(REFUSAL.resets_at, 'en')}.`,
     );
   });
 
@@ -65,7 +70,7 @@ describe('quota_exceeded', () => {
     await i18next.changeLanguage('de');
     try {
       expect(quotaMessage(REFUSAL)).toBe(
-        'Grenze für KI-Anfragen erreicht (1/1); wird am 01.11.2026 zurückgesetzt.',
+        `Grenze für KI-Anfragen erreicht (1/1); wird am ${day(REFUSAL.resets_at, 'de')} zurückgesetzt.`,
       );
     } finally {
       await i18next.changeLanguage('en');
@@ -78,7 +83,7 @@ describe('quota_exceeded', () => {
       vi.fn(async () => new Response(JSON.stringify(REFUSAL), { status: 402 })),
     );
     await expect(testSlot('chat')).rejects.toThrow(
-      'AI requests limit reached (1/1); resets Nov 1, 2026.',
+      `AI requests limit reached (1/1); resets ${day(REFUSAL.resets_at, 'en')}.`,
     );
   });
 });

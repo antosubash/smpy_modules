@@ -50,7 +50,11 @@ describe('UsageCard', () => {
     const doc = render([meter({ used: 3, limit: 10 })]);
     const item = row(doc, 'exports.monthly');
     expect(item.textContent).toContain('3 of 10');
-    expect(item.textContent).toContain('Resets Nov 1, 2026');
+    // The card formats in the runner's local time zone; so does this.
+    const day = new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(
+      new Date('2026-11-01T00:00:00Z'),
+    );
+    expect(item.textContent).toContain(`Resets ${day}`);
     const bar = item.querySelector('[role="progressbar"]');
     expect(bar?.getAttribute('aria-valuenow')).toBe('30');
     expect(bar?.getAttribute('data-tone')).toBe('normal');
