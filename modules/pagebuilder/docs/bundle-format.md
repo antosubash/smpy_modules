@@ -204,8 +204,10 @@ top of `pagebuilder.publish` / `pagebuilder.approve`:
   `details_unavailable: true` (`note_key`
   `pagebuilder.plan.section_details_unavailable`) and a warning is logged. The section's `applied`
   record holds only identities (id and `created_at`) and counts, and is
-  served as counts to such a reader. `/imports/pending` needs
-  `pagebuilder.publish`.
+  served as counts to such a reader. `/imports/pending` and the review screen
+  need `pagebuilder.publish` or `pagebuilder.approve`. The Import / Export
+  screen is open to every pagebuilder role, but it carries the pending restore
+  only for those readers.
 
 News asks for `news.edit` to capture and download, and for `news.edit` plus
 `news.publish` to restore.
