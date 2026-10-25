@@ -58,7 +58,14 @@ def register_meter(app: FastAPI) -> bool:
 
 def billing_metering_installed() -> bool:
     """Whether a billing that meters is installed (it is optional, and a
-    billing older than usage metering has no ``RequiresQuota``)."""
+    billing older than usage metering has no ``RequiresQuota``).
+
+    ``find_spec`` of a dotted name imports its parents (``sm_billing``,
+    ``sm_billing.metering``) when they exist — only an *installed* billing is
+    ever imported. Only a missing module means "absent": any other import
+    error in an installed billing propagates, rather than quietly turning
+    metering off.
+    """
     try:
         return find_spec(constants.BILLING_QUOTA_MODULE) is not None
     except ModuleNotFoundError:  # no sm_billing, or one without metering
