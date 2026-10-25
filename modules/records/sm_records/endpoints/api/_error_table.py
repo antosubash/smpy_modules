@@ -18,7 +18,10 @@ which statuses is the other half and lives next door in
 
 from __future__ import annotations
 
+from operator import attrgetter
 from typing import Final, NamedTuple
+
+from sm_records.endpoints.api._error_table_submissions import SUBMISSION_ROWS
 
 __all__ = ["ERROR_TABLE", "ErrorRow"]
 
@@ -29,7 +32,7 @@ class ErrorRow(NamedTuple):
     body: str
 
 
-ERROR_TABLE: Final[tuple[ErrorRow, ...]] = (
+_CORE: Final[tuple[ErrorRow, ...]] = (
     ErrorRow(
         400,
         "A filter or sort naming an unknown field",
@@ -268,3 +271,9 @@ ERROR_TABLE: Final[tuple[ErrorRow, ...]] = (
         '`{"detail": "internal error"}` — always JSON',
     ),
 )
+
+ERROR_TABLE: Final[tuple[ErrorRow, ...]] = tuple(
+    sorted((*_CORE, *(ErrorRow(*row) for row in SUBMISSION_ROWS)), key=attrgetter("status"))
+)
+"""Every row, by status; within one status the order above, then the
+website-submission rows (``_error_table_submissions``). ``sorted`` is stable."""

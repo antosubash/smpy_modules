@@ -759,6 +759,32 @@
       "sm_unsubscribed_at": "Unsubscribed at",
       "sm_confirm_sent_at": "Confirmation sent at",
       "sm_consent_ip_hash": "Consent IP hash"
+    },
+    "actions": {
+      "title": "Submission",
+      "resend": "Resend notification",
+      "resent": "The notification will be sent again.",
+      "spam": "Mark as spam",
+      "spam_confirm_title": "Mark this submission as spam?",
+      "spam_confirm_body": "It moves to the trash, and nobody is notified. \"Not spam\" in the trash brings it back.",
+      "spam_done": "Marked as spam and moved to the trash.",
+      "not_spam": "Not spam",
+      "not_spam_done": "Restored. Its notification is on its way.",
+      "is_spam": "Kept as spam ({reason})",
+      "spam_reason": {
+        "links": "too many links",
+        "manual": "marked by hand"
+      },
+      "not_sent": "Notification not sent",
+      "failed": "That didn't work: {message}"
+    },
+    "mail": {
+      "notify": {
+        "subject": "New {type} submission on {site}",
+        "intro": "Someone sent a new {type} submission through {site}:",
+        "open": "Open it in the console:",
+        "footer": "You get this email because this address is notified of submissions on {site}."
+      }
     }
   }
 }

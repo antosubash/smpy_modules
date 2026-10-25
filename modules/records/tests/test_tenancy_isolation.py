@@ -18,11 +18,12 @@ from __future__ import annotations
 import pytest
 from sm_records import constants
 
-# Imported for their ``@covers`` marks: the route table is checked against all four.
+# Imported for their ``@covers`` marks: the route table is checked against all five.
 from tests import (  # noqa: F401
     test_tenancy_isolation_io,
     test_tenancy_isolation_public,
     test_tenancy_isolation_records,
+    test_tenancy_isolation_submissions,
 )
 from tests.isolation_support import (
     ACME,

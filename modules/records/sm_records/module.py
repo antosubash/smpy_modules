@@ -13,11 +13,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter
+from simple_module_core.events import EventBus
 from simple_module_core.health import HealthRegistry
 from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
+from simple_module_core.rate_limit import RateLimitRegistry, RateLimitRule
 
 from sm_records import constants
 
@@ -163,7 +165,7 @@ class RecordsModule(ModuleBase):
         registry.add(stale_reindex_check(self))
 
     def register_public_routes(self, registry: PublicRouteRegistry) -> None:
-        """Nothing here — the exemption is added at startup instead.
+        """The read API's exemption is added at startup instead.
 
         Which path is public depends on ``public_route_prefix``, and this hook
         runs during app construction, before the host hydrates that from the
@@ -173,7 +175,14 @@ class RecordsModule(ModuleBase):
         ``AuthMiddleware`` reads the registry live, so
         :func:`sm_records.boot.exempt_public_routes` can fill it from
         ``on_startup`` — after hydration, before the first request. Design §10.
+
+        The website-submission routes (#101) are the exception: their prefix
+        is fixed, so they are exempted here, for ``GET`` and ``POST`` only.
         """
+        registry.add_prefix(
+            constants.PUBLIC_SUBMISSIONS_API_PREFIX,
+            methods=set(constants.PUBLIC_SUBMISSIONS_ROUTE_METHODS),
+        )
 
     def register_middleware(self, app: FastAPI) -> None:
         """Install the deferred-job drain and the sidebar sync.
@@ -215,63 +224,34 @@ class RecordsModule(ModuleBase):
         app.add_middleware(MenuSyncMiddleware, module=self)
 
     async def on_startup(self, app: FastAPI) -> None:
-        """Hand the health check what it cannot reach on its own.
-
-        ``register_health_checks`` runs before the lifespan opens the database,
-        and module settings are hydrated from the DB at lifespan start — so the
-        check closes over *this instance* and reads both from here, once they
-        exist. Storing them rather than capturing ``app`` keeps the check free
-        of the request/app object entirely, which is what lets a test call it
-        with a module whose ``db`` is a bare ``DatabaseState``.
-
-        ``settings`` is overwritten with the hydrated object: it was either
-        ``None`` or a test's pre-seeded stand-in until now, and the check wants
-        ``reindex_stale_after_seconds`` as the operator set it.
-        """
-        self.db = getattr(app.state, "sm", None) and app.state.sm.db
-        from sm_records import tenancy
-
-        # Single or multi, from the built stack (tenancy §A.3); the health check
-        # and the sidebar read it from here (§A.5, §I).
-        self.tenancy_mode = tenancy.configure(app)
-        if (session_class := getattr(self.db, "sync_session_class", None)) is not None:
-            tenancy.install_guard(session_class)  # before any read below (tenancy §A.4)
-        services = getattr(app.state, constants.PACKAGE, None)
-        if services is not None and getattr(services, "settings", None) is not None:
-            self.settings = services.settings
-
-        # The anonymous read API (design §10), mounted and exempted here for
-        # the reason in ``boot``'s docstring: its prefix is a DB-backed setting
-        # that only exists as the operator set it from this point on.
+        """Everything that needs the hydrated settings and an open database —
+        the tenancy guard, the anonymous read API, the media picker, the
+        orphaned-locale count and the first sidebar read. The body is
+        :func:`sm_records.boot.startup`, which says why each runs here."""
         from sm_records import boot
-        from sm_records.settings import RecordsSettings
 
-        settings = self.settings or RecordsSettings()
-        boot.mount_public_router(app, settings)
-        boot.exempt_public_routes(app, settings)
-        # The media library the ``media`` picker calls, found by route shape
-        # (never by importing it) — :mod:`sm_records.media`. Same reason as above.
-        from sm_records import media
+        await boot.startup(self, app)
 
-        media.configure(app, settings.media_api_prefix)
+    def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
+        """The outbox handler that mails a website submission's notification
+        (#101), when the host delivers durably. Registered whatever ``app`` is:
+        the outbox worker builds modules with ``app=None`` and still has to
+        know the handler. See :mod:`sm_records.public_submissions.mail_runner`."""
+        from sm_records.public_submissions.mail_runner import (
+            HANDLER_NAME,
+            NotificationDue,
+            durable_handler,
+        )
 
-        # Dropping a content locale is not refused at save (``settings_checks``
-        # says why), so this is what makes the records left behind visible. Once
-        # per boot: the framework offers no hook to re-run it when an operator
-        # hydrates new settings, which the health check's docstring records.
-        from sm_records import health
+        bus.subscribe_durable(NotificationDue, durable_handler(self), name=HANDLER_NAME)
 
-        if self.db is not None:
-            self.orphaned_locales = await health.count_orphaned_locales(self.db, settings)
-
-        # The first sidebar read: ``register_menu_items`` ran before there was
-        # a database, so until now the registry holds the hub entry and none
-        # of the per-type ones. Forced past the refresh window because there
-        # is nothing to be stale yet — and deliberately last, so a database
-        # this cannot read costs a log line rather than a boot.
-        from sm_records import menu
-
-        await menu.refresh(self, force=True)
+    def register_rate_limits(self, registry: RateLimitRegistry) -> None:
+        """A static backstop on the anonymous form definition. Submits are
+        limited by the module itself, at rates that are settings."""
+        registry.add_prefix(
+            constants.PUBLIC_SUBMISSIONS_API_PREFIX,
+            RateLimitRule("60/minute", key="ip", methods=frozenset({"GET"})),
+        )
 
     def locale_dirs(self) -> dict[str, Path]:
         base = Path(str(importlib.resources.files(__package__) / "locales"))
@@ -283,7 +263,12 @@ class RecordsModule(ModuleBase):
         # built yet, and a top-level import would make one missing dependency
         # take the whole module — and its tables — out of discovery.
         from sm_records.endpoints.api import router as api
+        from sm_records.endpoints.api.public_submissions_public import router as submissions
         from sm_records.endpoints.views import router as views
 
         api_router.include_router(api)
+        # Beside the admin router, not in it: anonymous, so without its tenant
+        # binding and CSRF check (``endpoints.api.public_submissions_public``).
+        prefix = constants.PUBLIC_SUBMISSIONS_API_PREFIX.removeprefix(constants.ROUTE_PREFIX_API)
+        api_router.include_router(submissions, prefix=prefix.rstrip("/"))
         view_router.include_router(views)

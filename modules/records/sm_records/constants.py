@@ -202,6 +202,15 @@ PUBLIC_ROUTE_METHODS: Final = frozenset({"GET", "HEAD"})
 ``PublicRouteRegistry`` exemption covers — pinned so a future route under the
 same prefix cannot widen the exemption by accident (§10)."""
 
+PUBLIC_SUBMISSIONS_API_PREFIX: Final = f"{ROUTE_PREFIX_API}/submissions/"
+"""Where website visitors send records (#101): a form's definition and its
+submit. **Fixed**, unlike the read API's prefix, so it needs no restart and no
+"would this exempt the admin API" check — no admin route lives under it."""
+
+PUBLIC_SUBMISSIONS_ROUTE_METHODS: Final = frozenset({"GET", "POST"})
+"""The verbs the submissions exemption covers: the definition is a ``GET`` and
+every submission a ``POST``."""
+
 MAX_LOCALE_LEN: Final = 16
 """``records_record.locale`` width — a BCP 47 tag such as ``pt-BR``."""
 

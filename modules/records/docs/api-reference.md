@@ -35,6 +35,7 @@ Contents:
 [Domain events](#domain-events) ·
 [Import and export](#import-and-export-formats) ·
 [Public read API](#public-read-api) ·
+[Website submissions](#website-submissions) ·
 [Errors](#error-table) ·
 [Limits](#limits-that-bound-a-request)
 
@@ -1009,6 +1010,7 @@ they are the only way to observe a write without polling.
 | `RecordTypeChanged` | `PUT /types/{key}`, `POST …/revisions/{v}/restore`, `POST /types/import` with `mode=update` | `type_key`, `tenant_id`, `schema_version`, `kind`, `index_affecting_keys` |
 | `RecordTypeDeleted` | `DELETE /types/{key}` | `type_key`, `tenant_id`, `purged` |
 | `RecordTypeMoved` | `PUT /types/{key}` with a changed `collection` | `type_key`, `tenant_id`, `source`, `target`, `moved` |
+| `FormSubmitted` | `POST /api/records/submissions/{type_key}/submit`, beside its `RecordCreated` | `type_key`, `tenant_id`, `uuid`, `spam` |
 
 **`tenant_id` is on every event**, second after `type_key`. It was added to
 the contract with multi-tenancy. A type key and a record uuid are unique only
@@ -1364,6 +1366,87 @@ page of the same query — and not merely when some row somewhere was touched.
 
 ---
 
+## Website submissions
+
+A record type can accept submissions from the website (#101): its
+`public_submissions` config (`TypeRead.public_submissions`) has a `kind`, an
+`enabled` switch ("Accept submissions from the website"), the `public_fields`
+a visitor may fill, the `notify_to` recipients and the `consent` text. **The
+type is the trust anchor**: a form only names a type key, and nothing the
+server relies on comes from it. Today the routes serve the contact-form kind
+(`"form"`); a newsletter list's signup flow is not served yet and answers the
+404 below.
+
+The routes are anonymous, at a **fixed** prefix that is not a setting, and
+exempt from authentication for `GET` and `POST` only:
+
+| Method | Path | Answers |
+|---|---|---|
+| `GET` | `/api/records/submissions/{type_key}?locale=` | `SubmissionDefinition` |
+| `POST` | `/api/records/submissions/{type_key}/submit` | `202 {"ok": true}` |
+
+`SubmissionDefinition` is `{kind, schema_version, fields, consent, token,
+captcha}`: one entry per public field (`key`, `type`, `label`, `help`,
+`required`, `choices`, `constraints`, `default`), the consent checkbox with its
+text in `?locale=` (else the default content locale's) or `null`, a signed
+token, and `captcha: null`. Fetch it when the form mounts — never from cached
+page JSON — and send the token back.
+
+The submit body is `{data, token, hp, consent, block, locale}`. `data` holds
+the public fields only; any other key is a `422 unknown_field`, and a visitor
+can never write an `sm_*` value. `hp` is a honeypot input a person never
+fills: a non-empty one answers the same `202` and stores nothing. `consent`
+is required when the type requires it. `block` (≤ 100 characters) names the
+page block and `locale` the page's language; both are hints, stored as
+`sm_source_block` and `sm_locale`.
+
+A submission is stored as a **draft** record written by nobody, through the
+same create the admin API uses, with its `sm_*` system fields filled by the
+server: the `Referer` path, a keyed hash of the IP address, the user agent,
+the consent text the visitor saw, and `sm_notified_at` once the notification
+has gone out. One with more than `public_submissions_max_links` links is kept
+as spam — trashed, `sm_spam: "links"`, nobody notified. Every answer is
+`Cache-Control: no-store`.
+
+**No CSRF token, on purpose.** The pages that host a form are anonymous and
+cached. A submit instead needs `Content-Type: application/json` (`415`
+otherwise), an `Origin` — else a `Referer` — that is this host, the host's
+`public_base_url` or one of `public_submissions_allowed_origins` (`403
+bad_origin`), and a token that verifies, was issued at least
+`public_submissions_min_fill_seconds` and at most
+`public_submissions_token_max_age_seconds` ago (`400 form_expired`). A token
+issued before the type's schema changed is a `409 form_changed` carrying the
+fresh `definition`. The body is capped at `public_submissions_max_body_bytes`
+(`413`); one address may send `public_submissions_rate_per_ip` and one type
+accept `public_submissions_type_rate` (`429` with `Retry-After`).
+`public_submissions_enabled` off turns every route into the 404.
+
+**The form token** is `{schema_version}.{issued}.{nonce}.{mac}`, the MAC an
+HMAC-SHA256 under the host's `secret_key` over the tenant, the type key, the
+schema version, the issue time and the nonce. It is stateless; rotating the
+secret invalidates outstanding tokens and costs a visitor one reload.
+
+**The notification** goes to each `notify_to` address, never inside the
+request: through the outbox when the host has a durable transport
+(`background_tasks`), otherwise from a task started after the commit. It is
+sent only when the host's mail sender delivers email and `public_base_url`
+is set; otherwise the record stands and `sm_notified_at` stays `null`.
+
+Three admin actions sit under the record, need `records.edit` and the
+type's `allowed_roles`, and refuse a type that is not a contact form with
+`409 wrong_kind`:
+
+| Method | Path | Does |
+|---|---|---|
+| `POST` | `…/records/{uuid}/submission/resend` | `202 {"queued": true}` — queues the notification again, once a minute per record |
+| `POST` | `…/records/{uuid}/submission/spam` | `RecordRead` — `sm_spam: "manual"`, then into the trash |
+| `POST` | `…/records/{uuid}/submission/not-spam` | `RecordRead` — out of the trash, `sm_spam` cleared, notification queued |
+
+Every refusal on these routes carries a stable snake_case `code`; the
+*Submissions* rows of the error table list them.
+
+---
+
 ## Error table
 
 **This table is `sm_records/endpoints/api/_error_table.py`.** The rows below
@@ -1391,13 +1474,16 @@ kind of route can produce, with the body schema
 | `400` | An import file that is not the format it claims, or a header naming an unknown column | `{"detail"}` |
 | `400` | A filter term containing a NUL (`\x00`) character | `{"detail"}` |
 | `400` | *Public API only* — any of the above | `{"detail"}` — no `field`, no `reason` |
+| `400` | *Submissions* — a form token that does not verify, or a form sent sooner than `public_submissions_min_fill_seconds` or later than `public_submissions_token_max_age_seconds` after it was loaded | `{"detail", "code": "form_expired"}` — load the form again |
 | `401` | No session | `{"detail": "Not authenticated"}` — the framework's, not this module's |
 | `403` | Missing `records.view` / `records.edit` / `records.manage_types` | `{"detail": "Permission required: records.edit"}` |
 | `403` | The type's `allowed_roles` exclude the caller | `{"detail"}` — names the type and the roles, deliberately |
 | `403` | *Multi-tenant hosts* — the framework resolved no tenant (no active organisation) for the signed-in account | `{"detail", "code": "tenant_required"}` — a tenant header does not change it: the framework never lets a signed-in user pick a tenant outside their memberships |
+| `403` | *Submissions* — an `Origin` (else `Referer`) that is neither this host, the host's `public_base_url` nor one of `public_submissions_allowed_origins` | `{"detail", "code": "bad_origin"}` |
 | `404` | Unknown type key, unknown uuid, a record in the trash on a non-trash read | `{"detail"}` |
 | `404` | *Public API* — any of: unknown type, non-public type, draft, trashed, unknown uuid; on a multi-tenant host, no tenant resolved (no or malformed `X-Tenant-ID`) | `{"detail": "not found"}` |
 | `404` | A preview job this process does not hold | `{"detail"}` |
+| `404` | *Submissions* — any of: unknown type, a type that does not accept submissions or has them switched off, a newsletter list, `public_submissions_enabled` off; on a multi-tenant host, no tenant resolved | `{"detail": "not found"}` |
 | `409` | `expected_version` no longer matches | `{"detail", "current": RecordRead \| TypeRead}` |
 | `409` | A slug or `unique` value already claimed (possibly by a trashed record) | `{"detail"}` |
 | `409` | A delete blocked by `on_delete: restrict` | `{"detail", "total": n, "referrers": [uuid, …], "hidden": n, "more": n}` |
@@ -1409,10 +1495,15 @@ kind of route can produce, with the body schema
 | `409` | A translation a type or a sibling will not allow | `{"detail"}` |
 | `409` | Turning `translatable` off while records exist in another language | `{"detail"}` |
 | `409` | A bulk action at least one named record refused | `{"detail", "report": BulkReport}` — nothing was changed |
+| `409` | *Submissions* — the type's schema changed after the form was loaded | `{"detail", "code": "form_changed", "definition": SubmissionDefinition}` |
+| `409` | *Submissions* — a `unique` value already claimed | `{"detail", "code": "conflict"}` |
+| `409` | A submission action on a type that is not a contact form, *Not spam* on a record outside the trash, *Resend* on a type that notifies nobody | `{"detail", "code": "wrong_kind" \| "not_in_trash" \| "no_recipients"}` |
 | `413` | An import body over `max_import_bytes` | `{"detail"}` |
 | `413` | An import file holding more rows than `max_import_rows` | `{"detail"}` — refused before anything is written |
 | `413` | A bulk action naming more than `max_bulk_records` records | `{"detail"}` — refused before a record is touched |
 | `413` | Any other `/api/records/*` write body over `max_payload_bytes` + 65,536 | `{"detail"}` — refused from `Content-Length`, before the body is read |
+| `413` | *Submissions* — a body over `public_submissions_max_body_bytes` | `{"detail"}` — refused from `Content-Length`, before the body is read |
+| `415` | *Submissions* — a body that is not `application/json` | `{"detail", "code": "unsupported_media_type"}` |
 | `422` | A payload that does not satisfy the schema | `{"detail", "errors": [{"field", "message"}, …]}` |
 | `422` | An invalid field or type definition | `{"detail", "errors"}` |
 | `422` | `rescan: true` with `fields` that are not the type's stored ones | `{"detail", "errors"}` — nothing was scanned or marked |
@@ -1422,6 +1513,8 @@ kind of route can produce, with the body schema
 | `422` | `on_error=abort` and a bad row | `{"detail", "report": ImportReport}` |
 | `422` | `page` outside `1 … 1000000`, `page_size` below 1 | FastAPI validation error |
 | `422` | An empty `uuids` list, or an `action` that is not one of the five | FastAPI validation error |
+| `422` | *Submissions* — a `data` key outside the type's `public_fields`, a required consent not given, or `data` that does not satisfy the schema | `{"detail", "code": "unknown_field" \| "consent_required" \| "invalid", "errors"}` |
+| `429` | *Submissions* — over `public_submissions_rate_per_ip` or `public_submissions_type_rate`; *Resend* more than once a minute for one record | `{"detail", "code": "rate_limited"}` with `Retry-After` |
 | `500` | Anything unanticipated on `/api/records/*` | `{"detail": "internal error"}` — always JSON |
 
 Worked examples:

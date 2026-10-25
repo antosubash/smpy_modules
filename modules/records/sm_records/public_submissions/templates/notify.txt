@@ -1,0 +1,8 @@
+$intro
+
+$fields
+
+$open_label
+$link
+
+$footer

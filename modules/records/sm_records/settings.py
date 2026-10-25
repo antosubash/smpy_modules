@@ -27,7 +27,9 @@ the base class :class:`~sm_records.settings_boot.BootSettings` — the README's
 settings table lists the same four.
 
 Everything else is read per request and takes effect on save. The per-field
-checks live in :mod:`sm_records.settings_checks`.
+checks live in :mod:`sm_records.settings_checks`; the website-submission
+knobs are declared on :class:`~sm_records.settings_public_submissions.
+PublicSubmissionsSettings`, the class between this one and its base.
 """
 
 from __future__ import annotations
@@ -36,12 +38,12 @@ from pydantic import Field, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from sm_records.constants import EXPAND_DEPTH_CAP
-from sm_records.settings_boot import BootSettings
+from sm_records.settings_public_submissions import PublicSubmissionsSettings
 
 __all__ = ["RecordsSettings"]
 
 
-class RecordsSettings(BootSettings):
+class RecordsSettings(PublicSubmissionsSettings):
     # ``use_attribute_docstrings`` puts the prose under each field on the
     # Settings screen: the admin UI renders ``FieldInfo.description``, and
     # without this every field would arrive there unexplained while the
@@ -264,4 +266,6 @@ class RecordsSettings(BootSettings):
                 f"max_indexed_fields_per_type ({self.max_indexed_fields_per_type}) "
                 f"must not exceed max_fields_per_type ({self.max_fields_per_type})"
             )
+        if self.public_submissions_max_body_bytes > self.max_payload_bytes:
+            raise ValueError("public_submissions_max_body_bytes must not exceed max_payload_bytes")
         return self

@@ -148,4 +148,10 @@ async def response_for(request: Request, exc: Exception) -> JSONResponse:
         # ``TenantRequired``: a 403 a client must tell apart from a missing
         # permission without reading the sentence.
         body["code"] = code
-    return JSONResponse(body, status_code=exc.status_code)
+    # A website-submission refusal (``public_submissions.errors``) also
+    # carries extra keys — the per-field ``errors``, a changed form's fresh
+    # ``definition`` — and a ``Retry-After`` on a 429.
+    body.update(getattr(exc, "extra", None) or {})
+    return JSONResponse(
+        body, status_code=exc.status_code, headers=getattr(exc, "headers", None) or None
+    )

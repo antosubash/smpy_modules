@@ -759,6 +759,32 @@
       "sm_unsubscribed_at": "Abgemeldet am",
       "sm_confirm_sent_at": "Bestätigung gesendet am",
       "sm_consent_ip_hash": "IP-Hash der Einwilligung"
+    },
+    "actions": {
+      "title": "Einsendung",
+      "resend": "Benachrichtigung erneut senden",
+      "resent": "Die Benachrichtigung wird erneut gesendet.",
+      "spam": "Als Spam markieren",
+      "spam_confirm_title": "Diese Einsendung als Spam markieren?",
+      "spam_confirm_body": "Sie wird in den Papierkorb verschoben, und niemand wird benachrichtigt. Mit „Kein Spam“ im Papierkorb holen Sie sie zurück.",
+      "spam_done": "Als Spam markiert und in den Papierkorb verschoben.",
+      "not_spam": "Kein Spam",
+      "not_spam_done": "Wiederhergestellt. Die Benachrichtigung ist unterwegs.",
+      "is_spam": "Als Spam behalten ({reason})",
+      "spam_reason": {
+        "links": "zu viele Links",
+        "manual": "von Hand markiert"
+      },
+      "not_sent": "Benachrichtigung nicht gesendet",
+      "failed": "Das hat nicht geklappt: {message}"
+    },
+    "mail": {
+      "notify": {
+        "subject": "Neue Einsendung ({type}) auf {site}",
+        "intro": "Über {site} wurde eine neue Einsendung ({type}) gesendet:",
+        "open": "In der Konsole öffnen:",
+        "footer": "Sie erhalten diese E-Mail, weil diese Adresse über Einsendungen auf {site} benachrichtigt wird."
+      }
     }
   }
 }
