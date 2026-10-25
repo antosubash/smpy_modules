@@ -21,7 +21,6 @@ from pagebuilder.contracts.bundle import (
 from pagebuilder.snapshots.files import UnsafeBundlePathError
 from pagebuilder.snapshots.validate import BundleError
 
-
 _SNAPSHOTS = "/api/pagebuilder/snapshots"
 _PENDING = "/api/pagebuilder/imports/pending"
 
