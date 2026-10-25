@@ -108,8 +108,19 @@ async def test_a_reader_without_news_edit_gets_counts_only(tmp_path, route):
 async def test_the_pending_import_needs_the_snapshot_permission(tmp_path):
     async with bundle_host(tmp_path) as client:
         await _staged_with_news(client)
-        refused = await client.get(_PENDING, headers=as_role("news-only"))
-        assert refused.status_code == 403
+        reader = as_role("news-only")
+        assert (await client.get(_PENDING, headers=reader)).status_code == 403
+        # The screens hold the same line as the API.
+        inertia = {**reader, "X-Inertia": "true"}
+        assert (await client.get(_REVIEW, headers=inertia)).status_code == 403
+        listing = await client.get("/pagebuilder/content", headers=inertia)
+        assert listing.status_code == 200
+        assert listing.json()["props"]["pending"] is None
+        # A publisher still sees it there.
+        shown = await client.get(
+            "/pagebuilder/content", headers={**as_role("pb"), "X-Inertia": "true"}
+        )
+        assert shown.json()["props"]["pending"]["id"]
 
 
 async def test_a_section_denied_at_staging_cannot_block_the_approval(tmp_path):

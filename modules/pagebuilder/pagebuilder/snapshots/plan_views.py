@@ -20,6 +20,7 @@ column, which is audited and served to everyone with Import / Export rights:
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -33,6 +34,10 @@ if TYPE_CHECKING:
 
 IMPORTS_DIR = "imports"
 _DETAILS = "sections.json"
+logger = logging.getLogger(__name__)
+
+DETAILS_UNAVAILABLE_KEY = "pagebuilder.plan.section_details_unavailable"
+"""``{label}``: the details of this plan could not be read; the counts stand."""
 REDACTED_REASON_KEY = "pagebuilder.plan.section_redacted"
 """``{label}``: only the counts are shown; the details need ``{permissions}``."""
 
@@ -61,13 +66,14 @@ def write_details(root: Path, import_id: int, details: Details) -> None:
     write_json(directory / _DETAILS, details)
 
 
-def read_details(root: Path, import_id: int) -> Details:
+def read_details(root: Path, import_id: int) -> Details | None:
+    """The staged items, or ``None`` when the file is missing, unreadable or not a map."""
     path = _dir(root, import_id) / _DETAILS
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return {}
-    return data if isinstance(data, dict) else {}
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def remove_details(root: Path, import_ids: list[int]) -> None:
@@ -81,10 +87,39 @@ def _counts_only(value: Any) -> Any:
     return value
 
 
+def _bare(entry: dict[str, Any]) -> dict[str, Any]:
+    """*entry* with every line's items cleared, whatever was stored."""
+    return {**entry, "lines": [{**line, "items": []} for line in entry.get("lines") or []]}
+
+
+def _items_for(entry: dict[str, Any], details: Details | None) -> list[list[Any]] | None:
+    """The staged items of *entry*'s lines, or ``None`` if they cannot be read."""
+    got = (details or {}).get(entry["section"])
+    lines = entry.get("lines") or []
+    if (
+        isinstance(got, list)
+        and len(got) == len(lines)
+        and all(isinstance(items, list) for items in got)
+    ):
+        return got
+    return None
+
+
 def for_reader(
-    plan: dict[str, Any], details: Details, registry: SectionRegistry, access: SectionAccess
+    plan: dict[str, Any],
+    details: Details | None,
+    registry: SectionRegistry,
+    access: SectionAccess,
+    *,
+    import_id: int | None = None,
 ) -> dict[str, Any]:
-    """*plan* as *access* may read it; see the module docstring."""
+    """*plan* as *access* may read it; see the module docstring.
+
+    Items come only from *details*, never from the stored plan: a plan holding
+    inline items (one staged by any other code path) is served bare, so the
+    boundary holds whatever was stored. Details that cannot be read give the
+    counts with ``details_unavailable`` rather than silently empty lists.
+    """
 
     def missing(name: str) -> list[str] | None:
         """What the reader lacks to see *name*; ``None`` when they may see it."""
@@ -97,23 +132,24 @@ def for_reader(
     sections = []
     for entry in plan.get("sections") or []:
         lacking = missing(entry["section"])
-        items = details.get(entry["section"]) or []
-        if lacking is None and len(items) == len(entry["lines"]):
-            lines = [
-                {**line, "items": got} for line, got in zip(entry["lines"], items, strict=True)
-            ]
-            sections.append({**entry, "lines": lines})
-        elif lacking is None:
-            sections.append(entry)
-        else:
-            sections.append(
-                {
-                    **entry,
-                    "redacted": True,
-                    "reason_key": REDACTED_REASON_KEY,
-                    "permissions": lacking,
-                }
+        bare = _bare(entry)
+        if lacking is not None:
+            marker = {"redacted": True, "reason_key": REDACTED_REASON_KEY, "permissions": lacking}
+            sections.append(bare | marker)
+            continue
+        items = _items_for(entry, details)
+        if items is None:
+            logger.warning(
+                "plan details for import %s, section %r are missing or unreadable",
+                import_id,
+                entry["section"],
             )
+            sections.append(
+                bare | {"details_unavailable": True, "note_key": DETAILS_UNAVAILABLE_KEY}
+            )
+            continue
+        lines = [{**line, "items": got} for line, got in zip(bare["lines"], items, strict=True)]
+        sections.append({**bare, "lines": lines})
     out = {**plan, "sections": sections} if "sections" in plan else dict(plan)
     applied = plan.get("applied")
     # Keyed by section since #80; an older row's flat shape is pagebuilder's alone.

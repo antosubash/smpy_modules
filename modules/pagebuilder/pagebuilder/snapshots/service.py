@@ -175,7 +175,9 @@ class SnapshotService(RestoreMixin):
         """*staged* as this principal may read it — every response with a plan uses this."""
         details = await asyncio.to_thread(read_details, self.root, staged.id or 0)
         read = PendingImportRead.model_validate(staged)
-        plan = for_reader(staged.plan or {}, details, self.sections, self.access)
+        plan = for_reader(
+            staged.plan or {}, details, self.sections, self.access, import_id=staged.id
+        )
         return read.model_copy(update={"plan": plan})
 
     async def download(self, snapshot_id: int, target: Path) -> int:

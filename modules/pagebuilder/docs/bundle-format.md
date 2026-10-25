@@ -197,7 +197,12 @@ top of `pagebuilder.publish` / `pagebuilder.approve`:
   Every response that carries a plan (pending import, review screen, staging,
   reject) puts them back only for a reader who holds the section's capture
   permissions. Anyone else gets the counts and `redacted: true` with
-  `reason_key` `pagebuilder.plan.section_redacted`. The section's `applied`
+  `reason_key` `pagebuilder.plan.section_redacted`. Items are only ever served from
+  that file. Inline items in a stored plan are cleared at the serving boundary,
+  and stripped again when approval writes the audited plan. If the file is
+  missing or unreadable, an allowed reader gets the counts with
+  `details_unavailable: true` (`note_key`
+  `pagebuilder.plan.section_details_unavailable`) and a warning is logged. The section's `applied`
   record holds only identities (id and `created_at`) and counts, and is
   served as counts to such a reader. `/imports/pending` needs
   `pagebuilder.publish`.

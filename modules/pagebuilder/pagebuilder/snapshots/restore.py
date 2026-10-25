@@ -201,7 +201,10 @@ class RestoreMixin(HostBase):
             # JSON column sees it.
             applied = {PAGEBUILDER_SECTION: result.pop("applied")}
             applied |= {name: done["applied"] for name, done in contributed.items()}
-            staged.plan = {**(staged.plan or {}), "applied": applied, "denied": denied}
+            # Items stripped again: the audited value never names a section's rows.
+            staged.plan = split_items(
+                {**(staged.plan or {}), "applied": applied, "denied": denied}
+            )[0]
             await self.db.flush()
         except Exception as exc:
             # `take` guards its own capture; this covers the apply below. The
