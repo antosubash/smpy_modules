@@ -1402,5 +1402,17 @@
     "media": "Mediathek",
     "import_export": "Import / Export",
     "group_site": "Website"
+  },
+  "public": {
+    "skip_to_content": "Zum Inhalt springen",
+    "not_found": {
+      "title": "Diese Seite gibt es nicht",
+      "body": "Die Adresse ist vielleicht falsch geschrieben, oder die Seite wurde verschoben oder entfernt.",
+      "home": "Zur Startseite"
+    },
+    "preview": {
+      "label": "Vorschau — dieser Entwurf ist nicht veröffentlicht",
+      "back_to_editor": "Zurück zum Editor"
+    }
   }
 }

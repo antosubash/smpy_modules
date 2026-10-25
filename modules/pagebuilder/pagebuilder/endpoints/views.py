@@ -17,7 +17,7 @@ from simple_module_inertia import InertiaResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pagebuilder import board as board_query
-from pagebuilder import locales, site_nav
+from pagebuilder import locales
 from pagebuilder.contracts.schemas import (
     LayoutDetail,
     LayoutRevisionListResponse,
@@ -27,13 +27,11 @@ from pagebuilder.contracts.schemas import (
     PageRead,
     StatusFilter,
 )
-from pagebuilder.deps import get_media_service, get_settings
-from pagebuilder.endpoints import content_views
-from pagebuilder.layout_service import LayoutService, public_layout_props
+from pagebuilder.deps import get_media_service
+from pagebuilder.endpoints import content_views, preview_view
+from pagebuilder.layout_service import LayoutService
 from pagebuilder.media_service import MediaService
-from pagebuilder.og_image import og_image
 from pagebuilder.service import PagesService
-from pagebuilder.settings import PagebuilderSettings
 
 router = APIRouter()
 # The content-snapshot screens live in their own module (300-line cap) but
@@ -49,8 +47,6 @@ _PAGE_MEDIA = "PageBuilder/MediaLibrary"
 _PAGE_MEDIA_DETAIL = "PageBuilder/MediaDetail"
 _PAGE_PENDING = "PageBuilder/PendingReview"
 _PAGE_LAYOUT_EDITOR = "PageBuilder/LayoutEditor"
-# The draft preview deliberately reuses the public component — see admin_preview.
-_PAGE_PUBLIC = "PageBuilder/PublicPage"
 
 
 PAGE_LIST_LIMIT = 25
@@ -192,51 +188,10 @@ async def admin_edit(
     )
 
 
-@router.get("/{page_id}/preview", response_model=None)
-async def admin_preview(
-    page_id: int,
-    inertia: InertiaDep,
-    db: AsyncSession = Depends(get_db),
-    settings: PagebuilderSettings = Depends(get_settings),
-) -> InertiaResponse:
-    """The draft as a visitor would see it.
-
-    Rendered through the *public* page component rather than a preview-only
-    one: a preview built from a second renderer is a preview that can disagree
-    with the published page, which makes it worse than no preview at all.
-
-    It reads ``draft_data``, so it answers the question the published URL
-    cannot — what the unsaved-to-live version looks like. This is an admin
-    route and stays behind the session, and it is marked noindex whatever the
-    page's own setting says, because a preview URL that gets indexed in place
-    of the real one is the one failure here that would be hard to undo.
-    """
-    page = await PagesService(db).get_page(page_id)
-    layout = await LayoutService(db).get()
-    return await inertia.render(
-        _PAGE_PUBLIC,
-        {
-            "title": (page.meta_title or "").strip() or page.title,
-            "data": page.draft_data or {},
-            "meta_description": page.meta_description,
-            # Relative is fine here: a preview is noindex and never shared.
-            "og_image": og_image(page.og_image, page.draft_data, ""),
-            "canonical_url": None,
-            "og_url": None,
-            "index_in_search": False,
-            "json_ld": page.json_ld,
-            "site_name": settings.site_name,
-            "twitter_handle": settings.twitter_handle,
-            # No alternates: a preview is one draft, and advertising the
-            # published translations of it from behind the session would name
-            # live URLs on a page that is deliberately noindex.
-            "locale": page.locale,
-            **public_layout_props(layout),
-            "site_nav": await site_nav.site_nav(
-                db, settings.public_route_prefix, page.locale
-            ),
-        },
-    )
+# The draft preview lives in its own module (300-line cap); included here so it
+# keeps its place in the route order, after the editor and before the media
+# routes it sits beside.
+router.include_router(preview_view.router)
 
 
 @router.get("/layout", response_model=None)
