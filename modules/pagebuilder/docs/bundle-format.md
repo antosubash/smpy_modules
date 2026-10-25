@@ -35,7 +35,7 @@ once per tenant in the shared blob store.
 {
   "format": "simple-module.content-bundle",
   "format_version": 2,
-  "format_minor": 1,
+  "format_minor": 2,
   "created_at": "2026-10-22T09:00:00+00:00",
   "source": {
     "module": "pagebuilder",
@@ -48,7 +48,8 @@ once per tenant in the shared blob store.
       "section": "pagebuilder",
       "version": 1,
       "required": true,
-      "paths": ["layout.json", "redirects.json", "pages/", "media/"]
+      "paths": ["layout.json", "redirects.json", "pages/", "media/"],
+      "counts": {"pages": 12, "redirects": 4, "media": 9}
     }
   ],
   "pages": [{"slug", "locale", "title", "status", "parent_slug"}],
@@ -79,7 +80,9 @@ once per tenant in the shared blob store.
 A **major** bump is for a change an older reader would *misread*. A **minor**
 bump is for keys an older reader can safely ignore; minor 1 added `format`,
 `format_minor`, `source`, `tenant` and `contents` and changed nothing else, so
-a build that predates it still restores bundles written after it.
+a build that predates it still restores bundles written after it. Minor 2
+added `contents[].counts` and sections contributed by other modules (#80),
+which a minor-1 reader already skips as unknown optional sections.
 
 A manifest with no `format_version` at all is read as major 1. Every bundle this
 module has written carries one; the rule exists so a hand-assembled bundle in
@@ -100,6 +103,7 @@ bundle keeps the major it arrived with.
 | `version` | The section's own integer version, independent of the format's. |
 | `required` | Default `true`. Whether restoring the bundle without this section would leave the site incoherent. |
 | `paths` | The files and directories (`dir/`) the section owns. |
+| `counts` | Optional (minor 2). Per-kind integer totals, for the snapshot list. |
 
 Reading rules:
 
@@ -110,7 +114,11 @@ Reading rules:
 - A **required** section this build does not know is refused (422): restoring
   half of what the bundle says belongs together would be worse than not
   restoring it.
-- An **optional** section this build does not know is ignored. Its `paths`
+- A section this host *does* know (pagebuilder's, or one a module registered)
+  at a version it cannot read is refused (422), even when optional: a restore
+  that silently left out content the operator expected is worse.
+- An **optional** section this build does not know is ignored — extracted,
+  kept and downloaded again with the bundle, never read. Its `paths`
   must all sit under `<section>/`, so its files can never be read as pages,
   and its name may not be one pagebuilder uses at the root: `pagebuilder`,
   `pages`, `media`, `blobs`, `layout`, `redirects` and `manifest` are
@@ -124,18 +132,20 @@ Reading rules:
   Files an OS adds when a bundle is re-zipped by hand (`__MACOSX/`,
   `.DS_Store`, `Thumbs.db`, `desktop.ini`) are skipped, not extracted.
 
-### Adding a section (not built)
+### Contributed sections
 
-Nothing writes a second section yet. The shape exists so another module's
-content can join a bundle later (#80) without a major bump: a module would
-contribute a section such as
+Another module adds a section through `pagebuilder.contracts.bundle` (#80):
+it registers a `BundleSection` from its `on_startup`, and pagebuilder calls it
+to capture into `<section>/`, validate on upload, plan beside the pages and
+apply after them, inside the approve request's one transaction. The rules a
+contributor follows are in that module's docstring. The section's manifest
+entry is written by pagebuilder:
 
 ```json
-{"section": "news", "version": 1, "required": false, "paths": ["news/"]}
+{"section": "news", "version": 1, "required": false, "paths": ["news/"],
+ "counts": {"articles": 42}}
 ```
 
-with its documents under `news/`, and an older host would restore the
-pagebuilder content and skip the rest. Whether a contributed section is
-`required` is that module's call. The contribution hook itself — how a module
-registers a section and takes part in the restore's transaction — is the open
-design question #80 tracks.
+A host without the contributor restores the pagebuilder content and reports
+the section as skipped; a bundle without the section (an older one, or one from
+a host without the contributor) leaves that module's content as it is.

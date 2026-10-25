@@ -58,3 +58,5 @@ class ImportApplyResponse(BaseModel):
     media_added: int
     redirects: int
     redirects_dropped: list[str]
+    sections: dict[str, dict[str, int]] = {}
+    """Per contributed section (#80), the counts its apply reported."""

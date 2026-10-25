@@ -30,6 +30,8 @@ from pagebuilder.snapshots.format import (
     REDIRECTS_NAME,
 )
 from pagebuilder.snapshots.manifest import check_manifest, check_members
+from pagebuilder.snapshots.registry import SectionRegistry
+from pagebuilder.snapshots.sections import validate_sections
 from pagebuilder.snapshots.validate import (
     BundleError,
     check_documents,
@@ -37,7 +39,7 @@ from pagebuilder.snapshots.validate import (
     load_document,
 )
 
-__all__ = ["BundleError", "read_zip", "write_zip"]
+__all__ = ["BundleError", "index_rows", "read_zip", "write_zip"]
 
 
 _BLOB_PREFIX = f"{MEDIA_DIR}/{BLOBS_DIR}/"
@@ -104,8 +106,13 @@ def read_zip(
     dest: Path,
     blobs: BlobStore,
     max_extracted_bytes: int | None = None,
+    sections: SectionRegistry | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Extract, validate and store *data*. Returns ``(manifest, media index)``.
+
+    *sections* are the contributed sections this host restores (#80): each one
+    the bundle carries validates its own files, and any other optional section
+    is extracted and kept unread, so it survives a re-download.
 
     Documents land in *dest*; blob bytes go straight into the shared store, so
     the extracted tree holds only JSON regardless of how large the media was.
@@ -160,7 +167,8 @@ def read_zip(
     manifest_path = dest / MANIFEST_NAME
     if not manifest_path.is_file():
         raise BundleError("bundle has no manifest.json")
-    manifest = check_manifest(load_document(manifest_path, MANIFEST_NAME))
+    registry = sections if sections is not None else SectionRegistry()
+    manifest = check_manifest(load_document(manifest_path, MANIFEST_NAME), registry.readable())
     check_members(manifest, members)
 
     index_path = dest / MEDIA_DIR / MEDIA_INDEX_NAME
@@ -186,6 +194,7 @@ def read_zip(
         raise BundleError("bundle is missing the bytes for: " + ", ".join(missing_blobs))
 
     check_documents(dest, index)
+    validate_sections(manifest, registry, dest, index)
 
     # Only commit blobs once every check has passed, so a rejected bundle
     # leaves no trace in the shared store. The digest is the one already
@@ -197,3 +206,17 @@ def read_zip(
         (dest / REDIRECTS_NAME).write_text("[]\n")
 
     return manifest, index
+
+
+def index_rows(index: dict[str, Any]) -> list[dict[str, Any]]:
+    """``SnapshotMedia`` fields for each entry of a validated media index."""
+    return [
+        {
+            "bundle_name": bundle_name,
+            "sha256": entry["sha256"],
+            "original_filename": entry.get("original_filename", bundle_name),
+            "content_type": entry.get("content_type", "application/octet-stream"),
+            "folder": entry.get("folder"),
+        }
+        for bundle_name, entry in index.items()
+    ]

@@ -126,7 +126,7 @@ async def test_restoring_twice_creates_nothing(snapshot_db):
 
     assert [e["slug"] for e in plan["pages"]["unchanged"]] == ["old"]
     assert plan["pages"]["new"] == plan["pages"]["overwritten"] == []
-    assert (result["pages_created"], plan["applied"]["overwritten"]) == (0, [])
+    assert (result["pages_created"], plan["applied"]["pagebuilder"]["overwritten"]) == (0, [])
     assert [p.id for p in await _pages(session)] == [page.id]
 
 
