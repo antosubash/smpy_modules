@@ -91,7 +91,7 @@ jobs:
         run: scripts/pytest_modules.sh
 
       - name: Run pytest (host)
-        run: uv run pytest host/tests
+        run: uv run pytest -n "${PYTEST_WORKERS:-auto}" host/tests
 
   postgres:
     name: Postgres (migrations + module suites)
@@ -143,7 +143,11 @@ jobs:
       # records, pagebuilder and news through pg_support.py's TRUNCATE …
       # RESTART IDENTITY, billing (simple_module_test's fixtures) by dropping
       # and recreating the `public` schema, and the records perf smoke with
-      # CREATE DATABASE … TEMPLATE copies of its own.
+      # CREATE DATABASE … TEMPLATE copies of its own. The suites run on
+      # pytest-xdist workers, and simple_module_test points each worker at a
+      # database of its own (`ci_records_gw0`, `ci_records_gw1`, …), created
+      # on first use, so two workers never truncate each other's rows. The
+      # perf smoke stays serial: it measures.
       - name: Create test databases
         run: |
           for db in ci_records ci_records_perf ci_pagebuilder ci_news ci_billing; do
@@ -186,7 +190,7 @@ jobs:
       - name: Run pytest (records, Postgres)
         env:
           SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_records
-        run: cd modules/records && uv run pytest -q -p no:cacheprovider
+        run: cd modules/records && uv run pytest -q -p no:cacheprovider -n "${PYTEST_WORKERS:-auto}"
 
       # The other suites whose tenant-filtered queries, scheduler claims and
       # row locks behave differently on Postgres (#117). The full suites, not

@@ -65,10 +65,16 @@ downgrade:
 
 test: test-py test-js
 
+# pytest-xdist workers per suite: `auto` (one per core) unless PYTEST_WORKERS
+# says otherwise — `PYTEST_WORKERS=8 make test-py` on a shared machine, `0` to
+# run serially; set but empty counts as unset. Each suite is still its own
+# process, one after another.
+PYTEST_WORKERS := $(or $(PYTEST_WORKERS),auto)
+
 test-py:
-	uv run pytest host/tests scripts/tests
+	uv run pytest -n $(PYTEST_WORKERS) host/tests scripts/tests
 	@for d in modules/*/; do \
-	  if [ -d "$$d/tests" ]; then echo "--- pytest $$d"; (cd "$$d" && uv run pytest) || exit 1; fi \
+	  if [ -d "$$d/tests" ]; then echo "--- pytest $$d"; (cd "$$d" && uv run pytest -n $(PYTEST_WORKERS)) || exit 1; fi \
 	done
 
 # Unit tests for module frontend code, from the repo root — vitest.config.ts

@@ -12,6 +12,8 @@ Skipped when ``uv`` is not on PATH.
 
 from __future__ import annotations
 
+import fcntl
+import os
 import re
 import shutil
 import subprocess
@@ -30,11 +32,7 @@ _TEST_IMPORT = re.compile(
 _FRONTEND_SOURCE = (".ts", ".tsx", ".js", ".jsx", ".mjs")
 
 
-@pytest.fixture(scope="module")
-def wheels(tmp_path_factory: pytest.TempPathFactory) -> list[Path]:
-    if shutil.which("uv") is None:
-        pytest.skip("uv is not installed")
-    out = tmp_path_factory.mktemp("wheels")
+def _build(out: Path) -> list[Path]:
     subprocess.run(
         ["uv", "build", "--all-packages", "--wheel", "--out-dir", str(out), "-q"],
         cwd=REPO,
@@ -43,6 +41,30 @@ def wheels(tmp_path_factory: pytest.TempPathFactory) -> list[Path]:
     built = sorted(out.glob("*.whl"))
     assert len(built) == len(list((REPO / "modules").glob("*/pyproject.toml")))
     return built
+
+
+@pytest.fixture(scope="module")
+def wheels(tmp_path_factory: pytest.TempPathFactory) -> list[Path]:
+    """Every module's wheel, built once per run even under pytest-xdist.
+
+    This file's tests may land on different xdist workers, and each would
+    otherwise run its own full ``uv build`` of the workspace at the same time.
+    Workers share their run's base temp directory, so the first one to take
+    the lock builds into it and the rest reuse the result (the pattern
+    pytest-xdist documents for session-wide fixtures).
+    """
+    if shutil.which("uv") is None:
+        pytest.skip("uv is not installed")
+    if not os.environ.get("PYTEST_XDIST_WORKER"):  # serial, or xdist not even loaded
+        return _build(tmp_path_factory.mktemp("wheels"))
+    shared = tmp_path_factory.getbasetemp().parent / "wheels"
+    with (shared.parent / "wheels.lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if (shared / "done").exists():
+            return sorted(shared.glob("*.whl"))
+        built = _build(shared)
+        (shared / "done").touch()
+        return built
 
 
 def test_wheels_ship_no_frontend_test_code(wheels: list[Path]) -> None:

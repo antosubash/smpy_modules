@@ -44,6 +44,7 @@ there.
 
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 from typing import Any
@@ -51,7 +52,9 @@ from typing import Any
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
 from sqlalchemy import MetaData, text
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool, StaticPool
 
 ENV_VAR = "SM_TEST_DATABASE_URL"
 """The name every module in this repo agrees on."""
@@ -67,8 +70,47 @@ def _resolve_url() -> str:
     for name in (ENV_VAR, *LEGACY_ENV_VARS):
         value = os.environ.get(name, "").strip()
         if value:
-            return value
+            return _worker_url(value)
     return ""
+
+
+def _worker_url(url: str) -> str:
+    """Under pytest-xdist, this worker's own Postgres database, created if missing.
+
+    ``simple_module_test``'s plugin gives each worker ``<database>_gwN`` by
+    rewriting :data:`ENV_VAR` in ``pytest_load_initial_conftests``, so N
+    workers never truncate each other's tables. That hook is too late for a
+    suite whose ``addopts`` loads a ``-p`` plugin importing this module
+    (pagebuilder's ``db_fixture``): ``-p`` plugins are imported while pytest
+    parses its arguments, before the hook, and every worker would read the
+    shared database. So the same name is derived here rather than read back —
+    left alone if the hook already ran, and identical to the one it writes if
+    it runs later. The legacy alias, which the plugin never rewrites, gets it
+    too.
+    """
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "")
+    if not worker or not url.startswith("postgresql"):
+        return url
+    parsed = make_url(url)
+    if not parsed.database:
+        return url
+    if parsed.database.endswith(f"_{worker}"):
+        return url
+    name = f"{parsed.database}_{worker}"
+    asyncio.run(_create_database_if_missing(url, name))
+    return parsed.set(database=name).render_as_string(hide_password=False)
+
+
+async def _create_database_if_missing(server_url: str, name: str) -> None:
+    engine = create_async_engine(server_url, poolclass=NullPool, isolation_level="AUTOCOMMIT")
+    try:
+        async with engine.connect() as conn:
+            query = text("SELECT 1 FROM pg_database WHERE datname = :n")
+            if not await conn.scalar(query, {"n": name}):
+                quoted = conn.dialect.identifier_preparer.quote_identifier(name)
+                await conn.execute(text(f"CREATE DATABASE {quoted}"))
+    finally:
+        await engine.dispose()
 
 
 TEST_URL = _resolve_url()
