@@ -12,7 +12,10 @@
 # one run shows every broken module rather than only the first.
 #
 # Extra pytest arguments go through PYTEST_ADDOPTS, and the environment
-# (SM_TEST_DATABASE_URL, say) reaches every module unchanged.
+# (SM_TEST_DATABASE_URL, say) reaches every module unchanged. Each suite runs
+# on PYTEST_WORKERS pytest-xdist workers (default `auto`, one per core; `0`
+# runs serially); under xdist, simple_module_test gives every worker its own
+# `<SM_TEST_DATABASE_URL's database>_gwN` Postgres database.
 #
 # Run from the repo root (CI does).
 set -uo pipefail
@@ -33,7 +36,7 @@ for d in "${dirs[@]}"; do
     continue
   fi
   echo "::group::pytest $name"
-  if ! (cd "$d" && uv run pytest); then
+  if ! (cd "$d" && uv run pytest -n "${PYTEST_WORKERS:-auto}"); then
     failed+=("$name")
     echo "::error title=pytest $name::pytest failed in modules/$name"
   fi
