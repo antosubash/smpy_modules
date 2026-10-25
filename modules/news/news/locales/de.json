@@ -567,5 +567,25 @@
     "search": "Alles durchsuchen",
     "group_news": "News",
     "group_find": "Finden"
+  },
+  "bundle": {
+    "title": "News",
+    "counts": {
+      "articles": "Artikel",
+      "categories": "Kategorien",
+      "tags": "Schlagwörter",
+      "redirects": "Weiterleitungen"
+    },
+    "plan": {
+      "new": "Neue Artikel",
+      "overwritten": "Überschriebene Artikel",
+      "revived": "Aus dem Papierkorb zurückgeholte Artikel",
+      "renamed_from": "Artikel, die an ihre Adresse im Snapshot zurückkehren",
+      "unchanged": "Unveränderte Artikel",
+      "untouched": "Artikel, die nicht im Snapshot sind (bleiben erhalten)",
+      "categories": "Kategorien",
+      "tags": "Schlagwörter",
+      "redirects_dropped": "Verworfene Weiterleitungen (ihr Artikel existiert nicht mehr)"
+    }
   }
 }

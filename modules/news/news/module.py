@@ -189,6 +189,11 @@ class NewsModule(ModuleBase):
         # Which languages this site publishes in, before anything reads them.
         boot.publish_locales(app)
 
+        # Articles join pagebuilder's content bundle where it is mounted (#80).
+        from news.integrations.pagebuilder import register_bundle_section
+
+        register_bundle_section(app)
+
         # Mounted here rather than through ``register_routes`` because that
         # router is hard-prefixed with ``view_prefix``; this screen spans more
         # than the news console and belongs at the app root.

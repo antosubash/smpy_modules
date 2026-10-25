@@ -54,9 +54,11 @@ Where a host runs `simple_module_pagebuilder` too, two conveniences light up:
 - the **News feed** block joins that module's palette, so a page can list live
   articles;
 - the admin search screen gains **Pages** and **Media** sections alongside
-  articles, with "see all" links into that module's screens.
+  articles, with "see all" links into that module's screens;
+- articles travel in that module's **content bundle** (Import / Export) — see
+  [Content bundles](#content-bundles).
 
-Neither is required, and nothing outside `news/integrations/pagebuilder.py`
+None is required, and nothing outside `news/integrations/pagebuilder.py`
 imports the package — every import there is deferred and guarded, so on a host
 without it `available()` is `False` and the extra sections are simply absent.
 `test_module.py` spawns a subprocess to prove that importing news never imports
@@ -76,6 +78,45 @@ dependency). A host without pagebuilder never builds them, and needs no
 exclusion in `host/client_app/blocks.ts`. Every other screen — the list, both
 editors, the public viewer — builds and runs with the package absent. The block
 needs a pagebuilder that ships that glob (the release after 0.0.11).
+
+### Content bundles
+
+On a host running pagebuilder, every snapshot (Import / Export, and the
+automatic `pre_restore` safety snapshot) also carries the tenant's news content
+under `news/` in the bundle, as an optional section (#80):
+
+```
+news/articles/<slug>.json            default content language
+news/articles/<locale>__<slug>.json  any other language
+news/categories.json                 [{name, slug, position}]
+news/tags.json                       [{name, slug}]
+news/redirects.json                  [{from_slug, locale, to_slug}]   article redirects
+news/tag_redirects.json              [{from_slug, to_slug}]           tag redirects
+```
+
+An article document carries its address and language, translation group,
+title, both bodies, status, SEO and listing fields, byline, display date,
+schedule and tag names. Media-library URLs inside it travel as pagebuilder's
+`asset://` references and resolve to the target host's copies. **Not carried:**
+revision history, trashed articles, the user ids on the audit columns, and
+rejection notes. Bylines and drafts are, so treat a downloaded bundle like a
+database export.
+
+A restore matches each article to a live one by translation group, then by
+address (trashed rows included, which it brings back), moves a renamed article
+back to its snapshot address while keeping a redirect from the newer one, and
+upserts categories and tags by name. It **never deletes**: articles,
+categories and tags the bundle does not carry are kept and listed as
+untouched. The two redirect tables are rebuilt from the bundle, as pages' is.
+A category or tag slug now held by one the bundle does not carry, or an
+address another article took, refuses the restore (409) before anything is
+written. News applies after pagebuilder, in the same transaction: a failure in
+either rolls both back.
+
+A host without news restores the pages and keeps the `news/` files unread; a
+bundle written before news joined leaves every article alone. The code is
+`news/integrations/bundle/`, registered from `register_bundle_section` in
+`NewsModule.on_startup`.
 
 ## Usage
 
