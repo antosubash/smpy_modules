@@ -12,16 +12,18 @@ another PyPI project.
 
 ```python
 from sm_ai.contracts import (
+    METER_REQUESTS,
     AiError,
     AiKeyUnreadableError,
     AiNotConfiguredError,
+    RequiresAiRequest,
     embedding_dim,
     resolve_embedder,
     resolve_model,
 )
 ```
 
-All three functions read the running host's current settings. You pass no
+The three resolve functions read the running host's current settings. You pass no
 app, session or request. They also work in a process that never ran the web
 host, such as a Celery worker: there they read the settings table
 themselves, cached per process for 60 seconds (see
@@ -83,6 +85,46 @@ Each slot is checked in this order. The first failure raises
 | `AiError` | base class; catch this to handle every AI module error | |
 | `AiNotConfiguredError(AiError)` | a required setting is missing or invalid | `field`; the message names it and may add a hint |
 | `AiKeyUnreadableError(AiError)` | a stored key has the `enc:v1:` prefix but can't be decrypted, because `SM_SECRET_KEY` changed | `field` |
+
+### Usage metering: `RequiresAiRequest`
+
+`RequiresAiRequest(qty: int = 1)` is a FastAPI dependency for a consumer's
+route that calls the model. It charges `qty` of the `ai.requests` meter
+(`METER_REQUESTS`) to the request's tenant before the handler runs:
+
+```python
+@router.post("/summarise", dependencies=[RequiresAiRequest()])
+async def summarise(...): ...
+```
+
+| Host | Behaviour |
+|---|---|
+| billing installed and running | billing's `RequiresQuota("ai.requests", qty)`, unchanged: its tenant rule (single-tenant host: `default`; multi-tenant: the resolved tenant, else 403 `tenant_required`), 402 `quota_exceeded` past the limit, its `Idempotency-Key` rules |
+| billing installed, not running | yields `None`; nothing is limited |
+| no billing (or one older than usage metering) | a no-op yielding `None`; billing is never imported |
+
+`AiModule.on_startup` registers the meter (`counter`, unit `count`, label
+`ai.meters.requests`) when `app.state.billing_meters` exists, so the plan
+editor suggests it. A `qty` that is not an integer from 1 to 2^53 raises
+`ValueError` at route definition, with or without billing.
+
+**Refunds.** The charge is refunded only when the handler raises. A provider
+or model error that propagates (or is re-raised as an `HTTPException`) costs
+nothing; a handler that catches it and *returns* an error response keeps the
+charge. **Streaming.** The dependency is function-scoped, so for a
+`StreamingResponse` it settles when the handler returns the response, before
+the body streams: open the model call inside the handler if a failure to
+connect should refund, and know that an error mid-stream does not.
+
+**The 402 in the browser.** The body is
+`{"detail": "quota_exceeded", "meter", "limit", "used", "requested", "resets_at"}`.
+`sm_ai/utils/quotaError.ts` (`isQuotaExceeded`, `quotaMessage`) renders it as
+"AI requests limit reached (1/1); resets Nov 1, 2026." in the console's
+language; this module's `api.ts` decodes every failed call through it.
+
+A worker that calls the model outside a request meters through billing's
+`app.state.billing_usage` directly (`consume` / `record` with
+`METER_REQUESTS`), as billing's API reference describes.
 
 ## HTTP API — `/api/ai`
 
@@ -171,6 +213,11 @@ unreadable key, a refused connection, an authentication error, or
 failure (an `AiError`, a refused connection, a provider error status) as one
 warning line, and anything else with its traceback, so a code defect stays
 distinguishable from a configuration problem.
+
+The probe is not metered as `ai.requests`. It is the operator checking the
+deployment-wide (SYSTEM-scope) connection, not an organisation's use, and an
+organisation that used up its allowance must not stop the operator from
+diagnosing the provider.
 
 ### `POST /api/ai/models`
 

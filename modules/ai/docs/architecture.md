@@ -203,7 +203,8 @@ async def index(chunks: list[str]) -> None:
 | `crypto.py` | `enc:v1:` Fernet layer |
 | `service.py`, `deps.py` | read with secrets masked; build and apply changes |
 | `csrf.py` | shares the framework CSRF token with the settings page |
+| `metering.py` | `ai.requests`: registers the meter with an installed billing, and `RequiresAiRequest` (billing's `RequiresQuota`, or a no-op without billing) |
 | `contracts/` | the public surface (`__init__.py`), errors, API DTOs |
 | `endpoints/` | `api.py` (settings, test), `views.py` (`Ai/Settings`) |
-| `pages/Settings.tsx`, `components/SlotCard.tsx`, `utils/` | the settings page (only real Inertia pages under `pages/`) |
+| `pages/Settings.tsx`, `components/SlotCard.tsx`, `utils/` | the settings page (only real Inertia pages under `pages/`); `utils/quotaError.ts` renders billing's 402 |
 | `locales/en.json` | console strings, namespace `ai` |

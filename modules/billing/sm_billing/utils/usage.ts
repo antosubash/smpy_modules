@@ -107,3 +107,13 @@ export function parseAdjustQuantity(text: string): number | null {
   if (!Number.isSafeInteger(value) || value === 0) return null;
   return value;
 }
+
+/**
+ * The meter the Adjust dialog opens on: the drawer's own meter when it is a
+ * counter, else the first counter — never whichever counter sorts first while
+ * the drawer shows another counter.
+ */
+export function adjustDefault(counters: { key: string }[], drawerMeter: string): string {
+  if (counters.some((m) => m.key === drawerMeter)) return drawerMeter;
+  return counters[0]?.key ?? '';
+}

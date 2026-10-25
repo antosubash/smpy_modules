@@ -17,7 +17,7 @@ import { api } from '../utils/api';
 import { clipName } from '../utils/format';
 import { keys, useT } from '../utils/i18n';
 import type { MeterInfo, UsageHold, UsageRow } from '../utils/types';
-import { meterLabel } from '../utils/usage';
+import { adjustDefault, meterLabel } from '../utils/usage';
 import { AdjustDialog } from './AdjustDialog';
 import { UsageHolds } from './UsageHolds';
 import { UsageLedger } from './UsageLedger';
@@ -111,7 +111,7 @@ export function UsageDetail({
       setAdjusting(false);
     });
 
-  const initialAdjust = counters.some((m) => m.key === detail.meter) ? detail.meter : '';
+  const initialAdjust = adjustDefault(counters, detail.meter);
 
   return (
     <Sheet open={row !== null} onOpenChange={(open) => !open && onClose()}>

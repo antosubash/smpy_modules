@@ -1,9 +1,14 @@
 """Public surface for consuming modules.
 
-    from sm_ai.contracts import resolve_model, resolve_embedder, embedding_dim
+    from sm_ai.contracts import RequiresAiRequest, resolve_model, resolve_embedder, embedding_dim
 
-    agent = Agent(instructions=..., output_type=MySchema)
-    result = await agent.run(text, model=resolve_model())
+    @router.post("/summarise", dependencies=[RequiresAiRequest()])
+    async def summarise(...):
+        agent = Agent(instructions=..., output_type=MySchema)
+        result = await agent.run(text, model=resolve_model())
+
+``RequiresAiRequest`` charges the ``ai.requests`` meter when billing is
+installed and is a no-op otherwise (see ``sm_ai.metering``).
 
 The base module resolves *connections*; consumers own *behaviour* —
 temperature, prompts, retries and streaming belong on the consumer's Agent.
@@ -13,7 +18,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from sm_ai.constants import METER_REQUESTS
 from sm_ai.contracts.errors import AiError, AiKeyUnreadableError, AiNotConfiguredError
+from sm_ai.metering import RequiresAiRequest
 
 if TYPE_CHECKING:
     from pydantic_ai import Embedder
@@ -45,9 +52,11 @@ def embedding_dim() -> int:
 
 
 __all__ = [
+    "METER_REQUESTS",
     "AiError",
     "AiKeyUnreadableError",
     "AiNotConfiguredError",
+    "RequiresAiRequest",
     "embedding_dim",
     "resolve_embedder",
     "resolve_model",

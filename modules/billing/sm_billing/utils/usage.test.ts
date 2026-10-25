@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { describeError } from './api';
 import {
+  adjustDefault,
   formatBytes,
   formatQuantity,
   kindLabel,
@@ -51,15 +52,20 @@ describe('usage formatting', () => {
 });
 
 describe('quota_exceeded', () => {
+  const RESETS = '2026-11-01T00:00:00+00:00';
+  // Formatted in the runner's local time zone, as the message is.
+  const day = (iso: string, locale: string) =>
+    new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(iso));
+
   it('names the meter, the numbers and the reset date', () => {
     const message = describeError('quota_exceeded', {
       meter: 'ai.requests',
       used: 10,
       limit: 10,
       requested: 1,
-      resets_at: '2026-11-01T00:00:00+00:00',
+      resets_at: RESETS,
     });
-    expect(message).toBe('ai.requests limit reached (10/10); resets Nov 1, 2026.');
+    expect(message).toBe(`ai.requests limit reached (10/10); resets ${day(RESETS, 'en')}.`);
   });
 
   it('leaves the date out for a gauge, which never resets', () => {
@@ -71,5 +77,19 @@ describe('quota_exceeded', () => {
       resets_at: null,
     });
     expect(message).toBe('jobs.concurrent limit reached (2/2).');
+  });
+});
+
+describe('adjustDefault', () => {
+  const counters = [{ key: 'ai.requests' }, { key: 'demo.exports' }];
+
+  it("opens on the drawer's meter when it is a counter", () => {
+    expect(adjustDefault(counters, 'demo.exports')).toBe('demo.exports');
+  });
+
+  it('falls back to the first counter for a gauge or no meter', () => {
+    expect(adjustDefault(counters, 'demo.jobs')).toBe('ai.requests');
+    expect(adjustDefault(counters, '')).toBe('ai.requests');
+    expect(adjustDefault([], 'demo.jobs')).toBe('');
   });
 });

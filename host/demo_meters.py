@@ -1,9 +1,9 @@
 """Usage meters this demo host registers with billing — one of each kind.
 
-No module in this repo meters anything yet (the first consumer, ai's
-``ai.requests``, is a follow-up), so without these the tenant's usage card and
-the admin Usage tab would have nothing to show in development or in the e2e
-suite. ``scripts/seed_usage.py`` seeds usage against them for the e2e run.
+ai registers ``ai.requests`` itself, but no route in this repo charges it (ai
+serves no chat; its consumers' routes do), so without these the tenant's usage
+card and the admin Usage tab would have nothing to show in development or in
+the e2e suite. ``scripts/seed_usage.py`` seeds usage against them for the e2e run.
 
 Registered right after ``create_app``: billing creates the registry while the
 app is built (``register_settings``), and a meter only has to exist before the

@@ -63,7 +63,13 @@ test.describe('admin usage tab', () => {
 
     // Adjust needs a reason; the correction lands on the ledger with it.
     const reason = `e2e credit ${Date.now()}`;
+    // The drawer is the gauge's, so the dialog opens on the first counter by
+    // key — `ai.requests` once ai registers it — not necessarily ours. Pick it.
     await drawer.getByRole('button', { name: 'Adjust' }).click();
+    await page
+      .getByRole('dialog', { name: /^Adjust / })
+      .getByLabel('Meter', { exact: true })
+      .selectOption(COUNTER);
     const adjust = page.getByRole('dialog', { name: `Adjust ${COUNTER}` });
     await adjust.getByLabel('Quantity').fill('-1');
     await adjust.getByRole('button', { name: 'Record adjustment' }).click();

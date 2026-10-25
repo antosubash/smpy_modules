@@ -155,4 +155,5 @@ never opened, so a worker can't create an empty one.
 | Warning "stored unencrypted" | a key came from `set_setting.py` (or, before #164, the generic settings screen) | Re-save it on the AI page. |
 | Saved a change but some requests still use the old model | other workers have stale settings | Restart the app. |
 | Setting `SM_AI_CHAT_MODEL` (or any `SM_AI_*`) has no effect | the module reads no environment variables | Change it on the AI page or with `set_setting.py`; see [Moving off `SM_AI_*` variables](#moving-off-sm_ai-variables). |
+| A module's AI feature answers 402 "AI requests limit reached" | the organisation used its plan's `ai.requests` allowance for the period (billing installed) | Billing → Usage: raise the plan's limit, or credit with **Adjust**. The settings page's own **Test connection** is not metered. |
 | **Test connection** OK, but a module still fails | the module's own call (prompt, output schema, model override) | That is the module's behaviour; check its logs. |

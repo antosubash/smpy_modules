@@ -84,3 +84,15 @@ TEST_PROMPT: Final = "Reply with the single word: ok"
 TEST_TIMEOUT_SECONDS: Final = 30
 
 SECRET_FIELDS: Final = frozenset({"chat_api_key", "embedding_api_key"})
+
+# Usage metering (#99): the billing counter every AI request charges, and the
+# label its usage screens show, from this module's catalogue. The key is a
+# ``Plan.limits`` key, so changing it orphans every plan's limit.
+METER_REQUESTS: Final = "ai.requests"
+METER_REQUESTS_LABEL_KEY: Final = "ai.meters.requests"
+METER_KIND_COUNTER: Final = "counter"
+METER_UNIT_COUNT: Final = "count"
+# The optional billing module's RequiresQuota, and the registry it puts on
+# app.state.
+BILLING_QUOTA_MODULE: Final = "sm_billing.metering.deps"
+BILLING_METERS_ATTR: Final = "billing_meters"
