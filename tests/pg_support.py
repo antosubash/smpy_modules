@@ -89,8 +89,10 @@ def _worker_url(url: str) -> str:
     too.
     """
     worker = os.environ.get("PYTEST_XDIST_WORKER", "")
+    if not worker or not url.startswith("postgresql"):
+        return url
     parsed = make_url(url)
-    if not worker or not url.startswith("postgresql") or not parsed.database:
+    if not parsed.database:
         return url
     if parsed.database.endswith(f"_{worker}"):
         return url
