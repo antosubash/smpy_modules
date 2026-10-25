@@ -12,10 +12,15 @@ as it always has.
   :mod:`.abuse` and :mod:`.tokens` the checks before the write.
 - :mod:`.mail`, :mod:`.mail_runner` — the notification, through the outbox or
   after the commit; :mod:`.system` writes its delivery mark.
-- :mod:`.actions` — resend, spam and not spam.
+- :mod:`.actions` — resend, spam and not spam; on a list, resend the
+  confirmation and unsubscribe.
+- :mod:`.subscribe` — a newsletter signup's state machine; :mod:`.confirmation`
+  its mail, :mod:`.links` the signed confirm and unsubscribe links, and
+  :mod:`.opt_in` what following them does.
 
-The routes are ``endpoints/api/public_submissions_public.py`` (anonymous) and
-``…_admin.py``.
+The routes are ``endpoints/api/public_submissions_public.py`` and ``…_links.py``
+(anonymous), ``…_admin.py``, and the landing pages
+``endpoints/public_submissions_views.py``.
 
 The contract is :mod:`sm_records.contracts.public_submissions`.
 """

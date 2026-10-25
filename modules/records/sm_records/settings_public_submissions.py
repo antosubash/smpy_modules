@@ -85,7 +85,22 @@ class PublicSubmissionsSettings(BootSettings):
     public_submissions_store_user_agent: bool = True
     """Keep the sender's user agent (``sm_user_agent``), cut to 256 characters."""
 
-    @field_validator("public_submissions_rate_per_ip", "public_submissions_type_rate", mode="after")
+    public_submissions_confirm_rate_per_email: str = "3/day"
+    """How many confirmation emails one address is sent for one newsletter
+    list, as ``<count>/<period>`` — signups and admin resends together. Over
+    it the signup still answers the same ``202`` and nothing is sent, so
+    nobody can use the list to flood an inbox. ``off`` disables it."""
+
+    public_submissions_confirm_ttl_hours: int = Field(default=168, ge=1, le=24 * 365)
+    """How long a confirmation link works, in hours. Later it is expired and
+    the visitor signs up again."""
+
+    @field_validator(
+        "public_submissions_rate_per_ip",
+        "public_submissions_type_rate",
+        "public_submissions_confirm_rate_per_email",
+        mode="after",
+    )
     @classmethod
     def _check_rate(cls, value: str) -> str:
         try:

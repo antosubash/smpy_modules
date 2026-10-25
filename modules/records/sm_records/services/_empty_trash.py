@@ -27,6 +27,7 @@ from sm_records import events
 from sm_records.index.query import Filter, filtered, only_trashed
 from sm_records.models import RecordType, tables_for
 from sm_records.services._common import mark_written
+from sm_records.services._forget_deliveries import forget_deliveries
 from sm_records.services._lock import lock_type
 from sm_records.services.errors import Conflict
 from sm_records.tenancy import bound_tenant
@@ -96,6 +97,8 @@ async def _purge_ids(db: AsyncSession, rtype: RecordType, ids: list[int]) -> Non
         await db.execute(
             sa_delete(revision).where(revision.record_id.in_(batch), revision.tenant_id == tenant)
         )
+        uuids = select(document.uuid).where(document.id.in_(batch), document.tenant_id == tenant)
+        await forget_deliveries(db, tenant, uuids, lock=document.id.in_(batch), table=document)
         gone = await db.execute(
             sa_delete(document).where(document.id.in_(batch), document.tenant_id == tenant)
         )

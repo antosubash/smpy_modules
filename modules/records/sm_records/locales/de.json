@@ -779,7 +779,15 @@
       "not_sent": "Benachrichtigung nicht gesendet",
       "failed": "Das hat nicht geklappt: {message}",
       "rate_limited": "Die Benachrichtigung wurde gerade erneut gesendet. Versuchen Sie es in einer Minute noch einmal.",
-      "stale": "Diese Einsendung wurde in einem anderen Tab oder Fenster geändert. Laden Sie die Seite neu und versuchen Sie es noch einmal."
+      "stale": "Diese Einsendung wurde in einem anderen Tab oder Fenster geändert. Laden Sie die Seite neu und versuchen Sie es noch einmal.",
+      "resend_confirmation": "Bestätigung erneut senden",
+      "resent_confirmation": "Die Bestätigungs-E-Mail wird erneut gesendet.",
+      "confirmation_not_sent": "Bestätigung nicht gesendet",
+      "unsubscribe": "Abmelden",
+      "unsubscribe_confirm_title": "Diese Adresse abmelden?",
+      "unsubscribe_confirm_body": "Die Adresse bleibt als abgemeldet in der Liste, damit sie nie versehentlich erneut angemeldet wird. Ihr Einwilligungsnachweis wird gelöscht, und alle an sie gesendeten Links funktionieren nicht mehr.",
+      "unsubscribe_done": "Abgemeldet.",
+      "confirmation_limited": "Diese Adresse hat ihre Bestätigung zu oft erhalten. Versuchen Sie es später erneut."
     },
     "mail": {
       "notify": {
@@ -787,6 +795,32 @@
         "intro": "Über {site} wurde eine neue Einsendung ({type}) gesendet:",
         "open": "In der Konsole öffnen:",
         "footer": "Sie erhalten diese E-Mail, weil diese Adresse über Einsendungen auf {site} benachrichtigt wird."
+      },
+      "confirm": {
+        "subject": "Bestätigen Sie Ihr Abonnement von {list} auf {site}",
+        "intro": "Jemand, hoffentlich Sie, möchte {list} von {site} an diese Adresse erhalten. Bitte bestätigen Sie, dass Sie das waren.",
+        "confirm": "Abonnement bestätigen:",
+        "expiry": "Dieser Link gilt bis {expires}. Wenn Sie sich nicht angemeldet haben, ignorieren Sie diese E-Mail: Es passiert nichts, und Sie hören nicht wieder von uns.",
+        "why": "Sie erhalten diese E-Mail, weil diese Adresse in einem Anmeldeformular auf {site} eingegeben wurde.",
+        "unsubscribe": "Später umentschieden? Hier abmelden:"
+      }
+    },
+    "landing": {
+      "sending": "Einen Moment …",
+      "failed": "Das hat nicht geklappt. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+      "confirm": {
+        "title": "Abonnement bestätigen",
+        "intro": "Klicken Sie auf die Schaltfläche, um zu bestätigen, dass Sie diesen Newsletter erhalten möchten.",
+        "button": "Abonnement bestätigen",
+        "done": "Vielen Dank. Ihr Abonnement ist bestätigt.",
+        "already": "Ihr Abonnement war bereits bestätigt. Sie müssen nichts weiter tun.",
+        "expired": "Dieser Link ist abgelaufen oder nicht mehr gültig. Melden Sie sich auf der Website erneut an, um einen neuen zu erhalten."
+      },
+      "unsubscribe": {
+        "title": "Abmelden",
+        "intro": "Klicken Sie auf die Schaltfläche, um diesen Newsletter nicht mehr zu erhalten.",
+        "button": "Abmelden",
+        "done": "Sie sind abgemeldet. Sie erhalten diesen Newsletter nicht mehr."
       }
     }
   }

@@ -118,6 +118,19 @@ def mount_public_router(app: FastAPI, settings: RecordsSettings) -> None:
     app.include_router(router, prefix=dir_prefix(public_prefix(settings)).rstrip("/"))
 
 
+def mount_submission_views(app: FastAPI) -> None:
+    """The newsletter's landing pages (#101), at the app root: their prefix
+    is fixed, but outside ``view_prefix`` — the router ``register_routes``
+    gets is hard-prefixed with ``/admin/records``. Idempotent, like the
+    exemption above."""
+    from sm_records.endpoints.public_submissions_views import router
+
+    prefix = constants.PUBLIC_SUBMISSIONS_VIEW_PREFIX.rstrip("/")
+    if any(getattr(route, "path", "").startswith(prefix + "/") for route in app.router.routes):
+        return
+    app.include_router(router, prefix=prefix)
+
+
 async def startup(module: Any, app: FastAPI) -> None:
     """:meth:`RecordsModule.on_startup`'s body — moved here for the 300-line cap.
 
@@ -151,6 +164,7 @@ async def startup(module: Any, app: FastAPI) -> None:
     settings = module.settings or RecordsSettings()
     mount_public_router(app, settings)
     exempt_public_routes(app, settings)
+    mount_submission_views(app)
     # The media library the ``media`` picker calls, found by route shape
     # (never by importing it) — :mod:`sm_records.media`. Same reason as above.
     from sm_records import media

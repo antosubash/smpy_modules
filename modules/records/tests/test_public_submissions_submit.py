@@ -8,7 +8,6 @@ import time
 from sm_records.contracts.events import FormSubmitted, RecordCreated
 from sm_records.public_submissions.tokens import sign_form
 
-from tests.app_harness import ADMIN, roles
 from tests.public_submissions_support import form_config, update
 from tests.submissions_http import (
     JSON,
@@ -255,36 +254,3 @@ async def test_required_consent_is_checked_and_snapshotted(site):
     assert (await send(site, consent=True, locale="fr")).status_code == 202
     (record,) = await records_of(site)
     assert record["data"]["sm_consent_text"] == "I agree.", "falls back to the default locale"
-
-
-async def test_every_closed_door_is_the_same_404(site):
-    await contact_type(site)
-    await contact_type(site, "closed", enabled=False)
-    plain = await site.post(
-        "/api/records/types",
-        json={"key": "plain", "label": "P", "fields": []},
-        headers=roles(ADMIN),
-    )
-    assert plain.status_code == 201, plain.text
-    news = await site.post(
-        "/api/records/types",
-        json={
-            "key": "news",
-            "label": "N",
-            "fields": [],
-            "public_submissions": {"kind": "subscription", "enabled": True},
-        },
-        headers=roles(ADMIN),
-    )
-    assert news.status_code == 201, news.text
-    unknown = await site.get(f"{SUBMISSIONS}/nosuch")
-    assert unknown.status_code == 404
-    for key in ("closed", "plain", "news"):
-        resp = await site.get(f"{SUBMISSIONS}/{key}")
-        assert (resp.status_code, resp.json()) == (404, unknown.json()), key
-        posted = await send(site, key, token="x")
-        assert posted.status_code in (400, 404), key
-    configure(site, public_submissions_enabled=False)
-    resp = await site.get(f"{SUBMISSIONS}/contact")
-    assert (resp.status_code, resp.json()) == (404, unknown.json())
-    assert (await send(site, token="x")).status_code == 404

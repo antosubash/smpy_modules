@@ -33,6 +33,7 @@ from sm_records.services._common import (
 from sm_records.services._delete_locks import check_delete_plan, lock_delete_graph, still_there
 from sm_records.services._delete_plan import apply_set_null, plan_delete
 from sm_records.services._empty_trash import _purge_ids
+from sm_records.services._forget_deliveries import forget_deliveries
 from sm_records.services._lock import lock_type
 from sm_records.services.errors import ReferencedByOthers
 from sm_records.services.revisions import write_revision
@@ -262,6 +263,8 @@ async def purge_type_records(db: AsyncSession, rtype: RecordType) -> list[Purged
             tables.revision.record_id.in_(owned), tables.revision.tenant_id == tenant
         )
     )
+    uuids = select(cls.uuid).where(cls.type_id == rtype.id, cls.tenant_id == tenant)
+    await forget_deliveries(db, tenant, uuids, lock=cls.type_id == rtype.id, table=cls)
     await db.execute(sa_delete(cls).where(cls.type_id == rtype.id, cls.tenant_id == tenant))
     await db.flush()
     # Core DML does not fire ``after_flush``, so the request's session would

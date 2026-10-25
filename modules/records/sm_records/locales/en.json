@@ -779,7 +779,15 @@
       "not_sent": "Notification not sent",
       "failed": "That didn't work: {message}",
       "rate_limited": "The notification was just sent again. Try again in a minute.",
-      "stale": "This submission changed in another tab or window. Reload the page and try again."
+      "stale": "This submission changed in another tab or window. Reload the page and try again.",
+      "resend_confirmation": "Resend confirmation",
+      "resent_confirmation": "The confirmation email will be sent again.",
+      "confirmation_not_sent": "Confirmation not sent",
+      "unsubscribe": "Unsubscribe",
+      "unsubscribe_confirm_title": "Unsubscribe this address?",
+      "unsubscribe_confirm_body": "The address stays on the list as unsubscribed, so it is never signed up again by accident. Its consent record is cleared, and every link sent to it stops working.",
+      "unsubscribe_done": "Unsubscribed.",
+      "confirmation_limited": "This address was sent its confirmation too often. Try again later."
     },
     "mail": {
       "notify": {
@@ -787,6 +795,32 @@
         "intro": "Someone sent a new {type} submission through {site}:",
         "open": "Open it in the console:",
         "footer": "You get this email because this address is notified of submissions on {site}."
+      },
+      "confirm": {
+        "subject": "Confirm your subscription to {list} on {site}",
+        "intro": "Someone, hopefully you, asked to receive {list} from {site} at this address. Please confirm that it was you.",
+        "confirm": "Confirm your subscription:",
+        "expiry": "This link works until {expires}. If you did not sign up, ignore this email: nothing happens and you will not hear from us again.",
+        "why": "You get this email because this address was entered in a signup form on {site}.",
+        "unsubscribe": "Changed your mind later? Unsubscribe here:"
+      }
+    },
+    "landing": {
+      "sending": "One moment…",
+      "failed": "That didn't work. Check your connection and try again.",
+      "confirm": {
+        "title": "Confirm your subscription",
+        "intro": "Press the button to confirm that you want to receive this newsletter.",
+        "button": "Confirm subscription",
+        "done": "Thank you. Your subscription is confirmed.",
+        "already": "Your subscription was already confirmed. There is nothing else to do.",
+        "expired": "This link has expired or is no longer valid. Sign up again on the website to get a new one."
+      },
+      "unsubscribe": {
+        "title": "Unsubscribe",
+        "intro": "Press the button to stop receiving this newsletter.",
+        "button": "Unsubscribe",
+        "done": "You are unsubscribed. You will not receive this newsletter any more."
       }
     }
   }

@@ -89,13 +89,24 @@ async def test_every_public_operation_documents_its_refusals(schema):
 
 
 async def test_every_submission_operation_documents_its_refusals(schema):
-    """Anonymous, so no 401; its 403 is ``bad_origin``, never a permission."""
-    seen = list(_operations(schema, public="submissions"))
-    assert len(seen) == 2, seen
-    for name, operation in seen:
+    """Anonymous, so no 401; its 403 is ``bad_origin``, never a permission. A
+    newsletter link checks no origin and no content type — the signed link is
+    the capability — so it has neither the 403 nor the 415; confirm has its
+    410."""
+    seen = dict(_operations(schema, public="submissions"))
+    links = {
+        "POST /api/records/submissions/confirm",
+        "POST /api/records/submissions/unsubscribe",
+    }
+    assert len(seen) == 4 and links <= set(seen), sorted(seen)
+    for name, operation in seen.items():
         codes = set(operation.get("responses", {}))
-        assert codes >= {"400", "403", "404", "415", "429"}, f"{name} documents {sorted(codes)}"
         assert "401" not in codes, f"{name} documents an auth refusal"
+        if name in links:
+            assert codes >= {"404", "413"} and not codes & {"403", "415"}, name
+        else:
+            assert codes >= {"400", "403", "404", "415", "429"}, f"{name} documents {sorted(codes)}"
+    assert "410" in seen["POST /api/records/submissions/confirm"]["responses"]
 
 
 async def test_no_operation_documents_an_undocumented_status(schema):

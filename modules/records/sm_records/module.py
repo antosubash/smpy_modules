@@ -13,15 +13,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter
-from simple_module_core.events import EventBus
 from simple_module_core.health import HealthRegistry
 from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
-from simple_module_core.rate_limit import RateLimitRegistry, RateLimitRule
 
 from sm_records import constants
+from sm_records._module_submissions import SubmissionHooks
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -32,7 +31,7 @@ if TYPE_CHECKING:
 _VERSION = importlib.metadata.version(constants.DISTRIBUTION)
 
 
-class RecordsModule(ModuleBase):
+class RecordsModule(SubmissionHooks, ModuleBase):
     meta = ModuleMeta(
         name=constants.MODULE_NAME,
         route_prefix=constants.ROUTE_PREFIX_API,
@@ -177,12 +176,14 @@ class RecordsModule(ModuleBase):
         ``on_startup`` — after hydration, before the first request. Design §10.
 
         The website-submission routes (#101) are the exception: their prefix
-        is fixed, so they are exempted here, for ``GET`` and ``POST`` only.
+        is fixed, so they are exempted here, for ``GET`` and ``POST`` only —
+        and the newsletter's landing pages for ``GET`` only.
         """
         registry.add_prefix(
             constants.PUBLIC_SUBMISSIONS_API_PREFIX,
             methods=set(constants.PUBLIC_SUBMISSIONS_ROUTE_METHODS),
         )
+        registry.add_prefix(constants.PUBLIC_SUBMISSIONS_VIEW_PREFIX, methods={"GET"})
 
     def register_middleware(self, app: FastAPI) -> None:
         """Install the deferred-job drain and the sidebar sync.
@@ -247,27 +248,6 @@ class RecordsModule(ModuleBase):
             await asyncio.wait_for(drain(), timeout=30)
         await _pattern_worker.close()
 
-    def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
-        """The outbox handler that mails a website submission's notification
-        (#101), when the host delivers durably. Registered whatever ``app`` is:
-        the outbox worker builds modules with ``app=None`` and still has to
-        know the handler. See :mod:`sm_records.public_submissions.mail_runner`."""
-        from sm_records.public_submissions.mail_runner import (
-            HANDLER_NAME,
-            NotificationDue,
-            durable_handler,
-        )
-
-        bus.subscribe_durable(NotificationDue, durable_handler(self), name=HANDLER_NAME)
-
-    def register_rate_limits(self, registry: RateLimitRegistry) -> None:
-        """A static backstop on the anonymous form definition. Submits are
-        limited by the module itself, at rates that are settings."""
-        registry.add_prefix(
-            constants.PUBLIC_SUBMISSIONS_API_PREFIX,
-            RateLimitRule("60/minute", key="ip", methods=frozenset({"GET"})),
-        )
-
     def locale_dirs(self) -> dict[str, Path]:
         base = Path(str(importlib.resources.files(__package__) / "locales"))
         return {constants.PERM_GROUP: base}
@@ -278,12 +258,15 @@ class RecordsModule(ModuleBase):
         # built yet, and a top-level import would make one missing dependency
         # take the whole module — and its tables — out of discovery.
         from sm_records.endpoints.api import router as api
+        from sm_records.endpoints.api.public_submissions_links import router as links
         from sm_records.endpoints.api.public_submissions_public import router as submissions
         from sm_records.endpoints.views import router as views
 
         api_router.include_router(api)
         # Beside the admin router, not in it: anonymous, so without its tenant
-        # binding and CSRF check (``endpoints.api.public_submissions_public``).
+        # binding and CSRF check (``endpoints.api.public_submissions_public``);
+        # the newsletter's links bind the tenant their token names.
         prefix = constants.PUBLIC_SUBMISSIONS_API_PREFIX.removeprefix(constants.ROUTE_PREFIX_API)
-        api_router.include_router(submissions, prefix=prefix.rstrip("/"))
+        for router in (links, submissions):
+            api_router.include_router(router, prefix=prefix.rstrip("/"))
         view_router.include_router(views)

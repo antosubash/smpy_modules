@@ -55,6 +55,7 @@ from tests.census import Census, census_enabled
 from tests.csrf_support import session_client  # noqa: F401 - test_csrf*'s fixture
 from tests.events_harness import bus, note  # noqa: F401
 from tests.isolation_support import two_tenants  # noqa: F401 - the tenancy matrix's fixture
+from tests.newsletter_http import newsletter  # noqa: F401 - a newsletter list on that fixture
 from tests.pg_support import arm_reset, make_db_state
 from tests.shared_fixtures import (  # noqa: F401
     bilingual,
