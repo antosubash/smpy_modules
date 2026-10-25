@@ -12,7 +12,7 @@ from collections.abc import Iterator
 from conftest import _build_app
 from fastapi.dependencies.models import Dependant
 from pagebuilder.module import PagebuilderModule
-from pagebuilder.tenancy import bind_admin, bind_public
+from pagebuilder.tenancy import bind_admin, bind_public, bind_public_viewer
 
 #: Reads no rows, so it answers on any host (see ``endpoints/seo.py``).
 ALLOW_UNBOUND = {"/robots.txt"}
@@ -39,9 +39,14 @@ def _api_routes(routes: list) -> Iterator[object]:
             yield route
 
 
+#: ``bind_public_viewer`` is the page viewer's binder: it binds the same tenant
+#: and, with none, yields ``None`` so the viewer renders its own 404 (#89).
+_BINDERS = (bind_admin, bind_public, bind_public_viewer)
+
+
 def _guarded(route: object) -> bool:
     calls = list(_calls(route.dependant))
-    return bind_admin in calls or bind_public in calls
+    return any(binder in calls for binder in _BINDERS)
 
 
 async def test_every_pagebuilder_route_binds_a_tenant(tmp_path) -> None:
@@ -54,8 +59,7 @@ async def test_every_pagebuilder_route_binds_a_tenant(tmp_path) -> None:
         routes = [
             r
             for r in _api_routes(app.routes)
-            if r.path not in ALLOW_UNBOUND
-            and r.path.startswith(prefixes)
+            if r.path not in ALLOW_UNBOUND and r.path.startswith(prefixes)
         ]
         assert routes, "no pagebuilder routes found; the guard is checking nothing"
         unbound = sorted(f"{sorted(r.methods)} {r.path}" for r in routes if not _guarded(r))

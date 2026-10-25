@@ -60,8 +60,10 @@ test.describe('Records — permissions', () => {
         `/admin/records/${key}/new`,
       ]) {
         await other.goto(path);
-        await expect(other.getByRole('heading', { name: '403' })).toBeVisible();
-        await expect(other.getByText('Permission required: records.')).toBeVisible();
+        // The framework's error page (the host's Error.tsx re-exports it, #89):
+        // a "No access" heading naming the records permission the role lacks.
+        await expect(other.getByRole('heading', { name: 'No access', level: 1 })).toBeVisible();
+        await expect(other.locator('main code', { hasText: /^records\./ })).toBeVisible();
       }
 
       // …and the JSON API refuses the same session, so the screens are not

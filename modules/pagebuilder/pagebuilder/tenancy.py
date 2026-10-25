@@ -60,6 +60,7 @@ __all__ = [
     "TenancyMode",
     "bind_admin",
     "bind_public",
+    "bind_public_viewer",
     "configure",
     "detect_mode",
     "mode_of",
@@ -225,5 +226,23 @@ async def bind_public(request: Request) -> AsyncIterator[str]:
     tenant = resolve_public(request)
     if tenant is None:
         raise HTTPException(status_code=404, detail=_NOT_FOUND)
+    with tenant_context(tenant):
+        yield tenant
+
+
+async def bind_public_viewer(request: Request) -> AsyncIterator[str | None]:
+    """:func:`bind_public` for the page viewer: ``None`` instead of raising.
+
+    The viewer answers a request that resolved no tenant with its own branded
+    404 rather than the host's error page (#89) — rendered *without* a site
+    layout, because there is no tenant to read one from, and never the
+    default tenant's, which would brand another organisation's address with
+    the default site. Nothing is bound in that case, so the endpoint must not
+    query.
+    """
+    tenant = resolve_public(request)
+    if tenant is None:
+        yield None
+        return
     with tenant_context(tenant):
         yield tenant

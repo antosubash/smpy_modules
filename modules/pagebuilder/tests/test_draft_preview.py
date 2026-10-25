@@ -90,3 +90,23 @@ async def test_preview_does_not_shadow_the_media_routes(authed_client: AsyncClie
     """``/pagebuilder/{page_id}/preview`` sits next to ``/media/{asset_id}``."""
     response = await authed_client.get("/pagebuilder/media", headers=INERTIA)
     assert response.status_code == 200, response.text
+
+
+async def test_preview_carries_the_draft_bar(authed_client: AsyncClient) -> None:
+    """The bar that tells an editor this is not the live page (#89)."""
+    page_id = await _create(authed_client, "preview-bar")
+
+    response = await authed_client.get(f"/pagebuilder/{page_id}/preview", headers=INERTIA)
+
+    preview = response.json()["props"]["preview"]
+    assert preview == {"editor_href": f"/pagebuilder/{page_id}/edit", "status": "draft"}
+
+
+async def test_the_public_page_never_shows_the_draft_bar(authed_client: AsyncClient) -> None:
+    page_id = await _create(authed_client, "live-no-bar")
+    await authed_client.post(f"{API}/{page_id}/publish", json={})
+
+    live = await authed_client.get("/p/live-no-bar", headers=INERTIA)
+
+    assert live.status_code == 200, live.text
+    assert "preview" not in live.json()["props"]

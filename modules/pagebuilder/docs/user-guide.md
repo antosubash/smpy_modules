@@ -90,7 +90,24 @@ draft ──Publish──▶ published          (publish is allowed from any sta
   until they approve or reject.
 - **Preview** (`/pagebuilder/{id}/preview`) renders the *draft* exactly as a
   visitor would see it, inside the site layout. It stays behind sign-in and is
-  always `noindex`.
+  always `noindex`. A bar across the top says **Preview — this draft is not
+  published**, shows the page's status and links **Back to editor**; visitors
+  never see it.
+
+### What visitors see when a page is missing
+
+An address with nothing to show — a typo, a draft, a page in the trash, or one
+scheduled but not yet live — answers **404** with the site's own not-found
+page: your header and footer, your branding, the words *This page doesn't
+exist* in the address's language (`/de/p/…` is German), and a button back to
+the home page (`/`). Every cause gets exactly the same page, so it never
+reveals that a draft exists, and it is never cached. A renamed page still
+redirects to its new address instead.
+
+Every public page also has a **Skip to content** link for keyboard users (the
+first thing Tab reaches), keeps its footer at the bottom of the window on a
+short page, and prints without the header and footer — the page's address
+is printed at the top instead.
 
 ### Scheduling
 

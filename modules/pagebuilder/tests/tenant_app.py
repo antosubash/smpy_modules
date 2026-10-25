@@ -35,9 +35,15 @@ class HeaderTenant:
             await self.app(scope, receive, send)
 
 
-async def multi_client(tmp_path, *, inject_user: bool = True) -> AsyncIterator[AsyncClient]:
+async def multi_client(
+    tmp_path, *, inject_user: bool = True, settings: dict | None = None
+) -> AsyncIterator[AsyncClient]:
     app, cleanup = await _build_app(
-        tmp_path, requires_auth=True, csrf_protect=False, inject_user=inject_user
+        tmp_path,
+        requires_auth=True,
+        csrf_protect=False,
+        inject_user=inject_user,
+        settings=settings,
     )
     app.add_middleware(HeaderTenant)  # inner: runs after TenantMiddleware
     app.add_middleware(TenantMiddleware)  # makes detect_mode say MULTI

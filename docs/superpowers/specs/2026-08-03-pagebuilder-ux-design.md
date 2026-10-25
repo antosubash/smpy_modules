@@ -114,7 +114,10 @@ a broken selector points at a single file. Then:
 ## Out of scope
 
 - Restyling the public viewer (`PublicPage.tsx`) — it renders author-composed
-  content and the site layout feature already governs its framing.
+  content and the site layout feature already governs its framing. Decided in
+  #89: no restyle; the chrome states (404, draft preview, skip link,
+  full-height column, print) are hardened instead, and dark mode deliberately
+  follows the design pack.
 - The Puck canvas itself.
 - The missing favicon (host scaffold, not this module).
 - `HEAD /p/{slug}` returning 405 — pre-existing, unrelated to UX.
