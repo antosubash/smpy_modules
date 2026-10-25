@@ -50,7 +50,7 @@ from sm_records.contracts.public_submissions_api import SubmitBody
 from sm_records.index.query import Filter, FilterOp, exists_query
 from sm_records.models import Record, RecordStatus, RecordType, tables_for
 from sm_records.public_submissions import abuse
-from sm_records.public_submissions.confirmation import queue_confirmation, within_budget
+from sm_records.public_submissions.confirmation import budget_wait, queue_confirmation
 from sm_records.public_submissions.definition import EMAIL_KEY, consent_text, page_locale
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.tokens import host_secret, ip_hash
@@ -213,5 +213,5 @@ async def signup(
     after = (record.data or {}).get("sm_status")
     if wrote:
         events.emit(db, changed(rtype, record, before, after))
-    if after == PENDING and await within_budget(request, rtype, email, settings):
+    if after == PENDING and await budget_wait(request, rtype, email, settings) == 0:
         await queue_confirmation(db, request.app, rtype, record)

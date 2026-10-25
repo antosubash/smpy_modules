@@ -54,7 +54,6 @@ __all__ = [
     "message",
     "queue_confirmation",
     "recipient_key",
-    "within_budget",
 ]
 
 logger = logging.getLogger(__name__)
@@ -173,12 +172,6 @@ async def budget_wait(
     digest = hmac.new(secret, f"budget|{email}".encode(), hashlib.sha256).hexdigest()
     key = abuse.rate_key(rtype.tenant_id, f"{rtype.key}:email={digest}")
     return await abuse.wait(request, key, settings.public_submissions_confirm_rate_per_email)
-
-
-async def within_budget(
-    request: Request, rtype: RecordType, email: str, settings: RecordsSettings
-) -> bool:
-    return await budget_wait(request, rtype, email, settings) == 0
 
 
 async def queue_confirmation(db: AsyncSession, app: Any, rtype: RecordType, record: Record) -> None:
