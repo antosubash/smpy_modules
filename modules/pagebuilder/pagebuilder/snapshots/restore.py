@@ -123,11 +123,12 @@ class RestoreMixin(HostBase):
     async def _revalidate(self, snapshot: ContentSnapshot) -> None:
         """Hold the bundle to the sections registered *now* (see ``revalidate``)."""
         await asyncio.to_thread(
-            revalidate,
-            snapshot.manifest or {},
-            self.sections,
-            self.dir_for(snapshot.id),
-            self._index_for(snapshot.id),
+            lambda: revalidate(
+                snapshot.manifest or {},
+                self.sections,
+                self.dir_for(snapshot.id),
+                self._index_for(snapshot.id),
+            )
         )
 
     async def _recheck(self, snapshot: ContentSnapshot) -> None:
@@ -189,7 +190,9 @@ class RestoreMixin(HostBase):
             # raise still rolls the request's transaction back — pages, layout,
             # redirects, every section's rows and `_decide`'s status alike.
             shutil.rmtree(self.dir_for(pre_restore.id), ignore_errors=True)
-            if isinstance(exc, RestoreConflictError):
+            # A section that cannot apply after all — a conflict, or a version
+            # this host stopped reading since the re-check — is a refusal, not a 500.
+            if isinstance(exc, (RestoreConflictError, BundleError)):
                 raise _refusal(exc) from exc
             raise
         return result

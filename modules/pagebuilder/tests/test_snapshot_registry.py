@@ -35,7 +35,7 @@ def test_a_reserved_name_is_refused(name):
         SectionRegistry().register(_section(name=name))
 
 
-@pytest.mark.parametrize("name", ["", "News", "1news", "news-feed", "a" * 65, None])
+@pytest.mark.parametrize("name", ["", "News", "1news", "news-feed", "a" * 65, "news\n", None])
 def test_an_invalid_name_is_refused(name):
     with pytest.raises(ValueError, match="not"):
         SectionRegistry().register(_section(name=name))

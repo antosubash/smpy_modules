@@ -58,6 +58,8 @@ from typing import Any, Literal, Protocol, runtime_checkable
 from simple_module_db import current_tenant_id
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pagebuilder.snapshots.assets import collect_sentinels
+from pagebuilder.snapshots.files import UnsafeBundlePathError, inside, write_json
 from pagebuilder.snapshots.match import (
     Identified,
     IdentityMatch,
@@ -65,6 +67,7 @@ from pagebuilder.snapshots.match import (
     match_by_identity,
 )
 from pagebuilder.snapshots.registry import SectionRegistry
+from pagebuilder.snapshots.validate import BundleError
 
 
 class TenantMismatchError(RuntimeError):
@@ -95,8 +98,6 @@ class CaptureContext(_Bound):
 
     def write_json(self, relative: str, payload: Any) -> int:
         """Write *payload* under ``dir`` the way every bundle document is written."""
-        from pagebuilder.snapshots.files import inside, write_json
-
         return write_json(inside(self.dir, relative), payload)
 
 
@@ -110,25 +111,19 @@ class ValidateContext:
 
     def invalid(self, message: str) -> Exception:
         """The exception to raise for a section this host must refuse (422)."""
-        from pagebuilder.snapshots.validate import BundleError
-
         return BundleError(message)
 
     def read_json(self, relative: str) -> Any:
         """Parse a document under ``dir``; bad JSON or an unsafe name is :meth:`invalid`."""
-        from pagebuilder.snapshots.files import UnsafeBundlePathError, inside
-
         try:
-            return json.loads(inside(self.dir, relative).read_text())
+            return json.loads(inside(self.dir, relative).read_text(encoding="utf-8"))
         except UnsafeBundlePathError as exc:
             raise self.invalid(str(exc)) from exc
-        except (OSError, json.JSONDecodeError) as exc:
+        except (OSError, ValueError, RecursionError) as exc:  # incl. bad UTF-8 and bad JSON
             raise self.invalid(f"{self.dir.name}/{relative} is not readable JSON") from exc
 
     def check_media(self, node: Any, label: str) -> None:
         """Refuse *node* if it references media the bundle does not carry."""
-        from pagebuilder.snapshots.assets import collect_sentinels
-
         missing = sorted(collect_sentinels(node) - self.media_names)
         if missing:
             raise self.invalid(
@@ -155,10 +150,8 @@ class RestoreContext(_Bound):
         An unsafe name raises ``UnsafeBundlePathError`` (a ``ValueError``), which
         aborts the restore.
         """
-        from pagebuilder.snapshots.files import inside
-
         path = inside(self.dir, relative)
-        return json.loads(path.read_text()) if path.is_file() else default
+        return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else default
 
 
 @dataclass(frozen=True)

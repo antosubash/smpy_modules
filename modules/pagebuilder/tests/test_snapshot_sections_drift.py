@@ -15,9 +15,11 @@ from page_helpers import create_draft
 from pagebuilder.contracts.bundle import (
     CaptureContext,
     RestoreContext,
+    SectionCapture,
     ValidateContext,
     register_section,
 )
+from pagebuilder.snapshots import restore as restore_module
 from pagebuilder.snapshots.files import UnsafeBundlePathError
 from pagebuilder.snapshots.validate import BundleError
 
@@ -111,6 +113,40 @@ async def test_a_section_enabled_after_staging_is_validated_before_apply(tmp_pat
         assert refused.status_code == 422
         assert [c[0] for c in section.calls] == ["validate"]  # never planned or applied
         assert await notes(client) == {}
+        assert (await client.get(_PENDING)).json()["id"] == staged.json()["id"]
+
+
+async def test_non_integer_counts_fail_the_capture(tmp_path):
+    section = NotesSection()
+    original = section.capture
+
+    async def bad_counts(ctx):
+        await original(ctx)
+        return SectionCapture(counts={"notes": "1"})
+
+    section.capture = bad_counts
+    async for client in notes_client(tmp_path, section):
+        with pytest.raises(ValueError, match="non-integer counts"):
+            await client.post(_SNAPSHOTS, json={})
+        root = client._transport.app.state.pagebuilder.settings.snapshot_root / "snapshots"
+        assert not root.exists() or list(root.iterdir()) == []
+
+
+async def test_a_bundle_error_during_apply_is_a_422_and_stays_pending(tmp_path, monkeypatch):
+    async for client in notes_client(tmp_path, NotesSection()):
+        page = await create_draft(client, slug="home", title="Before")
+        snapshot = await _take(client)
+        await client.put(f"/api/pagebuilder/pages/{page['id']}", json={"title": "After"})
+        staged = await client.post(f"{_SNAPSHOTS}/{snapshot['id']}/restore")
+
+        async def unreadable(*args, **kwargs):
+            raise BundleError("unsupported version 1 of the 'notes' section")
+
+        monkeypatch.setattr(restore_module, "apply_sections", unreadable)
+        refused = await client.post(f"/api/pagebuilder/imports/{staged.json()['id']}/approve")
+        assert refused.status_code == 422
+        current = await client.get(f"/api/pagebuilder/pages/{page['id']}")
+        assert current.json()["title"] == "After"
         assert (await client.get(_PENDING)).json()["id"] == staged.json()["id"]
 
 

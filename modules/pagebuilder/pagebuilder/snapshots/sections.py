@@ -42,7 +42,12 @@ if TYPE_CHECKING:
 
 
 def _tenant() -> str:
-    """The bound tenant; a section never runs without one."""
+    """The bound tenant; a section never runs without one.
+
+    Read once per stage, before the first section runs, and handed to every
+    context: reading it per section would let one contributor that leaves
+    another tenant bound pass the next one's check.
+    """
     tenant = current_tenant_id.get()
     if not tenant:
         raise TenantMismatchError("bundle sections need a bound tenant")
@@ -78,6 +83,7 @@ async def capture_sections(
     """
     entries: list[dict[str, Any]] = []
     size = 0
+    tenant = _tenant() if len(registry) else ""
     for section in registry:
         directory = dest / section.name
         if directory.exists():
@@ -85,12 +91,20 @@ async def capture_sections(
         directory.mkdir(parents=True)
         ctx = CaptureContext(
             db=db,
-            tenant_id=_tenant(),
+            tenant_id=tenant,
             dir=directory,
             to_portable=partial(to_sentinels, url_to_name=url_to_name),
         )
         ctx.check_tenant()
         result = await section.capture(ctx)
+        counts = dict(result.counts)
+        # Checked here, not trusted: upload refuses non-integer counts, so a
+        # contributor that wrote one would make its own snapshot unrestorable.
+        if not all(
+            isinstance(k, str) and isinstance(v, int) and not isinstance(v, bool)
+            for k, v in counts.items()
+        ):
+            raise ValueError(f"bundle section {section.name!r} reported non-integer counts")
         size += await asyncio.to_thread(tree_size, directory)
         entries.append(
             {
@@ -98,7 +112,7 @@ async def capture_sections(
                 "version": section.version,
                 "required": section.required,
                 "paths": [f"{section.name}/"],
-                "counts": dict(result.counts),
+                "counts": counts,
             }
         )
     return entries, size
@@ -138,6 +152,7 @@ def _restore_context(
     entry: dict[str, Any],
     bundle_dir: Path,
     name_to_url: dict[str, str],
+    tenant: str,
 ) -> RestoreContext:
     version = entry["version"]
     if version not in section.readable_versions:
@@ -145,7 +160,7 @@ def _restore_context(
         raise BundleError(f"unsupported version {version} of the {section.name!r} section")
     ctx = RestoreContext(
         db=db,
-        tenant_id=_tenant(),
+        tenant_id=tenant,
         dir=bundle_dir / section.name,
         version=version,
         from_portable=partial(from_sentinels, name_to_url=name_to_url),
@@ -195,8 +210,9 @@ async def plan_sections(
     """
     known = present(manifest, registry)
     sections = []
+    tenant = _tenant() if known else ""
     for section, entry in known:
-        ctx = _restore_context(db, section, entry, bundle_dir, name_to_url)
+        ctx = _restore_context(db, section, entry, bundle_dir, name_to_url, tenant)
         sections.append(_plan_entry(section, entry["version"], await section.plan(ctx)))
     carried = {entry["section"] for entry in _contributed(manifest)}
     return {
@@ -227,8 +243,10 @@ async def apply_sections(
     section that raises aborts the caller's whole transaction.
     """
     outcome: dict[str, dict[str, Any]] = {}
-    for section, entry in present(manifest, registry):
-        ctx = _restore_context(db, section, entry, bundle_dir, name_to_url)
+    known = present(manifest, registry)
+    tenant = _tenant() if known else ""
+    for section, entry in known:
+        ctx = _restore_context(db, section, entry, bundle_dir, name_to_url, tenant)
         result = await section.apply(ctx)
         outcome[section.name] = {"counts": dict(result.counts), "applied": dict(result.applied)}
     await db.flush()

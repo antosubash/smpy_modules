@@ -83,7 +83,7 @@ RESERVED_SECTION_NAMES = frozenset(
 """Names no other section may take. A section's files live under
 ``<section>/``, so one named ``pages`` would have its files read as pages."""
 
-SECTION_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+SECTION_NAME = re.compile(r"[a-z][a-z0-9_]{0,63}\Z")  # not `$`: it admits a trailing newline
 _PACKAGE = "simple_module_pagebuilder"
 
 
