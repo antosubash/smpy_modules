@@ -41,6 +41,7 @@ from sm_records.public_submissions.definition import (
     definition,
     form_digest,
     page_locale,
+    public_fields_of,
 )
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.mail_runner import queue_notification
@@ -71,7 +72,7 @@ def visitor_data(rtype: RecordType, sent: dict[str, Any]) -> dict[str, Any]:
     so the same inbox is one value to filter, de-duplicate and erase by.
     Fields the visitor does not fill get their default from the validator.
     """
-    allowed = set((rtype.public_submissions or {}).get("public_fields") or [])
+    allowed = {entry.key for entry in public_fields_of(rtype)}
     unknown = sorted(set(sent) - allowed)
     if unknown:
         raise SubmissionRefused(

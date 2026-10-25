@@ -19,7 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import events
 from sm_records.models import Record, RecordType
+from sm_records.schema.compile import to_jsonable
 from sm_records.services import records as record_service
+from sm_records.services._common import mark_written
 from sm_records.services._payload import field_defs
 from sm_records.services.errors import Conflict, ValidationFailed
 from sm_records.settings import RecordsSettings
@@ -89,20 +91,44 @@ async def try_system_update(
     """:func:`system_update`, for a mark that must not block what it marks.
 
     A record that no longer satisfies its type's schema (a forced restrictive
-    change) cannot take *any* write until an admin edits it, and a system
-    write is a write. The spam verdict, the not-spam clearing and the
-    delivery mark are bookkeeping: refused here, they are logged and skipped
-    — the record is still trashed, restored or mailed, and the outbox does not
-    retry a mail it already sent. Nothing was written when validation refused.
+    change) cannot take an ordinary write until an admin edits it. The spam
+    verdict, the not-spam clearing and the delivery mark are bookkeeping about
+    server-owned fields, so for such a record they are written **directly**
+    onto the stored payload (:func:`_write_marks`), leaving the visitor's
+    values exactly as they are — otherwise a stale ``sm_spam`` would offer
+    *Not spam* again after an ordinary delete, and every cycle would mail
+    everyone. Nothing was written when validation refused.
     """
     try:
         return await system_update(db, rtype, record, values, settings=settings)
     except ValidationFailed as exc:
+        written = await _write_marks(db, rtype, record, values)
         logger.warning(
-            "records: %s record %s no longer matches its schema; %s not recorded (%s)",
+            "records: %s record %s no longer matches its schema (%s); %s %s directly",
             rtype.key,
             record.uuid,
-            ", ".join(values),
             exc.detail,
+            ", ".join(values),
+            "written" if written else "NOT written",
         )
         return record
+
+
+async def _write_marks(
+    db: AsyncSession, rtype: RecordType, record: Record, values: dict[str, Any]
+) -> bool:
+    """Set system values on the stored payload, no validation, no revision.
+
+    Only for system fields that are not indexed (every contact-form one): an
+    indexed key would leave its index row behind, so it is refused. The
+    version moves, so an editor holding the record sees the change on save.
+    """
+    system = {entry.key: entry for entry in field_defs(rtype) if entry.system}
+    if any(key not in system or system[key].indexed for key in values):
+        return False
+    record.data = {**(record.data or {}), **to_jsonable(values)}
+    record.version = record.version + 1
+    db.add(record)
+    await db.flush()
+    mark_written(db)
+    return True

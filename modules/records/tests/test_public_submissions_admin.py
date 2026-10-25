@@ -161,9 +161,11 @@ async def test_the_actions_need_the_csrf_token(session_client):
     assert (await session_client.post(url, headers=headers)).status_code == 200
 
 
-async def test_spam_still_trashes_a_record_that_fails_its_schema(site):
+async def test_a_record_that_fails_its_schema_takes_the_marks_and_cannot_cycle(site):
     """A record no longer valid under its type (a forced change) cannot take
-    the spam mark — a write — but is still moved to the trash."""
+    an ordinary write, but the server-owned marks are written directly: it is
+    trashed as spam, Not spam clears the mark, and after an ordinary delete it
+    cannot be "not spam" again (each cycle would mail everyone)."""
     await contact_type(site)
     async with site.db_state.session_factory() as session:
         stmt = select(RecordType).where(RecordType.key == "contact")
@@ -172,7 +174,15 @@ async def test_spam_still_trashes_a_record_that_fails_its_schema(site):
     spam = await site.post(_action("contact", record.uuid, "spam"), headers=roles(ADMIN))
     assert spam.status_code == 200, spam.text
     assert spam.json()["is_deleted"] is True
-    assert spam.json()["data"].get("sm_spam") is None, "the mark was skipped, the trash was not"
+    assert spam.json()["data"]["sm_spam"] == "manual"
+    assert spam.json()["data"]["email"] == "not-an-email", "the visitor's values are untouched"
+    back = await site.post(_action("contact", record.uuid, "not-spam"), headers=roles(ADMIN))
+    assert back.status_code == 200, back.text
+    assert back.json()["is_deleted"] is False and back.json()["data"]["sm_spam"] is None
+    gone = await site.delete(f"{API}/contact/records/{record.uuid}", headers=roles(ADMIN))
+    assert gone.status_code == 204
+    again = await site.post(_action("contact", record.uuid, "not-spam"), headers=roles(ADMIN))
+    assert (again.status_code, again.json()["code"]) == (409, "not_in_trash")
 
 
 async def test_not_spam_is_only_for_a_submission_kept_as_spam(site):

@@ -70,7 +70,12 @@ export function PublicFieldsChecklist({
               </Label>
             </div>
             {!eligible && (
-              <p className="ml-6 text-xs text-muted-foreground">
+              // Ticked but ineligible is a stored config the form already
+              // ignores (the server leaves such a field out): say so loudly.
+              <p
+                className={`ml-6 text-xs ${ticked ? 'text-destructive' : 'text-muted-foreground'}`}
+                data-testid={ticked ? 'records-public-field-ignored' : undefined}
+              >
                 {field.unique
                   ? t(keys.records.public_submissions.public_field_unique)
                   : t(keys.records.public_submissions.public_field_ineligible, {

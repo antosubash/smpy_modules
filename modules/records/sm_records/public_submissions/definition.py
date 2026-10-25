@@ -26,6 +26,7 @@ from sm_records.contracts.public_submissions_api import (
     SubmissionField,
 )
 from sm_records.models import RecordType
+from sm_records.public_submissions.spec import SUBMITTABLE_TYPES
 from sm_records.public_submissions.tokens import sign_form
 from sm_records.services._payload import field_defs
 from sm_records.services.errors import NotFound
@@ -33,7 +34,14 @@ from sm_records.services.public import NOT_FOUND
 from sm_records.services.types import get_type
 from sm_records.settings import RecordsSettings
 
-__all__ = ["accepting_type", "consent_text", "definition", "form_digest", "page_locale"]
+__all__ = [
+    "accepting_type",
+    "consent_text",
+    "definition",
+    "form_digest",
+    "page_locale",
+    "public_fields_of",
+]
 
 _LOCALE_RE = re.compile(LOCALE_PATTERN)
 DIGEST_LEN = 16
@@ -89,12 +97,26 @@ def _field(entry: Any) -> SubmissionField:
     )
 
 
+def public_fields_of(rtype: RecordType) -> list[Any]:
+    """The fields a visitor may fill *now*, in render order: the stored
+    ``public_fields`` that still name an ordinary, submittable, non-unique
+    field. Applied at runtime as well as on save, because a config stored
+    before a rule existed (a unique public field, refused on save only
+    since that rule was added) must not reach the form: a duplicate's 409 would tell a visitor
+    what another visitor sent."""
+    by_key = {entry.key: entry for entry in field_defs(rtype) if not entry.system}
+    return [
+        by_key[key]
+        for key in (rtype.public_submissions or {}).get("public_fields", [])
+        if key in by_key and by_key[key].type in SUBMITTABLE_TYPES and not by_key[key].unique
+    ]
+
+
 def _shown(
     rtype: RecordType, settings: RecordsSettings, locale: str | None
 ) -> tuple[list[SubmissionField], SubmissionConsent | None]:
     config = rtype.public_submissions or {}
-    by_key = {entry.key: entry for entry in field_defs(rtype) if not entry.system}
-    fields = [_field(by_key[key]) for key in config.get("public_fields", []) if key in by_key]
+    fields = [_field(entry) for entry in public_fields_of(rtype)]
     consent_cfg = config.get("consent") or {}
     text = consent_text(config, settings, page_locale(locale))
     consent = (

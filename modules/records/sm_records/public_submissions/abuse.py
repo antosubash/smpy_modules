@@ -50,45 +50,68 @@ def client_ip(request: Request) -> str:
 
 
 def _sent_origin(request: Request) -> str | None:
+    """The ``Origin`` header, else the ``Referer``'s origin, else ``None``.
+
+    The literal ``null`` is an opaque origin (a sandboxed frame, a redirect
+    across sites, a ``file:`` page): it is refused outright rather than
+    falling back to a ``Referer`` the same request may also carry."""
     origin = request.headers.get("origin")
-    if origin and origin != "null":
-        return origin.rstrip("/").lower()
+    if origin is not None:
+        return None if origin.strip().lower() == "null" else origin
     parts = urlsplit(request.headers.get("referer") or "")
     if parts.scheme and parts.netloc:
-        return f"{parts.scheme}://{parts.netloc}".lower()
+        return f"{parts.scheme}://{parts.netloc}"
     return None
 
 
 _DEFAULT_PORTS: Final = {"http": 80, "https": 443}
 
+Origin = tuple[str, str, int]
 
-def origin_of(url: str) -> str | None:
-    """``scheme://host[:port]``, lowercased, with a default port dropped and any
-    path ignored — so ``https://Example.org:443/site`` and the browser's
-    ``https://example.org`` compare equal."""
+
+def origin_of(url: str) -> Origin | None:
+    """``(scheme, host, port)``: lowercased, a trailing dot dropped from the
+    host, the default port filled in, any path ignored. Compared as a tuple,
+    never as a string: an IPv6 literal written without its brackets would
+    make ``[2001:db8::1]:8443`` and ``[2001:db8::1:8443]`` the same text."""
     try:
         parts = urlsplit(url.strip())
         port = parts.port
     except ValueError:
         return None
-    if parts.scheme.lower() not in _DEFAULT_PORTS or not parts.hostname:
-        return None
     scheme = parts.scheme.lower()
-    keep = port is not None and port != _DEFAULT_PORTS[scheme]
-    return f"{scheme}://{parts.hostname.lower()}" + (f":{port}" if keep else "")
+    host = (parts.hostname or "").rstrip(".").lower()
+    if scheme not in _DEFAULT_PORTS or not host:
+        return None
+    return scheme, host, _DEFAULT_PORTS[scheme] if port is None else port
+
+
+def _same_host(request: Request, sent: Origin) -> bool:
+    """The request's own host, by authority only: behind a TLS-terminating
+    proxy the scheme this process sees is not the one the browser used, so a
+    ``Host`` without a port matches the sent scheme's default port."""
+    try:
+        parts = urlsplit("//" + (request.headers.get("host") or ""))
+        port = parts.port
+    except ValueError:
+        return False
+    host = (parts.hostname or "").rstrip(".").lower()
+    if not host:
+        return False
+    return host == sent[1] and (
+        port == sent[2] or (port is None and sent[2] == _DEFAULT_PORTS[sent[0]])
+    )
 
 
 def _origin_allowed(request: Request, origin: str) -> bool:
-    parts = urlsplit(origin)
-    host = (request.headers.get("host") or "").lower()
-    # The request's own host, by authority only: behind a TLS-terminating
-    # proxy the scheme this process sees is not the one the browser used.
-    if host and parts.netloc == host:
-        return True
     sent = origin_of(origin)
+    if sent is None:
+        return False
+    if _same_host(request, sent):
+        return True
     configured = [*get_settings(request).public_submissions_allowed_origins]
     configured.append(public_base_url(request.app))
-    return sent is not None and sent in {origin_of(item) for item in configured if item}
+    return sent in {origin_of(item) for item in configured if item}
 
 
 async def guard(request: Request) -> None:
