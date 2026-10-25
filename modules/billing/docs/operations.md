@@ -60,7 +60,7 @@ environment variables — an `SM_BILLING_*` line does nothing.
 | `reconcile_interval_minutes` | `0` | Run [reconcile](#reconcile) inside the app every N minutes over subscriptions not synced for N minutes. `0` is off. Takes effect on save: the loop starts, stops or re-times itself. `60` suits most deployments. |
 | `usage_hold_ttl_seconds` | `900` | Default TTL of a usage hold when neither its meter nor the caller sets one (at least 30). A holder that crashes gives its slot back once the hold lapses. Read per call. |
 | `usage_sweep_interval_seconds` | `60` | Seconds between sweeps that expire lapsed holds (every instance sweeps; the guarded transition releases each hold once). `0` turns it off. Re-read from the database before every tick, so a value saved on one worker reaches all of them. |
-| `usage_event_retention_days` | `400` | The daily purge drops ledger charges older than this together with their refunds (by the charge's age, so a key is never left with only its refund; a refund goes only while its selected charge row is still there, so a stale batch on another instance never takes a newer call's refund), and settled holds older than 30 days. Each transaction deletes up to 1,000 charges plus their refunds (so up to about 2,000 ledger rows), or up to 1,000 settled holds, with at most 20 transactions per table per tick; and carries a backlog over to the next ticks, so SQLite's write lock is never held for long. `0` keeps the ledger. Counters and gauges are never purged. A purged key is forgotten whole and can be used again. |
+| `usage_event_retention_days` | `400` | The daily purge drops ledger charges older than this together with their refunds (by the charge's age, so a key is never left with only its refund; a refund goes only while its selected charge row is still there, so a stale batch on another instance never takes a newer call's refund), and settled holds older than 30 days. Each transaction deletes up to 1,000 charges plus their refunds (so up to about 2,000 ledger rows), or up to 1,000 settled holds, with at most 20 purge write transactions per table per tick, and carries a backlog over to the next ticks, so SQLite's write lock is never held for long. `0` keeps the ledger. Counters and gauges are never purged. A purged key is forgotten whole and can be used again. |
 
 > **Rotating the app's `secret_key` makes stored Stripe secrets unreadable.**
 > Billing then falls back to `manual` at startup and the connection screen
@@ -215,8 +215,8 @@ than `usage_event_retention_days` ago (by the server-side `recorded_at`)
 together with their refunds, and released or expired holds settled more than
 30 days ago. Each ledger transaction selects up to 1,000 charges and deletes
 them with their refunds, so up to about 2,000 rows; each hold transaction
-deletes up to 1,000 settled holds. At most 20 transactions run per table per
-tick; a backlog (after an outage, or after lowering the
+deletes up to 1,000 settled holds. At most 20 purge write transactions run per
+table per tick; a backlog (after an outage, or after lowering the
 retention) carries over to later ticks. The per-period counters and the
 gauges are **never** purged, so the usage screens keep their history. A
 purged key is forgotten whole and could be counted again, which is why the
