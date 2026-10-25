@@ -181,3 +181,21 @@ async def test_a_lapse_still_corrects_the_end_of_its_own_period(app, admin):
 
     await _sync(app, tenant, NEXT)  # recovered into the next period
     assert await _previous(admin) == [(METER, 4, EXTENDED.isoformat()[:16])]
+
+
+async def test_a_lapse_corrects_a_provider_period_that_matches_a_calendar_month(app, admin):
+    """A provider period aligned to a calendar month: its rows are still the
+    provider's (recorded when written, not guessed from the boundaries), so
+    a lapsed snapshot moving its end moves theirs."""
+    tenant = await _tenant(app)
+    start = calendar_month(NOW - timedelta(days=40))[0]
+    aligned = (start, calendar_month(start)[1])  # Sep 1 -> Oct 1, say
+    await _sync(app, tenant, aligned)
+    usage = service(app, Clock(start + timedelta(days=1)))
+    assert (await usage.consume(tenant, METER, 2, "k1", source="t")).ok
+    moved = aligned[1] + timedelta(days=9)
+    await _sync(app, tenant, (start, moved), status="unpaid")
+    assert await _ends(app, tenant) == [(moved, 2)]
+
+    await _sync(app, tenant, (moved, moved + timedelta(days=60)))
+    assert await _previous(admin) == [(METER, 2, moved.isoformat()[:16])]

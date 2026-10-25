@@ -33,7 +33,7 @@ def calendar_month(now: datetime) -> tuple[datetime, datetime]:
     return start, datetime(now.year, now.month + 1, 1, tzinfo=UTC)
 
 
-def _provider_period(sub: Subscription | None, now: datetime) -> tuple[datetime, datetime] | None:
+def provider_period(sub: Subscription | None, now: datetime) -> tuple[datetime, datetime] | None:
     """The subscription's own period, when it is in force and ``now`` is inside it."""
     if (
         sub is not None
@@ -50,7 +50,7 @@ def _provider_period(sub: Subscription | None, now: datetime) -> tuple[datetime,
 def current_period(sub: Subscription | None, now: datetime) -> tuple[datetime, datetime]:
     """The ``[start, end)`` a call at ``now`` counts against; ``end`` is exclusive."""
     now = as_utc(now)
-    return _provider_period(sub, now) or calendar_month(now)
+    return provider_period(sub, now) or calendar_month(now)
 
 
 def _back_one(start: datetime, *, years: int) -> datetime:
@@ -78,7 +78,7 @@ def previous_period(sub: Subscription | None, now: datetime) -> tuple[datetime, 
     Its end is always the current period's start.
     """
     now = as_utc(now)
-    provider = _provider_period(sub, now)
+    provider = provider_period(sub, now)
     if provider is None:
         start = calendar_month(now)[0]
         return calendar_month(start - timedelta(microseconds=1))[0], start

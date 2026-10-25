@@ -17,7 +17,6 @@ from tenants.models import Tenant
 
 from sm_billing.constants import ENTITLED_STATUSES, STRIPE_STATUS_MAP, SubscriptionStatus
 from sm_billing.lifecycle import apply_lifecycle
-from sm_billing.metering.periods import as_utc, calendar_month
 from sm_billing.metering.sql import extend_rollups
 from sm_billing.models import Customer, Subscription
 from sm_billing.plans import PlanService
@@ -63,24 +62,15 @@ async def _follow_period_end(db: AsyncSession, tenant_id: str, sub: Subscription
     """A provider that moves a period's end (same start) moves its usage
     counters' stored end too, in this transaction: the stored end stays the
     period's real end, which is how the next period's "previous" finds it.
-
-    That holds for a lapsed subscription too: rows written while it was in
-    force are its period's. What a lapse writes are calendar months
-    (``current_period``); when its start is a month's, the rows ending where
-    that month ends are those and keep their end."""
+    Lapsed or not; which rows are the period's is ``extend_rollups``' rule."""
     if sub.current_period_start is None or sub.current_period_end is None:
         return
-    start = as_utc(sub.current_period_start)
-    keep_end = None
-    if sub.status not in ENTITLED_STATUSES:
-        month = calendar_month(start)
-        keep_end = month[1] if month[0] == start else None
     await db.execute(
         extend_rollups(
             tenant_id=tenant_id,
             start=sub.current_period_start,
             end=sub.current_period_end,
-            keep_end=keep_end,
+            entitled=sub.status in ENTITLED_STATUSES,
         )
     )
     mark_written(db)

@@ -17,7 +17,17 @@ from datetime import UTC, datetime
 
 from simple_module_db.base import create_module_base
 from simple_module_db.mixins import AuditMixin
-from sqlalchemy import JSON, BigInteger, Column, DateTime, Index, Integer, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Column,
+    DateTime,
+    Index,
+    Integer,
+    Text,
+    UniqueConstraint,
+    false,
+)
 from sqlmodel import Field
 
 from sm_billing.constants import SubscriptionStatus
@@ -182,6 +192,10 @@ class UsagePeriod(Base, table=True):  # ty: ignore[unsupported-base]
     period_end: datetime = Field(sa_column=_tz_column(nullable=False))
     used: int = Field(default=0, sa_column=_bigint(server_default="0"))
     updated_at: datetime = Field(default_factory=_utcnow, sa_column=_tz_column(nullable=False))
+    #: The row counts a provider's period, not a calendar month. A provider
+    #: that moves the period's end moves this row's, even once lapsed; a
+    #: calendar month written while lapsed keeps its own end.
+    provider_period: bool = Field(default=False, sa_column_kwargs={"server_default": false()})
 
 
 class UsageGauge(Base, table=True):  # ty: ignore[unsupported-base]
