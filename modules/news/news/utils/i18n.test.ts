@@ -89,8 +89,11 @@ describe('the news catalogue', () => {
     // `menu.*` is read on the server — each MenuItem's label_key/group_key
     // in module.py — not by any .tsx; host/tests/test_menu_labels.py checks
     // every one of those resolves.
+    // `bundle.*` labels news' content-bundle section (#80): news hands them to
+    // pagebuilder as label keys (integrations/bundle/), and pagebuilder's
+    // restore plan renders them — no news .tsx names them.
     const orphans = CATALOGUE.filter(
-      (key) => !key.startsWith('menu.') && !referenced.has(stem(key)),
+      (key) => !key.startsWith('menu.') && !key.startsWith('bundle.') && !referenced.has(stem(key)),
     );
     expect(orphans).toEqual([]);
   });
