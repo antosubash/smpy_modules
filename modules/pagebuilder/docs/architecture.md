@@ -135,8 +135,10 @@ sequenceDiagram
   trashed or not-yet-live slug renders `PageBuilder/PublicNotFound` with status
   404, one body for every cause (no oracle), `Cache-Control: no-store` plus the
   tenant `Vary`. A request that resolved no tenant gets the same page with no
-  layout and no nav — never the default tenant's. `Accept: application/json`
-  without `text/html` keeps `{"detail": "Page not found"}`. The frame's words
+  layout and no nav — never the default tenant's. A caller that prefers JSON
+  by q-value (or refuses `text/html` with `q=0`) keeps
+  `{"detail": "Page not found"}`; an Inertia visit always gets the page
+  (`wants_json`, mirroring the framework's error-page rule). The frame's words
   (skip link, not-found copy) come from `public_copy.py` in the *content*
   locale, not the visitor's UI language.
 - **`PublicShell`** (`components/public/`) is the one frame for the page, the

@@ -17,7 +17,6 @@ from typing import Any, Final
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
-from simple_module_hosting._error_handlers import _wants_json as _framework_wants_json
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,19 +38,49 @@ another tenant's address with it, and a page published a second later must not
 be hidden behind a cached "missing"."""
 
 
+def _accept_q(accept: str, media_type: str) -> float | None:
+    """The q-value ``accept`` gives ``media_type`` by name, or ``None`` when it
+    is not listed. Wildcards don't count: what matters is whether the caller
+    *named* the type. A malformed q is 1.0 (RFC 9110)."""
+    for part in accept.split(","):
+        media, _, params = part.partition(";")
+        if media.strip().lower() != media_type:
+            continue
+        q = 1.0
+        for param in params.split(";"):
+            name, _, value = param.partition("=")
+            if name.strip().lower() == "q":
+                try:
+                    q = float(value.strip())
+                except ValueError:
+                    q = 1.0
+        return q
+    return None
+
+
 def wants_json(request: Request) -> bool:
     """Whether this caller gets the JSON body rather than the page.
 
-    Exactly the framework's own error-page negotiation, so one request never
-    sees two error shapes depending on who answered it: an Inertia visit
-    always gets the page, q-values are honoured (``text/html;q=0`` rules the
-    page out; ``application/json, text/html;q=0.5`` prefers JSON), and a
-    browser navigation gets the page. It is a private helper of the
-    framework's, imported rather than copied so the two cannot drift; the
-    framework range (``<0.1``) bounds the exposure, and a test pins the
-    behaviour.
+    The same answer the framework's error pages give on a non-API path, so one
+    request never sees two error shapes depending on who answered it. Kept
+    local because the framework's helper is private and has already moved
+    once:
+
+    - an Inertia visit always gets the page, whatever its ``Accept``;
+    - HTML named with q > 0, at least as preferred as JSON → the page;
+    - HTML refused (``q=0``) → JSON, if JSON was named at all;
+    - otherwise JSON only when it was named with q > 0 (``*/*`` → the page).
     """
-    return _framework_wants_json(request)
+    if request.headers.get("x-inertia"):
+        return False
+    accept = request.headers.get("accept", "")
+    html_q = _accept_q(accept, "text/html")
+    json_q = _accept_q(accept, "application/json")
+    if html_q is not None and html_q > 0 and html_q >= (json_q or 0.0):
+        return False
+    if html_q == 0:
+        return json_q is not None
+    return bool(json_q)
 
 
 async def render_not_found(
