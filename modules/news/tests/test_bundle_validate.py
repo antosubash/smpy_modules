@@ -91,6 +91,24 @@ def test_an_absent_section_directory_passes(tmp_path):
             "g/en twice",
         ),
         ({"categories.json": {"name": "x"}}, "categories.json is not a list"),
+        (
+            {"categories.json": [{"name": "A", "slug": "a", "position": 2**63}]},
+            "malformed entry",
+        ),
+        ({"categories.json": [{"name": "  ", "slug": "a", "position": 0}]}, "malformed entry"),
+        (
+            {
+                "categories.json": [
+                    {"name": "Updates", "slug": "a", "position": 0},
+                    {"name": "updates ", "slug": "b", "position": 1},
+                ]
+            },
+            "which are the same name",
+        ),
+        (
+            {"tags.json": [{"name": "Python", "slug": "a"}, {"name": "PYTHON", "slug": "b"}]},
+            "which are the same name",
+        ),
         ({"categories.json": [{"name": "A", "slug": "a", "position": "1"}]}, "malformed entry"),
         (
             {"tags.json": [{"name": "A", "slug": "a"}, {"name": "B", "slug": "a"}]},
@@ -129,3 +147,9 @@ async def test_upload_refuses_a_malformed_news_section(tmp_path):
 
         assert refused.status_code == 422
         assert "news/articles/launch.json has an invalid status" in refused.json()["detail"]
+
+        # Past an INTEGER column: refused here, not as a 500 at approval.
+        huge = [{"name": "Updates", "slug": "updates", "position": 9223372036854775808}]
+        refused = await upload(client, rezip(data, {"news/categories.json": huge}))
+        assert refused.status_code == 422
+        assert "news/categories.json has a malformed entry" in refused.json()["detail"]

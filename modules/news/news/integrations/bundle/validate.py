@@ -36,11 +36,26 @@ from news.integrations.bundle.documents import (
     REDIRECTS_NAME,
     TAG_REDIRECTS_NAME,
     TAGS_NAME,
+    name_key,
     normalise_locale,
 )
 from news.models import ArticleStatus
 
 _STATUSES = frozenset(s.value for s in ArticleStatus)
+_INT_MIN, _INT_MAX = -(2**31), 2**31 - 1
+"""The range of an ``INTEGER`` column on every database news runs on."""
+
+
+def _integer(value: Any) -> bool:
+    """An ``int`` the column can store — a larger one would fail at approval, not here."""
+    return isinstance(value, int) and not isinstance(value, bool) and _INT_MIN <= value <= _INT_MAX
+
+
+def _name(limit: int) -> Callable[[Any], bool]:
+    """A category or tag name: within the column, and not blank once trimmed."""
+    return lambda v: isinstance(v, str) and len(v) <= limit and bool(name_key(v))
+
+
 _SLUG = re.compile(SLUG_PATTERN)
 
 
@@ -118,6 +133,18 @@ def _unique(ctx: ValidateContext, name: str, rows: list, *keys: str) -> None:
             seen.add(value)
 
 
+def _unique_names(ctx: ValidateContext, name: str, rows: list) -> None:
+    """Two names the admin would call one (``Updates`` and ``updates``) are refused."""
+    seen: dict[str, str] = {}
+    for row in rows:
+        key = name_key(row["name"])
+        if key in seen:
+            raise ctx.invalid(
+                f"news/{name} lists {seen[key]!r} and {row['name']!r}, which are the same name"
+            )
+        seen[key] = row["name"]
+
+
 def _article(ctx: ValidateContext, relative: str) -> dict[str, Any]:
     doc = ctx.read_json(relative)
     where = f"news/{relative}"
@@ -143,15 +170,17 @@ def validate(ctx: ValidateContext) -> None:
         ctx,
         CATEGORIES_NAME,
         {
-            "name": _text(MAX_CATEGORY_LEN, empty=False),
+            "name": _name(MAX_CATEGORY_LEN),
             "slug": _text(MAX_CATEGORY_LEN, empty=False),
-            "position": lambda v: isinstance(v, int) and not isinstance(v, bool),
+            "position": _integer,
         },
     )
     _unique(ctx, CATEGORIES_NAME, categories, "name", "slug")
+    _unique_names(ctx, CATEGORIES_NAME, categories)
     tag_rule = _text(MAX_TAG_LEN, empty=False)
-    tags = _list(ctx, TAGS_NAME, {"name": tag_rule, "slug": tag_rule})
+    tags = _list(ctx, TAGS_NAME, {"name": _name(MAX_TAG_LEN), "slug": tag_rule})
     _unique(ctx, TAGS_NAME, tags, "name", "slug")
+    _unique_names(ctx, TAGS_NAME, tags)
     redirects = _list(
         ctx,
         REDIRECTS_NAME,

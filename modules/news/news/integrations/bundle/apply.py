@@ -85,8 +85,9 @@ async def _redirects(
     """Rebuild the article redirect table; return how many it holds for the bundle.
 
     A redirect resolves in its own language. Targets are the restored rows and
-    the live articles the bundle left alone; one naming neither is dropped
-    (the plan lists it). A row moved back to its snapshot slug keeps the
+    the live articles the bundle left alone; one naming neither, or one from an
+    address an article holds, is dropped (``Prepared.dropped_redirects``, which
+    the plan lists). A row moved back to its snapshot slug keeps the
     address it was renamed to working, as pages do.
     """
     await db.execute(delete(NewsArticleRedirect))
@@ -96,9 +97,10 @@ async def _redirects(
         if row.deleted_at is None
     }
     kept = 0
+    dropped = {(r["locale"], r["from_slug"]) for r in prep.dropped_redirects()}
     for entry in prep.redirects:
         article_id = ids.get((entry["locale"], entry["to_slug"]))
-        if article_id is None:
+        if article_id is None or (entry["locale"], entry["from_slug"]) in dropped:
             continue
         db.add(
             NewsArticleRedirect(
@@ -117,12 +119,14 @@ async def _redirects(
 
 async def apply(ctx: RestoreContext) -> SectionApplied:
     prep = await prepare(ctx)
-    await taxonomy.upsert(ctx.db, NewsCategory, prep.categories, prep.live_categories)
-    tags, moved = await taxonomy.upsert(ctx.db, NewsTag, prep.tags, prep.live_tags)
+    await taxonomy.upsert(ctx.db, NewsCategory, prep.categories, prep.category_rows)
+    tags, moved = await taxonomy.upsert(ctx.db, NewsTag, prep.tags, prep.tag_rows)
     by_key, overwritten = await _articles(ctx.db, prep)
     await _links(ctx.db, prep, by_key, tags)
     kept = await _redirects(ctx.db, prep, by_key)
-    tags_dropped = await taxonomy.rebuild_tag_redirects(ctx.db, prep.tag_redirects, tags, moved)
+    tags_dropped = prep.dropped_tag_redirects()
+    kept_tags = [r for r in prep.tag_redirects if r not in tags_dropped]
+    await taxonomy.rebuild_tag_redirects(ctx.db, kept_tags, tags, moved)
     ctx.check_tenant()
     applied: dict[str, list[dict[str, Any]]] = {
         "created": [identity(by_key[key]) for key in sorted(prep.match.creates)],
@@ -130,7 +134,7 @@ async def apply(ctx: RestoreContext) -> SectionApplied:
         "redirects_dropped": [
             {"locale": r["locale"], "from_slug": r["from_slug"]} for r in prep.dropped_redirects()
         ],
-        "tag_redirects_dropped": tags_dropped,
+        "tag_redirects_dropped": [{"from_slug": r["from_slug"]} for r in tags_dropped],
     }
     return SectionApplied(
         counts={

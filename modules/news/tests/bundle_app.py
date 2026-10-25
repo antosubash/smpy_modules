@@ -202,3 +202,18 @@ def rezip(data: bytes, replace: dict[str, Any]) -> bytes:
             if value is not None:
                 out.writestr(name, value if isinstance(value, bytes) else json.dumps(value))
     return buffer.getvalue()
+
+
+async def update(client: AsyncClient, model: Any, row_id: int, **fields: Any) -> None:
+    """Set *fields* on one row, committed."""
+    async with session(client) as db:
+        row = await db.get(model, row_id)
+        for name, value in fields.items():
+            setattr(row, name, value)
+        await db.commit()
+
+
+def plan_lines(plan: dict) -> dict[str, dict]:
+    """The news section's plan lines, by the last segment of their label key."""
+    [news] = plan["sections"]
+    return {line["label_key"].rsplit(".", 1)[1]: line for line in news["lines"]}

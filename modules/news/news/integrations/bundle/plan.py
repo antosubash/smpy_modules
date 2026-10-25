@@ -32,7 +32,14 @@ def plan_lines(prep: Prepared) -> SectionPlan:
         (row for row in match.untouched if row.deleted_at is None),
         key=lambda row: (row.locale, row.slug),
     )
-    dropped = prep.dropped_redirects()
+    # Article redirects carry their language; tag redirects have none.
+    dropped = [
+        PlanItem(title=r["from_slug"], slug=r["from_slug"], locale=r["locale"])
+        for r in prep.dropped_redirects()
+    ] + [
+        PlanItem(title=r["from_slug"], slug=r["from_slug"], note_key=_KEY + "tags")
+        for r in prep.dropped_tag_redirects()
+    ]
 
     def line(name: str, keys: list[ArticleKey], tone: str | None = None) -> PlanLine:
         return PlanLine(
@@ -66,10 +73,7 @@ def plan_lines(prep: Prepared) -> SectionPlan:
         PlanLine(
             _KEY + "redirects_dropped",
             len(dropped),
-            [
-                PlanItem(title=r["from_slug"], slug=r["from_slug"], locale=r["locale"])
-                for r in dropped
-            ],
+            dropped,
             "warning" if dropped else None,
         ),
     ]

@@ -84,6 +84,15 @@ def doc_key(doc: dict[str, Any]) -> ArticleKey:
     return locale, doc["slug"]
 
 
+def name_key(name: str) -> str:
+    """A category or tag name as the admin compares it: trimmed, case-insensitive.
+
+    The rule ``category_service.find_by_name`` and ``tag_service`` apply, so a
+    restore cannot create two rows the admin would call one.
+    """
+    return name.strip().lower()
+
+
 def _segment(value: str) -> str:
     return value.replace("/", "_").replace("\\", "_")
 

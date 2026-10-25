@@ -8,8 +8,10 @@ trusted from the staged plan: articles move in between.
 
 Everything that cannot land is raised here, before anything is written, as
 ``ctx.conflict`` (409): an address another article now holds, or a category or
-tag slug held by a live one the bundle does not carry. Renaming either out of
-the way would silently change something nobody asked about.
+tag the bundle cannot pair with a live one (:func:`taxonomy.pair`). Renaming
+either out of the way would silently change something nobody asked about.
+Redirects that would not work — a target that will not exist, or a source
+address an article or tag holds — are dropped, and the plan names them.
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from pagebuilder.contracts.bundle import IdentityMatch, RestoreContext, match_by
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from news.integrations.bundle import taxonomy
 from news.integrations.bundle.documents import (
     ARTICLES_DIR,
     CATEGORIES_NAME,
@@ -48,8 +51,11 @@ class Prepared:
     tags: list[dict[str, Any]]
     redirects: list[dict[str, Any]]
     tag_redirects: list[dict[str, Any]]
-    live_categories: dict[str, NewsCategory]
-    live_tags: dict[str, NewsTag]
+    category_rows: dict[str, NewsCategory]
+    """Bundle category name -> the live row it restores onto."""
+    tag_rows: dict[str, NewsTag]
+    other_tags: list[NewsTag]
+    """Live tags no bundled tag claims: they keep their slugs."""
     live_links: dict[int, list[str]] = field(default_factory=dict)
     """Tag names of every matched article, as they are now."""
 
@@ -58,16 +64,31 @@ class Prepared:
         kept = {(r.locale, r.slug) for r in self.match.untouched if r.deleted_at is None}
         return set(self.match.rows) | set(self.match.creates) | kept
 
-    def tag_slugs(self) -> dict[str, str]:
-        """Tag slug -> name, once the restore lands."""
-        bundled = {t["name"]: t["slug"] for t in self.tags}
-        live = {t.slug: name for name, t in self.live_tags.items() if name not in bundled}
-        return live | {slug: name for name, slug in bundled.items()}
+    def tag_slugs(self) -> set[str]:
+        """Every tag slug once the restore lands."""
+        return {t["slug"] for t in self.tags} | {t.slug for t in self.other_tags}
 
     def dropped_redirects(self) -> list[dict[str, Any]]:
-        """Bundle article redirects whose target will not exist."""
-        targets = self.article_targets()
-        return [r for r in self.redirects if (r["locale"], r["to_slug"]) not in targets]
+        """Bundle article redirects that would not work once the restore lands.
+
+        Either the target will not exist, or the source address is an
+        article's own — trashed or unpublished ones included, in that
+        language: such a redirect would sit under that article and start
+        sending its readers elsewhere the moment it stopped serving.
+        """
+        targets, held = self.article_targets(), self.match.final_keys()
+        return [
+            r
+            for r in self.redirects
+            if (r["locale"], r["to_slug"]) not in targets or (r["locale"], r["from_slug"]) in held
+        ]
+
+    def dropped_tag_redirects(self) -> list[dict[str, Any]]:
+        """Bundle tag redirects whose target will not exist or whose source a tag holds."""
+        slugs = self.tag_slugs()
+        return [
+            r for r in self.tag_redirects if r["to_slug"] not in slugs or r["from_slug"] in slugs
+        ]
 
     def changed(self, key: ArticleKey) -> bool:
         """Whether restoring *key* writes anything onto its matched row.
@@ -109,21 +130,6 @@ def _resolved(ctx: RestoreContext, doc: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def _check_slugs(
-    ctx: RestoreContext, noun: str, bundled: list[dict[str, Any]], live: list[Any]
-) -> None:
-    """A bundled slug held by a live row the bundle does not carry is a conflict."""
-    names = {entry["name"] for entry in bundled}
-    by_slug = {row.slug: row for row in live}
-    for entry in bundled:
-        holder = by_slug.get(entry["slug"])
-        if holder is not None and holder.name != entry["name"] and holder.name not in names:
-            raise ctx.conflict(
-                f"the {noun} slug {entry['slug']!r} now belongs to {holder.name!r}, not "
-                f"{entry['name']!r} — rename that {noun} first"
-            )
-
-
 async def _links(db: AsyncSession, ids: list[int]) -> dict[int, list[str]]:
     if not ids:
         return {}
@@ -150,8 +156,9 @@ async def prepare(ctx: RestoreContext) -> Prepared:
 
     categories = list((await ctx.db.execute(select(NewsCategory))).scalars())
     tags = list((await ctx.db.execute(select(NewsTag))).scalars())
-    _check_slugs(ctx, "category", raw[CATEGORIES_NAME], categories)
-    _check_slugs(ctx, "tag", raw[TAGS_NAME], tags)
+    category_rows = taxonomy.pair(ctx, "category", raw[CATEGORIES_NAME], categories)
+    tag_rows = taxonomy.pair(ctx, "tag", raw[TAGS_NAME], tags)
+    claimed = {id(row) for row in tag_rows.values()}
 
     return Prepared(
         articles=articles,
@@ -160,7 +167,8 @@ async def prepare(ctx: RestoreContext) -> Prepared:
         tags=raw[TAGS_NAME],
         redirects=[{**r, "locale": normalise_locale(r["locale"])} for r in raw[REDIRECTS_NAME]],
         tag_redirects=raw[TAG_REDIRECTS_NAME],
-        live_categories={c.name: c for c in categories},
-        live_tags={t.name: t for t in tags},
+        category_rows=category_rows,
+        tag_rows=tag_rows,
+        other_tags=[t for t in tags if id(t) not in claimed],
         live_links=await _links(ctx.db, [r.id for r in match.rows.values() if r.id is not None]),
     )
