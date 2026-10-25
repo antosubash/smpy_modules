@@ -167,9 +167,15 @@ async def _write(
         existing = await record_service.restore_record(db, rtype, existing, settings=settings)
     again = {**fresh, "sm_status": PENDING, "sm_confirmed_at": None}
 
+    first = [restored]
+
     def derive(row: Record) -> Change | None:
+        # The restore forces a write once, from the row it restored. A retry
+        # decides from the row as it is now: a confirm that landed in between
+        # is not reset to pending.
+        forced, first[0] = first[0], False
         status = (row.data or {}).get("sm_status")
-        if not restored and status in (PENDING, CONFIRMED):
+        if not forced and status in (PENDING, CONFIRMED):
             return None  # pending: the confirmation goes out again; confirmed: nothing
         return again, data
 

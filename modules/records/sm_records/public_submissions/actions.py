@@ -24,7 +24,7 @@ from sm_records.contracts.public_submissions import KIND_FORM, KIND_SUBSCRIPTION
 from sm_records.deps import get_settings
 from sm_records.models import Record, RecordType
 from sm_records.public_submissions import abuse, opt_in
-from sm_records.public_submissions.confirmation import PENDING, queue_confirmation, within_budget
+from sm_records.public_submissions.confirmation import PENDING, budget_wait, queue_confirmation
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.mail_runner import queue_notification
 from sm_records.public_submissions.system import try_system_update
@@ -120,11 +120,12 @@ async def _resend_confirmation(
     if data.get("sm_status") != PENDING:
         raise SubmissionRefused("not_pending", "only a subscriber still pending is sent one")
     settings = get_settings(request)
-    if not await within_budget(request, rtype, str(data.get("sm_email") or ""), settings):
+    wait = await budget_wait(request, rtype, str(data.get("sm_email") or ""), settings)
+    if wait:
         raise SubmissionRefused(
             "rate_limited",
             "this address was sent its confirmation too often; try again later",
-            headers={"Retry-After": "3600"},
+            headers={"Retry-After": str(wait)},
         )
     await queue_confirmation(db, app, rtype, record)
 

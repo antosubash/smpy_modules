@@ -124,6 +124,9 @@ async def test_the_master_switch_closes_the_links_too(newsletter):
     tokens = await _signed_up(newsletter)
     configure(newsletter, public_submissions_enabled=False)
     assert (await follow(newsletter, "confirm", tokens["confirm"])).status_code == 404
+    # ...but not the way out: a mail already sent must keep its unsubscribe link.
+    leave = await follow(newsletter, "unsubscribe", tokens["unsubscribe"])
+    assert (leave.status_code, leave.json()) == (200, {"status": "unsubscribed"})
 
 
 async def test_a_disabled_list_does_not_confirm_but_still_unsubscribes(newsletter):

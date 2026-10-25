@@ -9,15 +9,17 @@ from sm_records.models import RecordType, tables_for
 from sm_records.public_submissions import mail_runner
 from sqlalchemy import select, update
 
-from tests.app_harness import ADMIN, roles
+from tests.app_harness import ADMIN, field, roles
 from tests.newsletter_http import (
     LIST,
     admin,
     follow,
     links_in,
+    list_config,
     signup,
     subscriber,
 )
+from tests.public_submissions_support import create
 
 pytestmark = pytest.mark.unbound_tenant
 
@@ -73,28 +75,31 @@ async def test_a_subscriber_no_longer_pending_is_not_mailed(newsletter, monkeypa
     assert newsletter.outbox.sent == []
 
 
-async def test_an_unsubscribe_reaches_a_record_that_fails_its_schema(newsletter):
-    """A forced restrictive change left the row invalid: the ordinary write is
-    refused, and the guarded compare-and-set writes the status — index row
-    included, so the filter finds it."""
-    await signup(newsletter, data={"first_name": "Ada"})
-    tokens = links_in(newsletter.outbox.sent[0])
-    record = await subscriber(newsletter)
-    async with newsletter.db_state.session_factory() as session:
-        from sm_records.tenancy import tenant_scope
+async def _misfit(site, record: dict, key: str = LIST, **values) -> None:
+    """Rewrite the stored payload behind the schema's back (a forced change)."""
+    from sm_records.tenancy import tenant_scope
 
+    async with site.db_state.session_factory() as session:
         with tenant_scope("default"):
-            rtype = (
-                await session.execute(select(RecordType).where(RecordType.key == LIST))
-            ).scalar_one()
+            stmt = select(RecordType).where(RecordType.key == key)
+            rtype = (await session.execute(stmt)).scalar_one()
             cls = tables_for(rtype).record
-            misfit = {**record["data"], "first_name": "x" * 500}  # over max_length 100
             await session.execute(
                 update(cls)
                 .where(cls.uuid == record["uuid"], cls.tenant_id == "default")
-                .values(data=misfit)
+                .values(data={**record["data"], **values})
             )
             await session.commit()
+
+
+async def test_an_unsubscribe_reaches_a_record_that_fails_its_schema(newsletter):
+    """A forced restrictive change left an *optional* value invalid: the
+    unsubscribe clears it, so the ordinary write lands — index row included,
+    so the filter finds the record."""
+    await signup(newsletter, data={"first_name": "Ada"})
+    tokens = links_in(newsletter.outbox.sent[0])
+    record = await subscriber(newsletter)
+    await _misfit(newsletter, record, first_name="x" * 500)  # over max_length 100
     resp = await follow(newsletter, "unsubscribe", tokens["unsubscribe"]["t"])
     assert resp.json() == {"status": "unsubscribed"}
     data = (await subscriber(newsletter))["data"]
@@ -105,3 +110,27 @@ async def test_an_unsubscribe_reaches_a_record_that_fails_its_schema(newsletter)
         headers=roles(ADMIN),
     )
     assert [r["uuid"] for r in found.json()["items"]] == [record["uuid"]]
+
+
+async def test_the_fallback_clears_optional_values_and_a_unique_one_never_blocks(site):
+    """A *required* value the schema now refuses keeps the ordinary write
+    from landing, so the guarded merge writes the unsubscribe: the status and
+    nonce, the optional ``city`` cleared in the same step — and the unique
+    ``member_id``, whose claim only the ordinary write may check, left as it
+    is (and logged) rather than blocking anything."""
+    first = field("first_name", required=True, indexed=False)
+    first["constraints"] = {"max_length": 100}
+    member = field("member_id", unique=True)
+    city = field("city", indexed=False)
+    config = list_config(public_fields=["first_name"])
+    resp = await create(site, "club", fields=[first, member, city], config=config)
+    assert resp.status_code == 201, resp.text
+    await signup(site, key="club", data={"first_name": "Ada"})
+    tokens = links_in(site.outbox.sent[0])
+    record = await subscriber(site, "club")
+    await _misfit(site, record, "club", first_name="x" * 500, member_id="M-1", city="Berlin")
+    await follow(site, "unsubscribe", tokens["unsubscribe"]["t"])
+    data = (await subscriber(site, "club"))["data"]
+    assert data["sm_status"] == "unsubscribed" and data["sm_nonce"] != record["data"]["sm_nonce"]
+    assert data["city"] is None, "cleared by the direct merge"
+    assert data["member_id"] == "M-1" and data["first_name"] == "x" * 500

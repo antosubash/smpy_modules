@@ -17,7 +17,9 @@ The binding is the first dependency, so ``get_db``'s commit runs inside it.
 Unsubscribe answers ``200 {"status": "unsubscribed"}`` whatever the link —
 forged, for another tenant, for nobody, already used — so it is no oracle and
 a second click sees what the first did. Confirm answers ``410 link_expired``
-for every link it cannot honour. Every answer is ``no-store``.
+for every link it cannot honour, and ``404`` while the master switch is off.
+Unsubscribe ignores the switch: a mail already sent must keep its way out.
+Every answer is ``no-store``.
 """
 
 from __future__ import annotations
@@ -45,7 +47,6 @@ __all__ = ["router"]
 router = APIRouter(
     route_class=SubmissionRoute,
     responses=responses(*SUBMISSION_LINK),
-    dependencies=[Depends(abuse.switch)],
 )
 
 
@@ -90,7 +91,7 @@ _unsubscribe_link = _bind(links.UNSUBSCRIBE)
     "/confirm",
     response_model=LinkResult,
     responses=responses(410),
-    dependencies=[Depends(_confirm_link)],
+    dependencies=[Depends(abuse.switch), Depends(_confirm_link)],
 )
 async def confirm_subscription(
     request: Request,

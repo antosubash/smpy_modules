@@ -1599,7 +1599,7 @@ kind of route can produce, with the body schema
 | `404` | Unknown type key, unknown uuid, a record in the trash on a non-trash read | `{"detail"}` |
 | `404` | *Public API* — any of: unknown type, non-public type, draft, trashed, unknown uuid; on a multi-tenant host, no tenant resolved (no or malformed `X-Tenant-ID`) | `{"detail": "not found"}` |
 | `404` | A preview job this process does not hold | `{"detail"}` |
-| `404` | *Submissions* — any of: unknown type, a type that does not accept submissions or has them switched off, `public_submissions_enabled` off; on a multi-tenant host, no tenant resolved (a newsletter link binds the tenant it names instead) | `{"detail": "not found"}` |
+| `404` | *Submissions* — any of: unknown type, a type that does not accept submissions or has them switched off, `public_submissions_enabled` off; on a multi-tenant host, no tenant resolved (a newsletter link binds the tenant it names instead; an unsubscribe link ignores the master switch) | `{"detail": "not found"}` |
 | `409` | `expected_version` no longer matches | `{"detail", "current": RecordRead \| TypeRead}` |
 | `409` | A slug or `unique` value already claimed (possibly by a trashed record) | `{"detail"}` |
 | `409` | A delete blocked by `on_delete: restrict` | `{"detail", "total": n, "referrers": [uuid, …], "hidden": n, "more": n}` |

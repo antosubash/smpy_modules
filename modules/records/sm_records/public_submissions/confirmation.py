@@ -50,6 +50,7 @@ from sm_records.settings import RecordsSettings
 __all__ = [
     "PENDING",
     "ConfirmationDue",
+    "budget_wait",
     "message",
     "queue_confirmation",
     "recipient_key",
@@ -161,14 +162,21 @@ async def _send(
     )
 
 
+async def budget_wait(
+    request: Request, rtype: RecordType, email: str, settings: RecordsSettings
+) -> int:
+    """Count one confirmation against the address's budget on this list: ``0``
+    while within it, else the seconds until it frees up. Keyed by a hash, so
+    the address itself is never a rate-limit key."""
+    digest = hashlib.sha256(email.encode()).hexdigest()
+    key = abuse.rate_key(rtype.tenant_id, f"{rtype.key}:email={digest}")
+    return await abuse.wait(request, key, settings.public_submissions_confirm_rate_per_email)
+
+
 async def within_budget(
     request: Request, rtype: RecordType, email: str, settings: RecordsSettings
 ) -> bool:
-    """Count one confirmation against the address's budget on this list.
-    Keyed by a hash, so the address itself is never a rate-limit key."""
-    digest = hashlib.sha256(email.encode()).hexdigest()
-    key = abuse.rate_key(rtype.tenant_id, f"{rtype.key}:email={digest}")
-    return await abuse.allow(request, key, settings.public_submissions_confirm_rate_per_email)
+    return await budget_wait(request, rtype, email, settings) == 0
 
 
 async def queue_confirmation(db: AsyncSession, app: Any, rtype: RecordType, record: Record) -> None:

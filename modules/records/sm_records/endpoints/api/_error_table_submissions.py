@@ -30,7 +30,8 @@ SUBMISSION_ROWS: Final[tuple[tuple[int, str, str], ...]] = (
         404,
         "*Submissions* — any of: unknown type, a type that does not accept submissions or has "
         "them switched off, `public_submissions_enabled` off; on a multi-tenant host, no "
-        "tenant resolved (a newsletter link binds the tenant it names instead)",
+        "tenant resolved (a newsletter link binds the tenant it names instead; an unsubscribe "
+        "link ignores the master switch)",
         '`{"detail": "not found"}`',
     ),
     (

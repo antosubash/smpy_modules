@@ -158,3 +158,24 @@ async def test_deleting_the_list_forgets_its_claims(newsletter):
     )
     assert resp.status_code == 204, resp.text
     assert await _deliveries(newsletter) == []
+
+
+async def test_a_restore_that_lost_a_race_does_not_reset_a_confirmation(newsletter, monkeypatch):
+    """The restore forces one write; when that write loses to a confirm, the
+    retry decides from the confirmed row and leaves it confirmed."""
+    await signup(newsletter)
+    uuid = (await subscriber(newsletter))["uuid"]
+    await newsletter.delete(f"/api/records/types/{LIST}/records/{uuid}", headers=roles(ADMIN))
+    _move_first_write(monkeypatch, sm_status="confirmed")
+    assert (await signup(newsletter)).status_code == 202
+    assert (await subscriber(newsletter))["data"]["sm_status"] == "confirmed"
+
+
+async def test_the_admin_resend_limit_says_when_it_frees_up(newsletter):
+    await signup(newsletter)
+    uuid = (await subscriber(newsletter))["uuid"]
+    path = f"/api/records/types/{LIST}/records/{uuid}/submission/resend"
+    answers = [await newsletter.post(path, headers=roles(ADMIN)) for _ in range(3)]
+    assert [a.status_code for a in answers] == [202, 202, 429]
+    wait = int(answers[-1].headers["retry-after"])
+    assert 0 < wait <= 86400 and wait != 3600

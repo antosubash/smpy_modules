@@ -30,7 +30,6 @@ from sm_records.services.errors import NotFound
 from sm_records.services.public import NOT_FOUND
 
 __all__ = [
-    "allow",
     "client_ip",
     "count_links",
     "guard",
@@ -39,6 +38,7 @@ __all__ = [
     "rate_store",
     "source_page",
     "switch",
+    "wait",
 ]
 
 _JSON: Final = "application/json"
@@ -162,14 +162,16 @@ def rate_key(tenant: str, what: str) -> str:
     return f"records:submissions:{tenant}:{what}"
 
 
-async def allow(request: Request, key: str, rate: str) -> bool:
-    """Count one against ``key`` at ``rate``; whether it was still within it.
-    For a limit the caller answers silently (the newsletter's per-address
-    confirmation budget), where :func:`hit` answers ``429``."""
+async def wait(request: Request, key: str, rate: str) -> int:
+    """Count one against ``key`` at ``rate``: ``0`` while within it, else the
+    seconds until it frees up. For a limit the caller answers silently (the
+    newsletter's per-address confirmation budget), where :func:`hit` answers
+    ``429``."""
     spec = parse_rate(rate)
     if spec is None:
-        return True
-    return bool((await rate_store(request.app).hit(key, spec)).allowed)
+        return 0
+    result = await rate_store(request.app).hit(key, spec)
+    return 0 if result.allowed else max(1, int(result.retry_after))
 
 
 async def hit(request: Request, key: str, rate: str) -> None:

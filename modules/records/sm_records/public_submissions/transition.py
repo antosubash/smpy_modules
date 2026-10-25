@@ -35,6 +35,7 @@ from sm_records import events
 from sm_records.models import Record, RecordType
 from sm_records.public_submissions.system import _merge_marks, _ordinary, _reload
 from sm_records.services import records as record_service
+from sm_records.services._payload import field_defs
 from sm_records.services.errors import Conflict, ValidationFailed
 from sm_records.settings import RecordsSettings
 
@@ -54,6 +55,21 @@ class Outcome:
     before: dict[str, Any]
     """The payload the change was decided from."""
     wrote: bool
+
+
+def _clearable(
+    rtype: RecordType, stored: dict[str, Any], data: dict[str, Any] | None
+) -> tuple[dict[str, Any], list[str]]:
+    """The ordinary values the direct merge may write: only those that change,
+    of ordinary fields that are not ``unique`` (whose claim only the ordinary
+    write checks). The rest are named, so the status still lands — an
+    unsubscribe must never be refused because a value could not be cleared."""
+    if not data:
+        return {}, []
+    defs = {entry.key: entry for entry in field_defs(rtype)}
+    changed = {key: value for key, value in data.items() if stored.get(key) != value}
+    kept = sorted(key for key in changed if key not in defs or defs[key].system or defs[key].unique)
+    return {key: value for key, value in changed.items() if key not in kept}, kept
 
 
 async def transition(
@@ -91,13 +107,15 @@ async def transition(
             continue  # the row moved: decide again from what it is now
         except ValidationFailed as exc:
             refused = exc.detail
-        if await _merge_marks(db, rtype, record, values, ordinary=data, version=seen):
+        clearable, kept = _clearable(rtype, before, data)
+        if await _merge_marks(db, rtype, record, values, ordinary=clearable, version=seen):
             logger.warning(
-                "records: %s record %s no longer matches its schema (%s); %s written directly",
+                "records: %s record %s no longer matches its schema (%s); %s written directly%s",
                 rtype.key,
                 record.uuid,
                 refused,
-                ", ".join(values),
+                ", ".join([*values, *clearable]),
+                f"; not cleared: {', '.join(kept)}" if kept else "",
             )
             return Outcome(await _reload(db, record), before, wrote=True)
     raise Conflict(f"{rtype.key} record {record.uuid} kept changing; try again")
