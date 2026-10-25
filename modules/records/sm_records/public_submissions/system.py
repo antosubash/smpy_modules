@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from sqlalchemy import select, update
 from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -80,6 +81,10 @@ async def system_update(
     raise AssertionError("unreachable")  # pragma: no cover
 
 
+MARK_ATTEMPTS = 3
+"""How often a mark is retried when the row changed under it."""
+
+
 async def try_system_update(
     db: AsyncSession,
     rtype: RecordType,
@@ -93,42 +98,79 @@ async def try_system_update(
     A record that no longer satisfies its type's schema (a forced restrictive
     change) cannot take an ordinary write until an admin edits it. The spam
     verdict, the not-spam clearing and the delivery mark are bookkeeping about
-    server-owned fields, so for such a record they are written **directly**
-    onto the stored payload (:func:`_write_marks`), leaving the visitor's
-    values exactly as they are — otherwise a stale ``sm_spam`` would offer
-    *Not spam* again after an ordinary delete, and every cycle would mail
-    everyone. Nothing was written when validation refused.
+    server-owned fields, so for such a record they are merged **directly**
+    into the stored payload (:func:`_merge_marks`) — otherwise a stale
+    ``sm_spam`` would offer *Not spam* again after an ordinary delete, and
+    every cycle would mail everyone.
+
+    Each attempt starts from the row as it is now, never from what this
+    session loaded earlier: an admin may have repaired the record meanwhile,
+    in which case the ordinary write now succeeds, and the direct merge only
+    ever adds the mark keys to the current payload under a version check. A
+    lost race is retried, up to :data:`MARK_ATTEMPTS` times.
     """
-    try:
-        return await system_update(db, rtype, record, values, settings=settings)
-    except ValidationFailed as exc:
-        written = await _write_marks(db, rtype, record, values)
-        logger.warning(
-            "records: %s record %s no longer matches its schema (%s); %s %s directly",
-            rtype.key,
-            record.uuid,
-            exc.detail,
-            ", ".join(values),
-            "written" if written else "NOT written",
-        )
-        return record
+    for attempt in range(MARK_ATTEMPTS):
+        if attempt:
+            record = await _reload(db, record)
+        try:
+            return await system_update(db, rtype, record, values, settings=settings)
+        except ValidationFailed as exc:
+            refused = exc.detail
+        if await _merge_marks(db, rtype, record, values):
+            logger.warning(
+                "records: %s record %s no longer matches its schema (%s); %s written directly",
+                rtype.key,
+                record.uuid,
+                refused,
+                ", ".join(values),
+            )
+            return await _reload(db, record)
+    logger.warning(
+        "records: %s record %s: %s NOT written (the row kept changing)",
+        rtype.key,
+        record.uuid,
+        ", ".join(values),
+    )
+    return record
 
 
-async def _write_marks(
+async def _reload(db: AsyncSession, record: Record) -> Record:
+    """The row as stored now, into the same instance (trashed ones included)."""
+    cls = type(record)
+    stmt = (
+        select(cls)
+        .where(cls.id == record.id, cls.tenant_id == record.tenant_id)
+        .execution_options(include_deleted=True, populate_existing=True)
+    )
+    return (await db.execute(stmt)).scalars().one()
+
+
+async def _merge_marks(
     db: AsyncSession, rtype: RecordType, record: Record, values: dict[str, Any]
 ) -> bool:
-    """Set system values on the stored payload, no validation, no revision.
+    """Compare-and-set the mark keys into the stored payload.
 
-    Only for system fields that are not indexed (every contact-form one): an
-    indexed key would leave its index row behind, so it is refused. The
-    version moves, so an editor holding the record sees the change on save.
+    Reads the current payload and version, adds *only* ``values`` (system
+    fields that are not indexed — every contact-form one; an indexed key
+    would leave its index row behind, so it is refused), and writes it back
+    ``WHERE version = <read>`` in this tenant. ``False`` when the row moved
+    between the read and the write, or the keys are not allowed. No
+    validation and no revision: nothing but server-owned bookkeeping changes.
     """
     system = {entry.key: entry for entry in field_defs(rtype) if entry.system}
     if any(key not in system or system[key].indexed for key in values):
         return False
-    record.data = {**(record.data or {}), **to_jsonable(values)}
-    record.version = record.version + 1
-    db.add(record)
-    await db.flush()
+    cls = type(record)
+    where = (cls.id == record.id, cls.tenant_id == record.tenant_id)
+    read = select(cls.data, cls.version).where(*where).execution_options(include_deleted=True)
+    current = (await db.execute(read)).one()
+    merged = {**(current.data or {}), **to_jsonable(values)}
+    stmt = (
+        update(cls)
+        .where(*where, cls.version == current.version)
+        .values(data=merged, version=current.version + 1)
+        .execution_options(synchronize_session=False, include_deleted=True)
+    )
+    result = await db.execute(stmt)
     mark_written(db)
-    return True
+    return result.rowcount == 1
