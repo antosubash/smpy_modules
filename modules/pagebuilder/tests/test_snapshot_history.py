@@ -145,7 +145,7 @@ def _factory(client):
 async def _applied(client, import_id: int) -> dict:
     async with _factory(client)() as db:
         staged = await db.get(PendingImport, import_id)
-        return dict(staged.plan["applied"])
+        return dict(staged.plan["applied"]["pagebuilder"])
 
 
 async def _purge(client, page_id: int) -> None:
@@ -241,6 +241,24 @@ async def test_a_record_without_applied_falls_back_to_the_plan(authed_client):
     async with _factory(authed_client)() as db:
         staged = await db.get(PendingImport, import_id)
         staged.plan = {k: v for k, v in staged.plan.items() if k != "applied"}
+        await db.commit()
+
+    [marker] = await _restores(authed_client, page["id"])
+    assert (marker["import_id"], marker["change"]) == (import_id, "overwritten")
+
+
+async def test_a_record_in_the_flat_applied_shape_still_marks(authed_client):
+    # Imports approved before #80 hold pagebuilder's lists at the top level of
+    # `applied`; the keyed shape (`{"pagebuilder": ...}`) must not hide them.
+    page = await create_draft(authed_client, slug="home", title="Before")
+    snapshot_id = await _snapshot(authed_client)
+    await authed_client.put(f"{_PAGES}/{page['id']}", json={"title": "After"})
+    import_id = await _restore(authed_client, snapshot_id)
+
+    async with _factory(authed_client)() as db:
+        staged = await db.get(PendingImport, import_id)
+        flat = staged.plan["applied"]["pagebuilder"]
+        staged.plan = {**staged.plan, "applied": flat}
         await db.commit()
 
     [marker] = await _restores(authed_client, page["id"])

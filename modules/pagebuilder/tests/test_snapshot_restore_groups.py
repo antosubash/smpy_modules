@@ -74,7 +74,7 @@ async def test_the_plan_does_not_count_a_group_the_restore_keeps(snapshot_db):
     plan, _ = await _restore(snapshot_db, snapshot_id)
 
     assert [e["slug"] for e in plan["pages"]["unchanged"]] == ["about"]
-    assert plan["applied"]["overwritten"] == []
+    assert plan["applied"]["pagebuilder"]["overwritten"] == []
 
 
 @pytest.mark.asyncio
