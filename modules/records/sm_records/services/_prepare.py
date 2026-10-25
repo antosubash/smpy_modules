@@ -14,10 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.base import NO_VALUE
 
 from sm_records.models import RecordType
+from sm_records.schema._text_checks import checked
 from sm_records.schema.compile import from_stored
 from sm_records.schema.fields import FieldDefinition
 from sm_records.services import _claims, _payload, _relations
 from sm_records.services._common import type_id_map
+from sm_records.services._patterns import precheck
 from sm_records.settings import RecordsSettings
 
 __all__ = ["Prepared", "prepare"]
@@ -85,9 +87,12 @@ async def prepare(
     validated_against = _loaded_schema_version(rtype)
     defs = _payload.field_defs(rtype)
     data = _payload.carry_system(defs, data, previous, system)
-    values, stored = _payload.validate(
-        rtype, defs, data, max_payload_bytes=settings.max_payload_bytes
-    )
+    # Patterns are matched in a worker under a deadline, never on the loop
+    # (``services._patterns``); the validator then reads the verdicts.
+    with checked(await precheck(defs, [data])):
+        values, stored = _payload.validate(
+            rtype, defs, data, max_payload_bytes=settings.max_payload_bytes
+        )
     await _claims.lock_type(db, rtype, schema_version=validated_against)
     types = await type_id_map(db)
     await _relations.check_targets(db, defs, values, types)

@@ -207,10 +207,14 @@ does not make a write re-claim a value the row already holds.
    service raising `HTTPException` would be unusable from the CLI, from a
    background task and from another module.
 2. **Services never commit.** `get_db` owns the request's transaction; flush if
-   you need DB-assigned values. Exactly three callers commit, and each says
-   why in its docstring: `cli_io` (no request exists) and the two deferred-job
+   you need DB-assigned values. Exactly four callers commit, and each says
+   why in its docstring: `cli_io` (no request exists), the two deferred-job
    runners, `services/reindex_runner` and `services/preview_runner`, which
-   have no `get_db` to commit for them.
+   have no `get_db` to commit for them, and
+   `public_submissions/mail_runner`, which marks a website submission's
+   notification sent after the request that stored it is gone (#101) — with
+   `public_submissions/delivery`, whose per-recipient claims commit in
+   sessions of their own so that no rollback can forget a send.
 
 Because the error route turns an exception into a *response* inside the handler,
 `get_db` never sees it and would commit whatever the refused call already wrote.

@@ -6,7 +6,7 @@ import { ConflictPanel } from '../components/ConflictPanel';
 import { InvalidNotice } from '../components/InvalidNotice';
 import { JsonField } from '../components/JsonField';
 import { MediaApiProvider } from '../components/media/MediaApiContext';
-import { SubmissionDetails } from '../components/public_submissions/SubmissionDetails';
+import { SubmissionPanel } from '../components/public_submissions/SubmissionPanel';
 import { RecordEditorActionsRow } from '../components/RecordEditorActionsRow';
 import { RecordEditorTypeLink } from '../components/RecordEditorTypeLink';
 import { RecordAdvancedFields, RecordHeaderFields } from '../components/RecordEnvelopeFields';
@@ -228,7 +228,7 @@ function RecordEditor({
             </MediaApiProvider>
           )}
 
-          <SubmissionDetails fields={type.fields} data={current?.data} />
+          <SubmissionPanel type={type} current={current} onChanged={applyRestored} />
 
           <RecordAdvancedFields
             slug={slug}

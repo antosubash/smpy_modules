@@ -36,9 +36,14 @@ class ErrorDetail(SQLModel):
     What a 401, a 403, a 404, a 413 and a 500 all send, and what the public
     API sends for *every* refusal — there, deliberately without the ``field``
     and ``reason`` the admin grammar adds (§10).
+
+    ``code`` is set by the website-submission routes (#101), whose every
+    refusal carries a stable snake_case one a form branches on
+    (``unsupported_media_type``, ``rate_limited``); nothing else sends it.
     """
 
     detail: str
+    code: str | None = None
 
 
 class ForbiddenBody(SQLModel):
@@ -69,6 +74,7 @@ class ValidationErrorBody(SQLModel):
 
     detail: str
     errors: list[FieldError] = SQLField(default_factory=list)
+    code: str | None = None
 
 
 class QueryErrorBody(SQLModel):
@@ -84,6 +90,7 @@ class QueryErrorBody(SQLModel):
     detail: str
     field: str | None = None
     reason: str | None = None
+    code: str | None = None
 
 
 class ConflictBody(SQLModel):
@@ -94,8 +101,9 @@ class ConflictBody(SQLModel):
     ``TypeRead``); ``total``/``referrers``/``hidden``/``more`` a delete
     blocked by ``on_delete: restrict``; ``report`` a schema change that would
     leave records invalid; ``conflicts`` a re-added key that still holds
-    orphaned values; ``field``/``reason`` a filter on a field mid-rebuild. A
-    slug or ``unique`` collision carries none of them.
+    orphaned values; ``field``/``reason`` a filter on a field mid-rebuild;
+    ``code``/``definition`` a website form sent after its type changed
+    (``form_changed``, #101). A slug or ``unique`` collision carries none.
 
     ``total`` is how many records block the delete — ``referrers`` plus
     ``hidden`` plus ``more`` — and it is a field rather than something to
@@ -112,3 +120,5 @@ class ConflictBody(SQLModel):
     conflicts: dict[str, int] | None = None
     field: str | None = None
     reason: str | None = None
+    code: str | None = None
+    definition: dict[str, Any] | None = None

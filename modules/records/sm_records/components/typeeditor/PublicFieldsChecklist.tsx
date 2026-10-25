@@ -48,7 +48,9 @@ export function PublicFieldsChecklist({
       )}
       {candidates.map((field) => {
         const id = `public-field-${field.uid}`;
-        const eligible = SUBMITTABLE_TYPES.has(field.type);
+        // `config.settle`: a unique field cannot be public (a duplicate's 409
+        // would tell a visitor what another visitor sent).
+        const eligible = SUBMITTABLE_TYPES.has(field.type) && !field.unique;
         const ticked = selected.includes(field.key);
         return (
           <div key={field.uid} className="grid gap-0.5">
@@ -68,8 +70,17 @@ export function PublicFieldsChecklist({
               </Label>
             </div>
             {!eligible && (
-              <p className="ml-6 text-xs text-muted-foreground">
-                {t(keys.records.public_submissions.public_field_ineligible, { type: field.type })}
+              // Ticked but ineligible is a stored config the form already
+              // ignores (the server leaves such a field out): say so loudly.
+              <p
+                className={`ml-6 text-xs ${ticked ? 'text-destructive' : 'text-muted-foreground'}`}
+                data-testid={ticked ? 'records-public-field-ignored' : undefined}
+              >
+                {field.unique
+                  ? t(keys.records.public_submissions.public_field_unique)
+                  : t(keys.records.public_submissions.public_field_ineligible, {
+                      type: field.type,
+                    })}
               </p>
             )}
             {missing.includes(field.key) && (

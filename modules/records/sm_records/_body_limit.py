@@ -109,6 +109,8 @@ async def _refuse(declared: int, limit: int, send: Send) -> None:
             "status": 413,
             "headers": [
                 (b"content-type", b"application/json"),
+                # Never cached: the refusal is about this one request.
+                (b"cache-control", b"no-store"),
                 (b"content-length", str(len(body)).encode()),
             ],
         }
@@ -157,4 +159,11 @@ class BodyLimitMiddleware:
         app: Any = scope.get("app")
         container = getattr(getattr(app, "state", None), constants.PACKAGE, None)
         settings = getattr(container, "settings", None)
-        return None if settings is None else body_ceiling(settings)
+        if settings is None:
+            return None
+        # A website submission is anonymous and small: its own, much tighter
+        # ceiling (16 KiB by default, #101), with no envelope headroom — and
+        # never above ``max_payload_bytes``, whichever the operator lowered.
+        if path.startswith(constants.PUBLIC_SUBMISSIONS_API_PREFIX):
+            return min(settings.public_submissions_max_body_bytes, settings.max_payload_bytes)
+        return body_ceiling(settings)

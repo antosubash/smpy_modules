@@ -14,6 +14,7 @@ that declares no collection has no other set. Code that *does* have a type asks
 from __future__ import annotations
 
 from sm_records.models._base import Base
+from sm_records.models._delivery import SubmissionDelivery
 from sm_records.models._record import (
     RecordStatus,
     RevisionEvent,
@@ -63,6 +64,7 @@ __all__ = [
     "RecordType",
     "RecordTypeRevision",
     "RevisionEvent",
+    "SubmissionDelivery",
     "TableSet",
     "collection_names",
     "new_uuid",

@@ -7,7 +7,10 @@ every intermediate commit.
 ``public`` is **not** among them: the anonymous read API is mounted at its own
 configurable prefix from ``on_startup`` (:mod:`sm_records.boot`), because the
 prefix is a database-backed setting the host has not hydrated yet at the point
-this router is built.
+this router is built. Nor is ``public_submissions_public``, the anonymous
+website-submission routes (#101): they must not carry this router's tenant
+binding or CSRF check, so ``RecordsModule.register_routes`` includes them
+beside it, at a fixed prefix.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ from sm_records.endpoints.api import (
     io_types,
     lifecycle,
     preview,
+    public_submissions_admin,
     records,
     referrers,
     revisions,
@@ -72,6 +76,9 @@ router.include_router(lifecycle.router)
 # ``/records/trash/empty`` sit under the path ``records`` claims for one
 # record, and Starlette matches in registration order.
 router.include_router(bulk.router)
+# Before ``records`` for the same reason: the website-submission actions
+# (#101) sit under ``/types/{key}/records/{uuid}/submission/…``.
+router.include_router(public_submissions_admin.router)
 router.include_router(records.router)
 router.include_router(referrers.router)
 router.include_router(revisions.router)

@@ -26,6 +26,7 @@ from sm_records.endpoints.api._error_table import ERROR_TABLE
 _DOC = Path(__file__).resolve().parents[1] / "docs" / "api-reference.md"
 _API = "/api/records"
 _PUBLIC = "/api/records/public"
+_SUBMISSIONS = "/api/records/submissions"
 _SUCCESS = {"200", "201", "202", "204"}
 _ADMIN_MINIMUM = {"401", "403", "404", "500"}
 _PUBLIC_MINIMUM = {"400", "404"}
@@ -41,11 +42,15 @@ async def schema(client):
     return resp.json()
 
 
-def _operations(schema: dict, *, public: bool):
+def _operations(schema: dict, *, public: bool | str):
     for path, methods in schema["paths"].items():
         if not path.startswith(_API):
             continue
-        if path.startswith(_PUBLIC) is not public:
+        # Website submissions (#101) are anonymous too, but a write with an
+        # origin check, so they have their own minimum below.
+        if path.startswith(_SUBMISSIONS) is not (public == "submissions"):
+            continue
+        if public != "submissions" and path.startswith(_PUBLIC) is not public:
             continue
         for method, operation in methods.items():
             yield f"{method.upper()} {path}", operation
@@ -83,11 +88,23 @@ async def test_every_public_operation_documents_its_refusals(schema):
         assert not codes & {"401", "403"}, f"{name} documents an auth refusal"
 
 
+async def test_every_submission_operation_documents_its_refusals(schema):
+    """Anonymous, so no 401; its 403 is ``bad_origin``, never a permission."""
+    seen = list(_operations(schema, public="submissions"))
+    assert len(seen) == 2, seen
+    for name, operation in seen:
+        codes = set(operation.get("responses", {}))
+        assert codes >= {"400", "403", "404", "415", "429"}, f"{name} documents {sorted(codes)}"
+        assert "401" not in codes, f"{name} documents an auth refusal"
+
+
 async def test_no_operation_documents_an_undocumented_status(schema):
     known = {str(row.status) for row in ERROR_TABLE} | _SUCCESS
     for name, operation in _operations(schema, public=True):
         assert set(operation["responses"]) <= known, name
     for name, operation in _operations(schema, public=False):
+        assert set(operation["responses"]) <= known, name
+    for name, operation in _operations(schema, public="submissions"):
         assert set(operation["responses"]) <= known, name
 
 

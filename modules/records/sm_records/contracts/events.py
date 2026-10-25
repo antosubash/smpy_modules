@@ -41,6 +41,7 @@ from dataclasses import dataclass, field
 from simple_module_core.events import Event
 
 __all__ = [
+    "FormSubmitted",
     "RecordCreated",
     "RecordPurged",
     "RecordRestored",
@@ -199,3 +200,20 @@ class RecordTypeMoved(Event):
     source: str | None
     target: str | None
     moved: int
+
+
+@dataclass
+class FormSubmitted(Event):
+    """A website visitor sent a contact-form type a submission (#101).
+
+    Published after the commit, beside the ``RecordCreated`` the same write
+    produces — that one says a record exists, this one says a visitor sent it.
+    ``spam`` is true for a submission kept in the trash as spam (``sm_spam``),
+    whose notification nobody is sent. Identifiers only, as everywhere: the
+    message is in the record, and the record is readable.
+    """
+
+    type_key: str
+    tenant_id: str
+    uuid: str
+    spam: bool

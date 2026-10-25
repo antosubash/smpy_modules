@@ -81,11 +81,16 @@ class PublicSubmissionsConfig(SQLModel):
     @field_validator("notify_to")
     @classmethod
     def _emails(cls, value: list[str]) -> list[str]:
+        # Case-insensitive: ``Ops@x.org`` and ``ops@x.org`` are one inbox in
+        # practice, and listing both would send it every notification twice.
+        # The first spelling is kept.
         out: list[str] = []
+        seen: set[str] = set()
         for address in value:
             cleaned = address.strip()
             _check_email(cleaned)
-            if cleaned not in out:
+            if cleaned.lower() not in seen:
+                seen.add(cleaned.lower())
                 out.append(cleaned)
         return out
 

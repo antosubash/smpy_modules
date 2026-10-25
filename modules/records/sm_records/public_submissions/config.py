@@ -148,6 +148,10 @@ def settle(
             raise _refuse(f"{key!r} is a system field; visitors cannot fill it in")
         if entry["type"] not in _SUBMITTABLE:
             raise _refuse(f"{key!r} is a {entry['type']} field, which visitors cannot fill in")
+        if entry.get("unique"):
+            # A duplicate would be refused with a 409, telling an anonymous
+            # visitor what another visitor already sent.
+            raise _refuse(f"{key!r} is unique, so visitors cannot fill it in")
     if config["enabled"]:
         missing = [
             key

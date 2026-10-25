@@ -77,6 +77,11 @@ def check_public_route_prefix(value: str) -> str:
                 f"{value!r} is {reserved!r} or a parent of it, so exempting it from "
                 "authentication would expose the admin surface to anonymous callers"
             )
+    # The read API's exemption is ``GET``-only and the submissions one admits
+    # ``POST``; nested, the two would answer for each other's paths.
+    submissions = constants.PUBLIC_SUBMISSIONS_API_PREFIX.rstrip("/")
+    if trimmed == submissions or trimmed.startswith(f"{submissions}/"):
+        raise ValueError(f"{value!r} is under {submissions!r}, where website submissions live")
     return value
 
 

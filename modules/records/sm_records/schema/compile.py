@@ -27,8 +27,6 @@ all. Dumps therefore always pass ``by_alias=True``.
 from __future__ import annotations
 
 import json
-from datetime import date
-from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError, create_model
@@ -36,6 +34,10 @@ from pydantic import Field as PydField
 
 from sm_records.constants import ORPHANED_KEY
 from sm_records.schema._builders import annotation_for
+
+# Re-exported: callers import it from here, as before the split.
+from sm_records.schema._jsonable import to_jsonable as to_jsonable
+from sm_records.schema._text_checks import reading
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle guard, see module docstring
     from sm_records.schema.fields import FieldDefinition
@@ -212,24 +214,6 @@ def coerce_value(field: FieldDefinition, value: Any, *, required: bool = False) 
         raise PayloadValidationError(errors) from exc
 
 
-def to_jsonable(data: Any) -> Any:
-    """Convert a validated payload to types the JSON column can store.
-
-    ``Decimal`` becomes a string, not a float: round-tripping through a float
-    is exactly the precision loss the ``number`` contract (§7.3) exists to
-    prevent, and it would put the payload and the index out of step.
-    """
-    if isinstance(data, Decimal):
-        return str(data)
-    if isinstance(data, date):  # ``datetime`` included: it is a ``date``
-        return data.isoformat()
-    if isinstance(data, dict):
-        return {key: to_jsonable(value) for key, value in data.items()}
-    if isinstance(data, list | tuple):
-        return [to_jsonable(item) for item in data]
-    return data
-
-
 def from_stored(fields: list[FieldDefinition], data: dict[str, Any]) -> dict[str, Any]:
     """The read path: lenient coercion of a stored payload to the *current*
     schema. Design §8.3/§8.4.
@@ -255,6 +239,21 @@ def from_stored(fields: list[FieldDefinition], data: dict[str, Any]) -> dict[str
     orphaned_values = data.get(ORPHANED_KEY)
     if not isinstance(orphaned_values, dict):
         orphaned_values = {}
+    with reading():
+        _coerce_all(fields, data, orphaned_values, out)
+    if orphaned_values:
+        out[ORPHANED_KEY] = orphaned_values
+    return out
+
+
+def _coerce_all(
+    fields: list[FieldDefinition],
+    data: dict[str, Any],
+    orphaned_values: dict[str, Any],
+    out: dict[str, Any],
+) -> None:
+    """``from_stored``'s loop, under ``reading()``: the stored string comes back
+    either way, so no pattern is matched for it."""
     for field in fields:
         if field.key in data:
             raw = data[field.key]
@@ -267,6 +266,3 @@ def from_stored(fields: list[FieldDefinition], data: dict[str, Any]) -> dict[str
             out[field.key] = coerce_value(field, raw)
         except (PayloadValidationError, ValueError):
             out[field.key] = raw
-    if orphaned_values:
-        out[ORPHANED_KEY] = orphaned_values
-    return out
