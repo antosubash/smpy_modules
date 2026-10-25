@@ -104,6 +104,10 @@ guards this and CI runs `--check-current`.
 invalidation on `on_commit`, which only `simple_module_db.finalize_session`
 runs. A bare `commit()` in a webhook, reconcile or event handler suspends the
 tenant in the database while every member's cached view still says active.
+Metering writes run in their own short transaction finished with
+`finalize_session`. Pass `db=` to `consume`/`record` only when the rest of the
+caller's transaction is short, because the rollup row lock is held until it
+commits.
 Two more billing invariants: webhook payloads are never trusted for state (every
 event re-fetches the subscription through `sync.resync`/`apply_snapshot`, the
 one place provider state becomes local state), and response models

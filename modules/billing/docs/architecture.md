@@ -29,7 +29,9 @@ plain dataclasses. No Stripe object crosses it.
 | `billing_subscription` | unique `tenant_id`, unique `provider_subscription_id` | the local mirror: plan, status, interval, quantity, trial end, period start and end, `cancel_at_period_end`, `suspended_by_billing`, `synced_at` |
 | `billing_webhook_event` | provider event id | `processed_at`, `error` — idempotency and an audit trail |
 | `billing_usage_event` | `id`, unique `(tenant_id, meter, idempotency_key)` | the append-only metering ledger: consume, record, refund and adjust rows, each with the `period_start` it counted against |
-| `billing_usage_period` | `(tenant_id, meter, period_start)` | the per-period counter (`used`, `period_end`) the conditional upsert enforces on |
+| `billing_usage_period` | `(tenant_id, meter, period_start)` | the per-period counter (`used`, `period_end`) the conditional upsert enforces on, and `provider_period` (the row counts a provider's period, not a calendar month) |
+| `billing_usage_gauge` | `(tenant_id, meter)` | a gauge's current level (`in_use`), the sum of its live holds |
+| `billing_usage_hold` | `id` (random 128-bit hex), unique `(tenant_id, meter, idempotency_key)` | one reservation against a gauge: `quantity`, `status` (`held`, `committed`, `released`, `expired`), `expires_at`, `settled_at` |
 
 One subscription row per organisation. `tenant_id` is a plain column, not a
 foreign key: each module owns its own SQLAlchemy `MetaData`, so a cross-module
@@ -144,25 +146,71 @@ instead of a 500, and the request session stays usable.
 
 ## Usage metering (`metering/`)
 
-`UsageService` (`app.state.billing_usage`) counts per tenant, meter and
-period. The period is the subscription's provider period
-(`current_period_start`/`_end`, written only by `sync.apply_snapshot`) when
-`now` is inside it, else the UTC calendar month (`metering/periods.py`).
-A manual assignment (`admin.assign`) clears the provider's period
-(`current_period_start`/`_end`) along with its subscription id, so the
-subscription row stays the one source of truth: a tenant moved off Stripe
-mid-period resets on the 1st, not on the old Stripe renewal. It keeps
-`trial_end`, the trial history checkout reads (one trial per organisation);
-metering never reads it. Rollover needs no job: a new period is a new counter row.
+`UsageService` (`app.state.billing_usage`, installed in `startup.run` once the
+session factory exists) counts per tenant, meter and period, and holds gauge
+capacity. Meters are registered on `app.state.billing_meters`
+(`MeterRegistry`, created in `register_settings`, so it exists before any
+module's `on_startup`); a call on an unregistered meter, or one of the other
+kind, raises `UnknownMeterError`. Startup refuses any database but Postgres
+and SQLite 3.35+ (`sql.ensure_supported`): the primitive needs `RETURNING`
+and `ON CONFLICT … DO UPDATE … WHERE`.
 
-Enforcement is one statement, so no check can be split from its write
-(`metering/sql.py`):
+### Periods (`metering/periods.py`)
+
+The period is the subscription's provider period
+(`current_period_start`/`_end`, written only by `sync.apply_snapshot`) when
+the subscription is entitled and `now` is inside it, else the UTC calendar
+month. A manual assignment (`admin.assign`) clears the provider's period
+along with its subscription id, so the subscription row stays the one source
+of truth: a tenant moved off Stripe mid-period resets on the 1st, not on the
+old Stripe renewal. It keeps `trial_end`, the trial history checkout reads
+(one trial per organisation); metering never reads it. Rollover needs no
+job: a new period is a new `period_start`, so its first call inserts a fresh
+counter row and the old rows stay as history. If the provider moves its
+anchor (a new `period_start`), usage does not carry over. `record` counts
+against the period current when it is recorded; its `occurred_at` is kept on
+the ledger row for reference only.
+
+### Transaction rules
+
+- **Every write is its own short transaction**, opened from
+  `app.state.sm.db.session_factory` and finished with `finalize_session`,
+  never a bare `commit()` (`metering/tx.run_write`). The statements are Core
+  DML, so the wrapper calls `mark_written` first or `finalize_session` would
+  see nothing to commit. A replay or a refusal rolls the session back,
+  ledger row included. The counter's row lock is held for the length of two
+  statements.
+- **`db=`** (`consume` and `record` only) runs the same statements inside
+  `db.begin_nested()`, a savepoint of the caller's transaction, so a refusal
+  or a replay rolls back only the metering and the usage commits with the
+  caller's own write. The row lock is then held **until the caller commits**:
+  on Postgres every other call for that tenant and meter waits behind the
+  caller's remaining work. Pass `db=` only when that rest is short. In `db=`
+  mode the limit and period are read through the caller's session, not a
+  separate one.
+- **Holds have no `db=` mode.** A hold must be visible to other requests
+  before the caller's work finishes, and it outlives the request.
+- **Read, then write, in separate sessions.** The plan's limit and the
+  current period are read in a short session of their own
+  (`core._resolve`, `effective_plan` plus the period rule), closed before the
+  write session opens. The write session's first statement is a write (the
+  ledger or hold `INSERT`).
+- **Lock order: subscription, then rollup.** A counter upsert reads the
+  tenant's subscription row `FOR SHARE` inside the same statement (see the
+  period extension below) before it writes the rollup. `sync.apply_snapshot`
+  updates the subscription, flushes, and only then moves the rollups
+  (`_follow_period_end`). Both take the locks in the same order, so a
+  concurrent sync and consume wait on each other instead of deadlocking.
+
+### The primitive (`metering/sql.py`, `hold_sql.py`)
+
+Enforcement is one statement, so no check can be split from its write:
 
 1. `INSERT … ON CONFLICT (tenant_id, meter, idempotency_key) DO NOTHING
    RETURNING id` claims the key; no row back is a replay, answered from the
-   ledger — but only when the stored quantity, kind and source match the
-   call (otherwise `IdempotencyConflict`, 409), and as `Refunded`, not
-   admitted, once a `<key>:refund` row exists.
+   ledger, but only when the stored quantity, kind and source match the call
+   (otherwise `IdempotencyConflict`, 409), and as `Refunded`, not admitted,
+   once a `<key>:refund` row exists.
 2. `INSERT … ON CONFLICT (tenant_id, meter, period_start) DO UPDATE SET used =
    used + qty WHERE used + qty <= limit RETURNING used`; no row back is a
    refusal, and the transaction (ledger row included) rolls back. The insert
@@ -171,16 +219,117 @@ Enforcement is one statement, so no check can be split from its write
    inserts: refused when there is no row yet, admitted on a counter an admin
    credited below zero when it still fits. `check` and `consume` agree.
 
-On Postgres (READ COMMITTED) a concurrent upsert waits on the row lock and
-the `WHERE` is re-evaluated against the committed row, so with a limit of 1
-exactly one of two racing calls is admitted. On SQLite there is one writer;
-the trap is a transaction that *read* before writing, whose stale snapshot
-fails with `SQLITE_BUSY_SNAPSHOT` regardless of `busy_timeout`. So the limit
-and period are read in a separate session closed first, and the write
-session's first statement is the ledger insert. Every own session ends with
-`finalize_session`; `db=` runs in a savepoint of the caller's transaction.
-`tests/test_usage_concurrency.py` races real connections on a file SQLite
-database and on Postgres.
+`record` and `adjust` run the same upsert with no limit. `refund` claims
+`<key>:refund` and decrements the row of the `period_start` the original
+counted against, not the current one. Refused attempts write nothing, so
+there is no ledger of denials; they are logged at INFO with the tenant and
+meter.
+
+A gauge `reserve` has the same shape on `billing_usage_hold` and
+`billing_usage_gauge` (`in_use = in_use + qty WHERE in_use + qty <= limit`).
+Capacity comes back only through one guarded transition,
+`UPDATE billing_usage_hold … WHERE id = :id AND status IN (…) [AND expires_at
+<= now] RETURNING …`, followed by the gauge decrement in the same
+transaction. Release, sweeper expiry and a late `commit`/`extend` that finds
+the hold lapsed all go through it, and only the call whose `UPDATE` matched
+lowers the gauge, so a hold is returned exactly once however many callers
+race. `recount` (the admin repair) upserts the gauge row first to take its
+lock, then sets `in_use` from the `SUM(quantity)` of the held and committed
+holds.
+
+### Why it is race-safe
+
+- **Postgres (READ COMMITTED).** Two concurrent upserts on one row: the
+  second waits on the row lock (or on the unique index for the very first
+  insert). When the first commits, Postgres re-evaluates the `DO UPDATE …
+  WHERE` against the committed row version (the documented `ON CONFLICT`
+  guarantee). With a limit of 1 the second sees `1 + 1 > 1`, updates nothing
+  and returns no row: exactly one is admitted. No advisory lock is needed,
+  because nothing reads a sum and then inserts.
+- **SQLite.** There is one writer. The trap is pysqlite's deferred `BEGIN` in
+  WAL mode: a transaction that *read* before it writes holds an old snapshot,
+  and its first write fails with `SQLITE_BUSY_SNAPSHOT`, which `busy_timeout`
+  cannot wait out. Because the reads happen in a separate, closed session
+  and the write session starts with the `INSERT`, the write lock is taken at
+  once; a concurrent writer waits on `busy_timeout` and its statement then
+  runs against the committed state, so the `WHERE` sees the first writer's
+  increment. A metering write that still cannot get the lock (in practice
+  only `consume(db=…)`, whose caller read first) fails closed: 503
+  `usage_busy`, nothing counted and nothing admitted.
+- `tests/test_usage_concurrency.py` and `tests/test_usage_hold_races.py` race
+  real connections on a file SQLite database and on Postgres; removing the
+  upsert's `WHERE`, or the status guard from the settle transition, fails
+  them.
+
+### A period whose end the provider moves
+
+Stripe can move a period's end while keeping its start (the rows are keyed
+on the start, so writes keep landing in the same row). The stored
+`period_end` must stay the period's real end, because the admin screen's
+"previous period" is found by its exact boundaries. Three rules keep it so:
+
+- **The sync moves the rows.** `sync.apply_snapshot` runs
+  `sql.extend_rollups` after the subscription write: every counter row of the
+  tenant starting at the subscription's `current_period_start` gets its
+  `current_period_end` and `provider_period = true`. While the subscription
+  is entitled that is every row at that start (a consume writes into it from
+  now on, even a row written as a calendar month while it lapsed). While it
+  is lapsed only rows already marked `provider_period` move; a calendar
+  month written during a lapse keeps its own end even when its start
+  coincides with the provider's.
+- **A first row takes an extension that landed after its read.** The period
+  is resolved in an earlier read, so a sync that extended it in between, and
+  found no row to extend yet, would leave a new row with the stale end. The
+  insert therefore reads, in the same statement and under `FOR SHARE`, the
+  entitled subscription whose period starts at the resolved start, and
+  stores its end when that is later (`_stored_end`), marking the row
+  `provider_period` (`_takes_sub_end`). A sync whose subscription update is in
+  flight is waited for; one that starts after the read waits for this write
+  to commit and then extends the row. SQLite ignores the lock clause; its
+  single writer already orders the two.
+- **An end only moves out.** On conflict the upsert keeps the later of the
+  stored and the resolved end (`_later_end`), and `provider_period` is
+  sticky (`OR`), so a write that resolved the period before a concurrent
+  extension cannot undo it.
+
+The usage screens read the period with the same rule enforcement uses
+(`effective_plan` plus `current_period`), and the admin overview shows the
+current row with the resolved end, so a stale stored end never shows as
+current.
+
+### Holds and the sweeper
+
+`commit` clears `expires_at` (the hold stays counted until released);
+`extend` pushes a held hold's expiry; `holding()` reserves on entry and
+releases on exit, shielded from cancellation. A hold that is neither
+committed nor extended lapses, and `metering/sweeper.UsageSweeper` (started in
+`startup.run` next to the reconcile loop on every instance, stopped in
+`on_shutdown`) expires up to 500 lapsed holds a tick through the guarded
+transition. On several instances two sweepers may pick the same hold; the
+guard moves it for one of them. There is no lease: the guard is the claim, as
+in the reconcile scheduler. The same loop purges the ledger once a day per
+process (`metering/retention.py`, see [operations](operations.md#usage-metering)).
+
+### Changes from the design
+
+The approved design is on issue #99. The code differs from it where review
+changed it:
+
+- A replayed `Idempotency-Key` on a `RequiresQuota` route never re-runs the
+  handler (409 `idempotency_replay`), instead of "a retried request is free";
+  a refunded key is spent (409 `idempotency_key_spent`).
+- `RequiresQuota` is function-scoped (FastAPI 0.121+), so a client that
+  disconnects after the handler returned refunds nothing.
+- No `sm_lease` around the sweep (the guarded transition is the claim).
+- `summary` is not on the `UsageMeter` protocol; the card is
+  `metering/report.tenant_summary`.
+- An adjustment is Core DML in the service's own transaction, so the ORM
+  audit does not see it; its ledger row (kind `adjust`, `actor`, `reason`,
+  `source = admin`) is the audit record.
+- Pagination is billing's own (`report.page_numbers`), and the client uses
+  billing's `api()` helper, to keep the `>=0.0.36` framework floor.
+- The ledger purge goes by the charge's server-side `recorded_at`, never the
+  caller-supplied `occurred_at`, and a refund goes with its charge.
 
 ## Settings and secrets
 
@@ -235,7 +384,12 @@ module must not import a sibling optional module).
 | `teardown.py`, `sweep.py`, `teardown_claim.py` | what deleting a tenant cancels; the reconcile retry of it; the per-customer claim and backoff every run goes through |
 | `scheduler.py` | the periodic reconcile: stale-row claims, pacing, the loop task |
 | `lifecycle.py` | status → tenant suspension |
-| `metering/`, `contracts/metering.py` | usage ledger, per-period counters and the `UsageMeter` seam |
+| `contracts/metering.py` | the `UsageMeter` seam: protocol, outcomes and exceptions |
+| `metering/service.py`, `core.py`, `tx.py`, `sql.py`, `periods.py` | counters: the read side, the transaction wrapper, the upserts, the period rule |
+| `metering/holds.py`, `hold_sql.py` | gauge holds and their guarded transitions |
+| `metering/deps.py`, `errors.py`, `validate.py`, `registry.py` | `RequiresQuota`, metering errors, argument checks, the meter registry |
+| `metering/sweeper.py`, `retention.py` | the hold sweeper and the ledger purge |
+| `metering/report.py`, `admin.py`, `schemas.py` | the usage card, the admin overview and drawer, response models |
 | `admin.py` | admin operations and connection settings |
 | `providers/` | `manual`, `stripe`, factory |
 | `endpoints/` | routers (tenant API, admin API, views, webhook) |

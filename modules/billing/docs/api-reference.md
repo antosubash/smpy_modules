@@ -87,6 +87,50 @@ transaction is short: the counter's row lock is held until the caller commits,
 so every other call for that tenant and meter waits behind it. On SQLite a
 `db=` call can fail closed with 503 `usage_busy` (see the error table).
 
+### The protocol and its outcomes
+
+`sm_billing.contracts.metering` is the whole contract a consumer types
+against:
+
+| Name | What it is |
+|---|---|
+| `UsageMeter` | the `runtime_checkable` protocol: `check`, `consume`, `record`, `refund`, `reserve`, `commit`, `release`, `extend`, `holding` |
+| `Allowed(used, limit, period_end, replayed=False)` | counted (or a replay of a call that was); `used` is the period's total after it, `limit` `None` when the plan sets none, `period_end` when the counter resets. `ok` is true |
+| `Exceeded(used, limit, requested, period_end)` | refused: `used + requested` would pass `limit`; nothing was written. `ok` is false. For a gauge `used` is the level held and `period_end` is `None` |
+| `Refunded(used, limit, period_end, replayed=True)` | a replay of a key whose call was since refunded: not admitted, the key is spent. `ok` is false |
+| `Hold(id, tenant_id, meter, quantity, status, expires_at, replayed=False)` | a reservation; `ok` while it is `held` or `committed` |
+| `MeterKind`, `MeterDefinition`, `HoldStatus` | `counter` / `gauge`; a registered meter (`key`, `kind`, `unit`, `label_key`, `hold_ttl_seconds`); `held` / `committed` / `released` / `expired` |
+| `UnknownMeterError` | the meter is not registered, or is the other kind: a programming error, so a 500 |
+| `IdempotencyConflict` | 409 `idempotency_conflict` |
+| `QuotaExceededError(meter, outcome)` | raised where an outcome cannot be returned (`RequiresQuota`, `holding()`): 402 `quota_exceeded` |
+| `HoldNotFound`, `HoldExpired` | 404 `hold_not_found`; 409 `hold_expired` with the hold's `status` |
+
+`ok` is a class flag, so a consumer that imports the types only under
+`TYPE_CHECKING` can still tell the outcomes apart. Bad arguments (a
+non-positive or non-integer `qty`, an empty or over-long key, `meter` or
+`source`, a TTL outside 1 second to 30 days) raise `ValueError`: they are
+bugs in the caller, not refusals.
+
+### Registering a meter
+
+Billing creates `app.state.billing_meters` while the app is constructed, so
+it exists in every module's `on_startup`. Register there, with plain keyword
+arguments and no billing import:
+
+```python
+reg = getattr(app.state, "billing_meters", None)
+if reg is not None:
+    reg.define(key="ai.requests", kind="counter", unit="count", label_key="ai.meters.requests")
+    reg.define(key="jobs.concurrent", kind="gauge", hold_ttl_seconds=600)
+```
+
+`unit` is one of `count`, `bytes`, `tokens` or `ms` (display only).
+`label_key` is an i18n key in *your* module's catalogue; the usage screens
+fall back to the meter key without one. `hold_ttl_seconds` is for gauges
+only. Defining a meter again identically is a no-op; any other redefinition
+raises at boot. Registered keys are suggested in the plan editor's Limits
+after `tenants.seats`.
+
 ### Guarding a route: `RequiresQuota`
 
 ```python
@@ -136,10 +180,13 @@ For capacity held over time (concurrent jobs, reserved bytes), register a
 | `holding(tenant, meter, qty, key, *, source, ttl=None)` | `async with`: reserve (raises `QuotaExceededError` → 402), release on exit. The block runs at most once per key: a replayed key raises 409 `idempotency_replay` |
 
 A hold that is neither committed nor extended lapses, and the sweeper returns
-its capacity. Meters are registered on `app.state.billing_meters` in the
-consumer's `on_startup` (`reg.define(key=..., kind="counter" | "gauge", unit=...,
-label_key=..., hold_ttl_seconds=...)`); a call on an unregistered meter, or one
-of the other kind, raises `UnknownMeterError`.
+its capacity. Every call names a meter registered [as above](#registering-a-meter);
+an unregistered meter, or one of the other kind, raises `UnknownMeterError`.
+A replayed `reserve` key returns the original `Hold` with `replayed=True` (not
+`ok` once it was released or expired), and only for the same quantity and
+`source`, else `IdempotencyConflict`. `extend` on a committed hold returns it
+unchanged. `commit`, `extend` and `release` take only the hold id, a 128-bit
+random handle, so they are not tenant-filtered.
 
 ## Tenant API — `/api/billing`
 
@@ -173,6 +220,31 @@ of an organisation billing suspended (restore mode).
 lapsed). `subscription` is `null` for an organisation that never subscribed.
 `seats.used` counts members plus pending invitations — the number the seat
 limit is enforced against.
+
+### `GET /api/billing/usage`
+
+Permission: `billing.view`, the same gate and restore mode as `/status`. The
+organisation's meters, the same rows the Billing page's usage card shows (its
+`usage` Inertia prop): one per registered meter the plan limits or the
+organisation has used. Empty when no meter is registered, or before billing
+has started.
+
+```json
+[
+  {"meter": "ai.requests", "kind": "counter", "unit": "count",
+   "label_key": "ai.meters.requests", "used": 42, "limit": 100,
+   "period_start": "2026-10-01T00:00:00Z", "period_end": "2026-11-01T00:00:00Z",
+   "holds": null},
+  {"meter": "jobs.concurrent", "kind": "gauge", "unit": "count", "label_key": "",
+   "used": 1, "limit": 2, "period_start": null, "period_end": null, "holds": 1}
+]
+```
+
+For a counter `used` is this period's total and `period_end` when it resets;
+for a gauge `used` is the level held now and `holds` how many live holds make
+it up. `limit` is `null` when the plan sets none. The limit and the period are
+read with the rule enforcement uses, so the numbers are the ones the next
+`consume` is held to.
 
 ### `POST /api/billing/checkout`
 
@@ -265,6 +337,56 @@ one; `clear_*` removes it. Secrets are trimmed and stored encrypted. The
 response is `{"provider", "active_provider", "provider_error",
 "has_secret_key", "has_webhook_secret", "return_base_url", "webhook_path"}`.
 
+## Admin usage API — `/api/billing/admin/usage`
+
+Behind `RequiresCsrf` like the other billing routers, so every `POST` needs
+`X-CSRF-Token`. Platform admin spans organisations, so the tenant comes from
+the path, and every query filters on it.
+
+| Method & path | Permission | Returns |
+|---|---|---|
+| `GET /usage?meter=&q=&over=&period=current\|previous&page=&per_page=` | `billing.platform.view` | one row per organisation and meter, fullest first, paged |
+| `GET /usage/{tenant_id}/events?meter=&kind=&page=&per_page=` | `billing.platform.view` | the organisation's ledger, newest first, paged |
+| `GET /usage/{tenant_id}/holds?meter=&status=` | `billing.platform.view` | its holds, newest first, at most 200 |
+| `POST /usage/{tenant_id}/adjust` `{"meter", "quantity", "reason"}` | `billing.platform.manage` | `{"meter", "used"}` |
+| `POST /usage/{tenant_id}/recount` `{"meter"}` | `billing.platform.manage` | `{"meter", "in_use"}` |
+| `POST /usage/holds/{hold_id}/release` | `billing.platform.manage` | `{"released": true \| false}` |
+
+`per_page` is 1–100 (default 25); a page past the end serves the last one.
+Pages are `{"items", "total", "page", "per_page", "pages"}`.
+
+- **Overview.** `q` matches the organisation's name, slug or id; `over=true`
+  keeps rows at 80% or more of their limit; `period=previous` shows each
+  organisation's period immediately before its current one (counters only:
+  a gauge has no period). A row is
+  `{"tenant_id", "tenant_name", "tenant_slug", "meter", "kind", "unit",
+  "label_key", "registered", "used", "limit", "percent", "period_start",
+  "period_end"}`; `percent` is `null` without a limit, and `registered` is
+  false for a meter no module registers any more.
+- **Ledger.** `kind` is `consume`, `record`, `refund` or `adjust`. An entry is
+  `{"id", "meter", "kind", "quantity", "idempotency_key", "source", "actor",
+  "reason", "period_start", "occurred_at", "recorded_at"}`.
+- **Holds.** `status` is `live` (the default: held or committed, the holds
+  that count), `held`, `committed`, `released` or `expired`. A hold is
+  `{"id", "meter", "quantity", "status", "idempotency_key", "source",
+  "expires_at", "created_at", "settled_at"}`.
+- **Adjust** is a signed correction to a counter's current period: a negative
+  `quantity` is a credit and may take `used` below zero. `quantity` is a
+  non-zero integer (a JSON float or bool is a 422); `reason` is required,
+  trimmed, at most 500 characters (blank is a 422). It is ledgered as
+  `adjust` with the reason, the acting admin's user id as `actor` and
+  `source = "admin"`.
+- **Recount** rebuilds a gauge's level from the `SUM` of its held and
+  committed holds, repairing drift left by a bug that bypassed the service.
+- **Release** returns a hold's capacity; a hold already settled answers
+  `{"released": false}`.
+
+Adjust takes counters only and recount gauges only: anything else, or an
+unregistered meter, is 400 `unknown_meter` (`{"meter", "kind"}`). Both answer
+404 `tenant_not_found` for an organisation with no row; on a single-tenant
+host `default` is allowed. An unknown hold is 404 `hold_not_found`. Every
+write goes through `UsageService` in its own short transaction.
+
 ## Webhook — `POST /billing/webhooks/stripe`
 
 Public (exempt from login), no CSRF; authenticated by the `Stripe-Signature`
@@ -306,7 +428,8 @@ Handled events: `checkout.session.completed` and
 | `price_not_found` / `price_mismatch` | 400 | admin plans (Stripe) | `{"price", "reason"}` |
 | `provider_managed` | 409 | assign | Stripe owns subscriptions; use resync |
 | `no_provider_subscription` | 409 | resync | nothing at Stripe to read |
-| `tenant_not_found` | 404 | assign, resync | |
+| `tenant_not_found` | 404 | assign, resync, usage adjust and recount | |
+| `unknown_meter` | 400 | usage adjust and recount | `{"meter", "kind"}`: not a registered meter of that kind |
 | `invalid_return_url` | 400 | connection | `{"message"}` says the rule |
 | `provider_unavailable` | 503 | any | no provider built (startup failed) |
 | `idempotency_conflict` | 409 | a metered route | the idempotency key was first used for a different call (quantity, kind or source) |
