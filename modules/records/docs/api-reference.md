@@ -1531,7 +1531,7 @@ kind of route can produce, with the body schema
 | `409` | A bulk action at least one named record refused | `{"detail", "report": BulkReport}` — nothing was changed |
 | `409` | *Submissions* — a field or the consent text changed after the form was loaded | `{"detail", "code": "form_changed", "definition": SubmissionDefinition}` |
 | `409` | *Submissions* — a `unique` value already claimed | `{"detail", "code": "conflict"}` |
-| `409` | A submission action on a type that is not a contact form, *Not spam* on a record outside the trash, *Resend* on a type that notifies nobody | `{"detail", "code": "wrong_kind" \| "not_in_trash" \| "no_recipients"}` |
+| `409` | A submission action on a type that is not a contact form, *Not spam* on a record not in the trash as spam, *Resend* on a type that notifies nobody | `{"detail", "code": "wrong_kind" \| "not_in_trash" \| "no_recipients"}` |
 | `413` | An import body over `max_import_bytes` | `{"detail"}` |
 | `413` | An import file holding more rows than `max_import_rows` | `{"detail"}` — refused before anything is written |
 | `413` | A bulk action naming more than `max_bulk_records` records | `{"detail"}` — refused before a record is touched |

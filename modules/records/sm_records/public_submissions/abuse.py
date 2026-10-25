@@ -59,6 +59,25 @@ def _sent_origin(request: Request) -> str | None:
     return None
 
 
+_DEFAULT_PORTS: Final = {"http": 80, "https": 443}
+
+
+def origin_of(url: str) -> str | None:
+    """``scheme://host[:port]``, lowercased, with a default port dropped and any
+    path ignored — so ``https://Example.org:443/site`` and the browser's
+    ``https://example.org`` compare equal."""
+    try:
+        parts = urlsplit(url.strip())
+        port = parts.port
+    except ValueError:
+        return None
+    if parts.scheme.lower() not in _DEFAULT_PORTS or not parts.hostname:
+        return None
+    scheme = parts.scheme.lower()
+    keep = port is not None and port != _DEFAULT_PORTS[scheme]
+    return f"{scheme}://{parts.hostname.lower()}" + (f":{port}" if keep else "")
+
+
 def _origin_allowed(request: Request, origin: str) -> bool:
     parts = urlsplit(origin)
     host = (request.headers.get("host") or "").lower()
@@ -66,11 +85,10 @@ def _origin_allowed(request: Request, origin: str) -> bool:
     # proxy the scheme this process sees is not the one the browser used.
     if host and parts.netloc == host:
         return True
-    allowed = set(get_settings(request).public_submissions_allowed_origins)
-    base = public_base_url(request.app).lower()
-    if base:
-        allowed.add(base)
-    return origin in allowed
+    sent = origin_of(origin)
+    configured = [*get_settings(request).public_submissions_allowed_origins]
+    configured.append(public_base_url(request.app))
+    return sent is not None and sent in {origin_of(item) for item in configured if item}
 
 
 async def guard(request: Request) -> None:

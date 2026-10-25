@@ -46,7 +46,7 @@ SUBMISSION_ROWS: Final[tuple[tuple[int, str, str], ...]] = (
     (
         409,
         "A submission action on a type that is not a contact form, *Not spam* on a record "
-        "outside the trash, *Resend* on a type that notifies nobody",
+        "not in the trash as spam, *Resend* on a type that notifies nobody",
         '`{"detail", "code": "wrong_kind" \\| "not_in_trash" \\| "no_recipients"}`',
     ),
     (

@@ -173,3 +173,13 @@ async def test_spam_still_trashes_a_record_that_fails_its_schema(site):
     assert spam.status_code == 200, spam.text
     assert spam.json()["is_deleted"] is True
     assert spam.json()["data"].get("sm_spam") is None, "the mark was skipped, the trash was not"
+
+
+async def test_not_spam_is_only_for_a_submission_kept_as_spam(site):
+    """A record a person deleted is restored with Restore, which mails nobody."""
+    await contact_type(site)
+    uuid = await _one(site)
+    deleted = await site.delete(f"{API}/contact/records/{uuid}", headers=roles(ADMIN))
+    assert deleted.status_code == 204
+    resp = await site.post(_action("contact", uuid, "not-spam"), headers=roles(ADMIN))
+    assert (resp.status_code, resp.json()["code"]) == (409, "not_in_trash")

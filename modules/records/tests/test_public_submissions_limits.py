@@ -121,3 +121,16 @@ async def test_the_ip_hash_and_user_agent_can_be_left_out(site):
     (record,) = await records_of(site)
     assert record["data"]["sm_ip_hash"] is None
     assert record["data"]["sm_user_agent"] is None
+
+
+async def test_origins_compare_normalised(site):
+    """``public_base_url`` with a path, a default port or capitals is still the
+    origin a browser sends; a different port or scheme is not."""
+    host_parts(site.app, base_url="https://Site.Example:443/en")
+    configure(site, public_submissions_allowed_origins=("http://www.example.org:80",))
+    await contact_type(site)
+    for origin in ("https://site.example", "http://www.example.org"):
+        assert (await send(site, headers={"Origin": origin})).status_code == 202, origin
+    for origin in ("https://site.example:8443", "http://site.example"):
+        refused = await send(site, headers={"Origin": origin})
+        assert refused.json()["code"] == "bad_origin", origin

@@ -726,6 +726,7 @@
     "public_fields_help": "Only ticked fields appear on the form, in the order of the field list.",
     "public_fields_none": "This type has no fields yet that a visitor could fill in.",
     "public_field_ineligible": "A {type} field can't be filled in on a website form.",
+    "public_field_unique": "A unique field can't be filled in on a website form: a duplicate would reveal what someone else sent.",
     "public_field_required": "Required with no default: the form can't be turned on without it.",
     "notify_to": "Notify",
     "notify_to_help": "Who gets an email about each submission. One address per line, up to {max}.",

@@ -77,8 +77,12 @@ async def mark_not_spam(
     actor: str | None,
 ) -> Record:
     require_form(rtype)
-    if not record.is_deleted:
-        raise SubmissionRefused("not_in_trash", "only a submission in the trash can be not spam")
+    # Only a record kept *as spam*: restoring one a person deleted would mail
+    # its recipients about a submission somebody already dealt with.
+    if not record.is_deleted or not (record.data or {}).get("sm_spam"):
+        raise SubmissionRefused(
+            "not_in_trash", "only a submission in the trash as spam can be not spam"
+        )
     record = await record_service.restore_record(db, rtype, record, settings=settings, actor=actor)
     record = await try_system_update(db, rtype, record, {"sm_spam": None}, settings=settings)
     await queue_notification(db, app, rtype, record)

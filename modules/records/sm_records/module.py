@@ -233,9 +233,18 @@ class RecordsModule(ModuleBase):
         await boot.startup(self, app)
 
     async def on_shutdown(self, app: FastAPI) -> None:
-        """Stop the pattern-check workers (``sm_records._pattern_worker``)."""
-        from sm_records import _pattern_worker
+        """Let in-flight submission mail finish (bounded), then stop the
+        pattern-check workers (``sm_records._pattern_worker``). Without the
+        drain a send cancelled at shutdown leaves its claim to expire and the
+        record "not sent" until someone presses *Resend*."""
+        import asyncio
+        import contextlib
 
+        from sm_records import _pattern_worker
+        from sm_records.public_submissions.mail_runner import drain
+
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(drain(), timeout=30)
         await _pattern_worker.close()
 
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:

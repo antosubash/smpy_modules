@@ -104,6 +104,15 @@ describe('PublicSubmissionsCard', () => {
     await view.unmount();
   });
 
+  it('greys out a unique field, which a visitor cannot fill', async () => {
+    const fields = [row('ref', 'text', { unique: true })];
+    const view = await mount(card({ config: defaultConfig('form'), fields }));
+    const box = view.find('[data-testid="records-public-fields"] button[role="checkbox"]');
+    expect(box?.hasAttribute('disabled')).toBe(true);
+    expect(view.host.textContent).toContain("A unique field can't be filled in");
+    await view.unmount();
+  });
+
   it('says which required field blocks an enabled form', async () => {
     const config: PublicSubmissionsConfig = { ...defaultConfig('form'), enabled: true };
     const view = await mount(card({ config }));

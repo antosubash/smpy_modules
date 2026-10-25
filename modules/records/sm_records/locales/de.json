@@ -726,6 +726,7 @@
     "public_fields_help": "Nur angehakte Felder erscheinen im Formular, in der Reihenfolge der Feldliste.",
     "public_fields_none": "Dieser Typ hat noch keine Felder, die ein Besucher ausfüllen könnte.",
     "public_field_ineligible": "Ein Feld vom Typ {type} kann in einem Website-Formular nicht ausgefüllt werden.",
+    "public_field_unique": "Ein eindeutiges Feld kann nicht auf einem Website-Formular ausgefüllt werden: ein Duplikat würde verraten, was jemand anderes gesendet hat.",
     "public_field_required": "Pflichtfeld ohne Standardwert: Ohne dieses Feld kann das Formular nicht eingeschaltet werden.",
     "notify_to": "Benachrichtigen",
     "notify_to_help": "Wer zu jeder Einsendung eine E-Mail erhält. Eine Adresse pro Zeile, höchstens {max}.",
