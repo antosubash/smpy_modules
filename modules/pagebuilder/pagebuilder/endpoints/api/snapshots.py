@@ -25,7 +25,11 @@ from pagebuilder.contracts.schemas import (
     SnapshotRead,
 )
 from pagebuilder.deps import get_snapshot_service
-from pagebuilder.endpoints.api._deps import require_approve, require_publish
+from pagebuilder.endpoints.api._deps import (
+    require_approve,
+    require_publish,
+    require_publish_or_approve,
+)
 from pagebuilder.snapshots.service import SnapshotService
 
 router = APIRouter()
@@ -166,7 +170,7 @@ async def request_restore(
 @router.get(
     "/imports/pending",
     response_model=PendingImportRead | None,
-    dependencies=[require_publish],
+    dependencies=[require_publish_or_approve],
 )
 async def get_pending_import(
     service: SnapshotService = Depends(get_snapshot_service),

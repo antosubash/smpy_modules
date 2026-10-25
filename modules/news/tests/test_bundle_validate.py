@@ -65,6 +65,8 @@ def test_an_absent_section_directory_passes(tmp_path):
     ("files", "message"),
     [
         ({"articles/a.json": _doc(status="archived")}, "invalid status"),
+        ({"articles/a.json": _doc(status=["draft"])}, "invalid status"),
+        ({"articles/a.json": _doc(status={"x": 1})}, "invalid status"),
         ({"articles/a.json": _doc(locale="not a locale!")}, "unreadable locale"),
         ({"articles/a.json": _doc(slug="../escape")}, "invalid slug"),
         ({"articles/a.json": _doc(slug="Has Space")}, "invalid slug"),

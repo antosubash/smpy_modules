@@ -116,6 +116,12 @@ async def test_the_pending_import_needs_the_snapshot_permission(tmp_path):
         listing = await client.get("/pagebuilder/content", headers=inertia)
         assert listing.status_code == 200
         assert listing.json()["props"]["pending"] is None
+        # Someone who may only approve still reads what they would approve.
+        approver = {**as_role("approve-only"), "X-Inertia": "true"}
+        assert (await client.get(_PENDING, headers=approver)).status_code == 200
+        assert (await client.get(_REVIEW, headers=approver)).status_code == 200
+        listed = await client.get("/pagebuilder/content", headers=approver)
+        assert listed.json()["props"]["pending"]["id"]
         # A publisher still sees it there.
         shown = await client.get(
             "/pagebuilder/content", headers={**as_role("pb"), "X-Inertia": "true"}

@@ -94,7 +94,7 @@ _ARTICLE_RULES: dict[str, Callable[[Any], bool]] = {
     "translation_group": _optional(_text(MAX_TRANSLATION_GROUP_LEN, empty=False)),
     "draft_data": lambda v: isinstance(v, dict),
     "published_data": _optional(lambda v: isinstance(v, dict)),
-    "status": lambda v: v in _STATUSES,
+    "status": lambda v: isinstance(v, str) and v in _STATUSES,
     "meta_description": _optional(_text(MAX_URL_LEN)),
     "og_image": _optional(_text(MAX_URL_LEN)),
     "canonical_url": _optional(_text(MAX_URL_LEN)),

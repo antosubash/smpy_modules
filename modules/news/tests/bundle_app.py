@@ -47,6 +47,8 @@ ROLES = {
     "pb": list(PB_PERMISSIONS),
     "pb-news-edit": [*PB_PERMISSIONS, PERM_VIEW, PERM_EDIT],
     "pb-news": [*PB_PERMISSIONS, PERM_VIEW, PERM_EDIT, PERM_PUBLISH],
+    # Approves restores without staging them (a custom role).
+    "approve-only": ["pagebuilder.approve"],
     # News' own rights and none of Import / Export.
     "news-only": [PERM_VIEW, PERM_EDIT],
 }
