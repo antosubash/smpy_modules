@@ -216,13 +216,18 @@ the target fails without it.
   same name.
 
   **The trap, if you add a module.** The framework generates the `keys` object
-  and the `t()` key union into `packages/i18n/src`, from the merged registry of
-  every locale directory *a host inside its own monorepo* loads. That directory
-  does not exist here, and the published `@simple-module-py/i18n` carries only
-  the framework's own namespaces — so `keys.<yourmodule>` does not exist and
-  passing a literal to `t()` is a type error. That is a property of where the
-  generator writes rather than of anything a module does wrong, and it will be
-  equally true of the next module added to this repo.
+  and the `t()` key union from the merged registry of every locale directory a
+  host loads. Inside its own monorepo it writes them into `packages/i18n/src`.
+  Here, `@simple-module-py/i18n` comes from npm, and as installed it carries
+  only the framework's own namespaces. Until something regenerates it,
+  `keys.<yourmodule>` does not exist and passing a literal to `t()` is a type
+  error. Since 0.0.38, `smpy host gen-i18n` (upstream #449) can write every
+  installed module's keys into `node_modules/@simple-module-py/i18n/src`, but
+  that does not fix the problem for a published module, for two reasons. The
+  copy is untracked and every `npm ci` wipes it. And `keys` is a runtime value,
+  so a consuming host that bundles a module without running gen-i18n first gets
+  `keys.<module>` undefined. A module therefore has to ship its own key tree,
+  and so will the next module added to this repo.
 
   The way round it, which news established and pagebuilder copied: derive `keys`
   from the module's own `locales/en.json` at compile time (`resolveJsonModule`
@@ -243,8 +248,6 @@ the target fails without it.
   `content_locales` setting and `pagebuilder.locales`, deliberately separate
   from the host's `SM_I18N_SUPPORTED_LOCALES` above — one decides what the site
   publishes, the other what the console speaks.
-- **`smpy_pagebuilder`** still holds the pre-port copy of this module. This
-  repo is canonical; that one is frozen.
 - **The demo host defaults to single-tenant.** Every module is tenant-aware,
   so `SM_MULTI_TENANT=true` boots with all of them enabled. The multi-tenant
   e2e specs (`billing-tenant`, `news-tenant`, `records-tenant`) are opt-in with
