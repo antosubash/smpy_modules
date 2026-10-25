@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import warnings
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import RedirectResponse
 from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
@@ -25,12 +25,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from pagebuilder import locales, public_cache, redirects, site_nav
 from pagebuilder.deps import get_settings
+from pagebuilder.endpoints.public_not_found import render_not_found
 from pagebuilder.html_lang import set_html_lang
 from pagebuilder.layout_service import LayoutService, public_layout_props
 from pagebuilder.og_image import og_image
+from pagebuilder.public_copy import public_copy
 from pagebuilder.service import PagesService
 from pagebuilder.settings import PagebuilderSettings
-from pagebuilder.tenancy import bind_public, vary_on_tenant
+from pagebuilder.tenancy import bind_public, bind_public_viewer, vary_on_tenant
 
 _PAGE_PUBLIC = "PageBuilder/PublicPage"
 
@@ -84,9 +86,7 @@ async def _alternates(
     ]
     # x-default names the version to serve someone whose language nobody
     # matched. The site's own default is the only defensible answer.
-    default = next(
-        (alt for alt in alternates if locales.is_default(alt["locale"])), None
-    )
+    default = next((alt for alt in alternates if locales.is_default(alt["locale"])), None)
     if default is not None:
         alternates.append({"locale": "x-default", "url": default["url"]})
     return alternates
@@ -132,7 +132,15 @@ async def render_public_page(
             target = locales.public_path(prefix, moved_to, locale)
             # A 301 is cacheable by default; key it on what picks the tenant.
             return vary_on_tenant(RedirectResponse(target, status_code=301), request)
-        raise HTTPException(status_code=404, detail="Page not found")
+        # Unknown, draft, trashed or not yet live: one answer for all (#89).
+        return await render_not_found(
+            request,
+            inertia,
+            settings,
+            locale=locale,
+            layout=await LayoutService(db).get(),
+            nav=await site_nav.site_nav(db, settings.public_route_prefix, locale),
+        )
 
     layout = await LayoutService(db).get()
     nav = await site_nav.site_nav(db, settings.public_route_prefix, page.locale)
@@ -190,9 +198,8 @@ async def render_public_page(
             "site_name": settings.site_name,
             "twitter_handle": settings.twitter_handle,
             "locale": page.locale,
-            "alternates": await _alternates(
-                db, request, settings, page.translation_group
-            ),
+            "copy": public_copy(page.locale),
+            "alternates": await _alternates(db, request, settings, page.translation_group),
             **public_layout_props(layout),
             "site_nav": nav,
         },
@@ -214,11 +221,12 @@ def locale_router(locale: str) -> APIRouter:
     route registry exempts by string prefix, so the exemption would have to be
     widened to something that no longer describes what is public.
 
-    ``bind_public`` comes first so everything the viewer reads — redirects,
-    layout, alternates — runs in the request's tenant, and a request
-    that resolved none gets the unknown-slug 404.
+    ``bind_public_viewer`` comes first so everything the viewer reads —
+    redirects, layout, alternates — runs in the request's tenant. A request
+    that resolved none gets the unknown-slug 404 without a lookup, and without
+    any site's layout.
     """
-    router = APIRouter(dependencies=[Depends(bind_public)])
+    router = APIRouter(dependencies=[Depends(bind_public_viewer)])
 
     @router.api_route("/{slug}", methods=["GET", "HEAD"], response_model=None)
     async def public_view(
@@ -227,11 +235,14 @@ def locale_router(locale: str) -> APIRouter:
         inertia: InertiaDep,
         db: AsyncSession = Depends(get_db),
         settings: PagebuilderSettings = Depends(get_settings),
+        tenant: str | None = Depends(bind_public_viewer),
     ) -> Response:
         """A published page at this module's own address, in one language."""
-        return await render_public_page(
-            slug, request, inertia, db, settings, locale=locale
-        )
+        if tenant is None:
+            return await render_not_found(
+                request, inertia, settings, locale=locale, layout=None, nav=None
+            )
+        return await render_public_page(slug, request, inertia, db, settings, locale=locale)
 
     return router
 

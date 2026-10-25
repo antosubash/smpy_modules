@@ -106,10 +106,10 @@ sequenceDiagram
   participant R as locale_router(locale)
   participant DB as pages / redirects / layout
   V->>R: GET /de/p/about
-  R->>R: bind_public (tenant or 404)
+  R->>R: bind_public_viewer (tenant, or PublicNotFound with no layout)
   R->>DB: published page (slug, locale)
   alt not found
-    R->>DB: redirects.resolve(slug, locale) → 301 to current URL, else 404
+    R->>DB: redirects.resolve(slug, locale) → 301 to current URL, else PublicNotFound
   end
   R->>DB: layout + site_nav(locale)
   R->>R: ETag(page, layout, variant, nav) → 304 on match
@@ -126,9 +126,25 @@ sequenceDiagram
   skipping hrefs the layout already has (trailing slash ignored, dropdown
   children included) — `appendPages` in
   `components/widgets/_internal/site-nav-context.tsx`. Order is the layout's.
-- **Preview** (`/pagebuilder/{id}/preview`) renders `draft_data` through the same
-  `PublicPage` component with `index_in_search=False` and no alternates, so the
-  preview cannot disagree with the live renderer.
+- **Preview** (`/pagebuilder/{id}/preview`, `endpoints/preview_view.py`)
+  renders `draft_data` through the same `PublicPage` component with
+  `index_in_search=False` and no alternates, so the preview cannot disagree
+  with the live renderer. Its `preview` prop (`editor_href`, `status`) is what
+  shows the draft bar; no public route sets it.
+- **Not found** (`endpoints/public_not_found.py`, #89): an unknown, draft,
+  trashed or not-yet-live slug renders `PageBuilder/PublicNotFound` with status
+  404, one body for every cause (no oracle), `Cache-Control: no-store` plus the
+  tenant `Vary`. A request that resolved no tenant gets the same page with no
+  layout and no nav — never the default tenant's. `Accept: application/json`
+  without `text/html` keeps `{"detail": "Page not found"}`. The frame's words
+  (skip link, not-found copy) come from `public_copy.py` in the *content*
+  locale, not the visitor's UI language.
+- **`PublicShell`** (`components/public/`) is the one frame for the page, the
+  preview and the 404: branding head, design-pack root class, skip link to
+  `main#main`, a `min-h-dvh` column with `main` as `flex-1` (footer at the
+  bottom of a short page), the preview bar, and `print.css` (header, footer,
+  bar and skip link hidden in print). Author content is untouched. Public pages
+  deliberately ignore `prefers-color-scheme`: the look is the design pack's.
 - **Sitemap** uses a column-only query (no block JSON) and adds `xhtml:link`
   alternates per translation group.
 
@@ -236,11 +252,11 @@ one — ignoring trashed pages.
 | `tenancy.py`, `access.py`, `csrf.py`, `permissions.py` | tenant binding; admin route dependencies; CSRF; permissions and roles |
 | `models/`, `contracts/` | tables; public DTOs and `PageDeleted` |
 | `service/` | `PagesService` (CRUD, workflow, revisions, trash, translations) |
-| `layout_service.py`, `site_nav.py`, `redirects.py` | layout; nav flags; old slugs |
+| `layout_service.py`, `site_nav.py`, `redirects.py`, `public_copy.py` | layout; nav flags; old slugs; the public frame's strings per content locale |
 | `media_*.py` | upload, images, queries, files, usage |
 | `scheduler.py` | per-tenant publish/unpublish/purge loop |
 | `snapshots/` | capture, archive, validate, plan, apply |
 | `endpoints/api/` | JSON API, one file per resource |
-| `endpoints/views.py`, `content_views.py` | Inertia admin views |
-| `endpoints/public_views.py`, `seo.py` | public viewer; sitemap and robots |
+| `endpoints/views.py`, `content_views.py`, `preview_view.py` | Inertia admin views |
+| `endpoints/public_views.py`, `public_not_found.py`, `seo.py` | public viewer and its 404; sitemap and robots |
 | `pages/`, `components/`, `hooks/`, `utils/` | frontend |

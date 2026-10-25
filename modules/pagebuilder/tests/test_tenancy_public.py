@@ -128,3 +128,33 @@ async def test_single_mode_stamps_the_default_tenant(authed_client: AsyncClient,
     async with app.state.sm.db.session_factory() as session:
         rows = (await session.execute(select(Page.tenant_id))).scalars().all()
     assert rows == ["default"]
+
+
+@pytest.mark.unbound_tenant
+async def test_no_tenant_gets_the_404_page_without_any_sites_layout(
+    mt: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No tenant, no frame (#89): reading a layout here would mean reading the
+    default tenant's, and branding another organisation's address with it."""
+    from pagebuilder.layout_service import LayoutService
+
+    await _publish(mt, A, "x", "X")
+    reads: list[object] = []
+    original = LayoutService.get
+
+    async def spy(self: LayoutService):
+        reads.append(self)
+        return await original(self)
+
+    monkeypatch.setattr(LayoutService, "get", spy)
+
+    response = await mt.get("/p/x", headers=INERTIA)
+
+    assert response.status_code == 404
+    body = response.json()
+    assert body["component"] == "PageBuilder/PublicNotFound"
+    assert body["props"]["layout_header"] is None
+    assert body["props"]["layout_footer"] is None
+    assert body["props"]["site_nav"] is None
+    assert response.headers["Cache-Control"].endswith("no-store")
+    assert reads == []

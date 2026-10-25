@@ -1402,5 +1402,17 @@
     "media": "Media library",
     "import_export": "Import / Export",
     "group_site": "Site"
+  },
+  "public": {
+    "skip_to_content": "Skip to content",
+    "not_found": {
+      "title": "This page doesn't exist",
+      "body": "The address may be mistyped, or the page may have been moved or taken down.",
+      "home": "Go to the home page"
+    },
+    "preview": {
+      "label": "Preview — this draft is not published",
+      "back_to_editor": "Back to editor"
+    }
   }
 }

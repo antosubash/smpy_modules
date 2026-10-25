@@ -1,0 +1,40 @@
+/* Printing a public page prints the author's content, not the site around it
+   (#89). The layout's header and footer, the draft bar and the skip link are
+   chrome a sheet of paper has no use for; the page's own address takes their
+   place, so a printout says where it came from. Author blocks are untouched
+   apart from external links in prose, which gain their target — a printed
+   link is otherwise just underlined text. Scoped to the public shell, so the
+   console prints as it always has. */
+.pb-print-url {
+  display: none;
+}
+
+@media print {
+  .pb-public [data-testid="site-header"],
+  .pb-public [data-testid="site-footer"],
+  .pb-public .pb-preview-bar,
+  .pb-public .pb-skip {
+    display: none;
+  }
+
+  .pb-public {
+    min-height: 0;
+  }
+
+  .pb-public main {
+    padding: 0;
+  }
+
+  .pb-public .pb-print-url {
+    display: block;
+    margin: 0 0 1rem;
+    font-size: 0.75rem;
+    color: #555;
+  }
+
+  .pb-public main .prose a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    word-break: break-all;
+  }
+}

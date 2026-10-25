@@ -1,13 +1,11 @@
-import { Head, usePage } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { type Data, Render } from '@puckeditor/core';
-import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
-import type { SharedProps } from '@simple-module-py/ui/types';
 
-import { getLayoutPuckConfig } from '../components/layoutPuckConfig';
 import { migrateContent } from '../components/migrateContent';
+import type { PreviewInfo } from '../components/public/PreviewBar';
+import { type PublicCopy, PublicShell } from '../components/public/PublicShell';
 import { getPuckConfig } from '../components/puckConfig';
-import { type SiteNav, SiteNavProvider } from '../components/widgets/_internal/site-nav-context';
-import { useDocumentLang } from '../hooks/useDocumentLang';
+import type { SiteNav } from '../components/widgets/_internal/site-nav-context';
 
 /** One language this document also exists in, as the server resolved it. */
 interface Alternate {
@@ -34,6 +32,10 @@ interface Props {
   layout_footer?: Record<string, unknown> | null;
   /** Pages flagged for the header / footer nav, in this page's language. */
   site_nav?: SiteNav | null;
+  /** Only the admin's draft preview sends this; it shows the draft bar. */
+  preview?: PreviewInfo | null;
+  /** The frame's own strings, in this page's language. */
+  copy?: PublicCopy | null;
 }
 
 // Inline JSON-LD as a string requires the document to be safe to embed
@@ -64,35 +66,23 @@ export default function PublicPage({
   layout_header,
   layout_footer,
   site_nav,
+  preview,
+  copy,
 }: Props) {
   const jsonLdScript = json_ld ? safeJsonLd(json_ld) : null;
-  // The server writes `<html lang>` for a fresh document; this covers an
-  // Inertia visit between languages, which keeps the old shell (#187).
-  useDocumentLang(locale ?? undefined);
-  // The design pack is a site-wide branding setting: one site, one look. Its
-  // CSS is scoped to a root class, applied here around the *whole* document so
-  // the header and footer adopt it too — a class on the page root alone would
-  // stop at <main> and leave the chrome reading as a different site.
-  //
-  // `designPack` is not on the published SharedProps type yet; the cast goes
-  // away when the framework release carrying it lands.
-  const { branding } = usePage<{ props: SharedProps }>().props as unknown as SharedProps;
-  const designPack = (branding as unknown as { designPack?: string | null })?.designPack;
-  // Bound once per render because each of the three `migrateContent` calls
-  // below needs the same config its `<Render>` gets — migrating against a
-  // different palette than the one rendering would resolve zones to slots the
-  // renderer doesn't have.
+  // The same config its `<Render>` gets: migrating against a different
+  // palette than the one rendering would resolve zones to slots the renderer
+  // doesn't have. The layout's header and footer are `PublicShell`'s.
   const pageConfig = getPuckConfig();
-  const layoutConfig = getLayoutPuckConfig();
   return (
-    <div className={designPack ? `${designPack}-root` : undefined}>
-      {/* The admin shell mounts this through AuthenticatedLayout; a public page
-          has no layout, so without it the configured brand colour and favicon
-          stopped at the sign-in wall. The widgets' `--pb-accent` and their
-          solid `bg-primary-800` surfaces read the `--primary` / ramp variables
-          it writes, so this is what makes Settings → Branding reach the
-          public site. */}
-      <BrandingHead />
+    <PublicShell
+      locale={locale}
+      layout_header={layout_header}
+      layout_footer={layout_footer}
+      site_nav={site_nav}
+      preview={preview}
+      copy={copy}
+    >
       <Head title={title}>
         {meta_description && (
           <>
@@ -135,27 +125,7 @@ export default function PublicPage({
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript }} />
         )}
       </Head>
-      <SiteNavProvider nav={site_nav}>
-        {layout_header && (
-          <header data-testid="site-header">
-            <Render
-              config={layoutConfig}
-              data={migrateContent(layout_header as unknown as Data, layoutConfig)}
-            />
-          </header>
-        )}
-        <main>
-          <Render config={pageConfig} data={migrateContent(data as unknown as Data, pageConfig)} />
-        </main>
-        {layout_footer && (
-          <footer data-testid="site-footer">
-            <Render
-              config={layoutConfig}
-              data={migrateContent(layout_footer as unknown as Data, layoutConfig)}
-            />
-          </footer>
-        )}
-      </SiteNavProvider>
-    </div>
+      <Render config={pageConfig} data={migrateContent(data as unknown as Data, pageConfig)} />
+    </PublicShell>
   );
 }
