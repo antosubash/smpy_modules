@@ -124,11 +124,16 @@ def validate_sections(
     """Hand each known section its extracted files; unknown ones are kept unread."""
     media_names = frozenset(index)
     for section, entry in present(manifest, registry):
-        section.validate(
-            ValidateContext(
-                dir=dest / section.name, version=entry["version"], media_names=media_names
+        try:
+            section.validate(
+                ValidateContext(
+                    dir=dest / section.name, version=entry["version"], media_names=media_names
+                )
             )
-        )
+        except BundleError:
+            raise
+        except Exception as exc:  # a contributor parsing untrusted files
+            raise BundleError(f"the {section.name!r} section is malformed") from exc
 
 
 def revalidate(

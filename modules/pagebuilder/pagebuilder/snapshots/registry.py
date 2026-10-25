@@ -39,6 +39,8 @@ class SectionRegistry:
             raise ValueError(f"bundle section {name!r} cannot read the version {version} it writes")
         if not isinstance(section.required, bool):
             raise ValueError(f"bundle section {name!r} has a non-boolean 'required'")
+        if not isinstance(getattr(section, "label_key", None), str):
+            raise ValueError(f"bundle section {name!r} has no label_key")
         for method in ("capture", "validate", "plan", "apply"):
             if not callable(getattr(section, method, None)):
                 raise ValueError(f"bundle section {name!r} has no {method}() method")

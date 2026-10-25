@@ -116,6 +116,21 @@ async def test_a_section_enabled_after_staging_is_validated_before_apply(tmp_pat
         assert (await client.get(_PENDING)).json()["id"] == staged.json()["id"]
 
 
+async def test_a_contributor_crashing_in_validate_is_a_422(tmp_path):
+    section = NotesSection()
+    async for client in notes_client(tmp_path, section):
+        taken = await _take(client)
+        data = (await client.get(f"{_SNAPSHOTS}/{taken['id']}/download")).content
+
+        def crash(ctx):
+            raise KeyError("name")
+
+        section.validate = crash
+        refused = await client.post(f"{_SNAPSHOTS}/upload", files={"file": ("b.zip", data)})
+        assert refused.status_code == 422
+        assert "'notes' section is malformed" in refused.json()["detail"]
+
+
 async def test_non_integer_counts_fail_the_capture(tmp_path):
     section = NotesSection()
     original = section.capture
