@@ -1,38 +1,45 @@
 """The ``text``-like length and pattern checks, split from ``_builders`` for
-the 300-line cap — and because the pattern match is the one place a check has
-to be bounded in *time*, not only in size (#101).
+the 300-line cap.
+
+Patterns are Python ``re`` patterns, matched with ``re`` — the same engine the
+save-time check compiles them with, so a constraint means exactly what it has
+always meant. ``re`` cannot be interrupted, and ``_sre`` holds the GIL for a
+whole match, so an admin's ``^(a+)+$`` and an attacker's ``aaaa…!`` would pin
+the event loop. Input from a website visitor therefore never reaches the
+match here: :mod:`sm_records.public_submissions.patterns` checks it first in
+a worker process under one deadline for the whole submission, and the writes
+that follow run inside :func:`patterns_prechecked`, which skips the match
+(the value was checked — or it is a stored value that already was).
 """
 
 from __future__ import annotations
 
+import re
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any
 
-import regex
+__all__ = ["patterns_prechecked", "text_check"]
 
-__all__ = ["PATTERN_TIMEOUT_SECONDS", "text_check"]
-
-PATTERN_TIMEOUT_SECONDS = 0.1
-"""How long one ``constraints.pattern`` match may run. An admin-written
-pattern can backtrack catastrophically (``^(a+)+$``), and a website visitor
-chooses the input (#101): a synchronous ``re`` match would pin the event loop.
-``regex`` honours a timeout inside the matcher, and running out of it is the
-same refusal as not matching."""
+_PRECHECKED: ContextVar[bool] = ContextVar("sm_records_patterns_prechecked", default=False)
 
 
-def _compile_pattern(source: str) -> Any:
+@contextmanager
+def patterns_prechecked() -> Iterator[None]:
+    """Skip ``constraints.pattern`` inside the block: the caller has checked
+    every value it writes against it already (off the event loop)."""
+    token = _PRECHECKED.set(True)
     try:
-        return regex.compile(source)
-    except regex.error:
-        # Valid for ``re`` (the save-time check) but not for ``regex``: refuse
-        # every value rather than match it with an unbounded engine.
-        return None
+        yield
+    finally:
+        _PRECHECKED.reset(token)
 
 
 def text_check(constraints: dict[str, Any], *, required: bool = False):
     minimum = constraints.get("min_length")
     maximum = constraints.get("max_length")
-    source = constraints.get("pattern") or None
-    pattern = _compile_pattern(source) if source else None
+    pattern = re.compile(constraints["pattern"]) if constraints.get("pattern") else None
 
     def check(value: str | None) -> str | None:
         if value is None:
@@ -45,17 +52,8 @@ def text_check(constraints: dict[str, Any], *, required: bool = False):
             raise ValueError(f"must be at least {minimum} characters")
         if maximum is not None and len(value) > maximum:
             raise ValueError(f"must be at most {maximum} characters")
-        if source is not None and not _matches(pattern, value):
-            raise ValueError(f"must match {source}")
+        if pattern is not None and not _PRECHECKED.get() and not pattern.search(value):
+            raise ValueError(f"must match {pattern.pattern}")
         return value
 
     return check
-
-
-def _matches(pattern: Any, value: str) -> bool:
-    if pattern is None:
-        return False
-    try:
-        return pattern.search(value, timeout=PATTERN_TIMEOUT_SECONDS) is not None
-    except TimeoutError:
-        return False

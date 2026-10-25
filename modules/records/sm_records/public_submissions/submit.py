@@ -3,9 +3,11 @@
 Every check runs before anything is written, cheapest first: the two rate
 limits, the honeypot, the signed form token, the type (enabled, of a kind
 served), whether what the visitor saw has changed, the allowlist of fields, the
-consent box. Then the write is ``services.records.create_record`` — the call
-the admin ``POST /records`` makes — so validation, ``unique`` claims, the
-revision, the index rows and ``RecordCreated`` are exactly an admin create's.
+consent box, and the field patterns — in a worker process, under one deadline
+for the whole submission (:mod:`.patterns`). Then the write is
+``services.records.create_record`` — the call the admin ``POST /records``
+makes — so validation, ``unique`` claims, the revision, the index rows and
+``RecordCreated`` are exactly an admin create's.
 The record is always a **draft** (a submission is personal data, and never
 published), written by nobody (``actor=None``), with its ``sm_*`` values
 passed through ``system=``; nothing the visitor sends can reach one.
@@ -41,7 +43,9 @@ from sm_records.public_submissions.definition import (
 )
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.mail_runner import queue_notification
+from sm_records.public_submissions.patterns import check_patterns
 from sm_records.public_submissions.tokens import TokenError, host_secret, ip_hash, verify_form
+from sm_records.schema._text_checks import patterns_prechecked
 from sm_records.schema.types import FieldType
 from sm_records.services import records as record_service
 from sm_records.services._payload import field_defs
@@ -169,18 +173,22 @@ async def submit(
             "tick the consent box to send this form",
             errors=[{"field": "consent", "message": "required"}],
         )
+    # Off the event loop, under one deadline for the whole submission; the
+    # write below then skips the patterns it would otherwise match again.
+    await check_patterns(request.app, rtype, data)
     limit = settings.public_submissions_max_links
     spam = bool(limit) and abuse.count_links(data) > limit
     try:
-        record = await record_service.create_record(
-            db,
-            rtype,
-            data=data,
-            settings=settings,
-            status=RecordStatus.DRAFT,
-            actor=None,
-            system=_system(request, rtype, body, settings, spam),
-        )
+        with patterns_prechecked():
+            record = await record_service.create_record(
+                db,
+                rtype,
+                data=data,
+                settings=settings,
+                status=RecordStatus.DRAFT,
+                actor=None,
+                system=_system(request, rtype, body, settings, spam),
+            )
     except ValidationFailed as exc:
         raise SubmissionRefused("invalid", exc.detail, errors=exc.errors) from exc
     except Conflict as exc:

@@ -21,9 +21,7 @@ async def test_create_appends_the_kinds_system_fields(client):
     assert resp.status_code == 201, resp.text
     body = resp.json()
     assert keys_of(body) == ["name", "email", "message", "triage", *FORM_SYSTEM_KEYS]
-    system = {entry["key"]: entry["system"] for entry in body["fields"][4:]}
-    assert system.pop("sm_delivery") == "internal", "delivery bookkeeping is hidden"
-    assert set(system.values()) == {"readonly"}
+    assert all(entry["system"] == "readonly" for entry in body["fields"][4:])
     assert all("system" not in entry for entry in body["fields"][:4])
     assert body["public_submissions"] == {
         "kind": "form",

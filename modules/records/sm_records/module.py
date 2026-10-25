@@ -232,6 +232,12 @@ class RecordsModule(ModuleBase):
 
         await boot.startup(self, app)
 
+    async def on_shutdown(self, app: FastAPI) -> None:
+        """Stop the pattern-check workers of website submissions (#101)."""
+        from sm_records.public_submissions import patterns
+
+        await patterns.close(app)
+
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
         """The outbox handler that mails a website submission's notification
         (#101), when the host delivers durably. Registered whatever ``app`` is:

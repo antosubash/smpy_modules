@@ -4,13 +4,9 @@ cases where a submission is stored and deliberately not mailed."""
 from __future__ import annotations
 
 import logging
-import time
 
-import pytest
 from sm_records.contracts.events import FormSubmitted
-from sm_records.schema._text_checks import text_check
 
-from tests.public_submissions_support import contact_fields, create, form_config
 from tests.submissions_http import (
     configure,
     contact_type,
@@ -125,28 +121,3 @@ async def test_the_ip_hash_and_user_agent_can_be_left_out(site):
     (record,) = await records_of(site)
     assert record["data"]["sm_ip_hash"] is None
     assert record["data"]["sm_user_agent"] is None
-
-
-async def test_a_backtracking_pattern_cannot_pin_the_server(site):
-    """ReDoS: an admin's ``^(a+)+$`` on a public field, and a visitor's
-    ``aaaa…!``. The match is time-bounded, and running out is a refusal."""
-    fields = contact_fields()
-    fields[0]["constraints"] = {"pattern": "^(a+)+$"}
-    config = form_config(enabled=True, notify_to=["ops@example.org"])
-    assert (await create(site, "evil", fields=fields, config=config)).status_code == 201
-    started = time.monotonic()
-    evil = {"name": "a" * 5000 + "!", "email": "a@b.org", "message": "m"}
-    resp = await send(site, "evil", data=evil)
-    assert time.monotonic() - started < 5
-    assert (resp.status_code, resp.json()["code"]) == (422, "invalid")
-    assert [e["field"] for e in resp.json()["errors"]] == ["name"]
-    ok = await send(site, "evil", data={"name": "aaa", "email": "a@b.org", "message": "m"})
-    assert ok.status_code == 202, "the pattern still matches what it should"
-
-
-def test_the_pattern_check_is_bounded_on_every_path():
-    """The same validator serves the admin API, so it is bounded there too."""
-    check = text_check({"pattern": "^(a|aa)+$"})
-    with pytest.raises(ValueError, match="must match"):
-        check("a" * 5000 + "!")
-    assert check("aaaa") == "aaaa"

@@ -1434,6 +1434,16 @@ request: through the outbox when the host has a durable transport
 (`background_tasks`), otherwise from a task started after the commit. It is
 sent only when the host's mail sender delivers email and `public_base_url`
 is set; otherwise the record stands and `sm_notified_at` stays `null`.
+Each recipient of one delivery attempt is claimed in the internal
+`records_submission_delivery` table before it is mailed, so a retry never
+mails a recipient whose send was recorded and two workers never both send;
+a claim left by a crashed worker is retried once it is ten minutes old. A
+*Resend* is a new attempt and reaches everyone again.
+
+**Field patterns** keep Python `re`'s meaning on this path too. A visitor's
+values are matched in a worker process, never on the server's event loop,
+with one half-second budget for the whole submission; a submission that runs
+out of it is a `422 invalid` (`__root__`: "took too long to check").
 
 Three admin actions sit under the record, need `records.edit` and the
 type's `allowed_roles`, and refuse a type that is not a contact form with

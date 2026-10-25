@@ -212,7 +212,9 @@ does not make a write re-claim a value the row already holds.
    runners, `services/reindex_runner` and `services/preview_runner`, which
    have no `get_db` to commit for them, and
    `public_submissions/mail_runner`, which marks a website submission's
-   notification sent after the request that stored it is gone (#101).
+   notification sent after the request that stored it is gone (#101) — with
+   `public_submissions/delivery`, whose per-recipient claims commit in
+   sessions of their own so that no rollback can forget a send.
 
 Because the error route turns an exception into a *response* inside the handler,
 `get_db` never sees it and would commit whatever the refused call already wrote.

@@ -16,9 +16,8 @@ Their *values* are written only through the internal ``system=`` argument of
 the stored ones over (``services._payload.carry_system``).
 
 ``system`` is ``"readonly"`` (shown in the record editor's read-only panel, the
-list's columns and the export) or ``"internal"`` (hidden
-from all three, kept in the admin API's ``data``): a newsletter's
-``sm_nonce`` and a contact form's ``sm_delivery``.
+list's columns and the export) or ``"internal"`` (``sm_nonce`` only: hidden
+from all three, kept in the admin API's ``data``).
 """
 
 from __future__ import annotations
@@ -96,9 +95,6 @@ _FORM: Final = (
     _field("sm_consent_text", "Consent text", _LONG),
     _field("sm_spam", "Spam", FieldType.SELECT, choices=("links", "manual")),
     _field("sm_notified_at", "Notified at", _DT),
-    # Which recipients one delivery attempt has reached, so a retry mails only
-    # the rest (``public_submissions.mail_runner``). Bookkeeping: internal.
-    _field("sm_delivery", "Delivery", _LONG, system=INTERNAL),
 )
 
 _SUBSCRIPTION: Final = (

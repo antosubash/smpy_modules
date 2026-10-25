@@ -16,9 +16,6 @@ dependencies = [
     "simple_module_inertia>=0.0.38,<0.1",
     "simple_module_settings>=0.0.38,<0.1",
     "pydantic-settings>=2.0",
-    # Pattern matching with a timeout: input from a public form must not be
-    # able to backtrack a constraint pattern without bound (#101).
-    "regex>=2022.1.18",
 ]
 
 [project.urls]
