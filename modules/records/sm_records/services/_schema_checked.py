@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from sm_records.schema.fields import FieldDefinition
 from sm_records.services._patterns import check_defaults
 from sm_records.services._schema import normalise
 from sm_records.settings import RecordsSettings
@@ -19,7 +20,7 @@ __all__ = ["normalise_checked"]
 
 async def normalise_checked(
     fields_raw: list[dict[str, Any]], settings: RecordsSettings, *, kind: str | None = None
-) -> Any:
+) -> tuple[list[FieldDefinition], list[dict[str, Any]]]:
     defs, fields = normalise(fields_raw, settings, kind=kind)
     await check_defaults(defs)
     return defs, fields

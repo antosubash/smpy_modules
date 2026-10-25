@@ -94,8 +94,9 @@ async def test_the_delivery_mark_is_not_announced_as_an_edit(site):
 
 async def test_a_honeypot_hit_is_accepted_and_dropped(site):
     await contact_type(site)
-    resp = await send(site, hp="I am a bot")
-    assert (resp.status_code, resp.json()) == (202, {"ok": True})
+    for trap in ("I am a bot", "x" * 5000):
+        resp = await send(site, hp=trap)
+        assert (resp.status_code, resp.json()) == (202, {"ok": True}), "any value, same answer"
     assert await records_of(site) == []
     assert site.outbox.sent == []
 
@@ -145,6 +146,7 @@ async def test_an_oversized_body_is_refused_before_it_is_read(site):
         f"{SUBMISSIONS}/contact/submit", content=b"{" + b" " * 20000 + b"}", headers=JSON
     )
     assert resp.status_code == 413, resp.text
+    assert resp.headers["cache-control"] == "no-store"
 
 
 async def test_a_bad_young_or_old_token_is_form_expired(site):

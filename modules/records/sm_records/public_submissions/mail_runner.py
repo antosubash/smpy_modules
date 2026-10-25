@@ -41,7 +41,6 @@ from typing import Any, Final
 from simple_module_core.events import Event
 from simple_module_core.mail import (
     MailSender,
-    current_mail_sender,
     mail_transport_installed,
     resolve_mail_sender,
 )
@@ -164,14 +163,18 @@ def _independent(db: AsyncSession) -> Any:
 
 
 async def _run(app: Any, due: NotificationDue) -> None:
-    sender = current_mail_sender()
-    if not _can_send(sender, due):
-        return
     services = getattr(app.state, constants.PACKAGE, None)
     settings = getattr(services, "settings", None) or RecordsSettings()
     with tenant_scope(due.tenant_id):
         session = app.state.sm.db.session_factory()
         try:
+            # Resolved from the session, like the outbox path: a host whose
+            # sender is built from database settings installs a resolver, not
+            # a sender, and ``current_mail_sender`` alone would answer the
+            # console fallback (``delivers_email`` false) and never mail.
+            sender = await resolve_mail_sender(session)
+            if not _can_send(sender, due):
+                return
             loaded = await load(session, due)
             if loaded is not None:
                 factory = app.state.sm.db.session_factory

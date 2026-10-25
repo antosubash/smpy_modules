@@ -25,7 +25,6 @@ __all__ = [
 ]
 
 MAX_TOKEN_LEN = 200
-MAX_HONEYPOT_LEN = 1000
 
 
 class SubmissionField(SQLModel):
@@ -67,8 +66,10 @@ class SubmitBody(SQLModel):
 
     data: dict[str, Any] = Field(default_factory=dict)
     token: str = Field(default="", max_length=MAX_TOKEN_LEN)
-    hp: str = Field(default="", max_length=MAX_HONEYPOT_LEN)
-    """The honeypot: a hidden input a person never fills in."""
+    hp: str = ""
+    """The honeypot: a hidden input a person never fills in. Unbounded on
+    purpose (the body cap bounds it): a length refusal would tell a bot it was
+    caught, where any value is the same silent 202."""
     consent: bool = False
     block: str | None = Field(default=None, max_length=100)
     """A hint naming the page block that sent it (``sm_source_block``)."""

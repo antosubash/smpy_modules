@@ -229,11 +229,13 @@ async def deliver(
     failure: Exception | None = None
     for to in (rtype.public_submissions or {}).get("notify_to", []):
         slot = Slot(tenant, record.uuid, attempt, to)
+        # Built before the claim: a failure here must not leave a claim that
+        # blocks the retry for a whole lease.
+        message = notification(rtype, record, to=to, base_url=due.base_url, locale=due.locale)
         state, token = await claim(factory, slot)
         if state != "claimed" or token is None:
             busy = busy or state == "busy"
             continue
-        message = notification(rtype, record, to=to, base_url=due.base_url, locale=due.locale)
         try:
             await _send_one(factory, slot, token, sender, message)
         except Exception as exc:

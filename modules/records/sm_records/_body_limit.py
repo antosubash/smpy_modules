@@ -109,6 +109,8 @@ async def _refuse(declared: int, limit: int, send: Send) -> None:
             "status": 413,
             "headers": [
                 (b"content-type", b"application/json"),
+                # Never cached: the refusal is about this one request.
+                (b"cache-control", b"no-store"),
                 (b"content-length", str(len(body)).encode()),
             ],
         }
