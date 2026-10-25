@@ -134,3 +134,32 @@ async def test_the_fallback_clears_optional_values_and_a_unique_one_never_blocks
     assert data["sm_status"] == "unsubscribed" and data["sm_nonce"] != record["data"]["sm_nonce"]
     assert data["city"] is None, "cleared by the direct merge"
     assert data["member_id"] == "M-1" and data["first_name"] == "x" * 500
+
+
+async def test_an_unchanged_unique_value_does_not_block_the_direct_merge(site):
+    """A change that names the subscriber's own ``sm_email`` again (a
+    re-subscribe's system values) still lands on a misfit record."""
+    from sm_records.public_submissions.transition import transition
+    from sm_records.services.records import get_record
+    from sm_records.settings import RecordsSettings
+    from sm_records.tenancy import tenant_scope
+
+    first = field("first_name", required=True, indexed=False)
+    first["constraints"] = {"max_length": 100}
+    config = list_config(public_fields=["first_name"])
+    assert (await create(site, "club", fields=[first], config=config)).status_code == 201
+    await signup(site, key="club", data={"first_name": "Ada"})
+    record = await subscriber(site, "club")
+    await _misfit(site, record, "club", first_name="x" * 500)
+    values = {"sm_email": record["data"]["sm_email"], "sm_status": "unsubscribed"}
+    async with site.db_state.session_factory() as session:
+        with tenant_scope("default"):
+            stmt = select(RecordType).where(RecordType.key == "club")
+            rtype = (await session.execute(stmt)).scalar_one()
+            row = await get_record(session, rtype, record["uuid"])
+            outcome = await transition(
+                session, rtype, row, lambda _row: (values, None), settings=RecordsSettings()
+            )
+            await session.commit()
+    assert outcome.wrote
+    assert (await subscriber(site, "club"))["data"]["sm_status"] == "unsubscribed"

@@ -166,9 +166,11 @@ async def budget_wait(
     request: Request, rtype: RecordType, email: str, settings: RecordsSettings
 ) -> int:
     """Count one confirmation against the address's budget on this list: ``0``
-    while within it, else the seconds until it frees up. Keyed by a hash, so
-    the address itself is never a rate-limit key."""
-    digest = hashlib.sha256(email.encode()).hexdigest()
+    while within it, else the seconds until it frees up. Keyed by a keyed
+    hash, so neither the address nor a plain digest of it — which a list of
+    addresses would reverse — is ever a rate-limit key."""
+    secret = host_secret(request.app).encode()
+    digest = hmac.new(secret, f"budget|{email}".encode(), hashlib.sha256).hexdigest()
     key = abuse.rate_key(rtype.tenant_id, f"{rtype.key}:email={digest}")
     return await abuse.wait(request, key, settings.public_submissions_confirm_rate_per_email)
 

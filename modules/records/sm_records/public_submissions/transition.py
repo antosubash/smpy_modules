@@ -108,13 +108,17 @@ async def transition(
         except ValidationFailed as exc:
             refused = exc.detail
         clearable, kept = _clearable(rtype, before, data)
-        if await _merge_marks(db, rtype, record, values, ordinary=clearable, version=seen):
+        # A unique system value the change leaves as it is (a re-subscribe's
+        # ``sm_email``) is no claim to check: dropped, so the merge can land.
+        unique = {entry.key for entry in field_defs(rtype) if entry.unique}
+        marks = {k: v for k, v in values.items() if not (k in unique and before.get(k) == v)}
+        if await _merge_marks(db, rtype, record, marks, ordinary=clearable, version=seen):
             logger.warning(
                 "records: %s record %s no longer matches its schema (%s); %s written directly%s",
                 rtype.key,
                 record.uuid,
                 refused,
-                ", ".join([*values, *clearable]),
+                ", ".join([*marks, *clearable]),
                 f"; not cleared: {', '.join(kept)}" if kept else "",
             )
             return Outcome(await _reload(db, record), before, wrote=True)
