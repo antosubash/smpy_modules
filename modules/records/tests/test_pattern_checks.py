@@ -12,7 +12,7 @@ from sm_records import _pattern_worker
 from sm_records.schema._text_checks import checked, text_check
 from sm_records.services import _patterns
 
-from tests.app_harness import ADMIN, field, roles
+from tests.app_harness import ADMIN, field, roles, seed_type
 
 API = "/api/records/types"
 EVIL = "^(a|aa)+$"
@@ -147,3 +147,63 @@ async def test_a_verdict_covers_exactly_its_pair():
         check("y")
     with pytest.raises(ValueError):
         check("zz")
+
+
+SLOW_DEFAULT = "^(a+)+$|!$"
+
+
+async def test_a_backtracking_default_is_checked_in_the_worker_on_save(client):
+    entry = field("name", indexed=False)
+    entry["constraints"] = {"pattern": SLOW_DEFAULT}
+    entry["default"] = "a" * 40 + "!"
+    body = {"key": "slowdefault", "label": "S", "fields": [entry]}
+    started = time.monotonic()
+    resp = await client.post(API, json=body, headers=roles(ADMIN))
+    assert time.monotonic() - started < 4
+    _too_slow(resp)
+    entry["constraints"] = {"pattern": "^x+$"}
+    entry["default"] = "y"
+    refused = await client.post(API, json=body, headers=roles(ADMIN))
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["errors"] == [
+        {"field": "name", "message": "default is invalid: must match ^x+$"}
+    ]
+    entry["default"] = "xx"
+    assert (await client.post(API, json=body, headers=roles(ADMIN))).status_code == 201
+
+
+async def test_a_stored_default_is_never_matched_again_on_load(client):
+    """A type whose stored default would backtrack: loading the schema (every
+    record read and write does) does not match it."""
+    entry = field("name", indexed=False)
+    entry["constraints"] = {"pattern": SLOW_DEFAULT}
+    entry["default"] = "a" * 40 + "!"
+    await seed_type(client.db_state, "stored", [entry])
+    started = time.monotonic()
+    assert (await client.get(f"{API}/stored", headers=roles(ADMIN))).status_code == 200
+    listed = await client.get(f"{API}/stored/records", headers=roles(ADMIN))
+    assert listed.status_code == 200
+    made = await client.post(
+        f"{API}/stored/records", json={"data": {"name": "!"}}, headers=roles(ADMIN)
+    )
+    assert made.status_code == 201, made.text
+    assert time.monotonic() - started < 4
+
+
+async def test_a_batch_whose_answer_exceeds_64_kib_is_framed():
+    pairs = [("^a", f"a{i}") for i in range(100_000)]
+    found = await _pattern_worker.pool().check(pairs, 30)
+    assert found is not None and len(found) == len(pairs) and all(found)
+    await _pattern_worker.close()
+
+
+async def test_a_garbled_worker_answer_is_a_clean_refusal(client, monkeypatch):
+    await _patterned(client)
+    await _pattern_worker.close()
+    garbled = "import sys\nfor _ in sys.stdin: print('{]', flush=True)"
+    monkeypatch.setattr(_pattern_worker, "_WORKER", garbled)
+    resp = await client.post(
+        f"{API}/note/records", json={"data": {"name": "aa"}}, headers=roles(ADMIN)
+    )
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["errors"] == [{"field": "__root__", "message": "could not be checked"}]

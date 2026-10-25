@@ -22,7 +22,11 @@ after-commit task's session) never loses them.
 **The residual window.** SMTP cannot be made exactly-once: a message the
 server accepted, followed by a crash (or a stall past the lease) before
 ``sent_at`` is written, is sent again by whoever takes the claim over. That
-window is one send long, and nothing else re-mails a recipient.
+window is one send long, and nothing else re-mails a recipient. It opens
+without a crash too: a send cancelled mid-SMTP by :data:`SEND_TIMEOUT`, after
+the server may already have accepted the message, is retried. And
+``asyncio.wait_for`` is not a hard wall-clock cap — it awaits the cancelled
+send's cleanup — so a send can outlast the timeout by that much.
 * A recipient claimed by another worker, still inside its lease, raises
   :class:`DeliveryInProgress`: the outbox retries later, and the record is not
   marked notified until every recipient is sent.

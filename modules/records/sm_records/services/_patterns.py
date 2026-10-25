@@ -24,7 +24,7 @@ from sm_records.schema.fields import FieldDefinition
 from sm_records.schema.types import FieldType
 from sm_records.services.errors import ValidationFailed
 
-__all__ = ["WRITE_BUDGET", "batch_budget", "pairs_of", "precheck"]
+__all__ = ["WRITE_BUDGET", "batch_budget", "check_defaults", "pairs_of", "precheck"]
 
 WRITE_BUDGET: Final = 2.0
 """Seconds for every pattern of one authenticated write together."""
@@ -35,6 +35,7 @@ _CAP: Final = 10.0
 _TEXTLIKE: Final = frozenset({FieldType.TEXT, FieldType.LONGTEXT, FieldType.EMAIL, FieldType.URL})
 
 TOO_SLOW: Final = "took too long to check"
+NOT_CHECKED: Final = "could not be checked"
 
 
 def batch_budget(values: int) -> float:
@@ -75,10 +76,40 @@ async def precheck(
     pending = sorted(pair for pair in pairs_of(defs, payloads) if pair not in known)
     if not pending:
         return {}
-    found = await _pattern_worker.pool().check(pending, WRITE_BUDGET if budget is None else budget)
+    try:
+        found = await _pattern_worker.pool().check(
+            pending, WRITE_BUDGET if budget is None else budget
+        )
+    except _pattern_worker.WorkerFailed as exc:
+        raise ValidationFailed(
+            f"the field patterns {NOT_CHECKED}", [{"field": "__root__", "message": NOT_CHECKED}]
+        ) from exc
     if found is None:
         raise ValidationFailed(
             f"checking the field patterns {TOO_SLOW}",
             [{"field": "__root__", "message": TOO_SLOW}],
         )
     return dict(zip(pending, found, strict=True))
+
+
+async def check_defaults(defs: Iterable[FieldDefinition]) -> None:
+    """A proposed schema's patterned defaults, matched in the worker.
+
+    ``validate_fields`` coerces a default without matching its pattern (that
+    would be a synchronous match, on every load of the schema), so a schema
+    save or preview checks them here, once, and refuses one that does not
+    match — or takes too long to tell — with a 422 naming the field.
+    """
+    defs = list(defs)
+    found = await precheck(defs, [{}])
+    for entry in defs:
+        pattern = (entry.constraints or {}).get("pattern")
+        if (
+            pattern
+            and isinstance(entry.default, str)
+            and found.get((pattern, entry.default)) is False
+        ):
+            problem = f"default is invalid: must match {pattern}"
+            raise ValidationFailed(
+                f"field {entry.key!r}: {problem}", [{"field": entry.key, "message": problem}]
+            )

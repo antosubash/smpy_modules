@@ -25,12 +25,28 @@ import sys
 import weakref
 from typing import Final
 
-__all__ = ["MAX_WORKERS", "PatternPool", "PoolBusy", "close", "pool", "started"]
+__all__ = [
+    "CHUNK",
+    "MAX_WORKERS",
+    "PatternPool",
+    "PoolBusy",
+    "WorkerFailed",
+    "close",
+    "pool",
+    "started",
+]
 
 MAX_WORKERS: Final = 2
 
+CHUNK: Final = 16384
+"""Verdicts per response line. A batch may hold a verdict per value of a
+20,000-row import, and asyncio's ``StreamReader`` refuses a line over its
+64 KiB limit, so the answer comes back as lines of ``0``/``1`` characters
+no longer than this, then a line holding only ``.``."""
+
 _WORKER = r"""
-import json, re, sys
+import re, sys, json
+CHUNK = @CHUNK@
 cache = {}
 for line in sys.stdin:
     out = []
@@ -40,14 +56,21 @@ for line in sys.stdin:
             if len(cache) > 256:
                 cache.clear()
             rx = cache[pattern] = re.compile(pattern)
-        out.append(rx.search(value) is not None)
-    sys.stdout.write(json.dumps(out) + "\n")
+        out.append("1" if rx.search(value) is not None else "0")
+    for start in range(0, len(out), CHUNK):
+        sys.stdout.write("".join(out[start:start + CHUNK]) + "\n")
+    sys.stdout.write(".\n")
     sys.stdout.flush()
-"""
+""".replace("@CHUNK@", str(CHUNK))
 
 
 class PoolBusy(RuntimeError):  # noqa: N818 - reads as the condition it is
     """No worker became free within the caller's wait."""
+
+
+class WorkerFailed(RuntimeError):  # noqa: N818 - reads as the condition it is
+    """The worker died or answered something that is not a verdict list. The
+    worker is gone; the caller refuses the write rather than guessing."""
 
 
 class _Worker:
@@ -72,10 +95,17 @@ class _Worker:
         assert self.proc.stdin is not None and self.proc.stdout is not None
         self.proc.stdin.write(json.dumps(checks).encode() + b"\n")
         await self.proc.stdin.drain()
-        line = await self.proc.stdout.readline()
-        if not line:
-            raise RuntimeError("records: the pattern worker exited")
-        return [bool(item) for item in json.loads(line)]
+        verdicts: list[bool] = []
+        while True:
+            line = (await self.proc.stdout.readline()).rstrip(b"\n")
+            if line == b".":
+                break
+            if not line or len(line) > CHUNK or line.strip(b"01"):
+                raise WorkerFailed("the pattern worker gave no well-formed answer")
+            verdicts.extend(char == ord("1") for char in line)
+        if len(verdicts) != len(checks):
+            raise WorkerFailed(f"{len(verdicts)} verdicts for {len(checks)} checks")
+        return verdicts
 
     async def kill(self) -> None:
         if self.proc.returncode is None:
@@ -104,6 +134,11 @@ class PatternPool:
             except TimeoutError:
                 await worker.kill()
                 return None
+            except (ValueError, OSError, WorkerFailed) as exc:
+                # ``readline`` raises ValueError past its limit; a dead pipe is
+                # an OSError. Either way the worker is unusable.
+                await worker.kill()
+                raise WorkerFailed(str(exc)) from exc
             except BaseException:
                 await worker.kill()
                 raise

@@ -23,8 +23,6 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.constants import REINDEX_ALL
-from sm_records.index.reindex import pending_map
 from sm_records.models import RecordType
 from sm_records.public_submissions.config import kind_of
 from sm_records.schema.changes import DryRunReport, SchemaDiff
@@ -32,9 +30,10 @@ from sm_records.schema.diff import diff_fields
 from sm_records.schema.types import ChangeClass
 from sm_records.services import _orphaned
 from sm_records.services._claims import lock_type
-from sm_records.services._common import bump_or_conflict, reload, utcnow
+from sm_records.services._common import bump_or_conflict, reload
 from sm_records.services._dry_run import change_report, refusal
 from sm_records.services._payload import field_defs
+from sm_records.services._pending import mark_pending
 from sm_records.services._preview import MISSING, pointer_preview_changes, reused_report
 
 # Re-exported: an undo is an ``apply`` of an earlier revision, so it belongs to
@@ -43,10 +42,10 @@ from sm_records.services._rollback import rollback
 from sm_records.services._schema import (
     check_pointers,
     check_targets,
-    normalise,
     pointers_moved,
     write_type_row,
 )
+from sm_records.services._schema_checked import normalise_checked
 from sm_records.services.errors import (
     Conflict,
     NotFound,
@@ -101,7 +100,7 @@ async def preview(
     normalised ``fields`` differ from the stored ones is refused, and the
     marking pass is given ``field_defs(rtype)`` rather than the body's.
     """
-    new_defs, _ = normalise(fields_raw, settings, kind=kind_of(rtype))
+    new_defs, _ = await normalise_checked(fields_raw, settings, kind=kind_of(rtype))
     stored_defs = field_defs(rtype)
     if rescan and new_defs != stored_defs:
         raise ValidationFailed(
@@ -136,26 +135,6 @@ async def preview(
         on_progress=on_progress,
     )
     return diff, report
-
-
-async def _mark_pending(
-    db: AsyncSession, rtype: RecordType, keys: list[str], *, whole_type: bool
-) -> None:
-    """Step 1 of §8.5, in the same transaction as the ``fields`` write. Every
-    marked key is refused as a filter or a sort key — a 409 naming it — until
-    the rebuild clears it; partial results without comment is the failure
-    mode this ceremony is for."""
-    if not keys and not whole_type:
-        return
-    pending = pending_map(rtype)
-    now = utcnow().isoformat()
-    for key in keys:
-        pending[key] = now
-    if whole_type:
-        pending[REINDEX_ALL] = now
-    rtype.reindex_pending = pending
-    db.add(rtype)
-    await db.flush()
 
 
 async def apply(
@@ -199,7 +178,7 @@ async def apply(
     """
     changes = dict(changes or {})
     new_defs, new_fields = (
-        normalise(fields_raw, settings, kind=kind_of(rtype, changes))
+        await normalise_checked(fields_raw, settings, kind=kind_of(rtype, changes))
         if fields_raw is not None
         else (field_defs(rtype), None)
     )
@@ -290,7 +269,7 @@ async def apply(
     # ``display_field`` feeds every record's denormalised ``display_title``
     # (§18 Q2), so changing it is a whole-type rebuild; ``slug_field`` is not —
     # a slug is an address, and regenerating one handed out breaks every link.
-    await _mark_pending(
+    await mark_pending(
         db, rtype, list(diff.keys(ChangeClass.INDEX_AFFECTING)), whole_type=display_moved
     )
     return rtype, diff

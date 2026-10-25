@@ -32,11 +32,13 @@ PHASE_4_TABLES = [
     "records_index_text",
     "records_record",
     "records_revision",
+    "records_submission_delivery",
     "records_type",
     "records_type_revision",
 ]
-"""Every table the module owned before Phase 5 §6, sorted. The reduce table of
-§5 is the eleventh and the newest; nothing else has moved since Phase 4."""
+"""Every table the module owns outside a collection, sorted: the Phase 4 set,
+the reduce table of §5, and the website submissions' delivery claims (#101).
+None of them is per collection."""
 
 
 def _run(source: str) -> str:

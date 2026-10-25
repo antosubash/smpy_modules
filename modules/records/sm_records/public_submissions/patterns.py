@@ -17,7 +17,7 @@ from sm_records import _pattern_worker
 from sm_records.models import RecordType
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.schema._text_checks import Verdicts
-from sm_records.services._patterns import TOO_SLOW, pairs_of
+from sm_records.services._patterns import NOT_CHECKED, TOO_SLOW, pairs_of
 from sm_records.services._payload import field_defs
 
 __all__ = ["BUDGET_SECONDS", "WAIT_SECONDS", "check_patterns"]
@@ -41,6 +41,12 @@ async def check_patterns(rtype: RecordType, data: dict[str, Any]) -> Verdicts:
         raise SubmissionRefused(
             "rate_limited", "too many submissions; try again", headers={"Retry-After": "1"}
         ) from None
+    except _pattern_worker.WorkerFailed as exc:
+        raise SubmissionRefused(
+            "invalid",
+            f"this submission {NOT_CHECKED}",
+            errors=[{"field": "__root__", "message": NOT_CHECKED}],
+        ) from exc
     if found is None:
         raise SubmissionRefused(
             "invalid",

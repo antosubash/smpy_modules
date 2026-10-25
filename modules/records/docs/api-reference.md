@@ -1453,6 +1453,9 @@ once it is ten minutes old; one send may take at most 60 seconds. A *Resend*
 is a new attempt and reaches everyone again. **One window remains**: a message
 the mail server accepted, followed by a crash before the send is recorded, is
 sent again by whoever takes the claim over — SMTP cannot be made exactly-once.
+A send cut off at the 60 seconds after the server may already have accepted it
+is retried too, so it can duplicate without a crash; and the 60 seconds is not
+a hard wall-clock cap, since the cancelled send's cleanup is awaited.
 
 **Field patterns** keep Python `re`'s meaning. A visitor's values are
 matched in a worker process, never on the server's event loop, with one
