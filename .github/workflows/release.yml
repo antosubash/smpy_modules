@@ -294,9 +294,10 @@ jobs:
         run: |
           mkdir -p release-tools
           cp scripts/release_pypi_check.py release-tools/
-          # A hidden file here would never reach publish-pypi (upload-artifact
-          # skips them), so refuse one rather than record it.
-          hidden=$(find dist-py release-tools -name '.*' -type f)
+          # A hidden file, or one under a hidden directory, would never reach
+          # publish-pypi (upload-artifact skips both), so refuse one rather
+          # than record it.
+          hidden=$(find dist-py release-tools -type f -path '*/.*')
           test -z "$hidden" || { echo "::error::hidden files would not be uploaded: $hidden"; exit 1; }
           find dist-py release-tools -type f -print0 | sort -z \
             | xargs -0 sha256sum > "$RUNNER_TEMP/SHA256SUMS"
