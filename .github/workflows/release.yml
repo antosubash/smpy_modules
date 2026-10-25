@@ -277,8 +277,14 @@ jobs:
           make gen-pages
           npm run build
 
+      # uv also writes a `.gitignore` (`*`) into the out dir. upload-artifact
+      # leaves hidden files out, so recording it made every publish-pypi job
+      # fail its manifest check (v0.0.12's first run): drop it before the
+      # manifest, which is then exactly what gets uploaded.
       - name: Build wheels + sdists
-        run: uv build --all-packages --out-dir dist-py
+        run: |
+          uv build --all-packages --out-dir dist-py
+          rm -f dist-py/.gitignore
 
       # The PyPI check script travels with the artifacts, so publish-pypi
       # checks out nothing: every file it uploads or runs comes from this job
@@ -288,6 +294,10 @@ jobs:
         run: |
           mkdir -p release-tools
           cp scripts/release_pypi_check.py release-tools/
+          # A hidden file here would never reach publish-pypi (upload-artifact
+          # skips them), so refuse one rather than record it.
+          hidden=$(find dist-py release-tools -name '.*' -type f)
+          test -z "$hidden" || { echo "::error::hidden files would not be uploaded: $hidden"; exit 1; }
           find dist-py release-tools -type f -print0 | sort -z \
             | xargs -0 sha256sum > "$RUNNER_TEMP/SHA256SUMS"
           cat "$RUNNER_TEMP/SHA256SUMS"
