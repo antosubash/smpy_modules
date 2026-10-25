@@ -19,10 +19,13 @@ from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import events
+from sm_records.index.providers import TypeIndex
+from sm_records.index.reduce import snapshot
+from sm_records.index.writer import write_index
 from sm_records.models import Record, RecordType
 from sm_records.schema.compile import to_jsonable
 from sm_records.services import records as record_service
-from sm_records.services._common import mark_written
+from sm_records.services._common import mark_written, type_id_map
 from sm_records.services._payload import field_defs
 from sm_records.services.errors import Conflict, ValidationFailed
 from sm_records.settings import RecordsSettings
@@ -47,8 +50,12 @@ async def system_update(
     values: dict[str, Any],
     *,
     settings: RecordsSettings,
+    data: dict[str, Any] | None = None,
 ) -> Record:
     """Write ``values`` (system keys only) onto ``record``.
+
+    ``data`` replaces the ordinary values when given (an unsubscribe clears
+    them); otherwise they are sent back unchanged.
 
     Against the version this session holds; a concurrent admin edit that won
     the race is reloaded and the write tried once more, since a mark has
@@ -62,7 +69,7 @@ async def system_update(
                     rtype,
                     record,
                     expected_version=record.version,
-                    data=_ordinary(rtype, record),
+                    data=_ordinary(rtype, record) if data is None else data,
                     settings=settings,
                     system=values,
                 )
@@ -92,6 +99,7 @@ async def try_system_update(
     values: dict[str, Any],
     *,
     settings: RecordsSettings,
+    data: dict[str, Any] | None = None,
 ) -> Record:
     """:func:`system_update`, for a mark that must not block what it marks.
 
@@ -113,7 +121,7 @@ async def try_system_update(
         if attempt:
             record = await _reload(db, record)
         try:
-            return await system_update(db, rtype, record, values, settings=settings)
+            return await system_update(db, rtype, record, values, settings=settings, data=data)
         except ValidationFailed as exc:
             refused = exc.detail
         if await _merge_marks(db, rtype, record, values):
@@ -146,25 +154,42 @@ async def _reload(db: AsyncSession, record: Record) -> Record:
 
 
 async def _merge_marks(
-    db: AsyncSession, rtype: RecordType, record: Record, values: dict[str, Any]
+    db: AsyncSession,
+    rtype: RecordType,
+    record: Record,
+    values: dict[str, Any],
+    *,
+    ordinary: dict[str, Any] | None = None,
+    version: int | None = None,
 ) -> bool:
     """Compare-and-set the mark keys into the stored payload.
 
     Reads the current payload and version, adds *only* ``values`` (system
-    fields that are not indexed — every contact-form one; an indexed key
-    would leave its index row behind, so it is refused), and writes it back
-    ``WHERE version = <read>`` in this tenant. ``False`` when the row moved
-    between the read and the write, or the keys are not allowed. No
-    validation and no revision: nothing but server-owned bookkeeping changes.
+    fields — a unique one is refused, since its claim is checked by the
+    ordinary write alone) and ``ordinary`` (declared ordinary fields an
+    unsubscribe clears, in the same step), and writes it back ``WHERE version
+    = <read>`` in this tenant. ``version`` pins the read too: a caller that
+    decided the change from the row at that version gets ``False`` if the row
+    has moved since. An indexed key (a subscriber's ``sm_status``) has its
+    index rows rebuilt from the merged payload, so a filter sees the new value.
+    No validation and no revision: nothing but server-owned bookkeeping
+    changes.
     """
-    system = {entry.key: entry for entry in field_defs(rtype) if entry.system}
-    if any(key not in system or system[key].indexed for key in values):
+    defs = {entry.key: entry for entry in field_defs(rtype)}
+    ordinary = ordinary or {}
+    if any(key not in defs or not defs[key].system or defs[key].unique for key in values):
+        return False
+    if any(key not in defs or defs[key].system or defs[key].unique for key in ordinary):
         return False
     cls = type(record)
     where = (cls.id == record.id, cls.tenant_id == record.tenant_id)
-    read = select(cls.data, cls.version).where(*where).execution_options(include_deleted=True)
-    current = (await db.execute(read)).one()
-    merged = {**(current.data or {}), **to_jsonable(values)}
+    read = select(cls.data, cls.version).where(*where)
+    if version is not None:
+        read = read.where(cls.version == version)
+    current = (await db.execute(read.execution_options(include_deleted=True))).first()
+    if current is None:
+        return False
+    merged = {**(current.data or {}), **to_jsonable(ordinary), **to_jsonable(values)}
     stmt = (
         update(cls)
         .where(*where, cls.version == current.version)
@@ -173,4 +198,11 @@ async def _merge_marks(
     )
     result = await db.execute(stmt)
     mark_written(db)
-    return result.rowcount == 1
+    if result.rowcount != 1:
+        return False
+    if any(defs[key].indexed for key in (*values, *ordinary)):
+        before = snapshot(record, current.data or {})
+        record = await _reload(db, record)
+        resolver = TypeIndex(await type_id_map(db))
+        await write_index(db, record, rtype, resolve_type_id=resolver, previous=before)
+    return True

@@ -33,6 +33,31 @@ def test_the_submission_routes_are_anonymous(method, path):
     assert _registry().matches(method, path)
 
 
+@pytest.mark.parametrize(
+    "path", ["/api/records/submissions/confirm", "/api/records/submissions/unsubscribe"]
+)
+def test_the_newsletter_links_are_anonymous(path):
+    assert _registry().matches("POST", path)
+
+
+@pytest.mark.parametrize(
+    "path", ["/records/submissions/confirm", "/records/submissions/unsubscribe"]
+)
+def test_the_landing_pages_are_anonymous_for_get_only(path):
+    registry = _registry()
+    assert registry.matches("GET", path)
+    for method in ("POST", "PUT", "DELETE"):
+        assert not registry.matches(method, path), method
+    assert not registry.matches("GET", "/records/submissionsx/confirm")
+    assert not registry.matches("GET", "/records/other")
+
+
+def test_the_confirm_link_lifetime_is_bounded():
+    assert RecordsSettings().public_submissions_confirm_ttl_hours == 168
+    with pytest.raises(ValidationError):
+        RecordsSettings(public_submissions_confirm_ttl_hours=0)
+
+
 @pytest.mark.parametrize("method", ["PUT", "PATCH", "DELETE"])
 def test_only_get_and_post_are_exempt(method):
     assert not _registry().matches(method, SUBMIT)
@@ -76,7 +101,7 @@ def test_the_definition_has_a_static_rate_limit():
 
 
 def test_the_routes_are_mounted_at_the_fixed_prefix():
-    from tests.isolation_support import route_table
+    from tests.route_table_support import route_table
 
     mounted = set(route_table())
     assert ("GET", "/api/records/submissions/{type_key}") in mounted
@@ -100,7 +125,12 @@ def test_the_body_ceiling_is_the_submissions_one():
 
 
 @pytest.mark.parametrize(
-    "field", ["public_submissions_rate_per_ip", "public_submissions_type_rate"]
+    "field",
+    [
+        "public_submissions_rate_per_ip",
+        "public_submissions_type_rate",
+        "public_submissions_confirm_rate_per_email",
+    ],
 )
 def test_a_rate_must_parse(field):
     assert getattr(RecordsSettings(**{field: "off"}), field) == "off"

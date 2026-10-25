@@ -26,3 +26,14 @@ export function markSpam(typeKey: string, uuid: string): Promise<RecordRead> {
 export function markNotSpam(typeKey: string, uuid: string): Promise<RecordRead> {
   return request(path(typeKey, uuid, 'not-spam'), { method: 'POST' });
 }
+
+/** A newsletter subscriber still pending: send the confirmation again (the
+ *  same `resend` route; 409 when not pending, 429 past the address's budget). */
+export function resendConfirmation(typeKey: string, uuid: string): Promise<{ queued: boolean }> {
+  return request(path(typeKey, uuid, 'resend'), { method: 'POST' });
+}
+
+/** Unsubscribe a newsletter subscriber, as their own link would. */
+export function unsubscribeSubscriber(typeKey: string, uuid: string): Promise<RecordRead> {
+  return request(path(typeKey, uuid, 'unsubscribe'), { method: 'POST' });
+}

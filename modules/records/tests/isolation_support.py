@@ -25,18 +25,13 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import AsyncIterator, Callable
-from types import SimpleNamespace
 from typing import Any
 
 import pytest_asyncio
-from fastapi import APIRouter, FastAPI
-from fastapi.routing import iter_route_contexts
 from httpx import ASGITransport, AsyncClient, Response
-from settings.module_registry import ModuleSettingsRegistry
 from simple_module_db import all_tenants
 from sm_records import boot, constants
 from sm_records.models import RecordType, table_sets
-from sm_records.module import RecordsModule
 from sm_records.settings import RecordsSettings
 from sqlalchemy import select
 
@@ -252,26 +247,3 @@ def covers(*routes: str) -> Callable[[Any], Any]:
         return fn
 
     return mark
-
-
-def route_table() -> list[tuple[str, str]]:
-    """``(method, path)`` for every route the module mounts, through the same
-    hooks the host calls (``register_routes``, ``boot.mount_public_router``)."""
-    module = RecordsModule()
-    module.settings = RecordsSettings()
-    app = FastAPI()
-    app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
-    module.register_settings(app)
-    api_router = APIRouter(prefix=module.meta.route_prefix)
-    view_router = APIRouter(prefix=module.meta.view_prefix)
-    module.register_routes(api_router, view_router)
-    app.include_router(api_router)
-    app.include_router(view_router)
-    boot.mount_public_router(app, module.settings)
-    prefixes = (module.meta.route_prefix, module.meta.view_prefix)
-    return sorted(
-        (method, route.path)
-        for route in iter_route_contexts(app.routes)
-        if route.path and route.path.startswith(prefixes)
-        for method in route.methods or ()
-    )

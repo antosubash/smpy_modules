@@ -30,6 +30,7 @@ __all__ = [
     "PUBLIC_READ",
     "SUBMISSION",
     "SUBMISSION_ACTION",
+    "SUBMISSION_LINK",
     "TYPE_WRITE",
     "WRITE",
     "responses",
@@ -42,6 +43,7 @@ _MODELS: Final[dict[int, Any]] = {
     404: ErrorDetail,
     409: ConflictBody,
     413: ErrorDetail,
+    410: ErrorDetail,
     415: ErrorDetail,
     422: ValidationErrorBody,
     429: ErrorDetail,
@@ -114,6 +116,10 @@ SUBMISSION: Final = (400, 403, 404, 409, 413, 415, 422, 429, 500)
 """A website submission (#101). Anonymous like the read API — no 401 — but a
 write: its 403 is ``bad_origin``, never a permission, and every refusal
 carries a ``code``."""
+
+SUBMISSION_LINK: Final = (404, 409, 413, 500)
+"""A newsletter link's ``POST`` (#101): anonymous, no origin or content-type
+check — the signed link is the capability. Confirm adds its ``410``."""
 
 SUBMISSION_ACTION: Final = (*WRITE, 429)
 """An admin action on a submission: a record write, plus the resend throttle."""

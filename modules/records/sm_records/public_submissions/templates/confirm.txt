@@ -1,0 +1,11 @@
+$intro
+
+$confirm_label
+$confirm_link
+
+$expiry
+
+$unsubscribe_label
+$unsubscribe_link
+
+$why

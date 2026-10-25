@@ -18,9 +18,10 @@ from __future__ import annotations
 import pytest
 from sm_records import constants
 
-# Imported for their ``@covers`` marks: the route table is checked against all five.
+# Imported for their ``@covers`` marks: the route table is checked against all six.
 from tests import (  # noqa: F401
     test_tenancy_isolation_io,
+    test_tenancy_isolation_newsletter,
     test_tenancy_isolation_public,
     test_tenancy_isolation_records,
     test_tenancy_isolation_submissions,
@@ -37,9 +38,9 @@ from tests.isolation_support import (
     VIEW,
     as_,
     covers,
-    route_table,
     same_as_unknown,
 )
+from tests.route_table_support import route_table
 
 pytestmark = pytest.mark.unbound_tenant
 

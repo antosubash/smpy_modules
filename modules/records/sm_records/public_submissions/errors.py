@@ -29,6 +29,8 @@ CODES: dict[str, int] = {
     "wrong_kind": 409,
     "not_in_trash": 409,
     "no_recipients": 409,
+    "not_pending": 409,
+    "link_expired": 410,
 }
 """Every code and its status — what ``docs/api-reference.md`` lists."""
 

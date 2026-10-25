@@ -15,54 +15,36 @@ The visitor's values leave the database here and only here, by design.
 from __future__ import annotations
 
 import importlib.resources
-import json
 from functools import cache
 from string import Template
 from typing import Any, Final
 from urllib.parse import urlsplit
 
-from simple_module_core.mail import MailMessage
+from simple_module_core.mail import MailMessage, MailSender
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import constants
 from sm_records.models import Record, RecordType
+from sm_records.public_submissions import strings
+from sm_records.public_submissions.delivery import SessionFactory
+from sm_records.public_submissions.sending import send_all
+from sm_records.services._common import utcnow
 from sm_records.services._payload import field_defs
+from sm_records.settings import RecordsSettings
 
-__all__ = ["notification", "text"]
+__all__ = ["deliver", "notification", "template", "text"]
 
-_PREFIX: Final = "public_submissions.mail.notify."
-_FALLBACK: Final = "en"
 _EMPTY: Final = "—"
-
-
-def _flatten(tree: dict[str, Any], prefix: str = "") -> dict[str, str]:
-    out: dict[str, str] = {}
-    for key, value in tree.items():
-        if isinstance(value, dict):
-            out.update(_flatten(value, f"{prefix}{key}."))
-        else:
-            out[f"{prefix}{key}"] = str(value)
-    return out
-
-
-@cache
-def _catalogue(locale: str) -> dict[str, str]:
-    path = importlib.resources.files(constants.PACKAGE) / "locales" / f"{locale}.json"
-    try:
-        return _flatten(json.loads(path.read_text(encoding="utf-8")))
-    except (FileNotFoundError, ValueError):
-        return {}
 
 
 def text(key: str, locale: str | None, **params: Any) -> str:
     """``public_submissions.mail.notify.<key>`` in ``locale``, else English."""
-    full = f"{_PREFIX}{key}"
-    template = _catalogue(locale or _FALLBACK).get(full) or _catalogue(_FALLBACK).get(full, full)
-    return template.format_map(params)
+    return strings.text(f"mail.notify.{key}", locale, **params)
 
 
 @cache
-def _template() -> Template:
-    path = importlib.resources.files(__package__) / "templates" / "notify.txt"
+def template(name: str) -> Template:
+    path = importlib.resources.files(__package__) / "templates" / name
     return Template(path.read_text(encoding="utf-8"))
 
 
@@ -91,7 +73,7 @@ def notification(
 ) -> MailMessage:
     site = urlsplit(base_url).netloc or base_url
     link = f"{base_url}{constants.VIEW_PREFIX}/{rtype.key}/{record.uuid}"
-    body = _template().substitute(
+    body = template("notify.txt").substitute(
         intro=text("intro", locale, type=rtype.label, site=site),
         fields=_lines(rtype, record),
         open_label=text("open", locale),
@@ -100,4 +82,34 @@ def notification(
     )
     return MailMessage(
         to=to, subject=text("subject", locale, type=rtype.label, site=site), text=body
+    )
+
+
+async def deliver(
+    db: AsyncSession,
+    rtype: RecordType,
+    record: Record,
+    sender: MailSender,
+    due: Any,
+    settings: RecordsSettings,
+    factory: SessionFactory,
+) -> None:
+    """A submission's notification: every ``notify_to`` address, then
+    ``sm_notified_at``."""
+    # Built before the claims: a failure here must not leave a claim that
+    # blocks the retry for a whole lease.
+    messages = [
+        (to, notification(rtype, record, to=to, base_url=due.base_url, locale=due.locale))
+        for to in (rtype.public_submissions or {}).get("notify_to", [])
+    ]
+    await send_all(
+        db,
+        rtype,
+        record,
+        sender,
+        due,
+        settings,
+        factory,
+        messages,
+        lambda: {"sm_notified_at": utcnow()},
     )

@@ -34,6 +34,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from functools import partial
 from typing import Any, Final
@@ -50,7 +51,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from sm_records import constants, events
 from sm_records.models import Record, RecordType
-from sm_records.public_submissions.delivery import deliver, load
+from sm_records.public_submissions.delivery import SessionFactory, load
+from sm_records.public_submissions.mail import deliver
 from sm_records.public_submissions.tokens import public_base_url
 from sm_records.services._common import mark_written
 from sm_records.settings import RecordsSettings
@@ -60,9 +62,12 @@ __all__ = [
     "HANDLER_NAME",
     "MailUnavailable",
     "NotificationDue",
+    "Work",
     "drain",
     "durable_handler",
+    "queue",
     "queue_notification",
+    "ui_locale",
 ]
 
 logger = logging.getLogger(__name__)
@@ -73,6 +78,10 @@ must never change: an outbox row naming a handler that no longer exists is
 retried as unknown and then dropped."""
 
 _TASKS: set[asyncio.Task[None]] = set()
+
+Work = Callable[[AsyncSession, MailSender, Any, RecordsSettings, SessionFactory], Awaitable[None]]
+"""What one queued mail does once a sender is resolved, in its tenant: the
+notification here, the newsletter's confirmation in ``.confirmation``."""
 
 
 class MailUnavailable(RuntimeError):  # noqa: N818 - reads as the condition it is
@@ -94,18 +103,41 @@ class NotificationDue(Event):
     (``public_submissions.delivery``); a *Resend* is a new one."""
 
 
-def _ui_locale(app: Any) -> str:
+def ui_locale(app: Any) -> str:
     """The host's default console language: the notification goes to staff."""
     host = getattr(getattr(app.state, "host", None), "settings", None)
     return str(getattr(host, "i18n_default_locale", "") or "en")
 
 
-def _durable(bus: Any) -> bool:
+def _durable(bus: Any, event_type: type) -> bool:
     return (
         bus is not None
         and getattr(bus, "durable_transport", None) is not None
-        and bool(bus.durable.handler_names(NotificationDue))
+        and bool(bus.durable.handler_names(event_type))
     )
+
+
+async def queue(db: AsyncSession, app: Any, due: Any, work: Work, *, durable: bool = True) -> None:
+    """Arrange for ``due`` to be worked once ``db`` commits: durably when the
+    host has an outbox with a handler for it (and ``durable``), else after the
+    commit."""
+    bus = db.info.get(events.BUS_KEY)
+    if durable and _durable(bus, type(due)):
+        await bus.publish_durable(due, db)
+    else:
+        register_on_commit(db, partial(_spawn, app, due, work))
+    # A *Resend* writes nothing else, and ``get_db`` commits — and runs
+    # ``on_commit`` — only for a session that wrote; an outbox row the
+    # transport has not flushed yet would be dropped the same way.
+    mark_written(db)
+
+
+async def _notify(
+    db: AsyncSession, sender: MailSender, due: Any, settings: RecordsSettings, factory: Any
+) -> None:
+    loaded = await load(db, due)
+    if loaded is not None:
+        await deliver(db, *loaded, sender, due, settings, factory)
 
 
 async def queue_notification(db: AsyncSession, app: Any, rtype: RecordType, record: Record) -> bool:
@@ -118,22 +150,14 @@ async def queue_notification(db: AsyncSession, app: Any, rtype: RecordType, reco
         type_key=rtype.key,
         uuid=record.uuid,
         base_url=public_base_url(app),
-        locale=_ui_locale(app),
+        locale=ui_locale(app),
         attempt=uuid.uuid4().hex,
     )
-    bus = db.info.get(events.BUS_KEY)
-    if _durable(bus):
-        await bus.publish_durable(due, db)
-    else:
-        register_on_commit(db, partial(_spawn, app, due))
-    # A *Resend* writes nothing else, and ``get_db`` commits — and runs
-    # ``on_commit`` — only for a session that wrote; an outbox row the
-    # transport has not flushed yet would be dropped the same way.
-    mark_written(db)
+    await queue(db, app, due, _notify)
     return True
 
 
-def _can_send(sender: MailSender, due: NotificationDue) -> bool:
+def _can_send(sender: MailSender, due: Any) -> bool:
     if not getattr(sender, "delivers_email", False):
         logger.warning(
             "records: %s submission %s stored but not mailed: no mail transport delivers email",
@@ -162,7 +186,7 @@ def _independent(db: AsyncSession) -> Any:
     )
 
 
-async def _run(app: Any, due: NotificationDue) -> None:
+async def _run(app: Any, due: Any, work: Work) -> None:
     services = getattr(app.state, constants.PACKAGE, None)
     settings = getattr(services, "settings", None) or RecordsSettings()
     with tenant_scope(due.tenant_id):
@@ -175,11 +199,8 @@ async def _run(app: Any, due: NotificationDue) -> None:
             sender = await resolve_mail_sender(session)
             if not _can_send(sender, due):
                 return
-            loaded = await load(session, due)
-            if loaded is not None:
-                factory = app.state.sm.db.session_factory
-                await deliver(session, *loaded, sender, due, settings, factory)
-                await events.commit(session)
+            await work(session, sender, due, settings, app.state.sm.db.session_factory)
+            await events.commit(session)
         except Exception:
             logger.exception(
                 "records: mailing %s submission %s failed; it stays 'not sent'",
@@ -191,9 +212,9 @@ async def _run(app: Any, due: NotificationDue) -> None:
             await session.close()
 
 
-async def _spawn(app: Any, due: NotificationDue) -> None:
+async def _spawn(app: Any, due: Any, work: Work) -> None:
     """The ``on_commit`` callback: start the send, do not wait for it."""
-    task = asyncio.get_running_loop().create_task(_run(app, due))
+    task = asyncio.get_running_loop().create_task(_run(app, due, work))
     _TASKS.add(task)
     task.add_done_callback(_TASKS.discard)
 
@@ -204,11 +225,11 @@ async def drain() -> None:
         await asyncio.gather(*list(_TASKS), return_exceptions=True)
 
 
-def durable_handler(module: Any) -> Any:
+def durable_handler(module: Any, work: Work = _notify) -> Any:
     """The outbox handler, closed over the module for its settings (the worker
     builds the module without an app, so there is no ``app.state`` to read)."""
 
-    async def send_notification(event: NotificationDue, ctx: Any) -> None:
+    async def send(event: Any, ctx: Any) -> None:
         if not mail_transport_installed():
             raise MailUnavailable("no mail transport is installed in this process")
         sender = await resolve_mail_sender(ctx.db)
@@ -216,8 +237,6 @@ def durable_handler(module: Any) -> Any:
             return
         settings = getattr(module, "settings", None) or RecordsSettings()
         with tenant_scope(event.tenant_id):
-            loaded = await load(ctx.db, event)
-            if loaded is not None:
-                await deliver(ctx.db, *loaded, sender, event, settings, _independent(ctx.db))
+            await work(ctx.db, sender, event, settings, _independent(ctx.db))
 
-    return send_notification
+    return send

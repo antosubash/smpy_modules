@@ -168,11 +168,11 @@ async def test_a_failed_mark_does_not_mail_everyone_again(site, monkeypatch):
     real = delivery.system_update
     failed: list[bool] = []
 
-    async def flaky(db, rtype, record, values, *, settings):
+    async def flaky(db, rtype, record, values, *, settings, **kw):
         if "sm_notified_at" in values and not failed:
             failed.append(True)
             raise RuntimeError("database went away")
-        return await real(db, rtype, record, values, settings=settings)
+        return await real(db, rtype, record, values, settings=settings, **kw)
 
     monkeypatch.setattr(delivery, "system_update", flaky)
     with pytest.raises(RuntimeError):

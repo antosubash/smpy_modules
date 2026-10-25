@@ -50,6 +50,7 @@ __all__ = [
     "RecordTypeDeleted",
     "RecordTypeMoved",
     "RecordUpdated",
+    "SubscriptionChanged",
 ]
 
 
@@ -217,3 +218,18 @@ class FormSubmitted(Event):
     tenant_id: str
     uuid: str
     spam: bool
+
+
+@dataclass
+class SubscriptionChanged(Event):
+    """A newsletter subscriber's status moved (#101): a signup or a re-signup
+    (``status_after="pending"``, or ``"confirmed"`` without double opt-in), a
+    confirmation, an unsubscribe. ``status_before`` is ``None`` for a new
+    address. Identifiers only — never the address, never a link.
+    """
+
+    type_key: str
+    tenant_id: str
+    uuid: str
+    status_before: str | None
+    status_after: str
