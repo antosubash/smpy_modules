@@ -17,6 +17,9 @@ import tomlkit
 REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / "scripts" / "bump_version.py"
 
+sys.path.insert(0, str(SCRIPT.parent))
+import bump_version  # noqa: E402  — its targets() is the list of files to copy
+
 
 def _run(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
@@ -70,15 +73,6 @@ def test_module_version_matches_root_version():
     assert str(root) == str(mod)
 
 
-def _manifests(root: Path) -> list[Path]:
-    """Every file a bump rewrites — discovered the same way the script does."""
-    return [
-        root / "pyproject.toml",
-        *sorted((root / "modules").glob("*/pyproject.toml")),
-        *sorted((root / "modules").glob("*/package.json")),
-    ]
-
-
 def _copy_of_the_tree(tmp_path: Path) -> Path:
     """The script and every manifest it rewrites, copied under ``tmp_path``.
 
@@ -90,7 +84,7 @@ def _copy_of_the_tree(tmp_path: Path) -> Path:
     it, or a concurrent manifest check could read it.
     """
     root = tmp_path / "repo"
-    for path in [SCRIPT, *_manifests(REPO)]:
+    for path in [SCRIPT, *bump_version.targets()]:
         target = root / path.relative_to(REPO)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
