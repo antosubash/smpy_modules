@@ -196,7 +196,7 @@ async def test_a_record_trashed_under_a_racing_spam_is_a_409_not_a_500(monkeypat
     from sqlalchemy.exc import InvalidRequestError
 
     async def stale(*args, **kwargs):
-        raise Conflict("record changed")
+        raise Conflict("record changed", current=object())
 
     async def gone(record):
         raise InvalidRequestError("Could not refresh instance")
@@ -204,5 +204,6 @@ async def test_a_record_trashed_under_a_racing_spam_is_a_409_not_a_500(monkeypat
     monkeypatch.setattr(system.record_service, "update_record", stale)
     monkeypatch.setattr(system, "_ordinary", lambda rtype, record: {})
     db = SimpleNamespace(refresh=gone, info={})
-    with pytest.raises(Conflict):
+    with pytest.raises(Conflict) as refused:
         await system.system_update(db, None, SimpleNamespace(version=1), {}, settings=None)
+    assert refused.value.current is None, "no unreloadable row for the 409 body to render"

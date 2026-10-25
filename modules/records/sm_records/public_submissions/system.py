@@ -71,8 +71,10 @@ async def system_update(
             except InvalidRequestError:
                 # Gone from under us — trashed or purged by a concurrent
                 # request (the soft-delete filter hides it from a refresh):
-                # the original 409, not a 500.
-                raise conflict from None
+                # a 409, not a 500. Without ``current``: the row it carries
+                # is the one that could not be reloaded, and rendering it
+                # into the body would fail the same way.
+                raise Conflict(conflict.detail) from None
     raise AssertionError("unreachable")  # pragma: no cover
 
 
