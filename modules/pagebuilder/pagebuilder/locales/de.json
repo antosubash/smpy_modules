@@ -1003,6 +1003,7 @@
     "apply": "Anwenden",
     "apply_failed": "Anwenden fehlgeschlagen",
     "approve": "Freigeben und anwenden",
+    "approver_needed": "Nur wer Wiederherstellungen freigeben darf, kann diese anwenden oder ablehnen.",
     "approve_description": "Zuvor wird ein Snapshot der Website in ihrem aktuellen Zustand erstellt, sodass sich dies durch Wiederherstellen dieses Snapshots rückgängig machen lässt.",
     "approve_title": "Diesen Snapshot anwenden?",
     "back": "Zurück zu den Snapshots",

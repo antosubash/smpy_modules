@@ -1,9 +1,9 @@
 """Content snapshots: take, download, upload, and the restore approval gate.
 
 Taking and staging need ``pagebuilder.publish``; only ``pagebuilder.approve``
-can apply one. Self-approval is allowed, matching the page workflow — imports
-are not held to a stricter rule than pages without a deliberate decision to
-tighten both.
+can apply one. Reading the list or the staged restore takes either.
+Self-approval is allowed, matching the page workflow — imports are not held to
+a stricter rule than pages without a deliberate decision to tighten both.
 """
 
 from __future__ import annotations
@@ -29,6 +29,7 @@ from pagebuilder.endpoints.api._deps import (
     require_approve,
     require_publish,
     require_publish_or_approve,
+    snapshot_capabilities,
 )
 from pagebuilder.snapshots.service import SnapshotService
 
@@ -74,13 +75,23 @@ def _actor() -> str | None:
     return current_user_id.get()
 
 
-@router.get("/snapshots", response_model=SnapshotListResponse)
+@router.get(
+    "/snapshots",
+    response_model=SnapshotListResponse,
+    dependencies=[require_publish_or_approve],
+)
 async def list_snapshots(
     service: SnapshotService = Depends(get_snapshot_service),
 ) -> SnapshotListResponse:
+    """The restore points, for whoever may stage or approve a restore.
+
+    Notes, creators and manifests are not for every signed-in user, so this
+    carries the same gate as the pending restore it sits beside.
+    """
     return SnapshotListResponse(
         items=[SnapshotRead.model_validate(s) for s in await service.list()],
         sections=service.sections.labels(),
+        capabilities=snapshot_capabilities(service.access),
     )
 
 

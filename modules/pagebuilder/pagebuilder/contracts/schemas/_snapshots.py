@@ -36,10 +36,23 @@ class SectionLabels(BaseModel):
     count_label_keys: dict[str, str] = {}
 
 
+class SnapshotCapabilities(BaseModel):
+    """What the reader may do on the Import / Export screen.
+
+    Sent by the server so the screen offers only the controls the API will
+    accept: ``publish`` covers taking, uploading, downloading, deleting and
+    staging a restore; ``approve`` covers deciding a staged one.
+    """
+
+    publish: bool = False
+    approve: bool = False
+
+
 class SnapshotListResponse(BaseModel):
     items: list[SnapshotRead]
     sections: list[SectionLabels] = []
     """The contributed sections registered here, to label each row's counts."""
+    capabilities: SnapshotCapabilities = SnapshotCapabilities()
 
 
 class SnapshotCreateRequest(BaseModel):

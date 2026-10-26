@@ -14,11 +14,15 @@ import { sectionContents } from './sectionSummary';
  * Restore is offered on every row and is deliberately *not* a confirm-heavy
  * action: it only stages a plan for approval, and putting friction here would
  * charge people for looking. The expensive click lives on the review screen.
+ *
+ * Download, Restore and Delete all need `pagebuilder.publish`, so a reader
+ * without it — an approver — sees the rows and no actions (`canPublish`).
  */
 export function SnapshotList({
   snapshots,
   sections = [],
   busy,
+  canPublish = false,
   hasPending,
   pendingSnapshotId,
   onRestore,
@@ -28,6 +32,8 @@ export function SnapshotList({
   /** The contributed sections registered here, to name each row's counts. */
   sections?: SectionLabels[];
   busy: boolean;
+  /** Whether the reader holds `pagebuilder.publish`, as the server said. */
+  canPublish?: boolean;
   hasPending: boolean;
   /** The snapshot a staged-but-undecided restore targets, if any. */
   pendingSnapshotId: number | null;
@@ -72,42 +78,46 @@ export function SnapshotList({
             </div>
 
             {/* Wraps: three German labels do not fit beside each other at phone width. */}
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" asChild>
-                <a href={downloadUrl(snapshot.id)}>{t(keys.pagebuilder.snapshot_list.download)}</a>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy || hasPending}
-                title={hasPending ? t(keys.pagebuilder.snapshot_list.pending_hint) : undefined}
-                onClick={() => void onRestore(snapshot)}
-              >
-                {t(keys.pagebuilder.snapshot_list.restore)}
-              </Button>
-              <ConfirmDialog
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy || pendingSnapshotId === snapshot.id}
-                    title={
-                      pendingSnapshotId === snapshot.id
-                        ? t(keys.pagebuilder.snapshot_list.staged_hint)
-                        : undefined
-                    }
-                  >
-                    {t(keys.pagebuilder.snapshot_list.delete)}
-                  </Button>
-                }
-                title={t(keys.pagebuilder.snapshot_list.delete_title)}
-                description={t(keys.pagebuilder.snapshot_list.delete_description)}
-                confirmLabel={t(keys.pagebuilder.snapshot_list.delete_confirm)}
-                destructive
-                level="medium"
-                onConfirm={() => onDelete(snapshot)}
-              />
-            </div>
+            {canPublish && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" asChild>
+                  <a href={downloadUrl(snapshot.id)}>
+                    {t(keys.pagebuilder.snapshot_list.download)}
+                  </a>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={busy || hasPending}
+                  title={hasPending ? t(keys.pagebuilder.snapshot_list.pending_hint) : undefined}
+                  onClick={() => void onRestore(snapshot)}
+                >
+                  {t(keys.pagebuilder.snapshot_list.restore)}
+                </Button>
+                <ConfirmDialog
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy || pendingSnapshotId === snapshot.id}
+                      title={
+                        pendingSnapshotId === snapshot.id
+                          ? t(keys.pagebuilder.snapshot_list.staged_hint)
+                          : undefined
+                      }
+                    >
+                      {t(keys.pagebuilder.snapshot_list.delete)}
+                    </Button>
+                  }
+                  title={t(keys.pagebuilder.snapshot_list.delete_title)}
+                  description={t(keys.pagebuilder.snapshot_list.delete_description)}
+                  confirmLabel={t(keys.pagebuilder.snapshot_list.delete_confirm)}
+                  destructive
+                  level="medium"
+                  onConfirm={() => onDelete(snapshot)}
+                />
+              </div>
+            )}
           </li>
         );
       })}

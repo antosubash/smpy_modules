@@ -113,9 +113,9 @@ async def test_the_pending_import_needs_the_snapshot_permission(tmp_path):
         # The screens hold the same line as the API.
         inertia = {**reader, "X-Inertia": "true"}
         assert (await client.get(_REVIEW, headers=inertia)).status_code == 403
+        # The list too: its notes and manifests are Import / Export's, not everyone's.
         listing = await client.get("/pagebuilder/content", headers=inertia)
-        assert listing.status_code == 200
-        assert listing.json()["props"]["pending"] is None
+        assert listing.status_code == 403
         # Someone who may only approve still reads what they would approve.
         approver = {**as_role("approve-only"), "X-Inertia": "true"}
         assert (await client.get(_PENDING, headers=approver)).status_code == 200

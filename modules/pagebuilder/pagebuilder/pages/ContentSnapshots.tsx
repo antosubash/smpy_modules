@@ -8,13 +8,20 @@ import { snapshotFootnote } from '../components/snapshots/sectionSummary';
 import { UploadBundleDialog } from '../components/snapshots/UploadBundleDialog';
 import { useSnapshots } from '../hooks/useSnapshots';
 import { keys, useT } from '../utils/i18n';
-import type { PendingImport, SectionLabels, Snapshot } from '../utils/snapshotsApi';
+import type {
+  PendingImport,
+  SectionLabels,
+  Snapshot,
+  SnapshotCapabilities,
+} from '../utils/snapshotsApi';
 
 interface Props {
   snapshots: Snapshot[];
   pending: PendingImport | null;
   /** The contributed sections registered on this host (#80). */
   sections?: SectionLabels[];
+  /** Which controls this reader may use; absent means none (fail closed). */
+  capabilities?: SnapshotCapabilities;
 }
 
 /**
@@ -32,8 +39,10 @@ function ContentSnapshots() {
     snapshots,
     pending,
     sections = [],
+    capabilities,
   } = usePage<{ props: Props }>().props as unknown as Props;
   const state = useSnapshots(snapshots, pending);
+  const canPublish = capabilities?.publish === true;
 
   return (
     <>
@@ -42,15 +51,17 @@ function ContentSnapshots() {
         title={t(keys.pagebuilder.snapshots.title)}
         description={t(keys.pagebuilder.snapshots.description)}
         actions={
-          <div className="flex items-center gap-2">
-            <UploadBundleDialog
-              trigger={<Button variant="outline">{t(keys.pagebuilder.snapshots.upload)}</Button>}
-              onUploaded={state.reload}
-            />
-            <Button disabled={state.busy} onClick={() => void state.take()}>
-              {t(keys.pagebuilder.snapshots.take)}
-            </Button>
-          </div>
+          canPublish ? (
+            <div className="flex items-center gap-2">
+              <UploadBundleDialog
+                trigger={<Button variant="outline">{t(keys.pagebuilder.snapshots.upload)}</Button>}
+                onUploaded={state.reload}
+              />
+              <Button disabled={state.busy} onClick={() => void state.take()}>
+                {t(keys.pagebuilder.snapshots.take)}
+              </Button>
+            </div>
+          ) : undefined
         }
       >
         {state.pending && (
@@ -77,6 +88,7 @@ function ContentSnapshots() {
           snapshots={state.snapshots}
           sections={sections}
           busy={state.busy}
+          canPublish={canPublish}
           hasPending={state.pending !== null}
           pendingSnapshotId={state.pending?.snapshot_id ?? null}
           onRestore={state.restore}
