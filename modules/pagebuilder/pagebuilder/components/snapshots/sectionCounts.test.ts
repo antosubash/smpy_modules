@@ -131,7 +131,7 @@ describe('restoredWith', () => {
   it('counts what the same restore wrote elsewhere', () => {
     expect(
       restoredWith(marker([{ section: 'news', label_key: 'news.bundle.title', count: 3 }])),
-    ).toBe('Also restored with it: News (3)');
+    ).toBe('The same restore also changed: News (3)');
   });
 
   it('says nothing for a pages-only restore', () => {

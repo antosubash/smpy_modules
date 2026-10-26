@@ -69,7 +69,7 @@ export function sectionMarker(entry: SectionPlanEntry): string | null {
     return translate(keys.pagebuilder.plan.section_details_unavailable, { label });
   }
   // Every line empty: say so, rather than leave a card with a title and nothing under it.
-  if (!entry.lines.some((line) => line.count > 0)) {
+  if (!entry.overwrites && !entry.lines.some((line) => line.count > 0)) {
     return translate(keys.pagebuilder.plan.sections.empty, { label });
   }
   return null;
@@ -214,7 +214,7 @@ export function deniedSections(result: ApplyResult): string[] {
   );
 }
 
-/** "Also restored with it: News (3)" under a page's restore marker. */
+/** "The same restore also changed: News (3)" under a page's restore marker. */
 export function restoredWith(marker: PageRestoreMarker): string | null {
   const sections = marker.sections ?? [];
   if (sections.length === 0) return null;

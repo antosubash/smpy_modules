@@ -90,10 +90,12 @@ describe('sectionMarker', () => {
   });
 
   it('says a section with nothing to do changes nothing, instead of an empty card', () => {
-    const idle = entry({ lines: [{ label_key: 'news.bundle.plan.new', count: 0, items: [] }] });
-    expect(sectionMarker(idle)).toBe(
+    const lines = [{ label_key: 'news.bundle.plan.new', count: 0, items: [] }];
+    expect(sectionMarker(entry({ lines, overwrites: 0 }))).toBe(
       'This bundle carries News content, but restoring it changes nothing.',
     );
+    // A section reporting overwrites is never called a no-op, whatever its lines say.
+    expect(sectionMarker(entry({ lines, overwrites: 1 }))).toBeNull();
   });
 });
 

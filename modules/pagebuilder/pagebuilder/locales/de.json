@@ -994,7 +994,7 @@
     "restored": "Version als Entwurf wiederhergestellt.",
     "restored_created": "Die Wiederherstellung hat diese Seite angelegt.",
     "restored_from_snapshot": "Aus Snapshot #{id} wiederhergestellt",
-    "restored_with": "Damit ebenfalls wiederhergestellt: {sections}",
+    "restored_with": "Dieselbe Wiederherstellung hat außerdem geändert: {sections}",
     "restored_section": "{label} ({count})"
   },
   "import_review": {

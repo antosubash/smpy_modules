@@ -994,7 +994,7 @@
     "restored": "Revision restored to draft.",
     "restored_created": "The restore created this page.",
     "restored_from_snapshot": "Restored from snapshot #{id}",
-    "restored_with": "Also restored with it: {sections}",
+    "restored_with": "The same restore also changed: {sections}",
     "restored_section": "{label} ({count})"
   },
   "import_review": {
