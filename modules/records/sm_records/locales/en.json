@@ -822,6 +822,62 @@
         "button": "Unsubscribe",
         "done": "You are unsubscribed. You will not receive this newsletter any more."
       }
+    },
+    "block": {
+      "block_label": "Form (Records)",
+      "palette_group": "Forms",
+      "field_type_key": "Form or newsletter list",
+      "type_disabled": "{label} (not accepting submissions)",
+      "field_title": "Title",
+      "field_intro": "Introduction",
+      "field_submit_label": "Button label",
+      "field_success_title": "Thank-you title",
+      "field_success_body": "Thank-you message",
+      "field_labels": "Field labels on this page",
+      "label_new": "New label",
+      "label_field": "Field",
+      "label_label": "Label",
+      "label_help": "Help text",
+      "placeholder": "Choose a form or newsletter list in the block settings.",
+      "editor_note": "Submits on the published page."
+    },
+    "form": {
+      "loading": "Loading the form…",
+      "unavailable": "This form isn't available right now.",
+      "submit": "Send",
+      "subscribe": "Subscribe",
+      "sending": "Sending…",
+      "optional": "(optional)",
+      "choose": "Choose…",
+      "honeypot": "Leave this field empty",
+      "success_title": "Thank you",
+      "success_body": "Your message has been sent.",
+      "success_body_subscription": "Almost done: check your inbox and confirm your subscription.",
+      "changed": "This form changed while you were filling it in. Check your entries and send it again.",
+      "invalid": "Please check the highlighted fields.",
+      "required": "Please fill in this field.",
+      "field_invalid": "Please check this value.",
+      "consent_required": "Please tick this box to continue."
+    },
+    "errors": {
+      "form_expired": "This form has expired. Reload the page and try again.",
+      "rate_limited": "Too many attempts. Please wait {seconds} seconds and try again.",
+      "captcha_failed": "Please complete the security check and try again.",
+      "captcha_unavailable": "The security check isn't available right now. Please try again in a few minutes.",
+      "bad_origin": "This form can only be sent from this website.",
+      "network": "That didn't work. Check your connection and try again.",
+      "generic": "Something went wrong. Please try again later."
+    },
+    "system_values": {
+      "sm_status": {
+        "pending": "Pending confirmation",
+        "confirmed": "Confirmed",
+        "unsubscribed": "Unsubscribed"
+      },
+      "sm_spam": {
+        "links": "Too many links",
+        "manual": "Marked by hand"
+      }
     }
   }
 }

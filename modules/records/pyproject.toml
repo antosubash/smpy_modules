@@ -16,6 +16,8 @@ dependencies = [
     "simple_module_inertia>=0.0.38,<0.1",
     "simple_module_settings>=0.0.38,<0.1",
     "pydantic-settings>=2.0",
+    # The optional CAPTCHA's server-side verification (#101).
+    "httpx>=0.27",
 ]
 
 [project.urls]

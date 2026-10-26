@@ -378,6 +378,17 @@ variables are read. Configure on the Settings screen or with
 | `reindex_batch_size` | 500 | no |
 | `reindex_stale_after_seconds` | 900 (15 min) | no |
 | `menu_refresh_seconds` | 5 | no |
+| `public_submissions_enabled` | `true` (nothing is accepted until a type opts in) | no |
+| `public_submissions_rate_per_ip` / `_type_rate` | `5/10minute` / `60/hour` | no |
+| `public_submissions_confirm_rate_per_email` | `3/day` | no |
+| `public_submissions_min_fill_seconds` / `_token_max_age_seconds` | 3 / 7200 | no |
+| `public_submissions_confirm_ttl_hours` | 168 | no |
+| `public_submissions_max_links` / `_max_body_bytes` | 5 / 16384 | no |
+| `public_submissions_allowed_origins` | `[]` | no |
+| `public_submissions_store_ip_hash` / `_store_user_agent` | `true` / `true` | no |
+| `public_submissions_captcha_provider` / `_site_key` / `_secret` | `none` / `""` / `""` | no |
+| `public_submissions_retention_enabled` / `_retention_interval_seconds` | `true` / 3600 | no |
+| `public_submissions_delivery_retention_days` | 30 | no |
 
 `content_locales` and `default_content_locale` are the languages records may
 be authored in — see [Content languages](#content-languages).
@@ -390,6 +401,11 @@ this host.
 
 `menu_refresh_seconds` is the sidebar's refresh window — see
 [Sidebar entries](#sidebar-entries).
+
+The `public_submissions_*` settings are one deployment's limits for website
+forms and newsletters, shared by every type and tenant — see
+[Public forms and newsletters](#public-forms-and-newsletters). What one form
+accepts lives on its type.
 
 `max_count` is how far a list page's `total` is counted exactly — see
 [Paging a large type](#paging-a-large-type). `max_bulk_records` is how many
@@ -576,6 +592,70 @@ The rules worth knowing before you point a site at it:
   > to the session and does not work around it; until that is fixed upstream,
   > the headers help a browser and a private cache rather than a CDN.
 
+## Public forms and newsletters
+
+A record type can take submissions from the website (#101): a **contact
+form**, where every submission becomes a record, or a **newsletter list**,
+one record per address with a double opt-in. Nothing changes for a type until
+it opts in.
+
+**Set one up.** *Record types → New type → Start from a preset* gives the
+*Contact form* (name, email, enquiry, message, and a `triage` select for your
+own workflow) or the *Newsletter list*. On the type editor's *Website
+submissions* card, tick the fields visitors fill in, add who is notified, set
+the consent text per content language, and switch on *Accept submissions from
+the website*. Then put the **Form (Records)** block (`RecordForm`) on a page,
+or in the site header or footer, and choose the type. Without pagebuilder the
+same form can be built against the headless API (`docs/api-reference.md`,
+*Website submissions*).
+
+**The type is the trust anchor.** The block only names a type and words the
+form for its page (title, button, thank-you message, per-page field labels).
+Which fields are public, their validation, the consent text and the recipients
+all live on the type; nothing the server relies on travels in page JSON. The
+block fetches the form's definition live on every page view, so an edited
+label or a newly ticked field shows at once, and a visitor who loaded the form
+before an edit is asked to check it and send again.
+
+**System fields.** A submission's `sm_*` fields — source page and block,
+language, a keyed hash of the IP address, user agent, the consent text the
+visitor saw, spam reason, when it was notified; for a list, the address,
+status and consent proof — are written by the server only. The record editor
+shows them read-only in *Submission details*; export includes them, except
+the internal `sm_nonce`.
+
+**Spam is the trash.** A submission with too many links is stored straight
+into the trash, marked `links`, with nobody notified; *Mark as spam* does the
+same by hand and *Not spam* brings it back and sends the notification.
+Emptying the trash deletes spam.
+
+**Newsletter.** A signup is `pending` until the visitor presses *Confirm* on
+the page the confirmation email links to (opening the link changes nothing);
+every answer to a signup is the same, so nobody can probe who is on the list.
+Unsubscribing keeps the address as `unsubscribed`, with its consent proof
+removed, so it is never signed up again without a fresh confirmation.
+
+**Abuse.** A honeypot, a signed form token with a minimum fill time, an
+origin check, a body cap, per-IP and per-type rate limits and a per-address
+confirmation budget are always on. An optional CAPTCHA (Cloudflare Turnstile
+or hCaptcha) is off by default; turning it on needs the provider's host added
+to pagebuilder's `public_csp` (`script-src` and `frame-src`), which records
+warns about at startup.
+
+**Retention.** Contact-form submissions older than the type's *Keep
+submissions for (days)* (365 by default, 0 keeps them) and newsletter signups
+never confirmed within *Delete unconfirmed signups after (days)* (30) are
+deleted by an hourly sweep, together with their revisions and the record of
+who their email reached. A record another type references with
+`on_delete: restrict` is skipped, not forced.
+
+**Privacy.** Revisions hold copies of what was submitted; a purge removes
+them too. To erase one person, filter each form or list by their address
+(`email` or `sm_email`), select all, and purge. Records' `records.view` is
+broad on purpose: set the type's `allowed_roles` to decide who can read
+submissions — the card warns while it is empty. The notification email is the
+one place field values leave the database.
+
 ## Permissions
 
 Three static permissions, registered at boot and visible in the role editor:
@@ -682,6 +762,12 @@ setting alone does not install `TenantMiddleware`. From there:
   is set to — so using the widget on a host that renamed the header needs
   `SM_TENANT_HEADER=X-Tenant-ID` to match it, and a cross-origin embed
   sending it triggers a CORS preflight.
+- **Website forms and newsletters** work in the tenant the public page
+  resolved (the organisation's subdomain); the `RecordForm` block sends no
+  tenant of its own, and with none resolved the form is the shared `404`. A
+  newsletter's confirm and unsubscribe links name their tenant inside the
+  signed token, so they work on the apex `public_base_url`, and the hourly
+  retention sweep runs once per tenant.
 - `/health/ready` needs no login, so records' detail there gives **counts
   only** — no tenant, type, field or language names. The named detail is
   logged at INFO by `sm_records.health`

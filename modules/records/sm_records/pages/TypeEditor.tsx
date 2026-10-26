@@ -236,7 +236,7 @@ function TypeEditor({
             errors={errorGroups.topLevel}
             onChange={(publicSubmissions) => setValues((prev) => ({ ...prev, publicSubmissions }))}
             onPreset={(kind) => {
-              const draft = presetDraft(kind);
+              const draft = presetDraft(kind, fields);
               setFields(draft.fields);
               setValues((prev) => ({ ...prev, ...draft.values }));
             }}

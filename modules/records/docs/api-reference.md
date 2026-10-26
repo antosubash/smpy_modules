@@ -1016,7 +1016,7 @@ they are the only way to observe a write without polling.
 | `RecordUpdated` | `PUT /records/{uuid}`, `POST …/revisions/{id}/restore`, each import row that updated, each record a bulk `publish`/`unpublish` changed | `type_key`, `tenant_id`, `uuid`, `version`, `status_before`, `status_after` |
 | `RecordTrashed` | `DELETE /records/{uuid}` and `POST …/records/bulk`, once per record the delete reached | `type_key`, `tenant_id`, `uuid`, `cascaded_from` |
 | `RecordRestored` | `POST …/restore`, `POST …/records/bulk` | `type_key`, `tenant_id`, `uuid` |
-| `RecordPurged` | `DELETE …/purge`, `POST …/records/bulk`, `POST …/records/trash/empty`, and once per record of a deleted type | `type_key`, `tenant_id`, `uuid`, `locale`, `translation_group` |
+| `RecordPurged` | `DELETE …/purge`, `POST …/records/bulk`, `POST …/records/trash/empty`, the website-submission retention sweep, and once per record of a deleted type | `type_key`, `tenant_id`, `uuid`, `locale`, `translation_group` |
 | `RecordTypeChanged` | `PUT /types/{key}`, `POST …/revisions/{v}/restore`, `POST /types/import` with `mode=update` | `type_key`, `tenant_id`, `schema_version`, `kind`, `index_affecting_keys` |
 | `RecordTypeDeleted` | `DELETE /types/{key}` | `type_key`, `tenant_id`, `purged` |
 | `RecordTypeMoved` | `PUT /types/{key}` with a changed `collection` | `type_key`, `tenant_id`, `source`, `target`, `moved` |
@@ -1400,10 +1400,14 @@ exempt from authentication for `GET` and `POST` only:
 captcha}`: one entry per public field (`key`, `type`, `label`, `help`,
 `required`, `choices`, `constraints`, `default`), the consent checkbox with its
 text in `?locale=` (else the default content locale's) or `null`, a signed
-token, and `captcha: null`. Fetch it when the form mounts — never from cached
-page JSON — and send the token back.
+token, and `captcha`: `{"provider": "turnstile" | "hcaptcha", "site_key"}`
+when the host requires a CAPTCHA, else `null`. Fetch it when the form mounts
+— never from cached page JSON — and send the token back. The records
+`RecordForm` pagebuilder block is one such form; a host can build its own
+against these two routes.
 
-The submit body is `{data, token, hp, consent, block, locale}`. `data` holds
+The submit body is `{data, token, hp, consent, block, locale,
+captcha_response}`. `data` holds
 the public fields only; any other key is a `422 unknown_field`, and a visitor
 can never write an `sm_*` value. `hp` is a honeypot input a person never
 fills: a non-empty one answers the same `202` and stores nothing. `consent`
@@ -1432,6 +1436,16 @@ the submission's `locale` — is a `409 form_changed` carrying the fresh
 (`413`); one address may send `public_submissions_rate_per_ip` and one type
 accept `public_submissions_type_rate` (`429` with `Retry-After`).
 `public_submissions_enabled` off turns every route into the 404.
+
+**The CAPTCHA** is off by default (`public_submissions_captcha_provider:
+"none"`). Set to `turnstile` or `hcaptcha`, with the provider's
+`public_submissions_captcha_site_key` and `public_submissions_captcha_secret`,
+every submission's `captcha_response` is verified with the provider's
+`siteverify` endpoint (5-second timeout) after the token and before anything
+is stored: a missing or rejected response is `400 captcha_failed`, and a
+provider that cannot be reached, answers with an error, or is configured
+without both keys is `503 captcha_unavailable` — it fails closed. A honeypot
+hit is dropped before the provider is asked.
 
 **The form token** is `{digest}.{issued}.{nonce}.{mac}`, the MAC an
 HMAC-SHA256 under the host's `secret_key` over the tenant, the type key, the
@@ -1479,6 +1493,20 @@ type's `allowed_roles`, and refuse a type that is not a contact form with
 
 Every refusal on these routes carries a stable snake_case `code`; the
 *Submissions* rows of the error table list them.
+
+**Retention.** An hourly sweep in every process
+(`public_submissions_retention_interval_seconds`; off with
+`public_submissions_retention_enabled`) deletes, per tenant, contact-form
+submissions older than the type's `retention_days` (`0` keeps them; the trash
+included), never-confirmed newsletter signups whose last signup or
+confirmation is older than the list's `pending_purge_days`, and
+`records_submission_delivery` rows older than
+`public_submissions_delivery_retention_days`. It goes through the ordinary
+trash-then-purge path, so subscribers see `RecordTrashed` (for a live record)
+and `RecordPurged`, a record's delivery claims go with it, and a record an
+`on_delete: restrict` reference holds is skipped rather than forced. One
+process sweeps at a time, under the framework lease
+`records:public_submissions:retention`.
 
 ### Newsletter lists
 
@@ -1593,6 +1621,7 @@ kind of route can produce, with the body schema
 | `400` | A filter term containing a NUL (`\x00`) character | `{"detail"}` |
 | `400` | *Public API only* — any of the above | `{"detail"}` — no `field`, no `reason` |
 | `400` | *Submissions* — a form token that does not verify, or a form sent sooner than `public_submissions_min_fill_seconds` or later than `public_submissions_token_max_age_seconds` after it was loaded | `{"detail", "code": "form_expired"}` — load the form again |
+| `400` | *Submissions* — a CAPTCHA is required (`public_submissions_captcha_provider`) and `captcha_response` is missing or the provider rejects it | `{"detail", "code": "captcha_failed"}` — complete the CAPTCHA again |
 | `401` | No session | `{"detail": "Not authenticated"}` — the framework's, not this module's |
 | `403` | Missing `records.view` / `records.edit` / `records.manage_types` | `{"detail": "Permission required: records.edit"}` |
 | `403` | The type's `allowed_roles` exclude the caller | `{"detail"}` — names the type and the roles, deliberately |
@@ -1635,6 +1664,7 @@ kind of route can produce, with the body schema
 | `422` | *Submissions* — a `data` key outside the type's `public_fields`, a required consent not given, or `data` that does not satisfy the schema | `{"detail", "code": "unknown_field" \| "consent_required" \| "invalid", "errors"}` |
 | `429` | *Submissions* — over `public_submissions_rate_per_ip` or `public_submissions_type_rate`; *Resend* more than once a minute for one record, or a newsletter confirmation past `public_submissions_confirm_rate_per_email` | `{"detail", "code": "rate_limited"}` with `Retry-After` |
 | `500` | Anything unanticipated on `/api/records/*` | `{"detail": "internal error"}` — always JSON |
+| `503` | *Submissions* — a CAPTCHA is required and its provider cannot be reached, answers with an error, or is configured without a site key or secret (fails closed) | `{"detail", "code": "captcha_unavailable"}` |
 
 Worked examples:
 

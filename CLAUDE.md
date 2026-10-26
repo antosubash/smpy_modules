@@ -85,6 +85,17 @@ through `pagebuilder.contracts` (news' search calls
 `search_pages`/`search_media`, #130); the caller names the tenant and the
 contract pins `tenant_id` itself.
 
+**Records' website-submission routes are anonymous writes (#101).** The record
+type is the trust anchor: never trust the `RecordForm` block's props —
+which fields are public, the consent text and the recipients live on
+`RecordType.public_submissions`. The `sm_*` system fields are written only
+through the internal `system=` argument of `create_record`/`update_record`.
+The routes under `/api/records/submissions/` do not use `RequiresCsrf` on
+purpose (JSON, `Origin` and a signed form token instead). Anything that
+deletes a submission — retention included — goes through
+`soft_delete_record`/`hard_delete_record`, whose purge locks the record rows
+and forgets their `records_submission_delivery` claims first.
+
 **Never add a file under `modules/*/*/pages/` unless it is a real Inertia
 page.** The page name is derived from that path by `import.meta.glob`, so a
 stray `.tsx` there silently registers a new page. Extractions go to

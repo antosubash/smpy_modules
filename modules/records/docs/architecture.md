@@ -214,7 +214,10 @@ does not make a write re-claim a value the row already holds.
    `public_submissions/mail_runner`, which marks a website submission's
    notification sent after the request that stored it is gone (#101) — with
    `public_submissions/delivery`, whose per-recipient claims commit in
-   sessions of their own so that no rollback can forget a send.
+   sessions of their own so that no rollback can forget a send. The
+   retention sweep (`public_submissions/retention`) commits too — it runs
+   from a loop with no request — but through the ordinary services, one
+   short session per batch, finished with `events.commit`.
 
 Because the error route turns an exception into a *response* inside the handler,
 `get_db` never sees it and would commit whatever the refused call already wrote.
@@ -471,6 +474,49 @@ The config is operational like `is_public`: it is not snapshotted and bumps no
 `schema_version`. The first kind is the exception, because it adds the system
 fields as an ordinary additive schema change.
 
+### The form on the page, and what happens after
+
+**The `RecordForm` block** (`components/public_submissions/form/`) is
+registered from `pagebuilder-blocks.ts` beside `RecordsList` — the seam
+pagebuilder's `blockRegistry` offers, so pagebuilder still imports nothing of
+records — with `layout: true`, because a newsletter signup in the footer is
+the classic case. Its props are presentation only (title, button, thank-you
+text, per-page field labels) plus the type key. On mount it fetches the live
+definition and renders one input per public field; `useSubmissionForm` is the
+state machine (`form_expired` refetches and sends once more by itself,
+`form_changed` re-renders from the 409's definition keeping the values, a 422
+is mapped onto its fields). It needs JavaScript: pagebuilder's public pages
+are Inertia pages. The newsletter's landing pages, which take a form-encoded
+`POST`, are the part that works without.
+
+**Spam is the trash.** There is no spam folder: a submission over the link
+limit is created and trashed in one transaction, marked `sm_spam: "links"`,
+and *Not spam* is a restore plus the notification. Emptying the trash deletes
+spam, and the two share one view, told apart by `sm_spam`.
+
+**The CAPTCHA** (`public_submissions/captcha.py`) is a verification call to
+the provider after the signed token and before anything is read into a
+record. It fails closed: unreachable is a `503`, never a pass. The widget's
+script is loaded by the block only when the definition names a provider.
+
+**Retention** (`public_submissions/retention.py`, driven by
+`retention_loop.py`). An in-process loop per process, started from
+`on_startup` and cancelled from `on_shutdown` like news' and pagebuilder's
+schedulers, reads its settings each tick from `app.state.sm_records`. A sweep
+takes the framework lease `records:public_submissions:retention`
+(non-blocking, so other processes skip), lists the tenants across the board
+on a session of its own, and then per tenant, under `tenant_scope`, deletes
+what is due **through the same services as an admin**: `soft_delete_record`
+for a live record (so `on_delete` referrers are honoured and the reduce
+indexes decremented), then `hard_delete_record`. That path's `_purge_ids`
+locks the record rows `FOR UPDATE` and deletes their
+`records_submission_delivery` claims before the rows go — the lock a
+confirmation task claiming a recipient takes `FOR SHARE` on, so a claim either
+lands first and is deleted, or finds the record gone. A record that refuses (a
+`restrict` reference) rolls its batch back and is skipped for the sweep.
+Delivery rows older than `public_submissions_delivery_retention_days` are
+pruned per tenant as well: they only stop a retry from mailing someone twice.
+
 ## The wire contracts
 
 `contracts/` is the only thing endpoints serialize, split by subject: `schemas`
@@ -544,7 +590,8 @@ sm_records/
 ├── schema/          field definitions, the compiler, the diff and its classes
 ├── index/           query building, writing, reindex, reduce, providers
 ├── services/        the domain; raises RecordsError, never commits
-├── public_submissions/  the sm_* system fields and the config's save rules
+├── public_submissions/  website forms (#101): system fields, config rules, the
+│                    submit pipeline, mail, newsletter links, CAPTCHA, retention
 ├── contracts/       wire DTOs
 ├── endpoints/       api/* (JSON), views*.py (Inertia) + _list_view.py (the list screen's offset/keyset query)
 ├── seed/            the demo dataset
