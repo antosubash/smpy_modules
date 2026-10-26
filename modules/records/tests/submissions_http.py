@@ -59,6 +59,18 @@ def host_parts(app: Any, *, base_url: str = BASE_URL) -> None:
     )
 
 
+async def _settle_mail(_response: Any) -> None:
+    """Finish the mail a request spawned before the test sends the next one.
+
+    The after-commit send (``mail_runner._spawn``) opens its own session, and
+    in production that is its own pooled connection. Here every session shares
+    the one ``StaticPool`` connection to ``:memory:``, so a send still running
+    while the next request commits interleaves two transactions on one sqlite3
+    handle: "cannot commit transaction - SQL statements in progress" (#262).
+    """
+    await mail_runner.drain()
+
+
 @pytest_asyncio.fixture
 async def site(tmp_path) -> AsyncIterator[AsyncClient]:
     app, db_state = await build_app(tmp_path)
@@ -66,7 +78,11 @@ async def site(tmp_path) -> AsyncIterator[AsyncClient]:
     outbox = Outbox()
     install_mail_sender(outbox)
     try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url=ORIGIN) as client:
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url=ORIGIN,
+            event_hooks={"response": [_settle_mail]},
+        ) as client:
             client.app = app  # type: ignore[attr-defined]
             client.db_state = db_state  # type: ignore[attr-defined]
             client.outbox = outbox  # type: ignore[attr-defined]
