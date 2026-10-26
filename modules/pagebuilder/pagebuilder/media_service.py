@@ -251,18 +251,35 @@ class MediaService:
             variants=variants,
         )
         self.db.add(asset)
-        await self.db.flush()
-        await self.db.refresh(asset)
+        try:
+            await self.db.flush()
+            await self.db.refresh(asset)
+        except BaseException:
+            # No row will name them, and the caller never learns their names
+            # to clean up (a restore tracks them only once this returns, #250).
+            # A failed refresh leaves its flushed row in the transaction: the
+            # caller must roll back, never commit past this raise.
+            _unlink(root, filename, variants)
+            raise
         return asset
 
     async def delete(self, asset_id: int) -> None:
         asset = await self.get_asset(asset_id)
-        root = self.tenant_dir(asset.tenant_id)
-        (root / asset.filename).unlink(missing_ok=True)
-        for meta in (asset.variants or {}).values():
-            if isinstance(meta, dict):
-                name = meta.get("filename")
-                if name:
-                    (root / name).unlink(missing_ok=True)
+        _unlink(self.tenant_dir(asset.tenant_id), asset.filename, asset.variants)
         await self.db.delete(asset)
         await self.db.flush()
+
+
+def media_file_names(filename: str, variants: dict | None) -> list[str]:
+    """The original's name and every variant's, as one upload wrote them."""
+    return [filename] + [
+        meta["filename"]
+        for meta in (variants or {}).values()
+        if isinstance(meta, dict) and meta.get("filename")
+    ]
+
+
+def _unlink(root: Path, filename: str, variants: dict | None) -> None:
+    """Remove an upload's original and every variant it wrote."""
+    for name in media_file_names(filename, variants):
+        (root / name).unlink(missing_ok=True)

@@ -26,6 +26,7 @@ from pagebuilder.contracts.schemas import PendingImportRead
 from pagebuilder.media_files import resolve_media_root
 from pagebuilder.models import ContentSnapshot, PendingImport, SnapshotMedia, SnapshotSource
 from pagebuilder.settings import PagebuilderSettings
+from pagebuilder.snapshots import written
 from pagebuilder.snapshots.access import (
     DOWNLOAD_PERMISSIONS_KEY,
     SYSTEM,
@@ -94,6 +95,11 @@ class SnapshotService(RestoreMixin):
         snapshot = ContentSnapshot(note=note, source=source, format_version=FORMAT_VERSION)
         self.db.add(snapshot)
         await self.db.flush()
+        if source is SnapshotSource.PRE_RESTORE:
+            # Tracked before the capture writes anything, so a cancellation
+            # inside it (which `except Exception` below misses) still removes
+            # the directory with the rolled-back row (#250).
+            written.track(self.db, [self.dir_for(snapshot.id)])
 
         # `pre_restore` is the system's own snapshot, not the approver's: it
         # captures every section, so the restore it guards stays reversible.

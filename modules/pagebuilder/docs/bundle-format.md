@@ -137,7 +137,9 @@ Reading rules:
 Another module adds a section through `pagebuilder.contracts.bundle` (#80):
 it registers a `BundleSection` from its `on_startup`, and pagebuilder calls it
 to capture into `<section>/`, validate on upload, plan beside the pages and
-apply after them, inside the approve request's one transaction. The rules a
+apply after them, inside the approve request's one transaction. A section
+that fails rolls the whole restore back, including the media files the restore
+had already written for it (#250). The rules a
 contributor follows are in that module's docstring. The section's manifest
 entry is written by pagebuilder:
 

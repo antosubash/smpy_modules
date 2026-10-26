@@ -12,14 +12,14 @@ stating here rather than burying:
 
 Contributed sections (#80) are planned beside the pages and applied after
 them, through this request's one session: a section that fails rolls
-pagebuilder's part back too, and the import stays pending.
+pagebuilder's part back too — the media files it wrote included (#250) — and
+the import stays pending.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-import shutil
 from datetime import UTC, datetime
 from typing import Any
 
@@ -28,6 +28,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
 from pagebuilder.models import ContentSnapshot, ImportStatus, PendingImport, SnapshotSource
+from pagebuilder.snapshots import written
 from pagebuilder.snapshots._host import HostBase
 from pagebuilder.snapshots.apply import apply_bundle
 from pagebuilder.snapshots.format import MEDIA_DIR, MEDIA_INDEX_NAME, is_readable
@@ -170,7 +171,10 @@ class RestoreMixin(HostBase):
         await self._recheck(snapshot, denied_at_staging)
         # Before anything is overwritten, so the previous state is one click
         # away — contributed sections included, since `take` captures them.
-        pre_restore = await self.take(_PRE_RESTORE_NOTE, source=SnapshotSource.PRE_RESTORE)
+        await self.take(_PRE_RESTORE_NOTE, source=SnapshotSource.PRE_RESTORE)
+        # `take` tracked that directory, and the apply tracks each media file it
+        # writes: all go if this transaction rolls back — here, or at a later
+        # failed commit (#250).
 
         try:
             bundle = self.dir_for(snapshot.id)
@@ -206,11 +210,13 @@ class RestoreMixin(HostBase):
                 {**(staged.plan or {}), "applied": applied, "denied": denied}
             )[0]
             await self.db.flush()
-        except Exception as exc:
+        except BaseException as exc:
+            # BaseException: a cancelled approval leaves its files behind too.
             # `take` guards its own capture; this covers the apply below. The
             # raise still rolls the request's transaction back — pages, layout,
-            # redirects, every section's rows and `_decide`'s status alike.
-            shutil.rmtree(self.dir_for(pre_restore.id), ignore_errors=True)
+            # redirects, every section's rows and `_decide`'s status alike —
+            # and the files written for it go now rather than at that rollback.
+            written.discard(self.db)
             # A section that cannot apply after all — a conflict, or a version
             # this host stopped reading since the re-check — is a refusal, not a 500.
             if isinstance(exc, (RestoreConflictError, BundleError)):
