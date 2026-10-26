@@ -75,14 +75,22 @@ async def test_an_oversized_consume_on_a_credited_row_stores_the_new_end(app):
 
 
 @postgres_only
-@pytest.mark.parametrize("existing", [False, True], ids=["first-row", "row-exists"])
+@pytest.mark.parametrize(
+    ("existing", "qty", "used"),
+    [(False, 3, 3), (True, 3, 4), (True, 120, 71)],
+    ids=["first-row", "row-exists", "oversized-on-credit"],
+)
 async def test_consume_during_a_shortening_sync_waits_and_stores_the_new_end(
-    app, monkeypatch, existing
+    app, monkeypatch, existing, qty, used
 ):
     """The real ``apply_snapshot`` is paused after it moved the rollups in,
     before its commit; a consume that starts then waits on the subscription
-    row and stores the shorter end."""
+    row and stores the shorter end. ``oversized-on-credit`` takes the plain
+    ``UPDATE`` (``add_within_limit``): it must take the locks in the same
+    order, never deadlocking with the sync."""
     tenant = await _setup(app, existing)
+    if qty > 100:  # the plan's limit
+        await service(app, CLOCK).adjust(tenant, METER, -50, reason="credit")
     paused, go = asyncio.Event(), asyncio.Event()
     follow = sync_module._follow_period_end
 
@@ -94,13 +102,13 @@ async def test_consume_during_a_shortening_sync_waits_and_stores_the_new_end(
     monkeypatch.setattr(sync_module, "_follow_period_end", follow_then_pause)
     syncing = asyncio.create_task(_sync(app, tenant, SHORT))
     await asyncio.wait_for(paused.wait(), 10)
-    consume = asyncio.create_task(service(app, CLOCK).consume(tenant, METER, 3, "k1", source="t"))
+    consume = asyncio.create_task(service(app, CLOCK).consume(tenant, METER, qty, "k1", source="t"))
     await asyncio.sleep(0.5)
     assert not consume.done()  # waiting on the subscription row
     go.set()
     await asyncio.wait_for(syncing, 10)
     assert (await asyncio.wait_for(consume, 10)).ok
-    assert await _ends(app, tenant) == [(SHORT[1], 4 if existing else 3)]
+    assert await _ends(app, tenant) == [(SHORT[1], used)]
 
 
 @postgres_only

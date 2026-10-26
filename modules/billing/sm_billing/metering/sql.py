@@ -192,7 +192,11 @@ def add_within_limit(
 
     For ``qty > limit``, where inserting a fresh row would over-admit. On
     Postgres a concurrent writer's row lock makes this wait and re-check the
-    committed row, as the upsert does.
+    committed row, as the upsert does. Its end and ``provider_period``
+    follow the subscription exactly as the upsert's conflict branch does
+    (``_authoritative_end``); the subscription's ``FOR SHARE`` read is an
+    uncorrelated subquery, evaluated before the row is locked, so the lock
+    order is still subscription, then rollup.
     """
     table = UsagePeriod.__table__
     total = table.c.used + qty
