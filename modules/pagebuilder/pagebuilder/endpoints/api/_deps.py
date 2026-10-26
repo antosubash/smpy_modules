@@ -11,12 +11,14 @@ from fastapi import Depends, HTTPException, Request
 from simple_module_core.permissions import grants
 from simple_module_hosting.permissions import PermissionDenied, ensure_resolved_permissions
 
+from pagebuilder.contracts.schemas import SnapshotCapabilities
 from pagebuilder.permissions import (
     PERM_APPROVE,
     PERM_EDIT,
     PERM_PUBLISH,
     RequiresPermission,
 )
+from pagebuilder.snapshots.access import SectionAccess
 
 require_edit = Depends(RequiresPermission(PERM_EDIT))
 require_publish = Depends(RequiresPermission(PERM_PUBLISH))
@@ -34,4 +36,12 @@ async def _publish_or_approve(request: Request) -> None:
 
 
 require_publish_or_approve = Depends(_publish_or_approve)
-"""Reading the staged restore: whoever may stage it or approve it."""
+"""Reading the staged restore or the snapshot list: whoever may stage it or approve it."""
+
+
+def snapshot_capabilities(access: SectionAccess) -> SnapshotCapabilities:
+    """Which Import / Export controls *access* may use, for the screen to offer."""
+    return SnapshotCapabilities(
+        publish=not access.lacking([PERM_PUBLISH]),
+        approve=not access.lacking([PERM_APPROVE]),
+    )

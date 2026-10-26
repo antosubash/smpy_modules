@@ -18,7 +18,7 @@ from simple_module_inertia import InertiaResponse
 
 from pagebuilder.contracts.schemas import SnapshotRead
 from pagebuilder.deps import get_snapshot_service
-from pagebuilder.endpoints.api._deps import require_publish_or_approve
+from pagebuilder.endpoints.api._deps import require_publish_or_approve, snapshot_capabilities
 from pagebuilder.permissions import PERM_APPROVE, PERM_PUBLISH
 from pagebuilder.snapshots.service import SnapshotService
 
@@ -44,7 +44,7 @@ async def _pending_props(service: SnapshotService) -> dict | None:
     return (await service.readable(staged)).model_dump(mode="json")
 
 
-@router.get("/content", response_model=None)
+@router.get("/content", response_model=None, dependencies=[require_publish_or_approve])
 async def admin_content(
     inertia: InertiaDep,
     service: SnapshotService = Depends(get_snapshot_service),
@@ -55,8 +55,11 @@ async def admin_content(
     travels with it because a restore awaiting approval is the one thing on
     this screen nobody should have to go looking for.
 
-    The screen itself is not gated (the menu offers it to every pagebuilder
-    role and the list is ungated in the API too); only the pending restore is.
+    Gated like the API list: a reader without ``pagebuilder.publish`` or
+    ``pagebuilder.approve`` gets the framework's 403, not the notes, creators
+    and manifests. ``capabilities`` tells the screen which controls to offer,
+    so an approver sees the list and the pending restore but no publish
+    actions.
     """
     snapshots = [
         SnapshotRead.model_validate(s).model_dump(mode="json") for s in await service.list()
@@ -68,6 +71,7 @@ async def admin_content(
             "pending": await _pending_props(service),
             # The contributed sections registered here, to label each row's counts.
             "sections": service.sections.labels(),
+            "capabilities": snapshot_capabilities(service.access).model_dump(),
         },
     )
 
