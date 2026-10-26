@@ -108,16 +108,26 @@ async def verify(settings: RecordsSettings, response: str | None, remote_ip: str
     try:
         async with (
             client_factory() as client,
-            client.stream("POST", PROVIDERS[provider]["verify"], data=form) as answer,
+            client.stream(
+                "POST",
+                PROVIDERS[provider]["verify"],
+                data=form,
+                headers={"Accept-Encoding": "identity"},
+            ) as answer,
         ):
             answer.raise_for_status()
+            # Raw bytes, unencoded as asked: a decoded stream could expand a
+            # small compressed answer far past the bound before it is counted.
+            encoding = answer.headers.get("content-encoding", "identity").strip().lower()
+            if encoding not in ("", "identity"):
+                raise ValueError(f"the provider answered with {encoding!r}, not identity")
             body = bytearray()
-            async for piece in answer.aiter_bytes():
+            async for piece in answer.aiter_raw():
                 body += piece
                 if len(body) > MAX_ANSWER_BYTES:
                     raise ValueError("the provider's answer is too large")
         success = json.loads(bytes(body)).get("success") is True
-    except (httpx.HTTPError, ValueError, AttributeError) as exc:
+    except (httpx.HTTPError, httpx.StreamError, ValueError, AttributeError) as exc:
         logger.warning("records: the %s CAPTCHA could not be verified: %s", provider, exc)
         raise SubmissionRefused(
             "captcha_unavailable", "the CAPTCHA could not be checked; try again shortly"

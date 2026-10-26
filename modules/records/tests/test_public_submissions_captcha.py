@@ -6,6 +6,7 @@ captcha_unavailable``, and neither writes anything."""
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 from urllib.parse import parse_qs
 
@@ -23,21 +24,35 @@ ON = {
 }
 
 
+def _streamed(status: int, body: bytes, headers: dict | None = None) -> httpx.Response:
+    """A response read the way a real transport hands it over: as a stream,
+    which ``verify`` reads raw and bounded."""
+    return httpx.Response(status, stream=httpx.ByteStream(body), headers=headers or {})
+
+
 class Provider:
     """A stand-in ``siteverify``: answers ``success`` for the response
     ``"good"``, and records what it was asked."""
 
-    def __init__(self, *, status: int = 200, body: object = None) -> None:
+    def __init__(
+        self, *, status: int = 200, body: object = None, headers: dict | None = None
+    ) -> None:
         self.status = status
         self.body = body
+        self.headers = headers or {}
         self.asked: list[tuple[str, dict[str, list[str]]]] = []
+        self.encodings: list[str | None] = []
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         form = parse_qs(request.content.decode())
         self.asked.append((str(request.url), form))
+        self.encodings.append(request.headers.get("accept-encoding"))
+        if isinstance(self.body, bytes):
+            return _streamed(self.status, self.body, self.headers)
         if self.body is not None:
-            return httpx.Response(self.status, content=str(self.body).encode())
-        return httpx.Response(self.status, json={"success": form.get("response") == ["good"]})
+            return _streamed(self.status, str(self.body).encode())
+        verdict = {"success": form.get("response") == ["good"]}
+        return _streamed(self.status, json.dumps(verdict).encode())
 
 
 @pytest.fixture
@@ -171,3 +186,21 @@ def test_the_secret_is_masked_on_the_settings_screen():
     from simple_module_core.secret_fields import conceals_secret
 
     assert conceals_secret("public_submissions_captcha_secret", "secret-1")
+
+
+async def test_a_compressed_answer_is_refused_unread(site, monkeypatch):
+    """The provider is asked for an identity answer and read raw, so a small
+    compressed body cannot expand past the bound before it is counted."""
+    import gzip
+
+    fake = Provider(body=gzip.compress(b'{"success": true}'), headers={"content-encoding": "gzip"})
+    monkeypatch.setattr(
+        captcha,
+        "client_factory",
+        lambda: httpx.AsyncClient(transport=httpx.MockTransport(fake.handler)),
+    )
+    configure(site, **ON)
+    await contact_type(site)
+    refused = await send(site, captcha_response="good")
+    assert refused.status_code == 503 and refused.json()["code"] == "captcha_unavailable"
+    assert fake.encodings == ["identity"]

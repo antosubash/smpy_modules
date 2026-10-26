@@ -1470,8 +1470,10 @@ Each recipient of one delivery attempt is claimed in the internal
 token: a retry never mails a recipient whose send was recorded, two workers
 never both send, and a worker that stalled past its claim can neither release
 nor complete its successor's. A claim left by a crashed worker is taken over
-once it is ten minutes old; one send may take at most 60 seconds. A *Resend*
-is a new attempt and reaches everyone again. **One window remains**: a message
+once it is ten minutes old; one send may take at most 60 seconds. An
+attempt's recipients are fixed when it first runs: a retry mails the
+addresses it started with, even after `notify_to` changes. A *Resend* is a new
+attempt, with the current recipients, and reaches everyone again. **One window remains**: a message
 the mail server accepted, followed by a crash before the send is recorded, is
 sent again by whoever takes the claim over — SMTP cannot be made exactly-once.
 A send cut off at the 60 seconds after the server may already have accepted it

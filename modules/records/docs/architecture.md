@@ -526,9 +526,15 @@ sweep (`LeaseLost`).
 Delivery rows are pruned per tenant by **attempt**, never row by row
 (`retention_deliveries.py`): a sent marker is what stops a retried attempt
 from mailing that recipient again, so an attempt's rows go together. Whether
-an attempt is finished is **recorded, never inferred**: `send_all` writes a
-completion row (recipient `~attempt-complete`) once every recipient of the
-attempt's full set is sent, and only an attempt with that row, past
+an attempt is finished is **recorded, never inferred**. An attempt's
+recipients are fixed when it first runs (`attempts.manifest`: a
+`~attempt-manifest` row plus one pending row per recipient, in one
+transaction), and every retry works from that set, never from the type's
+current `notify_to` — an admin's change applies to the next attempt. The
+completion row (`~attempt-complete`) is written by one `INSERT … SELECT` that
+lands only beside the manifest and with no recipient of the attempt unsent,
+so a worker that lost its claim (which now fails the attempt) or saw part of
+the set cannot stamp it. Only an attempt with that row, past
 `public_submissions_delivery_retention_days`, is pruned. (Inferring it from
 the rows present fails: a worker that mailed A and crashed before claiming B
 leaves only "sent" rows.) Two more cases go: a newsletter confirmation whose

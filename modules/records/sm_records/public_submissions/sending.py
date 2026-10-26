@@ -15,7 +15,7 @@ from simple_module_core.mail import MailSender
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.models import Record, RecordType, tables_for
-from sm_records.public_submissions import delivery
+from sm_records.public_submissions import attempts, delivery
 from sm_records.public_submissions.delivery import SessionFactory
 from sm_records.public_submissions.system import try_system_update
 from sm_records.settings import RecordsSettings
@@ -35,17 +35,35 @@ async def send_all(
     factory: SessionFactory,
     messages: list[tuple[str, Any]],
     mark: Callable[[], dict[str, Any]],
+    build: Callable[[str], Any] | None = None,
 ) -> None:
-    """Mail every recipient this attempt has not reached, then write ``mark()``
-    onto the record. ``messages`` are ``(recipient key, message)``: the key
-    names the recipient in the claims table — the address for staff, a keyed
-    hash for a subscriber — and the message carries the address. A failed
-    send is raised once every recipient has been tried; the ones that went
-    through stay sent."""
+    """Mail every recipient of this attempt's **fixed** set it has not
+    reached, stamp the attempt complete, then write ``mark()`` onto the
+    record.
+
+    ``messages`` are ``(recipient key, message)`` as the attempt would be
+    built now: the key names the recipient in the claims table — the address
+    for staff, a keyed hash for a subscriber. The first run persists those
+    keys as the attempt's set (:func:`.attempts.manifest`); a retry works from
+    the persisted set, building a message for a key no longer in ``messages``
+    with ``build`` (an address an admin has since removed is still owed this
+    attempt's mail). A failed send — a lost claim included — is raised once
+    every recipient has been tried; the ones that went through stay sent."""
     tenant, attempt, busy = rtype.tenant_id, delivery.attempt_of(due), False
     failure: Exception | None = None
     table = tables_for(rtype).record
-    for to, message in messages:
+    current = dict(messages)
+    keys = await attempts.manifest(factory, tenant, record.uuid, attempt, list(current), table)
+    if keys is None:
+        logger.info("records: %s record %s is gone; not mailed", rtype.key, record.uuid)
+        return
+    for to in keys:
+        message = current.get(to)
+        if message is None and build is not None:
+            message = build(to)
+        if message is None:
+            failure = failure or RuntimeError(f"no message for recipient {to} of {record.uuid}")
+            continue
         slot = delivery.Slot(tenant, record.uuid, attempt, to)
         state, token = await delivery.claim(factory, slot, table)
         if state == "gone":
@@ -63,11 +81,11 @@ async def send_all(
             failure = failure or exc
     if failure is not None:
         raise failure
-    if busy:
+    # The database confirms every recipient of the fixed set is sent before
+    # it stamps the attempt: a recipient another worker still holds keeps it
+    # open, and so does a stale worker's view of the set.
+    if busy or not await attempts.complete(factory, tenant, record.uuid, attempt):
         raise delivery.DeliveryInProgress(
             f"another worker is still mailing submission {record.uuid}"
         )
-    # Every recipient of the attempt's full set is sent: say so explicitly,
-    # so pruning never has to infer it (:mod:`.retention_deliveries`).
-    await delivery.complete(factory, tenant, record.uuid, attempt)
     await try_system_update(db, rtype, record, mark(), settings=settings)

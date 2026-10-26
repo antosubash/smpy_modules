@@ -9,7 +9,7 @@ from datetime import timedelta
 
 import pytest
 from sm_records.public_submissions import retention
-from sm_records.public_submissions.delivery import COMPLETE
+from sm_records.public_submissions.attempts import COMPLETE
 from sm_records.public_submissions.retention_deliveries import prune_deliveries
 from sm_records.services import records as record_service
 from sm_records.services import types as type_service

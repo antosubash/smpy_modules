@@ -9,7 +9,7 @@ claimed the next recipient, leaving every existing row "sent"). An attempt's
 rows are deleted, all together, only when
 
 * the attempt is **complete** — it has the completion row
-  (:data:`.delivery.COMPLETE`) that ``send_all`` writes once every recipient
+  (:data:`.attempts.COMPLETE`) that ``send_all`` writes once every recipient
   of its full set is sent — and the newest of its rows is older than the
   horizon (``public_submissions_delivery_retention_days``); or
 * it is a newsletter **confirmation that can never resume**: the subscriber
@@ -32,13 +32,13 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import case, func, select, tuple_, union_all
+from sqlalchemy import and_, case, func, select, tuple_, union_all
 from sqlalchemy import delete as sa_delete
 
 from sm_records import events
 from sm_records.contracts.public_submissions import KIND_SUBSCRIPTION
 from sm_records.models import RecordType, SubmissionDelivery, table_sets
-from sm_records.public_submissions.delivery import COMPLETE
+from sm_records.public_submissions.attempts import COMPLETE, MARKERS
 from sm_records.public_submissions.retention_rules import PENDING
 from sm_records.tenancy import bound_tenant
 
@@ -99,12 +99,15 @@ async def prune_deliveries(
     table = SubmissionDelivery
     tenant = bound_tenant()
     completed = func.count(case((table.recipient == COMPLETE, 1)))
+    # Belt and braces: ``attempts.complete`` writes the marker only when none
+    # is unsent, and pruning checks the same again.
+    unsent = func.count(case((and_(table.recipient.not_in(MARKERS), table.sent_at.is_(None)), 1)))
     newest = func.max(func.coalesce(table.sent_at, table.claimed_at))
     session = session_factory()
     try:
         groups = (
             await session.execute(
-                select(table.record_uuid, table.attempt, completed, newest)
+                select(table.record_uuid, table.attempt, completed, unsent, newest)
                 .where(table.tenant_id == tenant)
                 .group_by(table.record_uuid, table.attempt)
             )
@@ -117,14 +120,14 @@ async def prune_deliveries(
     finally:
         await session.close()
     done: list[tuple[str, str]] = []
-    for uuid, attempt, complete_rows, last in groups:
+    for uuid, attempt, complete_rows, open_rows, last in groups:
         uuid = str(uuid)
         if uuid not in records:
             done.append((uuid, attempt))  # verifiably gone: can never resume
             continue
         stamp = _aware(last)
         old = stamp is None or stamp < cutoff
-        if old and (complete_rows or _retired(*records[uuid])):
+        if old and ((complete_rows and not open_rows) or _retired(*records[uuid])):
             done.append((uuid, attempt))
     deleted = 0
     for start in range(0, len(done), _CHUNK):
