@@ -1,6 +1,6 @@
 """A sync that extends a period while a consume is between resolving the
 period and inserting its first rollup row: the row still gets the extended
-end (``metering.sql._stored_end``)."""
+end (``metering.sql._sub_end``)."""
 
 from __future__ import annotations
 

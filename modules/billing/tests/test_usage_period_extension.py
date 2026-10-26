@@ -4,6 +4,7 @@ as "previous" — through the snapshot sync and through a consume."""
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -119,19 +120,19 @@ async def test_a_consume_after_the_extension_moves_the_stored_end(app, admin):
 
 async def test_a_write_resolving_an_earlier_end_never_moves_it_back(app):
     """A consume that resolved the period before a concurrent extension
-    landed must not undo the extension."""
+    landed must not undo the extension: the subscription's end wins."""
     tenant = await _tenant(app)
     await _sync(app, tenant, (START, EXTENDED))
     usage = service(app, Clock(START + timedelta(days=1)))
     assert (await usage.consume(tenant, METER, 1, "k1", source="t")).ok
-    async with app.state.sm.db.session_factory() as session:  # the stale view
-        await session.execute(
-            update(Subscription)
-            .where(Subscription.tenant_id == tenant)
-            .values(current_period_end=FIRST_END)
-        )
-        await session.commit()
-    assert (await usage.consume(tenant, METER, 1, "k2", source="t")).ok
+    resolve = usage._resolve
+
+    async def stale(*args, **kwargs):  # the view from before the extension
+        return replace(await resolve(*args, **kwargs), period=(START, FIRST_END))
+
+    usage._resolve = stale
+    outcome = await usage.consume(tenant, METER, 1, "k2", source="t")
+    assert outcome.ok and outcome.period_end == EXTENDED
     assert await _ends(app, tenant) == [(EXTENDED, 2)]
 
 

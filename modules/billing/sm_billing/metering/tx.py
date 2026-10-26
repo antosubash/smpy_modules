@@ -11,7 +11,7 @@ SQLite.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from simple_module_db import finalize_session, mark_written
@@ -31,9 +31,11 @@ Apply = Callable[["AsyncSession"], Awaitable[Any]]
 
 @dataclass(frozen=True)
 class Counted:
-    """What an ``apply`` returns to keep its writes: the counter's new value."""
+    """What an ``apply`` returns to keep its writes: the counter's new value
+    (and, for a period counter, its stored end)."""
 
     used: int
+    end: datetime | None = field(default=None, kw_only=True)
 
 
 class _Undo(Exception):  # noqa: N818 - control flow, never escapes this module
