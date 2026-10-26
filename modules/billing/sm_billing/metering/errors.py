@@ -12,11 +12,14 @@ _SQLITE_BUSY = 5  # the primary code; BUSY_SNAPSHOT (517) and the rest share it
 class UsageBusyError(BillingError):
     """SQLite could not take the write lock for a metering write → 503.
 
-    It fails closed: the call is not counted *and* not admitted. In practice
-    only ``consume(db=…)`` on SQLite meets it, when the caller's transaction
-    read before the metering write and another writer committed in between
-    (``SQLITE_BUSY_SNAPSHOT``, which ``busy_timeout`` cannot wait out). The
-    client retries after a second.
+    It fails closed: the call is not counted *and* not admitted.
+    ``tx.run_write`` maps SQLite busy for every metering write it wraps
+    (consume, record, refund, adjust, holds, recount). It is most likely with
+    ``consume(db=…)`` or ``record(db=…)``, when the caller's transaction read
+    before the metering write and another writer committed in between
+    (``SQLITE_BUSY_SNAPSHOT``, which ``busy_timeout`` cannot wait out), but an
+    own-transaction write under heavy contention can also run out of
+    ``busy_timeout``. The client retries after a second.
     """
 
     def __init__(self) -> None:

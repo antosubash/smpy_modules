@@ -197,7 +197,7 @@ the ledger row for reference only.
   ledger or hold `INSERT`).
 - **Lock order: subscription, then rollup.** A counter upsert reads the
   tenant's subscription row `FOR SHARE` inside the same statement (see the
-  period extension below) before it writes the rollup. `sync.apply_snapshot`
+  moved period end below) before it writes the rollup. `sync.apply_snapshot`
   updates the subscription, flushes, and only then moves the rollups
   (`_follow_period_end`). Both take the locks in the same order, so a
   concurrent sync and consume wait on each other instead of deadlocking.
@@ -269,7 +269,7 @@ holds.
 Stripe can move a period's end while keeping its start (the rows are keyed
 on the start, so writes keep landing in the same row). The stored
 `period_end` must stay the period's real end, because the admin screen's
-"previous period" is found by its exact boundaries. Three rules keep it so:
+"previous period" is found by its exact boundaries. Two rules keep it so:
 
 - **The sync moves the rows.** `sync.apply_snapshot` runs
   `sql.extend_rollups` after the subscription write: every counter row of the
@@ -280,20 +280,24 @@ on the start, so writes keep landing in the same row). The stored
   is lapsed only rows already marked `provider_period` move; a calendar
   month written during a lapse keeps its own end even when its start
   coincides with the provider's.
-- **A first row takes an extension that landed after its read.** The period
-  is resolved in an earlier read, so a sync that extended it in between, and
-  found no row to extend yet, would leave a new row with the stale end. The
-  insert therefore reads, in the same statement and under `FOR SHARE`, the
-  entitled subscription whose period starts at the resolved start, and
-  stores its end when that is later (`_stored_end`), marking the row
-  `provider_period` (`_takes_sub_end`). A sync whose subscription update is in
-  flight is waited for; one that starts after the read waits for this write
-  to commit and then extends the row. SQLite ignores the lock clause; its
-  single writer already orders the two.
-- **An end only moves out.** On conflict the upsert keeps the later of the
-  stored and the resolved end (`_later_end`), and `provider_period` is
-  sticky (`OR`), so a write that resolved the period before a concurrent
-  extension cannot undo it.
+- **A write stores the subscription's end, not its own.** The period is
+  resolved in an earlier read, so a sync that moved its end in between
+  (later *or* earlier) would otherwise have the write store a stale end: a
+  new row the sync found nothing to move, or an existing row the sync
+  already moved, moved back. Each counter write therefore reads, in the same
+  statement and under `FOR SHARE`, the entitled subscription whose period
+  starts at the resolved start (`_sub_end`). The insert stores that
+  subscription's end, else the resolved one, and marks the row
+  `provider_period` when the subscription supplied it. On conflict (and in
+  the `qty > limit` `UPDATE`) the row takes the subscription's end when
+  there is one, earlier or later, and otherwise keeps its stored end
+  (`_authoritative_end`): a write never stores an end the subscription does
+  not currently have, so neither an extension nor a shortening (#240) can be
+  undone by a racing write. `provider_period` is sticky (`OR`). The
+  returned `Allowed.period_end` is the stored end. A sync whose subscription
+  update is in flight is waited for; one that starts after the read waits
+  for this write to commit and then moves the row. SQLite ignores the lock
+  clause; its single writer already orders the two.
 
 The usage screens read the period with the same rule enforcement uses
 (`effective_plan` plus `current_period`), and the admin overview shows the

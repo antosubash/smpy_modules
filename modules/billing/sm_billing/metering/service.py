@@ -148,15 +148,14 @@ class UsageService(HoldsMixin):
             if limit is not None and qty > limit:
                 # Only a credited (negative) counter can fit it; never insert.
                 stmt = sql.add_within_limit(
-                    **fields, start=period[0], end=period[1], qty=qty, limit=limit, now=now
+                    **fields, start=period[0], qty=qty, limit=limit, now=now
                 )
             else:
                 stmt = sql.upsert_period(
                     dialect, **fields, period=period, qty=qty, limit=limit, now=now
                 )
-            moved = await session.execute(stmt)
-            used = moved.scalar_one_or_none()
-            return None if used is None else Counted(int(used))
+            row = (await session.execute(stmt)).one_or_none()
+            return None if row is None else Counted(int(row.used), as_utc(row.period_end))
 
         return apply
 
@@ -164,7 +163,7 @@ class UsageService(HoldsMixin):
         tenant_id, meter = event["tenant_id"], event["meter"]
         outcome = await run_write(self._factory, db, self._counter(event, res, limit))
         if isinstance(outcome, Counted):
-            return Allowed(outcome.used, res.limit, res.period[1])
+            return Allowed(outcome.used, res.limit, outcome.end or res.period[1])
         if outcome == _REPLAY:
             replayed = await self._replay(event, res, db)
             if replayed is not None:

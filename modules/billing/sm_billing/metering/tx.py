@@ -31,9 +31,11 @@ Apply = Callable[["AsyncSession"], Awaitable[Any]]
 
 @dataclass(frozen=True)
 class Counted:
-    """What an ``apply`` returns to keep its writes: the counter's new value."""
+    """What an ``apply`` returns to keep its writes: the counter's new value
+    (and, for a period counter, its stored end)."""
 
     used: int
+    end: datetime | None = None
 
 
 class _Undo(Exception):  # noqa: N818 - control flow, never escapes this module
