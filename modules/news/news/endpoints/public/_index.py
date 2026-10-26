@@ -34,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from news import tag_redirects, tenancy
 from news.authors import resolve as resolve_author
 from news.endpoints.public._archive import render_archive
+from news.endpoints.public._not_found import not_found
 from news.endpoints.public._paging import page_param
 from news.models import NewsCategory, NewsTag
 from news.settings import (
@@ -61,13 +62,17 @@ def index_router(locale: str) -> APIRouter:
         page: int = Depends(page_param),
         q: str | None = Query(None),
         db: AsyncSession = Depends(get_db),
+        tenant: str | None = Depends(tenancy.bind_public_viewer),
     ) -> Response:
         """Everything published in this language, newest first."""
+        if tenant is None:
+            return await not_found(request, inertia, db, locale=locale, tenant=None)
         return await render_archive(
             request=request,
             inertia=inertia,
             db=db,
             locale=locale,
+            tenant=tenant,
             page=page,
             q=q,
             path_for=lambda loc: public_index_path(locale=loc),
@@ -82,6 +87,7 @@ def index_router(locale: str) -> APIRouter:
         page: int = Depends(page_param),
         q: str | None = Query(None),
         db: AsyncSession = Depends(get_db),
+        tenant: str | None = Depends(tenancy.bind_public_viewer),
     ) -> Response:
         """One category's archive.
 
@@ -89,6 +95,8 @@ def index_router(locale: str) -> APIRouter:
         slug is matched against the managed rows first and falls back to the raw
         value — the same rule the listing API already applies.
         """
+        if tenant is None:
+            return await not_found(request, inertia, db, locale=locale, tenant=None)
         name = await db.scalar(
             select(NewsCategory.name).where(NewsCategory.slug == slug)
         )
@@ -97,6 +105,7 @@ def index_router(locale: str) -> APIRouter:
             inertia=inertia,
             db=db,
             locale=locale,
+            tenant=tenant,
             page=page,
             q=q,
             path_for=lambda loc: public_category_path(slug, loc),
@@ -113,6 +122,7 @@ def index_router(locale: str) -> APIRouter:
         page: int = Depends(page_param),
         q: str | None = Query(None),
         db: AsyncSession = Depends(get_db),
+        tenant: str | None = Depends(tenancy.bind_public_viewer),
     ) -> Response:
         """One tag's archive.
 
@@ -121,6 +131,8 @@ def index_router(locale: str) -> APIRouter:
         published while it existed should say "nothing here now", not "never
         existed". A renamed tag's old slug 301s to its new one.
         """
+        if tenant is None:
+            return await not_found(request, inertia, db, locale=locale, tenant=None)
         name = await db.scalar(select(NewsTag.name).where(NewsTag.slug == slug))
         if name is None and (moved := await tag_redirects.resolve(db, slug)):
             # Renamed: the old address follows it. Keyed on the tenant like
@@ -136,6 +148,7 @@ def index_router(locale: str) -> APIRouter:
             inertia=inertia,
             db=db,
             locale=locale,
+            tenant=tenant,
             page=page,
             q=q,
             path_for=lambda loc: public_tag_path(slug, loc),
@@ -152,6 +165,7 @@ def index_router(locale: str) -> APIRouter:
         page: int = Depends(page_param),
         q: str | None = Query(None),
         db: AsyncSession = Depends(get_db),
+        tenant: str | None = Depends(tenancy.bind_public_viewer),
     ) -> Response:
         """One byline's archive.
 
@@ -169,12 +183,15 @@ def index_router(locale: str) -> APIRouter:
         article carrying them, and the URL published while they had one should
         say "nothing here now".
         """
+        if tenant is None:
+            return await not_found(request, inertia, db, locale=locale, tenant=None)
         names, display = await resolve_author(db, slug, locale)
         return await render_archive(
             request=request,
             inertia=inertia,
             db=db,
             locale=locale,
+            tenant=tenant,
             page=page,
             q=q,
             path_for=lambda loc: public_author_path(slug, loc),

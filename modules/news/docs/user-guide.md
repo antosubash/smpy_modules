@@ -223,8 +223,12 @@ What you can do depends on your news permissions, on top of pagebuilder's:
 - `/news/category/{slug}`, `/news/tag/{slug}`, `/news/author/{slug}` — the same
   archive narrowed. The search box narrows the page you are on; it matches
   headline, URL, summary and tags, not the body.
-- `/news/{slug}` — one published article. A draft, a trashed article and an
-  unknown slug all answer 404.
+- `/news/{slug}` — one published article. A draft, one waiting for review or
+  for its scheduled time, a trashed article and an unknown slug all answer the
+  same 404: on a site that also runs pagebuilder, the site's own "This page
+  doesn't exist" page inside its header and footer, in the address's language
+  ("Diese Seite gibt es nicht" on `/de/news/…`). An old address of a renamed
+  article still forwards to the new one.
 - On a multilingual site other languages are prefixed (`/de/news/…`), and an
   article with live translations offers **Read this article in another
   language**.

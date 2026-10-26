@@ -90,17 +90,19 @@ async def render_not_found(
     *,
     locale: str,
     db: AsyncSession | None,
+    detail: str = NOT_FOUND_DETAIL,
 ) -> Response:
     """The 404, in ``locale``, framed by the tenant's layout when there is one.
 
     ``db`` is ``None`` for a request that resolved no tenant: the page then
     renders with the default branding and no header or footer, never another
     site's. The layout and nav are read only when the page is rendered, so a
-    JSON caller costs no queries.
+    JSON caller costs no queries. ``detail`` is the JSON body's wording, which
+    news keeps as its own "Article not found" (#248).
     """
     response: Response
     if wants_json(request):
-        response = JSONResponse({"detail": NOT_FOUND_DETAIL}, status_code=404)
+        response = JSONResponse({"detail": detail}, status_code=404)
     else:
         frame: dict[str, Any] = {"layout_header": None, "layout_footer": None}
         nav: SiteNav | None = None
