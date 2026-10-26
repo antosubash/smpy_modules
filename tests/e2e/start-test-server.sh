@@ -106,6 +106,21 @@ uv run python scripts/set_setting.py sm_records \
 # meters an organisation of its own.
 uv run python scripts/seed_usage.py
 
+# The host limits anonymous traffic to public routes per client IP
+# (`rate_limit_public`, 120/minute). Every test signs in from scratch — an
+# anonymous GET /users/login and POST /api/users/auth/login — and all of them
+# come from 127.0.0.1, so a fast shard spends that budget on logins alone and
+# the next sign-in page is a 429 (#245). Raised rather than switched off, so
+# the limiter stays in the request path; a rule with its own `rate=` (records'
+# public forms) is unaffected.
+#
+# Exported rather than written with set_setting.py: it is a host setting the
+# middleware stack is built from, and host/main.py builds the app from
+# `Settings()` — the environment — so a `host.rate_limit_public` row would be
+# stored and never read. Set here, before both `exec`s below, it reaches the
+# bundle server, `make dev` and the multi-tenant run alike.
+export SM_RATE_LIMIT_PUBLIC=100000/minute
+
 # Multi-tenant runs only (E2E_MULTI_TENANT=1 → SM_MULTI_TENANT=true): resolve
 # the tenant from the host, so `<slug>.localhost` addresses an organisation's
 # public site the way an anonymous visitor would reach it. A spec names the

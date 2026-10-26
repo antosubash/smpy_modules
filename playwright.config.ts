@@ -130,14 +130,6 @@ export default defineConfig({
       // switch to the second catalogue. English stays the default and the
       // browser asks for en-US, so every other spec still reads English.
       SM_I18N_SUPPORTED_LOCALES: '["en","de"]',
-      // The host limits anonymous traffic to public routes per client IP
-      // (`rate_limit_public`, 120/minute). Every test signs in from scratch
-      // — an anonymous GET /users/login and POST /api/users/auth/login — and
-      // all of them come from 127.0.0.1, so a fast shard spends that budget
-      // on logins alone and the next sign-in page is a 429 (#245). Raised
-      // rather than switched off, so the limiter stays in the request path;
-      // a rule with its own `rate=` (records' public forms) is unaffected.
-      SM_RATE_LIMIT_PUBLIC: '100000/minute',
       // Opt-in: the billing tenant flow needs an active organisation, which
       // only exists with multi-tenancy on. The default suite runs without it.
       ...(process.env.E2E_MULTI_TENANT ? { SM_MULTI_TENANT: 'true' } : {}),
