@@ -96,12 +96,13 @@ async def deliver(
 ) -> None:
     """A submission's notification: every ``notify_to`` address, then
     ``sm_notified_at``."""
+
     # Built before the claims: a failure here must not leave a claim that
     # blocks the retry for a whole lease.
-    messages = [
-        (to, notification(rtype, record, to=to, base_url=due.base_url, locale=due.locale))
-        for to in (rtype.public_submissions or {}).get("notify_to", [])
-    ]
+    def build(to: str) -> MailMessage:
+        return notification(rtype, record, to=to, base_url=due.base_url, locale=due.locale)
+
+    messages = [(to, build(to)) for to in (rtype.public_submissions or {}).get("notify_to", [])]
     await send_all(
         db,
         rtype,
@@ -112,4 +113,5 @@ async def deliver(
         factory,
         messages,
         lambda: {"sm_notified_at": utcnow()},
+        build,
     )

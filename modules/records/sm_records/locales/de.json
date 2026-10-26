@@ -822,6 +822,62 @@
         "button": "Abmelden",
         "done": "Sie sind abgemeldet. Sie erhalten diesen Newsletter nicht mehr."
       }
+    },
+    "block": {
+      "block_label": "Formular (Records)",
+      "palette_group": "Formulare",
+      "field_type_key": "Formular oder Newsletter-Liste",
+      "type_disabled": "{label} (nimmt keine Einsendungen an)",
+      "field_title": "Titel",
+      "field_intro": "Einleitung",
+      "field_submit_label": "Beschriftung der Schaltfläche",
+      "field_success_title": "Titel der Danke-Nachricht",
+      "field_success_body": "Danke-Nachricht",
+      "field_labels": "Feldbeschriftungen auf dieser Seite",
+      "label_new": "Neue Beschriftung",
+      "label_field": "Feld",
+      "label_label": "Beschriftung",
+      "label_help": "Hilfetext",
+      "placeholder": "Wählen Sie in den Einstellungen des Blocks ein Formular oder eine Newsletter-Liste.",
+      "editor_note": "Wird auf der veröffentlichten Seite gesendet."
+    },
+    "form": {
+      "loading": "Formular wird geladen…",
+      "unavailable": "Dieses Formular ist gerade nicht verfügbar.",
+      "submit": "Senden",
+      "subscribe": "Abonnieren",
+      "sending": "Wird gesendet…",
+      "optional": "(optional)",
+      "choose": "Bitte wählen…",
+      "honeypot": "Dieses Feld leer lassen",
+      "success_title": "Vielen Dank",
+      "success_body": "Ihre Nachricht wurde gesendet.",
+      "success_body_subscription": "Fast geschafft: Bitte prüfen Sie Ihr Postfach und bestätigen Sie Ihr Abonnement.",
+      "changed": "Dieses Formular wurde geändert, während Sie es ausgefüllt haben. Prüfen Sie Ihre Angaben und senden Sie es erneut.",
+      "invalid": "Bitte prüfen Sie die markierten Felder.",
+      "required": "Bitte füllen Sie dieses Feld aus.",
+      "field_invalid": "Bitte prüfen Sie diesen Wert.",
+      "consent_required": "Bitte setzen Sie hier ein Häkchen, um fortzufahren."
+    },
+    "errors": {
+      "form_expired": "Dieses Formular ist abgelaufen. Laden Sie die Seite neu und versuchen Sie es noch einmal.",
+      "rate_limited": "Zu viele Versuche. Bitte warten Sie {seconds} Sekunden und versuchen Sie es dann erneut.",
+      "captcha_failed": "Bitte schließen Sie die Sicherheitsprüfung ab und versuchen Sie es erneut.",
+      "captcha_unavailable": "Die Sicherheitsprüfung ist gerade nicht verfügbar. Bitte versuchen Sie es in ein paar Minuten erneut.",
+      "bad_origin": "Dieses Formular kann nur von dieser Website gesendet werden.",
+      "network": "Das hat nicht geklappt. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+      "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es später noch einmal."
+    },
+    "system_values": {
+      "sm_status": {
+        "pending": "Bestätigung ausstehend",
+        "confirmed": "Bestätigt",
+        "unsubscribed": "Abgemeldet"
+      },
+      "sm_spam": {
+        "links": "Zu viele Links",
+        "manual": "Von Hand markiert"
+      }
     }
   }
 }

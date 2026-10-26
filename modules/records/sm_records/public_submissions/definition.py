@@ -26,6 +26,7 @@ from sm_records.contracts.public_submissions_api import (
     SubmissionField,
 )
 from sm_records.models import RecordType
+from sm_records.public_submissions.captcha import public_config
 from sm_records.public_submissions.spec import SUBMITTABLE_TYPES
 from sm_records.public_submissions.tokens import sign_form
 from sm_records.services._payload import field_defs
@@ -173,4 +174,6 @@ def definition(
         fields=fields,
         consent=consent,
         token=sign_form(secret, tenant, rtype.key, digest, now=issued),
+        captcha=public_config(settings),
+        min_fill_seconds=settings.public_submissions_min_fill_seconds,
     )

@@ -171,6 +171,14 @@ async def startup(module: Any, app: FastAPI) -> None:
 
     media.configure(app, settings.media_api_prefix)
 
+    # Website submissions (#101): the retention sweep's loop, and a warning
+    # when a CAPTCHA is on that the public pages' CSP would block.
+    from sm_records.public_submissions import captcha, retention_loop
+
+    retention_loop.start(module, app)
+    if (warning := captcha.csp_warning(app, settings)) is not None:
+        logger.warning(warning)
+
     # Dropping a content locale is not refused at save (``settings_checks``
     # says why), so this is what makes the records left behind visible. Once
     # per boot: the framework offers no hook to re-run it when an operator

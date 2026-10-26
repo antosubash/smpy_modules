@@ -55,14 +55,28 @@ export function stripUids(fields: EditableField[]): FieldDef[] {
 }
 
 /** A *From a preset* draft for a new type (#101): fresh, unsaved rows (their
- *  keys still editable) and the metadata the preset sets. */
-export function presetDraft(kind: SubmissionKind): {
+ *  keys still editable) and the metadata the preset sets.
+ *
+ *  `current` is what the admin has added so far, and it is **kept**: the
+ *  preset's fields come first, then every field of the admin's whose key the
+ *  preset does not define (a preset field of the same key wins). Picking the
+ *  *Newsletter list* preset after adding a first-name field used to drop it,
+ *  since that preset brings no ordinary fields of its own. */
+export function presetDraft(
+  kind: SubmissionKind,
+  current: EditableField[] = [],
+): {
   fields: EditableField[];
   values: Partial<TypeMetadataValues>;
 } {
   const preset = PRESETS[kind];
+  const taken = new Set(preset.fields.map((field) => field.key));
+  const kept = current.filter((field) => !field.system && !taken.has(field.key));
   return {
-    fields: preset.fields.map((field) => ({ ...field, uid: newFieldUid(), fromServer: false })),
+    fields: [
+      ...preset.fields.map((field) => ({ ...field, uid: newFieldUid(), fromServer: false })),
+      ...kept,
+    ],
     values: {
       displayField: preset.displayField,
       showInMenu: preset.showInMenu,

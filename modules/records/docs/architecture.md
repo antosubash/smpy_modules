@@ -214,7 +214,10 @@ does not make a write re-claim a value the row already holds.
    `public_submissions/mail_runner`, which marks a website submission's
    notification sent after the request that stored it is gone (#101) — with
    `public_submissions/delivery`, whose per-recipient claims commit in
-   sessions of their own so that no rollback can forget a send.
+   sessions of their own so that no rollback can forget a send. The
+   retention sweep (`public_submissions/retention`) commits too — it runs
+   from a loop with no request — but through the ordinary services, one
+   short session per batch, finished with `events.commit`.
 
 Because the error route turns an exception into a *response* inside the handler,
 `get_db` never sees it and would commit whatever the refused call already wrote.
@@ -471,6 +474,75 @@ The config is operational like `is_public`: it is not snapshotted and bumps no
 `schema_version`. The first kind is the exception, because it adds the system
 fields as an ordinary additive schema change.
 
+### The form on the page, and what happens after
+
+**The `RecordForm` block** (`components/public_submissions/form/`) is
+registered from `pagebuilder-blocks.ts` beside `RecordsList` — the seam
+pagebuilder's `blockRegistry` offers, so pagebuilder still imports nothing of
+records — with `layout: true`, because a newsletter signup in the footer is
+the classic case. Its props are presentation only (title, button, thank-you
+text, per-page field labels) plus the type key. On mount it fetches the live
+definition and renders one input per public field; `useSubmissionForm` is the
+state machine (`form_expired` refetches and sends once more by itself,
+`form_changed` re-renders from the 409's definition keeping the values, a 422
+is mapped onto its fields). It needs JavaScript: pagebuilder's public pages
+are Inertia pages. The newsletter's landing pages, which take a form-encoded
+`POST`, are the part that works without.
+
+**Spam is the trash.** There is no spam folder: a submission over the link
+limit is created and trashed in one transaction, marked `sm_spam: "links"`,
+and *Not spam* is a restore plus the notification. Emptying the trash deletes
+spam, and the two share one view, told apart by `sm_spam`.
+
+**The CAPTCHA** (`public_submissions/captcha.py`) is a verification call to
+the provider after the signed token and before anything is read into a
+record. It fails closed: unreachable is a `503`, never a pass. The widget's
+script is loaded by the block only when the definition names a provider.
+
+**Retention** (`public_submissions/retention.py`, driven by
+`retention_loop.py`). An in-process loop per process, started from
+`on_startup` and cancelled from `on_shutdown` like news' and pagebuilder's
+schedulers, reads its settings each tick from `app.state.sm_records`. A sweep
+takes the framework lease `records:public_submissions:retention`
+(non-blocking, so other processes skip), lists the tenants across the board
+on a session of its own, and then per tenant, under `tenant_scope`, deletes
+what is due **through the same services as an admin**: `soft_delete_record`
+for a live record (so `on_delete` referrers are honoured and the reduce
+indexes decremented), then `hard_delete_record`. That path's `_purge_ids`
+locks the record rows `FOR UPDATE` and deletes their
+`records_submission_delivery` claims before the rows go — the lock a
+confirmation task claiming a recipient takes `FOR SHARE` on, so a claim either
+lands first and is deleted, or finds the record gone. A record that refuses (a
+`restrict` reference) rolls its batch back and is skipped for the sweep.
+The candidates are read before the lock, so each is re-read under
+`lock_type` and `FOR UPDATE` on its row — the order every record write
+takes — and deleted only if it is still due: a subscriber who confirmed in
+between is kept. A list's pending window opens when the record last *entered*
+pending (`sm_consent_at`, written on signup and on a return from unsubscribed
+or the trash), so neither a repeated signup nor a *Resend* extends it. The
+lease is renewed during the work, and a renewal that reports it lost stops the
+sweep (`LeaseLost`).
+
+Delivery rows are pruned per tenant by **attempt**, never row by row
+(`retention_deliveries.py`): a sent marker is what stops a retried attempt
+from mailing that recipient again, so an attempt's rows go together. Whether
+an attempt is finished is **recorded, never inferred**. An attempt's
+recipients are fixed when it first runs (`attempts.manifest`: a
+`~attempt-manifest` row plus one pending row per recipient, in one
+transaction), and every retry works from that set, never from the type's
+current `notify_to` — an admin's change applies to the next attempt. The
+completion row (`~attempt-complete`) is written by one `INSERT … SELECT` that
+lands only beside the manifest and with no recipient of the attempt unsent,
+so a worker that lost its claim (which now fails the attempt) or saw part of
+the set cannot stamp it. Only an attempt with that row, past
+`public_submissions_delivery_retention_days`, is pruned. (Inferring it from
+the rows present fails: a worker that mailed A and crashed before claiming B
+leaves only "sent" rows.) Two more cases go: a newsletter confirmation whose
+subscriber is no longer pending, which can never be resent; and any attempt
+whose record is verifiably gone, looked up at prune time by tenant and uuid
+in every record table at once (one statement, the trash included), never
+from a list of types read earlier. Each prune batch renews the lease first.
+
 ## The wire contracts
 
 `contracts/` is the only thing endpoints serialize, split by subject: `schemas`
@@ -544,7 +616,8 @@ sm_records/
 ├── schema/          field definitions, the compiler, the diff and its classes
 ├── index/           query building, writing, reindex, reduce, providers
 ├── services/        the domain; raises RecordsError, never commits
-├── public_submissions/  the sm_* system fields and the config's save rules
+├── public_submissions/  website forms (#101): system fields, config rules, the
+│                    submit pipeline, mail, newsletter links, CAPTCHA, retention
 ├── contracts/       wire DTOs
 ├── endpoints/       api/* (JSON), views*.py (Inertia) + _list_view.py (the list screen's offset/keyset query)
 ├── seed/            the demo dataset

@@ -21,6 +21,8 @@ CODES: dict[str, int] = {
     "unsupported_media_type": 415,
     "rate_limited": 429,
     "form_expired": 400,
+    "captcha_failed": 400,
+    "captcha_unavailable": 503,
     "form_changed": 409,
     "unknown_field": 422,
     "consent_required": 422,

@@ -37,7 +37,7 @@ from sm_records.contracts.events import FormSubmitted
 from sm_records.contracts.public_submissions import KIND_SUBSCRIPTION
 from sm_records.contracts.public_submissions_api import SubmitBody
 from sm_records.models import RecordStatus, RecordType
-from sm_records.public_submissions import abuse, subscribe
+from sm_records.public_submissions import abuse, captcha, subscribe
 from sm_records.public_submissions.definition import (
     EMAIL_KEY,
     accepting_type,
@@ -178,6 +178,9 @@ async def submit(
         abuse.rate_key(tenant, f"type={rtype.key}"),
         settings.public_submissions_type_rate,
     )
+    # After the token, so only a form this host signed costs a call to the
+    # provider; before anything is read into a record or written.
+    await captcha.verify(settings, body.captcha_response, ip)
     sent = dict(body.data)
     newsletter = rtype.public_submissions.get("kind") == KIND_SUBSCRIPTION
     address = sent.pop(EMAIL_KEY, None) if newsletter else None
