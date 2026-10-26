@@ -48,6 +48,7 @@ _MODELS: Final[dict[int, Any]] = {
     422: ValidationErrorBody,
     429: ErrorDetail,
     500: ErrorDetail,
+    503: ErrorDetail,
 }
 """Which shape each status sends. A status with no entry would be documented
 with a description and no model, which is the honest answer for one whose body

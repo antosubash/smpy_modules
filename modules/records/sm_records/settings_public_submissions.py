@@ -14,6 +14,7 @@ these are one deployment's limits.
 
 from __future__ import annotations
 
+from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic import Field, field_validator
@@ -94,6 +95,36 @@ class PublicSubmissionsSettings(BootSettings):
     public_submissions_confirm_ttl_hours: int = Field(default=168, ge=1, le=24 * 365)
     """How long a confirmation link works, in hours. Later it is expired and
     the visitor signs up again."""
+
+    public_submissions_captcha_provider: Literal["none", "turnstile", "hcaptcha"] = "none"
+    """A CAPTCHA every submission must pass: ``none`` (the default — the
+    honeypot, the signed form token and the rate limits stop most spam),
+    ``turnstile`` (Cloudflare) or ``hcaptcha``. Checked with the provider
+    before anything is stored; when the provider cannot be reached the
+    submission is refused, never let through. Add the provider's host to
+    pagebuilder's ``public_csp`` (``script-src`` and ``frame-src``), or the
+    widget cannot load."""
+
+    public_submissions_captcha_site_key: str = ""
+    """The provider's public site key, sent to the form to render the widget."""
+
+    public_submissions_captcha_secret: str = ""
+    """The provider's secret key, used only to verify a response server-side.
+    Masked on the Settings screen and stored as other secrets here are."""
+
+    public_submissions_retention_enabled: bool = True
+    """Run the hourly clean-up: delete contact-form submissions older than
+    their type's retention, newsletter signups never confirmed within the
+    list's unconfirmed purge, and old delivery bookkeeping. Off, nothing is
+    deleted automatically (a deployment that purges another way)."""
+
+    public_submissions_retention_interval_seconds: int = Field(default=3600, ge=60)
+    """How often the clean-up runs, in seconds."""
+
+    public_submissions_delivery_retention_days: int = Field(default=30, ge=1, le=3650)
+    """How long the record of who a submission's email reached is kept, in
+    days. It stops a retried delivery from mailing someone twice, which only
+    matters while a retry can still happen."""
 
     @field_validator(
         "public_submissions_rate_per_ip",

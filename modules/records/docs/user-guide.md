@@ -1089,7 +1089,70 @@ classified as both.
 
 ---
 
-## 7. Where to go next
+## 7. Website forms and newsletters
+
+A record type can take submissions from your website: a contact form, where
+every message becomes a record, or a newsletter list, one record per address.
+
+### Building a contact form
+
+1. **Record Types → New type**, fill in the key and label, and under
+   *Website submissions* press **Contact form** in *Start from a preset*. It
+   adds *Name*, *Email*, *Enquiry*, *Message* and *Triage*, and ticks the first
+   four as *Fields visitors fill in*. Fields you already added are kept.
+2. Put your team's address in **Notify** (one per line, up to ten). With
+   nobody there, submissions are stored but nobody is emailed — the card says
+   so. A change to the list applies to submissions from then on: an email
+   already being sent (or retried after a mail failure) still goes to the
+   addresses it started with, so removing an address does not cancel it.
+3. Optionally tick **Visitors must tick a consent checkbox** and write the
+   consent text for each language your site publishes.
+4. Set **Allowed roles**: submissions are personal data, and without a role
+   anyone with `records.view` can read them. The card warns while it is empty.
+5. Make sure **Accept submissions from the website** is on, and **Save**.
+6. In the page editor, drag **Form (Records)** from the *Forms* group onto a
+   page (or into the site header or footer) and choose the type under *Form
+   or newsletter list*. Give it a title, a button label and a thank-you
+   message if you like, and — on a page in another language — German (or any)
+   labels for its fields under *Field labels on this page*. The form shows
+   with its button disabled in the editor; it sends on the published page.
+
+Each submission arrives as a **draft** record of the type, with a *Submission
+details* panel showing where it came from. **Triage** is yours: filter the
+list by it to get an inbox (*new*, *in progress*, *done*).
+
+### Spam
+
+A submission with too many links goes straight to the **trash**, marked as
+spam, and nobody is notified. **Mark as spam** in the record editor does the
+same by hand. To rescue one, open it in the trash and press **Not spam**: it
+comes back and the notification is sent. Emptying the trash deletes spam for
+good.
+
+### Building a newsletter list
+
+Start a new type from the **Newsletter list** preset. Its only field is the
+address (`sm_email`); add others (a first name) and tick them if visitors
+should fill them in. Keep **Confirm signups by email (double opt-in)** on: a
+signup stays *Pending confirmation* until the subscriber presses *Confirm* on
+the page the email links to, and is deleted after **Delete unconfirmed
+signups after (days)** if they never do. Put a **Form (Records)** block for
+the list in the site footer. Filter the list by **Status** (`sm_status`) to see
+your confirmed subscribers, and export them from there.
+
+**Unsubscribe** in the record editor does what the subscriber's own link
+does. The address stays on the list as *Unsubscribed*, with the consent
+record removed, so nobody can sign it up again without a new confirmation.
+
+### Keeping and deleting
+
+Submissions are deleted automatically after **Keep submissions for (days)**
+(365 by default; 0 keeps them). To erase one person's data on request, open
+each form and list, filter by their address (`email` or `sm_email`), select
+all, and **Purge** from the trash after deleting — their history goes with
+them. Repeat for every type that collects addresses.
+
+## 8. Where to go next
 
 - The same operations over HTTP, with the exact wire shapes:
   [api-reference.md](api-reference.md)

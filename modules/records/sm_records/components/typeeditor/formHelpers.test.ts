@@ -237,4 +237,25 @@ describe('public submissions in the draft (#101)', () => {
     const extra = extraCreateFields({ ...metadataFrom(null), ...draft.values });
     expect(extra.public_submissions).toEqual(draft.values.publicSubmissions);
   });
+
+  it('a preset keeps the fields the admin already added', () => {
+    const added = withUids([
+      { ...plain, key: 'first_name', label: 'First name' },
+      { ...plain, key: 'email', label: 'Mine' },
+    ]);
+    const newsletter = presetDraft('subscription', added);
+    expect(newsletter.fields.map((f) => f.key)).toEqual(['first_name', 'email']);
+    expect(newsletter.fields[0].uid).toBe(added[0].uid);
+    // The contact preset defines `email` itself: its row wins, the rest stay.
+    const contact = presetDraft('form', added);
+    expect(contact.fields.map((f) => f.key)).toEqual([
+      'name',
+      'email',
+      'enquiry',
+      'message',
+      'triage',
+      'first_name',
+    ]);
+    expect(contact.fields.find((f) => f.key === 'email')?.label).toBe('Email');
+  });
 });

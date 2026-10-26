@@ -64,6 +64,7 @@ from sm_records.services.types import get_type
 __all__ = [
     "LEASE",
     "SEND_TIMEOUT",
+    "ClaimLost",
     "DeliveryInProgress",
     "Slot",
     "attempt_of",
@@ -89,6 +90,10 @@ Claim = Literal["claimed", "sent", "busy", "gone"]
 
 class DeliveryInProgress(RuntimeError):  # noqa: N818 - reads as the condition it is
     """Another worker holds a live claim on a recipient of this attempt."""
+
+
+class ClaimLost(DeliveryInProgress):
+    """This worker's claim expired mid-send and another worker took it over."""
 
 
 def attempt_of(due: Any) -> str:
@@ -234,3 +239,6 @@ async def _send_one(
             slot.recipient,
             slot.uuid,
         )
+        # Not a success: the successor owns the recipient now, and this
+        # worker must neither report the attempt done nor stamp it complete.
+        raise ClaimLost(f"lost the claim on {slot.recipient} for {slot.uuid}")

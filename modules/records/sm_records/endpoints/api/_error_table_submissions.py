@@ -21,6 +21,12 @@ SUBMISSION_ROWS: Final[tuple[tuple[int, str, str], ...]] = (
         '`{"detail", "code": "form_expired"}` — load the form again',
     ),
     (
+        400,
+        "*Submissions* — a CAPTCHA is required (`public_submissions_captcha_provider`) and "
+        "`captcha_response` is missing or the provider rejects it",
+        '`{"detail", "code": "captcha_failed"}` — complete the CAPTCHA again',
+    ),
+    (
         403,
         "*Submissions* — an `Origin` (else `Referer`) that is neither this host, the host's "
         "`public_base_url` nor one of `public_submissions_allowed_origins`",
@@ -82,5 +88,11 @@ SUBMISSION_ROWS: Final[tuple[tuple[int, str, str], ...]] = (
         "`public_submissions_type_rate`; *Resend* more than once a minute for one record, or "
         "a newsletter confirmation past `public_submissions_confirm_rate_per_email`",
         '`{"detail", "code": "rate_limited"}` with `Retry-After`',
+    ),
+    (
+        503,
+        "*Submissions* — a CAPTCHA is required and its provider cannot be reached, answers "
+        "with an error, or is configured without a site key or secret (fails closed)",
+        '`{"detail", "code": "captcha_unavailable"}`',
     ),
 )

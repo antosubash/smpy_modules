@@ -463,6 +463,7 @@ python scripts/set_setting.py sm_records content_locales '["en","de"]'
 | `reindex_batch_size` | `500` | no | Records per batch in a rebuild, and the export's page size |
 | `reindex_stale_after_seconds` | `900` (15 min) | no | How old a `reindex_pending` entry may get before `/health/ready` degrades |
 | `menu_refresh_seconds` | `5` | no | How stale a per-type sidebar entry may get. `0` re-reads on every page request |
+| `public_submissions_*` | see the README | no | Website forms and newsletters — see [Website forms and newsletters](#website-forms-and-newsletters) |
 
 Everything not marked *restart* is read per request and takes effect on save.
 
@@ -596,6 +597,64 @@ GET /api/records/types/{key}/records?filter=locale:eq:de
 Adding the tag back restores everything — nothing was rewritten.
 
 ---
+
+## Website forms and newsletters
+
+What an operator needs for records' public submissions (#101). Every knob
+below is a `public_submissions_*` setting on the Settings screen (or
+`scripts/set_setting.py sm_records …`), read per request; none needs a
+restart.
+
+- **The kill switch.** `public_submissions_enabled false` makes every
+  submission route — definition, submit, confirm, unsubscribe — the `404`,
+  for every type at once. Reach for it under a flood; nothing stored is
+  touched.
+- **Behind a proxy, set `SM_TRUSTED_PROXY`.** The per-IP limit
+  (`public_submissions_rate_per_ip`) and the stored IP hash use the client
+  address the framework resolves; without it every visitor is the proxy, and
+  one bucket fills for all of them.
+- **Rate limits are per process** unless the host has Redis
+  (`SM_REDIS_URL`), which shares the framework's rate-limit store across
+  workers. With four workers and no Redis, a visitor gets four times the
+  budget.
+- **Mail needs a sender and `public_base_url`.** Notifications and
+  confirmation emails go out only when the host's mail module delivers
+  (`delivers_email`) and the host's `public_base_url` is set — every link in
+  them is absolute. Otherwise the submission is stored, a warning is logged,
+  and the record says "not sent" until an admin presses *Resend*.
+- **Durable notifications need `background_tasks`.** With the framework's
+  outbox installed, a contact-form notification is published in the
+  submission's own transaction and retried with backoff. Without it the mail
+  is sent from a task after the commit: a crash between the two loses it
+  (visibly — "not sent" — and *Resend* recovers it). A newsletter's
+  confirmation always takes the after-commit path, because its links need the
+  host's `secret_key`, which an outbox worker does not have.
+- **The CAPTCHA.** `public_submissions_captcha_provider` is `none` by
+  default. To turn on `turnstile` or `hcaptcha`, set
+  `public_submissions_captcha_site_key` and `public_submissions_captcha_secret`
+  (masked on the Settings screen) **and** add the provider to pagebuilder's
+  `public_csp`: `https://challenges.cloudflare.com` (Turnstile) or
+  `https://hcaptcha.com https://*.hcaptcha.com` (hCaptcha), in `script-src`,
+  `frame-src` and `connect-src`. Records logs a warning at startup when the
+  provider's host is missing from it. The server verifies with a 5-second
+  timeout and fails closed: while the provider is unreachable, submissions
+  are refused with `503 captcha_unavailable`, never accepted unchecked.
+- **Retention.** Every process runs a loop that, every
+  `public_submissions_retention_interval_seconds` (3600), deletes contact-form
+  submissions past their type's retention, newsletter signups never confirmed
+  within the list's unconfirmed purge (counted from when they last entered
+  pending), and the delivery rows of attempts recorded complete older than
+  `public_submissions_delivery_retention_days` (30) — an attempt that can
+  still be retried keeps its rows. Only one process sweeps
+  at a time: the sweep holds the framework lease
+  `records:public_submissions:retention` (Redis when `SM_REDIS_URL` is set,
+  else the `sm_lease` table), renewed while it works — a sweep whose renewal
+  fails stops — and the others skip that tick. It runs once per
+  tenant, through the ordinary trash-and-purge path, so event subscribers see
+  `RecordTrashed`/`RecordPurged` as for an admin's purge. Turn it off with
+  `public_submissions_retention_enabled false` when another job does the
+  purging; a record another type references with `on_delete: restrict` is
+  skipped and logged, never forced.
 
 ## The CLI
 

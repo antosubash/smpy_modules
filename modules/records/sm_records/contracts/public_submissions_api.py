@@ -56,7 +56,13 @@ class SubmissionDefinition(SQLModel):
     token: str
     """Signed: send it back with the submission (``public_submissions.tokens``)."""
     captcha: dict[str, str] | None = None
-    """Always ``null`` until a CAPTCHA provider is supported."""
+    """``{"provider": "turnstile" | "hcaptcha", "site_key": …}`` when the
+    host requires a CAPTCHA, else ``null``. The form renders the provider's
+    widget and sends its response as ``captcha_response``."""
+    min_fill_seconds: int = 0
+    """How old ``token`` must be before a submission carrying it is accepted
+    (``public_submissions_min_fill_seconds``); sooner is ``form_expired``. A
+    form resending after a refresh waits this long."""
 
 
 class SubmitBody(SQLModel):
@@ -80,6 +86,8 @@ class SubmitBody(SQLModel):
     """A hint naming the page block that sent it (``sm_source_block``)."""
     locale: str | None = Field(default=None, max_length=16)
     """The page's language (``sm_locale``, and the consent text's)."""
+    captcha_response: str | None = None
+    """The CAPTCHA widget's response, when the definition named a provider."""
 
     @field_validator("hp", mode="before")
     @classmethod

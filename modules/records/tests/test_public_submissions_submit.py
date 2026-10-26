@@ -36,6 +36,10 @@ async def test_the_definition_lists_the_public_fields_only(site):
     assert body["consent"] == {"required": True, "text": "Einverstanden?"}
     assert len(body["token"].split(".")) == 4
     assert body["captcha"] is None
+    # What a form resending after `form_expired` waits for (the harness sets 0).
+    assert body["min_fill_seconds"] == 0
+    configure(site, public_submissions_min_fill_seconds=3)
+    assert (await site.get(f"{SUBMISSIONS}/contact")).json()["min_fill_seconds"] == 3
 
 
 async def test_a_submission_is_stored_as_a_draft_and_mailed(site):

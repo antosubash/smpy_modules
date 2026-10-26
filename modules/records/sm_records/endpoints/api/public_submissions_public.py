@@ -84,7 +84,12 @@ async def get_submission_form(
     return definition(rtype, settings, secret=secret, tenant=bound_tenant(), locale=locale)
 
 
-@router.post("/{type_key}/submit", status_code=202, response_model=SubmissionAccepted)
+@router.post(
+    "/{type_key}/submit",
+    status_code=202,
+    response_model=SubmissionAccepted,
+    responses=responses(503),
+)
 async def submit_form(
     type_key: str,
     body: SubmitBody,

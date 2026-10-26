@@ -11,7 +11,7 @@ import pytest
 from simple_module_core.durable_events import DurableContext
 from sm_records import events
 from sm_records.models import SubmissionDelivery
-from sm_records.public_submissions import delivery
+from sm_records.public_submissions import attempts, delivery
 from sm_records.public_submissions.mail_runner import HANDLER_NAME, NotificationDue
 from sm_records.services._common import utcnow
 from sm_records.tenancy import tenant_scope
@@ -19,6 +19,7 @@ from sqlalchemy import select, update
 
 from tests.app_harness import ADMIN, roles
 from tests.pg_support import USING_POSTGRES
+from tests.public_submissions_support import update as update_type
 from tests.submissions_http import contact_type, records_of, send
 
 pytestmark = pytest.mark.unbound_tenant
@@ -177,3 +178,81 @@ async def test_a_send_that_hangs_is_cut_off_and_released(site, monkeypatch):
     site.outbox.send = real  # type: ignore[method-assign]
     await _run(site, event)
     assert _to(site) == ["alice@example.org"], "the released claim is retried at once"
+
+
+async def _complete_rows(site) -> list[str]:
+    with tenant_scope("default"):
+        session = site.db_state.session_factory()
+        try:
+            stmt = select(SubmissionDelivery.attempt).where(
+                SubmissionDelivery.recipient == attempts.COMPLETE
+            )
+            return list((await session.execute(stmt)).scalars().all())
+        finally:
+            await session.close()
+
+
+async def test_an_attempt_is_recorded_complete_only_once_everyone_is_sent(site):
+    """Pruning trusts this row alone (``retention_deliveries``)."""
+    transport = _durable(site)
+    await contact_type(site, notify_to=TWO)
+    await send(site)
+    (event,) = transport.events
+    site.outbox.fail_for = {"bob@example.org"}
+    with pytest.raises(OSError):
+        await _run(site, event)
+    assert await _complete_rows(site) == [], "bob is still owed: not complete"
+    site.outbox.fail_for = set()
+    await _run(site, event)
+    assert await _complete_rows(site) == [delivery.attempt_of(event)]
+    await _run(site, event)
+    assert len(await _complete_rows(site)) == 1, "a redelivery writes it once"
+
+
+async def test_an_attempt_keeps_the_recipients_it_started_with(site):
+    """A retry works from the attempt's persisted set, never the type's
+    current ``notify_to``: an admin change applies to the next attempt."""
+    transport = _durable(site)
+    created = await contact_type(site, notify_to=TWO)
+    await send(site)
+    (event,) = transport.events
+    site.outbox.fail_for = {"bob@example.org"}
+    with pytest.raises(OSError):
+        await _run(site, event)
+    site.outbox.fail_for = set()
+    config = {**created["public_submissions"], "notify_to": ["alice@example.org", "carol@x.org"]}
+    resp = await update_type(site, "contact", public_submissions=config)
+    assert resp.status_code == 200, resp.text
+    await _run(site, event)
+    assert _to(site) == ["alice@example.org", "bob@example.org"], "bob is owed; carol is not"
+    assert await _complete_rows(site) == [delivery.attempt_of(event)]
+
+
+class _Quiet:
+    async def send(self, message) -> None:
+        return None
+
+
+async def test_no_stale_or_partial_worker_can_stamp_an_attempt_complete(site):
+    factory = site.db_state.session_factory
+    uuid, attempt = "d" * 32, "attempt-9"
+    with tenant_scope("default"):
+        keys = await attempts.manifest(factory, "default", uuid, attempt, ["a@x.org", "b@x.org"])
+        assert keys == ["a@x.org", "b@x.org"]
+        # A retry seeing a different set gets the persisted one back.
+        assert await attempts.manifest(factory, "default", uuid, attempt, ["c@x.org"]) == keys
+        slot = delivery.Slot("default", uuid, attempt, "a@x.org")
+        _, stale = await delivery.claim(factory, slot)
+        await _age(factory)
+        _, fresh = await delivery.claim(factory, slot)
+        assert stale and fresh and stale != fresh
+        with pytest.raises(delivery.ClaimLost):
+            await delivery._send_one(factory, slot, stale, _Quiet(), object())
+        assert await attempts.complete(factory, "default", uuid, attempt) is False
+        assert await delivery.mark_sent(factory, slot, fresh)
+        assert await attempts.complete(factory, "default", uuid, attempt) is False, "b unsent"
+        other = delivery.Slot("default", uuid, attempt, "b@x.org")
+        _, token = await delivery.claim(factory, other)
+        assert token and await delivery.mark_sent(factory, other, token)
+        assert await attempts.complete(factory, "default", uuid, attempt) is True
+        assert await attempts.complete(factory, "default", uuid, attempt) is True, "idempotent"

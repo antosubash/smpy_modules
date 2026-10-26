@@ -87,6 +87,20 @@ contract pins `tenant_id` itself. A bundle section
 (`pagebuilder.contracts.bundle`, #80) applies through the restore's own
 session and bound tenant, and never commits or resolves a tenant itself.
 
+**Records' website-submission routes are anonymous writes (#101).** The record
+type is the trust anchor: never trust the `RecordForm` block's props —
+which fields are public, the consent text and the recipients live on
+`RecordType.public_submissions`. The `sm_*` system fields are written only
+through the internal `system=` argument of `create_record`/`update_record`.
+The routes under `/api/records/submissions/` do not use `RequiresCsrf` on
+purpose (JSON, `Origin` and a signed form token instead). Every purge path
+— `hard_delete_record` (which the bulk purge calls per record), emptying the
+trash (`empty_trash`; both reach `_purge_ids`) and deleting the type
+(`purge_type_records`) — locks the record rows and forgets their
+`records_submission_delivery` claims first, through `forget_deliveries`; a
+new way of deleting records must go through one of them. The retention sweep
+trashes with `soft_delete_record` and then calls `hard_delete_record`.
+
 **Never add a file under `modules/*/*/pages/` unless it is a real Inertia
 page.** The page name is derived from that path by `import.meta.glob`, so a
 stray `.tsx` there silently registers a new page. Extractions go to

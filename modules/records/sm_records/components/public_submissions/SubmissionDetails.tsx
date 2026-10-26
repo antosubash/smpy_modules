@@ -1,15 +1,31 @@
-import { keys, useT } from '../../utils/i18n';
+import { keys, type Translate, useT } from '../../utils/i18n';
 import type { FieldDef } from '../../utils/types';
+import { formatDateTime } from '../../utils/values';
 
 /** Shown behind a disclosure: identifying, rarely needed, and long. */
 const COLLAPSED = new Set(['sm_ip_hash', 'sm_user_agent', 'sm_consent_ip_hash']);
 
-function display(field: FieldDef, value: unknown): string | null {
+/** The server's stored words for a status or a spam reason, as the console
+ *  says them — `pending` reads "Bestätigung ausstehend" in German. */
+const VALUES = keys.records.public_submissions.system_values as Record<
+  string,
+  Record<string, string> | undefined
+>;
+
+/** A system value as a person reads it: a datetime in the console's locale
+ *  (not the browser's), a known status or spam reason translated. */
+export function display(
+  field: FieldDef,
+  value: unknown,
+  t: Translate,
+  locale: string | undefined,
+): string | null {
   if (value === null || value === undefined || value === '') return null;
   if (field.type === 'datetime' && typeof value === 'string') {
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) return parsed.toLocaleString();
+    return formatDateTime(value, locale);
   }
+  const known = typeof value === 'string' ? VALUES[field.key]?.[value] : undefined;
+  if (known) return t(known);
   return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
@@ -41,7 +57,7 @@ export function SubmissionDetails({
   fields: FieldDef[];
   data: Record<string, unknown> | null | undefined;
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const ps = keys.records.public_submissions;
   const shown = fields.filter((field) => field.system === 'readonly');
   if (shown.length === 0 || !data) return null;
@@ -63,7 +79,7 @@ export function SubmissionDetails({
           <Row
             key={field.key}
             label={label(field)}
-            value={display(field, data[field.key])}
+            value={display(field, data[field.key], t, locale)}
             empty={empty}
           />
         ))}
@@ -78,7 +94,7 @@ export function SubmissionDetails({
               <Row
                 key={field.key}
                 label={label(field)}
-                value={display(field, data[field.key])}
+                value={display(field, data[field.key], t, locale)}
                 empty={empty}
               />
             ))}
