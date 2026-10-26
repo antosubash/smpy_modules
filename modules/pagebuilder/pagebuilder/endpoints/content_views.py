@@ -84,5 +84,9 @@ async def admin_content_review(
     """The staged restore's plan, for an approver to accept or reject."""
     return await inertia.render(
         _PAGE_IMPORT_REVIEW,
-        {"pending": await _pending_props(service), "sections": service.sections.labels()},
+        {
+            "pending": await _pending_props(service),
+            "sections": service.sections.labels(),
+            "capabilities": snapshot_capabilities(service.access).model_dump(),
+        },
     )

@@ -93,7 +93,8 @@ class TestMenu:
         """Menu role filtering is a plain intersection with no admin bypass.
 
         Gating these on the pagebuilder roles would hide them from an admin,
-        and would overstate the gating — the views require auth only.
+        and would overstate the gating — those views require auth only.
+        Import / Export is the exception and is checked on permissions.
         """
         labels = [i["label"] for i in await self._sidebar(roles=[], held=set())]
         assert labels == ["Pages", "Site layout", "Media library"]

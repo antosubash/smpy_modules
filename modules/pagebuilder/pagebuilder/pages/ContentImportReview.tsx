@@ -15,12 +15,15 @@ import {
   type PendingImport,
   rejectImport,
   type SectionLabels,
+  type SnapshotCapabilities,
 } from '../utils/snapshotsApi';
 
 interface Props {
   pending: PendingImport | null;
   /** The contributed sections registered here, to name the applied counts (#80). */
   sections?: SectionLabels[];
+  /** Which controls this reader may use; absent means none (fail closed). */
+  capabilities?: SnapshotCapabilities;
 }
 
 const CONTENT_URL = '/pagebuilder/content';
@@ -35,7 +38,11 @@ const CONTENT_URL = '/pagebuilder/content';
  */
 function ContentImportReview() {
   const { t } = useT();
-  const { pending, sections = [] } = usePage<{ props: Props }>().props as unknown as Props;
+  const {
+    pending,
+    sections = [],
+    capabilities,
+  } = usePage<{ props: Props }>().props as unknown as Props;
   const [error, setError] = useState<string | null>(null);
 
   if (!pending) {
@@ -98,31 +105,33 @@ function ContentImportReview() {
           author: pending.created_by ?? t(keys.pagebuilder.import_review.someone),
         })}
         actions={
-          <div className="flex items-center gap-2">
-            <NoteDialog
-              trigger={
-                <Button variant="outline">{t(keys.pagebuilder.import_review.reject)}</Button>
-              }
-              title={t(keys.pagebuilder.import_review.reject_title)}
-              description={t(keys.pagebuilder.import_review.reject_description)}
-              label={t(keys.pagebuilder.import_review.reject_label)}
-              placeholder={t(keys.pagebuilder.import_review.reject_placeholder)}
-              submitLabel={t(keys.pagebuilder.import_review.reject)}
-              required
-              onSubmit={async (note) => {
-                await rejectImport(pending.id, note);
-                router.visit(CONTENT_URL);
-              }}
-            />
-            <ConfirmDialog
-              trigger={<Button>{t(keys.pagebuilder.import_review.approve)}</Button>}
-              title={t(keys.pagebuilder.import_review.approve_title)}
-              description={t(keys.pagebuilder.import_review.approve_description)}
-              confirmLabel={t(keys.pagebuilder.import_review.apply)}
-              level="medium"
-              onConfirm={apply}
-            />
-          </div>
+          capabilities?.approve === true ? (
+            <div className="flex items-center gap-2">
+              <NoteDialog
+                trigger={
+                  <Button variant="outline">{t(keys.pagebuilder.import_review.reject)}</Button>
+                }
+                title={t(keys.pagebuilder.import_review.reject_title)}
+                description={t(keys.pagebuilder.import_review.reject_description)}
+                label={t(keys.pagebuilder.import_review.reject_label)}
+                placeholder={t(keys.pagebuilder.import_review.reject_placeholder)}
+                submitLabel={t(keys.pagebuilder.import_review.reject)}
+                required
+                onSubmit={async (note) => {
+                  await rejectImport(pending.id, note);
+                  router.visit(CONTENT_URL);
+                }}
+              />
+              <ConfirmDialog
+                trigger={<Button>{t(keys.pagebuilder.import_review.approve)}</Button>}
+                title={t(keys.pagebuilder.import_review.approve_title)}
+                description={t(keys.pagebuilder.import_review.approve_description)}
+                confirmLabel={t(keys.pagebuilder.import_review.apply)}
+                level="medium"
+                onConfirm={apply}
+              />
+            </div>
+          ) : undefined
         }
       >
         {error && <p className="mb-4 text-sm text-destructive">{error}</p>}

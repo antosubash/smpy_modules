@@ -101,3 +101,17 @@ async def test_an_approver_reads_the_list_and_the_pending_restore_only(tmp_path)
 async def test_an_admin_holds_both_capabilities(authed_client):
     response = await authed_client.get(_SNAPSHOTS)
     assert response.json()["capabilities"] == {"publish": True, "approve": True}
+
+
+@pytest.mark.parametrize(
+    ("grants", "expected"),
+    [
+        ([PERM_EDIT, PERM_PUBLISH], {"publish": True, "approve": False}),
+        ([PERM_APPROVE], {"publish": False, "approve": True}),
+    ],
+)
+async def test_the_review_screen_says_who_may_decide(tmp_path, grants, expected):
+    async for client in _client(tmp_path, grants, seed=True):
+        props = (await client.get(f"{_CONTENT}/review", headers=_INERTIA)).json()["props"]
+        assert props["capabilities"] == expected
+        assert props["pending"]["status"] == "pending"

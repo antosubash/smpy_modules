@@ -277,7 +277,9 @@ alone, and a redirect whose target is missing is dropped and listed.
 
 The screen offers only what you may do: **Take snapshot**, **Upload bundle…**,
 **Download**, **Restore…** and **Delete** need `pagebuilder.publish`, so an
-approver without it sees the list and **Review it**, and nothing else.
+approver without it sees the list and **Review it**, and nothing else. On the
+review screen, **Approve & apply** and **Reject** appear only for a holder of
+`pagebuilder.approve`; a publisher who cannot approve sees the plan alone.
 
 ### Who sees and restores a contributed section
 

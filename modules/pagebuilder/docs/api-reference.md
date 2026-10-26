@@ -218,7 +218,7 @@ asset's URL (current or pre-tenancy flat URL).
 
 | Route | Permission | Body / returns |
 |---|---|---|
-| `GET /snapshots` | auth | `{"items": [SnapshotRead], "sections": [SectionLabels]}` |
+| `GET /snapshots` | `pagebuilder.publish` or `pagebuilder.approve` | `{"items": [SnapshotRead], "sections": [SectionLabels], "capabilities": {"publish", "approve"}}` |
 | `POST /snapshots` | `pagebuilder.publish` | `{"note"?}` → 201 `SnapshotRead` |
 | `GET /snapshots/{id}/download` | `pagebuilder.publish` | `application/zip`, `content-snapshot-{id}.zip` |
 | `POST /snapshots/upload` | `pagebuilder.publish` | multipart `file` → 201 `SnapshotRead`; 413 over `snapshot_max_upload_bytes`; 422 invalid bundle |

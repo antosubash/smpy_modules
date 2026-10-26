@@ -16,6 +16,7 @@ vi.mock('@inertiajs/react', async (original) => ({
 }));
 
 const { default: ContentSnapshots } = await import('../../pages/ContentSnapshots');
+const { default: ContentImportReview } = await import('../../pages/ContentImportReview');
 
 const SNAPSHOT: Snapshot = {
   id: 7,
@@ -35,7 +36,19 @@ const SNAPSHOT: Snapshot = {
   created_by: 'someone',
 };
 
-const PENDING = { id: 3, snapshot_id: 7, status: 'pending' } as unknown as PendingImport;
+const PENDING = {
+  id: 3,
+  snapshot_id: 7,
+  status: 'pending',
+  note: null,
+  created_at: '2026-10-01T00:00:00Z',
+  created_by: 'someone',
+  plan: {
+    pages: { new: [], overwritten: [], unchanged: [], untouched: [] },
+    layout: { header: 0, footer: 0 },
+    redirects: { added: [], removed: [], dropped: [] },
+  },
+} as unknown as PendingImport;
 
 function controls(markup: string): string[] {
   const doc = new DOMParser().parseFromString(`<div>${markup}</div>`, 'text/html');
@@ -89,5 +102,26 @@ describe('ContentSnapshots controls', () => {
 
   it('fails closed when the server sent no capabilities', () => {
     expect(controls(screen(undefined))).toEqual(['Review it']);
+  });
+});
+
+describe('ContentImportReview controls', () => {
+  function review(capabilities?: SnapshotCapabilities): string[] {
+    page.props = { pending: PENDING, sections: [], capabilities };
+    return controls(renderToStaticMarkup(<ContentImportReview />));
+  }
+
+  it('offers Reject and Approve to an approver', () => {
+    expect(review({ publish: false, approve: true })).toEqual(
+      expect.arrayContaining(['Reject', 'Approve & apply']),
+    );
+  });
+
+  it('offers a publisher who cannot approve neither decision, and fails closed', () => {
+    for (const capabilities of [{ publish: true, approve: false }, undefined]) {
+      const found = review(capabilities);
+      expect(found).not.toContain('Reject');
+      expect(found).not.toContain('Approve & apply');
+    }
   });
 });
