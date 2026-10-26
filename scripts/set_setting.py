@@ -27,17 +27,17 @@ import asyncio
 import json
 import sys
 
+from headless_settings import headless_settings
 from settings.hydrate import value_type_for_field
 from settings.service import SettingService
 from settings.store import SettingsStore
-from simple_module_hosting import merge_host_settings
 from simple_module_hosting.app_builder import create_app
 
 _USAGE = "usage: set_setting.py <package> <field> <value> [<field> <value> ...]"
 
 
 async def _write(package: str, pairs: list[tuple[str, str]]) -> None:
-    app = create_app(merge_host_settings())
+    app = create_app(headless_settings())
     registry = app.state.settings.module_registry
     cls = registry.get(package)
     if cls is None:

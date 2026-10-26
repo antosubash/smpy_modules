@@ -170,7 +170,14 @@ a restart — the Settings screen marks them: tenancy (`multi_tenant`,
 without the settings table yet (a fresh install) boots on env and defaults;
 outside `SM_ENVIRONMENT=development`/`testing`, a connection or query failure
 while reading it fails the boot instead (framework #494). The headless scripts
-(`set_setting.py`, `seed_usage.py`) build their app the same way.
+(`set_setting.py`, `seed_usage.py`) build their app the same way, through
+`scripts/headless_settings.py`, with one difference: `merge_host_settings()`
+generates and commits a `host.secret_key` row when neither env nor the
+database has a key, and a one-off command must never provision the
+deployment's session key (a later boot without `SM_SECRET_KEY` would adopt
+it, signing everyone out and orphaning ai's encrypted credentials). So they
+exit with "no secret key provisioned" instead; set `SM_SECRET_KEY` or boot
+the app once.
 
 **Run Python entry points from the repo root.** `alembic.ini` resolves its
 `script_location` relative to itself and `dev-api` uses `--app-dir host`, so

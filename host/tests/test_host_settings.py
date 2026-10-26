@@ -33,10 +33,14 @@ PUBLIC_PAGE = "/users/login"
 
 
 def _run(args: list[str], url: str) -> None:
+    # A key in the environment: ``set_setting.py`` refuses to run without one
+    # (env or stored) rather than create the deployment's key itself, and CI
+    # has no ``.env`` to supply it.
+    env = {"SM_SECRET_KEY": "host-settings-test-key", **os.environ, "SM_DATABASE_URL": url}
     result = subprocess.run(
         [sys.executable, *args],
         cwd=REPO,
-        env={**os.environ, "SM_DATABASE_URL": url},
+        env=env,
         capture_output=True,
         text=True,
         check=False,
