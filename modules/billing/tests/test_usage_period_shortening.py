@@ -37,13 +37,17 @@ async def _flags(app, tenant_id: str) -> list[bool]:
         return list((await session.execute(stmt)).scalars())
 
 
-def _resolve_then_shorten(app, usage, tenant: str):
+def _resolve_then_shorten(app, usage, tenant: str, moved=SHORT, resolved_as=OCT, later=None):
+    """The consume resolves ``resolved_as``; before it writes, the sync moves
+    the period to ``moved`` and (``later``) the clock moves on."""
     resolve = usage._resolve
 
     async def stale(*args, **kwargs):
         resolved = await resolve(*args, **kwargs)
-        assert resolved.period == OCT
-        await _sync(app, tenant, SHORT)
+        assert resolved.period == resolved_as and resolved.provider
+        await _sync(app, tenant, moved)
+        if later is not None:
+            usage._clock.now = later
         return resolved
 
     usage._resolve = stale
@@ -83,23 +87,24 @@ async def test_an_oversized_consume_on_a_credited_row_stores_the_new_end(app):
 async def test_consume_during_a_shortening_sync_waits_and_stores_the_new_end(
     app, monkeypatch, existing, qty, used
 ):
-    """The real ``apply_snapshot`` is paused after it moved the rollups in,
-    before its commit; a consume that starts then waits on the subscription
-    row and stores the shorter end. ``oversized-on-credit`` takes the plain
-    ``UPDATE`` (``add_within_limit``): it must take the locks in the same
-    order, never deadlocking with the sync."""
+    """The real ``apply_snapshot`` is paused after its subscription update
+    was flushed but before it moves the rollups; a consume that starts then
+    must wait on the subscription row *before* it locks the rollup row, or
+    the resumed sync's rollup update and the consume deadlock. It then
+    stores the shorter end. ``oversized-on-credit`` takes the plain
+    ``UPDATE`` (``add_within_limit``)."""
     tenant = await _setup(app, existing)
     if qty > 100:  # the plan's limit
         await service(app, CLOCK).adjust(tenant, METER, -50, reason="credit")
     paused, go = asyncio.Event(), asyncio.Event()
     follow = sync_module._follow_period_end
 
-    async def follow_then_pause(*args, **kwargs):
-        await follow(*args, **kwargs)
+    async def pause_then_follow(*args, **kwargs):
         paused.set()
         await go.wait()
+        await follow(*args, **kwargs)
 
-    monkeypatch.setattr(sync_module, "_follow_period_end", follow_then_pause)
+    monkeypatch.setattr(sync_module, "_follow_period_end", pause_then_follow)
     syncing = asyncio.create_task(_sync(app, tenant, SHORT))
     await asyncio.wait_for(paused.wait(), 10)
     consume = asyncio.create_task(service(app, CLOCK).consume(tenant, METER, qty, "k1", source="t"))
@@ -147,3 +152,32 @@ async def test_a_period_that_already_ended_never_ends_a_calendar_month(app):
     assert outcome.ok and outcome.period_end == OCT[1]
     assert await _ends(app, tenant) == [(OCT[1], 1)]
     assert await _flags(app, tenant) == [False]
+
+
+@pytest.mark.parametrize("existing", [False, True], ids=["first-row", "row-exists"])
+async def test_a_shortening_to_an_end_already_past_still_lands(app, existing):
+    """The consume resolved Oct 1 -> Nov 1 as the provider's; the sync then
+    shortened it to Oct 20 and the write lands on Oct 25. A provider-resolved
+    write takes the subscription's end even when it is past, so after the
+    rollover the row is still found by its real boundaries."""
+    tenant = await _setup(app, existing)
+    usage = service(app, Clock(CLOCK.now))
+    _resolve_then_shorten(app, usage, tenant, later=datetime(2026, 10, 25, tzinfo=UTC))
+    assert (await usage.consume(tenant, METER, 3, "k1", source="t")).period_end == SHORT[1]
+    assert await _ends(app, tenant) == [(SHORT[1], 4 if existing else 3)]
+    assert await _flags(app, tenant) == [True]
+
+
+async def test_an_extension_to_an_end_already_past_still_lands(app):
+    """The same for an extension: resolved Oct 1 -> Oct 20, extended to
+    Oct 22, written on Oct 25 — the first row stores Oct 22."""
+    tenant = await _tenant(app)
+    await _sync(app, tenant, SHORT)
+    usage = service(app, Clock(CLOCK.now))
+    extended = (OCT[0], datetime(2026, 10, 22, tzinfo=UTC))
+    _resolve_then_shorten(
+        app, usage, tenant, extended, SHORT, later=datetime(2026, 10, 25, tzinfo=UTC)
+    )
+    assert (await usage.consume(tenant, METER, 2, "k1", source="t")).period_end == extended[1]
+    assert await _ends(app, tenant) == [(extended[1], 2)]
+    assert await _flags(app, tenant) == [True]

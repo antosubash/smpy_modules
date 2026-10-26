@@ -84,7 +84,8 @@ def upsert_period(
     subscription supplies (``_sub_end``) is one too, whatever ``period`` was
     resolved as."""
     table = UsagePeriod.__table__
-    sub_end = _sub_end(tenant_id, period[0], now)
+    cutoff = None if provider else now  # see _sub_end
+    sub_end = _sub_end(tenant_id, period[0], cutoff)
     stmt = _insert(dialect_name)(table).values(
         tenant_id=tenant_id,
         meter=meter,
@@ -101,17 +102,17 @@ def upsert_period(
             "used": total,
             "updated_at": stmt.excluded.updated_at,
             # Not the excluded end: that falls back to the resolved one.
-            "period_end": _authoritative_end(table, tenant_id, period[0], now),
+            "period_end": _authoritative_end(table, tenant_id, period[0], cutoff),
             "provider_period": or_(table.c.provider_period, stmt.excluded.provider_period),
         },
         where=None if limit is None else total <= limit,
     ).returning(table.c.used, table.c.period_end)
 
 
-def _sub_end(tenant_id: str, start: datetime, now: datetime) -> Any:
+def _sub_end(tenant_id: str, start: datetime, cutoff: datetime | None) -> Any:
     """The end of the entitled subscription whose period starts at ``start``
-    and is still running at ``now``, else NULL: the authoritative end of the
-    rows at that start.
+    (and, with ``cutoff``, is still running then), else NULL: the
+    authoritative end of the rows at that start.
 
     ``period`` was resolved in an earlier read, so a sync that moved its end
     since (same start, later *or earlier* end) would otherwise have a write
@@ -128,12 +129,19 @@ def _sub_end(tenant_id: str, start: datetime, now: datetime) -> Any:
     the ``CASE``, not the ``WHERE``, so the row is locked whatever its
     status: a consume that resolved a calendar month while the subscription
     was unpaid still waits for the sync that makes it active, then takes
-    its end. A period that has already ended is not current either: after a
-    missed webhook the write falls back to the calendar month, which may
-    share its start, and must not take the stale period's past end.
+    its end.
+
+    ``cutoff`` is the write's ``now`` when it fell back to the calendar
+    month: after a missed webhook the subscription's period may be over and
+    share its start with the month, whose row must not take that past end. A
+    write that resolved the subscription's own period passes ``None``: it
+    always takes the subscription's end, even one a sync has since moved to
+    before ``now`` (shortened, or extended to a day already past).
     """
     end = Subscription.current_period_end
-    entitled = and_(Subscription.status.in_(ENTITLED_STATUSES), end > now)
+    entitled = Subscription.status.in_(ENTITLED_STATUSES)
+    if cutoff is not None:
+        entitled = and_(entitled, end > cutoff)
     return (
         select(case((entitled, end)))
         .where(Subscription.tenant_id == tenant_id, Subscription.current_period_start == start)
@@ -142,7 +150,7 @@ def _sub_end(tenant_id: str, start: datetime, now: datetime) -> Any:
     )
 
 
-def _authoritative_end(table: Any, tenant_id: str, start: datetime, now: datetime) -> Any:
+def _authoritative_end(table: Any, tenant_id: str, start: datetime, cutoff: datetime | None) -> Any:
     """An existing row's new ``period_end``: the subscription's (``_sub_end``)
     when it supplies one, earlier or later, else the stored end unchanged.
 
@@ -152,7 +160,7 @@ def _authoritative_end(table: Any, tenant_id: str, start: datetime, now: datetim
     that moved the end either way since, and one the subscription no longer
     has must not come back (#240).
     """
-    return func.coalesce(_sub_end(tenant_id, start, now), table.c.period_end)
+    return func.coalesce(_sub_end(tenant_id, start, cutoff), table.c.period_end)
 
 
 def extend_rollups(*, tenant_id: str, start: datetime, end: datetime, entitled: bool) -> Any:
@@ -200,6 +208,7 @@ def add_within_limit(
     """
     table = UsagePeriod.__table__
     total = table.c.used + qty
+    cutoff = None if provider else now  # see _sub_end
     return (
         update(table)
         .where(
@@ -211,10 +220,10 @@ def add_within_limit(
         .values(
             used=total,
             updated_at=now,
-            period_end=_authoritative_end(table, tenant_id, start, now),
+            period_end=_authoritative_end(table, tenant_id, start, cutoff),
             provider_period=true()
             if provider
-            else or_(table.c.provider_period, _sub_end(tenant_id, start, now).is_not(None)),
+            else or_(table.c.provider_period, _sub_end(tenant_id, start, cutoff).is_not(None)),
         )
         .returning(table.c.used, table.c.period_end)
     )
