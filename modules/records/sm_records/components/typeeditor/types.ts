@@ -34,9 +34,8 @@ export type TypeEditorProps = {
   collections: string[];
   /** Which tenant this screen reads, and whether the host runs several
    *  (`views_types.py::_editor_context`, tenancy design §J/§I) — read-only.
-   *  `tenancy_mode` is also what `SidebarField` hides "Show in sidebar" on:
-   *  multi mode has no per-type sidebar entries at all (design §I), so the
-   *  toggle would promise something the host can't do. */
+   *  Only the tenant badge reads it now: "Show in sidebar" is offered in
+   *  every mode, since the sidebar entries are per request (#92). */
   tenant?: string;
   tenancy_mode?: TenancyMode;
 };

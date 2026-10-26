@@ -1,145 +1,94 @@
-"""The per-type sidebar entries: what they look like, and when they are read.
+"""The per-type sidebar entries: what they look like, who sees them, and when
+they are read.
 
-Three layers, tested at three levels, because they fail differently.
-
-:func:`~sm_records.menu.type_menu_items` is pure — label, url, icon fallback,
-roles and the alphabetical order the registry's ``order``-only sort leaves to
-insertion. :func:`~sm_records.menu.sync_type_menu` is the one place this module
-reaches inside the framework's registry, so what it must never do (touch an
-item it did not put there) is asserted directly against ``all_items``. And
-:func:`~sm_records.menu.refresh` is about *timing*: the TTL, the dirty flag a
-type write sets, and the read that fails without taking the request with it.
+:func:`~sm_records.menu.type_menu_items` is pure — label, url, icon fallback
+and the alphabetical order the registry's ``order``-only sort leaves to the
+provider. :func:`~sm_records.menu.visible_items` is the per-caller filter.
+:func:`~sm_records.menu.type_menu_provider` is what the framework calls per
+request (upstream #340): the tenant it reads, the paths it never reads on,
+the cache it keeps per tenant, and the read that fails without taking the
+page with it. Per-tenant behaviour over HTTP is ``test_menu_tenancy.py``.
 """
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
+from fastapi import FastAPI
+from simple_module_core.menu import MenuRegistry, MenuSection
 from sm_records import constants, menu
 from sm_records.menu import MenuType
 from sm_records.module import RecordsModule
 from sm_records.settings import RecordsSettings
+from sm_records.tenancy import TenancyMode, tenant_scope
+from starlette.requests import Request
 
 from tests.app_harness import seed_type
+
+_VIEW = {constants.PERM_VIEW}
 
 
 def _type(key: str, plural: str, *, icon: str | None = None, roles: list[str] | None = None):
     return MenuType(key=key, label_plural=plural, icon=icon, allowed_roles=roles or [])
 
 
-def _hub() -> MenuItem:
-    """The module's own hub entry, as ``register_menu_items`` adds it (U17:
-    now in the same "Records" group as its per-type children, first by
-    ``order``, labelled "All record types")."""
-    return MenuItem(
-        label="All record types",
-        url=constants.MENU_URL,
-        icon=constants.MENU_ICON,
-        order=constants.MENU_ORDER,
-        section=MenuSection.ADMIN_SIDEBAR,
-        group=constants.MENU_GROUP_TYPES,
-    )
+def _user(*roles: str) -> SimpleNamespace:
+    return SimpleNamespace(id="u", roles=list(roles))
 
 
-def test_item_carries_the_types_label_url_icon_and_roles():
+def test_item_carries_the_types_label_url_and_icon_and_no_roles():
     [item] = menu.type_menu_items([_type("company", "Companies", icon="building", roles=["ops"])])
 
     assert item.label == "Companies"
     assert item.url == f"{constants.VIEW_PREFIX}/company"
     assert item.icon == "building"
-    assert item.roles == ["ops"]
+    # Visibility is decided per caller by ``visible_items``, not by the
+    # registry's role filter, which cannot see a per-type grant.
+    assert item.roles == []
     assert item.section is MenuSection.ADMIN_SIDEBAR
-    # Same group as the hub (U17) — see MENU_GROUP_TYPES's docstring.
     assert item.group == constants.MENU_GROUP_TYPES
-    # One past the hub, so the types cluster directly under it.
     assert item.order == constants.MENU_ORDER + 1
 
 
 def test_item_without_an_icon_falls_back_to_the_modules_own():
     [item] = menu.type_menu_items([_type("order", "Orders")])
-
     assert item.icon == constants.MENU_ICON
-    # Empty roles is the registry's "every authenticated user", not "nobody".
-    assert item.roles == []
 
 
-def test_items_are_inserted_in_case_insensitive_alphabetical_order():
+def test_items_sort_by_plural_label_case_folded():
     items = menu.type_menu_items(
-        [_type("z", "zebras"), _type("c", "Companies"), _type("a", "apples")]
+        [_type("z", "zebras"), _type("a", "Apples"), _type("m", "mangoes"), _type("b", "Bananas")]
     )
-
-    # The registry sorts by ``order`` alone and stably, so this insertion order
-    # is the order the sidebar renders in.
-    assert [item.label for item in items] == ["apples", "Companies", "zebras"]
+    assert [item.label for item in items] == ["Apples", "Bananas", "mangoes", "zebras"]
 
 
-def test_sync_adds_items_and_leaves_foreign_ones_alone():
-    registry = MenuRegistry()
-    hub = _hub()
-    host_item = MenuItem(label="Reports", url=f"{constants.VIEW_PREFIX}/reports", order=10)
-    registry.add_many([hub, host_item])
+def test_visible_items_follow_allowed_roles_with_no_admin_exception():
+    types = [_type("open", "Opens"), _type("ops", "Ops things", roles=["ops"])]
 
-    ours = menu.sync_type_menu(registry, [_type("company", "Companies")])
-
-    assert [item.label for item in registry.all_items] == [
-        "Reports",
-        "All record types",
-        "Companies",
+    assert [i.label for i in menu.visible_items(types, _user("ops"), _VIEW)] == [
+        "Opens",
+        "Ops things",
     ]
-    assert [item.label for item in ours] == ["Companies"]
+    assert [i.label for i in menu.visible_items(types, _user("sales"), _VIEW)] == ["Opens"]
+    # The wildcard reaches ``records.view`` but not a narrowed type.
+    assert [i.label for i in menu.visible_items(types, _user("admin"), {"*"})] == ["Opens"]
 
 
-def test_sync_replaces_only_the_items_it_added_last_time():
-    registry = MenuRegistry()
-    host_item = MenuItem(label="Reports", url=f"{constants.VIEW_PREFIX}/reports", order=10)
-    registry.add_many([_hub(), host_item])
-    ours = menu.sync_type_menu(registry, [_type("company", "Companies")])
-
-    # ``company`` renamed, ``order`` newly opted in.
-    ours = menu.sync_type_menu(
-        registry, [_type("company", "Firms"), _type("order", "Orders")], previous=ours
-    )
-
-    labels = [item.label for item in registry.all_items]
-    assert labels == ["Reports", "All record types", "Firms", "Orders"]
-    assert "Companies" not in labels
-    assert [item.label for item in ours] == ["Firms", "Orders"]
+def test_a_per_type_grant_shows_a_narrowed_entry():
+    types = [_type("ops", "Ops things", roles=["ops"])]
+    held = {constants.PERM_VIEW, "records.type.ops"}
+    assert [i.label for i in menu.visible_items(types, _user("sales"), held)] == ["Ops things"]
+    # Another type's grant does nothing for this one.
+    other = {constants.PERM_VIEW, "records.type.company"}
+    assert menu.visible_items(types, _user("sales"), other) == []
 
 
-def test_sync_with_nothing_opted_in_removes_our_items_and_keeps_the_hub():
-    registry = MenuRegistry()
-    registry.add(_hub())
-    ours = menu.sync_type_menu(registry, [_type("company", "Companies")])
-
-    ours = menu.sync_type_menu(registry, [], previous=ours)
-
-    assert [item.label for item in registry.all_items] == ["All record types"]
-    assert ours == []
-
-
-def test_sync_that_changes_nothing_does_not_touch_the_registry():
-    registry = MenuRegistry()
-    registry.add(_hub())
-    ours = menu.sync_type_menu(registry, [_type("company", "Companies")])
-    before = [id(item) for item in registry.all_items]
-
-    ours = menu.sync_type_menu(registry, [_type("company", "Companies")], previous=ours)
-
-    assert [id(item) for item in registry.all_items] == before
-
-
-def test_sync_keeps_a_host_item_that_looks_exactly_like_ours():
-    """Removal is by identity, not by value: a host that adds the same entry
-    by hand keeps it, however indistinguishable the two items are."""
-    registry = MenuRegistry()
-    ours = menu.sync_type_menu(registry, [_type("company", "Companies")])
-    registry.add(menu.type_menu_items([_type("company", "Companies")])[0])
-
-    menu.sync_type_menu(registry, [], previous=ours)
-
-    assert [item.label for item in registry.all_items] == ["Companies"]
+def test_no_entries_without_records_view_or_without_a_user():
+    types = [_type("open", "Opens")]
+    assert menu.visible_items(types, _user("guest"), set()) == []
+    assert menu.visible_items(types, None, _VIEW) == []
 
 
 async def test_load_menu_types_reads_only_the_types_that_asked(db_state):
@@ -155,77 +104,120 @@ async def test_load_menu_types_reads_only_the_types_that_asked(db_state):
     assert loaded[1].allowed_roles == ["ops"]
 
 
+# --- the provider -------------------------------------------------------------
+
+
 def _module(db_state: Any, **settings: Any) -> RecordsModule:
-    """A module instance wired the way ``on_startup`` leaves one."""
     module = RecordsModule()
     module.settings = RecordsSettings(**settings)
     module.db = db_state
-    module.menu_registry = MenuRegistry()
-    module.menu_registry.add(_hub())
+    module.tenancy_mode = TenancyMode.SINGLE
     return module
 
 
-async def test_refresh_does_nothing_without_a_registry(db_state):
+def _request(
+    path: str = "/admin/records/",
+    *,
+    user: Any = None,
+    held: set[str] | None = None,
+    tenant: str | None = None,
+    mode: TenancyMode = TenancyMode.SINGLE,
+) -> Request:
+    app = FastAPI()
+    setattr(app.state, constants.PACKAGE, SimpleNamespace(tenancy=mode))
+    state = {"user": user, "tenant_id": tenant, "resolved_permissions": held or set()}
+    return Request({"type": "http", "path": path, "app": app, "state": state, "headers": []})
+
+
+async def _labels(module: RecordsModule, **kwargs: Any) -> list[str]:
+    return [item.label for item in await menu.type_menu_provider(module, _request(**kwargs))]
+
+
+async def test_the_provider_lists_the_single_tenant_hosts_types(db_state):
+    await seed_type(db_state, "company", [], label_plural="Companies", show_in_menu=True)
     module = _module(db_state)
-    module.menu_registry = None
 
-    assert await menu.refresh(module, force=True) is False
+    assert await _labels(module, user=_user("viewer"), held=_VIEW) == ["Companies"]
 
 
-async def test_refresh_honours_the_window_and_the_dirty_flag(db_state):
+async def test_the_provider_reads_nothing_where_no_sidebar_renders(db_state):
+    class _Unreadable:
+        def session_factory(self):  # pragma: no cover - must never be called
+            raise AssertionError("read on a path that renders no sidebar")
+
+    module = _module(_Unreadable())
+    for path in ("/api/records/types", "/static/app.css", "/health/ready"):
+        assert await _labels(module, path=path, user=_user("v"), held=_VIEW) == []
+    # Anonymous: nothing either, and no read.
+    assert await _labels(module) == []
+
+
+@pytest.mark.unbound_tenant
+async def test_a_multi_tenant_request_with_no_tenant_gets_no_entries(db_state):
+    with tenant_scope("default"):
+        await seed_type(db_state, "company", [], label_plural="Companies", show_in_menu=True)
+    module = _module(db_state)
+    module.tenancy_mode = TenancyMode.MULTI
+
+    assert await _labels(module, user=_user("v"), held=_VIEW, mode=TenancyMode.MULTI) == []
+
+
+async def test_the_cache_honours_the_window_and_a_type_write(db_state):
     await seed_type(db_state, "company", [], label_plural="Companies", show_in_menu=True)
     module = _module(db_state, menu_refresh_seconds=300)
+    ask = {"user": _user("v"), "held": _VIEW}
 
-    assert await menu.refresh(module, force=True) is True
-    assert [item.label for item in module.menu_registry.all_items] == [
-        "All record types",
-        "Companies",
-    ]
-
-    # Inside the window, and nothing said otherwise.
+    assert await _labels(module, **ask) == ["Companies"]
     await seed_type(db_state, "order", [], label_plural="Orders", show_in_menu=True)
-    assert await menu.refresh(module) is False
-    assert [item.label for item in module.menu_registry.all_items] == [
-        "All record types",
-        "Companies",
-    ]
+    assert await _labels(module, **ask) == ["Companies"], "inside the window"
 
-    # What a type write in this process does — the endpoints call it through
-    # ``menu.mark_dirty``.
-    module.mark_menu_dirty()
-    assert await menu.refresh(module) is True
-    assert [item.label for item in module.menu_registry.all_items] == [
-        "All record types",
-        "Companies",
-        "Orders",
-    ]
+    module.mark_menu_dirty()  # what a type write in this process does
+    assert await _labels(module, **ask) == ["Companies", "Orders"]
 
 
-async def test_refresh_with_a_zero_window_reads_every_time(db_state):
+async def test_a_zero_window_reads_every_time(db_state):
     module = _module(db_state, menu_refresh_seconds=0)
-
-    assert await menu.refresh(module) is True
-    assert await menu.refresh(module) is True
-
-
-async def test_a_failed_read_keeps_the_previous_items(db_state, caplog):
+    ask = {"user": _user("v"), "held": _VIEW}
+    assert await _labels(module, **ask) == []
     await seed_type(db_state, "company", [], label_plural="Companies", show_in_menu=True)
-    module = _module(db_state, menu_refresh_seconds=0)
-    await menu.refresh(module)
+    assert await _labels(module, **ask) == ["Companies"]
 
+
+async def test_a_failed_read_contributes_nothing_and_logs(caplog):
     class _Broken:
         def session_factory(self):
             raise RuntimeError("no such table: records_type")
 
-    module.db = _Broken()
+    module = _module(_Broken(), menu_refresh_seconds=0)
     with caplog.at_level("WARNING"):
-        assert await menu.refresh(module) is False
-
-    assert [item.label for item in module.menu_registry.all_items] == [
-        "All record types",
-        "Companies",
-    ]
+        assert await _labels(module, user=_user("v"), held=_VIEW) == []
     assert "sidebar" in caplog.text
+
+
+def test_the_tenant_cache_never_answers_for_another_tenant():
+    cache = menu.TypeMenuCache()
+    cache.put("acme", [_type("secret", "Secrets")])
+    assert cache.get("globex", 300) is None
+    assert [t.key for t in cache.get("acme", 300) or []] == ["secret"]
+
+
+def test_the_tenant_cache_is_bounded(monkeypatch):
+    monkeypatch.setattr(menu, "MAX_CACHED_TENANTS", 2)
+    cache = menu.TypeMenuCache()
+    for tenant in ("a", "b", "c"):
+        cache.put(tenant, [])
+    assert cache.get("a", 300) is None
+    assert cache.get("c", 300) == []
+
+
+async def test_register_menu_items_adds_the_hub_and_one_provider():
+    module = RecordsModule()
+    registry = MenuRegistry()
+    module.register_menu_items(registry)
+
+    assert [item.label for item in registry.all_items] == ["All record types"]
+    # Before startup there is no database: the provider contributes nothing.
+    assert await registry.collect_provider_items(_request(user=_user("v"), held=_VIEW)) == []
 
 
 def test_affects_menu_only_for_columns_an_entry_is_built_from():
@@ -235,54 +227,3 @@ def test_affects_menu_only_for_columns_an_entry_is_built_from():
     assert menu.affects_menu({"allowed_roles": ["ops"]})
     assert not menu.affects_menu({"label": "Firm", "description": "x", "fields_raw": []})
     assert not menu.affects_menu({})
-
-
-async def test_middleware_skips_the_paths_that_render_no_sidebar(db_state, monkeypatch):
-    from sm_records._menu_middleware import MenuSyncMiddleware
-
-    synced: list[bool] = []
-
-    async def _fake_refresh(module, *, force=False):
-        synced.append(force)
-        return True
-
-    monkeypatch.setattr(menu, "refresh", _fake_refresh)
-    seen: list[str] = []
-
-    async def _inner(scope, receive, send):
-        seen.append(scope["path"])
-
-    middleware = MenuSyncMiddleware(_inner, module=_module(db_state))
-
-    for path in ("/api/records/types", "/static/app.css", "/health/ready"):
-        await middleware({"type": "http", "path": path}, _receive, _send)
-    assert synced == []
-
-    await middleware({"type": "http", "path": "/admin/records/"}, _receive, _send)
-    assert synced == [False]
-    # Every one of them still reached the app — skipping the sync is not
-    # skipping the request.
-    assert len(seen) == 4
-
-
-@pytest.mark.parametrize("scope_type", ["websocket", "lifespan"])
-async def test_middleware_passes_non_http_scopes_straight_through(db_state, scope_type):
-    from sm_records._menu_middleware import MenuSyncMiddleware
-
-    seen: list[dict] = []
-
-    async def _inner(scope, receive, send):
-        seen.append(scope)
-
-    middleware = MenuSyncMiddleware(_inner, module=_module(db_state))
-    await middleware({"type": scope_type}, _receive, _send)
-
-    assert seen == [{"type": scope_type}]
-
-
-async def _receive() -> dict:
-    return {"type": "http.request"}
-
-
-async def _send(message: dict) -> None:
-    return None

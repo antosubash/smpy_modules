@@ -36,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.index.query import QueryError
 from sm_records.models import RecordType
 from sm_records.schema.types import FieldType
-from sm_records.services._common import role_blocked
+from sm_records.services._access import role_blocked
 
 __all__ = ["Hop", "plan", "relation_defs"]
 

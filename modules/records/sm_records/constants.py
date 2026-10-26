@@ -59,9 +59,16 @@ is set by the lowest ``order`` among its items (see ``MenuRegistry`` in
 "Records" group directly after "Content" in the admin sidebar."""
 
 MENU_SKIP_PREFIXES: Final = ("/api/", "/static", "/health")
-"""Request paths :class:`sm_records._menu_middleware.MenuSyncMiddleware` never
-re-reads the menu for: none of them renders a sidebar, and the JSON API is the
-one surface where a per-request read would show up in a statement count."""
+"""Request paths the per-type sidebar provider (:mod:`sm_records.menu`) answers
+with nothing and no read: none of them renders a sidebar, and the JSON API is
+the one surface where a per-request read would show up in a statement count."""
+
+PERMISSION_SYNC_SKIP_PREFIXES: Final = (ROUTE_PREFIX_API + "/", "/static", "/health")
+"""Request paths :class:`sm_records._permission_sync.PermissionSyncMiddleware`
+never refreshes the per-type permission list on. Narrower than
+:data:`MENU_SKIP_PREFIXES`: the role editor's own ``/api/permissions/`` calls
+must see a type created a moment ago, while this module's JSON API keeps the
+statement counts ``tests/perf`` asserts."""
 
 MODULE_ATTR: Final = "records_module"
 """``app.state`` attribute holding the :class:`~sm_records.module.RecordsModule`
@@ -78,6 +85,13 @@ PERM_GROUP: Final = "records"
 PERM_VIEW: Final = "records.view"
 PERM_EDIT: Final = "records.edit"
 PERM_MANAGE_TYPES: Final = "records.manage_types"
+
+PERM_TYPE_PREFIX: Final = "records.type."
+"""Per-type permissions, ``records.type.<key>``, contributed to the role
+editor through ``PermissionRegistry.add_source`` (:mod:`sm_records.
+type_permissions`). Holding one admits the caller to that type's records even
+when its ``allowed_roles`` name none of their roles — see
+:func:`sm_records.services._access.role_blocked`."""
 
 _PAGE_TYPES: Final = f"{MODULE_NAME}/Types"
 _PAGE_RECORD_LIST: Final = f"{MODULE_NAME}/RecordList"

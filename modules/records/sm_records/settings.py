@@ -217,14 +217,15 @@ class RecordsSettings(PublicSubmissionsSettings):
     schema-triggered index-table migration (design doc §8.5)."""
 
     menu_refresh_seconds: int = Field(default=5, ge=0)
-    """How stale a per-type admin sidebar entry may get, in seconds.
+    """How stale a per-type admin sidebar entry, or the role editor's list of
+    per-type permissions, may get, in seconds.
 
-    A type with ``show_in_menu`` has its own sidebar item
-    (:mod:`sm_records.menu`) and the framework's menu registry is filled once at
-    boot, so a worker that did not serve the write re-reads the types at most
-    this often, on a request that renders a sidebar. The worker that *did*
-    serve it re-reads on its next one regardless — so this is the window another
-    process can lag by, not a delay the editor sees. ``0`` re-reads every time.
+    A type with ``show_in_menu`` has its own sidebar item, and each tenant's
+    such types are cached per worker for this long (:mod:`sm_records.menu`);
+    every type's ``records.type.<key>`` is re-read on the same terms
+    (:mod:`sm_records.type_permissions`). The worker that served a type write
+    drops both at once — so this is the window another process can lag by,
+    not a delay the editor sees. ``0`` re-reads every time.
     """
 
     reindex_stale_after_seconds: int = 900

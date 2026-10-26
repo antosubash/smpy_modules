@@ -4,8 +4,8 @@ Two ways the app records is handed can hide a multi-tenant parent: a
 ``Middleware(factory)`` entry, which installs who-knows-what, and a ``Mount``
 under a parent whose ``TenantMiddleware`` the child never sees. Both are
 ``MULTI`` unless the framework itself answers — the rule news and pagebuilder
-follow (#192) — and the sidebar, which publishes into one process-wide
-registry, drops its default-tenant per-type entries for the same reason.
+follow (#192). The sidebar provider then has no tenant and lists no per-type
+entries, and the role editor's per-type permissions lose their labels.
 """
 
 from __future__ import annotations
@@ -16,13 +16,19 @@ from typing import Any
 import pytest
 from fastapi import FastAPI, Request
 from httpx import ASGITransport, AsyncClient
-from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
+from simple_module_core.permissions import PermissionRegistry
 from sm_records import constants, menu
-from sm_records._menu_middleware import MenuSyncMiddleware
+from sm_records._permission_sync import PermissionSyncMiddleware
 from sm_records.module import RecordsModule
 from sm_records.services.errors import TenantRequired
 from sm_records.settings import RecordsSettings
-from sm_records.tenancy import TenancyMode, detect_mode, resolve_admin, resolve_public
+from sm_records.tenancy import (
+    TenancyMode,
+    detect_mode,
+    resolve_admin,
+    resolve_public,
+    tenant_scope,
+)
 from starlette.applications import Starlette
 from starlette.routing import Mount
 
@@ -81,58 +87,59 @@ def test_a_mounted_child_without_a_framework_answer_fails_closed():
     assert resolve_admin(request) == "default"
 
 
-def _hub() -> MenuItem:
-    return MenuItem(
-        label="All record types",
-        url=constants.MENU_URL,
-        icon=constants.MENU_ICON,
-        order=constants.MENU_ORDER,
-        section=MenuSection.ADMIN_SIDEBAR,
-        group=constants.MENU_GROUP_TYPES,
-    )
-
-
-async def _synced_module(db_state: Any) -> RecordsModule:
-    """A single-tenant module whose startup sync published a per-type entry."""
-    await seed_type(db_state, "company", [], label_plural="Companies", show_in_menu=True)
+def _module(db_state: Any) -> RecordsModule:
+    """A single-tenant module the way ``on_startup`` leaves one."""
     module = RecordsModule()
     module.settings = RecordsSettings(menu_refresh_seconds=0)
     module.db = db_state
     module.tenancy_mode = TenancyMode.SINGLE
-    module.menu_registry = MenuRegistry()
-    module.menu_registry.add(_hub())
-    assert await menu.refresh(module, force=True) is True
+    module.type_permissions.register(PermissionRegistry())
     return module
 
 
 def _sidebar_app(module: RecordsModule) -> FastAPI:
+    """A child app with the module's middleware, whose one route answers with
+    what the sidebar provider and the role editor's source would show."""
     app = FastAPI()
-    app.add_middleware(MenuSyncMiddleware, module=module)
+    app.add_middleware(PermissionSyncMiddleware, module=module)
 
     @app.get("/admin/records/")
-    async def sidebar(request: Request) -> list[str]:
-        return [item.label for item in module.menu_registry.all_items]
+    async def sidebar(request: Request) -> dict[str, list]:
+        request.state.user = SimpleNamespace(id="u", roles=["v"])
+        request.state.resolved_permissions = {constants.PERM_VIEW}
+        items = await menu.type_menu_provider(module, request)
+        return {"menu": [item.label for item in items], "perms": list(module.type_permissions())}
 
     return app
 
 
-async def _labels(app: Any, path: str) -> list[str]:
+async def _get(app: Any, path: str) -> dict[str, list]:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as client:
         response = await client.get(path)
     assert response.status_code == 200, response.text
     return response.json()
 
 
-async def test_a_mounted_childs_sidebar_shows_no_default_tenant_types(db_state):
-    module = await _synced_module(db_state)
+@pytest.mark.unbound_tenant
+async def test_a_mounted_child_shows_no_default_tenant_types_or_labels(db_state):
+    with tenant_scope("default"):
+        await seed_type(db_state, "company", [], label_plural="Companies", show_in_menu=True)
+    module = _module(db_state)
     child = _sidebar_app(module)
     parent = Starlette(routes=[Mount("/child", app=child)])
 
-    assert await _labels(parent, "/child/admin/records/") == ["All record types"]
-    # Latched: the registry is process-wide, so a later request served
-    # directly must not put the entries back for the mounted tenants to see.
-    assert await _labels(child, "/admin/records/") == ["All record types"]
-    assert module._type_menu_items == []
+    served = await _get(parent, "/child/admin/records/")
+    # No tenant the framework can vouch for: no per-type entries, per request.
+    assert served["menu"] == []
+    # The role editor is host-wide, so its source latches unlabelled: the
+    # default tenant's type label must not name the parent's tenants' grants.
+    assert served["perms"] == ["records.type.company"]
+    assert module.type_permissions.ambiguous is True
+    # Served directly afterwards, the sidebar is the default tenant's again —
+    # nothing is process-wide any more — and the labels stay off.
+    direct = await _get(child, "/admin/records/")
+    assert direct["menu"] == ["Companies"]
+    assert direct["perms"] == ["records.type.company"]
 
 
 @pytest.mark.unbound_tenant
@@ -148,9 +155,10 @@ def test_a_mounted_childs_default_tenant_answer_is_never_shared():
     assert _tenancy(request) == (None, False)
 
 
+@pytest.mark.unbound_tenant
 async def test_an_unmounted_single_tenant_sidebar_keeps_its_types(db_state):
-    module = await _synced_module(db_state)
-    assert await _labels(_sidebar_app(module), "/admin/records/") == [
-        "All record types",
-        "Companies",
-    ]
+    with tenant_scope("default"):
+        await seed_type(db_state, "company", [], label_plural="Companies", show_in_menu=True)
+    served = await _get(_sidebar_app(_module(db_state)), "/admin/records/")
+    assert served["menu"] == ["Companies"]
+    assert served["perms"] == [["records.type.company", "Records: Companies"]]
