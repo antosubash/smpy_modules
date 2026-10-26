@@ -4,7 +4,7 @@ import { Switch } from '@simple-module-py/ui/components/ui/switch';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { useRef } from 'react';
 import { keys, type Translate, useT } from '../../utils/i18n';
-import type { TenancyMode, ValidationError } from '../../utils/types';
+import type { ValidationError } from '../../utils/types';
 import { CollectionField } from './CollectionField';
 import { fieldMessage } from './errors';
 import { keyFromLabel, pluralFromLabel } from './formHelpers';
@@ -45,7 +45,6 @@ export function TypeMetadataForm({
   contentLocales,
   collections,
   translatableError,
-  tenancyMode,
 }: {
   isNew: boolean;
   roles: string[];
@@ -67,9 +66,6 @@ export function TypeMetadataForm({
    *  exist (design §4.1) — not a field-scoped `422`, so it doesn't arrive
    *  through `errors` and is shown here instead. */
   translatableError?: string | null;
-  /** From the page's `tenancy_mode` view prop — `SidebarField` hides "Show in
-   *  sidebar" for a note instead once this is `'multi'` (design §I). */
-  tenancyMode?: TenancyMode;
 }) {
   const { t } = useT();
   // Which of the two derived fields the operator has taken over. Refs, not
@@ -223,7 +219,6 @@ export function TypeMetadataForm({
       <SidebarField
         showInMenu={values.showInMenu}
         labelPlural={values.labelPlural}
-        tenancyMode={tenancyMode}
         onChange={(showInMenu) => onChange({ showInMenu })}
       />
 

@@ -199,7 +199,6 @@ function TypeEditor({
                 contentLocales={content_locales}
                 collections={collections}
                 translatableError={translatableError}
-                tenancyMode={tenancy_mode}
               />
             </CardContent>
           </Card>

@@ -47,6 +47,7 @@ from tests.harness_auth import (  # noqa: F401 - re-exported: tests import them 
     ROLE_MANAGER,
     ROLE_NONE,
     ROLE_VIEWER,
+    TEST_SCOPES_HEADER,
     TEST_TENANT_HEADER,
     _HeaderAuthMiddleware,
     _register_roles,

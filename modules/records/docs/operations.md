@@ -12,7 +12,7 @@ Contents:
 [CLI](#the-cli) ·
 [Health](#health-checks) ·
 [Reindexing](#reindexing) ·
-[Sidebar sync](#the-sidebar-sync) ·
+[Sidebar and role editor](#the-sidebar-and-the-role-editor) ·
 [Deployment constraints](#deployment-constraints) ·
 [SQLite and PostgreSQL](#sqlite-and-postgresql) ·
 [Backup and restore](#backup-and-restore) ·
@@ -404,14 +404,14 @@ tenancy:
 - [Health checks §5](#5-tenants-outside-default-single-tenant-hosts) —
   `tenants_outside_default`, the one detail that is informational rather than
   degrading.
-- [The sidebar sync](#the-sidebar-sync) — a multi-tenant host gets the "All
-  record types" hub entry only; per-type sidebar entries would leak one
-  tenant's type labels to every other tenant, because the framework's menu
-  registry is one process-wide list built before the request's tenant is
-  known. Framework 0.0.36 now has a per-request menu provider for exactly this
-  (upstream [#340](https://github.com/antosubash/simple_module_python/issues/340),
-  `MenuRegistry.add_provider`); records has not adopted it yet, so the limitation
-  stands.
+- [The sidebar and the role editor](#the-sidebar-and-the-role-editor) — each
+  organisation's sidebar lists its own `show_in_menu` types, from a per-request
+  menu provider (upstream
+  [#340](https://github.com/antosubash/simple_module_python/issues/340),
+  `MenuRegistry.add_provider`). The role editor is host-wide: it lists every
+  tenant's `records.type.<key>` permissions, without labels on a multi-tenant
+  host, and a grant of one applies in every tenant that has a type with that
+  key.
 
 ### Upstream issues this works around
 
@@ -462,7 +462,7 @@ python scripts/set_setting.py sm_records content_locales '["en","de"]'
 | `preview_job_ttl_seconds` | `600` (10 min) | no | How long a finished preview's report stays reusable by the save that follows. `0` makes every save run its own pass |
 | `reindex_batch_size` | `500` | no | Records per batch in a rebuild, and the export's page size |
 | `reindex_stale_after_seconds` | `900` (15 min) | no | How old a `reindex_pending` entry may get before `/health/ready` degrades |
-| `menu_refresh_seconds` | `5` | no | How stale a per-type sidebar entry may get. `0` re-reads on every page request |
+| `menu_refresh_seconds` | `5` | no | How stale a per-type sidebar entry, or the role editor's list of per-type permissions, may get in a worker that did not serve the type write. `0` re-reads on every request |
 | `public_submissions_*` | see the README | no | Website forms and newsletters — see [Website forms and newsletters](#website-forms-and-newsletters) |
 
 Everything not marked *restart* is read per request and takes effect on save.
@@ -1065,47 +1065,84 @@ after deploying a changed one, and make sure every worker registers it.
 
 ---
 
-## The sidebar sync
+## The sidebar and the role editor
 
-The framework's `MenuRegistry` is filled once per process, at app construction.
-Record Types are created long after that, so a type with `show_in_menu` has its
-entry added by this module's own sync.
+Record Types are created at runtime, long after the framework's registries are
+built. Records uses the two framework hooks made for that (framework 0.0.36,
+PR #407).
 
-- The worker that served the type write re-reads on its **next** request that
+**Sidebar: a per-request menu provider** (`MenuRegistry.add_provider`, upstream
+[#340](https://github.com/antosubash/simple_module_python/issues/340)). The
+framework calls it for every request after auth and tenant resolution, and it
+returns that request's per-type entries (`sm_records.menu`):
+
+- The tenant is the one the framework resolved, else `default` on a
+  single-tenant host, else none, in which case there are no per-type entries.
+  This is the same rule as the public read API (`resolve_public`). So a
+  multi-tenant host shows each organisation its own `show_in_menu` types.
+  Before the provider it showed only "All record types".
+- An entry is shown to a caller who holds `records.view` and is not narrowed out
+  by the type's `allowed_roles`, or who holds the type's `records.type.<key>`.
+  It is the same check the record list behind the link applies, so nobody is
+  shown a link that 403s.
+- Each tenant's types are cached per worker for `menu_refresh_seconds`
+  (5 by default), keyed by tenant: one tenant's entries never answer for
+  another's. The worker that served a type write drops its cache at once.
+  Other workers catch up within the window. `0` reads on every page request.
+- Requests under `/api/`, `/static` and `/health` never read: none of them
   renders a sidebar.
-- Every other worker re-reads within `menu_refresh_seconds` (5 by default).
-- `0` re-reads on every page request — one query per page, for an install that
-  would rather never show a stale sidebar.
+- A failed read is logged and contributes nothing for that request:
 
-**Multi-tenant hosts get no per-type entries**, only "All record types". The
-registry is one list per process, and the sync runs before the request's
-tenant is known. Per-type entries would show each tenant's type labels to
-every other tenant, linking to keys that resolve differently per viewer. The
-hub page lists the viewer's own tenant's types, so nothing becomes
-unreachable. On a single-tenant host the sync reads `default`'s types, as
-before.
+  ```
+  records: could not read the sidebar types
+  ```
 
-Requests under `/api/`, `/static` and `/health` never trigger a re-read: none of
-them renders a sidebar.
+**Role editor: a runtime permission source** (`PermissionRegistry.add_source`,
+upstream [#334](https://github.com/antosubash/simple_module_python/issues/334)).
+Every type has a permission `records.type.<key>`, listed in the "records"
+group next to the three static ones (`sm_records.type_permissions`):
 
-A failed read (a boot before the migration, a transient error) is logged and
-otherwise ignored; the previously synced items stay in place. The clock is reset
-too, so a database that is down costs one query per window rather than one per
-request.
+- On a single-tenant host the label names the type and, for a narrowed one, the
+  roles `allowed_roles` lets in: `Records: Companies (restricted to editor,
+  sales)`. On a multi-tenant host there are no labels. The role editor is
+  host-wide, so a label from one tenant's type would end up naming the grant
+  for every other tenant.
+- Granting it (to a role or a user) admits the holder to that type even when
+  `allowed_roles` names none of their roles. It never overrides
+  `records.view`/`records.edit`, which the caller still needs.
+- **On a multi-tenant host the grant is host-wide.** Role and direct grants
+  belong to the host, not to an organisation, and a grant names a key, not a
+  tenant, so it applies to that key's type in every tenant. Seeing the
+  cross-tenant list of keys (the role editor, `GET /api/permissions/`) needs
+  `permissions.view`; granting one needs `permissions.manage`. Both are
+  host-level permissions, not something a tenant admin holds.
+- **Deleting a type does not revoke its `records.type.<key>` grants.** The key
+  leaves the role editor's list, but the framework never prunes a stored grant
+  for a key it no longer lists, so a new type created later with the same key
+  inherits every grant the old one had. Revoke the grants first if a key is
+  going to be reused for something sensitive.
+- The `admin` wildcard grants no per-type access. Narrowing has never had an
+  admin exception, and the `permissions` module copies every registered key
+  onto the admin role at startup. So the role editor shows admin holding every
+  `records.type.<key>`, but an admin still reaches a narrowed type only by
+  being listed in its `allowed_roles`. That holds for an admin's API token
+  too: the framework replaces an admin token's wildcard with its scopes, and
+  a scope naming `records.type.<key>` still grants nothing, because per-type
+  grants come only from the owner's genuine (non-wildcard) grants. A token
+  never holds more per-type access than its owner.
+- The framework's source is synchronous and must not read the database, so a
+  module middleware refreshes the list before the route runs. It refreshes on a
+  type write in this worker, otherwise at most every `menu_refresh_seconds`. It
+  covers every path except records' own JSON API, `/static` and `/health`, so
+  the role editor's own `/api/permissions/` calls see a type created a moment
+  ago. A failed read keeps the previous list:
 
-```
-records: could not read the sidebar types; keeping the previous entries
-```
+  ```
+  records: could not read the types for the role editor; keeping the previous list
+  ```
 
-**Removal goes through the registry's public `MenuRegistry.remove(predicate)`**
-(core 0.0.36, upstream [#340](https://github.com/antosubash/simple_module_python/issues/340)),
-so the sync no longer reaches into framework internals. The same release added
-a dynamic provider hook,
-`MenuRegistry.add_provider(fn)` from `register_menu_items`, where
-`fn(request)` returns the items for that request (sync or async) and runs after
-auth and tenant resolution, so a per-tenant sidebar becomes possible. Records
-has **not** adopted the provider: the remove-and-add sync above is still what
-runs, and moving to a provider is separate work.
+Existing installs see no change in access: nobody holds a `records.type.<key>`
+until someone grants it, and admin's copied rows are ignored.
 
 ---
 
@@ -1338,8 +1375,8 @@ cd modules/records && RECORDS_PERF_N=20000 ../../.venv/bin/python -m pytest -q -
 Filed against
 [antosubash/simple_module_python](https://github.com/antosubash/simple_module_python).
 
-**Status as of framework 0.0.36.** At the host's 0.0.38 pin, #334's
-`add_source` and #340's `add_provider` are still there and still unadopted.
+**Status as of framework 0.0.36.** At the host's 0.0.38 pin, records uses
+#334's `add_source` and #340's `add_provider` (#92).
 Fixed upstream: #332, #337 (0.0.36, PR #398: one `RequiresPermission`, honouring
 direct user grants), #338 (0.0.36: `SidebarLayout` mounts the `<Toaster>`),
 #341 (0.0.36, PR #400: skip link), #342 (0.0.36, PR #406: autogenerated
@@ -1347,8 +1384,8 @@ revisions are portable to Postgres; this host's hand-corrected revisions stay
 as they are), #343, #355, #356, #357, #358, #359, #363, #364, #365, #366, #367
 (0.0.36: the tenant source is recorded and `Vary` set), #369 (0.0.35), and
 #335, #336, #339 through `hard_delete`, `mark_written` and SQLite's WAL,
-`busy_timeout` and `foreign_keys=ON`. Available but not adopted by records:
-#334 (runtime permission sources) and #340 (menu providers), both PR #407.
+`busy_timeout` and `foreign_keys=ON`. Adopted: #334 (runtime permission
+sources) and #340 (menu providers), both PR #407.
 Closed as a docs correction only: #333. Closed as not planned, with the problem
 solved by the tenants module and the 0.0.36 tenancy adoption: #360, #361, #362
 (their rows below say what changed). Records has not revisited the
@@ -1374,13 +1411,13 @@ single-tenant host and the CLI, which do not run strict.
 |---|---|---|
 | [#332](https://github.com/antosubash/simple_module_python/issues/332) | Soft-delete and tenant filters are skipped for selects that name no mapper (`select(func.count())`) — a [comment](https://github.com/antosubash/simple_module_python/issues/332#issuecomment-5794906795) measures the same gap's breadth: join targets, `exists()`/`in_()` subqueries, `update()`/`delete()`, and an already-loaded `session.get()` | Every count selects `func.count(Record.id)` over the mapped entity, never `count()` over a bare `select_from`; every other shape in the comment gets an explicit `tenant_id == bound_tenant()` predicate (design §E), checked by a statement census that runs over the whole suite on PostgreSQL |
 | [#333](https://github.com/antosubash/simple_module_python/issues/333) | `alembic downgrade <label>@base` walks the whole revision chain | Closed upstream on 2026-10-07 as a documentation correction (0.0.36, PR #403): the framework's docs no longer claim a per-module rollback, and the behaviour is unchanged. The README and [Migrations](#the-recordsbase-caveat) above say what the label actually buys, and how to drop the tables instead |
-| [#334](https://github.com/antosubash/simple_module_python/issues/334) | No runtime permission source for resources defined after boot | Per-type access is `RecordType.allowed_roles`, not a framework permission — which is why it is invisible in the role editor. Framework 0.0.36 (PR #407) adds `PermissionRegistry.add_source(name, provider)` and `invalidate_source(name)`: a sync provider over an in-memory cache returns keys or `(key, label)` pairs, shown in the role editor and enforced by `RequiresPermission`. Records has not adopted it |
+| [#334](https://github.com/antosubash/simple_module_python/issues/334) | No runtime permission source for resources defined after boot | Adopted (#92). Framework 0.0.36 (PR #407) added `PermissionRegistry.add_source`. Every type now has a `records.type.<key>` permission in the role editor, labelled with its narrowing on a single-tenant host. Granting it admits a caller `allowed_roles` leaves out. `allowed_roles` still narrows as before, and the admin wildcard is still no exception. See [The sidebar and the role editor](#the-sidebar-and-the-role-editor) |
 | [#335](https://github.com/antosubash/simple_module_python/issues/335) | No supported way to hard-delete a `SoftDeleteMixin` row | A purge goes through the module's own `hard_delete_record`, which issues core DML rather than `session.delete()` |
 | [#336](https://github.com/antosubash/simple_module_python/issues/336) | `get_db` auto-commit ignores core DML, so a request whose only write is `session.execute(update(...))` is rolled back | `services._common.mark_written` sets the flag the framework's `after_flush` listener would have set |
 | [#337](https://github.com/antosubash/simple_module_python/issues/337) | Two `RequiresPermission` classes; the hosting one silently ignores per-user grants | Fixed in 0.0.36: the hosting checker honours direct grants, and `permissions.deps` re-exports it. `deps.py` now uses it alone; its old preference for the `permissions` class called it with that class's 0.0.35 signature and broke every records route on 0.0.36 |
 | [#338](https://github.com/antosubash/simple_module_python/issues/338) | `AdminLayout` mounts no `<Toaster>`, so `toast.*()` is swallowed on every admin page | Fixed in 0.0.36 (`SidebarLayout` mounts one). The module's own `RecordsToaster` is removed: with both mounted, every toast showed twice |
 | [#339](https://github.com/antosubash/simple_module_python/issues/339) | The SQLite engine is left at driver defaults: rollback journal, implicit 5 s busy timeout, foreign keys **off** — a [comment](https://github.com/antosubash/simple_module_python/issues/339#issuecomment-5795747765) adds that the tenancy migration's composite `(type_id, tenant_id)` FK is therefore unenforced on a SQLite host | `on_delete` is enforced in the application rather than by FK cascades, and the reindex runner retries a short bounded backoff on `database is locked`; the composite type FK is proven only by tests that turn `PRAGMA foreign_keys=ON` themselves — a SQLite production host gets no such guarantee |
-| [#340](https://github.com/antosubash/simple_module_python/issues/340) | `MenuRegistry` has no way to remove items or contribute them dynamically — a [comment](https://github.com/antosubash/simple_module_python/issues/340#issuecomment-5794907667) proposes a per-request `register_menu_provider(request -> items)` for a per-tenant sidebar | `sm_records.menu.sync_type_menu` removes its own items from the registry by object identity through the public `MenuRegistry.remove` (0.0.36; it spliced the private list before); on a multi-tenant host it syncs no per-type items at all rather than leak one tenant's labels to another ([The sidebar sync](#the-sidebar-sync)). Framework 0.0.36 (PR #407) adds `MenuRegistry.add_provider(fn)` (`fn(request)` returns items per request, after tenant resolution) and `MenuRegistry.remove(predicate)`. Records uses `remove`; it has not adopted the provider |
+| [#340](https://github.com/antosubash/simple_module_python/issues/340) | `MenuRegistry` has no way to remove items or contribute them dynamically. A [comment](https://github.com/antosubash/simple_module_python/issues/340#issuecomment-5794907667) proposes a per-request `register_menu_provider(request -> items)` for a per-tenant sidebar | Adopted (#92). Framework 0.0.36 (PR #407) added `MenuRegistry.add_provider`. The per-type entries come from a provider that reads the request's own tenant's types, so a multi-tenant host shows each organisation its own. The old remove-and-add sync of a process-wide list is gone. See [The sidebar and the role editor](#the-sidebar-and-the-role-editor) |
 | [#341](https://github.com/antosubash/simple_module_python/issues/341) | `AdminLayout`/`SidebarLayout` have no skip link, and five chrome tab stops precede the first page control | Fixed in 0.0.36 (PR #400): `SidebarLayout`, and so `AdminLayout`, renders a "skip to content" link to `#main` ahead of the chrome. Nothing to work around; the module's own per-type sidebar entries still add tab stops before the page |
 | [#342](https://github.com/antosubash/simple_module_python/issues/342) | Migrations autogenerated on SQLite are not portable to Postgres (boolean defaults as `text('0')`, expression indexes invisible, enum types left behind on downgrade), and every check reports them clean | This host's revisions were corrected by hand (`ed06f4584f6b`, `4cf1b4c9f8f9`, `b98d8185ecef`, `d2b7a1c4e905`); see [postgres-2026-09-21.md](postgres-2026-09-21.md) § 2 (fixed upstream in 0.0.36 for new revisions; existing ones are unchanged) |
 | [#343](https://github.com/antosubash/simple_module_python/issues/343) | `simple_module_test` fixtures hard-code in-memory SQLite, so a module suite cannot run on Postgres | The repo-root `tests/pg_support.py` and `SM_TEST_DATABASE_URL` do it for `records`, `pagebuilder` and `news`; see [postgres-2026-09-21.md](postgres-2026-09-21.md) § 3 and § 13 |

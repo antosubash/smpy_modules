@@ -37,7 +37,7 @@ Five rules, all of them load-bearing:
   row is read, so a restricted expansion leaks neither its content nor
   whether the uuid still exists — nor, one level down, anything its own
   relations hold (:mod:`._expand_plan` plans nothing beneath it). The
-  predicate is ``_common.role_blocked`` — the same one
+  predicate is ``_access.role_blocked`` — the same one
   ``deps.check_type_roles`` raises on, so the read surface cannot be more
   permissive than the write surface. Every statement runs on the request's
   session, so the tenant binding that scopes the page scopes every hop.

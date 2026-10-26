@@ -11,6 +11,10 @@ framework bump, not in production.
   ``single_tenant_id`` come first; the stack stays the fallback for an app
   built outside ``create_app`` and the source of the tenant header, which
   has no public replacement yet.
+* ``sm_records/menu.py`` and ``sm_records/type_permissions.py`` —
+  ``MenuRegistry.add_provider`` and ``PermissionRegistry.add_source`` /
+  ``invalidate_source`` (0.0.36, upstream #340 / #334). Public, but the
+  sidebar and the role editor rest on how they behave, so that is pinned.
 * ``sm_records/endpoints/api/_errors.py`` —
   ``simple_module_hosting._error_handlers.render_error_page``. No public
   replacement yet.
@@ -32,7 +36,8 @@ from sm_records.tenancy import TenancyMode
 pytestmark = pytest.mark.unbound_tenant
 
 _TENANCY = "sm_records/_tenancy_mode.py (_tenant_middleware / _kwargs)"
-_MENU = "sm_records/menu.py (sync_type_menu)"
+_MENU = "sm_records/menu.py (type_menu_provider)"
+_PERMS = "sm_records/type_permissions.py (TypePermissions)"
 _ERRORS = "sm_records/endpoints/api/_errors.py (_error_page)"
 
 
@@ -149,15 +154,42 @@ def test_an_explicit_fixed_pin_must_agree_with_the_frameworks_answer():
 # --- menu registry ------------------------------------------------------------
 
 
-def test_remove_reaches_all_items():
-    """Behaviour, not just names: a removed entry leaves the *sorted* view."""
+async def test_a_provider_reaches_the_rendered_sidebar():
+    """Behaviour, not just names: ``get_for_request`` asks the provider with
+    the request and renders its items after the static ones of equal order."""
     registry = MenuRegistry()
     hub = MenuItem(label="Hub", url="/hub", order=1, section=MenuSection.ADMIN_SIDEBAR)
     registry.add(hub)
-    [ours] = menu.sync_type_menu(registry, [menu.MenuType("a", "As", None, [])])
-    assert ours in registry.all_items  # warms the sorted cache
-    menu.sync_type_menu(registry, [], previous=[ours])
-    assert registry.all_items == [hub], f"{_MENU}: MenuRegistry.remove no longer changes all_items"
+    seen: list[object] = []
+
+    async def provider(request):
+        seen.append(request)
+        return menu.type_menu_items([menu.MenuType("a", "As", None, [])])
+
+    registry.add_provider(provider)
+    request = object()
+    rendered = await registry.get_for_request(request, is_authenticated=True)  # type: ignore[arg-type]
+    assert seen == [request], f"{_MENU}: MenuRegistry no longer passes the request to a provider"
+    labels = [entry["label"] for entry in rendered[MenuSection.ADMIN_SIDEBAR.value]]
+    assert labels == ["Hub", "As"], f"{_MENU}: provider items no longer render after the hub"
+
+
+def test_a_permission_source_reaches_the_role_editor():
+    """``add_source`` keys join the group of the same name, with their labels,
+    and ``invalidate_source`` makes the registry ask again."""
+    from simple_module_core.permissions import PermissionRegistry
+
+    registry = PermissionRegistry()
+    registry.add_group(constants.PERM_GROUP, [constants.PERM_VIEW])
+    entries = [("records.type.a", "Records: As")]
+    registry.add_source(constants.PERM_GROUP, lambda: list(entries))
+    [group] = registry.groups
+    assert group.permissions == [constants.PERM_VIEW, "records.type.a"], f"{_PERMS}: merge changed"
+    assert registry.source_labels(constants.PERM_GROUP) == {"records.type.a": "Records: As"}
+    entries.append(("records.type.b", "Records: Bs"))
+    assert "records.type.b" not in registry.all_permissions, f"{_PERMS}: source no longer cached"
+    registry.invalidate_source(constants.PERM_GROUP)
+    assert "records.type.b" in registry.all_permissions, f"{_PERMS}: invalidate_source is inert"
 
 
 # --- error page ---------------------------------------------------------------

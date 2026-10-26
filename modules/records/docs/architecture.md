@@ -607,7 +607,9 @@ sm_records/
 │                    restart-marked BootSettings, + settings_checks.py
 ├── deps.py          permissions, allowed_roles narrowing, request session
 ├── _grammar.py      ?filter= / ?sort= / ?expand= / ?after= parsing
-├── menu.py          per-type sidebar entries (+ _menu_middleware.py)
+├── menu.py          per-type sidebar entries: a per-request MenuRegistry provider
+├── type_permissions.py  records.type.<key> in the role editor (add_source),
+│                    refreshed by _permission_sync.py
 ├── health.py        the records.reindex check
 ├── deferred.py      post-response job middleware
 ├── collections.py, locales.py, pagebuilder-blocks.ts

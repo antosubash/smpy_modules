@@ -2,8 +2,6 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { Switch } from '@simple-module-py/ui/components/ui/switch';
 import { keys, useT } from '../../utils/i18n';
 
-import type { TenancyMode } from '../../utils/types';
-
 const ID = 'type-editor-show-in-menu';
 
 /**
@@ -13,15 +11,11 @@ const ID = 'type-editor-show-in-menu';
  * hub table. Off by default for a new type — the hub link always exists, so
  * nothing is unreachable while this stays off.
  *
- * **Hidden in multi-tenant mode** (tenancy design §I): `MenuRegistry` is one
- * static list per process, evaluated before the request's tenant is known, so
- * multi mode never syncs a per-type entry at all — only the "All record
- * types" hub survives. The toggle would promise something the host can't do,
- * so it is replaced by a note saying why, rather than left on to be silently
- * inert. The API still accepts and stores `show_in_menu` unchanged (a host
- * that later drops back to single mode picks its value back up), so this
- * component still receives `showInMenu`/`onChange` — it just doesn't render
- * controls for them while `tenancyMode === 'multi'`.
+ * Shown on multi-tenant hosts too: the entries come from a per-request menu
+ * provider that reads the request's own tenant's types (framework 0.0.36,
+ * upstream #340), so each organisation's sidebar lists its own. Before that
+ * this was replaced by a note on such hosts, because the process-wide menu
+ * registry could not be per tenant.
  *
  * Split out of `TypeMetadataForm` for the 300-line cap, mirroring
  * `PublicField` — this is the only other type-level switch with its own
@@ -31,7 +25,6 @@ const ID = 'type-editor-show-in-menu';
 export function SidebarField({
   showInMenu,
   labelPlural,
-  tenancyMode,
   onChange,
 }: {
   showInMenu: boolean;
@@ -39,22 +32,9 @@ export function SidebarField({
    *  appears rather than describing it abstractly — mirrors the menu item's
    *  `label=rtype.label_plural`. */
   labelPlural: string;
-  /** From the page's own `tenancy_mode` view prop; absent (an older fixture,
-   *  a screen tenancy hasn't reached) renders the toggle as before. */
-  tenancyMode?: TenancyMode;
   onChange: (showInMenu: boolean) => void;
 }) {
   const { t } = useT();
-  if (tenancyMode === 'multi') {
-    return (
-      <p
-        className="text-sm text-muted-foreground sm:col-span-2"
-        data-testid="records-show-in-menu-multi-note"
-      >
-        {t(keys.records.type_editor.show_in_menu_multi_note)}
-      </p>
-    );
-  }
   return (
     <>
       <div className="flex items-center gap-2 sm:col-span-2">

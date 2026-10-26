@@ -56,16 +56,16 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         # ``{locale: records}`` for languages this install no longer publishes,
         # counted once at startup — see :mod:`sm_records.health`.
         self.orphaned_locales: dict[str, int] = {}
-        # The sidebar state of :mod:`sm_records.menu`: the registry handed to
-        # ``register_menu_items``, the per-type items this module last put in
-        # it, and when. Kept here because the registry is built once at boot
-        # and the types it describes are created at runtime — the module
-        # instance is the only thing that outlives both.
-        self.menu_registry: MenuRegistry | None = None
-        self._type_menu_items: list[MenuItem] = []
-        self._menu_dirty = False
-        self._menu_suppressed = False  # a mounted request with no tenancy answer (#210)
-        self._menu_synced_at = 0.0
+        # Runtime state for the two framework hooks that describe types,
+        # which are created after boot: each tenant's sidebar types
+        # (:mod:`sm_records.menu`) and the role editor's per-type permissions
+        # (:mod:`sm_records.type_permissions`). The module instance is the one
+        # thing that outlives both the registries and the requests.
+        from sm_records.menu import TypeMenuCache
+        from sm_records.type_permissions import TypePermissions
+
+        self.menu_cache = TypeMenuCache()
+        self.type_permissions = TypePermissions()
 
     def register_settings(self, app: FastAPI) -> None:
         """Register the settings class and mount the services container.
@@ -100,16 +100,18 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         )
 
     def register_permissions(self, registry: PermissionRegistry) -> None:
-        """Three static permissions — the only ones the role editor can show.
+        """Three static permissions, plus one per type from a runtime source.
 
-        Per-type access (``RecordType.allowed_roles``) narrows these at request
-        time and is invisible here: ``register_permissions`` runs before the
-        database is open, and types are created at runtime. Design doc §10.
+        Types are created at runtime, after this hook, so their
+        ``records.type.<key>`` permissions come from
+        ``PermissionRegistry.add_source`` (framework 0.0.36, upstream #334) over
+        a cache :mod:`sm_records.type_permissions` keeps. Design doc §10.
         """
         registry.add_group(
             constants.PERM_GROUP,
             [constants.PERM_VIEW, constants.PERM_EDIT, constants.PERM_MANAGE_TYPES],
         )
+        self.type_permissions.register(registry)
 
     def register_menu_items(self, registry: MenuRegistry) -> None:
         """Deliberately not role-gated: menu role filtering is a plain
@@ -138,21 +140,24 @@ class RecordsModule(SubmissionHooks, ModuleBase):
                 group_key=constants.MENU_GROUP_KEY_TYPES,
             )
         )
-        # Kept, because a type opting into its own entry (``show_in_menu``) is
-        # a runtime fact and this hook runs once, at boot, before there is a
-        # database to ask. :mod:`sm_records.menu` fills the rest in later and
-        # keeps it current; the hub item above is never one of its items.
-        self.menu_registry = registry
+        # A type opting into its own entry (``show_in_menu``) is a runtime
+        # fact, and each tenant has its own: a per-request provider (framework
+        # 0.0.36, upstream #340) reads the request's tenant's types.
+        from sm_records.menu import type_menu_provider
+
+        registry.add_provider(lambda request: type_menu_provider(self, request))
 
     def mark_menu_dirty(self) -> None:
-        """Re-read the sidebar types on the next request that renders one.
+        """Re-read the sidebar types and the per-type permissions on the next
+        request that needs them.
 
         Called through :func:`sm_records.menu.mark_dirty` by the endpoints
-        that write a type. It is a flag and not a refresh: the write has not
-        committed yet when they call it (the framework commits after the
+        that write a type. It drops and flags rather than reads: the write has
+        not committed yet when they call it (the framework commits after the
         response starts), so reading now would read the row as it was.
         """
-        self._menu_dirty = True
+        self.menu_cache.clear()
+        self.type_permissions.mark_dirty()
 
     def register_health_checks(self, registry: HealthRegistry) -> None:
         """A reindex orphaned by a worker restart is recoverable but silent —
@@ -186,7 +191,7 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         registry.add_prefix(constants.PUBLIC_SUBMISSIONS_VIEW_PREFIX, methods={"GET"})
 
     def register_middleware(self, app: FastAPI) -> None:
-        """Install the deferred-job drain and the sidebar sync.
+        """Install the deferred-job drain and the per-type permission sync.
 
         The drain is :mod:`sm_records.deferred`: the reindex of §8.9 must not
         start until the request that scheduled it has committed and released
@@ -195,8 +200,8 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         it, which on SQLite deadlocks the schema write against its own
         rebuild.
 
-        The sync is :mod:`sm_records.menu`, and middleware for a different
-        reason — see below.
+        The sync is :mod:`sm_records.type_permissions`, and middleware for a
+        different reason — see below.
 
         The body guard is :mod:`sm_records._body_limit`, and middleware
         because a router dependency runs *after* FastAPI has read and parsed
@@ -204,25 +209,23 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         avoid. The framework offers nothing shared to hook into here.
         """
         from sm_records._body_limit import BodyLimitMiddleware
-        from sm_records._menu_middleware import MenuSyncMiddleware
+        from sm_records._permission_sync import PermissionSyncMiddleware
         from sm_records.deferred import DeferredJobsMiddleware
 
         app.add_middleware(DeferredJobsMiddleware)
         # Added before the two below so it ends up *outside* them
         # (``add_middleware`` is LIFO): a body this module will not read must
-        # not have a sidebar sync or a deferred-job drain wrapped around it.
+        # not have a permission sync or a deferred-job drain wrapped around it.
         app.add_middleware(BodyLimitMiddleware)
         # Parked before the middleware that reads it so a handler can reach
         # this instance through ``request.app`` — today only to mark the
-        # sidebar stale after a type write (:func:`sm_records.menu.mark_dirty`).
+        # sidebar and the per-type permissions stale after a type write
+        # (:func:`sm_records.menu.mark_dirty`).
         setattr(app.state, constants.MODULE_ATTR, self)
-        # Keeps the per-type sidebar entries current in *this* worker, which
-        # is the half of :mod:`sm_records.menu` that a multi-process host
-        # needs: the registry is per process, and only one process served the
-        # write. Added here rather than wrapped around a route because it has
-        # to run before ``InertiaLayoutDataMiddleware`` reads the registry —
-        # see :mod:`sm_records._menu_middleware`.
-        app.add_middleware(MenuSyncMiddleware, module=self)
+        # Keeps the role editor's per-type permissions current in *this*
+        # worker: the framework's source is sync and cannot read, so the read
+        # happens here, before the route — see :mod:`sm_records._permission_sync`.
+        app.add_middleware(PermissionSyncMiddleware, module=self)
 
     async def on_startup(self, app: FastAPI) -> None:
         """Everything that needs the hydrated settings and an open database —

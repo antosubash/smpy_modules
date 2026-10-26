@@ -79,3 +79,36 @@ test("one organisation's records are not another's", async ({ page }) => {
   expect(await typeKeys(page)).toContain(key);
   await expectListed(page, key, record.uuid, orgA);
 });
+
+test("each organisation's sidebar lists its own types", async ({ page }) => {
+  await login(page);
+  const stamp = Date.now();
+  const orgA = await createOrg(page, `Sidebar A ${stamp}`);
+  const key = uniqueTypeKey('tsidebar');
+  const plural = `Sidebar A things ${key}`;
+  await apiCreateType(page, {
+    key,
+    label: 'Sidebar A thing',
+    label_plural: plural,
+    fields: [{ key: 'title', type: 'text', label: 'Title' }],
+    show_in_menu: true,
+  });
+
+  // The per-request menu provider (#92, upstream #340): A's entry, in A.
+  const link = () => page.locator('aside').getByRole('link', { name: plural, exact: true });
+  await page.goto('/admin/records/');
+  await expect(link()).toBeVisible();
+  // The toggle is offered on a multi-tenant host now, not replaced by a note.
+  await page.goto(`/admin/records/types/${key}`);
+  await expect(page.locator('#type-editor-show-in-menu')).toBeChecked();
+
+  // Org B, now active: none of A's entries.
+  await createOrg(page, `Sidebar B ${stamp}`);
+  await page.goto('/admin/records/');
+  await expect(page.getByRole('heading', { name: 'Record Types' })).toBeVisible();
+  await expect(link()).toHaveCount(0);
+
+  await switchTo(page, orgA);
+  await page.goto('/admin/records/');
+  await expect(link()).toBeVisible();
+});
