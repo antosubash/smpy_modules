@@ -171,10 +171,10 @@ class RestoreMixin(HostBase):
         await self._recheck(snapshot, denied_at_staging)
         # Before anything is overwritten, so the previous state is one click
         # away — contributed sections included, since `take` captures them.
-        pre_restore = await self.take(_PRE_RESTORE_NOTE, source=SnapshotSource.PRE_RESTORE)
-        # Its directory, like every media file the apply writes, goes if this
-        # transaction rolls back — here, or at a commit that fails later (#250).
-        written.track(self.db, [self.dir_for(pre_restore.id)])
+        await self.take(_PRE_RESTORE_NOTE, source=SnapshotSource.PRE_RESTORE)
+        # `take` tracked its directory, like every media file the apply writes:
+        # it goes if this transaction rolls back — here, or at a later failed
+        # commit (#250).
 
         try:
             bundle = self.dir_for(snapshot.id)
