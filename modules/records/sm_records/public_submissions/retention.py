@@ -49,7 +49,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any, Final
 
 from simple_module_core.leases import lease
@@ -61,6 +61,7 @@ from sm_records.contracts.public_submissions import KIND_FORM, KIND_SUBSCRIPTION
 from sm_records.index.query import Filter, FilterOp, filtered
 from sm_records.models import RecordType, tables_for
 from sm_records.public_submissions.retention_deliveries import prune_deliveries
+from sm_records.public_submissions.retention_rules import PENDING, days_for, still_due
 from sm_records.services._common import utcnow
 from sm_records.services._lock import lock_type
 from sm_records.services.errors import Conflict, NotFound
@@ -78,8 +79,6 @@ LEASE_TTL: Final = 300
 REFRESH_EVERY: float = LEASE_TTL / 5
 """Seconds between renewals while a sweep works (a module attribute, so a
 test can make it renew every time)."""
-
-PENDING: Final = "pending"
 
 
 class LeaseLost(RuntimeError):  # noqa: N818 - reads as the condition it is
@@ -133,19 +132,13 @@ async def _tenants(factory: Any) -> list[str]:
         await session.close()
 
 
-def _days(config: dict[str, Any]) -> int:
-    if config.get("kind") == KIND_FORM:
-        return int(config.get("retention_days", 365) or 0)
-    return max(1, int(config.get("pending_purge_days", 30) or 30))
-
-
 def _due(rtype: RecordType, now: datetime, limit: int, skip: set[str]) -> Any:
     """The uuids that *may* be due, trash included, or ``None`` when the type
     keeps everything. A superset for a list — a pending window starts no
-    earlier than the record — that :func:`_still_due` narrows under the lock."""
+    earlier than the record — that :func:`.retention_rules.still_due` narrows under the lock."""
     config = rtype.public_submissions or {}
     cls = tables_for(rtype).record
-    days = _days(config)
+    days = days_for(config)
     if config.get("kind") not in (KIND_FORM, KIND_SUBSCRIPTION) or days <= 0:
         return None
     stmt = select(cls.uuid).where(
@@ -161,34 +154,6 @@ def _due(rtype: RecordType, now: datetime, limit: int, skip: set[str]) -> Any:
     return stmt.order_by(cls.id).limit(limit).execution_options(include_deleted=True)
 
 
-def _moment(value: Any) -> datetime | None:
-    """A stored timestamp as an aware datetime (SQLite hands back naive UTC,
-    and the payload holds ISO text)."""
-    try:
-        moment = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
-    except ValueError:
-        return None
-    return moment.replace(tzinfo=UTC) if moment.tzinfo is None else moment
-
-
-def _still_due(rtype: RecordType, record: Any, now: datetime) -> bool:
-    """Whether the locked ``record`` is due *now*: a form submission past
-    retention, or a subscriber still pending past the window that opened when
-    they last entered pending."""
-    config = rtype.public_submissions or {}
-    cutoff = now - timedelta(days=_days(config))
-    created = _moment(record.created_at) if record.created_at else None
-    if created is None or created >= cutoff:
-        return False
-    if config.get("kind") == KIND_FORM:
-        return True
-    data = record.data or {}
-    if data.get("sm_status") != PENDING:
-        return False
-    entered = (_moment(data["sm_consent_at"]) if data.get("sm_consent_at") else None) or created
-    return entered < cutoff
-
-
 async def _purge_one(session: Any, rtype: RecordType, uuid: str, run: _Run) -> bool:
     """Delete ``uuid`` if it is still due under the lock; ``False`` when it
     is not (or has gone)."""
@@ -201,7 +166,7 @@ async def _purge_one(session: Any, rtype: RecordType, uuid: str, run: _Run) -> b
         .execution_options(include_deleted=True, populate_existing=True)
     )
     record = (await session.execute(stmt)).scalars().first()
-    if record is None or not _still_due(rtype, record, run.now):
+    if record is None or not still_due(rtype, record, run.now):
         return False
     if not record.is_deleted:
         await soft_delete_record(session, rtype, record, settings=run.settings)
