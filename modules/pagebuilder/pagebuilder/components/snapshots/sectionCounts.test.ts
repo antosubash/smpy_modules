@@ -36,6 +36,12 @@ describe('countParts', () => {
       'Tags: 2',
     );
   });
+
+  it("follows the section's declared order, not the stored one", () => {
+    expect(countParts({ extra: 1, tags: 2, articles: 4 }, NEWS.count_label_keys)).toBe(
+      'Articles: 4 · Tags: 2 · extra: 1',
+    );
+  });
 });
 
 describe('sectionContents', () => {

@@ -145,7 +145,12 @@ export function countParts(
   countLabelKeys: Record<string, string> = {},
   { skipZero = false }: { skipZero?: boolean } = {},
 ): string {
+  // The section's declared order first, whatever order the manifest stored
+  // (an uploaded bundle's keys come back sorted); unknown kinds after.
+  const order = Object.keys(countLabelKeys);
+  const rank = (kind: string) => (order.includes(kind) ? order.indexOf(kind) : order.length);
   return Object.entries(counts)
+    .sort(([a], [b]) => rank(a) - rank(b))
     .filter(([, count]) => typeof count === 'number' && !(skipZero && count === 0))
     .map(([kind, count]) =>
       translate(keys.pagebuilder.snapshot_list.section_count, {

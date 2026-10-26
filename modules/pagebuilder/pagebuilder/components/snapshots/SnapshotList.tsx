@@ -51,7 +51,7 @@ export function SnapshotList({
           <li key={snapshot.id} className="flex flex-wrap items-start justify-between gap-4 p-4">
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">
+                <span className="font-medium [overflow-wrap:anywhere]">
                   {snapshot.note || t(keys.pagebuilder.snapshot_list.untitled, { id: snapshot.id })}
                 </span>
                 <Badge variant="secondary">{sourceLabel(snapshot.source)}</Badge>
