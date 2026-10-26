@@ -114,11 +114,11 @@ uv run python scripts/seed_usage.py
 # the limiter stays in the request path; a rule with its own `rate=` (records'
 # public forms) is unaffected.
 #
-# Exported rather than written with set_setting.py: it is a host setting the
-# middleware stack is built from, and host/main.py builds the app from
-# `Settings()` — the environment — so a `host.rate_limit_public` row would be
-# stored and never read. Set here, before both `exec`s below, it reaches the
-# bundle server, `make dev` and the multi-tenant run alike.
+# Exported rather than written with set_setting.py: a `host.rate_limit_public`
+# row is read at boot too since #260, but the environment wins over it, so an
+# export cannot be shadowed by a row a developer's own database already holds.
+# Set here, before both `exec`s below, it reaches the bundle server,
+# `make dev` and the multi-tenant run alike.
 export SM_RATE_LIMIT_PUBLIC=100000/minute
 
 # Multi-tenant runs only (E2E_MULTI_TENANT=1 → SM_MULTI_TENANT=true): resolve
