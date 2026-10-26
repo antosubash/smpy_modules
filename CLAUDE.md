@@ -154,8 +154,8 @@ cwd-relative file (#124).
 Settings screen or with `scripts/set_setting.py host <field> <value>` is read
 at boot (#260). A bare `Settings()` reads the environment only, so before
 that the rows the app is *built* from were ignored; runtime fields were
-already hydrated onto `app.state` at lifespan start. Precedence is the framework's: **env → database →
-default**, `.env` counting as env. So a field `.env` sets (`SM_MULTI_TENANT`,
+already hydrated onto `app.state` at lifespan start. Precedence is the
+framework's: **env → database → default**, `.env` counting as env. So a field `.env` sets (`SM_MULTI_TENANT`,
 `SM_I18N_SUPPORTED_LOCALES` in `.env.example`) cannot be changed from the
 database; delete the line first. Every host field the app is built from needs
 a restart — the Settings screen marks them: tenancy (`multi_tenant`,
