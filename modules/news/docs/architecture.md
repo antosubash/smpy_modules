@@ -165,7 +165,7 @@ block's are resolved by pagebuilder's own `localizeConfig`, hence the
 | `category_service.py`, `tag_service.py`, `authors.py`, `redirects.py` | taxonomy, bylines, old slugs |
 | `search_service.py` | admin search |
 | `scheduler.py` | the polling loop |
-| `integrations/` | the only pagebuilder seam |
+| `integrations/` | the only pagebuilder seam; `integrations/bundle/` is news' content-bundle section (#80) |
 | `endpoints/api/`, `endpoints/views.py`, `endpoints/public/` | JSON API, admin screens, reader routes |
 | `pages/`, `components/`, `hooks/`, `utils/` | React screens (only real Inertia pages under `pages/`) |
 | `pagebuilder-blocks.ts` | News feed block registration (needs pagebuilder; loaded only by pagebuilder's `puck-blocks.ts`) |

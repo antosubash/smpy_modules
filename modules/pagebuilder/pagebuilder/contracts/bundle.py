@@ -41,6 +41,23 @@ across modules:
 * Contributors are applied in name order after pagebuilder and may not depend
   on one another.
 
+**Permissions.** A section may name the permissions it needs, in its own
+module's vocabulary — pagebuilder only checks them, with the framework's own
+resolution, and never learns what they mean:
+
+* ``capture_permissions``: a snapshot a *user* takes leaves the section out
+  unless they hold all of them, and the manifest's ``omitted`` list says so;
+  a restore of that bundle treats the section as absent, which never deletes.
+  A system snapshot (``pre_restore``) always includes it. Downloading a
+  bundle that carries the section needs them too (403 otherwise).
+* ``apply_permissions``: a restore applies the section only if the stager
+  held them (otherwise it is not even planned) and the approver still does;
+  either way pages restore, and the plan and result list it under
+  ``denied``.
+
+Both default to none (empty), which is how a section that declares neither
+behaves.
+
 Media URLs inside a contributor's documents are made portable with
 ``ctx.to_portable`` (the same ``asset://`` sentinels pages use) and resolved
 again with ``ctx.from_portable``. A section whose documents reference media
@@ -205,6 +222,12 @@ class BundleSection(Protocol):
     required one and skips an optional one."""
     label_key: str
     count_label_keys: Mapping[str, str]
+    capture_permissions: frozenset[str]
+    """Needed to capture or download the section; empty (the default when
+    absent) means anyone who may take a snapshot."""
+    apply_permissions: frozenset[str]
+    """Needed to restore the section; empty (the default when absent) means
+    anyone who may approve a restore."""
 
     async def capture(self, ctx: CaptureContext) -> SectionCapture: ...
 

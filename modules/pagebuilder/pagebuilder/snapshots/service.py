@@ -17,17 +17,27 @@ import shutil
 from pathlib import Path
 
 from fastapi import HTTPException, status
+from simple_module_core.permission_denied import PermissionDenied
 from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from pagebuilder.contracts.schemas import PendingImportRead
 from pagebuilder.media_files import resolve_media_root
 from pagebuilder.models import ContentSnapshot, PendingImport, SnapshotMedia, SnapshotSource
 from pagebuilder.settings import PagebuilderSettings
+from pagebuilder.snapshots.access import (
+    DOWNLOAD_PERMISSIONS_KEY,
+    SYSTEM,
+    SectionAccess,
+    download_needs,
+    download_record,
+)
 from pagebuilder.snapshots.archive import BundleError, index_rows, read_zip, write_zip
 from pagebuilder.snapshots.blobs import BLOBS_DIR, BlobStore, tenant_store
 from pagebuilder.snapshots.capture import capture
 from pagebuilder.snapshots.format import FORMAT_VERSION
+from pagebuilder.snapshots.plan_views import for_reader, read_details, remove_details
 from pagebuilder.snapshots.registry import SectionRegistry
 from pagebuilder.snapshots.restore import RestoreMixin
 
@@ -40,10 +50,14 @@ class SnapshotService(RestoreMixin):
         db: AsyncSession,
         settings: PagebuilderSettings,
         sections: SectionRegistry | None = None,
+        access: SectionAccess = SYSTEM,
     ) -> None:
         self.db = db
         self.settings = settings
         self.sections = sections if sections is not None else SectionRegistry()
+        self.access = access
+        """What the acting principal may do with contributed sections; ``SYSTEM``
+        (everything) when no request stands behind the service."""
 
     @property
     def root(self) -> Path:
@@ -81,11 +95,14 @@ class SnapshotService(RestoreMixin):
         self.db.add(snapshot)
         await self.db.flush()
 
+        # `pre_restore` is the system's own snapshot, not the approver's: it
+        # captures every section, so the restore it guards stays reversible.
+        access = SYSTEM if source is SnapshotSource.PRE_RESTORE else self.access
         try:
             result = await capture(
-                self.db, self.settings, self.dir_for(snapshot.id), self.blobs, self.sections
+                self.db, self.settings, self.dir_for(snapshot.id), self.blobs, self.sections, access
             )
-            snapshot.manifest = result.manifest
+            snapshot.manifest = self._with_record(result.manifest)
             snapshot.size_bytes = result.size_bytes
             for row in result.media:
                 self.db.add(SnapshotMedia(snapshot_id=snapshot.id, **row))
@@ -133,7 +150,7 @@ class SnapshotService(RestoreMixin):
             shutil.rmtree(target, ignore_errors=True)
             raise
 
-        snapshot.manifest = manifest
+        snapshot.manifest = self._with_record(manifest)  # never the bundle's own claim
         snapshot.format_version = manifest["format_version"]  # the bundle's, not ours
         snapshot.size_bytes = len(data)
         for row in index_rows(index):
@@ -141,8 +158,31 @@ class SnapshotService(RestoreMixin):
         await self.db.flush()
         return snapshot
 
+    def _with_record(self, manifest: dict) -> dict:
+        """*manifest* with this host's record of what each section needs to download."""
+        return {**manifest, DOWNLOAD_PERMISSIONS_KEY: download_record(manifest, self.sections)}
+
+    def _check_download(self, snapshot: ContentSnapshot) -> None:
+        """403 unless the principal may take every section the bundle carries.
+
+        Fails closed: see :func:`~pagebuilder.snapshots.access.download_needs`.
+        """
+        missing = self.access.lacking(download_needs(snapshot.manifest or {}, self.sections))
+        if missing:
+            raise PermissionDenied(missing[0])
+
+    async def readable(self, staged: PendingImport) -> PendingImportRead:
+        """*staged* as this principal may read it — every response with a plan uses this."""
+        details = await asyncio.to_thread(read_details, self.root, staged.id or 0)
+        read = PendingImportRead.model_validate(staged)
+        plan = for_reader(
+            staged.plan or {}, details, self.sections, self.access, import_id=staged.id
+        )
+        return read.model_copy(update={"plan": plan})
+
     async def download(self, snapshot_id: int, target: Path) -> int:
         snapshot = await self.get(snapshot_id)
+        self._check_download(snapshot)
         rows = await self.media_rows(snapshot.id)
         try:
             # Off the event loop: DEFLATE over the whole media library.
@@ -171,6 +211,10 @@ class SnapshotService(RestoreMixin):
         # SnapshotMedia row would poison delete_unreferenced's keep-set
         # forever, and a stale PENDING PendingImport would 404 on approve
         # while still blocking every future restore.
+        imports = await self.db.execute(
+            select(PendingImport.id).where(PendingImport.snapshot_id == snapshot.id)
+        )
+        await asyncio.to_thread(remove_details, self.root, [i for (i,) in imports])
         await self.db.execute(
             sa_delete(PendingImport).where(PendingImport.snapshot_id == snapshot.id)
         )

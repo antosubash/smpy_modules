@@ -136,6 +136,7 @@ class TestNewsImportsWithoutPagebuilder:
 
             assert pb.available() is False, "available() must answer, not raise"
             assert pb.page_editor_path(7) == ""
+            assert pb.register_bundle_section(object()) is False
             assert news.locales.supported() == ("en",)
             assert news.locales.default() == "en"
 

@@ -18,7 +18,8 @@ from pagebuilder.contracts.bundle import (
 )
 from pagebuilder.snapshots.match import RestoreConflictError, match_pages
 from pagebuilder.snapshots.registry import SectionRegistry
-from pagebuilder.snapshots.sections import capture_sections, plan_sections
+from pagebuilder.snapshots.section_restore import plan_sections
+from pagebuilder.snapshots.sections import capture_sections
 from simple_module_db import tenant_context
 
 

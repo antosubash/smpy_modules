@@ -35,7 +35,9 @@ from pagebuilder.snapshots.manifest import PAGEBUILDER_SECTION
 from pagebuilder.snapshots.match import RestoreConflictError, match_live
 from pagebuilder.snapshots.media_match import preview_urls
 from pagebuilder.snapshots.plan import build_plan, read_documents
-from pagebuilder.snapshots.sections import apply_sections, plan_sections, present, revalidate
+from pagebuilder.snapshots.plan_views import split_items, write_details
+from pagebuilder.snapshots.section_restore import apply_sections, plan_sections
+from pagebuilder.snapshots.sections import present, revalidate
 from pagebuilder.snapshots.validate import BundleError
 
 _PRE_RESTORE_NOTE = "Automatic snapshot taken before restoring"
@@ -81,11 +83,16 @@ class RestoreMixin(HostBase):
         try:
             await self._revalidate(snapshot)
             plan = await build_plan(self.db, bundle, name_to_url)
-            plan |= await plan_sections(self.db, self.sections, manifest, bundle, name_to_url)
+            plan |= await plan_sections(
+                self.db, self.sections, manifest, bundle, name_to_url, self.access
+            )
         except (RestoreConflictError, BundleError) as exc:
             raise _refusal(exc) from exc
 
-        staged = PendingImport(snapshot_id=snapshot.id, plan=plan)
+        # Contributed sections' items (their rows' titles and slugs) stay out
+        # of the audited column; `readable` serves them to who may see them.
+        stored, details = split_items(plan)
+        staged = PendingImport(snapshot_id=snapshot.id, plan=stored)
         self.db.add(staged)
         try:
             await self.db.flush()
@@ -97,6 +104,7 @@ class RestoreMixin(HostBase):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT, detail=_ALREADY_PENDING
             ) from exc
+        await asyncio.to_thread(write_details, self.root, staged.id or 0, details)
         return staged
 
     async def _decide(
@@ -131,10 +139,12 @@ class RestoreMixin(HostBase):
             )
         )
 
-    async def _recheck(self, snapshot: ContentSnapshot) -> None:
+    async def _recheck(self, snapshot: ContentSnapshot, denied: frozenset[str]) -> None:
         """Re-run every matcher, so a refusal at approval writes nothing.
 
         Not trusted from staging: pages and contributed rows move in between.
+        A section left out at staging (*denied*) is not re-planned: it will not
+        be applied, so it must not be able to block the pages with a 409.
         """
         bundle = self.dir_for(snapshot.id)
         manifest = snapshot.manifest or {}
@@ -145,7 +155,9 @@ class RestoreMixin(HostBase):
             if present(manifest, self.sections):
                 rows = await self.media_rows(snapshot.id)
                 urls = await preview_urls(self.db, self.settings, rows)
-                await plan_sections(self.db, self.sections, manifest, bundle, urls)
+                await plan_sections(
+                    self.db, self.sections, manifest, bundle, urls, self.access, denied
+                )
         except (RestoreConflictError, BundleError) as exc:
             raise _refusal(exc) from exc
 
@@ -154,7 +166,8 @@ class RestoreMixin(HostBase):
         snapshot = await self.get(staged.snapshot_id)
         # Before the pre-restore snapshot, so a refusal writes nothing and the
         # import stays pending.
-        await self._recheck(snapshot)
+        denied_at_staging = frozenset(d["section"] for d in (staged.plan or {}).get("denied") or [])
+        await self._recheck(snapshot, denied_at_staging)
         # Before anything is overwritten, so the previous state is one click
         # away — contributed sections included, since `take` captures them.
         pre_restore = await self.take(_PRE_RESTORE_NOTE, source=SnapshotSource.PRE_RESTORE)
@@ -170,20 +183,28 @@ class RestoreMixin(HostBase):
                 note=f"Restored snapshot #{snapshot.id}",
             )
             # Pagebuilder first: every contributor may reference its media.
-            contributed = await apply_sections(
+            # A section left out at staging stays out; one the approver may not
+            # apply now is skipped too. Pages restore either way.
+            contributed, denied = await apply_sections(
                 self.db,
                 self.sections,
                 snapshot.manifest or {},
                 bundle,
                 result.pop("name_to_url"),
+                self.access,
+                denied_at_staging,
             )
             result["sections"] = {name: done["counts"] for name, done in contributed.items()}
+            result["denied_sections"] = denied
             # By identity, keyed by section, on the import's own audit row:
             # `history.py` reads the page markers from here. Reassigned so the
             # JSON column sees it.
             applied = {PAGEBUILDER_SECTION: result.pop("applied")}
             applied |= {name: done["applied"] for name, done in contributed.items()}
-            staged.plan = {**(staged.plan or {}), "applied": applied}
+            # Items stripped again: the audited value never names a section's rows.
+            staged.plan = split_items(
+                {**(staged.plan or {}), "applied": applied, "denied": denied}
+            )[0]
             await self.db.flush()
         except Exception as exc:
             # `take` guards its own capture; this covers the apply below. The

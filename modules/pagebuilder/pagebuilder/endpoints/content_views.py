@@ -16,8 +16,10 @@ from fastapi import APIRouter, Depends
 from simple_module_hosting.inertia_deps import InertiaDep
 from simple_module_inertia import InertiaResponse
 
-from pagebuilder.contracts.schemas import PendingImportRead, SnapshotRead
+from pagebuilder.contracts.schemas import SnapshotRead
 from pagebuilder.deps import get_snapshot_service
+from pagebuilder.endpoints.api._deps import require_publish_or_approve
+from pagebuilder.permissions import PERM_APPROVE, PERM_PUBLISH
 from pagebuilder.snapshots.service import SnapshotService
 
 router = APIRouter()
@@ -26,11 +28,20 @@ _PAGE_SNAPSHOTS = "PageBuilder/ContentSnapshots"
 _PAGE_IMPORT_REVIEW = "PageBuilder/ContentImportReview"
 
 
-def _pending_props(staged: object | None) -> dict | None:
-    """A staged import as the screens want it, or ``None`` when nothing waits."""
+async def _pending_props(service: SnapshotService) -> dict | None:
+    """The staged import as the screens want it, or ``None`` when nothing waits.
+
+    Through ``service.readable``, so a contributed section's rows reach only a
+    reader who may see them (#80). Only for a reader holding
+    ``pagebuilder.publish`` or ``pagebuilder.approve`` — the gate on
+    ``GET /imports/pending`` — so the screens cannot serve what the API refuses.
+    """
+    if service.access.lacking([PERM_PUBLISH]) and service.access.lacking([PERM_APPROVE]):
+        return None
+    staged = await service.pending()
     if staged is None:
         return None
-    return PendingImportRead.model_validate(staged).model_dump(mode="json")
+    return (await service.readable(staged)).model_dump(mode="json")
 
 
 @router.get("/content", response_model=None)
@@ -43,21 +54,23 @@ async def admin_content(
     Server-rendered so the list paints on first navigation; the pending banner
     travels with it because a restore awaiting approval is the one thing on
     this screen nobody should have to go looking for.
+
+    The screen itself is not gated (the menu offers it to every pagebuilder
+    role and the list is ungated in the API too); only the pending restore is.
     """
     snapshots = [
-        SnapshotRead.model_validate(s).model_dump(mode="json")
-        for s in await service.list()
+        SnapshotRead.model_validate(s).model_dump(mode="json") for s in await service.list()
     ]
     return await inertia.render(
         _PAGE_SNAPSHOTS,
         {
             "snapshots": snapshots,
-            "pending": _pending_props(await service.pending()),
+            "pending": await _pending_props(service),
         },
     )
 
 
-@router.get("/content/review", response_model=None)
+@router.get("/content/review", response_model=None, dependencies=[require_publish_or_approve])
 async def admin_content_review(
     inertia: InertiaDep,
     service: SnapshotService = Depends(get_snapshot_service),
@@ -65,5 +78,5 @@ async def admin_content_review(
     """The staged restore's plan, for an approver to accept or reject."""
     return await inertia.render(
         _PAGE_IMPORT_REVIEW,
-        {"pending": _pending_props(await service.pending())},
+        {"pending": await _pending_props(service)},
     )
