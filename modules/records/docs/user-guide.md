@@ -26,7 +26,7 @@ The admin sidebar has a **Records** entry under the **Content** group. It opens
 the Records hub at `/admin/records/`.
 
 If a type has **Show in sidebar** turned on, it also gets an entry of its own,
-in a separate **Records** group directly below Content, labeled with the type's
+in a separate **Records** group, labeled with the type's
 plural and using the type's icon. That entry links straight to the type's record
 list. This is off by default: an install with thirty types would have an
 unusable sidebar. You see an entry only for a type you can open. On a

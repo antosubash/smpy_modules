@@ -337,7 +337,7 @@
     "translatable": "Translatable",
     "translatable_help": "Records can exist in several languages ({locales}); each translation is its own record with its own slug.",
     "show_in_menu": "Show in sidebar",
-    "show_in_menu_help": "Adds {label_plural} to the admin sidebar, in its own Records group right after Content.",
+    "show_in_menu_help": "Adds {label_plural} to the admin sidebar, in its own Records group.",
     "collection": "Collection",
     "collection_shared": "Shared tables",
     "collection_help": "Gives this type its own document and index tables. It can be moved to another collection later, through the API.",

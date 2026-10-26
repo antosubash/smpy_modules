@@ -680,8 +680,15 @@ else: the static `records.view`/`records.edit` are still required. An install
 that grants none of them has exactly the access it had before. On a
 multi-tenant host the list holds every tenant's keys, unlabelled, and **a
 grant is host-wide**: it applies to the type of that key in every tenant.
-Only a holder of `permissions.manage` can grant one or see the cross-tenant
-key list, both of which are host-level, not tenant-admin, powers.
+Seeing the cross-tenant key list (the role editor, `GET /api/permissions/`)
+needs `permissions.view`; granting a key needs `permissions.manage`. Both are
+host-level permissions, not something a tenant admin holds.
+
+**Deleting a type does not revoke its `records.type.<key>` grants.** The key
+leaves the role editor's list, but the framework never prunes a stored grant,
+so a new type created later with the same key inherits every grant the old
+one had. If a key is going to be reused for something sensitive, revoke the
+grants first.
 
 `allowed_roles` narrows, and narrowing has no exceptions: a caller holding
 the `admin` wildcard is refused on a type whose `allowed_roles` is non-empty

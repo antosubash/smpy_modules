@@ -1112,15 +1112,15 @@ group next to the three static ones (`sm_records.type_permissions`):
   `records.view`/`records.edit`, which the caller still needs.
 - **On a multi-tenant host the grant is host-wide.** Role and direct grants
   belong to the host, not to an organisation, and a grant names a key, not a
-  tenant, so it applies to that key's type in every tenant. Only a holder of
-  `permissions.manage` can grant it, and only a holder of the role editor's
-  permissions can see the cross-tenant list of keys. Both are host-level
-  permissions, not something a tenant admin holds.
-- A grant outlives its type. Deleting a type removes its key from the role
-  editor's list, but the framework never prunes a stored grant for a key it no
-  longer lists. A type created later with the same key is reached through
-  that old grant. Revoke the grant first if a key is going to be reused for
-  something more sensitive.
+  tenant, so it applies to that key's type in every tenant. Seeing the
+  cross-tenant list of keys (the role editor, `GET /api/permissions/`) needs
+  `permissions.view`; granting one needs `permissions.manage`. Both are
+  host-level permissions, not something a tenant admin holds.
+- **Deleting a type does not revoke its `records.type.<key>` grants.** The key
+  leaves the role editor's list, but the framework never prunes a stored grant
+  for a key it no longer lists, so a new type created later with the same key
+  inherits every grant the old one had. Revoke the grants first if a key is
+  going to be reused for something sensitive.
 - The `admin` wildcard grants no per-type access. Narrowing has never had an
   admin exception, and the `permissions` module copies every registered key
   onto the admin role at startup. So the role editor shows admin holding every
