@@ -98,6 +98,7 @@ export function useSubmissionForm({
   const [hp, setHp] = useState('');
   const [captchaRound, setCaptchaRound] = useState(0);
   const captcha = useRef('');
+  const inFlight = useRef(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [problem, setProblem] = useState<Problem | null>(null);
   const [changed, setChanged] = useState(false);
@@ -248,7 +249,15 @@ export function useSubmissionForm({
     // A CAPTCHA not yet completed would only come back `captcha_failed`.
     if (definition.captcha && !captcha.current) return refuse({ key: errors.captcha_failed });
     setProblem(null);
-    return send(definition, false);
+    // `phase` is state, so clicks inside one tick all still see `ready`:
+    // the ref is what makes a burst of clicks one submission.
+    if (inFlight.current) return;
+    inFlight.current = true;
+    try {
+      await send(definition, false);
+    } finally {
+      inFlight.current = false;
+    }
   };
 
   return {

@@ -168,6 +168,27 @@ describe('RecordFormRender — sending', () => {
     await view.unmount();
   });
 
+  it('a burst of clicks in one tick sends one submission (QA BUG-001)', async () => {
+    const calls = server(
+      { status: 200, body: definition() },
+      { status: 202, body: { ok: true } },
+      { status: 202, body: { ok: true } },
+    );
+    const view = await mount(block());
+    await settle();
+    await fill(view);
+    const button = view.find<HTMLButtonElement>('button[type="submit"]');
+    await act(async () => {
+      for (let i = 0; i < 5; i += 1) {
+        button?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      }
+    });
+    await settle();
+    await settle();
+    expect(calls.filter((c) => c.init?.method === 'POST')).toHaveLength(1);
+    await view.unmount();
+  });
+
   it('form_changed is refused before the CAPTCHA check, so the response is kept', async () => {
     const withCaptcha = definition({
       captcha: { provider: 'turnstile', site_key: 'k' },
