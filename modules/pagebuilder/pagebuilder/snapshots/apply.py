@@ -191,7 +191,7 @@ async def apply_bundle(
     """
     documents = await read_documents(bundle_dir)
     bundled = documents.pages
-    # Before media, which writes files no rollback removes.
+    # Before media, so a conflict refuses before any file is written.
     match = await match_live(db, bundled)
     name_to_url, media_added = await restore_media(db, settings, blobs, index)
 
