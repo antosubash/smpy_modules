@@ -16,7 +16,7 @@ from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.datastructures import Headers
 
-from pagebuilder.media_service import MediaService
+from pagebuilder.media_service import MediaService, media_file_names
 from pagebuilder.models import MediaAsset
 from pagebuilder.settings import PagebuilderSettings
 from pagebuilder.snapshots.blobs import BlobStore
@@ -81,10 +81,4 @@ async def restore_media(
 def _files_of(service: MediaService, asset: MediaAsset) -> list[Path]:
     """The paths one fresh upload wrote, in its own tenant's directory."""
     folder = service.tenant_dir(asset.tenant_id)
-    names = [asset.filename]
-    names += [
-        meta["filename"]
-        for meta in (asset.variants or {}).values()
-        if isinstance(meta, dict) and meta.get("filename")
-    ]
-    return [folder / name for name in names]
+    return [folder / name for name in media_file_names(asset.filename, asset.variants)]

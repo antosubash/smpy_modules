@@ -216,9 +216,10 @@ one — ignoring trashed pages.
   removed when its outermost transaction ends without a commit — the apply
   raises or is cancelled, the request's commit fails, or the session closes
   with the transaction open (a savepoint's commit or rollback decides nothing).
-  `MediaService.upload` removes its own files if the row's flush fails. Only paths this restore created are
-  recorded, each in its own tenant's directory: a matched asset it reused and
-  the content-addressed blob store are never touched. The cost is a longer
+  `MediaService.upload` removes its own files if the row's flush fails. Only
+  paths this restore created are recorded, each in its own tenant's directory:
+  a matched asset it reused and the content-addressed blob store are never
+  touched. The cost is a longer
   write transaction on a large bundle. Permissions are checked per section
   (`access.py`); plan rows are kept off the audited row (`plan_views.py`).
   The screens render each section from its own catalogue keys
