@@ -148,6 +148,37 @@ encryption, and only as the framework's `BootstrapSettings` locates `.env`
 (`SM_PROJECT_ROOT`, else the walk up to the project root) — never a
 cwd-relative file (#124).
 
+**Host settings come from the environment first, then the database.**
+`host/main.py` builds its settings with the framework's
+`merge_host_settings()` — what `create_app` does when given none — so a
+`host.*` row written on the Settings screen or with `scripts/set_setting.py
+host <field> <value>` is read at boot (#260). A bare `Settings()` reads the
+environment only, so before that the rows the app is *built* from were
+ignored; runtime fields were already hydrated onto `app.state` at lifespan
+start. Precedence is the framework's: **env → database → default**, `.env`
+counting as env. So a field `.env` sets (`SM_MULTI_TENANT`,
+`SM_I18N_SUPPORTED_LOCALES` in `.env.example`) cannot be changed from the
+database; delete the line first. Every host field the app is built from needs
+a restart — the Settings screen marks them: tenancy (`multi_tenant`,
+`tenant_header`, `default_tenant`), i18n (`i18n_*`), logging, `auth_provider`,
+`auth_public_paths`, the request guards (`rate_limit_public`,
+`rate_limit_authenticated`, `max_request_body_bytes`, `trusted_proxy`,
+`forwarded_host_allowlist`), CORS, `session_cookie_secure`, the OpenAPI fields
+(`api_*`, `openapi_public`) and the database pool (`db_*`).
+`maintenance_mode`/`maintenance_message`, `public_base_url` and
+`native_link_prefixes` are read per request and apply at once. A database
+without the settings table yet (a fresh install) boots on env and defaults;
+outside `SM_ENVIRONMENT=development`/`testing`, a connection or query failure
+while reading it fails the boot instead (framework #494). The headless scripts
+(`set_setting.py`, `seed_usage.py`) build their app the same way, through
+`scripts/headless_settings.py`, with one difference: `merge_host_settings()`
+generates and commits a `host.secret_key` row when neither env nor the
+database has a key, and a one-off command must never provision the
+deployment's session key (a later boot without `SM_SECRET_KEY` would adopt
+it, signing everyone out and orphaning ai's encrypted credentials). So they
+exit with "no secret key provisioned" instead; set `SM_SECRET_KEY` or boot
+the app once.
+
 **Run Python entry points from the repo root.** `alembic.ini` resolves its
 `script_location` relative to itself and `dev-api` uses `--app-dir host`, so
 the root `.env` is the single source of truth for settings regardless of the

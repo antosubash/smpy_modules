@@ -10,10 +10,18 @@ via entry_points; add them to this host's pyproject.toml to install them.
 # the app. See the module. ``demo_meters`` is used after ``create_app``.
 import demo_meters
 import records_collections  # noqa: F401
-from simple_module_hosting import Settings, create_app
+from simple_module_hosting import create_app, merge_host_settings
 from simple_module_hosting.logging import setup_logging
 
-settings = Settings()
+# The settings the framework would build itself when ``create_app`` gets none:
+# the environment (``.env`` included), then the host settings stored in the
+# database (the Settings screen, ``scripts/set_setting.py host …``), then the
+# defaults. Built here rather than left to ``create_app`` because logging is
+# set up from them first. A bare ``Settings()`` reads the environment only, so
+# every stored host setting was ignored (#260). Env wins over the database,
+# and a stored value the middleware or module discovery is built from
+# (``rate_limit_*``, ``multi_tenant``, …) applies at the next restart.
+settings = merge_host_settings()
 
 setup_logging(
     level=settings.log_level,
