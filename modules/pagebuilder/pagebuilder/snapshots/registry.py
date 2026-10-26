@@ -71,6 +71,17 @@ class SectionRegistry:
     def __len__(self) -> int:
         return len(self._sections)
 
+    def labels(self) -> list[dict[str, object]]:
+        """How the screens name each section: its catalogue keys, in name order."""
+        return [
+            {
+                "section": section.name,
+                "label_key": section.label_key,
+                "count_label_keys": dict(section.count_label_keys),
+            }
+            for section in self
+        ]
+
     def readable(self) -> dict[str, frozenset[int]]:
         """``{section: readable versions}``, for the manifest check."""
         return {name: frozenset(s.readable_versions) for name, s in self._sections.items()}

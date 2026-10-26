@@ -24,6 +24,18 @@ export interface SnapshotManifest {
   };
   counts: { pages: number; redirects: number; media: number };
   missing_media: string[];
+  /** Every section the bundle carries, pagebuilder's own included (#80). */
+  contents?: { section: string; version?: number; counts?: Record<string, number> }[];
+  /** Sections the capture left out: its taker lacked their permissions. */
+  omitted?: SectionNote[];
+}
+
+/** How the screens name a contributed section registered on this host (#80).
+ *  Both keys are the contributor's own, resolved when rendered. */
+export interface SectionLabels {
+  section: string;
+  label_key: string;
+  count_label_keys: Record<string, string>;
 }
 
 export interface Snapshot {
@@ -39,6 +51,7 @@ export interface Snapshot {
 
 export interface PagePlanEntry {
   slug: string;
+  locale?: string | null;
   title: string | null;
   added?: number;
   removed?: number;
@@ -64,6 +77,55 @@ export interface ImportPlan {
     footer_present?: boolean;
   };
   redirects: { added: string[]; removed: string[]; dropped: string[] };
+  /** What each contributed section would do (#80). */
+  sections?: SectionPlanEntry[];
+  /** Sections the stager may not restore: not planned, and left out. */
+  denied?: SectionNote[];
+  /** Sections the bundle carries that no module here can restore. */
+  skipped?: SectionNote[];
+  /** Sections registered here that the bundle does not carry. */
+  absent?: SectionNote[];
+}
+
+export interface SectionPlanItem {
+  title: string;
+  slug: string;
+  locale?: string | null;
+  note_key?: string | null;
+}
+
+export interface SectionPlanLine {
+  label_key: string;
+  count: number;
+  /** Empty for a reader who may not see the section's rows. */
+  items: SectionPlanItem[];
+  tone?: 'warning' | null;
+}
+
+export interface SectionPlanEntry {
+  section: string;
+  label_key: string;
+  version?: number;
+  lines: SectionPlanLine[];
+  overwrites: number;
+  /** Counts only: the reader lacks `permissions` to see the rows. */
+  redacted?: boolean;
+  /** The rows could not be read back; the counts stand. */
+  details_unavailable?: boolean;
+  reason_key?: string;
+  note_key?: string;
+  permissions?: string[];
+}
+
+/** A section named beside the plan rather than planned: denied, absent,
+ *  omitted at capture, or skipped. Which keys are present says which. */
+export interface SectionNote {
+  section: string;
+  label_key?: string;
+  reason_key?: string;
+  permissions?: string[];
+  omitted?: boolean;
+  version?: number | null;
 }
 
 export interface PendingImport {
@@ -82,6 +144,10 @@ export interface ApplyResult {
   media_added: number;
   redirects: number;
   redirects_dropped: string[];
+  /** Per contributed section, the counts its apply reported. */
+  sections?: Record<string, Record<string, number>>;
+  /** Sections this restore left out for want of permission. */
+  denied_sections?: SectionNote[];
 }
 
 export function takeSnapshot(note?: string): Promise<Snapshot> {

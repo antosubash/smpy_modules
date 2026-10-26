@@ -8,11 +8,19 @@ import { toast } from 'sonner';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { NoteDialog } from '../components/NoteDialog';
 import { ImportPlanSummary } from '../components/snapshots/ImportPlanSummary';
+import { appliedSections, deniedSections } from '../components/snapshots/sectionSummary';
 import { keys, useT } from '../utils/i18n';
-import { approveImport, type PendingImport, rejectImport } from '../utils/snapshotsApi';
+import {
+  approveImport,
+  type PendingImport,
+  rejectImport,
+  type SectionLabels,
+} from '../utils/snapshotsApi';
 
 interface Props {
   pending: PendingImport | null;
+  /** The contributed sections registered here, to name the applied counts (#80). */
+  sections?: SectionLabels[];
 }
 
 const CONTENT_URL = '/pagebuilder/content';
@@ -27,7 +35,7 @@ const CONTENT_URL = '/pagebuilder/content';
  */
 function ContentImportReview() {
   const { t } = useT();
-  const { pending } = usePage<{ props: Props }>().props as unknown as Props;
+  const { pending, sections = [] } = usePage<{ props: Props }>().props as unknown as Props;
   const [error, setError] = useState<string | null>(null);
 
   if (!pending) {
@@ -54,12 +62,23 @@ function ContentImportReview() {
   const apply = async () => {
     try {
       const result = await approveImport(pending.id);
-      toast.success(t(keys.pagebuilder.import_review.applied), {
-        description: t(keys.pagebuilder.import_review.applied_description, {
+      // Pages first, then one line per contributed section that wrote anything.
+      const description = [
+        t(keys.pagebuilder.import_review.applied_description, {
           created: result.pages_created,
           updated: result.pages_updated,
         }),
+        ...appliedSections(result, sections),
+      ].join('\n');
+      toast.success(t(keys.pagebuilder.import_review.applied), {
+        description: <span className="whitespace-pre-line">{description}</span>,
       });
+      const denied = deniedSections(result);
+      if (denied.length > 0) {
+        toast.warning(t(keys.pagebuilder.import_review.denied_title), {
+          description: <span className="whitespace-pre-line">{denied.join('\n')}</span>,
+        });
+      }
       router.visit(CONTENT_URL);
     } catch (e) {
       const message =

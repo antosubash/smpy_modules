@@ -83,7 +83,9 @@ code `tenant_required`); billing reads the same `request.state.tenant_id`
 through `context.billing_context`. Another module reads pagebuilder only
 through `pagebuilder.contracts` (news' search calls
 `search_pages`/`search_media`, #130); the caller names the tenant and the
-contract pins `tenant_id` itself.
+contract pins `tenant_id` itself. A bundle section
+(`pagebuilder.contracts.bundle`, #80) applies through the restore's own
+session and bound tenant, and never commits or resolves a tenant itself.
 
 **Never add a file under `modules/*/*/pages/` unless it is a real Inertia
 page.** The page name is derived from that path by `import.meta.glob`, so a

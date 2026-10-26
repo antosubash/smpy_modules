@@ -1,9 +1,8 @@
-"""Page create/read/update, revisions and diffs."""
+"""Page create/read/update and the workflow requests (revisions: ``_revisions``)."""
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
@@ -14,7 +13,7 @@ from pagebuilder.contracts.schemas._fields import (
     UtcInstant,
 )
 from pagebuilder.locales import MAX_LOCALE_LEN
-from pagebuilder.models import PageStatus, RevisionEvent
+from pagebuilder.models import PageStatus
 
 PuckData = dict[str, Any]
 
@@ -216,44 +215,6 @@ class PageListResponse(BaseModel):
     total: int = 0
 
 
-class PageRevisionRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    page_id: int
-    title: str
-    meta_description: str | None
-    og_image: str | None
-    event: RevisionEvent
-    note: str | None
-    created_at: datetime
-    created_by: str | None
-
-
-class PageRevisionDetail(PageRevisionRead):
-    data: PuckData
-
-
-class PageRestoreMarker(BaseModel):
-    """A bulk snapshot restore that wrote this page.
-
-    Not a revision — there is no page state behind it to compare or restore —
-    so a list of its own beside ``items``, derived on read from the approved
-    import. The client interleaves the two by time.
-    """
-
-    import_id: int
-    snapshot_id: int
-    change: Literal["created", "overwritten"]
-    restored_at: datetime
-    restored_by: str | None
-
-
-class PageRevisionListResponse(BaseModel):
-    items: list[PageRevisionRead]
-    restores: list[PageRestoreMarker] = Field(default_factory=list)
-
-
 class PageRejectRequest(BaseModel):
     """Approver-supplied reason for sending a submission back to draft.
 
@@ -272,29 +233,3 @@ class PageNoteRequest(BaseModel):
     """
 
     note: OptionalNote = None
-
-
-class BlockChange(BaseModel):
-    id: str
-    type: str | None = None
-    fields: list[str] = Field(default_factory=list)
-    type_before: str | None = None
-
-
-class MetadataChange(BaseModel):
-    before: Any = None
-    after: Any = None
-
-
-class RevisionDiffResponse(BaseModel):
-    """Block-level diff between two revisions.
-
-    ``metadata`` only contains keys whose value actually changed;
-    ``blocks`` is always present so the client can render an empty diff
-    ("no changes") deterministically.
-    """
-
-    before_id: int
-    after_id: int
-    metadata: dict[str, MetadataChange] = Field(default_factory=dict)
-    blocks: dict[str, list[BlockChange]] = Field(default_factory=dict)

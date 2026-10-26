@@ -91,6 +91,10 @@ export function NoteDialog({
             <Textarea
               id={fieldId}
               rows={3}
+              // The server's NOTE_MAX: a longer note is refused anyway, and an
+              // unbounded one grows the dialog until its buttons leave the screen.
+              maxLength={2000}
+              className="max-h-60"
               value={note}
               autoFocus
               disabled={pending}
