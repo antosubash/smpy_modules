@@ -135,6 +135,11 @@ function ContentImportReview() {
         }
       >
         {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
+        {capabilities?.approve !== true && (
+          <p className="mb-4 text-sm text-muted-foreground">
+            {t(keys.pagebuilder.import_review.approver_needed)}
+          </p>
+        )}
         <ImportPlanSummary plan={pending.plan} />
       </PageShell>
     </>

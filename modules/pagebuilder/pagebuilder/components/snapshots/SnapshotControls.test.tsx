@@ -106,15 +106,18 @@ describe('ContentSnapshots controls', () => {
 });
 
 describe('ContentImportReview controls', () => {
-  function review(capabilities?: SnapshotCapabilities): string[] {
+  function markup(capabilities?: SnapshotCapabilities): string {
     page.props = { pending: PENDING, sections: [], capabilities };
-    return controls(renderToStaticMarkup(<ContentImportReview />));
+    return renderToStaticMarkup(<ContentImportReview />);
   }
+  const review = (capabilities?: SnapshotCapabilities) => controls(markup(capabilities));
+  const HINT = 'Only someone who may approve restores can apply or reject this one.';
 
   it('offers Reject and Approve to an approver', () => {
     expect(review({ publish: false, approve: true })).toEqual(
       expect.arrayContaining(['Reject', 'Approve & apply']),
     );
+    expect(markup({ publish: false, approve: true })).not.toContain(HINT);
   });
 
   it('offers a publisher who cannot approve neither decision, and fails closed', () => {
@@ -122,6 +125,7 @@ describe('ContentImportReview controls', () => {
       const found = review(capabilities);
       expect(found).not.toContain('Reject');
       expect(found).not.toContain('Approve & apply');
+      expect(markup(capabilities)).toContain(HINT);
     }
   });
 });

@@ -22,11 +22,10 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
-from simple_module_core.permissions import grants
 from simple_module_hosting.permissions import ensure_resolved_permissions
 from starlette.requests import Request
 
-from pagebuilder.permissions import PERM_APPROVE, PERM_PUBLISH
+from pagebuilder.permissions import may_use_import_export
 
 # Grouped under "Site" so the rail reads News / Site, and a screen's section
 # is visible before you click it.
@@ -57,14 +56,13 @@ async def import_export_items(request: Request) -> Iterable[MenuItem]:
     """Import / Export, for a reader holding ``pagebuilder.publish`` or ``.approve``.
 
     The same rule as ``require_publish_or_approve``, over the permission set
-    the layout middleware already resolved (roles plus grant sources).
+    the layout middleware already resolved and cached for this request (roles
+    plus grant sources), so it costs a set lookup, not a second resolution.
     """
     if getattr(request.state, "user", None) is None:
         return []
     held = await ensure_resolved_permissions(request)
-    if grants(held, PERM_PUBLISH) or grants(held, PERM_APPROVE):
-        return [IMPORT_EXPORT]
-    return []
+    return [IMPORT_EXPORT] if may_use_import_export(held) else []
 
 
 def register(registry: MenuRegistry) -> None:

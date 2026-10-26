@@ -1003,6 +1003,7 @@
     "apply": "Apply",
     "apply_failed": "Apply failed",
     "approve": "Approve & apply",
+    "approver_needed": "Only someone who may approve restores can apply or reject this one.",
     "approve_description": "A snapshot of the site as it stands right now is taken first, so this can be undone by restoring that one.",
     "approve_title": "Apply this snapshot?",
     "back": "Back to snapshots",
