@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
-from datetime import datetime
 from typing import Any
 
 from pagebuilder.contracts.bundle import ValidateContext
@@ -38,6 +37,7 @@ from news.integrations.bundle.documents import (
     TAGS_NAME,
     name_key,
     normalise_locale,
+    parse_instant,
 )
 from news.models import ArticleStatus
 
@@ -78,8 +78,10 @@ def _instant(value: Any) -> bool:
     if not isinstance(value, str):
         return False
     try:
-        datetime.fromisoformat(value)
-    except ValueError:
+        # Converted as well as parsed: `0001-01-01T00:00:00+01:00` is valid ISO
+        # but falls before year 1 in UTC, and apply stores every instant in UTC.
+        parse_instant(value)
+    except (ValueError, OverflowError):
         return False
     return True
 

@@ -55,8 +55,10 @@ class NewsBundleSection:
     apply_permissions = frozenset({PERM_EDIT, PERM_PUBLISH})
     """Restoring overwrites and publishes articles, so it takes what publishing does."""
     count_label_keys: ClassVar[dict[str, str]] = {
-        kind: f"news.bundle.counts.{kind}"
-        for kind in ("articles", "categories", "tags", "redirects")
+        "articles": "news.bundle.counts.articles",
+        "categories": "news.bundle.counts.categories",
+        "tags": "news.bundle.counts.tags",
+        "redirects": "news.bundle.counts.redirects",
     }
 
     async def capture(self, ctx: CaptureContext) -> SectionCapture:

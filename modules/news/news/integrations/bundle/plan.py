@@ -14,7 +14,19 @@ from pagebuilder.contracts.bundle import PlanItem, PlanLine, RestoreContext, Sec
 from news.integrations.bundle.documents import ArticleKey
 from news.integrations.bundle.prepare import Prepared, prepare
 
-_KEY = "news.bundle.plan."
+LINE_KEYS: dict[str, str] = {
+    "new": "news.bundle.plan.new",
+    "overwritten": "news.bundle.plan.overwritten",
+    "revived": "news.bundle.plan.revived",
+    "renamed_from": "news.bundle.plan.renamed_from",
+    "unchanged": "news.bundle.plan.unchanged",
+    "untouched": "news.bundle.plan.untouched",
+    "category_respelled": "news.bundle.plan.category_respelled",
+    "categories": "news.bundle.plan.categories",
+    "tags": "news.bundle.plan.tags",
+    "redirects_dropped": "news.bundle.plan.redirects_dropped",
+}
+"""Every plan line's label, spelled out (the catalogue check reads these)."""
 
 
 def _item(prep: Prepared, key: ArticleKey) -> PlanItem:
@@ -38,13 +50,13 @@ def plan_lines(prep: Prepared) -> SectionPlan:
         PlanItem(title=r["from_slug"], slug=r["from_slug"], locale=r["locale"])
         for r in prep.dropped_redirects()
     ] + [
-        PlanItem(title=r["from_slug"], slug=r["from_slug"], note_key=_KEY + "tags")
+        PlanItem(title=r["from_slug"], slug=r["from_slug"], note_key=LINE_KEYS["tags"])
         for r in prep.dropped_tag_redirects()
     ]
 
     def line(name: str, keys: list[ArticleKey], tone: str | None = None) -> PlanLine:
         return PlanLine(
-            _KEY + name,
+            LINE_KEYS[name],
             len(keys),
             [_item(prep, k) for k in keys],
             "warning" if tone else None,
@@ -57,28 +69,28 @@ def plan_lines(prep: Prepared) -> SectionPlan:
         line("renamed_from", sorted(match.renames)),
         line("unchanged", unchanged),
         PlanLine(
-            _KEY + "untouched",
+            LINE_KEYS["untouched"],
             len(untouched),
             [PlanItem(title=r.title, slug=r.slug, locale=r.locale) for r in untouched],
         ),
         PlanLine(
-            _KEY + "category_respelled",
+            LINE_KEYS["category_respelled"],
             len(respelled),
             [PlanItem(title=r.title, slug=r.slug, locale=r.locale) for r in respelled],
             "warning" if respelled else None,
         ),
         PlanLine(
-            _KEY + "categories",
+            LINE_KEYS["categories"],
             len(prep.categories),
             [PlanItem(title=c["name"], slug=c["slug"]) for c in prep.categories],
         ),
         PlanLine(
-            _KEY + "tags",
+            LINE_KEYS["tags"],
             len(prep.tags),
             [PlanItem(title=t["name"], slug=t["slug"]) for t in prep.tags],
         ),
         PlanLine(
-            _KEY + "redirects_dropped",
+            LINE_KEYS["redirects_dropped"],
             len(dropped),
             dropped,
             "warning" if dropped else None,

@@ -29,15 +29,16 @@ const PLURAL_SUFFIXES = ['_zero', '_one', '_two', '_few', '_many', '_other'];
  *  full of the same strings compiled — scanning it would double every count. */
 const SKIP_DIRS = new Set(['static', 'node_modules', '__pycache__']);
 
-/** Every `"pagebuilder.<key>"` string literal in the module's Python. */
-function serverKeys(dir: string = PACKAGE, found = new Set<string>()): Set<string> {
-  for (const name of readdirSync(dir)) {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) {
-      if (!SKIP_DIRS.has(name)) serverKeys(path, found);
-    } else if (name.endsWith('.py')) {
-      const text = readFileSync(path, 'utf-8');
-      for (const match of text.matchAll(/["']pagebuilder\.([\w.]+)["']/g)) found.add(match[1]);
+/** The catalogue keys the restore plan names: the `*_KEY = "pagebuilder.…"`
+ *  constants in snapshots/ (access.py, plan_views.py), and nothing else — a
+ *  comment or a stray string mentioning a key does not count as a use. */
+function serverKeys(): Set<string> {
+  const found = new Set<string>();
+  const dir = join(PACKAGE, 'snapshots');
+  for (const name of readdirSync(dir).filter((n) => n.endsWith('.py'))) {
+    const text = readFileSync(join(dir, name), 'utf-8');
+    for (const match of text.matchAll(/^[A-Z_]+_KEY\s*=\s*"pagebuilder\.([\w.]+)"$/gm)) {
+      found.add(match[1]);
     }
   }
   return found;

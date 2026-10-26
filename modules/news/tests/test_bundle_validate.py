@@ -73,6 +73,9 @@ def test_an_absent_section_directory_passes(tmp_path):
         ({"articles/a.json": _doc(title="x" * 301)}, "invalid title"),
         ({"articles/a.json": _doc(pinned="yes")}, "invalid pinned"),
         ({"articles/a.json": _doc(publish_at="tomorrow")}, "invalid publish_at"),
+        # Valid ISO, but before year 1 once converted to UTC: refused here,
+        # not an OverflowError (500) at staging.
+        ({"articles/a.json": _doc(publish_at="0001-01-01T00:00:00+01:00")}, "invalid publish_at"),
         ({"articles/a.json": {"slug": "a"}}, "missing locale, status, title"),
         ({"articles/a.json": ["not", "a", "document"]}, "not an article document"),
         ({"articles/a.json": "{not json"}, "not readable JSON"),

@@ -126,7 +126,9 @@ def _instant(value: datetime | None) -> str | None:
 
 
 def parse_instant(raw: Any) -> datetime | None:
-    return as_utc(datetime.fromisoformat(raw)) if raw else None
+    """*raw* as an aware UTC instant. ``OverflowError`` if it falls outside UTC's range."""
+    value = as_utc(datetime.fromisoformat(raw)) if raw else None
+    return value.astimezone(UTC) if value is not None else None
 
 
 def article_doc(article: NewsArticle, tags: list[str]) -> dict[str, Any]:
