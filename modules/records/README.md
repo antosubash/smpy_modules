@@ -644,9 +644,10 @@ warns about at startup.
 
 **Retention.** Contact-form submissions older than the type's *Keep
 submissions for (days)* (365 by default, 0 keeps them) and newsletter signups
-never confirmed within *Delete unconfirmed signups after (days)* (30) are
-deleted by an hourly sweep, together with their revisions and the record of
-who their email reached. A record another type references with
+never confirmed within *Delete unconfirmed signups after (days)* (30) of
+signing up — or of coming back after unsubscribing; a repeated signup does not
+extend it — are deleted by an hourly sweep, together with their revisions and
+the record of who their email reached. A record another type references with
 `on_delete: restrict` is skipped, not forced.
 
 **Privacy.** Revisions hold copies of what was submitted; a purge removes

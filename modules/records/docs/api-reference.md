@@ -1397,7 +1397,9 @@ exempt from authentication for `GET` and `POST` only:
 | `POST` | `/api/records/submissions/{type_key}/submit` | `202 {"ok": true}` |
 
 `SubmissionDefinition` is `{kind, schema_version, fields, consent, token,
-captcha}`: one entry per public field (`key`, `type`, `label`, `help`,
+captcha, min_fill_seconds}` — the last is how old the token must be before a
+submission carrying it is accepted, which a form that fetched a fresh token
+after `form_expired` waits out before sending again: one entry per public field (`key`, `type`, `label`, `help`,
 `required`, `choices`, `constraints`, `default`), the consent checkbox with its
 text in `?locale=` (else the default content locale's) or `null`, a signed
 token, and `captcha`: `{"provider": "turnstile" | "hcaptcha", "site_key"}`
@@ -1498,15 +1500,21 @@ Every refusal on these routes carries a stable snake_case `code`; the
 (`public_submissions_retention_interval_seconds`; off with
 `public_submissions_retention_enabled`) deletes, per tenant, contact-form
 submissions older than the type's `retention_days` (`0` keeps them; the trash
-included), never-confirmed newsletter signups whose last signup or
-confirmation is older than the list's `pending_purge_days`, and
-`records_submission_delivery` rows older than
-`public_submissions_delivery_retention_days`. It goes through the ordinary
+included), newsletter signups still pending `pending_purge_days` after they
+last entered pending (the signup, or a return from unsubscribed or the trash —
+`sm_consent_at`; a repeated signup or a *Resend* does not extend it), and the
+`records_submission_delivery` rows of finished delivery attempts: every
+recipient sent, the newest send older than
+`public_submissions_delivery_retention_days` and the record marked delivered —
+or the record gone. A record's eligibility is re-checked under the type lock
+and its row lock before it is deleted, so one confirmed meanwhile is kept. It
+goes through the ordinary
 trash-then-purge path, so subscribers see `RecordTrashed` (for a live record)
 and `RecordPurged`, a record's delivery claims go with it, and a record an
 `on_delete: restrict` reference holds is skipped rather than forced. One
 process sweeps at a time, under the framework lease
-`records:public_submissions:retention`.
+`records:public_submissions:retention`, renewed during the work; a sweep that
+finds the lease lost stops at once.
 
 ### Newsletter lists
 

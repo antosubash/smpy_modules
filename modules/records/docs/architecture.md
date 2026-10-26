@@ -514,8 +514,22 @@ locks the record rows `FOR UPDATE` and deletes their
 confirmation task claiming a recipient takes `FOR SHARE` on, so a claim either
 lands first and is deleted, or finds the record gone. A record that refuses (a
 `restrict` reference) rolls its batch back and is skipped for the sweep.
-Delivery rows older than `public_submissions_delivery_retention_days` are
-pruned per tenant as well: they only stop a retry from mailing someone twice.
+The candidates are read before the lock, so each is re-read under
+`lock_type` and `FOR UPDATE` on its row — the order every record write
+takes — and deleted only if it is still due: a subscriber who confirmed in
+between is kept. A list's pending window opens when the record last *entered*
+pending (`sm_consent_at`, written on signup and on a return from unsubscribed
+or the trash), so neither a repeated signup nor a *Resend* extends it. The
+lease is renewed during the work, and a renewal that reports it lost stops the
+sweep (`LeaseLost`).
+
+Delivery rows are pruned per tenant by **attempt**, never row by row
+(`retention_deliveries.py`): a sent marker is what stops a retried attempt
+from mailing that recipient again, so an attempt's rows go together, and only
+when the attempt is finished — every row sent, the newest send past
+`public_submissions_delivery_retention_days`, and the record's delivery mark
+(`sm_notified_at`/`sm_confirm_sent_at`) set — or when the record is gone. An
+attempt with a recipient never sent stays until the record is purged.
 
 ## The wire contracts
 

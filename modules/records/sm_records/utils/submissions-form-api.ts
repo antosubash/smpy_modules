@@ -37,6 +37,8 @@ export type SubmissionDefinition = {
   consent: { required: boolean; text: string } | null;
   token: string;
   captcha: { provider: 'turnstile' | 'hcaptcha'; site_key: string } | null;
+  /** How old `token` must be before the server accepts it. */
+  min_fill_seconds?: number;
 };
 
 export type DefinitionResult =

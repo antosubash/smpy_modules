@@ -175,4 +175,5 @@ def definition(
         consent=consent,
         token=sign_form(secret, tenant, rtype.key, digest, now=issued),
         captcha=public_config(settings),
+        min_fill_seconds=settings.public_submissions_min_fill_seconds,
     )

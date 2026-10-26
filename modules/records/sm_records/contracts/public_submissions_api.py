@@ -59,6 +59,10 @@ class SubmissionDefinition(SQLModel):
     """``{"provider": "turnstile" | "hcaptcha", "site_key": …}`` when the
     host requires a CAPTCHA, else ``null``. The form renders the provider's
     widget and sends its response as ``captcha_response``."""
+    min_fill_seconds: int = 0
+    """How old ``token`` must be before a submission carrying it is accepted
+    (``public_submissions_min_fill_seconds``); sooner is ``form_expired``. A
+    form resending after a refresh waits this long."""
 
 
 class SubmitBody(SQLModel):

@@ -76,6 +76,14 @@ type Options = {
   onFocus?: (target: FocusTarget) => void;
 };
 
+/** The extra wait past the token's minimum age, for the clock and the trip. */
+const MARGIN_MS = 300;
+
+function wait(seconds: number | undefined): Promise<void> {
+  const ms = seconds ? seconds * 1000 + MARGIN_MS : 0;
+  return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+}
+
 export function useSubmissionForm({
   typeKey,
   locale,
@@ -96,12 +104,21 @@ export function useSubmissionForm({
   const focus = useRef(onFocus);
   focus.current = onFocus;
 
-  const adopt = useCallback((next: SubmissionDefinition, previous: FormValues = {}) => {
-    setDefinition(next);
-    setValues(valuesFor(next, previous));
+  const resetCaptcha = useCallback(() => {
     captcha.current = '';
     setCaptchaRound((round) => round + 1);
   }, []);
+
+  /** Render `next`. `keepCaptcha` when the server refused before it checked
+   *  the CAPTCHA (`form_expired`), so the response is still unused. */
+  const adopt = useCallback(
+    (next: SubmissionDefinition, previous: FormValues = {}, keepCaptcha = false) => {
+      setDefinition(next);
+      setValues(valuesFor(next, previous));
+      if (!keepCaptcha || !next.captcha) resetCaptcha();
+    },
+    [resetCaptcha],
+  );
 
   useEffect(() => {
     if (!enabled || !typeKey) return;
@@ -148,7 +165,9 @@ export function useSubmissionForm({
     if (result.code === 'form_expired' && !retried) {
       const fresh = await fetchDefinition(typeKey, locale);
       if (fresh.status === 'ready') {
-        adopt(fresh.definition, values);
+        adopt(fresh.definition, values, true);
+        // The fresh token is refused until it is `min_fill_seconds` old.
+        await wait(fresh.definition.min_fill_seconds);
         return send(fresh.definition, true);
       }
     }
@@ -171,8 +190,6 @@ export function useSubmissionForm({
       );
     }
     if (result.code === 'captcha_failed') {
-      captcha.current = '';
-      setCaptchaRound((round) => round + 1);
       // Loaded before the host turned a CAPTCHA on: the form has no widget
       // to complete, so fetch the definition that names one.
       if (!current.captcha) {
@@ -198,6 +215,8 @@ export function useSubmissionForm({
         ...(current.captcha ? { captcha_response: captcha.current } : {}),
       });
     } catch {
+      // It may have reached the provider: a response is good for one check.
+      if (current.captcha) resetCaptcha();
       return refuse({ key: errors.network });
     }
     if (result.ok) {
@@ -205,6 +224,10 @@ export function useSubmissionForm({
       focus.current?.('success');
       return;
     }
+    // Any refusal after the token check may have spent the response (a 422
+    // comes after verification), so the widget starts over -- except
+    // `form_expired`, refused before it, whose resend reuses the response.
+    if (current.captcha && result.code !== 'form_expired') resetCaptcha();
     return refused(result, current, retried);
   };
 

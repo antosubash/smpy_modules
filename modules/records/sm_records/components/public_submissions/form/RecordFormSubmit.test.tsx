@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { mount, settle } from '../../../test-dom';
+import { act, mount, settle, setValue } from '../../../test-dom';
 import { definition, field, fill, input, send, server } from './record-form-test-support';
 
 vi.mock('@simple-module-py/pagebuilder/pagebuilder/components/widgets/_shared', () => ({
@@ -11,7 +11,9 @@ vi.mock('@simple-module-py/pagebuilder/pagebuilder/components/widgets/_shared', 
 // The provider's script cannot load here; the widget's own loader is not
 // what these tests are about.
 vi.mock('./CaptchaWidget', () => ({
-  CaptchaWidget: () => <div data-testid="records-form-captcha" />,
+  CaptchaWidget: ({ round }: { round: number }) => (
+    <div data-testid="records-form-captcha" data-round={round} />
+  ),
 }));
 
 const { RecordFormRender } = await import('./RecordFormRender');
@@ -66,12 +68,14 @@ describe('RecordFormRender — sending', () => {
     await view.unmount();
   });
 
-  it('a stale token fetches a fresh form and sends once more by itself', async () => {
-    const fresh = definition({ token: 'tok-2' });
+  it('a stale token fetches a fresh form and sends once more, once it is old enough', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    const fresh = definition({ token: 'tok-2', min_fill_seconds: 3 });
     const calls = server(
       { status: 200, body: definition() },
       { status: 400, body: { detail: 'x', code: 'form_expired' } },
       { status: 200, body: fresh },
+      { status: 202, body: { ok: true } },
       { status: 202, body: { ok: true } },
     );
     const view = await mount(block());
@@ -79,6 +83,18 @@ describe('RecordFormRender — sending', () => {
     await fill(view);
     await send(view);
     await settle();
+    // Sent at once, the fresh token would be refused as too young again.
+    expect(calls.map((c) => c.init?.method ?? 'GET')).toEqual(['GET', 'POST', 'GET']);
+    expect(view.find<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_900);
+    });
+    expect(calls).toHaveLength(3);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    await settle();
+    vi.useRealTimers();
     expect(calls.map((c) => c.init?.method ?? 'GET')).toEqual(['GET', 'POST', 'GET', 'POST']);
     expect(JSON.parse(String(calls[3].init?.body)).token).toBe('tok-2');
     expect(view.find('[data-testid="records-form-success"]')).not.toBeNull();
@@ -122,6 +138,26 @@ describe('RecordFormRender — sending', () => {
     expect(view.host.textContent).toContain('Please check this value.');
     await send(view);
     expect(view.find('[role="alert"]')?.textContent).toContain('wait 42 seconds');
+    await view.unmount();
+  });
+
+  it('after a refusal past the CAPTCHA check, the widget starts over', async () => {
+    const calls = server(
+      {
+        status: 200,
+        body: definition({ captcha: { provider: 'turnstile', site_key: 'k' }, consent: null }),
+      },
+      { status: 422, body: { code: 'invalid', errors: [{ field: 'email', message: 'x' }] } },
+    );
+    const view = await mount(block());
+    await settle();
+    const before = view.find('[data-testid="records-form-captcha"]')?.getAttribute('data-round');
+    await setValue(input(view, 'name') as HTMLInputElement, 'Ada');
+    await setValue(input(view, 'email') as HTMLInputElement, 'ada@example.org');
+    await send(view);
+    expect(calls).toHaveLength(2);
+    const after = view.find('[data-testid="records-form-captcha"]')?.getAttribute('data-round');
+    expect(Number(after)).toBeGreaterThan(Number(before));
     await view.unmount();
   });
 });

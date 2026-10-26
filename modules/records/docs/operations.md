@@ -642,11 +642,14 @@ restart.
 - **Retention.** Every process runs a loop that, every
   `public_submissions_retention_interval_seconds` (3600), deletes contact-form
   submissions past their type's retention, newsletter signups never confirmed
-  within the list's unconfirmed purge, and delivery rows older than
-  `public_submissions_delivery_retention_days` (30). Only one process sweeps
+  within the list's unconfirmed purge (counted from when they last entered
+  pending), and the delivery rows of finished attempts older than
+  `public_submissions_delivery_retention_days` (30) — an attempt that can
+  still be retried keeps its rows. Only one process sweeps
   at a time: the sweep holds the framework lease
   `records:public_submissions:retention` (Redis when `SM_REDIS_URL` is set,
-  else the `sm_lease` table), and the others skip that tick. It runs once per
+  else the `sm_lease` table), renewed while it works — a sweep whose renewal
+  fails stops — and the others skip that tick. It runs once per
   tenant, through the ordinary trash-and-purge path, so event subscribers see
   `RecordTrashed`/`RecordPurged` as for an admin's purge. Turn it off with
   `public_submissions_retention_enabled false` when another job does the
