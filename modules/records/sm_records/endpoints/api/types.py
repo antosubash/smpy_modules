@@ -118,8 +118,9 @@ async def create_from(
         public_submissions=body.public_submissions,
         actor=who,
     )
-    if body.show_in_menu:
-        mark_dirty(request.app)
+    # Every new type is a new ``records.type.<key>`` in the role editor,
+    # whether or not it asked for a sidebar entry.
+    mark_dirty(request.app)
     # A freshly created type holds no records, trashed or otherwise — skip
     # the queries rather than count a table it cannot yet appear in.
     return type_read(rtype, 0, 0, 0)
@@ -270,12 +271,9 @@ async def delete_type(
     of it was the one gap in that rule, not a deliberate exception.
     """
     check_type_roles(request, rtype)
-    shown = rtype.show_in_menu
     await type_service.delete_type(db, rtype, confirm_record_count=confirm_record_count)
-    # Read before the delete: afterwards the row is gone and the attribute is
-    # a question about an expired instance.
-    if shown:
-        mark_dirty(request.app)
+    # Its sidebar entry, if any, and its ``records.type.<key>`` both go.
+    mark_dirty(request.app)
 
 
 @router.post("/types/{key}/reindex", status_code=202, dependencies=[require_manage_types])

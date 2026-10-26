@@ -29,7 +29,8 @@ If a type has **Show in sidebar** turned on, it also gets an entry of its own,
 in a separate **Records** group directly below Content, labeled with the type's
 plural and using the type's icon. That entry links straight to the type's record
 list. This is off by default: an install with thirty types would have an
-unusable sidebar.
+unusable sidebar. You see an entry only for a type you can open. On a
+multi-tenant host you see the entries of the organisation you are working in.
 
 > A per-type entry can lag behind by a few seconds on a host running several
 > worker processes. The worker that served your save updates immediately;
@@ -76,16 +77,12 @@ schema editor — so it is never a guess which tenant a save will land in. The
 badge only appears on a multi-tenant host; a single-tenant install shows
 nothing new here at all.
 
-**"Show in sidebar" is replaced by a note on a multi-tenant host.** Per-type
-sidebar entries are one process-wide list, decided before your tenant is known
-(see [§1 The sidebar](#the-sidebar)), so a multi-tenant host cannot show a
-per-tenant sidebar without leaking another tenant's type labels to everyone.
-The type editor's **Details** section shows *"Sidebar entries are per-install,
-not per-tenant, so this host shows only the 'Records' hub. Every type stays
-reachable from there."* in place of the toggle. The underlying setting is
-untouched — a type saved with it on before the host became multi-tenant, or
-saved through the API directly, keeps its stored value, and picks the sidebar
-entry back up if the host later returns to single-tenant mode.
+**"Show in sidebar" works per organisation on a multi-tenant host.** The
+sidebar lists the types of the organisation you are working in (see
+[§1 The sidebar](#the-sidebar)), so turning it on for a type adds an entry for
+that organisation's members only. Older versions replaced the toggle with a
+note on such hosts. A type saved with it on back then, or through the API, now
+shows its entry without a further change.
 
 **The `RecordsList` pagebuilder block has an optional Tenant field.** A page
 built with the block renders for anonymous visitors, who carry no session and
@@ -276,11 +273,16 @@ One exception: a **`records.manage_types`** holder can always open the type
 editor and read the type's definition, whatever Allowed roles says. A manager
 locked out of the screen that edits Allowed roles would be a one-way door.
 
-> **Two honest limitations.** Per-type Allowed roles are invisible in the
-> framework's role editor (framework 0.0.36 can show runtime permissions there;
-> records does not use that yet): an administrator editing roles sees only the three
-> coarse permissions and has no way to discover from that screen that a type is
-> further restricted. And a schema **preview** (below) lists up to ten failing
+**The role editor lists every type too.** Each type has a permission of its own,
+`records.type.<key>`, in the "records" group. On a single-tenant host its label
+names the roles Allowed roles lets in, for example *"Records: Companies
+(restricted to editor)"*. Granting it to a role or a user admits them to that
+type even when Allowed roles does not list their role. They still need
+`records.view` (and `records.edit` to write). The `admin` wildcard does not
+count as holding it, even though the role editor shows admin with every
+permission ticked: to let admins in, list `admin` under Allowed roles.
+
+> **An honest limitation.** A schema **preview** (below) lists up to ten failing
 > records by title, and is gated on `records.manage_types` rather than on the
 > type's Allowed roles — so Allowed roles hides titles from the record API, not
 > from a schema preview.

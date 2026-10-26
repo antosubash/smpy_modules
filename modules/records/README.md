@@ -92,18 +92,20 @@ It is **not a schema change**: no classification, no dry run, no revision and
 no `schema_version` bump, exactly like `is_public`. It round-trips through
 export and import with the rest of the definition.
 
-A type's `allowed_roles` narrow who sees the entry, deliberately: role
-filtering in the menu is a plain intersection with no admin bypass, and so is
-the check on the record list behind the link, so a caller the type excludes
-would get a 403 from a link only they could see. An empty `allowed_roles` —
-the default — means everyone with `records.view` sees it.
+The entries come from a per-request menu provider (framework 0.0.36,
+upstream #340), so each request sees **its own tenant's** types. On a
+multi-tenant host every organisation gets its own entries.
 
-**The entry can lag by `menu_refresh_seconds` in a multi-worker host.** The
-framework's menu registry is built once per process, at boot, and types are
-created long after that; the worker that served your save re-reads the types
-on its next page request, and the others within the window (5 seconds by
-default, `0` to re-read on every page request). Nothing about the record data
-is affected — only which links the sidebar is showing.
+An entry is shown only to a caller who may open the page behind it. That means
+`records.view`, and not narrowed out by the type's `allowed_roles` (no admin
+bypass) unless they hold the type's `records.type.<key>`. An empty
+`allowed_roles`, the default, means everyone with `records.view` sees it.
+
+**The entry can lag by `menu_refresh_seconds` in a multi-worker host.** Each
+worker caches a tenant's sidebar types for that long (5 seconds by default,
+`0` to read on every page request). The worker that served your save drops its
+cache at once. Nothing about the record data is affected, only which links the
+sidebar shows.
 
 ### Choosing the list's columns
 
@@ -399,8 +401,9 @@ be authored in — see [Content languages](#content-languages).
 one; it is edited as JSON because of those three states, and must be a path on
 this host.
 
-`menu_refresh_seconds` is the sidebar's refresh window — see
-[Sidebar entries](#sidebar-entries).
+`menu_refresh_seconds` is the refresh window of the sidebar and of the role
+editor's per-type permissions. See [Sidebar entries](#sidebar-entries) and
+[Permissions](#permissions).
 
 The `public_submissions_*` settings are one deployment's limits for website
 forms and newsletters, shared by every type and tenant — see
@@ -659,21 +662,31 @@ one place field values leave the database.
 
 ## Permissions
 
-Three static permissions, registered at boot and visible in the role editor:
-`records.view`, `records.edit`, `records.manage_types`.
+Three static permissions, registered at boot: `records.view`, `records.edit`,
+`records.manage_types`. Each `RecordType` also carries its own
+`allowed_roles`, which narrows which roles may work with records of that type
+on top of the static permission. An empty list means "any role holding the
+static permission".
 
-Record Types are created at runtime, after the database is open, but
-`register_permissions` runs at app construction, before it — so **per-type
-permissions are not framework permissions**. (Framework 0.0.36 added runtime
-permission sources, `PermissionRegistry.add_source`, which would make them
-possible; records has not adopted it.) Each `RecordType` instead
-carries its own `allowed_roles`, narrowing which roles may write records of
-that type on top of the static `records.edit`/`records.manage_types`
-permission; an empty list means "any role holding the static permission".
+**Every type also has a framework permission, `records.type.<key>`.** Types
+are created at runtime, after `register_permissions` has run, so these come
+from a runtime permission source (`PermissionRegistry.add_source`, framework
+0.0.36, upstream #334). The role editor lists them in the "records" group. On
+a single-tenant host each label names the roles `allowed_roles` lets in,
+for example `Records: Companies (restricted to editor)`. Granting one to a
+role, a user or a tenant role admits the holder to that type even when
+`allowed_roles` names none of their roles. It widens the narrowing and nothing
+else: the static `records.view`/`records.edit` are still required. An install
+that grants none of them has exactly the access it had before. On a
+multi-tenant host the list holds every tenant's keys, unlabelled, and a grant
+applies to the type of that key in every tenant.
 
 `allowed_roles` narrows, and narrowing has no exceptions: a caller holding
 the `admin` wildcard is refused on a type whose `allowed_roles` is non-empty
-unless `admin` is one of the roles listed. So an admin creating a restricted
+unless `admin` is one of the roles listed. The wildcard does not count as
+holding `records.type.<key>` either, although the `permissions` module copies
+every registered key onto the admin role and the role editor shows them
+ticked. So an admin creating a restricted
 type must list a role they actually hold, or else use `records.manage_types`
 to edit `allowed_roles` back before they can work with its records. The same
 list also governs what a delete elsewhere may do to this type's records: a
@@ -709,14 +722,9 @@ refusal: an `?expand=` of it comes back `restricted` (see Relations), because
 the caller is reading a record they are entitled to see that happens to point
 somewhere they are not.
 
-**This is an honest limitation, not an oversight: per-type `allowed_roles`
-are invisible in the framework's role editor.** An admin editing roles sees
-only the three coarse permissions above and has no way to discover, from that
-screen, that a given type is further restricted to specific roles. Framework
-0.0.36 can list such permissions there (a *source*, registered with
-`registry.add_source(name, provider)`, returns keys or `(key, label)` pairs
-from an in-memory cache, and `invalidate_source` refreshes it), but records
-does not use it yet.
+The role editor's list of per-type permissions is refreshed on the next
+request after a type write in that worker, and otherwise within
+`menu_refresh_seconds`. See operations, "The sidebar and the role editor".
 
 ## Multi-tenancy
 

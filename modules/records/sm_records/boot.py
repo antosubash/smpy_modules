@@ -188,11 +188,12 @@ async def startup(module: Any, app: FastAPI) -> None:
     if module.db is not None:
         module.orphaned_locales = await health.count_orphaned_locales(module.db, settings)
 
-    # The first sidebar read: ``register_menu_items`` ran before there was a
-    # database, so until now the registry holds the hub entry and none of the
-    # per-type ones. Forced past the refresh window because there is nothing
-    # to be stale yet — and deliberately last, so a database this cannot read
-    # costs a log line rather than a boot.
-    from sm_records import menu
+    # The first read of the role editor's per-type permissions:
+    # ``register_permissions`` ran before there was a database, so until now
+    # the source has listed none. Forced past the refresh window, and
+    # deliberately last, so a database this cannot read costs a log line
+    # rather than a boot. (The sidebar needs no such step: its provider reads
+    # per request.)
+    from sm_records import type_permissions
 
-    await menu.refresh(module, force=True)
+    await type_permissions.refresh(module, force=True)

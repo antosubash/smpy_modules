@@ -18,7 +18,7 @@ from typing import Final
 
 from fastapi import Depends, HTTPException, Query, Request
 from simple_module_db import get_db
-from simple_module_hosting.permissions import RequiresPermission
+from simple_module_hosting.permissions import RequiresPermission, resolved_permissions_for
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records import constants, events
@@ -32,7 +32,7 @@ from sm_records._grammar import (
     parse_view_filters,
 )
 from sm_records.models import RecordType
-from sm_records.services._common import role_blocked
+from sm_records.services._access import CallerRoles, caller_access, role_blocked
 from sm_records.services.errors import Forbidden
 from sm_records.services.types import get_type
 from sm_records.settings import RecordsSettings
@@ -104,15 +104,16 @@ async def load_type(key: str, db: AsyncSession = Depends(request_db)) -> RecordT
 def check_type_roles(request: Request, rtype: RecordType) -> None:
     """Design §10: a type's ``allowed_roles`` narrows the static ``records.view``
     and ``records.edit`` permissions a caller already holds. Empty means any
-    role holding the permission may read and write; this is invisible in the
-    framework's role editor, which is the documented limitation, not a bug here.
+    role holding the permission may read and write. The type's own
+    ``records.type.<key>`` permission, granted in the role editor, admits a
+    caller the list leaves out (:mod:`sm_records.services._access`).
 
     Applied on every *record* read (:func:`load_allowed_type`) and write, never
     on type management — narrowing is a property of a type's own records, and a
     ``records.manage_types`` holder has to stay able to open the schema screen
     and widen ``allowed_roles`` again.
 
-    The predicate itself is ``services._common.role_blocked`` and is not
+    The predicate itself is ``services._access.role_blocked`` and is not
     re-implemented here: the read paths that report a relation *target* as
     ``restricted`` rather than refusing (``services.expand``, the referrers
     listing) answer the *same* question, admin wildcard included.
@@ -137,15 +138,20 @@ async def load_allowed_type(request: Request, rtype: RecordType = Depends(load_t
     return rtype
 
 
-def caller_roles(request: Request) -> list[str]:
-    """The roles :func:`check_type_roles` narrows against, as a plain list.
+def caller_roles(request: Request) -> CallerRoles:
+    """The caller :func:`check_type_roles` narrows against: their roles, plus
+    the type keys they hold ``records.type.<key>`` for.
 
     Handed to ``soft_delete_record`` so the same narrowing reaches the
     referrers a cascade or a set_null would touch — types the URL never
     names, and which ``check_type_roles`` therefore cannot see.
+
+    The permission set is the one the framework resolved for this request
+    (roles, the role editor's grants, direct and tenant grants), cached by
+    the router's ``RequiresPermission`` before any handler runs.
     """
     user = getattr(request.state, "user", None)
-    return list(getattr(user, "roles", None) or [])
+    return caller_access(user, resolved_permissions_for(request) if user is not None else ())
 
 
 def actor(request: Request) -> str | None:

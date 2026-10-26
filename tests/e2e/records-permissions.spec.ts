@@ -1,7 +1,7 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { login } from './helpers';
-import { seedTextType, uniqueTypeKey } from './records-helpers';
+import { apiCreateType, seedTextType, uniqueTypeKey } from './records-helpers';
 
 /**
  * Who may reach the Records admin.
@@ -108,6 +108,67 @@ test.describe('Records — permissions', () => {
     try {
       await other.goto('/admin/records/');
       await expect(other.getByRole('heading', { name: 'Record Types' })).toBeVisible();
+    } finally {
+      await other.context().close();
+    }
+  });
+
+  test('a narrowed type is listed in the role editor, and its grant opens it', async ({
+    page,
+    browser,
+  }) => {
+    await login(page);
+    const key = uniqueTypeKey('pertype');
+    const plural = `Per-type things ${key}`;
+    await apiCreateType(page, {
+      key,
+      label: `Per-type thing ${key}`,
+      label_plural: plural,
+      allowed_roles: ['admin'],
+      show_in_menu: true,
+    });
+
+    // The role editor's own list (#92, upstream #334): the type's permission,
+    // labelled with the narrowing it widens.
+    const groups = (await (await page.request.get('/api/permissions/')).json()) as {
+      name: string;
+      permissions: string[];
+      labels: Record<string, string>;
+    }[];
+    const records = groups.find((g) => g.name === 'records');
+    const perm = `records.type.${key}`;
+    expect(records?.permissions).toContain(perm);
+    expect(records?.labels[perm]).toBe(`Records: ${plural} (restricted to admin)`);
+
+    const who = await createPlainUser(page);
+    const listed = await page.request.get('/api/users/admin?per_page=100');
+    const users = (await listed.json()) as { id: string; email: string }[];
+    const id = users.find((u) => u.email === who.email)?.id;
+    expect(id).toBeTruthy();
+    const grant = (permissions: string[]) =>
+      page.request.put(`/api/permissions/users/${id}`, {
+        headers: { 'content-type': 'application/json' },
+        data: { permissions },
+      });
+
+    const other = await asUser(browser, who);
+    try {
+      // records.view alone: allowed_roles shuts them out, and no sidebar link.
+      expect((await grant(['records.view'])).status()).toBe(200);
+      const refused = await other.goto(`/admin/records/${key}`);
+      expect(refused?.status()).toBe(403);
+      await other.goto('/admin/records/');
+      await expect(
+        other.locator('aside').getByRole('link', { name: plural, exact: true }),
+      ).toHaveCount(0);
+
+      // Plus the per-type permission: the list opens and the entry appears.
+      expect((await grant(['records.view', perm])).status()).toBe(200);
+      await other.goto('/admin/records/');
+      const link = other.locator('aside').getByRole('link', { name: plural, exact: true });
+      await expect(link).toBeVisible();
+      await link.click();
+      await expect(other).toHaveURL(new RegExp(`/admin/records/${key}$`));
     } finally {
       await other.context().close();
     }
