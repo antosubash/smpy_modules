@@ -88,6 +88,13 @@ describe('sectionMarker', () => {
   it('is silent for a reader who sees the rows', () => {
     expect(sectionMarker(entry())).toBeNull();
   });
+
+  it('says a section with nothing to do changes nothing, instead of an empty card', () => {
+    const idle = entry({ lines: [{ label_key: 'news.bundle.plan.new', count: 0, items: [] }] });
+    expect(sectionMarker(idle)).toBe(
+      'This bundle carries News content, but restoring it changes nothing.',
+    );
+  });
 });
 
 describe('lineItems', () => {

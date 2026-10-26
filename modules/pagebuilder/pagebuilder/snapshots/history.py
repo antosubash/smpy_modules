@@ -32,6 +32,7 @@ markers — the audit row is the only record there is.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -107,7 +108,15 @@ def _sections_written(plan: dict[str, Any]) -> list[dict[str, Any]]:
     for name, record in sorted(applied.items()):
         if name == PAGEBUILDER_SECTION or not isinstance(record, dict):
             continue
-        count = sum(len(v) for v in record.values() if isinstance(v, list))
+        # Distinct identities: a contributor may name one row in two lists.
+        count = len(
+            {
+                json.dumps(item, sort_keys=True, default=str)
+                for v in record.values()
+                if isinstance(v, list)
+                for item in v
+            }
+        )
         if count:
             label = labels.get(name)
             out.append(

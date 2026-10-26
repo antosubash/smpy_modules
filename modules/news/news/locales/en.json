@@ -578,7 +578,7 @@
       "created": "Articles created",
       "overwritten": "Articles overwritten",
       "redirects_dropped": "Redirects dropped",
-      "category_respelled": "Articles re-spelled"
+      "category_respelled": "Articles whose category spelling changed"
     },
     "plan": {
       "new": "New articles",

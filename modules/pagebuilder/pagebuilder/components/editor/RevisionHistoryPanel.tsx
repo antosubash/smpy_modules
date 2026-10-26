@@ -149,6 +149,7 @@ export function RevisionHistoryPanel({
 /** "Restored from snapshot #N" — not a revision, so no Compare or Restore. */
 function RestoreMarkerRow({ marker }: { marker: PageRestoreMarker }) {
   const { t, locale } = useT();
+  const alsoRestored = restoredWith(marker);
   return (
     <li className="py-1" data-testid={`restore-marker-${marker.import_id}`}>
       <span className="font-medium">
@@ -167,9 +168,7 @@ function RestoreMarkerRow({ marker }: { marker: PageRestoreMarker }) {
           {t(keys.pagebuilder.history.restored_created)}
         </div>
       )}
-      {restoredWith(marker) && (
-        <div className="mt-0.5 text-muted-foreground">{restoredWith(marker)}</div>
-      )}
+      {alsoRestored && <div className="mt-0.5 text-muted-foreground">{alsoRestored}</div>}
     </li>
   );
 }

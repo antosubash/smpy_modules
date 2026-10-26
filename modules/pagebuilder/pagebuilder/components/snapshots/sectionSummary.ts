@@ -68,6 +68,10 @@ export function sectionMarker(entry: SectionPlanEntry): string | null {
   if (entry.details_unavailable) {
     return translate(keys.pagebuilder.plan.section_details_unavailable, { label });
   }
+  // Every line empty: say so, rather than leave a card with a title and nothing under it.
+  if (!entry.lines.some((line) => line.count > 0)) {
+    return translate(keys.pagebuilder.plan.sections.empty, { label });
+  }
   return null;
 }
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 from bundle_fake import NotesSection, notes_client, seed_note
 from page_helpers import create_draft
+from pagebuilder.snapshots.history import _sections_written
 
 pytestmark = pytest.mark.asyncio
 
@@ -82,3 +83,18 @@ async def test_a_pages_only_restore_marker_names_no_sections(authed_client):
     history = await authed_client.get(f"/api/pagebuilder/pages/{page['id']}/revisions")
     [marker] = history.json()["restores"]
     assert marker["sections"] == []
+
+
+def test_a_row_named_in_two_lists_is_counted_once():
+    row = {"id": 1, "created_at": "2026-10-26T00:00:00+00:00"}
+    plan = {
+        "sections": [{"section": "notes", "label_key": "notes.bundle.title"}],
+        "applied": {
+            "pagebuilder": {"created": [], "overwritten": []},
+            "notes": {"overwritten": [row], "respelled": [row, {"id": 2}]},
+            "idle": {"created": []},
+        },
+    }
+    assert _sections_written(plan) == [
+        {"section": "notes", "label_key": "notes.bundle.title", "count": 2}
+    ]

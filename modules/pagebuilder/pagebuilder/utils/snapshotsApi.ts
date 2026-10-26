@@ -51,6 +51,7 @@ export interface Snapshot {
 
 export interface PagePlanEntry {
   slug: string;
+  locale?: string | null;
   title: string | null;
   added?: number;
   removed?: number;

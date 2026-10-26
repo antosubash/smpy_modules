@@ -19,7 +19,8 @@ function pageItems(
   describe?: (entry: PagePlanEntry) => string | null,
 ): PlanGroupItem[] {
   return entries.map((entry) => ({
-    key: entry.slug,
+    // A slug is unique per language, so two translations share one.
+    key: `${entry.locale ?? ''}:${entry.slug}`,
     title: entry.title || entry.slug,
     slug: entry.slug,
     detail: describe?.(entry) ?? null,

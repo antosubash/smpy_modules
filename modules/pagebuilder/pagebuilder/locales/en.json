@@ -1214,7 +1214,8 @@
     "overwrite_items_other": "{count} items will be overwritten, counting pages and the content below.",
     "sections": {
       "absent": "{label} is not in this bundle and stays as it is.",
-      "skipped": "This bundle also carries {section} content, which this site cannot restore. It will be skipped."
+      "skipped": "This bundle also carries {section} content, which this site cannot restore. It will be skipped.",
+      "empty": "This bundle carries {label} content, but restoring it changes nothing."
     }
   },
   "row": {

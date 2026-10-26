@@ -1214,7 +1214,8 @@
     "overwrite_items_other": "{count} Einträge werden überschrieben, Seiten und die Inhalte unten zusammengezählt.",
     "sections": {
       "absent": "{label} ist nicht in diesem Bundle enthalten und bleibt, wie es ist.",
-      "skipped": "Dieses Bundle enthält auch Inhalte von {section}, die diese Website nicht wiederherstellen kann. Sie werden übersprungen."
+      "skipped": "Dieses Bundle enthält auch Inhalte von {section}, die diese Website nicht wiederherstellen kann. Sie werden übersprungen.",
+      "empty": "Dieses Bundle enthält Inhalte von {label}, aber ihre Wiederherstellung ändert nichts."
     }
   },
   "row": {
