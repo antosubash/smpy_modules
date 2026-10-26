@@ -180,7 +180,7 @@ class HoldsMixin(MeteringCore):
                     tenant_id=row.tenant_id, meter=row.meter, qty=int(row.quantity), now=now
                 )
             )
-            return _Kept(0, row)
+            return _Kept(0, row=row)
 
         outcome = await run_write(self._factory, None, apply)
         return outcome.row if isinstance(outcome, _Kept) else None
@@ -215,7 +215,7 @@ class HoldsMixin(MeteringCore):
                 .returning(*hold_sql.HOLD_COLUMNS)
             )
             row = (await session.execute(stmt)).one_or_none()
-            return None if row is None else _Kept(0, row)
+            return None if row is None else _Kept(0, row=row)
 
         outcome = await run_write(self._factory, None, apply)
         if isinstance(outcome, _Kept):
