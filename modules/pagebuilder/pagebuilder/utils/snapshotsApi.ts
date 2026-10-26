@@ -38,6 +38,13 @@ export interface SectionLabels {
   count_label_keys: Record<string, string>;
 }
 
+/** What the reader may do on Import / Export, decided by the server. `publish`
+ *  covers take, upload, download, delete and restore; `approve` the decision. */
+export interface SnapshotCapabilities {
+  publish: boolean;
+  approve: boolean;
+}
+
 export interface Snapshot {
   id: number;
   note: string | null;

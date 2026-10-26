@@ -10,20 +10,16 @@ from pathlib import Path
 from fastapi import APIRouter, FastAPI
 from simple_module_core import ModuleBase, ModuleMeta
 from simple_module_core.csp import CspSourceRegistry
-from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
+from simple_module_core.menu import MenuRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 
-from pagebuilder import boot, locales, tenancy
+from pagebuilder import boot, locales, menu, tenancy
 from pagebuilder.scheduler import Scheduler
 from pagebuilder.settings import PagebuilderSettings
 
 _log = logging.getLogger("simple_module.pagebuilder")
 
-# Sidebar entries. Grouped under "Content" so an app that installs several
-# content modules clusters them together rather than scattering them.
-# Paired with the news module's own group: the rail reads News / Site, so a
-# screen's section is visible before you click it.
 _PACKAGE = "pagebuilder"
 #: The prefix every key in ``pagebuilder/locales/*.json`` is registered under,
 #: so a console string is ``pagebuilder.<section>.<key>``. Deliberately the
@@ -36,18 +32,6 @@ _LOCALE_NAMESPACE = _PACKAGE
 #: framework 0.0.38, ``app.state.settings.module_registry`` before) exists by the time
 #: ``register_settings`` runs — the host topo-sorts modules on this field.
 _MODULE_SETTINGS = "Settings"
-
-_MENU_GROUP = "Site"
-#: Catalogue keys under this module's namespace (`pagebuilder.menu.*`).
-_MENU_KEY = f"{_LOCALE_NAMESPACE}.menu"
-_URL_PAGES = "/pagebuilder/"
-_URL_LAYOUT = "/pagebuilder/layout"
-_URL_MEDIA = "/pagebuilder/media"
-_URL_CONTENT = "/pagebuilder/content"
-_ICON_PAGES = "file-text"
-_ICON_LAYOUT = "layout"
-_ICON_MEDIA = "image"
-_ICON_CONTENT = "package"
 
 
 # Read from installed package metadata so pyproject.toml is the single source
@@ -108,60 +92,10 @@ class PagebuilderModule(ModuleBase):
         exempt_public_routes` can fill it from ``on_startup`` — after
         hydration, before the first request.
         """
-    def register_menu_items(self, registry: MenuRegistry) -> None:
-        """Contribute the admin surface to the host's sidebar.
 
-        Deliberately not role-gated. Menu role filtering is a plain
-        intersection with no admin bypass, so listing the pagebuilder roles
-        here would hide the entries from an ``admin`` user. It would also
-        misrepresent the gating: these views require authentication only —
-        it's the write endpoints that carry per-permission dependencies — so
-        every authenticated user can reach them.
-        """
-        registry.add_many(
-            [
-                MenuItem(
-                    label="Pages",
-                    label_key=f"{_MENU_KEY}.pages",
-                    url=_URL_PAGES,
-                    icon=_ICON_PAGES,
-                    order=200,
-                    section=MenuSection.SIDEBAR,
-                    group=_MENU_GROUP,
-                    group_key=f"{_MENU_KEY}.group_site",
-                ),
-                MenuItem(
-                    label="Site layout",
-                    label_key=f"{_MENU_KEY}.layout",
-                    url=_URL_LAYOUT,
-                    icon=_ICON_LAYOUT,
-                    order=210,
-                    section=MenuSection.SIDEBAR,
-                    group=_MENU_GROUP,
-                    group_key=f"{_MENU_KEY}.group_site",
-                ),
-                MenuItem(
-                    label="Media library",
-                    label_key=f"{_MENU_KEY}.media",
-                    url=_URL_MEDIA,
-                    icon=_ICON_MEDIA,
-                    order=220,
-                    section=MenuSection.SIDEBAR,
-                    group=_MENU_GROUP,
-                    group_key=f"{_MENU_KEY}.group_site",
-                ),
-                MenuItem(
-                    label="Import / Export",
-                    label_key=f"{_MENU_KEY}.import_export",
-                    url=_URL_CONTENT,
-                    icon=_ICON_CONTENT,
-                    order=230,
-                    section=MenuSection.SIDEBAR,
-                    group=_MENU_GROUP,
-                    group_key=f"{_MENU_KEY}.group_site",
-                ),
-            ]
-        )
+    def register_menu_items(self, registry: MenuRegistry) -> None:
+        """Contribute the admin surface to the host's sidebar (``pagebuilder.menu``)."""
+        menu.register(registry)
 
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
         from pagebuilder.access import (

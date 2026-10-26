@@ -2,13 +2,15 @@
 
 PageBuilder's screens sit under **Site** in the app sidebar: **Pages**, **Site
 layout**, **Media library** and **Import / Export**. Every signed-in user can open
-them; what you can *do* depends on three permissions:
+the first three; **Import / Export** is listed for, and opens to, only a holder of
+`pagebuilder.publish` or `pagebuilder.approve` (anyone else gets a 403). What you
+can *do* depends on three permissions:
 
 | Permission | Lets you |
 |---|---|
 | `pagebuilder.edit` | create and save pages, **Submit for review**, restore revisions and trashed pages, **Delete forever**, edit the site layout, upload and describe media |
-| `pagebuilder.publish` | **Publish**, **Unpublish**, set a schedule, take, upload, download and stage snapshots |
-| `pagebuilder.approve` | **Approve** or **Reject** a submitted page, see **Pending review**, apply or reject a staged restore |
+| `pagebuilder.publish` | **Publish**, **Unpublish**, set a schedule; open **Import / Export** and take, upload, download, delete and stage (**Restore…**) snapshots |
+| `pagebuilder.approve` | **Approve** or **Reject** a submitted page, see **Pending review**; open **Import / Export** to see the snapshots and the staged restore, and apply or reject it |
 
 The suggested roles are `pagebuilder_editor` (edit), `pagebuilder_publisher`
 (edit + publish) and `pagebuilder_approver` (all three). The editor shows the
@@ -272,6 +274,12 @@ says what each section wrote, and a page's history notes what the same restore
 wrote elsewhere ("The same restore also changed: News (3)"). Restoring never
 deletes: a page or article on the site but absent from the snapshot is left
 alone, and a redirect whose target is missing is dropped and listed.
+
+The screen offers only what you may do: **Take snapshot**, **Upload bundle…**,
+**Download**, **Restore…** and **Delete** need `pagebuilder.publish`, so an
+approver without it sees the list and **Review it**, and nothing else. On the
+review screen, **Approve & apply** and **Reject** appear only for a holder of
+`pagebuilder.approve`; a publisher who cannot approve sees the plan alone.
 
 ### Who sees and restores a contributed section
 

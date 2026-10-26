@@ -13,6 +13,9 @@ unchanged — re-exported here so endpoint code only needs one import.
 
 from __future__ import annotations
 
+from collections.abc import Collection
+
+from simple_module_core.permissions import grants
 from simple_module_hosting.permissions import RequiresPermission
 
 __all__ = [
@@ -25,6 +28,7 @@ __all__ = [
     "ROLE_EDITOR",
     "ROLE_PUBLISHER",
     "RequiresPermission",
+    "may_use_import_export",
 ]
 
 PERM_EDIT = "pagebuilder.edit"
@@ -42,3 +46,12 @@ DEFAULT_ROLE_MAP: dict[str, list[str]] = {
     ROLE_PUBLISHER: [PERM_EDIT, PERM_PUBLISH],
     ROLE_APPROVER: [PERM_EDIT, PERM_PUBLISH, PERM_APPROVE],
 }
+
+
+def may_use_import_export(held: Collection[str]) -> bool:
+    """Whether *held* opens Import / Export: whoever may stage a restore or approve one.
+
+    The one statement of the rule, shared by the route gate
+    (``require_publish_or_approve``) and the sidebar entry (``pagebuilder.menu``).
+    """
+    return grants(held, PERM_PUBLISH) or grants(held, PERM_APPROVE)
