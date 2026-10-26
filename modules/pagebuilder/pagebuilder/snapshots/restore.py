@@ -172,9 +172,9 @@ class RestoreMixin(HostBase):
         # Before anything is overwritten, so the previous state is one click
         # away — contributed sections included, since `take` captures them.
         await self.take(_PRE_RESTORE_NOTE, source=SnapshotSource.PRE_RESTORE)
-        # `take` tracked its directory, like every media file the apply writes:
-        # it goes if this transaction rolls back — here, or at a later failed
-        # commit (#250).
+        # `take` tracked that directory, and the apply tracks each media file it
+        # writes: all go if this transaction rolls back — here, or at a later
+        # failed commit (#250).
 
         try:
             bundle = self.dir_for(snapshot.id)

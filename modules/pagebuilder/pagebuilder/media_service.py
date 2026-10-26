@@ -257,8 +257,8 @@ class MediaService:
         except BaseException:
             # No row will name them, and the caller never learns their names
             # to clean up (a restore tracks them only once this returns, #250).
-            # A failed refresh leaves its flushed row in a transaction the
-            # caller must roll back, so the row goes too.
+            # A failed refresh leaves its flushed row in the transaction: the
+            # caller must roll back, never commit past this raise.
             _unlink(root, filename, variants)
             raise
         return asset
