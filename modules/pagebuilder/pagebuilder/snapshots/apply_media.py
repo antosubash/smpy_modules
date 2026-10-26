@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from io import BytesIO
+from pathlib import Path
 from typing import Any
 
 from fastapi import UploadFile
@@ -20,6 +21,7 @@ from pagebuilder.models import MediaAsset
 from pagebuilder.settings import PagebuilderSettings
 from pagebuilder.snapshots.blobs import BlobStore
 from pagebuilder.snapshots.media_match import match_existing
+from pagebuilder.snapshots.written import track
 
 
 async def restore_media(
@@ -45,6 +47,10 @@ async def restore_media(
     Bytes go back through ``MediaService.upload`` rather than straight to disk,
     so thumbnails regenerate against this host's current settings and a bundle
     carrying a disallowed content-type is refused exactly as an upload would be.
+
+    Every file an upload writes — the original and each variant — is tracked
+    on *db* (#250), so a rollback of this transaction removes them with the
+    rows. A matched asset is reused, never rewritten, so nothing of it is.
     """
     service = MediaService(db, settings)
     existing = await match_existing(db, settings, index)
@@ -65,7 +71,20 @@ async def restore_media(
                 ),
             )
             asset = await service.upload(upload, folder=entry.get("folder"))
+            track(db, _files_of(service, asset))
             uploaded[entry["sha256"]] = asset
             added += 1
         name_to_url[bundle_name] = service.url_for(asset.filename, asset.tenant_id)
     return name_to_url, added
+
+
+def _files_of(service: MediaService, asset: MediaAsset) -> list[Path]:
+    """The paths one fresh upload wrote, in its own tenant's directory."""
+    folder = service.tenant_dir(asset.tenant_id)
+    names = [asset.filename]
+    names += [
+        meta["filename"]
+        for meta in (asset.variants or {}).values()
+        if isinstance(meta, dict) and meta.get("filename")
+    ]
+    return [folder / name for name in names]

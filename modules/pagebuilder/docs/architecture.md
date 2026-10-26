@@ -208,9 +208,15 @@ one — ignoring trashed pages.
   `from_portable` resolving media through the map the page apply just built.
   **Why one session:** a restore is one decision, so it is one transaction.
   A section that raises after flushing rolls back the pages, layout, redirects,
-  every other section and the import's status together, and the `pre_restore`
-  directory is removed; there is no two-phase commit to get wrong and no state
-  where pages are restored but articles are half-written. The cost is a longer
+  every other section and the import's status together; there is no two-phase
+  commit to get wrong and no state where pages are restored but articles are
+  half-written. **Files are not in the transaction**, so they follow it
+  (`written.py`, #250): every media file the apply uploads (original and
+  variants) and the `pre_restore` directory are recorded on the session and
+  removed when it rolls back — when the apply raises, and when the apply
+  returns but the request's commit fails. Only paths this restore created are
+  recorded, each in its own tenant's directory: a matched asset it reused and
+  the content-addressed blob store are never touched. The cost is a longer
   write transaction on a large bundle. Permissions are checked per section
   (`access.py`); plan rows are kept off the audited row (`plan_views.py`).
   The screens render each section from its own catalogue keys
