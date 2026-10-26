@@ -18,7 +18,10 @@ site that happens to run both modules:
 * the site's content languages are pagebuilder's, borrowed through the sibling
   :mod:`news.integrations.locales` — a separate file because it answers a
   question about configuration rather than about data, behind the same
-  boundary.
+  boundary;
+* articles travel in pagebuilder's content bundle (Import / Export and the
+  ``pre_restore`` snapshot) as a contributed section, :mod:`news.integrations.bundle`,
+  registered by :func:`register_bundle_section` (#80).
 
 So every import here is deferred and guarded. On a host without pagebuilder
 ``available()`` is ``False``, the two extra sections return nothing, news
@@ -49,6 +52,7 @@ __all__ = [
     "media_library_path",
     "page_editor_path",
     "page_search_path",
+    "register_bundle_section",
     "search_media",
     "search_pages",
 ]
@@ -145,3 +149,28 @@ async def search_media(
     if contract is None:
         return [], 0
     return await contract.search_media(db, pattern, tenant_id=search_tenant(), limit=limit)
+
+
+# ── The content bundle ────────────────────────────────────────────────
+
+
+def register_bundle_section(app: Any) -> bool:
+    """Make articles part of pagebuilder's content bundle, where it is mounted (#80).
+
+    ``False`` and nothing else when pagebuilder is not installed, or installed
+    but not mounted on this app. Both imports are deferred: ``news.integrations.bundle``
+    imports :mod:`pagebuilder.contracts` at module scope, so importing it is
+    what would make the neighbour a hard requirement. Pagebuilder creates its
+    section registry while the app is built, before any ``on_startup``, so
+    the order the two modules start in does not matter.
+    """
+    if not available():
+        return False
+    try:
+        from pagebuilder.contracts import bundle
+    except ImportError:  # a pagebuilder older than the extra's floor: no bundle contract
+        return False
+
+    from news.integrations.bundle import NewsBundleSection
+
+    return bundle.register_section(app, NewsBundleSection())

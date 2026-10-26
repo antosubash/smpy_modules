@@ -29,6 +29,21 @@ const PLURAL_SUFFIXES = ['_zero', '_one', '_two', '_few', '_many', '_other'];
  *  full of the same strings compiled — scanning it would double every count. */
 const SKIP_DIRS = new Set(['static', 'node_modules', '__pycache__']);
 
+/** The catalogue keys the restore plan names: the `*_KEY = "pagebuilder.…"`
+ *  constants in snapshots/ (access.py, plan_views.py), and nothing else — a
+ *  comment or a stray string mentioning a key does not count as a use. */
+function serverKeys(): Set<string> {
+  const found = new Set<string>();
+  const dir = join(PACKAGE, 'snapshots');
+  for (const name of readdirSync(dir).filter((n) => n.endsWith('.py'))) {
+    const text = readFileSync(join(dir, name), 'utf-8');
+    for (const match of text.matchAll(/^[A-Z_]+_KEY\s*=\s*"pagebuilder\.([\w.]+)"$/gm)) {
+      found.add(match[1]);
+    }
+  }
+  return found;
+}
+
 function sources(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);
@@ -97,8 +112,12 @@ describe('the pagebuilder catalogue', () => {
     // `menu.*` is read on the server — each MenuItem's label_key/group_key
     // in module.py — not by any .tsx; host/tests/test_menu_labels.py checks
     // every one of those resolves.
+    // A plan's reason keys (`pagebuilder.plan.section_denied`, …) are named by
+    // the server in the restore plan (snapshots/access.py, plan_views.py) and
+    // rendered from the plan, so a literal in the Python counts as a use.
+    const server = serverKeys();
     const orphans = CATALOGUE.filter(
-      (key) => !key.startsWith('menu.') && !referenced.has(stem(key)),
+      (key) => !key.startsWith('menu.') && !referenced.has(stem(key)) && !server.has(key),
     );
     expect(orphans).toEqual([]);
   });

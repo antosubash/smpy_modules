@@ -24,6 +24,18 @@ import { keys, translate } from './i18n';
 const NEWS = join(import.meta.dirname, '..');
 const PLURAL_SUFFIXES = ['_zero', '_one', '_two', '_few', '_many', '_other'];
 
+/** The `"news.bundle.…"` keys spelled out as values in integrations/bundle/. */
+function bundleKeys(): Set<string> {
+  const found = new Set<string>();
+  const dir = join(NEWS, 'integrations', 'bundle');
+  for (const name of readdirSync(dir).filter((n) => n.endsWith('.py'))) {
+    const text = readFileSync(join(dir, name), 'utf-8');
+    // A value in an assignment or a dict entry — `= "…"` or `: "…"` — not prose.
+    for (const match of text.matchAll(/[=:]\s*"news\.(bundle\.[\w.]+)"/g)) found.add(match[1]);
+  }
+  return found;
+}
+
 function sources(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);
@@ -89,8 +101,13 @@ describe('the news catalogue', () => {
     // `menu.*` is read on the server — each MenuItem's label_key/group_key
     // in module.py — not by any .tsx; host/tests/test_menu_labels.py checks
     // every one of those resolves.
+    // news' content-bundle section (#80) hands its labels to pagebuilder,
+    // whose restore plan renders them — no news .tsx names them. They count as
+    // used only when the section spells them out (integrations/bundle/), and
+    // tests/test_bundle_labels.py holds that list to what the section emits.
+    const bundle = bundleKeys();
     const orphans = CATALOGUE.filter(
-      (key) => !key.startsWith('menu.') && !referenced.has(stem(key)),
+      (key) => !key.startsWith('menu.') && !bundle.has(key) && !referenced.has(stem(key)),
     );
     expect(orphans).toEqual([]);
   });

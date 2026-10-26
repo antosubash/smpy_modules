@@ -567,5 +567,26 @@
     "search": "Search everything",
     "group_news": "News",
     "group_find": "Find"
+  },
+  "bundle": {
+    "title": "News",
+    "counts": {
+      "articles": "Articles",
+      "categories": "Categories",
+      "tags": "Tags",
+      "redirects": "Redirects"
+    },
+    "plan": {
+      "new": "New articles",
+      "overwritten": "Articles overwritten",
+      "revived": "Trashed articles brought back",
+      "renamed_from": "Articles moved back to their snapshot address",
+      "unchanged": "Unchanged articles",
+      "untouched": "Articles not in this snapshot (kept)",
+      "categories": "Categories",
+      "tags": "Tags",
+      "redirects_dropped": "Redirects dropped (their article is gone)",
+      "category_respelled": "Articles not in this snapshot whose category spelling changes"
+    }
   }
 }

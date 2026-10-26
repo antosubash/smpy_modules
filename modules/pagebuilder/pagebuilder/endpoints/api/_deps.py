@@ -7,7 +7,9 @@ publish rights.
 
 from __future__ import annotations
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException, Request
+from simple_module_core.permissions import grants
+from simple_module_hosting.permissions import PermissionDenied, ensure_resolved_permissions
 
 from pagebuilder.permissions import (
     PERM_APPROVE,
@@ -19,3 +21,17 @@ from pagebuilder.permissions import (
 require_edit = Depends(RequiresPermission(PERM_EDIT))
 require_publish = Depends(RequiresPermission(PERM_PUBLISH))
 require_approve = Depends(RequiresPermission(PERM_APPROVE))
+
+
+async def _publish_or_approve(request: Request) -> None:
+    """Either Import / Export permission: the one who stages a restore, or the one who
+    approves it. Resolved like ``RequiresPermission`` (roles plus grant sources)."""
+    if getattr(request.state, "user", None) is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    held = await ensure_resolved_permissions(request)
+    if not (grants(held, PERM_PUBLISH) or grants(held, PERM_APPROVE)):
+        raise PermissionDenied(PERM_PUBLISH)
+
+
+require_publish_or_approve = Depends(_publish_or_approve)
+"""Reading the staged restore: whoever may stage it or approve it."""

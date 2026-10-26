@@ -3,13 +3,16 @@
 Pagebuilder's own documents are handled where they always were; this file is
 the loop over :class:`~pagebuilder.snapshots.registry.SectionRegistry` that
 ``capture``, ``read_zip`` and ``SnapshotService`` call after them, so none of
-those files has to know what a section is beyond one call.
+those files has to know what a section is beyond one call. Capture and
+validation are here; planning and applying a restore are
+:mod:`pagebuilder.snapshots.section_restore`, split off at the 300-line cap.
 
 Order is fixed: pagebuilder first — every contributor may reference its media,
 so ``name_to_url`` has to exist — then contributors by name. Every call goes
 through the caller's session, and every one is preceded by a tenant check, so
 a section can neither leave the restore's transaction nor run for a tenant
-other than the bound one.
+other than the bound one. Which sections the acting principal may capture or
+apply is :mod:`pagebuilder.snapshots.access`.
 """
 
 from __future__ import annotations
@@ -26,12 +29,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from pagebuilder.contracts.bundle import (
     CaptureContext,
-    RestoreContext,
-    SectionPlan,
     TenantMismatchError,
     ValidateContext,
 )
-from pagebuilder.snapshots.assets import from_sentinels, to_sentinels
+from pagebuilder.snapshots.access import (
+    SYSTEM,
+    SectionAccess,
+    omitted_entry,
+)
+from pagebuilder.snapshots.assets import to_sentinels
 from pagebuilder.snapshots.files import tree_size
 from pagebuilder.snapshots.manifest import PAGEBUILDER_SECTION, check_manifest
 from pagebuilder.snapshots.validate import BundleError
@@ -73,18 +79,28 @@ def present(
 
 
 async def capture_sections(
-    db: AsyncSession, registry: SectionRegistry, dest: Path, url_to_name: dict[str, str]
-) -> tuple[list[dict[str, Any]], int]:
-    """Capture every registered section into ``dest/<name>/``.
+    db: AsyncSession,
+    registry: SectionRegistry,
+    dest: Path,
+    url_to_name: dict[str, str],
+    access: SectionAccess = SYSTEM,
+) -> tuple[list[dict[str, Any]], int, list[dict[str, Any]]]:
+    """Capture every registered section *access* may capture into ``dest/<name>/``.
 
-    Returns the manifest ``contents`` entries and the bytes written. The size
-    is read off the files rather than reported by the section, so the
-    snapshot's size cannot disagree with what is on disk.
+    Returns the manifest ``contents`` entries, the bytes written, and the
+    manifest's ``omitted`` entries for the sections left out. The size is read
+    off the files rather than reported by the section, so the snapshot's size
+    cannot disagree with what is on disk.
     """
     entries: list[dict[str, Any]] = []
+    omitted: list[dict[str, Any]] = []
     size = 0
     tenant = _tenant() if len(registry) else ""
     for section in registry:
+        missing = access.missing(section, "capture")
+        if missing:
+            omitted.append(omitted_entry(section, missing))
+            continue
         directory = dest / section.name
         if directory.exists():
             await asyncio.to_thread(shutil.rmtree, directory)
@@ -116,7 +132,7 @@ async def capture_sections(
                 "counts": counts,
             }
         )
-    return entries, size
+    return entries, size, omitted
 
 
 def validate_sections(
@@ -150,113 +166,3 @@ def revalidate(
     """
     check_manifest(manifest, registry.readable())
     validate_sections(manifest, registry, bundle_dir, index)
-
-
-def _restore_context(
-    db: AsyncSession,
-    section: BundleSection,
-    entry: dict[str, Any],
-    bundle_dir: Path,
-    name_to_url: dict[str, str],
-    tenant: str,
-) -> RestoreContext:
-    version = entry["version"]
-    if version not in section.readable_versions:
-        # A snapshot taken here before this host's section was upgraded past it.
-        raise BundleError(f"unsupported version {version} of the {section.name!r} section")
-    ctx = RestoreContext(
-        db=db,
-        tenant_id=tenant,
-        dir=bundle_dir / section.name,
-        version=version,
-        from_portable=partial(from_sentinels, name_to_url=name_to_url),
-    )
-    ctx.check_tenant()
-    return ctx
-
-
-def _plan_entry(section: BundleSection, version: int, plan: SectionPlan) -> dict[str, Any]:
-    return {
-        "section": section.name,
-        "label_key": section.label_key,
-        "version": version,
-        "lines": [
-            {
-                "label_key": line.label_key,
-                "count": line.count,
-                "items": [
-                    {
-                        "title": item.title,
-                        "slug": item.slug,
-                        "locale": item.locale,
-                        "note_key": item.note_key,
-                    }
-                    for item in line.items
-                ],
-                "tone": line.tone,
-            }
-            for line in plan.lines
-        ],
-        "overwrites": plan.overwrites,
-    }
-
-
-async def plan_sections(
-    db: AsyncSession,
-    registry: SectionRegistry,
-    manifest: dict[str, Any],
-    bundle_dir: Path,
-    name_to_url: dict[str, str],
-) -> dict[str, Any]:
-    """The plan's ``sections``, ``skipped`` and ``absent`` keys. Writes nothing.
-
-    Raises ``RestoreConflictError`` (via ``ctx.conflict``) for what a section
-    cannot apply, and ``BundleError`` for a section version this host no
-    longer reads.
-    """
-    known = present(manifest, registry)
-    sections = []
-    tenant = _tenant() if known else ""
-    for section, entry in known:
-        ctx = _restore_context(db, section, entry, bundle_dir, name_to_url, tenant)
-        plan = await section.plan(ctx)
-        ctx.check_tenant()
-        sections.append(_plan_entry(section, entry["version"], plan))
-    carried = {entry["section"] for entry in _contributed(manifest)}
-    return {
-        "sections": sections,
-        "skipped": [
-            {"section": entry["section"], "version": entry.get("version")}
-            for entry in _contributed(manifest)
-            if registry.get(entry["section"]) is None
-        ],
-        "absent": [
-            {"section": section.name, "label_key": section.label_key}
-            for section in registry
-            if section.name not in carried
-        ],
-    }
-
-
-async def apply_sections(
-    db: AsyncSession,
-    registry: SectionRegistry,
-    manifest: dict[str, Any],
-    bundle_dir: Path,
-    name_to_url: dict[str, str],
-) -> dict[str, dict[str, Any]]:
-    """Apply every known section the bundle carries, after pagebuilder's part.
-
-    ``{section: {"counts": ..., "applied": ...}}``. Nothing commits here; a
-    section that raises aborts the caller's whole transaction.
-    """
-    outcome: dict[str, dict[str, Any]] = {}
-    known = present(manifest, registry)
-    tenant = _tenant() if known else ""
-    for section, entry in known:
-        ctx = _restore_context(db, section, entry, bundle_dir, name_to_url, tenant)
-        result = await section.apply(ctx)
-        ctx.check_tenant()
-        outcome[section.name] = {"counts": dict(result.counts), "applied": dict(result.applied)}
-    await db.flush()
-    return outcome

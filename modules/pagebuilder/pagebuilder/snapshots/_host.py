@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from pagebuilder.models import ContentSnapshot, SnapshotMedia, SnapshotSource
 from pagebuilder.settings import PagebuilderSettings
+from pagebuilder.snapshots.access import SectionAccess
 from pagebuilder.snapshots.blobs import BlobStore
 from pagebuilder.snapshots.registry import SectionRegistry
 
@@ -27,9 +28,13 @@ class SnapshotHost(Protocol):
     db: AsyncSession
     settings: PagebuilderSettings
     sections: SectionRegistry
+    access: SectionAccess
 
     @property
     def blobs(self) -> BlobStore: ...
+
+    @property
+    def root(self) -> Path: ...
 
     def dir_for(self, snapshot_id: int) -> Path: ...
 

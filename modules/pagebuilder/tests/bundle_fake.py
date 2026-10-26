@@ -58,7 +58,12 @@ class NotesSection:
     label_key = "notes.bundle.title"
     count_label_keys: ClassVar[dict[str, str]] = {"notes": "notes.bundle.counts.notes"}
 
-    def __init__(self) -> None:
+    def __init__(
+        self, *, capture_permissions: frozenset[str] = frozenset(), apply_permissions=frozenset()
+    ) -> None:
+        # Declared per instance so a test can require permissions of its own.
+        self.capture_permissions = frozenset(capture_permissions)
+        self.apply_permissions = frozenset(apply_permissions)
         self.fail_apply = False
         self.conflict_on: str | None = None
         self.calls: list[tuple[str, Any]] = []
