@@ -3,6 +3,8 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withBlockIds } from '../components/body/blockIds';
+import { articleOutline } from '../components/body/blocks/outline';
 import { useArticleBody } from './useArticleBody';
 
 // Lets `act` know this is a React test environment.
@@ -111,6 +113,45 @@ describe('useArticleBody — stale writes', () => {
     });
 
     expect(calls.filter((c) => c.method === 'POST' && c.url.endsWith('/publish'))).toHaveLength(1);
+    await act(async () => root.unmount());
+  });
+
+  it('repairs block ids on load the way the public page does, and saves them (#266)', async () => {
+    // Written through the API: two headings without ids, one id twice.
+    const stored = {
+      root: { props: {} },
+      content: [
+        { type: 'Heading', props: { text: 'Background', level: '2' } },
+        { type: 'Heading', props: { id: 'dup', text: 'Background', level: '2' } },
+        { type: 'Paragraph', props: { id: 'dup', text: 'x', lead: false } },
+        { type: 'Heading', props: { text: 'Background 2', level: '2' } },
+      ],
+    };
+    responder = (_url, method) =>
+      method === 'GET' ? json(detail('2026-01-01T00:00:00Z', stored)) : json(detail('t2'));
+    const root = await mount();
+
+    const blocks = (api.data?.content ?? []) as { props: { id: string } }[];
+    const ids = blocks.map((block) => block.props.id);
+    expect(ids.every(Boolean)).toBe(true);
+    expect(new Set(ids).size).toBe(ids.length);
+    // The canvas's outline is the published page's, entry for entry.
+    const canvas = articleOutline(api.data);
+    expect(canvas).toEqual(articleOutline(withBlockIds(stored)));
+    expect(canvas.map((entry) => entry.anchor)).toEqual([
+      'background',
+      'background-2',
+      'background-2-2',
+    ]);
+    expect(new Set(canvas.map((entry) => entry.blockId)).size).toBe(3);
+    // Opening is not an edit; the first real save carries the ids.
+    expect(api.dirty).toBe(false);
+    await act(async () => api.change({ ...(api.data as object), zones: {} } as never));
+    await act(async () => {
+      await api.saveNow();
+    });
+    const saved = calls.at(-1)?.body?.draft_data as { content: { props: { id: string } }[] };
+    expect(saved.content.map((block) => block.props.id)).toEqual(ids);
     await act(async () => root.unmount());
   });
 });

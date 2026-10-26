@@ -9,6 +9,7 @@
 import type { Data } from '@puckeditor/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { withBlockIds } from '../components/body/blockIds';
 import {
   type ArticleDetail,
   getArticleDetail,
@@ -72,7 +73,11 @@ export function useArticleBody(articleId: number) {
         if (!aliveRef.current) return;
         setArticle(detail);
         updatedAtRef.current = detail.updated_at ?? null;
-        const body = (detail.draft_data ?? {}) as unknown as Data;
+        // Repaired the way the public page repairs it, so the canvas and the
+        // published article agree on every block id and anchor (#266). Counted
+        // as saved: opening an article is not an edit, and the ids are
+        // deterministic, so they reach the server with the first real save.
+        const body = withBlockIds((detail.draft_data ?? {}) as unknown as Data);
         setData(body);
         savedRef.current = JSON.stringify(body);
       } catch (e) {
