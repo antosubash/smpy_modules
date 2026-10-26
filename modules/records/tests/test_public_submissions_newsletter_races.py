@@ -18,6 +18,7 @@ import pytest
 from sm_records.contracts.events import SubscriptionChanged
 from sm_records.models import SubmissionDelivery, tables_for
 from sm_records.public_submissions import transition as transition_module
+from sm_records.public_submissions.delivery import COMPLETE
 from sm_records.tenancy import tenant_scope
 from sqlalchemy import select, update
 
@@ -140,7 +141,10 @@ async def _deliveries(site) -> list:
 
 async def test_a_purge_leaves_no_trace_of_the_address_in_the_claims(newsletter):
     await signup(newsletter)
-    (claim,) = await _deliveries(newsletter)
+    rows = await _deliveries(newsletter)
+    # The recipient's claim, and the attempt's completion row (``delivery.COMPLETE``).
+    (claim,) = [row for row in rows if row.recipient != COMPLETE]
+    assert [row.recipient for row in rows if row.recipient == COMPLETE] == [COMPLETE]
     assert claim.recipient.startswith("h:") and STORED not in claim.recipient
     uuid = (await subscriber(newsletter))["uuid"]
     base = f"/api/records/types/{LIST}/records/{uuid}"
