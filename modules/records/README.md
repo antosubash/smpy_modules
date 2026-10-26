@@ -674,19 +674,22 @@ from a runtime permission source (`PermissionRegistry.add_source`, framework
 0.0.36, upstream #334). The role editor lists them in the "records" group. On
 a single-tenant host each label names the roles `allowed_roles` lets in,
 for example `Records: Companies (restricted to editor)`. Granting one to a
-role, a user or a tenant role admits the holder to that type even when
+role or a user admits the holder to that type even when
 `allowed_roles` names none of their roles. It widens the narrowing and nothing
 else: the static `records.view`/`records.edit` are still required. An install
 that grants none of them has exactly the access it had before. On a
-multi-tenant host the list holds every tenant's keys, unlabelled, and a grant
-applies to the type of that key in every tenant.
+multi-tenant host the list holds every tenant's keys, unlabelled, and **a
+grant is host-wide**: it applies to the type of that key in every tenant.
+Only a holder of `permissions.manage` can grant one or see the cross-tenant
+key list, both of which are host-level, not tenant-admin, powers.
 
 `allowed_roles` narrows, and narrowing has no exceptions: a caller holding
 the `admin` wildcard is refused on a type whose `allowed_roles` is non-empty
 unless `admin` is one of the roles listed. The wildcard does not count as
 holding `records.type.<key>` either, although the `permissions` module copies
 every registered key onto the admin role and the role editor shows them
-ticked. So an admin creating a restricted
+ticked. An admin's API token scoped to `records.type.<key>` gets no per-type
+access either: those grants come only from the owner's genuine grants. So an admin creating a restricted
 type must list a role they actually hold, or else use `records.manage_types`
 to edit `allowed_roles` back before they can work with its records. The same
 list also governs what a delete elsewhere may do to this type's records: a

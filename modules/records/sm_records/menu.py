@@ -43,7 +43,7 @@ from sqlalchemy import select
 
 from sm_records import constants
 from sm_records.models import RecordType
-from sm_records.services._access import caller_access, role_blocked
+from sm_records.services._access import caller_access, request_role_map, role_blocked
 from sm_records.settings import RecordsSettings
 from sm_records.tenancy import resolve_public, tenant_scope
 
@@ -109,12 +109,17 @@ def type_menu_items(types: Sequence[MenuType]) -> list[MenuItem]:
     ]
 
 
-def visible_items(types: Sequence[MenuType], user: Any, held: set[str]) -> list[MenuItem]:
+def visible_items(
+    types: Sequence[MenuType],
+    user: Any,
+    held: set[str],
+    role_map: Mapping[str, Any] | None = None,
+) -> list[MenuItem]:
     """The items of ``types`` this caller may open: ``records.view``, and not
     narrowed out (an ``admin`` included — narrowing has no wildcard)."""
     if user is None or not grants(held, constants.PERM_VIEW):
         return []
-    caller = caller_access(user, held)
+    caller = caller_access(user, held, role_map)
     return type_menu_items([rtype for rtype in types if not role_blocked(rtype, caller)])
 
 
@@ -199,7 +204,8 @@ async def type_menu_provider(module: Any, request: Request) -> list[MenuItem]:
     except Exception:
         logger.warning("records: could not read the sidebar types", exc_info=True)
         return []
-    return visible_items(types, user, await ensure_resolved_permissions(request))
+    held = await ensure_resolved_permissions(request)
+    return visible_items(types, user, held, request_role_map(request))
 
 
 def affects_menu(changes: Mapping[str, Any]) -> bool:

@@ -2,7 +2,7 @@
 
 Every record type has a permission of its own, ``records.type.<key>``, listed
 under the "records" group next to the three static ones. Granting it (to a
-role, a user, or a tenant role) admits the holder to that type's records even
+role or a user, host-wide) admits the holder to that type's records even
 when its ``allowed_roles`` name none of their roles; the rule itself is
 :func:`sm_records.services._access.role_blocked`. Its label names the type and,
 for a narrowed one, the roles ``allowed_roles`` lets in — which is how the

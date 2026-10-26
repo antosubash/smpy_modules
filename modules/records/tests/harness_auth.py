@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 from fastapi import Request
 from simple_module_core.permissions import PermissionRegistry
-from simple_module_hosting.permissions import resolve_permissions
+from simple_module_hosting.permissions import apply_scope_cap, resolve_permissions
 from starlette.middleware.base import BaseHTTPMiddleware
 
 try:
@@ -45,6 +45,10 @@ ROLE_MANAGER = "records-manager"
 #: Registered nowhere: resolves to an empty permission set, same as any
 #: role nobody mapped. Named for readability at call sites.
 ROLE_NONE = "records-nobody"
+
+TEST_SCOPES_HEADER = "X-Test-Scopes"
+"""Makes the caller an API-token principal capped at these comma-separated
+scopes, the way the framework caps a personal token (``apply_scope_cap``)."""
 
 TEST_TENANT_HEADER = "X-Test-Tenant"
 """Sets the stub user's ``tenant_id``; the framework's own header is
@@ -89,11 +93,13 @@ class _HeaderAuthMiddleware(BaseHTTPMiddleware):
             )
             # ``X-Test-Tenant`` is the user row's ``tenant_id`` (tenancy §K);
             # absent, the account has none — the bootstrap admin's case.
+            raw_scopes = request.headers.get(TEST_SCOPES_HEADER)
             request.state.user = SimpleNamespace(
                 id=user_id,
                 email="test@example.com",
                 roles=roles_list,
                 tenant_id=request.headers.get(TEST_TENANT_HEADER),
+                scopes=None if raw_scopes is None else raw_scopes.split(","),
             )
             # Mirrors ``AuthMiddleware`` (``simple_module_hosting/middleware.py``),
             # which runs ahead of every dependency in production. Without it,
@@ -101,8 +107,9 @@ class _HeaderAuthMiddleware(BaseHTTPMiddleware):
             # own, roles-only checker) has no role-map fallback of its own and
             # treats every caller as holding nothing but direct grants.
             registry = request.app.state.sm.permissions
-            request.state.resolved_permissions = resolve_permissions(
-                roles_list, role_map=registry.role_map
+            request.state.resolved_permissions = apply_scope_cap(
+                resolve_permissions(roles_list, role_map=registry.role_map),
+                request.state.user,
             )
         return await call_next(request)
 

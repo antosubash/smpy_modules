@@ -21,14 +21,21 @@ them already takes — so the per-type grants ride along on it as
 
 from __future__ import annotations
 
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from typing import Any
 
-from simple_module_core.permissions import WILDCARD
+from simple_module_core.permissions import DEFAULT_ROLE_PERMISSIONS, WILDCARD
 
 from sm_records import constants
 
-__all__ = ["CallerRoles", "caller_access", "role_blocked", "type_grants", "type_permission"]
+__all__ = [
+    "CallerRoles",
+    "caller_access",
+    "request_role_map",
+    "role_blocked",
+    "type_grants",
+    "type_permission",
+]
 
 
 class CallerRoles(list[str]):
@@ -60,10 +67,38 @@ def type_grants(held: Collection[str]) -> frozenset[str]:
     return frozenset(p.removeprefix(prefix) for p in held if p.startswith(prefix))
 
 
-def caller_access(user: Any, held: Collection[str]) -> CallerRoles:
-    """:class:`CallerRoles` for ``user`` holding the resolved set ``held``."""
+def _wildcard_by_role(roles: Sequence[str], role_map: Mapping[str, Any] | None) -> bool:
+    """Whether one of ``roles`` maps to the wildcard — the admin role, by default."""
+    mapping = role_map if role_map is not None else DEFAULT_ROLE_PERMISSIONS
+    return any(WILDCARD in (mapping.get(role) or ()) for role in roles)
+
+
+def caller_access(
+    user: Any, held: Collection[str], role_map: Mapping[str, Any] | None = None
+) -> CallerRoles:
+    """:class:`CallerRoles` for ``user`` holding the resolved set ``held``.
+
+    ``role_map`` is the registry's merged role map. A caller whose *roles*
+    carry the wildcard gets no per-type grants even when ``held`` no longer
+    shows it: the framework's ``apply_scope_cap`` replaces an admin token's
+    wildcard with the token's scopes, and those scopes may name any
+    registered key — ``records.type.<key>`` included — because the wildcard
+    expands to all of them. Without this an admin excluded by
+    ``allowed_roles`` could mint a token scoped to the type's key and read
+    what their own session is refused. So a token never holds more per-type
+    access than its owner's genuine (non-wildcard) grants.
+    """
     roles = list(getattr(user, "roles", None) or []) if user is not None else []
+    if _wildcard_by_role(roles, role_map):
+        return CallerRoles(roles)
     return CallerRoles(roles, type_grants(held))
+
+
+def request_role_map(request: Any) -> Mapping[str, Any] | None:
+    """The permission registry's role map for ``request``'s app, if it has one."""
+    sm = getattr(getattr(request.app, "state", None), "sm", None)
+    registry = getattr(sm, "permissions", None)
+    return registry.role_map if registry is not None else None
 
 
 def role_blocked(rtype: Any, roles: Sequence[str] | None) -> bool:

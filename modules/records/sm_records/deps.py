@@ -32,7 +32,12 @@ from sm_records._grammar import (
     parse_view_filters,
 )
 from sm_records.models import RecordType
-from sm_records.services._access import CallerRoles, caller_access, role_blocked
+from sm_records.services._access import (
+    CallerRoles,
+    caller_access,
+    request_role_map,
+    role_blocked,
+)
 from sm_records.services.errors import Forbidden
 from sm_records.services.types import get_type
 from sm_records.settings import RecordsSettings
@@ -151,7 +156,8 @@ def caller_roles(request: Request) -> CallerRoles:
     the router's ``RequiresPermission`` before any handler runs.
     """
     user = getattr(request.state, "user", None)
-    return caller_access(user, resolved_permissions_for(request) if user is not None else ())
+    held = resolved_permissions_for(request) if user is not None else ()
+    return caller_access(user, held, request_role_map(request))
 
 
 def actor(request: Request) -> str | None:

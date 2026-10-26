@@ -1107,16 +1107,24 @@ group next to the three static ones (`sm_records.type_permissions`):
   sales)`. On a multi-tenant host there are no labels. The role editor is
   host-wide, so a label from one tenant's type would end up naming the grant
   for every other tenant.
-- Granting it (to a role, a user, or a tenant role) admits the holder to that
-  type even when `allowed_roles` names none of their roles. It never
-  overrides `records.view`/`records.edit`, which the caller still needs. A
-  grant names a key, not a tenant: on a multi-tenant host it applies to every
-  tenant's type of that key.
+- Granting it (to a role or a user) admits the holder to that type even when
+  `allowed_roles` names none of their roles. It never overrides
+  `records.view`/`records.edit`, which the caller still needs.
+- **On a multi-tenant host the grant is host-wide.** Role and direct grants
+  belong to the host, not to an organisation, and a grant names a key, not a
+  tenant, so it applies to that key's type in every tenant. Only a holder of
+  `permissions.manage` can grant it, and only a holder of the role editor's
+  permissions can see the cross-tenant list of keys. Both are host-level
+  permissions, not something a tenant admin holds.
 - The `admin` wildcard grants no per-type access. Narrowing has never had an
   admin exception, and the `permissions` module copies every registered key
   onto the admin role at startup. So the role editor shows admin holding every
   `records.type.<key>`, but an admin still reaches a narrowed type only by
-  being listed in its `allowed_roles`.
+  being listed in its `allowed_roles`. That holds for an admin's API token
+  too: the framework replaces an admin token's wildcard with its scopes, and
+  a scope naming `records.type.<key>` still grants nothing, because per-type
+  grants come only from the owner's genuine (non-wildcard) grants. A token
+  never holds more per-type access than its owner.
 - The framework's source is synchronous and must not read the database, so a
   module middleware refreshes the list before the route runs. It refreshes on a
   type write in this worker, otherwise at most every `menu_refresh_seconds`. It
