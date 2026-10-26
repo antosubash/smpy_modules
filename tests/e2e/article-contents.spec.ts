@@ -180,51 +180,71 @@ test.describe('Contents and section anchors', () => {
     ]);
   });
 
-  test('the canvas and the published article agree on every anchor', async ({ page }) => {
-    // A contents link that resolves on the canvas and lands nowhere on the
-    // published page is the characteristic failure of deriving the outline
-    // twice. Nothing else in the suite compares the two screens; each one only
-    // ever checks that it agrees with itself.
-    //
-    // The headings are chosen to be the hard case: "Background", "Background"
-    // and "Background 2" all reach for `background-2`, so the two screens have
-    // to run the same disambiguation in the same order to end up in the same
-    // place.
-    await login(page);
-    const { articleId, url } = await seedArticle(page, {
-      prefix: 'toc-agree',
-      publishedAt: SEED_DATE,
-      publish: true,
-      body: contentsBody([
+  // A body written through the API may lack block ids or repeat one (#266);
+  // both screens must repair them alike (`withBlockIds`).
+  const agreeBodies: [string, Record<string, unknown>[]][] = [
+    [
+      'with ids',
+      [
         heading('h-a', 'Background'),
         paragraph('p-a'),
         heading('h-b', 'Background'),
         paragraph('p-b'),
         heading('h-c', 'Background 2'),
         paragraph('p-c'),
-      ]),
+      ],
+    ],
+    [
+      'with missing and repeated ids',
+      [
+        { type: 'Heading', props: { text: 'Background', level: '2' } },
+        { type: 'Paragraph', props: { text: LOREM, lead: false } },
+        heading('h-dup', 'Background'),
+        paragraph('h-dup'),
+        { type: 'Heading', props: { text: 'Background 2', level: '2' } },
+        paragraph('p-c'),
+      ],
+    ],
+  ];
+
+  for (const [label, blocks] of agreeBodies) {
+    test(`the canvas and the published article agree on every anchor, ${label}`, async ({
+      page,
+    }) => {
+      // A contents link that resolves on the canvas and lands nowhere on the
+      // published page is the failure of deriving the outline twice; nothing
+      // else in the suite compares the two screens. "Background" twice and
+      // "Background 2" all reach for `background-2`, so both screens have to
+      // disambiguate the same way, in the same order.
+      await login(page);
+      const { articleId, url } = await seedArticle(page, {
+        prefix: 'toc-agree',
+        publishedAt: SEED_DATE,
+        publish: true,
+        body: contentsBody(blocks),
+      });
+
+      await page.goto(`/admin/news/articles/${articleId}/body`);
+      const canvas = page.frameLocator('#preview-frame');
+      const canvasNav = canvas.locator(`nav[aria-label="${CONTENTS_LABEL}"]`);
+      await expect(canvasNav).toBeVisible();
+      const canvasHrefs = await hrefsOf(canvasNav);
+      const canvasIds = await idsOf(canvas.locator('h2[id]'));
+
+      await page.goto(url);
+      const publicNav = page.locator(`nav[aria-label="${CONTENTS_LABEL}"]`);
+      await expect(publicNav).toBeVisible();
+      const publicHrefs = await hrefsOf(publicNav);
+      const publicIds = await idsOf(page.locator('h2[id]'));
+
+      // Spelled out as well as compared: two screens that had both drifted the
+      // same way would still be equal to each other.
+      expect(canvasHrefs).toEqual(['#background', '#background-2', '#background-2-2']);
+      expect(publicHrefs).toEqual(canvasHrefs);
+      expect(canvasIds).toEqual(['background', 'background-2', 'background-2-2']);
+      expect(publicIds).toEqual(canvasIds);
     });
-
-    await page.goto(`/admin/news/articles/${articleId}/body`);
-    const canvas = page.frameLocator('#preview-frame');
-    const canvasNav = canvas.locator(`nav[aria-label="${CONTENTS_LABEL}"]`);
-    await expect(canvasNav).toBeVisible();
-    const canvasHrefs = await hrefsOf(canvasNav);
-    const canvasIds = await idsOf(canvas.locator('h2[id]'));
-
-    await page.goto(url);
-    const publicNav = page.locator(`nav[aria-label="${CONTENTS_LABEL}"]`);
-    await expect(publicNav).toBeVisible();
-    const publicHrefs = await hrefsOf(publicNav);
-    const publicIds = await idsOf(page.locator('h2[id]'));
-
-    // Spelled out as well as compared: two screens that had both drifted the
-    // same way would still be equal to each other.
-    expect(canvasHrefs).toEqual(['#background', '#background-2', '#background-2-2']);
-    expect(publicHrefs).toEqual(canvasHrefs);
-    expect(canvasIds).toEqual(['background', 'background-2', 'background-2-2']);
-    expect(publicIds).toEqual(canvasIds);
-  });
+  }
 
   test('arriving with a #section link lands on that section', async ({ page }) => {
     // The reader-facing outcome behind `useAnchorOnArrival` in

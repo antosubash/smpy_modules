@@ -1,9 +1,10 @@
 import { Head } from '@inertiajs/react';
 import { type Data, Render } from '@puckeditor/core';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Byline } from '../components/Byline';
 import { articlePuckConfig } from '../components/body/articlePuckConfig';
+import { withBlockIds } from '../components/body/blockIds';
 import { articleOutline } from '../components/body/blocks/outline';
 import { type Alternate, LanguageSwitch } from '../components/LanguageSwitch';
 import { type ArticlePreviewState, PreviewBanner } from '../components/PreviewBanner';
@@ -132,6 +133,9 @@ export default function PublicArticle({
   const { locale: consoleLocale } = useT();
   const jsonLdScript = json_ld ? safeJsonLd(json_ld) : null;
   const dated = formatArticleDate(published_at ?? null, locale ?? consoleLocale);
+  // Every block keyed, and the outline built over the same ids — see
+  // `withBlockIds` for why a stored document may not carry them (#266).
+  const body = useMemo(() => withBlockIds(data), [data]);
 
   return (
     <div>
@@ -217,8 +221,8 @@ export default function PublicArticle({
             never reach a reader. The canvas localizes it — see `ArticleBody`. */}
         <Render
           config={articlePuckConfig}
-          data={data as unknown as Data}
-          metadata={{ currentSlug: slug, outline: articleOutline(data) }}
+          data={body as unknown as Data}
+          metadata={{ currentSlug: slug, outline: articleOutline(body) }}
         />
       </article>
     </div>
