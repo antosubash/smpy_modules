@@ -133,10 +133,10 @@ publish.
 A snapshot restore (see Import / Export) writes no revision, so the list also
 shows **Restored from snapshot #N** at the time it was applied and by whom,
 with "The restore created this page." when the page did not exist before, and
-"The same restore also changed: News (3)" when the same restore wrote another module's
-content (a count, never which rows). It
-has no **Compare** or **Restore as draft**: to undo it, restore the automatic
-snapshot taken just before it.
+"The same restore also changed: News (3)" when the same restore wrote another
+module's content (a count, never which rows). It has no **Compare** or
+**Restore as draft**: to undo it, restore the automatic snapshot taken just
+before it.
 
 ### Slugs and redirects
 
@@ -269,9 +269,9 @@ headline counts every overwrite, pages and contributed rows together. One
 restore can wait at a time. Applying first takes an automatic snapshot of the
 current site, contributed sections included, so it can be undone; the result
 says what each section wrote, and a page's history notes what the same restore
-wrote elsewhere ("The same restore also changed: News (3)"). Restoring never deletes: a
-page or article on the site but absent from the snapshot is left alone, and a
-redirect whose target is missing is dropped and listed.
+wrote elsewhere ("The same restore also changed: News (3)"). Restoring never
+deletes: a page or article on the site but absent from the snapshot is left
+alone, and a redirect whose target is missing is dropped and listed.
 
 ### Who sees and restores a contributed section
 
