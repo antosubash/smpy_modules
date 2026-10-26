@@ -84,6 +84,56 @@ async def test_a_savepoint_rollback_does_not_remove_the_outer_writes(snapshot_db
     assert not any(p.exists() for p in added)
 
 
+async def test_closing_the_session_without_a_commit_removes_its_files(snapshot_db, tmp_path):
+    """``close()`` ends the transaction with no rollback event (a cancelled request)."""
+    added = await _restore(snapshot_db, tmp_path, ("hero.png", PNG))
+
+    await snapshot_db.session.close()
+
+    assert not any(p.exists() for p in added)
+
+
+async def test_a_savepoint_commit_does_not_keep_the_outer_writes(snapshot_db, tmp_path):
+    """``after_commit`` fires on a savepoint's release too; only the outermost counts."""
+    added = await _restore(snapshot_db, tmp_path, ("hero.png", PNG))
+
+    async with snapshot_db.session.begin_nested():
+        pass
+
+    assert set(written.tracked(snapshot_db.session)) == added
+    await snapshot_db.session.rollback()
+    assert not any(p.exists() for p in added)
+
+
+async def test_writes_in_a_rolled_back_savepoint_wait_for_the_outer_outcome(snapshot_db, tmp_path):
+    nested = await snapshot_db.session.begin_nested()
+    added = await _restore(snapshot_db, tmp_path, ("hero.png", PNG))
+    await nested.rollback()
+
+    assert all(p.is_file() for p in added)
+    assert set(written.tracked(snapshot_db.session)) == added
+    await snapshot_db.session.rollback()
+    assert not any(p.exists() for p in added)
+
+
+@pytest.mark.parametrize("step", ["flush", "refresh"])
+async def test_a_failed_upload_flush_leaves_no_files(snapshot_db, tmp_path, monkeypatch, step):
+    """The files exist before the row does; ``upload`` removes them itself."""
+    session = snapshot_db.session
+
+    async def broken(*args, **kwargs):
+        raise RuntimeError(f"injected {step} failure")
+
+    monkeypatch.setattr(session, step, broken)
+    blobs = BlobStore(tmp_path / "blobs")
+    index = _index(blobs, ("hero.png", PNG))
+
+    with pytest.raises(RuntimeError, match=f"injected {step}"):
+        await restore_media(session, snapshot_db.settings, blobs, index)
+
+    assert _files(resolve_media_root(snapshot_db.settings.media_root)) == set()
+
+
 async def test_a_file_that_existed_before_is_never_removed(snapshot_db, tmp_path):
     """An image the restore matched is reused, not rewritten, so not tracked."""
     session, settings = snapshot_db.session, snapshot_db.settings

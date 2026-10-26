@@ -65,6 +65,8 @@ class NotesSection:
         self.capture_permissions = frozenset(capture_permissions)
         self.apply_permissions = frozenset(apply_permissions)
         self.fail_apply = False
+        # Raised instead of the RuntimeError when set (a CancelledError, #250).
+        self.apply_error: BaseException | None = None
         self.conflict_on: str | None = None
         self.calls: list[tuple[str, Any]] = []
 
@@ -127,6 +129,8 @@ class NotesSection:
             row.body = ctx.from_portable(doc["body"])
             ctx.db.add(row)
         await ctx.db.flush()
+        if self.apply_error is not None:
+            raise self.apply_error
         if self.fail_apply:
             raise RuntimeError("injected failure in the notes section")
         return SectionApplied(

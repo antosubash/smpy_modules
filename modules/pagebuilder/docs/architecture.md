@@ -213,8 +213,10 @@ one — ignoring trashed pages.
   half-written. **Files are not in the transaction**, so they follow it
   (`written.py`, #250): every media file the apply uploads (original and
   variants) and the `pre_restore` directory are recorded on the session and
-  removed when it rolls back — when the apply raises, and when the apply
-  returns but the request's commit fails. Only paths this restore created are
+  removed when its outermost transaction ends without a commit — the apply
+  raises or is cancelled, the request's commit fails, or the session closes
+  with the transaction open (a savepoint's commit or rollback decides nothing).
+  `MediaService.upload` removes its own files if the row's flush fails. Only paths this restore created are
   recorded, each in its own tenant's directory: a matched asset it reused and
   the content-addressed blob store are never touched. The cost is a longer
   write transaction on a large bundle. Permissions are checked per section

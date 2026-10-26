@@ -4,8 +4,9 @@ A restore's database work is one transaction, but the media files it writes
 onto disk are not part of it: before this, a section that failed after the
 media step rolled every row back and left the files behind, named by no row.
 Each path a restore writes is recorded on its session here and removed when
-that session's transaction rolls back — whether the apply raised, or the
-apply returned and the request's commit failed afterwards.
+that session's outermost transaction ends without committing — the apply
+raised or was cancelled, the request's commit failed afterwards, or the
+session was closed with the transaction still open.
 
 Only paths this transaction *created* are ever recorded: freshly minted media
 names (``uuid4().hex`` and its variants) and the pre-restore snapshot's own
@@ -15,7 +16,7 @@ so no rollback can remove it. Each path is already inside its own tenant's
 directory, which is what keeps the cleanup to the tenant that wrote it.
 
 SQLAlchemy's session events rather than the framework's ``on_commit``: there
-is no after-rollback hook in ``simple_module_db``, and these fire on any
+is no after-rollback or on-close hook in ``simple_module_db``, and these fire on any
 session, the request's ``RequestSession`` and a test's plain one alike.
 """
 
@@ -42,7 +43,7 @@ def track(db: AsyncSession, paths: Iterable[Path]) -> None:
     if written is None:
         written = sync.info[_KEY] = []
         event.listen(sync, "after_commit", _forget)
-        event.listen(sync, "after_soft_rollback", _on_rollback)
+        event.listen(sync, "after_transaction_end", _on_end)
     written.extend(paths)
 
 
@@ -57,15 +58,22 @@ def discard(db: AsyncSession) -> None:
 
 
 def _forget(session: Session) -> None:
-    # Committed: the rows naming these files are durable, so the files stay.
-    session.info.get(_KEY, []).clear()
+    # `after_commit` fires on a savepoint's release too, while that savepoint
+    # is still the session's nested transaction; only the outermost commit
+    # makes the rows naming these files durable, so only it keeps the files.
+    if session.get_nested_transaction() is None:
+        session.info.get(_KEY, []).clear()
 
 
-def _on_rollback(session: Session, previous: SessionTransaction) -> None:
-    # Only the outermost transaction ending strands the files: a savepoint's
-    # rollback, or a failed flush's inner one, leaves it able to commit still
-    # (or to be rolled back, which fires this again with the outermost).
-    if previous.parent is None:
+def _on_end(session: Session, transaction: SessionTransaction) -> None:
+    # The outermost transaction ending by any route but a commit strands the
+    # files: a rollback, a failed commit, and a plain `close()` — which ends it
+    # without a rollback event, as when a cancelled request's session context
+    # exits (CancelledError passes every `except Exception`). After a commit
+    # `_forget` has emptied the list already. A savepoint's or a failed flush's
+    # inner transaction ending leaves the outermost one to decide, so a file
+    # written inside a rolled-back savepoint stays tracked until then.
+    if transaction.parent is None:
         _remove(session)
 
 

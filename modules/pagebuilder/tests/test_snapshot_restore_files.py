@@ -8,6 +8,7 @@ pagebuilder's media step has written its files.
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -99,6 +100,23 @@ async def test_a_failing_section_leaves_no_new_media_file_or_row(client, section
     assert {a.filename for a in await _asset_rows(client)} == rows_before
     assert _snapshot_files(client) == snapshots_before
     assert any(p.name == kept["filename"] for p in media_before)
+
+
+async def test_a_cancelled_approval_leaves_no_new_media_file_or_row(client, section):
+    """CancelledError passes every ``except Exception`` on the way out."""
+    import_id, _ = await _staged_restore_of_a_deleted_image(client)
+    media_before, snapshots_before = _media(client), _snapshot_files(client)
+    rows_before = {a.filename for a in await _asset_rows(client)}
+    section.apply_error = asyncio.CancelledError()
+
+    # Starlette's BaseHTTPMiddleware turns the cancelled call into its own
+    # "No response returned." on the way out; either way, the request failed.
+    with pytest.raises((asyncio.CancelledError, RuntimeError)):
+        await _approve(client, import_id)
+
+    assert _media(client) == media_before
+    assert {a.filename for a in await _asset_rows(client)} == rows_before
+    assert _snapshot_files(client) == snapshots_before
 
 
 async def test_a_successful_restore_keeps_the_files_it_wrote(client):

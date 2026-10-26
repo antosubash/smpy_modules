@@ -126,9 +126,7 @@ class MediaService:
     async def list_folders(self) -> list[str]:
         """Return every distinct non-empty folder name, sorted."""
         result = await self.db.execute(
-            select(MediaAsset.folder)
-            .where(MediaAsset.folder.is_not(None))
-            .distinct()
+            select(MediaAsset.folder).where(MediaAsset.folder.is_not(None)).distinct()
         )
         return sorted({row for row in result.scalars().all() if row})
 
@@ -165,8 +163,7 @@ class MediaService:
             raise HTTPException(
                 status_code=415,
                 detail=(
-                    f"Declared content-type {declared!r} does not match "
-                    f"sniffed type {sniffed!r}"
+                    f"Declared content-type {declared!r} does not match sniffed type {sniffed!r}"
                 ),
             )
         content_type = sniffed
@@ -251,18 +248,26 @@ class MediaService:
             variants=variants,
         )
         self.db.add(asset)
-        await self.db.flush()
-        await self.db.refresh(asset)
+        try:
+            await self.db.flush()
+            await self.db.refresh(asset)
+        except BaseException:
+            # No row will name them, and the caller never learns their names
+            # to clean up (a restore tracks them only once this returns, #250).
+            _unlink(root, filename, variants)
+            raise
         return asset
 
     async def delete(self, asset_id: int) -> None:
         asset = await self.get_asset(asset_id)
-        root = self.tenant_dir(asset.tenant_id)
-        (root / asset.filename).unlink(missing_ok=True)
-        for meta in (asset.variants or {}).values():
-            if isinstance(meta, dict):
-                name = meta.get("filename")
-                if name:
-                    (root / name).unlink(missing_ok=True)
+        _unlink(self.tenant_dir(asset.tenant_id), asset.filename, asset.variants)
         await self.db.delete(asset)
         await self.db.flush()
+
+
+def _unlink(root: Path, filename: str, variants: dict | None) -> None:
+    """Remove an upload's original and every variant it wrote."""
+    (root / filename).unlink(missing_ok=True)
+    for meta in (variants or {}).values():
+        if isinstance(meta, dict) and meta.get("filename"):
+            (root / meta["filename"]).unlink(missing_ok=True)

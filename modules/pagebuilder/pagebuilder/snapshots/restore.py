@@ -210,7 +210,8 @@ class RestoreMixin(HostBase):
                 {**(staged.plan or {}), "applied": applied, "denied": denied}
             )[0]
             await self.db.flush()
-        except Exception as exc:
+        except BaseException as exc:
+            # BaseException: a cancelled approval leaves its files behind too.
             # `take` guards its own capture; this covers the apply below. The
             # raise still rolls the request's transaction back — pages, layout,
             # redirects, every section's rows and `_decide`'s status alike —
