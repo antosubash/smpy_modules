@@ -1,6 +1,6 @@
 {
   "name": "@simple-module-py/billing",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "private": true,
   "description": "Frontend assets for the Billing module",
   "peerDependencies": {
