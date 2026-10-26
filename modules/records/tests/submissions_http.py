@@ -62,11 +62,13 @@ def host_parts(app: Any, *, base_url: str = BASE_URL) -> None:
 async def _settle_mail(_response: Any) -> None:
     """Finish the mail a request spawned before the test sends the next one.
 
-    The after-commit send (``mail_runner._spawn``) opens its own session, and
-    in production that is its own pooled connection. Here every session shares
-    the one ``StaticPool`` connection to ``:memory:``, so a send still running
-    while the next request commits interleaves two transactions on one sqlite3
-    handle: "cannot commit transaction - SQL statements in progress" (#262).
+    The after-commit send (``mail_runner._spawn``) opens its own session; on a
+    default file-backed host that is its own pooled connection. Here every
+    session shares the one ``StaticPool`` connection to ``:memory:``, so a send
+    still running while the next request commits interleaves two transactions
+    on one sqlite3 handle: "cannot commit transaction - SQL statements in
+    progress" (#262). A host configured with ``sqlite+aiosqlite:///:memory:``
+    gets ``StaticPool`` too and has the same limitation.
     """
     await mail_runner.drain()
 
