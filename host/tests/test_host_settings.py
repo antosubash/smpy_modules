@@ -60,7 +60,13 @@ def _boot_main():
 
 
 def _statuses(app, n: int) -> list[int]:
-    with TestClient(app) as client:
+    """``n`` anonymous GETs of the public page, one request each.
+
+    Redirects are not followed: a fresh database sends the login page to the
+    setup wizard (302 → ``/setup``), itself public, so following it would
+    spend two of the same client's ``rate_limit_public`` slots per GET.
+    """
+    with TestClient(app, follow_redirects=False) as client:
         return [client.get(PUBLIC_PAGE).status_code for _ in range(n)]
 
 
@@ -74,8 +80,10 @@ def test_stored_rate_limit_takes_effect_after_restart(stored_limit):
     app = _boot_main()
     assert app.state.sm.settings.rate_limit_public == "2/minute"
     statuses = _statuses(app, 4)
-    assert statuses[0] == 200
-    assert 429 in statuses  # the default, 120/minute, would admit all four
+    # Exactly two admitted, then the limit; the default, 120/minute, would
+    # admit all four.
+    assert 429 not in statuses[:2], statuses
+    assert statuses[2:] == [429, 429], statuses
 
 
 def test_environment_wins_over_the_stored_value(stored_limit, monkeypatch):

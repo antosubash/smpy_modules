@@ -152,8 +152,9 @@ cwd-relative file (#124).
 `host/main.py` builds its settings with the framework's `merge_host_settings()`
 — what `create_app` does when given none — so a `host.*` row written on the
 Settings screen or with `scripts/set_setting.py host <field> <value>` is read
-at boot (#260; a bare `Settings()` reads the environment only and silently
-ignored every row). Precedence is the framework's: **env → database →
+at boot (#260). A bare `Settings()` reads the environment only, so before
+that the rows the app is *built* from were ignored; runtime fields were
+already hydrated onto `app.state` at lifespan start. Precedence is the framework's: **env → database →
 default**, `.env` counting as env. So a field `.env` sets (`SM_MULTI_TENANT`,
 `SM_I18N_SUPPORTED_LOCALES` in `.env.example`) cannot be changed from the
 database; delete the line first. Every host field the app is built from needs
@@ -165,8 +166,8 @@ a restart — the Settings screen marks them: tenancy (`multi_tenant`,
 fields (`api_*`, `openapi_public`) and the database pool (`db_*`).
 `maintenance_mode`/`maintenance_message`, `public_base_url` and
 `native_link_prefixes` are read per request and apply at once. Outside
-development an unreadable settings table fails the boot rather than starting
-on defaults (framework #494).
+`SM_ENVIRONMENT=development`/`testing` an unreadable settings table fails the boot
+rather than starting on defaults (framework #494).
 
 **Run Python entry points from the repo root.** `alembic.ini` resolves its
 `script_location` relative to itself and `dev-api` uses `--app-dir host`, so
