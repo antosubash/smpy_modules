@@ -643,7 +643,7 @@ restart.
   `public_submissions_retention_interval_seconds` (3600), deletes contact-form
   submissions past their type's retention, newsletter signups never confirmed
   within the list's unconfirmed purge (counted from when they last entered
-  pending), and the delivery rows of finished attempts older than
+  pending), and the delivery rows of attempts recorded complete older than
   `public_submissions_delivery_retention_days` (30) — an attempt that can
   still be retried keeps its rows. Only one process sweeps
   at a time: the sweep holds the framework lease

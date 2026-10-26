@@ -221,16 +221,18 @@ async def _sweep_type(run: _Run, key: str, swept: Swept) -> None:
 async def _sweep_tenant(run: _Run, swept: Swept) -> None:
     session = run.factory()
     try:
-        every = list(await list_types(session))
+        types = await list_types(session)
+        keys = [t.key for t in types if (t.public_submissions or {}).get("kind")]
     finally:
         await session.close()
-    for rtype in every:
-        if (rtype.public_submissions or {}).get("kind"):
-            await _sweep_type(run, rtype.key, swept)
-    await run.keep()
+    for key in keys:
+        await _sweep_type(run, key, swept)
     days = run.settings.public_submissions_delivery_retention_days
-    # Every type: a record of one that stopped accepting submissions has attempts too.
-    swept.deliveries += await prune_deliveries(run.session, every, run.now - timedelta(days=days))
+    # No type inventory goes in: pruning looks each record up itself, at prune
+    # time, and renews the lease (``run.keep``) before every commit.
+    swept.deliveries += await prune_deliveries(
+        run.session, run.now - timedelta(days=days), run.keep
+    )
 
 
 async def sweep(

@@ -525,11 +525,17 @@ sweep (`LeaseLost`).
 
 Delivery rows are pruned per tenant by **attempt**, never row by row
 (`retention_deliveries.py`): a sent marker is what stops a retried attempt
-from mailing that recipient again, so an attempt's rows go together, and only
-when the attempt is finished — every row sent, the newest send past
-`public_submissions_delivery_retention_days`, and the record's delivery mark
-(`sm_notified_at`/`sm_confirm_sent_at`) set — or when the record is gone. An
-attempt with a recipient never sent stays until the record is purged.
+from mailing that recipient again, so an attempt's rows go together. Whether
+an attempt is finished is **recorded, never inferred**: `send_all` writes a
+completion row (recipient `~attempt-complete`) once every recipient of the
+attempt's full set is sent, and only an attempt with that row, past
+`public_submissions_delivery_retention_days`, is pruned. (Inferring it from
+the rows present fails: a worker that mailed A and crashed before claiming B
+leaves only "sent" rows.) Two more cases go: a newsletter confirmation whose
+subscriber is no longer pending, which can never be resent; and any attempt
+whose record is verifiably gone, looked up at prune time by tenant and uuid
+in every record table at once (one statement, the trash included), never
+from a list of types read earlier. Each prune batch renews the lease first.
 
 ## The wire contracts
 

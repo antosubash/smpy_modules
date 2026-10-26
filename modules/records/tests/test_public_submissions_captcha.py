@@ -97,7 +97,13 @@ async def test_a_rejected_or_missing_response_is_captcha_failed(site, provider):
 
 @pytest.mark.parametrize(
     "fake",
-    [Provider(status=502), Provider(body="not json"), Provider(body="[1]")],
+    [
+        Provider(status=502),
+        Provider(body="not json"),
+        Provider(body="[1]"),
+        # A vouching answer too large to be one is not read, let alone trusted.
+        Provider(body='{"success": true, "pad": "' + "x" * 70_000 + '"}'),
+    ],
 )
 async def test_an_unreachable_provider_fails_closed(site, monkeypatch, fake):
     monkeypatch.setattr(

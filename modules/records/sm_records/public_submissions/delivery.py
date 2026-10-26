@@ -62,12 +62,14 @@ from sm_records.services.records import get_record
 from sm_records.services.types import get_type
 
 __all__ = [
+    "COMPLETE",
     "LEASE",
     "SEND_TIMEOUT",
     "DeliveryInProgress",
     "Slot",
     "attempt_of",
     "claim",
+    "complete",
     "load",
     "mark_sent",
     "release",
@@ -82,6 +84,36 @@ SEND_TIMEOUT: Final = timedelta(seconds=60)
 """How long one send may take before it counts as failed — well under
 :data:`LEASE`, so a live worker's claim never expires while it is sending.
 The framework's ``MailSender.send`` takes no timeout of its own."""
+
+COMPLETE: Final = "~attempt-complete"
+"""The recipient key of an attempt's completion row: written once every
+recipient of the attempt's full set is sent (:func:`complete`). No recipient
+key can be it — staff keys are addresses and subscriber keys are hex — and no
+claim is ever made for it. Pruning trusts only this row (or a record that is
+verifiably gone), never an inference from the rows that happen to exist."""
+
+
+async def complete(factory: SessionFactory, tenant: str, uuid: str, attempt: str) -> None:
+    """Stamp ``attempt`` finished. Idempotent: a second worker finishing the
+    same attempt finds the row there and leaves it."""
+    session = factory()
+    try:
+        session.add(
+            SubmissionDelivery(
+                tenant_id=tenant,
+                record_uuid=uuid,
+                attempt=attempt,
+                recipient=COMPLETE,
+                sent_at=utcnow(),
+            )
+        )
+        try:
+            await events.commit(session)
+        except IntegrityError:
+            await events.rollback(session)
+    finally:
+        await session.close()
+
 
 SessionFactory = Callable[[], AsyncSession]
 Claim = Literal["claimed", "sent", "busy", "gone"]

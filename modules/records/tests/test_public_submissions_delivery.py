@@ -177,3 +177,32 @@ async def test_a_send_that_hangs_is_cut_off_and_released(site, monkeypatch):
     site.outbox.send = real  # type: ignore[method-assign]
     await _run(site, event)
     assert _to(site) == ["alice@example.org"], "the released claim is retried at once"
+
+
+async def _complete_rows(site) -> list[str]:
+    with tenant_scope("default"):
+        session = site.db_state.session_factory()
+        try:
+            stmt = select(SubmissionDelivery.attempt).where(
+                SubmissionDelivery.recipient == delivery.COMPLETE
+            )
+            return list((await session.execute(stmt)).scalars().all())
+        finally:
+            await session.close()
+
+
+async def test_an_attempt_is_recorded_complete_only_once_everyone_is_sent(site):
+    """Pruning trusts this row alone (``retention_deliveries``)."""
+    transport = _durable(site)
+    await contact_type(site, notify_to=TWO)
+    await send(site)
+    (event,) = transport.events
+    site.outbox.fail_for = {"bob@example.org"}
+    with pytest.raises(OSError):
+        await _run(site, event)
+    assert await _complete_rows(site) == [], "bob is still owed: not complete"
+    site.outbox.fail_for = set()
+    await _run(site, event)
+    assert await _complete_rows(site) == [delivery.attempt_of(event)]
+    await _run(site, event)
+    assert len(await _complete_rows(site)) == 1, "a redelivery writes it once"

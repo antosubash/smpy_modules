@@ -67,4 +67,7 @@ async def send_all(
         raise delivery.DeliveryInProgress(
             f"another worker is still mailing submission {record.uuid}"
         )
+    # Every recipient of the attempt's full set is sent: say so explicitly,
+    # so pruning never has to infer it (:mod:`.retention_deliveries`).
+    await delivery.complete(factory, tenant, record.uuid, attempt)
     await try_system_update(db, rtype, record, mark(), settings=settings)

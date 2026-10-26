@@ -15,8 +15,6 @@ from sqlalchemy import select, update
 
 from tests.retention_support import (
     NOW,
-    claim,
-    claims,
     form,
     newsletter,
     record,
@@ -89,43 +87,6 @@ async def test_the_pending_window_opens_on_entering_pending_and_resends_do_not_e
     assert swept.purged == 1, f"window is {days} days"
     assert await uuids(db, "news") == {returned}
     assert resent not in await uuids(db, "news")
-
-
-async def test_only_finished_delivery_attempts_are_pruned(db):
-    await form(db, retention_days=0)
-    old = NOW - timedelta(days=31)
-    # A sent, B failed (claim given back): the attempt can still resume, so
-    # A's "sent" must survive however old it is, or the retry mails A again.
-    retrying = await record(db, "contact", age_days=0)
-    await claim(db, retrying, attempt="x", sent=old, who="a@x.org")
-    await claim(db, retrying, attempt="x", who="b@x.org")
-    # Everyone sent long ago and the record is marked notified: finished.
-    done = await record(db, "contact", age_days=0, sm_notified_at=NOW.isoformat())
-    await claim(db, done, attempt="y", sent=old, who="a@x.org")
-    await claim(db, done, attempt="y", sent=old, who="b@x.org")
-    # Finished but recent: kept until the horizon.
-    recent = await record(db, "contact", age_days=0, sm_notified_at=NOW.isoformat())
-    await claim(db, recent, attempt="z", sent=NOW, who="a@x.org")
-    # All rows sent, but the record was never marked: not known finished.
-    unmarked = await record(db, "contact", age_days=0)
-    await claim(db, unmarked, attempt="w", sent=old, who="a@x.org")
-    # The record is gone: nothing can resume, whatever the rows say.
-    await claim(db, "e" * 32, attempt="v", who="c@x.org")
-    await claim(db, "f" * 32, tenant="acme", sent=old, who="acme@x.org")
-
-    swept = await sweep(db)
-
-    assert swept.deliveries == 3
-    assert await claims(db) == sorted(
-        [
-            (retrying, "a@x.org"),
-            (retrying, "b@x.org"),
-            (recent, "a@x.org"),
-            (unmarked, "a@x.org"),
-        ]
-    )
-    # Another tenant's rows are never touched from this one's sweep.
-    assert await claims(db, "acme") == [("f" * 32, "acme@x.org")]
 
 
 class _LostLease:

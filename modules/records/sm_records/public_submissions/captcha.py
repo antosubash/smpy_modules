@@ -24,6 +24,7 @@ The widget's script comes from the provider's host, so the public pages'
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Callable
 from typing import Any, Final
@@ -61,6 +62,10 @@ PROVIDERS: Final[dict[str, dict[str, str]]] = {
 MAX_RESPONSE_LEN: Final = 8192
 """A Turnstile response is at most 2048 characters and an hCaptcha one a few
 thousand; far longer is not one (the body cap bounds it anyway)."""
+
+MAX_ANSWER_BYTES: Final = 64 * 1024
+"""The most of a provider's answer that is read: a verdict is a few hundred
+bytes, so a larger one is refused (fails closed) rather than buffered."""
 
 client_factory: Callable[[], httpx.AsyncClient] = lambda: httpx.AsyncClient(  # noqa: E731
     timeout=TIMEOUT_SECONDS
@@ -101,10 +106,17 @@ async def verify(settings: RecordsSettings, response: str | None, remote_ip: str
     if remote_ip and remote_ip != "unknown":  # ``abuse.client_ip``'s "no client" placeholder
         form["remoteip"] = remote_ip
     try:
-        async with client_factory() as client:
-            answer = await client.post(PROVIDERS[provider]["verify"], data=form)
-        answer.raise_for_status()
-        success = answer.json().get("success") is True
+        async with (
+            client_factory() as client,
+            client.stream("POST", PROVIDERS[provider]["verify"], data=form) as answer,
+        ):
+            answer.raise_for_status()
+            body = bytearray()
+            async for piece in answer.aiter_bytes():
+                body += piece
+                if len(body) > MAX_ANSWER_BYTES:
+                    raise ValueError("the provider's answer is too large")
+        success = json.loads(bytes(body)).get("success") is True
     except (httpx.HTTPError, ValueError, AttributeError) as exc:
         logger.warning("records: the %s CAPTCHA could not be verified: %s", provider, exc)
         raise SubmissionRefused(

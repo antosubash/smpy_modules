@@ -1454,7 +1454,11 @@ HMAC-SHA256 under the host's `secret_key` over the tenant, the type key, the
 digest, the issue time and the nonce. `digest` is a SHA-256 prefix of what
 the definition showed: the schema version, the public fields and the consent
 box with its text. It is stateless; rotating the
-secret invalidates outstanding tokens and costs a visitor one reload.
+secret invalidates outstanding tokens and costs a visitor one reload. Being
+stateless, a token can be sent more than once until it expires: the rate
+limits bound that, and the `RecordForm` block sends a burst of clicks as one
+submission, but a client that posts the same token twice stores two
+records — a deliberate trade-off.
 
 **The notification** goes to each `notify_to` address, never inside the
 request: through the outbox when the host has a durable transport
@@ -1503,10 +1507,10 @@ submissions older than the type's `retention_days` (`0` keeps them; the trash
 included), newsletter signups still pending `pending_purge_days` after they
 last entered pending (the signup, or a return from unsubscribed or the trash —
 `sm_consent_at`; a repeated signup or a *Resend* does not extend it), and the
-`records_submission_delivery` rows of finished delivery attempts: every
-recipient sent, the newest send older than
-`public_submissions_delivery_retention_days` and the record marked delivered —
-or the record gone. A record's eligibility is re-checked under the type lock
+`records_submission_delivery` rows of attempts recorded complete (every
+recipient of the attempt sent) once older than
+`public_submissions_delivery_retention_days`, of confirmations whose
+subscriber is no longer pending, and of records that no longer exist. A record's eligibility is re-checked under the type lock
 and its row lock before it is deleted, so one confirmed meanwhile is kept. It
 goes through the ordinary
 trash-then-purge path, so subscribers see `RecordTrashed` (for a live record)
