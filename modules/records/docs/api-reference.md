@@ -1472,7 +1472,9 @@ never both send, and a worker that stalled past its claim can neither release
 nor complete its successor's. A claim left by a crashed worker is taken over
 once it is ten minutes old; one send may take at most 60 seconds. An
 attempt's recipients are fixed when it first runs: a retry mails the
-addresses it started with, even after `notify_to` changes. A *Resend* is a new
+addresses it started with, even after `notify_to` changes — removing an
+address does not cancel an attempt already started, and adding one does not
+join it. A *Resend* is a new
 attempt, with the current recipients, and reaches everyone again. **One window remains**: a message
 the mail server accepted, followed by a crash before the send is recorded, is
 sent again by whoever takes the claim over — SMTP cannot be made exactly-once.

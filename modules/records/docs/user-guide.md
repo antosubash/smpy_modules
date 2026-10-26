@@ -1102,7 +1102,9 @@ every message becomes a record, or a newsletter list, one record per address.
    four as *Fields visitors fill in*. Fields you already added are kept.
 2. Put your team's address in **Notify** (one per line, up to ten). With
    nobody there, submissions are stored but nobody is emailed — the card says
-   so.
+   so. A change to the list applies to submissions from then on: an email
+   already being sent (or retried after a mail failure) still goes to the
+   addresses it started with, so removing an address does not cancel it.
 3. Optionally tick **Visitors must tick a consent checkbox** and write the
    consent text for each language your site publishes.
 4. Set **Allowed roles**: submissions are personal data, and without a role

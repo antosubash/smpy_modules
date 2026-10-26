@@ -123,9 +123,11 @@ async def verify(settings: RecordsSettings, response: str | None, remote_ip: str
                 raise ValueError(f"the provider answered with {encoding!r}, not identity")
             body = bytearray()
             async for piece in answer.aiter_raw():
-                body += piece
-                if len(body) > MAX_ANSWER_BYTES:
+                # Checked before appending: the buffer never holds more than
+                # the bound, however large one chunk is.
+                if len(body) + len(piece) > MAX_ANSWER_BYTES:
                     raise ValueError("the provider's answer is too large")
+                body += piece
         success = json.loads(bytes(body)).get("success") is True
     except (httpx.HTTPError, httpx.StreamError, ValueError, AttributeError) as exc:
         logger.warning("records: the %s CAPTCHA could not be verified: %s", provider, exc)

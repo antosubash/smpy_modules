@@ -204,3 +204,45 @@ async def test_a_compressed_answer_is_refused_unread(site, monkeypatch):
     refused = await send(site, captcha_response="good")
     assert refused.status_code == 503 and refused.json()["code"] == "captcha_unavailable"
     assert fake.encodings == ["identity"]
+
+
+class _Chunks(httpx.AsyncByteStream):
+    """An answer arriving in the given chunks, recording how many were read."""
+
+    def __init__(self, *chunks: bytes) -> None:
+        self.chunks = chunks
+        self.read = 0
+
+    async def __aiter__(self):
+        for chunk in self.chunks:
+            self.read += 1
+            yield chunk
+
+
+@pytest.mark.parametrize(("extra", "status"), [(0, 202), (1, 503)])
+async def test_the_answer_bound_is_exact_and_checked_before_buffering(
+    site, monkeypatch, extra, status
+):
+    """A verdict exactly at the bound is read; one byte more is refused as the
+    chunk that would cross it arrives — before it is buffered."""
+    head = b'{"success": true, "pad": "'
+    tail = b'"}'
+    pad = captcha.MAX_ANSWER_BYTES - len(head) - len(tail) + extra
+    body = head + b"x" * pad + tail
+    trailing = (b"never read",) if extra else ()
+    stream = _Chunks(body[:10], body[10:], *trailing)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, stream=stream)
+
+    monkeypatch.setattr(
+        captcha,
+        "client_factory",
+        lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    configure(site, **ON)
+    await contact_type(site)
+    answer = await send(site, captcha_response="good")
+    assert answer.status_code == status, answer.text
+    if status == 503:
+        assert stream.read == 2, "refused at the crossing chunk, the rest unread"
