@@ -65,6 +65,9 @@ test.describe('Trash', () => {
       .getByRole('alertdialog')
       .getByRole('button', { name: /^delete$/i })
       .click();
+    // Gone first, so the card being visible below means the undo brought it
+    // back — not that the board had not reloaded after the delete yet.
+    await expect(boardCard(page, 'draft', slug)).toHaveCount(0);
 
     // Ten seconds is the window; the click is what matters, not the timing.
     await page.getByRole('button', { name: /^undo$/i }).click();
@@ -113,6 +116,10 @@ test.describe('Trash', () => {
       .getByRole('alertdialog')
       .getByRole('button', { name: /^delete$/i })
       .click();
+    // The board reloads only once the DELETE has answered. Navigating before
+    // that aborts the request in flight, and the page never reaches the trash
+    // this test is about to open (#245).
+    await expect(boardCard(page, 'draft', slug)).toHaveCount(0);
 
     await page.goto('/pagebuilder/trash');
     await trashRow(page, slug)
