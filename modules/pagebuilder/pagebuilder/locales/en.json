@@ -993,7 +993,9 @@
     "restore_trigger": "Restore as draft",
     "restored": "Revision restored to draft.",
     "restored_created": "The restore created this page.",
-    "restored_from_snapshot": "Restored from snapshot #{id}"
+    "restored_from_snapshot": "Restored from snapshot #{id}",
+    "restored_with": "The same restore also changed: {sections}",
+    "restored_section": "{label} ({count})"
   },
   "import_review": {
     "applied": "Snapshot restored",
@@ -1013,7 +1015,9 @@
     "reject_placeholder": "Wrong bundle, stale content, …",
     "reject_title": "Reject this import",
     "someone": "someone",
-    "title": "Review import"
+    "title": "Review import",
+    "applied_section": "{section}: {counts}",
+    "denied_title": "Left out of this restore"
   },
   "inspector": {
     "tab_languages": "languages",
@@ -1205,7 +1209,14 @@
     "source_pre_restore": "Automatic, before a restore",
     "source_upload": "Uploaded",
     "untouched_one": "{count} page is on this site but not in this snapshot. It will not be deleted.",
-    "untouched_other": "{count} pages are on this site but not in this snapshot. They will not be deleted."
+    "untouched_other": "{count} pages are on this site but not in this snapshot. They will not be deleted.",
+    "overwrite_items_one": "{count} item will be overwritten, counting pages and the content below.",
+    "overwrite_items_other": "{count} items will be overwritten, counting pages and the content below.",
+    "sections": {
+      "absent": "{label} is not in this bundle and stays as it is.",
+      "skipped": "This bundle also carries {section} content, which this site cannot restore. It will be skipped.",
+      "empty": "This bundle carries {label} content, but restoring it changes nothing."
+    }
   },
   "row": {
     "delete": "Delete",
@@ -1286,11 +1297,14 @@
     "pending_hint": "An import is already awaiting approval",
     "restore": "Restore…",
     "staged_hint": "A restore staged from this snapshot is awaiting approval",
-    "untitled": "Snapshot #{id}"
+    "untitled": "Snapshot #{id}",
+    "section_count": "{label}: {count}",
+    "section_line": "{section} — {counts}",
+    "section_omitted": "{label} is not in this snapshot: whoever took it did not hold {permissions}."
   },
   "snapshots": {
     "description": "Snapshot the whole site, move it between hosts, and roll back to any point.",
-    "footnote": "Restoring never deletes: a page on the site but absent from the snapshot is left alone. Branding and news articles are not part of a snapshot.",
+    "footnote": "Restoring never deletes: a page on the site but absent from the snapshot is left alone. Branding and other modules' content are not part of a snapshot.",
     "generic_error": "Something went wrong",
     "pending_description": "Nothing has changed on the site yet. Someone with approval rights has to apply it.",
     "pending_review": "Review it",
@@ -1299,7 +1313,8 @@
     "taken": "Snapshot taken",
     "taken_description": "The site as it stands is now a restore point.",
     "title": "Import / Export",
-    "upload": "Upload bundle…"
+    "upload": "Upload bundle…",
+    "footnote_with_sections": "Restoring never deletes: anything on the site but absent from the snapshot is left alone. Besides pages, a snapshot carries {sections}. Branding is not part of a snapshot."
   },
   "toolbar": {
     "approve": "Approve",

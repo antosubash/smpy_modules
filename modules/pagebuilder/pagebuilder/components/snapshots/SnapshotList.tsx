@@ -3,9 +3,10 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { formatTimestamp } from '../../utils/dates';
 import { keys, useT } from '../../utils/i18n';
 import { formatBytes } from '../../utils/mediaFormat';
-import { downloadUrl, type Snapshot } from '../../utils/snapshotsApi';
+import { downloadUrl, type SectionLabels, type Snapshot } from '../../utils/snapshotsApi';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { contentsLine, missingMediaWarning, sourceLabel } from './planSummary';
+import { sectionContents } from './sectionSummary';
 
 /**
  * The restore points, newest first.
@@ -16,6 +17,7 @@ import { contentsLine, missingMediaWarning, sourceLabel } from './planSummary';
  */
 export function SnapshotList({
   snapshots,
+  sections = [],
   busy,
   hasPending,
   pendingSnapshotId,
@@ -23,6 +25,8 @@ export function SnapshotList({
   onDelete,
 }: {
   snapshots: Snapshot[];
+  /** The contributed sections registered here, to name each row's counts. */
+  sections?: SectionLabels[];
   busy: boolean;
   hasPending: boolean;
   /** The snapshot a staged-but-undecided restore targets, if any. */
@@ -47,7 +51,7 @@ export function SnapshotList({
           <li key={snapshot.id} className="flex flex-wrap items-start justify-between gap-4 p-4">
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">
+                <span className="font-medium [overflow-wrap:anywhere]">
                   {snapshot.note || t(keys.pagebuilder.snapshot_list.untitled, { id: snapshot.id })}
                 </span>
                 <Badge variant="secondary">{sourceLabel(snapshot.source)}</Badge>
@@ -55,6 +59,11 @@ export function SnapshotList({
               <p className="text-sm text-muted-foreground">
                 {contentsLine(snapshot)} · {formatBytes(snapshot.size_bytes)}
               </p>
+              {sectionContents(snapshot, sections).map((line) => (
+                <p key={line} className="text-sm text-muted-foreground">
+                  {line}
+                </p>
+              ))}
               <p className="text-xs text-muted-foreground">
                 {formatTimestamp(snapshot.created_at, locale)}
                 {snapshot.created_by ? ` · ${snapshot.created_by}` : ''}

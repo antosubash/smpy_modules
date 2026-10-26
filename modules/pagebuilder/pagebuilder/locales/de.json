@@ -993,7 +993,9 @@
     "restore_trigger": "Als Entwurf wiederherstellen",
     "restored": "Version als Entwurf wiederhergestellt.",
     "restored_created": "Die Wiederherstellung hat diese Seite angelegt.",
-    "restored_from_snapshot": "Aus Snapshot #{id} wiederhergestellt"
+    "restored_from_snapshot": "Aus Snapshot #{id} wiederhergestellt",
+    "restored_with": "Dieselbe Wiederherstellung hat außerdem geändert: {sections}",
+    "restored_section": "{label} ({count})"
   },
   "import_review": {
     "applied": "Snapshot wiederhergestellt",
@@ -1013,7 +1015,9 @@
     "reject_placeholder": "Falsches Bundle, veraltete Inhalte, …",
     "reject_title": "Diesen Import ablehnen",
     "someone": "jemand",
-    "title": "Import prüfen"
+    "title": "Import prüfen",
+    "applied_section": "{section}: {counts}",
+    "denied_title": "Nicht Teil dieser Wiederherstellung"
   },
   "inspector": {
     "tab_languages": "Sprachen",
@@ -1205,7 +1209,14 @@
     "source_pre_restore": "Automatisch, vor einer Wiederherstellung",
     "source_upload": "Hochgeladen",
     "untouched_one": "{count} Seite befindet sich auf dieser Website, aber nicht in diesem Snapshot. Sie wird nicht gelöscht.",
-    "untouched_other": "{count} Seiten befinden sich auf dieser Website, aber nicht in diesem Snapshot. Sie werden nicht gelöscht."
+    "untouched_other": "{count} Seiten befinden sich auf dieser Website, aber nicht in diesem Snapshot. Sie werden nicht gelöscht.",
+    "overwrite_items_one": "{count} Eintrag wird überschrieben, Seiten und die Inhalte unten zusammengezählt.",
+    "overwrite_items_other": "{count} Einträge werden überschrieben, Seiten und die Inhalte unten zusammengezählt.",
+    "sections": {
+      "absent": "{label} ist nicht in diesem Bundle enthalten und bleibt, wie es ist.",
+      "skipped": "Dieses Bundle enthält auch Inhalte von {section}, die diese Website nicht wiederherstellen kann. Sie werden übersprungen.",
+      "empty": "Dieses Bundle enthält Inhalte von {label}, aber ihre Wiederherstellung ändert nichts."
+    }
   },
   "row": {
     "delete": "Löschen",
@@ -1286,11 +1297,14 @@
     "pending_hint": "Ein Import wartet bereits auf Freigabe",
     "restore": "Wiederherstellen …",
     "staged_hint": "Eine aus diesem Snapshot bereitgestellte Wiederherstellung wartet auf Freigabe",
-    "untitled": "Snapshot #{id}"
+    "untitled": "Snapshot #{id}",
+    "section_count": "{label}: {count}",
+    "section_line": "{section} — {counts}",
+    "section_omitted": "{label} ist nicht in diesem Snapshot: Wer ihn erstellt hat, hatte {permissions} nicht."
   },
   "snapshots": {
     "description": "Die ganze Website als Snapshot sichern, zwischen Hosts übertragen und zu jedem Zeitpunkt zurückkehren.",
-    "footnote": "Wiederherstellen löscht nie etwas: Eine Seite, die auf der Website vorhanden, aber nicht im Snapshot enthalten ist, bleibt unberührt. Branding und News-Artikel sind nicht Teil eines Snapshots.",
+    "footnote": "Wiederherstellen löscht nie etwas: Eine Seite, die auf der Website vorhanden, aber nicht im Snapshot enthalten ist, bleibt unberührt. Branding und die Inhalte anderer Module sind nicht Teil eines Snapshots.",
     "generic_error": "Etwas ist schiefgegangen",
     "pending_description": "Auf der Website hat sich noch nichts geändert. Jemand mit Freigaberechten muss es anwenden.",
     "pending_review": "Prüfen",
@@ -1299,7 +1313,8 @@
     "taken": "Snapshot erstellt",
     "taken_description": "Die Website im aktuellen Zustand ist jetzt ein Wiederherstellungspunkt.",
     "title": "Import / Export",
-    "upload": "Bundle hochladen …"
+    "upload": "Bundle hochladen …",
+    "footnote_with_sections": "Wiederherstellen löscht nie etwas: Was auf der Website vorhanden, aber nicht im Snapshot enthalten ist, bleibt unberührt. Neben den Seiten enthält ein Snapshot {sections}. Branding ist nicht Teil eines Snapshots."
   },
   "toolbar": {
     "approve": "Freigeben",

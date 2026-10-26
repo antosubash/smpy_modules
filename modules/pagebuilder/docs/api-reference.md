@@ -218,19 +218,25 @@ asset's URL (current or pre-tenancy flat URL).
 
 | Route | Permission | Body / returns |
 |---|---|---|
-| `GET /snapshots` | auth | `{"items": [SnapshotRead]}` |
+| `GET /snapshots` | auth | `{"items": [SnapshotRead], "sections": [SectionLabels]}` |
 | `POST /snapshots` | `pagebuilder.publish` | `{"note"?}` → 201 `SnapshotRead` |
 | `GET /snapshots/{id}/download` | `pagebuilder.publish` | `application/zip`, `content-snapshot-{id}.zip` |
 | `POST /snapshots/upload` | `pagebuilder.publish` | multipart `file` → 201 `SnapshotRead`; 413 over `snapshot_max_upload_bytes`; 422 invalid bundle |
 | `DELETE /snapshots/{id}` | `pagebuilder.publish` | 204 |
 | `POST /snapshots/{id}/restore` | `pagebuilder.publish` | 201 `PendingImportRead`; writes nothing to the site; 409 if one is pending |
-| `GET /imports/pending` | auth | `PendingImportRead` or `null` |
+| `GET /imports/pending` | `pagebuilder.publish` or `.approve` | `PendingImportRead` or `null`; a contributed section's rows only for a reader holding its capture permissions |
 | `POST /imports/{id}/approve` | `pagebuilder.approve` | `ImportApplyResponse` |
 | `POST /imports/{id}/reject` | `pagebuilder.approve` | `{"note"?}` → `PendingImportRead` |
 
 `PageRestoreMarker`: `import_id`, `snapshot_id`, `change` (`created` |
-`overwritten`), `restored_at`, `restored_by` — one per approved snapshot restore
-that wrote the page. Not a revision: there is nothing to diff or restore.
+`overwritten`), `restored_at`, `restored_by`, `sections` (`[{section,
+label_key, count}]`: how many rows the same restore wrote in each contributed
+section, #80) — one per approved snapshot restore that wrote the page. Not a
+revision: there is nothing to diff or restore.
+
+`SectionLabels` (#80): `section`, `label_key`, `count_label_keys` — how the
+screens name a contributed section registered on this host. Both keys are the
+contributor's, resolved by the client.
 
 `SnapshotRead`: `id`, `note`, `source` (`manual` | `upload` | `pre_restore`),
 `format_version` (the bundle's major — an upload keeps the one it arrived with),
@@ -240,10 +246,16 @@ required section this build cannot restore, and for a manifest whose sections
 do not account for the archive (see bundle-format.md, *Reading rules*).
 `PendingImportRead`: `id`, `snapshot_id`, `plan`, `status` (`pending` |
 `approved` | `rejected`), `note`, `created_*`, `decided_at`, `decided_by`.
-Once approved, `plan.applied` is `{created: [{id, created_at}], overwritten: [...]}`
-— what the apply actually wrote, which the history markers read.
+`plan` also carries `sections`, `denied`, `skipped` and `absent` for contributed
+sections (shapes in [bundle-format.md](bundle-format.md), *How the plan names a
+section*). Once approved, `plan.applied` is keyed by section:
+`{"pagebuilder": {created: [{id, created_at}], overwritten: [...]}, "<section>": {...}}`
+— what the apply actually wrote, which the history markers read (rows approved
+before #80 hold pagebuilder's lists at the top level, and still read).
 `ImportApplyResponse`: `pages_created`, `pages_updated`, `media_added`,
-`redirects`, `redirects_dropped` (slugs). Deciding an import twice is 409
+`redirects`, `redirects_dropped` (slugs), `sections` (`{section: {kind:
+count}}`, what each contributed section wrote) and `denied_sections` (sections
+left out for want of permission). Deciding an import twice is 409
 `Import already decided`. Self-approval is allowed.
 
 ## Public routes
@@ -279,6 +291,19 @@ session with none bound answers `([], 0)`. Pages match title, slug and draft
 body, never trashed, unpublished only with `include_drafts`, every language
 unless `locale` is given; media match the uploaded or stored filename. News'
 admin search is the consumer (#130).
+
+**`pagebuilder.contracts.bundle`** (#80) lets a module add a section to the
+content bundle: `BundleSection` (Protocol), `register_section(app, section)`
+(`False` when pagebuilder is not mounted; `ValueError` for a reserved, invalid
+or duplicate name), the contexts `CaptureContext`, `ValidateContext`,
+`RestoreContext`, the results `SectionCapture`, `PlanLine`, `PlanItem`,
+`SectionPlan`, `SectionApplied`, `TenantMismatchError`, and
+`match_by_identity` (the page matcher, reusable for any row with a translation
+group, locale and slug). A section applies through the restore's own session
+and bound tenant, after pagebuilder's part and in name order; it flushes, never
+commits, never opens a session and never resolves a tenant, and anything it
+raises rolls the whole restore back. News is the consumer; see
+[bundle-format.md](bundle-format.md#contributed-sections).
 
 **`PageDeleted(page_id, slug)`** (`pagebuilder.contracts.events`) is published
 on the event bus when a page is *purged* — not when it is trashed, since a

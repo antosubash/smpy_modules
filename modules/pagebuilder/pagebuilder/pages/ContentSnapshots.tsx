@@ -4,28 +4,35 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 
 import { SnapshotList } from '../components/snapshots/SnapshotList';
+import { snapshotFootnote } from '../components/snapshots/sectionSummary';
 import { UploadBundleDialog } from '../components/snapshots/UploadBundleDialog';
 import { useSnapshots } from '../hooks/useSnapshots';
 import { keys, useT } from '../utils/i18n';
-import type { PendingImport, Snapshot } from '../utils/snapshotsApi';
+import type { PendingImport, SectionLabels, Snapshot } from '../utils/snapshotsApi';
 
 interface Props {
   snapshots: Snapshot[];
   pending: PendingImport | null;
+  /** The contributed sections registered on this host (#80). */
+  sections?: SectionLabels[];
 }
 
 /**
  * Import / Export — the site's restore points.
  *
  * A snapshot holds every page, redirect, the site layout and the media
- * library. It deliberately does not hold branding or another module's content:
- * pagebuilder does not depend on those, and a snapshot that quietly reached
- * across module boundaries would restore things its owner never chose to
- * capture.
+ * library, plus what other modules contribute through the bundle contract
+ * (#80: news' articles). It does not hold branding, nor content a module did
+ * not choose to contribute: a snapshot that quietly reached across module
+ * boundaries would restore things their owner never chose to capture.
  */
 function ContentSnapshots() {
   const { t } = useT();
-  const { snapshots, pending } = usePage<{ props: Props }>().props as unknown as Props;
+  const {
+    snapshots,
+    pending,
+    sections = [],
+  } = usePage<{ props: Props }>().props as unknown as Props;
   const state = useSnapshots(snapshots, pending);
 
   return (
@@ -68,6 +75,7 @@ function ContentSnapshots() {
 
         <SnapshotList
           snapshots={state.snapshots}
+          sections={sections}
           busy={state.busy}
           hasPending={state.pending !== null}
           pendingSnapshotId={state.pending?.snapshot_id ?? null}
@@ -75,9 +83,7 @@ function ContentSnapshots() {
           onDelete={state.remove}
         />
 
-        <p className="mt-6 text-xs text-muted-foreground">
-          {t(keys.pagebuilder.snapshots.footnote)}
-        </p>
+        <p className="mt-6 text-xs text-muted-foreground">{snapshotFootnote(sections)}</p>
       </PageShell>
     </>
   );

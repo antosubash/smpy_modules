@@ -66,6 +66,8 @@ async def admin_content(
         {
             "snapshots": snapshots,
             "pending": await _pending_props(service),
+            # The contributed sections registered here, to label each row's counts.
+            "sections": service.sections.labels(),
         },
     )
 
@@ -78,5 +80,5 @@ async def admin_content_review(
     """The staged restore's plan, for an approver to accept or reject."""
     return await inertia.render(
         _PAGE_IMPORT_REVIEW,
-        {"pending": await _pending_props(service)},
+        {"pending": await _pending_props(service), "sections": service.sections.labels()},
     )

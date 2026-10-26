@@ -574,7 +574,11 @@
       "articles": "Artikel",
       "categories": "Kategorien",
       "tags": "Schlagwörter",
-      "redirects": "Weiterleitungen"
+      "redirects": "Weiterleitungen",
+      "created": "Angelegte Artikel",
+      "overwritten": "Überschriebene Artikel",
+      "redirects_dropped": "Verworfene Weiterleitungen",
+      "category_respelled": "Artikel mit neuer Kategorie-Schreibweise"
     },
     "plan": {
       "new": "Neue Artikel",

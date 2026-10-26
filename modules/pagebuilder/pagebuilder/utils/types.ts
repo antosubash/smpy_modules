@@ -115,6 +115,8 @@ export interface PageRestoreMarker {
   change: 'created' | 'overwritten';
   restored_at: string;
   restored_by: string | null;
+  /** How many rows the same restore wrote in each contributed section (#80). */
+  sections?: { section: string; label_key: string | null; count: number }[];
 }
 
 export interface MediaAssetVariant {

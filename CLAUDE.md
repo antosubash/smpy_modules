@@ -83,7 +83,9 @@ code `tenant_required`); billing reads the same `request.state.tenant_id`
 through `context.billing_context`. Another module reads pagebuilder only
 through `pagebuilder.contracts` (news' search calls
 `search_pages`/`search_media`, #130); the caller names the tenant and the
-contract pins `tenant_id` itself.
+contract pins `tenant_id` itself. A bundle section
+(`pagebuilder.contracts.bundle`, #80) applies through the restore's own
+session and bound tenant, and never commits or resolves a tenant itself.
 
 **Records' website-submission routes are anonymous writes (#101).** The record
 type is the trust anchor: never trust the `RecordForm` block's props —
