@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 TASK_ATTR = "retention_task"
 """Where the module instance keeps its task."""
 
+FIRST_SWEEP_AFTER = 60
+"""Seconds from startup to the first sweep — past the boot's own work."""
+
 
 def _settings(app: Any, module: Any) -> RecordsSettings:
     services = getattr(app.state, constants.PACKAGE, None)
@@ -40,10 +43,13 @@ def _settings(app: Any, module: Any) -> RecordsSettings:
 async def _run(app: Any, module: Any) -> None:
     factory = app.state.sm.db.session_factory
     bus = getattr(app.state.sm, "event_bus", None)
+    # The first sweep soon after startup rather than a whole interval later:
+    # a host restarted more often than the interval would otherwise never sweep.
+    delay = FIRST_SWEEP_AFTER
     while True:
+        await asyncio.sleep(delay)
         settings = _settings(app, module)
-        await asyncio.sleep(settings.public_submissions_retention_interval_seconds)
-        settings = _settings(app, module)
+        delay = settings.public_submissions_retention_interval_seconds
         if not settings.public_submissions_retention_enabled:
             continue
         try:

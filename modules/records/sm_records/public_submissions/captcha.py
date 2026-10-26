@@ -58,8 +58,9 @@ PROVIDERS: Final[dict[str, dict[str, str]]] = {
 """Each provider's verify endpoint, and the host its widget loads from (what
 ``public_csp`` has to name)."""
 
-MAX_RESPONSE_LEN: Final = 4096
-"""A widget response is a few hundred characters; anything longer is not one."""
+MAX_RESPONSE_LEN: Final = 8192
+"""A Turnstile response is at most 2048 characters and an hCaptcha one a few
+thousand; far longer is not one (the body cap bounds it anyway)."""
 
 client_factory: Callable[[], httpx.AsyncClient] = lambda: httpx.AsyncClient(  # noqa: E731
     timeout=TIMEOUT_SECONDS
@@ -97,7 +98,7 @@ async def verify(settings: RecordsSettings, response: str | None, remote_ip: str
     if not response or len(response) > MAX_RESPONSE_LEN:
         raise SubmissionRefused("captcha_failed", "complete the CAPTCHA and send the form again")
     form: dict[str, Any] = {"secret": secret, "response": response}
-    if remote_ip:
+    if remote_ip and remote_ip != "unknown":  # ``abuse.client_ip``'s "no client" placeholder
         form["remoteip"] = remote_ip
     try:
         async with client_factory() as client:

@@ -87,7 +87,7 @@ async def test_a_vouched_response_is_stored(site, provider, provider_name, url):
 async def test_a_rejected_or_missing_response_is_captcha_failed(site, provider):
     configure(site, **ON)
     await contact_type(site)
-    for extra in ({"captcha_response": "bad"}, {}, {"captcha_response": "x" * 5000}):
+    for extra in ({"captcha_response": "bad"}, {}, {"captcha_response": "x" * 9000}):
         refused = await send(site, **extra)
         assert refused.status_code == 400, refused.text
         assert refused.json()["code"] == "captcha_failed"

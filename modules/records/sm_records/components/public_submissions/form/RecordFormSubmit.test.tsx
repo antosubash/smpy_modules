@@ -8,13 +8,20 @@ vi.mock('@simple-module-py/pagebuilder/pagebuilder/components/widgets/_shared', 
   Section: ({ children }: { children: unknown }) => <section>{children as never}</section>,
 }));
 
-// The provider's script cannot load here; the widget's own loader is not
-// what these tests are about.
-vi.mock('./CaptchaWidget', () => ({
-  CaptchaWidget: ({ round }: { round: number }) => (
-    <div data-testid="records-form-captcha" data-round={round} />
-  ),
-}));
+// The provider's script cannot load here: a stand-in widget hands over a
+// response at once (unless a test sets `widget.token` to '').
+const widget = vi.hoisted(() => ({ token: 'cap-token' }));
+vi.mock('./CaptchaWidget', async () => {
+  const { useEffect } = await import('react');
+  return {
+    CaptchaWidget: ({ round, onToken }: { round: number; onToken: (t: string) => void }) => {
+      useEffect(() => {
+        if (widget.token) onToken(widget.token);
+      }, [round, onToken]);
+      return <div data-testid="records-form-captcha" data-round={round} />;
+    },
+  };
+});
 
 const { RecordFormRender } = await import('./RecordFormRender');
 

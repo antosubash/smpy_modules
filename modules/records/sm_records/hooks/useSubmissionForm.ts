@@ -243,6 +243,8 @@ export function useSubmissionForm({
       return refuse({ key: form.invalid }, first);
     }
     setFieldErrors({});
+    // A CAPTCHA not yet completed would only come back `captcha_failed`.
+    if (definition.captcha && !captcha.current) return refuse({ key: errors.captcha_failed });
     setProblem(null);
     return send(definition, false);
   };

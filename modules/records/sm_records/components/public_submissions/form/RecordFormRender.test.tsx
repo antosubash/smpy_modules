@@ -8,11 +8,20 @@ vi.mock('@simple-module-py/pagebuilder/pagebuilder/components/widgets/_shared', 
   Section: ({ children }: { children: unknown }) => <section>{children as never}</section>,
 }));
 
-// The provider's script cannot load here; the widget's own loader is not
-// what these tests are about.
-vi.mock('./CaptchaWidget', () => ({
-  CaptchaWidget: () => <div data-testid="records-form-captcha" />,
-}));
+// The provider's script cannot load here: a stand-in widget hands over a
+// response at once (unless a test sets `widget.token` to '').
+const widget = vi.hoisted(() => ({ token: 'cap-token' }));
+vi.mock('./CaptchaWidget', async () => {
+  const { useEffect } = await import('react');
+  return {
+    CaptchaWidget: ({ round, onToken }: { round: number; onToken: (t: string) => void }) => {
+      useEffect(() => {
+        if (widget.token) onToken(widget.token);
+      }, [round, onToken]);
+      return <div data-testid="records-form-captcha" data-round={round} />;
+    },
+  };
+});
 
 const { RecordFormRender } = await import('./RecordFormRender');
 
@@ -139,7 +148,7 @@ describe('RecordFormRender', () => {
     await setValue(input(view, 'name') as HTMLInputElement, 'Ada');
     await setValue(input(view, 'email') as HTMLInputElement, 'ada@example.org');
     await send(view);
-    expect(JSON.parse(String(calls[1].init?.body))).toHaveProperty('captcha_response', '');
+    expect(JSON.parse(String(calls[1].init?.body))).toHaveProperty('captcha_response', 'cap-token');
     expect(view.find('[role="alert"]')?.textContent).toContain('security check');
     await view.unmount();
   });
@@ -163,5 +172,25 @@ describe('RecordFormRender', () => {
     expect(view.find('[data-testid="records-form-captcha"]')).not.toBeNull();
     expect((input(view, 'name') as HTMLInputElement).value).toBe('Ada');
     await view.unmount();
+  });
+
+  it('an unfinished CAPTCHA is asked for before anything is sent', async () => {
+    widget.token = '';
+    try {
+      const calls = server({
+        status: 200,
+        body: definition({ captcha: { provider: 'turnstile', site_key: 'k' }, consent: null }),
+      });
+      const view = await mount(block());
+      await settle();
+      await setValue(input(view, 'name') as HTMLInputElement, 'Ada');
+      await setValue(input(view, 'email') as HTMLInputElement, 'ada@example.org');
+      await send(view);
+      expect(calls).toHaveLength(1);
+      expect(view.find('[role="alert"]')?.textContent).toContain('security check');
+      await view.unmount();
+    } finally {
+      widget.token = 'cap-token';
+    }
   });
 });

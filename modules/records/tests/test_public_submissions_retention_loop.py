@@ -86,3 +86,23 @@ async def test_started_once_and_stopped_on_shutdown(monkeypatch):
     no_db = SimpleNamespace(state=SimpleNamespace(sm=SimpleNamespace(db=None)))
     retention_loop.start(module, no_db)
     assert getattr(module, retention_loop.TASK_ATTR) is None, "no database, nothing to sweep"
+
+
+async def test_the_first_sweep_comes_soon_after_startup(monkeypatch):
+    """A host restarted more often than the interval still sweeps."""
+    slept: list[float] = []
+
+    async def fake_sweep(*_args, **_kwargs):
+        return None
+
+    async def fake_sleep(seconds):
+        slept.append(seconds)
+        if len(slept) > 2:
+            raise RuntimeError("stop")
+
+    monkeypatch.setattr(retention_loop, "sweep", fake_sweep)
+    monkeypatch.setattr(retention_loop.asyncio, "sleep", fake_sleep)
+    settings = RecordsSettings(public_submissions_retention_interval_seconds=7200)
+    with pytest.raises(RuntimeError):
+        await retention_loop._run(_app(settings), SimpleNamespace(settings=None))
+    assert slept == [retention_loop.FIRST_SWEEP_AFTER, 7200, 7200]
