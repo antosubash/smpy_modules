@@ -232,13 +232,14 @@ async def _sweep_type(run: _Run, key: str, swept: Swept) -> None:
                     purged += 1
                 else:
                     skip.add(current)
+            current = None  # a refusal from here on is the commit's, not a record's
             await run.keep()
             await events.commit(session)
             swept.purged += purged
         except (Conflict, NotFound) as exc:
             await events.rollback(session)
             if current is None:
-                return  # the type itself went away mid-sweep
+                return  # the type went away, or the commit refused: next sweep
             logger.warning("records: retention skipped %s/%s: %s", key, current, exc.detail)
             skip.add(current)
             swept.skipped += 1
@@ -255,14 +256,16 @@ async def _sweep_type(run: _Run, key: str, swept: Swept) -> None:
 async def _sweep_tenant(run: _Run, swept: Swept) -> None:
     session = run.factory()
     try:
-        types = [t for t in await list_types(session) if (t.public_submissions or {}).get("kind")]
+        every = list(await list_types(session))
     finally:
         await session.close()
-    for rtype in types:
-        await _sweep_type(run, rtype.key, swept)
+    for rtype in every:
+        if (rtype.public_submissions or {}).get("kind"):
+            await _sweep_type(run, rtype.key, swept)
     await run.keep()
     days = run.settings.public_submissions_delivery_retention_days
-    swept.deliveries += await prune_deliveries(run.session, types, run.now - timedelta(days=days))
+    # Every type: a record of one that stopped accepting submissions has attempts too.
+    swept.deliveries += await prune_deliveries(run.session, every, run.now - timedelta(days=days))
 
 
 async def sweep(

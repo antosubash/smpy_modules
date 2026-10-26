@@ -53,11 +53,12 @@ async def _marks(session: Any, types: Sequence[RecordType], uuids: list[str]) ->
     found: dict[str, bool] = {}
     for rtype in types:
         cls = tables_for(rtype).record
-        for start in range(0, len(uuids), _CHUNK):
+        todo = [uuid for uuid in uuids if uuid not in found]
+        for start in range(0, len(todo), _CHUNK):
             stmt = select(cls.uuid, cls.data).where(
                 cls.tenant_id == tenant,
                 cls.type_id == rtype.id,
-                cls.uuid.in_(uuids[start : start + _CHUNK]),
+                cls.uuid.in_(todo[start : start + _CHUNK]),
             )
             rows = await session.execute(stmt.execution_options(include_deleted=True))
             for uuid, data in rows.all():

@@ -167,4 +167,28 @@ describe('RecordFormRender — sending', () => {
     expect(Number(after)).toBeGreaterThan(Number(before));
     await view.unmount();
   });
+
+  it('form_changed is refused before the CAPTCHA check, so the response is kept', async () => {
+    const withCaptcha = definition({
+      captcha: { provider: 'turnstile', site_key: 'k' },
+      consent: null,
+    });
+    const calls = server(
+      { status: 200, body: withCaptcha },
+      {
+        status: 409,
+        body: { code: 'form_changed', definition: { ...withCaptcha, token: 'tok-9' } },
+      },
+    );
+    const view = await mount(block());
+    await settle();
+    const before = view.find('[data-testid="records-form-captcha"]')?.getAttribute('data-round');
+    await setValue(input(view, 'name') as HTMLInputElement, 'Ada');
+    await setValue(input(view, 'email') as HTMLInputElement, 'ada@example.org');
+    await send(view);
+    expect(calls).toHaveLength(2);
+    const after = view.find('[data-testid="records-form-captcha"]')?.getAttribute('data-round');
+    expect(after).toBe(before);
+    await view.unmount();
+  });
 });

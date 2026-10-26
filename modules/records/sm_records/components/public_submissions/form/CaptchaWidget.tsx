@@ -41,7 +41,10 @@ export function loadCaptcha(provider: Provider): Promise<Api> {
     const ready = () => {
       const api = (window as unknown as Record<string, Api | undefined>)[global];
       if (api) resolve(api);
-      else reject(new Error(`${provider} did not load`));
+      else {
+        loading.delete(provider);
+        reject(new Error(`${provider} did not load`));
+      }
     };
     const script = document.createElement('script');
     script.src = src;
@@ -89,6 +92,7 @@ export function CaptchaWidget({
           ...(lang ? (provider === 'turnstile' ? { language: lang } : { hl: lang }) : {}),
           callback: (token: string) => callback.current(token),
           'expired-callback': () => callback.current(''),
+          'error-callback': () => callback.current(''),
         });
       })
       .catch(() => callback.current(''));

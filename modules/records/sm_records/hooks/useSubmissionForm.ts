@@ -110,7 +110,7 @@ export function useSubmissionForm({
   }, []);
 
   /** Render `next`. `keepCaptcha` when the server refused before it checked
-   *  the CAPTCHA (`form_expired`), so the response is still unused. */
+   *  the CAPTCHA (`form_expired`, `form_changed`), so the response is still unused. */
   const adopt = useCallback(
     (next: SubmissionDefinition, previous: FormValues = {}, keepCaptcha = false) => {
       setDefinition(next);
@@ -172,7 +172,7 @@ export function useSubmissionForm({
       }
     }
     if (result.code === 'form_changed') {
-      adopt(result.definition ?? current, values);
+      adopt(result.definition ?? current, values, true);
       setChanged(true);
       return refuse({ key: form.changed });
     }
@@ -226,8 +226,10 @@ export function useSubmissionForm({
     }
     // Any refusal after the token check may have spent the response (a 422
     // comes after verification), so the widget starts over -- except
-    // `form_expired`, refused before it, whose resend reuses the response.
-    if (current.captcha && result.code !== 'form_expired') resetCaptcha();
+    // `form_expired` and `form_changed`, refused before it: the response is
+    // still unused and the resend reuses it.
+    const beforeCheck = result.code === 'form_expired' || result.code === 'form_changed';
+    if (current.captcha && !beforeCheck) resetCaptcha();
     return refused(result, current, retried);
   };
 
