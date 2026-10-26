@@ -21,8 +21,8 @@ import sys
 from pathlib import Path
 
 from simple_module_db.tenancy import DEFAULT_TENANT_ID
+from simple_module_hosting import merge_host_settings
 from simple_module_hosting.app_builder import create_app
-from simple_module_hosting.settings import Settings
 
 HOST_DIR = Path(__file__).resolve().parents[1] / "host"
 COUNTER, GAUGE = "demo.exports", "demo.jobs"
@@ -37,7 +37,7 @@ async def _seed(tenant_id: str) -> None:
     from sm_billing.metering.validate import TTL_MAX
     from sm_billing.plans import seed_default_plan
 
-    app = create_app(Settings())
+    app = create_app(merge_host_settings())
     demo_meters.register(app)
     factory = app.state.sm.db.session_factory
     await seed_default_plan(factory)

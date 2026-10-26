@@ -165,9 +165,11 @@ a restart — the Settings screen marks them: tenancy (`multi_tenant`,
 `forwarded_host_allowlist`), CORS, `session_cookie_secure`, the OpenAPI
 fields (`api_*`, `openapi_public`) and the database pool (`db_*`).
 `maintenance_mode`/`maintenance_message`, `public_base_url` and
-`native_link_prefixes` are read per request and apply at once. Outside
-`SM_ENVIRONMENT=development`/`testing` an unreadable settings table fails the boot
-rather than starting on defaults (framework #494).
+`native_link_prefixes` are read per request and apply at once. A database
+without the settings table yet (a fresh install) boots on env and defaults;
+outside `SM_ENVIRONMENT=development`/`testing`, a connection or query failure
+while reading it fails the boot instead (framework #494). The headless scripts
+(`set_setting.py`, `seed_usage.py`) build their app the same way.
 
 **Run Python entry points from the repo root.** `alembic.ini` resolves its
 `script_location` relative to itself and `dev-api` uses `--app-dir host`, so

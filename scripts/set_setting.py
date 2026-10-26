@@ -30,14 +30,14 @@ import sys
 from settings.hydrate import value_type_for_field
 from settings.service import SettingService
 from settings.store import SettingsStore
+from simple_module_hosting import merge_host_settings
 from simple_module_hosting.app_builder import create_app
-from simple_module_hosting.settings import Settings
 
 _USAGE = "usage: set_setting.py <package> <field> <value> [<field> <value> ...]"
 
 
 async def _write(package: str, pairs: list[tuple[str, str]]) -> None:
-    app = create_app(Settings())
+    app = create_app(merge_host_settings())
     registry = app.state.settings.module_registry
     cls = registry.get(package)
     if cls is None:
@@ -63,7 +63,7 @@ async def _write(package: str, pairs: list[tuple[str, str]]) -> None:
                 except json.JSONDecodeError as exc:
                     raise SystemExit(
                         f"{package}.{field} is stored as JSON and {raw!r} is not "
-                        f'valid JSON ({exc}). A string value is quoted: \'"{raw}"\''
+                        f"valid JSON ({exc}). A string value is quoted: '\"{raw}\"'"
                     ) from exc
             await store.set_override(package, field, raw, value_type)
             print(f"{package}.{field} = {raw} ({value_type})")

@@ -12,12 +12,14 @@ from __future__ import annotations
 
 import importlib
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from simple_module_core.dotenv import parse_dotenv
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "host"))
@@ -42,14 +44,32 @@ def _run(args: list[str], url: str) -> None:
     assert result.returncode == 0, result.stderr[-2000:]
 
 
-@pytest.fixture
-def stored_limit(tmp_path, monkeypatch):
-    """A migrated database holding ``host.rate_limit_public = 2/minute``."""
-    url = f"sqlite+aiosqlite:///{tmp_path / 'host.db'}"
+@pytest.fixture(scope="module")
+def _template_db(tmp_path_factory):
+    """A migrated database holding ``host.rate_limit_public = 2/minute``.
+
+    Built once: the two alembic runs dominate the module's time, and each test
+    boots its own app against a private copy, so what one writes stays out of
+    the other.
+    """
+    path = tmp_path_factory.mktemp("host-settings") / "template.db"
+    url = f"sqlite+aiosqlite:///{path}"
     _run(["-m", "alembic", "-c", "host/alembic.ini", "upgrade", "heads"], url)
     _run(["scripts/set_setting.py", "host", "rate_limit_public", "2/minute"], url)
+    return path
+
+
+@pytest.fixture
+def stored_limit(_template_db, tmp_path, monkeypatch):
+    """A private copy of the template database, selected through the environment."""
+    copy = tmp_path / "host.db"
+    shutil.copyfile(_template_db, copy)
+    url = f"sqlite+aiosqlite:///{copy}"
     monkeypatch.setenv("SM_DATABASE_URL", url)
     monkeypatch.delenv("SM_RATE_LIMIT_PUBLIC", raising=False)
+    # ``.env`` counts as the environment and would win over the stored row.
+    if "SM_RATE_LIMIT_PUBLIC" in parse_dotenv():
+        pytest.skip("the repo's .env sets SM_RATE_LIMIT_PUBLIC")
     return url
 
 
