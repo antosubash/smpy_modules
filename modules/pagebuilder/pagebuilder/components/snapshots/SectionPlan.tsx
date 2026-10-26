@@ -1,7 +1,7 @@
 import { useT } from '../../utils/i18n';
 import type { ImportPlan, SectionPlanEntry } from '../../utils/snapshotsApi';
 import { PlanGroup } from './PlanGroup';
-import { lineItems, sectionLabel, sectionMarker, sectionNotes } from './sectionSummary';
+import { lineItems, lineLabel, sectionLabel, sectionMarker, sectionNotes } from './sectionSummary';
 
 /**
  * One contributed section of a restore (#80): its own card, below the pages.
@@ -13,7 +13,8 @@ import { lineItems, sectionLabel, sectionMarker, sectionNotes } from './sectionS
  * are what the decision turns on.
  */
 export function SectionPlan({ entry }: { entry: SectionPlanEntry }) {
-  const { t } = useT();
+  // Subscribes the card to a language switch; the labels resolve through `translate`.
+  useT();
   const marker = sectionMarker(entry);
   const lines = entry.lines.filter((line) => line.count > 0);
   return (
@@ -31,7 +32,7 @@ export function SectionPlan({ entry }: { entry: SectionPlanEntry }) {
       {lines.map((line) => (
         <PlanGroup
           key={line.label_key}
-          title={t(line.label_key)}
+          title={lineLabel(line.label_key)}
           count={line.count}
           items={lineItems(line)}
           tone={line.tone}

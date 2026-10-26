@@ -30,6 +30,16 @@ export function sectionLabel(labelKey: string | null | undefined, section: strin
   return labelKey ? translate(labelKey, { defaultValue: section }) : section;
 }
 
+/**
+ * A plan line's heading in the reader's language, or — when the contributor's
+ * catalogue is gone (its module disabled after staging) — the key's last
+ * segment, spaced: "overwritten", never "news.bundle.plan.overwritten".
+ */
+export function lineLabel(labelKey: string): string {
+  const last = labelKey.split('.').pop() || labelKey;
+  return translate(labelKey, { defaultValue: last.replace(/_/g, ' ') });
+}
+
 /** Permission names are identifiers, not prose: listed as they are. */
 function permissionList(permissions: string[] | undefined): string {
   return (permissions ?? []).join(', ');

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ImportPlan, SectionPlanEntry } from '../../utils/snapshotsApi';
 import { overwritesAnything, overwriteWarning } from './planSummary';
-import { lineItems, sectionLabel, sectionMarker, sectionNotes } from './sectionSummary';
+import { lineItems, lineLabel, sectionLabel, sectionMarker, sectionNotes } from './sectionSummary';
 
 // The host merges every module's catalogue (tests/vitest-i18n.ts does the
 // same), so news' own keys resolve here; pagebuilder never names them itself.
@@ -42,6 +42,16 @@ describe('sectionLabel', () => {
   it('falls back to the raw name, never a dotted key', () => {
     expect(sectionLabel('notes.bundle.title', 'notes')).toBe('notes');
     expect(sectionLabel(null, 'notes')).toBe('notes');
+  });
+});
+
+describe('lineLabel', () => {
+  it("resolves the contributor's line key", () => {
+    expect(lineLabel('news.bundle.plan.overwritten')).toBe('Articles overwritten');
+  });
+
+  it("reads as words when the contributor's catalogue is gone", () => {
+    expect(lineLabel('gone.bundle.plan.redirects_dropped')).toBe('redirects dropped');
   });
 });
 
