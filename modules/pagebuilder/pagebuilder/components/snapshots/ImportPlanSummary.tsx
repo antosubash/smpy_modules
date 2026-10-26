@@ -23,6 +23,7 @@ function pageItems(
     key: `${entry.locale ?? ''}:${entry.slug}`,
     title: entry.title || entry.slug,
     slug: entry.slug,
+    locale: entry.locale,
     detail: describe?.(entry) ?? null,
   }));
 }
@@ -110,7 +111,7 @@ export function ImportPlanSummary({ plan }: { plan: ImportPlan }) {
           <p className="text-sm text-muted-foreground">{untouched}</p>
           <ul className="flex flex-wrap gap-2 text-xs text-muted-foreground">
             {plan.pages.untouched.map((entry) => (
-              <li key={entry.slug} className="font-mono">
+              <li key={`${entry.locale ?? ''}:${entry.slug}`} className="font-mono">
                 {entry.slug}
               </li>
             ))}
