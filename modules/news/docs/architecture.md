@@ -111,8 +111,22 @@ while it is bound:
 
 - `bind_admin` — every API and admin view router. SINGLE → `default`; MULTI →
   the resolved tenant, else **403 `tenant_required`**.
-- `bind_public` — every public router. SINGLE → `default`; MULTI → the
+- `bind_public` — the feed and sitemap. SINGLE → `default`; MULTI → the
   resolved tenant, else 404 with the same message as an unknown slug.
+- `bind_public_viewer` — the article, archive and default-locale alias routes.
+  The same rule, but with no tenant it yields `None` and the endpoint answers
+  with the site's 404 without a lookup, rendered with no layout (#248).
+
+**The site's 404.** Every reader page that has nothing to show (unknown,
+draft, in review, trashed or not-yet-live article; an archive page past the
+end; no tenant) answers through `endpoints/public/_not_found.py`. Where
+pagebuilder is mounted that is its `PageBuilder/PublicNotFound` page, reached
+only through `pagebuilder.contracts.public.render_not_found`: the tenant's
+header, footer, branding and design pack, in the address's language,
+`Cache-Control: no-store`, `Vary` on the tenant. Old-slug redirects are
+checked first and still win. Without pagebuilder (or with one older than
+0.0.13) it is the host's error page, still `no-store`. A JSON caller gets
+`{"detail": "Article not found"}` (or `"No such page"` past an archive's end).
 - `search_tenant()` — cross-module reads of pagebuilder's tables pin
   `tenant_id` explicitly: the tenant `bind_admin` bound, else **403
   `tenant_required`** — never a fallback to `default` (#210).

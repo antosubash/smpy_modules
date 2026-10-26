@@ -305,6 +305,17 @@ commits, never opens a session and never resolves a tenant, and anything it
 raises rolls the whole restore back. News is the consumer; see
 [bundle-format.md](bundle-format.md#contributed-sections).
 
+**`pagebuilder.contracts.public.render_not_found(request, inertia, db, *, locale,
+tenant_id, detail="Page not found")`** (#248) renders the public viewer's 404
+(`PageBuilder/PublicNotFound`, #89) for another module's public route: the
+tenant's layout and nav read with `tenant_id` bound here, no layout and no query
+when `tenant_id` is `None`, `no-store`, the tenant `Vary`, `Content-Language`,
+and `{"detail": detail}` for a JSON caller. It returns `None` where pagebuilder
+is not mounted on the app. `tenant_id` must be the tenant the framework
+resolved for the request, never client input: when `request.state.tenant_id`
+names a different one the call raises `TenantMismatchError` instead of rendering
+another tenant's frame. News' article and archive pages are the consumer.
+
 **`PageDeleted(page_id, slug)`** (`pagebuilder.contracts.events`) is published
 on the event bus when a page is *purged* — not when it is trashed, since a
 restore would otherwise come back without what other modules dropped. A module

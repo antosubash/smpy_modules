@@ -18,7 +18,7 @@ something inferred later.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import RedirectResponse
 from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import locales, redirects, service, tenancy
 from news.content import ArticlesService
+from news.endpoints.public._not_found import not_found
 from news.endpoints.public._render import render_article
 from news.endpoints.public._urls import (
     absolute_article,
@@ -37,7 +38,7 @@ from news.endpoints.public._urls import (
 )
 from news.safe_url import canonical_or_none
 from news.settings import NewsSettings, active, public_article_path
-from news.tenancy import bind_public
+from news.tenancy import bind_public_viewer
 
 
 async def alternates(
@@ -103,13 +104,20 @@ def article_router(locale: str) -> APIRouter:
         request: Request,
         inertia: InertiaDep,
         db: AsyncSession = Depends(get_db),
+        # The router-level binder, repeated to read its value: FastAPI caches a
+        # dependency per request, so it runs (and binds) once.
+        tenant: str | None = Depends(bind_public_viewer),
     ) -> Response:
         """One published article, with everything a public URL needs.
 
-        A draft, a trashed article and a slug that was never an article all
-        answer the same 404. A distinguishable "exists but is not published"
-        would answer exactly the question the 404 is there to refuse.
+        A draft, a trashed article, one scheduled but not yet live and a slug
+        that was never an article all answer the same 404 — the site's own,
+        see ``_not_found`` (#248). A distinguishable "exists but is not
+        published" would answer exactly the question the 404 is there to
+        refuse. A request that resolved no tenant gets it too, without a lookup.
         """
+        if tenant is None:
+            return await not_found(request, inertia, db, locale=locale, tenant=None)
         settings = active()
         article = await ArticlesService(db).get_by_slug_published(slug, locale)
         if article is None or article.published_data is None:
@@ -128,7 +136,7 @@ def article_router(locale: str) -> APIRouter:
                     RedirectResponse(public_article_path(moved, locale), status_code=301),
                     request,
                 )
-            raise HTTPException(status_code=404, detail="Article not found")
+            return await not_found(request, inertia, db, locale=locale, tenant=tenant)
 
         variant = "inertia" if request.headers.get("x-inertia") else "html"
         etag = etag_for(article.id or 0, article.updated_at, variant, viewer_key(request))
@@ -184,12 +192,24 @@ def default_locale_alias_router(prefix: str) -> APIRouter:
     correct and useless. A 301 is the third option and the only good one.
 
     Bound like every public router although it reads no rows: it costs nothing,
-    and the route guard then needs no exception a later edit could outgrow.
+    and the route guard then needs no exception a later edit could outgrow. A
+    request that resolved no tenant gets the article viewer's 404, not a 301.
     """
-    router = APIRouter(dependencies=[Depends(bind_public)])
+    router = APIRouter(dependencies=[Depends(bind_public_viewer)])
 
     @router.api_route("/{slug}", methods=["GET", "HEAD"], response_model=None)
-    async def redirect_to_unprefixed(slug: str) -> RedirectResponse:
+    async def redirect_to_unprefixed(
+        slug: str,
+        request: Request,
+        inertia: InertiaDep,
+        db: AsyncSession = Depends(get_db),
+        tenant: str | None = Depends(bind_public_viewer),
+    ) -> Response:
+        if tenant is None:
+            # The same layout-less 404 as `/news/x` without a tenant (#248).
+            return await not_found(
+                request, inertia, db, locale=locales.default(), tenant=None
+            )
         return RedirectResponse(f"{prefix.rstrip('/')}/{slug}", status_code=301)
 
     return router

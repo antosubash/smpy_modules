@@ -241,14 +241,16 @@ with `<title>`, description, `og:*`, `twitter:*`, canonical, `hreflang`,
 | Surface | Single-tenant host | Multi-tenant host, no tenant resolved |
 |---|---|---|
 | `/api/news/*`, `/admin/news/*`, `/admin/search` | runs in tenant `default` | **403 `tenant_required`** |
-| public reader routes | runs in tenant `default` | 404 "Article not found" |
+| feed, sitemap | runs in tenant `default` | 404 "Article not found" |
+| article, archive pages | runs in tenant `default` | the site's 404 page, with no layout (JSON callers: "Article not found") |
 
 ## Error messages
 
 | Status | `detail` | Where |
 |---|---|---|
 | 403 | `tenant_required` | any admin/API route, multi-tenant host with no tenant |
-| 404 | `Article not found.` / `Article not found` | unknown, trashed, or (to non-editors) unpublished article |
+| 404 | `Article not found.` / `Article not found` | unknown, trashed, or (to non-editors) unpublished article. A browser on a public route gets the site's 404 page instead (pagebuilder's `PublicNotFound`, `no-store`); JSON only when the caller asks for it |
+| 404 | `No such page` | an archive page past the end |
 | 409 | `Slug already in use` | create, update, translation |
 | 409 | `Could not derive a free URL from '…'. Set one explicitly.` | create without slug |
 | 409 | `This article was changed somewhere else. Reload…` | stale `expected_updated_at` |

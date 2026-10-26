@@ -8,7 +8,7 @@ were hardcoded in the frontend.
 
 None of that is true any more. ``NewsArticle`` carries its own body, address,
 status and revisions, and :mod:`news.endpoints.public` serves them. What
-remains is genuinely optional — three conveniences that only make sense on a
+remains is genuinely optional — conveniences that only make sense on a
 site that happens to run both modules:
 
 * the admin search screen searches *pages* and *media* alongside articles,
@@ -53,6 +53,7 @@ __all__ = [
     "page_editor_path",
     "page_search_path",
     "register_bundle_section",
+    "render_not_found",
     "search_media",
     "search_pages",
 ]
@@ -149,6 +150,32 @@ async def search_media(
     if contract is None:
         return [], 0
     return await contract.search_media(db, pattern, tenant_id=search_tenant(), limit=limit)
+
+
+# ── The site's not-found page ─────────────────────────────────────────
+
+
+async def render_not_found(
+    request: Any,
+    inertia: Any,
+    db: AsyncSession,
+    *,
+    locale: str,
+    tenant_id: str | None,
+    detail: str,
+) -> Any:
+    """The site's branded 404 (#248), or ``None`` without pagebuilder.
+
+    ``None`` too where pagebuilder is installed but not mounted on this app, or
+    is older than the contract: there is no site frame to put the page in, and
+    the caller answers with its own plain 404.
+    """
+    public = getattr(_contract(), "public", None)
+    if public is None:
+        return None
+    return await public.render_not_found(
+        request, inertia, db, locale=locale, tenant_id=tenant_id, detail=detail
+    )
 
 
 # ── The content bundle ────────────────────────────────────────────────

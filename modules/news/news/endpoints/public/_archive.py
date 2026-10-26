@@ -16,13 +16,15 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from fastapi import HTTPException, Request, Response
+from fastapi import Request, Response
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import constants, locales, service
 from news.endpoints.public import _head
 from news.endpoints.public._lang import set_html_lang
+from news.endpoints.public._not_found import NO_SUCH_PAGE, not_found
+from news.endpoints.public._paging import MAX_PAGE
 from news.endpoints.public._urls import absolute, apply_cache
 from news.settings import NewsSettings, active, public_feed_path
 
@@ -145,6 +147,7 @@ async def render_archive(
     inertia: InertiaDep,
     db: AsyncSession,
     locale: str,
+    tenant: str,
     page: int,
     path_for: Callable[[str], str],
     heading: str,
@@ -169,6 +172,11 @@ async def render_archive(
     dropped that scope would answer a question nobody asked.
     """
     settings: NewsSettings = active()
+    if page > MAX_PAGE:
+        # `page_param`'s "no such page", answered before any OFFSET is bound.
+        return await not_found(
+            request, inertia, db, locale=locale, tenant=tenant, detail=NO_SUCH_PAGE
+        )
     query = (q or "").strip()[:MAX_QUERY_LEN]
     path = path_for(locale)
     items, total = await service.list_articles(
@@ -195,7 +203,9 @@ async def render_archive(
         # with nothing in it as well: page 1 of an empty tag, byline or search
         # is a real address that happens to be empty, but there is no reading
         # under which it has a page 2.
-        raise HTTPException(status_code=404, detail="No such page")
+        return await not_found(
+            request, inertia, db, locale=locale, tenant=tenant, detail=NO_SUCH_PAGE
+        )
 
     canonical = absolute(request, settings, archive_url(path, page=page, q=query))
     feed_path = public_feed_path(locale)

@@ -29,25 +29,29 @@ from news.endpoints.public._article import article_router, default_locale_alias_
 from news.endpoints.public._feeds import feed_router
 from news.endpoints.public._index import index_router
 from news.endpoints.public._sitemap import sitemap_entries, sitemap_router
-from news.tenancy import bind_public
+from news.tenancy import bind_public, bind_public_viewer
 
 
 def public_router(locale: str) -> APIRouter:
     """Everything one language serves, ready to mount under its own prefix."""
-    # Bound once for the whole language — the sitemap included — so every route
-    # under it runs in the request's tenant, and one with none is a 404.
-    router = APIRouter(dependencies=[Depends(bind_public)])
+    # Every route under it runs in the request's tenant. The feed and sitemap
+    # are machine-read, so one with none is a plain 404; the pages a person
+    # reads get the site's own 404 instead (#248), so their binder yields None
+    # and each endpoint answers it without a lookup.
+    router = APIRouter()
+    machine = [Depends(bind_public)]
+    reader = [Depends(bind_public_viewer)]
     # Fixed paths first...
-    router.include_router(feed_router(locale))
+    router.include_router(feed_router(locale), dependencies=machine)
     if locales.is_default(locale):
         # One sitemap for the whole site, listing every language at its own
         # address — see ``sitemap_router``. It hangs off the default language's
         # prefix because that is the address that exists on every site,
         # monolingual or not.
-        router.include_router(sitemap_router())
-    router.include_router(index_router(locale))
+        router.include_router(sitemap_router(), dependencies=machine)
+    router.include_router(index_router(locale), dependencies=reader)
     # ...and the catch-all last.
-    router.include_router(article_router(locale))
+    router.include_router(article_router(locale), dependencies=reader)
     return router
 
 
