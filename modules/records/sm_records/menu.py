@@ -203,11 +203,13 @@ async def type_menu_provider(module: Any, request: Request) -> list[MenuItem]:
     if user is None:
         return []
     try:
+        held = await ensure_resolved_permissions(request)
+        if not grants(held, constants.PERM_VIEW):
+            return []  # no records.view: skip the tenant read entirely
         tenant = resolve_public(request)
         if tenant is None:
             return []
         types = await tenant_menu_types(module, tenant)
-        held = await ensure_resolved_permissions(request)
     except Exception:
         logger.warning("records: could not read the sidebar types", exc_info=True)
         return []
