@@ -132,7 +132,9 @@ publish.
 
 A snapshot restore (see Import / Export) writes no revision, so the list also
 shows **Restored from snapshot #N** at the time it was applied and by whom,
-with "The restore created this page." when the page did not exist before. It
+with "The restore created this page." when the page did not exist before, and
+"Also restored with it: News (3)" when the same restore wrote another module's
+content (a count, never which rows). It
 has no **Compare** or **Restore as draft**: to undo it, restore the automatic
 snapshot taken just before it.
 
@@ -247,18 +249,60 @@ a pasted URL.
 
 **Take snapshot** captures the whole site as a restore point: every non-trashed
 page (templates included) in every language, page redirects, the site layout and
-the media files. It does **not** hold branding, other modules' content (news
-articles included), trashed pages or revision history. Each snapshot is marked
-**Taken here**, **Uploaded** or **Automatic, before a restore**. **Download**
-exports it as a `.zip`; **Upload bundle…** adds a `.zip` from another site.
+the media files — and the content of every module that contributes to the
+bundle. News does: its articles, categories, tags and their redirects ride
+along (see the news user guide). It does **not** hold branding, trashed pages
+or revision history. Each snapshot is marked **Taken here**, **Uploaded** or
+**Automatic, before a restore**, and its row lists each contributed section's
+counts ("News — Articles: 12 · Categories: 3 · …"). **Download** exports it as a
+`.zip`; **Upload bundle…** adds a `.zip` from another site. A bundle includes
+draft and scheduled articles and their bylines: treat a downloaded bundle like a
+database export.
 
 **Restore…** never applies directly. It stages a plan — pages **Created**,
-**Overwritten**, **Unchanged**, redirects, layout, media — and an approver opens
-**Review it** (`/pagebuilder/content/review`) to **Approve & apply** or
-**Reject**. One restore can wait at a time. Applying first takes an automatic
-snapshot of the current site, so it can be undone. Restoring never deletes: a
-page on the site but absent from the snapshot is left alone, and a redirect whose
-target page is missing is dropped and listed.
+**Overwritten**, **Unchanged**, redirects, layout, media, then one card per
+contributed section with its own lines (for news: articles new, overwritten,
+brought back from the trash, moved back to their snapshot address, unchanged,
+kept, categories, tags, redirects dropped) — and an approver opens **Review it**
+(`/pagebuilder/content/review`) to **Approve & apply** or **Reject**. The
+headline counts every overwrite, pages and contributed rows together. One
+restore can wait at a time. Applying first takes an automatic snapshot of the
+current site, contributed sections included, so it can be undone; the result
+says what each section wrote, and a page's history notes what the same restore
+wrote elsewhere ("Also restored with it: News (3)"). Restoring never deletes: a
+page or article on the site but absent from the snapshot is left alone, and a
+redirect whose target is missing is dropped and listed.
+
+### Who sees and restores a contributed section
+
+A contributed section declares its own permissions; pagebuilder enforces them
+without knowing the module. For news:
+
+| To … | you need, beyond pagebuilder's own |
+|---|---|
+| have your snapshot include the articles, or download a bundle that carries them | `news.edit` |
+| see the articles' titles and addresses in a staged restore | `news.edit` |
+| restore the articles (staging *and* approving) | `news.edit` and `news.publish` |
+
+- A snapshot taken without `news.edit` leaves news out, and its row says so
+  ("News is not in this snapshot: whoever took it did not hold news.edit").
+  Restoring it leaves the live articles alone.
+- **Who may see a staged restore:** the review screen and the pending banner
+  need `pagebuilder.publish` or `pagebuilder.approve`. A reader without
+  `news.edit` sees the news card's counts only, with "only the counts are shown
+  here. Seeing the details needs news.edit." Article titles and slugs are never
+  stored on the audited import row; they are served only to readers allowed to
+  see them.
+- Staged by someone without `news.edit` and `news.publish`, news is not planned
+  at all: the plan says "News is left out of this restore", and it stays out
+  even if the approver could restore it — stage again as someone who can.
+- An approver who lacks them restores the pages only; the result names the
+  section left out.
+- Other markers: "This bundle also carries *x* content, which this site cannot
+  restore" (no module here reads that section — it is kept in the bundle and
+  downloads again unchanged), "*News* is not in this bundle and stays as it is"
+  (a bundle from before the section existed), and "the details of this plan
+  could not be read" (the staged rows went missing on disk; the counts stand).
 
 A bundle from a newer build with a format this one does not understand is
 refused on upload with a message naming the version; the format is described in

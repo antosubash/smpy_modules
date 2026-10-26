@@ -47,7 +47,18 @@ def test_the_section_satisfies_the_contract() -> None:
         False,
         frozenset({1}),
     )
-    assert set(section.count_label_keys) == {"articles", "categories", "tags", "redirects"}
+    # Every count capture writes and apply reports has a label (#80): the
+    # snapshot list and the approve result both name them through these.
+    assert set(section.count_label_keys) == {
+        "articles",
+        "categories",
+        "tags",
+        "redirects",
+        "created",
+        "overwritten",
+        "redirects_dropped",
+        "category_respelled",
+    }
     assert section.capture_permissions == {"news.edit"}
     assert section.apply_permissions == {"news.edit", "news.publish"}
 

@@ -189,6 +189,33 @@ and tags of articles. Where pagebuilder is installed it adds **Pages** and
 **Media** sections, each with an "N more →" link into pagebuilder's screens.
 Filter with **Everything**, **Articles**, **Pages**, **Media**.
 
+## Snapshots and restores (pagebuilder's Import / Export)
+
+On a site running pagebuilder, a snapshot taken under **Site → Import /
+Export** also holds the news content: every article that is not in the trash
+(drafts, scheduled and published, in every language), categories, tags and
+old-address redirects. Revision history, trashed articles and rejection notes
+are not carried. A downloaded bundle includes drafts and bylines, so treat it
+like a database export.
+
+Restoring one shows a **News** card on the review screen: new articles,
+articles overwritten, trashed articles brought back, articles moved back to
+their snapshot address, unchanged articles, articles not in the snapshot (kept
+— a restore never deletes), categories, tags, and redirects dropped because
+their article is gone. Applying it restores the articles together with the
+pages, in one step that is undone by restoring the automatic snapshot taken
+just before.
+
+What you can do depends on your news permissions, on top of pagebuilder's:
+
+- Your snapshot includes news only if you hold `news.edit`; without it the
+  snapshot says news was left out, and restoring it leaves the articles alone.
+- You see article titles in a staged restore only with `news.edit`; without it
+  the card shows counts and says what you would need.
+- Restoring the articles takes `news.edit` and `news.publish`, both from the
+  person who stages the restore and from the approver. Without them the pages
+  restore and the plan says news was left out.
+
 ## What readers see
 
 - `/news/` — the archive, newest first (pinned first), twelve per page, with

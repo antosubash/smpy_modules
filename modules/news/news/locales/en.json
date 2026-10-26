@@ -574,7 +574,11 @@
       "articles": "Articles",
       "categories": "Categories",
       "tags": "Tags",
-      "redirects": "Redirects"
+      "redirects": "Redirects",
+      "created": "Articles created",
+      "overwritten": "Articles overwritten",
+      "redirects_dropped": "Redirects dropped",
+      "category_respelled": "Articles re-spelled"
     },
     "plan": {
       "new": "New articles",

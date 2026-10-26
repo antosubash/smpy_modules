@@ -59,6 +59,12 @@ class NewsBundleSection:
         "categories": "news.bundle.counts.categories",
         "tags": "news.bundle.counts.tags",
         "redirects": "news.bundle.counts.redirects",
+        # What `apply` reports beyond the captured totals: the approve result
+        # labels its counts with these too (#80).
+        "created": "news.bundle.counts.created",
+        "overwritten": "news.bundle.counts.overwritten",
+        "redirects_dropped": "news.bundle.counts.redirects_dropped",
+        "category_respelled": "news.bundle.counts.category_respelled",
     }
 
     async def capture(self, ctx: CaptureContext) -> SectionCapture:

@@ -192,7 +192,30 @@ one — ignoring trashed pages.
   approved before `applied` existed fall back, best-effort, to the staged
   plan's `(locale, slug)` buckets plus the page's redirects. No table or column
   is added for it, so deleting a snapshot — which deletes its imports —
-  removes its markers too.
+  removes its markers too. Since #80 `applied` is keyed by section, and a
+  marker also counts the identities each contributed section recorded
+  (`restores[].sections`), never naming them.
+- **Contributed sections (#80).** Other modules register a `BundleSection`
+  (`pagebuilder.contracts.bundle`) on `app.state.pagebuilder.bundle_sections`
+  (`registry.py`). `sections.py` captures them after pagebuilder's own
+  documents and validates them on upload; `section_restore.py` plans them at
+  staging and applies them at approval. **The order inside approve** is: the
+  staged plan's denials are read, every section the stager was allowed is
+  re-planned (a new conflict is a 409 and nothing is written), the
+  `pre_restore` snapshot is taken (sections included), `apply_bundle` writes
+  pagebuilder's part, then each section applies in name order through
+  `RestoreContext` — the same request session and bound tenant, with
+  `from_portable` resolving media through the map the page apply just built.
+  **Why one session:** a restore is one decision, so it is one transaction.
+  A section that raises after flushing rolls back the pages, layout, redirects,
+  every other section and the import's status together, and the `pre_restore`
+  directory is removed; there is no two-phase commit to get wrong and no state
+  where pages are restored but articles are half-written. The cost is a longer
+  write transaction on a large bundle. Permissions are checked per section
+  (`access.py`); plan rows are kept off the audited row (`plan_views.py`).
+  The screens render each section from its own catalogue keys
+  (`components/snapshots/SectionPlan.tsx`, `sectionSummary.ts`), so pagebuilder
+  never names a contributor.
 
 ## Frontend
 

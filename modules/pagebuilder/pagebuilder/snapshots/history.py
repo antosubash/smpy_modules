@@ -87,6 +87,39 @@ def _recorded(applied: Any, page: Page) -> str | None:
     return None
 
 
+def _sections_written(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    """Per contributed section, how many rows the same restore wrote (#80).
+
+    Counted off the identities its apply recorded under ``applied.<section>``
+    (every list there names rows it wrote), labelled by the ``label_key`` the
+    staged plan carried. Counts only: the identities themselves stay on the
+    audit row. A section that wrote nothing is left out.
+    """
+    applied = plan.get(APPLIED_KEY)
+    if not isinstance(applied, dict) or PAGEBUILDER_SECTION not in applied:
+        return []
+    labels = {
+        entry.get("section"): entry.get("label_key")
+        for entry in plan.get("sections") or []
+        if isinstance(entry, dict)
+    }
+    out = []
+    for name, record in sorted(applied.items()):
+        if name == PAGEBUILDER_SECTION or not isinstance(record, dict):
+            continue
+        count = sum(len(v) for v in record.values() if isinstance(v, list))
+        if count:
+            label = labels.get(name)
+            out.append(
+                {
+                    "section": name,
+                    "label_key": label if isinstance(label, str) else None,
+                    "count": count,
+                }
+            )
+    return out
+
+
 def _inferred(
     plan: dict[str, Any], page: Page, slugs: set[str], restored_at: datetime
 ) -> str | None:
@@ -138,6 +171,7 @@ async def restore_markers(db: AsyncSession, page: Page) -> list[dict[str, Any]]:
                 "change": change,
                 "restored_at": restored_at,
                 "restored_by": staged.decided_by,
+                "sections": _sections_written(plan),
             }
         )
     return markers

@@ -24,8 +24,22 @@ class SnapshotRead(BaseModel):
     created_by: str | None = None
 
 
+class SectionLabels(BaseModel):
+    """How the screens name a section registered on this host (#80).
+
+    ``label_key`` and ``count_label_keys`` are the contributor's own catalogue
+    keys, resolved by the client at render time.
+    """
+
+    section: str
+    label_key: str
+    count_label_keys: dict[str, str] = {}
+
+
 class SnapshotListResponse(BaseModel):
     items: list[SnapshotRead]
+    sections: list[SectionLabels] = []
+    """The contributed sections registered here, to label each row's counts."""
 
 
 class SnapshotCreateRequest(BaseModel):

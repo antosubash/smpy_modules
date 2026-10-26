@@ -150,6 +150,67 @@ A host without the contributor restores the pagebuilder content and reports
 the section as skipped; a bundle without the section (an older one, or one from
 a host without the contributor) leaves that module's content as it is.
 
+#### The contract in brief
+
+`BundleSection` (in `pagebuilder.contracts.bundle`) is a Protocol: `name`,
+`version`, `readable_versions`, `required`, `label_key`, `count_label_keys`,
+optional `capture_permissions`/`apply_permissions`, and four calls —
+`capture(CaptureContext) -> SectionCapture(counts)`, `validate(ValidateContext)`
+(sync, no database), `plan(RestoreContext) -> SectionPlan(lines, overwrites)`
+and `apply(RestoreContext) -> SectionApplied(counts, applied)`. Each context
+carries the request's session and bound tenant (`check_tenant()` before and
+after every call), the section's directory, and the helpers a contributor needs
+(`write_json`, `read_json`, `to_portable`/`from_portable` for media URLs,
+`check_media`, `invalid()` for a 422, `conflict()` for a 409). A contributor
+flushes and never commits, never opens a session and never resolves a tenant;
+raising aborts the whole restore, pages included. The full rules are the
+module's docstring; `api-reference.md` lists the exports.
+
+#### News' section
+
+News registers `news`, version 1, optional. Its files live under `news/`:
+`articles/<slug>.json` (or `<locale>__<slug>.json` outside the default
+language), `categories.json`, `tags.json`, `redirects.json` and
+`tag_redirects.json`. It carries every non-trashed article with its draft and
+published bodies, dates, byline, category and tags, and media as `asset://`
+sentinels; never revisions, `created_by`/`updated_by`, rejection notes or ids.
+The news README ("Content bundles") has the matching rules.
+
+#### How the plan names a section
+
+A staged plan gains four keys beside `pages`, `layout` and `redirects`:
+
+```json
+"sections": [{"section": "news", "label_key": "news.bundle.title", "version": 1,
+              "overwrites": 1,
+              "lines": [{"label_key": "news.bundle.plan.overwritten", "count": 1,
+                         "tone": "warning",
+                         "items": [{"title": "Hello", "slug": "hello",
+                                    "locale": "en", "note_key": null}]}]}],
+"denied":  [{"section": "news", "label_key": "news.bundle.title",
+             "reason_key": "pagebuilder.plan.section_denied",
+             "permissions": ["news.edit", "news.publish"]}],
+"skipped": [{"section": "shop", "version": 1}],
+"absent":  [{"section": "news", "label_key": "news.bundle.title"}]
+```
+
+A section entry may also carry `redacted` or `details_unavailable` (see
+Permissions below), and an `absent` one `omitted` with the permissions the
+capture lacked. Every label is the contributor's own catalogue key; the review
+screen (`ImportPlanSummary` → `SectionPlan`) resolves them at render against
+the host's merged catalogue, so pagebuilder renders a section it has never
+heard of, falling back to the section's name. The section's `overwrites` add
+to the headline's overwrite count.
+
+`GET /api/pagebuilder/snapshots` (and both Import / Export screens) also return
+`sections: [{section, label_key, count_label_keys}]` for every section
+registered here, so the list labels each row's `contents[].counts`; a section
+this host does not register is listed by its raw name and count kinds. The
+approve response's `sections` holds each section's apply counts, labelled the
+same way, and a page's restore marker
+(`GET /pages/{id}/revisions` → `restores[].sections`) counts the rows the same
+restore wrote in each section — counts only, never which rows.
+
 #### Permissions
 
 A contributor may name the permissions its section needs, in its own

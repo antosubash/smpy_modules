@@ -2,51 +2,28 @@ import { Badge } from '@simple-module-py/ui/components/ui/badge';
 
 import { keys, useT } from '../../utils/i18n';
 import type { ImportPlan, PagePlanEntry } from '../../utils/snapshotsApi';
+import { PlanGroup, type PlanGroupItem } from './PlanGroup';
 import {
   describeLayoutSide,
   describeOverwrite,
+  overwritesAnything,
   overwriteWarning,
   planTotals,
   untouchedNote,
 } from './planSummary';
+import { SectionPlans } from './SectionPlan';
 
-/** One bucket of the plan, hidden entirely when it is empty.
- *
- * An empty "0 pages removed" row is noise on a screen whose whole job is to
- * make the one number that matters easy to find.
- */
-function Group({
-  title,
-  entries,
-  tone,
-  describe,
-}: {
-  title: string;
-  entries: PagePlanEntry[];
-  tone?: 'warning';
-  describe?: (entry: PagePlanEntry) => string | null;
-}) {
-  if (entries.length === 0) return null;
-  return (
-    <div className="space-y-2">
-      <h3 className="text-sm font-medium">
-        {title} <span className="text-muted-foreground">({entries.length})</span>
-      </h3>
-      <ul className="divide-y rounded-md border text-sm">
-        {entries.map((entry) => (
-          <li key={entry.slug} className="flex items-baseline justify-between gap-4 px-3 py-2">
-            <span className={tone === 'warning' ? 'font-medium' : undefined}>
-              {entry.title || entry.slug}
-              <span className="ml-2 font-mono text-xs text-muted-foreground">{entry.slug}</span>
-            </span>
-            {describe?.(entry) && (
-              <span className="shrink-0 text-xs text-muted-foreground">{describe(entry)}</span>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+/** A page bucket's rows, in the shape the shared plan bucket renders. */
+function pageItems(
+  entries: PagePlanEntry[],
+  describe?: (entry: PagePlanEntry) => string | null,
+): PlanGroupItem[] {
+  return entries.map((entry) => ({
+    key: entry.slug,
+    title: entry.title || entry.slug,
+    slug: entry.slug,
+    detail: describe?.(entry) ?? null,
+  }));
 }
 
 /**
@@ -66,20 +43,28 @@ export function ImportPlanSummary({ plan }: { plan: ImportPlan }) {
     <div className="space-y-6">
       <p
         className={
-          totals.overwritten > 0 ? 'text-sm font-medium text-amber-700' : 'text-sm font-medium'
+          overwritesAnything(plan) ? 'text-sm font-medium text-amber-700' : 'text-sm font-medium'
         }
       >
         {overwriteWarning(plan)}
       </p>
 
-      <Group
+      <PlanGroup
         title={t(keys.pagebuilder.plan.group_overwritten)}
-        entries={plan.pages.overwritten}
+        count={plan.pages.overwritten.length}
+        items={pageItems(plan.pages.overwritten, describeOverwrite)}
         tone="warning"
-        describe={describeOverwrite}
       />
-      <Group title={t(keys.pagebuilder.plan.group_created)} entries={plan.pages.new} />
-      <Group title={t(keys.pagebuilder.plan.group_unchanged)} entries={plan.pages.unchanged} />
+      <PlanGroup
+        title={t(keys.pagebuilder.plan.group_created)}
+        count={plan.pages.new.length}
+        items={pageItems(plan.pages.new)}
+      />
+      <PlanGroup
+        title={t(keys.pagebuilder.plan.group_unchanged)}
+        count={plan.pages.unchanged.length}
+        items={pageItems(plan.pages.unchanged)}
+      />
 
       <div className="space-y-2">
         <h3 className="text-sm font-medium">{t(keys.pagebuilder.plan.site_layout)}</h3>
@@ -131,6 +116,8 @@ export function ImportPlanSummary({ plan }: { plan: ImportPlan }) {
           </ul>
         </div>
       )}
+
+      <SectionPlans plan={plan} />
     </div>
   );
 }

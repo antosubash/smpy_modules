@@ -5,7 +5,9 @@ Status: implemented (pagebuilder `snapshots/`). Snapshots v2 (#79) is built:
 page history shows "Restored from snapshot #N", read from the pages the
 apply recorded on the approved import's own row, and the manifest is versioned with a `contents` list of
 sections (`modules/pagebuilder/docs/bundle-format.md`). The per-module
-contribution hook that would add other sections (#80) is not built.
+contribution hook (#80) is built too: `pagebuilder.contracts.bundle`, with
+news as its first contributor (articles, categories, tags, redirects) and the
+review screen rendering each section from its own keys. Branding is still out.
 
 ## Context
 
@@ -55,10 +57,11 @@ snapshot, and the two admin pages that drive all of it.
 
 **Out (deliberately):**
 
-- **News articles and any other module's content.** A snapshot is *pagebuilder
-  content only*: pages (including templates), redirects, layout, media. A
-  per-module contribution hook was considered and rejected for v1 — see Rejected
-  alternatives.
+- **News articles and any other module's content** — in v1. A snapshot was
+  *pagebuilder content only*: pages (including templates), redirects, layout,
+  media. A per-module contribution hook was considered and rejected for v1 —
+  see Rejected alternatives. *Superseded by #80:* the hook now exists
+  (`pagebuilder.contracts.bundle`) and news contributes its articles.
 - **Branding**, for the same reason and one more. `pagebuilder` currently has
   *no* Python dependency on the branding module — not one import — and capture
   runs in-process, so putting `app_name` / `primary_color` / `design_pack` in the

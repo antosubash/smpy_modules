@@ -135,6 +135,15 @@ Export permissions:
   and the plan (up front, at staging) and the result list news as skipped for
   missing permission.
 
+**On screen.** Pagebuilder's Import / Export list shows each snapshot's news
+counts ("News — Articles: 12 · Categories: 3 · …"), the review screen a
+**News** card with one line per plan bucket (warning-toned for overwritten,
+revived, re-spelled and dropped), and the approve result what news wrote. Every
+label is a key from news' own catalogue (`bundle.title`, `bundle.counts.*`,
+`bundle.plan.*`), resolved by pagebuilder at render; adding a plan line or a
+count means adding its key to `en.json` and `de.json`, and to
+`count_label_keys` for a count.
+
 A host without news restores the pages and keeps the `news/` files unread; a
 bundle written before news joined leaves every article alone. The code is
 `news/integrations/bundle/`, registered from `register_bundle_section` in

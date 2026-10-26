@@ -79,7 +79,8 @@ async def list_snapshots(
     service: SnapshotService = Depends(get_snapshot_service),
 ) -> SnapshotListResponse:
     return SnapshotListResponse(
-        items=[SnapshotRead.model_validate(s) for s in await service.list()]
+        items=[SnapshotRead.model_validate(s) for s in await service.list()],
+        sections=service.sections.labels(),
     )
 
 

@@ -10,6 +10,7 @@
 
 import { keys, translate } from '../../utils/i18n';
 import type { ImportPlan, PagePlanEntry, Snapshot } from '../../utils/snapshotsApi';
+import { sectionOverwrites } from './sectionSummary';
 
 export interface PlanTotals {
   created: number;
@@ -52,8 +53,19 @@ function pluralize(key: string, count: number): string {
  */
 export function overwriteWarning(plan: ImportPlan): string {
   const { overwritten } = planTotals(plan);
+  // A contributed section's overwrites count too (#80): an approver weighing
+  // "0 pages" while twelve articles are about to be replaced would be misled.
+  const contributed = sectionOverwrites(plan);
+  if (contributed > 0) {
+    return pluralize(keys.pagebuilder.plan.overwrite_items, overwritten + contributed);
+  }
   if (overwritten === 0) return translate(keys.pagebuilder.plan.overwrite_none);
   return pluralize(keys.pagebuilder.plan.overwrite, overwritten);
+}
+
+/** Whether anything at all is overwritten, pages or contributed rows. */
+export function overwritesAnything(plan: ImportPlan): boolean {
+  return planTotals(plan).overwritten + sectionOverwrites(plan) > 0;
 }
 
 /**

@@ -13,6 +13,7 @@ import { buildHistory } from '../../utils/historyTimeline';
 import { keys, useT } from '../../utils/i18n';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { DiffSummary } from '../DiffSummary';
+import { restoredWith } from '../snapshots/sectionSummary';
 
 // Catalogue keys, resolved where the list renders — a module-scope constant
 // has no hook to call.
@@ -165,6 +166,9 @@ function RestoreMarkerRow({ marker }: { marker: PageRestoreMarker }) {
         <div className="mt-0.5 text-muted-foreground">
           {t(keys.pagebuilder.history.restored_created)}
         </div>
+      )}
+      {restoredWith(marker) && (
+        <div className="mt-0.5 text-muted-foreground">{restoredWith(marker)}</div>
       )}
     </li>
   );
