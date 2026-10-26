@@ -153,6 +153,7 @@ class TypeMenuCache:
 
     def __init__(self) -> None:
         self._entries: OrderedDict[str, tuple[float, list[MenuType]]] = OrderedDict()
+        self.generation = 0
 
     def get(self, tenant: str, max_age: float) -> list[MenuType] | None:
         entry = self._entries.get(tenant)
@@ -168,6 +169,7 @@ class TypeMenuCache:
             self._entries.popitem(last=False)
 
     def clear(self) -> None:
+        self.generation += 1
         self._entries.clear()
 
 
@@ -177,9 +179,13 @@ async def tenant_menu_types(module: Any, tenant: str) -> list[MenuType]:
     cached = module.menu_cache.get(tenant, settings.menu_refresh_seconds)
     if cached is not None:
         return cached
+    generation = module.menu_cache.generation
     with tenant_scope(tenant):
         types = await load_menu_types(module.db)
-    module.menu_cache.put(tenant, types)
+    # A type write that landed during the read cleared the cache: this read may
+    # predate it, so serve it once but do not keep it.
+    if generation == module.menu_cache.generation:
+        module.menu_cache.put(tenant, types)
     return types
 
 
@@ -196,10 +202,10 @@ async def type_menu_provider(module: Any, request: Request) -> list[MenuItem]:
     user = getattr(request.state, "user", None)
     if user is None:
         return []
-    tenant = resolve_public(request)
-    if tenant is None:
-        return []
     try:
+        tenant = resolve_public(request)
+        if tenant is None:
+            return []
         types = await tenant_menu_types(module, tenant)
         held = await ensure_resolved_permissions(request)
     except Exception:
