@@ -24,7 +24,7 @@ import sqlite3
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import case, func, or_, select, true, update
+from sqlalchemy import and_, case, func, or_, select, true, update
 from sqlalchemy.dialects import postgresql, sqlite
 
 from sm_billing.constants import ENTITLED_STATUSES
@@ -84,7 +84,7 @@ def upsert_period(
     subscription supplies (``_sub_end``) is one too, whatever ``period`` was
     resolved as."""
     table = UsagePeriod.__table__
-    sub_end = _sub_end(tenant_id, period[0])
+    sub_end = _sub_end(tenant_id, period[0], now)
     stmt = _insert(dialect_name)(table).values(
         tenant_id=tenant_id,
         meter=meter,
@@ -101,16 +101,17 @@ def upsert_period(
             "used": total,
             "updated_at": stmt.excluded.updated_at,
             # Not the excluded end: that falls back to the resolved one.
-            "period_end": _authoritative_end(table, tenant_id, period[0]),
+            "period_end": _authoritative_end(table, tenant_id, period[0], now),
             "provider_period": or_(table.c.provider_period, stmt.excluded.provider_period),
         },
         where=None if limit is None else total <= limit,
     ).returning(table.c.used, table.c.period_end)
 
 
-def _sub_end(tenant_id: str, start: datetime) -> Any:
-    """The end of the entitled subscription whose period starts at ``start``,
-    else NULL: the authoritative end of the rows at that start.
+def _sub_end(tenant_id: str, start: datetime, now: datetime) -> Any:
+    """The end of the entitled subscription whose period starts at ``start``
+    and is still running at ``now``, else NULL: the authoritative end of the
+    rows at that start.
 
     ``period`` was resolved in an earlier read, so a sync that moved its end
     since (same start, later *or earlier* end) would otherwise have a write
@@ -127,18 +128,21 @@ def _sub_end(tenant_id: str, start: datetime) -> Any:
     the ``CASE``, not the ``WHERE``, so the row is locked whatever its
     status: a consume that resolved a calendar month while the subscription
     was unpaid still waits for the sync that makes it active, then takes
-    its end.
+    its end. A period that has already ended is not current either: after a
+    missed webhook the write falls back to the calendar month, which may
+    share its start, and must not take the stale period's past end.
     """
-    entitled = Subscription.status.in_(ENTITLED_STATUSES)
+    end = Subscription.current_period_end
+    entitled = and_(Subscription.status.in_(ENTITLED_STATUSES), end > now)
     return (
-        select(case((entitled, Subscription.current_period_end)))
+        select(case((entitled, end)))
         .where(Subscription.tenant_id == tenant_id, Subscription.current_period_start == start)
         .with_for_update(read=True)
         .scalar_subquery()
     )
 
 
-def _authoritative_end(table: Any, tenant_id: str, start: datetime) -> Any:
+def _authoritative_end(table: Any, tenant_id: str, start: datetime, now: datetime) -> Any:
     """An existing row's new ``period_end``: the subscription's (``_sub_end``)
     when it supplies one, earlier or later, else the stored end unchanged.
 
@@ -148,7 +152,7 @@ def _authoritative_end(table: Any, tenant_id: str, start: datetime) -> Any:
     that moved the end either way since, and one the subscription no longer
     has must not come back (#240).
     """
-    return func.coalesce(_sub_end(tenant_id, start), table.c.period_end)
+    return func.coalesce(_sub_end(tenant_id, start, now), table.c.period_end)
 
 
 def extend_rollups(*, tenant_id: str, start: datetime, end: datetime, entitled: bool) -> Any:
@@ -203,10 +207,10 @@ def add_within_limit(
         .values(
             used=total,
             updated_at=now,
-            period_end=_authoritative_end(table, tenant_id, start),
+            period_end=_authoritative_end(table, tenant_id, start, now),
             provider_period=true()
             if provider
-            else or_(table.c.provider_period, _sub_end(tenant_id, start).is_not(None)),
+            else or_(table.c.provider_period, _sub_end(tenant_id, start, now).is_not(None)),
         )
         .returning(table.c.used, table.c.period_end)
     )

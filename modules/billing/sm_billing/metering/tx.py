@@ -11,7 +11,7 @@ SQLite.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from simple_module_db import finalize_session, mark_written
@@ -35,7 +35,7 @@ class Counted:
     (and, for a period counter, its stored end)."""
 
     used: int
-    end: datetime | None = None
+    end: datetime | None = field(default=None, kw_only=True)
 
 
 class _Undo(Exception):  # noqa: N818 - control flow, never escapes this module

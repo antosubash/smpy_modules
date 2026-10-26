@@ -155,7 +155,7 @@ class UsageService(HoldsMixin):
                     dialect, **fields, period=period, qty=qty, limit=limit, now=now
                 )
             row = (await session.execute(stmt)).one_or_none()
-            return None if row is None else Counted(int(row.used), as_utc(row.period_end))
+            return None if row is None else Counted(int(row.used), end=as_utc(row.period_end))
 
         return apply
 

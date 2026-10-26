@@ -286,7 +286,9 @@ on the start, so writes keep landing in the same row). The stored
   new row the sync found nothing to move, or an existing row the sync
   already moved, moved back. Each counter write therefore reads, in the same
   statement and under `FOR SHARE`, the entitled subscription whose period
-  starts at the resolved start (`_sub_end`). The insert stores that
+  starts at the resolved start and is still running (`_sub_end`; a period
+  already over after a missed webhook is not, so the calendar month that
+  shares its start keeps the month's end). The insert stores that
   subscription's end, else the resolved one, and marks the row
   `provider_period` when the subscription supplied it. On conflict (and in
   the `qty > limit` `UPDATE`) the row takes the subscription's end when

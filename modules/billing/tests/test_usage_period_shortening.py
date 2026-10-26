@@ -125,3 +125,17 @@ async def test_a_later_consume_never_restores_the_longer_end(app):
     later = service(app, Clock(SHORT[1] - timedelta(days=1)))
     assert (await later.consume(tenant, METER, 1, "k1", source="t")).period_end == SHORT[1]
     assert await _ends(app, tenant) == [(SHORT[1], 2)]
+
+
+async def test_a_period_that_already_ended_never_ends_a_calendar_month(app):
+    """A missed webhook: the subscription's Oct 1 -> Oct 20 is over, so a
+    call on Oct 25 counts against the calendar month, which shares its start.
+    The row keeps the month's end, not the stale period's past one."""
+    tenant = await _tenant(app)
+    await _sync(app, tenant, SHORT)
+    outcome = await service(app, Clock(datetime(2026, 10, 25, tzinfo=UTC))).consume(
+        tenant, METER, 1, "k1", source="t"
+    )
+    assert outcome.ok and outcome.period_end == OCT[1]
+    assert await _ends(app, tenant) == [(OCT[1], 1)]
+    assert await _flags(app, tenant) == [False]
