@@ -26,7 +26,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.index.providers import TypeIndex
 from sm_records.models import RecordType, tables_for
-from sm_records.services._access import role_blocked  # noqa: F401 - re-exported, its old home
 from sm_records.services.errors import Conflict
 from sm_records.tenancy import bound_tenant
 

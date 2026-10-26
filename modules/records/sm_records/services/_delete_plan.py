@@ -26,7 +26,8 @@ from sm_records.index.reduce import snapshot
 from sm_records.index.writer import write_index
 from sm_records.models import Record, RecordType, RevisionEvent, tables_for
 from sm_records.services import _payload, _relations
-from sm_records.services._common import bump_or_conflict, role_blocked, type_resolver
+from sm_records.services._access import role_blocked
+from sm_records.services._common import bump_or_conflict, type_resolver
 from sm_records.services.revisions import write_revision
 from sm_records.settings import RecordsSettings
 

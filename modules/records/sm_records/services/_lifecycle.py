@@ -98,7 +98,7 @@ async def soft_delete_record(
     the CLI, a background task, any path with no user behind it. Given a list,
     a referrer whose *type* narrows writes to roles the caller does not hold
     is treated as ``restrict`` however its field is declared: see
-    :func:`~sm_records.services._common.role_blocked`.
+    :func:`~sm_records.services._access.role_blocked`.
     """
     # Locks first, then the walk: see ``services._delete_locks``.
     graph = await lock_delete_graph(db, rtype)

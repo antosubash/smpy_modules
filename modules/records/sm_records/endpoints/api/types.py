@@ -41,7 +41,7 @@ from sm_records.menu import affects_menu, mark_dirty
 from sm_records.models import RecordType
 from sm_records.services import _orphaned, reindex_runner
 from sm_records.services import types as type_service
-from sm_records.services._common import role_blocked
+from sm_records.services._access import role_blocked
 from sm_records.services.errors import ValidationFailed
 from sm_records.settings import RecordsSettings
 

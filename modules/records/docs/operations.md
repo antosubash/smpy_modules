@@ -1116,6 +1116,11 @@ group next to the three static ones (`sm_records.type_permissions`):
   `permissions.manage` can grant it, and only a holder of the role editor's
   permissions can see the cross-tenant list of keys. Both are host-level
   permissions, not something a tenant admin holds.
+- A grant outlives its type. Deleting a type removes its key from the role
+  editor's list, but the framework never prunes a stored grant for a key it no
+  longer lists. A type created later with the same key is reached through
+  that old grant. Revoke the grant first if a key is going to be reused for
+  something more sensitive.
 - The `admin` wildcard grants no per-type access. Narrowing has never had an
   admin exception, and the `permissions` module copies every registered key
   onto the admin role at startup. So the role editor shows admin holding every

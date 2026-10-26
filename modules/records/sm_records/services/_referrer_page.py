@@ -18,7 +18,7 @@ again for a badge, on every load.
 
 **Visibility is a type-level predicate, so it fits in the query.** A referrer
 is hidden from this caller when its *type* narrows ``allowed_roles`` past
-them (``services._common.role_blocked``) — a fact about the type, not the
+them (``services._access.role_blocked``) — a fact about the type, not the
 row, and one the schema answers in a single read before the walk starts. So
 "which types are blocked" becomes ``tid NOT IN (…)`` and the page window is
 taken over the visible set in ``LIMIT``/``OFFSET``, which is the property the

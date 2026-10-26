@@ -201,10 +201,10 @@ async def type_menu_provider(module: Any, request: Request) -> list[MenuItem]:
         return []
     try:
         types = await tenant_menu_types(module, tenant)
+        held = await ensure_resolved_permissions(request)
     except Exception:
         logger.warning("records: could not read the sidebar types", exc_info=True)
         return []
-    held = await ensure_resolved_permissions(request)
     return visible_items(types, user, held, request_role_map(request))
 
 
