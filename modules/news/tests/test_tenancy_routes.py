@@ -15,7 +15,7 @@ from fastapi.dependencies.models import Dependant
 from news import constants
 from news.module import NewsModule
 from news.settings import active
-from news.tenancy import bind_admin, bind_public
+from news.tenancy import bind_admin, bind_public, bind_public_viewer
 from stub_auth import stub_user
 
 
@@ -40,9 +40,14 @@ def _api_routes(routes: list) -> Iterator[object]:
             yield route
 
 
+#: ``bind_public_viewer`` is the reader pages' binder: it binds the same tenant
+#: and, with none, yields ``None`` so the page renders the site's 404 (#248).
+_BINDERS = (bind_admin, bind_public, bind_public_viewer)
+
+
 def _guarded(route: object) -> bool:
     calls = list(_calls(route.dependant))
-    return bind_admin in calls or bind_public in calls
+    return any(binder in calls for binder in _BINDERS)
 
 
 async def test_every_news_route_binds_a_tenant(bilingual) -> None:
@@ -69,6 +74,6 @@ async def test_every_news_route_binds_a_tenant(bilingual) -> None:
         assert f"{public}/sitemap.xml" in paths, "sitemap not mounted"
         assert f"{constants.ADMIN_SEARCH_PREFIX}/search" in paths, "admin search not mounted"
         unbound = sorted(f"{sorted(r.methods)} {r.path}" for r in routes if not _guarded(r))
-        assert not unbound, f"routes without bind_admin/bind_public: {unbound}"
+        assert not unbound, f"routes without a tenant binder: {unbound}"
     finally:
         await state.engine.dispose()

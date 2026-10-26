@@ -68,16 +68,9 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
     Family(
         "tenancy binding",
         (
-            Copy(
-                f"{PB}/tenancy.py",
-                {"pagebuilder": "MODULE"},
-                own={
-                    "bind_public_viewer": "Pagebuilder's page viewer renders its own "
-                    "branded 404 for a request that resolved no tenant (#89), so it needs "
-                    "the binder that yields None instead of raising; news' viewer still "
-                    "raises to the host's error page (its own 404 is a separate issue).",
-                },
-            ),
+            # Both viewers answer a request that resolved no tenant with the
+            # site's branded 404 (#89, #248), so bind_public_viewer is shared.
+            Copy(f"{PB}/tenancy.py", {"pagebuilder": "MODULE"}),
             Copy(
                 f"{NEWS}/tenancy.py",
                 {"news": "MODULE"},
@@ -90,8 +83,7 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
         differ={
             "_NOT_FOUND": "Each public viewer's own 404 wording, reused word for word for "
             "a request that resolved no tenant.",
-            "__all__": "News also exports search_tenant; pagebuilder also exports "
-            "bind_public_viewer.",
+            "__all__": "News also exports search_tenant.",
             "configure": "News also warns that public_base_url on a multi-tenant host points "
             "every tenant's links at one origin; pagebuilder has no such setting.",
             "mode_of": "News also reads app.state.news_tenancy, where configure stores the "

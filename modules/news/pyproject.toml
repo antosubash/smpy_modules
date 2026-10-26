@@ -60,7 +60,11 @@ dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.36,<0.1"]
 # through ``pagebuilder.contracts.bundle``, first released in 0.0.13. On an
 # older neighbour ``register_bundle_section`` fails at startup with an
 # ImportError.
-# floor: 0.0.13 — contracts.bundle, the content-bundle section contract (#80).
+#
+# 0.0.13 is also the first with ``pagebuilder.contracts.public`` (#248), the
+# site's branded 404 news' reader pages render; on an older neighbour they
+# fall back to the host's error page.
+# floor: 0.0.13 — contracts.bundle (#80) and contracts.public (#248).
 pagebuilder = ["simple_module_pagebuilder>=0.0.13,<0.1"]
 
 [build-system]

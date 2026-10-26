@@ -4,7 +4,7 @@ Everything outside this package is internal and may change without a
 major version bump.
 """
 
-from pagebuilder.contracts import bundle
+from pagebuilder.contracts import bundle, public
 from pagebuilder.contracts.schemas import (
     BlockChange,
     LayoutDetail,
@@ -72,6 +72,7 @@ __all__ = [
     "PageUpdate",
     "RevisionDiffResponse",
     "bundle",
+    "public",
     "search_media",
     "search_pages",
 ]
