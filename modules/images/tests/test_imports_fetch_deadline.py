@@ -14,7 +14,7 @@ import time
 
 import httpx
 import pytest
-from sm_images.imports import fetch, url_safety
+from sm_images.imports import dns, fetch, url_safety
 from sm_images.imports.fetch import FetchTimeoutError, PinnedTransport, safe_stream
 
 from tests.fetch_support import OTHER_PUBLIC_IP, PUBLIC_IP
@@ -53,7 +53,7 @@ async def test_slow_dns_counts_against_the_deadline():
 
 @pytest.mark.usefixtures("stuck_dns")
 async def test_dns_has_its_own_bound(monkeypatch):
-    monkeypatch.setattr(fetch, "DNS_TIMEOUT_SECONDS", 0.05)
+    monkeypatch.setattr(dns, "DNS_TIMEOUT_SECONDS", 0.05)
     assert await _timed_out("http://cdn.example/a.jpg", 30) < 1
 
 

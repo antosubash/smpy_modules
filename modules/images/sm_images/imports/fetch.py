@@ -33,20 +33,16 @@ transports ahead of the pinned one.
 from __future__ import annotations
 
 import asyncio
-import functools
 import logging
 from collections.abc import AsyncIterator, Callable
-from concurrent.futures import ThreadPoolExecutor
 from typing import Final
 
 import httpx
 
-from sm_images.imports.url_safety import (
-    DEFAULT_ALLOWED_PORTS,
-    UnsafeURLError,
-    check_url,
-    resolve_public,
-)
+from sm_images.imports.dns import resolve_bounded
+from sm_images.imports.errors import FetchError, FetchTimeoutError, FetchTooLargeError
+from sm_images.imports.netsafe import harden
+from sm_images.imports.url_safety import DEFAULT_ALLOWED_PORTS, UnsafeURLError, check_url
 
 __all__ = [
     "MAX_REDIRECTS",
@@ -61,51 +57,12 @@ logger = logging.getLogger(__name__)
 
 MAX_REDIRECTS: Final = 5
 MAX_ADDRESSES_PER_HOP: Final = 4
-DNS_TIMEOUT_SECONDS: float = 5.0
-_DNS_POOL: Final = ThreadPoolExecutor(max_workers=8, thread_name_prefix="sm-images-dns")
 _IDENTITY: Final = frozenset({"", "identity"})
-
-
-class FetchError(Exception):
-    """A fetch that failed for a reason worth recording. ``code`` is a constant."""
-
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
-
-
-class FetchTooLargeError(FetchError):
-    """The body is (declared or actually) larger than ``max_bytes``. Permanent."""
-
-    def __init__(self) -> None:
-        super().__init__("too_large")
-
-
-class FetchTimeoutError(FetchError):
-    """The whole fetch overran its wall-clock budget (a trickling body). Retryable."""
-
-    def __init__(self) -> None:
-        super().__init__("timeout")
 
 
 def _inner_transport() -> httpx.AsyncBaseTransport:
     """The real connection layer. Tests replace it; production never does."""
     return httpx.AsyncHTTPTransport(verify=True, trust_env=False)
-
-
-async def _resolve(url: httpx.URL, allowed_ports: frozenset[int]) -> tuple[str, tuple[str, ...]]:
-    """``resolve_public`` on the bounded DNS pool, within ``DNS_TIMEOUT_SECONDS``.
-
-    Cancelling a resolver thread does not stop ``getaddrinfo``, so it runs on a
-    small dedicated pool: a hung resolver ties up one of its threads, never the
-    loop's default executor, and later lookups time out instead of piling up.
-    """
-    loop = asyncio.get_running_loop()
-    job = functools.partial(resolve_public, url, allowed_ports=allowed_ports)
-    try:
-        return await asyncio.wait_for(loop.run_in_executor(_DNS_POOL, job), DNS_TIMEOUT_SECONDS)
-    except TimeoutError as error:
-        raise FetchTimeoutError() from error
 
 
 class PinnedTransport(httpx.AsyncBaseTransport):
@@ -130,11 +87,11 @@ class PinnedTransport(httpx.AsyncBaseTransport):
     def _inner_for(self, url: httpx.URL) -> httpx.AsyncBaseTransport:
         origin = (url.scheme, url.host, url.port)
         if origin not in self._inners:
-            self._inners[origin] = self._factory()
+            self._inners[origin] = harden(self._factory())
         return self._inners[origin]
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        host, ips = await _resolve(request.url, self._allowed_ports)
+        host, ips = await resolve_bounded(request.url, self._allowed_ports)
         inner = self._inner_for(request.url)
         extensions = dict(request.extensions)
         if request.url.scheme == "https":
