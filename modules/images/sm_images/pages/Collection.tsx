@@ -10,6 +10,7 @@ import { VisibilitySelect } from '../components/collections/VisibilitySelect';
 import { Gallery } from '../components/gallery/Gallery';
 import { UploadButton } from '../components/gallery/UploadButton';
 import { ImagesLayout } from '../components/ImagesLayout';
+import { PipelineTab } from '../components/pipeline/PipelineTab';
 import { ShareDialog } from '../components/share/ShareDialog';
 import { useImages } from '../hooks/useImages';
 import { deleteCollection, setVisibility } from '../utils/api';
@@ -25,8 +26,8 @@ type Props = {
   direct_upload_threshold: number;
 };
 
-/** `Images/Collection` - `/admin/images/{id}`. Tabs come with their own tasks
- *  (map, imports, pipeline, review); only the gallery exists today. */
+/** `Images/Collection` - `/admin/images/{id}`. Tabs: the gallery and the
+ *  pipeline; map, imports and review arrive with their own tasks. */
 function Collection({
   collection,
   can_edit,
@@ -39,6 +40,7 @@ function Collection({
   const gallery = useImages(collection.id);
   const [visibility, setVisible] = useState<Visibility>(collection.visibility);
   const [saving, setSaving] = useState(false);
+  const [tab, setTab] = useState<'gallery' | 'pipeline'>('gallery');
 
   const changeVisibility = async (next: Visibility) => {
     setSaving(true);
@@ -108,7 +110,30 @@ function Collection({
               />
             </div>
           )}
-          <Gallery gallery={gallery} />
+          <div
+            role="tablist"
+            aria-label={t(keys.images.tabs.label)}
+            className="flex gap-2 border-b"
+          >
+            {(['gallery', 'pipeline'] as const).map((name) => (
+              <button
+                key={name}
+                type="button"
+                role="tab"
+                aria-selected={tab === name}
+                data-testid={`images-tab-${name}`}
+                className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === name ? 'border-primary font-medium' : 'border-transparent text-muted-foreground'}`}
+                onClick={() => setTab(name)}
+              >
+                {t(keys.images.tabs[name])}
+              </button>
+            ))}
+          </div>
+          {tab === 'gallery' ? (
+            <Gallery gallery={gallery} />
+          ) : (
+            <PipelineTab collectionId={collection.id} canManage={can_manage} />
+          )}
         </div>
       </PageShell>
     </>

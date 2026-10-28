@@ -1,5 +1,6 @@
 import { keys, useT } from '../../utils/i18n';
 import type { ImageItem } from '../../utils/types';
+import { ResultView } from '../results/ResultView';
 
 function bytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -16,13 +17,14 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-/** Metadata, then the image's `properties` as a generic key/value view. A step's
- *  own result view arrives with the review screens (Task 14). */
+/** Metadata, then each step run through `ResultView` (a plugin's own view, else
+ *  the generic one), then the image's `properties` as key/value rows. */
 export function ImageMeta({ image }: { image: ImageItem }) {
   const { t, locale } = useT();
   const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString(locale) : '-');
   const camera = [image.camera_make, image.camera_model].filter(Boolean).join(' ');
   const props = Object.entries(image.properties ?? {});
+  const runs = image.step_runs ?? [];
 
   return (
     <div className="space-y-6">
@@ -51,16 +53,25 @@ export function ImageMeta({ image }: { image: ImageItem }) {
         <h2 id="images-results-title" className="mb-2 text-lg font-semibold">
           {t(keys.images.viewer.results)}
         </h2>
-        {props.length === 0 ? (
+        {runs.length > 0 && (
+          <div className="divide-y" data-testid="images-step-results">
+            {runs.map((run) => (
+              <ResultView key={run.step} kind="step" id={run.step} output={run.output} run={run} />
+            ))}
+          </div>
+        )}
+        {props.length === 0 && runs.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t(keys.images.viewer.no_results)}</p>
         ) : (
-          <dl className="divide-y" data-testid="images-results">
-            {props.map(([name, value]) => (
-              <Row key={name} label={name}>
-                {typeof value === 'string' ? value : JSON.stringify(value)}
-              </Row>
-            ))}
-          </dl>
+          props.length > 0 && (
+            <dl className="divide-y" data-testid="images-results">
+              {props.map(([name, value]) => (
+                <Row key={name} label={name}>
+                  {typeof value === 'string' ? value : JSON.stringify(value)}
+                </Row>
+              ))}
+            </dl>
+          )
         )}
       </section>
     </div>

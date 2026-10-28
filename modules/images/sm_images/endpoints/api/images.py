@@ -189,9 +189,10 @@ async def list_images(
 
 @router.get("/images/{image_id}", dependencies=[require_view])
 async def get_image(
-    image_id: uuid.UUID, collection: ImageCollectionView, db=Depends(get_db)
+    image_id: uuid.UUID, collection: ImageCollectionView, who: Principal, db=Depends(get_db)
 ) -> ImageOut:
-    return await present.present_one(db, collection, await gallery.get(db, collection, image_id))
+    row = await gallery.get(db, collection, image_id)
+    return await present.present_detail(db, collection, row, who)
 
 
 @router.patch("/images/{image_id}", dependencies=[require_view])

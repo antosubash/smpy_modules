@@ -55,6 +55,35 @@ describe('Image viewer', () => {
     await view.unmount();
   });
 
+  it('renders each step run through ResultView, registered view first', async () => {
+    const { registerResultView, clearResultViews } = await import('../components/results/registry');
+    registerResultView({
+      kind: 'step',
+      id: 'exif',
+      component: ({ output }) => <p data-testid="exif-view">{String(output?.make)}</p>,
+    });
+    const run = (step: string, output: Record<string, unknown> | null) => ({
+      step,
+      status: 'completed',
+      step_version: 1,
+      error_code: null,
+      error_message: null,
+      finished_at: null,
+      output,
+    });
+    const view = await mount(
+      <Image
+        image={image('i1', { step_runs: [run('exif', { make: 'Canon' }), run('quality', { score: 7 })] })}
+        can_view_original={false}
+        {...props}
+      />,
+    );
+    expect(view.find('[data-testid="exif-view"]')?.textContent).toBe('Canon');
+    expect(view.find('[data-testid="images-result-generic"]')?.textContent).toContain('quality');
+    await view.unmount();
+    clearResultViews();
+  });
+
   it('offers deletion only to someone who may manage the collection', async () => {
     const view = await mount(
       <Image image={image('i1')} can_view_original={false} {...props} can_manage={false} />,

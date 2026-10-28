@@ -8,7 +8,7 @@ from sm_images.models import Image, Rendition
 from sqlalchemy import update
 
 from tests.stub_auth import as_user
-from tests.upload_support import BASE, OLGA, all_rows, jpeg, make_collection, post_files
+from tests.upload_support import BASE, OLGA, WRITER, all_rows, jpeg, make_collection, post_files
 
 VIEWS = "/admin/images"
 INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
@@ -123,3 +123,52 @@ async def test_an_images_refusal_on_a_screen_is_the_hosts_error_page(uploads):
     screen = await uploads.get(f"{VIEWS}/x/boom", headers={**OLGA, **INERTIA})
     assert screen.status_code == 404
     assert screen.json().get("component") and "detail" not in screen.json()
+
+
+async def _seed_run(client, iid: str) -> None:
+    from sm_images.models import StepRun, StepStatus
+    from sqlalchemy import delete
+
+    async with client.db_state.session_factory() as s:
+        await s.execute(delete(StepRun).where(StepRun.image_id == uuid.UUID(iid)))
+        s.add(
+            StepRun(
+                image_id=uuid.UUID(iid),
+                step="exif",
+                status=StepStatus.FAILED,
+                step_version=2,
+                error_code="boom",
+                error_message="/srv/internal/path blew up",
+                output={"regions": [[1, 2, 3, 4]]},
+            )
+        )
+        await s.commit()
+
+
+async def test_an_editor_sees_step_output_and_messages_a_viewer_does_not(uploads):
+    publisher = as_user("olga", (*WRITER, "images.publish"))
+    cid = await make_collection(uploads, publisher, visibility="internal")
+    got = await post_files(uploads, cid, [("a.jpg", jpeg(), "image/jpeg")])
+    iid = got.json()["results"][0]["id"]
+    await _seed_run(uploads, iid)
+    url = f"{VIEWS}/images/{iid}"
+    api = f"/api/images/images/{iid}"
+    viewer = as_user("sam", ("images.view",))
+
+    for headers in (OLGA, MANAGER):  # the owner; images.manage
+        page = props(await uploads.get(url, headers={**headers, **INERTIA}))
+        (run,) = page["image"]["step_runs"]
+        assert run["output"] == {"regions": [[1, 2, 3, 4]]}
+        assert run["error_message"] == "/srv/internal/path blew up"
+        assert run["step_version"] == 2 and run["error_code"] == "boom"
+        assert (await uploads.get(api, headers=headers)).json()["step_runs"][0]["output"]
+
+    page = props(await uploads.get(url, headers={**viewer, **INERTIA}))
+    (run,) = page["image"]["step_runs"]
+    assert run["step"] == "exif" and run["status"] == "failed" and run["error_code"] == "boom"
+    assert run["output"] is None and run["error_message"] is None
+    (api_run,) = (await uploads.get(api, headers=viewer)).json()["step_runs"]
+    assert api_run["output"] is None and api_run["error_message"] is None
+
+    listed = await uploads.get(f"/api/images/collections/{cid}/images", headers=OLGA)
+    assert listed.json()["items"][0]["step_runs"] is None

@@ -20,6 +20,18 @@ Filename = Annotated[
 ]
 
 
+class StepRunOut(BaseModel):
+    """One step's state for one image, with the output the result view renders."""
+
+    step: str
+    status: str
+    step_version: int | None
+    error_code: str | None
+    error_message: str | None
+    finished_at: datetime | None
+    output: dict[str, Any] | None
+
+
 class ImageOut(BaseModel):
     id: uuid.UUID
     collection_id: uuid.UUID
@@ -48,6 +60,8 @@ class ImageOut(BaseModel):
     pipeline has produced one for the current display copy."""
     display_url: str | None = None
     """The versioned display copy; the original's bytes when there is none."""
+    step_runs: list[StepRunOut] | None = None
+    """Only on the detail response (``present_detail``); lists leave it ``None``."""
 
     @classmethod
     def from_row(
@@ -63,7 +77,7 @@ class ImageOut(BaseModel):
         )
 
 
-_COMPUTED = {"has_display", "location_source", "thumb_url", "display_url"}
+_COMPUTED = {"has_display", "location_source", "thumb_url", "display_url", "step_runs"}
 _PLAIN = tuple(name for name in ImageOut.model_fields if name not in _COMPUTED)
 
 

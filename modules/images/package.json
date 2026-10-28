@@ -2,6 +2,9 @@
   "name": "@simple-module-py/images",
   "version": "0.0.13",
   "private": true,
+  "exports": {
+    ".": "./sm_images/index.ts"
+  },
   "description": "Frontend assets for the Images module",
   "peerDependencies": {
     "@inertiajs/react": "^3.9.1",

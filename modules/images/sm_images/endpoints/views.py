@@ -89,7 +89,9 @@ async def image(
     return await inertia.render(
         constants.PAGE_IMAGE,
         {
-            "image": (await present.present_one(db, collection, row)).model_dump(mode="json"),
+            "image": (await present.present_detail(db, collection, row, who)).model_dump(
+                mode="json"
+            ),
             "collection": _out(collection, who).model_dump(mode="json"),
             "can_view_original": can_view_original(who, row, collection, protected=protected),
             "can_edit": rights["can_edit"],

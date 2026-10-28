@@ -139,5 +139,33 @@
     "offline": "Sie scheinen offline zu sein. Nichts wurde gespeichert; versuchen Sie es erneut, sobald Sie verbunden sind.",
     "csrf_failed": "Ihr Sitzungstoken ist veraltet. Laden Sie die Seite neu und versuchen Sie es erneut.",
     "request_failed": "Die Anfrage ist fehlgeschlagen ({status})."
+  },
+  "tabs": {
+    "label": "Bereiche der Sammlung",
+    "gallery": "Galerie",
+    "pipeline": "Pipeline"
+  },
+  "results": {
+    "withheld": "Die Ausgabe dieses Schritts sehen nur Personen, die die Sammlung bearbeiten dürfen."
+  },
+  "pipeline": {
+    "title": "Verarbeitungs-Pipeline",
+    "save": "Pipeline speichern",
+    "saved": "Pipeline gespeichert",
+    "restarted": "Neustart gestartet",
+    "offer": "Gespeichert. Bilder, die schon in dieser Sammlung sind, übernehmen neu aktivierte Schritte erst nach einem Neustart.",
+    "later": "Jetzt nicht",
+    "invalid_json": "Das ist kein gültiges JSON und wurde nicht übernommen.",
+    "requires": "Benötigt: {steps}",
+    "not_installed": "Dieser Schritt ist nicht mehr installiert. Seine gespeicherten Einstellungen bleiben erhalten.",
+    "results_not_installed_one": "{count} Ergebnis gehört zu einem Schritt, der nicht installiert ist.",
+    "results_not_installed_other": "{count} Ergebnisse gehören zu Schritten, die nicht installiert sind.",
+    "stale_one": "{count} Ergebnis stammt von einer älteren Version seines Schritts.",
+    "stale_other": "{count} Ergebnisse stammen von einer älteren Version ihres Schritts.",
+    "restart": {
+      "failed": "Fehlgeschlagene wiederholen",
+      "stale": "Veraltete neu berechnen",
+      "all": "Alles neu berechnen"
+    }
   }
 }

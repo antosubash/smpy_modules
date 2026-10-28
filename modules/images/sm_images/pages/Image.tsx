@@ -3,6 +3,8 @@ import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { toast } from 'sonner';
 
+import '../images-steps'; // fills the result-view registry before anything renders
+
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ImagesLayout } from '../components/ImagesLayout';
 import { ImageMeta } from '../components/viewer/ImageMeta';

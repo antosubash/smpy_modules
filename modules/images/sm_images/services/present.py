@@ -5,13 +5,15 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from simple_module_core.resources import ACTION_EDIT, ResourcePrincipal
 from sqlalchemy import select
 
 from sm_images import constants, urls
-from sm_images.models import Collection, Image, Rendition
-from sm_images.schemas.image import ImageOut
+from sm_images.access import POLICY
+from sm_images.models import Collection, Image, Rendition, StepRun
+from sm_images.schemas.image import ImageOut, StepRunOut
 
-__all__ = ["present", "present_one"]
+__all__ = ["present", "present_detail", "present_one"]
 
 
 async def present(db: Any, collection: Collection, images: Sequence[Image]) -> list[ImageOut]:
@@ -40,3 +42,29 @@ async def present(db: Any, collection: Collection, images: Sequence[Image]) -> l
 
 async def present_one(db: Any, collection: Collection, image: Image) -> ImageOut:
     return (await present(db, collection, [image]))[0]
+
+
+async def present_detail(
+    db: Any, collection: Collection, image: Image, who: ResourcePrincipal
+) -> ImageOut:
+    """``present_one`` plus the image's step runs, for the viewer's result views.
+
+    Output (region coordinates, extracted text) and error messages (internals)
+    are for those who can edit the collection; a viewer gets the step, its
+    status and its error code only."""
+    out = await present_one(db, collection, image)
+    detailed = POLICY.can(who, ACTION_EDIT, collection)
+    stmt = select(StepRun).where(StepRun.image_id == image.id).order_by(StepRun.id)
+    out.step_runs = [
+        StepRunOut(
+            step=r.step,
+            status=r.status.value,
+            error_code=r.error_code,
+            step_version=r.step_version if detailed else None,
+            error_message=r.error_message if detailed else None,
+            finished_at=r.finished_at if detailed else None,
+            output=r.output if detailed else None,
+        )
+        for r in (await db.execute(stmt)).scalars()
+    ]
+    return out

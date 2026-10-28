@@ -26,6 +26,18 @@ export type Page<T> = {
   total: number | null;
 };
 
+/** One step's state for one image. Only the detail response carries these; for
+ *  someone who may not edit, only `step`, `status` and `error_code` are set. */
+export type StepRun = {
+  step: string;
+  status: string;
+  step_version: number | null;
+  error_code: string | null;
+  error_message: string | null;
+  finished_at: string | null;
+  output: Record<string, unknown> | null;
+};
+
 export type ImageItem = {
   id: string;
   collection_id: string;
@@ -53,6 +65,8 @@ export type ImageItem = {
   thumb_url: string | null;
   /** The versioned display copy (the original's bytes when there is none). */
   display_url: string | null;
+  /** Detail response only. */
+  step_runs?: StepRun[] | null;
 };
 
 /** Gallery filter chips; each maps to query parameters of the list route. */
@@ -84,3 +98,43 @@ export type ApiErrorBody = {
   code?: string;
   errors?: { field?: string; message: string }[];
 };
+
+// ---- Pipeline ------------------------------------------------------------
+
+/** A JSON Schema as pydantic emits it; only the parts the params form reads. */
+export type JsonSchema = {
+  type?: string;
+  title?: string;
+  description?: string;
+  default?: unknown;
+  enum?: unknown[];
+  anyOf?: JsonSchema[];
+  items?: JsonSchema;
+  properties?: Record<string, JsonSchema>;
+  required?: string[];
+};
+
+export type PipelineStep = {
+  id: string;
+  installed: boolean;
+  state: string;
+  enabled: boolean;
+  params?: Record<string, unknown>;
+  version?: number;
+  queue?: string;
+  requires?: string[];
+  mutates_display?: boolean;
+  params_schema?: JsonSchema;
+};
+
+export type PipelineOverview = {
+  config: { steps: Record<string, Record<string, unknown>> };
+  preset_id: string | null;
+  steps: PipelineStep[];
+  status: Record<string, Record<string, number>>;
+  stale: number;
+  not_installed: number;
+  pending: number;
+};
+
+export type RestartScope = 'failed' | 'stale' | 'all';

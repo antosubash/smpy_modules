@@ -15,6 +15,8 @@ import type {
   GalleryFilter,
   ImageItem,
   Page,
+  PipelineOverview,
+  RestartScope,
   UploadResult,
   Visibility,
 } from './types';
@@ -150,4 +152,22 @@ export function failedUpload(file: File, error: unknown): UploadResult {
     };
   }
   throw error;
+}
+
+// ---- Pipeline ------------------------------------------------------------
+
+export function getPipeline(collectionId: string): Promise<PipelineOverview> {
+  return send(`${BASE}/collections/${collectionId}/pipeline`);
+}
+
+/** `steps` is `{id: {enabled, ...params}}`, the shape the server validates. */
+export function savePipeline(
+  collectionId: string,
+  steps: Record<string, Record<string, unknown>>,
+): Promise<PipelineOverview> {
+  return send(`${BASE}/collections/${collectionId}/pipeline`, json('PUT', { steps }));
+}
+
+export function restartPipeline(collectionId: string, scope: RestartScope): Promise<unknown> {
+  return send(`${BASE}/collections/${collectionId}/pipeline/restart`, json('POST', { scope }));
 }
