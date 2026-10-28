@@ -47,7 +47,9 @@ class _Candidate:
     image_id: uuid.UUID
 
 
-async def _take_over(db: Any, c: _Candidate) -> bool:
+async def _take_over(db: Any, c: _Candidate, now: datetime) -> bool:
+    """The compare-and-set re-checks expiry in its own WHERE: a lease renewed
+    (or an open session extended) after the candidate SELECT makes it miss."""
     if c.status is UploadStatus.ABORTED:
         return True  # already ours to clean; cleanup is idempotent
     same_claim = (
@@ -55,11 +57,16 @@ async def _take_over(db: Any, c: _Candidate) -> bool:
         if c.token is None
         else UploadSession.claim_token == c.token
     )
+    expired = (
+        UploadSession.expires_at <= now
+        if c.status is UploadStatus.OPEN
+        else UploadSession.lease_expires_at <= now
+    )
     values = {"status": UploadStatus.ABORTED, "claim_token": uuid.uuid4()}
-    return await move(db, c.id, c.status, values, same_claim)
+    return await move(db, c.id, c.status, values, same_claim, expired)
 
 
-async def _reap_one(db: Any, store: Any, c: _Candidate) -> bool:
+async def _reap_one(db: Any, store: Any, c: _Candidate, now: datetime) -> bool:
     """Take over (committed on its own), *then* clean, then record it clean.
 
     The takeover commits before any storage call, so a cleanup that fails -
@@ -68,7 +75,7 @@ async def _reap_one(db: Any, store: Any, c: _Candidate) -> bool:
     cleanup leaves ``cleaned_at`` NULL and the next run retries it.
     """
     async with independent_session(db) as s:
-        took = await _take_over(s, c)
+        took = await _take_over(s, c, now)
     if not took:
         return False  # a complete or abort moved it first
     await discard(db, store, c.key, c.upload, c.image_id)
@@ -98,7 +105,7 @@ async def reap_expired_uploads(db: Any, store: Any, now: datetime, cap: int) -> 
     reaped = 0
     for c in candidates:
         try:
-            reaped += await _reap_one(db, store, c)
+            reaped += await _reap_one(db, store, c, now)
         except Exception:
             logger.warning("images: could not reap upload session %s", c.id, exc_info=True)
     return reaped
