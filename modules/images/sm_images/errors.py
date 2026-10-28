@@ -103,6 +103,12 @@ class UploadInProgress(Conflict):
     code = constants.CODE_UPLOAD_IN_PROGRESS
 
 
+class UploadNotOpen(Conflict):
+    """A part sent after a complete claimed (or finished) the upload."""
+
+    code = constants.CODE_UPLOAD_NOT_OPEN
+
+
 class DirectUploadUnsupported(ServiceUnavailable):
     code = constants.CODE_DIRECT_UNSUPPORTED
 

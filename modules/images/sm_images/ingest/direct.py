@@ -148,9 +148,13 @@ async def start(
         return token, ticket, relay, False
 
 
-async def write_part(store: Any, ticket: Ticket, no: int, body: AsyncIterator[bytes]) -> Any:
-    """Relay one part (backends that cannot presign). Exactly the expected size."""
+async def write_part(
+    db: Any, store: Any, ticket: Ticket, no: int, body: AsyncIterator[bytes]
+) -> Any:
+    """Relay one part (backends that cannot presign), only while the session is
+    ``open`` (``state.require_open``). Exactly the expected size."""
     limit = ticket.part_bytes(no)
+    await state.require_open(db, ticket)
     try:
         part = await _backend(store).write_part(
             ticket.key, ticket.upload, no, body, max_bytes=limit
@@ -199,7 +203,8 @@ async def complete(
     existing = await _existing(ingest.db, ticket)
     if existing is not None:
         return existing
-    if not await state.claim_complete(ingest.db, ticket):
+    token = await state.claim_complete(ingest.db, ticket)
+    if token is None:
         existing = await _existing(ingest.db, ticket)
         if existing is None:
             raise UploadNotFound(_GONE)
@@ -213,11 +218,10 @@ async def complete(
         assembled = True
         outcome = await _ingest(ingest, collection, ticket, filename=filename, meta=meta)
     except Exception:
-        await state.settle(
-            ingest.db, ticket, UploadStatus.ABORTED if assembled else UploadStatus.OPEN
-        )
+        handed_back = UploadStatus.ABORTED if assembled else UploadStatus.OPEN
+        await state.settle(ingest.db, ticket, token, handed_back)
         raise
-    await state.finish(ingest.db, ticket)
+    await state.finish(ingest.db, ticket, token)
     return outcome
 
 
@@ -264,10 +268,11 @@ async def _drop(ingest: IngestService, ticket: Ticket) -> None:
 
 async def abort(db: Any, store: Any, ticket: Ticket) -> None:
     """Claim the session ``aborted``, then discard the parts and the staged
-    object (never one a row owns). A completed upload is left alone; one a
-    complete is still working on is 409 ``upload_in_progress``."""
+    object (never one a row owns), then record ``cleaned_at``; a cleanup that
+    fails leaves it NULL for the reaper to retry. A completed upload is left
+    alone; one a complete is still working on is 409 ``upload_in_progress``."""
     if not await state.claim_abort(db, ticket):
         return
-    await _backend(store).abort_multipart(ticket.key, ticket.upload)
-    if await _existing(db, ticket) is None:
-        await store.delete_keys([ticket.key])
+    _backend(store)  # 503 on a backend without multipart uploads
+    await state.discard(db, store, ticket.key, ticket.upload, uuid.UUID(ticket.image))
+    await state.mark_cleaned(db, uuid.UUID(ticket.session))

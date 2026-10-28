@@ -16,6 +16,7 @@
     "parts_mismatch": "Part of the upload is missing or incomplete. Start it again.",
     "direct_upload_unsupported": "This server's storage does not support direct uploads.",
     "upload_failed": "The file could not be stored. Try again.",
-    "upload_in_progress": "This upload is being completed. Try again in a moment."
+    "upload_in_progress": "This upload is being completed. Try again in a moment.",
+    "upload_not_open": "This upload no longer accepts parts."
   }
 }

@@ -95,9 +95,13 @@ async def start_upload(
     f"{constants.UPLOADS_PATH}/{{upload_id}}/parts/{{part_no}}", dependencies=[require_view]
 )
 async def put_part(
-    part_no: int, request: Request, ticket: Ticket, collection: TicketCollection
+    part_no: int,
+    request: Request,
+    ticket: Ticket,
+    collection: TicketCollection,
+    db=Depends(get_db),
 ) -> PartOut:
-    part = await direct.write_part(store_for(request.app), ticket, part_no, request.stream())
+    part = await direct.write_part(db, store_for(request.app), ticket, part_no, request.stream())
     return PartOut(no=part.no, etag=part.etag, size=part.size)
 
 

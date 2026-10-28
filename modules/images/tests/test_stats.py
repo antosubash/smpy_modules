@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
+
+import pytest
 from sm_images.models import Collection, Image, Visibility
 from sm_images.services import stats
 from sqlalchemy import select
+
+from tests.pg_support import USING_POSTGRES
 
 
 async def _seed(db) -> Collection:
@@ -139,6 +144,11 @@ def _image(coll: Collection, key: str, lat: float | None = None, **kw) -> Image:
     )
 
 
+@pytest.mark.skipif(
+    USING_POSTGRES,
+    reason="staged in one task: on Postgres the injected writer waits on recompute's row "
+    "lock; the real-connection test below covers Postgres",
+)
 async def test_recompute_has_no_read_then_write_window(db, db_state):
     """P2-4: an image another transaction adds (and counts) while ``recompute``
     runs is never lost. The concurrent writer is let in before any statement
@@ -187,3 +197,34 @@ async def test_recompute_ignores_trashed_images(db):
     c = await _row(db, coll)
     assert (c.image_count, c.located_count) == (1, 0)
     assert _bbox(c) == (None, None, None, None)
+
+
+@pytest.mark.skipif(not USING_POSTGRES, reason="needs real connections (Postgres)")
+async def test_recompute_waits_for_an_inflight_upload_and_counts_it(db, db_state):
+    """Round 2, P2-5, on real connections. An upload has inserted and counted
+    an image but not committed; recompute must wait for it and then count it.
+    An ``UPDATE`` that merely blocks on the row keeps the snapshot it started
+    with (Read Committed) and overwrites the count without the image."""
+    coll = await _seed(db)
+    db.add(_image(coll, "a", 1.0))
+    await db.commit()
+
+    async with db_state.session_factory() as writer:
+        writer.add(_image(coll, "b", 40.0))
+        await writer.flush()
+        await stats.on_image_added(writer, coll.id, 40.0, 40.0)
+
+        async def run_recompute() -> None:
+            async with db_state.session_factory() as other:
+                await stats.recompute(other, coll.id)
+                await other.commit()
+
+        task = asyncio.create_task(run_recompute())
+        await asyncio.sleep(0.3)
+        assert not task.done()  # blocked behind the writer's row lock
+        await writer.commit()
+        await asyncio.wait_for(task, 10)
+
+    c = await _row(db, coll)
+    assert (c.image_count, c.located_count) == (2, 2)
+    assert c.bbox_maxx == 40.0

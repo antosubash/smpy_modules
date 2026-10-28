@@ -8,7 +8,20 @@ SQLite does not have as two-argument scalars.
 
 They only ever *grow* the box and clamp counters at zero. A removal or a lost
 location cannot shrink a box incrementally; :func:`recompute` does that, from
-one ``UPDATE`` of correlated aggregates, and is what the reconcile task and the delete paths call.
+one ``UPDATE`` of correlated aggregates, and is what the reconcile task and
+the delete paths call.
+
+**Lock order.** Every write here first takes the collection row's lock in a
+statement of its own (``SELECT ... FOR NO KEY UPDATE``; SQLite serialises
+writers anyway), and touches nothing else. That matters for
+:func:`recompute` on Postgres: under Read Committed a statement that blocks
+on the row keeps the snapshot it *started* with, so an ``UPDATE`` that waited
+for an in-flight upload would still aggregate without that upload's image and
+overwrite its increment. Waiting in a separate, earlier statement means the
+aggregate ``UPDATE`` starts after the upload committed and sees its image.
+``NO KEY UPDATE`` rather than ``UPDATE`` so the lock does not conflict with
+the ``KEY SHARE`` an image insert's foreign key takes: an upload holds that
+before it counts itself, and two uploads must not deadlock on each other.
 
 Coordinates are ``lat, lng``; the box is ``(minx, miny, maxx, maxy)`` =
 ``(lng, lat, lng, lat)``. ``(0, 0)`` is a valid location.
@@ -51,7 +64,14 @@ def _extend(lat: float, lng: float) -> dict[str, Any]:
     }
 
 
+async def _lock(db: Any, collection_id: uuid.UUID) -> None:
+    """The collection row's write lock, taken before any stats write (see above)."""
+    stmt = select(Collection.id).where(Collection.id == collection_id)
+    await db.execute(stmt.with_for_update(key_share=True))
+
+
 async def _apply(db: Any, collection_id: uuid.UUID, values: dict[str, Any]) -> None:
+    await _lock(db, collection_id)
     await db.execute(
         update(Collection)
         .where(Collection.id == collection_id)

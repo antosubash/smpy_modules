@@ -39,3 +39,15 @@ class UploadSession(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: igno
     content_type: str = Field(max_length=100)
     status: UploadStatus = enum_col(UploadStatus, "upload_status", UploadStatus.OPEN)
     expires_at: datetime = Field(sa_type=AwareDateTime(), sa_column_kwargs={"nullable": False})
+    claim_token: uuid.UUID | None = Field(default=None, sa_column=Column(Uuid, nullable=True))
+    """Fences ``completing``: written by the complete's claim, changed by a
+    reaper takeover; ``finish`` and ``settle`` match it."""
+    lease_expires_at: datetime | None = Field(
+        default=None, sa_type=AwareDateTime(), sa_column_kwargs={"nullable": True}
+    )
+    """Until when a ``completing`` claim is held; only after it may the reaper take over."""
+    cleaned_at: datetime | None = Field(
+        default=None, sa_type=AwareDateTime(), sa_column_kwargs={"nullable": True}
+    )
+    """When an ``aborted`` session's parts and staged object were discarded;
+    ``NULL`` means the cleanup still has to (re)run."""

@@ -13,15 +13,19 @@ would hide exactly the bug these pin.
 from __future__ import annotations
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 from sharing.endpoints.api import router as sharing_router
 from sharing.models import ResourceShare
 from simple_module_core.resources import ResourceTypeRegistry
 from simple_module_core.user_directory import DirectoryUser
 from simple_module_db import tenant_context
 from simple_module_db.listeners import TenantIsolationError
-from sm_images import constants
-from sm_images.tenancy import ALL_TENANTS
+from sm_images import _tenancy_mode, constants
+from sm_images.models import Collection
+from sm_images.tenancy import ALL_TENANTS, tenant_scope
 from sqlalchemy import select
+from starlette.applications import Starlette
+from starlette.routing import Mount
 
 from tests.isolation_support import ACME, GLOBEX, as_
 from tests.stub_auth import as_user, user_uuid
@@ -166,3 +170,45 @@ async def test_single_detection_on_a_strict_engine_fails_closed(client):
     client.db_state.tenant_strict = True
     with pytest.raises(TenantIsolationError):
         await client.post(SHARES, json=grant_body(cid), headers=olga)
+
+
+class UpstreamTenant:
+    """A layer that resolved ``acme`` onto ``request.state`` - as a parent's
+    ``TenantMiddleware`` does - without binding the tenant contextvar."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            scope.setdefault("state", {})["tenant_id"] = ACME
+        await self.app(scope, receive, send)
+
+
+async def test_an_upstream_request_state_tenant_wins_over_a_single_detection(client):
+    """Round 2: the loader follows ``request.state.tenant_id`` (what
+    ``resolve_admin`` reads first), not images' boot-time mode."""
+    client.app.add_middleware(UpstreamTenant)
+    mount_sharing(client.app)
+    with tenant_scope(ACME):
+        async with client.db_state.session_factory() as s:
+            row = Collection(slug="a", name="A", owner_id=user_uuid("olga"))
+            s.add(row)
+            await s.commit()
+    olga = as_user("olga", OWNER_PERMS)
+    got = await client.post(SHARES, json=grant_body(str(row.id)), headers=olga)
+    assert got.status_code == 201, got.text
+
+
+async def test_a_mounted_child_the_framework_cannot_answer_for_fails_closed(client, monkeypatch):
+    """Round 2: a child app mounted under a parent, with no framework answer for
+    its mode, is ``MULTI`` per request (``scope_mode``): no fallback to default."""
+    mount_sharing(client.app)
+    olga = as_user("olga", OWNER_PERMS)
+    cid = await make_collection(client, olga)
+    monkeypatch.setattr(_tenancy_mode, "_framework_mode", lambda app: None)
+    parent = Starlette(routes=[Mount("/child", app=client.app)])
+    async with AsyncClient(transport=ASGITransport(app=parent), base_url="http://p") as outer:
+        got = await outer.post(f"/child{SHARES}", json=grant_body(cid), headers=olga)
+    assert (got.status_code, got.json()["code"]) == (403, constants.TENANT_REQUIRED_CODE)
+    assert await share_rows(client) == []

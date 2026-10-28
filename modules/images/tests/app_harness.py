@@ -104,7 +104,8 @@ async def build_app(
     if tenancy == "multi":
         app.add_middleware(TenantMiddleware, header=TENANT_HEADER)
     app.add_middleware(HeaderAuthMiddleware)
-    module.tenancy = configure(app)  # what ``on_startup`` records
+    module.register_middleware(app)
+    configure(app)
     install_guard(db_state.sync_session_class)
     app.state.images_module = module
     return app, db_state

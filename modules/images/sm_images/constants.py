@@ -170,6 +170,7 @@ CODE_PARTS_MISMATCH: Final = "parts_mismatch"
 CODE_DIRECT_UNSUPPORTED: Final = "direct_upload_unsupported"
 CODE_UPLOAD_FAILED: Final = "upload_failed"
 CODE_UPLOAD_IN_PROGRESS: Final = "upload_in_progress"
+CODE_UPLOAD_NOT_OPEN: Final = "upload_not_open"
 ERROR_CODES: Final = (
     CODE_UNSUPPORTED_TYPE,
     CODE_TOO_MANY_PIXELS,
@@ -183,5 +184,6 @@ ERROR_CODES: Final = (
     CODE_DIRECT_UNSUPPORTED,
     CODE_UPLOAD_FAILED,
     CODE_UPLOAD_IN_PROGRESS,
+    CODE_UPLOAD_NOT_OPEN,
 )
 """Every code an upload can answer with; each has a translated sentence."""

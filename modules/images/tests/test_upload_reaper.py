@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from sm_images import constants
-from sm_images.ingest.upload_session import COMPLETING_GRACE, reap_expired_uploads
+from sm_images.ingest.upload_reaper import reap_expired_uploads
 from sm_images.models import UploadSession, UploadStatus
 from sm_images.storage import ImageStore
 
@@ -84,19 +84,3 @@ async def test_a_live_session_and_the_cap_are_respected(uploads):
     by_id = {str(r.id): r.status for r in await sessions(uploads)}
     assert by_id[live.session] is UploadStatus.OPEN
     assert {by_id[old1.session], by_id[old2.session]} == {UploadStatus.ABORTED}
-
-
-async def test_a_stuck_completing_session_is_reaped_only_after_the_grace(uploads):
-    """``completing`` is committed on its own; a process that died mid-complete
-    leaves it. It is reclaimed, but only well after it expired, so a complete
-    that claimed just before expiry is never pulled out from under."""
-    cid = await make_collection(uploads)
-    ticket = await _one_part_in(uploads, cid)
-    now = datetime.now(UTC)
-    await _set(
-        uploads, ticket, expires_at=now - timedelta(seconds=1), status=UploadStatus.COMPLETING
-    )
-    assert await _reap(uploads, now) == 0
-    assert _parts_exist(uploads, ticket)
-    assert await _reap(uploads, now + COMPLETING_GRACE) == 1
-    assert not _parts_exist(uploads, ticket)

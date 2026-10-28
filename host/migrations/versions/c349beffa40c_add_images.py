@@ -549,6 +549,9 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("claim_token", sa.Uuid(), nullable=True),
+        sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("cleaned_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(
             ["collection_id"],
             ["images_collection.id"],
