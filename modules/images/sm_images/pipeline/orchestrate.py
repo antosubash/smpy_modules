@@ -23,8 +23,8 @@ Both modes run the same claim, work and completion code.
 
 from __future__ import annotations
 
-import asyncio
 import logging
+import sys
 import uuid
 from collections import deque
 from collections.abc import Iterable
@@ -126,21 +126,33 @@ class _Queue(deque):
     closed = False
 
 
-def _in_delivery(transport: Any) -> bool:
-    """Is this code running inside one of the transport's own deliveries?
+def _deliver_code() -> Any:
+    """The code object of the framework coroutine that runs a durable handler."""
+    try:
+        from background_tasks.outbox_dispatch import deliver_one
+    except ImportError:  # pragma: no cover - background_tasks is a dependency
+        return None
+    return deliver_one.__code__
 
-    The installed ``OutboxTransport`` exposes no flag, so read its state: an
-    eager delivery is a task in ``_tasks``, and every delivery holds
-    ``_dispatch_lock`` (inline ones run on the publisher's task). Waiting from
-    there would wait on that delivery itself, or on the lock it holds - so the
-    caller leaves delivery to the dispatcher already running. A lock held by
-    an unrelated delivery only makes this return early.
+
+def _in_delivery() -> bool:
+    """Is this code running inside a durable delivery (an outbox handler)?
+
+    Decided by the **call path**, not by the transport's global state: while a
+    coroutine runs, its awaiting callers' frames are on the stack, so a
+    handler - delivered on its own task or inline on a request's - finds
+    ``deliver_one`` below it. Waiting for the transport from there would wait
+    on that very delivery (or the dispatcher lock it holds), so the caller
+    leaves delivery to the dispatcher already running. Code that merely runs
+    while some *unrelated* delivery is in flight is not inside one, and waits.
     """
-    current = asyncio.current_task()
-    if current is not None and current in getattr(transport, "_tasks", ()):
-        return True
-    lock = getattr(transport, "_dispatch_lock", None)
-    return bool(lock is not None and lock.locked())
+    target = _deliver_code()
+    frame = sys._getframe(1)
+    while frame is not None:
+        if frame.f_code is target:
+            return True
+        frame = frame.f_back
+    return False
 
 
 async def _drain_durable(runtime: Runtime) -> bool:
@@ -150,7 +162,7 @@ async def _drain_durable(runtime: Runtime) -> bool:
     ``False`` when there was nothing to wait for (or it must not wait)."""
     transport = getattr(runtime.bus(), "durable_transport", None)
     drain = getattr(transport, "drain", None)
-    if drain is None or _in_delivery(transport) or not getattr(transport, "_tasks", True):
+    if drain is None or _in_delivery():
         return False
     try:
         await drain()
