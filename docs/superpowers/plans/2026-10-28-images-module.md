@@ -244,7 +244,7 @@
 - `test_unbound_tenant_admin_403`;
 - `test_every_read_route_hides_private_collection`.
 
-- [ ] Commit `feat(images): collection API and contracts`
+- [x] Commit `feat(images): collection API and contracts`
 
 ### Task 7: Ingest, direct and batch upload
 
