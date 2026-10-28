@@ -3,7 +3,9 @@
 ``zipfile.ZipFile`` parses the whole central directory into memory on open,
 and it believes a ZIP64 end record whenever a ZIP64 locator sits right before
 the legacy one - whatever the legacy record says. So the bounds are read the
-same way: the locator is **always** looked for; when present its record's
+same way: the locator is **always** looked for, and its record is read where
+``zipfile`` reads it (right before the locator; the locator's offset field
+must agree, and a multi-disk archive is refused). When present, that record's
 count and directory size are the ones that count, and a legacy record that
 names other (non-sentinel) values is a forgery (``invalid_zip``). Only then
 are the bounds capped, by the caller.
@@ -37,14 +39,21 @@ def _read_at(handle: BinaryIO, offset: int, size: int) -> bytes:
 
 
 def _zip64(handle: BinaryIO, eocd_at: int) -> tuple[int, int] | None:
-    """The ZIP64 record's ``(count, directory size)``, or ``None`` without a locator."""
+    """The ZIP64 record's ``(count, directory size)``, or ``None`` without a
+    locator. Read where ``zipfile`` reads it - immediately before the locator,
+    not wherever the locator's offset field points - and that field must name
+    exactly that place; a split (multi-disk) archive is refused, as there."""
     locator_at = eocd_at - _ZIP64_LOCATOR[1]
     if locator_at < 0:
         return None
     locator = _read_at(handle, locator_at, _ZIP64_LOCATOR[1])
-    if not locator.startswith(_ZIP64_LOCATOR[0]):
+    if len(locator) < _ZIP64_LOCATOR[1] or not locator.startswith(_ZIP64_LOCATOR[0]):
         return None
-    record = _read_at(handle, struct.unpack("<4sLQL", locator)[2], _ZIP64_EOCD[1])
+    _, disk, named_at, disks = struct.unpack("<4sLQL", locator)
+    record_at = locator_at - _ZIP64_EOCD[1]
+    if disk != 0 or disks > 1 or record_at < 0 or named_at != record_at:
+        raise ZipRejected("invalid_zip")
+    record = _read_at(handle, record_at, _ZIP64_EOCD[1])
     if len(record) < _ZIP64_EOCD[1] or not record.startswith(_ZIP64_EOCD[0]):
         raise ZipRejected("invalid_zip")
     entries, cd_size = struct.unpack("<QQ", record[32:48])

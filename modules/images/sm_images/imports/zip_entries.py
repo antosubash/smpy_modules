@@ -7,7 +7,8 @@ each value the image's metadata. The portal's spelling (``latitude``,
 range or the wrong shape fails the whole job (``metadata_invalid``), as there.
 An entry finds its record by its full path in the archive first, then by its
 basename (the portal's key). Its ``external_source`` names the id's namespace
-(the portal's dedupe key was the pair); without one it is ``import``.
+(the portal's dedupe key was the pair), with or without an id of its own;
+without one it is ``import``.
 Coordinates from it are a person's, so they are stored as ``manual``.
 
 **Each entry is one item**, at ``feature_index`` = its place among the entries,
@@ -116,7 +117,7 @@ def entry_item(
     parsed = Parsed(
         entry.index,
         external_id=meta.external_id or base64_external_id(job_id, entry.index),
-        external_source=meta.external_source if meta.external_id else None,
+        external_source=meta.external_source,
         filename=entry.filename[: constants.FILENAME_MAX],
         captured_at=parse_datetime(meta.captured_at),
         properties=meta.properties or None,

@@ -54,6 +54,7 @@ PARSE_CODES: Final = frozenset(
         "invalid_external_id",
         "invalid_feature",
         "feature_too_large",
+        "invalid_metadata",
     }
 )
 """Failures decided by the feature itself: a retry would only repeat them, so

@@ -18,6 +18,10 @@ __all__ = ["coordinates", "lookup", "parse_datetime"]
 
 _DATE_FORMATS = ("%Y-%m-%d %H:%M:%S", "%Y:%m:%d %H:%M:%S", "%d-%m-%Y", "%m/%d/%Y")
 _MS_THRESHOLD = 1e11
+_TIMESTAMP_MAX = 10**15
+"""Beyond any real timestamp (seconds or milliseconds): refused before ``float``."""
+_DATE_TEXT_MAX = 64
+"""Longest date text worth parsing; longer is no date (and never reaches ``int``)."""
 """A number above this is a timestamp in milliseconds (1e11 s is the year 5138)."""
 
 
@@ -125,8 +129,10 @@ def parse_datetime(value: Any) -> datetime | None:
     if isinstance(value, datetime):
         return _aware(value)
     if isinstance(value, int | float):
+        if isinstance(value, int) and abs(value) > _TIMESTAMP_MAX:
+            return None  # a huge integer: ``float()`` would overflow
         seconds = float(value)
-        if not math.isfinite(seconds):
+        if not math.isfinite(seconds) or abs(seconds) > _TIMESTAMP_MAX:
             return None
         if abs(seconds) > _MS_THRESHOLD:
             seconds /= 1000
@@ -137,13 +143,15 @@ def parse_datetime(value: Any) -> datetime | None:
     if not isinstance(value, str) or not value.strip():
         return None
     text = value.strip()
+    if len(text) > _DATE_TEXT_MAX:
+        return None
     try:
         return _aware(datetime.fromisoformat(text.replace("Z", "+00:00")))
-    except ValueError:
+    except (ValueError, OverflowError):
         pass
     for fmt in _DATE_FORMATS:
         try:
             return _aware(datetime.strptime(text, fmt))
-        except ValueError:
+        except (ValueError, OverflowError):
             continue
     return None

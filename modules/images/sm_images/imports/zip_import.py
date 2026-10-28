@@ -115,6 +115,16 @@ def _untrusted(parse: Any, *args: Any) -> Any:
         raise ZipRejected("invalid_archive") from exc
 
 
+def _item(entry: Entry, *args: Any) -> Parsed:
+    """The entry's item; any failure converting its untrusted values fails that
+    item alone (``invalid_metadata``) - never the run, never a retry loop."""
+    try:
+        return entry_item(entry, *args)
+    except Exception:
+        logger.warning("images.import.zip_entry_unparseable index=%s", entry.index, exc_info=True)
+        return Parsed(entry.index, error="invalid_metadata", filename=entry.filename)
+
+
 def _inspect(path: Path, limits: Limits) -> Any:
     return _untrusted(inspect, path, limits)
 
@@ -186,7 +196,7 @@ async def _import(
     with zipfile.ZipFile(path) as zf:
         for lo in range(start, len(plan.entries), ENTRY_BATCH):
             batch = plan.entries[lo : lo + ENTRY_BATCH]
-            parsed = [entry_item(e, metadata, mapping, job.id, roles) for e in batch]
+            parsed = [_item(e, metadata, mapping, job.id, roles) for e in batch]
             await chunk.record_chunk(runtime, tenant, job, parsed)
             await _settle_chunk(runtime, tenant, job, coll, zf, plan.entries, parsed)
 
