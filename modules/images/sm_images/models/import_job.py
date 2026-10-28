@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from simple_module_db.mixins import AuditMixin, MultiTenantMixin
+from sqlalchemy import BigInteger, Column, Uuid
 from sqlmodel import Field
 
 from sm_images.models._base import Base
@@ -29,6 +30,13 @@ class ImportJob(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[u
     """Where the source was fetched from (``safe_stream``); lets a restart re-stage it."""
     staged_keys: list[str] = json_col(list)
     """Every object this job staged, so cancel and the janitor can delete exactly these."""
+    upload_session_id: uuid.UUID | None = Field(default=None, sa_column=Column(Uuid, nullable=True))
+    """A ZIP import's ``images_upload_session``: the archive's multipart upload."""
+    source_etag: str | None = Field(default=None, max_length=200)
+    """A ZIP's fingerprint at the seal (the backend's etag, or one derived from
+    its parts); extraction refuses an object that no longer matches."""
+    source_size: int | None = Field(default=None, sa_type=BigInteger)
+    """A ZIP's size at the seal, in bytes."""
     reset_mode: str | None = Field(default=None, max_length=20)
     """While ``resetting``: ``restart`` or ``retry``, so reconcile can resume it."""
     generation: int = Field(default=0, sa_column_kwargs={"nullable": False})

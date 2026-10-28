@@ -12,6 +12,12 @@ by the request's spooled upload, inside the upload body limit) or
 ``source_url`` (fetched by the runner through the SSRF guard). The answer is
 202 with the job; on an eager host (tests, dev without a broker) the import
 has already run by then.
+
+A ZIP goes in two calls (``imports.zip_upload``): ``POST
+/collections/{id}/imports/zip`` opens the job and a direct upload for the
+archive (presigned parts, or the relay route); ``POST /imports/{job}/extract``
+- an ``edit`` on the collection again, so a share revoked meanwhile stops it -
+seals the uploaded archive to the job and starts the extraction.
 """
 
 from __future__ import annotations
@@ -19,21 +25,32 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
 from simple_module_core.resources import ACTION_EDIT, ResourcePrincipal
 from simple_module_db.deps import get_db
 from simple_module_db.listeners import current_tenant_id
 from simple_module_hosting.resource_deps import RequiresResource, resource_principal
 from sqlalchemy import select
 
+from sm_images import constants
 from sm_images.access import POLICY, CollectionEdit
 from sm_images.deps import require_view
-from sm_images.errors import ServiceUnavailable
-from sm_images.imports import controls
+from sm_images.endpoints.api.uploads import _secret
+from sm_images.errors import ServiceUnavailable, UploadNotFound
+from sm_images.imports import controls, zip_upload
 from sm_images.imports.service import start_import
+from sm_images.imports.zip_import import launch_sealed
 from sm_images.models import Collection, ImportJob
 from sm_images.pipeline.runtime import Runtime, current_runtime
-from sm_images.schemas.imports import ImportJobOut, ImportJobPage, job_out
+from sm_images.schemas.image import DirectCreated
+from sm_images.schemas.imports import (
+    ImportJobOut,
+    ImportJobPage,
+    ZipCreate,
+    ZipCreated,
+    ZipExtract,
+    job_out,
+)
 
 router = APIRouter(tags=["imports"])
 
@@ -91,6 +108,45 @@ async def create_import(
         created_by=who.user_id,
     )
     return job_out(row)
+
+
+@router.post(
+    "/collections/{collection_id}/imports/zip", status_code=201, dependencies=[require_view]
+)
+async def create_zip_import(
+    body: ZipCreate, request: Request, collection: CollectionEdit, who: Principal
+) -> ZipCreated:
+    if who.user_id is None:  # pragma: no cover - require_view admits only signed-in callers
+        raise UploadNotFound("Upload not found")
+    job, (token, ticket, urls, presigned) = await zip_upload.start(
+        _runtime(),
+        _tenant(),
+        collection,
+        filename=body.filename,
+        size=body.size,
+        mapping=body.mapping,
+        owner=who.user_id,
+        secret=_secret(request),
+        auto_run_prompts=body.auto_run_prompts,
+    )
+    upload = DirectCreated(
+        upload_id=token,
+        part_size=ticket.part_size,
+        part_urls=urls,
+        direct=presigned,
+        expires_in=constants.DIRECT_UPLOAD_TTL_SECONDS,
+    )
+    return ZipCreated(job_id=job.id, upload=upload)
+
+
+@router.post("/imports/{job_id}/extract", status_code=202, dependencies=[require_view])
+async def extract_zip_import(
+    job_id: uuid.UUID, body: ZipExtract, collection: JobCollection
+) -> ImportJobOut:
+    runtime, tenant = _runtime(), _tenant()
+    generation = await zip_upload.seal(runtime, tenant, job_id, {p.no: p.etag for p in body.parts})
+    await launch_sealed(runtime, tenant, job_id, generation)
+    return job_out(await controls.get(runtime, tenant, job_id))
 
 
 @router.get("/collections/{collection_id}/imports", dependencies=[require_view])

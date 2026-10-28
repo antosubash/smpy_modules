@@ -147,6 +147,7 @@ def upgrade() -> None:
         sa.Column(
             "status",
             sa.Enum(
+                "UPLOADING",
                 "PENDING",
                 "STAGING",
                 "RUNNING",
@@ -163,6 +164,9 @@ def upgrade() -> None:
         sa.Column("source_key", sa.String(length=500), nullable=True),
         sa.Column("source_url", sa.String(length=2000), nullable=True),
         sa.Column("staged_keys", sa.JSON(), nullable=False),
+        sa.Column("upload_session_id", sa.Uuid(), nullable=True),
+        sa.Column("source_etag", sa.String(length=200), nullable=True),
+        sa.Column("source_size", sa.BigInteger(), nullable=True),
         sa.Column("reset_mode", sa.String(length=20), nullable=True),
         sa.Column("generation", sa.Integer(), nullable=False),
         sa.Column("heartbeat_at", sa.DateTime(timezone=True), nullable=True),

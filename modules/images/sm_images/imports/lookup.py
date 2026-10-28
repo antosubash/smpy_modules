@@ -49,9 +49,9 @@ async def live_collection(runtime: Runtime, tenant: str, collection_id: uuid.UUI
 
 
 async def resume_index(runtime: Runtime, tenant: str, job: JobSnap) -> int:
-    """Where streaming restarts: the checkpoint, or - base64, whose image bytes
-    live only in the source - the first recorded item still waiting for one."""
-    if job.kind is not ImportKind.GEOJSON_BASE64:
+    """Where streaming restarts: the checkpoint, or - base64 and ZIP, whose image
+    bytes live only in the source - the first recorded item still waiting for one."""
+    if job.kind not in (ImportKind.GEOJSON_BASE64, ImportKind.ZIP):
         return job.checkpoint_index
     stmt = select(func.min(ImportItem.feature_index)).where(
         ImportItem.job_id == job.id,

@@ -47,6 +47,8 @@ class ImportKind(str, enum.Enum):  # noqa: UP042
 
 
 class JobStatus(str, enum.Enum):  # noqa: UP042
+    UPLOADING = "uploading"
+    """A ZIP import waiting for its archive; ``extract`` seals it (``running``)."""
     PENDING = "pending"
     STAGING = "staging"
     RUNNING = "running"

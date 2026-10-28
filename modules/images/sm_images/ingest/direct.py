@@ -38,29 +38,26 @@ sniffed bytes are another type - so the key's extension, the row's
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator
-from dataclasses import asdict
 from typing import Any
 
-from file_storage.contracts.service import NotSupportedError, StorageError, StorageNotFoundError
+from file_storage.contracts.service import StorageError
 from sqlalchemy import select
 
 from sm_images import constants, storage_keys
 from sm_images.errors import (
-    DirectUploadUnsupported,
     FileTooLarge,
     ImagesError,
-    InvalidUpload,
     PartsMismatch,
     UnsupportedType,
     UploadNotFound,
 )
 from sm_images.ingest import upload_session as state
 from sm_images.ingest.meta import IngestMeta
-from sm_images.ingest.service import Duplicate, IngestService, safe_filename
+from sm_images.ingest.multipart import assemble as _assemble
+from sm_images.ingest.multipart import backend_of, open_upload, write_part
+from sm_images.ingest.service import Duplicate, IngestService
 from sm_images.ingest.sniff import EXTENSIONS, sniff
 from sm_images.ingest.ticket import (
-    _BAD_PART,
     _BAD_TYPE,
     _GONE,
     Ticket,
@@ -68,22 +65,20 @@ from sm_images.ingest.ticket import (
     load_ticket,
     serializer,
 )
-from sm_images.intents import object_intent
 from sm_images.models import Collection, Image, UploadStatus
 from sm_images.tenancy import bound_tenant
 
-__all__ = ["Ticket", "abort", "complete", "load_ticket", "start", "write_part"]
+__all__ = [
+    "Ticket",
+    "abort",
+    "complete",
+    "load_ticket",
+    "start",
+    "write_part",
+]
 
-_NO_DIRECT = "This storage backend does not support direct uploads"
 _TOO_LARGE = "The upload is larger than the image size limit"
 _SIZE_MISMATCH = "The stored upload is not the declared size"
-
-
-def _backend(store: Any) -> Any:
-    backend = store.backend
-    if not getattr(backend, "supports_direct_upload", False):
-        raise DirectUploadUnsupported(_NO_DIRECT)
-    return backend
 
 
 async def start(
@@ -103,83 +98,31 @@ async def start(
     declared type, which ``complete`` then holds the bytes to."""
     if size > max_bytes:
         raise FileTooLarge(_TOO_LARGE)
-    backend = _backend(store)
-    signer = serializer(secret)
+    backend_of(store)
+    serializer(secret)
     declared = declared_type(filename, content_type)
     image_id = uuid.uuid4()
-    tenant = bound_tenant()
-    ext = EXTENSIONS[declared]
-    key = storage_keys.original_key(tenant, str(collection.id), str(image_id), ext)
-    async with object_intent([key], session_factory=intent_factory):
-        upload = await backend.create_multipart(key, declared)
-    ticket = Ticket(
-        session=str(uuid.uuid4()),
-        key=key,
-        upload=upload,
-        collection=str(collection.id),
-        image=str(image_id),
-        tenant=tenant,
-        owner=owner,
-        size=size,
-        part_size=constants.DIRECT_PART_BYTES,
-        filename=safe_filename(filename),
-        content_type=declared,
+    key = storage_keys.original_key(
+        bound_tenant(), str(collection.id), str(image_id), EXTENSIONS[declared]
     )
-    db.add(state.new_session(ticket, collection.id))
-    await db.flush()
-    token = signer.dumps(asdict(ticket))
-    numbers = range(1, ticket.parts + 1)
-    try:
-        urls = [
-            await backend.presign_part(
-                key, upload, n, constants.DIRECT_PRESIGN_TTL_SECONDS, ticket.part_bytes(n)
-            )
-            for n in numbers
-        ]
-        return token, ticket, urls, True
-    except NotSupportedError:
-        relay = [constants.PART_PATH.format(upload_id=token, part_no=n) for n in numbers]
-        return token, ticket, relay, False
-
-
-async def write_part(
-    db: Any, store: Any, ticket: Ticket, no: int, body: AsyncIterator[bytes]
-) -> Any:
-    """Relay one part (backends that cannot presign), only while the session is
-    ``open`` (``state.require_open``). Exactly the expected size."""
-    limit = ticket.part_bytes(no)
-    await state.require_open(db, ticket)
-    try:
-        part = await _backend(store).write_part(
-            ticket.key, ticket.upload, no, body, max_bytes=limit
-        )
-    except StorageNotFoundError as exc:
-        raise UploadNotFound(_GONE) from exc
-    except StorageError as exc:
-        raise InvalidUpload(_BAD_PART, constants.CODE_PARTS_MISMATCH) from exc
-    if part.size != limit:
-        raise InvalidUpload(_BAD_PART, constants.CODE_PARTS_MISMATCH)
-    return part
+    return await open_upload(
+        db,
+        store,
+        collection,
+        key=key,
+        image_id=image_id,
+        size=size,
+        content_type=declared,
+        filename=filename,
+        owner=owner,
+        secret=secret,
+        intent_factory=intent_factory,
+    )
 
 
 async def _existing(db: Any, ticket: Ticket) -> Image | None:
     stmt = select(Image).where(Image.id == uuid.UUID(ticket.image))
     return (await db.execute(stmt.execution_options(include_deleted=True))).scalars().first()
-
-
-async def _assemble(store: Any, ticket: Ticket, claimed: dict[int, str | None]) -> None:
-    backend = _backend(store)
-    held = {p.no: p for p in await backend.list_parts(ticket.key, ticket.upload)}
-    wanted = range(1, ticket.parts + 1)
-    bad = [n for n in wanted if n not in held or held[n].size != ticket.part_bytes(n)]
-    bad += [
-        n
-        for n, etag in claimed.items()
-        if etag and n in held and held[n].etag.strip('"') != etag.strip('"')
-    ]
-    if bad or set(held) - set(wanted):
-        raise PartsMismatch(_BAD_PART)
-    await backend.complete_multipart(ticket.key, ticket.upload, [held[n] for n in wanted])
 
 
 async def complete(
@@ -270,6 +213,6 @@ async def abort(db: Any, store: Any, ticket: Ticket) -> None:
     alone; one a complete is still working on is 409 ``upload_in_progress``."""
     if not await state.claim_abort(db, ticket):
         return
-    _backend(store)  # 503 on a backend without multipart uploads
+    backend_of(store)  # 503 on a backend without multipart uploads
     await state.discard(db, store, ticket.key, ticket.upload, uuid.UUID(ticket.image))
     await state.mark_cleaned(db, uuid.UUID(ticket.session))

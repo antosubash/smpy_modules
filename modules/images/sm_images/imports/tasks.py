@@ -7,7 +7,8 @@ bodies, which run through :func:`~sm_images.pipeline.worker_runtime.run_task`
 after-commit dispatch).
 
 * ``images.import_geojson(job_id, generation)`` - stage, stream and record a
-  GeoJSON source; a stale ``generation`` does nothing.
+  GeoJSON source, or extract a sealed ZIP (the name predates ZIPs); a stale
+  ``generation`` does nothing.
 * ``images.download_items(job_id, ids, generation)`` - fetch and settle a
   batch of URL items for a runner of ``generation``.
 * ``images.reset_import(job_id, generation)`` - the ``resetting`` phase of a
@@ -29,13 +30,11 @@ STUCK_AFTER_SECONDS = 12 * 3600
 
 @shared_task(name=IMPORT_GEOJSON, stuck_after=STUCK_AFTER_SECONDS)
 def import_geojson(job_id: str, generation: int) -> str:
-    from sm_images.imports.runner import import_geojson_async
+    from sm_images.imports.zip_import import run_import
     from sm_images.pipeline.worker_runtime import run_task
 
     return run_task(
-        lambda runtime, tenant: import_geojson_async(
-            runtime, tenant, uuid.UUID(job_id), int(generation)
-        )
+        lambda runtime, tenant: run_import(runtime, tenant, uuid.UUID(job_id), int(generation))
     )
 
 

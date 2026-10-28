@@ -7,11 +7,12 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from sm_images.models import ImportJob
+from sm_images.schemas.image import DirectCreated, Filename, PartIn
 
-__all__ = ["ImportJobOut", "ImportJobPage", "job_out"]
+__all__ = ["ImportJobOut", "ImportJobPage", "ZipCreate", "ZipCreated", "ZipExtract", "job_out"]
 
 
 class ImportJobOut(BaseModel):
@@ -35,6 +36,31 @@ class ImportJobOut(BaseModel):
 
 class ImportJobPage(BaseModel):
     items: list[ImportJobOut]
+
+
+class ZipCreate(BaseModel):
+    """``POST /collections/{id}/imports/zip``: the archive to come, and how to
+    group its images (``filename_pattern`` is the only mapping a ZIP takes)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    filename: Filename
+    size: int = Field(ge=1)
+    mapping: dict[str, Any] | None = None
+    auto_run_prompts: bool = False
+
+
+class ZipCreated(BaseModel):
+    job_id: uuid.UUID
+    upload: DirectCreated
+    """Send the parts here, then ``POST /imports/{job_id}/extract``."""
+
+
+class ZipExtract(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    parts: list[PartIn] = Field(default_factory=list, max_length=10_000)
+    """The etags the client got back, checked against what storage holds (optional)."""
 
 
 def job_out(row: ImportJob) -> ImportJobOut:

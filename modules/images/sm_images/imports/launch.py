@@ -6,7 +6,8 @@ the publish, on this loop, where its ``asyncio.run`` cannot start. A broker
 process sends the message stamped with the tenant header, which the
 framework's ``task_prerun`` turns back into the bound tenant.
 
-* the runner and a reset go to ``images_imports`` (concurrency 1: long work);
+* the runner (of any kind: ``zip_import.run_import`` picks it) and a reset go
+  to ``images_imports`` (concurrency 1: long work);
 * downloads go to ``images`` in batches of :data:`DOWNLOAD_BATCH`, each
   carrying the job generation they were handed out under (settlement is
   fenced on it).
@@ -27,9 +28,9 @@ DOWNLOAD_BATCH: Final = 50
 
 async def launch_runner(runtime: Runtime, tenant: str, job_id: uuid.UUID, generation: int) -> None:
     if runtime.is_eager():
-        from sm_images.imports.runner import import_geojson_async
+        from sm_images.imports.zip_import import run_import
 
-        await import_geojson_async(runtime, tenant, job_id, generation)
+        await run_import(runtime, tenant, job_id, generation)
         return
     from background_tasks.tenant_context import TENANT_HEADER
 

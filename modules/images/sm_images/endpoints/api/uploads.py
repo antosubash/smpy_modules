@@ -24,7 +24,7 @@ from sm_images import constants
 from sm_images.access import POLICY, CollectionEdit, collection_stmt
 from sm_images.deps import require_view
 from sm_images.endpoints.api.images import Ingest, result
-from sm_images.errors import UploadNotFound
+from sm_images.errors import UploadNotFound, UploadNotOpen
 from sm_images.ingest import direct
 from sm_images.models import Collection
 from sm_images.schemas.image import (
@@ -109,6 +109,8 @@ async def put_part(
 async def complete_upload(
     body: DirectComplete, ticket: Ticket, collection: TicketCollection, ingest: Ingest
 ) -> UploadResult:
+    if ticket.kind != "image":  # a ZIP is sealed by its import's extract, never here
+        raise UploadNotOpen("This upload is completed by its import's extract")
     meta = body.metadata.to_ingest() if body.metadata else direct.IngestMeta()
     outcome = await direct.complete(
         ingest,

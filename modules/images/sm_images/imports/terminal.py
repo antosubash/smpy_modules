@@ -9,7 +9,7 @@ caller completes the job, and a paused or cancelled job is never resurrected.
 asked for it, so a late clean-up never acts on a newer generation). A URL
 job's items carry every URL, so a finished one never needs its source again
 and deletes it at once. A base64
-job's image bytes live only in the source: one that finished with failed items
+(or ZIP) job's image bytes live only in the source: one that finished with failed items
 keeps it, so retry-failed can re-read them, until the janitor's grace period
 (:func:`sm_images.imports.cleanup.reap_staging`); one with no failures deletes
 it at once. Failed and cancelled jobs delete theirs.
@@ -108,10 +108,10 @@ async def _delete_objects(runtime: Runtime, keys: list[str]) -> None:
 
 
 def _eligible(grace_cutoff: datetime | None) -> Any:
-    """SQL for "may delete its source now": not a source a finished base64 job
-    keeps for retry-failed - or, for the janitor, kept past the grace period."""
+    """SQL for "may delete its source now": not a source a finished base64 or
+    ZIP job keeps for retry-failed - or, for the janitor, kept past the grace period."""
     kept = and_(
-        ImportJob.kind == ImportKind.GEOJSON_BASE64,
+        ImportJob.kind.in_((ImportKind.GEOJSON_BASE64, ImportKind.ZIP)),
         ImportJob.status == JobStatus.COMPLETED,
         ImportJob.failed_count > 0,
     )

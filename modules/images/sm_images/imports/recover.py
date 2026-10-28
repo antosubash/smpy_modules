@@ -15,6 +15,10 @@ Delivery is at-most-once, so two things can be lost:
   untouched since the cutoff, in a ``running`` job. It is handed out again for
   the job's current generation; the claim makes a surfacing original skip it.
 
+A ZIP job still ``uploading`` is none of this: it has no runner until its
+archive is sealed. Once its upload session is gone it is failed instead
+(:func:`expire_uploads`).
+
 The caller (reconcile) has bound the tenant; every statement names it too.
 """
 
@@ -27,11 +31,11 @@ from datetime import UTC, datetime
 from typing import Final
 
 from simple_module_db import finalize_session
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 
 from sm_images.imports import jobs
 from sm_images.imports import launch as handoff
-from sm_images.models import ImportItem, ImportJob
+from sm_images.models import ImportItem, ImportJob, UploadSession, UploadStatus
 from sm_images.models.enums import ImportKind, ItemStatus, JobStatus
 from sm_images.pipeline.runtime import Runtime
 
@@ -88,8 +92,38 @@ async def _stale_items(
         after = int(rows[-1][0])
 
 
+async def expire_uploads(runtime: Runtime, tenant: str) -> int:
+    """Fail ``uploading`` ZIP jobs whose upload session expired, was aborted or
+    is gone (``upload_expired``); the reaper deletes the parts. How many."""
+    from sm_images.imports.zip_upload import fail_upload
+
+    gone = or_(
+        UploadSession.id.is_(None),
+        UploadSession.status == UploadStatus.ABORTED,
+        and_(UploadSession.status == UploadStatus.OPEN, UploadSession.expires_at <= jobs.now()),
+    )
+    stmt = (
+        select(ImportJob)
+        .outerjoin(UploadSession, UploadSession.id == ImportJob.upload_session_id)
+        .where(ImportJob.tenant_id == tenant, ImportJob.status == JobStatus.UPLOADING, gone)
+        .limit(ITEM_BATCH)
+    )
+    async with runtime.session_factory() as db:
+        rows = list((await db.execute(stmt)).scalars())
+        db.expunge_all()
+        await finalize_session(db)
+    for row in rows:
+        await fail_upload(runtime, tenant, row, "upload_expired")
+    return len(rows)
+
+
 async def recover_imports(runtime: Runtime, tenant: str, cutoff: datetime) -> tuple[int, int]:
-    """Relaunch stale runners and re-send stale downloads; ``(jobs, items)``."""
+    """Relaunch stale runners and re-send stale downloads; ``(jobs, items)``.
+    ZIP jobs whose upload never arrived are failed first (:func:`expire_uploads`)."""
+    try:
+        await expire_uploads(runtime, tenant)
+    except Exception:
+        logger.exception("images.reconcile.expire_uploads_failed tenant=%s", tenant)
     relaunched = 0
     for job_id, status in await _stale_jobs(runtime, tenant, cutoff):
         generation = await jobs.claim_stale(runtime, tenant, job_id, cutoff)

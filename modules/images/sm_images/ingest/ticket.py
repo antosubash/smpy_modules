@@ -46,6 +46,9 @@ class Ticket:
     part_size: int
     filename: str
     content_type: str
+    kind: str = "image"
+    """``image`` (completed by ``/complete``) or ``zip`` (sealed by its import's
+    ``extract``; ``/complete`` refuses it)."""
 
     @property
     def parts(self) -> int:
