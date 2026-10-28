@@ -482,7 +482,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 - `test_retry_after_honoured`;
 - `test_per_domain_concurrency`.
 
-- [ ] Commit `feat(images): safe fetch`
+- [x] Commit `feat(images): safe fetch`
 
 ### Task 17: GeoJSON import (URL and base64) (hard)
 
