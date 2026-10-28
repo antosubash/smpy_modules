@@ -30,6 +30,9 @@ class StepRunOut(BaseModel):
     error_message: str | None
     finished_at: datetime | None
     output: dict[str, Any] | None
+    output_visible: bool = False
+    """True when the caller may see ``output``/``error_message`` (an editor), so
+    ``output is None`` then means the step produced none, not that it is withheld."""
 
 
 class ImageOut(BaseModel):

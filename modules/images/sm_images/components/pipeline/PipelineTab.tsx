@@ -19,7 +19,7 @@ function draftsOf(overview: PipelineOverview): Drafts {
  *  saved config; a step that is not installed is sent back exactly as saved. */
 export function payloadOf(overview: PipelineOverview, drafts: Drafts) {
   const saved = overview.config.steps ?? {};
-  const out: Record<string, Record<string, unknown>> = {};
+  const out: Record<string, Record<string, unknown>> = Object.create(null);
   for (const step of overview.steps) {
     if (!step.installed) {
       if (step.id in saved) out[step.id] = saved[step.id];

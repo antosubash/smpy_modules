@@ -120,7 +120,10 @@ function Collection({
                 key={name}
                 type="button"
                 role="tab"
+                id={`images-tab-${name}`}
+                aria-controls="images-tabpanel"
                 aria-selected={tab === name}
+                tabIndex={tab === name ? 0 : -1}
                 data-testid={`images-tab-${name}`}
                 className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === name ? 'border-primary font-medium' : 'border-transparent text-muted-foreground'}`}
                 onClick={() => setTab(name)}
@@ -129,11 +132,13 @@ function Collection({
               </button>
             ))}
           </div>
-          {tab === 'gallery' ? (
-            <Gallery gallery={gallery} />
-          ) : (
-            <PipelineTab collectionId={collection.id} canManage={can_manage} />
-          )}
+          <div role="tabpanel" id="images-tabpanel" aria-labelledby={`images-tab-${tab}`}>
+            {tab === 'gallery' ? (
+              <Gallery gallery={gallery} />
+            ) : (
+              <PipelineTab collectionId={collection.id} canManage={can_manage} />
+            )}
+          </div>
         </div>
       </PageShell>
     </>

@@ -8,6 +8,9 @@ import type { JsonSchema } from '../../utils/types';
 
 type Params = Record<string, unknown>;
 
+/** Names that would reach the prototype if used as a key. */
+const UNSAFE = new Set(['__proto__', 'constructor', 'prototype']);
+
 /** The one non-null branch of a pydantic `Optional[...]`, else the schema. */
 function resolve(schema: JsonSchema): JsonSchema {
   const branches = (schema.anyOf ?? []).filter((b) => b.type !== 'null');
@@ -172,7 +175,7 @@ export function ParamsForm({
   disabled: boolean;
   onChange: (next: Params) => void;
 }) {
-  const fields = Object.entries(schema.properties ?? {});
+  const fields = Object.entries(schema.properties ?? {}).filter(([name]) => !UNSAFE.has(name));
   if (fields.length === 0) return null;
   return (
     <div className="grid gap-3 sm:grid-cols-2" data-testid={`images-params-${stepId}`}>

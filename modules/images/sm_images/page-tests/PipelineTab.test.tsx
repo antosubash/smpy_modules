@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { PipelineTab } from '../components/pipeline/PipelineTab';
+import { PipelineTab, payloadOf } from '../components/pipeline/PipelineTab';
 import { click, mount, setValue } from '../test-dom';
 import type { PipelineOverview } from '../utils/types';
 import { flush, stubFetch } from './support';
@@ -69,10 +69,8 @@ describe('PipelineTab', () => {
   it('saves the toggled step with its params, then prompts a restart', async () => {
     const calls = stubFetch({
       [`GET ${URL}`]: overview(),
-      [`PUT ${URL}`]: (call: { body: unknown }) => {
-        void call;
-        return overview({ config: { steps: { exif: { enabled: true }, quality: { enabled: true } } } });
-      },
+      [`PUT ${URL}`]: () =>
+        overview({ config: { steps: { exif: { enabled: true }, quality: { enabled: true } } } }),
       [`POST ${URL}/restart`]: { status: 'accepted', scope: 'stale' },
     });
     const view = await mount(<PipelineTab collectionId="c1" canManage={true} />);
@@ -99,14 +97,41 @@ describe('PipelineTab', () => {
     await view.unmount();
   });
 
-  it('keeps an invalid JSON draft out of the payload', async () => {
-    stubFetch({ [`GET ${URL}`]: overview() });
+  it('keeps an invalid JSON draft out of the saved payload', async () => {
+    const calls = stubFetch({ [`GET ${URL}`]: overview(), [`PUT ${URL}`]: overview() });
     const view = await mount(<PipelineTab collectionId="c1" canManage={true} />);
     await flush();
     await click(get(view, 'images-step-toggle-quality'));
     await setValue(view.find('#images-param-quality-nested') as HTMLTextAreaElement, '{oops');
     expect(view.host.textContent).toContain('not valid JSON');
+    await click(get(view, 'images-pipeline-save'));
+    await flush();
+    const put = calls.find((c) => c.method === 'PUT');
+    expect(put?.body).toEqual({ steps: { exif: { enabled: true }, quality: { enabled: true } } });
     await view.unmount();
+  });
+
+  it('does not render a param named __proto__ or constructor', async () => {
+    const hostile = JSON.parse(`{"id":"safe","installed":true,"state":"ok","enabled":true,"params":{},
+      "params_schema":{"properties":{"__proto__":{"type":"string"},"constructor":{"type":"string"},"ok":{"type":"string"}}}}`);
+    stubFetch({ [`GET ${URL}`]: overview({ steps: [hostile], config: { steps: {} } }) });
+    const view = await mount(<PipelineTab collectionId="c1" canManage={true} />);
+    await flush();
+    const ids = view.all('[data-testid="images-params-safe"] input').map((i) => i.id);
+    expect(ids).toEqual(['images-param-safe-ok']);
+    await view.unmount();
+  });
+
+  it('builds the payload on a prototype-less object, so a step id __proto__ is just a key', () => {
+    const data = overview({
+      steps: [{ id: '__proto__', installed: true, state: 'ok', enabled: true, params: {} }],
+      config: { steps: {} },
+    });
+    const drafts = JSON.parse('{"__proto__":{"enabled":true,"params":{}}}');
+    const sent = payloadOf(data, drafts);
+    expect(Object.getPrototypeOf(sent)).toBeNull();
+    expect(Object.keys(sent)).toEqual(['__proto__']);
+    expect(({} as Record<string, unknown>).enabled).toBeUndefined();
   });
 
   it('shows the stale and not-installed banners and the restart buttons', async () => {

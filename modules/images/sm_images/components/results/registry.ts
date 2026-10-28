@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 
-import type { StepRun } from '../../utils/types';
+import type { Translate } from '../../utils/i18n';
+import type { ImageItem, StepRun } from '../../utils/types';
 
 export type ResultKind = 'step' | 'prompt_result' | 'cross_check';
 
@@ -11,6 +12,9 @@ export type ResultViewProps = {
   id: string;
   output: Record<string, unknown> | null;
   run: StepRun | null;
+  /** The image the result belongs to (spec §8.4: `{output, image, t}`). */
+  image: ImageItem | null;
+  t: Translate;
 };
 
 export type ResultViewRegistration = {

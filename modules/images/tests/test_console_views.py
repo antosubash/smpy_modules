@@ -158,7 +158,7 @@ async def test_an_editor_sees_step_output_and_messages_a_viewer_does_not(uploads
     for headers in (OLGA, MANAGER):  # the owner; images.manage
         page = props(await uploads.get(url, headers={**headers, **INERTIA}))
         (run,) = page["image"]["step_runs"]
-        assert run["output"] == {"regions": [[1, 2, 3, 4]]}
+        assert run["output"] == {"regions": [[1, 2, 3, 4]]} and run["output_visible"] is True
         assert run["error_message"] == "/srv/internal/path blew up"
         assert run["step_version"] == 2 and run["error_code"] == "boom"
         assert (await uploads.get(api, headers=headers)).json()["step_runs"][0]["output"]
@@ -172,3 +172,30 @@ async def test_an_editor_sees_step_output_and_messages_a_viewer_does_not(uploads
 
     listed = await uploads.get(f"/api/images/collections/{cid}/images", headers=OLGA)
     assert listed.json()["items"][0]["step_runs"] is None
+
+
+async def test_an_edit_share_sees_step_output_and_a_view_share_does_not(uploads):
+    from tests.test_sharing_routes import grant_body, mount_sharing
+
+    mount_sharing(uploads.app)
+    owner = as_user("olga", (*WRITER, "sharing.share"))
+    cid = await make_collection(uploads, owner)
+    iid = (await post_files(uploads, cid, [("a.jpg", jpeg(), "image/jpeg")], headers=owner)).json()[
+        "results"
+    ][0]["id"]
+    await _seed_run(uploads, iid)
+    for who, role in (("edna", "edit"), ("vic", "view")):
+        got = await uploads.post(
+            "/api/sharing/shares", json=grant_body(cid, who, role), headers=owner
+        )
+        assert got.status_code == 201, got.text
+    url = f"/api/images/images/{iid}"
+    (edit_run,) = (await uploads.get(url, headers=as_user("edna", ("images.view",)))).json()[
+        "step_runs"
+    ]
+    assert edit_run["output"] and edit_run["error_message"] and edit_run["output_visible"] is True
+    (view_run,) = (await uploads.get(url, headers=as_user("vic", ("images.view",)))).json()[
+        "step_runs"
+    ]
+    assert view_run["output"] is None and view_run["error_message"] is None
+    assert view_run["output_visible"] is False

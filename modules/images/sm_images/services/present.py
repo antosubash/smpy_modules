@@ -44,6 +44,15 @@ async def present_one(db: Any, collection: Collection, image: Image) -> ImageOut
     return (await present(db, collection, [image]))[0]
 
 
+async def can_edit(db: Any, who: ResourcePrincipal, collection: Collection) -> bool:
+    """Owner, an edit share or ``images.manage``. Asked of the database: a share
+    is a row, and ``POLICY.can`` on a loaded object cannot see it."""
+    stmt = POLICY.filter(
+        who, ACTION_EDIT, select(Collection.id).where(Collection.id == collection.id)
+    )
+    return (await db.execute(stmt)).first() is not None
+
+
 async def present_detail(
     db: Any, collection: Collection, image: Image, who: ResourcePrincipal
 ) -> ImageOut:
@@ -53,8 +62,8 @@ async def present_detail(
     are for those who can edit the collection; a viewer gets the step, its
     status and its error code only."""
     out = await present_one(db, collection, image)
-    detailed = POLICY.can(who, ACTION_EDIT, collection)
-    stmt = select(StepRun).where(StepRun.image_id == image.id).order_by(StepRun.id)
+    detailed = await can_edit(db, who, collection)
+    stmt = select(StepRun).where(StepRun.image_id == image.id).order_by(StepRun.step)
     out.step_runs = [
         StepRunOut(
             step=r.step,
@@ -64,6 +73,7 @@ async def present_detail(
             error_message=r.error_message if detailed else None,
             finished_at=r.finished_at if detailed else None,
             output=r.output if detailed else None,
+            output_visible=detailed,
         )
         for r in (await db.execute(stmt)).scalars()
     ]

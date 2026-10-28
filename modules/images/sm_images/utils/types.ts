@@ -36,6 +36,8 @@ export type StepRun = {
   error_message: string | null;
   finished_at: string | null;
   output: Record<string, unknown> | null;
+  /** True for an editor: `output === null` then means the step made none. */
+  output_visible?: boolean;
 };
 
 export type ImageItem = {

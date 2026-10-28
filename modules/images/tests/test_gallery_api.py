@@ -41,10 +41,16 @@ async def test_list_filters(uploads):
     (group,) = await all_rows(uploads, Group)
     assert await names(uploads, cid, group=str(group.id)) == ["a.jpg"]
     async with uploads.db_state.session_factory() as s:
-        s.add(StepRun(image_id=uuid.UUID(ids["b.jpg"]), step="exif", status=StepStatus.FAILED))
-        s.add(StepRun(image_id=uuid.UUID(ids["c.jpg"]), step="exif"))
+        # Ingest already planned the default pipeline's runs; set their states.
+        await s.execute(update(StepRun).values(status=StepStatus.COMPLETED))
+        for name, status in (("b.jpg", StepStatus.FAILED), ("c.jpg", StepStatus.PENDING)):
+            await s.execute(
+                update(StepRun)
+                .where(StepRun.image_id == uuid.UUID(ids[name]), StepRun.step == "exif")
+                .values(status=status)
+            )
         await s.commit()
-    assert await names(uploads, cid, step="exif") == ["b.jpg", "c.jpg"]
+    assert await names(uploads, cid, step="exif") == ["a.jpg", "b.jpg", "c.jpg"]
     assert await names(uploads, cid, step="exif", step_status="failed") == ["b.jpg"]
     assert await names(uploads, cid, step_status="pending") == ["c.jpg"]
     assert await names(uploads, cid, review_status="accepted") == []

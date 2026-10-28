@@ -56,7 +56,14 @@ export function ImageMeta({ image }: { image: ImageItem }) {
         {runs.length > 0 && (
           <div className="divide-y" data-testid="images-step-results">
             {runs.map((run) => (
-              <ResultView key={run.step} kind="step" id={run.step} output={run.output} run={run} />
+              <ResultView
+                key={run.step}
+                kind="step"
+                id={run.step}
+                output={run.output}
+                run={run}
+                image={image}
+              />
             ))}
           </div>
         )}

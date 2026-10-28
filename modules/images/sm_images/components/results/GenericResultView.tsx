@@ -1,4 +1,4 @@
-import { keys, useT } from '../../utils/i18n';
+import { keys } from '../../utils/i18n';
 import type { ResultViewProps } from './registry';
 
 function show(value: unknown): string {
@@ -7,8 +7,7 @@ function show(value: unknown): string {
 
 /** The fallback for a result with no view of its own: its status, and its
  *  output as plain key/value rows. */
-export function GenericResultView({ id, output, run }: ResultViewProps) {
-  const { t } = useT();
+export function GenericResultView({ id, output, run, t }: ResultViewProps) {
   const rows = Object.entries(output ?? {});
   return (
     <div className="py-2 text-sm" data-testid="images-result-generic" data-result-id={id}>
@@ -28,7 +27,7 @@ export function GenericResultView({ id, output, run }: ResultViewProps) {
           ))}
         </dl>
       )}
-      {output === null && run?.status === 'completed' && (
+      {output === null && run?.status === 'completed' && run.output_visible === false && (
         <p className="text-muted-foreground">{t(keys.images.results.withheld)}</p>
       )}
     </div>
