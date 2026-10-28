@@ -47,14 +47,13 @@ from sm_images.models import (
     UploadSession,
     UploadStatus,
 )
-from sm_images.purge_select import MIN_INTENT_AGE, Keys, chunks, collect_keys, pick
+from sm_images.purge_delete import FAILURE_LIMIT, delete_keys
+from sm_images.purge_select import MIN_INTENT_AGE, Keys, Selection, chunks, collect_keys, pick
 
 __all__ = ["FAILURE_LIMIT", "MIN_INTENT_AGE", "PurgeReport", "purge_expired"]
 
 logger = logging.getLogger(__name__)
 
-FAILURE_LIMIT = 20
-"""Storage failures after which one pass stops trying (the rest wait)."""
 _SYNC = {"synchronize_session": False}
 _UNSETTLED = or_(
     UploadSession.status.in_((UploadStatus.OPEN, UploadStatus.COMPLETING)),
@@ -123,32 +122,6 @@ class _Upload:
     backend_upload_id: str
 
 
-async def _delete_groups(store: Any, groups: dict[uuid.UUID, set[str]]) -> tuple[set, set]:
-    """``(failed, untried)`` group ids; every other group's keys are gone."""
-    keys = sorted(set().union(*groups.values())) if groups else []
-    if not keys:
-        return set(), set()
-    try:
-        await store.delete_keys(keys)
-        return set(), set()
-    except Exception:
-        logger.warning("images.purge.batch_delete_failed n=%d", len(keys), exc_info=True)
-    failed: set = set()
-    untried: set = set()
-    for gid, group in groups.items():
-        if not group:
-            continue
-        if len(failed) >= FAILURE_LIMIT:
-            untried.add(gid)
-            continue
-        try:
-            await store.delete_keys(sorted(group))
-        except Exception:
-            logger.warning("images.purge.object_delete_failed owner=%s", gid, exc_info=True)
-            failed.add(gid)
-    return failed, untried
-
-
 async def _delete_rows(
     db: Any, image_ids: list, whole_ids: list, keys: list[str], keep_sessions: list
 ) -> None:
@@ -182,26 +155,36 @@ async def _delete_rows(
         await run(delete(ObjectIntent).where(ObjectIntent.key.in_(chunk)))
 
 
-async def _clear(db: Any, store: Any, images: list[Image], whole: set, keys: Keys, now: datetime):
-    """Steps 1 and 2: what may go. Returns ``(images, whole, failed, stuck)``."""
-    stuck = await _abort_uploads(db, store, [i.id for i in images], sorted(whole))
+async def _record(db: Any, model: Any, ids: set, now: datetime) -> None:
+    """Send what failed to the back of later passes."""
+    if ids:
+        await db.execute(
+            update(model)
+            .where(model.id.in_(sorted(ids)))
+            .values(purge_failed_at=now)
+            .execution_options(**_SYNC, include_deleted=True)
+        )
+
+
+async def _clear(db: Any, store: Any, sel: Selection, keys: Keys, now: datetime):
+    """Steps 1 and 2: what may go. Returns ``(images, whole, failed, stuck, deleted)``."""
+    whole = {c.id for c in sel.whole}
+    stuck = await _abort_uploads(db, store, [i.id for i in sel.images], sorted(whole))
     blocked = {u.storage_key for u in stuck}
     whole -= {u.collection_id for u in stuck}
     for group in (*keys.images.values(), *keys.collections.values()):
         group -= blocked
-    failed, untried = await _delete_groups(store, keys.images)
-    skipped = failed | untried
-    whole -= {i.collection_id for i in images if i.id in skipped}
-    lost, later = await _delete_groups(store, {c: keys.collections[c] for c in whole})
-    whole -= lost | later
-    if failed:
-        await db.execute(
-            update(Image)
-            .where(Image.id.in_(sorted(failed)))
-            .values(purge_failed_at=now)
-            .execution_options(**_SYNC, include_deleted=True)
-        )
-    return [i for i in images if i.id not in skipped], whole, failed, stuck
+    of = {i.id: i.collection_id for i in sel.images}
+    cleared = await delete_keys(store, keys, of, whole)
+    failed = {ident for kind, ident in cleared.failed if kind == "image"}
+    kept = {ident for kind, ident in cleared.kept() if kind == "image"}
+    picked = {c.id for c in sel.collections}
+    bad = {ident for kind, ident in cleared.failed if kind == "collection"}
+    bad |= {u.collection_id for u in stuck} | {of[i] for i in failed}
+    await _record(db, Image, failed, now)
+    await _record(db, Collection, bad & picked, now)
+    images = [i for i in sel.images if i.id not in kept]
+    return images, whole, failed, stuck, cleared.deleted
 
 
 async def purge_expired(
@@ -223,12 +206,9 @@ async def purge_expired(
     if dry_run:
         await db.rollback()  # nothing changed; let the row locks go
         return report
-    images, whole, failed, stuck = await _clear(
-        db, store, sel.images, set(report.collections), keys, now
-    )
-    gone = [*(keys.images[i.id] for i in images), *(keys.collections[c] for c in whole)]
+    images, whole, failed, stuck, deleted = await _clear(db, store, sel, keys, now)
     report.images, report.collections = [i.id for i in images], sorted(whole)
-    report.keys, report.failed = sorted(set().union(*gone)), sorted(failed)
+    report.keys, report.failed = sorted(deleted), sorted(failed)
     await _delete_rows(db, report.images, report.collections, report.keys, [u.id for u in stuck])
     await billing.release_storage(db, [(i.id, i.storage_hold_id, i.storage_bytes) for i in images])
     return report

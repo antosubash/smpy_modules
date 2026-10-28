@@ -33,7 +33,8 @@ from sm_images.pipeline.claim import (
 )
 from sm_images.pipeline.config import validate_pipeline_config
 from sm_images.pipeline.cycle import bump_cycle, mark_processed, reset_runs
-from sm_images.pipeline.plan import RunView, plan, reopenable
+from sm_images.pipeline.plan import RunView, plan
+from sm_images.pipeline.reopen import reopenable
 from sm_images.pipeline.runtime import Runtime
 
 __all__ = ["Advanced", "advance_locked", "claim_ready", "conclude", "plan_and_claim", "view"]

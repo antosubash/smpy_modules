@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, ClassVar
 
 from simple_module_db.mixins import AuditMixin, MultiTenantMixin, SoftDeleteMixin
 from sqlalchemy import Index
@@ -20,6 +20,7 @@ COLLECTION_SLUG_INDEX = "uq_images_collection_tenant_slug"
 class Collection(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     __tablename__ = "images_collection"
     __table_args__ = (Index(COLLECTION_SLUG_INDEX, "tenant_id", "slug", unique=True),)
+    __audit_exclude_fields__: ClassVar[set[str]] = {"purge_failed_at"}
 
     id: uuid.UUID = pk_uuid()
     slug: str = Field(max_length=100)
@@ -49,3 +50,6 @@ class Collection(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True
     Serving reads this, not the live registry, so uninstalling the plugin never
     unprotects an original; only an owner's save of a config with no mutator,
     every step of it installed, clears it (``pipeline.config.protect_originals``)."""
+    purge_failed_at: datetime | None = dt_col()
+    """When the janitor last failed to purge this (trashed) collection, or one
+    of its images; it then goes to the back of later passes (``sm_images.purge``)."""

@@ -71,6 +71,7 @@ def upgrade() -> None:
         sa.Column("map_built_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("map_image_count", sa.Integer(), nullable=False),
         sa.Column("protect_originals", sa.Boolean(), nullable=False),
+        sa.Column("purge_failed_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_images_collection")),
     )
     op.create_index(

@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sm_images.models import Collection, Image, StepRun
 from sm_images.models.enums import StepStatus
 from sm_images.pipeline.config import validate_pipeline_config
-from sm_images.pipeline.plan import PLACEHOLDER_CODES
+from sm_images.pipeline.reopen import PLACEHOLDER_CODES
 from sm_images.pipeline.runtime import Runtime
 
 __all__ = ["reopenable_images"]

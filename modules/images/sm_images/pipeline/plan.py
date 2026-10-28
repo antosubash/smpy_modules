@@ -42,7 +42,6 @@ __all__ = [
     "is_blocked",
     "is_stale",
     "plan",
-    "reopenable",
 ]
 
 RENDITIONS = "renditions"
@@ -58,8 +57,6 @@ BLOCKED_CODES = frozenset(
     {DEPENDENCY_FAILED, DEPENDENCY_UNAVAILABLE, DEPENDENCY_STALE, NOT_INSTALLED, DISABLED}
 )
 """``error_code`` of a skip the executor decided, not the step: never a prerequisite."""
-PLACEHOLDER_CODES = frozenset({NOT_INSTALLED, DISABLED})
-"""Skips that only stand in for a step that could not run: they reopen once it can."""
 
 
 @dataclass(frozen=True)
@@ -227,17 +224,3 @@ def plan(cfg: PipelineConfig, runs: dict[str, RunView]) -> Plan:
             out.ready.append(sid)
     out.final = not out.ready and all(state[s].status in FINAL for s in enabled)
     return out
-
-
-def reopenable(cfg: PipelineConfig, runs: dict[str, RunView]) -> list[str]:
-    """Placeholder skips (``not_installed``, ``disabled``) of steps that are now
-    enabled and installed: back to ``pending`` before planning, or a plugin
-    reinstalled (or a step switched back on) would stay skipped for good."""
-    out = []
-    for sid, run in runs.items():
-        sc = cfg.get(sid)
-        if sc is None or not sc.enabled or sc.state == "not_installed":
-            continue
-        if run.status is StepStatus.SKIPPED and run.error_code in PLACEHOLDER_CODES:
-            out.append(sid)
-    return sorted(out)

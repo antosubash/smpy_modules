@@ -7,8 +7,8 @@ row and its own objects: the map, import staging, upload sessions) only when
 the selected images are all it has: ``SKIP LOCKED`` silently passes over an
 image a step is completing on, so the pass counts the collection's images
 again *without* it and leaves the collection for the next pass if any remain.
-Images whose purge already failed (``purge_failed_at``) come last, so a key
-that will not delete cannot take the budget of every pass.
+Collections and images whose purge already failed (``purge_failed_at``) come
+last, so a key that will not delete cannot take the budget of every pass.
 
 **Keys** are grouped by what owns them - each image, and each whole
 collection - so the caller can delete them group by group and keep the rows
@@ -54,6 +54,8 @@ class Selection:
     images: list[Image] = field(default_factory=list)
     whole: list[Collection] = field(default_factory=list)
     """Collections every one of whose images is in ``images``."""
+    collections: list[Collection] = field(default_factory=list)
+    """Every trashed collection this pass reached (whole or not)."""
 
 
 @dataclass
@@ -98,7 +100,11 @@ async def pick(db: Any, cutoff: datetime, cap: int) -> Selection:
         _locked(
             select(Collection)
             .where(Collection.is_deleted.is_(True), Collection.deleted_at <= cutoff)
-            .order_by(Collection.deleted_at, Collection.id)
+            .order_by(
+                Collection.purge_failed_at.asc().nulls_first(),
+                Collection.deleted_at,
+                Collection.id,
+            )
             .limit(cap)
         ),
     )
@@ -106,6 +112,7 @@ async def pick(db: Any, cutoff: datetime, cap: int) -> Selection:
     for coll in colls:
         if budget <= 0:
             break
+        out.collections.append(coll)
         stmt = select(Image).where(Image.collection_id == coll.id)
         rows = await _scalars(db, _locked(stmt.order_by(*_failed_last(Image.id)).limit(budget + 1)))
         taken = rows[:budget]

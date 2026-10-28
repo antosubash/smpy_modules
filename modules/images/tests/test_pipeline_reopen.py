@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from sm_images import redaction
 from sm_images.models import Collection, Image
 from sm_images.models.enums import StepStatus
@@ -107,6 +108,50 @@ async def test_reconcile_runs_a_reinstalled_step(pipe):
     # Settled now: the next reconcile has nothing to reopen.
     again = await reconcile_tenant(pipe.runtime, T, datetime.now(UTC) + timedelta(minutes=20))
     assert again["reopened"] == 0 and x.calls == 1
+
+
+async def _dependant_blocked(pipe, *, placeholder: bool):
+    """``acme.y`` requires ``acme.x``; x is off (saved around validation), so
+    y settles ``dependency_unavailable``. With ``placeholder`` x also has a
+    ``disabled`` run; without, it has none."""
+    from sm_images.models import StepRun
+
+    x, y = Scripted("acme.x"), Scripted("acme.y", requires=("acme.x",))
+    z = Scripted("acme.z", requires=("acme.y",))
+    use_steps(x, y, z)
+    coll = await pipe.collection({"acme.x": {"enabled": False}, "acme.y": {}, "acme.z": {}})
+    img = await pipe.image(coll)
+    if placeholder:
+        async with pipe.db_state.session_factory() as s:
+            s.add(StepRun(image_id=img, step="acme.x"))
+            await s.commit()
+    await pipe.run(img)
+    runs = await pipe.runs(img)
+    assert runs["acme.y"].error_code == runs["acme.z"].error_code == "dependency_unavailable"
+    if placeholder:
+        assert runs["acme.x"].error_code == "disabled"
+    await _configure(pipe, coll, {"acme.x": {}, "acme.y": {}, "acme.z": {}})
+    return img, (x, y, z)
+
+
+@pytest.mark.parametrize("placeholder", [True, False])
+async def test_dependants_blocked_by_a_reopened_step_run_after_it(pipe, placeholder):
+    img, steps = await _dependant_blocked(pipe, placeholder=placeholder)
+    await pipe.run(img)
+    assert await pipe.status(img) == dict.fromkeys(["acme.x", "acme.y", "acme.z"], "completed")
+    assert [s.calls for s in steps] == [1, 1, 1]
+
+
+async def test_a_dependant_stays_blocked_while_its_prerequisite_is_off(pipe):
+    x, y = Scripted("acme.x"), Scripted("acme.y", requires=("acme.x",))
+    use_steps(x, y)
+    coll = await pipe.collection({"acme.x": {"enabled": False}, "acme.y": {}})
+    img = await pipe.image(coll)
+    await pipe.run(img)
+    await pipe.run(img)  # nothing changed: no reopen, no churn
+    run = (await pipe.runs(img))["acme.y"]
+    assert (run.error_code, y.calls) == ("dependency_unavailable", 0)
+    assert (await pipe.row(img)).processing_generation == 1
 
 
 async def test_a_placeholder_stays_while_its_step_is_still_missing_or_off(pipe):
