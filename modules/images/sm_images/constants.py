@@ -106,3 +106,23 @@ MULTIPART_OVERHEAD_BYTES: Final = 1024 * 1024
 
 MODULE_ATTR: Final = "images_module"
 """``app.state`` attribute holding the module instance."""
+
+# --- Collections ---
+
+SLUG_MAX: Final = 80
+SLUG_PATTERN: Final = r"^[a-z0-9-]{1,80}$"
+SLUG_FALLBACK: Final = "collection"
+NAME_MAX: Final = 200
+DESCRIPTION_MAX: Final = 2000
+PAGE_DEFAULT: Final = 25
+PAGE_MAX: Final = 100
+COLLECTION_FILTERS: Final = ("owned", "shared", "internal", "public", "all")
+CANDIDATES_MAX: Final = 20
+CANDIDATES_SCAN: Final = 100
+"""How many directory hits are read before the tenant filter, so a page of
+non-members does not hide the members behind them."""
+SLUG_TAKEN_DETAIL: Final = "That slug is already in use"
+PUBLISH_REQUIRED_DETAIL: Final = "Publishing a collection needs the images.publish permission"
+BAD_CURSOR_DETAIL: Final = "Invalid cursor"
+DIRECTORY_UNAVAILABLE_CODE: Final = "user_directory_unavailable"
+DIRECTORY_UNAVAILABLE_DETAIL: Final = "No user directory is installed on this host"

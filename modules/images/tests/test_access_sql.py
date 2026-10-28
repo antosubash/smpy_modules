@@ -94,7 +94,7 @@ async def test_filter_matrix(db_state, action, who):
                 assert row.slug in EXPECTED[action][who]
 
 
-async def test_internal_needs_a_signed_in_principal(db_state):
+async def test_internal_needs_a_signed_in_principal():
     internal = collection("int", Visibility.INTERNAL)
     assert POLICY.can(principal(STRANGER), ACTION_VIEW, internal)
     assert not POLICY.can(principal(ANON), ACTION_VIEW, internal)

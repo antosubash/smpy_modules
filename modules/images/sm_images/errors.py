@@ -33,6 +33,18 @@ class Forbidden(ImagesError):  # noqa: N818 - HTTP vocabulary, deliberately
     status_code = 403
 
 
+class Conflict(ImagesError):  # noqa: N818 - HTTP vocabulary, deliberately
+    status_code = 409
+
+
+class Invalid(ImagesError):  # noqa: N818 - HTTP vocabulary, deliberately
+    status_code = 422
+
+
+class ServiceUnavailable(ImagesError):  # noqa: N818 - HTTP vocabulary, deliberately
+    status_code = 503
+
+
 class TenantRequired(Forbidden):
     """A multi-tenant host, and a signed-in request the framework resolved no
     tenant for (no active organisation). Refused rather than guessed; the same

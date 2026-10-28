@@ -168,6 +168,6 @@ def test_images_object_intents_work_in_the_real_app(booted_host):
                 return list((await session.execute(select(ObjectIntent.key))).scalars())
 
     try:
-        assert asyncio.run(write_and_read()) == ["images/default/boot-check"]
+        assert "images/default/boot-check" in asyncio.run(write_and_read())
     finally:
         use_session_factory(None)

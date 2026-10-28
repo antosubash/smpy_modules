@@ -65,11 +65,11 @@ def test_body_limits_follow_the_upload_setting():
     assert registry.limit_for("POST", "/api/images/collections", app) is None
 
 
-async def test_harness_serves_the_empty_routers(client, storage):
+async def test_harness_serves_the_routers(client, storage):
     assert client.app.state.sm_images.settings.batch_max == 50
     assert client.app.state.file_storage.backend is storage
-    # No endpoints yet: the tenant binding and CSRF dependencies guard an empty router.
-    assert (await client.get("/api/images/collections")).status_code == 404
+    # The collection routes are mounted, and an anonymous caller is refused.
+    assert (await client.get("/api/images/collections")).status_code == 401
 
 
 async def test_on_startup_installs_the_intent_session_factory(images_app):

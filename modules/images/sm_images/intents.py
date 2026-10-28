@@ -35,6 +35,13 @@ def use_session_factory(factory: Any) -> None:
     _default_factory = factory
 
 
+def current_factory() -> Any:
+    """The process-wide session factory (also what contracts open sessions from)."""
+    if _default_factory is None:
+        raise RuntimeError("no session factory: call use_session_factory() at startup")
+    return _default_factory
+
+
 @asynccontextmanager
 async def object_intent(keys: Iterable[str], *, session_factory: Any = None) -> AsyncIterator[None]:
     """Record ``keys`` durably, then run the write inside the block."""

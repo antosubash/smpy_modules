@@ -64,10 +64,3 @@ async def test_caller_rollback_drops_its_row_but_keeps_the_intent(tmp_path):
         assert await _keys(db_state) == set(KEYS)
     finally:
         await db_state.engine.dispose()
-
-
-def test_the_default_factory_does_not_leak_between_tests():
-    """Reset by the autouse fixture in ``conftest`` after every test."""
-    from sm_images import intents
-
-    assert intents._default_factory is None

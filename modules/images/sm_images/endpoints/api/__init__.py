@@ -9,6 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from simple_module_hosting.csrf import RequiresCsrf
 
+from sm_images.endpoints.api import collections, shares
 from sm_images.tenancy import bind_admin
 
 # The tenant binding is the router's **first** dependency, and FastAPI puts a
@@ -22,3 +23,5 @@ from sm_images.tenancy import bind_admin
 # site, which is same-site with it. Reads pass. Anonymous routes are mounted on
 # their own router and never carry either.
 router = APIRouter(dependencies=[Depends(bind_admin), Depends(RequiresCsrf())])
+router.include_router(collections.router)
+router.include_router(shares.router)
