@@ -127,6 +127,7 @@ async def _publish(
         if locked.display_key:
             replaced.append(locked.display_key)
         await publish.invalidate_renditions(db, tenant, image_id)
+        await publish.invalidate_other_mutators(db, tenant, image_id, loaded.step)
     if staged.renditions:
         if locked.display_generation != loaded.display_generation:
             return None  # cut from a display copy that has since been replaced

@@ -23,6 +23,14 @@ A mutator has settled when its run for this image is ``completed``, or a skip
 the step itself returned ("nothing to redact"), **at the installed step
 version**. A skip the planner decided (``plan.BLOCKED_CODES``:
 ``dependency_*``, ``not_installed``, ``disabled``) settles nothing.
+
+A settled run only stands while the display copy it settled on does: when a
+step publishes a new display copy, every *other* mutator's run - and every
+uninstalled non-``prompt:`` step's, which might be one - goes back to
+``pending`` (``pipeline.publish.invalidate_other_mutators``). So a blur that
+completed before a crop re-read the original vouches for nothing once the
+crop's copy is current; a disabled blur settles as a ``disabled`` placeholder,
+which dispatch reopens - and re-runs - when it is enabled again.
 """
 
 from __future__ import annotations

@@ -15,11 +15,13 @@ from sqlalchemy import delete, or_, select, update
 
 from sm_images.models import Image, ObjectIntent, Rendition, StepRun
 from sm_images.models.enums import LocationSource, StepStatus
+from sm_images.pipeline import registry
 from sm_images.processing.exif import ExifData
 from sm_images.services import stats
 
 __all__ = [
     "add_intents",
+    "invalidate_other_mutators",
     "invalidate_renditions",
     "publish_display",
     "replace_renditions",
@@ -61,26 +63,59 @@ async def publish_display(
     return (await db.execute(stmt)).first() is not None
 
 
-async def invalidate_renditions(db: Any, tenant: str, image_id: uuid.UUID) -> None:
-    """The display changed: renditions run again, whatever their state, and a
-    rendition worker still holding the old lease can no longer complete."""
+_REOPENED = {
+    "status": StepStatus.PENDING,
+    "lease_token": None,
+    "lease_expires_at": None,
+    "error_code": None,
+    "error_message": None,
+    "output": None,
+    "started_at": None,
+    "finished_at": None,
+}
+
+
+async def _reopen(db: Any, tenant: str, image_id: uuid.UUID, steps: list[str]) -> None:
+    """Back to ``pending`` whatever their state; a worker still holding one of
+    the old leases can no longer complete."""
+    if not steps:
+        return
     await db.execute(
         update(StepRun)
-        .where(
-            StepRun.tenant_id == tenant, StepRun.image_id == image_id, StepRun.step == RENDITIONS
-        )
-        .values(
-            status=StepStatus.PENDING,
-            lease_token=None,
-            lease_expires_at=None,
-            error_code=None,
-            error_message=None,
-            output=None,
-            started_at=None,
-            finished_at=None,
-        )
+        .where(StepRun.tenant_id == tenant, StepRun.image_id == image_id, StepRun.step.in_(steps))
+        .values(**_REOPENED)
         .execution_options(**_SYNC)
     )
+
+
+async def invalidate_renditions(db: Any, tenant: str, image_id: uuid.UUID) -> None:
+    """The display changed: renditions run again."""
+    await _reopen(db, tenant, image_id, [RENDITIONS])
+
+
+def _may_mutate(step: str) -> bool:
+    """A registered display mutator, or an unknown step that might be one
+    (``prompt:*`` never writes a display copy)."""
+    impl = registry.get_step(step)
+    if impl is None:
+        return not step.startswith(registry.PROMPT_PREFIX)
+    return bool(impl.mutates_display)
+
+
+async def invalidate_other_mutators(
+    db: Any, tenant: str, image_id: uuid.UUID, writer: str
+) -> list[str]:
+    """``writer`` replaced the display copy: every *other* mutator's result
+    described a copy that is gone (a blur that settled before a crop re-read the
+    original), so none may vouch for the new one (``sm_images.redaction``).
+    Their runs go back to ``pending``: an enabled one runs again, a disabled
+    one settles as a ``disabled`` placeholder, reopened when it is enabled."""
+    stmt = select(StepRun.step).where(
+        StepRun.tenant_id == tenant, StepRun.image_id == image_id, StepRun.step != writer
+    )
+    steps = sorted(s for s in (await db.execute(stmt)).scalars() if _may_mutate(s))
+    await _reopen(db, tenant, image_id, steps)
+    return steps
 
 
 async def replace_renditions(

@@ -64,7 +64,12 @@ async def test_restart_in_broker_mode_is_queued_with_the_tenant(world, monkeypat
     monkeypatch.setattr(tasks.restart_collection, "s", MagicMock(return_value=sig))
     r = await world.c.post(url(world, "/restart"), json={"scope": "stale"}, headers=headers(OWNER))
     assert r.status_code == 202, r.text
-    tasks.restart_collection.s.assert_called_once_with(world.cid, "stale")
+    from sm_images.models import PipelineRestart
+    from sqlalchemy import select
+
+    async with world.c.db_state.session_factory() as s:
+        (rid,) = (await s.execute(select(PipelineRestart.id))).scalars()
+    tasks.restart_collection.s.assert_called_once_with(world.cid, "stale", str(rid))
     (kw,) = [c.kwargs for c in sig.apply_async.call_args_list]
     assert kw["queue"] == "images_imports" and "default" in kw["headers"].values()
 

@@ -112,3 +112,35 @@ async def test_restart_and_overview_skip_trashed_images(pipe):
     async with pipe.db_state.session_factory() as s:
         body = await overview(s, coll)
     assert body["status"]["acme.x"] == {"completed": 1}
+
+
+async def test_a_lost_first_restart_delivery_is_resumed_by_reconcile(pipe, monkeypatch):
+    """Broker mode: the restart's record is stored before the message is sent
+    and the message names it, so a lost first delivery is still finished."""
+    from celery import current_app
+    from sm_images.pipeline.control import launch_restart
+    from sm_images.pipeline.runtime import Runtime
+    from sm_images.task_config import RESTART_COLLECTION
+
+    x = Scripted("acme.x")
+    use_steps(x)
+    coll = await pipe.collection({"acme.x": {}})
+    img = await pipe.image(coll)
+    await pipe.run(img)
+    sent: list = []
+
+    def lost(args=None, kwargs=None, **o):
+        sent.append(tuple(args))  # published, never delivered
+
+    monkeypatch.setattr(current_app.tasks[RESTART_COLLECTION], "apply_async", lost)
+    rt = pipe.runtime
+    broker = Runtime(rt.session_factory, rt.store, rt.settings, rt.bus, eager=False)
+    await launch_restart(broker, T, coll.id, "all")
+    (row,) = await _restarts(pipe)
+    assert row.finished_at is None and row.scope == "force"
+    assert sent == [(str(coll.id), "force", str(row.id))]
+
+    await reconcile_async(pipe.runtime, datetime.now(UTC) + timedelta(hours=1))
+    (row,) = await _restarts(pipe)
+    assert row.finished_at is not None
+    assert x.calls == 2 and (await pipe.runs(img))["acme.x"].attempts == 2

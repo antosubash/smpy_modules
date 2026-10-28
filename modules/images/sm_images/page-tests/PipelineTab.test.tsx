@@ -149,6 +149,46 @@ describe('PipelineTab', () => {
     await view.unmount();
   });
 
+  it('removes a step that is not installed from the saved payload, with an undo', async () => {
+    const saved = { exif: { enabled: true }, ghost: { enabled: true, level: 3 } };
+    const calls = stubFetch({
+      [`GET ${URL}`]: overview({ config: { steps: saved } }),
+      [`PUT ${URL}`]: () => overview({ config: { steps: { exif: { enabled: true } } } }),
+    });
+    const view = await mount(<PipelineTab collectionId="c1" canManage={true} />);
+    await flush();
+    expect(get(view, 'images-pipeline-save')?.hasAttribute('disabled')).toBe(true);
+    await click(get(view, 'images-step-remove-ghost'));
+    expect(get(view, 'images-step-removed-ghost')).not.toBeNull();
+    await click(get(view, 'images-step-undo-ghost'));
+    expect(get(view, 'images-step-removed-ghost')).toBeNull();
+    await click(get(view, 'images-step-remove-ghost'));
+    await click(get(view, 'images-pipeline-save'));
+    await flush();
+    const put = calls.find((c) => c.method === 'PUT');
+    expect(put?.body).toEqual({ steps: { exif: { enabled: true } } });
+    await view.unmount();
+  });
+
+  it('keeps a missing step exactly as saved unless it is removed', () => {
+    const data = overview({ config: { steps: { exif: { enabled: true }, ghost: { enabled: true, level: 3 } } } });
+    const drafts = {
+      exif: { enabled: true, params: {} },
+      quality: { enabled: false, params: {} },
+      ghost: { enabled: true, params: {} },
+    };
+    expect(payloadOf(data, drafts).ghost).toEqual({ enabled: true, level: 3 });
+    expect('ghost' in payloadOf(data, { ...drafts, ghost: { ...drafts.ghost, removed: true } })).toBe(false);
+  });
+
+  it('offers no remove action without manage rights', async () => {
+    stubFetch({ [`GET ${URL}`]: overview() });
+    const view = await mount(<PipelineTab collectionId="c1" canManage={false} />);
+    await flush();
+    expect(get(view, 'images-step-remove-ghost')).toBeNull();
+    await view.unmount();
+  });
+
   it('is read-only without manage rights', async () => {
     stubFetch({ [`GET ${URL}`]: overview() });
     const view = await mount(<PipelineTab collectionId="c1" canManage={false} />);

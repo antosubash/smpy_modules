@@ -101,7 +101,8 @@ async def test_purge_removes_storage_and_rows(pipe, blur, monkeypatch):
         released.extend(holds)
 
     monkeypatch.setattr(billing, "release_storage", record)
-    report = await _purge(pipe)
+    # A day on: the replaced generations' intents are past ``MIN_INTENT_AGE``.
+    report = await _purge(pipe, now=NOW + timedelta(days=1, minutes=1))
 
     assert report.images == [img] and report.collections == []
     assert _under(pipe, *prefix) == []  # original, both generations, all renditions

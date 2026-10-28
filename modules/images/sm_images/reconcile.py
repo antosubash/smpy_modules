@@ -11,6 +11,9 @@ isolation applying as in a request:
   dispatched again - the claim's conditional ``UPDATE`` makes a duplicate
   harmless. A ``running`` row with *no* lease (an older writer) is first put
   back to ``pending``, or it would never expire;
+* placeholder skips (``not_installed``, ``disabled``) whose step is enabled
+  and installed again are dispatched, which reopens them
+  (:mod:`sm_images.placeholders`);
 * images whose processing cycle never concluded (a dispatch lost after
   ingest's commit, e.g. an empty pipeline) are dispatched, which decides
   ``ImageProcessed`` once;
@@ -28,6 +31,7 @@ from __future__ import annotations
 import logging
 from collections import Counter
 from datetime import datetime, timedelta
+from functools import partial
 from typing import Any
 
 from simple_module_db import all_tenants, finalize_session, tenant_context
@@ -37,6 +41,7 @@ from sm_images.models import Collection, Image, ImportItem, ImportJob, PipelineR
 from sm_images.models.enums import ItemStatus, JobStatus, StepStatus
 from sm_images.pipeline.orchestrate import submit_dispatch
 from sm_images.pipeline.runtime import Runtime
+from sm_images.placeholders import reopenable_images
 from sm_images.services import stats
 from sm_images.tenancy import all_tenants as tagged
 from sm_images.tenancy import valid_tenant
@@ -209,7 +214,9 @@ async def reconcile_tenant(runtime: Runtime, tenant: str, now: datetime) -> Coun
     done["repaired"] = await _repair_unleased(runtime, tenant, cutoff)
     stranded = await _ids(runtime, _stranded(tenant, now, cutoff), StepRun.image_id)
     unconcluded = await _ids(runtime, _unconcluded(tenant, cutoff), Image.id)
-    for image_id in dict.fromkeys([*stranded, *unconcluded]):
+    reopen = await reopenable_images(runtime, tenant, partial(_ids, runtime))
+    done["reopened"] = len(reopen)
+    for image_id in dict.fromkeys([*stranded, *unconcluded, *reopen]):
         await submit_dispatch(runtime, tenant, image_id)
         done["dispatched"] += 1
     done["restarts"] = await _restarts(runtime, tenant, now, cutoff)

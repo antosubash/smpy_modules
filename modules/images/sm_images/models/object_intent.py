@@ -28,3 +28,8 @@ class ObjectIntent(Base, table=True):  # ty: ignore[unsupported-base]
         sa_type=AwareDateTime(),
         sa_column_kwargs={"nullable": False, "index": True},
     )
+    attempted_at: datetime | None = Field(
+        default=None, sa_type=AwareDateTime(), sa_column_kwargs={"nullable": True}
+    )
+    """When the intent reaper last failed to delete the object: such intents
+    go to the back of later passes, so one stuck key cannot starve the rest."""

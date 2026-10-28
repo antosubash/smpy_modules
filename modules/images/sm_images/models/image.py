@@ -51,7 +51,11 @@ class Image(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  #
             postgresql_where=_UNPROCESSED,
         ),
     )
-    __audit_exclude_fields__: ClassVar[set[str]] = {"processing_generation", "processed_generation"}
+    __audit_exclude_fields__: ClassVar[set[str]] = {
+        "processing_generation",
+        "processed_generation",
+        "purge_failed_at",
+    }
 
     id: uuid.UUID = pk_uuid()
     collection_id: uuid.UUID = fk_uuid("images_collection.id")
@@ -74,6 +78,9 @@ class Image(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  #
     """The last cycle ``ImageProcessed`` was decided for; equal to
     ``processing_generation`` once every enabled step of that cycle is final.
     Conditional ``UPDATE`` on these two is what makes the event fire once."""
+    purge_failed_at: datetime | None = dt_col()
+    """When the janitor last failed to delete this (trashed) image's objects;
+    such images go to the back of later purge passes (``sm_images.purge``)."""
     storage_hold_id: str | None = Field(default=None, max_length=64)
     storage_bytes: int = Field(default=0, sa_type=BigInteger, sa_column_kwargs={"nullable": False})
     """Sum of this image's objects, as held against the storage gauge."""

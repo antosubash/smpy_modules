@@ -86,6 +86,7 @@ def upgrade() -> None:
         "images_object_intent",
         sa.Column("key", sa.String(length=500), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("attempted_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("key", name=op.f("pk_images_object_intent")),
     )
     op.create_index(
@@ -249,6 +250,7 @@ def upgrade() -> None:
         sa.Column("display_step_version", sa.Integer(), nullable=True),
         sa.Column("processing_generation", sa.Integer(), nullable=False),
         sa.Column("processed_generation", sa.Integer(), nullable=False),
+        sa.Column("purge_failed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("storage_hold_id", sa.String(length=64), nullable=True),
         sa.Column("storage_bytes", sa.BigInteger(), nullable=False),
         sa.Column("filename", sa.String(length=255), nullable=False),

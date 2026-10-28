@@ -32,8 +32,8 @@ from sm_images.pipeline.claim import (
     settle,
 )
 from sm_images.pipeline.config import validate_pipeline_config
-from sm_images.pipeline.cycle import mark_processed
-from sm_images.pipeline.plan import RunView, plan
+from sm_images.pipeline.cycle import bump_cycle, mark_processed, reset_runs
+from sm_images.pipeline.plan import RunView, plan, reopenable
 from sm_images.pipeline.runtime import Runtime
 
 __all__ = ["Advanced", "advance_locked", "claim_ready", "conclude", "plan_and_claim", "view"]
@@ -69,6 +69,10 @@ async def advance_locked(
 ) -> Advanced:
     cfg = await collection_config(db, tenant, locked.collection_id)
     runs = await load_runs(db, tenant, image_id)
+    reopen = reopenable(cfg, {sid: view(r, now) for sid, r in runs.items()})
+    if reopen and await reset_runs(db, tenant, image_id, reopen, now):
+        await bump_cycle(db, tenant, image_id)  # ``ImageProcessed`` once more
+        runs = await load_runs(db, tenant, image_id)
     decided = plan(cfg, {sid: view(r, now) for sid, r in runs.items()})
     await insert_missing(db, image_id, decided.missing)
     for s in decided.settle:

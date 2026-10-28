@@ -1,38 +1,37 @@
 """The janitor's purge (spec §7 "Purge"): trashed rows past the grace period.
 
 Runs in the caller's session under the bound tenant (the janitor binds each in
-turn). One pass:
+turn); :mod:`sm_images.purge_select` decides the rows and their keys. One pass:
 
-1. **Lock.** Collections soft-deleted before the cutoff, then images - every
-   image of such a collection (trashed or not), and images trashed on their
-   own - are selected ``FOR UPDATE SKIP LOCKED``: a step completing on one
-   holds its lock, so the purge skips it this pass instead of racing it, and
-   a completion arriving later finds no row and drops its staged objects.
-   ``cap`` bounds the rows of one pass; a collection is removed only in the
-   pass that takes its last image.
-2. **Collect** every key: the original, the current display copy and
-   renditions from the rows, upload sessions, a collection's map and its
-   import jobs' staging - and, from the write-ahead intents under each
-   image's (and purged collection's) prefix, every *replaced* display
-   generation and rendition whose after-commit delete failed, and anything a
-   crashed worker staged. A key a surviving row still references is kept.
-3. **Delete the keys, then the rows** (children first), then the intents, and
-   release the images' storage holds (:mod:`sm_images.billing`). Keys go first:
-   a failed delete raises before any row is touched, so the next pass retries
-   with the rows still there to say what to delete. The caller commits.
+1. **Uploads.** Every upload session that may still hold multipart parts is
+   taken over and its upload aborted *before* its row can go - the row is the
+   only record of the backend's upload id. A failed abort keeps the session,
+   and its collection, for the next pass.
+2. **Keys, group by group.** One batched delete; if it fails, each image's
+   keys, then each whole collection's own keys (its map, import staging) are
+   deleted separately. A group whose delete fails keeps its rows - the next
+   pass retries with the rows still there to say what to delete - and only
+   that group: an image is recorded (``purge_failed_at``, which sends it to
+   the back of later passes) and its collection is not removed. After
+   :data:`FAILURE_LIMIT` failures a pass stops trying (storage is down).
+3. **Rows** of what was cleared, children first; the intents of the deleted
+   keys; the images' storage holds (:mod:`sm_images.billing`). The caller
+   commits.
 """
 
 from __future__ import annotations
 
+import logging
 import uuid
-from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import delete, or_, select, update
+from simple_module_db.independent import independent_session
+from sqlalchemy import and_, delete, or_, select, update
 
-from sm_images import billing, storage_keys
+from sm_images import billing
+from sm_images.ingest.upload_session import mark_cleaned, move
 from sm_images.models import (
     Collection,
     Group,
@@ -48,12 +47,19 @@ from sm_images.models import (
     UploadSession,
     UploadStatus,
 )
+from sm_images.purge_select import MIN_INTENT_AGE, Keys, chunks, collect_keys, pick
 
-__all__ = ["PurgeReport", "purge_expired"]
+__all__ = ["FAILURE_LIMIT", "MIN_INTENT_AGE", "PurgeReport", "purge_expired"]
 
-_CHUNK = 500
+logger = logging.getLogger(__name__)
+
+FAILURE_LIMIT = 20
+"""Storage failures after which one pass stops trying (the rest wait)."""
 _SYNC = {"synchronize_session": False}
-_LIVE_UPLOADS = (UploadStatus.OPEN, UploadStatus.COMPLETING)
+_UNSETTLED = or_(
+    UploadSession.status.in_((UploadStatus.OPEN, UploadStatus.COMPLETING)),
+    and_(UploadSession.status == UploadStatus.ABORTED, UploadSession.cleaned_at.is_(None)),
+)
 
 
 @dataclass
@@ -65,134 +71,99 @@ class PurgeReport:
     """Deleted (or, on a dry run, that would be)."""
     kept: list[str] = field(default_factory=list)
     """Collected but still referenced by a surviving row: never deleted."""
+    failed: list[uuid.UUID] = field(default_factory=list)
+    """Images whose objects would not delete: kept, retried by a later pass."""
 
 
-def _chunks[T](items: Iterable[T], n: int = _CHUNK) -> Iterator[list[T]]:
-    batch = list(items)
-    for i in range(0, len(batch), n):
-        yield batch[i : i + n]
+async def _abort_one(db: Any, store: Any, row: Any) -> bool:
+    """Take the session over (committed on its own), abort, record it clean."""
+    if row.status is not UploadStatus.ABORTED:
+        async with independent_session(db) as s:
+            values = {"status": UploadStatus.ABORTED, "claim_token": uuid.uuid4()}
+            if not await move(s, row.id, row.status, values):
+                return False  # it moved under us: next pass
+    abort = getattr(store.backend, "abort_multipart", None)
+    if abort is not None:  # a backend without multipart has no parts to drop
+        await abort(row.storage_key, row.backend_upload_id)
+    async with independent_session(db) as s:
+        await mark_cleaned(s, row.id)
+    return True
 
 
-def _locked(stmt: Any) -> Any:
-    return stmt.execution_options(include_deleted=True).with_for_update(skip_locked=True)
+async def _abort_uploads(db: Any, store: Any, image_ids: list, whole: list) -> list[Any]:
+    """Abort every unsettled upload; the sessions that could not be."""
+    owners = [UploadSession.collection_id.in_(whole)] if whole else []
+    for chunk in chunks(image_ids):
+        owners.append(UploadSession.image_id.in_(chunk))
+    if not owners:
+        return []
+    stmt = select(UploadSession).where(or_(*owners), _UNSETTLED)
+    rows = [
+        (r.id, r.collection_id, r.status, r.storage_key, r.backend_upload_id)
+        for r in (await db.execute(stmt)).scalars()
+    ]
+    stuck = []
+    for sid, cid, status, key, upload in rows:
+        row = _Upload(sid, cid, status, key, upload)
+        try:
+            if await _abort_one(db, store, row):
+                continue
+        except Exception:
+            logger.warning("images.purge.upload_abort_failed session=%s", sid, exc_info=True)
+        stuck.append(row)
+    return stuck
 
 
-async def _scalars(db: Any, stmt: Any) -> list[Any]:
-    return list((await db.execute(stmt)).scalars())
+@dataclass(frozen=True)
+class _Upload:
+    id: uuid.UUID
+    collection_id: uuid.UUID
+    status: UploadStatus
+    storage_key: str
+    backend_upload_id: str
 
 
-async def _pick(db: Any, cutoff: datetime, cap: int) -> tuple[list[Image], list[Collection]]:
-    """The rows of this pass: whole collections and the images to purge."""
-    colls = await _scalars(
-        db,
-        _locked(
-            select(Collection)
-            .where(Collection.is_deleted.is_(True), Collection.deleted_at <= cutoff)
-            .order_by(Collection.deleted_at, Collection.id)
-            .limit(cap)
-        ),
-    )
-    budget, images, whole = cap, [], []
-    for coll in colls:
-        if budget <= 0:
-            break
-        stmt = select(Image).where(Image.collection_id == coll.id).order_by(Image.id)
-        rows = await _scalars(db, _locked(stmt.limit(budget + 1)))
-        if len(rows) < budget:  # all of them, and the collection row too
-            images += rows
-            whole.append(coll)
-            budget -= len(rows) + 1
-        else:
-            images += rows[:budget]
-            budget = 0
-    if budget > 0:
-        stmt = select(Image).where(Image.is_deleted.is_(True), Image.deleted_at <= cutoff)
-        if colls:
-            stmt = stmt.where(Image.collection_id.not_in([c.id for c in colls]))
-        images += await _scalars(
-            db, _locked(stmt.order_by(Image.deleted_at, Image.id).limit(budget))
-        )
-    return images, whole
-
-
-async def _intent_keys(db: Any, prefixes: Iterable[str]) -> set[str]:
-    found: set[str] = set()
-    for chunk in _chunks(sorted(set(prefixes)), 100):
-        match = or_(*[ObjectIntent.key.startswith(p, autoescape=True) for p in chunk])
-        found.update(await _scalars(db, select(ObjectIntent.key).where(match)))
-    return found
-
-
-async def _keys(db: Any, images: list[Image], whole: list[Collection]) -> set[str]:
-    keys = {i.storage_key for i in images} | {i.display_key for i in images if i.display_key}
-    prefixes = {
-        storage_keys.image_prefix(i.tenant_id, str(i.collection_id), str(i.id)) for i in images
-    }
-    for chunk in _chunks([i.id for i in images]):
-        keys.update(
-            await _scalars(db, select(Rendition.storage_key).where(Rendition.image_id.in_(chunk)))
-        )
-        keys.update(
-            await _scalars(
-                db, select(UploadSession.storage_key).where(UploadSession.image_id.in_(chunk))
-            )
-        )
-    whole_ids = [c.id for c in whole]
-    for coll in whole:
-        keys.add(storage_keys.map_key(coll.tenant_id, str(coll.id)))
-        prefixes.add(storage_keys.collection_prefix(coll.tenant_id, str(coll.id)))
-    if whole_ids:
-        sessions = select(UploadSession.storage_key).where(
-            UploadSession.collection_id.in_(whole_ids)
-        )
-        keys.update(await _scalars(db, sessions))
-        jobs = await _scalars(db, select(ImportJob).where(ImportJob.collection_id.in_(whole_ids)))
-        for job in jobs:
-            keys.update(k for k in [job.source_key, *(job.staged_keys or [])] if k)
-            prefixes.add(storage_keys.import_prefix(job.tenant_id, str(job.id)))
-    return keys | await _intent_keys(db, prefixes)
-
-
-async def _referenced(
-    db: Any, keys: set[str], image_ids: list[uuid.UUID], whole_ids: list[uuid.UUID]
-) -> set[str]:
-    """The keys a row that survives this pass still points at."""
-    found: set[str] = set()
-    for chunk in _chunks(sorted(keys)):
-        images = (
-            select(Image.storage_key, Image.display_key)
-            .where(
-                or_(Image.storage_key.in_(chunk), Image.display_key.in_(chunk)),
-                Image.id.not_in(image_ids),
-            )
-            .execution_options(include_deleted=True)
-        )
-        for original, display in (await db.execute(images)).all():
-            found.update(k for k in (original, display) if k in chunk)
-        renditions = select(Rendition.storage_key).where(
-            Rendition.storage_key.in_(chunk), Rendition.image_id.not_in(image_ids)
-        )
-        found.update(await _scalars(db, renditions))
-        uploads = select(UploadSession.storage_key).where(
-            UploadSession.storage_key.in_(chunk),
-            UploadSession.status.in_(_LIVE_UPLOADS),
-            UploadSession.image_id.not_in(image_ids),
-            UploadSession.collection_id.not_in(whole_ids),
-        )
-        found.update(await _scalars(db, uploads))
-    return found
+async def _delete_groups(store: Any, groups: dict[uuid.UUID, set[str]]) -> tuple[set, set]:
+    """``(failed, untried)`` group ids; every other group's keys are gone."""
+    keys = sorted(set().union(*groups.values())) if groups else []
+    if not keys:
+        return set(), set()
+    try:
+        await store.delete_keys(keys)
+        return set(), set()
+    except Exception:
+        logger.warning("images.purge.batch_delete_failed n=%d", len(keys), exc_info=True)
+    failed: set = set()
+    untried: set = set()
+    for gid, group in groups.items():
+        if not group:
+            continue
+        if len(failed) >= FAILURE_LIMIT:
+            untried.add(gid)
+            continue
+        try:
+            await store.delete_keys(sorted(group))
+        except Exception:
+            logger.warning("images.purge.object_delete_failed owner=%s", gid, exc_info=True)
+            failed.add(gid)
+    return failed, untried
 
 
 async def _delete_rows(
-    db: Any, image_ids: list[uuid.UUID], whole_ids: list[uuid.UUID], keys: list[str]
+    db: Any, image_ids: list, whole_ids: list, keys: list[str], keep_sessions: list
 ) -> None:
     async def run(stmt: Any) -> None:
         await db.execute(stmt.execution_options(**_SYNC))
 
-    for chunk in _chunks(image_ids):
+    for chunk in chunks(image_ids):
         await run(update(ImportItem).where(ImportItem.image_id.in_(chunk)).values(image_id=None))
-        for model in (StepRun, Rendition, PromptResult, UploadSession):
+        for model in (StepRun, Rendition, PromptResult):
             await run(delete(model).where(model.image_id.in_(chunk)))
+        await run(
+            delete(UploadSession).where(
+                UploadSession.image_id.in_(chunk), UploadSession.id.not_in(keep_sessions)
+            )
+        )
         await run(delete(Image).where(Image.id.in_(chunk)))
     if whole_ids:
         prompts = select(Prompt.id).where(Prompt.collection_id.in_(whole_ids))
@@ -207,8 +178,30 @@ async def _delete_rows(
         for model in (Prompt, Group, ImportJob, PipelineRestart, UploadSession):
             await run(delete(model).where(model.collection_id.in_(whole_ids)))
         await run(delete(Collection).where(Collection.id.in_(whole_ids)))
-    for chunk in _chunks(keys):
+    for chunk in chunks(keys):
         await run(delete(ObjectIntent).where(ObjectIntent.key.in_(chunk)))
+
+
+async def _clear(db: Any, store: Any, images: list[Image], whole: set, keys: Keys, now: datetime):
+    """Steps 1 and 2: what may go. Returns ``(images, whole, failed, stuck)``."""
+    stuck = await _abort_uploads(db, store, [i.id for i in images], sorted(whole))
+    blocked = {u.storage_key for u in stuck}
+    whole -= {u.collection_id for u in stuck}
+    for group in (*keys.images.values(), *keys.collections.values()):
+        group -= blocked
+    failed, untried = await _delete_groups(store, keys.images)
+    skipped = failed | untried
+    whole -= {i.collection_id for i in images if i.id in skipped}
+    lost, later = await _delete_groups(store, {c: keys.collections[c] for c in whole})
+    whole -= lost | later
+    if failed:
+        await db.execute(
+            update(Image)
+            .where(Image.id.in_(sorted(failed)))
+            .values(purge_failed_at=now)
+            .execution_options(**_SYNC, include_deleted=True)
+        )
+    return [i for i in images if i.id not in skipped], whole, failed, stuck
 
 
 async def purge_expired(
@@ -221,18 +214,21 @@ async def purge_expired(
     cap: int = 1000,
 ) -> PurgeReport:
     """Hard-delete what was trashed more than ``grace_days`` before ``now``."""
-    images, whole = await _pick(db, now - timedelta(days=grace_days), cap)
-    report = PurgeReport(dry_run, [c.id for c in whole], [i.id for i in images])
-    if not images and not whole:
+    sel = await pick(db, now - timedelta(days=grace_days), cap)
+    report = PurgeReport(dry_run, [c.id for c in sel.whole], [i.id for i in sel.images])
+    if not sel.images and not sel.whole:
         return report
-    keys = await _keys(db, images, whole)
-    kept = await _referenced(db, keys, report.images, report.collections)
-    report.keys, report.kept = sorted(keys - kept), sorted(kept)
+    keys = await collect_keys(db, sel, now)
+    report.keys, report.kept = sorted(keys.all()), sorted(keys.kept)
     if dry_run:
         await db.rollback()  # nothing changed; let the row locks go
         return report
-    holds = [(i.id, i.storage_hold_id, i.storage_bytes) for i in images]
-    await store.delete_keys(report.keys)
-    await _delete_rows(db, report.images, report.collections, report.keys)
-    await billing.release_storage(db, holds)
+    images, whole, failed, stuck = await _clear(
+        db, store, sel.images, set(report.collections), keys, now
+    )
+    gone = [*(keys.images[i.id] for i in images), *(keys.collections[c] for c in whole)]
+    report.images, report.collections = [i.id for i in images], sorted(whole)
+    report.keys, report.failed = sorted(set().union(*gone)), sorted(failed)
+    await _delete_rows(db, report.images, report.collections, report.keys, [u.id for u in stuck])
+    await billing.release_storage(db, [(i.id, i.storage_hold_id, i.storage_bytes) for i in images])
     return report

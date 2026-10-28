@@ -16,13 +16,14 @@ function draftsOf(overview: PipelineOverview): Drafts {
 }
 
 /** The `PUT` body: every enabled step, plus any disabled step already in the
- *  saved config; a step that is not installed is sent back exactly as saved. */
+ *  saved config; a step that is not installed is sent back exactly as saved,
+ *  unless the owner removed it. */
 export function payloadOf(overview: PipelineOverview, drafts: Drafts) {
   const saved = overview.config.steps ?? {};
   const out: Record<string, Record<string, unknown>> = Object.create(null);
   for (const step of overview.steps) {
     if (!step.installed) {
-      if (step.id in saved) out[step.id] = saved[step.id];
+      if (step.id in saved && !drafts[step.id]?.removed) out[step.id] = saved[step.id];
       continue;
     }
     const draft = drafts[step.id];

@@ -113,7 +113,10 @@ async def lock_image(db: Any, tenant: str, image_id: uuid.UUID) -> LockedImage |
 
 
 async def load_runs(db: Any, tenant: str, image_id: uuid.UUID) -> dict[str, StepRun]:
-    rows = (await db.execute(select(StepRun).where(*_run(tenant, image_id)))).scalars()
+    # ``populate_existing``: the fenced DML here never synchronises the
+    # session, so a second load in one transaction must re-read the rows.
+    stmt = select(StepRun).where(*_run(tenant, image_id)).execution_options(populate_existing=True)
+    rows = (await db.execute(stmt)).scalars()
     return {r.step: r for r in rows}
 
 

@@ -1,13 +1,15 @@
+import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Switch } from '@simple-module-py/ui/components/ui/switch';
 
 import { keys, useT } from '../../utils/i18n';
 import type { PipelineStep } from '../../utils/types';
 import { ParamsForm } from './ParamsForm';
 
-export type StepDraft = { enabled: boolean; params: Record<string, unknown> };
+export type StepDraft = { enabled: boolean; params: Record<string, unknown>; removed?: boolean };
 
 /** One step: its toggle, what it needs, and its params form. A step the API
- *  reports as not installed keeps its saved config but cannot be edited. */
+ *  reports as not installed keeps its saved config but cannot be edited; a
+ *  manager can only remove it from the config (on the next save), or undo that. */
 export function StepCard({
   step,
   draft,
@@ -49,14 +51,43 @@ export function StepCard({
           onCheckedChange={(enabled) => onChange({ ...draft, enabled })}
         />
       </div>
-      {!step.installed && (
-        <p
-          className="rounded-md border border-destructive/40 p-2 text-sm text-destructive"
-          role="alert"
-          data-testid={`images-step-missing-${step.id}`}
-        >
-          {t(keys.images.pipeline.not_installed)}
-        </p>
+      {!step.installed && !draft.removed && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/40 p-2">
+          <p
+            className="text-sm text-destructive"
+            role="alert"
+            data-testid={`images-step-missing-${step.id}`}
+          >
+            {t(keys.images.pipeline.not_installed)}
+          </p>
+          {canEdit && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              data-testid={`images-step-remove-${step.id}`}
+              onClick={() => onChange({ ...draft, removed: true })}
+            >
+              {t(keys.images.pipeline.remove)}
+            </Button>
+          )}
+        </div>
+      )}
+      {!step.installed && draft.removed && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
+          <p className="text-sm" data-testid={`images-step-removed-${step.id}`}>
+            {t(keys.images.pipeline.removed)}
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            data-testid={`images-step-undo-${step.id}`}
+            onClick={() => onChange({ ...draft, removed: false })}
+          >
+            {t(keys.images.pipeline.undo)}
+          </Button>
+        </div>
       )}
       {step.installed && step.params_schema && (
         <ParamsForm

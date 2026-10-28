@@ -23,7 +23,7 @@ from sm_images.pipeline import registry
 from sm_images.pipeline.config import validate_pipeline_config
 from sm_images.pipeline.orchestrate import Scope, rerun_image
 from sm_images.pipeline.plan import is_stale
-from sm_images.pipeline.restart import restart_collection_async
+from sm_images.pipeline.restart import restart_collection_async, start_restart
 from sm_images.pipeline.runtime import Runtime
 
 __all__ = ["RESTART_SCOPES", "launch_restart", "overview", "reprocess"]
@@ -97,7 +97,12 @@ async def overview(db: Any, collection: Collection) -> dict[str, Any]:
 async def launch_restart(
     runtime: Runtime, tenant: str, collection_id: uuid.UUID, scope: ApiScope
 ) -> None:
-    """Re-run a collection's steps: inline when eager, else on ``images_imports``."""
+    """Re-run a collection's steps: inline when eager, else on ``images_imports``.
+
+    In broker mode the :class:`PipelineRestart` record commits *before* the
+    message is published, and the message names it: a first delivery that is
+    lost leaves a record whose heartbeat goes stale, and reconcile resumes it.
+    """
     inner = RESTART_SCOPES[scope]
     if runtime.is_eager():
         await restart_collection_async(runtime, tenant, collection_id, inner)
@@ -107,7 +112,8 @@ async def launch_restart(
     from sm_images.task_config import QUEUE_IMPORTS
     from sm_images.tasks import restart_collection
 
-    restart_collection.s(str(collection_id), inner).apply_async(
+    restart_id = await start_restart(runtime, tenant, collection_id, inner)
+    restart_collection.s(str(collection_id), inner, str(restart_id)).apply_async(
         queue=QUEUE_IMPORTS, headers={TENANT_HEADER: tenant}
     )
 

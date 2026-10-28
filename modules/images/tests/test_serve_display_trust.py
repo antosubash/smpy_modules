@@ -102,6 +102,26 @@ async def test_an_uninstalled_crops_display_waits_for_a_newly_enabled_blur(clien
     assert await _codes(client, g) == {200}
 
 
+async def test_saving_without_the_uninstalled_step_restores_the_trusted_display(client, g):
+    """Phase 3 fix 6: the console's "remove" drops a missing step from the
+    saved payload; strict validation accepts that config, and the blur's copy
+    is served again (and only then)."""
+    use_steps(Blur())  # acme.crop is gone
+    await _set(client, g, {"acme.blur": {}, "acme.crop": {}}, display_step="acme.blur")
+    await _blur_completed(client, g)
+    assert await _codes(client, g) == {404}
+    for coll in ("pub", "priv"):
+        put = await client.put(
+            f"/api/images/collections/{g.ids[coll]}/pipeline",
+            json={"steps": {"acme.blur": {}}},
+            headers=headers(OWNER),
+        )
+        assert put.status_code == 200, put.text
+        assert put.json()["config"] == {"steps": {"acme.blur": {}}}
+    assert await _codes(client, g) == {200}
+    await _original_protected(client, g)
+
+
 async def test_two_enabled_installed_mutators_trust_neither(client, g):
     # Saved around validation (strict refuses two mutators).
     await _set(client, g, {"acme.blur": {}, "acme.crop": {}}, display_step="acme.blur")

@@ -26,7 +26,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from simple_module_db import all_tenants, finalize_session, tenant_context
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 
 from sm_images.ingest.upload_reaper import reap_expired_uploads
 from sm_images.models import (
@@ -39,12 +39,13 @@ from sm_images.models import (
     UploadStatus,
 )
 from sm_images.pipeline.runtime import Runtime
-from sm_images.purge import PurgeReport, purge_expired
+from sm_images.purge import MIN_INTENT_AGE, PurgeReport, purge_expired
 from sm_images.reconcile import tenants
 from sm_images.tenancy import all_tenants as tagged
 
 __all__ = [
     "CAP",
+    "FAILURE_LIMIT",
     "MIN_INTENT_AGE",
     "IntentReport",
     "PurgeReport",
@@ -57,9 +58,8 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 CAP = 1000
-MIN_INTENT_AGE = timedelta(days=1)
-"""An intent younger than this is never reaped, whatever the grace setting
-(``0`` is allowed): its writer may still be about to commit the row."""
+FAILURE_LIMIT = 20
+"""Failed object deletes after which one intent pass stops trying."""
 _CHUNK = 500
 _LIVE_UPLOADS = (UploadStatus.OPEN, UploadStatus.COMPLETING)
 
@@ -131,10 +131,14 @@ async def reap_intents(
     entered ``all_tenants()`` and commits. An object whose delete fails keeps
     its intent for the next pass."""
     cutoff = now - max(timedelta(days=grace_days), MIN_INTENT_AGE)
+    # An intent whose delete failed before (``attempted_at``) goes to the back:
+    # one key that will never delete must not take the whole cap of every pass.
     stmt = (
         select(ObjectIntent.key)
         .where(ObjectIntent.created_at <= cutoff)
-        .order_by(ObjectIntent.created_at, ObjectIntent.key)
+        .order_by(
+            ObjectIntent.attempted_at.asc().nulls_first(), ObjectIntent.created_at, ObjectIntent.key
+        )
         .limit(cap)
     )
     keys = list((await db.execute(stmt)).scalars())
@@ -145,13 +149,21 @@ async def reap_intents(
     if dry_run:
         return report
     gone: list[str] = []
+    failed: list[str] = []
     for key in report.reaped:
+        if len(failed) >= FAILURE_LIMIT:
+            break  # storage is down: the rest wait for the next pass
         try:
             await store.delete_keys([key])
             gone.append(key)
         except Exception:
             logger.warning("images.janitor.object_delete_failed key=%s", key, exc_info=True)
+            failed.append(key)
     report.reaped = gone
+    if failed:
+        await db.execute(
+            update(ObjectIntent).where(ObjectIntent.key.in_(failed)).values(attempted_at=now)
+        )
     done = gone + report.referenced
     for i in range(0, len(done), _CHUNK):
         chunk = done[i : i + _CHUNK]

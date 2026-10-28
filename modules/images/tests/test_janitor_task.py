@@ -118,6 +118,100 @@ async def test_janitor_purges_past_the_settings_grace(pipe):
         assert list((await s.execute(left)).scalars()) == [recent]
 
 
+def _refusing(monkeypatch, bad: set[str]) -> list[str]:
+    """Deletes of ``bad`` keys fail; returns every key a delete was tried on."""
+    from sm_images.storage import ImageStore
+
+    real, tried = ImageStore.delete_keys, []
+
+    async def delete_keys(self, keys):
+        keys = list(keys)
+        tried.extend(keys)
+        if bad & set(keys):
+            raise RuntimeError("storage refused")
+        return await real(self, keys)
+
+    monkeypatch.setattr(ImageStore, "delete_keys", delete_keys)
+    return tried
+
+
+async def test_a_failing_intent_does_not_starve_newer_ones(pipe, monkeypatch):
+    use_steps()
+    stuck, fresh = "images/default/c/i/display.1.stuck.jpg", "images/default/c/i/display.1.ok.jpg"
+    await _intent(pipe, stuck, OLD - timedelta(days=1))
+    await _intent(pipe, fresh, OLD)
+    _refusing(monkeypatch, {stuck})
+
+    assert (await _reap(pipe, cap=1)).reaped == []  # tried the stuck one, recorded it
+    assert (await _reap(pipe, cap=1)).reaped == [fresh]  # then the newer one's turn
+    assert await _intents(pipe) == [stuck]
+    async with pipe.db_state.session_factory() as s:
+        (row,) = (await s.execute(select(ObjectIntent))).scalars()
+        assert row.attempted_at is not None
+
+
+async def test_an_intent_pass_stops_trying_after_repeated_failures(pipe, monkeypatch):
+    use_steps()
+    keys = [f"images/default/c/i/display.1.k{n}.jpg" for n in range(5)]
+    for n, key in enumerate(keys):
+        await _intent(pipe, key, OLD - timedelta(minutes=n))
+    monkeypatch.setattr(janitor, "FAILURE_LIMIT", 2)
+    tried = _refusing(monkeypatch, set(keys))
+
+    report = await _reap(pipe)
+    assert report.reaped == [] and len(tried) == 2  # storage is down: stop early
+    assert await _intents(pipe) == sorted(keys)
+
+
+async def test_purge_dry_run_leaves_intents_and_billing_alone(pipe, monkeypatch):
+    from sm_images import billing, storage_keys
+    from sm_images.purge import purge_expired
+
+    use_steps()
+    coll = await pipe.collection({})
+    img = await pipe.image(coll)
+    old = storage_keys.image_prefix("default", str(coll.id), str(img)) + "display.1.x.jpg"
+    await _intent(pipe, old, OLD)
+    await pipe.trash(Image, img, OLD)
+    released: list = []
+
+    async def record(db, holds):
+        released.append(holds)
+
+    monkeypatch.setattr(billing, "release_storage", record)
+    async with pipe.db_state.session_factory() as db:
+        report = await purge_expired(db, pipe.store, now=NOW, grace_days=7, dry_run=True)
+        await db.commit()
+    assert report.images == [img] and old in report.keys
+    assert await _intents(pipe) == [old] and await pipe.store.exists(old)
+    assert released == []
+
+
+async def test_janitor_dry_run_end_to_end_changes_nothing(pipe, monkeypatch):
+    from sm_images import billing
+
+    use_steps()
+    coll = await pipe.collection({})
+    img = await pipe.image(coll)
+    orphan = f"images/default/{coll.id}/0000/display.1.dead.jpg"
+    await _intent(pipe, orphan, OLD)
+    await pipe.trash(Image, img, OLD)
+    before = pipe.keys()
+    released: list = []
+
+    async def record(db, holds):
+        released.append(holds)
+
+    monkeypatch.setattr(billing, "release_storage", record)
+    summary = await janitor_async(pipe.runtime, NOW, dry_run=True)
+    assert summary["images_purged"] == 1 and summary["intents_reaped"] == 1  # would be
+    assert pipe.keys() == before and await _intents(pipe) == [orphan]
+    async with pipe.db_state.session_factory() as s:
+        left = select(Image.id).execution_options(include_deleted=True)
+        assert list((await s.execute(left)).scalars()) == [img]
+    assert released == []
+
+
 def test_janitor_is_a_daily_beat_next_to_reconcile():
     entry = task_config.BEAT_SCHEDULE["images-janitor"]
     assert entry["task"] == task_config.JANITOR == "images.janitor"
