@@ -147,7 +147,7 @@
 - `make lint`;
 - `uv run pytest host/tests/test_host_boots.py host/tests/test_menu_labels.py`.
 
-- [ ] Commit `feat(images): module skeleton`
+- [x] Commit `feat(images): module skeleton`
 
 ### Task 3: Models and first migration
 
