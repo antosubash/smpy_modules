@@ -425,7 +425,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 - vitest page tests (`page-tests/`).
 - e2e `tests/e2e/images-core.spec.ts`: create a collection, upload two jpegs, see thumbnails (eager pipeline), open the viewer, share with a second user who then sees it. Standalone.
 
-- [ ] Commit `feat(images): console collections, gallery and viewer`
+- [x] Commit `feat(images): console collections, gallery and viewer`
 
 ### Task 14: Pipeline UI and result-view registry
 
@@ -438,7 +438,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 
 **Tests:** vitest `registry.test.ts` and `PipelineTab.test.tsx`.
 
-- [ ] Commit `feat(images): pipeline UI and result views`
+- [x] Commit `feat(images): pipeline UI and result views`
 
 ### Task 15: Test plugin and janitor
 
@@ -458,7 +458,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 - `test_purge_respects_grace`;
 - `test_orphan_intent_reaped`.
 
-- [ ] Commit `feat(images): plugin end-to-end test and janitor`
+- [x] Commit `feat(images): plugin end-to-end test and janitor`
 
 ---
 
