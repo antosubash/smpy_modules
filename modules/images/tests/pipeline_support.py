@@ -29,7 +29,7 @@ from sm_images.pipeline.runtime import Runtime
 from sm_images.settings import ImagesSettings
 from sm_images.storage import ImageStore
 from sm_images.tenancy import DEFAULT_TENANT, install_guard
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -154,6 +154,19 @@ class Pipe:
         async with self.db_state.session_factory() as s:
             stmt = select(Rendition).where(Rendition.image_id == image_id)
             return {r.size: r for r in (await s.execute(stmt)).scalars()}
+
+    async def trash(self, model: Any, row_id: uuid.UUID, at: Any = None) -> None:
+        """Soft-delete a row as the API would, ``deleted_at`` = ``at`` (default now)."""
+        from datetime import UTC, datetime
+
+        async with self.db_state.session_factory() as s:
+            await s.execute(
+                update(model)
+                .where(model.id == row_id)
+                .values(is_deleted=True, deleted_at=at or datetime.now(UTC))
+                .execution_options(synchronize_session=False)
+            )
+            await s.commit()
 
     def keys(self) -> list[str]:
         root = Path(self.backend.root)

@@ -91,3 +91,24 @@ async def test_finished_restart_is_not_resumed(pipe):
     assert await restart.restart_collection_async(pipe.runtime, T, coll.id, "force") == 1
     await reconcile_async(pipe.runtime, datetime.now(UTC) + timedelta(hours=1))
     assert x.calls == 2
+
+
+async def test_restart_and_overview_skip_trashed_images(pipe):
+    from sm_images.models import Image
+    from sm_images.pipeline.control import overview
+
+    x = Scripted("acme.x")
+    use_steps(x)
+    coll = await pipe.collection({"acme.x": {}})
+    live, gone = await pipe.image(coll), await pipe.image(coll)
+    for img in (live, gone):
+        await pipe.run(img)
+    await pipe.trash(Image, gone)
+
+    await restart.restart_collection_async(pipe.runtime, T, coll.id, "force")
+    assert (await pipe.runs(live))["acme.x"].attempts == 2
+    assert (await pipe.runs(gone))["acme.x"].attempts == 1  # never reset nor re-run
+    assert x.calls == 3
+    async with pipe.db_state.session_factory() as s:
+        body = await overview(s, coll)
+    assert body["status"]["acme.x"] == {"completed": 1}
