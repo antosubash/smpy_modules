@@ -25,6 +25,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from sm_images.errors import ImageTooLarge
 from sm_images.pipeline import registry
 from sm_images.pipeline.step import StepContext, StepOutcome
 
@@ -48,14 +49,17 @@ class QualityParams(BaseModel):
 
 
 def measure(data: bytes, p: QualityParams) -> dict[str, Any]:
-    """The metrics and verdicts for ``data``. Raises on an undecodable file."""
+    """The metrics and verdicts for ``data``. Raises on an undecodable file, and
+    ``ImageTooLarge`` on a pixel bomb before anything is decoded."""
     import cv2  # the [quality] extra; deliberately not at module level
     import numpy as np
     from PIL import Image, ImageOps
 
     from sm_images._heif import register_heif
+    from sm_images.ingest.guards import guard_pixels
 
     register_heif()
+    guard_pixels(data)  # the decompression-bomb guard, before any decode
     with Image.open(io.BytesIO(data)) as src:
         src.load()
         img = ImageOps.exif_transpose(src)
@@ -98,6 +102,8 @@ class QualityStep:
         data = await ctx.read_original()
         try:
             out = await asyncio.to_thread(measure, data, params)
+        except ImageTooLarge as exc:
+            return StepOutcome.failed("image_too_large", str(exc)[:500])
         except Exception as exc:  # PIL decode errors are many types; the file is the problem
             return StepOutcome.failed("unreadable_image", f"{type(exc).__name__}: {exc}"[:500])
         return StepOutcome.completed(out)

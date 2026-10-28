@@ -86,6 +86,21 @@ async def test_an_undecodable_file_fails_the_run_with_a_code():
     assert (got.status, got.code) == ("failed", "unreadable_image")
 
 
+@pytest.mark.parametrize("side", [12, 20], ids=["1x-2x-warning-band", "over-2x"])
+async def test_a_pixel_bomb_is_refused_before_decoding(monkeypatch, side):
+    """``measure`` runs ``guard_pixels`` first: Pillow alone only *warns* in the
+    1x-2x band and would decode the whole bitmap."""
+    from sm_images.errors import ImageTooLarge
+    from sm_images.steps.quality import QualityParams, measure
+
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 100)
+    bomb = _png(Image.new("RGB", (side, side), (128, 128, 128)))
+    with pytest.raises(ImageTooLarge):
+        measure(bomb, QualityParams())
+    got = await run_quality(bomb)
+    assert (got.status, got.code) == ("failed", "image_too_large")
+
+
 def test_params_are_validated():
     from sm_images.steps.quality import QualityParams
 
