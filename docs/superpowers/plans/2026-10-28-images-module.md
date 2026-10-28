@@ -7,73 +7,94 @@
 
 **Goal:** Ship `modules/images` (`sm_images`, PyPI `simple_module_images`): photo collections with location, a registered-step pipeline, imports at portal scale, review of AI results, a map and plugin extension points, on framework 0.0.41.
 
-**Architecture:** One framework module modelled on `modules/records` (layout, tenancy copy, settings, harness, i18n). It stores bytes through the framework's `file_storage` backend, shares through `sharing`, and runs work as Celery tasks through `background_tasks` (eager in tests and e2e). Heavy processors are extras (`[quality]`, `[anonymize]`, `[ai]`, `[map]`, `[pagebuilder]`) imported only inside the step that needs them.
+**Architecture:** One framework module modelled on `modules/records` (layout, tenancy copy, settings, harness, i18n). It stores bytes through the framework `file_storage` backend under its own key layout, shares through `sharing`, and runs work as Celery tasks through `background_tasks`. Celery workers never build the app, so everything a task needs (extension registry, settings, storage, the DB engine) has a worker-safe bootstrap of its own. Heavy processors are extras (`[quality]`, `[anonymize]`, `[ai]`, `[map]`, `[pagebuilder]`, `[billing]`) imported only inside the step that needs them.
 
-**Tech Stack:** FastAPI, SQLModel/SQLAlchemy async, Alembic (host), Celery via `background_tasks`, Pillow + pillow-heif, ijson, httpx, opencv-python-headless, torch/facenet-pytorch/ultralytics (extra only), pydantic-ai through `sm_ai.contracts`, tippecanoe (system binary), React + Inertia + `@simple-module-py/ui`, MapLibre + pmtiles (frontend), vitest, Playwright.
+**Tech Stack:** FastAPI, SQLModel/SQLAlchemy async, Alembic (host), Celery via `background_tasks`, Pillow + pillow-heif, ijson, httpx, opencv-python-headless, torch/facenet-pytorch/ultralytics (extra only), pydantic-ai through `sm_ai.contracts`, tippecanoe (system binary), React + Inertia + `@simple-module-py/ui`, MapLibre + pmtiles, vitest, Playwright.
 
 **Spec:** `docs/superpowers/specs/2026-10-28-images-module-design.md` (approved). Read it alongside this plan.
-**Porting map:** `docs/superpowers/plans/2026-10-28-images-module-porting-map.md` (Codex's read of the portal: files to port, invariants, tests worth porting). The portal source is `~/Repos/gis-data-portal/backend/app/features/images/` and `frontend/src/features/images/`. Read it as reference only; never import from it.
+**Porting map:** `docs/superpowers/plans/2026-10-28-images-module-porting-map.md`. It is Codex's read of the portal: files to port, invariants and tests worth porting. The portal source is `~/Repos/gis-data-portal/backend/app/features/images/` and `frontend/src/features/images/`. Use it as reference only; never import from it.
+**Framework reference:** the 0.0.41 sources are in `~/Repos/simple_module_python` (local HEAD equals 0.0.41 for all Python). Read `docs/modules/{sharing,file_storage,background_tasks}.md` there before touching those APIs.
 
 ## Global Constraints
 
 - Framework floor in `modules/images/pyproject.toml`: `simple_module_*>=0.0.41,<0.1`. Never `==`. The host pins exactly `==0.0.41`.
-- Sibling extras: `ai = ["simple_module_ai>=0.0.13,<0.1"]`, `billing = ["simple_module_billing>=0.0.13,<0.1"]` and `pagebuilder = ["simple_module_pagebuilder>=0.0.13,<0.1"]`, each with a `# floor: <reason>` comment. If the `ai` metering callable (Task 22) is new, the `ai` floor is the next lockstep version and the comment says so.
-- Plain `pip install simple_module_images` pulls no torch, ultralytics or cv2. Import them only inside the step module, behind the extra.
-- Package `sm_images`. `ModuleMeta.name = "Images"`. Locale namespace `images`. Table prefix `images_`. `create_module_base("images")`.
-- Routes: API `/api/images`, console views `/admin/images`, public views `/images/c/{slug}`. Constants live in `sm_images/constants.py` (`check_hardcoded_strings`).
-- The settings class subclasses `DbBackedSettings` (no env), SYSTEM scope. Boot-time fields are `json_schema_extra=_RESTART` and read in `on_startup`.
-- Every router binds a tenant via `sm_images.tenancy.bind_admin` / `bind_public`. It is a copy of `sm_records.tenancy` and is added to the parity family in `scripts/tests/parity_tenancy.py`.
-- Every `.py`, `.ts` and `.tsx` file is at most 300 lines; split by responsibility at 280.
-- Nothing goes under `sm_images/pages/` except real Inertia pages.
-- en and de catalogues are kept in step (`check_locales`). Frontend keys are derived from `locales/en.json` as in `modules/news/news/utils/i18n.ts`.
-- **Originals are immutable.** No code path writes `storage_key` after insert. Only `StepContext.write_display` writes `display_key`.
-- Migrations: host revisions only. The first images revision carries `branch_labels = ("images",)`. The history ends in one head. Run `alembic check` on SQLite and Postgres after each migration task.
-- Outside a request, commit with `simple_module_db.finalize_session` wherever events or billing are involved.
-- Tests: targeted only (the module's touched test files, or one e2e spec). No full suites and no CI waits until `/ship`. `PYTEST_WORKERS=8`. Run `~/.claude/bin/wait-for-headroom` before any suite, dev server or browser.
-- Commit messages: `feat(images): <task>`, ending with `Claude-Session: https://claude.ai/code/session_017uTbtobjCKQYnAxF5tgK8t`.
+- Sibling extras: `ai = ["simple_module_ai>=…,<0.1"]`, `billing = [...]` and `pagebuilder = [...]`, each with a `# floor: <reason>` comment naming the change it needs. The `ai` floor is the next lockstep version, because Task 22 adds `consume_requests`.
+- `pip install simple_module_images` pulls no torch, ultralytics or cv2.
+- Package `sm_images`; `ModuleMeta.name = "Images"`; locale namespace `images`; table prefix `images_`; `create_module_base("images")`.
+- Routes: API `/api/images`, console `/admin/images`, public `/images/c/{slug}`. Constants live in `sm_images/constants.py`.
+- Settings subclass `DbBackedSettings` (no env), SYSTEM scope. Boot-time fields are `_RESTART` and are read in `on_startup`. Workers read settings with `background_tasks.settings_for(ImagesSettings, "sm_images")`.
+- Every router binds a tenant (`sm_images.tenancy`, a copy of `sm_records.tenancy`, added to the parity families). A public response for a resolved tenant is never shareable-cached (CLAUDE.md, records #196).
+- Beat and recovery tasks never run unscoped. They enumerate tenants in a narrow `all_tenants()` query, then do each tenant's work under `tenant_context(t)`.
+- Files: at most 300 lines (split by responsibility at 280). Nothing but real Inertia pages under `sm_images/pages/`. en and de catalogues in step. Frontend keys derived from `en.json` as in `modules/news/news/utils/i18n.ts`.
+- **Originals are immutable.** Nothing writes `storage_key` after insert. Only `StepContext.write_display` produces a display copy, and only under a valid lease (Task 10).
+- Migrations: host revisions only. The first images revision carries `branch_labels=("images",)`. The history has one head. Run `alembic check` on SQLite and Postgres after every migration change.
+- Outside a request, commit with `simple_module_db.finalize_session` wherever events or billing are queued.
+- Tests: targeted only (the touched module's test files, or one e2e spec). No full suites and no CI waits until `/ship`. `PYTEST_WORKERS=8`. Run `~/.claude/bin/wait-for-headroom` before any suite, dev server, worker or browser. Stop servers and workers when done.
+- Commits: `feat(images): <task>`, ending with `Claude-Session: https://claude.ai/code/session_017uTbtobjCKQYnAxF5tgK8t`.
 
 ## Decisions made during planning (deviations from the design text)
 
-1. **Registry freeze timing (§8.2).** In the framework, a dependant's `on_startup` runs *after* its dependency's, and the framework has no "after all modules started" hook (verified against 0.0.41). So:
-   - plugins call `register_step` / `register_preset` from a `register_*` hook. The documented choice is `register_settings(app)`, which every module's runs before any `on_startup`;
-   - images freezes the registry in its own `on_startup`, and lazily on first read in a Celery worker;
-   - a registration after the freeze raises `RegistryFrozenError`.
+1. **Extension registration (§8.2).** Celery workers never build the app or run module hooks. In the web process, a dependant's `on_startup` also runs *after* images' own. So a plugin registers through a file, the Python twin of `images-steps.ts`:
+   - The plugin's package ships `images_extensions.py` with `def register(registry) -> None`.
+   - `sm_images.pipeline.extensions.load_extensions()` iterates the installed `simple_module` entry points. For each module package that has an `images_extensions` submodule (`find_spec`), it imports it and calls `register`, then freezes the registry.
+   - The web app calls it in images' `on_startup`. A worker calls it on first registry read. Both run one code path, so the registries match.
+   - A plugin is still an ordinary framework module, with no new entry-point group. `register_step`/`register_preset` outside `load_extensions` raises `RegistryFrozenError` once frozen.
 
-   The worked example in the module docs uses `register_settings`. The intent of the design (a late registration fails at boot) holds.
-2. **No share UI ships in the framework.** Images builds its own share dialog against `GET/POST/DELETE /api/sharing/shares`.
-3. **`file_storage` has no delete-by-prefix.** The janitor deletes known keys. Each image's keys come from its row, its renditions, its display copy and the map. Import staging keys are recorded on the job.
-4. **Bytes go through `app.state.file_storage.backend` directly.** They go through the backend (or `build_backend(settings_for(...))` in a worker) under our own key layout, not as `StoredFile` rows. The `file_storage` quota therefore doesn't apply; images' own limits and billing do.
-5. **No framework `worker_ready` hook.** `sm_images/tasks.py` connects `celery.signals.worker_ready` itself to resume interrupted imports.
-6. Console URL `/admin/images` (repo convention, as records and news use) instead of the design's bare `/images`.
+   The docs' worked example changes accordingly.
+2. **`internal` visibility needs our own policy.** `OwnedResourcePolicy` knows only `public`. `ImagesCollectionPolicy` wraps it and adds `visibility='internal'` for view to any authenticated principal in the bound tenant. Binding already requires active membership (multi-tenant), and on single-tenant every user is a member. The same policy object is used by lists, `RequiresResource` and the `ResourceType` registration.
+3. **No share UI in the framework.** Images builds a share dialog against `/api/sharing/shares`, plus its own gated user picker `GET /api/images/collections/{id}/share-candidates?q=`. That picker is owner or `images.manage`, uses `UserDirectory.search`, and is filtered to `tenant_member_ids`.
+4. **No delete-by-prefix in `file_storage`.** The janitor deletes known keys. An intent table `images_object_intent(key, created_at)` is written in an independent session before every object write and cleared when the referencing row commits. The janitor reaps intents older than the grace period that no row references (dry-run, cap). This catches crash and rollback orphans.
+5. **Bytes go through the backend directly.** They use `app.state.file_storage.backend` in the web process, and `build_backend(settings_for(FileStorageSettings,"file_storage"))` in workers, under our key layout. `StoredFile` rows and the `file_storage` quota are not used.
+6. **Delivery is at-most-once (`enqueue_after_commit`).** A beat task `images.reconcile` (every 5 min) re-dispatches, per tenant:
+   - step runs that are `pending` or have an expired lease, older than 5 minutes;
+   - import items that are pending;
+   - import jobs whose heartbeat is stale.
+
+   `worker_ready` (a Celery signal connected in `sm_images/tasks.py`) triggers one reconcile.
+7. **Console at `/admin/images`** (the repo convention), not the design's bare `/images`.
+8. **`normalize_downloads` is dropped.** Re-encoding would replace the delivered original, and renditions already cover display sizes.
+9. **Direct upload threshold is per image.** The default `direct_upload_threshold = 20 MiB` sits below `max_image_bytes = 50 MiB`. The multipart batch route registers a body limit of `upload_body_max_bytes = 100 MiB`.
+10. **Storage billing uses a gauge.** The meter is `images.storage_bytes`, kind `gauge`. Each image holds one committed hold sized to the sum of its objects (`images_image.storage_hold_id`, `storage_bytes`). When the display copy or renditions change, the image takes a new hold for the new total and then releases the old one. The janitor releases the hold on hard delete.
 
 ## Review Focus
 
-1. **A caller sees an image or count they cannot open.** Lists, counts, points, tiles, renditions, group views and the review queue must all apply the same SQL policy. Task 6 adds `test_every_read_route_hides_private_collection` and parametrises it over every GET route.
-2. **A re-run after a skipped step, or EXIF after a manual location, changes data it must not.** Task 13 adds `test_skipped_is_final_for_version` and `test_exif_never_overrides_manual_location`.
-3. **A huge or hostile upload.** This covers a decompression bomb, a zip bomb, zip-slip, HEIC, and a wrong extension versus the magic bytes. Tasks 8 and 17 add `test_bomb_pixels_413_translated`, `test_zip_total_uncompressed_cap` and `test_heic_upload_processes`.
-4. **An import interrupted mid-stream** (worker restart). It must resume from the checkpoint without duplicates. Task 16 adds `test_resume_after_kill_no_duplicates`.
-5. **A tenant leak on a single-tenant host or in a worker task.** Task 6 adds `test_unbound_tenant_admin_403`. Task 12 adds `test_task_runs_in_enqueuer_tenant`.
+1. **A caller sees an image or count they cannot open.** This covers lists, counts, points, tiles, renditions, groups, the review queue and the contracts. Task 6 adds `test_every_read_route_hides_private_collection`, parametrised over `tests/read_routes.py`, which each later task appends to.
+2. **A slow worker overwrites a newer result** (lease expired and reclaimed). Task 10 adds `test_stale_lease_cannot_complete_or_publish_display`.
+3. **A huge or hostile input.** This covers a pixel bomb, a zip bomb, zip-slip, a replaced presigned object, HEIC, a wrong extension, and an SSRF via redirect or a GeoJSON source URL. Tasks 7, 16, 17 and 18 own the tests.
+4. **An interrupted import replays.** Task 17 adds `test_resume_after_kill_no_duplicates_base64_without_ids`.
+5. **A tenant leak in a worker or beat task.** Task 10 adds `test_task_runs_in_enqueuer_tenant` and `test_reconcile_scopes_each_tenant`.
 
 ---
 
 ## Phase 1 — Framework bump
 
-### Task 1: Framework 0.0.41
+### Task 1: Framework 0.0.41, worker topology, CI extras
 
 **Files:**
-- Modify: `host/pyproject.toml` (every `==0.0.38` becomes `==0.0.41`; add `simple_module_file_storage`, `simple_module_sharing`, `simple_module_background_tasks` at `==0.0.41` if they are not already present; check the exact PyPI names), `host/client_app/package.json` (`@simple-module-py/*` to 0.0.41), `uv.lock`, `package-lock.json`.
-- Create: host revisions porting the framework's revisions this host lacks, in order. They are listed in the framework repo at `host/migrations/versions/`: `f733c7938fd1` (sharing_resource_share), `d7b3a9e5c1f2` (mail keys; check whether `30033455948e` already ported it), `bb906e1a1089`, `1f5985daa10b`, `a625f0b7c912`, `a626b1c8d023`, plus any `background_tasks` / `file_storage` tables that 0.0.38's port skipped. Each docstring ends `(framework 0.0.4x)` and states the upstream id, as `b65e04cf65d7` does. Linear, one head.
-- Modify: `CLAUDE.md`. Update the "no Redis or Celery" line, list the 0.0.39–0.0.41 ported revisions, and add the 0.0.40 note that bearer tokens are hashed (everyone re-logs in once).
-- Modify: any test or code that 0.0.39–0.0.41 broke (`TenantDeleted`/`UserDeleted` moved but are re-exported; `@simple-module-py/ui/components/ui/form` was removed, so grep the modules for it).
-- Create: `Makefile` target `worker` (`uv run celery -A host.worker:celery worker -l info -Q images,images_imports,images_heavy,images_gpu,celery`) and `host/worker.py` (`celery = build_runner_celery(<repo>/.env)`, modelled on the framework's `scripts/run_worker.py`).
-- Modify: `.env.example` (`SM_REDIS_URL` commented, pointing at dev-services; `SM_BG_TASKS_TASK_ALWAYS_EAGER=true` for local runs without a worker).
+- Modify: `host/pyproject.toml` (pins `==0.0.41`; add `simple_module_file_storage`, `simple_module_sharing` and `simple_module_background_tasks` at `==0.0.41`), `host/client_app/package.json`, `uv.lock` and `package-lock.json`.
+- Create: host revisions porting each framework revision this host lacks, in upstream order. The candidates, from the framework's `host/migrations/versions/`, are `f733c7938fd1` (sharing), `d7b3a9e5c1f2` (check whether `30033455948e` already is it), `bb906e1a1089`, `1f5985daa10b`, `a625f0b7c912` and `a626b1c8d023`. Also add any `background_tasks`/`file_storage` tables that the host never ported (diff the table sets). Each docstring ends `(framework 0.0.4x)` and names its upstream id, like `b65e04cf65d7`. Linear, one head.
+- Create: `host/worker.py` (`celery = build_runner_celery(<repo>/.env)`).
+- Modify: `Makefile`, adding these targets (dev-services Redis):
+
+  | Target | Command |
+  |---|---|
+  | `worker` | `-Q images,celery -c 4` |
+  | `worker-imports` | `-Q images_imports -c 1` |
+  | `worker-heavy` | `-Q images_heavy -c 2` |
+  | `worker-gpu` | `-Q images_gpu -c 1` |
+  | `beat` | `celery beat` |
+
+  They are not started by `dev`.
+- Modify: `.env.example` (`SM_REDIS_URL` commented; `SM_BG_TASKS_TASK_ALWAYS_EAGER=true` for runs without a worker), `tests/e2e/start-test-server.sh` (export `SM_BG_TASKS_TASK_ALWAYS_EAGER=true` and `SM_BG_TASKS_TASK_EAGER_PROPAGATES=true`).
+- Modify: `.github/workflows/ci.yml` at lines 86 and 528: `--all-extras` becomes `--all-extras --no-extra anonymize`. Install `tippecanoe` with apt in the Python test job and the Postgres job.
+- Modify: `CLAUDE.md` (Redis/Celery is now used, by images; the ported revisions; the 0.0.40 bearer-token hashing note) and any code broken by 0.0.39–0.0.41 (grep for `@simple-module-py/ui/components/ui/form`).
 
 **Done-check:**
-- `make lint` passes.
-- `uv run alembic upgrade heads && uv run alembic check` passes on SQLite and on Postgres (`SM_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/smpy_modules_images`, created in dev-services).
-- `scripts/check_migration_heads.py` passes.
-- `uv run pytest host/tests -n 8` passes.
-- The framework-pins tests in each module (`test_framework_pins.py`) pass.
+- `make lint`;
+- `alembic upgrade heads && alembic check` on SQLite and on Postgres (`smpy_modules_images` in dev-services);
+- `scripts/check_migration_heads.py`;
+- `uv run pytest -n 8 host/tests`;
+- each module's `test_framework_pins.py`.
 
 - [ ] Commit `deps: framework 0.0.41`
 
@@ -85,327 +106,357 @@
 
 **Files:**
 - Create:
-  - `modules/images/{pyproject.toml,package.json,tsconfig.json,README.md}` (copy records' shapes; extras `quality`, `anonymize`, `ai`, `billing`, `map`, `pagebuilder`, `dev`).
-  - `sm_images/{__init__.py,constants.py,module.py,settings.py,settings_boot.py,tenancy.py,_tenancy_mode.py,_tenant_guard.py,deps.py,locales/en.json,locales/de.json,utils/i18n.ts}`.
-  - `tests/{__init__.py,conftest.py,pg_support.py,app_harness.py,stub_auth.py,isolation_support.py}`.
+  - `modules/images/{pyproject.toml,package.json,tsconfig.json,README.md}`. Copy records' shapes. Extras: `quality`, `anonymize`, `ai`, `billing`, `map` and `pagebuilder`. Pytest `addopts = "-m 'not perf and not real_models'"`.
+  - Under `sm_images/`: `__init__.py`, `constants.py`, `module.py`, `settings.py`, `settings_boot.py`, `tenancy.py`, `_tenancy_mode.py`, `_tenant_guard.py`, `deps.py`, `menu.py`, `locales/{en,de}.json` and `utils/i18n.ts`.
+  - Under `tests/`: `__init__.py`, `conftest.py`, `pg_support.py`, `app_harness.py`, `stub_auth.py` and `isolation_support.py`.
 - Modify:
-  - root `pyproject.toml` `testpaths` (add `"modules/images/tests"`);
+  - root `pyproject.toml` `testpaths`;
   - `host/pyproject.toml` (dependency plus workspace source);
-  - `host/tests/test_host_boots.py` `REPO_MODULES` (add `"Images"`);
-  - `host/tests/test_menu_labels.py` (`sm_images`, `images.`);
-  - `scripts/tests/parity_tenancy.py` and `parity_families.py` (add images' copies);
-  - `.github/workflows/ci.yml` (add `ci_images` to the Postgres DB loop and a "Run pytest (images, Postgres)" step);
-  - `README.md` module table.
+  - `host/tests/test_host_boots.py` (`REPO_MODULES` gets `"Images"`);
+  - `host/tests/test_menu_labels.py`;
+  - `scripts/tests/parity_tenancy.py` and `parity_families.py`;
+  - `.github/workflows/ci.yml` (`ci_images` in the Postgres DB loop, plus a "Run pytest (images, Postgres)" step);
+  - the `README.md` module table.
 
 **Interfaces — Produces:**
-- `constants.PACKAGE="sm_images"`, `MODULE_NAME="Images"`, `DISTRIBUTION="simple_module_images"`, `ROUTE_PREFIX_API="/api/images"`, `VIEW_PREFIX="/admin/images"`, `PUBLIC_PREFIX="/images"`.
-- Permissions `PERM_VIEW="images.view"`, `PERM_CREATE="images.create"`, `PERM_PUBLISH="images.publish"`, `PERM_MANAGE="images.manage"`, `PERM_ORIGINALS="images.originals.view"`, `PERM_SETTINGS="images.settings"`.
-- `ImagesSettings(DbBackedSettings)` fields, with defaults from the spec:
-  - `max_image_bytes=50*2**20`, `batch_max=50`, `direct_upload_threshold=64*2**20`;
-  - `zip_max_bytes=2*2**30`, `zip_max_entries=10_000`, `zip_max_entry_bytes=200*2**20`, `zip_max_total_bytes=8*2**30`;
+- Constants:
+  - `PACKAGE="sm_images"`, `MODULE_NAME="Images"`, `DISTRIBUTION="simple_module_images"`;
+  - `ROUTE_PREFIX_API="/api/images"`, `VIEW_PREFIX="/admin/images"`, `PUBLIC_PREFIX="/images"`;
+  - `PERM_VIEW/CREATE/PUBLISH/MANAGE/ORIGINALS/SETTINGS` = `images.view`, `images.create`, `images.publish`, `images.manage`, `images.originals.view`, `images.settings`.
+- `ImagesSettings(DbBackedSettings)`:
+  - `max_image_bytes=50*2**20`, `batch_max=50`, `upload_body_max_bytes=100*2**20`, `direct_upload_threshold=20*2**20`;
+  - `zip_max_bytes=2*2**30`, `zip_max_entries=10_000`, `zip_max_entry_bytes=200*2**20`, `zip_max_total_bytes=8*2**30`, `zip_max_ratio=200`;
   - `geojson_max_features=1_000_000`, `geojson_max_bytes=2*2**30`;
   - `download_concurrency_per_domain=4`, `download_concurrency_total=32`, `download_timeout=60`;
-  - `thumbnail_sizes={"marker":64,"small":160,"medium":400,"large":1024}`;
-  - `dedupe_by_hash=False`, `normalize_downloads=False`;
+  - `thumbnail_sizes={"marker":64,"small":160,"medium":400,"large":1024}`, `dedupe_by_hash=False`;
   - `tippecanoe_path="tippecanoe"`, `anonymize_weights_path=""`;
   - `map_rebuild_threshold_pct=5`, `map_rebuild_threshold_abs=100`;
-  - `public_asset_base_url=""`, `janitor_grace_days=7`, `step_output_max_bytes=65536`.
-- `ImagesServices` at `app.state.sm_images` with `.settings`.
-- Tenancy exports identical to records' (`bind_admin`, `bind_public`, `tenant_scope`, `TenantRequired`).
-- Harness: `images_app`, `client`, `as_user(user_id, perms)`, `two_tenants`, plus a `storage` fixture giving the module an in-memory or `tmp_path` filesystem backend.
+  - `public_asset_base_url=""`, `janitor_grace_days=7`, `step_output_max_bytes=65536`, `step_lease_seconds=1800`.
+- `ImagesServices` at `app.state.sm_images`.
+- `register_body_limits` (upload routes: `upload_body_max_bytes`; base64: the same).
+- `register_public_routes` (GET-only for `/images/c/` and the public serving/points/map prefixes).
+- Harness: `images_app`, `client`, `as_user(user_id, perms)`, `two_tenants`, plus a `storage` fixture (filesystem backend on `tmp_path`, installed as `app.state.file_storage.backend`).
 
 **Tests** (`tests/test_module_boot.py`):
-- `test_module_registers_permissions` asserts the six permissions are in the registry.
-- `test_settings_ignore_env` with `SM_IMAGES_MAX_IMAGE_BYTES=1` set in the env still sees `ImagesSettings().max_image_bytes == 50*2**20`.
-- `test_unbound_tenant_admin_403` (multi-tenant harness, no tenant): `GET /api/images/collections` gives 403 `tenant_required`.
+- `test_module_registers_permissions`;
+- `test_settings_ignore_env`: with env `SM_IMAGES_MAX_IMAGE_BYTES=1` set, the default stays.
+- `test_public_routes_get_only`.
 
-**Done-check:** `cd modules/images && uv run pytest -n 8 tests/test_module_boot.py`, `make lint`, `uv run pytest host/tests/test_host_boots.py host/tests/test_menu_labels.py`.
+**Done-check:**
+- `cd modules/images && uv run pytest -n 8 tests/test_module_boot.py`;
+- `make lint`;
+- `uv run pytest host/tests/test_host_boots.py host/tests/test_menu_labels.py`.
 
 - [ ] Commit `feat(images): module skeleton`
 
 ### Task 3: Models and first migration
 
-**Files:**
-- Create: `sm_images/models/{__init__.py,_base.py,collection.py,image.py,rendition.py,step_run.py,group.py,prompt.py,import_job.py,download.py,enums.py}`; `host/migrations/versions/<rev>_add_images.py` (autogenerate with `make migration msg="add images"`, then add `branch_labels=("images",)` and a Postgres `_drop_enums()` helper as in `e23090832709`).
+**Files:** Create `sm_images/models/{__init__.py,_base.py,enums.py,collection.py,image.py,rendition.py,step_run.py,group.py,prompt.py,import_job.py,import_item.py,object_intent.py}`, plus `host/migrations/versions/<rev>_add_images.py` (autogenerate; add `branch_labels=("images",)` and a Postgres `_drop_enums()`, as in `e23090832709`).
 
-**Interfaces — Produces** (columns exactly as spec §1):
-- Models `Collection`, `Image`, `Rendition`, `StepRun`, `Group`, `Prompt`, `PromptResult`, `ImportJob`, `Download`.
-- Enums `Visibility{private,internal,public}`, `LocationSource{exif=1,import_=2,manual=3}` (an int precedence column), `StepStatus{pending,running,completed,skipped,failed}`, `ReviewStatus{unreviewed,accepted,corrected,rejected}`, `ImportKind{geojson_url,geojson_base64,zip}`, `JobStatus`, `DownloadStatus`.
-- The partial unique index `uq_images_image_external` on `(collection_id, external_source, external_id) WHERE external_id IS NOT NULL` (both dialects).
-- Unique constraints: `(tenant_id, slug)` on collection, `(image_id, size)` on rendition, `(image_id, step)` on step_run, `(collection_id, key)` on group, and on prompt_result `(prompt_id, image_id)` plus `(prompt_id, group_id)`.
-- `sm_images/storage_keys.py`: `original_key(t,c,i,ext)`, `display_key(t,c,i)`, `rendition_key(t,c,i,size)`, `map_key(t,c)` and `import_key(t,job,name)`, matching spec §1's layout.
+**Interfaces — Produces** (columns as spec §1, plus the following):
+- Collection stats: `image_count`, `located_count`, `bbox_minx/miny/maxx/maxy`, `map_built_at`, `map_image_count`.
+- `Image`: adds `storage_hold_id`, `storage_bytes` and `display_generation:int`.
+- `StepRun`: adds `lease_token: uuid|None`, `lease_expires_at`, `step_version`, `prompt_revision: int|None`.
+- `Prompt`: adds `revision:int`, bumped when the instruction or schema is edited.
+- `ImportJob`: adds `generation:int`, `heartbeat_at` and `staged_keys: list[str]`.
+- `ImportItem` replaces the spec's `images_download` and covers both modes. It is unique on `(job_id, feature_index)`, with `url|None`, `external_id`, `status`, `attempts`, `last_error`, `lat`, `lng`, `captured_at`, `group_key`, `group_role`, `properties`, `image_id`.
+- `ObjectIntent(key pk, created_at)`, not tenant-scoped (platform janitor).
+- Enums:
+  - `Visibility{private,internal,public}`;
+  - `LocationSource`, int precedence `exif=1, import_=2, manual=3`;
+  - `StepStatus{pending,running,completed,skipped,failed}`;
+  - `ReviewStatus{unreviewed,accepted,corrected,rejected}`;
+  - `ImportKind{geojson_url,geojson_base64,zip}`;
+  - `JobStatus{pending,staging,running,paused,completed,failed,cancelled}`;
+  - `ItemStatus{pending,done,duplicate,failed}`.
+- Partial unique index `uq_images_image_external` on `(collection_id, external_source, external_id) WHERE external_id IS NOT NULL` (both dialects).
+- `sm_images/storage_keys.py`: `original_key`, `display_key(t,c,i,generation)` (→ `…/display.<gen>.jpg`), `rendition_key(t,c,i,size,generation)`, `map_key` and `import_key`.
 
 **Tests:**
-- `tests/test_models.py`:
-  - `test_external_id_dedupe_index`: a second insert with the same external triple raises `IntegrityError`, and a null external_id never conflicts.
-  - `test_soft_delete_hides_collection`.
-- `tests/test_storage_keys.py`: the exact strings.
+- `tests/test_models.py`: `test_external_id_dedupe_index`, `test_import_item_unique_per_feature`, `test_soft_delete_hides_collection`.
+- `tests/test_storage_keys.py`: the exact key strings.
 
-**Done-check:** both test files pass; `alembic upgrade heads && alembic check` pass on SQLite and Postgres; one head.
+**Done-check:** the tests pass; `alembic check` on SQLite and Postgres; one head.
 
 - [ ] Commit `feat(images): data model and migration`
 
-### Task 4: Storage adapter
+### Task 4: Storage adapter and object intents
 
-**Files:** Create `sm_images/storage.py`.
+**Files:** Create `sm_images/storage.py`, `sm_images/intents.py`.
 
 **Interfaces — Produces:**
-- `class ImageStore`:
-  - `async put(key, data: bytes | AsyncIterator[bytes], *, content_type, size)`;
-  - `async read(key) -> bytes`;
-  - `async stream(key) -> AsyncIterator[bytes]`;
-  - `async stream_range(key, start, end)`;
-  - `async delete_keys(keys: Iterable[str]) -> int`;
-  - `async exists(key)`.
-- `def store_for(app) -> ImageStore` (uses `app.state.file_storage.backend`).
-- `def worker_store() -> ImageStore` (`build_backend(settings_for(FileStorageSettings, "file_storage"))`, cached).
+- `ImageStore` methods: `put(key, data|aiter, *, content_type, size)`, `read(key)->bytes`, `stream(key)`, `stream_range(key,start,end)`, `head(key)->(size,etag)|None`, `delete_keys(keys)->int` and `exists(key)`.
+- `store_for(app)` and `worker_store()`.
+- `async with object_intent(keys):`. It records the intents in an independent session before the write. The caller clears them in the same transaction that commits the referencing row, via `clear_intents(db, keys)`.
 
-**Tests** (`tests/test_storage.py`, filesystem backend on `tmp_path`): round trip; a range read; `delete_keys` ignores missing keys.
+**Tests:**
+- a round trip;
+- a range read;
+- `delete_keys` ignores missing keys;
+- an intent survives a rolled-back caller transaction and is cleared on commit.
 
 - [ ] Commit `feat(images): storage adapter`
 
 ### Task 5: Access policy and sharing
 
-**Files:** Create `sm_images/access.py`, `sm_images/resource_types.py`; modify `module.py` (`register_resource_types`, `depends_on` includes `"Sharing"`, `"FileStorage"` and `"BackgroundTasks"` by their real `ModuleMeta` names).
+**Files:** Create `sm_images/access.py`, `sm_images/resource_types.py`. Modify `module.py`: `register_resource_types`, and `depends_on` gets the real `ModuleMeta` names of sharing, file_storage and background_tasks.
 
 **Interfaces — Produces:**
 - `COLLECTION_RESOURCE="images.collection"`.
-- `POLICY = OwnedResourcePolicy(Collection.owner_id, bypass_perm=PERM_MANAGE, visibility_col=Collection.visibility, share_exists=share_exists_for(...))`.
-- `def visible_collections(who: ResourcePrincipal, action) -> Select` adds `OR visibility='internal'` for view when `who` is a tenant member.
-- `def visible_images(who, action) -> Select` joins collection under the same predicate and excludes soft-deleted collections.
-- Dependencies `CollectionView`, `CollectionEdit` and `CollectionOwner` (owner or `images.manage`, for destructive actions) via `RequiresResource`.
-- `def can_view_original(who, image, collection) -> bool` (owner or `PERM_ORIGINALS`).
-- `public_collection(slug)` for anonymous access: `visibility='public'`, otherwise 404.
+- `POLICY = ImagesCollectionPolicy(...)`: wraps `OwnedResourcePolicy(owner_id, bypass_perm=PERM_MANAGE, visibility_col=Collection.visibility, share_exists=share_exists_for(...))`. For `view`, it adds `OR visibility IN ('internal','public')` when `principal.user_id` is set and `OR visibility='public'` otherwise.
+- `visible_images(who, action) -> Select`.
+- Dependencies `CollectionView`, `CollectionEdit` and `CollectionOwner` (owner or manage), via `RequiresResource(POLICY, …)`.
+- `can_view_original(who, image, collection)`.
+- `public_collection(slug)`.
 
-**Tests** (`tests/test_access.py`, parametrised over visibility × principal):
-- an owner sees private;
-- a stranger is 404 on private;
-- a member sees internal;
+**Tests** (`tests/test_access.py`, a matrix of visibility × principal over **both** the list and the detail route):
+- the owner sees private;
+- a stranger gets 404;
+- a member sees internal on list *and* detail;
 - anonymous sees only public;
-- a `view` share can't upload (403) and an `edit` share can;
-- an `edit` share can't delete the collection;
+- a view share can't upload and an edit share can;
+- an edit share can't delete;
 - `images.manage` bypasses.
 
-- [ ] Commit `feat(images): access policy and sharing`
+- [ ] Commit `feat(images): access policy`
 
-### Task 6: Collection CRUD API
+### Task 6: Collection API, stats, contracts
 
-**Files:** Create `sm_images/endpoints/api/{__init__.py,collections.py}`, `sm_images/schemas/collection.py`, `sm_images/services/collections.py`, `sm_images/events.py`, `sm_images/contracts/{__init__.py,events.py,schemas.py}`.
+**Files:** Create `sm_images/endpoints/api/{__init__.py,collections.py,shares.py}`, `sm_images/schemas/collection.py`, `sm_images/services/{collections.py,stats.py}`, `sm_images/events.py`, `sm_images/contracts/{__init__.py,events.py,schemas.py,reads.py}`, `tests/read_routes.py`.
 
 **Interfaces — Produces:**
 - Routes:
-  - `GET/POST /api/images/collections` (filters `owned|shared|internal|public|all`, cursor pagination);
+  - `GET/POST /api/images/collections` (filter `owned|shared|internal|public|all`, cursor);
   - `GET/PATCH/DELETE /api/images/collections/{id}`;
-  - `PUT …/{id}/visibility` (internal/public need `images.publish`).
-- `CollectionService` with `create`, `update`, `set_visibility` and `soft_delete`.
-- Events `CollectionVisibilityChanged` and `CollectionDeleted`, published via `db.on_commit`.
-- Schemas `CollectionCreate`, `CollectionUpdate`, `CollectionOut` (output models carry no input bounds; see CLAUDE.md billing note) and `CollectionPage`.
+  - `PUT …/{id}/visibility` (internal and public need `images.publish`);
+  - `GET …/{id}/share-candidates?q=`.
+- Events `CollectionVisibilityChanged` and `CollectionDeleted` (`db.on_commit`).
+- `stats.on_image_added(db, coll_id, lat, lng)`, `on_image_removed` and `on_location_changed`. They are incremental SQL `UPDATE`s in the caller's transaction (counts plus bbox extension). `recompute(db, coll_id)` serves deletes and shrinks, called by reconcile.
+- Contracts `get_collection(tenant_id, id, principal)`, `list_collections(tenant_id, principal, …)`, `points(tenant_id, coll_id, bbox, principal)` (wired in Task 26) and `rendition_url(image, size)`. Each pins `tenant_context(tenant_id)`.
 
-**Tests** (`tests/test_collections_api.py`):
+**Tests:**
 - CRUD;
-- slug uniqueness per tenant (409);
-- publish permission;
+- slug 409;
+- the publish permission;
 - an event fires only after commit;
-- `test_every_read_route_hides_private_collection`, parametrised over a list `READ_ROUTES` in `tests/read_routes.py` that later tasks append to (gallery, image detail, renditions, points, map, groups, prompts, review queue, import jobs).
+- the share-candidates picker returns only tenant members and gives 403 for an edit share;
+- the contracts filter by tenant and policy;
+- `test_unbound_tenant_admin_403`;
+- `test_every_read_route_hides_private_collection`.
 
-- [ ] Commit `feat(images): collection API`
+- [ ] Commit `feat(images): collection API and contracts`
 
-### Task 7: Image ingest service and direct/batch upload
+### Task 7: Ingest, direct and batch upload
 
-**Files:** Create `sm_images/ingest/{__init__.py,sniff.py,guards.py,service.py}`, `sm_images/endpoints/api/images.py`, `sm_images/schemas/image.py`.
+**Files:** Create `sm_images/ingest/{__init__.py,sniff.py,guards.py,service.py,direct.py}`, `sm_images/endpoints/api/{images.py,uploads.py}`, `sm_images/schemas/image.py`.
 
 **Interfaces — Produces:**
-- `sniff(data: bytes) -> str | None` returns a content type from magic bytes (jpeg, png, webp, heic/heif, tiff).
-- `guard_pixels(data) -> (w,h)` raises `ImageTooLarge` (mapped to a translated 413, as pagebuilder #221 does; reuse its message key pattern).
-- `IngestService.add_image(collection, data, filename, meta: IngestMeta, *, source) -> Image | Duplicate`:
-  - it sha256-hashes the data;
-  - it dedupes by external triple (three layers: pre-check, in-batch set, IntegrityError re-check) and by hash when `dedupe_by_hash` is on;
-  - it writes the original under `original_key`, inserts the row and creates the pending `StepRun` rows for the collection's enabled steps;
-  - it fires `ImageAdded` on commit and enqueues the pipeline after commit (Task 12 wires the executor; until then a no-op hook `on_image_added`).
-- `IngestMeta(lat,lng,captured_at,external_source,external_id,group_key,group_role,properties)`. Manual lat/lng sets `location_source=manual`.
+- `sniff(data)->str|None` (jpeg, png, webp, heic/heif, tiff).
+- `guard_pixels(data)->(w,h)` raises `ImageTooLarge`, which maps to a translated 413 (pagebuilder #221's pattern).
+- `IngestService.add_image(collection, *, data|staged_key, filename, meta: IngestMeta, source) -> Image | Duplicate`:
+  1. hash;
+  2. three-layer external dedupe (pre-check, in-batch set, IntegrityError re-check), plus hash dedupe when on;
+  3. write the original under an intent (or adopt the staged key);
+  4. insert;
+  5. create pending `StepRun`s for the enabled steps;
+  6. update stats;
+  7. clear the intents;
+  8. on commit, `ImageAdded` and `pipeline.dispatch(image_id)`. This is a no-op hook until Task 10.
+- `IngestMeta(lat,lng,captured_at,external_source,external_id,group_key,group_role,properties)`. Manual coordinates set `location_source=manual`.
 - Routes:
-  - `POST /api/images/collections/{id}/images` (multipart, 1..`batch_max` files plus optional `metadata` JSON keyed by filename);
+  - `POST /api/images/collections/{id}/images` (multipart, 1..`batch_max` files, optional `metadata` JSON keyed by filename; a file over `direct_upload_threshold` gives 413 `use_direct_upload`);
   - `POST …/images/base64`;
-  - `GET …/collections/{id}/images` (cursor, filters `has_location`, `step`, `step_status`, `review_status`, `group`);
-  - `GET/PATCH/DELETE /api/images/images/{id}` (PATCH: lat/lng manual, group; DELETE needs owner or manage).
+  - `POST …/collections/{id}/uploads`, then `{upload_id, part_size, part_urls}` through `DirectUploadBackend`, then `POST /api/images/uploads/{id}/complete {parts, filename, metadata}`. On complete it calls `head`, verifies size ≤ `max_image_bytes`, sniffs, guards and ingests (`DELETE` aborts);
+  - `GET …/collections/{id}/images` (cursor; `has_location`, `step`, `step_status`, `review_status`, `group`);
+  - `GET/PATCH/DELETE /api/images/images/{id}`. PATCH sets a manual location through a conditional update and updates stats. DELETE is owner or manage, and soft.
 
-**Tests** (`tests/test_upload.py`):
-- `test_magic_bytes_not_extension` (a PNG named `.jpg` is stored as `image/png`; a text file is 415);
+**Tests:**
+- `test_magic_bytes_not_extension`;
+- `test_unknown_type_415`;
 - `test_bomb_pixels_413_translated`;
 - `test_batch_over_max_422`;
+- `test_over_threshold_requires_direct`;
+- `test_direct_upload_complete_checks_size`;
 - `test_base64_dedupes_external_id`;
 - `test_hash_dedupe_off_by_default`;
-- `test_heic_upload_processes` (needs `pillow-heif` in the core deps);
-- `test_original_never_rewritten`, which asserts the bytes at `storage_key` stay equal across the whole lifecycle; later tasks extend it.
+- `test_heic_upload_processes` (`pillow-heif` is a core dependency);
+- `test_original_never_rewritten`, which later tasks extend;
+- `test_body_limit_via_host_middleware` (through the full app).
 
 - [ ] Commit `feat(images): upload and ingest`
 
-### Task 8: Built-in `exif` and `renditions` (as plain functions)
+### Task 8: `exif` and `renditions` processors
 
-**Files:** Create `sm_images/processing/{exif.py,renditions.py}`.
+**Files:** Create `sm_images/processing/{exif.py,renditions.py}`, plus fixtures in `tests/fixtures/` (a geotagged jpeg, a rotated jpeg, a heic, a png without exif).
 
 **Interfaces — Produces:**
-- `read_exif(data) -> ExifData(lat,lng,altitude,heading,captured_at,make,model,orientation)`, ported from the portal's `pipeline/geolocation.py` (GPS rationals, ref signs, DateTimeOriginal with offset).
-- `make_renditions(display_bytes, sizes: dict[str,int]) -> dict[str, (bytes,w,h)]` applies `ImageOps.exif_transpose`, gives JPEG q85, never enlarges, and strips metadata.
+- `read_exif(data)->ExifData(lat,lng,altitude,heading,captured_at,make,model,orientation)`, ported from the portal's `pipeline/geolocation.py`.
+- `make_renditions(display_bytes, sizes)->dict[str,(bytes,w,h)]`. It applies `exif_transpose`, encodes JPEG at q85, never enlarges, and strips metadata.
 
-**Tests:** fixture images in `tests/fixtures/` (a geotagged jpeg, a rotated jpeg, a heic, a png without exif), with exact expected values.
+**Tests:** exact values for each fixture.
 
 - [ ] Commit `feat(images): exif and rendition processors`
-
-### Task 9: Image serving route
-
-**Files:** Create `sm_images/endpoints/api/serve.py`, `sm_images/endpoints/public.py`.
-
-**Interfaces — Produces:**
-- `GET /api/images/images/{id}/r/{size}`, `…/display` and `…/original`:
-  - stream from `ImageStore`;
-  - an `ETag` is `sha256` (original) or the rendition's key plus `updated_at`;
-  - honour `If-None-Match` with 304;
-  - public collection: `Cache-Control: public, max-age=31536000, immutable`; otherwise `private, max-age=3600`;
-  - `…/original` needs `can_view_original` when `display_key` is set (the original *is* the display copy when it isn't);
-  - unknown size gives 404.
-- Public twins under `bind_public` for public collections.
-- `rendition_url(image, size) -> str` in `sm_images/urls.py`: `?v=<updated_at epoch>`, prefixed by `public_asset_base_url` for public collections when it's set.
-
-**Tests** (`tests/test_serve.py`): cache headers per visibility; a 304 path; private is 404 to a stranger and to anonymous; the original route is 403 for an `edit` share once `display_key` is set.
-
-- [ ] Commit `feat(images): access-checked image route`
-
-### Task 10: Console screens — collections, gallery, viewer
-
-**Files:** Create `sm_images/endpoints/views.py`, `sm_images/pages/{Collections.tsx,Collection.tsx,Image.tsx}`, `sm_images/components/{collections/*,gallery/*,viewer/*,share/ShareDialog.tsx}`, `sm_images/hooks/{useCollections.ts,useImages.ts,useShares.ts}`, `sm_images/utils/api.ts`, `menu.py`, and locale keys.
-
-**Interfaces — Produces:**
-- Inertia pages `Images/Collections`, `Images/Collection` and `Images/Image`.
-- The gallery is a cursor-paginated grid of `small` renditions with filter chips.
-- The viewer shows the display copy, an original toggle (shown only when the prop `can_view_original`), metadata, step results (generic key/value view for now; Task 14 adds the registry) and prompt results (Task 22).
-- The share dialog lists, grants and revokes through `/api/sharing/shares`, with view/edit and a user picker from the framework's user directory endpoint.
-- Collection tabs: Gallery, Map (Task 27), Imports (Task 19), Pipeline (Task 14), Groups (Task 21), Prompts (Task 23), Review (Task 24). Placeholders render only for implemented tabs.
-
-**Tests:**
-- vitest page tests in `sm_images/page-tests/` for `Collections` and `Image` (render, filter, original toggle hidden without the prop).
-- e2e `tests/e2e/images-core.spec.ts`: create a collection, upload two jpegs, see thumbnails, open the viewer, share with a second user who sees it (standalone; it seeds its own data).
-
-- [ ] Commit `feat(images): console collections, gallery and viewer`
 
 ---
 
 ## Phase 3 — Pipeline framework
 
-### Task 11: Step registry and contracts
+### Task 9: Step registry and extension loading
 
-**Files:** Create `sm_images/pipeline/{registry.py,step.py,presets.py}`; export them from `sm_images/contracts/__init__.py`.
+**Files:** Create `sm_images/pipeline/{registry.py,step.py,presets.py,extensions.py}`. Export them from `sm_images/contracts/__init__.py`.
 
-**Interfaces — Produces** (exactly spec §8.3):
+**Interfaces — Produces** (spec §8.3):
 - `Step` Protocol.
-- `StepContext` (`image: ImageRead`, `params`, `tenant_id`, `read_display()`, `read_original()`, `write_display(data, content_type)` — raises unless `step.mutates_display` — and `progress(pct)`, which calls `background_tasks.heartbeat`).
-- `StepOutcome.completed(output) | .skipped(reason) | .failed(code, message)`.
-- `Preset` and `PromptSpec` (pydantic).
-- `register_step`, `register_preset`, `get_step(id) -> Step | None`, `get_preset`, `all_steps()`, `freeze()`, `is_frozen()`.
+- `StepContext`: `image`, `params`, `tenant_id`, `read_display()`, `read_original()`, `write_display(data, content_type)` (only for `mutates_display`; writes to `display_key(…, generation+1)`), and `progress(pct)` (renews the lease and calls `heartbeat`).
+- `StepOutcome.completed/skipped/failed`.
+- `Preset` and `PromptSpec`.
+- `register_step`, `register_preset`, `get_step(id)->Step|None`, `get_preset`, `all_steps()`, `freeze()`, `is_frozen()`.
+- `load_extensions()`, idempotent (Decision 1).
 - Errors `RegistryFrozenError`, `DuplicateStepError`, `ReservedStepIdError`, `UnresolvedRequiresError`, `CyclicRequiresError`.
-- `RESERVED={"exif","renditions","quality","anonymize","classify"}` plus the prefix `prompt:`.
-- Plugin ids must be `<module>.<name>` (regex `^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$`); built-ins register through an internal path.
-- `topo_order(step_ids) -> list[str]` validates and orders.
-- Freeze semantics are in "Decisions made" item 1.
+- Reserved ids: `exif`, `renditions`, `quality`, `anonymize`, `classify`, and the prefix `prompt:`. Plugin ids match `^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$`.
+- `topo_order(ids)`.
+- The registry freezes implementations only; `prompt:<id>` steps are resolved per execution from the DB (Task 22).
 
-**Tests** (`tests/test_registry.py`):
-- duplicate id;
-- reserved id;
-- a bad namespace;
-- an unresolved `requires` and a cycle fail at `freeze()`;
-- a registration after freeze raises;
-- `test_mutates_display_at_most_one` (pipeline config validation refuses two);
-- a missing step returns `None` and doesn't raise.
+**Tests:**
+- duplicate, reserved and namespace errors;
+- unresolved and cyclic `requires` fail at freeze;
+- a late registration raises;
+- `load_extensions` finds a fixture package's `images_extensions.py`;
+- `test_registry_parity_fresh_process`: run `python -c` in a subprocess with no app built, call `load_extensions()`, and get the same ids as the web app;
+- `test_mutates_display_at_most_one`.
 
-- [ ] Commit `feat(images): step registry`
+- [ ] Commit `feat(images): step registry and extension loading`
 
-### Task 12: Executor, claim, lease, Celery tasks (hard)
+### Task 10: Executor, leases, orchestration, reconcile (hard)
 
-**Files:** Create `sm_images/pipeline/{executor.py,claim.py,config.py,builtin_steps.py}`, `sm_images/tasks.py`, `sm_images/task_config.py`.
+Before implementing, a Codex root-cause/design pass over this task's interfaces settles the async-DB-in-Celery approach. Check how `background_tasks.sync_db` and `simple_module_db` build engines; one option is an `asyncio.run` wrapper over a per-process async engine with the host's tenant policy.
+
+**Files:** Create `sm_images/pipeline/{executor.py,claim.py,config.py,orchestrate.py,builtin_steps.py,worker_runtime.py}`, `sm_images/tasks.py`, `sm_images/task_config.py`, `sm_images/reconcile.py`.
 
 **Interfaces:**
-- Consumes: Task 11's registry, Task 8's processors, Task 4's `ImageStore`.
+- Consumes: Tasks 4, 8 and 9.
 - Produces:
-  - `pipeline_config` validation: `validate_pipeline_config(cfg: dict) -> PipelineConfig` (enabled steps plus params validated by each step's `params_schema()`; an unknown step id is kept and reported as `not_installed`).
-  - Built-in `ExifStep` (writes location only when `image.location_source` is NULL or `exif`, so it never overrides import or manual) and `RenditionsStep` (re-runs when `display_key` changed after its last completion).
-  - `claim_steps(db, image_id, now) -> list[StepRun]`: `SELECT … FOR UPDATE SKIP LOCKED` on Postgres and a plain transaction on SQLite; a `running` row older than 30 minutes is reclaimable.
-  - `run_image(image_id, *, force=False)`, three-phase per step with short sessions (load / work outside the session / store).
-  - Status rules from spec §3:
-    - `skipped` is final for its `step_version`;
-    - a retry runs `failed` and `pending`;
-    - `force` runs all;
-    - a stale `step_version` counts as pending only under `force` or the "re-run stale" action;
-    - an independent step still runs after a sibling fails.
-  - `ImageProcessed` fires when every enabled step is final.
-- Celery: `images.run_image` (queue chosen per step: the task runs light steps inline and enqueues `images.run_step` on `images_heavy` / `images_gpu` for others), `images.restart_collection(collection_id, scope: failed|stale|all)` (set-based in chunks of 1000 ids, on `images_imports`). `TASK_ROUTES`/`QUEUES` live in `task_config.py`.
-- Enqueue with `enqueue_after_commit`. Ingest's `on_image_added` now enqueues `images.run_image`.
-- Output larger than `step_output_max_bytes` fails the step with `output_too_large`.
+  - `validate_pipeline_config(cfg)->PipelineConfig` (params validated by each step's `params_schema()`; unknown ids are kept as `not_installed`).
+  - Built-in `ExifStep` and `RenditionsStep`, registered internally.
+  - `claim_ready(db, image_id, now, lease_s) -> list[Claim(step, token)]`. It is one conditional `UPDATE … SET status='running', lease_token=:new, lease_expires_at=… WHERE image_id=:i AND step IN (:ready) AND (status='pending' OR (status='running' AND lease_expires_at < now)) RETURNING step`. That is atomic on both dialects (SQLite ≥ 3.35 `RETURNING`).
+  - `ready` means every `requires` is `completed`/`skipped` at the current version.
+  - `complete(db, image_id, step, token, outcome)` is a conditional update `WHERE lease_token=:token`; a rowcount of 0 means a lost lease, so the result is discarded.
+  - Display publication is fenced the same way: `UPDATE image SET display_key=:k, display_generation=:g WHERE id=:i AND display_generation=:g-1` inside the `complete` transaction, and the loser's object is deleted.
+  - `ExifStep`'s location write is a conditional update `WHERE location_source IS NULL OR location_source=1`.
+  - `dispatch(image_id)`: claim ready steps; for each, `enqueue_after_commit(images.run_step, image_id, step, token)` on the step's queue.
+  - `images.run_step`: work, `complete`, then `dispatch(image_id)` again, which continues to newly eligible dependants. The same path serves eager and async.
+  - When every enabled step is final, `ImageProcessed` fires once.
+  - Status rules (spec §3):
+    - `skipped` is final per version;
+    - a retry re-runs `failed` and `pending`;
+    - `force` re-runs all;
+    - a stale `step_version`/`prompt_revision` is shown as stale and re-runs only via `force` or "re-run stale";
+    - a failed step never blocks independent steps.
+  - `images.restart_collection(collection_id, scope)` runs in chunks of 1000 on `images_imports`.
+  - `images.reconcile` (beat, 5 min): `all_tenants()` distinct tenant ids, then per tenant `tenant_context` re-dispatches stale pending or expired steps, pending import items and stale jobs (Decision 6), and recomputes the stats of collections touched by deletes.
+  - `worker_ready` triggers one reconcile.
+  - `worker_runtime.py` provides the worker-side settings, store, engine and `load_extensions()` bootstrap.
+  - Output over `step_output_max_bytes` fails the step with `output_too_large`.
 
-**Tests** (`tests/test_executor.py`, eager Celery):
+**Tests** (eager unless noted):
 - `test_skipped_is_final_for_version`;
 - `test_exif_never_overrides_manual_location`;
+- `test_manual_edit_between_load_and_store_wins`;
 - `test_failed_step_does_not_block_independent`;
-- `test_lease_reclaims_after_30_min` (freezegun or an injected clock);
-- `test_concurrent_claim_runs_once` (Postgres only; skip on SQLite; two real connections, as in `fix/race-tests-real-connections`);
+- `test_dependants_dispatch_after_completion` (renditions run after a display-mutating fake step);
+- `test_lease_expiry_reclaims`;
+- `test_stale_lease_cannot_complete_or_publish_display`;
+- `test_concurrent_claim_runs_once` (Postgres; two real connections);
 - `test_force_reruns_all`;
 - `test_version_bump_marks_stale`;
 - `test_task_runs_in_enqueuer_tenant`;
+- `test_reconcile_scopes_each_tenant` (two tenants, no header);
+- `test_reconcile_redispatches_lost_message`;
 - `test_output_cap`.
 
-- [ ] Commit `feat(images): pipeline executor and tasks`
+- [ ] Commit `feat(images): pipeline executor`
 
-### Task 13: `quality` step and pipeline API
+### Task 11: `quality` step and pipeline API
 
-**Files:** Create `sm_images/steps/quality.py` (imports cv2 inside `run`; registers only when `find_spec("cv2")`), `sm_images/endpoints/api/pipeline.py`.
+**Files:** Create `sm_images/steps/quality.py` (cv2 imported inside; registered only if `find_spec("cv2")`) and `sm_images/endpoints/api/pipeline.py`.
 
 **Interfaces — Produces:**
-- `QualityParams(min_width=640, min_height=480, blur_threshold=100.0, dark_threshold=0.05, bright_threshold=0.95)`. Port the portal's `pipeline/quality.py` metrics.
+- `QualityParams(min_width=640,min_height=480,blur_threshold=100.0,dark_threshold=0.05,bright_threshold=0.95)`.
 - Routes:
-  - `GET /api/images/collections/{id}/pipeline` (config, the registered steps with their JSON schemas, per-step status counts, stale counts, `not_installed` steps);
-  - `PUT …/pipeline` (owner or manage);
-  - `POST …/pipeline/restart {scope}`;
+  - `GET /api/images/collections/{id}/pipeline` (config; the registered steps with their JSON schemas; status, stale and not-installed counts);
+  - `PUT …/pipeline` (owner or manage; validates);
+  - `POST …/pipeline/restart {scope: failed|stale|all}`;
   - `POST /api/images/images/{id}/reprocess {force}`.
 
-**Tests:**
-- `test_quality_metrics_known_fixture` (blurred versus sharp fixture);
-- `test_quality_absent_without_cv2` (monkeypatch `find_spec`);
-- pipeline API permission tests;
-- `test_not_installed_step_reported_never_scheduled`.
+**Tests:** `test_quality_metrics_known_fixture`, `test_quality_absent_without_cv2`, `test_not_installed_step_reported_never_scheduled`, and the permission tests.
 
 - [ ] Commit `feat(images): quality step and pipeline API`
 
-### Task 14: Pipeline config UI and result-view registry
+### Task 12: Image serving route
 
-**Files:**
-- Create: `sm_images/components/pipeline/*`, `sm_images/components/results/{registry.ts,GenericResultView.tsx,ResultView.tsx}`, `sm_images/images-steps.ts` (`import.meta.glob('../../*/*/images-steps.ts', { eager: true })` excluding itself; mirror pagebuilder's `puck-blocks.ts`), `sm_images/index.ts`.
-- Modify: `package.json` `exports` so `@simple-module-py/images` resolves `registerResultView`.
+**Files:** Create `sm_images/endpoints/api/serve.py`, `sm_images/endpoints/public.py`, `sm_images/urls.py`, `sm_images/cache.py`.
 
 **Interfaces — Produces:**
-- `registerResultView({kind: 'step'|'prompt_result'|'cross_check', id, component})`. It throws on a duplicate.
-- `<ResultView kind id output image? group?/>`, which falls back to `GenericResultView`.
-- The pipeline tab: step toggles, a params form generated from the JSON schema (use the same JSON-schema form approach records uses, if it has one; otherwise a small field renderer), stale banner and restart buttons.
+- `GET /api/images/images/{id}/r/{size}`, `…/display` and `…/original` stream from the store. The ETag is the object's generation-specific key plus its size. `If-None-Match` gives 304.
+- `cache_headers(request, collection, route)`:
+  - `public, max-age=31536000, immutable` only when **all** of these hold: the collection is public, the route is `r/` or `display`, it is served through the public twin, and no tenant was resolved from a request-specific source (CLAUDE.md #196 rule);
+  - otherwise `private, max-age=3600`;
+  - `…/original` of an image with a display copy is always `private, no-store`.
+- Headers are computed before the 304 decision.
+- `…/original` needs `can_view_original` when a display copy exists.
+- `rendition_url(image,size)` gives `…?v=<display_generation>`, behind `public_asset_base_url` for public collections.
 
-**Tests:** vitest `registry.test.ts` (fallback, duplicate throws) and `PipelineTab.test.tsx` (toggle sends PUT, not-installed warning shown).
+**Tests:** headers per case; a 304; a stranger and anonymous get 404 on private; the protected original returns 403 to an edit share and is `no-store` for the owner; an unknown size gives 404.
+
+- [ ] Commit `feat(images): access-checked image route`
+
+### Task 13: Console screens — collections, gallery, viewer, sharing
+
+**Files:** Create `sm_images/endpoints/views.py`, `sm_images/pages/{Collections,Collection,Image}.tsx`, `sm_images/components/{collections,gallery,viewer,share}/*`, `sm_images/hooks/{useCollections,useImages,useShares}.ts`, `sm_images/utils/api.ts`, and the locale keys.
+
+**Interfaces — Produces:**
+- Inertia pages `Images/Collections`, `Images/Collection` and `Images/Image`.
+- The gallery is a cursor grid of `small` renditions with filter chips.
+- The viewer shows the display copy, an original toggle (when the `can_view_original` prop is set), metadata and results. Results use the generic view until Task 14.
+- The share dialog lists, grants (view/edit) and revokes through `/api/sharing/shares`, with the share-candidates picker.
+- Collection tabs appear as their tasks land.
+
+**Tests:**
+- vitest page tests (`page-tests/`).
+- e2e `tests/e2e/images-core.spec.ts`: create a collection, upload two jpegs, see thumbnails (eager pipeline), open the viewer, share with a second user who then sees it. Standalone.
+
+- [ ] Commit `feat(images): console collections, gallery and viewer`
+
+### Task 14: Pipeline UI and result-view registry
+
+**Files:** Create `sm_images/components/pipeline/*`, `sm_images/components/results/{registry.ts,GenericResultView.tsx,ResultView.tsx}`, `sm_images/images-steps.ts` (`import.meta.glob('../../*/*/images-steps.ts', { eager: true })`, mirroring pagebuilder's `puck-blocks.ts`) and `sm_images/index.ts`. Modify `package.json` `exports`.
+
+**Interfaces — Produces:**
+- `registerResultView({kind:'step'|'prompt_result'|'cross_check', id, component})`, which throws on a duplicate.
+- `<ResultView …/>`, with a generic fallback.
+- The pipeline tab: toggles, a JSON-schema params form, a stale banner and restart actions.
+
+**Tests:** vitest `registry.test.ts` and `PipelineTab.test.tsx`.
 
 - [ ] Commit `feat(images): pipeline UI and result views`
 
 ### Task 15: Test plugin and janitor
 
-**Files:**
-- Create: `modules/images/tests/plugin_fixture/` (a tiny module `images_testplugin` with `register_step` of `testplugin.count_pixels` and a preset, registered in `register_settings`), `tests/test_plugin_e2e.py`.
-- Create: `sm_images/janitor.py` and its tasks `images.janitor` (beat, daily) and `images.purge_collection`.
+**Files:** Create `modules/images/tests/plugin_fixture/images_testplugin/{__init__.py,module.py,images_extensions.py}` (step `testplugin.count_pixels` and a preset `testplugin`), `tests/test_plugin_e2e.py`, `sm_images/janitor.py`.
 
 **Interfaces — Produces:**
-- `purge_expired(db, store, *, now, grace_days, dry_run=False, cap=1000) -> PurgeReport`. It locks rows and deletes every key of each image (original, display, renditions), the map key and job staging keys, then hard-deletes the rows. It also removes abandoned import staging older than the grace period.
-- Billing release hook point (Task 25 wires it).
+- `images.janitor` (beat, daily; per tenant).
+- `purge_expired(db, store, *, now, grace_days, dry_run=False, cap=1000) -> PurgeReport`. It row-locks, collects every key (original, all display generations, renditions, map, job staging), deletes them, hard-deletes the rows, and calls the billing release hook (Task 25).
+- `reap_intents(...)`: intents older than the grace period that no row references.
 
 **Tests:**
-- the plugin's step runs through the executor and its output is stored;
-- a registration in `on_startup` (too late) raises at boot;
-- uninstalling (unregister in a fresh app) leaves its results readable and `not_installed`;
+- the plugin's step runs and its output is stored;
+- registering outside `load_extensions` after the freeze raises;
+- a removed plugin leaves its results readable and its step `not_installed`;
 - `test_purge_removes_storage_and_rows`;
-- `test_purge_dry_run_changes_nothing`;
-- `test_purge_respects_grace`.
+- `test_purge_dry_run`;
+- `test_purge_respects_grace`;
+- `test_orphan_intent_reaped`.
 
 - [ ] Commit `feat(images): plugin end-to-end test and janitor`
 
@@ -413,81 +464,93 @@
 
 ## Phase 4 — Imports
 
-### Task 16: GeoJSON streaming import (hard)
+### Task 16: Safe fetch — SSRF guard, limiter, downloader (hard)
 
-**Files:** Create `sm_images/imports/{geojson_stream.py,mapping.py,checkpoint.py,jobs.py,filename_pattern.py}`, `sm_images/imports/tasks.py` (registered through `sm_images/tasks.py`).
-
-**Interfaces — Produces:**
-- `Mapping(url_prop, image_prop, lat_prop, lng_prop, datetime_prop, external_id_prop, group_key_prop, group_role_prop, filename_pattern)`.
-- `validate_and_count(source) -> int` (ijson; limits `geojson_max_features` and `geojson_max_bytes`).
-- `stage_source(job, data|url) -> key`.
-- Task `images.import_geojson(job_id)`:
-  - it streams features from the staged key and resumes at `checkpoint_index`;
-  - it checkpoints every 1000 features;
-  - base64 mode ingests inline;
-  - URL mode inserts `Download` rows with `external_id = external_id_prop or sha256(url)[:32]`, with a backpressure ceiling on pending downloads;
-  - it applies the group key and role from properties or the filename pattern, upserting `Group`.
-- Job controls: `POST /api/images/collections/{id}/imports` (kind geojson_url or geojson_base64, mapping), `GET …/imports`, `GET /api/images/imports/{job}`, and `POST …/{job}/{resume|restart|retry-failed}` and `DELETE`.
-
-**Tests** (port from the portal's `test_import_resume.py` and `test_import_dedup.py`; see the porting map):
-- `test_resume_after_kill_no_duplicates` (raise mid-stream, rerun the task);
-- `test_checkpoint_every_1000`;
-- `test_three_layer_dedupe`;
-- `test_feature_limit`;
-- `test_filename_pattern_groups`.
-
-- [ ] Commit `feat(images): GeoJSON streaming import`
-
-### Task 17: Downloads with the SSRF guard and rate limits (hard)
-
-**Files:** Create `sm_images/imports/{url_safety.py,downloader.py,rate_limit.py}`.
+**Files:** Create `sm_images/imports/{url_safety.py,fetch.py,rate_limit.py}`.
 
 **Interfaces — Produces:**
-- `resolve_public(url) -> (host, ips)`. It resolves DNS (`loop.getaddrinfo`) and rejects private, loopback, link-local, multicast, reserved and metadata addresses (169.254.169.254, fd00:ec2::254) and non-http(s) schemes.
-- An httpx transport that pins the resolved IP and re-checks each redirect, with at most 5 redirects.
-- `DomainLimiter(per_domain, total)` (asyncio semaphores).
-- Task `images.download_batch(job_id, ids)`:
-  - 429/5xx backoff honours `Retry-After` (capped);
-  - `max_image_bytes` is enforced while streaming;
-  - sniff, then `IngestService.add_image(source="import")`;
-  - per-row status/attempts/last_error.
-- `normalize_downloads` (off) re-encodes at 4000 px and quality 85 only when it's on.
+- `resolve_public(url)->(host, ips)` resolves with `getaddrinfo`. It rejects private, loopback, link-local, multicast, reserved, CGNAT and metadata addresses (169.254.169.254, fd00:ec2::254) and non-http(s) schemes.
+- `safe_stream(url, *, max_bytes, timeout) -> AsyncIterator[bytes]`. It pins the IP (SNI and Host intact), re-validates each redirect (at most 5) and enforces `max_bytes` while streaming.
+- `DomainLimiter(per_domain,total)`.
+- `backoff(response, attempt)` honours `Retry-After` (capped at 300 s).
 
 **Tests:**
-- `test_rejects_private_ip_after_dns` (a hostname resolving to 10.x, via a monkeypatched resolver);
+- `test_rejects_private_ip_after_dns`;
 - `test_redirect_to_private_rejected`;
-- `test_retry_after_honoured`;
+- `test_ipv6_mapped_v4_rejected`;
 - `test_oversize_stream_aborted`;
-- `test_per_domain_concurrency` (counting a fake transport);
-- `test_download_idempotent` (port the portal's `test_download_task_idempotency`).
+- `test_retry_after_honoured`;
+- `test_per_domain_concurrency`.
 
-- [ ] Commit `feat(images): safe downloads`
+- [ ] Commit `feat(images): safe fetch`
 
-### Task 18: ZIP import with limits
+### Task 17: GeoJSON import (URL and base64) (hard)
+
+**Files:** Create `sm_images/imports/{geojson_stream.py,mapping.py,jobs.py,filename_pattern.py,tasks.py}` and `sm_images/endpoints/api/imports.py`.
+
+**Interfaces — Produces:**
+- `Mapping(url_prop,image_prop,lat_prop,lng_prop,datetime_prop,external_id_prop,group_key_prop,group_role_prop,filename_pattern)`.
+- The source is staged to storage. A source URL goes through `safe_stream` with `geojson_max_bytes`.
+- `validate_and_count` (ijson, `geojson_max_features`).
+- `images.import_geojson(job_id, generation)`:
+  - it aborts if the job's generation moved on;
+  - it streams from `checkpoint_index`;
+  - per chunk of 1000 features, it upserts `ImportItem`s (`ON CONFLICT (job_id, feature_index) DO NOTHING`) and advances the checkpoint **in one transaction**;
+  - base64 items ingest inline, and an item that already has an `image_id` is skipped;
+  - URL items are dispatched to `images.download_items(job_id, ids)` with a backpressure ceiling;
+  - it upserts groups from properties or the pattern;
+  - it heartbeats `job.heartbeat_at`.
+- `external_id` defaults to `sha256(url)[:32]` (URL mode), or to `sha256(job_id:feature_index)` for base64 items without one.
+- `images.download_items` uses `safe_stream`, `DomainLimiter` and `backoff`, then calls `IngestService.add_image(source="import")`.
+- Job controls:
+  - `POST /api/images/collections/{id}/imports`;
+  - `GET …/imports`;
+  - `GET /api/images/imports/{job}`;
+  - `POST …/{job}/{resume|restart|retry-failed|pause}`, where `restart` bumps the generation and chunked set-based resets happen in 1000s;
+  - `DELETE`.
+
+**Tests** (port from the porting map):
+- `test_resume_after_kill_no_duplicates_base64_without_ids`;
+- `test_checkpoint_atomic_with_items`;
+- `test_restart_bumps_generation_old_task_aborts`;
+- `test_three_layer_dedupe`;
+- `test_feature_limit`;
+- `test_source_url_ssrf_rejected`;
+- `test_filename_pattern_groups`;
+- `test_download_idempotent`.
+
+- [ ] Commit `feat(images): GeoJSON import`
+
+### Task 18: ZIP import
 
 **Files:** Create `sm_images/imports/{zip_import.py,zip_safety.py}` (port the portal's `zip_safety.py`).
 
 **Interfaces — Produces:**
-- `POST /api/images/collections/{id}/imports/zip` returns `{job_id, upload}` (a presigned PUT through `DirectUploadBackend` when supported, else the multipart relay).
-- `POST /api/images/imports/{job}/extract`.
-- Limits: `zip_max_bytes`, `zip_max_entries`, `zip_max_entry_bytes`, `zip_max_total_bytes`, and the compression ratio.
-- Zip-slip guard.
-- An optional `metadata.json` applies as in the portal.
-- Filename-pattern grouping.
+- `POST /api/images/collections/{id}/imports/zip` returns `{job_id, upload}` (direct upload when supported, else relay).
+- `POST /api/images/imports/{job}/extract`:
+  - it calls `head` to verify the size ≤ `zip_max_bytes` and records the etag;
+  - it seals the job: status becomes `running`, and further part or complete calls return 409;
+  - extraction re-checks the etag and enforces `zip_max_entries`, `zip_max_entry_bytes`, `zip_max_total_bytes` and `zip_max_ratio` on the bytes **actually decompressed**;
+  - it applies a zip-slip guard, an optional `metadata.json` and pattern grouping.
+- Each entry becomes an `ImportItem` (so it resumes and dedupes like GeoJSON).
 
-**Tests:** `test_zip_slip_rejected`, `test_zip_total_uncompressed_cap`, `test_zip_entry_cap`, `test_zip_metadata_json_applied` and `test_zip_groups_by_pattern`.
+**Tests:**
+- `test_zip_slip_rejected`;
+- `test_zip_total_uncompressed_cap` (a lying header);
+- `test_zip_entry_cap`;
+- `test_replaced_object_after_seal_rejected`;
+- `test_zip_metadata_json_applied`;
+- `test_zip_groups_by_pattern`.
 
 - [ ] Commit `feat(images): ZIP import`
 
-### Task 19: Import wizard and jobs panel; auto-run everywhere
+### Task 19: Import wizard, jobs panel, auto-run
 
-**Files:**
-- Create: `sm_images/components/imports/*` (port the portal's `geojsonPreview.ts` client-side preview and property auto-mapping, split under 300 lines) and `sm_images/hooks/useImportJobs.ts`.
-- Modify: ingest so that every import path enqueues the pipeline and the `auto_run` prompts (prompt enqueue is a no-op hook until Task 22).
+**Files:** Create `sm_images/components/imports/*` (port `geojsonPreview.ts`, preview and auto-mapping) and `sm_images/hooks/useImportJobs.ts`. Modify ingest so that every path queues the `auto_run` prompts (a no-op until Task 22).
 
 **Tests:**
-- vitest `geojsonPreview.test.ts` (auto-mapping of common property names).
-- e2e `tests/e2e/images-import.spec.ts`: a base64 GeoJSON import of 3 features shows a completed job and 3 located images (standalone; the URL mode is covered by unit tests only, since e2e has no outbound network).
+- vitest `geojsonPreview.test.ts`.
+- e2e `tests/e2e/images-import.spec.ts`: a base64 GeoJSON of 3 features gives a completed job and 3 located images. Standalone.
 
 - [ ] Commit `feat(images): import wizard and jobs panel`
 
@@ -495,60 +558,55 @@
 
 ## Phase 5 — Anonymization
 
-### Task 20: `anonymize` step, originals permission and opt-in CI job
+### Task 20: `anonymize` step and the real-model CI job
 
-**Files:**
-- Create: `sm_images/steps/anonymize/{__init__.py,step.py,detectors.py,blur.py}` (the detectors import torch, facenet_pytorch and ultralytics lazily; register only when they're importable; weights from `anonymize_weights_path` or downloaded once to the cache dir).
-- Modify: the viewer's original toggle.
-- Create: `.github/workflows/images-models.yml` (`workflow_dispatch` plus a weekly schedule; installs `[anonymize]` and runs `pytest -m real_models`).
+**Files:** Create `sm_images/steps/anonymize/{__init__.py,step.py,detectors.py,blur.py}` (lazy torch, facenet-pytorch and ultralytics; registered only when importable; weights from the setting or downloaded once to a cache dir) and `.github/workflows/images-models.yml` (`workflow_dispatch` plus a weekly schedule; `uv sync --extra anonymize`; `pytest -m real_models`). Modify the viewer's original toggle.
 
 **Interfaces — Produces:**
 - `AnonymizeParams(faces=True, plates=True, padding=0.15, min_confidence=0.5)`.
-- A `Detector` protocol `detect(img) -> list[Region]` with an injectable fake.
-- Output `{regions:[…], faces:n, plates:n}`.
-- It writes a display copy via `ctx.write_display`. `mutates_display=True`, queue `images_gpu`.
+- A `Detector` protocol (injectable fake).
+- Output `{regions, faces, plates}`.
+- `mutates_display=True`, queue `images_gpu`.
 
-**Tests:**
-- with a fake detector: `test_display_written_original_untouched` (extends `test_original_never_rewritten`), `test_renditions_rerun_from_display` and `test_original_route_permission`;
-- `@pytest.mark.real_models test_real_face_blur` (deselected by default via `addopts`).
+**Tests:** `test_display_written_original_untouched`, `test_renditions_rerun_from_display`, `test_original_route_permission`, and `@pytest.mark.real_models test_real_face_blur`.
 
 - [ ] Commit `feat(images): anonymization writes a display copy`
 
 ---
 
-## Phase 6 — AI
+## Phase 6 — Groups and AI
 
 ### Task 21: Groups
 
-**Files:** Create `sm_images/endpoints/api/groups.py`, `sm_images/services/groups.py` (port the regroup logic from the portal's `regroup.py` and `crud_bag.py` with `group_roles` from the collection, not hardcoded), and `sm_images/components/groups/*`.
+**Files:** Create `sm_images/endpoints/api/groups.py`, `sm_images/services/groups.py` (port `regroup.py` and `crud_bag.py`, with roles from `collection.group_roles`) and `sm_images/components/groups/*`.
 
 **Interfaces — Produces:**
 - `GET/POST /api/images/collections/{id}/groups`, `GET/PATCH/DELETE /api/images/groups/{id}`.
 - `POST …/collections/{id}/regroup {pattern}`.
-- A group detail lists its members ordered by `collection.group_roles`.
+- Members are ordered by `group_roles`.
 
-**Tests:** role order from the collection; regroup by pattern; an `edit` share can manage groups.
+**Tests:** role order; regroup; an edit share manages groups and a view share can't.
 
 - [ ] Commit `feat(images): groups`
 
-### Task 22: `ai` metering callable, `classify` and image prompts (hard)
+### Task 22: `ai` metering callable, `classify`, image prompts (hard)
 
 **Files:**
-- `modules/ai/sm_ai/contracts/__init__.py` plus `modules/ai/sm_ai/metering.py`: add `async def consume_requests(tenant_id: str, qty: int = 1, *, idempotency_key: str, source: str) -> bool`. With billing installed it goes through billing's `UsageService` in its own session finished with `finalize_session`; without billing it returns True. Add tests in `modules/ai/tests/test_metering_outside_request.py`.
-- Create: `sm_images/steps/classify.py`, `sm_images/ai/{runner.py,schema_safety.py}`, `sm_images/endpoints/api/prompts.py`.
+- `modules/ai/sm_ai/{metering.py,contracts/__init__.py}`: add `async def consume_requests(tenant_id, qty=1, *, idempotency_key, source) -> bool`. It must work in a worker (no app): when `sm_billing` is importable it uses billing's usage service in its own session with `finalize_session`, and otherwise it returns True. Check billing's worker-side entry point in `modules/billing/docs/`. Tests go in `modules/ai/tests/test_metering_outside_request.py`. Bump the images `ai` extra floor.
+- Create: `sm_images/steps/classify.py`, `sm_images/ai/{runner.py,schema_safety.py,prompt_steps.py}`, `sm_images/endpoints/api/prompts.py`.
 
 **Interfaces — Produces:**
-- `ClassifyParams(vocabulary: list[str] = [], instruction: str = <neutral default>, max_side=1024)`.
-- `run_structured(instruction, output_schema | None, images: list[bytes]) -> (data|text, model_name)`, using `sm_ai.contracts.resolve_model()` and a pydantic-ai `Agent` (output type built from the JSON Schema after `schema_safety.check(schema)`, which caps depth, size and `$ref`).
-- `prompt:<id>` steps synthesised from `images_prompt` rows with image scope.
-- A `PromptResult` upsert that preserves the review history (last 5).
-- Prompts CRUD: `/api/images/collections/{id}/prompts`, `/api/images/prompts/{id}`, `POST …/prompts/{id}/run {scope: all|unprocessed|ids}`.
-- Billing exceeded fails the step with `quota_exceeded`, with no retry storm.
+- `ClassifyParams(vocabulary=[], instruction=<neutral default>, max_side=1024)`.
+- `run_structured(instruction, output_schema|None, images) -> (data|text, model_name)`. It uses `resolve_model()` and an `Agent` whose output type is built from the schema after `schema_safety.check`.
+- `prompt_steps.resolve(db, collection) -> list[Step]` (per execution; version = `prompt.revision`).
+- The `PromptResult` upsert resets the review to `unreviewed` and keeps the last 5 reviewed values in `history`.
+- Prompts CRUD and `POST /api/images/prompts/{id}/run {scope}`.
+- An exceeded quota fails the step with `quota_exceeded`, without retrying.
 
-**Tests:**
-- pydantic-ai `TestModel`/`FunctionModel` (no network);
+**Tests** (pydantic-ai `TestModel`/`FunctionModel`):
 - `test_classify_uses_resolve_model`;
 - `test_rerun_resets_review_keeps_history`;
+- `test_prompt_edit_marks_results_stale`;
 - `test_schema_safety_rejects_deep_schema`;
 - `test_metered_per_call`;
 - `test_quota_exceeded_fails_step`;
@@ -556,49 +614,48 @@
 
 - [ ] Commit `feat(images,ai): classify, prompts and metering outside requests`
 
-### Task 23: Group-scope prompts, presets and cross-check
+### Task 23: Group prompts, presets, cross-check, prompt manager UI
 
-**Files:** Create `sm_images/ai/group_run.py`, `sm_images/services/presets.py`, `sm_images/components/prompts/*` (port `CustomPipelineManager` and `SchemaFieldBuilder`).
+**Files:** Create `sm_images/ai/group_run.py`, `sm_images/services/presets.py` and `sm_images/components/prompts/*` (port `CustomPipelineManager` and `SchemaFieldBuilder`).
 
 **Interfaces — Produces:**
-- `run_group(prompt, group)`:
-  - it ensures member image-scope results, reusing stored ones with at most 4 concurrent;
-  - it makes one consolidation call at temperature 0;
-  - it calls `preset.cross_check(group_read, results)`, whose return value goes into `cross_check`, guarded by try/except as `{error}`.
-- `apply_preset(collection, preset_id)` seeds `pipeline_config`, `group_roles`, prompts (by `PromptSpec.id`, idempotent) and `preset_id`.
+- `run_group(prompt, group)`: member results with at most 4 concurrent, reusing stored ones; one consolidation call at temperature 0; then `preset.cross_check`, whose exceptions are stored as `{error}`.
+- `apply_preset(collection, preset_id)` is idempotent by `PromptSpec.id`.
 - `GET /api/images/presets`.
-- Group-scope inputs: images, results or both.
 
-**Tests:** consolidation is called once per group; members are reused; the cross-check is stored; a cross-check exception is captured; applying a preset is idempotent; the test plugin's preset is listed.
+**Tests:** one consolidation per group; members reused; the cross-check stored or its error captured; applying a preset is idempotent; the test plugin's preset is listed.
 
 - [ ] Commit `feat(images): group prompts, presets and cross-check`
 
 ### Task 24: Review queue
 
-**Files:** Create `sm_images/endpoints/api/review.py`, `sm_images/pages/Review.tsx`, `sm_images/components/review/*` (a schema-generated correction form, keyboard path: j/k move, a accept, r reject, e edit).
+**Files:** Create `sm_images/endpoints/api/review.py`, `sm_images/pages/Review.tsx` and `sm_images/components/review/*` (a schema-generated correction form; keys j/k, a, r, e).
 
 **Interfaces — Produces:**
-- `GET /api/images/collections/{id}/review?status=unreviewed&prompt=` (cursor).
-- `POST /api/images/prompt-results/{id}/review {action: accept|correct|reject, data?}`; `correct` validates `data` against the prompt's `output_schema` (422 otherwise).
-- `PromptResultReviewed` is published on commit.
+- `GET /api/images/collections/{id}/review?status=&prompt=` (cursor).
+- `POST /api/images/prompt-results/{id}/review {action, data?}`. `correct` validates `data` against the schema (422 otherwise).
+- `PromptResultReviewed` on commit.
 
 **Tests:**
-- API: an `edit` share can review and a `view` share can't; correction validation; the event after commit.
-- vitest: keyboard flow.
-- e2e `tests/e2e/images-review.spec.ts`: seed a prompt result through a test-only seeding script (no AI call) and accept one, then correct one.
+- API permissions and validation, and the event after commit.
+- vitest: the keyboard flow.
+- e2e `images-review.spec.ts`: seed results with a test-only script (no AI call), accept one and correct one.
 
 - [ ] Commit `feat(images): review queue`
 
-### Task 25: Billing storage counter
+### Task 25: Storage billing gauge
 
 **Files:** Create `sm_images/billing.py`.
 
 **Interfaces — Produces:**
-- Meter `images.storage_bytes` (defined in `on_startup` when `app.state.billing_meters` exists).
-- `check` on upload and import start; `consume` per stored object (original, display and renditions) with idempotency key `obj:<key>`; `release` on hard delete in the janitor.
+- Meter `images.storage_bytes` (gauge, unit bytes), defined in `on_startup` when `billing_meters` exists.
+- `check` on upload and import start (402 or `quota_exceeded`).
+- Per image, `reserve` then `commit` a hold for the total bytes, stored as `storage_hold_id`. On a display or rendition change it reserves and commits the new total and releases the old hold. If the hold fails, the new objects are deleted and the step fails with `quota_exceeded`.
+- The janitor releases the hold.
+- Worker-side access goes through the same seam as Task 22.
 - `None` billing means unlimited.
 
-**Tests:** over quota gives 402/`quota_exceeded` on upload; the janitor releases; no billing means no-op.
+**Tests:** over quota gives 402; a regenerated display moves the hold; a purge releases it; no billing means no-op.
 
 - [ ] Commit `feat(images): storage metering`
 
@@ -611,44 +668,48 @@
 **Files:** Create `sm_images/map/{points.py,pmtiles_build.py,tasks.py}` and `sm_images/endpoints/api/map.py`.
 
 **Interfaces — Produces:**
-- `GET /api/images/collections/{id}/points?bbox=&limit=` returns a GeoJSON FeatureCollection (id, captured_at, group_id only) under the policy.
-- `build_map(collection_id)`:
-  - it writes NDJSON and runs `tippecanoe -o out.pmtiles -l images -z14 -Z0 -r1 --cluster-distance=10 …` (port the portal's exact args);
-  - it stores at `map_key` and sets `map_built_at` and `map_image_count`;
-  - it fires on the thresholds (`map_rebuild_threshold_pct` or `_abs`) after `ImageProcessed`, and on `CollectionVisibilityChanged`.
-- `GET …/collections/{id}/map.pmtiles` with Range support (206, `Accept-Ranges`).
-- The health check reports a missing tippecanoe.
+- `GET /api/images/collections/{id}/points?bbox=&limit=` returns GeoJSON with only id, captured_at and group_id, filtered by the policy. It is also the `points` contract.
+- `build_map(collection_id)` writes NDJSON and runs tippecanoe with the portal's exact arguments (`-l images -Z0 -z14 -r1 --cluster-distance=10 …`), then stores the result under `map_key`.
+- Rebuilds trigger on the thresholds after `ImageProcessed` and on `CollectionVisibilityChanged`.
+- `GET …/collections/{id}/map.pmtiles` serves Range requests (206, `Accept-Ranges`) with Task 12's cache rules.
+- A health check reports when tippecanoe is missing.
+
+**Tests:** the bbox filter; points hide a private collection; `test_range_request_206`; `test_tiles_have_no_filenames` (skipped if tippecanoe is absent); the rebuild threshold.
+
+- [ ] Commit `feat(images): points and PMTiles`
+
+### Task 27: Map tab, public page, pagebuilder block
+
+**Files:** Create `sm_images/components/map/*` (`maplibre-gl` and `pmtiles` npm deps), `sm_images/pages/PublicCollection.tsx` (`/images/c/{slug}`, `bind_public`) and `sm_images/pagebuilder-blocks.ts` (an `ImageGallery` block; labels as keys via `localizeConfig.ts`; pagebuilder as an optional peer).
 
 **Tests:**
-- points bbox filter;
-- points hide a private collection;
-- `test_range_request_206`;
-- `test_tiles_have_no_filenames` (skip if tippecanoe is absent locally; CI installs it, so add `apt-get install -y tippecanoe` to the pytest jobs in `ci.yml`);
-- the rebuild threshold.
-
-- [ ] Commit `feat(images): points and PMTiles map`
-
-### Task 27: Map tab, public collection page, pagebuilder block
-
-**Files:**
-- Create: `sm_images/components/map/*` (MapLibre plus the `pmtiles` protocol; add the npm deps to `modules/images/package.json` and the root lock), `sm_images/pages/PublicCollection.tsx` (served at `/images/c/{slug}` via `bind_public`), `sm_images/pagebuilder-blocks.ts` (an `ImageGallery` block: collection picker, size and count; labels are keys resolved by `localizeConfig.ts`), and `pagebuilder` as an optional peer.
-
-**Tests:**
-- vitest for the block config.
-- e2e `tests/e2e/images-public.spec.ts`: publish a collection, view `/images/c/<slug>` anonymously and see thumbnails; the map tab renders a canvas.
+- vitest: the block config.
+- e2e `images-public.spec.ts`: publish, then view anonymously with thumbnails; the map tab renders a canvas.
 
 - [ ] Commit `feat(images): map tab, public page and gallery block`
 
 ---
 
-## Phase 8 — Docs and finish
+## Phase 8 — Verification and docs
 
-### Task 28: Module docs and repo notes
+### Task 28: Real-worker integration check
 
-**Files:** `modules/images/docs/{index.md,pipeline.md,writing-a-plugin.md,imports.md,access.md,worker.md,migrating-from-portal.md}` (worker settings from spec §3), `modules/images/README.md`, and `CLAUDE.md` (images in the tenancy, no-env and i18n lists; Celery now used; the CI extras rule from spec §9).
+Not eager. Start dev-services Redis, `make worker worker-imports worker-heavy beat` (after the headroom check) and the dev server. Then:
+- upload 3 images and see all steps complete;
+- run a 3-feature base64 GeoJSON import;
+- kill `worker-imports` mid-import, restart it, and see it resume without duplicates;
+- confirm that a plugin step runs in the worker (registry parity).
 
-**Done-check:** `make lint` (check_readmes, locales, file size, rules).
+Record the results in `modules/images/docs/worker.md` and stop everything afterwards. Fix whatever breaks.
+
+- [ ] Commit `test(images): real-worker integration notes`
+
+### Task 29: Module docs and repo notes
+
+**Files:** `modules/images/docs/{index,pipeline,writing-a-plugin,imports,access,worker,migrating-from-portal}.md` (worker settings from spec §3; the plugin example uses `images_extensions.py`), `modules/images/README.md` and `CLAUDE.md` (images in the tenancy, no-env and i18n lists; Celery; the CI extras rule; the `images_extensions.py` registration rule).
+
+**Done-check:** `make lint`.
 
 - [ ] Commit `docs(images): module documentation`
 
-Then `/ship` updates PR #272.
+Then `/ship`, which updates PR #272.
