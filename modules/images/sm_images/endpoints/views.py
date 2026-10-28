@@ -13,7 +13,7 @@ import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
-from simple_module_core.resources import ACTION_DELETE, ACTION_EDIT, ResourcePrincipal
+from simple_module_core.resources import ACTION_DELETE, ResourcePrincipal
 from simple_module_db.deps import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 from simple_module_hosting.resource_deps import resource_principal
@@ -25,6 +25,7 @@ from sm_images.access import (
     POLICY,
     CollectionView,
     ImageCollectionView,
+    can_edit,
     can_view_original,
 )
 from sm_images.contracts.schemas import collection_fields
@@ -45,10 +46,12 @@ def _out(row: Any, who: ResourcePrincipal) -> CollectionOut:
     return CollectionOut(**collection_fields(row), is_owner=who.user_id == row.owner_id)
 
 
-def _rights(who: ResourcePrincipal, collection: Any) -> dict[str, bool]:
+async def _rights(db: Any, who: ResourcePrincipal, collection: Any) -> dict[str, bool]:
+    # Delete and share are never granted by a share, so the in-memory ``can`` is
+    # exact; edit can come from a share row, so it asks the database.
     owner = POLICY.can(who, ACTION_DELETE, collection)
     return {
-        "can_edit": POLICY.can(who, ACTION_EDIT, collection),
+        "can_edit": await can_edit(db, who, collection),
         "can_manage": owner,
         "can_share": owner and who.has(constants.PERM_SHARE),
         "can_publish": who.has(constants.PERM_PUBLISH),
@@ -85,7 +88,7 @@ async def image(
     200."""
     row = await gallery.get(db, collection, image_id)
     protected = row.display_key is not None or await redaction_state.pending(db, collection, row)
-    rights = _rights(who, collection)
+    rights = await _rights(db, who, collection)
     return await inertia.render(
         constants.PAGE_IMAGE,
         {
@@ -102,13 +105,17 @@ async def image(
 
 @router.get("/{collection_id}", response_model=None)
 async def collection_page(
-    request: Request, collection: CollectionView, inertia: InertiaDep, who: Principal
+    request: Request,
+    collection: CollectionView,
+    inertia: InertiaDep,
+    who: Principal,
+    db: Any = Depends(get_db),
 ) -> InertiaResponse:
     return await inertia.render(
         constants.PAGE_COLLECTION,
         {
             "collection": _out(collection, who).model_dump(mode="json"),
-            **_rights(who, collection),
+            **await _rights(db, who, collection),
             # Where the uploader switches from one multipart request to a direct upload.
             "direct_upload_threshold": get_settings(request).direct_upload_threshold,
         },

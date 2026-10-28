@@ -186,6 +186,16 @@ def can_view_original(
     return owner or who.has(constants.PERM_ORIGINALS)
 
 
+async def can_edit(db: Any, who: ResourcePrincipal, collection: Collection) -> bool:
+    """Owner, an edit share or ``images.manage``. Asked of the database: a share
+    is a row, and ``POLICY.can`` on a loaded object cannot see it. (``can`` is
+    right only for delete and share, which no share ever grants.)"""
+    stmt = POLICY.filter(
+        who, ACTION_EDIT, select(Collection.id).where(Collection.id == collection.id)
+    )
+    return (await db.execute(stmt)).first() is not None
+
+
 async def public_collection(slug: str, db: Any = Depends(get_db)) -> Collection:
     """Dependency for the anonymous routes: a public, untrashed collection or 404.
 

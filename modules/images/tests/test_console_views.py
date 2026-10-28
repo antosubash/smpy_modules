@@ -199,3 +199,10 @@ async def test_an_edit_share_sees_step_output_and_a_view_share_does_not(uploads)
     ]
     assert view_run["output"] is None and view_run["error_message"] is None
     assert view_run["output_visible"] is False
+    # The screens' ``can_edit`` agrees: a share row is invisible to ``POLICY.can``.
+    for who, expected in (("edna", True), ("vic", False)):
+        head = {**as_user(who, ("images.view",)), **INERTIA}
+        assert props(await uploads.get(f"{VIEWS}/{cid}", headers=head))["can_edit"] is expected
+        assert (
+            props(await uploads.get(f"{VIEWS}/images/{iid}", headers=head))["can_edit"] is expected
+        )

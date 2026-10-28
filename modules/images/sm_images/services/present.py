@@ -5,11 +5,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from simple_module_core.resources import ACTION_EDIT, ResourcePrincipal
+from simple_module_core.resources import ResourcePrincipal
 from sqlalchemy import select
 
-from sm_images import constants, urls
-from sm_images.access import POLICY
+from sm_images import access, constants, urls
 from sm_images.models import Collection, Image, Rendition, StepRun
 from sm_images.schemas.image import ImageOut, StepRunOut
 
@@ -44,15 +43,6 @@ async def present_one(db: Any, collection: Collection, image: Image) -> ImageOut
     return (await present(db, collection, [image]))[0]
 
 
-async def can_edit(db: Any, who: ResourcePrincipal, collection: Collection) -> bool:
-    """Owner, an edit share or ``images.manage``. Asked of the database: a share
-    is a row, and ``POLICY.can`` on a loaded object cannot see it."""
-    stmt = POLICY.filter(
-        who, ACTION_EDIT, select(Collection.id).where(Collection.id == collection.id)
-    )
-    return (await db.execute(stmt)).first() is not None
-
-
 async def present_detail(
     db: Any, collection: Collection, image: Image, who: ResourcePrincipal
 ) -> ImageOut:
@@ -62,7 +52,7 @@ async def present_detail(
     are for those who can edit the collection; a viewer gets the step, its
     status and its error code only."""
     out = await present_one(db, collection, image)
-    detailed = await can_edit(db, who, collection)
+    detailed = await access.can_edit(db, who, collection)
     stmt = select(StepRun).where(StepRun.image_id == image.id).order_by(StepRun.step)
     out.step_runs = [
         StepRunOut(

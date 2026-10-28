@@ -95,6 +95,8 @@ async def reprocess_image(
     who: Principal,
     db=Depends(get_db),
 ) -> dict[str, Any]:
+    # Delete is never granted by a share, so the in-memory ``can`` is exact.
+    # Delete is never granted by a share, so the in-memory ``can`` is exact.
     if body.force and not POLICY.can(who, ACTION_DELETE, collection):
         raise Forbidden("only the owner or a manager can force a full re-run")
     image = await gallery.get(db, collection, image_id)
