@@ -96,7 +96,7 @@
 - `uv run pytest -n 8 host/tests`;
 - each module's `test_framework_pins.py`.
 
-- [ ] Commit `deps: framework 0.0.41`
+- [x] Commit `deps: framework 0.0.41`
 
 ---
 
