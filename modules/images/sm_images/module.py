@@ -18,6 +18,7 @@ from simple_module_core.menu import MenuRegistry
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
+from simple_module_core.resources import ResourceTypeRegistry
 
 from sm_images import constants
 
@@ -34,7 +35,7 @@ class ImagesModule(ModuleBase):
         name=constants.MODULE_NAME,
         route_prefix=constants.ROUTE_PREFIX_API,
         view_prefix=constants.VIEW_PREFIX,
-        depends_on=[constants._MODULE_SETTINGS],
+        depends_on=list(constants.DEPENDS_ON),
         version=_VERSION,
         # The framework API version (1.0.0) is decoupled from the framework
         # package version (0.0.x) - this range is correct as written.
@@ -72,6 +73,11 @@ class ImagesModule(ModuleBase):
         registry.add_group(
             constants.PERM_GROUP, list(constants.PERMISSIONS), label_key=constants.PERM_GROUP_KEY
         )
+
+    def register_resource_types(self, registry: ResourceTypeRegistry) -> None:
+        from sm_images import resource_types
+
+        resource_types.register(registry)
 
     def register_menu_items(self, registry: MenuRegistry) -> None:
         from sm_images import menu
@@ -128,11 +134,14 @@ class ImagesModule(ModuleBase):
 
     async def on_startup(self, app: FastAPI) -> None:
         """Everything that needs the hydrated settings and an open database:
-        the tenancy mode and the fail-closed guard."""
-        from sm_images import tenancy
+        the tenancy mode, the fail-closed guard, and the session factory object
+        intents commit through on their own."""
+        from sm_images import intents, tenancy
 
         setattr(app.state, constants.MODULE_ATTR, self)
         tenancy.configure(app)
         db = getattr(getattr(app.state, "sm", None), "db", None)
         if (session_class := getattr(db, "sync_session_class", None)) is not None:
             tenancy.install_guard(session_class)
+        if (factory := getattr(db, "session_factory", None)) is not None:
+            intents.use_session_factory(factory)

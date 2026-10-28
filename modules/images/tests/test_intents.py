@@ -36,3 +36,38 @@ async def test_explicit_factory_and_repeat_is_idempotent(images_app):
     async with object_intent(KEYS[:1], session_factory=db_state.session_factory):
         pass
     assert await _keys(db_state) == set(KEYS[:1])
+
+
+async def test_caller_rollback_drops_its_row_but_keeps_the_intent(tmp_path):
+    """The realistic order: the handler has already read, writes the intent, then
+    inserts and flushes the referencing row, then fails and rolls back.
+
+    On a file database (one connection per session, like a host) so the intent's
+    commit cannot ride along with, or be undone by, the caller's transaction -
+    the shared ``StaticPool`` connection would hide exactly that.
+    """
+    from sm_images.models import Collection
+
+    from tests.pg_support import make_db_state
+
+    db_state = await make_db_state(file=tmp_path / "intents.db")
+    try:
+        use_session_factory(db_state.session_factory)
+        async with db_state.session_factory() as caller:
+            await caller.execute(select(Collection.id))
+            async with object_intent(KEYS):
+                caller.add(Collection(slug="c", name="c", owner_id="u"))
+                await caller.flush()
+            await caller.rollback()
+        async with db_state.session_factory() as s:
+            assert (await s.execute(select(Collection.id))).all() == []
+        assert await _keys(db_state) == set(KEYS)
+    finally:
+        await db_state.engine.dispose()
+
+
+def test_the_default_factory_does_not_leak_between_tests():
+    """Reset by the autouse fixture in ``conftest`` after every test."""
+    from sm_images import intents
+
+    assert intents._default_factory is None

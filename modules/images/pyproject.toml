@@ -15,6 +15,10 @@ dependencies = [
     "simple_module_hosting>=0.0.41,<0.1",
     "simple_module_inertia>=0.0.41,<0.1",
     "simple_module_settings>=0.0.41,<0.1",
+    # depends_on: shares (the access policy), the storage backend, the workers.
+    "simple_module_sharing>=0.0.41,<0.1",
+    "simple_module_file_storage>=0.0.41,<0.1",
+    "simple_module_background_tasks>=0.0.41,<0.1",
     "pydantic-settings>=2.0",
     "httpx>=0.27",
     "Pillow>=10.0",
@@ -33,7 +37,6 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
     "simple_module_test>=0.0.41,<0.1",
-    "simple_module_file_storage>=0.0.41,<0.1",
 ]
 
 # Heavy processors are extras, imported only inside the step that needs them:

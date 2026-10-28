@@ -48,6 +48,15 @@ def _default_tenant(request):
 
 
 @pytest.fixture(autouse=True)
+def _reset_intent_factory(monkeypatch):
+    """``use_session_factory`` sets a process-wide default; a test that sets it
+    must not hand its (disposed) factory to the next one."""
+    from sm_images import intents
+
+    monkeypatch.setattr(intents, "_default_factory", None)
+
+
+@pytest.fixture(autouse=True)
 def _arm_database_reset():
     """Every test starts from an empty database (a no-op on SQLite)."""
     arm_reset()

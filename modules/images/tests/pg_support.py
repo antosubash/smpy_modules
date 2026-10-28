@@ -51,19 +51,26 @@ arm_reset = _pg.arm_reset
 def _extra_metadata() -> list[Any]:
     """Table sets that are not ``sm_images``'s but that the harness needs.
 
+    ``sharing`` always: the access policy's ``EXISTS`` names its table.
     ``permissions`` only when it is installed — see the import guard in
     :mod:`tests.app_harness` for why its table has to exist even though this
     module's ``Base`` never declares it.
     """
+    from sharing.models import Base as SharingBase
+
     try:
         from permissions.models import Base as PermissionsBase
     except ImportError:  # pragma: no cover - exercised only without `permissions`
-        return []
-    return [PermissionsBase.metadata]
+        return [SharingBase.metadata]
+    return [SharingBase.metadata, PermissionsBase.metadata]
 
 
-async def make_db_state() -> Any:
-    """A ``DatabaseState`` with an empty images schema, on either backend."""
+async def make_db_state(*, file: Path | None = None) -> Any:
+    """A ``DatabaseState`` with an empty images schema, on either backend.
+
+    ``file`` gives SQLite one connection per session (see the shared helper),
+    for a test about two sessions' transactions.
+    """
     from sm_images.models import Base
 
-    return await _pg.make_db_state(Base.metadata, *_extra_metadata())
+    return await _pg.make_db_state(Base.metadata, *_extra_metadata(), file=file)

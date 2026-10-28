@@ -44,6 +44,18 @@ MENU_GROUP_KEY: Final = "images.menu.group_images"
 #: guarantees ``app.state.settings.module_registry`` exists by the time
 #: ``register_settings`` runs - the host topo-sorts modules on this field.
 _MODULE_SETTINGS: Final = "Settings"
+#: The framework modules images builds on, by ``ModuleMeta.name``: shares
+#: (``sharing.policy`` in the access policy), the storage backend, and the
+#: background workers the pipeline runs on.
+_MODULE_SHARING: Final = "Sharing"
+_MODULE_FILE_STORAGE: Final = "FileStorage"
+_MODULE_BACKGROUND_TASKS: Final = "BackgroundTasks"
+DEPENDS_ON: Final = (
+    _MODULE_SETTINGS,
+    _MODULE_SHARING,
+    _MODULE_FILE_STORAGE,
+    _MODULE_BACKGROUND_TASKS,
+)
 
 NOT_FOUND_DETAIL: Final = "Not found"
 """The one body an unknown, foreign or unbound-tenant public request gets."""

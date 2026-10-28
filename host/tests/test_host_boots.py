@@ -149,3 +149,25 @@ def test_no_module_subscribes_to_record_events(booted_host):
             }
 
     assert asyncio.run(listening_inside_lifespan()) == set()
+
+
+def test_images_object_intents_work_in_the_real_app(booted_host):
+    """``on_startup`` hands images the host's session factory, so a handler's
+    bare ``object_intent(keys)`` writes to the host database."""
+    from sm_images.intents import object_intent, use_session_factory
+    from sm_images.models import ObjectIntent
+    from sqlalchemy import select
+
+    app = booted_host
+
+    async def write_and_read() -> list[str]:
+        async with app.router.lifespan_context(app):
+            async with object_intent(["images/default/boot-check"]):
+                pass
+            async with app.state.sm.db.session_factory() as session:
+                return list((await session.execute(select(ObjectIntent.key))).scalars())
+
+    try:
+        assert asyncio.run(write_and_read()) == ["images/default/boot-check"]
+    finally:
+        use_session_factory(None)

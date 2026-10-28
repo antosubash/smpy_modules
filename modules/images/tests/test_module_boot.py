@@ -70,3 +70,21 @@ async def test_harness_serves_the_empty_routers(client, storage):
     assert client.app.state.file_storage.backend is storage
     # No endpoints yet: the tenant binding and CSRF dependencies guard an empty router.
     assert (await client.get("/api/images/collections")).status_code == 404
+
+
+async def test_on_startup_installs_the_intent_session_factory(images_app):
+    """Handlers call ``object_intent(keys)`` with no factory: ``on_startup`` must
+    have set the default to the app's own."""
+    from sm_images import intents
+    from sm_images.models import ObjectIntent
+    from sqlalchemy import select
+
+    app, db_state = images_app
+    await ImagesModule().on_startup(app)
+    assert intents._default_factory is db_state.session_factory
+    async with intents.object_intent(["images/default/boot"]):
+        pass
+    async with db_state.session_factory() as s:
+        assert (await s.execute(select(ObjectIntent.key))).scalars().all() == [
+            "images/default/boot"
+        ]
