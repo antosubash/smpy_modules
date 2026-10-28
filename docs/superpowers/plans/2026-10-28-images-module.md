@@ -195,7 +195,7 @@
 - `delete_keys` ignores missing keys;
 - an intent survives a rolled-back caller transaction and is cleared on commit.
 
-- [ ] Commit `feat(images): storage adapter`
+- [x] Commit `feat(images): storage adapter`
 
 ### Task 5: Access policy and sharing
 
