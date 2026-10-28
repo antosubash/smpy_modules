@@ -408,7 +408,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 
 **Tests:** headers per case; a 304; a stranger and anonymous get 404 on private; the protected original returns 403 to an edit share and is `no-store` for the owner; an unknown size gives 404.
 
-- [ ] Commit `feat(images): access-checked image route`
+- [x] Commit `feat(images): access-checked image route`
 
 ### Task 13: Console screens — collections, gallery, viewer, sharing
 
