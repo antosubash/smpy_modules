@@ -178,7 +178,7 @@
 
 **Done-check:** the tests pass; `alembic check` on SQLite and Postgres; one head.
 
-- [ ] Commit `feat(images): data model and migration`
+- [x] Commit `feat(images): data model and migration`
 
 ### Task 4: Storage adapter and object intents
 
