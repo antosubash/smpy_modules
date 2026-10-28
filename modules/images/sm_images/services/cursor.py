@@ -10,7 +10,7 @@ from __future__ import annotations
 import base64
 import binascii
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import and_, or_
@@ -32,7 +32,10 @@ def decode(cursor: str) -> tuple[datetime, uuid.UUID]:
     try:
         padded = cursor + "=" * (-len(cursor) % 4)
         stamp, _, ident = base64.urlsafe_b64decode(padded).decode().partition(_SEP)
-        return datetime.fromisoformat(stamp), uuid.UUID(ident)
+        moment = datetime.fromisoformat(stamp)
+        if moment.tzinfo is None:  # a forged cursor must not reach timestamptz naive
+            moment = moment.replace(tzinfo=UTC)
+        return moment, uuid.UUID(ident)
     except (ValueError, binascii.Error, UnicodeDecodeError) as exc:
         raise Invalid(constants.BAD_CURSOR_DETAIL) from exc
 

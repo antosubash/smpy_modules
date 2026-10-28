@@ -18,6 +18,7 @@ from simple_module_hosting.resource_deps import resource_principal
 
 from sm_images import constants, events
 from sm_images.access import CollectionEdit, CollectionOwner, CollectionView
+from sm_images.contracts.schemas import collection_fields
 from sm_images.deps import require_create, require_view
 from sm_images.models import Collection
 from sm_images.schemas.collection import (
@@ -40,8 +41,6 @@ def _bus(request: Request) -> object:
 
 
 def out(row: Collection, who: ResourcePrincipal) -> CollectionOut:
-    from sm_images.contracts.schemas import collection_fields
-
     return CollectionOut(**collection_fields(row), is_owner=who.user_id == row.owner_id)
 
 

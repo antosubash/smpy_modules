@@ -224,3 +224,43 @@ async def test_no_event_when_the_request_fails(client, seen):
     )
     assert r.status_code == 403
     assert seen == []
+
+
+MANAGER_ONLY = (*WRITER, "images.manage")
+
+
+async def test_manage_alone_satisfies_publish(client):
+    """The tenant bypass: ``images.manage`` publishes without ``images.publish``."""
+    r = await create(client, who="max", perms=MANAGER_ONLY, visibility="public")
+    assert r.status_code == 201, r.text
+    made = (await create(client, who="max", perms=MANAGER_ONLY, name="Two")).json()
+    r = await client.put(
+        f"{BASE}/{made['id']}/visibility",
+        json={"visibility": "internal"},
+        headers=h("max", MANAGER_ONLY),
+    )
+    assert r.status_code == 200
+    assert r.json()["visibility"] == "internal"
+
+
+async def test_a_failure_after_emit_publishes_nothing(client, seen, monkeypatch):
+    """The event is queued on the session; the request then fails and rolls back."""
+    from sm_images.endpoints.api import collections as routes
+
+    made = (await create(client, perms=PUBLISHER)).json()
+
+    def boom(*_a, **_k):
+        raise RuntimeError("after emit")
+
+    monkeypatch.setattr(routes, "out", boom)
+    with pytest.raises(RuntimeError):
+        await client.put(
+            f"{BASE}/{made['id']}/visibility",
+            json={"visibility": "public"},
+            headers=h("olga", PUBLISHER),
+        )
+    assert seen == []
+    async with client.db_state.session_factory() as s:
+        assert (
+            await s.execute(select(Collection.visibility))
+        ).scalars().one() == Visibility.PRIVATE

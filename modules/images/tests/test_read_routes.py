@@ -101,9 +101,12 @@ async def test_the_owner_can_still_read_what_the_stranger_cannot(client, secret,
     """The other half: the 404 above is the policy, not a broken route."""
     if route.needs == PUBLIC:
         pytest.skip("anonymous surface: private is private for its owner too")
+    from tests.test_share_candidates import FakeDirectory, person
+
+    client.app.state.user_directory = FakeDirectory([person("vic")])
     owner = as_user("olga", ("images.view", "images.create"))
     got = await client.request(route.method, fill(route, secret), headers=owner)
-    assert got.status_code in (200, 503), got.text  # 503: no user directory in the harness
+    assert got.status_code == 200, got.text
     if route.needs == LIST:
         assert secret["slug"] in got.text
 

@@ -122,3 +122,32 @@ async def test_a_multi_tenant_host_with_no_membership_store_offers_nobody(two_te
     r = await client.get(f"{BASE}/{cid}/share-candidates", headers=owner)
     assert r.status_code == 200
     assert r.json() == []
+
+
+@pytest.mark.unbound_tenant
+async def test_a_single_detected_app_with_an_upstream_tenant_still_filters(client):
+    """A mis-detected SINGLE host (or mounted child) whose parent resolved a
+    tenant must not list other tenants' users."""
+    from starlette.middleware.base import BaseHTTPMiddleware
+
+    class Upstream(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            if (tenant := request.headers.get("X-Up")) is not None:
+                request.state.tenant_id = tenant
+            return await call_next(request)
+
+    client.app.add_middleware(Upstream)
+    client.app.state.user_directory = FakeDirectory([person("olga"), person("amy"), person("bob")])
+
+    async def tenant_members(db, tenant_id, ids):
+        return {i for i in ids if i == user_uuid("amy")}
+
+    client.app.state.tenant_members = tenant_members
+    owner = {**as_user("olga", WRITER), "X-Up": ACME}
+    cid = await make(client, owner)
+    r = await client.get(f"{BASE}/{cid}/share-candidates", headers=owner)
+    assert [c["email"] for c in r.json()] == ["amy@example.com"]
+
+    del client.app.state.tenant_members  # no store: fail closed, not "everyone"
+    r = await client.get(f"{BASE}/{cid}/share-candidates", headers=owner)
+    assert r.json() == []

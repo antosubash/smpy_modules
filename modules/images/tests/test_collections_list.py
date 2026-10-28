@@ -113,3 +113,52 @@ async def test_bad_cursor_is_422(client, cursor):
 @pytest.mark.parametrize("limit", [0, 101])
 async def test_limit_is_bounded(client, limit):
     assert (await client.get(BASE, params={"limit": limit}, headers=h("olga"))).status_code == 422
+
+
+async def test_an_expired_share_is_not_shared(client):
+    from datetime import UTC, datetime, timedelta
+
+    await create(client, who="sam", name="theirs", slug="theirs")
+    async with client.db_state.session_factory() as s:
+        coll = (await s.execute(select(Collection))).scalars().one()
+        s.add(share(coll, "olga", "view", expires_at=datetime.now(UTC) - timedelta(days=1)))
+        await s.commit()
+    assert await slugs(client, filter="shared") == []
+    assert await slugs(client) == []
+
+
+async def test_equal_created_at_ties_break_by_id_across_a_page_boundary(client):
+    from datetime import UTC, datetime
+
+    from sqlalchemy import update
+
+    for n in range(5):
+        await create(client, name=f"t{n}", slug=f"t{n}")
+    async with client.db_state.session_factory() as s:
+        await s.execute(update(Collection).values(created_at=datetime(2026, 1, 1, tzinfo=UTC)))
+        await s.commit()
+    got: list[str] = []
+    cursor = None
+    while True:
+        params = {"limit": 2, **({"cursor": cursor} if cursor else {})}
+        body = (await client.get(BASE, params=params, headers=h("olga"))).json()
+        got += [i["id"] for i in body["items"]]
+        cursor = body["next_cursor"]
+        if cursor is None:
+            break
+    assert len(got) == 5
+    assert len(set(got)) == 5
+    assert got == sorted(got, reverse=True)
+
+
+def test_a_naive_cursor_is_read_as_utc():
+    import base64
+    import uuid
+    from datetime import UTC
+
+    from sm_images.services import cursor
+
+    raw = f"2026-01-01T00:00:00|{uuid.uuid4()}".encode()
+    forged = base64.urlsafe_b64encode(raw).decode().rstrip("=")
+    moment, _ = cursor.decode(forged)
+    assert moment.tzinfo is UTC

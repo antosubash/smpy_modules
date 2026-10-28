@@ -14,6 +14,7 @@ from sm_images import constants
 from sm_images.access import COLLECTION_RESOURCE, POLICY
 from sm_images.errors import Conflict, Forbidden, Invalid
 from sm_images.models import Collection, Visibility
+from sm_images.models.collection import COLLECTION_SLUG_INDEX
 from sm_images.services import cursor as cursors
 from sm_images.services.slugs import slugify
 
@@ -29,7 +30,9 @@ _SHARES = share_exists_for(COLLECTION_RESOURCE, Collection.id)
 
 
 def require_publish(who: ResourcePrincipal, target: Visibility) -> None:
-    if target is not Visibility.PRIVATE and not who.has(constants.PERM_PUBLISH):
+    if target is not Visibility.PRIVATE and not (
+        who.has(constants.PERM_PUBLISH) or who.has(constants.PERM_MANAGE)
+    ):
         raise Forbidden(constants.PUBLISH_REQUIRED_DETAIL)
 
 
@@ -75,6 +78,8 @@ async def create(
     try:
         await db.flush()
     except IntegrityError as exc:  # lost a race for the slug
+        if COLLECTION_SLUG_INDEX not in str(exc.orig) and "slug" not in str(exc.orig):
+            raise
         raise Conflict(constants.SLUG_TAKEN_DETAIL) from exc
     return row
 
