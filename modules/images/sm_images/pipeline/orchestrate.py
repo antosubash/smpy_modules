@@ -23,6 +23,7 @@ Both modes run the same claim, work and completion code.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import sys
 import uuid
@@ -72,6 +73,13 @@ class RunStep:
 
 
 _drain: ContextVar[Any] = ContextVar("sm_images_drain", default=None)
+# Set while an outermost drain runs inside a durable delivery, so the tasks it
+# (or anything it calls) spawns inherit "inside a delivery" with the context.
+_IN_DELIVERY: ContextVar[bool] = ContextVar("sm_images_in_delivery", default=False)
+
+#: Longest an eager drain waits for durable deliveries (see ``_drain_durable``).
+EAGER_DRAIN_TIMEOUT = 5.0
+_orphans: set[asyncio.Future[Any]] = set()  # shielded drains outliving their wait
 
 
 def utcnow() -> datetime:
@@ -99,6 +107,9 @@ async def submit(runtime: Runtime, items: Iterable[Any]) -> None:
         return
     queue = _Queue(items)
     reset = _drain.set(queue)
+    # Reset on exit: an inline delivery runs on a request's task, and the
+    # request's own later submits must still wait for their deliveries.
+    mark = _IN_DELIVERY.set(_in_delivery())
     first: BaseException | None = None
     try:
         while True:
@@ -117,6 +128,7 @@ async def submit(runtime: Runtime, items: Iterable[Any]) -> None:
                 break
     finally:
         queue.closed = True  # a later submit from a copied context starts afresh
+        _IN_DELIVERY.reset(mark)
         _drain.reset(reset)
     if first is not None:
         raise first
@@ -145,7 +157,15 @@ def _in_delivery() -> bool:
     on that very delivery (or the dispatcher lock it holds), so the caller
     leaves delivery to the dispatcher already running. Code that merely runs
     while some *unrelated* delivery is in flight is not inside one, and waits.
+
+    A task does not inherit its creator's frames, so a task spawned inside a
+    handler is invisible to the walk. ``_IN_DELIVERY`` covers the ones spawned
+    while images code runs inside a delivery; the rest (a handler that spawns
+    a submitting task before calling into images) are caught only by the
+    ``EAGER_DRAIN_TIMEOUT`` bound in :func:`_drain_durable`.
     """
+    if _IN_DELIVERY.get():
+        return True
     target = _deliver_code()
     frame = sys._getframe(1)
     while frame is not None:
@@ -159,13 +179,31 @@ async def _drain_durable(runtime: Runtime) -> bool:
     """Wait for the eager durable deliveries the drained work published (the
     web outbox transport starts them as tasks from ``after_commit``), so an
     eager caller returns with ``ImageProcessed``'s durable subscribers done.
-    ``False`` when there was nothing to wait for (or it must not wait)."""
+    ``False`` when there was nothing to wait for (or it must not wait).
+
+    The wait is bounded and shielded: a submit from a task spawned inside a
+    durable handler cannot tell it is in one, and its ``drain()`` gathers the
+    parent delivery that is awaiting it. After ``EAGER_DRAIN_TIMEOUT`` it gives
+    up (the deliveries carry on uncancelled), turning a deadlock into a delay.
+    """
     transport = getattr(runtime.bus(), "durable_transport", None)
     drain = getattr(transport, "drain", None)
     if drain is None or _in_delivery():
         return False
+    waiting = asyncio.ensure_future(drain())
     try:
-        await drain()
+        await asyncio.wait_for(asyncio.shield(waiting), timeout=EAGER_DRAIN_TIMEOUT)
+    except TimeoutError:
+        _orphans.add(waiting)
+        waiting.add_done_callback(_orphans.discard)
+        logger.warning(
+            "images.pipeline.eager_drain_timeout after %ss: durable deliveries are "
+            "still running, most likely because this submit runs in a task spawned "
+            "inside a durable handler and is waiting on its own parent delivery; "
+            "returning without them",
+            EAGER_DRAIN_TIMEOUT,
+        )
+        return False
     except Exception:
         logger.exception("images.pipeline.durable_drain_failed")
     return True
