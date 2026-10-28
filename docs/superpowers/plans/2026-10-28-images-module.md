@@ -374,7 +374,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 - `test_reconcile_redispatches_lost_message`;
 - `test_output_cap`.
 
-- [ ] Commit `feat(images): pipeline executor`
+- [x] Commit `feat(images): pipeline executor`
 
 ### Task 11: `quality` step and pipeline API
 
@@ -390,7 +390,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 
 **Tests:** `test_quality_metrics_known_fixture`, `test_quality_absent_without_cv2`, `test_not_installed_step_reported_never_scheduled`, and the permission tests.
 
-- [ ] Commit `feat(images): quality step and pipeline API`
+- [x] Commit `feat(images): quality step and pipeline API`
 
 ### Task 12: Image serving route
 
