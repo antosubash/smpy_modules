@@ -210,7 +210,13 @@ def plan(cfg: PipelineConfig, runs: dict[str, RunView]) -> Plan:
         if sid in cyclic:
             settle(sid, StepStatus.FAILED, INVALID_PIPELINE)
             continue
-        states = [_dep_state(state.get(d)) for d in effective_deps(cfg, sid)]
+        # A prerequisite the collection does not enable is unavailable whatever
+        # its old run says: a completed result from before it was disabled
+        # does not satisfy anything under this configuration.
+        states = [
+            _dep_state(state.get(d)) if d in enabled else "unavailable"
+            for d in effective_deps(cfg, sid)
+        ]
         code = _blocked_code(states)
         if code is not None:
             settle(sid, StepStatus.SKIPPED, code)

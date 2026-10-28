@@ -23,6 +23,7 @@ Both modes run the same claim, work and completion code.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from collections import deque
@@ -70,7 +71,7 @@ class RunStep:
     token: uuid.UUID
 
 
-_drain: ContextVar[deque[Any] | None] = ContextVar("sm_images_drain", default=None)
+_drain: ContextVar[Any] = ContextVar("sm_images_drain", default=None)
 
 
 def utcnow() -> datetime:
@@ -93,40 +94,69 @@ async def submit(runtime: Runtime, items: Iterable[Any]) -> None:
     once the queue is empty, so a test sees it and a request logs it.
     """
     active = _drain.get()
-    if active is not None:
+    if active is not None and not active.closed:
         active.extend(items)
         return
-    queue: deque[Any] = deque(items)
+    queue = _Queue(items)
     reset = _drain.set(queue)
     first: BaseException | None = None
     try:
-        while queue:
-            item = queue.popleft()
-            try:
-                with tenant_context(item.tenant):
-                    await _execute(runtime, item)
-            except Exception as exc:
-                logger.exception("images.pipeline.eager_item_failed item=%r", item)
-                first = first or exc
+        while True:
+            while queue:
+                item = queue.popleft()
+                try:
+                    with tenant_context(item.tenant):
+                        await _execute(runtime, item)
+                except Exception as exc:
+                    logger.exception("images.pipeline.eager_item_failed item=%r", item)
+                    first = first or exc
+            # Deliveries started by this work copied this context, so the
+            # reruns their handlers submit land in ``queue``: keep it open
+            # while waiting for them, then run whatever they added.
+            if not await _drain_durable(runtime) or not queue:
+                break
     finally:
+        queue.closed = True  # a later submit from a copied context starts afresh
         _drain.reset(reset)
-    await _drain_durable(runtime)
     if first is not None:
         raise first
 
 
-async def _drain_durable(runtime: Runtime) -> None:
+class _Queue(deque):
+    closed = False
+
+
+def _in_delivery(transport: Any) -> bool:
+    """Is this code running inside one of the transport's own deliveries?
+
+    The installed ``OutboxTransport`` exposes no flag, so read its state: an
+    eager delivery is a task in ``_tasks``, and every delivery holds
+    ``_dispatch_lock`` (inline ones run on the publisher's task). Waiting from
+    there would wait on that delivery itself, or on the lock it holds - so the
+    caller leaves delivery to the dispatcher already running. A lock held by
+    an unrelated delivery only makes this return early.
+    """
+    current = asyncio.current_task()
+    if current is not None and current in getattr(transport, "_tasks", ()):
+        return True
+    lock = getattr(transport, "_dispatch_lock", None)
+    return bool(lock is not None and lock.locked())
+
+
+async def _drain_durable(runtime: Runtime) -> bool:
     """Wait for the eager durable deliveries the drained work published (the
     web outbox transport starts them as tasks from ``after_commit``), so an
-    eager caller returns with ``ImageProcessed``'s durable subscribers done."""
-    bus = runtime.bus()
-    drain = getattr(getattr(bus, "durable_transport", None), "drain", None)
-    if drain is None:
-        return
+    eager caller returns with ``ImageProcessed``'s durable subscribers done.
+    ``False`` when there was nothing to wait for (or it must not wait)."""
+    transport = getattr(runtime.bus(), "durable_transport", None)
+    drain = getattr(transport, "drain", None)
+    if drain is None or _in_delivery(transport) or not getattr(transport, "_tasks", True):
+        return False
     try:
         await drain()
     except Exception:
         logger.exception("images.pipeline.durable_drain_failed")
+    return True
 
 
 async def submit_dispatch(runtime: Runtime, tenant: str, image_id: uuid.UUID) -> None:
