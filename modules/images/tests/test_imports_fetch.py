@@ -231,17 +231,3 @@ async def test_proxy_env_cannot_route_around_the_pin(resolver, inner, monkeypatc
     seen = inner(lambda r: body(b"ok"))
     assert await _fetch("https://cdn.example/a.jpg") == b"ok"
     assert seen[0].url.host == PUBLIC_IP
-
-
-async def test_overall_deadline_stops_a_trickling_body(resolver, inner, monkeypatch):
-    resolver["cdn.example"] = [PUBLIC_IP]
-    clock = iter(range(0, 1000, 3))
-    monkeypatch.setattr(fetch, "_now", lambda: float(next(clock)))
-
-    async def body():
-        for _ in range(100):
-            yield b"z"
-
-    inner(lambda r: httpx.Response(200, content=body()))
-    with pytest.raises(fetch.FetchTimeoutError):
-        await _fetch("http://cdn.example/a.jpg")

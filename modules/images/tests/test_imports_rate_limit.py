@@ -157,3 +157,17 @@ def test_exponential_backoff_is_capped():
 )
 def test_retryable_statuses(status, retry):
     assert rate_limit.is_retryable_status(status) is retry
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://xn--bcher-kva.example/a",
+        "https://BÜCHER.example./a",
+        "https://bücher.example:443/b",
+        "http://XN--BCHER-KVA.EXAMPLE./c",
+    ],
+)
+def test_domain_keys_are_normalised(url):
+    """Case, IDNA form and a trailing dot name one host, so they share one limit."""
+    assert domain_of(url) == "xn--bcher-kva.example"

@@ -17,10 +17,14 @@ inside ``connect_tcp``: httpx's ``AsyncHTTPTransport`` takes no network backend,
 so that route means replacing its private ``_pool`` or re-implementing its
 exception and stream mapping. The URL rewrite uses public extensions only. Its
 one weakness - the connection pool is keyed by IP, so two names on one IP could
-share a TLS connection made for the first name - is closed by giving every hop
-its own client (and so its own pool).
+share a TLS connection made for the first name - is closed inside the
+transport: each original origin (scheme, name, port) gets its own connection
+layer, so even a reused ``PinnedTransport`` verifies every name.
 
-Only connect failures (nothing sent yet) move on to the next validated address.
+Only connect failures (nothing sent yet) move on to the next validated address,
+and at most ``MAX_ADDRESSES_PER_HOP`` are tried. Resolution runs on a small
+dedicated thread pool under its own timeout, and one absolute deadline covers a
+whole fetch.
 Redirects are followed by hand (``follow_redirects=False``), at most five, each
 hop re-checked. ``trust_env=False``: proxy env vars would otherwise mount proxy
 transports ahead of the pinned one.
@@ -29,9 +33,10 @@ transports ahead of the pinned one.
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
-import time
 from collections.abc import AsyncIterator, Callable
+from concurrent.futures import ThreadPoolExecutor
 from typing import Final
 
 import httpx
@@ -55,6 +60,9 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 MAX_REDIRECTS: Final = 5
+MAX_ADDRESSES_PER_HOP: Final = 4
+DNS_TIMEOUT_SECONDS: float = 5.0
+_DNS_POOL: Final = ThreadPoolExecutor(max_workers=8, thread_name_prefix="sm-images-dns")
 _IDENTITY: Final = frozenset({"", "identity"})
 
 
@@ -85,12 +93,29 @@ def _inner_transport() -> httpx.AsyncBaseTransport:
     return httpx.AsyncHTTPTransport(verify=True, trust_env=False)
 
 
-def _now() -> float:
-    return time.monotonic()
+async def _resolve(url: httpx.URL, allowed_ports: frozenset[int]) -> tuple[str, tuple[str, ...]]:
+    """``resolve_public`` on the bounded DNS pool, within ``DNS_TIMEOUT_SECONDS``.
+
+    Cancelling a resolver thread does not stop ``getaddrinfo``, so it runs on a
+    small dedicated pool: a hung resolver ties up one of its threads, never the
+    loop's default executor, and later lookups time out instead of piling up.
+    """
+    loop = asyncio.get_running_loop()
+    job = functools.partial(resolve_public, url, allowed_ports=allowed_ports)
+    try:
+        return await asyncio.wait_for(loop.run_in_executor(_DNS_POOL, job), DNS_TIMEOUT_SECONDS)
+    except TimeoutError as error:
+        raise FetchTimeoutError() from error
 
 
 class PinnedTransport(httpx.AsyncBaseTransport):
-    """Validate every request's host and connect only to its validated IPs."""
+    """Validate every request's host and connect only to its validated IPs.
+
+    The connection layer is partitioned by the request's *original* origin
+    (scheme, name, port): its pool is keyed by the pinned IP, so a shared one
+    would let a TLS connection verified for one name serve another name on the
+    same IP. Each origin gets its own, so an instance is safe to reuse.
+    """
 
     def __init__(
         self,
@@ -99,17 +124,23 @@ class PinnedTransport(httpx.AsyncBaseTransport):
         inner: Callable[[], httpx.AsyncBaseTransport] | None = None,
     ) -> None:
         self._allowed_ports = allowed_ports
-        self._inner = (inner or _inner_transport)()
+        self._factory = inner or _inner_transport
+        self._inners: dict[tuple[str, str, int | None], httpx.AsyncBaseTransport] = {}
+
+    def _inner_for(self, url: httpx.URL) -> httpx.AsyncBaseTransport:
+        origin = (url.scheme, url.host, url.port)
+        if origin not in self._inners:
+            self._inners[origin] = self._factory()
+        return self._inners[origin]
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        host, ips = await asyncio.to_thread(
-            resolve_public, request.url, allowed_ports=self._allowed_ports
-        )
+        host, ips = await _resolve(request.url, self._allowed_ports)
+        inner = self._inner_for(request.url)
         extensions = dict(request.extensions)
         if request.url.scheme == "https":
             extensions["sni_hostname"] = host
         last_error: httpx.TransportError | None = None
-        for ip in ips:
+        for ip in ips[:MAX_ADDRESSES_PER_HOP]:
             pinned = httpx.Request(
                 method=request.method,
                 url=request.url.copy_with(host=ip),
@@ -118,7 +149,7 @@ class PinnedTransport(httpx.AsyncBaseTransport):
                 extensions=extensions,
             )
             try:
-                return await self._inner.handle_async_request(pinned)
+                return await inner.handle_async_request(pinned)
             except (httpx.ConnectError, httpx.ConnectTimeout) as error:
                 logger.info(
                     "Pinned address failed to connect, trying the next",
@@ -129,7 +160,9 @@ class PinnedTransport(httpx.AsyncBaseTransport):
         raise last_error
 
     async def aclose(self) -> None:
-        await self._inner.aclose()
+        inners, self._inners = list(self._inners.values()), {}
+        for inner in inners:
+            await inner.aclose()
 
 
 def _client(timeout: float, allowed_ports: frozenset[int]) -> httpx.AsyncClient:
@@ -159,10 +192,12 @@ async def safe_stream(
 ) -> AsyncIterator[bytes]:
     """GET ``url`` and yield its body as delivered, at most ``max_bytes`` of it.
 
-    ``timeout`` is both httpx's per-operation timeout and the wall-clock budget
-    for the whole fetch, redirects included. The body is the raw bytes on the
-    wire: ``Accept-Encoding: identity`` is sent and a content-encoded answer is
-    refused, so no decoder can inflate past the cap.
+    ``timeout`` is both httpx's per-operation timeout and one absolute deadline
+    for the whole fetch: every hop's resolution, connects, headers and each body
+    read run under ``asyncio.timeout_at`` and expiry is ``FetchTimeoutError``.
+    The body is the raw bytes on the wire: ``Accept-Encoding: identity`` is
+    sent and a content-encoded answer is refused, so no decoder can inflate
+    past the cap.
 
     Raises:
         UnsafeURLError: the URL or a redirect target fails the guard, or more
@@ -172,36 +207,60 @@ async def safe_stream(
         FetchTooLargeError, FetchTimeoutError, FetchError("unsupported_encoding").
         httpx.TransportError: the network failed (retryable).
     """
-    deadline = _now() + timeout
+    deadline = asyncio.get_running_loop().time() + timeout
     check_url(url, allowed_ports=allowed_ports)
     current = httpx.URL(url.strip())
     for hop in range(max_redirects + 1):
-        if _now() > deadline:
-            raise FetchTimeoutError()
-        async with (
-            _client(timeout, allowed_ports) as client,
-            client.stream("GET", current) as response,
-        ):
-            if response.has_redirect_location:
-                current = current.join(response.headers["location"])
-                check_url(
-                    current, allowed_ports=allowed_ports
-                )  # fail fast; the transport re-checks
-                logger.info("Following redirect", extra={"hop": hop + 1, "host": current.host})
-                continue
-            response.raise_for_status()
-            if response.headers.get("content-encoding", "").strip().lower() not in _IDENTITY:
-                raise FetchError("unsupported_encoding")
-            declared = _declared_length(response)
-            if declared is not None and declared > max_bytes:
-                raise FetchTooLargeError()
-            received = 0
-            async for chunk in response.aiter_raw():
-                received += len(chunk)
-                if received > max_bytes:
-                    raise FetchTooLargeError()
-                if _now() > deadline:
-                    raise FetchTimeoutError()
-                yield chunk
-            return
+        async with _client(timeout, allowed_ports) as client:
+            request = client.build_request("GET", current)
+            try:  # resolution, connecting across the addresses, headers
+                async with asyncio.timeout_at(deadline):
+                    response = await client.send(request, stream=True)
+            except TimeoutError as error:
+                raise FetchTimeoutError() from error
+            try:
+                if response.has_redirect_location:
+                    current = current.join(response.headers["location"])
+                    check_url(current, allowed_ports=allowed_ports)  # the transport re-checks
+                    logger.info("Following redirect", extra={"hop": hop + 1, "host": current.host})
+                    continue
+                _check_final(response, max_bytes)
+                async for chunk in _capped_body(response, max_bytes, deadline):
+                    yield chunk
+                return
+            finally:
+                await response.aclose()
     raise UnsafeURLError("too_many_redirects")
+
+
+def _check_final(response: httpx.Response, max_bytes: int) -> None:
+    response.raise_for_status()
+    if response.headers.get("content-encoding", "").strip().lower() not in _IDENTITY:
+        raise FetchError("unsupported_encoding")
+    declared = _declared_length(response)
+    if declared is not None and declared > max_bytes:
+        raise FetchTooLargeError()
+
+
+async def _capped_body(
+    response: httpx.Response, max_bytes: int, deadline: float
+) -> AsyncIterator[bytes]:
+    """The raw body, each read inside the deadline (``yield`` stays outside it,
+    so the consumer's own time is never cancelled by it)."""
+    chunks = response.aiter_raw()
+    received = 0
+    try:
+        while True:
+            try:
+                async with asyncio.timeout_at(deadline):
+                    chunk = await anext(chunks)
+            except StopAsyncIteration:
+                return
+            except TimeoutError as error:
+                raise FetchTimeoutError() from error
+            received += len(chunk)
+            if received > max_bytes:
+                raise FetchTooLargeError()
+            yield chunk
+    finally:
+        await chunks.aclose()

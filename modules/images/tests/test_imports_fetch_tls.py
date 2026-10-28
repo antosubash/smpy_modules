@@ -77,17 +77,21 @@ async def tls_server(tls_pki, resolver, monkeypatch):
     server_ctx.sni_callback = on_sni
 
     async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-        head = await reader.readuntil(b"\r\n\r\n")
-        for line in head.decode().split("\r\n"):
-            if line.lower().startswith("host:"):
-                seen["host"] = line.split(":", 1)[1].strip()
-        body = b"pinned-ok"
-        writer.write(
-            b"HTTP/1.1 200 OK\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s"
-            % (len(body), body)
-        )
-        await writer.drain()
-        writer.close()
+        """Keep-alive: answer requests on one connection until the client hangs up."""
+        seen["connections"] = seen.get("connections", 0) + 1
+        try:
+            while True:
+                head = await reader.readuntil(b"\r\n\r\n")
+                for line in head.decode().split("\r\n"):
+                    if line.lower().startswith("host:"):
+                        seen["host"] = line.split(":", 1)[1].strip()
+                body = b"pinned-ok"
+                writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n%s" % (len(body), body))
+                await writer.drain()
+        except (asyncio.IncompleteReadError, ConnectionError, ssl.SSLError):
+            pass
+        finally:
+            writer.close()
 
     server = await asyncio.start_server(handle, "127.0.0.1", 0, ssl=server_ctx)
     port = server.sockets[0].getsockname()[1]
@@ -134,3 +138,15 @@ async def test_the_guard_is_not_widened_outside_the_override(tls_server):
             [c async for c in safe_stream(f"https://img.example:{port}/", max_bytes=10, timeout=5)]
         )
     assert "sni" not in seen
+
+
+async def test_a_reused_transport_verifies_each_name_on_a_shared_ip(tls_server):
+    """A pooled connection verified for img.example is never reused for wrong.example."""
+    port, seen = tls_server
+    transport = fetch.PinnedTransport(allowed_ports=frozenset({port}))
+    async with httpx.AsyncClient(transport=transport, trust_env=False) as client:
+        for _ in range(2):
+            assert (await client.get(f"https://img.example:{port}/a")).content == b"pinned-ok"
+        assert seen["connections"] == 1  # keep-alive works within one name
+        with pytest.raises(httpx.ConnectError, match=r"(?i)certificate|hostname"):
+            await client.get(f"https://wrong.example:{port}/a")

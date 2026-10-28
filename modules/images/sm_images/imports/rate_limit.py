@@ -42,12 +42,13 @@ _RETRYABLE: Final = frozenset({408, 429})
 
 
 def domain_of(url: str) -> str:
-    """The lowercased host of ``url``, or ``"unknown"``."""
+    """``url``'s host as one key per host: IDNA (punycode), lowercased, without a
+    trailing dot - or ``"unknown"``."""
     try:
-        host = httpx.URL(url).host
-    except (httpx.InvalidURL, TypeError, ValueError):
+        host = httpx.URL(url).raw_host.decode("ascii")
+    except (httpx.InvalidURL, TypeError, ValueError, UnicodeDecodeError):
         return "unknown"
-    return host.lower() or "unknown"
+    return host.lower().rstrip(".") or "unknown"
 
 
 class SlotLimiter(Protocol):
