@@ -1,9 +1,13 @@
 """Direct uploads: start, relay a part, complete, abort (see ``ingest.direct``).
 
 ``POST /collections/{id}/uploads`` is an ``edit`` on the collection. The later
-calls carry the signed ``upload_id`` instead of a collection in the path;
-``complete`` re-checks ``edit`` on the collection the ticket names, so a share
-revoked mid-upload stops it.
+calls carry the signed ``upload_id`` instead of a collection in the path, and
+each of them - part, complete, abort - resolves the ticket's collection through
+the same ``RequiresResource(POLICY, ACTION_EDIT, ...)`` dependency the
+collection routes use (:data:`TicketCollection`), behind the same
+``images.view`` gate. So a share revoked mid-upload stops every later call
+(404, or 403 where the collection is still visible), and the routes treat an
+API token exactly as the collection routes do.
 """
 
 from __future__ import annotations
@@ -14,7 +18,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Path, Request, Response
 from simple_module_core.resources import ACTION_EDIT, ResourcePrincipal
 from simple_module_db.deps import get_db
-from simple_module_hosting.resource_deps import resource_principal
+from simple_module_hosting.resource_deps import RequiresResource, resource_principal
 
 from sm_images import constants
 from sm_images.access import POLICY, CollectionEdit, collection_stmt
@@ -43,16 +47,22 @@ def _secret(request: Request) -> str:
     return getattr(settings, "secret_key", "") or ""
 
 
-def _ticket(request: Request, upload_id: str, who: ResourcePrincipal) -> direct.Ticket:
+async def upload_ticket(upload_id: UploadId, request: Request, who: Principal) -> direct.Ticket:
+    """The caller's own, unexpired ticket in the bound tenant, or 404."""
     return direct.load_ticket(upload_id, secret=_secret(request), owner=who.user_id)
 
 
-async def _editable(db: Any, who: ResourcePrincipal, ticket: direct.Ticket) -> Collection:
-    stmt = POLICY.filter(who, ACTION_EDIT, collection_stmt(uuid.UUID(ticket.collection)))
-    found = (await db.execute(stmt)).scalars().first()
-    if found is None:
-        raise UploadNotFound("Upload not found")
-    return found
+Ticket = Annotated[direct.Ticket, Depends(upload_ticket)]
+
+
+def ticket_collection_stmt(ticket: Ticket) -> Any:
+    return collection_stmt(uuid.UUID(ticket.collection))
+
+
+TicketCollection = Annotated[
+    Collection, Depends(RequiresResource(POLICY, ACTION_EDIT, ticket_collection_stmt))
+]
+"""``edit`` on the ticket's collection, checked on every call, not just at start."""
 
 
 @router.post("/collections/{collection_id}/uploads", status_code=201, dependencies=[require_view])
@@ -83,22 +93,17 @@ async def start_upload(
 @router.put(
     f"{constants.UPLOADS_PATH}/{{upload_id}}/parts/{{part_no}}", dependencies=[require_view]
 )
-async def put_part(upload_id: UploadId, part_no: int, request: Request, who: Principal) -> PartOut:
-    ticket = _ticket(request, upload_id, who)
+async def put_part(
+    part_no: int, request: Request, ticket: Ticket, collection: TicketCollection
+) -> PartOut:
     part = await direct.write_part(store_for(request.app), ticket, part_no, request.stream())
     return PartOut(no=part.no, etag=part.etag, size=part.size)
 
 
 @router.post(f"{constants.UPLOADS_PATH}/{{upload_id}}/complete", dependencies=[require_view])
 async def complete_upload(
-    upload_id: UploadId,
-    body: DirectComplete,
-    request: Request,
-    who: Principal,
-    ingest: Ingest,
+    body: DirectComplete, ticket: Ticket, collection: TicketCollection, ingest: Ingest
 ) -> UploadResult:
-    ticket = _ticket(request, upload_id, who)
-    collection = await _editable(ingest.db, who, ticket)
     meta = body.metadata.to_ingest() if body.metadata else direct.IngestMeta()
     outcome = await direct.complete(
         ingest,
@@ -115,8 +120,7 @@ async def complete_upload(
     f"{constants.UPLOADS_PATH}/{{upload_id}}", status_code=204, dependencies=[require_view]
 )
 async def abort_upload(
-    upload_id: UploadId, request: Request, who: Principal, db=Depends(get_db)
+    request: Request, ticket: Ticket, collection: TicketCollection, db=Depends(get_db)
 ) -> Response:
-    ticket = _ticket(request, upload_id, who)
     await direct.abort(db, store_for(request.app), ticket)
     return Response(status_code=204)

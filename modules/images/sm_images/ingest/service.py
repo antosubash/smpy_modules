@@ -123,9 +123,13 @@ class IngestService:
     ) -> Image | Duplicate:
         """Add one image; ``data`` *or* ``staged_key`` (+ its ``image_id``).
 
-        A staged object is adopted at its key, never copied; on a duplicate it
-        is deleted. A refusal (``ImagesError``) raised before the insert leaves
-        a staged object for the caller to remove.
+        A staged object is adopted at its key, never copied. It is deleted only
+        on a pre-insert duplicate, and only while no row owns ``image_id``. After
+        an insert failure it is never touched: the key may be a concurrent
+        winner's committed original (two ``complete`` calls for one upload), so
+        the row is re-read by id and returned, or the object and its intent are
+        left for the janitor. A refusal (``ImagesError``) raised before the
+        insert leaves a staged object for the caller to remove.
         """
         if (data is None) == (staged_key is None):
             raise TypeError("pass exactly one of data= or staged_key=")
@@ -140,7 +144,8 @@ class IngestService:
 
         found = await self._precheck(collection.id, meta, sha)
         if found is not None:
-            await self._discard(staged_key, slot)
+            if staged_key is None or not await dedupe.find_id(self.db, image_id):
+                await self._discard(staged_key, slot)
             return Duplicate(found)
 
         if staged_key is not None:
@@ -174,14 +179,22 @@ class IngestService:
         try:
             await self._insert(collection, row, meta, key)
         except IntegrityError:
+            if staged_key is not None:
+                if await dedupe.find_id(self.db, new_id):
+                    return Duplicate(new_id)  # a concurrent complete won; its object stays
+                again = await self._recheck(collection.id, meta)
+                if again is None:
+                    raise
+                return Duplicate(again)  # the staged object is left to the janitor
             again = await self._recheck(collection.id, meta)
             if again is None:
                 await self._delete_object(key)
                 raise
             await self._discard(key, None)
             return Duplicate(again)
-        except BaseException:
-            await self._delete_object(key)
+        except Exception:
+            if staged_key is None:
+                await self._delete_object(key)
             raise
         self._remember(collection.id, meta, sha, row.id)
         events.emit(self.db, self.bus, events.image_added(row, source))

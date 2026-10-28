@@ -26,7 +26,7 @@ from sqlalchemy.exc import IntegrityError
 
 from sm_images.models import Group, Image
 
-__all__ = ["ensure_group", "find_external", "find_hash"]
+__all__ = ["ensure_group", "find_external", "find_hash", "find_id"]
 
 
 async def find_external(
@@ -42,6 +42,14 @@ async def find_external(
         .execution_options(include_deleted=True)
     )
     return (await db.execute(stmt)).scalars().first()
+
+
+async def find_id(db: Any, image_id: uuid.UUID | None) -> bool:
+    """Whether a row (trashed or not) already owns ``image_id``."""
+    if image_id is None:
+        return False
+    stmt = select(Image.id).where(Image.id == image_id).execution_options(include_deleted=True)
+    return (await db.execute(stmt)).scalars().first() is not None
 
 
 async def find_hash(db: Any, collection_id: uuid.UUID, sha256: str) -> uuid.UUID | None:

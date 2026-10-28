@@ -17,20 +17,30 @@ own part listing is the truth about what arrived, as in ``file_storage``'s own
 sessions; the database never mirrors it.
 
 Replay is safe: once the image row exists, ``complete`` answers with it again,
-and ``abort`` never deletes a key a row references.
+and nothing here deletes a key a row references - including the winner's
+original when two ``complete`` calls for one upload race (the loser re-reads the
+row, see ``IngestService.add_image``).
+
+**The token is signed, not encrypted.** Anyone holding it can read the key,
+ids and size inside (base64 JSON); only forging or altering it is prevented.
+It appears in the relay part URLs and so in access logs; it grants nothing
+without the owner's session, an ``edit`` on the collection and a bound tenant.
+
+The declared type is binding: ``start`` refuses one that maps to no accepted
+image type (415), and ``complete`` refuses (415, object deleted) when the
+sniffed bytes are another type - so the key's extension, the row's
+``content_type`` and the object agree.
 """
 
 from __future__ import annotations
 
-import math
 import uuid
 from collections.abc import AsyncIterator
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from pathlib import PurePosixPath
 from typing import Any
 
 from file_storage.contracts.service import NotSupportedError, StorageError, StorageNotFoundError
-from itsdangerous import BadData, URLSafeTimedSerializer
 from sqlalchemy import select
 
 from sm_images import constants, storage_keys
@@ -40,62 +50,23 @@ from sm_images.errors import (
     ImagesError,
     InvalidUpload,
     PartsMismatch,
+    UnsupportedType,
     UploadNotFound,
 )
 from sm_images.ingest.meta import IngestMeta
 from sm_images.ingest.service import Duplicate, IngestService, safe_filename
-from sm_images.ingest.sniff import EXTENSIONS
+from sm_images.ingest.sniff import EXTENSIONS, sniff
+from sm_images.ingest.ticket import _BAD_PART, _GONE, Ticket, load_ticket, serializer
 from sm_images.intents import object_intent
 from sm_images.models import Collection, Image
 from sm_images.tenancy import bound_tenant
 
 __all__ = ["Ticket", "abort", "complete", "load_ticket", "start", "write_part"]
 
-_GONE = "Upload not found"
 _NO_DIRECT = "This storage backend does not support direct uploads"
-_NO_SECRET = "Direct uploads need the host's secret_key"
-_BAD_PART = "A part is missing or has the wrong size"
 _TOO_LARGE = "The upload is larger than the image size limit"
-
-
-@dataclass(frozen=True)
-class Ticket:
-    key: str
-    upload: str
-    collection: str
-    image: str
-    tenant: str
-    owner: str
-    size: int
-    part_size: int
-    filename: str
-
-    @property
-    def parts(self) -> int:
-        return math.ceil(self.size / self.part_size)
-
-    def part_bytes(self, no: int) -> int:
-        if not 1 <= no <= self.parts:
-            raise InvalidUpload(_BAD_PART, constants.CODE_PARTS_MISMATCH)
-        return self.part_size if no < self.parts else self.size - (self.parts - 1) * self.part_size
-
-
-def _serializer(secret: str) -> URLSafeTimedSerializer:
-    if not secret:
-        raise DirectUploadUnsupported(_NO_SECRET)
-    return URLSafeTimedSerializer(secret, salt=constants.DIRECT_TOKEN_SALT)
-
-
-def load_ticket(token: str, *, secret: str, owner: str | None) -> Ticket:
-    """The signed ticket, if it is this caller's, in the bound tenant, and unexpired."""
-    try:
-        raw = _serializer(secret).loads(token, max_age=constants.DIRECT_UPLOAD_TTL_SECONDS)
-        ticket = Ticket(**raw)
-    except (BadData, TypeError) as exc:
-        raise UploadNotFound(_GONE) from exc
-    if owner is None or ticket.owner != owner or ticket.tenant != bound_tenant():
-        raise UploadNotFound(_GONE)
-    return ticket
+_BAD_TYPE = "The upload is not a supported image of the declared type"
+_SIZE_MISMATCH = "The stored upload is not the declared size"
 
 
 def _backend(store: Any) -> Any:
@@ -106,11 +77,15 @@ def _backend(store: Any) -> Any:
 
 
 def _declared_type(filename: str, content_type: str | None) -> str:
+    """The accepted type the client declared (content type, else extension); 415 if none."""
     if content_type in EXTENSIONS:
         return content_type
     suffix = PurePosixPath(filename).suffix.lower().lstrip(".")
-    by_ext = {ext: ctype for ctype, ext in EXTENSIONS.items()} | {"jpeg": "image/jpeg"}
-    return by_ext.get(suffix, "application/octet-stream")
+    by_ext = {ext: ctype for ctype, ext in EXTENSIONS.items()}
+    by_ext |= {"jpeg": "image/jpeg", "tiff": "image/tiff", "heif": "image/heif"}
+    if content_type is None and suffix in by_ext:
+        return by_ext[suffix]
+    raise UnsupportedType(_BAD_TYPE)
 
 
 async def start(
@@ -126,15 +101,15 @@ async def start(
     intent_factory: Any = None,
 ) -> tuple[str, Ticket, list[str], bool]:
     """``(upload_id, ticket, part_urls, direct)``. The key's extension is the
-    client's declaration; the stored ``content_type`` is sniffed on completion."""
+    declared type, which ``complete`` then holds the bytes to."""
     if size > max_bytes:
         raise FileTooLarge(_TOO_LARGE)
     backend = _backend(store)
-    serializer = _serializer(secret)
+    signer = serializer(secret)
     declared = _declared_type(filename, content_type)
     image_id = uuid.uuid4()
     tenant = bound_tenant()
-    ext = EXTENSIONS.get(declared, "bin")
+    ext = EXTENSIONS[declared]
     key = storage_keys.original_key(tenant, str(collection.id), str(image_id), ext)
     async with object_intent([key], session_factory=intent_factory):
         upload = await backend.create_multipart(key, declared)
@@ -148,8 +123,9 @@ async def start(
         size=size,
         part_size=constants.DIRECT_PART_BYTES,
         filename=safe_filename(filename),
+        content_type=declared,
     )
-    token = serializer.dumps(asdict(ticket))
+    token = signer.dumps(asdict(ticket))
     numbers = range(1, ticket.parts + 1)
     try:
         urls = [
@@ -187,10 +163,7 @@ async def _existing(db: Any, ticket: Ticket) -> Image | None:
 
 async def _assemble(store: Any, ticket: Ticket, claimed: dict[int, str | None]) -> None:
     backend = _backend(store)
-    try:
-        held = {p.no: p for p in await backend.list_parts(ticket.key, ticket.upload)}
-    except StorageNotFoundError as exc:
-        raise UploadNotFound(_GONE) from exc
+    held = {p.no: p for p in await backend.list_parts(ticket.key, ticket.upload)}
     wanted = range(1, ticket.parts + 1)
     bad = [n for n in wanted if n not in held or held[n].size != ticket.part_bytes(n)]
     bad += [
@@ -217,13 +190,27 @@ async def complete(
     existing = await _existing(ingest.db, ticket)
     if existing is not None:
         return existing
-    await _assemble(ingest.store, ticket, claimed)
+    try:
+        await _assemble(ingest.store, ticket, claimed)
+    except StorageError as exc:
+        # A concurrent complete already assembled (and consumed) the parts.
+        existing = await _existing(ingest.db, ticket)
+        if existing is not None:
+            return existing
+        raise UploadNotFound(_GONE) from exc
     head = await ingest.store.head(ticket.key)
     if head is None:
         raise UploadNotFound(_GONE)
-    if head[0] != ticket.size or head[0] > ingest.settings.max_image_bytes:
-        await ingest.store.delete_keys([ticket.key])
+    if head[0] != ticket.size:
+        await _drop(ingest, ticket)
+        raise PartsMismatch(_SIZE_MISMATCH)
+    if head[0] > ingest.settings.max_image_bytes:
+        await _drop(ingest, ticket)
         raise FileTooLarge(_TOO_LARGE)
+    first = b"".join([c async for c in await ingest.store.stream_range(ticket.key, 0, 31)])
+    if sniff(first) != ticket.content_type:
+        await _drop(ingest, ticket)
+        raise UnsupportedType(_BAD_TYPE)
     try:
         return await ingest.add_image(
             collection,
@@ -234,8 +221,14 @@ async def complete(
             source=constants.SOURCE_UPLOAD,
         )
     except ImagesError:
-        await ingest.store.delete_keys([ticket.key])
+        await _drop(ingest, ticket)
         raise
+
+
+async def _drop(ingest: IngestService, ticket: Ticket) -> None:
+    """Delete the staged object - unless a row (a concurrent winner) owns it."""
+    if await _existing(ingest.db, ticket) is None:
+        await ingest.store.delete_keys([ticket.key])
 
 
 async def abort(db: Any, store: Any, ticket: Ticket) -> None:
