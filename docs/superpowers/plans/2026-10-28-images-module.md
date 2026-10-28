@@ -295,7 +295,7 @@
 
 **Tests:** exact values for each fixture.
 
-- [ ] Commit `feat(images): exif and rendition processors`
+- [x] Commit `feat(images): exif and rendition processors`
 
 ---
 
