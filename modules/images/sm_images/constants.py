@@ -127,6 +127,8 @@ DESCRIPTION_MAX: Final = 2000
 PAGE_DEFAULT: Final = 25
 PAGE_MAX: Final = 100
 COLLECTION_FILTERS: Final = ("owned", "shared", "internal", "public", "all")
+THUMB_SIZE: Final = "small"
+"""The rendition the console gallery shows (a key of ``thumbnail_sizes``)."""
 CANDIDATES_MAX: Final = 20
 CANDIDATES_SCAN: Final = 100
 """How many directory hits are read before the tenant filter, so a page of
@@ -197,3 +199,12 @@ ERROR_CODES: Final = (
     CODE_UPLOAD_NOT_OPEN,
 )
 """Every code an upload can answer with; each has a translated sentence."""
+
+# --- Console pages (Inertia names: ``<module>/<file under pages/>``) ---
+
+PAGE_COLLECTIONS: Final = f"{MODULE_NAME}/Collections"
+PAGE_COLLECTION: Final = f"{MODULE_NAME}/Collection"
+PAGE_IMAGE: Final = f"{MODULE_NAME}/Image"
+PERM_SHARE: Final = "sharing.share"
+"""The framework's share permission (``sharing.constants.PERM_SHARE``): the
+share dialog is offered only to a holder who also owns the collection."""

@@ -46,7 +46,7 @@ from sm_images.schemas.image import (
     ImagePatch,
     UploadResult,
 )
-from sm_images.services import gallery
+from sm_images.services import gallery, present
 from sm_images.storage import store_for
 
 logger = logging.getLogger(__name__)
@@ -182,14 +182,16 @@ async def list_images(
     rows, token, total = await gallery.list_page(
         db, collection, filters, limit=limit, cursor=cursor
     )
-    return ImagePageOut(items=[ImageOut.from_row(r) for r in rows], next_cursor=token, total=total)
+    return ImagePageOut(
+        items=await present.present(db, collection, rows), next_cursor=token, total=total
+    )
 
 
 @router.get("/images/{image_id}", dependencies=[require_view])
 async def get_image(
     image_id: uuid.UUID, collection: ImageCollectionView, db=Depends(get_db)
 ) -> ImageOut:
-    return ImageOut.from_row(await gallery.get(db, collection, image_id))
+    return await present.present_one(db, collection, await gallery.get(db, collection, image_id))
 
 
 @router.patch("/images/{image_id}", dependencies=[require_view])
@@ -200,7 +202,7 @@ async def patch_image(
         raise InvalidUpload("lat and lng are set together", constants.CODE_INVALID_METADATA)
     image = await gallery.get(db, collection, image_id)
     image = await gallery.set_location(db, collection, image, body.lat, body.lng)
-    return ImageOut.from_row(image)
+    return await present.present_one(db, collection, image)
 
 
 @router.delete("/images/{image_id}", status_code=204, dependencies=[require_view])

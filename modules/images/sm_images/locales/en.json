@@ -4,6 +4,122 @@
     "collections": "Image collections",
     "group_images": "Images"
   },
+  "common": {
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "loading": "Loading…",
+    "back_to_collections": "All collections"
+  },
+  "collections": {
+    "page_title": "Image collections",
+    "page_subtitle": "Collections of images, with their own sharing and processing.",
+    "new": "New collection",
+    "empty": "There are no collections yet.",
+    "empty_filtered": "No collections match this filter.",
+    "filter_label": "Show collections",
+    "filter": {
+      "all": "All",
+      "owned": "Mine",
+      "shared": "Shared with me",
+      "internal": "Internal",
+      "public": "Public"
+    },
+    "image_count_one": "{count} image",
+    "image_count_other": "{count} images",
+    "owner": "Owner",
+    "load_more": "Load more"
+  },
+  "visibility": {
+    "label": "Visibility",
+    "private": "Private",
+    "internal": "Internal",
+    "public": "Public",
+    "changed": "Visibility updated"
+  },
+  "create": {
+    "title": "New collection",
+    "description": "Create an empty collection, then upload images into it.",
+    "name": "Name",
+    "details": "Description",
+    "visibility": "Visibility",
+    "submit": "Create collection",
+    "failed": "The collection could not be created."
+  },
+  "collection": {
+    "images": "Images",
+    "delete": "Delete collection",
+    "delete_title": "Delete this collection?",
+    "delete_body": "The collection and all of its images move to the trash.",
+    "delete_confirm": "Delete",
+    "deleted": "Collection deleted"
+  },
+  "gallery": {
+    "title": "Gallery",
+    "empty": "This collection has no images yet.",
+    "no_match": "No images match this filter.",
+    "load_more": "Load more",
+    "total_one": "{count} image",
+    "total_other": "{count} images",
+    "filter_label": "Filter images",
+    "filter": {
+      "all": "All",
+      "located": "With location",
+      "unlocated": "Without location",
+      "processing": "Processing",
+      "failed": "Failed"
+    },
+    "thumb_pending": "Preparing preview…",
+    "open": "Open {name}"
+  },
+  "upload": {
+    "button": "Upload images",
+    "uploading": "Uploading…",
+    "summary": "{created} uploaded, {duplicates} already present, {failed} failed",
+    "file_failed": "{name}: {reason}"
+  },
+  "viewer": {
+    "back": "Back to the collection",
+    "show_original": "Show original",
+    "show_display": "Show display copy",
+    "loading_original": "Loading the original…",
+    "original_failed": "The original could not be loaded.",
+    "metadata": "Details",
+    "filename": "File name",
+    "dimensions": "Dimensions",
+    "size": "File size",
+    "type": "Type",
+    "captured": "Captured",
+    "camera": "Camera",
+    "location": "Location",
+    "location_none": "No location",
+    "uploaded": "Uploaded",
+    "results": "Results",
+    "no_results": "This image has no results yet.",
+    "delete": "Delete image",
+    "delete_title": "Delete this image?",
+    "delete_body": "The image moves to the trash.",
+    "delete_confirm": "Delete",
+    "deleted": "Image deleted"
+  },
+  "share": {
+    "button": "Share",
+    "title": "Share this collection",
+    "description": "People you share with can see the collection, or upload to it.",
+    "current": "Shared with",
+    "none": "Not shared with anyone yet.",
+    "role": "Access",
+    "role_view": "Can view",
+    "role_edit": "Can edit",
+    "search_label": "Find a person",
+    "search_placeholder": "Name or email",
+    "no_candidates": "No one found.",
+    "grant": "Share",
+    "revoke": "Remove access",
+    "revoke_for": "Remove access for {name}",
+    "expired": "Expired",
+    "granted": "Shared with {name}",
+    "revoked": "Access removed"
+  },
   "errors": {
     "unsupported_type": "This file is not a supported image. Upload a JPEG, PNG, WebP, HEIC/HEIF or TIFF file.",
     "image_too_many_pixels": "This image has too many pixels to process. Scale it down and upload it again.",
@@ -17,6 +133,11 @@
     "direct_upload_unsupported": "This server's storage does not support direct uploads.",
     "upload_failed": "The file could not be stored. Try again.",
     "upload_in_progress": "This upload is being completed. Try again in a moment.",
-    "upload_not_open": "This upload no longer accepts parts."
+    "upload_not_open": "This upload no longer accepts parts.",
+    "session_expired": "Your session has expired. Redirecting you to sign in…",
+    "server_error": "The server had a problem. Nothing was lost; try again in a moment.",
+    "offline": "You appear to be offline. Nothing was saved; try again once you are connected.",
+    "csrf_failed": "Your session token is out of date. Reload the page and try again.",
+    "request_failed": "The request failed ({status})."
   }
 }

@@ -4,6 +4,122 @@
     "collections": "Bildersammlungen",
     "group_images": "Bilder"
   },
+  "common": {
+    "cancel": "Abbrechen",
+    "saving": "Wird gespeichert…",
+    "loading": "Wird geladen…",
+    "back_to_collections": "Alle Sammlungen"
+  },
+  "collections": {
+    "page_title": "Bildersammlungen",
+    "page_subtitle": "Sammlungen von Bildern mit eigener Freigabe und Verarbeitung.",
+    "new": "Neue Sammlung",
+    "empty": "Es gibt noch keine Sammlungen.",
+    "empty_filtered": "Keine Sammlung entspricht diesem Filter.",
+    "filter_label": "Sammlungen anzeigen",
+    "filter": {
+      "all": "Alle",
+      "owned": "Meine",
+      "shared": "Mit mir geteilt",
+      "internal": "Intern",
+      "public": "Öffentlich"
+    },
+    "image_count_one": "{count} Bild",
+    "image_count_other": "{count} Bilder",
+    "owner": "Eigentümer",
+    "load_more": "Mehr laden"
+  },
+  "visibility": {
+    "label": "Sichtbarkeit",
+    "private": "Privat",
+    "internal": "Intern",
+    "public": "Öffentlich",
+    "changed": "Sichtbarkeit aktualisiert"
+  },
+  "create": {
+    "title": "Neue Sammlung",
+    "description": "Legen Sie eine leere Sammlung an und laden Sie dann Bilder hoch.",
+    "name": "Name",
+    "details": "Beschreibung",
+    "visibility": "Sichtbarkeit",
+    "submit": "Sammlung anlegen",
+    "failed": "Die Sammlung konnte nicht angelegt werden."
+  },
+  "collection": {
+    "images": "Bilder",
+    "delete": "Sammlung löschen",
+    "delete_title": "Diese Sammlung löschen?",
+    "delete_body": "Die Sammlung und alle ihre Bilder werden in den Papierkorb verschoben.",
+    "delete_confirm": "Löschen",
+    "deleted": "Sammlung gelöscht"
+  },
+  "gallery": {
+    "title": "Galerie",
+    "empty": "Diese Sammlung enthält noch keine Bilder.",
+    "no_match": "Kein Bild entspricht diesem Filter.",
+    "load_more": "Mehr laden",
+    "total_one": "{count} Bild",
+    "total_other": "{count} Bilder",
+    "filter_label": "Bilder filtern",
+    "filter": {
+      "all": "Alle",
+      "located": "Mit Standort",
+      "unlocated": "Ohne Standort",
+      "processing": "In Verarbeitung",
+      "failed": "Fehlgeschlagen"
+    },
+    "thumb_pending": "Vorschau wird erstellt…",
+    "open": "{name} öffnen"
+  },
+  "upload": {
+    "button": "Bilder hochladen",
+    "uploading": "Wird hochgeladen…",
+    "summary": "{created} hochgeladen, {duplicates} bereits vorhanden, {failed} fehlgeschlagen",
+    "file_failed": "{name}: {reason}"
+  },
+  "viewer": {
+    "back": "Zurück zur Sammlung",
+    "show_original": "Original anzeigen",
+    "show_display": "Anzeigekopie anzeigen",
+    "loading_original": "Das Original wird geladen…",
+    "original_failed": "Das Original konnte nicht geladen werden.",
+    "metadata": "Details",
+    "filename": "Dateiname",
+    "dimensions": "Abmessungen",
+    "size": "Dateigröße",
+    "type": "Typ",
+    "captured": "Aufgenommen",
+    "camera": "Kamera",
+    "location": "Standort",
+    "location_none": "Kein Standort",
+    "uploaded": "Hochgeladen",
+    "results": "Ergebnisse",
+    "no_results": "Dieses Bild hat noch keine Ergebnisse.",
+    "delete": "Bild löschen",
+    "delete_title": "Dieses Bild löschen?",
+    "delete_body": "Das Bild wird in den Papierkorb verschoben.",
+    "delete_confirm": "Löschen",
+    "deleted": "Bild gelöscht"
+  },
+  "share": {
+    "button": "Teilen",
+    "title": "Diese Sammlung teilen",
+    "description": "Personen, mit denen Sie teilen, können die Sammlung ansehen oder Bilder hochladen.",
+    "current": "Geteilt mit",
+    "none": "Noch mit niemandem geteilt.",
+    "role": "Zugriff",
+    "role_view": "Darf ansehen",
+    "role_edit": "Darf bearbeiten",
+    "search_label": "Person suchen",
+    "search_placeholder": "Name oder E-Mail",
+    "no_candidates": "Niemand gefunden.",
+    "grant": "Teilen",
+    "revoke": "Zugriff entziehen",
+    "revoke_for": "Zugriff für {name} entziehen",
+    "expired": "Abgelaufen",
+    "granted": "Mit {name} geteilt",
+    "revoked": "Zugriff entzogen"
+  },
   "errors": {
     "unsupported_type": "Diese Datei ist kein unterstütztes Bild. Laden Sie eine JPEG-, PNG-, WebP-, HEIC/HEIF- oder TIFF-Datei hoch.",
     "image_too_many_pixels": "Dieses Bild hat zu viele Pixel für die Verarbeitung. Verkleinern Sie es und laden Sie es erneut hoch.",
@@ -17,6 +133,11 @@
     "direct_upload_unsupported": "Der Speicher dieses Servers unterstützt keine direkten Uploads.",
     "upload_failed": "Die Datei konnte nicht gespeichert werden. Versuchen Sie es erneut.",
     "upload_in_progress": "Dieser Upload wird gerade abgeschlossen. Versuchen Sie es gleich noch einmal.",
-    "upload_not_open": "Dieser Upload nimmt keine Teile mehr an."
+    "upload_not_open": "Dieser Upload nimmt keine Teile mehr an.",
+    "session_expired": "Ihre Sitzung ist abgelaufen. Sie werden zur Anmeldung weitergeleitet…",
+    "server_error": "Auf dem Server ist ein Problem aufgetreten. Nichts ging verloren; versuchen Sie es gleich noch einmal.",
+    "offline": "Sie scheinen offline zu sein. Nichts wurde gespeichert; versuchen Sie es erneut, sobald Sie verbunden sind.",
+    "csrf_failed": "Ihr Sitzungstoken ist veraltet. Laden Sie die Seite neu und versuchen Sie es erneut.",
+    "request_failed": "Die Anfrage ist fehlgeschlagen ({status})."
   }
 }

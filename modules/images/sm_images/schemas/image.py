@@ -43,20 +43,28 @@ class ImageOut(BaseModel):
     group_role: str | None
     created_at: datetime | None
     created_by: str | None
+    thumb_url: str | None = None
+    """The versioned ``small`` rendition (``sm_images.urls``); ``None`` until the
+    pipeline has produced one for the current display copy."""
+    display_url: str | None = None
+    """The versioned display copy; the original's bytes when there is none."""
 
     @classmethod
-    def from_row(cls, row: Any) -> ImageOut:
+    def from_row(
+        cls, row: Any, *, thumb_url: str | None = None, display_url: str | None = None
+    ) -> ImageOut:
         source = row.location_source
         return cls(
             **{name: getattr(row, name) for name in _PLAIN},
             has_display=row.display_key is not None,
             location_source=None if source is None else _SOURCE_NAMES[LocationSource(source)],
+            thumb_url=thumb_url,
+            display_url=display_url,
         )
 
 
-_PLAIN = tuple(
-    name for name in ImageOut.model_fields if name not in {"has_display", "location_source"}
-)
+_COMPUTED = {"has_display", "location_source", "thumb_url", "display_url"}
+_PLAIN = tuple(name for name in ImageOut.model_fields if name not in _COMPUTED)
 
 
 class ImagePageOut(BaseModel):
