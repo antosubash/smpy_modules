@@ -121,6 +121,12 @@ uv run python scripts/seed_usage.py
 # `make dev` and the multi-tenant run alike.
 export SM_RATE_LIMIT_PUBLIC=100000/minute
 
+# No Celery worker or Redis in e2e: background tasks run inline in the request
+# process, and a task error propagates to the caller instead of being swallowed
+# into a result nobody reads. Exported for the same reason as the line above.
+export SM_BG_TASKS_TASK_ALWAYS_EAGER=true
+export SM_BG_TASKS_TASK_EAGER_PROPAGATES=true
+
 # Multi-tenant runs only (E2E_MULTI_TENANT=1 → SM_MULTI_TENANT=true): resolve
 # the tenant from the host, so `<slug>.localhost` addresses an organisation's
 # public site the way an anonymous visitor would reach it. A spec names the

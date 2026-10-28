@@ -48,7 +48,18 @@ Downgrading *through* a merge point is ambiguous with `-1`; name the parent.
 revisions live in its repo's host, not in the wheels, so a framework bump means
 porting each new one into this history unchanged (see the `(framework 0.0.3x)`
 revisions, e.g. `307543b6146a`…`b65e04cf65d7` for 0.0.37/0.0.38) and then
-`alembic check` on SQLite *and* Postgres. SQLModel is unpinned since 0.0.38
+`alembic check` on SQLite *and* Postgres. Framework 0.0.41 added `simple_module_file_storage`,
+`simple_module_sharing` and `simple_module_background_tasks` to the host's
+dependencies. Their tables had never been in this history (the framework keeps
+`background_tasks_task_execution` in its initial schema, which this host never
+had), so `c9e3a5f1b7d2` creates it and `b5d3f08a6e17`, `e878882924e7`,
+`bb906e1a1089` and `1f5985daa10b` (background_tasks), `f733c7938fd1` (sharing)
+and `a625f0b7c912`, `a626b1c8d023` (users) follow, upstream ids unchanged and
+chained linearly. **0.0.40 hashes bearer tokens at rest**: `a626b1c8d023`
+deletes every `users_access_token` and `users_refresh_token` row, so every
+session and API token is invalidated once on upgrade, and anything that stored
+a raw token must keep the plaintext itself (the table holds only a digest).
+SQLModel is unpinned since 0.0.38
 (framework 0.0.37+ imports its `UTCDateTime`): a bare `datetime` field is
 `timestamptz` now, which is why `9d83e789a5b4` retypes the framework's
 `users_refresh_token` columns on Postgres. And since 0.0.37 the soft-delete and
@@ -221,7 +232,16 @@ Without that stack, one container matching CI's image is enough:
 docker run -d --name smpy-postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=smpy_modules postgres:16
 ```
 
-This repo does not use Redis or Celery.
+Redis and Celery are used by the **images** module (framework
+`background_tasks`, host pinned `==0.0.41`): `SM_REDIS_URL` points at dev-services'
+Redis, and `make worker` / `worker-imports` / `worker-heavy` / `worker-gpu` /
+`beat` run `host/worker.py` (`build_runner_celery`) with one queue set each.
+`make dev` starts none of them. With no worker, set
+`SM_BG_TASKS_TASK_ALWAYS_EAGER=true` (`.env.example`; the e2e server exports it,
+plus `..._TASK_EAGER_PROPAGATES=true`) and tasks run inline. CI installs
+`tippecanoe` with apt and syncs with `--all-extras --no-extra anonymize`
+(the `anonymize` extra arrives with the images module; `uv sync` rejects the
+flag until some project defines it).
 
 ## Working against an unreleased framework
 

@@ -1,6 +1,7 @@
 .PHONY: install install-py install-js dev dev-api dev-ui build gen-pages sync-module-deps typecheck \
         migrate migration downgrade test test-py test-js e2e e2e-bundle lint kill \
-        link-framework unlink-framework new-module env
+        link-framework unlink-framework new-module env \
+        worker worker-imports worker-heavy worker-gpu beat
 
 install: install-py install-js sync-module-deps
 
@@ -52,6 +53,29 @@ gen-pages:
 # Workspace modules under modules/* don't need this — npm hoists them automatically.
 sync-module-deps:
 	uv run --project host python -m simple_module_hosting sync-js-deps --host-client-app=host/client_app
+
+# Celery worker and beat processes (images, background_tasks). Not started by
+# `dev`: they need dev-services' Redis (SM_REDIS_URL) and are optional while
+# SM_BG_TASKS_TASK_ALWAYS_EAGER=true runs tasks inline. Run from the repo root;
+# PYTHONPATH=host makes host/worker.py importable as `worker`, and the root
+# .env stays the single source of settings. One queue set per target, so the
+# heavy and GPU work can run on other machines.
+CELERY = PYTHONPATH=host uv run --project host celery -A worker:celery
+
+worker:
+	$(CELERY) worker -l info -Q images,celery -c 4
+
+worker-imports:
+	$(CELERY) worker -l info -Q images_imports -c 1 -n imports@%h
+
+worker-heavy:
+	$(CELERY) worker -l info -Q images_heavy -c 2 -n heavy@%h
+
+worker-gpu:
+	$(CELERY) worker -l info -Q images_gpu -c 1 -n gpu@%h
+
+beat:
+	$(CELERY) beat -l info
 
 migrate:
 	uv run --project host alembic -c host/alembic.ini upgrade heads
