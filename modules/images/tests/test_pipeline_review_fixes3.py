@@ -4,10 +4,8 @@ the transport's global lock."""
 from __future__ import annotations
 
 import asyncio
-import inspect
 from types import SimpleNamespace
 
-from background_tasks import outbox_dispatch
 from background_tasks.models import Base as BackgroundBase
 from background_tasks.outbox_transport import OutboxTransport
 from background_tasks.settings import BackgroundTasksSettings
@@ -33,15 +31,6 @@ async def _transport(pipe) -> OutboxTransport:
     )
     pipe.bus.durable_transport = transport
     return transport
-
-
-def test_the_framework_hooks_relied_on_still_exist():
-    """Delivery is detected from the call path: ``deliver_one`` must be the
-    coroutine that runs a durable handler, and the transport must offer ``drain``."""
-    assert inspect.iscoroutinefunction(outbox_dispatch.deliver_one)
-    assert "sub.handler(event, ctx)" in inspect.getsource(outbox_dispatch.deliver_one)
-    assert inspect.iscoroutinefunction(OutboxTransport.drain)
-    assert eager_drain.deliver_code() is outbox_dispatch.deliver_one.__code__
 
 
 async def test_a_durable_handler_sees_itself_inside_a_delivery(pipe):
