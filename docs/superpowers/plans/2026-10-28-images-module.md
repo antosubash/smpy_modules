@@ -283,7 +283,7 @@
 - `test_original_never_rewritten`, which later tasks extend;
 - `test_body_limit_via_host_middleware` (through the full app).
 
-- [ ] Commit `feat(images): upload and ingest`
+- [x] Commit `feat(images): upload and ingest`
 
 ### Task 8: `exif` and `renditions` processors
 
