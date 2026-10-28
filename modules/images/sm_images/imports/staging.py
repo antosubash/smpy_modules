@@ -18,11 +18,13 @@ connection, which is released before hours of parsing.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import tempfile
 import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import AbstractAsyncContextManager
 from typing import IO, Any, Final
 
 from file_storage.contracts.service import StorageNotFoundError
@@ -84,12 +86,22 @@ def source_key(tenant: str, job_id: uuid.UUID, generation: int) -> str:
 
 
 async def put_spool(
-    runtime: Runtime, tenant: str, job_id: uuid.UUID, stream: IO[bytes], generation: int = 0
+    runtime: Runtime,
+    tenant: str,
+    job_id: uuid.UUID,
+    stream: IO[bytes],
+    generation: int = 0,
+    during: Callable[[], AbstractAsyncContextManager[Any]] | None = None,
 ) -> str:
     """Store ``stream`` as one staging attempt's source behind an intent;
-    returns its key. The caller clears the intent with the row that records it."""
+    returns its key. The caller clears the intent with the row that records it.
+    ``during`` wraps the object write only (a heartbeat: the intent's own
+    session is closed by then)."""
     key = source_key(tenant, job_id, generation)
-    async with object_intent([key], session_factory=runtime.session_factory):
+    async with (
+        object_intent([key], session_factory=runtime.session_factory),
+        (during or contextlib.nullcontext)(),
+    ):
         await runtime.store().put(
             key, _chunks(stream), content_type=_CONTENT_TYPE, size=size(stream)
         )

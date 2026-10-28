@@ -11,6 +11,14 @@ coordinate arithmetic, timestamps and the JSON the retained properties are
 stored as.
 
 Both functions take a seekable binary file (a spool) and leave it at offset 0.
+
+**The per-feature budget** (``geojson_max_feature_bytes``) counts the UTF-8
+bytes of every key and string, plus a small constant per other scalar, for
+container features and bare scalar features alike; a feature over it is never
+built (``OVERSIZE``). Accepted residual: ijson hands over each *token* already
+materialised, so one huge string is in memory before it can be counted - no
+streaming JSON parser for Python bounds a single token. It is bounded by
+``geojson_max_bytes``, the cap on the whole source.
 """
 
 from __future__ import annotations
@@ -109,8 +117,9 @@ _ENDS: Final = frozenset({"end_map", "end_array"})
 
 
 def _cost(event: str, value: Any) -> int:
+    """Bytes a token adds to its feature: UTF-8 length of keys and strings."""
     if event in ("string", "map_key"):
-        return len(value)
+        return len(value.encode("utf-8", "surrogatepass"))
     return _SCALAR_COST
 
 
@@ -120,11 +129,10 @@ def iter_features(
     """``(index, feature)`` for every feature from ``start`` on, by absolute
     index; a ``(index, Tick)`` every :data:`SKIP_TICK` features skipped before it.
 
-    Features are built from ijson's event stream with a running budget: once a
-    feature's keys and values pass ``max_feature_bytes`` its builder is dropped
-    and ``(index, OVERSIZE)`` is yielded when it ends - the rest of the file
-    streams on. (The parser still holds one token at a time; one huge string is
-    bounded only by ``geojson_max_bytes``. Every *built* feature is bounded.)
+    Features are built from ijson's event stream with a running byte budget
+    (see the module docstring): once a feature passes ``max_feature_bytes`` its
+    builder is dropped and ``(index, OVERSIZE)`` is yielded when it ends - the
+    rest of the file streams on.
     A feature may be any JSON value - the caller decides what is usable."""
     stream.seek(0)
     index, depth, size = -1, 0, 0
@@ -142,7 +150,8 @@ def iter_features(
                         depth, builder = 1, None
                     continue
                 if event not in _STARTS:  # a bare scalar feature
-                    yield index, value
+                    over = max_feature_bytes is not None and _cost(event, value) > max_feature_bytes
+                    yield index, (OVERSIZE if over else value)
                     continue
                 depth, size, builder = 1, 0, ijson.ObjectBuilder()
                 builder.event(event, value)

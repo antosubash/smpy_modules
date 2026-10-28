@@ -227,7 +227,12 @@ async def test_cleanup_loses_to_a_job_reopened_meanwhile(imp, monkeypatch):
             yield
 
     monkeypatch.setattr(terminal, "object_intent", reopened_meanwhile)
-    assert await terminal.release_staging(imp.runtime, T, job.id) is False
+    generation = (await imp.reload(job)).generation
+    past_grace = datetime.now(UTC) + timedelta(days=1)  # the janitor's sweep: eligible
+    released = await terminal.release_staging(
+        imp.runtime, T, job.id, generation, grace_cutoff=past_grace
+    )
+    assert released is False
     assert (await imp.reload(job)).source_key == kept and kept in imp.stored()
 
 

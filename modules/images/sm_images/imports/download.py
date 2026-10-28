@@ -80,6 +80,7 @@ async def _claim(
         .values(
             claim_token=token,
             claim_expires_at=stamp + timedelta(seconds=CLAIM_SECONDS),
+            claim_generation=generation,
             updated_at=stamp,
         )
         .returning(ImportItem.id)
@@ -115,6 +116,7 @@ async def _defer(
                 last_error=code,
                 claim_token=None,
                 claim_expires_at=None,
+                claim_generation=None,
                 updated_at=now(),
             )
             .execution_options(**SYNC)

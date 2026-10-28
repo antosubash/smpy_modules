@@ -347,6 +347,7 @@ def upgrade() -> None:
         sa.Column("attempts", sa.Integer(), nullable=False),
         sa.Column("claim_token", sa.String(length=64), nullable=True),
         sa.Column("claim_expires_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("claim_generation", sa.Integer(), nullable=True),
         sa.Column("last_error", sa.String(length=2000), nullable=True),
         sa.Column("lat", sa.Float(), nullable=True),
         sa.Column("lng", sa.Float(), nullable=True),

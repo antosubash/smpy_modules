@@ -34,6 +34,9 @@ class ImportItem(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[
     claim_token: str | None = Field(default=None, max_length=64)
     """The download currently holding this item; settlement requires it."""
     claim_expires_at: datetime | None = dt_col()
+    claim_generation: int | None = Field(default=None)
+    """The job generation the claim was taken under: a new run releases only
+    claims older than its own."""
     last_error: str | None = Field(default=None, max_length=2000)
     lat: float | None = Field(default=None)
     lng: float | None = Field(default=None)

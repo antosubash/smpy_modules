@@ -78,6 +78,7 @@ async def mark_item(
         "updated_at": jobs.now(),
         "claim_token": None,
         "claim_expires_at": None,
+        "claim_generation": None,
     }
     if image_id is not None:
         values["image_id"] = image_id

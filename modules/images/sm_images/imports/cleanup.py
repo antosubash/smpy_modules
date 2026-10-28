@@ -84,7 +84,7 @@ async def reap_staging(runtime: Runtime, tenant: str, now_: datetime, grace_days
     (a finished base64 job with failures keeps its source until then)."""
     cutoff = now_ - timedelta(days=grace_days)
     stmt = (
-        select(ImportJob.id)
+        select(ImportJob.id, ImportJob.generation)
         .where(
             ImportJob.tenant_id == tenant,
             ImportJob.status.in_(TERMINAL),
@@ -98,9 +98,9 @@ async def reap_staging(runtime: Runtime, tenant: str, now_: datetime, grace_days
         .limit(SWEEP_CAP)
     )
     async with runtime.session_factory() as db:
-        ids = list((await db.execute(stmt)).scalars())
+        rows = list((await db.execute(stmt)).all())
         await finalize_session(db)
     done = 0
-    for job_id in ids:
-        done += await release_staging(runtime, tenant, job_id)
+    for job_id, generation in rows:
+        done += await release_staging(runtime, tenant, job_id, generation, grace_cutoff=cutoff)
     return done

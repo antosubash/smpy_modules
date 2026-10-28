@@ -106,6 +106,7 @@ async def reset_batch(runtime: Runtime, tenant: str, job_id: uuid.UUID, generati
                         last_error=None,
                         claim_token=None,
                         claim_expires_at=None,
+                        claim_generation=None,
                         updated_at=now(),
                     )
                 )

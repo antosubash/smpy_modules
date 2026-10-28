@@ -31,7 +31,7 @@ from typing import IO, Final
 
 import httpx
 from simple_module_db import finalize_session, tenant_context
-from sqlalchemy import update
+from sqlalchemy import or_, update
 
 from sm_images.imports import chunk, jobs, launch, lookup, settle, staging, terminal
 from sm_images.imports.beat import beating
@@ -90,9 +90,15 @@ async def _stage(
         job.source_url, max_bytes=settings.geojson_max_bytes, beat=beat
     )
     try:
-        async with beating(runtime, tenant, job.id, job.generation):
+
+        def beat_now():
+            return beating(runtime, tenant, job.id, job.generation)
+
+        async with beat_now():  # counting makes no database call
             total = await staging.count(source, settings.geojson_max_features)
-            key = await staging.put_spool(runtime, tenant, job.id, source, job.generation)
+        key = await staging.put_spool(
+            runtime, tenant, job.id, source, job.generation, during=beat_now
+        )
         async with runtime.session_factory() as db:
             stmt = (
                 update(ImportJob)
@@ -131,20 +137,29 @@ async def _stage(
 async def _hand_out_pending(runtime: Runtime, tenant: str, job: jobs.JobSnap, below: int) -> None:
     """A URL run hands out the items already recorded and still pending - a
     resume, a retry, a reclaim after a crash - for its own generation. Claims
-    from before are released first: whoever held them can no longer settle
-    (the generation fence), so the items are not stranded until expiry."""
-    release = (
-        update(ImportItem)
-        .where(
-            ImportItem.job_id == job.id,
-            ImportItem.tenant_id == tenant,
-            ImportItem.status == ItemStatus.PENDING,
-            ImportItem.claim_token.is_not(None),
-        )
-        .values(claim_token=None, claim_expires_at=None)
-        .execution_options(**jobs.SYNC)
-    )
+    taken under an *older* generation are released first - whoever holds them
+    can no longer settle (the generation fence) - in a transaction fenced on
+    this run's generation still being current, so a delayed old run never
+    releases the claims of the run that replaced it."""
     async with runtime.session_factory() as db:
+        if not await jobs.bump(db, tenant, job.id, {}, job.generation):
+            await db.rollback()  # a newer generation owns the job: touch nothing
+            raise chunk.Stopped()
+        release = (
+            update(ImportItem)
+            .where(
+                ImportItem.job_id == job.id,
+                ImportItem.tenant_id == tenant,
+                ImportItem.status == ItemStatus.PENDING,
+                ImportItem.claim_token.is_not(None),
+                or_(
+                    ImportItem.claim_generation.is_(None),
+                    ImportItem.claim_generation < job.generation,
+                ),
+            )
+            .values(claim_token=None, claim_expires_at=None, claim_generation=None)
+            .execution_options(**jobs.SYNC)
+        )
         await db.execute(release)
         await finalize_session(db)
     after = -1

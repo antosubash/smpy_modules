@@ -30,12 +30,21 @@ async def beating(
     runtime: Runtime, tenant: str, job_id: uuid.UUID, generation: int
 ) -> AsyncIterator[Beat]:
     """Heartbeat every :data:`HEARTBEAT_SECONDS` in the background while a long
-    step (counting, storing or reading back the source) runs."""
+    step (counting, storing or reading back the source) runs.
+
+    Stopped cooperatively, never cancelled: a beat already talking to the
+    database finishes first. Cancelling a query mid-flight would leave its
+    connection unusable."""
     beat = Beat()
+    stop = asyncio.Event()
 
     async def loop() -> None:
         while True:
-            await asyncio.sleep(HEARTBEAT_SECONDS)
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=HEARTBEAT_SECONDS)
+                return
+            except TimeoutError:
+                pass
             try:
                 if not await jobs.heartbeat(runtime, tenant, job_id, generation):
                     beat.lost = True
@@ -47,6 +56,5 @@ async def beating(
     try:
         yield beat
     finally:
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
+        stop.set()
+        await task
