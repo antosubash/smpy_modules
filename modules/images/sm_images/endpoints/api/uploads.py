@@ -72,6 +72,7 @@ async def start_upload(
     if who.user_id is None:  # pragma: no cover - require_view admits only signed-in callers
         raise UploadNotFound("Upload not found")
     token, ticket, urls, presigned = await direct.start(
+        ingest.db,
         store_for(request.app),
         collection,
         filename=body.filename,

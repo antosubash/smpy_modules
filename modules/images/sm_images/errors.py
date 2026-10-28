@@ -97,6 +97,12 @@ class PartsMismatch(Conflict):
     code = constants.CODE_PARTS_MISMATCH
 
 
+class UploadInProgress(Conflict):
+    """The upload session is claimed by a ``complete`` that is still running."""
+
+    code = constants.CODE_UPLOAD_IN_PROGRESS
+
+
 class DirectUploadUnsupported(ServiceUnavailable):
     code = constants.CODE_DIRECT_UNSUPPORTED
 

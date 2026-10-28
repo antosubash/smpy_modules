@@ -48,6 +48,9 @@ class ImagesModule(ModuleBase):
         # ``register_settings`` hands it to the services container instead of
         # the pydantic defaults.
         self.settings = None
+        # The host's tenancy mode, set by ``on_startup``; the sharing loader
+        # reads it (``resource_types``), and ``None`` before startup fails closed.
+        self.tenancy = None
 
     def register_settings(self, app: FastAPI) -> None:
         """Register the settings class and mount the services container.
@@ -77,7 +80,7 @@ class ImagesModule(ModuleBase):
     def register_resource_types(self, registry: ResourceTypeRegistry) -> None:
         from sm_images import resource_types
 
-        resource_types.register(registry)
+        resource_types.register(registry, lambda: self.tenancy)
 
     def register_menu_items(self, registry: MenuRegistry) -> None:
         from sm_images import menu
@@ -139,7 +142,7 @@ class ImagesModule(ModuleBase):
         from sm_images import intents, tenancy
 
         setattr(app.state, constants.MODULE_ATTR, self)
-        tenancy.configure(app)
+        self.tenancy = tenancy.configure(app)
         db = getattr(getattr(app.state, "sm", None), "db", None)
         if (session_class := getattr(db, "sync_session_class", None)) is not None:
             tenancy.install_guard(session_class)

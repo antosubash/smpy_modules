@@ -18,7 +18,9 @@ from typing import Any, Final
 
 from PIL import Image
 
-from sm_images.ingest.sniff import sniff as _registers_heif  # noqa: F401 - registers pillow-heif
+from sm_images._heif import register_heif
+
+register_heif()
 
 __all__ = ["ExifData", "read_exif"]
 
@@ -141,5 +143,5 @@ def read_exif(data: bytes) -> ExifData:
         captured_at=_captured_at(base, sub),
         make=_text(base.get(0x010F)),
         model=_text(base.get(0x0110)),
-        orientation=orientation if isinstance(orientation, int) else None,
+        orientation=orientation if isinstance(orientation, int) and 1 <= orientation <= 8 else None,
     )

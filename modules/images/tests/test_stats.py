@@ -124,3 +124,66 @@ async def test_recompute_of_an_empty_collection_clears_the_bbox(db):
     c = await _row(db, coll)
     assert (c.image_count, c.located_count) == (0, 0)
     assert _bbox(c) == (None, None, None, None)
+
+
+def _image(coll: Collection, key: str, lat: float | None = None, **kw) -> Image:
+    return Image(
+        collection_id=coll.id,
+        storage_key=key,
+        filename="f",
+        content_type="image/jpeg",
+        size_bytes=1,
+        lat=lat,
+        lng=lat,
+        **kw,
+    )
+
+
+async def test_recompute_has_no_read_then_write_window(db, db_state):
+    """P2-4: an image another transaction adds (and counts) while ``recompute``
+    runs is never lost. The concurrent writer is let in before any statement
+    after recompute's first; a single ``UPDATE ... (SELECT ...)`` has no second
+    statement, so the counters always match the rows."""
+    coll = await _seed(db)
+    db.add(_image(coll, "a", 1.0))
+    await db.commit()
+
+    real_execute = db.execute
+    calls: list[int] = []
+
+    async def concurrent_upload() -> None:
+        async with db_state.session_factory() as other:
+            other.add(_image(coll, "b", 40.0))
+            await other.flush()
+            await stats.on_image_added(other, coll.id, 40.0, 40.0)
+            await other.commit()
+
+    async def interleaved(*args, **kwargs):
+        if calls:
+            await concurrent_upload()
+        calls.append(1)
+        return await real_execute(*args, **kwargs)
+
+    db.execute = interleaved  # type: ignore[method-assign]
+    try:
+        await stats.recompute(db, coll.id)
+        await db.commit()
+    finally:
+        db.execute = real_execute  # type: ignore[method-assign]
+    rows = (await db.execute(select(Image).where(Image.collection_id == coll.id))).scalars().all()
+    c = await _row(db, coll)
+    assert c.image_count == len(rows)
+    assert c.located_count == len([r for r in rows if r.lat is not None])
+    assert c.bbox_maxx == max(r.lng for r in rows)
+
+
+async def test_recompute_ignores_trashed_images(db):
+    """The soft-delete filter does not reach the subqueries of an ``UPDATE``,
+    so recompute must exclude the trash itself."""
+    coll = await _seed(db)
+    db.add_all([_image(coll, "a"), _image(coll, "b", 5.0, is_deleted=True)])
+    await db.commit()
+    await stats.recompute(db, coll.id)
+    c = await _row(db, coll)
+    assert (c.image_count, c.located_count) == (1, 0)
+    assert _bbox(c) == (None, None, None, None)

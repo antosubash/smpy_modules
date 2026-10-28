@@ -17,6 +17,7 @@ from sm_images.models.enums import (
     PromptScope,
     ReviewStatus,
     StepStatus,
+    UploadStatus,
     Visibility,
 )
 from sm_images.models.group import Group
@@ -27,6 +28,7 @@ from sm_images.models.object_intent import ObjectIntent
 from sm_images.models.prompt import Prompt, PromptResult
 from sm_images.models.rendition import Rendition
 from sm_images.models.step_run import StepRun
+from sm_images.models.upload_session import UploadSession
 
 __all__ = [
     "Base",
@@ -48,5 +50,7 @@ __all__ = [
     "ReviewStatus",
     "StepRun",
     "StepStatus",
+    "UploadSession",
+    "UploadStatus",
     "Visibility",
 ]

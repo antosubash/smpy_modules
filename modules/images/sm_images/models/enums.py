@@ -68,6 +68,16 @@ class PromptScope(str, enum.Enum):  # noqa: UP042
     GROUP = "group"
 
 
+class UploadStatus(str, enum.Enum):  # noqa: UP042
+    """A direct upload's lifecycle (``images_upload_session``). Leaving ``open``
+    is a claim: whoever moves a session to ``completing`` or ``aborted`` owns it."""
+
+    OPEN = "open"
+    COMPLETING = "completing"
+    COMPLETED = "completed"
+    ABORTED = "aborted"
+
+
 class PromptInputs(str, enum.Enum):  # noqa: UP042
     IMAGES = "images"
     RESULTS = "results"

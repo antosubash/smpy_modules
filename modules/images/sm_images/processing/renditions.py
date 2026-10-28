@@ -15,7 +15,9 @@ from typing import Final
 
 from PIL import Image, ImageOps
 
-from sm_images.ingest.sniff import sniff as _registers_heif  # noqa: F401 - registers pillow-heif
+from sm_images._heif import register_heif
+
+register_heif()
 
 __all__ = ["make_renditions"]
 
@@ -45,7 +47,7 @@ def make_renditions(
             raise ValueError(f"rendition {name!r}: size must be positive, got {edge}")
     with Image.open(io.BytesIO(display_bytes)) as src:
         src.load()
-        oriented = ImageOps.exif_transpose(_to_rgb(ImageOps.exif_transpose(src)))
+        oriented = _to_rgb(ImageOps.exif_transpose(src))
     out: dict[str, tuple[bytes, int, int]] = {}
     for name, edge in sizes.items():
         img = oriented.copy()

@@ -8,7 +8,7 @@ SQLite does not have as two-argument scalars.
 
 They only ever *grow* the box and clamp counters at zero. A removal or a lost
 location cannot shrink a box incrementally; :func:`recompute` does that, from
-one aggregate, and is what the reconcile task and the delete paths call.
+one ``UPDATE`` of correlated aggregates, and is what the reconcile task and the delete paths call.
 
 Coordinates are ``lat, lng``; the box is ``(minx, miny, maxx, maxy)`` =
 ``(lng, lat, lng, lat)``. ``(0, 0)`` is a valid location.
@@ -98,31 +98,33 @@ async def on_location_changed(
         await _apply(db, collection_id, values)
 
 
+def _over_images(*columns: Any) -> Any:
+    """A scalar subquery over the collection's live images, correlated on the
+    ``UPDATE``'s row. Trash is excluded here: the framework's soft-delete filter
+    covers ``SELECT`` statements, not the subqueries of an ``UPDATE``."""
+    return (
+        select(*columns)
+        .where(Image.collection_id == Collection.id, Image.is_deleted.is_(False))
+        .scalar_subquery()
+    )
+
+
 async def recompute(db: Any, collection_id: uuid.UUID) -> None:
-    """Counts and box from the images themselves (trashed ones excluded by the
-    soft-delete filter). The only way the box shrinks."""
-    row = (
-        await db.execute(
-            select(
-                func.count(Image.id),
-                func.count(Image.lat),
-                func.min(Image.lng),
-                func.min(Image.lat),
-                func.max(Image.lng),
-                func.max(Image.lat),
-            ).where(Image.collection_id == collection_id)
-        )
-    ).one()
-    total, located, minx, miny, maxx, maxy = row
+    """Counts and box from the images themselves. The only way the box shrinks.
+
+    One ``UPDATE ... SET col = (SELECT ...)`` (portable to SQLite and
+    Postgres): no read-then-write window in which a concurrent upload's
+    increment could be overwritten by a stale aggregate.
+    """
     await _apply(
         db,
         collection_id,
         {
-            "image_count": total,
-            "located_count": located,
-            "bbox_minx": minx,
-            "bbox_miny": miny,
-            "bbox_maxx": maxx,
-            "bbox_maxy": maxy,
+            "image_count": _over_images(func.count(Image.id)),
+            "located_count": _over_images(func.count(Image.lat)),
+            "bbox_minx": _over_images(func.min(Image.lng)),
+            "bbox_miny": _over_images(func.min(Image.lat)),
+            "bbox_maxx": _over_images(func.max(Image.lng)),
+            "bbox_maxy": _over_images(func.max(Image.lat)),
         },
     )

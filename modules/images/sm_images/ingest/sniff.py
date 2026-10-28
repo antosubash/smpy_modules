@@ -1,17 +1,17 @@
 """What an upload *is*, from its magic bytes. The filename and the declared
 content type are never trusted (portal ``upload_guards.sniff_image_content_type``).
 
-Importing this module registers ``pillow-heif``'s opener with Pillow, once, so
-everything that sniffs can also open what it accepted (HEIC/HEIF).
+It registers ``pillow-heif``'s opener (:func:`sm_images._heif.register_heif`)
+on import, so everything that sniffs can also open what it accepted (HEIC/HEIF).
 """
 
 from __future__ import annotations
 
 from typing import Final
 
-import pillow_heif
+from sm_images._heif import register_heif
 
-pillow_heif.register_heif_opener()
+register_heif()
 
 __all__ = ["EXTENSIONS", "sniff"]
 

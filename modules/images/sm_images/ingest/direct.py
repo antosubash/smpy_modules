@@ -4,22 +4,25 @@ The parts go through ``file_storage``'s ``DirectUploadBackend``: presigned URLs
 straight to storage on S3, or, on a backend that cannot presign (filesystem),
 ``PUT /api/images/uploads/{id}/parts/{n}`` relayed through this app.
 
-**No session table.** The upload is staged straight at the image's final
-``original_key`` (no copy on completion), and that key's write-ahead intent is
-recorded when the upload starts - so an abandoned upload is an orphan the
-janitor already knows about. Everything else the later calls need (key,
-backend upload id, collection, image id, tenant, owner, size, part size) is in
-the ``upload_id`` the client gets back: a token signed with the host's
-``secret_key`` (``itsdangerous``, the library behind the framework's session
-cookie) and valid for ``DIRECT_UPLOAD_TTL_SECONDS``. A tampered, expired,
-foreign-tenant or other user's token is a 404 like an unknown one. The backend's
-own part listing is the truth about what arrived, as in ``file_storage``'s own
-sessions; the database never mirrors it.
+**State is a table, the handle is a token.** The upload is staged straight at
+the image's final ``original_key`` (no copy on completion), and that key's
+write-ahead intent is recorded when the upload starts - so an abandoned upload
+is an orphan the janitor already knows about. ``start`` also records an
+``images_upload_session`` row (``ingest.upload_session``), and that row is
+authoritative: ``complete`` and ``abort`` each claim it by compare-and-set
+before touching storage, so an abort can never delete an object a complete
+has validated and is inserting (it gets 409 ``upload_in_progress``), and a
+complete after an abort is a 404. The ``upload_id`` the client gets back is a
+token signed with the host's ``secret_key`` (``itsdangerous``, the library
+behind the framework's session cookie), valid for
+``DIRECT_UPLOAD_TTL_SECONDS``, naming the session and carrying what the part
+relay needs. A tampered, expired, foreign-tenant or other user's token is a
+404 like an unknown one. The backend's own part listing is the truth about
+what arrived, as in ``file_storage``'s own sessions; the database never
+mirrors it.
 
 Replay is safe: once the image row exists, ``complete`` answers with it again,
-and nothing here deletes a key a row references - including the winner's
-original when two ``complete`` calls for one upload race (the loser re-reads the
-row, see ``IngestService.add_image``).
+and nothing here deletes a key a row references.
 
 **The token is signed, not encrypted.** Anyone holding it can read the key,
 ids and size inside (base64 JSON); only forging or altering it is prevented.
@@ -53,12 +56,13 @@ from sm_images.errors import (
     UnsupportedType,
     UploadNotFound,
 )
+from sm_images.ingest import upload_session as state
 from sm_images.ingest.meta import IngestMeta
 from sm_images.ingest.service import Duplicate, IngestService, safe_filename
 from sm_images.ingest.sniff import EXTENSIONS, sniff
 from sm_images.ingest.ticket import _BAD_PART, _GONE, Ticket, load_ticket, serializer
 from sm_images.intents import object_intent
-from sm_images.models import Collection, Image
+from sm_images.models import Collection, Image, UploadStatus
 from sm_images.tenancy import bound_tenant
 
 __all__ = ["Ticket", "abort", "complete", "load_ticket", "start", "write_part"]
@@ -89,6 +93,7 @@ def _declared_type(filename: str, content_type: str | None) -> str:
 
 
 async def start(
+    db: Any,
     store: Any,
     collection: Collection,
     *,
@@ -114,6 +119,7 @@ async def start(
     async with object_intent([key], session_factory=intent_factory):
         upload = await backend.create_multipart(key, declared)
     ticket = Ticket(
+        session=str(uuid.uuid4()),
         key=key,
         upload=upload,
         collection=str(collection.id),
@@ -125,6 +131,8 @@ async def start(
         filename=safe_filename(filename),
         content_type=declared,
     )
+    db.add(state.new_session(ticket, collection.id))
+    await db.flush()
     token = signer.dumps(asdict(ticket))
     numbers = range(1, ticket.parts + 1)
     try:
@@ -185,19 +193,42 @@ async def complete(
     filename: str | None,
     meta: IngestMeta,
 ) -> Image | Duplicate:
-    """Assemble, then re-check the *stored* object (the declared size was only a
-    claim) and ingest it in place."""
+    """Claim the session, assemble, re-check the *stored* object (the declared
+    size was only a claim) and ingest it in place; ``completed`` commits with
+    the row. A failure hands the claim back (``state.settle``)."""
     existing = await _existing(ingest.db, ticket)
     if existing is not None:
         return existing
-    try:
-        await _assemble(ingest.store, ticket, claimed)
-    except StorageError as exc:
-        # A concurrent complete already assembled (and consumed) the parts.
+    if not await state.claim_complete(ingest.db, ticket):
         existing = await _existing(ingest.db, ticket)
-        if existing is not None:
-            return existing
-        raise UploadNotFound(_GONE) from exc
+        if existing is None:
+            raise UploadNotFound(_GONE)
+        return existing
+    assembled = False
+    try:
+        try:
+            await _assemble(ingest.store, ticket, claimed)
+        except StorageError as exc:
+            raise UploadNotFound(_GONE) from exc
+        assembled = True
+        outcome = await _ingest(ingest, collection, ticket, filename=filename, meta=meta)
+    except Exception:
+        await state.settle(
+            ingest.db, ticket, UploadStatus.ABORTED if assembled else UploadStatus.OPEN
+        )
+        raise
+    await state.finish(ingest.db, ticket)
+    return outcome
+
+
+async def _ingest(
+    ingest: IngestService,
+    collection: Collection,
+    ticket: Ticket,
+    *,
+    filename: str | None,
+    meta: IngestMeta,
+) -> Image | Duplicate:
     head = await ingest.store.head(ticket.key)
     if head is None:
         raise UploadNotFound(_GONE)
@@ -232,7 +263,11 @@ async def _drop(ingest: IngestService, ticket: Ticket) -> None:
 
 
 async def abort(db: Any, store: Any, ticket: Ticket) -> None:
-    """Discard the parts, and the staged object unless a row already owns it."""
+    """Claim the session ``aborted``, then discard the parts and the staged
+    object (never one a row owns). A completed upload is left alone; one a
+    complete is still working on is 409 ``upload_in_progress``."""
+    if not await state.claim_abort(db, ticket):
+        return
     await _backend(store).abort_multipart(ticket.key, ticket.upload)
     if await _existing(db, ticket) is None:
         await store.delete_keys([ticket.key])

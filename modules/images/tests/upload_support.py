@@ -39,7 +39,9 @@ def png(**kw: Any) -> bytes:
 
 
 def heic(**kw: Any) -> bytes:
-    import sm_images.ingest.sniff  # noqa: F401 - registers the HEIF opener
+    from sm_images._heif import register_heif
+
+    register_heif()
 
     return picture("HEIF", **kw)
 

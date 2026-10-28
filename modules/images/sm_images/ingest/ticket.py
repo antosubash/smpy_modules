@@ -26,6 +26,8 @@ _BAD_PART = "A part is missing or has the wrong size"
 
 @dataclass(frozen=True)
 class Ticket:
+    session: str
+    """The ``images_upload_session`` row's id: the state, which this handle only names."""
     key: str
     upload: str
     collection: str
