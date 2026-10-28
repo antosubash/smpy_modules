@@ -239,9 +239,9 @@ Redis, and `make worker` / `worker-imports` / `worker-heavy` / `worker-gpu` /
 `make dev` starts none of them. With no worker, set
 `SM_BG_TASKS_TASK_ALWAYS_EAGER=true` (`.env.example`; the e2e server exports it,
 plus `..._TASK_EAGER_PROPAGATES=true`) and tasks run inline. CI installs
-`tippecanoe` with apt and syncs with `--all-extras --no-extra anonymize`
-(the `anonymize` extra arrives with the images module; `uv sync` rejects the
-flag until some project defines it).
+`tippecanoe` with apt in the Python-tests and Postgres jobs. (Task 2 will
+add `--no-extra anonymize` to the CI syncs together with the `anonymize`
+extra; `uv sync` rejects the flag until some project defines it.)
 
 ## Working against an unreleased framework
 

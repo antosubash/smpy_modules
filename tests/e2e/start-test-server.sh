@@ -13,6 +13,21 @@ if [[ -z "${SM_DATABASE_URL:-}" ]]; then
   exit 1
 fi
 
+# No Celery worker or Redis in e2e: background tasks run inline in the request
+# process, and a task error propagates to the caller instead of being swallowed
+# into a result nobody reads. Exported here, before the first command that builds the app (the
+# set_setting.py calls below do, and fail on the broker check otherwise).
+export SM_BG_TASKS_TASK_ALWAYS_EAGER=true
+# background_tasks refuses to boot outside development/testing (the bundle run
+# is production) while its broker or result backend points at localhost, which
+# the default does, eager or not. In-process transports satisfy that check and
+# need no Redis.
+export SM_BG_TASKS_BROKER_URL=memory://
+export SM_BG_TASKS_RESULT_BACKEND=cache+memory://
+# The invalidation transport would otherwise connect to the broker as Redis.
+export SM_BG_TASKS_BROADCAST_INVALIDATIONS=false
+export SM_BG_TASKS_TASK_EAGER_PROPAGATES=true
+
 # Start from an empty database. How that is done depends on the backend, and
 # the parameter expansion below is only meaningful for one of them: on a
 # Postgres URL `${SM_DATABASE_URL#sqlite+aiosqlite:///}` matches nothing, so
@@ -120,12 +135,6 @@ uv run python scripts/seed_usage.py
 # Set here, before both `exec`s below, it reaches the bundle server,
 # `make dev` and the multi-tenant run alike.
 export SM_RATE_LIMIT_PUBLIC=100000/minute
-
-# No Celery worker or Redis in e2e: background tasks run inline in the request
-# process, and a task error propagates to the caller instead of being swallowed
-# into a result nobody reads. Exported for the same reason as the line above.
-export SM_BG_TASKS_TASK_ALWAYS_EAGER=true
-export SM_BG_TASKS_TASK_EAGER_PROPAGATES=true
 
 # Multi-tenant runs only (E2E_MULTI_TENANT=1 → SM_MULTI_TENANT=true): resolve
 # the tenant from the host, so `<slug>.localhost` addresses an organisation's

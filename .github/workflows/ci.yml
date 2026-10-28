@@ -87,7 +87,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tippecanoe
 
       - name: Sync workspace (all packages, with dev extras)
-        run: uv sync --locked --all-packages --all-extras --no-extra anonymize
+        run: uv sync --locked --all-packages --all-extras
 
       # Every modules/*/, each from its own directory, all of them even after
       # one fails — see the script for why.
@@ -137,6 +137,10 @@ jobs:
 
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
+
+      # The images module shells out to tippecanoe to build vector tiles.
+      - name: Install tippecanoe
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tippecanoe
 
       - name: Sync workspace (all packages)
         run: uv sync --locked --all-packages
@@ -528,12 +532,8 @@ jobs:
         run: uv python install ${{ env.PYTHON_VERSION }}
 
 
-      # The images module shells out to tippecanoe to build vector tiles.
-      - name: Install tippecanoe
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tippecanoe
-
       - name: Sync workspace
-        run: uv sync --locked --all-packages --all-extras --no-extra anonymize
+        run: uv sync --locked --all-packages --all-extras
 
       # scripts/tests/test_nav_icons.py reads the framework's NavIcon.tsx out
       # of node_modules and skips itself when it is absent.
