@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+import importlib.util
 import json
 import os
 import subprocess
@@ -117,7 +118,8 @@ def test_builtins_are_registered_by_default(monkeypatch):
     monkeypatch.setattr(importlib.metadata, "entry_points", _eps())
     monkeypatch.setattr(extensions, "_BUILTIN_LOADERS", REAL_LOADERS)
     extensions.load_extensions()
-    assert sorted(reg.all_steps()) == ["exif", "renditions"]
+    quality = ["quality"] if importlib.util.find_spec("cv2") else []  # the [quality] extra
+    assert sorted(reg.all_steps()) == sorted(["exif", "renditions", *quality])
 
 
 def test_plugin_package_import_error_is_not_swallowed(monkeypatch):

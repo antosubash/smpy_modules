@@ -33,7 +33,13 @@ def _load_builtin_steps() -> None:
     register_builtins()
 
 
-_BUILTIN_LOADERS: list[Callable[[], None]] = [_load_builtin_steps]
+def _load_quality_step() -> None:
+    from sm_images.steps.quality import register_quality
+
+    register_quality()  # only when the [quality] extra (cv2) is installed
+
+
+_BUILTIN_LOADERS: list[Callable[[], None]] = [_load_builtin_steps, _load_quality_step]
 """Callables that ``register_builtin`` the reserved-id steps, run before plugins."""
 
 

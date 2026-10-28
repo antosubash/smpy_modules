@@ -68,9 +68,7 @@ async def test_task_spawned_in_a_durable_handler_does_not_deadlock(pipe, monkeyp
     assert "eager_drain_timeout" in caplog.text
 
 
-async def test_request_inline_delivery_whose_handler_awaits_a_submitting_task(
-    pipe, monkeypatch
-):
+async def test_request_inline_delivery_whose_handler_awaits_a_submitting_task(pipe, monkeypatch):
     """The request variant: the delivery runs inline on the publisher's task
     holding the dispatcher lock; the child's own delivery queues behind it."""
     transport, coll, parent, child, delivered, finished = await _setup(pipe, monkeypatch)

@@ -9,9 +9,11 @@ framing), and refuses one above it before any handler or auth runs.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from httpx import ASGITransport, AsyncClient
-from simple_module_hosting import Settings, create_app
+from simple_module_hosting import Settings, app_builder, create_app
 from sm_images import constants
 from sm_images.settings import ImagesSettings
 
@@ -20,9 +22,17 @@ UPLOAD = "/api/images/collections/00000000-0000-0000-0000-000000000001/images"
 ROUTES = [UPLOAD, f"{UPLOAD}/base64", "/api/images/uploads/token/complete"]
 
 
+REPO = Path(__file__).resolve().parents[3]
+
+
 @pytest.fixture(scope="module")
 def host_app():
-    return create_app(Settings())
+    """``create_app`` resolves the host's templates from the project root it
+    computed at import (the working directory then). Run from ``modules/images/``
+    (CI, the Makefile) that is the wrong directory, so it is pointed at the repo."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(app_builder, "_PROJECT_ROOT", REPO)
+        yield create_app(Settings())
 
 
 async def _post(app, path: str, declared: int):

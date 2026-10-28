@@ -38,6 +38,7 @@ READ_ROUTES: list[ReadRoute] = [
     ReadRoute("GET", "/api/images/collections/{collection_id}/share-candidates", COLLECTION),
     ReadRoute("GET", "/api/images/collections/{collection_id}/images", COLLECTION),
     ReadRoute("GET", "/api/images/images/{image_id}", IMAGE),
+    ReadRoute("GET", "/api/images/collections/{collection_id}/pipeline", COLLECTION),
 ]
 
 NOT_A_LEAK_SURFACE: frozenset[str] = frozenset()
