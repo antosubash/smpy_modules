@@ -2,9 +2,12 @@
 
 ``images/<tenant>/<collection>/<image>/original.<ext>``, ``display.<gen>.jpg``,
 ``r/<size>.<gen>.jpg``, ``images/<tenant>/<collection>/map.pmtiles`` and
-``images/<tenant>/imports/<job>/<name>``. Display and rendition keys carry a
-generation so a rewrite never overwrites the object a stale worker may still be
-reading or about to delete.
+``images/<tenant>/imports/<job>/<name>``. Display and rendition keys carry the
+display generation (for caches) **and the attempt** - the step run's lease
+token - because two attempts can load the same generation: a stale worker and
+the one that reclaimed its lease. The DB fence decides which is published; the
+attempt in the key is what stops the loser overwriting or deleting the
+winner's bytes.
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ import re
 
 ROOT = "images"
 _EXT_UNSAFE = re.compile(r"[^a-z0-9]")
+_ATTEMPT_UNSAFE = re.compile(r"[^a-z0-9]")
 
 
 def _ext(ext: str) -> str:
@@ -27,12 +31,21 @@ def original_key(tenant: str, collection: str, image: str, ext: str) -> str:
     return f"{_image_prefix(tenant, collection, image)}/original.{_ext(ext)}"
 
 
-def display_key(tenant: str, collection: str, image: str, generation: int) -> str:
-    return f"{_image_prefix(tenant, collection, image)}/display.{generation}.jpg"
+def _attempt(attempt: str) -> str:
+    return _ATTEMPT_UNSAFE.sub("", attempt.lower())[:32] or "0"
 
 
-def rendition_key(tenant: str, collection: str, image: str, size: str, generation: int) -> str:
-    return f"{_image_prefix(tenant, collection, image)}/r/{size}.{generation}.jpg"
+def display_key(tenant: str, collection: str, image: str, generation: int, attempt: str) -> str:
+    return (
+        f"{_image_prefix(tenant, collection, image)}/display.{generation}.{_attempt(attempt)}.jpg"
+    )
+
+
+def rendition_key(
+    tenant: str, collection: str, image: str, size: str, generation: int, attempt: str
+) -> str:
+    prefix = _image_prefix(tenant, collection, image)
+    return f"{prefix}/r/{size}.{generation}.{_attempt(attempt)}.jpg"
 
 
 def map_key(tenant: str, collection: str) -> str:

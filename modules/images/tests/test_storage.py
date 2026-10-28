@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from file_storage.contracts.service import StorageNotFoundError
-from sm_images.storage import ImageStore, store_for
+from sm_images.storage import ImageStore, reset_worker_store, store_for, worker_store
 
 KEY = "images/default/c/i/original.jpg"
 
@@ -69,3 +69,59 @@ async def test_delete_keys_ignores_missing(images_app, storage):
 async def test_read_missing_raises(images_app, storage):
     with pytest.raises(StorageNotFoundError):
         await store_for(images_app[0]).read("images/none")
+
+
+# -- worker_store: cached per process, rebuilt when the backend settings change --
+
+
+@pytest.fixture
+def worker_settings(monkeypatch):
+    import background_tasks
+    from file_storage import backends
+    from file_storage.settings import FileStorageSettings
+
+    current = {"value": FileStorageSettings(backend="filesystem", fs_root_path="/tmp/a")}
+    built: list[str] = []
+
+    def fake_settings_for(cls, package, **kw):
+        assert (cls, package) == (FileStorageSettings, "file_storage")
+        return current["value"].model_copy(deep=True)
+
+    def fake_build(settings):
+        built.append(settings.fs_root_path)
+        return object()
+
+    monkeypatch.setattr(background_tasks, "settings_for", fake_settings_for, raising=False)
+    monkeypatch.setattr(backends, "build_backend", fake_build)
+    reset_worker_store()
+    yield current, built
+    reset_worker_store()
+
+
+def test_worker_store_is_cached_while_settings_are_unchanged(worker_settings):
+    _, built = worker_settings
+    assert worker_store() is worker_store()
+    assert built == ["/tmp/a"]
+
+
+def test_worker_store_rebuilds_when_backend_settings_change(worker_settings):
+    from file_storage.settings import FileStorageSettings
+
+    current, built = worker_settings
+    first = worker_store()
+    current["value"] = FileStorageSettings(backend="filesystem", fs_root_path="/tmp/b")
+    second = worker_store()
+    assert second is not first
+    assert built == ["/tmp/a", "/tmp/b"]
+    assert worker_store() is second
+
+
+def test_worker_store_rebuilds_in_a_forked_child(worker_settings, monkeypatch):
+    import os
+
+    _, built = worker_settings
+    first = worker_store()
+    pid = os.getpid()
+    monkeypatch.setattr(os, "getpid", lambda: pid + 1)
+    assert worker_store() is not first
+    assert len(built) == 2

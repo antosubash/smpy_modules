@@ -15,6 +15,7 @@ from sm_images.pipeline import registry as reg
 from tests.step_support import FakeStep
 
 FIXTURE = str(Path(__file__).parent / "plugin_fixture")
+REAL_LOADERS = list(extensions._BUILTIN_LOADERS)
 
 
 def _eps(*values):
@@ -32,7 +33,7 @@ def _clean(monkeypatch):
     monkeypatch.syspath_prepend(FIXTURE)
     yield
     reg.reset_registry()
-    for name in [n for n in sys.modules if n.startswith("lucas_fixture")]:
+    for name in [n for n in sys.modules if n.startswith(("lucas_fixture", "broken_fixture"))]:
         del sys.modules[name]
 
 
@@ -97,6 +98,7 @@ print(json.dumps([sorted(all_steps()), sorted(all_presets())]))
 
 def test_registry_parity_fresh_process(monkeypatch):
     monkeypatch.setattr(importlib.metadata, "entry_points", _eps("lucas_fixture.module:Mod"))
+    monkeypatch.setattr(extensions, "_BUILTIN_LOADERS", REAL_LOADERS)
     extensions.load_extensions()
     here = [sorted(reg.all_steps()), sorted(reg.all_presets())]
     env = {**os.environ, "PYTHONPATH": os.pathsep.join([FIXTURE, os.environ.get("PYTHONPATH", "")])}
@@ -109,3 +111,27 @@ def test_registry_parity_fresh_process(monkeypatch):
         timeout=60,
     )
     assert json.loads(out.stdout.strip().splitlines()[-1]) == here
+
+
+def test_builtins_are_registered_by_default(monkeypatch):
+    monkeypatch.setattr(importlib.metadata, "entry_points", _eps())
+    monkeypatch.setattr(extensions, "_BUILTIN_LOADERS", REAL_LOADERS)
+    extensions.load_extensions()
+    assert sorted(reg.all_steps()) == ["exif", "renditions"]
+
+
+def test_plugin_package_import_error_is_not_swallowed(monkeypatch):
+    """A plugin whose own ``__init__`` imports a missing dependency is a broken
+    install, not "no images_extensions": the error must surface."""
+    monkeypatch.setattr(importlib.metadata, "entry_points", _eps("broken_fixture.module:Mod"))
+    with pytest.raises(ModuleNotFoundError) as exc:
+        extensions.load_extensions()
+    assert exc.value.name == "no_such_dependency_xyz"
+    assert not reg.is_frozen()
+
+
+def test_absent_parent_package_is_skipped_with_a_warning(monkeypatch, caplog):
+    monkeypatch.setattr(importlib.metadata, "entry_points", _eps("no_such_pkg_xyz:Mod"))
+    extensions.load_extensions()
+    assert reg.is_frozen()
+    assert "no_such_pkg_xyz" in caplog.text

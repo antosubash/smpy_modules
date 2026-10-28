@@ -113,3 +113,66 @@ def test_mutates_display_at_most_one():
     reg.check_display_mutators(["acme.m1", "gone.step"])
     with pytest.raises(reg.TooManyDisplayMutators):
         reg.check_display_mutators(["acme.m1", "acme.m2"])
+
+
+# -- protocol validation at registration (Task 9 review, carried to Task 10) --
+
+
+class _NoRun:
+    id = "acme.norun"
+    version = 1
+    requires = ()
+    mutates_display = False
+    queue = "images"
+
+    def params_schema(self):
+        return None
+
+    def applies(self, image, params):
+        return True
+
+
+@pytest.mark.parametrize(
+    ("attr", "value"),
+    [
+        ("version", 0),
+        ("version", True),
+        ("version", "1"),
+        ("queue", "images_imports"),
+        ("queue", "default"),
+        ("requires", ["acme.a"]),
+        ("requires", ("acme.a", 3)),
+        ("mutates_display", 1),
+        ("id", 7),
+    ],
+)
+def test_register_step_validates_protocol(attr, value):
+    step = FakeStep("acme.bad")
+    setattr(step, attr, value)
+    with pytest.raises(reg.InvalidStepError):
+        reg.register_step(step)
+    assert reg.all_steps() == {}
+
+
+def test_register_step_needs_callable_methods():
+    with pytest.raises(reg.InvalidStepError):
+        reg.register_step(_NoRun())
+
+
+@pytest.mark.parametrize("queue", ["images", "images_heavy", "images_gpu"])
+def test_allowed_queues(queue):
+    reg.register_step(FakeStep("acme.ok", queue=queue))
+
+
+def test_builtin_path_validates_too():
+    step = FakeStep("exif")
+    step.version = -1
+    with pytest.raises(reg.InvalidStepError):
+        reg.register_builtin(step)
+
+
+def test_prompt_requires_tolerated_at_freeze():
+    """``prompt:*`` ids are resolved per execution from the database."""
+    reg.register_step(FakeStep("acme.after", requires=("prompt:1234",)))
+    reg.freeze()
+    assert reg.is_frozen()

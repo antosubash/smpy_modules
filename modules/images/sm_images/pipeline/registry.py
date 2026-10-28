@@ -9,13 +9,16 @@ from __future__ import annotations
 
 import re
 import threading
+from typing import Any
 
 from sm_images.pipeline.presets import Preset
 from sm_images.pipeline.step import Step
 
 __all__ = [
+    "STEP_QUEUES",
     "CyclicRequiresError",
     "DuplicateStepError",
+    "InvalidStepError",
     "RegistryFrozenError",
     "ReservedStepIdError",
     "TooManyDisplayMutators",
@@ -38,6 +41,8 @@ RESERVED_IDS = frozenset({"exif", "renditions", "quality", "anonymize", "classif
 PROMPT_PREFIX = "prompt:"
 PLUGIN_STEP_ID = re.compile(r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$")
 PLUGIN_PRESET_ID = re.compile(r"^[a-z][a-z0-9_]*$")
+STEP_QUEUES = frozenset({"images", "images_heavy", "images_gpu"})
+"""Where a step may run. ``images_imports`` is the orchestrators' queue, not a step's."""
 
 
 class RegistryFrozenError(RuntimeError): ...
@@ -59,6 +64,10 @@ class TooManyDisplayMutators(ValueError):  # noqa: N818 - name fixed by the plan
     ...
 
 
+class InvalidStepError(TypeError):
+    """An object registered as a step does not satisfy the ``Step`` protocol."""
+
+
 _lock = threading.RLock()
 _steps: dict[str, Step] = {}
 _presets: dict[str, Preset] = {}
@@ -69,7 +78,30 @@ def _is_reserved(step_id: str) -> bool:
     return step_id in RESERVED_IDS or step_id.startswith(PROMPT_PREFIX)
 
 
+def _check_protocol(step: Any) -> None:
+    """The attributes the executor relies on, checked once at registration so a
+    malformed plugin fails at boot rather than on its first image."""
+    sid = getattr(step, "id", None)
+    if not isinstance(sid, str) or not sid:
+        raise InvalidStepError(f"step id must be a non-empty str, got {sid!r}")
+    version = getattr(step, "version", None)
+    if isinstance(version, bool) or not isinstance(version, int) or version < 1:
+        raise InvalidStepError(f"step {sid!r}: version must be a positive int, got {version!r}")
+    queue = getattr(step, "queue", None)
+    if queue not in STEP_QUEUES:
+        raise InvalidStepError(f"step {sid!r}: queue must be one of {sorted(STEP_QUEUES)}")
+    requires = getattr(step, "requires", None)
+    if not isinstance(requires, tuple) or not all(isinstance(r, str) for r in requires):
+        raise InvalidStepError(f"step {sid!r}: requires must be a tuple of str")
+    if not isinstance(getattr(step, "mutates_display", None), bool):
+        raise InvalidStepError(f"step {sid!r}: mutates_display must be a bool")
+    for method in ("params_schema", "applies", "run"):
+        if not callable(getattr(step, method, None)):
+            raise InvalidStepError(f"step {sid!r}: {method}() is missing")
+
+
 def _add(step: Step, *, builtin: bool) -> None:
+    _check_protocol(step)
     with _lock:
         if _frozen:
             raise RegistryFrozenError(f"registry is frozen; cannot register {step.id!r}")

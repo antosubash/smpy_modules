@@ -17,11 +17,15 @@ from pydantic import BaseModel
 if TYPE_CHECKING:
     from sm_images.contracts.schemas import ImageRead  # runtime import would cycle via contracts
 
-__all__ = ["DisplayNotAllowed", "Step", "StepContext", "StepOutcome"]
+__all__ = ["DisplayNotAllowed", "DisplayWriterMissing", "Step", "StepContext", "StepOutcome"]
 
 
 class DisplayNotAllowed(PermissionError):  # noqa: N818 - name fixed by the plan
     """A step that does not declare ``mutates_display`` tried to write one."""
+
+
+class DisplayWriterMissing(RuntimeError):  # noqa: N818 - pairs with DisplayNotAllowed
+    """A display mutator ran with no writer: the executor's bug, not the step's."""
 
 
 @runtime_checkable
@@ -64,7 +68,12 @@ class StepOutcome:
 
 class StepContext:
     """Passed to ``Step.run``. I/O is injected: the executor supplies the
-    readers, the fenced display writer and the lease-renewal callback."""
+    readers, the fenced display writer and the lease-renewal callback.
+
+    Every method is a coroutine and **must be awaited** - ``progress`` too: an
+    un-awaited ``ctx.progress(50)`` renews nothing, and the lease then expires
+    under a step that is still working.
+    """
 
     def __init__(
         self,
@@ -86,6 +95,8 @@ class StepContext:
         self._read_original = read_original
         self._write_display = write_display
         self._on_progress = on_progress
+        self._staging: Any = None
+        """Executor-only: where the built-in steps leave their typed writes."""
 
     async def read_display(self) -> bytes:
         return await self._read_display()
@@ -94,12 +105,20 @@ class StepContext:
         return await self._read_original()
 
     async def write_display(self, data: bytes, content_type: str) -> None:
-        if not self.step.mutates_display or self._write_display is None:
+        """Stage a new display copy. Published only if the step's lease still
+        holds when it completes; the original is never touched."""
+        if not self.step.mutates_display:
             raise DisplayNotAllowed(f"step {self.step.id!r} does not declare mutates_display")
+        if self._write_display is None:
+            raise DisplayWriterMissing(f"no display writer was supplied for step {self.step.id!r}")
         await self._write_display(data, content_type)
 
     async def progress(self, pct: int) -> None:
-        """Renew the lease (executor callback) and tell the task sweep we live."""
+        """Renew the lease (executor callback) and tell the task sweep we live.
+
+        Must be awaited. Raises the executor's lost-lease error when another
+        worker has reclaimed the run: stop working, the result would be discarded.
+        """
         pct = max(0, min(100, int(pct)))
         if self._on_progress is not None:
             await self._on_progress(pct)

@@ -7,7 +7,8 @@ Two ways to get a store, because two kinds of process write objects:
 
 * the web process: :func:`store_for` reads ``app.state.file_storage.backend``;
 * a Celery worker, which never builds the app: :func:`worker_store` builds the
-  backend from the DB-backed ``FileStorageSettings`` and caches it per process.
+  backend from the DB-backed ``FileStorageSettings`` and caches it per process
+  until those settings change.
 
 Optional backend capabilities degrade rather than fail: without ``get_range``
 the range is cut from a full stream; without ``head`` (``DirectUploadBackend``)
@@ -17,6 +18,7 @@ S3 backends both have ``head``, so the fallback only serves third-party ones.
 
 from __future__ import annotations
 
+import os
 import threading
 from collections.abc import AsyncIterable, AsyncIterator, Iterable
 from typing import Any
@@ -106,25 +108,38 @@ def store_for(app: Any) -> ImageStore:
 
 
 _worker_lock = threading.Lock()
-_worker_store: ImageStore | None = None
+_worker_store: tuple[tuple[int, str], ImageStore] | None = None
+
+
+def _fingerprint(settings: Any) -> str:
+    """Everything that decides which backend (and where) - the whole settings
+    object, so a backend id, root, bucket, endpoint or credential edit counts."""
+    return settings.model_dump_json()
 
 
 def worker_store() -> ImageStore:
-    """The store for a process with no app (Celery), built once and cached."""
-    global _worker_store
-    with _worker_lock:
-        if _worker_store is None:
-            from background_tasks import settings_for
-            from file_storage.backends import build_backend
-            from file_storage.settings import FileStorageSettings
+    """The store for a process with no app (Celery).
 
-            settings = settings_for(FileStorageSettings, "file_storage")
-            _worker_store = ImageStore(build_backend(settings))
-        return _worker_store
+    ``settings_for`` re-reads ``FileStorageSettings`` at most every 30 s; the
+    backend is rebuilt when they change (an admin moved storage) and in a
+    forked child, which must not reuse its parent's clients. A namespace change
+    is a data-location change: old objects stay where they were.
+    """
+    global _worker_store
+    from background_tasks import settings_for
+    from file_storage import backends
+    from file_storage.settings import FileStorageSettings
+
+    settings = settings_for(FileStorageSettings, "file_storage")
+    key = (os.getpid(), _fingerprint(settings))
+    with _worker_lock:
+        if _worker_store is None or _worker_store[0] != key:
+            _worker_store = (key, ImageStore(backends.build_backend(settings)))
+        return _worker_store[1]
 
 
 def reset_worker_store() -> None:
-    """Drop the cached store (tests, or after file_storage settings change)."""
+    """Drop the cached store (tests, and a prefork child at ``worker_process_init``)."""
     global _worker_store
     with _worker_lock:
         _worker_store = None

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
 from sm_images.contracts import DisplayNotAllowed, ImageRead, StepContext, StepOutcome
+from sm_images.models import LocationSource
+from sm_images.pipeline.step import DisplayWriterMissing
 
 from tests.step_support import _P, FakeStep
 
@@ -60,6 +63,58 @@ async def test_write_display_only_for_mutators():
     assert written == []
     await _ctx(FakeStep("acme.x", mutates_display=True), written).write_display(b"x", "image/jpeg")
     assert written == [(b"x", "image/jpeg")]
+
+
+async def test_write_display_without_a_writer_is_an_executor_error():
+    """A mutator handed no writer is the executor's bug, not the step's: the
+    error must not claim the step lacks ``mutates_display``."""
+    step = FakeStep("acme.x", mutates_display=True)
+    ctx = StepContext(
+        step=step,
+        image=_image(),
+        params=_P(),
+        tenant_id="default",
+        read_display=lambda: None,
+        read_original=lambda: None,
+    )
+    with pytest.raises(DisplayWriterMissing) as exc:
+        await ctx.write_display(b"x", "image/jpeg")
+    assert "mutates_display" not in str(exc.value)
+
+
+def test_image_read_from_row():
+    row = SimpleNamespace(
+        id=uuid.uuid4(),
+        collection_id=uuid.uuid4(),
+        filename="a.jpg",
+        content_type="image/jpeg",
+        size_bytes=3,
+        width=4,
+        height=5,
+        sha256="ab",
+        lat=1.0,
+        lng=2.0,
+        altitude=None,
+        heading=None,
+        location_source=LocationSource.MANUAL,
+        captured_at=None,
+        camera_make="Acme",
+        camera_model=None,
+        orientation=6,
+        external_source=None,
+        external_id=None,
+        properties={"k": 1},
+        group_id=None,
+        group_role=None,
+        display_generation=2,
+        storage_key="secret/original.jpg",
+    )
+    read = ImageRead.from_row(row)
+    assert read.location_source == 3 and type(read.location_source) is int
+    assert (read.width, read.display_generation, read.properties) == (4, 2, {"k": 1})
+    assert "storage_key" not in read.model_dump()
+    row.location_source = None
+    assert ImageRead.from_row(row).location_source is None
 
 
 async def test_progress_calls_callback_and_heartbeat(monkeypatch):

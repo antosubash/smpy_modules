@@ -12,6 +12,7 @@ from __future__ import annotations
 import importlib
 import importlib.metadata
 import importlib.util
+import logging
 from collections.abc import Callable
 
 from sm_images.pipeline import registry
@@ -23,8 +24,17 @@ __all__ = ["ENTRY_POINT_GROUP", "EXTENSIONS_MODULE", "Registrar", "load_extensio
 ENTRY_POINT_GROUP = "simple_module"
 EXTENSIONS_MODULE = "images_extensions"
 
-_BUILTIN_LOADERS: list[Callable[[], None]] = []
-"""Later tasks append a callable that ``register_builtin``s their steps."""
+logger = logging.getLogger(__name__)
+
+
+def _load_builtin_steps() -> None:
+    from sm_images.pipeline.builtin_steps import register_builtins
+
+    register_builtins()
+
+
+_BUILTIN_LOADERS: list[Callable[[], None]] = [_load_builtin_steps]
+"""Callables that ``register_builtin`` the reserved-id steps, run before plugins."""
 
 
 class Registrar:
@@ -46,6 +56,27 @@ def _plugin_packages() -> list[str]:
     return sorted(found)
 
 
+def _find(pkg: str) -> object | None:
+    """The spec of ``<pkg>.images_extensions``, or ``None`` when it has none.
+
+    Only *absence* is skipped: the probed submodule itself missing, or a
+    non-package parent (``exc.name`` is the submodule then). A parent that is not
+    installed at all is logged and skipped. Anything else - the plugin's own
+    ``__init__`` importing a dependency that is not there - is a broken install
+    and propagates, instead of silently dropping the plugin's steps.
+    """
+    name = f"{pkg}.{EXTENSIONS_MODULE}"
+    try:
+        return importlib.util.find_spec(name)
+    except ModuleNotFoundError as exc:
+        if exc.name == name:
+            return None
+        if exc.name == pkg:
+            logger.warning("images: entry-point package %r is not importable; skipped", pkg)
+            return None
+        raise
+
+
 def load_extensions() -> None:
     """Register built-ins, then every installed plugin's, then freeze. A second
     call is a no-op. A failure empties the registry so a retry starts clean."""
@@ -57,10 +88,7 @@ def load_extensions() -> None:
                 loader()
             registrar = Registrar()
             for pkg in _plugin_packages():
-                try:
-                    spec = importlib.util.find_spec(f"{pkg}.{EXTENSIONS_MODULE}")
-                except ModuleNotFoundError:  # parent missing or not a package
-                    continue
+                spec = _find(pkg)
                 if spec is None:
                     continue
                 module = importlib.import_module(f"{pkg}.{EXTENSIONS_MODULE}")
