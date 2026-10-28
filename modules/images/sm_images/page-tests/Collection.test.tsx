@@ -10,7 +10,7 @@ const Collection = (await import('../pages/Collection')).default;
 
 const LIST = 'GET /api/images/collections/c1/images';
 const page = (...ids: string[]) => ({ items: ids.map((id) => image(id)), next_cursor: null, total: ids.length });
-const rights = { can_edit: true, can_manage: true, can_share: true, can_publish: false };
+const rights = { can_edit: true, can_manage: true, can_share: true, can_publish: false, direct_upload_threshold: 1024 };
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -96,7 +96,7 @@ describe('Collection actions follow the caller\'s rights', () => {
   it('hides upload, share, visibility and delete from a read-only viewer', async () => {
     stubFetch({ [LIST]: page('i1') });
     const view = await mount(
-      <Collection collection={collection()} can_edit={false} can_manage={false} can_share={false} can_publish={false} />,
+      <Collection collection={collection()} can_edit={false} can_manage={false} can_share={false} can_publish={false} direct_upload_threshold={1024} />,
     );
     await flush();
     for (const id of ['images-upload', 'images-share', 'images-visibility', 'images-delete-collection']) {

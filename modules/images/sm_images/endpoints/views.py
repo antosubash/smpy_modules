@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from simple_module_core.resources import ACTION_DELETE, ACTION_EDIT, ResourcePrincipal
 from simple_module_db.deps import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
@@ -29,7 +29,7 @@ from sm_images.access import (
 )
 from sm_images.contracts.schemas import collection_fields
 from sm_images.csrf import share_csrf_token
-from sm_images.deps import require_view
+from sm_images.deps import get_settings, require_view
 from sm_images.schemas.collection import CollectionOut, CollectionPageOut
 from sm_images.services import collections as collection_service
 from sm_images.services import gallery, present
@@ -100,9 +100,14 @@ async def image(
 
 @router.get("/{collection_id}", response_model=None)
 async def collection_page(
-    collection: CollectionView, inertia: InertiaDep, who: Principal
+    request: Request, collection: CollectionView, inertia: InertiaDep, who: Principal
 ) -> InertiaResponse:
     return await inertia.render(
         constants.PAGE_COLLECTION,
-        {"collection": _out(collection, who).model_dump(mode="json"), **_rights(who, collection)},
+        {
+            "collection": _out(collection, who).model_dump(mode="json"),
+            **_rights(who, collection),
+            # Where the uploader switches from one multipart request to a direct upload.
+            "direct_upload_threshold": get_settings(request).direct_upload_threshold,
+        },
     )

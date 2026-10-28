@@ -1,21 +1,22 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-
-import { uploadImage } from '../../utils/api';
 import { codeMessage } from '../../utils/api-net';
+import { uploadFile } from '../../utils/direct-upload';
 import { keys, useT } from '../../utils/i18n';
 import type { UploadResult } from '../../utils/types';
 
-/** Pick files and upload them one request each, in order, so every refusal
- *  names its own file. Files above the direct-upload threshold are refused by
- *  the server with `use_direct_upload`; direct upload is not wired in the
- *  console yet. `onDone` runs once the batch has finished. */
+/** Pick files and upload them one at a time, in order, so every refusal names
+ *  its own file. A file over `directThreshold` (the server's
+ *  `direct_upload_threshold`) goes by direct upload, the rest as one multipart
+ *  request. `onDone` runs once the batch has finished. */
 export function UploadButton({
   collectionId,
+  directThreshold,
   onDone,
 }: {
   collectionId: string;
+  directThreshold: number;
   onDone: () => void;
 }) {
   const { t } = useT();
@@ -26,7 +27,7 @@ export function UploadButton({
     setBusy(true);
     const results: UploadResult[] = [];
     try {
-      for (const file of files) results.push(await uploadImage(collectionId, file));
+      for (const file of files) results.push(await uploadFile(collectionId, file, directThreshold));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
     } finally {

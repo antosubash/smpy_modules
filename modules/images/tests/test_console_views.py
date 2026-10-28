@@ -75,6 +75,7 @@ async def test_collection_screen_rights(uploads):
     cid, _ = await one_image(uploads)
     mine = props(await uploads.get(f"{VIEWS}/{cid}", headers={**OLGA, **INERTIA}))
     assert mine["collection"]["id"] == cid
+    assert mine["direct_upload_threshold"] == 20 * 1024 * 1024
     assert (mine["can_edit"], mine["can_manage"]) == (True, True)
     # Sharing is the owner's and needs the framework's own permission.
     assert mine["can_share"] is False
@@ -108,3 +109,17 @@ async def test_screens_hide_a_collection_the_caller_may_not_open(uploads):
     assert (await uploads.get(f"{VIEWS}/{cid}", headers={**stranger, **INERTIA})).status_code == 404
     got = await uploads.get(f"{VIEWS}/images/{iid}", headers={**stranger, **INERTIA})
     assert got.status_code == 404
+
+
+async def test_an_images_refusal_on_a_screen_is_the_hosts_error_page(uploads):
+    """The framework's own 404 (an id the policy hides) already gets the host's
+    page; this is the one images raises itself (``ImagesError``)."""
+    from sm_images.errors import NotFound
+
+    @uploads.app.get(f"{VIEWS}/x/boom")
+    async def boom():
+        raise NotFound("gone")
+
+    screen = await uploads.get(f"{VIEWS}/x/boom", headers={**OLGA, **INERTIA})
+    assert screen.status_code == 404
+    assert screen.json().get("component") and "detail" not in screen.json()

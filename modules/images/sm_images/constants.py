@@ -127,6 +127,8 @@ DESCRIPTION_MAX: Final = 2000
 PAGE_DEFAULT: Final = 25
 PAGE_MAX: Final = 100
 COLLECTION_FILTERS: Final = ("owned", "shared", "internal", "public", "all")
+DEFAULT_PIPELINE_STEPS: Final = ("exif", "renditions")
+"""Core built-in steps a new collection enables."""
 THUMB_SIZE: Final = "small"
 """The rendition the console gallery shows (a key of ``thumbnail_sizes``)."""
 CANDIDATES_MAX: Final = 20

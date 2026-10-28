@@ -22,11 +22,19 @@ type Props = {
   can_manage: boolean;
   can_share: boolean;
   can_publish: boolean;
+  direct_upload_threshold: number;
 };
 
 /** `Images/Collection` - `/admin/images/{id}`. Tabs come with their own tasks
  *  (map, imports, pipeline, review); only the gallery exists today. */
-function Collection({ collection, can_edit, can_manage, can_share, can_publish }: Props) {
+function Collection({
+  collection,
+  can_edit,
+  can_manage,
+  can_share,
+  can_publish,
+  direct_upload_threshold,
+}: Props) {
   const { t } = useT();
   const gallery = useImages(collection.id);
   const [visibility, setVisible] = useState<Visibility>(collection.visibility);
@@ -61,7 +69,11 @@ function Collection({ collection, can_edit, can_manage, can_share, can_publish }
         actions={
           <>
             {can_edit && (
-              <UploadButton collectionId={collection.id} onDone={() => void gallery.reload()} />
+              <UploadButton
+                collectionId={collection.id}
+                directThreshold={direct_upload_threshold}
+                onDone={() => void gallery.reload()}
+              />
             )}
             {can_share && <ShareDialog collectionId={collection.id} />}
           </>

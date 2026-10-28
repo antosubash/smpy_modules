@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { login, moduleCsrfHeader } from './helpers';
+import { login } from './helpers';
 
 /**
  * The images console, end to end: create a collection, upload two JPEGs, see
@@ -69,19 +69,7 @@ test('create a collection, upload two images, view one and share the collection'
   await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
   await expect(page.getByText('This collection has no images yet.')).toBeVisible();
 
-  // A new collection runs no pipeline until one is configured (the pipeline
-  // tab is a later task), so switch on the two core steps over the API.
-  const csrf = await moduleCsrfHeader(page, '/admin/images/');
-  const configured = await page.request.put(
-    `/api/images${collectionUrl.replace('/admin/images', '/collections')}/pipeline`,
-    {
-      headers: csrf,
-      data: { steps: { exif: { enabled: true }, renditions: { enabled: true } } },
-    },
-  );
-  expect(configured.status(), await configured.text()).toBe(200);
-
-  // Upload two JPEGs; their thumbnails appear.
+  // Upload two JPEGs; the default pipeline (exif, renditions) makes the thumbnails.
   await page.getByTestId('images-upload-input').setInputFiles(JPEGS);
   await thumbsLoaded(page, 2);
   await expect(page.getByText('2 images')).toBeVisible();

@@ -133,15 +133,21 @@ export async function uploadImage(collectionId: string, file: File): Promise<Upl
     );
     return results[0];
   } catch (error) {
-    if (error instanceof ApiError && error.status !== 401) {
-      return {
-        filename: file.name,
-        status: 'error',
-        id: null,
-        code: error.body?.code ?? null,
-        detail: error.message,
-      };
-    }
-    throw error;
+    return failedUpload(file, error);
   }
+}
+
+/** An upload error as a result for that file. A 401 (or a non-API error) is not
+ *  about the file, so it is rethrown for the caller to report once. */
+export function failedUpload(file: File, error: unknown): UploadResult {
+  if (error instanceof ApiError && error.status !== 401) {
+    return {
+      filename: file.name,
+      status: 'error',
+      id: null,
+      code: error.body?.code ?? null,
+      detail: error.message,
+    };
+  }
+  throw error;
 }

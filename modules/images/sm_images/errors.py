@@ -9,7 +9,7 @@ another with the same status.
 from __future__ import annotations
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from sm_images import constants
 
@@ -121,7 +121,26 @@ class TenantRequired(Forbidden):
     code = constants.TENANT_REQUIRED_CODE
 
 
-async def render(_: Request, exc: ImagesError) -> JSONResponse:
+async def _error_page(request: Request, exc: ImagesError) -> Response | None:
+    """The host's Inertia error page, for a console screen (records does the
+    same). ``None`` when the host cannot render one, so the caller answers JSON
+    rather than stacking an error on the refusal."""
+    config = getattr(getattr(request.app.state, "sm", None), "inertia_config", None)
+    if config is None:
+        return None
+    try:
+        from simple_module_hosting._error_handlers import render_error_page
+
+        return await render_error_page(request, exc.status_code, exc.detail)
+    except Exception:  # pragma: no cover - a framework without the function
+        return None
+
+
+async def render(request: Request, exc: ImagesError) -> Response:
+    if request.url.path.startswith(f"{constants.VIEW_PREFIX}/"):
+        page = await _error_page(request, exc)
+        if page is not None:
+            return page
     body: dict[str, str] = {"detail": exc.detail}
     if exc.code is not None:
         body["code"] = exc.code

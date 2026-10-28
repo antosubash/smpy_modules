@@ -51,6 +51,17 @@ async def _free_slug(db: Any, name: str) -> str:
     return slug
 
 
+def default_pipeline_config() -> dict[str, Any]:
+    """What a new collection runs: the core built-ins, so an upload gets its
+    EXIF data and thumbnails with no setup. Strictly validated like any saved
+    config; the owner may change it afterwards."""
+    from sm_images.pipeline.config import validate_pipeline_config
+
+    config = {"steps": {sid: {"enabled": True} for sid in constants.DEFAULT_PIPELINE_STEPS}}
+    validate_pipeline_config(config, strict=True)
+    return config
+
+
 async def create(
     db: Any,
     who: ResourcePrincipal,
@@ -73,6 +84,7 @@ async def create(
         description=description,
         owner_id=who.user_id,
         visibility=visibility,
+        pipeline_config=default_pipeline_config(),
     )
     db.add(row)
     try:
