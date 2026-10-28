@@ -1,0 +1,209 @@
+"""``images.janitor``: the daily clean-up beat (spec §7 "Purge", plan decision 4).
+
+A platform enumerator like ``images.reconcile``, and it reuses its tenant
+enumeration (:func:`sm_images.reconcile.tenants`). Per tenant, under
+``tenant_context(t)`` and each in its own session:
+
+* abandoned direct uploads are reclaimed (:func:`reap_expired_uploads`) -
+  first, so a purge never races an upload's own clean-up;
+* trashed rows past ``janitor_grace_days`` are purged with their objects
+  (:func:`sm_images.purge.purge_expired`).
+
+Then **one narrow platform pass**, under ``all_tenants()``, over the
+write-ahead intents (:class:`ObjectIntent` has no tenant - the key embeds it):
+:func:`reap_intents` deletes the objects of intents older than the grace
+period that no row references - the crash and rollback orphans, and replaced
+display generations or renditions whose after-commit delete failed.
+"""
+
+from __future__ import annotations
+
+import logging
+import uuid
+from collections import Counter
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import Any
+
+from simple_module_db import all_tenants, finalize_session, tenant_context
+from sqlalchemy import delete, select
+
+from sm_images.ingest.upload_reaper import reap_expired_uploads
+from sm_images.models import (
+    Collection,
+    Image,
+    ImportJob,
+    ObjectIntent,
+    Rendition,
+    UploadSession,
+    UploadStatus,
+)
+from sm_images.pipeline.runtime import Runtime
+from sm_images.purge import PurgeReport, purge_expired
+from sm_images.reconcile import tenants
+from sm_images.tenancy import all_tenants as tagged
+
+__all__ = [
+    "CAP",
+    "MIN_INTENT_AGE",
+    "IntentReport",
+    "PurgeReport",
+    "janitor_async",
+    "janitor_tenant",
+    "purge_expired",
+    "reap_intents",
+]
+
+logger = logging.getLogger(__name__)
+
+CAP = 1000
+MIN_INTENT_AGE = timedelta(days=1)
+"""An intent younger than this is never reaped, whatever the grace setting
+(``0`` is allowed): its writer may still be about to commit the row."""
+_CHUNK = 500
+_LIVE_UPLOADS = (UploadStatus.OPEN, UploadStatus.COMPLETING)
+
+
+@dataclass
+class IntentReport:
+    dry_run: bool
+    reaped: list[str] = field(default_factory=list)
+    """Unreferenced: object deleted, intent removed (on a dry run: would be)."""
+    referenced: list[str] = field(default_factory=list)
+    """A row owns the object; only the stale intent is removed."""
+
+
+def _uuid(text: str) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(text)
+    except ValueError:
+        return None
+
+
+async def _scalars(db: Any, stmt: Any) -> set[Any]:
+    """A deliberate cross-tenant read (the caller entered ``all_tenants()``)."""
+    stmt = tagged(stmt.execution_options(include_deleted=True))
+    return set((await db.execute(stmt)).scalars())
+
+
+async def _owned(db: Any, keys: list[str]) -> set[str]:
+    """The keys some row (trashed ones included) still points at."""
+    found: set[str] = set()
+    found |= await _scalars(db, select(Image.storage_key).where(Image.storage_key.in_(keys)))
+    found |= await _scalars(db, select(Image.display_key).where(Image.display_key.in_(keys)))
+    found |= await _scalars(
+        db, select(Rendition.storage_key).where(Rendition.storage_key.in_(keys))
+    )
+    found |= await _scalars(db, select(ImportJob.source_key).where(ImportJob.source_key.in_(keys)))
+    found |= await _scalars(
+        db,
+        select(UploadSession.storage_key).where(
+            UploadSession.storage_key.in_(keys), UploadSession.status.in_(_LIVE_UPLOADS)
+        ),
+    )
+    jobs: dict[uuid.UUID, list[str]] = {}
+    maps: dict[uuid.UUID, list[str]] = {}
+    for key in keys:  # images/<tenant>/imports/<job>/... and images/<tenant>/<coll>/map.pmtiles
+        parts = key.split("/")
+        if len(parts) >= 5 and parts[2] == "imports" and (job := _uuid(parts[3])):
+            jobs.setdefault(job, []).append(key)
+        elif len(parts) == 4 and parts[3] == "map.pmtiles" and (coll := _uuid(parts[2])):
+            maps.setdefault(coll, []).append(key)
+    if jobs:
+        for job in await _scalars(db, select(ImportJob.id).where(ImportJob.id.in_(list(jobs)))):
+            found.update(jobs[job])
+    if maps:
+        for coll in await _scalars(db, select(Collection.id).where(Collection.id.in_(list(maps)))):
+            found.update(maps[coll])
+    return found
+
+
+async def reap_intents(
+    db: Any,
+    store: Any,
+    *,
+    now: datetime,
+    grace_days: int,
+    dry_run: bool = False,
+    cap: int = CAP,
+) -> IntentReport:
+    """Reap up to ``cap`` intents older than the grace period. The caller has
+    entered ``all_tenants()`` and commits. An object whose delete fails keeps
+    its intent for the next pass."""
+    cutoff = now - max(timedelta(days=grace_days), MIN_INTENT_AGE)
+    stmt = (
+        select(ObjectIntent.key)
+        .where(ObjectIntent.created_at <= cutoff)
+        .order_by(ObjectIntent.created_at, ObjectIntent.key)
+        .limit(cap)
+    )
+    keys = list((await db.execute(stmt)).scalars())
+    owned: set[str] = set()
+    for i in range(0, len(keys), _CHUNK):
+        owned |= await _owned(db, keys[i : i + _CHUNK])
+    report = IntentReport(dry_run, [k for k in keys if k not in owned], sorted(owned))
+    if dry_run:
+        return report
+    gone: list[str] = []
+    for key in report.reaped:
+        try:
+            await store.delete_keys([key])
+            gone.append(key)
+        except Exception:
+            logger.warning("images.janitor.object_delete_failed key=%s", key, exc_info=True)
+    report.reaped = gone
+    done = gone + report.referenced
+    for i in range(0, len(done), _CHUNK):
+        chunk = done[i : i + _CHUNK]
+        await db.execute(delete(ObjectIntent).where(ObjectIntent.key.in_(chunk)))
+    return report
+
+
+async def janitor_tenant(
+    runtime: Runtime, tenant: str, now: datetime, *, dry_run: bool = False
+) -> Counter[str]:
+    """One tenant's clean-up; the caller has bound ``tenant``."""
+    store, grace = runtime.store(), runtime.settings().janitor_grace_days
+    done: Counter[str] = Counter()
+    if not dry_run:
+        async with runtime.session_factory() as db:
+            done["uploads_reaped"] = await reap_expired_uploads(db, store, now, CAP)
+            await finalize_session(db)
+    async with runtime.session_factory() as db:
+        report = await purge_expired(db, store, now=now, grace_days=grace, dry_run=dry_run, cap=CAP)
+        await finalize_session(db)
+    done["images_purged"] = len(report.images)
+    done["collections_purged"] = len(report.collections)
+    done["objects_deleted"] = len(report.keys)
+    return done
+
+
+async def janitor_async(
+    runtime: Runtime, now: datetime, *, dry_run: bool = False
+) -> dict[str, int]:
+    """Every tenant in its own scope, then the platform intent pass. A failure
+    is logged and counted and does not stop the rest."""
+    total: Counter[str] = Counter()
+    for tenant in await tenants(runtime):
+        try:
+            with tenant_context(tenant):
+                total.update(await janitor_tenant(runtime, tenant, now, dry_run=dry_run))
+        except Exception:
+            logger.exception("images.janitor.tenant_failed tenant=%s", tenant)
+            total["failed_tenants"] += 1
+    try:
+        with all_tenants():
+            async with runtime.session_factory() as db:
+                report = await reap_intents(
+                    db,
+                    runtime.store(),
+                    now=now,
+                    grace_days=runtime.settings().janitor_grace_days,
+                    dry_run=dry_run,
+                )
+                await finalize_session(db)
+        total["intents_reaped"] += len(report.reaped)
+    except Exception:
+        logger.exception("images.janitor.intents_failed")
+        total["failed_intent_pass"] += 1
+    return dict(total)

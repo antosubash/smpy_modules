@@ -54,3 +54,16 @@ def map_key(tenant: str, collection: str) -> str:
 
 def import_key(tenant: str, job: str, name: str) -> str:
     return f"{ROOT}/{tenant}/imports/{job}/{name}"
+
+
+def image_prefix(tenant: str, collection: str, image: str) -> str:
+    """Everything one image ever stored is under this (trailing ``/`` included)."""
+    return f"{_image_prefix(tenant, collection, image)}/"
+
+
+def collection_prefix(tenant: str, collection: str) -> str:
+    return f"{ROOT}/{tenant}/{collection}/"
+
+
+def import_prefix(tenant: str, job: str) -> str:
+    return f"{ROOT}/{tenant}/imports/{job}/"

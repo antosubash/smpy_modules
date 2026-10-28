@@ -12,6 +12,8 @@ Celery here, everything else inside the bodies. Routing and beat are in
   lost one is resumed (``restart_id``) by reconcile.
 * ``images.reconcile()`` - the five-minute recovery beat, also sent once when a
   worker comes up (``worker_ready``).
+* ``images.janitor(dry_run=False)`` - the daily clean-up beat: abandoned
+  uploads and trashed rows per tenant, then orphaned objects (:mod:`sm_images.janitor`).
 
 Bodies run through :mod:`sm_images.pipeline.worker_runtime`: no app, the
 message's tenant (restored by ``background_tasks``' ``task_prerun``), a fresh
@@ -28,7 +30,13 @@ from typing import Any
 from celery import shared_task
 from celery.signals import worker_process_init, worker_ready
 
-from sm_images.task_config import QUEUE_DEFAULT, RECONCILE, RESTART_COLLECTION, RUN_STEP
+from sm_images.task_config import (
+    JANITOR,
+    QUEUE_DEFAULT,
+    RECONCILE,
+    RESTART_COLLECTION,
+    RUN_STEP,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +81,19 @@ def reconcile() -> dict[str, int]:
     summary = run_platform(lambda runtime: reconcile_async(runtime, datetime.now(UTC)))
     if any(summary.values()):
         logger.info("images.reconcile %s", summary)
+    return summary
+
+
+@shared_task(name=JANITOR, stuck_after=STUCK_AFTER_SECONDS)
+def janitor(dry_run: bool = False) -> dict[str, int]:
+    from sm_images.janitor import janitor_async
+    from sm_images.pipeline.worker_runtime import run_platform
+
+    summary = run_platform(
+        lambda runtime: janitor_async(runtime, datetime.now(UTC), dry_run=dry_run)
+    )
+    if any(summary.values()):
+        logger.info("images.janitor dry_run=%s %s", dry_run, summary)
     return summary
 
 

@@ -150,13 +150,19 @@ def test_task_config_routes_and_beat():
     assert {"images", "images_imports", "images_heavy", "images_gpu"} == task_config.QUEUES
     assert task_config.TASK_ROUTES[task_config.RESTART_COLLECTION] == {"queue": "images_imports"}
     assert task_config.TASK_ROUTES[task_config.RECONCILE] == {"queue": "images"}
-    (entry,) = task_config.BEAT_SCHEDULE.values()
-    assert (entry["task"], entry["schedule"]) == (task_config.RECONCILE, 300.0)
+    entries = {e["task"]: e["schedule"] for e in task_config.BEAT_SCHEDULE.values()}
+    assert entries == {task_config.RECONCILE: 300.0, task_config.JANITOR: 86400.0}
     assert not hasattr(tasks, "BEAT_SCHEDULE")  # one place, or the entry doubles
 
 
 def test_tasks_are_registered_under_their_names():
     from celery import current_app
 
-    for name in (task_config.RUN_STEP, task_config.RESTART_COLLECTION, task_config.RECONCILE):
+    names = (
+        task_config.RUN_STEP,
+        task_config.RESTART_COLLECTION,
+        task_config.RECONCILE,
+        task_config.JANITOR,
+    )
+    for name in names:
         assert name in current_app.tasks
