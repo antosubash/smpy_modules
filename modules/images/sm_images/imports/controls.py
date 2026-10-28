@@ -83,6 +83,7 @@ async def resume(
         "status": JobStatus.PENDING,
         "generation": ImportJob.generation + 1,
         "heartbeat_at": now(),
+        "relaunches": 0,
     }
     found = await _cas(runtime, tenant, job_id, [resumable], values)
     if found is None:
@@ -102,6 +103,7 @@ async def _enter_reset(
         "generation": ImportJob.generation + 1,
         "errors": [],
         "heartbeat_at": now(),
+        "relaunches": 0,
         **extra,
     }
     found = await _cas(runtime, tenant, row.id, _unchanged(row), values)

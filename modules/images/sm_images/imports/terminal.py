@@ -80,11 +80,14 @@ async def finish(
     generation: int,
     status: JobStatus,
     code: str | None = None,
+    *,
+    from_: tuple[JobStatus, ...] = ACTIVE,
 ) -> bool:
-    """Move a job this runner owns to ``status`` (terminal), recording ``code``."""
+    """Move a job this runner owns to ``status`` (terminal), recording ``code``;
+    only from ``from_`` (reconcile's breaker also fails a ``resetting`` job)."""
     async with runtime.session_factory() as db:
         row = await load(db, tenant, job_id, lock=True)
-        if row is None or row.generation != generation or row.status not in ACTIVE:
+        if row is None or row.generation != generation or row.status not in from_:
             await db.rollback()
             return False
         row.status = status

@@ -42,6 +42,11 @@ class ImportJob(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[u
     generation: int = Field(default=0, sa_column_kwargs={"nullable": False})
     """Fences a stale runner after a resume."""
     heartbeat_at: datetime | None = dt_col(index=True)
+    relaunches: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    """Reconcile relaunches since the job last made progress (the poison-job
+    breaker, ``recover.RELAUNCH_LIMIT``); an operator's control resets it."""
+    progress_mark: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    """``checkpoint_index + done_count`` at the last relaunch."""
     checkpoint_index: int = Field(default=0, sa_column_kwargs={"nullable": False})
     total_count: int = Field(default=0, sa_column_kwargs={"nullable": False})
     done_count: int = Field(default=0, sa_column_kwargs={"nullable": False})

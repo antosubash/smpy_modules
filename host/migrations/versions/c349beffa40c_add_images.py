@@ -170,6 +170,8 @@ def upgrade() -> None:
         sa.Column("reset_mode", sa.String(length=20), nullable=True),
         sa.Column("generation", sa.Integer(), nullable=False),
         sa.Column("heartbeat_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("relaunches", sa.Integer(), nullable=False),
+        sa.Column("progress_mark", sa.Integer(), nullable=False),
         sa.Column("checkpoint_index", sa.Integer(), nullable=False),
         sa.Column("total_count", sa.Integer(), nullable=False),
         sa.Column("done_count", sa.Integer(), nullable=False),

@@ -48,6 +48,7 @@ __all__ = [
     "load",
     "now",
     "pending_count",
+    "progress",
     "returning_one",
     "snapshot",
     "start",
@@ -199,20 +200,35 @@ async def heartbeat(runtime: Runtime, tenant: str, job_id: uuid.UUID, generation
     return await returning_one(runtime, stmt) is not None
 
 
+def progress() -> Any:
+    """How far a job has got, as one number: what the poison-job breaker watches."""
+    return ImportJob.checkpoint_index + ImportJob.done_count
+
+
 async def claim_stale(
     runtime: Runtime, tenant: str, job_id: uuid.UUID, stale_before: datetime | None = None
 ) -> int | None:
     """Take over an active or resetting job whose worker is gone: bump its
     generation (the old one, if alive, stops at its next write) and return the
     new one. With
-    ``stale_before`` only a heartbeat older than it qualifies - one claim wins."""
+    ``stale_before`` only a heartbeat older than it qualifies - one claim wins.
+    The same ``UPDATE`` counts the relaunch: ``relaunches + 1`` when nothing
+    progressed since the last one (:func:`progress`), else back to 1."""
     conds = [*where(tenant, job_id), ImportJob.status.in_(CLAIMABLE)]
     if stale_before is not None:
         conds.append(ImportJob.heartbeat_at.is_(None) | (ImportJob.heartbeat_at < stale_before))
     stmt = (
         update(ImportJob)
         .where(*conds)
-        .values(generation=ImportJob.generation + 1, heartbeat_at=now(), updated_at=now())
+        .values(
+            generation=ImportJob.generation + 1,
+            heartbeat_at=now(),
+            updated_at=now(),
+            relaunches=case(
+                (progress() == ImportJob.progress_mark, ImportJob.relaunches + 1), else_=1
+            ),
+            progress_mark=progress(),
+        )
         .returning(ImportJob.generation)
     )
     found = await returning_one(runtime, stmt)

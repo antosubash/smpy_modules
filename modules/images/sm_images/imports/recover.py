@@ -15,6 +15,14 @@ Delivery is at-most-once, so two things can be lost:
   untouched since the cutoff, in a ``running`` job. It is handed out again for
   the job's current generation; the claim makes a surfacing original skip it.
 
+**The poison-job breaker.** Each claim counts the relaunch, in the same
+``UPDATE`` (``jobs.claim_stale``): ``relaunches`` grows while ``checkpoint_index
++ done_count`` stays where it was at the last one, and resets to 1 when it
+moved. A job found stale again after :data:`RELAUNCH_LIMIT` relaunches without
+progress is failed ``stalled`` under the generation just claimed (an ERROR is
+logged) instead of relaunched, so no unanticipated failure loops forever. A
+control an operator uses (resume, restart, retry-failed) resets the count.
+
 A ZIP job still ``uploading`` is none of this: it has no runner until its
 archive is sealed. Once its upload session is gone it is failed instead
 (:func:`expire_uploads`).
@@ -33,17 +41,20 @@ from typing import Final
 from simple_module_db import finalize_session
 from sqlalchemy import and_, or_, select
 
-from sm_images.imports import jobs
+from sm_images.imports import jobs, terminal
 from sm_images.imports import launch as handoff
 from sm_images.models import ImportItem, ImportJob, UploadSession, UploadStatus
 from sm_images.models.enums import ImportKind, ItemStatus, JobStatus
 from sm_images.pipeline.runtime import Runtime
 
-__all__ = ["ITEM_BATCH", "recover_imports"]
+__all__ = ["ITEM_BATCH", "RELAUNCH_LIMIT", "STALLED", "expire_uploads", "recover_imports"]
 
 logger = logging.getLogger(__name__)
 
 ITEM_BATCH: Final = 1000
+RELAUNCH_LIMIT: Final = 5
+"""Relaunches without progress before a job is failed as :data:`STALLED`."""
+STALLED: Final = "stalled"
 
 
 async def _stale_jobs(
@@ -92,6 +103,14 @@ async def _stale_items(
         after = int(rows[-1][0])
 
 
+async def _relaunches(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> int:
+    stmt = select(ImportJob.relaunches).where(*jobs.where(tenant, job_id))
+    async with runtime.session_factory() as db:
+        n = (await db.execute(stmt)).scalar_one_or_none()
+        await finalize_session(db)
+    return int(n or 0)
+
+
 async def expire_uploads(runtime: Runtime, tenant: str) -> int:
     """Fail ``uploading`` ZIP jobs whose upload session expired, was aborted or
     is gone (``upload_expired``); the reaper deletes the parts. How many."""
@@ -129,6 +148,18 @@ async def recover_imports(runtime: Runtime, tenant: str, cutoff: datetime) -> tu
         generation = await jobs.claim_stale(runtime, tenant, job_id, cutoff)
         if generation is None:
             continue  # someone else claimed it, or it moved on
+        if await _relaunches(runtime, tenant, job_id) > RELAUNCH_LIMIT:
+            logger.error("images.reconcile.import_stalled job=%s", job_id)
+            await terminal.finish(
+                runtime,
+                tenant,
+                job_id,
+                generation,
+                JobStatus.FAILED,
+                STALLED,
+                from_=jobs.CLAIMABLE,
+            )
+            continue
         relaunched += 1
         launcher = handoff.launch_reset if status is JobStatus.RESETTING else handoff.launch_runner
         try:

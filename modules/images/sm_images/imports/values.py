@@ -117,13 +117,21 @@ def coordinates(
     return None, None
 
 
-def _aware(value: datetime) -> datetime:
-    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+def _aware(value: datetime) -> datetime | None:
+    """``value`` in UTC (naive is read as UTC); ``None`` when the conversion
+    leaves datetime's range (``0001-01-01T00:00+01:00``) - what the database
+    would otherwise fail on, long after parsing."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    try:
+        return value.astimezone(UTC)
+    except (OverflowError, ValueError):
+        return None
 
 
 def parse_datetime(value: Any) -> datetime | None:
     """ISO 8601 (``Z`` too), a few common layouts, or a Unix timestamp in seconds
-    or milliseconds; ``None`` when unreadable."""
+    or milliseconds, always in UTC; ``None`` when unreadable or out of range."""
     if value is None or isinstance(value, bool):
         return None
     if isinstance(value, datetime):
