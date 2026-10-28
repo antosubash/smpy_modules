@@ -110,8 +110,23 @@ async def submit(runtime: Runtime, items: Iterable[Any]) -> None:
                 first = first or exc
     finally:
         _drain.reset(reset)
+    await _drain_durable(runtime)
     if first is not None:
         raise first
+
+
+async def _drain_durable(runtime: Runtime) -> None:
+    """Wait for the eager durable deliveries the drained work published (the
+    web outbox transport starts them as tasks from ``after_commit``), so an
+    eager caller returns with ``ImageProcessed``'s durable subscribers done."""
+    bus = runtime.bus()
+    drain = getattr(getattr(bus, "durable_transport", None), "drain", None)
+    if drain is None:
+        return
+    try:
+        await drain()
+    except Exception:
+        logger.exception("images.pipeline.durable_drain_failed")
 
 
 async def submit_dispatch(runtime: Runtime, tenant: str, image_id: uuid.UUID) -> None:
@@ -125,10 +140,9 @@ async def submit_dispatch(runtime: Runtime, tenant: str, image_id: uuid.UUID) ->
 
 async def dispatch_ready(runtime: Runtime, tenant: str, image_id: uuid.UUID) -> list[Any]:
     """Settle, claim and hand off ``image_id``'s ready steps; conclude its cycle."""
-    now = utcnow()
     lease_s = runtime.settings().step_lease_seconds
     async with runtime.session_factory() as db:
-        found = await advance.plan_and_claim(db, tenant, image_id, now, lease_s)
+        found = await advance.plan_and_claim(db, tenant, image_id, None, lease_s)
         if found is not None:
             await advance.conclude(db, runtime, tenant, image_id, found)
         await finalize_session(db)
@@ -161,16 +175,16 @@ def _selected(scope: Scope, cfg: Any, runs: dict[str, Any], now: datetime) -> li
 async def reset_image(db: Any, tenant: str, image_id: uuid.UUID, scope: Scope) -> list[str]:
     """Reset the runs ``scope`` selects (never a live lease) and, if any were,
     start a new processing cycle. Commit with the caller's session."""
-    now = utcnow()
     locked = await lock_image(db, tenant, image_id)
     if locked is None:
         return []
+    now = utcnow()
     cfg = await advance.collection_config(db, tenant, locked.collection_id)
     steps = _selected(scope, cfg, await load_runs(db, tenant, image_id), now)
-    if steps and await reset_runs(db, tenant, image_id, steps, now):
+    done = await reset_runs(db, tenant, image_id, steps, now)
+    if done:
         await bump_cycle(db, tenant, image_id)
-        return steps
-    return []
+    return done
 
 
 async def rerun_image(

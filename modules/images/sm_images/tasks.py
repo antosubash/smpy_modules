@@ -7,8 +7,9 @@ Celery here, everything else inside the bodies. Routing and beat are in
 
 * ``images.run_step(image_id, step, token)`` - execute one claimed run; its
   completion claims and enqueues whatever became ready.
-* ``images.restart_collection(collection_id, scope)`` - reset and re-dispatch a
-  collection in chunks (``images_imports``).
+* ``images.restart_collection(collection_id, scope, restart_id=None)`` - reset
+  and re-dispatch a collection in chunks (``images_imports``), recorded so a
+  lost one is resumed (``restart_id``) by reconcile.
 * ``images.reconcile()`` - the five-minute recovery beat, also sent once when a
   worker comes up (``worker_ready``).
 
@@ -47,7 +48,7 @@ def run_step(image_id: str, step: str, token: str) -> bool:
 
 
 @shared_task(name=RESTART_COLLECTION, stuck_after=STUCK_AFTER_SECONDS)
-def restart_collection(collection_id: str, scope: str) -> int:
+def restart_collection(collection_id: str, scope: str, restart_id: str | None = None) -> int:
     from sm_images.pipeline.restart import restart_collection_async
     from sm_images.pipeline.worker_runtime import run_task
 
@@ -55,7 +56,11 @@ def restart_collection(collection_id: str, scope: str) -> int:
         raise ValueError(f"unknown restart scope {scope!r}")
     return run_task(
         lambda runtime, tenant: restart_collection_async(
-            runtime, tenant, uuid.UUID(collection_id), scope
+            runtime,
+            tenant,
+            uuid.UUID(collection_id),
+            scope,
+            restart_id=uuid.UUID(restart_id) if restart_id else None,
         )
     )
 

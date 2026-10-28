@@ -122,4 +122,21 @@ def validate_pipeline_config(cfg: Any, *, strict: bool = True) -> PipelineConfig
         for sid in mutators:
             old = steps[sid]
             steps[sid] = StepConfig(sid, old.enabled, "invalid", error="too_many_display_mutators")
-    return PipelineConfig(steps)
+    out = PipelineConfig(steps)
+    if strict:
+        _check_graph(out)
+    return out
+
+
+def _check_graph(cfg: PipelineConfig) -> None:
+    """A save must not enable a step whose prerequisites are off, nor a cycle
+    the implicit rendition edge closes (the executor would only settle them)."""
+    from sm_images.pipeline.plan import effective_deps, graph_problems
+
+    unmet, cyclic = graph_problems(cfg)
+    if unmet:
+        enabled = set(cfg.enabled())
+        missing = {sid: sorted(set(effective_deps(cfg, sid)) - enabled) for sid in sorted(unmet)}
+        raise PipelineConfigError(f"enabled steps require steps that are not enabled: {missing}")
+    if cyclic:
+        raise PipelineConfigError(f"steps depend on each other in a cycle: {sorted(cyclic)}")

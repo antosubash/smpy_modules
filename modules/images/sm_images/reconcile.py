@@ -16,6 +16,8 @@ isolation applying as in a request:
   ``ImageProcessed`` once;
 * import items and jobs: counted and logged. Their runner tasks arrive with
   the import tasks; nothing is enqueued to a task name no worker registers;
+* unfinished collection restarts whose heartbeat is stale are resumed (on the
+  imports queue in broker mode, inline when eager);
 * every live collection's stats are recomputed (the only way a box shrinks
   after deletes; there is no durable "touched" marker yet, so all of them,
   in batches).
@@ -31,7 +33,7 @@ from typing import Any
 from simple_module_db import all_tenants, finalize_session, tenant_context
 from sqlalchemy import and_, or_, select, update
 
-from sm_images.models import Collection, Image, ImportItem, ImportJob, StepRun
+from sm_images.models import Collection, Image, ImportItem, ImportJob, PipelineRestart, StepRun
 from sm_images.models.enums import ItemStatus, JobStatus, StepStatus
 from sm_images.pipeline.orchestrate import submit_dispatch
 from sm_images.pipeline.runtime import Runtime
@@ -47,7 +49,7 @@ CUTOFF = timedelta(minutes=5)
 BATCH = 500
 STATS_BATCH = 100
 _ACTIVE_JOBS = (JobStatus.PENDING, JobStatus.STAGING, JobStatus.RUNNING)
-_OWNERS = (Collection, Image, StepRun, ImportJob, ImportItem)
+_OWNERS = (Collection, Image, StepRun, ImportJob, ImportItem, PipelineRestart)
 
 
 async def tenants(runtime: Runtime) -> list[str]:
@@ -99,11 +101,17 @@ async def _repair_unleased(runtime: Runtime, tenant: str, cutoff: datetime) -> i
 
 
 def _stranded(tenant: str, now: datetime, cutoff: datetime) -> Any:
+    """Runs of live images in live collections only: dead work is not re-sent."""
     return (
         select(StepRun.image_id)
         .distinct()
+        .join(Image, Image.id == StepRun.image_id)
+        .join(Collection, Collection.id == Image.collection_id)
         .where(
             StepRun.tenant_id == tenant,
+            Image.tenant_id == tenant,
+            Image.is_deleted.is_(False),
+            Collection.is_deleted.is_(False),
             or_(
                 and_(StepRun.status == StepStatus.PENDING, StepRun.created_at < cutoff),
                 and_(StepRun.status == StepStatus.RUNNING, StepRun.lease_expires_at < now),
@@ -149,6 +157,39 @@ async def _imports(runtime: Runtime, tenant: str, cutoff: datetime) -> tuple[int
     return len(stale_jobs), len(pending_items)
 
 
+async def _restarts(runtime: Runtime, tenant: str, now: datetime, cutoff: datetime) -> int:
+    """Resume restarts nobody is advancing; claim each by moving its heartbeat."""
+    stale = (
+        update(PipelineRestart)
+        .where(
+            PipelineRestart.tenant_id == tenant,
+            PipelineRestart.finished_at.is_(None),
+            or_(PipelineRestart.heartbeat_at.is_(None), PipelineRestart.heartbeat_at < cutoff),
+        )
+        .values(heartbeat_at=now)
+        .returning(PipelineRestart.id, PipelineRestart.collection_id, PipelineRestart.scope)
+        .execution_options(synchronize_session=False)
+    )
+    async with runtime.session_factory() as db:
+        rows = list((await db.execute(stale)).all())
+        await finalize_session(db)
+    for restart_id, collection_id, scope in rows:
+        if runtime.is_eager():
+            from sm_images.pipeline.restart import resume_restart
+
+            await resume_restart(runtime, tenant, restart_id)
+            continue
+        from background_tasks.tenant_context import TENANT_HEADER
+
+        from sm_images.task_config import QUEUE_IMPORTS
+        from sm_images.tasks import restart_collection
+
+        restart_collection.s(str(collection_id), scope, str(restart_id)).apply_async(
+            queue=QUEUE_IMPORTS, headers={TENANT_HEADER: tenant}
+        )
+    return len(rows)
+
+
 async def _recompute_stats(runtime: Runtime, tenant: str) -> int:
     ids = await _ids(
         runtime, select(Collection.id).where(Collection.tenant_id == tenant), Collection.id
@@ -171,6 +212,7 @@ async def reconcile_tenant(runtime: Runtime, tenant: str, now: datetime) -> Coun
     for image_id in dict.fromkeys([*stranded, *unconcluded]):
         await submit_dispatch(runtime, tenant, image_id)
         done["dispatched"] += 1
+    done["restarts"] = await _restarts(runtime, tenant, now, cutoff)
     done["stale_jobs"], done["pending_items"] = await _imports(runtime, tenant, cutoff)
     done["collections"] = await _recompute_stats(runtime, tenant)
     return done

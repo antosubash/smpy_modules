@@ -40,6 +40,45 @@ async def test_an_upload_runs_its_pipeline_after_the_commit(uploads):
     assert len(stored(uploads.storage)) == 1 + 4  # original + the default four sizes
 
 
+async def test_a_failing_step_does_not_fail_the_upload(uploads, monkeypatch):
+    from sm_images.pipeline import executor
+
+    from tests.pipeline_support import Scripted
+
+    boom = Scripted("acme.boom")
+
+    async def explode(ctx):
+        raise ValueError("step blew up")
+
+    boom.fn = explode
+    use_steps(boom)
+    ImagesModule._use_runtime(uploads.app, uploads.db_state.session_factory)
+
+    async def broken(*a, **kw):  # and an executor bug in the same drain
+        raise RuntimeError("executor bug")
+
+    cid = await make_collection(uploads)
+    async with uploads.db_state.session_factory() as s:
+        await s.execute(
+            update(Collection)
+            .where(Collection.id == uuid.UUID(cid))
+            .values(pipeline_config={"steps": {"acme.boom": {}}})
+        )
+        await s.commit()
+    got = await post_files(
+        uploads, cid, [("a.jpg", (FIX / "rotated.jpg").read_bytes(), "image/jpeg")]
+    )
+    assert got.status_code == 200, got.text
+    runs = {r.step: (r.status.value, r.error_code) for r in await all_rows(uploads, StepRun)}
+    assert runs == {"acme.boom": ("failed", "step_error")}
+
+    monkeypatch.setattr(executor, "_work", broken)
+    got = await post_files(
+        uploads, cid, [("b.jpg", (FIX / "geotagged.jpg").read_bytes(), "image/jpeg")]
+    )
+    assert got.status_code == 200, got.text
+
+
 async def test_rendition_retry_at_the_same_display_generation_replaces_its_objects(pipe):
     coll = await pipe.collection({"renditions": {}})
     img = await pipe.image(coll)

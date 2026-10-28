@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from functools import partial
@@ -39,6 +40,8 @@ __all__ = ["Staged", "complete_step", "stage"]
 
 logger = logging.getLogger(__name__)
 JPEG = "image/jpeg"
+EXIF = "exif"
+RENDITIONS = "renditions"
 
 
 @dataclass
@@ -65,13 +68,17 @@ async def stage(runtime: Runtime, loaded: Any, staging: Any) -> Staged:
     """Write the step's generated objects under intents (completed outcomes only)."""
     out = Staged()
     ids = (loaded.tenant, str(loaded.collection_id), str(loaded.image_id))
-    attempt = loaded.token.hex
+    # A fresh nonce per execution, not the lease token: a redelivered message
+    # runs twice under one token, and its loser must never share (and so
+    # delete) the winner's keys. The token only fences the database.
+    attempt = uuid.uuid4().hex
     writes: list[tuple[str, bytes, str]] = []
-    if staging.display is not None:
+    if staging.display is not None and loaded.mutates_display:
         data, content_type = staging.display
         out.display_key = storage_keys.display_key(*ids, loaded.display_generation + 1, attempt)
         writes.append((out.display_key, data, content_type))
-    for size, (data, width, height) in (staging.renditions or {}).items():
+    renditions = staging.renditions if loaded.step == RENDITIONS else None
+    for size, (data, width, height) in (renditions or {}).items():
         key = storage_keys.rendition_key(*ids, size, loaded.display_generation, attempt)
         out.renditions[size] = (key, width, height)
         writes.append((key, data, JPEG))
@@ -91,9 +98,9 @@ async def stage(runtime: Runtime, loaded: Any, staging: Any) -> Staged:
 
 async def _requeue(runtime: Runtime, loaded: Any, lease_s: int) -> None:
     """The display moved under a run we still own: give it back and plan again."""
-    now = datetime.now(UTC)
     async with runtime.session_factory() as db:
         locked = await lock_image(db, loaded.tenant, loaded.image_id)
+        now = datetime.now(UTC)
         if locked is not None and await release(
             db, loaded.tenant, loaded.image_id, loaded.step, loaded.token, now
         ):
@@ -123,7 +130,7 @@ async def _publish(
             return None  # cut from a display copy that has since been replaced
         replaced += await publish.replace_renditions(db, tenant, image_id, staged.renditions)
         await publish.touch_image(db, tenant, image_id, datetime.now(UTC))
-    if staging is not None and staging.exif is not None:
+    if staging is not None and staging.exif is not None and loaded.step == EXIF:
         await publish.store_exif(db, tenant, image_id, staging.exif)
     return replaced
 
@@ -141,10 +148,12 @@ async def complete_step(
         except Exception as exc:
             logger.warning("images.pipeline.stage_failed step=%s", loaded.step, exc_info=True)
             outcome = StepOutcome.failed("storage_error", f"{type(exc).__name__}: {exc}"[:2000])
-    now = datetime.now(UTC)
     requeue = False
     async with runtime.session_factory() as db:
         locked = await lock_image(db, loaded.tenant, loaded.image_id)
+        # Read the clock only once the lock is held: a completion that waited
+        # on it past its lease must be rejected, and later leases start now.
+        now = datetime.now(UTC)
         ok = locked is not None and await complete(
             db,
             loaded.tenant,

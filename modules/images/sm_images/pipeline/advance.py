@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import partial
 from typing import Any
 
@@ -78,11 +78,15 @@ async def advance_locked(
 
 
 async def plan_and_claim(
-    db: Any, tenant: str, image_id: uuid.UUID, now: datetime, lease_s: int
+    db: Any, tenant: str, image_id: uuid.UUID, now: datetime | None, lease_s: int
 ) -> Advanced | None:
+    """``now=None`` reads the clock once the lock is held (a planner that waited
+    on the lock must not judge leases, or start new ones, by an older time)."""
     locked = await lock_image(db, tenant, image_id)
     if locked is None:
         return None
+    if now is None:
+        now = datetime.now(UTC)
     return await advance_locked(db, tenant, image_id, locked, now, lease_s)
 
 

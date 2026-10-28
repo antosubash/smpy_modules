@@ -71,6 +71,7 @@ class Loaded:
     display_key: str | None
     display_generation: int
     config: StepConfig | None
+    mutates_display: bool = False
 
 
 def _now() -> datetime:
@@ -107,6 +108,7 @@ async def _load(runtime: Runtime, tenant: str, image_id: uuid.UUID, step: str, t
                 display_key=image.display_key,
                 display_generation=image.display_generation,
                 config=cfg.get(step),
+                mutates_display=bool(getattr(registry.get_step(step), "mutates_display", False)),
             )
         await finalize_session(db)  # read-only: closes the transaction before any work
     return loaded
@@ -242,10 +244,18 @@ async def run_step_async(
     staging = Staging(settings)
     try:
         outcome = await _work(runtime, loaded, staging)
-    except Exception as exc:  # a soft time limit: record it (fenced), then re-raise
-        failure = _failed("time_limit", exc)
+    except Exception as exc:
+        from celery.exceptions import SoftTimeLimitExceeded
+
+        # Record a fenced failure either way. A soft time limit is re-raised
+        # for Celery; anything else is an executor bug, logged, not a time limit.
+        timed_out = isinstance(exc, SoftTimeLimitExceeded)
+        failure = _failed("time_limit" if timed_out else "internal_error", exc)
         await complete_step(runtime, loaded, failure, Staging(settings), version=version)
-        raise
+        if timed_out:
+            raise
+        logger.exception("images.pipeline.internal_error step=%s image=%s", step, image_id)
+        return False
     if outcome is None:
         logger.info("images.pipeline.lease_lost step=%s image=%s", step, image_id)
         return False

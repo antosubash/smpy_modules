@@ -39,10 +39,11 @@ async def release(
 
 async def reset_runs(
     db: Any, tenant: str, image_id: uuid.UUID, steps: list[str], now: datetime
-) -> int:
-    """Back to ``pending`` - never a run someone holds a live lease on."""
+) -> list[str]:
+    """Back to ``pending`` - never a run someone holds a live lease on. Returns
+    the steps actually reset (the guard may refuse some the caller selected)."""
     if not steps:
-        return 0
+        return []
     live = and_(StepRun.status == StepStatus.RUNNING, StepRun.lease_expires_at >= now)
     stmt = (
         update(StepRun)
@@ -57,10 +58,10 @@ async def reset_runs(
             started_at=None,
             finished_at=None,
         )
-        .returning(StepRun.id)
+        .returning(StepRun.step)
         .execution_options(**_SYNC)
     )
-    return len((await db.execute(stmt)).all())
+    return sorted((await db.execute(stmt)).scalars())
 
 
 async def bump_cycle(db: Any, tenant: str, image_id: uuid.UUID) -> None:

@@ -30,7 +30,13 @@ from sm_images.pipeline.registry import (
     register_preset,
     register_step,
 )
-from sm_images.pipeline.step import DisplayNotAllowed, Step, StepContext, StepOutcome
+from sm_images.pipeline.step import (
+    DisplayNotAllowed,
+    DisplayWriterMissing,
+    Step,
+    StepContext,
+    StepOutcome,
+)
 
 __all__ = [
     "CollectionDeleted",
@@ -39,6 +45,7 @@ __all__ = [
     "CollectionVisibilityChanged",
     "CyclicRequiresError",
     "DisplayNotAllowed",
+    "DisplayWriterMissing",
     "DuplicateStepError",
     "ImageAdded",
     "ImageProcessed",
