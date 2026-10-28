@@ -325,7 +325,7 @@
 - `test_registry_parity_fresh_process`: run `python -c` in a subprocess with no app built, call `load_extensions()`, and get the same ids as the web app;
 - `test_mutates_display_at_most_one`.
 
-- [ ] Commit `feat(images): step registry and extension loading`
+- [x] Commit `feat(images): step registry and extension loading`
 
 ### Task 10: Executor, leases, orchestration, reconcile (hard)
 
