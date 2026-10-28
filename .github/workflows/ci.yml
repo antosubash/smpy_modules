@@ -87,7 +87,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tippecanoe
 
       - name: Sync workspace (all packages, with dev extras)
-        run: uv sync --locked --all-packages --all-extras
+        run: uv sync --locked --all-packages --all-extras --no-extra anonymize
 
       # Every modules/*/, each from its own directory, all of them even after
       # one fails — see the script for why.
@@ -158,7 +158,7 @@ jobs:
       # perf smoke stays serial: it measures.
       - name: Create test databases
         run: |
-          for db in ci_records ci_records_perf ci_pagebuilder ci_news ci_billing; do
+          for db in ci_records ci_records_perf ci_pagebuilder ci_news ci_billing ci_images; do
             PGPASSWORD=postgres createdb -h localhost -U postgres "$db"
           done
 
@@ -221,6 +221,12 @@ jobs:
         env:
           SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_billing
         run: scripts/pytest_modules.sh billing
+
+      - name: Run pytest (images, Postgres)
+        if: ${{ !cancelled() }}
+        env:
+          SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_images
+        run: scripts/pytest_modules.sh images
 
       # A short smoke, not the full study (which runs at N=20000): enough to
       # exercise the write, read, aggregate and i18n statement-count
@@ -533,7 +539,7 @@ jobs:
 
 
       - name: Sync workspace
-        run: uv sync --locked --all-packages --all-extras
+        run: uv sync --locked --all-packages --all-extras --no-extra anonymize
 
       # scripts/tests/test_nav_icons.py reads the framework's NavIcon.tsx out
       # of node_modules and skips itself when it is absent.

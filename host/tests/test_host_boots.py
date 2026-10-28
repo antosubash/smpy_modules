@@ -87,7 +87,7 @@ def test_ai_routes_mounted(app):
 
 # Every distributable module in this repo. The subscriber check below is only
 # evidence if each of them is booted, so it asserts that first.
-REPO_MODULES = {"Ai", "Billing", "News", "PageBuilder", "Records"}
+REPO_MODULES = {"Ai", "Billing", "Images", "News", "PageBuilder", "Records"}
 
 
 def _migrate(url: str) -> None:
