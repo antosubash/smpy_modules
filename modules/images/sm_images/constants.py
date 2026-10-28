@@ -94,4 +94,3 @@ MULTIPART_OVERHEAD_BYTES: Final = 1024 * 1024
 
 MODULE_ATTR: Final = "images_module"
 """``app.state`` attribute holding the module instance."""
-

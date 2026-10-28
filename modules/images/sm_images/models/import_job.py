@@ -1,0 +1,39 @@
+"""Import jobs: a GeoJSON feed or a zip, resumable from ``checkpoint_index``."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from typing import Any
+
+from simple_module_db.mixins import AuditMixin, MultiTenantMixin
+from sqlmodel import Field
+
+from sm_images.models._base import Base
+from sm_images.models._cols import dt_col, enum_col, fk_uuid, json_col, pk_uuid
+from sm_images.models.enums import ImportKind, JobStatus
+
+
+class ImportJob(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
+    __tablename__ = "images_import_job"
+
+    id: uuid.UUID = pk_uuid()
+    collection_id: uuid.UUID = fk_uuid("images_collection.id")
+    kind: ImportKind = enum_col(ImportKind, "import_kind", ImportKind.GEOJSON_URL)
+    status: JobStatus = enum_col(JobStatus, "job_status", JobStatus.PENDING)
+    mapping: dict[str, Any] = json_col(dict)
+    """url, image, lat, lng, datetime, external_id and group-key properties; filename pattern."""
+    source_key: str | None = Field(default=None, max_length=500)
+    staged_keys: list[str] = json_col(list)
+    """Every object this job staged, so cancel and the janitor can delete exactly these."""
+    generation: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    """Fences a stale runner after a resume."""
+    heartbeat_at: datetime | None = dt_col(index=True)
+    checkpoint_index: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    total_count: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    done_count: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    duplicate_count: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    failed_count: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    errors: list[dict[str, Any]] = json_col(list)
+    """Capped list of per-item errors."""
+    auto_run_prompts: bool = Field(default=False)
