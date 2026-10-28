@@ -10,10 +10,14 @@ import pytest
 from fastapi import FastAPI
 from sm_images import cache
 from sm_images.models import Visibility
-from sm_images.tenancy import configure, note_tenant_source
+from sm_images.tenancy import DEFAULT_TENANT, configure, note_tenant_source, tenant_scope
 from starlette.requests import Request
 
 from tests.access_support import collection
+
+# Each test binds (or not) the tenant contextvar itself: a binding is one of
+# the request-specific sources ``note_tenant_source`` records.
+pytestmark = pytest.mark.unbound_tenant
 
 SHARED = "public, max-age=31536000, immutable"
 PRIVATE = "private, max-age=3600"
@@ -119,3 +123,10 @@ def test_if_none_match(header, hit):
     tag = cache.etag("k", 1)
     sent = None if header is None else header.replace("TAG", tag)
     assert cache.not_modified(sent, tag) is hit
+
+
+def test_a_context_bound_default_with_no_request_state_is_not_shareable():
+    coll = collection("p", Visibility.PUBLIC)
+    with tenant_scope(DEFAULT_TENANT):
+        req = _request()
+    assert _cc(req, coll, cache.RENDITION, twin=True) == PRIVATE

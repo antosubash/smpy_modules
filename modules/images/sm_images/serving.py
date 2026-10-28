@@ -17,15 +17,16 @@ order is the point:
 **Protected** means the original is not what everyone sees: the image has a
 display copy, or its redaction is still pending (:mod:`sm_images.redaction`).
 
-The gate only ever withholds bytes derived from the **original**. A display
-copy, once published, was written by a display mutator and is already
-redacted: it and the renditions cut from it (``source_generation`` equal to
-the current ``display_generation``) are served whatever the mutator is doing
-now - re-running, bumped, or uninstalled. Only an image with *no* display copy
-is gated: while its redaction is pending, ``…/display`` (which would fall back
-to the original) and its renditions (cut from the original) are a 404, the
-portal's "thumbnail not available". A rendition is also a 404 unless it was
-cut from the image's current display generation.
+A display copy written by the collection's current display mutator
+(``Image.display_step``, any version of it) is redacted: it and the renditions
+cut from it (``source_generation`` equal to the current
+``display_generation``) are served whatever that mutator is doing now -
+re-running, bumped, or uninstalled. Anything else - no display copy, or one
+another step wrote (a crop, before an anonymiser was enabled) - is gated:
+while redaction is pending, ``…/display`` and its renditions are a 404, the
+portal's "thumbnail not available", and the original is protected. A
+rendition is also a 404 unless it was cut from the current display
+generation.
 
 **Versions.** The display copy and each rendition carry a version
 (:func:`sm_images.cache.version`); a request whose ``?v=`` is not it is served
@@ -89,8 +90,10 @@ async def resolve(
     if loaded is None:
         raise _missing()
     image, rendition = loaded
-    # Only original-derived bytes can be unredacted; a display copy never is.
-    pending = image.display_key is None and await redaction.pending(db, collection, image)
+    # A display copy the current mutator wrote is redacted; anything else -
+    # the original, or a copy from another step - waits for the gate.
+    trusted = redaction.trusts_display(collection, image)
+    pending = not trusted and await redaction.pending(db, collection, image)
     if route == cache.RENDITION:
         if rendition is None or pending or rendition.source_generation != image.display_generation:
             raise _missing()

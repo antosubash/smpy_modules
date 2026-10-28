@@ -245,6 +245,8 @@ def upgrade() -> None:
         sa.Column("storage_key", sa.String(length=500), nullable=False),
         sa.Column("display_key", sa.String(length=500), nullable=True),
         sa.Column("display_generation", sa.Integer(), nullable=False),
+        sa.Column("display_step", sa.String(length=100), nullable=True),
+        sa.Column("display_step_version", sa.Integer(), nullable=True),
         sa.Column("processing_generation", sa.Integer(), nullable=False),
         sa.Column("processed_generation", sa.Integer(), nullable=False),
         sa.Column("storage_hold_id", sa.String(length=64), nullable=True),

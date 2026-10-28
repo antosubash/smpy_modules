@@ -112,7 +112,7 @@ async def _requeue(runtime: Runtime, loaded: Any, lease_s: int) -> None:
 
 
 async def _publish(
-    db: Any, loaded: Any, locked: Any, staged: Staged, staging: Any
+    db: Any, loaded: Any, locked: Any, staged: Staged, staging: Any, version: int | None
 ) -> list[str] | None:
     """The built-in writes (``staging`` is ``None`` unless the step completed).
     ``None`` = a fence failed; the transaction must not commit."""
@@ -120,7 +120,9 @@ async def _publish(
     replaced: list[str] = []
     if staged.display_key is not None:
         generation = loaded.display_generation + 1
-        if not await publish.publish_display(db, tenant, image_id, staged.display_key, generation):
+        if not await publish.publish_display(
+            db, tenant, image_id, staged.display_key, generation, loaded.step, version
+        ):
             return None
         if locked.display_key:
             replaced.append(locked.display_key)
@@ -167,7 +169,7 @@ async def complete_step(
             version=version,
         )
         writes = staging if outcome.status == "completed" else None
-        replaced = await _publish(db, loaded, locked, staged, writes) if ok else None
+        replaced = await _publish(db, loaded, locked, staged, writes, version) if ok else None
         if replaced is None:
             await db.rollback()
             requeue = ok  # still ours: only the display fence failed

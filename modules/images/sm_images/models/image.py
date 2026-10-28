@@ -62,6 +62,12 @@ class Image(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  #
     """``None`` = the original is the display copy."""
     display_generation: int = Field(default=0, sa_column_kwargs={"nullable": False})
     """Fences display publication (``WHERE display_generation = :g - 1``)."""
+    display_step: str | None = Field(default=None, max_length=100)
+    """The step that wrote the current display copy, stamped at its fenced
+    publication. A display copy is trusted as redacted only while this is the
+    collection's enabled display mutator (``sm_images.redaction``): a crop is a
+    display mutator too, and redacts nothing."""
+    display_step_version: int | None = Field(default=None)
     processing_generation: int = Field(default=1, sa_column_kwargs={"nullable": False})
     """The processing cycle: bumped once by an accepted retry, force or re-run."""
     processed_generation: int = Field(default=0, sa_column_kwargs={"nullable": False})

@@ -36,13 +36,25 @@ def _image(tenant: str, image_id: uuid.UUID) -> list[Any]:
 
 
 async def publish_display(
-    db: Any, tenant: str, image_id: uuid.UUID, key: str, generation: int
+    db: Any,
+    tenant: str,
+    image_id: uuid.UUID,
+    key: str,
+    generation: int,
+    step: str,
+    version: int | None,
 ) -> bool:
-    """Swap in the new display copy, fenced on the generation it was made from."""
+    """Swap in the new display copy, fenced on the generation it was made from,
+    recording the *step* (and its *version*) that wrote it."""
     stmt = (
         update(Image)
         .where(*_image(tenant, image_id), Image.display_generation == generation - 1)
-        .values(display_key=key, display_generation=generation)
+        .values(
+            display_key=key,
+            display_generation=generation,
+            display_step=step,
+            display_step_version=version,
+        )
         .returning(Image.id)
         .execution_options(**_SYNC)
     )

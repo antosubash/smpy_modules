@@ -30,6 +30,9 @@ async def g(client, storage):
     return await seed_gallery(client.db_state.session_factory, storage)
 
 
+# Shared caching needs the host-wide fallback tenant: nothing bound upstream,
+# so this test runs without the suite's default binding (review fix 3.2).
+@pytest.mark.unbound_tenant
 @pytest.mark.parametrize(("tail", "what"), [("r/small", "small"), ("display", "display")])
 async def test_public_rendition_and_display_are_shareable(client, g, tail, what):
     got = await client.get(g.public_url("pub", "blurred", tail))
@@ -43,6 +46,9 @@ async def test_public_rendition_and_display_are_shareable(client, g, tail, what)
     assert again.headers["etag"] == got.headers["etag"]
 
 
+# Shared caching needs the host-wide fallback tenant: nothing bound upstream,
+# so this test runs without the suite's default binding (review fix 3.2).
+@pytest.mark.unbound_tenant
 async def test_public_display_supports_ranges(client, g):
     got = await client.get(
         g.public_url("pub", "blurred", "display"), headers={"Range": "bytes=0-9"}

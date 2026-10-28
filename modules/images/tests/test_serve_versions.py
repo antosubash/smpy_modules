@@ -44,9 +44,20 @@ async def test_an_upstream_default_tenant_is_not_shareable(client, g):
     assert got.headers["cache-control"] == PRIVATE
 
 
+async def test_a_context_bound_default_tenant_is_not_shareable(client, g):
+    """Bound in the tenant contextvar by an enclosing layer (here: the suite's
+    autouse binding), with nothing on ``request.state``: still request-specific."""
+    got = await client.get(g.public_url("pub", "plain", "r/small"))
+    assert got.status_code == 200
+    assert got.headers["cache-control"] == PRIVATE
+
+
 # --- 5. versions --------------------------------------------------------------
 
 
+# Shared caching needs the host-wide fallback tenant: nothing bound upstream,
+# so this test runs without the suite's default binding (review fix 3.2).
+@pytest.mark.unbound_tenant
 @pytest.mark.parametrize("tail", ["r/small", "display"])
 async def test_public_unversioned_or_stale_is_no_cache(client, g, tail):
     for url in (

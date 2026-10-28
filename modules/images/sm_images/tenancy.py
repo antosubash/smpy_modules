@@ -213,11 +213,16 @@ def note_tenant_source(request: Any) -> None:
 
     Called by :func:`bind_public` *before* its fallback: once the scope is
     bound, the tenant contextvar holds :data:`DEFAULT_TENANT` either way and
-    the two cases look alike. ``request.state.tenant_id`` set upstream (a
-    subdomain, a header, a parent app) is request-specific even when its value
-    is ``default`` - the rule of records #196 is about *who* chose, not what.
+    the two cases look alike. Both sources :func:`_resolved` accepts count -
+    ``request.state.tenant_id`` (a subdomain, a header, a parent app) and a
+    tenant an enclosing layer already bound in the contextvar - and either is
+    request-specific even when its value is ``default``: the rule of records
+    #196 is about *who* chose, not what.
     """
-    setattr(request.state, _UPSTREAM_ATTR, getattr(request.state, "tenant_id", None) is not None)
+    upstream = (
+        getattr(request.state, "tenant_id", None) is not None or current_tenant_id.get() is not None
+    )
+    setattr(request.state, _UPSTREAM_ATTR, upstream)
 
 
 def tenant_from_request(request: Any) -> bool:

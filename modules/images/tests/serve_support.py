@@ -20,10 +20,13 @@ from simple_module_db.listeners import current_tenant_id
 from sm_images import cache, storage_keys
 from sm_images.models import Image, Rendition, Visibility
 from sm_images.storage import ImageStore
+from sm_images.tenancy import DEFAULT_TENANT, tenant_scope
 
 from tests.access_support import EDITOR, OWNER, collection, share
 
 ATTEMPT = "a1"
+BLUR = "acme.blur"
+"""The step every seeded display copy is recorded as written by."""
 
 
 def blob(tag: str, size: int = 2048) -> bytes:
@@ -89,6 +92,8 @@ async def _image(
             storage_key=objects["original"],
             display_key=objects.get("display"),
             display_generation=1 if blurred else 0,
+            display_step=BLUR if blurred else None,
+            display_step_version=1 if blurred else None,
             filename=f"{label}.jpg",
             content_type="image/jpeg",
             size_bytes=len(out.bytes[f"{label}.original"]),
@@ -111,6 +116,15 @@ async def _image(
 
 
 async def seed_gallery(session_factory: Any, backend: Any, **coll_kw: Any) -> Served:
+    """Seed in the bound tenant - or in ``default`` for an ``unbound_tenant``
+    test, which binds nothing so its requests see no tenant bound upstream."""
+    if current_tenant_id.get() is None:
+        with tenant_scope(DEFAULT_TENANT):
+            return await _seed(session_factory, backend, **coll_kw)
+    return await _seed(session_factory, backend, **coll_kw)
+
+
+async def _seed(session_factory: Any, backend: Any, **coll_kw: Any) -> Served:
     store = ImageStore(backend)
     out = Served()
     pub = collection(f"pub-{uuid.uuid4().hex[:6]}", Visibility.PUBLIC, OWNER, **coll_kw)
