@@ -4,75 +4,47 @@ together, or not at all.
 :func:`settle_bytes` is shared by base64 imports (inline, by the runner) and
 URL imports (``download``): ``IngestService.add_image(source="import")`` - the
 sniff, the decode guards, the dedupe and the object write - then, **in the
-same transaction**, the item's compare-and-set out of ``pending``
-(:func:`mark_item`) and the counter increment. A loser of that compare-and-set
-(a redelivered message, a concurrent download of the same item) rolls back,
-so its image row vanishes, and deletes the object it wrote.
+same transaction**,
 
-An ``ImagesError`` from ingest (not an image, too large, too many pixels) is
-the item's permanent failure, recorded with its code.
+* the item's compare-and-set out of ``pending`` (:func:`mark_item`), which for
+  a download also requires the claim token it holds, and
+* the counter increment, **fenced** on the job being ``running`` in the
+  settler's generation (``jobs.bump``).
+
+If either fails - a redelivered message, a download whose claim was taken
+over, a job paused, restarted or reclaimed meanwhile - the transaction rolls
+back, so the image row vanishes, and the object it wrote is deleted (or, if
+that fails, left behind its intent for the janitor).
+
+An ``ImagesError`` from ingest or the base64 decoder (not an image, too large,
+too many pixels, bad base64) is the item's permanent failure, with its code.
 """
 
 from __future__ import annotations
 
-import base64
-import binascii
 import contextlib
 import logging
 import uuid
 from collections.abc import Sequence
-from typing import Any, Final
+from typing import Any
 
 from simple_module_db import finalize_session
-from sqlalchemy import select, update
+from sqlalchemy import update
 
+from sm_images import constants
 from sm_images.errors import ImagesError
 from sm_images.imports import jobs
-from sm_images.imports.chunk import SOURCE, pending_items
+from sm_images.imports.chunk import pending_items
 from sm_images.imports.features import Parsed
 from sm_images.ingest import Duplicate, IngestMeta, IngestService
+from sm_images.ingest.b64 import decode_base64
 from sm_images.models import Collection, Image, ImportItem
 from sm_images.models.enums import ItemStatus, LocationSource
 from sm_images.pipeline.runtime import Runtime
 
-__all__ = [
-    "decode_base64",
-    "fail_item",
-    "ingest_chunk",
-    "ingest_item",
-    "item_meta",
-    "mark_item",
-    "settle_bytes",
-]
+__all__ = ["fail_item", "ingest_chunk", "ingest_item", "item_meta", "mark_item", "settle_bytes"]
 
 logger = logging.getLogger(__name__)
-
-_DATA_URI: Final = "data:"
-
-
-class RefusedError(Exception):
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
-
-
-def decode_base64(text: str, max_bytes: int) -> bytes:
-    """Raw or data-URI base64, at most ``max_bytes`` decoded; ``RefusedError`` otherwise."""
-    text = text.strip()
-    if text.startswith(_DATA_URI):
-        _, _, text = text.partition(",")
-    text = "".join(text.split())
-    if len(text) // 4 * 3 > max_bytes + 3:
-        raise RefusedError("file_too_large")
-    try:
-        data = base64.b64decode(text, validate=True)
-    except (binascii.Error, ValueError) as exc:
-        raise RefusedError("invalid_base64") from exc
-    if not data:
-        raise RefusedError("invalid_base64")
-    if len(data) > max_bytes:
-        raise RefusedError("file_too_large")
-    return data
 
 
 def item_meta(item: ImportItem | Parsed) -> IngestMeta:
@@ -97,25 +69,35 @@ async def mark_item(
     image_id: uuid.UUID | None = None,
     error: str | None = None,
     attempts: int = 0,
+    token: str | None = None,
 ) -> bool:
-    """Move a ``pending`` item to ``status``; ``False`` if it is not pending (any more)."""
-    values: dict[str, Any] = {"status": status, "updated_at": jobs.now()}
+    """Move a ``pending`` item (held by ``token``, when given) to ``status``;
+    ``False`` if it is not pending, or not this claim's, any more."""
+    values: dict[str, Any] = {
+        "status": status,
+        "updated_at": jobs.now(),
+        "claim_token": None,
+        "claim_expires_at": None,
+    }
     if image_id is not None:
         values["image_id"] = image_id
     if error is not None:
         values["last_error"] = error[:2000]
     if attempts:
         values["attempts"] = ImportItem.attempts + attempts
+    conds = [
+        ImportItem.id == item_id,
+        ImportItem.tenant_id == tenant,
+        ImportItem.status == ItemStatus.PENDING,
+    ]
+    if token is not None:
+        conds.append(ImportItem.claim_token == token)
     stmt = (
         update(ImportItem)
-        .where(
-            ImportItem.id == item_id,
-            ImportItem.tenant_id == tenant,
-            ImportItem.status == ItemStatus.PENDING,
-        )
+        .where(*conds)
         .values(**values)
         .returning(ImportItem.id)
-        .execution_options(synchronize_session=False)
+        .execution_options(**jobs.SYNC)
     )
     return (await db.execute(stmt)).first() is not None
 
@@ -125,27 +107,45 @@ async def ingest_item(
 ) -> Image | Duplicate:
     """The one ingest call (a seam for the replay tests)."""
     return await ingest.add_image(
-        collection, data=data, filename=filename, meta=meta, source=SOURCE
+        collection, data=data, filename=filename, meta=meta, source=constants.SOURCE_IMPORT
     )
 
 
 async def fail_item(
-    runtime: Runtime, tenant: str, job_id: uuid.UUID, item_id: int, code: str, *, attempts: int = 1
+    runtime: Runtime,
+    tenant: str,
+    job_id: uuid.UUID,
+    generation: int,
+    item_id: int,
+    code: str,
+    *,
+    attempts: int = 1,
+    token: str | None = None,
 ) -> bool:
     async with runtime.session_factory() as db:
         moved = await mark_item(
-            db, tenant, item_id, ItemStatus.FAILED, error=code, attempts=attempts
+            db, tenant, item_id, ItemStatus.FAILED, error=code, attempts=attempts, token=token
         )
-        if moved:
-            await jobs.bump(db, tenant, job_id, {ItemStatus.FAILED: 1})
+        if moved and not await jobs.bump(db, tenant, job_id, {ItemStatus.FAILED: 1}, generation):
+            await db.rollback()
+            return False
         await finalize_session(db)
     return moved
+
+
+async def _discard(runtime: Runtime, created: Image | None) -> None:
+    """Its row rolled back: nothing references the object (best effort; the
+    intent written before the object stays for the janitor otherwise)."""
+    if created is not None:
+        with contextlib.suppress(Exception):
+            await runtime.store().delete_keys([created.storage_key])
 
 
 async def settle_bytes(
     runtime: Runtime,
     tenant: str,
     job_id: uuid.UUID,
+    generation: int,
     collection: Collection,
     item_id: int,
     data: bytes,
@@ -153,9 +153,10 @@ async def settle_bytes(
     filename: str | None,
     meta: IngestMeta,
     attempts: int = 1,
+    token: str | None = None,
 ) -> ItemStatus | None:
-    """Ingest ``data`` as item ``item_id``; its final status, or ``None`` when
-    another delivery settled it first."""
+    """Ingest ``data`` as item ``item_id``; its final status, or ``None`` when it
+    lost (settled elsewhere, claim lost, job moved on) and nothing was kept."""
     created: Image | None = None
     async with runtime.session_factory() as db:
         ingest = IngestService(
@@ -170,19 +171,23 @@ async def settle_bytes(
         except ImagesError as exc:
             await db.rollback()
             code = exc.code or "rejected"
-            failed = await fail_item(runtime, tenant, job_id, item_id, code, attempts=attempts)
+            failed = await fail_item(
+                runtime, tenant, job_id, generation, item_id, code, attempts=attempts, token=token
+            )
             return ItemStatus.FAILED if failed else None
         if isinstance(outcome, Duplicate):
             status, image_id = ItemStatus.DUPLICATE, outcome.image_id
         else:
             status, image_id, created = ItemStatus.DONE, outcome.id, outcome
-        if not await mark_item(db, tenant, item_id, status, image_id=image_id, attempts=attempts):
+        kept = await mark_item(
+            db, tenant, item_id, status, image_id=image_id, attempts=attempts, token=token
+        )
+        if kept:
+            kept = await jobs.bump(db, tenant, job_id, {status: 1}, generation)
+        if not kept:
             await db.rollback()
-            if created is not None:  # its row rolled back: nothing references the object
-                with contextlib.suppress(Exception):
-                    await runtime.store().delete_keys([created.storage_key])
+            await _discard(runtime, created)
             return None
-        await jobs.bump(db, tenant, job_id, {status: 1})
         await finalize_session(db)
     return status
 
@@ -194,29 +199,37 @@ async def ingest_chunk(
     collection: Collection,
     parsed: Sequence[Parsed],
 ) -> int:
-    """Base64 mode: ingest the chunk's items still waiting for an image, from
-    the payloads parsed out of the source. Returns how many were settled."""
+    """Base64 mode: settle the chunk's items still waiting for an image - from
+    the payloads parsed out of the source, or as failed when the feature itself
+    is unusable (a replay after retry-failed must settle them, not skip them).
+    Returns how many were settled."""
     if not parsed:
         return 0
     by_index = {p.index: p for p in parsed}
     max_bytes = runtime.settings().max_image_bytes
     settled = 0
-    for item_id, index in await pending_items(
-        runtime, tenant, job.id, parsed[0].index, parsed[-1].index
-    ):
+    first, last = parsed[0].index, parsed[-1].index
+    for item_id, index in await pending_items(runtime, tenant, job.id, first, last):
         p = by_index.get(index)
-        if p is None or p.payload is None:
+        if p is None:
+            continue
+        if p.error is not None or p.payload is None:
+            code = p.error or "missing_image"
+            settled += await fail_item(runtime, tenant, job.id, job.generation, item_id, code)
             continue
         try:
             data = decode_base64(p.payload, max_bytes)
-        except RefusedError as refused:
-            settled += await fail_item(runtime, tenant, job.id, item_id, refused.code)
+        except ImagesError as refused:
+            code = refused.code or "invalid_base64"
+            settled += await fail_item(runtime, tenant, job.id, job.generation, item_id, code)
             continue
-        p.payload = None  # release the encoded text as soon as it is decoded
+        finally:
+            p.payload = None  # release the encoded text as soon as it is decoded
         outcome = await settle_bytes(
             runtime,
             tenant,
             job.id,
+            job.generation,
             collection,
             item_id,
             data,
@@ -225,11 +238,3 @@ async def ingest_chunk(
         )
         settled += outcome is not None
     return settled
-
-
-async def item_row(runtime: Runtime, tenant: str, item_id: int) -> ImportItem | None:
-    async with runtime.session_factory() as db:
-        stmt = select(ImportItem).where(ImportItem.id == item_id, ImportItem.tenant_id == tenant)
-        row = (await db.execute(stmt)).scalar_one_or_none()
-        await finalize_session(db)
-    return row

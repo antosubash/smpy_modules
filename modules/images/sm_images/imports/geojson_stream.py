@@ -20,7 +20,15 @@ from typing import IO, Any, Final
 
 import ijson
 
-__all__ = ["SKIP_TICK", "GeoJSONError", "Tick", "iter_features", "validate_and_count"]
+__all__ = [
+    "OVERSIZE",
+    "SKIP_TICK",
+    "GeoJSONError",
+    "Oversize",
+    "Tick",
+    "iter_features",
+    "validate_and_count",
+]
 
 SKIP_TICK: Final = 10_000
 """While skipping to a resume point, yield a :class:`Tick` this often, so the
@@ -88,17 +96,69 @@ def validate_and_count(stream: IO[bytes], max_features: int) -> int:
     return count
 
 
-def iter_features(stream: IO[bytes], start: int = 0) -> Iterator[tuple[int, Any]]:
+class Oversize:
+    """Yielded in place of a feature over the byte budget; it was never built."""
+
+    __slots__ = ()
+
+
+OVERSIZE = Oversize()
+_SCALAR_COST: Final = 8
+_STARTS: Final = frozenset({"start_map", "start_array"})
+_ENDS: Final = frozenset({"end_map", "end_array"})
+
+
+def _cost(event: str, value: Any) -> int:
+    if event in ("string", "map_key"):
+        return len(value)
+    return _SCALAR_COST
+
+
+def iter_features(
+    stream: IO[bytes], start: int = 0, max_feature_bytes: int | None = None
+) -> Iterator[tuple[int, Any]]:
     """``(index, feature)`` for every feature from ``start`` on, by absolute
-    index; a ``(index, Tick)`` every :data:`SKIP_TICK` features skipped before
-    it. A feature may be any JSON value - the caller decides what is usable."""
+    index; a ``(index, Tick)`` every :data:`SKIP_TICK` features skipped before it.
+
+    Features are built from ijson's event stream with a running budget: once a
+    feature's keys and values pass ``max_feature_bytes`` its builder is dropped
+    and ``(index, OVERSIZE)`` is yielded when it ends - the rest of the file
+    streams on. (The parser still holds one token at a time; one huge string is
+    bounded only by ``geojson_max_bytes``. Every *built* feature is bounded.)
+    A feature may be any JSON value - the caller decides what is usable."""
     stream.seek(0)
+    index, depth, size = -1, 0, 0
+    builder: ijson.ObjectBuilder | None = None
     try:
-        for index, feature in enumerate(ijson.items(stream, _ITEM, use_float=True)):
-            if index < start:
-                if index and index % SKIP_TICK == 0:
-                    yield index, _TICK
+        for prefix, event, value in ijson.parse(stream, use_float=True):
+            if depth == 0:
+                if prefix != _ITEM or event not in _VALUE_EVENTS:
+                    continue
+                index += 1
+                if index < start:
+                    if index and index % SKIP_TICK == 0:
+                        yield index, _TICK
+                    if event in _STARTS:
+                        depth, builder = 1, None
+                    continue
+                if event not in _STARTS:  # a bare scalar feature
+                    yield index, value
+                    continue
+                depth, size, builder = 1, 0, ijson.ObjectBuilder()
+                builder.event(event, value)
                 continue
-            yield index, feature
+            if event in _STARTS:
+                depth += 1
+            elif event in _ENDS:
+                depth -= 1
+            if builder is not None:
+                size += _cost(event, value)
+                if max_feature_bytes is not None and size > max_feature_bytes:
+                    builder = None  # stop building; the feature is reported as too large
+                else:
+                    builder.event(event, value)
+            if depth == 0 and index >= start:
+                yield index, (OVERSIZE if builder is None else builder.value)
+                builder = None
     except ijson.JSONError as exc:
         raise GeoJSONError("invalid_json") from exc

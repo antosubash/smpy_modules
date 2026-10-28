@@ -154,8 +154,10 @@ async def test_controls_over_http(api):
     url = f"/api/images/imports/{job['id']}"
     paused = await api.post(f"{url}/pause", headers=OLGA)
     assert (paused.status_code, paused.json()["code"]) == (409, "job_not_active")
+    # A finished base64 job with failures keeps its source: retry-failed works.
     retried = await api.post(f"{url}/retry-failed", headers=OLGA)
-    assert (retried.status_code, retried.json()["code"]) == (409, "source_gone")
+    assert retried.status_code == 202, retried.text
+    assert (retried.json()["status"], retried.json()["failed_count"]) == ("completed", 1)
     resumed = await api.post(f"{url}/resume", headers=OLGA)
     assert resumed.status_code == 409
     assert (await api.delete(url, headers=OLGA)).status_code == 204

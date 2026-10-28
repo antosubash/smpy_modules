@@ -7,7 +7,10 @@ Every write that a runner or a download makes to a job is a conditional
   resume and reconcile's reclaim bump it, so a runner from before stops at its
   next write (:func:`start`, :func:`heartbeat`, ``chunk.advance_checkpoint``);
 * **counters** are increments (``done_count + n``, :func:`bump`), so
-  concurrent downloads never lose one another's.
+  concurrent downloads never lose one another's - and a settlement's
+  increment is itself fenced (``running`` and the settler's generation), in
+  the same transaction as its image, so work from before a pause, restart or
+  reclaim rolls back instead of landing.
 
 Completion and the other terminal moves are in :mod:`.terminal`.
 
@@ -27,39 +30,40 @@ from sqlalchemy import case, func, select, update
 
 from sm_images.imports.mapping import Mapping
 from sm_images.intents import clear_intents
-from sm_images.models import Collection, ImportItem, ImportJob
+from sm_images.models import ImportItem, ImportJob
 from sm_images.models.enums import ImportKind, ItemStatus, JobStatus
 from sm_images.pipeline.runtime import Runtime
 
 __all__ = [
     "ACTIVE",
+    "CLAIMABLE",
     "COUNTERS",
+    "SYNC",
     "TERMINAL",
     "JobSnap",
     "bump",
     "claim_stale",
     "create_job",
     "heartbeat",
-    "live_collection",
     "load",
     "now",
     "pending_count",
-    "resume_index",
     "returning_one",
     "snapshot",
     "start",
-    "touch",
     "where",
 ]
 
 ACTIVE: Final = (JobStatus.PENDING, JobStatus.STAGING, JobStatus.RUNNING)
+CLAIMABLE: Final = (*ACTIVE, JobStatus.RESETTING)
+"""What reconcile may take over once its heartbeat is stale."""
 TERMINAL: Final = (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED)
 COUNTERS: Final = {
     ItemStatus.DONE: "done_count",
     ItemStatus.DUPLICATE: "duplicate_count",
     ItemStatus.FAILED: "failed_count",
 }
-_SYNC: Final = {"synchronize_session": False}
+SYNC: Final = {"synchronize_session": False}
 
 
 def now() -> datetime:
@@ -151,9 +155,16 @@ async def create_job(
 
 async def returning_one(runtime: Runtime, stmt: Any) -> Any:
     async with runtime.session_factory() as db:
-        found = (await db.execute(stmt.execution_options(**_SYNC))).first()
+        found = (await db.execute(stmt.execution_options(**SYNC))).first()
         await finalize_session(db)
     return found
+
+
+def needs_staging(row: Any) -> bool:
+    """No stored source and features still to record. A finished URL job whose
+    source was cleaned up has every feature recorded and needs none."""
+    recorded = row.total_count > 0 and row.checkpoint_index >= row.total_count
+    return row.source_key is None and not recorded
 
 
 async def start(
@@ -166,7 +177,7 @@ async def start(
         if row is None or row.generation != generation or row.status not in ACTIVE:
             await db.rollback()
             return None
-        row.status = JobStatus.RUNNING if row.source_key else JobStatus.STAGING
+        row.status = JobStatus.STAGING if needs_staging(row) else JobStatus.RUNNING
         row.heartbeat_at = row.updated_at = now()
         snap = snapshot(row)
         await finalize_session(db)
@@ -188,18 +199,14 @@ async def heartbeat(runtime: Runtime, tenant: str, job_id: uuid.UUID, generation
     return await returning_one(runtime, stmt) is not None
 
 
-async def touch(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> None:
-    stmt = update(ImportJob).where(*where(tenant, job_id)).values(heartbeat_at=now())
-    await returning_one(runtime, stmt.returning(ImportJob.id))
-
-
 async def claim_stale(
     runtime: Runtime, tenant: str, job_id: uuid.UUID, stale_before: datetime | None = None
 ) -> int | None:
-    """Take over an active job whose runner is gone: bump its generation (the old
-    runner, if alive, stops at its next write) and return the new one. With
+    """Take over an active or resetting job whose worker is gone: bump its
+    generation (the old one, if alive, stops at its next write) and return the
+    new one. With
     ``stale_before`` only a heartbeat older than it qualifies - one claim wins."""
-    conds = [*where(tenant, job_id), ImportJob.status.in_(ACTIVE)]
+    conds = [*where(tenant, job_id), ImportJob.status.in_(CLAIMABLE)]
     if stale_before is not None:
         conds.append(ImportJob.heartbeat_at.is_(None) | (ImportJob.heartbeat_at < stale_before))
     stmt = (
@@ -210,35 +217,6 @@ async def claim_stale(
     )
     found = await returning_one(runtime, stmt)
     return None if found is None else int(found[0])
-
-
-async def live_collection(runtime: Runtime, tenant: str, collection_id: uuid.UUID):
-    async with runtime.session_factory() as db:
-        stmt = select(Collection).where(
-            Collection.id == collection_id, Collection.tenant_id == tenant
-        )
-        found = (await db.execute(stmt)).scalar_one_or_none()
-        if found is not None:
-            db.expunge(found)  # a loaded, detached snapshot: the commit must not expire it
-        await finalize_session(db)
-    return found
-
-
-async def resume_index(runtime: Runtime, tenant: str, job: JobSnap) -> int:
-    """Where streaming restarts: the checkpoint, or - base64, whose image bytes
-    live only in the source - the first recorded item still waiting for one."""
-    if job.kind is not ImportKind.GEOJSON_BASE64:
-        return job.checkpoint_index
-    stmt = select(func.min(ImportItem.feature_index)).where(
-        ImportItem.job_id == job.id,
-        ImportItem.tenant_id == tenant,
-        ImportItem.status == ItemStatus.PENDING,
-        ImportItem.image_id.is_(None),
-    )
-    async with runtime.session_factory() as db:
-        first = (await db.execute(stmt)).scalar()
-        await finalize_session(db)
-    return job.checkpoint_index if first is None else min(first, job.checkpoint_index)
 
 
 async def pending_count(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> int:
@@ -253,8 +231,17 @@ async def pending_count(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> int
     return int(n)
 
 
-async def bump(db: Any, tenant: str, job_id: uuid.UUID, deltas: dict[ItemStatus, int]) -> None:
-    """Add to the job's counters (in the caller's transaction) and heartbeat it."""
+async def bump(
+    db: Any,
+    tenant: str,
+    job_id: uuid.UUID,
+    deltas: dict[ItemStatus, int],
+    generation: int | None = None,
+) -> bool:
+    """Add to the job's counters (in the caller's transaction) and heartbeat it.
+
+    With ``generation``, only while the job is ``running`` in that generation -
+    ``False`` otherwise, and the caller rolls its whole transaction back."""
     values: dict[str, Any] = {"heartbeat_at": now(), "updated_at": now()}
     for status, n in deltas.items():
         if n and status in COUNTERS:
@@ -263,5 +250,8 @@ async def bump(db: Any, tenant: str, job_id: uuid.UUID, deltas: dict[ItemStatus,
             values[COUNTERS[status]] = (
                 column + n if n > 0 else case((column + n < 0, 0), else_=column + n)
             )
-    stmt = update(ImportJob).where(*where(tenant, job_id)).values(**values)
-    await db.execute(stmt.execution_options(**_SYNC))
+    conds = where(tenant, job_id)
+    if generation is not None:
+        conds += [ImportJob.generation == generation, ImportJob.status == JobStatus.RUNNING]
+    stmt = update(ImportJob).where(*conds).values(**values).returning(ImportJob.id)
+    return (await db.execute(stmt.execution_options(**SYNC))).first() is not None

@@ -72,13 +72,6 @@ async def _check_source_url(url: str) -> str:
     return url
 
 
-def _size(stream: IO[bytes]) -> int:
-    stream.seek(0, 2)
-    size = stream.tell()
-    stream.seek(0)
-    return size
-
-
 async def start_import(
     runtime: Runtime,
     tenant: str,
@@ -98,7 +91,7 @@ async def start_import(
     job_id = uuid.uuid4()
     common = {"kind": parsed_kind, "mapping": parsed, "job_id": job_id}
     if upload is not None:
-        if _size(upload) > settings.geojson_max_bytes:
+        if staging.size(upload) > settings.geojson_max_bytes:
             raise FileTooLarge("The GeoJSON file is too large")
         try:
             staged = await staging.put_upload(

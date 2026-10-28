@@ -3,6 +3,7 @@ that refuses, a late duplicate download message, and the worker runtime binding.
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import io
 import uuid
@@ -51,14 +52,14 @@ async def test_broker_mode_sends_the_runner_and_batched_downloads_with_the_tenan
     broker = dataclasses.replace(imp.runtime, eager=False)
     job_id = uuid.uuid4()
     await launch.launch_runner(broker, "acme", job_id, 3)
-    await launch.launch_downloads(broker, "acme", job_id, [1, 2, 3])
+    await launch.launch_downloads(broker, "acme", job_id, 3, [1, 2, 3])
     ((args, kw),) = runner_msgs.calls
     assert args == (str(job_id), 3)
     assert kw == {"queue": task_config.QUEUE_IMPORTS, "headers": {TENANT_HEADER: "acme"}}
     assert [c[0][1] for c in download_msgs.calls] == [[1, 2], [3]]
     assert all(c[1]["headers"] == {TENANT_HEADER: "acme"} for c in download_msgs.calls)
     assert all(c[1]["queue"] == task_config.QUEUE_DEFAULT for c in download_msgs.calls)
-    datetime.fromisoformat(download_msgs.calls[0][0][2])  # carries when it was sent
+    assert {c[0][2] for c in download_msgs.calls} == {3}  # the generation they serve
 
 
 async def test_a_broker_that_refuses_fails_the_job_and_deletes_its_staging(imp, monkeypatch):
@@ -90,27 +91,72 @@ async def test_a_broker_that_refuses_fails_the_job_and_deletes_its_staging(imp, 
     assert not [k for k in imp.stored() if "/imports/" in k]
 
 
-async def test_a_late_duplicate_download_message_does_not_fetch_again(
-    imp, resolver, inner, monkeypatch
-):
+async def test_duplicate_download_messages_fetch_an_item_once(imp, resolver, inner, monkeypatch):
+    """Reconcile's re-send and the original both arrive: the claim lets one fetch."""
+    from sm_images.imports import retrying
+
     sent: list[list[int]] = []
 
-    async def record(runtime, tenant, job_id, ids):
+    async def record(runtime, tenant, job_id, generation, ids):
         sent.append(list(ids))
 
     monkeypatch.setattr(launch, "launch_downloads", record)
     seen = serve_images(resolver, inner)
     job = await imp.job([feature({"url": f"https://{HOST}/a.jpg"})], URL)
     await imp.run(job)
-    # The item was handed out again after this message was sent: it is not this
-    # message's to fetch any more.
-    early = datetime.now(UTC) - timedelta(minutes=10)
-    await download.download_items_async(imp.runtime, DEFAULT_TENANT, job.id, sent[0], early)
-    assert seen == [] and await imp.statuses(job) == ["pending"]
-    await download.download_items_async(
-        imp.runtime, DEFAULT_TENANT, job.id, sent[0], datetime.now(UTC)
-    )
+    real = retrying._fetch
+
+    async def slow(*a, **k):
+        await asyncio.sleep(0.05)
+        return await real(*a, **k)
+
+    monkeypatch.setattr(retrying, "_fetch", slow)
+    calls = [
+        download.download_items_async(imp.runtime, DEFAULT_TENANT, job.id, job.generation, sent[0])
+        for _ in range(2)
+    ]
+    assert sorted(await asyncio.gather(*calls)) == [0, 1]
     assert len(seen) == 1 and await imp.statuses(job) == ["done"]
+
+
+async def test_an_expired_claim_can_be_taken_over_and_the_old_holder_loses(
+    imp, resolver, inner, monkeypatch
+):
+    from sm_images.models import ImportItem
+    from sqlalchemy import update
+
+    sent: list[list[int]] = []
+
+    async def record(runtime, tenant, job_id, generation, ids):
+        sent.append(list(ids))
+
+    monkeypatch.setattr(launch, "launch_downloads", record)
+    serve_images(resolver, inner)
+    job = await imp.job([feature({"url": f"https://{HOST}/a.jpg"})], URL)
+    await imp.run(job)
+    claimed = await download._claim(imp.runtime, DEFAULT_TENANT, job.id, job.generation, sent[0][0])
+    assert claimed is not None
+    assert (
+        await download._claim(imp.runtime, DEFAULT_TENANT, job.id, job.generation, sent[0][0])
+        is None
+    )
+    async with imp.pipe.db_state.session_factory() as s:
+        old = datetime.now(UTC) - timedelta(seconds=1)
+        await s.execute(update(ImportItem).values(claim_expires_at=old))
+        await s.commit()
+    assert (
+        await download.download_items_async(
+            imp.runtime, DEFAULT_TENANT, job.id, job.generation, sent[0]
+        )
+        == 1
+    )
+    from sm_images.imports import settle
+
+    async with imp.pipe.db_state.session_factory() as s:  # the first holder settles too late
+        assert not await settle.mark_item(
+            s, DEFAULT_TENANT, sent[0][0], settle.ItemStatus.DONE, token=claimed[1]
+        )
+    assert await imp.statuses(job) == ["done"]
 
 
 def test_run_task_binds_its_runtime_for_ingest_dispatch(monkeypatch):
@@ -130,7 +176,10 @@ def test_run_task_binds_its_runtime_for_ingest_dispatch(monkeypatch):
 
 async def test_staging_keeps_the_source_under_the_jobs_prefix(imp):
     job_id = uuid.uuid4()
-    key, total = await staging.put_upload(
+    first, total = await staging.put_upload(
         imp.runtime, DEFAULT_TENANT, job_id, io.BytesIO(geojson([])), 5
     )
-    assert key == f"images/{DEFAULT_TENANT}/imports/{job_id}/source.geojson" and total == 0
+    again = await staging.put_spool(imp.runtime, DEFAULT_TENANT, job_id, io.BytesIO(b"{}"), 0)
+    prefix = f"images/{DEFAULT_TENANT}/imports/{job_id}/source.0."
+    assert first.startswith(prefix) and again.startswith(prefix) and total == 0
+    assert first != again  # every staging attempt writes its own object

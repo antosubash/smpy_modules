@@ -28,17 +28,15 @@ from sqlalchemy import case, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
+from sm_images import constants
 from sm_images.imports.features import Parsed
-from sm_images.imports.jobs import COUNTERS, JobSnap, now, where
+from sm_images.imports.jobs import COUNTERS, SYNC, JobSnap, now, where
 from sm_images.ingest import dedupe
 from sm_images.models import Image, ImportItem, ImportJob
 from sm_images.models.enums import ItemStatus, JobStatus
 from sm_images.pipeline.runtime import Runtime
 
-__all__ = ["SOURCE", "Stopped", "advance_checkpoint", "pending_items", "record_chunk"]
-
-SOURCE = "import"
-"""``external_source`` of every imported image: one dedupe namespace per collection."""
+__all__ = ["Stopped", "advance_checkpoint", "pending_items", "record_chunk"]
 
 
 class Stopped(Exception):  # noqa: N818 - a signal, not an error
@@ -75,7 +73,7 @@ async def _existing_images(
         .where(
             Image.collection_id == collection_id,
             Image.tenant_id == tenant,
-            Image.external_source == SOURCE,
+            Image.external_source == constants.SOURCE_IMPORT,
             Image.external_id.in_(ids),
         )
         .execution_options(include_deleted=True)
@@ -149,7 +147,7 @@ async def advance_checkpoint(
         )
         .values(**values)
         .returning(ImportJob.id)
-        .execution_options(synchronize_session=False)
+        .execution_options(**SYNC)
     )
     return (await db.execute(stmt)).first() is not None
 
@@ -183,7 +181,12 @@ async def record_chunk(
 
 
 async def pending_items(
-    runtime: Runtime, tenant: str, job_id: uuid.UUID, first: int, last: int
+    runtime: Runtime,
+    tenant: str,
+    job_id: uuid.UUID,
+    first: int,
+    last: int,
+    limit: int | None = None,
 ) -> list[tuple[int, int]]:
     """``(item id, feature index)`` of the items in ``[first, last]`` still
     waiting for work (pending and without an image)."""
@@ -198,6 +201,8 @@ async def pending_items(
         )
         .order_by(ImportItem.feature_index)
     )
+    if limit is not None:
+        stmt = stmt.limit(limit)
     async with runtime.session_factory() as db:
         rows = [(int(i), int(f)) for i, f in (await db.execute(stmt)).all()]
         await finalize_session(db)

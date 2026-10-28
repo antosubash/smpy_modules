@@ -113,8 +113,15 @@ async def _owned(db: Any, keys: list[str]) -> set[str]:
         elif len(parts) == 4 and parts[3] == "map.pmtiles" and (coll := _uuid(parts[2])):
             maps.setdefault(coll, []).append(key)
     if jobs:
-        for job in await _scalars(db, select(ImportJob.id).where(ImportJob.id.in_(list(jobs)))):
-            found.update(jobs[job])
+        # Owned only while its job still names it: a terminal job *detaches*
+        # its staged keys before deleting them, so a failed delete is reaped here.
+        stmt = select(ImportJob.source_key, ImportJob.staged_keys).where(
+            ImportJob.id.in_(list(jobs))
+        )
+        named: set[str] = set()
+        for source_key, staged in (await db.execute(tagged(stmt))).all():
+            named.update(k for k in [source_key, *(staged or [])] if k)
+        found.update(k for keys in jobs.values() for k in keys if k in named)
     if maps:
         for coll in await _scalars(db, select(Collection.id).where(Collection.id.in_(list(maps)))):
             found.update(maps[coll])

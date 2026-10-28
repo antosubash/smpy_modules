@@ -132,6 +132,20 @@ class Imp:
         )
 
 
+async def touch(imp: Imp, job: ImportJob) -> None:
+    """Freshen a job's heartbeat (its runner looks alive)."""
+    from datetime import UTC, datetime
+
+    from sqlalchemy import update
+
+    async with imp.pipe.db_state.session_factory() as s:
+        stmt = (
+            update(ImportJob).where(ImportJob.id == job.id).values(heartbeat_at=datetime.now(UTC))
+        )
+        await s.execute(stmt)
+        await s.commit()
+
+
 def serve_images(resolver, inner, *, fail: dict[str, Any] | None = None):
     """``img.example`` answers every path with a JPEG (or ``fail[path]``)."""
     resolver[HOST] = [PUBLIC_IP]

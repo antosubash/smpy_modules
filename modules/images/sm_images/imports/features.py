@@ -33,11 +33,31 @@ from sm_images.imports.mapping import Mapping
 from sm_images.imports.values import coordinates, lookup, parse_datetime
 from sm_images.models.enums import ImportKind
 
-__all__ = ["URL_MAX", "Parsed", "base64_external_id", "extract", "url_external_id", "url_filename"]
+__all__ = [
+    "PARSE_CODES",
+    "URL_MAX",
+    "Parsed",
+    "base64_external_id",
+    "extract",
+    "url_external_id",
+    "url_filename",
+]
 
 logger = logging.getLogger(__name__)
 
 URL_MAX: Final = 2000
+PARSE_CODES: Final = frozenset(
+    {
+        "missing_url",
+        "invalid_url",
+        "missing_image",
+        "invalid_external_id",
+        "invalid_feature",
+        "feature_too_large",
+    }
+)
+"""Failures decided by the feature itself: a retry would only repeat them, so
+retry-failed never resets them."""
 
 
 @dataclass

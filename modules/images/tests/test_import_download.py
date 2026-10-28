@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import httpx
 import pytest
-from sm_images.imports import download, launch
+from sm_images.imports import download, launch, retrying
 from sm_images.imports.features import url_external_id
 from sm_images.ingest import dedupe
 from sm_images.models import Image
@@ -37,7 +37,7 @@ def no_sleep(monkeypatch):
     async def fake(seconds):
         waits.append(seconds)
 
-    monkeypatch.setattr(download, "_sleep", fake)
+    monkeypatch.setattr(retrying, "_sleep", fake)
     return waits
 
 
@@ -46,7 +46,7 @@ def broker(monkeypatch):
     """Downloads are recorded, not run: what a broker-backed runner leaves behind."""
     sent: list[list[int]] = []
 
-    async def fake(runtime, tenant, job_id, ids):
+    async def fake(runtime, tenant, job_id, generation, ids):
         sent.append(list(ids))
 
     monkeypatch.setattr(launch, "launch_downloads", fake)
@@ -135,7 +135,9 @@ async def test_existing_image_is_deduped_before_anything_is_downloaded(
     job = await imp.job([feature({"url": url("late.jpg")})], URL)
     assert await imp.run(job) == "running"  # its download is queued, not run
     late = await _existing(imp, url_external_id(url("late.jpg")))
-    await download.download_items_async(imp.runtime, DEFAULT_TENANT, job.id, broker[0])
+    await download.download_items_async(
+        imp.runtime, DEFAULT_TENANT, job.id, job.generation, broker[0]
+    )
     assert seen == []
     (item,) = await imp.items(job)
     assert (item.status.value, item.image_id) == ("duplicate", late.id)
@@ -156,7 +158,9 @@ async def test_duplicate_image_at_commit_is_treated_as_dedup_not_failure(
         return None if calls["n"] <= 2 else await real(*args)
 
     monkeypatch.setattr(dedupe, "find_external", blind_twice)
-    await download.download_items_async(imp.runtime, DEFAULT_TENANT, job.id, broker[0])
+    await download.download_items_async(
+        imp.runtime, DEFAULT_TENANT, job.id, job.generation, broker[0]
+    )
     (item,) = await imp.items(job)
     assert (item.status.value, item.image_id) == ("duplicate", winner.id)
     assert [i.id for i in await imp.images()] == [winner.id]
@@ -169,17 +173,23 @@ async def test_download_idempotent(imp, resolver, inner, broker):
     job = await imp.job([feature({"url": url("a.jpg")}), feature({"url": url("b.jpg")})], URL)
     await imp.run(job)
     ids = broker[0]
-    await download.download_items_async(imp.runtime, DEFAULT_TENANT, job.id, ids[:1])
+    await download.download_items_async(
+        imp.runtime, DEFAULT_TENANT, job.id, job.generation, ids[:1]
+    )
     before = await imp.counts(job)
-    await download.download_items_async(imp.runtime, DEFAULT_TENANT, job.id, ids[:1])
-    await download.download_items_async(imp.runtime, DEFAULT_TENANT, job.id, [999_999])
+    await download.download_items_async(
+        imp.runtime, DEFAULT_TENANT, job.id, job.generation, ids[:1]
+    )
+    await download.download_items_async(
+        imp.runtime, DEFAULT_TENANT, job.id, job.generation, [999_999]
+    )
     assert await imp.counts(job) == before
     assert paths(seen) == ["/a.jpg"]
 
     from sm_images.imports import controls
 
     await controls.pause(imp.runtime, DEFAULT_TENANT, job.id)
-    await download.download_items_async(imp.runtime, DEFAULT_TENANT, job.id, ids)
+    await download.download_items_async(imp.runtime, DEFAULT_TENANT, job.id, job.generation, ids)
     assert paths(seen) == ["/a.jpg"]  # a paused job downloads nothing
     assert await imp.statuses(job) == ["done", "pending"]
 

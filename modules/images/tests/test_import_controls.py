@@ -10,13 +10,13 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 from sm_images.errors import Conflict
-from sm_images.imports import controls, jobs, launch, runner, terminal
+from sm_images.imports import controls, jobs, launch, reset, runner, terminal
 from sm_images.models import ImportItem, ImportJob
 from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import select, update
 
 from tests.fetch_support import body
-from tests.import_support import B64, HOST, URL, b64, feature, serve_images
+from tests.import_support import B64, HOST, URL, b64, feature, serve_images, touch
 from tests.pipeline_support import jpeg
 
 pytestmark = pytest.mark.asyncio
@@ -55,20 +55,22 @@ async def test_retry_failed_decrements_the_failed_counter_and_reopens_the_job(im
     assert await imp.statuses(job) == ["done", "done"]
 
 
-async def test_retry_failed_needs_the_source_for_a_base64_job(imp):
-    job = await imp.job([feature({"img": "!!"})])
-    await imp.run(job)
-    with pytest.raises(Conflict):
-        await controls.retry_failed(imp.runtime, T, job.id)
-
-
-async def test_restart_deletes_unfinished_items_in_chunks_and_replays(
+async def test_restart_deletes_unfinished_items_in_fenced_chunks_and_replays(
     imp, monkeypatch, resolver, inner
 ):
-    monkeypatch.setattr(controls, "RESET_CHUNK", 2)
+    monkeypatch.setattr(reset, "RESET_CHUNK", 2)
+    batches = []
+    real_batch = reset.reset_batch
+
+    async def counting(*a, **k):
+        n = await real_batch(*a, **k)
+        batches.append(n)
+        return n
+
+    monkeypatch.setattr(reset, "reset_batch", counting)
     real = launch.launch_downloads
 
-    async def lost(runtime, tenant, job_id, ids):
+    async def lost(runtime, tenant, job_id, generation, ids):
         return None
 
     monkeypatch.setattr(launch, "launch_downloads", lost)
@@ -76,14 +78,15 @@ async def test_restart_deletes_unfinished_items_in_chunks_and_replays(
     job = await imp.job([feature({"url": f"https://{HOST}/{i}.jpg"}) for i in range(5)], URL)
     assert await imp.run(job) == "running"
     out = await controls.restart(imp.runtime, T, job.id, launch=False)
-    assert (out.status.value, out.checkpoint_index, out.generation) == (
-        "pending",
+    assert (out.status.value, out.reset_mode, out.checkpoint_index, out.generation) == (
+        "resetting",
+        "restart",
         0,
         job.generation + 1,
     )
-    assert await imp.items(job) == []  # 5 rows, deleted 2 at a time
     monkeypatch.setattr(launch, "launch_downloads", real)
-    assert await imp.run(job, out.generation) == "completed"
+    assert await reset.run_reset(imp.runtime, T, job.id, out.generation) == "reset"
+    assert batches == [2, 2, 1]  # 5 rows, deleted 2 at a time
     assert len(seen) == 5
     assert await imp.counts(job) == ("completed", 5, 5, 5, 0, 0)
 
@@ -91,9 +94,7 @@ async def test_restart_deletes_unfinished_items_in_chunks_and_replays(
 async def test_restart_of_a_finished_url_job_resets_from_its_rows(
     imp, monkeypatch, resolver, inner
 ):
-    from sm_images.imports import retry
-
-    monkeypatch.setattr(retry, "RESET_CHUNK", 1)
+    monkeypatch.setattr(reset, "RESET_CHUNK", 1)
     state = {"down": True}
     serve_images(
         resolver,
@@ -110,7 +111,8 @@ async def test_restart_of_a_finished_url_job_resets_from_its_rows(
     resolver.clear()
     serve_images(resolver, inner, fail={})
     out = await controls.restart(imp.runtime, T, job.id)
-    assert out.generation == job.generation + 1
+    assert out.generation == job.generation + 1 and out.reset_mode is None
+    # The bad URL is retried from its row; the feature without a URL stays failed.
     assert await imp.counts(job) == ("completed", 6, 6, 5, 0, 1)
     assert len(await imp.images()) == 5
 
@@ -157,7 +159,7 @@ async def test_filename_pattern_groups(imp):
 async def test_property_groups_are_created_when_the_chunk_is_recorded(imp, monkeypatch):
     sent = []
 
-    async def broker(runtime, tenant, job_id, ids):
+    async def broker(runtime, tenant, job_id, generation, ids):
         sent.append(ids)
 
     monkeypatch.setattr(launch, "launch_downloads", broker)
@@ -186,7 +188,7 @@ async def test_capacity_wait_heartbeats_and_is_bounded(imp, monkeypatch):
         beats.append(1)
         return await real_beat(*a, **k)
 
-    async def broker(runtime, tenant, job_id, ids):
+    async def broker(runtime, tenant, job_id, generation, ids):
         return None
 
     monkeypatch.setattr(runner, "_sleep", fake_sleep)
@@ -221,7 +223,7 @@ async def test_reconcile_redispatches_stale_pending_items(imp, resolver, inner, 
     sent = []
     real = launch.launch_downloads
 
-    async def lost(runtime, tenant, job_id, ids):
+    async def lost(runtime, tenant, job_id, generation, ids):
         sent.append(ids)  # the message never arrives
 
     monkeypatch.setattr(launch, "launch_downloads", lost)
@@ -230,30 +232,30 @@ async def test_reconcile_redispatches_stale_pending_items(imp, resolver, inner, 
     assert await imp.run(job) == "running"
     monkeypatch.setattr(launch, "launch_downloads", real)
     await _age(imp, job)
-    await jobs.touch(imp.runtime, T, job.id)  # the runner is fine; only the item is stale
+    await touch(imp, job)  # the runner is fine; only the item is stale
     summary = await reconcile_async(imp.runtime, datetime.now(UTC))
     assert summary["import_items"] == 1
     assert len(seen) == 1
     assert await imp.counts(job) == ("completed", 1, 1, 1, 0, 0)
 
 
-async def test_janitor_reaps_staging_a_terminal_job_left_behind(imp, monkeypatch):
+async def test_a_failed_staging_delete_is_detached_and_reaped_by_the_janitor(imp, monkeypatch):
     from sm_images.janitor import janitor_async
 
     async def broken(*a, **k):
         raise OSError("storage down")
 
     job = await imp.job([feature({"img": b64()})])
+    left = (await imp.reload(job)).source_key
     monkeypatch.setattr(terminal, "_delete_objects", broken)
     await imp.run(job)
     monkeypatch.undo()
-    left = (await imp.reload(job)).source_key
+    assert (await imp.reload(job)).source_key is None  # detached before the delete
     assert left in imp.stored()
     await janitor_async(imp.runtime, datetime.now(UTC))
     assert left in imp.stored()  # within the grace period
     await janitor_async(imp.runtime, datetime.now(UTC) + timedelta(days=8))
-    assert left not in imp.stored()
-    assert (await imp.reload(job)).source_key is None
+    assert left not in imp.stored()  # its intent: nothing names it any more
 
 
 async def test_a_job_with_no_source_and_a_base64_kind(imp):

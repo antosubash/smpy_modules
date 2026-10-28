@@ -53,14 +53,17 @@ async def test_base64_import_creates_images_and_completes(imp):
     assert (first.lat, first.lng, first.external_source) == (47.3, 8.5, "import")
     assert first.properties == {"site": "P1"}  # the image data itself is not retained
     assert first.location_source == LocationSource.IMPORT_
-    # A terminal job cleans its own staging.
-    done = await imp.reload(job)
-    assert (done.source_key, done.staged_keys) == (None, [])
-    assert not [k for k in imp.stored() if "/imports/" in k]
+    # It finished with failures: it keeps its source for retry-failed (the
+    # janitor removes it after the grace period).
+    assert (await imp.reload(job)).source_key in imp.stored()
 
 
 async def test_empty_and_all_invalid_jobs_reach_a_terminal_state(imp):
-    assert await imp.run(await imp.job([])) == "completed"
+    empty = await imp.job([])
+    assert await imp.run(empty) == "completed"
+    # No failures: the source is deleted at once.
+    assert (await imp.reload(empty)).staged_keys == []
+    assert not [k for k in imp.stored() if "/imports/" in k]
     job = await imp.job([feature(None), "x"])
     assert await imp.run(job) == "completed"
     assert await imp.counts(job) == ("completed", 2, 2, 0, 0, 2)
@@ -135,15 +138,29 @@ async def test_restart_bumps_generation_old_task_aborts(imp, monkeypatch):
     with pytest.raises(Killed):
         await imp.run(job)
     monkeypatch.undo()
-    from sm_images.imports import controls
+    from sm_images.imports import controls, reset
 
     restarted = await controls.restart(imp.runtime, DEFAULT_TENANT, job.id, launch=False)
     assert restarted.generation == job.generation + 1
-    assert (restarted.checkpoint_index, restarted.done_count) == (0, 1)  # the success is seeded
+    assert (restarted.status.value, restarted.checkpoint_index) == ("resetting", 0)
     # The old message arrives late: it must not write a thing.
     assert await imp.run(job, job.generation) == "stale"
+    assert [i.feature_index for i in await imp.items(job)] == [0, 1]
+    real_launch = reset.handoff.launch_runner
+    launched = []
+
+    async def hold(runtime, tenant, job_id, generation):
+        launched.append(generation)
+
+    monkeypatch.setattr(reset.handoff, "launch_runner", hold)
+    assert (
+        await reset.run_reset(imp.runtime, DEFAULT_TENANT, job.id, restarted.generation) == "reset"
+    )
+    after = await imp.reload(job)
+    assert (after.status.value, after.done_count) == ("pending", 1)  # the success is counted back
     assert [i.feature_index for i in await imp.items(job)] == [0]
-    assert await imp.run(job, restarted.generation) == "completed"
+    monkeypatch.setattr(reset.handoff, "launch_runner", real_launch)
+    assert await imp.run(job, launched[0]) == "completed"
     assert await imp.counts(job) == ("completed", 2, 2, 2, 0, 0)
     assert len(await imp.images()) == 2
 

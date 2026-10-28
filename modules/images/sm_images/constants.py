@@ -147,6 +147,9 @@ SOURCE_UPLOAD: Final = "upload"
 """The ``source`` every client upload path (multipart, base64, direct) passes
 to ``IngestService.add_image``, and so the default ``external_source``: the
 three share one dedupe namespace."""
+SOURCE_IMPORT: Final = "import"
+"""The ``source`` (and so the ``external_source``) of every GeoJSON-imported
+image: one dedupe namespace per collection, apart from client uploads."""
 DEFAULT_FILENAME: Final = "upload"
 FILENAME_MAX: Final = 255
 EXTERNAL_SOURCE_MAX: Final = 100

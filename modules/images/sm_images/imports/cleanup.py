@@ -21,9 +21,9 @@ from datetime import datetime, timedelta
 from typing import Final
 
 from simple_module_db import finalize_session
-from sqlalchemy import delete, select, update
+from sqlalchemy import String, cast, delete, or_, select, update
 
-from sm_images.imports.jobs import TERMINAL, load, now, where
+from sm_images.imports.jobs import SYNC, TERMINAL, load, now, where
 from sm_images.imports.lookup import get
 from sm_images.imports.terminal import release_staging
 from sm_images.intents import clear_intents, object_intent
@@ -36,7 +36,6 @@ __all__ = ["SWEEP_CAP", "delete_job", "reap_staging"]
 logger = logging.getLogger(__name__)
 
 SWEEP_CAP: Final = 200
-_SYNC: Final = {"synchronize_session": False}
 
 
 async def delete_job(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> None:
@@ -50,7 +49,7 @@ async def delete_job(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> None:
                 generation=ImportJob.generation + 1,
                 updated_at=now(),
             )
-            .execution_options(**_SYNC)
+            .execution_options(**SYNC)
         )
         await finalize_session(db)
     async with runtime.session_factory() as db:
@@ -63,9 +62,9 @@ async def delete_job(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> None:
         await db.execute(
             delete(ImportItem)
             .where(ImportItem.job_id == job_id, ImportItem.tenant_id == tenant)
-            .execution_options(**_SYNC)
+            .execution_options(**SYNC)
         )
-        await db.execute(delete(ImportJob).where(*where(tenant, job_id)).execution_options(**_SYNC))
+        await db.execute(delete(ImportJob).where(*where(tenant, job_id)).execution_options(**SYNC))
         await finalize_session(db)
     if not keys:
         return
@@ -81,14 +80,18 @@ async def delete_job(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> None:
 
 
 async def reap_staging(runtime: Runtime, tenant: str, now_: datetime, grace_days: int) -> int:
-    """Delete what terminal jobs older than the grace period still have staged."""
+    """Delete what terminal jobs older than the grace period still have staged
+    (a finished base64 job with failures keeps its source until then)."""
     cutoff = now_ - timedelta(days=grace_days)
     stmt = (
         select(ImportJob.id)
         .where(
             ImportJob.tenant_id == tenant,
             ImportJob.status.in_(TERMINAL),
-            ImportJob.source_key.is_not(None),
+            or_(
+                ImportJob.source_key.is_not(None),
+                cast(ImportJob.staged_keys, String) != "[]",
+            ),
             ImportJob.updated_at < cutoff,
         )
         .order_by(ImportJob.updated_at)

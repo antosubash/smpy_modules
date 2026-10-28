@@ -65,6 +65,11 @@ class ImagesSettings(BootSettings):
     geojson_max_bytes: int = Field(default=2 * _GIB, ge=1)
     """Largest GeoJSON source, in bytes."""
 
+    geojson_max_feature_bytes: int = Field(default=60 * _MIB, ge=1)
+    """Largest single feature of a GeoJSON source (roughly, in bytes of its
+    values); a larger one fails as ``feature_too_large`` without being built.
+    The default fits a 50 MiB image as base64 (4/3 larger)."""
+
     download_concurrency_per_domain: int = Field(default=4, ge=1)
     """Simultaneous image downloads from one host during an import."""
 

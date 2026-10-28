@@ -2,17 +2,18 @@
 
 Delivery is at-most-once, so two things can be lost:
 
-* **a runner** - a job ``pending``, ``staging`` or ``running`` whose heartbeat
-  is older than the cutoff (a lost message, a killed worker). It is reclaimed
+* **a runner or a reset** - a job ``pending``, ``staging``, ``running`` or
+  ``resetting`` whose heartbeat is older than the cutoff (a lost message, a
+  killed worker). It is reclaimed
   with :func:`jobs.claim_stale` - one conditional ``UPDATE`` that bumps the
   generation, so of two reconcilers only one wins and a still-living runner
-  stops at its next write - and a new runner is launched. It resumes from the
+  stops at its next write - and a new runner (or, for ``resetting``, the reset
+  again: its batches are idempotent) is launched. A runner resumes from the
   checkpoint (or, base64, the first item without an image); a fully recorded
-  job does not re-stream, it only tries to complete;
-* **a download** - a URL item still ``pending`` and untouched since the
-  cutoff in a ``running`` job. It is handed out again; the message carries
-  when it was sent, so the lost original, should it surface, does not fetch it
-  a second time.
+  job does not re-stream, it hands out its pending items and completes;
+* **a download** - a URL item still ``pending``, held by no live claim and
+  untouched since the cutoff, in a ``running`` job. It is handed out again for
+  the job's current generation; the claim makes a surfacing original skip it.
 
 The caller (reconcile) has bound the tenant; every statement names it too.
 """
@@ -22,7 +23,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections import defaultdict
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Final
 
 from simple_module_db import finalize_session
@@ -41,26 +42,28 @@ logger = logging.getLogger(__name__)
 ITEM_BATCH: Final = 1000
 
 
-async def _stale_jobs(runtime: Runtime, tenant: str, cutoff: datetime) -> list[uuid.UUID]:
-    stmt = select(ImportJob.id).where(
+async def _stale_jobs(
+    runtime: Runtime, tenant: str, cutoff: datetime
+) -> list[tuple[uuid.UUID, JobStatus]]:
+    stmt = select(ImportJob.id, ImportJob.status).where(
         ImportJob.tenant_id == tenant,
-        ImportJob.status.in_(jobs.ACTIVE),
+        ImportJob.status.in_(jobs.CLAIMABLE),
         or_(ImportJob.heartbeat_at.is_(None), ImportJob.heartbeat_at < cutoff),
     )
     async with runtime.session_factory() as db:
-        ids = list((await db.execute(stmt)).scalars())
+        rows = [(i, st) for i, st in (await db.execute(stmt)).all()]
         await finalize_session(db)
-    return ids
+    return rows
 
 
 async def _stale_items(
-    runtime: Runtime, tenant: str, cutoff: datetime
-) -> dict[uuid.UUID, list[int]]:
-    out: dict[uuid.UUID, list[int]] = defaultdict(list)
+    runtime: Runtime, tenant: str, cutoff: datetime, now: datetime
+) -> dict[tuple[uuid.UUID, int], list[int]]:
+    out: dict[tuple[uuid.UUID, int], list[int]] = defaultdict(list)
     after = 0
     while True:
         stmt = (
-            select(ImportItem.id, ImportItem.job_id)
+            select(ImportItem.id, ImportItem.job_id, ImportJob.generation)
             .join(ImportJob, ImportJob.id == ImportItem.job_id)
             .where(
                 ImportItem.tenant_id == tenant,
@@ -69,6 +72,7 @@ async def _stale_items(
                 ImportJob.kind == ImportKind.GEOJSON_URL,
                 ImportItem.status == ItemStatus.PENDING,
                 or_(ImportItem.updated_at.is_(None), ImportItem.updated_at < cutoff),
+                or_(ImportItem.claim_token.is_(None), ImportItem.claim_expires_at < now),
                 ImportItem.id > after,
             )
             .order_by(ImportItem.id)
@@ -77,8 +81,8 @@ async def _stale_items(
         async with runtime.session_factory() as db:
             rows = list((await db.execute(stmt)).all())
             await finalize_session(db)
-        for item_id, job_id in rows:
-            out[job_id].append(int(item_id))
+        for item_id, job_id, generation in rows:
+            out[(job_id, int(generation))].append(int(item_id))
         if len(rows) < ITEM_BATCH:
             return out
         after = int(rows[-1][0])
@@ -87,20 +91,22 @@ async def _stale_items(
 async def recover_imports(runtime: Runtime, tenant: str, cutoff: datetime) -> tuple[int, int]:
     """Relaunch stale runners and re-send stale downloads; ``(jobs, items)``."""
     relaunched = 0
-    for job_id in await _stale_jobs(runtime, tenant, cutoff):
+    for job_id, status in await _stale_jobs(runtime, tenant, cutoff):
         generation = await jobs.claim_stale(runtime, tenant, job_id, cutoff)
         if generation is None:
             continue  # someone else claimed it, or it moved on
         relaunched += 1
+        launcher = handoff.launch_reset if status is JobStatus.RESETTING else handoff.launch_runner
         try:
-            await handoff.launch_runner(runtime, tenant, job_id, generation)
+            await launcher(runtime, tenant, job_id, generation)
         except Exception:
             logger.exception("images.reconcile.import_runner_failed job=%s", job_id)
     sent = 0
-    for job_id, ids in (await _stale_items(runtime, tenant, cutoff)).items():
+    stale = await _stale_items(runtime, tenant, cutoff, datetime.now(UTC))
+    for (job_id, generation), ids in stale.items():
         sent += len(ids)
         try:
-            await handoff.launch_downloads(runtime, tenant, job_id, ids)
+            await handoff.launch_downloads(runtime, tenant, job_id, generation, ids)
         except Exception:
             logger.exception("images.reconcile.import_downloads_failed job=%s", job_id)
     return relaunched, sent

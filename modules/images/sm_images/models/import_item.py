@@ -31,6 +31,9 @@ class ImportItem(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[
     external_id: str | None = Field(default=None, max_length=255)
     status: ItemStatus = enum_col(ItemStatus, "item_status", ItemStatus.PENDING)
     attempts: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    claim_token: str | None = Field(default=None, max_length=64)
+    """The download currently holding this item; settlement requires it."""
+    claim_expires_at: datetime | None = dt_col()
     last_error: str | None = Field(default=None, max_length=2000)
     lat: float | None = Field(default=None)
     lng: float | None = Field(default=None)

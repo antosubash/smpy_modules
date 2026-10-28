@@ -29,6 +29,8 @@ class ImportJob(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[u
     """Where the source was fetched from (``safe_stream``); lets a restart re-stage it."""
     staged_keys: list[str] = json_col(list)
     """Every object this job staged, so cancel and the janitor can delete exactly these."""
+    reset_mode: str | None = Field(default=None, max_length=20)
+    """While ``resetting``: ``restart`` or ``retry``, so reconcile can resume it."""
     generation: int = Field(default=0, sa_column_kwargs={"nullable": False})
     """Fences a stale runner after a resume."""
     heartbeat_at: datetime | None = dt_col(index=True)

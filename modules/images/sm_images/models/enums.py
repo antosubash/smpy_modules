@@ -51,6 +51,8 @@ class JobStatus(str, enum.Enum):  # noqa: UP042
     STAGING = "staging"
     RUNNING = "running"
     PAUSED = "paused"
+    RESETTING = "resetting"
+    """A restart or retry-failed is resetting items (``ImportJob.reset_mode``)."""
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"

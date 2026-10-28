@@ -8,20 +8,21 @@ after-commit dispatch).
 
 * ``images.import_geojson(job_id, generation)`` - stage, stream and record a
   GeoJSON source; a stale ``generation`` does nothing.
-* ``images.download_items(job_id, ids, dispatched_at=None)`` - fetch and
-  settle a batch of URL items.
+* ``images.download_items(job_id, ids, generation)`` - fetch and settle a
+  batch of URL items for a runner of ``generation``.
+* ``images.reset_import(job_id, generation)`` - the ``resetting`` phase of a
+  restart or retry-failed, then the runner.
 """
 
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 
 from celery import shared_task
 
-from sm_images.task_config import DOWNLOAD_ITEMS, IMPORT_GEOJSON
+from sm_images.task_config import DOWNLOAD_ITEMS, IMPORT_GEOJSON, RESET_IMPORT
 
-__all__ = ["download_items", "import_geojson"]
+__all__ = ["download_items", "import_geojson", "reset_import"]
 
 STUCK_AFTER_SECONDS = 12 * 3600
 
@@ -39,13 +40,22 @@ def import_geojson(job_id: str, generation: int) -> str:
 
 
 @shared_task(name=DOWNLOAD_ITEMS, stuck_after=3600)
-def download_items(job_id: str, ids: list[int], dispatched_at: str | None = None) -> int:
+def download_items(job_id: str, ids: list[int], generation: int) -> int:
     from sm_images.imports.download import download_items_async
     from sm_images.pipeline.worker_runtime import run_task
 
-    sent = datetime.fromisoformat(dispatched_at) if dispatched_at else None
     return run_task(
         lambda runtime, tenant: download_items_async(
-            runtime, tenant, uuid.UUID(job_id), [int(i) for i in ids], sent
+            runtime, tenant, uuid.UUID(job_id), int(generation), [int(i) for i in ids]
         )
+    )
+
+
+@shared_task(name=RESET_IMPORT, stuck_after=STUCK_AFTER_SECONDS)
+def reset_import(job_id: str, generation: int) -> str:
+    from sm_images.imports.reset import run_reset
+    from sm_images.pipeline.worker_runtime import run_task
+
+    return run_task(
+        lambda runtime, tenant: run_reset(runtime, tenant, uuid.UUID(job_id), int(generation))
     )

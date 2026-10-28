@@ -14,8 +14,6 @@ which is what a one-file client expects.
 
 from __future__ import annotations
 
-import base64
-import binascii
 import logging
 import uuid
 from typing import Annotated, Any
@@ -34,8 +32,9 @@ from sm_images.access import (
     ImageCollectionView,
 )
 from sm_images.deps import get_settings, require_view
-from sm_images.errors import FileTooLarge, ImagesError, InvalidUpload, UploadFailed, UseDirectUpload
+from sm_images.errors import ImagesError, InvalidUpload, UploadFailed, UseDirectUpload
 from sm_images.ingest import Duplicate, IngestMeta, IngestService, parse_batch_metadata
+from sm_images.ingest.b64 import decode_base64
 from sm_images.ingest.guards import read_bounded
 from sm_images.models import Image, ReviewStatus, StepStatus
 from sm_images.schemas.image import (
@@ -54,7 +53,6 @@ router = APIRouter(tags=["images"])
 
 Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
 _TOO_MANY = "Too many files in one upload"
-_BAD_BASE64 = "The image data is not valid base64"
 _FAILED = "The file could not be stored"
 
 
@@ -139,23 +137,11 @@ async def upload_images(
     return BatchOut(results=results)
 
 
-def _decode(raw: str, max_bytes: int) -> bytes:
-    if raw.startswith("data:"):
-        raw = raw.partition(",")[2]
-    # Refused on the encoded length, before a byte is decoded.
-    if len(raw) * 3 // 4 > max_bytes + 3:
-        raise FileTooLarge("The file is larger than the image size limit")
-    try:
-        return base64.b64decode(raw, validate=True)
-    except (binascii.Error, ValueError) as exc:
-        raise InvalidUpload(_BAD_BASE64, constants.CODE_INVALID_BASE64) from exc
-
-
 @router.post("/collections/{collection_id}/images/base64", dependencies=[require_view])
 async def upload_base64(
     body: Base64Upload, collection: CollectionEdit, ingest: Ingest
 ) -> UploadResult:
-    data = _decode(body.data, ingest.settings.max_image_bytes)
+    data = decode_base64(body.data, ingest.settings.max_image_bytes)
     outcome = await ingest.add_image(
         collection,
         data=data,

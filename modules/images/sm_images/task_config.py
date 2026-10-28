@@ -4,7 +4,7 @@
   (routed here rather than behind a long import) and the daily
   ``images.janitor``;
 * ``images_imports`` - the orchestrators (``images.restart_collection``,
-  ``images.import_geojson``); run its worker with concurrency 1. Downloads
+  ``images.import_geojson``, ``images.reset_import``); run its worker with concurrency 1. Downloads
   (``images.download_items``) go to ``images``, so a long import stream never
   blocks its own downloads;
 * ``images_heavy`` / ``images_gpu`` - plugin steps that declare them.
@@ -22,6 +22,7 @@ RECONCILE = "images.reconcile"
 JANITOR = "images.janitor"
 IMPORT_GEOJSON = "images.import_geojson"
 DOWNLOAD_ITEMS = "images.download_items"
+RESET_IMPORT = "images.reset_import"
 
 QUEUE_DEFAULT = "images"
 QUEUE_IMPORTS = "images_imports"
@@ -34,6 +35,7 @@ TASK_ROUTES = {
     JANITOR: {"queue": QUEUE_DEFAULT},
     IMPORT_GEOJSON: {"queue": QUEUE_IMPORTS},
     DOWNLOAD_ITEMS: {"queue": QUEUE_DEFAULT},
+    RESET_IMPORT: {"queue": QUEUE_IMPORTS},
 }
 
 RECONCILE_INTERVAL_SECONDS = 300.0
