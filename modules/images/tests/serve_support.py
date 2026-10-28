@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from simple_module_db.listeners import current_tenant_id
-from sm_images import storage_keys
+from sm_images import cache, storage_keys
 from sm_images.models import Image, Rendition, Visibility
 from sm_images.storage import ImageStore
 
@@ -37,13 +37,34 @@ class Served:
     slugs: dict[str, str] = field(default_factory=dict)
     bytes: dict[str, bytes] = field(default_factory=dict)
     keys: dict[str, str] = field(default_factory=dict)
+    generations: dict[str, int] = field(default_factory=dict)
 
-    def url(self, coll: str, name: str, tail: str) -> str:
-        return f"/api/images/images/{self.ids[f'{coll}.{name}']}/{tail}"
+    def version(self, label: str, tail: str) -> str | None:
+        """The ``?v=`` the current representation behind *tail* answers to."""
+        gen = self.generations[label]
+        if tail.startswith("r/"):
+            key = self.keys.get(f"{label}.{tail[2:]}")
+        elif tail == "display":
+            key = self.keys.get(f"{label}.display") or self.keys[f"{label}.original"]
+        else:
+            return None
+        return None if key is None else cache.version(gen, key)
 
-    def public_url(self, coll: str, name: str, tail: str, slug: str | None = None) -> str:
-        image_id = self.ids[f"{coll}.{name}"]
-        return f"/api/images/public/c/{slug or self.slugs[coll]}/images/{image_id}/{tail}"
+    def _tail(self, label: str, tail: str, versioned: bool) -> str:
+        v = self.version(label, tail) if versioned and "?" not in tail else None
+        return tail if v is None else f"{tail}?v={v}"
+
+    def url(self, coll: str, name: str, tail: str, *, versioned: bool = True) -> str:
+        label = f"{coll}.{name}"
+        return f"/api/images/images/{self.ids[label]}/{self._tail(label, tail, versioned)}"
+
+    def public_url(
+        self, coll: str, name: str, tail: str, slug: str | None = None, *, versioned: bool = True
+    ) -> str:
+        label = f"{coll}.{name}"
+        image_id = self.ids[label]
+        path = self._tail(label, tail, versioned)
+        return f"/api/images/public/c/{slug or self.slugs[coll]}/images/{image_id}/{path}"
 
 
 async def _image(
@@ -74,10 +95,19 @@ async def _image(
         )
     )
     await session.flush()
+    generation = 1 if blurred else 0
     session.add(
-        Rendition(image_id=image_id, size="small", storage_key=objects["small"], width=8, height=8)
+        Rendition(
+            image_id=image_id,
+            size="small",
+            storage_key=objects["small"],
+            width=8,
+            height=8,
+            source_generation=generation,
+        )
     )
     out.ids[label] = image_id
+    out.generations[label] = generation
 
 
 async def seed_gallery(session_factory: Any, backend: Any, **coll_kw: Any) -> Served:

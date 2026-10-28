@@ -72,9 +72,14 @@ async def invalidate_renditions(db: Any, tenant: str, image_id: uuid.UUID) -> No
 
 
 async def replace_renditions(
-    db: Any, tenant: str, image_id: uuid.UUID, made: dict[str, tuple[str, int, int]]
+    db: Any,
+    tenant: str,
+    image_id: uuid.UUID,
+    made: dict[str, tuple[str, int, int]],
+    generation: int,
 ) -> list[str]:
-    """Replace the image's rendition rows with ``made`` (size -> key, w, h).
+    """Replace the image's rendition rows with ``made`` (size -> key, w, h), cut
+    from display ``generation`` (stamped as ``source_generation``).
 
     Returns the keys no longer referenced, for deletion after the commit.
     """
@@ -82,14 +87,23 @@ async def replace_renditions(
     old = (await db.execute(select(Rendition.storage_key).where(*where))).scalars().all()
     await db.execute(delete(Rendition).where(*where).execution_options(**_SYNC))
     for size, (key, width, height) in made.items():
-        db.add(Rendition(image_id=image_id, size=size, storage_key=key, width=width, height=height))
+        db.add(
+            Rendition(
+                image_id=image_id,
+                size=size,
+                storage_key=key,
+                width=width,
+                height=height,
+                source_generation=generation,
+            )
+        )
     await db.flush()
     keep = {key for key, _, _ in made.values()}
     return [k for k in old if k not in keep]
 
 
 async def touch_image(db: Any, tenant: str, image_id: uuid.UUID, now: datetime) -> None:
-    """Move ``updated_at``: ``rendition_url`` versions its cache key on it."""
+    """Move ``updated_at`` (the gallery shows when an image last changed)."""
     await db.execute(
         update(Image)
         .where(*_image(tenant, image_id))

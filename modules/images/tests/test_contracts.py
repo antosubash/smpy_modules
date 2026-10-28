@@ -125,7 +125,10 @@ async def test_the_tenant_is_unbound_again_afterwards(seeded):
     assert current_tenant_id.get() is None
 
 
-def test_rendition_url_versions_by_display_generation():
+def test_rendition_url_versions_by_the_renditions_bytes():
+    from sm_images import cache
+    from sm_images.models import Rendition
+
     img = Image(
         id=uuid.UUID(int=7),
         collection_id=uuid.uuid4(),
@@ -135,5 +138,8 @@ def test_rendition_url_versions_by_display_generation():
         size_bytes=1,
         display_generation=3,
     )
-    url = contracts.rendition_url(img, "400")
-    assert url == f"/api/images/images/{img.id}/r/400?v=3"
+    rend = Rendition(
+        image_id=img.id, size="400", storage_key="k/r/400", width=1, height=1, source_generation=3
+    )
+    url = contracts.rendition_url(img, rend)
+    assert url == f"/api/images/images/{img.id}/r/400?v={cache.version(3, 'k/r/400')}"

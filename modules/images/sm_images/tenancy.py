@@ -75,8 +75,10 @@ __all__ = [
     "detect_mode",
     "install_guard",
     "mode_of",
+    "note_tenant_source",
     "resolve_admin",
     "resolve_public",
+    "tenant_from_request",
     "tenant_header",
     "tenant_scope",
     "valid_tenant",
@@ -203,8 +205,30 @@ async def bind_admin(request: Request) -> AsyncIterator[str]:
         yield tenant
 
 
+_UPSTREAM_ATTR: Final = "images_tenant_from_request"
+
+
+def note_tenant_source(request: Any) -> None:
+    """Record whether something request-specific chose this request's tenant.
+
+    Called by :func:`bind_public` *before* its fallback: once the scope is
+    bound, the tenant contextvar holds :data:`DEFAULT_TENANT` either way and
+    the two cases look alike. ``request.state.tenant_id`` set upstream (a
+    subdomain, a header, a parent app) is request-specific even when its value
+    is ``default`` - the rule of records #196 is about *who* chose, not what.
+    """
+    setattr(request.state, _UPSTREAM_ATTR, getattr(request.state, "tenant_id", None) is not None)
+
+
+def tenant_from_request(request: Any) -> bool:
+    """What :func:`note_tenant_source` recorded; ``True`` (fail closed) if it
+    never ran for this request."""
+    return getattr(request.state, _UPSTREAM_ATTR, True) is not False
+
+
 async def bind_public(request: Request) -> AsyncIterator[str]:
     """Router dependency for the anonymous surface; 404 without a tenant."""
+    note_tenant_source(request)
     tenant = resolve_public(request)
     if tenant is None:
         from sm_images.errors import NotFound

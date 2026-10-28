@@ -25,7 +25,11 @@ from sm_images.access import POLICY, CollectionOwner, CollectionView, ImageColle
 from sm_images.deps import require_view
 from sm_images.errors import Forbidden, Invalid, ServiceUnavailable
 from sm_images.pipeline import control
-from sm_images.pipeline.config import PipelineConfigError, validate_pipeline_config
+from sm_images.pipeline.config import (
+    PipelineConfigError,
+    protect_originals,
+    validate_pipeline_config,
+)
 from sm_images.pipeline.runtime import Runtime, current_runtime
 from sm_images.schemas.pipeline import PipelineConfigIn, ReprocessIn, RestartIn
 from sm_images.services import gallery
@@ -64,12 +68,13 @@ async def put_pipeline(
     ``requires`` is off or unregistered, or a cycle, is a 422)."""
     config = {"steps": body.steps}
     try:
-        validate_pipeline_config(config, strict=True)
+        parsed = validate_pipeline_config(config, strict=True)
     except PipelineConfigError as exc:
         err = Invalid(str(exc)[:1000])
         err.code = CODE_INVALID_CONFIG
         raise err from exc
     collection.pipeline_config = config
+    collection.protect_originals = protect_originals(collection.protect_originals, parsed)
     await db.flush()
     return await control.overview(db, collection)
 

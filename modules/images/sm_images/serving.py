@@ -15,10 +15,16 @@ order is the point:
    ``Cache-Control`` and ``ETag``), then ``Range``, then the body.
 
 **Protected** means the original is not what everyone sees: the image has a
-display copy, *or* the collection enables a display mutator that has not
-settled (completed or skipped) for this image - until it has, the original is
-the unredacted picture, so ``…/display`` withholds it (404, the portal's
-"thumbnail not available") rather than falling back to it.
+display copy, or its redaction is still pending (:mod:`sm_images.redaction`).
+While it is pending, ``…/display`` and every rendition are a 404 (the portal's
+"thumbnail not available") rather than a fall back to unredacted bytes. A
+rendition is also a 404 unless it was cut from the image's *current* display
+generation (``Rendition.source_generation``).
+
+**Versions.** The display copy and each rendition carry a version
+(:func:`sm_images.cache.version`); a request whose ``?v=`` is not it is served
+the current bytes with ``no-cache`` (``sm_images.cache``). ``HEAD`` takes the
+same path and sends the headers without opening the object.
 """
 
 from __future__ import annotations
@@ -34,17 +40,14 @@ from file_storage.contracts.service import StorageNotFoundError
 from simple_module_core.resources import ResourcePrincipal
 from sqlalchemy import and_, select
 
-from sm_images import cache, constants
+from sm_images import cache, constants, redaction
 from sm_images.access import can_view_original
 from sm_images.errors import Forbidden, NotFound
-from sm_images.models import Collection, Image, Rendition, StepRun
-from sm_images.models.enums import StepStatus
+from sm_images.models import Collection, Image, Rendition
 from sm_images.ranges import RangeNotSatisfiable, parse_range
 from sm_images.storage import ImageStore, store_for
 
-__all__ = ["Target", "serve"]
-
-_SETTLED = (StepStatus.COMPLETED, StepStatus.SKIPPED)
+__all__ = ["Target", "resolve", "serve"]
 
 
 @dataclass(frozen=True)
@@ -52,6 +55,9 @@ class Target:
     key: str
     content_type: str
     protected: bool
+    version: str | None = None
+    """What ``?v=`` must say for the request to be "current"; ``None`` for an
+    original, whose bytes never change."""
 
 
 def _missing() -> NotFound:
@@ -59,39 +65,15 @@ def _missing() -> NotFound:
 
 
 async def _load(db: Any, collection: Collection, image_id: uuid.UUID, size: str | None) -> Any:
-    """The image (and the requested rendition's key) in one query."""
+    """The image (and the requested rendition) in one query."""
     where = (Image.id == image_id, Image.collection_id == collection.id)
     if size is None:
         found = (await db.execute(select(Image).where(*where))).scalars().first()
         return None if found is None else (found, None)
     on = and_(Rendition.image_id == Image.id, Rendition.size == size)
-    stmt = select(Image, Rendition.storage_key).outerjoin(Rendition, on).where(*where)
+    stmt = select(Image, Rendition).outerjoin(Rendition, on).where(*where)
     row = (await db.execute(stmt)).first()
     return None if row is None else (row[0], row[1])
-
-
-def _mutators(collection: Collection) -> list[str]:
-    """Enabled steps of *collection* that write a display copy."""
-    from sm_images.pipeline import registry
-    from sm_images.pipeline.config import validate_pipeline_config
-
-    cfg = validate_pipeline_config(collection.pipeline_config, strict=False)
-    return [
-        sid
-        for sid in cfg.enabled()
-        if (impl := registry.get_step(sid)) is not None and impl.mutates_display
-    ]
-
-
-async def _unsettled(db: Any, collection: Collection, image: Image) -> bool:
-    mutators = _mutators(collection)
-    if not mutators:
-        return False
-    stmt = select(StepRun.step).where(
-        StepRun.image_id == image.id, StepRun.step.in_(mutators), StepRun.status.in_(_SETTLED)
-    )
-    settled = set((await db.execute(stmt)).scalars().all())
-    return any(sid not in settled for sid in mutators)
 
 
 async def resolve(
@@ -100,17 +82,20 @@ async def resolve(
     loaded = await _load(db, collection, image_id, size if route == cache.RENDITION else None)
     if loaded is None:
         raise _missing()
-    image, rendition_key = loaded
+    image, rendition = loaded
+    pending = await redaction.pending(db, collection, image)
     if route == cache.RENDITION:
-        if rendition_key is None:
+        if rendition is None or pending or rendition.source_generation != image.display_generation:
             raise _missing()
-        return image, Target(rendition_key, constants.DISPLAY_CONTENT_TYPE, False)
-    protected = image.display_key is not None or await _unsettled(db, collection, image)
+        v = cache.version(rendition.source_generation, rendition.storage_key)
+        return image, Target(rendition.storage_key, constants.DISPLAY_CONTENT_TYPE, False, v)
     if route == cache.DISPLAY:
-        if image.display_key is not None:
-            return image, Target(image.display_key, constants.DISPLAY_CONTENT_TYPE, False)
-        if protected:
+        if pending:
             raise _missing()
+        key = image.display_key or image.storage_key
+        kind = constants.DISPLAY_CONTENT_TYPE if image.display_key else image.content_type
+        return image, Target(key, kind, False, cache.version(image.display_generation, key))
+    protected = image.display_key is not None or pending
     return image, Target(image.storage_key, image.content_type, protected)
 
 
@@ -146,6 +131,13 @@ async def _respond(
             return Response(
                 status_code=416, headers={**headers, "Content-Range": f"bytes */{size}"}
             )
+    status, length = 200, size
+    if wanted is not None:
+        status, length = 206, wanted.length
+        headers["Content-Range"] = f"bytes {wanted.start}-{wanted.end}/{size}"
+    headers["Content-Length"] = str(length)
+    if request.method == "HEAD":
+        return Response(status_code=status, media_type=target.content_type, headers=headers)
     try:
         if wanted is None:
             body = await store.stream(target.key)
@@ -153,11 +145,6 @@ async def _respond(
             body = await store.stream_range(target.key, wanted.start, wanted.end)
     except StorageNotFoundError:
         raise _missing() from None
-    status, length = 200, size
-    if wanted is not None:
-        status, length = 206, wanted.length
-        headers["Content-Range"] = f"bytes {wanted.start}-{wanted.end}/{size}"
-    headers["Content-Length"] = str(length)
     return StreamingResponse(
         _closing(body), status_code=status, media_type=target.content_type, headers=headers
     )
@@ -180,6 +167,9 @@ async def serve(
         who, image, collection, protected=target.protected
     ):
         raise Forbidden(constants.ORIGINAL_FORBIDDEN_DETAIL)
-    policy = cache.cache_headers(request, collection, route, twin=twin, protected=target.protected)
+    current = target.version is not None and request.query_params.get("v") == target.version
+    policy = cache.cache_headers(
+        request, collection, route, twin=twin, protected=target.protected, current=current
+    )
     ranged = route != cache.RENDITION
     return await _respond(request, store_for(request.app), target, policy, ranged)

@@ -128,7 +128,9 @@ async def _publish(
     if staged.renditions:
         if locked.display_generation != loaded.display_generation:
             return None  # cut from a display copy that has since been replaced
-        replaced += await publish.replace_renditions(db, tenant, image_id, staged.renditions)
+        replaced += await publish.replace_renditions(
+            db, tenant, image_id, staged.renditions, loaded.display_generation
+        )
         await publish.touch_image(db, tenant, image_id, datetime.now(UTC))
     if staging is not None and staging.exif is not None and loaded.step == EXIF:
         await publish.store_exif(db, tenant, image_id, staging.exif)

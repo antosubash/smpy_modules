@@ -60,12 +60,24 @@ router = APIRouter(
     route_class=_PublicRoute,
 )
 
+
+def _get_and_head(path: str, **kw: Any) -> Callable[[Any], Any]:
+    """``GET`` plus ``HEAD`` (same access and cache path, no body). ``HEAD`` is
+    kept out of the OpenAPI document, where it would duplicate the operation."""
+
+    def register(endpoint: Any) -> Any:
+        router.head(path, include_in_schema=False, response_model=None, **kw)(endpoint)
+        return router.get(path, response_model=None, **kw)(endpoint)
+
+    return register
+
+
 Public = Annotated[Collection, Depends(public_collection)]
 Size = Annotated[str, Path(max_length=constants.RENDITION_SIZE_MAX)]
 _BASE = "/c/{slug}/images/{image_id}"
 
 
-@router.get(f"{_BASE}/r/{{size}}", response_model=None)
+@_get_and_head(f"{_BASE}/r/{{size}}")
 async def public_rendition(
     request: Request, image_id: uuid.UUID, size: Size, collection: Public, db: Any = Depends(get_db)
 ) -> Response:
@@ -74,7 +86,7 @@ async def public_rendition(
     )
 
 
-@router.get(f"{_BASE}/display", response_model=None)
+@_get_and_head(f"{_BASE}/display")
 async def public_display(
     request: Request, image_id: uuid.UUID, collection: Public, db: Any = Depends(get_db)
 ) -> Response:
@@ -83,7 +95,7 @@ async def public_display(
     )
 
 
-@router.get(f"{_BASE}/original", response_model=None)
+@_get_and_head(f"{_BASE}/original")
 async def public_original(
     request: Request, image_id: uuid.UUID, collection: Public, db: Any = Depends(get_db)
 ) -> Response:

@@ -87,12 +87,14 @@ async def list_collections(
             )
 
 
-def rendition_url(image: Any, size: str, *, collection: Any = None) -> str:
-    """The URL that streams *image*'s rendition *size* (:func:`sm_images.urls.rendition_url`).
+def rendition_url(image: Any, rendition: Any, *, collection: Any = None) -> str:
+    """The URL that streams *rendition* (one of *image*'s ``Rendition`` rows);
+    see :func:`sm_images.urls.rendition_url`.
 
     Access is checked by the route, not here: a URL for an image the viewer may
-    not open is a 404 when followed. ``?v=`` is the image's display generation,
-    so a regenerated rendition is never served from a stale cache. Pass the
-    image's *collection* to let a public one go through ``public_asset_base_url``.
+    not open is a 404 when followed. ``?v=`` names the rendition's own bytes
+    (its source generation and key), so a regenerated rendition is a new URL.
+    Pass the image's *collection* to let a public one go through
+    ``public_asset_base_url``.
     """
-    return urls.rendition_url(image, size, collection=collection)
+    return urls.rendition_url(image, rendition, collection=collection)

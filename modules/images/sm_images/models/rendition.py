@@ -22,3 +22,7 @@ class Rendition(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[u
     storage_key: str = Field(max_length=500)
     width: int = Field(sa_column_kwargs={"nullable": False})
     height: int = Field(sa_column_kwargs={"nullable": False})
+    source_generation: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    """The ``Image.display_generation`` this was cut from. Served only while it
+    equals the image's current one: a rendition of an older (unredacted)
+    display copy is a 404 from the moment a new display is published."""

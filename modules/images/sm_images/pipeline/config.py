@@ -32,6 +32,7 @@ __all__ = [
     "PipelineConfig",
     "PipelineConfigError",
     "StepConfig",
+    "protect_originals",
     "validate_pipeline_config",
 ]
 
@@ -140,3 +141,27 @@ def _check_graph(cfg: PipelineConfig) -> None:
         raise PipelineConfigError(f"enabled steps require steps that are not enabled: {missing}")
     if cyclic:
         raise PipelineConfigError(f"steps depend on each other in a cycle: {sorted(cyclic)}")
+
+
+def _registered_mutator(sid: str) -> bool:
+    impl = registry.get_step(sid)
+    return impl is not None and bool(impl.mutates_display)
+
+
+def protect_originals(current: bool, cfg: PipelineConfig) -> bool:
+    """``Collection.protect_originals`` after an owner saves *cfg*.
+
+    Set when an enabled step is a registered display mutator. Cleared only by
+    a save with no mutator enabled *and* every step installed: a config naming
+    a step that is not installed (a plugin removed) might be naming the
+    mutator, so it keeps whatever protection there was. ``prompt:*`` steps
+    never write a display copy and do not count as missing.
+    """
+    if any(_registered_mutator(sid) for sid in cfg.enabled()):
+        return True
+    missing = [
+        s.id
+        for s in cfg.steps.values()
+        if s.state == "not_installed" and not s.id.startswith(registry.PROMPT_PREFIX)
+    ]
+    return current if missing else False

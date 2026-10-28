@@ -70,6 +70,7 @@ def upgrade() -> None:
         sa.Column("bbox_maxy", sa.Float(), nullable=True),
         sa.Column("map_built_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("map_image_count", sa.Integer(), nullable=False),
+        sa.Column("protect_originals", sa.Boolean(), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_images_collection")),
     )
     op.create_index(
@@ -466,6 +467,7 @@ def upgrade() -> None:
         sa.Column("storage_key", sa.String(length=500), nullable=False),
         sa.Column("width", sa.Integer(), nullable=False),
         sa.Column("height", sa.Integer(), nullable=False),
+        sa.Column("source_generation", sa.Integer(), nullable=False),
         sa.ForeignKeyConstraint(
             ["image_id"],
             ["images_image.id"],

@@ -43,7 +43,7 @@ async def _run(client, g, status: StepStatus | None) -> None:
         return
     async with client.db_state.session_factory() as s:
         for key in ("pub.plain", "priv.plain"):
-            s.add(StepRun(image_id=g.ids[key], step="acme.blur", status=status))
+            s.add(StepRun(image_id=g.ids[key], step="acme.blur", status=status, step_version=1))
         await s.commit()
 
 

@@ -44,3 +44,8 @@ class Collection(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True
     map_image_count: int = Field(default=0, sa_column_kwargs={"nullable": False})
     """Located-image count the current map was built from; a drift from
     ``located_count`` is what tells the scheduler the map is stale."""
+    protect_originals: bool = Field(default=False, sa_column_kwargs={"nullable": False})
+    """Set when a saved pipeline enabled a step registered as a display mutator.
+    Serving reads this, not the live registry, so uninstalling the plugin never
+    unprotects an original; only an owner's save of a config with no mutator,
+    every step of it installed, clears it (``pipeline.config.protect_originals``)."""

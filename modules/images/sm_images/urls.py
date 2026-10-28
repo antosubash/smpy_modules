@@ -1,8 +1,10 @@
 """Where an image's bytes are fetched from.
 
-Every URL is versioned with ``?v=<display_generation>``: a new display copy
-means new renditions under new keys, so a new URL, and the old one may stay
-cached forever (``cache.SHARED`` is ``immutable``).
+Every URL carries ``?v=`` naming the exact bytes - :func:`sm_images.cache.version`,
+the generation plus a digest of the object key. A regenerated rendition or a
+new display copy lives under a new key, so it gets a new URL, and an old URL
+may stay cached forever (``cache.SHARED`` is ``immutable``) because the route
+refuses to call a request "current" unless its ``v`` matches.
 
 ``public_asset_base_url`` (a boot-time setting, read in ``on_startup`` through
 :func:`configure`) puts a CDN in front of the **public twin** for public
@@ -15,11 +17,12 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import quote
 
-from sm_images import constants
+from sm_images import cache, constants
 from sm_images.models import Visibility
 
 __all__ = [
     "configure",
+    "display_url",
     "image_path",
     "public_image_path",
     "public_rendition_url",
@@ -45,8 +48,16 @@ def public_image_path(slug: str, image_id: Any, tail: str) -> str:
     return f"{constants.PUBLIC_API_PREFIX}c/{quote(slug, safe='')}/images/{image_id}/{tail}"
 
 
-def _tail(image: Any, size: str) -> str:
-    return f"r/{quote(size, safe='')}?v={int(image.display_generation or 0)}"
+def _rendition_tail(image: Any, rendition: Any) -> str:
+    if rendition.image_id != image.id:
+        raise ValueError("the rendition is not this image's")
+    v = cache.version(rendition.source_generation, rendition.storage_key)
+    return f"r/{quote(rendition.size, safe='')}?v={v}"
+
+
+def _display_tail(image: Any) -> str:
+    key = image.display_key or image.storage_key
+    return f"display?v={cache.version(image.display_generation or 0, key)}"
 
 
 def _check(collection: Any, image: Any) -> None:
@@ -54,23 +65,33 @@ def _check(collection: Any, image: Any) -> None:
         raise ValueError("the collection does not hold this image")
 
 
-def rendition_url(image: Any, size: str, *, collection: Any = None) -> str:
-    """The URL of *image*'s rendition *size*.
+def _url(image: Any, tail: str, collection: Any) -> str:
+    if collection is not None:
+        _check(collection, image)
+        if _public_base and collection.visibility == Visibility.PUBLIC:
+            return _public_base + public_image_path(collection.slug, image.id, tail)
+    return image_path(image.id, tail)
+
+
+def rendition_url(image: Any, rendition: Any, *, collection: Any = None) -> str:
+    """The URL of *rendition* (a ``Rendition`` row of *image*).
 
     Access is checked by the route, not here: followed by someone who may not
     open the image it is a 404. Behind ``public_asset_base_url`` only when
     *collection* (the image's own) is public and a base is configured.
     """
-    if collection is not None:
-        _check(collection, image)
-        if _public_base and collection.visibility == Visibility.PUBLIC:
-            return _public_base + public_image_path(collection.slug, image.id, _tail(image, size))
-    return image_path(image.id, _tail(image, size))
+    return _url(image, _rendition_tail(image, rendition), collection)
 
 
-def public_rendition_url(collection: Any, image: Any, size: str) -> str:
+def display_url(image: Any, *, collection: Any = None) -> str:
+    """The URL of *image*'s display copy (the original when it has none)."""
+    return _url(image, _display_tail(image), collection)
+
+
+def public_rendition_url(collection: Any, image: Any, rendition: Any) -> str:
     """The anonymous twin's URL, for a public page. Behind the CDN when set."""
     _check(collection, image)
     if collection.visibility != Visibility.PUBLIC:
         raise ValueError("only a public collection is served anonymously")
-    return _public_base + public_image_path(collection.slug, image.id, _tail(image, size))
+    tail = _rendition_tail(image, rendition)
+    return _public_base + public_image_path(collection.slug, image.id, tail)
