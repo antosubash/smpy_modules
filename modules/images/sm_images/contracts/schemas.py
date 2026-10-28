@@ -7,9 +7,10 @@ import uuid
 from datetime import datetime
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict
 from sqlmodel import SQLModel
 
-__all__ = ["CollectionPageRead", "CollectionRead", "collection_fields"]
+__all__ = ["CollectionPageRead", "CollectionRead", "ImageRead", "collection_fields"]
 
 
 def collection_fields(row: Any) -> dict[str, Any]:
@@ -53,3 +54,40 @@ class CollectionPageRead(SQLModel):
     next_cursor: str | None
     total: int | None
     """Counted on the first page only; carry it from there."""
+
+
+class ImageRead(BaseModel):
+    """Metadata of one image, for a pipeline step: no ORM object, no storage
+    keys (a step reads bytes through ``StepContext``). Frozen."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: uuid.UUID
+    collection_id: uuid.UUID
+    filename: str
+    content_type: str
+    size_bytes: int
+    width: int | None = None
+    height: int | None = None
+    sha256: str | None = None
+    lat: float | None = None
+    lng: float | None = None
+    altitude: float | None = None
+    heading: float | None = None
+    location_source: int | None = None
+    captured_at: datetime | None = None
+    camera_make: str | None = None
+    camera_model: str | None = None
+    orientation: int | None = None
+    external_source: str | None = None
+    external_id: str | None = None
+    properties: dict[str, Any] | None = None
+    group_id: uuid.UUID | None = None
+    group_role: str | None = None
+    display_generation: int = 0
+
+    @classmethod
+    def from_row(cls, row: Any) -> ImageRead:
+        data = {n: getattr(row, n) for n in cls.model_fields if n != "location_source"}
+        source = row.location_source
+        return cls(**data, location_source=None if source is None else int(source))
