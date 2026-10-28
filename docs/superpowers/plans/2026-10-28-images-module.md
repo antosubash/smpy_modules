@@ -519,7 +519,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 - `test_filename_pattern_groups`;
 - `test_download_idempotent`.
 
-- [ ] Commit `feat(images): GeoJSON import`
+- [x] Commit `feat(images): GeoJSON import`
 
 ### Task 18: ZIP import
 
