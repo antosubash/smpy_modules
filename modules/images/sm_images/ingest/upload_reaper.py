@@ -9,7 +9,8 @@ Three kinds of session are candidates, all in the bound tenant:
 
 The first two are taken over by compare-and-set - matching the status *and*
 the claim token read, writing a new token - so a completer that resumes finds
-its claim gone and its ``finish`` rolls back. Only then are the parts
+its claim gone and its ``renew``/``finish`` fails. The takeover commits on its
+own before any storage call; only then are the parts
 discarded and the staged key deleted (never one an image row owns), and
 ``cleaned_at`` is set. The key's write-ahead intent is left alone: it is the
 janitor's own backstop.
@@ -23,6 +24,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from simple_module_db.independent import independent_session
 from sqlalchemy import and_, or_, select
 
 from sm_images.ingest.upload_session import discard, mark_cleaned, move
@@ -58,18 +60,28 @@ async def _take_over(db: Any, c: _Candidate) -> bool:
 
 
 async def _reap_one(db: Any, store: Any, c: _Candidate) -> bool:
-    async with db.begin_nested():
-        if not await _take_over(db, c):
-            return False  # a complete or abort moved it first
-        await discard(db, store, c.key, c.upload, c.image_id)
-        await mark_cleaned(db, c.id)
+    """Take over (committed on its own), *then* clean, then record it clean.
+
+    The takeover commits before any storage call, so a cleanup that fails -
+    even after it deleted the object - can never roll the old claim token
+    back: a resuming completer's ``renew``/``finish`` keeps failing. A failed
+    cleanup leaves ``cleaned_at`` NULL and the next run retries it.
+    """
+    async with independent_session(db) as s:
+        took = await _take_over(s, c)
+    if not took:
+        return False  # a complete or abort moved it first
+    await discard(db, store, c.key, c.upload, c.image_id)
+    async with independent_session(db) as s:
+        await mark_cleaned(s, c.id)
     return True
 
 
 async def reap_expired_uploads(db: Any, store: Any, now: datetime, cap: int) -> int:
-    """Reclaim up to ``cap`` sessions; how many were. A session whose storage
-    cleanup fails rolls back to its savepoint and is retried next run. The
-    caller commits."""
+    """Reclaim up to ``cap`` sessions; how many were. ``db`` is only read
+    through; every state change commits in its own short transaction, so
+    nothing here waits for the caller to commit. A session whose storage
+    cleanup fails stays ``aborted`` with ``cleaned_at`` NULL for the next run."""
     stale = or_(
         and_(UploadSession.status == UploadStatus.OPEN, UploadSession.expires_at <= now),
         and_(

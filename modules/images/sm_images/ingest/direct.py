@@ -40,7 +40,6 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import asdict
-from pathlib import PurePosixPath
 from typing import Any
 
 from file_storage.contracts.service import NotSupportedError, StorageError, StorageNotFoundError
@@ -60,7 +59,15 @@ from sm_images.ingest import upload_session as state
 from sm_images.ingest.meta import IngestMeta
 from sm_images.ingest.service import Duplicate, IngestService, safe_filename
 from sm_images.ingest.sniff import EXTENSIONS, sniff
-from sm_images.ingest.ticket import _BAD_PART, _GONE, Ticket, load_ticket, serializer
+from sm_images.ingest.ticket import (
+    _BAD_PART,
+    _BAD_TYPE,
+    _GONE,
+    Ticket,
+    declared_type,
+    load_ticket,
+    serializer,
+)
 from sm_images.intents import object_intent
 from sm_images.models import Collection, Image, UploadStatus
 from sm_images.tenancy import bound_tenant
@@ -69,7 +76,6 @@ __all__ = ["Ticket", "abort", "complete", "load_ticket", "start", "write_part"]
 
 _NO_DIRECT = "This storage backend does not support direct uploads"
 _TOO_LARGE = "The upload is larger than the image size limit"
-_BAD_TYPE = "The upload is not a supported image of the declared type"
 _SIZE_MISMATCH = "The stored upload is not the declared size"
 
 
@@ -78,18 +84,6 @@ def _backend(store: Any) -> Any:
     if not getattr(backend, "supports_direct_upload", False):
         raise DirectUploadUnsupported(_NO_DIRECT)
     return backend
-
-
-def _declared_type(filename: str, content_type: str | None) -> str:
-    """The accepted type the client declared (content type, else extension); 415 if none."""
-    if content_type in EXTENSIONS:
-        return content_type
-    suffix = PurePosixPath(filename).suffix.lower().lstrip(".")
-    by_ext = {ext: ctype for ctype, ext in EXTENSIONS.items()}
-    by_ext |= {"jpeg": "image/jpeg", "tiff": "image/tiff", "heif": "image/heif"}
-    if content_type is None and suffix in by_ext:
-        return by_ext[suffix]
-    raise UnsupportedType(_BAD_TYPE)
 
 
 async def start(
@@ -111,7 +105,7 @@ async def start(
         raise FileTooLarge(_TOO_LARGE)
     backend = _backend(store)
     signer = serializer(secret)
-    declared = _declared_type(filename, content_type)
+    declared = declared_type(filename, content_type)
     image_id = uuid.uuid4()
     tenant = bound_tenant()
     ext = EXTENSIONS[declared]
@@ -216,7 +210,8 @@ async def complete(
         except StorageError as exc:
             raise UploadNotFound(_GONE) from exc
         assembled = True
-        outcome = await _ingest(ingest, collection, ticket, filename=filename, meta=meta)
+        await state.renew(ingest.db, ticket, token)  # each phase is bounded by the lease
+        outcome = await _ingest(ingest, collection, ticket, token, filename=filename, meta=meta)
     except Exception:
         handed_back = UploadStatus.ABORTED if assembled else UploadStatus.OPEN
         await state.settle(ingest.db, ticket, token, handed_back)
@@ -229,6 +224,7 @@ async def _ingest(
     ingest: IngestService,
     collection: Collection,
     ticket: Ticket,
+    token: uuid.UUID,
     *,
     filename: str | None,
     meta: IngestMeta,
@@ -246,6 +242,7 @@ async def _ingest(
     if sniff(first) != ticket.content_type:
         await _drop(ingest, ticket)
         raise UnsupportedType(_BAD_TYPE)
+    await state.renew(ingest.db, ticket, token)
     try:
         return await ingest.add_image(
             collection,

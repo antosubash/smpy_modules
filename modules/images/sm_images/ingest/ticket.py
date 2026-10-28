@@ -10,18 +10,26 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 
 from itsdangerous import BadData, URLSafeTimedSerializer
 
 from sm_images import constants
-from sm_images.errors import DirectUploadUnsupported, InvalidUpload, UploadNotFound
+from sm_images.errors import (
+    DirectUploadUnsupported,
+    InvalidUpload,
+    UnsupportedType,
+    UploadNotFound,
+)
+from sm_images.ingest.sniff import EXTENSIONS
 from sm_images.tenancy import bound_tenant
 
-__all__ = ["Ticket", "load_ticket", "serializer"]
+__all__ = ["Ticket", "declared_type", "load_ticket", "serializer"]
 
 _GONE = "Upload not found"
 _NO_SECRET = "Direct uploads need the host's secret_key"
 _BAD_PART = "A part is missing or has the wrong size"
+_BAD_TYPE = "The upload is not a supported image of the declared type"
 
 
 @dataclass(frozen=True)
@@ -65,3 +73,15 @@ def load_ticket(token: str, *, secret: str, owner: str | None) -> Ticket:
     if owner is None or ticket.owner != owner or ticket.tenant != bound_tenant():
         raise UploadNotFound(_GONE)
     return ticket
+
+
+def declared_type(filename: str, content_type: str | None) -> str:
+    """The accepted type the client declared (content type, else extension); 415 if none."""
+    if content_type in EXTENSIONS:
+        return content_type
+    suffix = PurePosixPath(filename).suffix.lower().lstrip(".")
+    by_ext = {ext: ctype for ctype, ext in EXTENSIONS.items()}
+    by_ext |= {"jpeg": "image/jpeg", "tiff": "image/tiff", "heif": "image/heif"}
+    if content_type is None and suffix in by_ext:
+        return by_ext[suffix]
+    raise UnsupportedType(_BAD_TYPE)

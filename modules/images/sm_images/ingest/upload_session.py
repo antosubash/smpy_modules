@@ -18,9 +18,11 @@ back off instead of acting on the same object:
   before any storage call - the other side sees them at once and never waits
   behind a slow S3 assembly;
 * ``completing`` is a **fenced lease**: the claim writes a fresh
-  ``claim_token`` and ``lease_expires_at`` (:data:`COMPLETE_LEASE`, far longer
-  than assembling an image takes). The reaper takes over only an expired
-  lease, and its takeover changes the token. ``finish`` (``completing ->
+  ``claim_token`` and ``lease_expires_at`` (:data:`COMPLETE_LEASE`), and the
+  completer renews it between its expensive phases (:func:`renew`), so the
+  lease bounds each phase and a completer whose token is gone stops. The
+  reaper takes over only an expired lease, and its takeover - committed before
+  any storage call - changes the token. ``finish`` (``completing ->
   completed``, in the request's transaction with the image row) and
   ``settle`` (a failed complete handing the claim back) both match the token;
   a ``finish`` that matches nothing rolls the request back - its image row
@@ -54,6 +56,7 @@ __all__ = [
     "mark_cleaned",
     "move",
     "new_session",
+    "renew",
     "require_open",
     "settle",
 ]
@@ -141,6 +144,23 @@ async def claim_abort(db: Any, ticket: Any) -> bool:
     raise UploadNotFound(_GONE)
 
 
+async def renew(db: Any, ticket: Any, token: uuid.UUID) -> None:
+    """Extend this claim's lease by :data:`COMPLETE_LEASE`, committed at once.
+    Called between a complete's expensive phases, so each phase - not the whole
+    complete - is bounded by the lease. The token gone (the reaper took over):
+    404, and the completer stops before doing more."""
+    async with independent_session(db) as s:
+        renewed = await move(
+            s,
+            uuid.UUID(ticket.session),
+            UploadStatus.COMPLETING,
+            {"lease_expires_at": _now() + COMPLETE_LEASE},
+            UploadSession.claim_token == token,
+        )
+    if not renewed:
+        raise UploadNotFound(_GONE)
+
+
 async def finish(db: Any, ticket: Any, token: uuid.UUID) -> None:
     """``completing -> completed`` in the caller's transaction, only under this
     claim. Lost (the reaper took the lease over): roll the caller back - the
@@ -193,7 +213,7 @@ async def discard(db: Any, store: Any, key: str, upload: str, image_id: uuid.UUI
 
 
 async def mark_cleaned(db: Any, sid: uuid.UUID) -> None:
-    """Record that an ``aborted`` session's storage is clean (caller's transaction)."""
+    """Record that an ``aborted`` session's storage is clean (in ``db``'s transaction)."""
     await db.execute(
         update(UploadSession)
         .where(UploadSession.id == sid, UploadSession.status == UploadStatus.ABORTED)
