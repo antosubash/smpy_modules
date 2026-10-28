@@ -261,7 +261,7 @@ async def _run(runtime: Runtime, tenant: str, job_id: uuid.UUID, generation: int
     finally:
         if source is not None:
             source.close()
-    if await terminal.try_complete(runtime, tenant, job_id):
+    if await terminal.try_complete(runtime, tenant, job_id, generation):
         return "completed"
     # A download may have completed it already (eager mode settles them inline).
     async with runtime.session_factory() as db:

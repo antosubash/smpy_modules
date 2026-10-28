@@ -45,8 +45,10 @@ logger = logging.getLogger(__name__)
 ERRORS_MAX: Final = 50
 
 
-async def try_complete(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> bool:
-    """Complete the job if everything is recorded and settled; one caller wins."""
+async def try_complete(runtime: Runtime, tenant: str, job_id: uuid.UUID, generation: int) -> bool:
+    """Complete the job if everything is recorded and settled - for the caller's
+    ``generation`` only (a stale runner or download never completes a newer
+    run's job); one caller wins."""
     pending = exists().where(
         ImportItem.job_id == job_id,
         ImportItem.tenant_id == tenant,
@@ -56,6 +58,7 @@ async def try_complete(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> bool
         update(ImportJob)
         .where(
             *where(tenant, job_id),
+            ImportJob.generation == generation,
             ImportJob.status == JobStatus.RUNNING,
             ImportJob.checkpoint_index >= ImportJob.total_count,
             ~pending,

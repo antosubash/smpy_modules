@@ -99,9 +99,22 @@ async def _claim(
 
 
 async def _defer(
-    runtime: Runtime, tenant: str, item_id: int, token: str, code: str, attempts: int
+    runtime: Runtime,
+    tenant: str,
+    job: tuple,
+    item_id: int,
+    token: str,
+    code: str,
+    attempts: int,
 ) -> None:
-    """Leave the item ``pending`` and release the claim, for reconcile to re-send."""
+    """Leave the item ``pending`` and release the claim, for reconcile to re-send -
+    only while this claim, of this generation, is still the job's current one."""
+    job_id, generation = job
+    current = select(ImportJob.id).where(
+        ImportJob.id == job_id,
+        ImportJob.tenant_id == tenant,
+        ImportJob.generation == generation,
+    )
     async with runtime.session_factory() as db:
         await db.execute(
             update(ImportItem)
@@ -110,6 +123,8 @@ async def _defer(
                 ImportItem.tenant_id == tenant,
                 ImportItem.status == ItemStatus.PENDING,
                 ImportItem.claim_token == token,
+                ImportItem.claim_generation == generation,
+                ImportItem.job_id.in_(current.scalar_subquery()),
             )
             .values(
                 attempts=ImportItem.attempts + attempts,
@@ -168,7 +183,7 @@ async def _one(runtime, tenant, job: tuple, coll, claimed, limiter, settings, db
         return
     except Defer as deferred:
         async with db_lock:
-            await _defer(runtime, tenant, item.id, token, deferred.code, deferred.attempts)
+            await _defer(runtime, tenant, job, item.id, token, deferred.code, deferred.attempts)
         return
     async with db_lock:
         await settle.settle_bytes(
@@ -213,7 +228,7 @@ async def _run(runtime, tenant, job_id, generation, ids) -> int:
     for result in results:
         if isinstance(result, BaseException):
             logger.warning("images.import.download_failed job=%s", job_id, exc_info=result)
-    await terminal.try_complete(runtime, tenant, job_id)
+    await terminal.try_complete(runtime, tenant, job_id, generation)
     return len(held)
 
 

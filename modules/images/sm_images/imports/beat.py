@@ -12,11 +12,19 @@ from typing import Final
 from sm_images.imports import jobs
 from sm_images.pipeline.runtime import Runtime
 
-__all__ = ["HEARTBEAT_SECONDS", "Beat", "beating"]
+__all__ = ["BEAT_TIMEOUT_SECONDS", "HEARTBEAT_SECONDS", "SHUTDOWN_WAIT_SECONDS", "Beat", "beating"]
 
 logger = logging.getLogger(__name__)
 
 HEARTBEAT_SECONDS: Final = 30.0
+BEAT_TIMEOUT_SECONDS: Final = 20.0
+"""Longest one heartbeat ``UPDATE`` may take: a beat stuck on a lock is given up
+(and counted as missed) rather than holding the loop."""
+SHUTDOWN_WAIT_SECONDS: Final = 5.0
+"""How long leaving :func:`beating` waits for a beat already in flight; after
+that the beat is left to finish on its own, never cancelled mid-query."""
+
+_orphans: set[asyncio.Task[None]] = set()  # beats outliving their step
 
 
 class Beat:
@@ -32,9 +40,11 @@ async def beating(
     """Heartbeat every :data:`HEARTBEAT_SECONDS` in the background while a long
     step (counting, storing or reading back the source) runs.
 
-    Stopped cooperatively, never cancelled: a beat already talking to the
-    database finishes first. Cancelling a query mid-flight would leave its
-    connection unusable."""
+    Each beat is bounded by :data:`BEAT_TIMEOUT_SECONDS`. Leaving signals the
+    loop to stop and waits at most :data:`SHUTDOWN_WAIT_SECONDS` for a beat in
+    flight, through a shield: neither that timeout nor a cancellation of the
+    step itself cancels a beat mid-query (which would leave its connection
+    unusable). A beat still running then finishes on its own."""
     beat = Beat()
     stop = asyncio.Event()
 
@@ -46,9 +56,15 @@ async def beating(
             except TimeoutError:
                 pass
             try:
-                if not await jobs.heartbeat(runtime, tenant, job_id, generation):
+                alive = await asyncio.wait_for(
+                    jobs.heartbeat(runtime, tenant, job_id, generation),
+                    timeout=BEAT_TIMEOUT_SECONDS,
+                )
+                if not alive:
                     beat.lost = True
                     return
+            except TimeoutError:
+                logger.warning("images.import.heartbeat_timeout job=%s", job_id)
             except Exception:  # a missed beat is not worth failing the step
                 logger.warning("images.import.heartbeat_failed job=%s", job_id, exc_info=True)
 
@@ -57,4 +73,13 @@ async def beating(
         yield beat
     finally:
         stop.set()
-        await task
+        try:
+            await asyncio.wait_for(asyncio.shield(task), timeout=SHUTDOWN_WAIT_SECONDS)
+        except TimeoutError:
+            logger.warning("images.import.heartbeat_left_running job=%s", job_id)
+            _orphans.add(task)
+            task.add_done_callback(_orphans.discard)
+        except asyncio.CancelledError:
+            _orphans.add(task)  # the step was cancelled; its beat carries on
+            task.add_done_callback(_orphans.discard)
+            raise

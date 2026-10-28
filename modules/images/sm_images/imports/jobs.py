@@ -236,12 +236,12 @@ async def bump(
     tenant: str,
     job_id: uuid.UUID,
     deltas: dict[ItemStatus, int],
-    generation: int | None = None,
+    generation: int,
 ) -> bool:
-    """Add to the job's counters (in the caller's transaction) and heartbeat it.
-
-    With ``generation``, only while the job is ``running`` in that generation -
-    ``False`` otherwise, and the caller rolls its whole transaction back."""
+    """Add to the job's counters (in the caller's transaction) and heartbeat it -
+    only while the job is ``running`` in ``generation``. ``False`` otherwise,
+    and the caller rolls its whole transaction back (the fence every item
+    settlement commits behind)."""
     values: dict[str, Any] = {"heartbeat_at": now(), "updated_at": now()}
     for status, n in deltas.items():
         if n and status in COUNTERS:
@@ -250,8 +250,10 @@ async def bump(
             values[COUNTERS[status]] = (
                 column + n if n > 0 else case((column + n < 0, 0), else_=column + n)
             )
-    conds = where(tenant, job_id)
-    if generation is not None:
-        conds += [ImportJob.generation == generation, ImportJob.status == JobStatus.RUNNING]
+    conds = [
+        *where(tenant, job_id),
+        ImportJob.generation == generation,
+        ImportJob.status == JobStatus.RUNNING,
+    ]
     stmt = update(ImportJob).where(*conds).values(**values).returning(ImportJob.id)
     return (await db.execute(stmt.execution_options(**SYNC))).first() is not None
