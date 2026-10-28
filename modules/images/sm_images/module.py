@@ -134,22 +134,28 @@ class ImagesModule(ModuleBase):
         # Alembic autogenerate and the doctor even when the routers cannot be
         # built yet.
         from sm_images.endpoints.api import router as api
+        from sm_images.endpoints.public import router as public
         from sm_images.endpoints.views import router as views
 
         api_router.include_router(api)
+        # Beside the admin router, not in it: anonymous, so without its tenant
+        # binding and CSRF check - ``bind_public`` instead.
+        api_router.include_router(public)
         view_router.include_router(views)
 
     async def on_startup(self, app: FastAPI) -> None:
         """Everything that needs the hydrated settings and an open database:
-        the tenancy mode, the fail-closed guard, the session factory object
-        intents commit through on their own, the step registry (built-ins and
-        every installed plugin's ``images_extensions``, then frozen) and the
-        runtime the pipeline's after-commit dispatch runs on."""
-        from sm_images import intents, tenancy
+        the tenancy mode, the CDN base public URLs use, the fail-closed guard,
+        the session factory object intents commit through on their own, the
+        step registry (built-ins and every installed plugin's
+        ``images_extensions``, then frozen) and the runtime the pipeline's
+        after-commit dispatch runs on."""
+        from sm_images import intents, tenancy, urls
         from sm_images.pipeline.extensions import load_extensions
 
         setattr(app.state, constants.MODULE_ATTR, self)
         tenancy.configure(app)
+        urls.configure(getattr(app.state, constants.PACKAGE).settings.public_asset_base_url)
         load_extensions()
         sm = getattr(app.state, "sm", None)
         db = getattr(sm, "db", None)

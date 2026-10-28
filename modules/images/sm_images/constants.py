@@ -89,6 +89,16 @@ PUBLIC_API_PREFIX: Final = f"{ROUTE_PREFIX_API}/public/"
 mount (renditions, ``points``, PMTiles). Terminated with ``/`` so it can never
 match ``/api/images`` itself."""
 PUBLIC_PREFIXES: Final = (PUBLIC_COLLECTION_PREFIX, PUBLIC_API_PREFIX)
+PUBLIC_API_ROUTER_PREFIX: Final = PUBLIC_API_PREFIX.removeprefix(ROUTE_PREFIX_API).rstrip("/")
+"""``/public``: the anonymous router's prefix inside the module's API router."""
+
+# --- Serving bytes (``/images/{id}/r/{size}``, ``/display``, ``/original``) ---
+
+RENDITION_SIZE_MAX: Final = 50
+"""``Rendition.size``'s column width; a longer path segment is a 422."""
+DISPLAY_CONTENT_TYPE: Final = "image/jpeg"
+"""Display copies and renditions are always JPEG (``storage_keys``)."""
+ORIGINAL_FORBIDDEN_DETAIL: Final = "The original of this image is not available to you"
 
 # --- Request-body ceilings: the routes that take an upload. ---
 

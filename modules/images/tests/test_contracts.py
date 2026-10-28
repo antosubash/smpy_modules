@@ -125,9 +125,7 @@ async def test_the_tenant_is_unbound_again_afterwards(seeded):
     assert current_tenant_id.get() is None
 
 
-def test_rendition_url_versions_by_update_time():
-    from datetime import UTC, datetime
-
+def test_rendition_url_versions_by_display_generation():
     img = Image(
         id=uuid.UUID(int=7),
         collection_id=uuid.uuid4(),
@@ -135,7 +133,7 @@ def test_rendition_url_versions_by_update_time():
         filename="f",
         content_type="image/jpeg",
         size_bytes=1,
-        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        display_generation=3,
     )
     url = contracts.rendition_url(img, "400")
-    assert url == f"/api/images/images/{img.id}/r/400?v={int(img.created_at.timestamp())}"
+    assert url == f"/api/images/images/{img.id}/r/400?v=3"

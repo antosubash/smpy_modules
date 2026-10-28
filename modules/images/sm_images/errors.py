@@ -121,7 +121,7 @@ class TenantRequired(Forbidden):
     code = constants.TENANT_REQUIRED_CODE
 
 
-async def _render(_: Request, exc: ImagesError) -> JSONResponse:
+async def render(_: Request, exc: ImagesError) -> JSONResponse:
     body: dict[str, str] = {"detail": exc.detail}
     if exc.code is not None:
         body["code"] = exc.code
@@ -129,4 +129,4 @@ async def _render(_: Request, exc: ImagesError) -> JSONResponse:
 
 
 def install_exception_handlers(app: FastAPI) -> None:
-    app.add_exception_handler(ImagesError, _render)  # type: ignore[arg-type]
+    app.add_exception_handler(ImagesError, render)  # type: ignore[arg-type]

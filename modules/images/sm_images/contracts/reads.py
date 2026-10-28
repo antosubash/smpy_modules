@@ -27,7 +27,7 @@ from typing import Any
 from simple_module_core.resources import ACTION_VIEW, ResourcePrincipal
 from sqlalchemy import select
 
-from sm_images import constants, intents
+from sm_images import constants, intents, urls
 from sm_images.access import POLICY
 from sm_images.contracts.schemas import CollectionPageRead, CollectionRead
 from sm_images.models import Collection
@@ -87,13 +87,12 @@ async def list_collections(
             )
 
 
-def rendition_url(image: Any, size: str) -> str:
-    """The console/API URL that streams *image*'s rendition *size*.
+def rendition_url(image: Any, size: str, *, collection: Any = None) -> str:
+    """The URL that streams *image*'s rendition *size* (:func:`sm_images.urls.rendition_url`).
 
     Access is checked by the route, not here: a URL for an image the viewer may
-    not open is a 404 when followed. ``?v=`` is the image's last update, so a
-    regenerated rendition is not served from a stale cache.
+    not open is a 404 when followed. ``?v=`` is the image's display generation,
+    so a regenerated rendition is never served from a stale cache. Pass the
+    image's *collection* to let a public one go through ``public_asset_base_url``.
     """
-    stamp = image.updated_at or image.created_at
-    version = int(stamp.timestamp()) if stamp is not None else 0
-    return f"{constants.ROUTE_PREFIX_API}/images/{image.id}/r/{size}?v={version}"
+    return urls.rendition_url(image, size, collection=collection)

@@ -13,7 +13,8 @@ import uuid
 import pytest
 import pytest_asyncio
 from sm_images import constants
-from sm_images.models import Visibility
+from sm_images.models import Rendition, Visibility
+from sm_images.storage import ImageStore
 
 from tests import read_routes
 from tests.access_support import OWNER, collection, image
@@ -23,12 +24,15 @@ from tests.stub_auth import as_user
 
 ROUTES = pytest.mark.parametrize("route", READ_ROUTES, ids=lambda r: f"{r.method} {r.path}")
 LIST_URL = "/api/images/collections"
+SIZE = "small"
 STRANGER = as_user("sam", ("images.view", "images.create"))
 
 
 @pytest_asyncio.fixture
-async def secret(client):
-    """olga's private collection and an image in it, plus one public collection."""
+async def secret(client, storage):
+    """olga's private collection and an image in it (stored, with a ``small``
+    rendition, so the byte routes have something to serve its owner), plus one
+    public collection."""
     private = collection("secret-trees", Visibility.PRIVATE, OWNER)
     public = collection("open-trees", Visibility.PUBLIC, OWNER)
     async with client.db_state.session_factory() as s:
@@ -36,12 +40,18 @@ async def secret(client):
         await s.flush()
         pic = image(private, "secret-photo.jpg")
         s.add(pic)
+        await s.flush()
+        s.add(Rendition(image_id=pic.id, size=SIZE, storage_key="k/small", width=1, height=1))
         await s.commit()
+    store = ImageStore(storage)
+    for key in (pic.storage_key, "k/small"):
+        await store.put(key, b"secret-bytes", content_type="image/jpeg", size=12)
     return {
         "collection_id": str(private.id),
         "image_id": str(pic.id),
         "slug": private.slug,
         "public_slug": public.slug,
+        "size": SIZE,
     }
 
 
@@ -52,14 +62,20 @@ def fill(route, ids) -> str:
 def absent(route, ids) -> str:
     """The same route for ids that do not exist at all."""
     return route.path.format(
-        collection_id=uuid.uuid4(), image_id=uuid.uuid4(), slug="no-such-collection"
+        collection_id=uuid.uuid4(), image_id=uuid.uuid4(), slug="no-such-collection", size=SIZE
     )
 
 
 def leaks(text: str, ids) -> list[str]:
     return [
         what
-        for what in (ids["collection_id"], ids["image_id"], ids["slug"], "secret-photo.jpg")
+        for what in (
+            ids["collection_id"],
+            ids["image_id"],
+            ids["slug"],
+            "secret-photo.jpg",
+            "secret-bytes",
+        )
         if what in text
     ]
 

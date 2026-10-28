@@ -12,7 +12,8 @@ without an entry fails ``test_every_get_route_is_listed``. An entry is
   slug, id and image id appear nowhere in the body.
 * ``"public"`` - anonymous surface (``{slug}``); anonymous gets 404.
 
-Placeholders: ``{collection_id}``, ``{image_id}``, ``{slug}``. A route that
+Placeholders: ``{collection_id}``, ``{image_id}``, ``{slug}``, ``{size}`` (a
+rendition the seeded image has). A route that
 needs a query string appends it to the template.
 """
 
@@ -39,6 +40,12 @@ READ_ROUTES: list[ReadRoute] = [
     ReadRoute("GET", "/api/images/collections/{collection_id}/images", COLLECTION),
     ReadRoute("GET", "/api/images/images/{image_id}", IMAGE),
     ReadRoute("GET", "/api/images/collections/{collection_id}/pipeline", COLLECTION),
+    ReadRoute("GET", "/api/images/images/{image_id}/r/{size}", IMAGE),
+    ReadRoute("GET", "/api/images/images/{image_id}/display", IMAGE),
+    ReadRoute("GET", "/api/images/images/{image_id}/original", IMAGE),
+    ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/r/{size}", PUBLIC),
+    ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/display", PUBLIC),
+    ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/original", PUBLIC),
 ]
 
 NOT_A_LEAK_SURFACE: frozenset[str] = frozenset()

@@ -164,17 +164,23 @@ ImageCollectionOwner = Annotated[
 ]
 
 
-def can_view_original(who: ResourcePrincipal, image: Image, collection: Collection) -> bool:
+def can_view_original(
+    who: ResourcePrincipal, image: Image, collection: Collection, *, protected: bool | None = None
+) -> bool:
     """Whether *who* may fetch *image*'s original bytes.
 
     Precondition: both rows were loaded through :data:`POLICY` for ``view``.
     With no display copy the original *is* what everyone sees; with one (a
     blurred derivative, say) only the owner and ``images.originals.view``
     holders get the original. ``images.manage`` alone does not.
+
+    ``protected`` overrides "has a display copy" for a caller that knows more:
+    the serving route also protects an original whose display mutator has not
+    settled yet (``sm_images.serving``).
     """
     if image.collection_id != collection.id:
         return False
-    if image.display_key is None:
+    if not (image.display_key is not None if protected is None else protected):
         return True
     owner = who.user_id is not None and collection.owner_id == who.user_id
     return owner or who.has(constants.PERM_ORIGINALS)
