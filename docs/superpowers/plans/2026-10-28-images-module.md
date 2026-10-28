@@ -218,7 +218,7 @@
 - an edit share can't delete;
 - `images.manage` bypasses.
 
-- [ ] Commit `feat(images): access policy`
+- [x] Commit `feat(images): access policy`
 
 ### Task 6: Collection API, stats, contracts
 
