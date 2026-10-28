@@ -200,3 +200,37 @@ async def test_a_result_of_an_older_step_version_does_not_settle(client, g):
     await _configure(client, g, {"acme.blur": {}}, protect=True)
     await _blur_run(client, g, StepStatus.COMPLETED, version=0)
     assert await _code(client, g.url("priv", "plain", "display")) == 404
+
+
+# --- round 2: an existing display copy is already redacted ----------------------
+
+
+async def test_a_rerunning_mutator_still_serves_the_existing_display(client, g):
+    await _configure(client, g, {"acme.blur": {}, "renditions": {}}, protect=True)
+    async with client.db_state.session_factory() as s:
+        for key in ("pub.blurred", "priv.blurred"):
+            s.add(
+                StepRun(
+                    image_id=g.ids[key], step="acme.blur", status=StepStatus.PENDING, step_version=1
+                )
+            )
+        await s.commit()
+    display = await client.get(g.url("priv", "blurred", "display"), headers=headers(EDITOR))
+    assert (display.status_code, display.content) == (200, g.bytes["priv.blurred.display"])
+    small = await client.get(g.url("priv", "blurred", "r/small"), headers=headers(EDITOR))
+    assert (small.status_code, small.content) == (200, g.bytes["priv.blurred.small"])
+    assert (await client.get(g.public_url("pub", "blurred", "r/small"))).status_code == 200
+    # The original stays protected all the same.
+    assert await _code(client, g.url("priv", "blurred", "original"), EDITOR) == 403
+
+
+async def test_an_uninstalled_plugin_serves_existing_displays_and_withholds_the_rest(client, g):
+    await _configure(client, g, {"acme.blur": {}}, protect=True)
+    use_steps()  # the plugin is gone
+    for tail in ("display", "r/small"):
+        assert await _code(client, g.url("priv", "blurred", tail), EDITOR) == 200
+        assert (await client.get(g.public_url("pub", "blurred", tail))).status_code == 200
+        assert await _code(client, g.url("priv", "plain", tail), EDITOR) == 404
+        assert (await client.get(g.public_url("pub", "plain", tail))).status_code == 404
+    assert await _code(client, g.url("priv", "plain", "original"), EDITOR) == 403
+    assert await _code(client, g.url("priv", "blurred", "original"), EDITOR) == 403

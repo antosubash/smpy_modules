@@ -16,10 +16,16 @@ order is the point:
 
 **Protected** means the original is not what everyone sees: the image has a
 display copy, or its redaction is still pending (:mod:`sm_images.redaction`).
-While it is pending, ``…/display`` and every rendition are a 404 (the portal's
-"thumbnail not available") rather than a fall back to unredacted bytes. A
-rendition is also a 404 unless it was cut from the image's *current* display
-generation (``Rendition.source_generation``).
+
+The gate only ever withholds bytes derived from the **original**. A display
+copy, once published, was written by a display mutator and is already
+redacted: it and the renditions cut from it (``source_generation`` equal to
+the current ``display_generation``) are served whatever the mutator is doing
+now - re-running, bumped, or uninstalled. Only an image with *no* display copy
+is gated: while its redaction is pending, ``…/display`` (which would fall back
+to the original) and its renditions (cut from the original) are a 404, the
+portal's "thumbnail not available". A rendition is also a 404 unless it was
+cut from the image's current display generation.
 
 **Versions.** The display copy and each rendition carry a version
 (:func:`sm_images.cache.version`); a request whose ``?v=`` is not it is served
@@ -83,7 +89,8 @@ async def resolve(
     if loaded is None:
         raise _missing()
     image, rendition = loaded
-    pending = await redaction.pending(db, collection, image)
+    # Only original-derived bytes can be unredacted; a display copy never is.
+    pending = image.display_key is None and await redaction.pending(db, collection, image)
     if route == cache.RENDITION:
         if rendition is None or pending or rendition.source_generation != image.display_generation:
             raise _missing()

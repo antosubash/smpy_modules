@@ -4,6 +4,8 @@ A display mutator (a blur, an anonymiser) writes the display copy everyone
 else sees. Until it has *settled* for an image, its original - and every
 rendition cut before it - may show what it exists to hide, so serving treats
 the image as **pending**: no display, no renditions, the original protected.
+Serving asks only for an image with **no display copy**: a published display
+copy is already redacted, and it and its current renditions are always served.
 
 Decided from persisted state, never from the live registry alone:
 
