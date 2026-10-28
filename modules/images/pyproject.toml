@@ -24,6 +24,9 @@ dependencies = [
     "Pillow>=10.0",
     "pillow-heif>=0.18",
     "ijson>=3.2",
+    # Time-bounded matching of user filename patterns (a catastrophic pattern
+    # must not pin an import worker); `re` has no timeout.
+    "regex>=2023.0",
     # Signs direct-upload tickets with the host's secret_key (the library the
     # framework's session cookie already uses).
     "itsdangerous>=2.0,<3",

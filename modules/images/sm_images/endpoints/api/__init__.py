@@ -9,7 +9,15 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from simple_module_hosting.csrf import RequiresCsrf
 
-from sm_images.endpoints.api import collections, images, pipeline, serve, shares, uploads
+from sm_images.endpoints.api import (
+    collections,
+    images,
+    imports,
+    pipeline,
+    serve,
+    shares,
+    uploads,
+)
 from sm_images.tenancy import bind_admin
 
 # The tenant binding is the router's **first** dependency, and FastAPI puts a
@@ -29,3 +37,4 @@ router.include_router(images.router)
 router.include_router(uploads.router)
 router.include_router(pipeline.router)
 router.include_router(serve.router)
+router.include_router(imports.router)

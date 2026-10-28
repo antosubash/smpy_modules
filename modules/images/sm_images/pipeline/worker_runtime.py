@@ -169,7 +169,9 @@ def run_task[T](body: Callable[[Runtime, str], Awaitable[T]]) -> T:
     runtime = worker_runtime()
 
     async def main() -> T:
-        with tenant_context(tenant):
+        from sm_images.pipeline.runtime import bind_runtime
+
+        with tenant_context(tenant), bind_runtime(runtime):
             return await body(runtime, tenant)
 
     return asyncio.run(main())

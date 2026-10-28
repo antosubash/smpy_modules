@@ -3,8 +3,10 @@
 * ``images`` - light steps (``exif``, ``renditions``), ``images.reconcile``
   (routed here rather than behind a long import) and the daily
   ``images.janitor``;
-* ``images_imports`` - the orchestrators (``images.restart_collection``, the
-  imports later); run its worker with concurrency 1;
+* ``images_imports`` - the orchestrators (``images.restart_collection``,
+  ``images.import_geojson``); run its worker with concurrency 1. Downloads
+  (``images.download_items``) go to ``images``, so a long import stream never
+  blocks its own downloads;
 * ``images_heavy`` / ``images_gpu`` - plugin steps that declare them.
 
 ``images.run_step``'s route is only a default: each message carries the queue
@@ -18,6 +20,8 @@ RUN_STEP = "images.run_step"
 RESTART_COLLECTION = "images.restart_collection"
 RECONCILE = "images.reconcile"
 JANITOR = "images.janitor"
+IMPORT_GEOJSON = "images.import_geojson"
+DOWNLOAD_ITEMS = "images.download_items"
 
 QUEUE_DEFAULT = "images"
 QUEUE_IMPORTS = "images_imports"
@@ -28,6 +32,8 @@ TASK_ROUTES = {
     RESTART_COLLECTION: {"queue": QUEUE_IMPORTS},
     RECONCILE: {"queue": QUEUE_DEFAULT},
     JANITOR: {"queue": QUEUE_DEFAULT},
+    IMPORT_GEOJSON: {"queue": QUEUE_IMPORTS},
+    DOWNLOAD_ITEMS: {"queue": QUEUE_DEFAULT},
 }
 
 RECONCILE_INTERVAL_SECONDS = 300.0

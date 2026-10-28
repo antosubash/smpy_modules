@@ -24,6 +24,9 @@ class ImportJob(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[u
     mapping: dict[str, Any] = json_col(dict)
     """url, image, lat, lng, datetime, external_id and group-key properties; filename pattern."""
     source_key: str | None = Field(default=None, max_length=500)
+    """The staged GeoJSON; cleared once a terminal job has deleted it."""
+    source_url: str | None = Field(default=None, max_length=2000)
+    """Where the source was fetched from (``safe_stream``); lets a restart re-stage it."""
     staged_keys: list[str] = json_col(list)
     """Every object this job staged, so cancel and the janitor can delete exactly these."""
     generation: int = Field(default=0, sa_column_kwargs={"nullable": False})

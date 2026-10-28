@@ -28,6 +28,24 @@ def body(data: bytes) -> httpx.Response:
     return httpx.Response(200, content=_chunks(data))
 
 
+class FakeSocket:
+    """``socket`` as ``url_safety`` sees it, with ``getaddrinfo`` replaced.
+
+    Only the guard's module attribute is swapped: patching
+    ``socket.getaddrinfo`` itself would also fake DNS for the database driver
+    (an asyncpg connection to ``localhost`` opened mid-test would fail)."""
+
+    def __init__(self, getaddrinfo) -> None:
+        self.getaddrinfo = getaddrinfo
+
+    def __getattr__(self, name: str):
+        return getattr(socket, name)
+
+
+def fake_dns(monkeypatch, getaddrinfo) -> None:
+    monkeypatch.setattr(url_safety, "socket", FakeSocket(getaddrinfo))
+
+
 @pytest.fixture
 def resolver(monkeypatch):
     """hostname -> list of IPs; an unknown host fails to resolve."""
@@ -47,7 +65,7 @@ def resolver(monkeypatch):
             for ip in table[host]
         ]
 
-    monkeypatch.setattr(url_safety.socket, "getaddrinfo", fake_getaddrinfo)
+    fake_dns(monkeypatch, fake_getaddrinfo)
     return table
 
 

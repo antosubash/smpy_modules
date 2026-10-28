@@ -160,6 +160,7 @@ def upgrade() -> None:
         ),
         sa.Column("mapping", sa.JSON(), nullable=False),
         sa.Column("source_key", sa.String(length=500), nullable=True),
+        sa.Column("source_url", sa.String(length=2000), nullable=True),
         sa.Column("staged_keys", sa.JSON(), nullable=False),
         sa.Column("generation", sa.Integer(), nullable=False),
         sa.Column("heartbeat_at", sa.DateTime(timezone=True), nullable=True),
@@ -373,6 +374,12 @@ def upgrade() -> None:
     )
     op.create_index(
         "ix_images_import_item_job_status", "images_import_item", ["job_id", "status"], unique=False
+    )
+    op.create_index(
+        "ix_images_import_item_job_external",
+        "images_import_item",
+        ["job_id", "external_id"],
+        unique=False,
     )
     op.create_index(
         op.f("ix_images_import_item_tenant_id"), "images_import_item", ["tenant_id"], unique=False
@@ -674,6 +681,7 @@ def downgrade() -> None:
     op.drop_table("images_prompt_result")
     op.drop_index(op.f("ix_images_import_item_tenant_id"), table_name="images_import_item")
     op.drop_index("ix_images_import_item_job_status", table_name="images_import_item")
+    op.drop_index("ix_images_import_item_job_external", table_name="images_import_item")
     op.drop_index(op.f("ix_images_import_item_job_id"), table_name="images_import_item")
     op.drop_index(op.f("ix_images_import_item_image_id"), table_name="images_import_item")
     op.drop_table("images_import_item")

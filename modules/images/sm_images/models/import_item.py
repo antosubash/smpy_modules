@@ -20,6 +20,8 @@ class ImportItem(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[
     __table_args__ = (
         UniqueConstraint("job_id", "feature_index", name="uq_images_import_item_job_feature"),
         Index("ix_images_import_item_job_status", "job_id", "status"),
+        # Layer 1 of the import dedupe: an external id seen earlier in the same job.
+        Index("ix_images_import_item_job_external", "job_id", "external_id"),
     )
 
     id: int | None = Field(default=None, primary_key=True)

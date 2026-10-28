@@ -20,11 +20,13 @@ task body inside the publish, on the request's loop, where a task body's
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 
-__all__ = ["Runtime", "celery_eager", "current_runtime", "use_runtime"]
+__all__ = ["Runtime", "bind_runtime", "celery_eager", "current_runtime", "use_runtime"]
 
 
 def celery_eager() -> bool:
@@ -49,6 +51,7 @@ class Runtime:
 
 
 _runtime: Runtime | None = None
+_bound: ContextVar[Runtime | None] = ContextVar("sm_images_bound_runtime", default=None)
 
 
 def use_runtime(runtime: Runtime | None) -> None:
@@ -57,5 +60,17 @@ def use_runtime(runtime: Runtime | None) -> None:
     _runtime = runtime
 
 
+@contextmanager
+def bind_runtime(runtime: Runtime) -> Iterator[Runtime]:
+    """Make ``runtime`` the current one for this context (a task body, an import
+    run), so ingest's after-commit dispatch inside it - which has no runtime of
+    its own in a worker - plans through it rather than waiting for reconcile."""
+    token = _bound.set(runtime)
+    try:
+        yield runtime
+    finally:
+        _bound.reset(token)
+
+
 def current_runtime() -> Runtime | None:
-    return _runtime
+    return _bound.get() or _runtime

@@ -17,8 +17,9 @@ isolation applying as in a request:
 * images whose processing cycle never concluded (a dispatch lost after
   ingest's commit, e.g. an empty pipeline) are dispatched, which decides
   ``ImageProcessed`` once;
-* import items and jobs: counted and logged. Their runner tasks arrive with
-  the import tasks; nothing is enqueued to a task name no worker registers;
+* import jobs whose runner went silent are reclaimed (a new generation) and
+  ``images.import_geojson`` is launched again; URL items left ``pending`` are
+  handed to ``images.download_items`` again (:mod:`sm_images.imports.recover`);
 * unfinished collection restarts whose heartbeat is stale are resumed (on the
   imports queue in broker mode, inline when eager);
 * every live collection's stats are recomputed (the only way a box shrinks
@@ -37,8 +38,9 @@ from typing import Any
 from simple_module_db import all_tenants, finalize_session, tenant_context
 from sqlalchemy import and_, or_, select, update
 
+from sm_images.imports.recover import recover_imports
 from sm_images.models import Collection, Image, ImportItem, ImportJob, PipelineRestart, StepRun
-from sm_images.models.enums import ItemStatus, JobStatus, StepStatus
+from sm_images.models.enums import StepStatus
 from sm_images.pipeline.orchestrate import submit_dispatch
 from sm_images.pipeline.runtime import Runtime
 from sm_images.placeholders import reopenable_images
@@ -53,7 +55,6 @@ logger = logging.getLogger(__name__)
 CUTOFF = timedelta(minutes=5)
 BATCH = 500
 STATS_BATCH = 100
-_ACTIVE_JOBS = (JobStatus.PENDING, JobStatus.STAGING, JobStatus.RUNNING)
 _OWNERS = (Collection, Image, StepRun, ImportJob, ImportItem, PipelineRestart)
 
 
@@ -133,35 +134,6 @@ def _unconcluded(tenant: str, cutoff: datetime) -> Any:
     )
 
 
-async def _imports(runtime: Runtime, tenant: str, cutoff: datetime) -> tuple[int, int]:
-    """Candidates only, until the import runner tasks exist to resume them."""
-    jobs = select(ImportJob.id).where(
-        ImportJob.tenant_id == tenant,
-        ImportJob.status.in_(_ACTIVE_JOBS),
-        or_(ImportJob.heartbeat_at.is_(None), ImportJob.heartbeat_at < cutoff),
-    )
-    items = (
-        select(ImportItem.id)
-        .join(ImportJob, ImportJob.id == ImportItem.job_id)
-        .where(
-            ImportItem.tenant_id == tenant,
-            ImportItem.status == ItemStatus.PENDING,
-            ImportJob.status.in_(_ACTIVE_JOBS),
-        )
-    )
-    stale_jobs = await _ids(runtime, jobs, ImportJob.id)
-    pending_items = await _ids(runtime, items, ImportItem.id)
-    if stale_jobs or pending_items:
-        logger.info(
-            "images.reconcile.imports tenant=%s stale_jobs=%d pending_items=%d "
-            "(no import runner registered yet; left in place)",
-            tenant,
-            len(stale_jobs),
-            len(pending_items),
-        )
-    return len(stale_jobs), len(pending_items)
-
-
 async def _restarts(runtime: Runtime, tenant: str, now: datetime, cutoff: datetime) -> int:
     """Resume restarts nobody is advancing; claim each by moving its heartbeat."""
     stale = (
@@ -220,7 +192,7 @@ async def reconcile_tenant(runtime: Runtime, tenant: str, now: datetime) -> Coun
         await submit_dispatch(runtime, tenant, image_id)
         done["dispatched"] += 1
     done["restarts"] = await _restarts(runtime, tenant, now, cutoff)
-    done["stale_jobs"], done["pending_items"] = await _imports(runtime, tenant, cutoff)
+    done["import_jobs"], done["import_items"] = await recover_imports(runtime, tenant, cutoff)
     done["collections"] = await _recompute_stats(runtime, tenant)
     return done
 

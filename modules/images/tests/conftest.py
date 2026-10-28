@@ -28,6 +28,7 @@ from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
     storage,
 )
 from tests.fetch_support import inner, resolver  # noqa: F401 - the safe-fetch tests' fixtures
+from tests.import_support import imp  # noqa: F401 - the import tests' fixture
 from tests.isolation_support import two_tenants  # noqa: F401 - the tenancy matrix's fixture
 from tests.pg_support import arm_reset, make_db_state
 from tests.pipeline_api_support import world  # noqa: F401 - the pipeline API tests' fixture

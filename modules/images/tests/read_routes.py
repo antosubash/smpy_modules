@@ -11,8 +11,10 @@ without an entry fails ``test_every_get_route_is_listed``. An entry is
 * ``"list"`` - returns rows; a stranger gets 200 and the private collection's
   slug, id and image id appear nowhere in the body.
 * ``"public"`` - anonymous surface (``{slug}``); anonymous gets 404.
+* ``"job"`` - the path names an import job (``{job_id}``) of such a
+  collection; same expectation as ``"collection"``.
 
-Placeholders: ``{collection_id}``, ``{image_id}``, ``{slug}``, ``{size}`` (a
+Placeholders: ``{collection_id}``, ``{image_id}``, ``{job_id}``, ``{slug}``, ``{size}`` (a
 rendition the seeded image has). A route that
 needs a query string appends it to the template.
 """
@@ -25,6 +27,7 @@ COLLECTION = "collection"
 IMAGE = "image"
 LIST = "list"
 PUBLIC = "public"
+JOB = "job"
 
 
 class ReadRoute(NamedTuple):
@@ -43,6 +46,8 @@ READ_ROUTES: list[ReadRoute] = [
     ReadRoute("GET", "/api/images/images/{image_id}/r/{size}", IMAGE),
     ReadRoute("GET", "/api/images/images/{image_id}/display", IMAGE),
     ReadRoute("GET", "/api/images/images/{image_id}/original", IMAGE),
+    ReadRoute("GET", "/api/images/collections/{collection_id}/imports", COLLECTION),
+    ReadRoute("GET", "/api/images/imports/{job_id}", JOB),
     ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/r/{size}", PUBLIC),
     ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/display", PUBLIC),
     ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/original", PUBLIC),

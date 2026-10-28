@@ -13,13 +13,13 @@ import uuid
 import pytest
 import pytest_asyncio
 from sm_images import constants
-from sm_images.models import Rendition, Visibility
+from sm_images.models import ImportJob, Rendition, Visibility
 from sm_images.storage import ImageStore
 
 from tests import read_routes
 from tests.access_support import OWNER, collection, image
 from tests.isolation_support import ACME, as_
-from tests.read_routes import COLLECTION, IMAGE, LIST, PUBLIC, READ_ROUTES
+from tests.read_routes import COLLECTION, IMAGE, JOB, LIST, PUBLIC, READ_ROUTES
 from tests.stub_auth import as_user
 
 ROUTES = pytest.mark.parametrize("route", READ_ROUTES, ids=lambda r: f"{r.method} {r.path}")
@@ -42,6 +42,8 @@ async def secret(client, storage):
         s.add(pic)
         await s.flush()
         s.add(Rendition(image_id=pic.id, size=SIZE, storage_key="k/small", width=1, height=1))
+        job = ImportJob(collection_id=private.id, mapping={"url_prop": "url"})
+        s.add(job)
         await s.commit()
     store = ImageStore(storage)
     for key in (pic.storage_key, "k/small"):
@@ -49,6 +51,7 @@ async def secret(client, storage):
     return {
         "collection_id": str(private.id),
         "image_id": str(pic.id),
+        "job_id": str(job.id),
         "slug": private.slug,
         "public_slug": public.slug,
         "size": SIZE,
@@ -62,7 +65,11 @@ def fill(route, ids) -> str:
 def absent(route, ids) -> str:
     """The same route for ids that do not exist at all."""
     return route.path.format(
-        collection_id=uuid.uuid4(), image_id=uuid.uuid4(), slug="no-such-collection", size=SIZE
+        collection_id=uuid.uuid4(),
+        image_id=uuid.uuid4(),
+        job_id=uuid.uuid4(),
+        slug="no-such-collection",
+        size=SIZE,
     )
 
 
@@ -72,6 +79,7 @@ def leaks(text: str, ids) -> list[str]:
         for what in (
             ids["collection_id"],
             ids["image_id"],
+            ids["job_id"],
             ids["slug"],
             "secret-photo.jpg",
             "secret-bytes",
@@ -85,7 +93,7 @@ async def test_every_read_route_hides_private_collection(client, secret, route):
     sent = {"method": route.method}
     url = fill(route, secret)
 
-    if route.needs in (COLLECTION, IMAGE):
+    if route.needs in (COLLECTION, IMAGE, JOB):
         got = await client.request(url=url, headers=STRANGER, **sent)
         assert got.status_code == 404, got.text
         assert leaks(got.text, secret) == []
