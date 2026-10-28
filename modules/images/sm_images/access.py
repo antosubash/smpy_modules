@@ -141,6 +141,29 @@ CollectionOwner = Annotated[
 deleting images and whole-collection re-runs."""
 
 
+def image_collection_stmt(image_id: uuid.UUID) -> Any:
+    """The collection holding ``image_id`` (an untrashed image), for the
+    ``/images/{image_id}`` routes: the image is reachable exactly when its
+    collection is, so the same policy decides, and a stranger's 404 is the one
+    an unknown id gets."""
+    return (
+        select(Collection)
+        .join(Image, Image.collection_id == Collection.id)
+        .where(Image.id == image_id)
+    )
+
+
+ImageCollectionView = Annotated[
+    Collection, Depends(RequiresResource(POLICY, ACTION_VIEW, image_collection_stmt))
+]
+ImageCollectionEdit = Annotated[
+    Collection, Depends(RequiresResource(POLICY, ACTION_EDIT, image_collection_stmt))
+]
+ImageCollectionOwner = Annotated[
+    Collection, Depends(RequiresResource(POLICY, ACTION_DELETE, image_collection_stmt))
+]
+
+
 def can_view_original(who: ResourcePrincipal, image: Image, collection: Collection) -> bool:
     """Whether *who* may fetch *image*'s original bytes.
 
@@ -178,9 +201,13 @@ __all__ = [
     "CollectionEdit",
     "CollectionOwner",
     "CollectionView",
+    "ImageCollectionEdit",
+    "ImageCollectionOwner",
+    "ImageCollectionView",
     "ImagesCollectionPolicy",
     "can_view_original",
     "collection_stmt",
+    "image_collection_stmt",
     "public_collection",
     "visible_collections",
     "visible_images",

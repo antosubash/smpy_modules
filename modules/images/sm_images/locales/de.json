@@ -3,5 +3,18 @@
   "menu": {
     "collections": "Bildersammlungen",
     "group_images": "Bilder"
+  },
+  "errors": {
+    "unsupported_type": "Diese Datei ist kein unterstütztes Bild. Laden Sie eine JPEG-, PNG-, WebP-, HEIC/HEIF- oder TIFF-Datei hoch.",
+    "image_too_many_pixels": "Dieses Bild hat zu viele Pixel für die Verarbeitung. Verkleinern Sie es und laden Sie es erneut hoch.",
+    "file_too_large": "Diese Datei überschreitet die zulässige Bildgröße.",
+    "use_direct_upload": "Diese Datei ist für einen normalen Upload zu groß. Sie muss direkt hochgeladen werden.",
+    "batch_too_large": "Zu viele Dateien in einem Upload. Laden Sie sie in kleineren Gruppen hoch.",
+    "invalid_metadata": "Die Bildmetadaten sind ungültig.",
+    "invalid_base64": "Die Bilddaten sind kein gültiges Base64.",
+    "upload_not_found": "Dieser Upload existiert nicht mehr. Starten Sie ihn erneut.",
+    "parts_mismatch": "Ein Teil des Uploads fehlt oder ist unvollständig. Starten Sie ihn erneut.",
+    "direct_upload_unsupported": "Der Speicher dieses Servers unterstützt keine direkten Uploads.",
+    "upload_failed": "Die Datei konnte nicht gespeichert werden. Versuchen Sie es erneut."
   }
 }

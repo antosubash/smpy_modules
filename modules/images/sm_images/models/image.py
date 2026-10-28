@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from simple_module_db.mixins import AuditMixin, MultiTenantMixin, SoftDeleteMixin
-from sqlalchemy import CheckConstraint, Index, SmallInteger, text
+from sqlalchemy import BigInteger, CheckConstraint, Index, SmallInteger, text
 from sqlmodel import Field
 
 from sm_images.models._base import Base
@@ -17,6 +17,9 @@ from sm_images.models.enums import LocationSource
 IMAGE_EXTERNAL_INDEX = "uq_images_image_external"
 IMAGE_GALLERY_INDEX = "ix_images_image_gallery"
 IMAGE_COORDS_CHECK = "coords_paired"
+IMAGE_EXTERNAL_CHECK = "external_sourced"
+"""An external id without a source would never dedupe (NULL is distinct in a
+unique index), so the pair is enforced together."""
 _HAS_EXTERNAL_ID = text("external_id IS NOT NULL")
 
 
@@ -24,6 +27,9 @@ class Image(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  #
     __tablename__ = "images_image"
     __table_args__ = (
         CheckConstraint("(lat IS NULL) = (lng IS NULL)", name=IMAGE_COORDS_CHECK),
+        CheckConstraint(
+            "external_id IS NULL OR external_source IS NOT NULL", name=IMAGE_EXTERNAL_CHECK
+        ),
         Index(
             IMAGE_EXTERNAL_INDEX,
             "collection_id",
@@ -46,12 +52,12 @@ class Image(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  #
     display_generation: int = Field(default=0, sa_column_kwargs={"nullable": False})
     """Fences display publication (``WHERE display_generation = :g - 1``)."""
     storage_hold_id: str | None = Field(default=None, max_length=64)
-    storage_bytes: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    storage_bytes: int = Field(default=0, sa_type=BigInteger, sa_column_kwargs={"nullable": False})
     """Sum of this image's objects, as held against the storage gauge."""
 
     filename: str = Field(max_length=255)
     content_type: str = Field(max_length=100)
-    size_bytes: int = Field(sa_column_kwargs={"nullable": False})
+    size_bytes: int = Field(sa_type=BigInteger, sa_column_kwargs={"nullable": False})
     width: int | None = Field(default=None)
     height: int | None = Field(default=None)
     sha256: str | None = Field(default=None, max_length=64, index=True)

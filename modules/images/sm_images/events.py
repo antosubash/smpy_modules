@@ -14,11 +14,11 @@ from typing import Any
 from simple_module_db.callbacks import register_on_commit
 from simple_module_db.listeners import current_tenant_id
 
-from sm_images.contracts.events import CollectionDeleted, CollectionVisibilityChanged
-from sm_images.models import Collection
+from sm_images.contracts.events import CollectionDeleted, CollectionVisibilityChanged, ImageAdded
+from sm_images.models import Collection, Image
 from sm_images.tenancy import bound_tenant, tenant_scope
 
-__all__ = ["deleted", "emit", "visibility_changed"]
+__all__ = ["deleted", "emit", "image_added", "visibility_changed"]
 
 
 async def _publish(bus: Any, event: Any, tenant: str | None) -> None:
@@ -49,4 +49,13 @@ def visibility_changed(collection: Collection, before: str) -> CollectionVisibil
 def deleted(collection: Collection) -> CollectionDeleted:
     return CollectionDeleted(
         tenant_id=bound_tenant(), collection_id=str(collection.id), slug=collection.slug
+    )
+
+
+def image_added(image: Image, source: str) -> ImageAdded:
+    return ImageAdded(
+        tenant_id=bound_tenant(),
+        collection_id=str(image.collection_id),
+        image_id=str(image.id),
+        source=source,
     )

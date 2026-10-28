@@ -29,6 +29,7 @@ from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
 )
 from tests.isolation_support import two_tenants  # noqa: F401 - the tenancy matrix's fixture
 from tests.pg_support import arm_reset, make_db_state
+from tests.upload_support import uploads  # noqa: F401 - the upload tests' client
 
 
 @pytest.fixture(autouse=True)

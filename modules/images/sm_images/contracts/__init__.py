@@ -7,7 +7,11 @@ map tables); ``register_step``/``register_preset`` arrive with the pipeline.
 
 from __future__ import annotations
 
-from sm_images.contracts.events import CollectionDeleted, CollectionVisibilityChanged
+from sm_images.contracts.events import (
+    CollectionDeleted,
+    CollectionVisibilityChanged,
+    ImageAdded,
+)
 from sm_images.contracts.reads import get_collection, list_collections, rendition_url
 from sm_images.contracts.schemas import CollectionPageRead, CollectionRead
 
@@ -16,6 +20,7 @@ __all__ = [
     "CollectionPageRead",
     "CollectionRead",
     "CollectionVisibilityChanged",
+    "ImageAdded",
     "get_collection",
     "list_collections",
     "rendition_url",

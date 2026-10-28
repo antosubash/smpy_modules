@@ -93,8 +93,8 @@ PUBLIC_PREFIXES: Final = (PUBLIC_COLLECTION_PREFIX, PUBLIC_API_PREFIX)
 # --- Request-body ceilings: the routes that take an upload. ---
 
 UPLOAD_ROUTE_PATTERNS: Final = (
-    # POST /collections/{id}/images (multipart batch), POST .../imports/zip (relay)
-    rf"^{ROUTE_PREFIX_API}/collections/[^/]+/(?:images|imports/zip)$",
+    # POST /collections/{id}/images (multipart batch), .../images/base64, .../imports/zip (relay)
+    rf"^{ROUTE_PREFIX_API}/collections/[^/]+/(?:images|images/base64|imports/zip)$",
     # POST /collections/{id}/imports with an inline base64 GeoJSON body
     rf"^{ROUTE_PREFIX_API}/collections/[^/]+/imports$",
 )
@@ -126,3 +126,60 @@ PUBLISH_REQUIRED_DETAIL: Final = "Publishing a collection needs the images.publi
 BAD_CURSOR_DETAIL: Final = "Invalid cursor"
 DIRECTORY_UNAVAILABLE_CODE: Final = "user_directory_unavailable"
 DIRECTORY_UNAVAILABLE_DETAIL: Final = "No user directory is installed on this host"
+
+# --- Upload and ingest ---
+
+SOURCE_UPLOAD: Final = "upload"
+"""The ``source`` every client upload path (multipart, base64, direct) passes
+to ``IngestService.add_image``, and so the default ``external_source``: the
+three share one dedupe namespace."""
+DEFAULT_FILENAME: Final = "upload"
+FILENAME_MAX: Final = 255
+EXTERNAL_SOURCE_MAX: Final = 100
+EXTERNAL_ID_MAX: Final = 255
+GROUP_KEY_MAX: Final = 200
+GROUP_ROLE_MAX: Final = 50
+PROPERTIES_MAX_BYTES: Final = 16 * 1024
+"""Largest ``properties`` object one image's metadata may carry, as compact JSON."""
+METADATA_MAX_BYTES: Final = 1024 * 1024
+"""Largest ``metadata`` form field of a multipart batch."""
+READ_CHUNK_BYTES: Final = 1024 * 1024
+
+DIRECT_PART_BYTES: Final = 8 * 1024 * 1024
+"""Part size of a direct upload; above S3's 5 MiB floor for every part but the last."""
+DIRECT_UPLOAD_TTL_SECONDS: Final = 24 * 3600
+"""How long a direct-upload token (and so the upload) stays usable."""
+DIRECT_PRESIGN_TTL_SECONDS: Final = 3600
+DIRECT_TOKEN_SALT: Final = "sm_images.direct-upload.v1"
+DIRECT_TOKEN_MAX: Final = 2048
+UPLOADS_PATH: Final = "/uploads"
+PART_PATH: Final = f"{ROUTE_PREFIX_API}{UPLOADS_PATH}/{{upload_id}}/parts/{{part_no}}"
+"""Where a backend that cannot presign (filesystem) has the client PUT each part."""
+
+# Error codes: the ``code`` of an ``ImagesError`` body. The console maps each to
+# ``images.errors.<code>`` in its catalogues (pagebuilder #221's pattern).
+CODE_UNSUPPORTED_TYPE: Final = "unsupported_type"
+CODE_TOO_MANY_PIXELS: Final = "image_too_many_pixels"
+CODE_FILE_TOO_LARGE: Final = "file_too_large"
+CODE_USE_DIRECT_UPLOAD: Final = "use_direct_upload"
+CODE_BATCH_TOO_LARGE: Final = "batch_too_large"
+CODE_INVALID_METADATA: Final = "invalid_metadata"
+CODE_INVALID_BASE64: Final = "invalid_base64"
+CODE_UPLOAD_NOT_FOUND: Final = "upload_not_found"
+CODE_PARTS_MISMATCH: Final = "parts_mismatch"
+CODE_DIRECT_UNSUPPORTED: Final = "direct_upload_unsupported"
+CODE_UPLOAD_FAILED: Final = "upload_failed"
+ERROR_CODES: Final = (
+    CODE_UNSUPPORTED_TYPE,
+    CODE_TOO_MANY_PIXELS,
+    CODE_FILE_TOO_LARGE,
+    CODE_USE_DIRECT_UPLOAD,
+    CODE_BATCH_TOO_LARGE,
+    CODE_INVALID_METADATA,
+    CODE_INVALID_BASE64,
+    CODE_UPLOAD_NOT_FOUND,
+    CODE_PARTS_MISMATCH,
+    CODE_DIRECT_UNSUPPORTED,
+    CODE_UPLOAD_FAILED,
+)
+"""Every code an upload can answer with; each has a translated sentence."""

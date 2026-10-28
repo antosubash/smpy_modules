@@ -45,6 +45,62 @@ class ServiceUnavailable(ImagesError):  # noqa: N818 - HTTP vocabulary, delibera
     status_code = 503
 
 
+class UnsupportedType(ImagesError):  # noqa: N818 - HTTP vocabulary, deliberately
+    """The bytes are not an image type images accepts (sniffed, never the name)."""
+
+    status_code = 415
+    code = constants.CODE_UNSUPPORTED_TYPE
+
+
+class ImageTooLarge(ImagesError):  # noqa: N818 - HTTP vocabulary, deliberately
+    """More pixels than Pillow's ``Image.MAX_IMAGE_PIXELS``: a decompression-bomb
+    candidate, refused before anything is stored (pagebuilder #221)."""
+
+    status_code = 413
+    code = constants.CODE_TOO_MANY_PIXELS
+
+
+class FileTooLarge(ImagesError):  # noqa: N818 - HTTP vocabulary, deliberately
+    status_code = 413
+    code = constants.CODE_FILE_TOO_LARGE
+
+
+class UseDirectUpload(ImagesError):  # noqa: N818 - HTTP vocabulary, deliberately
+    """A file over ``direct_upload_threshold`` sent in a request body."""
+
+    status_code = 413
+    code = constants.CODE_USE_DIRECT_UPLOAD
+
+
+class InvalidUpload(ImagesError):  # noqa: N818 - HTTP vocabulary, deliberately
+    """A 422 with a code: bad metadata, bad base64, too many files."""
+
+    status_code = 422
+
+    def __init__(self, detail: str, code: str) -> None:
+        super().__init__(detail)
+        self.code = code
+
+
+class UploadFailed(ImagesError):  # noqa: N818 - HTTP vocabulary, deliberately
+    """A file of a batch failed for a reason that is not the client's."""
+
+    status_code = 500
+    code = constants.CODE_UPLOAD_FAILED
+
+
+class UploadNotFound(NotFound):
+    code = constants.CODE_UPLOAD_NOT_FOUND
+
+
+class PartsMismatch(Conflict):
+    code = constants.CODE_PARTS_MISMATCH
+
+
+class DirectUploadUnsupported(ServiceUnavailable):
+    code = constants.CODE_DIRECT_UNSUPPORTED
+
+
 class TenantRequired(Forbidden):
     """A multi-tenant host, and a signed-in request the framework resolved no
     tenant for (no active organisation). Refused rather than guessed; the same

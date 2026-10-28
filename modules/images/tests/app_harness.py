@@ -78,7 +78,13 @@ async def build_app(
 
     registry = PermissionRegistry()
     module.register_permissions(registry)
-    app.state.sm = SimpleNamespace(db=db_state, permissions=registry, event_bus=EventBus())
+    # ``settings.secret_key``: what a host holds, and what direct-upload tokens are signed with.
+    app.state.sm = SimpleNamespace(
+        db=db_state,
+        permissions=registry,
+        event_bus=EventBus(),
+        settings=SimpleNamespace(secret_key="images-test-secret"),
+    )
 
     templates_dir = tmp_path / "templates"
     templates_dir.mkdir()

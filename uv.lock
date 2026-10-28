@@ -3088,6 +3088,7 @@ source = { editable = "modules/images" }
 dependencies = [
     { name = "httpx" },
     { name = "ijson" },
+    { name = "itsdangerous" },
     { name = "pillow" },
     { name = "pillow-heif" },
     { name = "pydantic-settings" },
@@ -3131,6 +3132,7 @@ quality = [
 requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "ijson", specifier = ">=3.2" },
+    { name = "itsdangerous", specifier = ">=2.0,<3" },
     { name = "opencv-python-headless", marker = "extra == 'quality'", specifier = ">=4.9" },
     { name = "pillow", specifier = ">=10.0" },
     { name = "pillow-heif", specifier = ">=0.18" },

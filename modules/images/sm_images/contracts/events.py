@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from simple_module_core.events import Event
 
-__all__ = ["CollectionDeleted", "CollectionVisibilityChanged"]
+__all__ = ["CollectionDeleted", "CollectionVisibilityChanged", "ImageAdded"]
 
 
 @dataclass
@@ -32,3 +32,14 @@ class CollectionDeleted(Event):
     tenant_id: str
     collection_id: str
     slug: str
+
+
+@dataclass
+class ImageAdded(Event):
+    """An image row was committed (any ingest path). ``source`` names the path:
+    ``upload`` for the client uploads, the import kind otherwise."""
+
+    tenant_id: str
+    collection_id: str
+    image_id: str
+    source: str
