@@ -24,31 +24,34 @@ is recorded**:
 
 Duplicate names are allowed: each entry is its own item (:class:`Entry`), in
 archive order. Folders, ``__MACOSX/`` and dot-files are not entries; the root
-``metadata.json`` is read (bounded) into :attr:`Plan.metadata` and is not an
-entry either.
+``metadata.json`` is read into :attr:`Plan.metadata` (``zip_metadata``) and
+is not an entry either - but its bytes count against the same entry, total
+and ratio caps, under its own size cap too, and a second one refuses the
+archive (``metadata_duplicate``). The end records are read by ``zip_eocd``.
 """
 
 from __future__ import annotations
 
 import copy
 import itertools
-import json
 import re
 import stat
-import struct
 import zipfile
 import zlib
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import Any, BinaryIO, Final
+from typing import Any, Final
+
+from sm_images.imports.zip_eocd import ZipRejected, directory_bounds
+from sm_images.imports.zip_metadata import parse_json
 
 __all__ = [
     "METADATA_MAX_BYTES",
+    "READ_CHUNK_BYTES",
     "Entry",
     "Limits",
     "Plan",
     "ZipRejected",
-    "central_directory_bounds",
     "inspect",
     "is_unsafe_name",
     "read_entry",
@@ -59,7 +62,8 @@ METADATA_MAX_BYTES: Final = 16 * 1024 * 1024
 RATIO_MIN_BYTES: Final = 1024 * 1024
 """The ratio is judged only past this many bytes (tiny files compress oddly)."""
 CD_BYTES_PER_ENTRY: Final = 1024
-CHUNK: Final = 1024 * 1024
+READ_CHUNK_BYTES: Final = 1024 * 1024
+"""Decompressed bytes read from an entry at a time."""
 _UNBOUNDED: Final = 1 << 62
 _ALLOWED_COMPRESSION: Final = frozenset({zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED})
 _ARCHIVE_SUFFIXES: Final = frozenset(
@@ -76,15 +80,6 @@ _ARCHIVE_MAGIC: Final = (
 )
 _DRIVE: Final = re.compile(r"^[A-Za-z]:")
 _LOCAL_HEADER: Final = 30
-_EOCD: Final = (b"PK\x05\x06", 22)
-_ZIP64_LOCATOR: Final = (b"PK\x06\x07", 20)
-_ZIP64_EOCD: Final = (b"PK\x06\x06", 56)
-
-
-class ZipRejected(Exception):  # noqa: N818 - a verdict, carried by its code
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
 
 
 @dataclass(frozen=True)
@@ -125,34 +120,6 @@ def is_unsafe_name(name: str) -> bool:
     return ".." in PurePosixPath(normalized).parts
 
 
-def _read_at(handle: BinaryIO, offset: int, size: int) -> bytes:
-    handle.seek(offset)
-    return handle.read(size)
-
-
-def central_directory_bounds(path: Path) -> tuple[int, int]:
-    """``(entry count, central directory bytes)`` from the end records alone."""
-    file_size = path.stat().st_size
-    tail_size = min(file_size, _EOCD[1] + 0xFFFF)
-    with path.open("rb") as handle:
-        tail = _read_at(handle, file_size - tail_size, tail_size)
-        at = tail.rfind(_EOCD[0])
-        if at < 0 or len(tail) - at < _EOCD[1]:
-            raise ZipRejected("invalid_zip")
-        _, _, _, _, entries, cd_size, _, _ = struct.unpack("<4s4H2LH", tail[at : at + _EOCD[1]])
-        if entries != 0xFFFF and cd_size != 0xFFFFFFFF:
-            return int(entries), int(cd_size)
-        locator_at = file_size - tail_size + at - _ZIP64_LOCATOR[1]
-        locator = _read_at(handle, max(locator_at, 0), _ZIP64_LOCATOR[1])
-        if locator_at < 0 or not locator.startswith(_ZIP64_LOCATOR[0]):
-            raise ZipRejected("invalid_zip")
-        record = _read_at(handle, struct.unpack("<4sLQL", locator)[2], _ZIP64_EOCD[1])
-        if len(record) < _ZIP64_EOCD[1] or not record.startswith(_ZIP64_EOCD[0]):
-            raise ZipRejected("invalid_zip")
-        entries64, cd_size64 = struct.unpack("<QQ", record[32:48])
-        return int(entries64), int(cd_size64)
-
-
 def _end(info: zipfile.ZipInfo) -> int:
     """A lower bound of where the entry's data ends (no extra field counted)."""
     return info.header_offset + _LOCAL_HEADER + len(info.orig_filename) + info.compress_size
@@ -191,11 +158,13 @@ def _chunks(zf: zipfile.ZipFile, info: zipfile.ZipInfo):
     wide = copy.copy(info)
     wide.file_size = _UNBOUNDED
     with zf.open(wide) as source:
-        while chunk := source.read(CHUNK):
+        while chunk := source.read(READ_CHUNK_BYTES):
             yield chunk
 
 
-def _measure(zf: zipfile.ZipFile, info: zipfile.ZipInfo, limits: Limits, budget: int) -> int:
+def _counted(zf: zipfile.ZipFile, info: zipfile.ZipInfo, limits: Limits, budget: int):
+    """The entry's real bytes, refused as soon as they pass a cap: the entry's
+    own, what is left of the archive's (``budget``), or the ratio."""
     seen = 0
     for chunk in _chunks(zf, info):
         if seen == 0 and chunk.startswith(_ARCHIVE_MAGIC):
@@ -207,7 +176,11 @@ def _measure(zf: zipfile.ZipFile, info: zipfile.ZipInfo, limits: Limits, budget:
             raise ZipRejected("uncompressed_too_large")
         if seen >= RATIO_MIN_BYTES and seen / max(info.compress_size, 1) > limits.max_ratio:
             raise ZipRejected("suspicious_ratio")
-    return seen
+        yield chunk
+
+
+def _measure(zf: zipfile.ZipFile, info: zipfile.ZipInfo, limits: Limits, budget: int) -> int:
+    return sum(len(chunk) for chunk in _counted(zf, info, limits, budget))
 
 
 def _junk(name: str) -> bool:
@@ -215,19 +188,15 @@ def _junk(name: str) -> bool:
     return path.parts[0] == "__MACOSX" or path.name.startswith(".")
 
 
-def _metadata(zf: zipfile.ZipFile, info: zipfile.ZipInfo) -> Any:
-    raw = b""
-    for chunk in _chunks(zf, info):
+def _metadata(zf: zipfile.ZipFile, info: zipfile.ZipInfo, limits: Limits, budget: int):
+    """``(document, bytes)``: counted against the archive's budgets like any
+    entry, and under its own size cap."""
+    raw = bytearray()
+    for chunk in _counted(zf, info, limits, budget):
         raw += chunk
         if len(raw) > METADATA_MAX_BYTES:
             raise ZipRejected("metadata_too_large")
-    try:
-        doc = json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ZipRejected("metadata_invalid") from exc
-    if not isinstance(doc, dict):
-        raise ZipRejected("metadata_invalid")
-    return doc
+    return parse_json(bytes(raw)), len(raw)
 
 
 def _plan(zf: zipfile.ZipFile, limits: Limits) -> Plan:
@@ -235,12 +204,17 @@ def _plan(zf: zipfile.ZipFile, limits: Limits) -> Plan:
     _check_directory(infos, getattr(zf, "start_dir", None), limits)
     plan = Plan(metadata={})
     budget = limits.max_total_bytes
+    seen_metadata = False
     for position, info in enumerate(infos):
         if info.is_dir():
             continue
         name = info.filename.replace("\\", "/")
         if name == METADATA_NAME:
-            plan.metadata = _metadata(zf, info)
+            if seen_metadata:
+                raise ZipRejected("metadata_duplicate")
+            seen_metadata = True
+            plan.metadata, used = _metadata(zf, info, limits, budget)
+            budget -= used
             continue
         budget -= _measure(zf, info, limits, budget)
         if not _junk(name):
@@ -252,7 +226,7 @@ def _plan(zf: zipfile.ZipFile, limits: Limits) -> Plan:
 def inspect(path: Path, limits: Limits) -> Plan:
     """Refuse the archive (:class:`ZipRejected`) or describe its entries.
     Synchronous and CPU-bound: run it off the event loop."""
-    entries, cd_size = central_directory_bounds(path)
+    entries, cd_size = directory_bounds(path)
     if entries > limits.max_entries or cd_size > limits.max_entries * CD_BYTES_PER_ENTRY:
         raise ZipRejected("too_many_entries")
     try:

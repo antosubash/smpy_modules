@@ -35,7 +35,7 @@ from sqlalchemy import select
 from sm_images import constants
 from sm_images.access import POLICY, CollectionEdit
 from sm_images.deps import require_view
-from sm_images.endpoints.api.uploads import _secret
+from sm_images.endpoints.api.uploads import host_secret
 from sm_images.errors import ServiceUnavailable, UploadNotFound
 from sm_images.imports import controls, zip_upload
 from sm_images.imports.service import start_import
@@ -126,7 +126,7 @@ async def create_zip_import(
         size=body.size,
         mapping=body.mapping,
         owner=who.user_id,
-        secret=_secret(request),
+        secret=host_secret(request),
         auto_run_prompts=body.auto_run_prompts,
     )
     upload = DirectCreated(

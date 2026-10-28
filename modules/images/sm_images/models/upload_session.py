@@ -17,6 +17,7 @@ from simple_module_db.types import AwareDateTime
 from sqlalchemy import BigInteger, Column, Index, Uuid
 from sqlmodel import Field
 
+from sm_images import constants
 from sm_images.models._base import Base
 from sm_images.models._cols import enum_col, fk_uuid, pk_uuid
 from sm_images.models.enums import UploadStatus
@@ -36,6 +37,11 @@ class UploadSession(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: igno
     storage_key: str = Field(max_length=500)
     backend_upload_id: str = Field(max_length=500)
     size: int = Field(sa_type=BigInteger, sa_column_kwargs={"nullable": False})
+    part_size: int = Field(
+        default=constants.DIRECT_PART_BYTES, sa_column_kwargs={"nullable": False}
+    )
+    """The part size the upload was opened with: every later call (a ZIP's seal)
+    splits the upload the same way, whatever the constant is by then."""
     content_type: str = Field(max_length=100)
     status: UploadStatus = enum_col(UploadStatus, "upload_status", UploadStatus.OPEN)
     expires_at: datetime = Field(sa_type=AwareDateTime(), sa_column_kwargs={"nullable": False})

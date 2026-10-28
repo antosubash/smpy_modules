@@ -68,6 +68,8 @@ class Parsed:
     payload: str | None = None
     """Base64 mode: the encoded image, held only while its chunk is processed."""
     external_id: str | None = None
+    external_source: str | None = None
+    """The id's namespace; ``None`` is ingest's ``import`` (ZIP metadata may name another)."""
     filename: str | None = None
     lat: float | None = None
     lng: float | None = None

@@ -9,6 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from sm_images import constants
 from sm_images.models import ImportJob
 from sm_images.schemas.image import DirectCreated, Filename, PartIn
 
@@ -59,7 +60,7 @@ class ZipCreated(BaseModel):
 class ZipExtract(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    parts: list[PartIn] = Field(default_factory=list, max_length=10_000)
+    parts: list[PartIn] = Field(default_factory=list, max_length=constants.DIRECT_MAX_PARTS)
     """The etags the client got back, checked against what storage holds (optional)."""
 
 

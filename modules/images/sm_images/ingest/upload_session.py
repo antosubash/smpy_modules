@@ -82,6 +82,7 @@ def new_session(ticket: Any, collection_id: uuid.UUID) -> UploadSession:
         storage_key=ticket.key,
         backend_upload_id=ticket.upload,
         size=ticket.size,
+        part_size=ticket.part_size,
         content_type=ticket.content_type,
         status=UploadStatus.OPEN,
         expires_at=_now() + timedelta(seconds=constants.DIRECT_UPLOAD_TTL_SECONDS),

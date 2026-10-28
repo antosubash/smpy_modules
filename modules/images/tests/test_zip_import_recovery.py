@@ -33,7 +33,7 @@ async def _set(imp, model, row_id, **values) -> None:
 async def test_zip_resume_after_kill_no_duplicates(imp, monkeypatch):
     """Killed after three ingests (the second chunk recorded): the replay skips
     what has an image and finds the rest by index - no duplicate, exact counts."""
-    monkeypatch.setattr(zip_import, "CHUNK", 2)
+    monkeypatch.setattr(zip_import, "ENTRY_BATCH", 2)
     job, generation = await sealed_zip(imp, _five())
     kill_after(monkeypatch, settle, "ingest_item", 3)
     with pytest.raises(Killed):
@@ -43,7 +43,7 @@ async def test_zip_resume_after_kill_no_duplicates(imp, monkeypatch):
     assert (status, total, checkpoint, done) == ("running", 5, 4, 3)
 
     monkeypatch.undo()
-    monkeypatch.setattr(zip_import, "CHUNK", 2)
+    monkeypatch.setattr(zip_import, "ENTRY_BATCH", 2)
     calls = kill_after(monkeypatch, settle, "ingest_item", 100)
     claimed = await jobs.claim_stale(imp.runtime, DEFAULT_TENANT, job.id)
     assert await run_zip(imp, job, generation) == "stale"  # the old generation writes nothing

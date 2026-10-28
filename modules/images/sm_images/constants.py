@@ -167,6 +167,8 @@ DIRECT_PART_BYTES: Final = 8 * 1024 * 1024
 DIRECT_UPLOAD_TTL_SECONDS: Final = 24 * 3600
 """How long a direct-upload token (and so the upload) stays usable."""
 DIRECT_PRESIGN_TTL_SECONDS: Final = 3600
+DIRECT_MAX_PARTS: Final = 10_000
+"""Most parts one direct upload may list (S3's own limit)."""
 DIRECT_TOKEN_SALT: Final = "sm_images.direct-upload.v1"
 DIRECT_TOKEN_MAX: Final = 2048
 UPLOADS_PATH: Final = "/uploads"

@@ -47,38 +47,41 @@ def _insert(db: Any) -> Any:
     return pg_insert if db.get_bind().dialect.name == "postgresql" else sqlite_insert
 
 
-async def _seen_in_job(db: Any, tenant: str, job_id: uuid.UUID, ids: list[str]) -> dict[str, int]:
-    """External id -> the first feature index that recorded it in this job."""
+async def _seen_in_job(
+    db: Any, tenant: str, job_id: uuid.UUID, ids: list[str]
+) -> dict[tuple[str, str], int]:
+    """``(source, external id)`` -> the first feature index that recorded it in this job."""
     if not ids:
         return {}
+    source = func.coalesce(ImportItem.external_source, constants.SOURCE_IMPORT)
     stmt = (
-        select(ImportItem.external_id, func.min(ImportItem.feature_index))
+        select(source, ImportItem.external_id, func.min(ImportItem.feature_index))
         .where(
             ImportItem.job_id == job_id,
             ImportItem.tenant_id == tenant,
             ImportItem.external_id.in_(ids),
         )
-        .group_by(ImportItem.external_id)
+        .group_by(source, ImportItem.external_id)
     )
-    return dict((await db.execute(stmt)).tuples().all())
+    return {(src, ext): int(i) for src, ext, i in (await db.execute(stmt)).all()}
 
 
 async def _existing_images(
     db: Any, tenant: str, collection_id: uuid.UUID, ids: list[str]
-) -> dict[str, uuid.UUID]:
+) -> dict[tuple[str, str], uuid.UUID]:
+    """``(source, external id)`` -> the collection's image (trashed ones too)."""
     if not ids:
         return {}
     stmt = (
-        select(Image.external_id, Image.id)
+        select(Image.external_source, Image.external_id, Image.id)
         .where(
             Image.collection_id == collection_id,
             Image.tenant_id == tenant,
-            Image.external_source == constants.SOURCE_IMPORT,
             Image.external_id.in_(ids),
         )
         .execution_options(include_deleted=True)
     )
-    return dict((await db.execute(stmt)).tuples().all())
+    return {(src, ext): i for src, ext, i in (await db.execute(stmt)).all()}
 
 
 def _row(tenant: str, job_id: uuid.UUID, p: Parsed, status: ItemStatus, image_id) -> dict:
@@ -91,6 +94,7 @@ def _row(tenant: str, job_id: uuid.UUID, p: Parsed, status: ItemStatus, image_id
         "feature_index": p.index,
         "url": p.url,
         "external_id": p.external_id,
+        "external_source": p.external_source,
         "status": status,
         "attempts": 0,
         "last_error": p.error,
@@ -112,14 +116,15 @@ async def _classify(db: Any, tenant: str, job: JobSnap, parsed: Sequence[Parsed]
     rows = []
     for p in parsed:
         status, image_id = ItemStatus.PENDING, None
+        ident = (p.external_source or constants.SOURCE_IMPORT, p.external_id)
         if p.error is not None:
             status = ItemStatus.FAILED
-        elif p.external_id in known:
-            status, image_id = ItemStatus.DUPLICATE, known[p.external_id]
-        elif seen.get(p.external_id, p.index) < p.index:
+        elif ident in known:
+            status, image_id = ItemStatus.DUPLICATE, known[ident]
+        elif seen.get(ident, p.index) < p.index:
             status = ItemStatus.DUPLICATE
         else:
-            seen[p.external_id] = min(seen.get(p.external_id, p.index), p.index)
+            seen[ident] = min(seen.get(ident, p.index), p.index)
         rows.append(_row(tenant, job.id, p, status, image_id))
     return rows
 

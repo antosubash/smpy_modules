@@ -6,7 +6,9 @@ each value the image's metadata. The portal's spelling (``latitude``,
 ``properties``) are both accepted; unknown keys are ignored; a value out of
 range or the wrong shape fails the whole job (``metadata_invalid``), as there.
 An entry finds its record by its full path in the archive first, then by its
-basename (the portal's key).
+basename (the portal's key). Its ``external_source`` names the id's namespace
+(the portal's dedupe key was the pair); without one it is ``import``.
+Coordinates from it are a person's, so they are stored as ``manual``.
 
 **Each entry is one item**, at ``feature_index`` = its place among the entries,
 so a resumed run records the same rows and dedupes as a GeoJSON import does.
@@ -40,7 +42,8 @@ from sm_images.imports.features import Parsed, base64_external_id
 from sm_images.imports.filename_pattern import canonical_role, group_key, match_group
 from sm_images.imports.mapping import Mapping, MappingError
 from sm_images.imports.values import parse_datetime
-from sm_images.imports.zip_safety import Entry, ZipRejected
+from sm_images.imports.zip_eocd import ZipRejected
+from sm_images.imports.zip_safety import Entry
 
 __all__ = ["ZipMeta", "entry_item", "parse_metadata", "zip_mapping"]
 
@@ -58,6 +61,7 @@ class ZipMeta(BaseModel):
     )
     captured_at: Any = None
     external_id: Annotated[Text, Field(max_length=constants.EXTERNAL_ID_MAX)] | None = None
+    external_source: Annotated[Text, Field(max_length=constants.EXTERNAL_SOURCE_MAX)] | None = None
     group_key: Any = None
     group_role: Any = None
     properties: dict[str, Any] | None = Field(
@@ -112,6 +116,7 @@ def entry_item(
     parsed = Parsed(
         entry.index,
         external_id=meta.external_id or base64_external_id(job_id, entry.index),
+        external_source=meta.external_source if meta.external_id else None,
         filename=entry.filename[: constants.FILENAME_MAX],
         captured_at=parse_datetime(meta.captured_at),
         properties=meta.properties or None,

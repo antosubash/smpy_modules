@@ -7,7 +7,7 @@ which picks the runner for a job's kind).
    sealed size and fingerprint must still hold - and **inspect**
    (``zip_safety``) off the event loop, both under a background heartbeat. A
    refusal fails the job with its code before any item exists.
-3. **Record and settle** in chunks of :data:`CHUNK` entries, from the resume
+3. **Record and settle** in chunks of :data:`ENTRY_BATCH` entries, from the resume
    index (the first item still waiting for an image): each chunk's items are
    recorded and checkpointed in one transaction (``chunk.record_chunk``),
    then each pending one is read (at most ``max_image_bytes``) and settled
@@ -42,14 +42,14 @@ from sm_images.imports.runner import import_geojson_async
 from sm_images.imports.zip_entries import entry_item, parse_metadata
 from sm_images.imports.zip_safety import Entry, Limits, ZipRejected, inspect, read_entry
 from sm_images.models import Collection, ImportJob
-from sm_images.models.enums import ImportKind, JobStatus
+from sm_images.models.enums import ImportKind, JobStatus, LocationSource
 from sm_images.pipeline.runtime import Runtime, bind_runtime
 
-__all__ = ["CHUNK", "import_zip_async", "launch_sealed", "run_import"]
+__all__ = ["ENTRY_BATCH", "import_zip_async", "launch_sealed", "run_import"]
 
 logger = logging.getLogger(__name__)
 
-CHUNK: Final = 500
+ENTRY_BATCH: Final = 500
 """Entries recorded per transaction (each then settled on its own)."""
 
 
@@ -102,6 +102,23 @@ async def _record_total(runtime: Runtime, tenant: str, job: jobs.JobSnap, total:
         raise chunk.Stopped()
 
 
+def _untrusted(parse: Any, *args: Any) -> Any:
+    """Parse archive content; any failure but a refusal is still the archive's
+    fault, so it fails the job (``invalid_archive``) rather than leave it
+    running for reconcile to retry forever. Local I/O errors stay transient."""
+    try:
+        return parse(*args)
+    except (ZipRejected, OSError):
+        raise
+    except Exception as exc:
+        logger.warning("images.import.zip_unparseable", exc_info=True)
+        raise ZipRejected("invalid_archive") from exc
+
+
+def _inspect(path: Path, limits: Limits) -> Any:
+    return _untrusted(inspect, path, limits)
+
+
 def _read(zf: zipfile.ZipFile, info: zipfile.ZipInfo, cap: int) -> bytes | str | None:
     try:
         return read_entry(zf, info, cap)
@@ -140,7 +157,7 @@ async def _settle_chunk(
                 item_id,
                 data,
                 filename=p.filename,
-                meta=settle.item_meta(p),
+                meta=settle.item_meta(p, located_by=LocationSource.MANUAL),
             )
         if outcome is None and not await jobs.heartbeat(runtime, tenant, job.id, job.generation):
             raise chunk.Stopped()  # paused, restarted, reclaimed or deleted meanwhile
@@ -158,17 +175,17 @@ async def _import(
         await zip_source.fetch_verified(
             runtime.store(), job.source_key, fingerprint=fingerprint, size=size, dest=path
         )
-        plan = await asyncio.to_thread(inspect, path, limits)
+        plan = await asyncio.to_thread(_inspect, path, limits)
     if beat.lost:
         raise chunk.Stopped()
-    metadata = parse_metadata(plan.metadata)
+    metadata = _untrusted(parse_metadata, plan.metadata)
     await _record_total(runtime, tenant, job, len(plan.entries))
     start = await lookup.resume_index(runtime, tenant, job)
     mapping = Mapping.model_validate(job.mapping)
     roles = list(coll.group_roles or [])
     with zipfile.ZipFile(path) as zf:
-        for lo in range(start, len(plan.entries), CHUNK):
-            batch = plan.entries[lo : lo + CHUNK]
+        for lo in range(start, len(plan.entries), ENTRY_BATCH):
+            batch = plan.entries[lo : lo + ENTRY_BATCH]
             parsed = [entry_item(e, metadata, mapping, job.id, roles) for e in batch]
             await chunk.record_chunk(runtime, tenant, job, parsed)
             await _settle_chunk(runtime, tenant, job, coll, zf, plan.entries, parsed)

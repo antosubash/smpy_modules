@@ -1,6 +1,8 @@
 """Removing an import: :func:`delete_job`, and the janitor's staging sweep.
 
-**Delete** first fences the job (a new generation, ``cancelled``), so a runner
+**Delete** of a ZIP job still uploading first aborts its upload session (a
+seal that holds it makes the delete a 409). Then delete fences the job (a new
+generation, ``cancelled``), so a runner
 or download still in flight stops at its next write or finds nothing. Its
 staged keys get write-ahead intents *before* the row goes - once the row is
 gone nothing else names those objects, and an intent is what lets the
@@ -39,7 +41,11 @@ SWEEP_CAP: Final = 200
 
 
 async def delete_job(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> None:
-    await get(runtime, tenant, job_id)
+    row = await get(runtime, tenant, job_id)
+    if row.status is JobStatus.UPLOADING:
+        from sm_images.imports.zip_upload import abort_upload
+
+        await abort_upload(runtime, tenant, row)  # a seal holding it: 409, nothing deleted
     async with runtime.session_factory() as db:
         await db.execute(
             update(ImportJob)

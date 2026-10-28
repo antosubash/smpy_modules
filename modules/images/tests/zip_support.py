@@ -76,6 +76,49 @@ def overlapping(name: bytes = b"a.jpg", other: bytes = b"b.jpg", body: bytes = b
     return single[:cd_offset] + central + eocd
 
 
+def zip64_disguised(data: bytes, legacy_entries: int) -> bytes:
+    """``data`` with a ZIP64 end record (the true count) before a legacy one
+    that claims ``legacy_entries`` - the record ``zipfile`` itself believes."""
+    at = data.rfind(b"PK\x05\x06")
+    _, _, _, _, n, cd_size, cd_offset, _ = struct.unpack("<4s4H2LH", data[at : at + 22])
+    record = struct.pack("<4sQ2H2L4Q", b"PK\x06\x06", 44, 45, 45, 0, 0, n, n, cd_size, cd_offset)
+    locator = struct.pack("<4sLQL", b"PK\x06\x07", 0, at, 1)
+    legacy = struct.pack(
+        "<4s4H2LH", b"PK\x05\x06", 0, 0, legacy_entries, legacy_entries, cd_size, cd_offset, 0
+    )
+    return data[:at] + record + locator + legacy
+
+
+class EtagStore:
+    """A store whose ``head`` has an etag (S3-like), over a real one.
+    ``on_stream`` runs once the download has started (a replacement mid-read)."""
+
+    def __init__(self, inner, on_stream=None) -> None:
+        self.inner, self.backend, self.on_stream = inner, inner.backend, on_stream
+
+    async def head(self, key):
+        import hashlib
+
+        found = await self.inner.head(key)
+        if found is None:
+            return None
+        return found[0], '"' + hashlib.md5(await self.inner.read(key)).hexdigest() + '"'
+
+    async def stream(self, key):
+        source = await self.inner.stream(key)
+
+        async def gen():
+            async for chunk in source:
+                yield chunk
+            if self.on_stream is not None:
+                await self.on_stream()
+
+        return gen()
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+
 # --- A ZIP job through the real upload and seal, against ``imp``'s store. ---
 
 SECRET = "zip-test-secret"

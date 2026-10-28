@@ -47,16 +47,21 @@ __all__ = ["fail_item", "ingest_chunk", "ingest_item", "item_meta", "mark_item",
 logger = logging.getLogger(__name__)
 
 
-def item_meta(item: ImportItem | Parsed) -> IngestMeta:
+def item_meta(
+    item: ImportItem | Parsed, *, located_by: LocationSource = LocationSource.IMPORT_
+) -> IngestMeta:
+    """``located_by``: where the item's coordinates came from - a feed's
+    properties (``import``), or a person's ``metadata.json`` (``manual``)."""
     return IngestMeta(
         lat=item.lat,
         lng=item.lng,
         captured_at=item.captured_at,
+        external_source=item.external_source,
         external_id=item.external_id,
         group_key=item.group_key,
         group_role=item.group_role,
         properties=item.properties,
-        location_source=LocationSource.IMPORT_,
+        location_source=located_by,
     )
 
 

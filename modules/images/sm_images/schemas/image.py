@@ -147,7 +147,7 @@ class PartOut(BaseModel):
 class DirectComplete(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    parts: list[PartIn] = Field(default_factory=list, max_length=10_000)
+    parts: list[PartIn] = Field(default_factory=list, max_length=constants.DIRECT_MAX_PARTS)
     filename: Filename | None = None
     metadata: UploadMeta | None = None
 

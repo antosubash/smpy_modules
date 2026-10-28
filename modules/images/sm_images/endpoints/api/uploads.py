@@ -42,14 +42,15 @@ Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
 UploadId = Annotated[str, Path(max_length=constants.DIRECT_TOKEN_MAX)]
 
 
-def _secret(request: Request) -> str:
+def host_secret(request: Request) -> str:
+    """The host's ``secret_key``, which signs direct-upload tickets."""
     settings = getattr(getattr(request.app.state, "sm", None), "settings", None)
     return getattr(settings, "secret_key", "") or ""
 
 
 async def upload_ticket(upload_id: UploadId, request: Request, who: Principal) -> direct.Ticket:
     """The caller's own, unexpired ticket in the bound tenant, or 404."""
-    return direct.load_ticket(upload_id, secret=_secret(request), owner=who.user_id)
+    return direct.load_ticket(upload_id, secret=host_secret(request), owner=who.user_id)
 
 
 Ticket = Annotated[direct.Ticket, Depends(upload_ticket)]
@@ -80,7 +81,7 @@ async def start_upload(
         content_type=body.content_type,
         max_bytes=ingest.settings.max_image_bytes,
         owner=who.user_id,
-        secret=_secret(request),
+        secret=host_secret(request),
     )
     return DirectCreated(
         upload_id=token,

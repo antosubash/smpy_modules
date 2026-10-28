@@ -98,6 +98,8 @@ async def start(
     declared type, which ``complete`` then holds the bytes to."""
     if size > max_bytes:
         raise FileTooLarge(_TOO_LARGE)
+    # Refuse in the order a client can act on: no direct uploads here (503),
+    # no secret to sign with (503), then the declared type (415).
     backend_of(store)
     serializer(secret)
     declared = declared_type(filename, content_type)

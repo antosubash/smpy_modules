@@ -343,6 +343,7 @@ def upgrade() -> None:
         sa.Column("feature_index", sa.Integer(), nullable=False),
         sa.Column("url", sa.String(length=2000), nullable=True),
         sa.Column("external_id", sa.String(length=255), nullable=True),
+        sa.Column("external_source", sa.String(length=100), nullable=True),
         sa.Column(
             "status",
             sa.Enum("PENDING", "DONE", "DUPLICATE", "FAILED", name="images_item_status"),
@@ -575,6 +576,7 @@ def upgrade() -> None:
         sa.Column("storage_key", sa.String(length=500), nullable=False),
         sa.Column("backend_upload_id", sa.String(length=500), nullable=False),
         sa.Column("size", sa.BigInteger(), nullable=False),
+        sa.Column("part_size", sa.Integer(), nullable=False),
         sa.Column("content_type", sa.String(length=100), nullable=False),
         sa.Column(
             "status",

@@ -30,7 +30,7 @@ from pydantic import ValidationError
 from simple_module_db import finalize_session, tenant_context
 from sqlalchemy import select, update
 
-from sm_images import constants, storage_keys
+from sm_images import storage_keys
 from sm_images.errors import FileTooLarge, ImagesError, PartsMismatch
 from sm_images.errors import UploadNotFound as Gone
 from sm_images.imports import jobs, terminal
@@ -48,7 +48,7 @@ from sm_images.models import Collection, ImportJob, UploadSession, UploadStatus
 from sm_images.models.enums import ImportKind, JobStatus
 from sm_images.pipeline.runtime import Runtime
 
-__all__ = ["ZIP_CONTENT_TYPE", "fail_upload", "seal", "start"]
+__all__ = ["ZIP_CONTENT_TYPE", "abort_upload", "fail_upload", "seal", "session_ticket", "start"]
 
 ZIP_CONTENT_TYPE: Final = "application/zip"
 _GONE = "Upload not found"
@@ -109,7 +109,7 @@ async def start(
     return await get(runtime, tenant, job_id), upload
 
 
-async def _ticket(runtime: Runtime, tenant: str, row: ImportJob) -> Ticket:
+async def session_ticket(runtime: Runtime, tenant: str, row: ImportJob) -> Ticket:
     """The archive's upload, as the ticket the multipart helpers take."""
     stmt = select(UploadSession).where(
         UploadSession.id == row.upload_session_id, UploadSession.tenant_id == tenant
@@ -127,7 +127,7 @@ async def _ticket(runtime: Runtime, tenant: str, row: ImportJob) -> Ticket:
                 tenant=tenant,
                 owner="",
                 size=found.size,
-                part_size=constants.DIRECT_PART_BYTES,
+                part_size=found.part_size,
                 filename="",
                 content_type=found.content_type,
                 kind="zip",
@@ -218,7 +218,7 @@ async def seal(
             raise conflict("not_a_zip_import", "This import does not take an archive")
         if row.status is not JobStatus.UPLOADING:
             raise conflict("already_sealed", "This archive was already handed to its import")
-        ticket = await _ticket(runtime, tenant, row)
+        ticket = await session_ticket(runtime, tenant, row)
         async with runtime.session_factory() as db:
             token = await state.claim_complete(db, ticket)
             if token is None:
@@ -242,3 +242,34 @@ async def seal(
                     code = exc.code if isinstance(exc, ImagesError) and exc.code else "seal_failed"
                     await fail_upload(runtime, tenant, row, code)
                 raise
+
+
+async def abort_upload(runtime: Runtime, tenant: str, row: ImportJob) -> None:
+    """Abort an ``uploading`` job's upload before the job goes: the session
+    ``open -> aborted`` (a compare-and-set; a seal holding it is a 409
+    ``upload_in_progress`` and the delete waits), then its parts and staged
+    object are discarded and the session recorded clean. A cleanup that fails
+    leaves ``cleaned_at`` NULL for the reaper."""
+    if row.upload_session_id is None:
+        return
+    try:
+        ticket = await session_ticket(runtime, tenant, row)
+    except Gone:
+        return
+    async with runtime.session_factory() as db:
+        try:
+            claimed = await state.claim_abort(db, ticket)
+        except Gone:
+            claimed = False
+        if not claimed:
+            await db.rollback()
+            return  # completed: the job owns the object now
+        try:
+            await state.discard(
+                db, runtime.store(), ticket.key, ticket.upload, uuid.UUID(ticket.image)
+            )
+        except Exception:
+            await db.rollback()
+            return
+        await state.mark_cleaned(db, uuid.UUID(ticket.session))
+        await finalize_session(db)

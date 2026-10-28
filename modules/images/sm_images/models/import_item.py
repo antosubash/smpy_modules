@@ -29,6 +29,8 @@ class ImportItem(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[
     feature_index: int = Field(sa_column_kwargs={"nullable": False})
     url: str | None = Field(default=None, max_length=2000)
     external_id: str | None = Field(default=None, max_length=255)
+    external_source: str | None = Field(default=None, max_length=100)
+    """The id's namespace when not ``import`` (a ZIP's metadata.json may name one)."""
     status: ItemStatus = enum_col(ItemStatus, "item_status", ItemStatus.PENDING)
     attempts: int = Field(default=0, sa_column_kwargs={"nullable": False})
     claim_token: str | None = Field(default=None, max_length=64)
