@@ -7,7 +7,8 @@ its params, validated by the step's ``params_schema()``.
 Two callers, two strictnesses:
 
 * a **save** (``strict=True``, the default) refuses invalid params, a malformed
-  shape and more than one enabled display mutator;
+  shape, more than one enabled display mutator, and a display mutator enabled
+  beside an uninstalled (non-``prompt:``) step;
 * the **executor** (``strict=False``) reads whatever was saved: a step whose
   params no longer validate is ``invalid`` (its run fails), and the extra
   mutators are ``invalid`` too.
@@ -125,8 +126,26 @@ def validate_pipeline_config(cfg: Any, *, strict: bool = True) -> PipelineConfig
             steps[sid] = StepConfig(sid, old.enabled, "invalid", error="too_many_display_mutators")
     out = PipelineConfig(steps)
     if strict:
+        _check_unknown_beside_mutator(out)
         _check_graph(out)
     return out
+
+
+def _check_unknown_beside_mutator(cfg: PipelineConfig) -> None:
+    """A save must not enable a display mutator beside an uninstalled step:
+    the unknown step might mutate the display too, so serving would never
+    trust the mutator's copy (``redaction.trusts_display``)."""
+    mutators = cfg.mutators()
+    unknown = [
+        s.id
+        for s in cfg.steps.values()
+        if s.enabled and s.state == "not_installed" and not s.id.startswith(registry.PROMPT_PREFIX)
+    ]
+    if mutators and unknown:
+        raise PipelineConfigError(
+            f"a display mutator {mutators} cannot be enabled beside steps that are "
+            f"not installed: {sorted(unknown)}; disable or remove them, or install them"
+        )
 
 
 def _check_graph(cfg: PipelineConfig) -> None:

@@ -224,13 +224,13 @@ async def test_a_rerunning_mutator_still_serves_the_existing_display(client, g):
     assert await _code(client, g.url("priv", "blurred", "original"), EDITOR) == 403
 
 
-async def test_an_uninstalled_plugin_serves_existing_displays_and_withholds_the_rest(client, g):
+async def test_an_uninstalled_plugin_withholds_its_displays_too(client, g):
+    """Fix round 4 reverses round 2: a step that is not installed cannot vouch
+    for its copy (it may have been a crop), so every display waits."""
     await _configure(client, g, {"acme.blur": {}}, protect=True)
     use_steps()  # the plugin is gone
-    for tail in ("display", "r/small"):
-        assert await _code(client, g.url("priv", "blurred", tail), EDITOR) == 200
-        assert (await client.get(g.public_url("pub", "blurred", tail))).status_code == 200
-        assert await _code(client, g.url("priv", "plain", tail), EDITOR) == 404
-        assert (await client.get(g.public_url("pub", "plain", tail))).status_code == 404
-    assert await _code(client, g.url("priv", "plain", "original"), EDITOR) == 403
-    assert await _code(client, g.url("priv", "blurred", "original"), EDITOR) == 403
+    for name in ("blurred", "plain"):
+        for tail in ("display", "r/small"):
+            assert await _code(client, g.url("priv", name, tail), EDITOR) == 404
+            assert (await client.get(g.public_url("pub", name, tail))).status_code == 404
+        assert await _code(client, g.url("priv", name, "original"), EDITOR) == 403

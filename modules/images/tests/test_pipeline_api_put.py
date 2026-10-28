@@ -44,6 +44,18 @@ async def test_put_rejects_two_display_mutators_and_the_implicit_cycle(world):
     assert (await put(world, {"acme.ma": {}, "renditions": {}})).status_code == 200
 
 
+async def test_put_rejects_a_display_mutator_beside_an_uninstalled_step(world):
+    mut = Scripted("acme.ma")
+    mut.mutates_display = True
+    use_steps(mut)
+    r = await put(world, {"acme.ma": {}, "acme.gone": {}})
+    assert r.status_code == 422 and r.json()["code"] == "invalid_pipeline_config"
+    assert "acme.gone" in r.json()["detail"] and "not installed" in r.json()["detail"]
+    # A prompt step never mutates, and a disabled unknown step runs nothing.
+    off = {"acme.ma": {}, "prompt:caption": {}, "acme.gone": {"enabled": False}}
+    assert (await put(world, off)).status_code == 200
+
+
 async def test_put_keeps_a_not_installed_step(world):
     r = await put(world, {"acme.gone": {"anything": 1}})
     assert r.status_code == 200

@@ -6,8 +6,10 @@ rendition cut before it - may show what it exists to hide, so serving treats
 the image as **pending**: no display, no renditions, the original protected.
 Serving asks only when the image has no **trusted** display copy
 (:func:`trusts_display`): one written by the collection's current display
-mutator is redacted, and it and its current renditions are always served; one
-written by another step (a crop) is no better than the original.
+mutator - installed, and the only enabled mutator or unknown step - is
+redacted, and it and its current renditions are always served; one written by
+another step (a crop), or by a step no longer installed, is no better than
+the original.
 
 Decided from persisted state, never from the live registry alone:
 
@@ -50,21 +52,29 @@ def _unknown(cfg: Any, sid: str) -> bool:
 
 
 def trusts_display(collection: Collection, image: Image) -> bool:
-    """Whether *image*'s display copy counts as redacted: it exists, and the
-    step that wrote it (``Image.display_step``) is the collection's enabled
-    display mutator - any version of it, so a re-run keeps serving the copy.
-    An enabled step that is not installed is taken at its word: it wrote a
-    display copy once, so it was a mutator, and uninstalling it does not make
-    its copy unredacted. A copy from any other step (a crop, say, before an
-    anonymiser was enabled), or from no recorded step, is not trusted.
+    """Whether *image*'s display copy counts as redacted. All of:
+
+    * the step that wrote it (``Image.display_step``) is enabled, installed
+      and a display mutator - any version of it, so a re-run keeps serving;
+    * no *other* enabled step is a display mutator;
+    * no other enabled step is uninstalled: an unknown step might be one.
+
+    ``prompt:*`` steps never write a display copy and are left out. A copy
+    from any other step (a crop, before an anonymiser was enabled), from an
+    uninstalled step, or from no recorded step is not trusted.
     """
-    if image.display_key is None or image.display_step is None:
+    writer = image.display_step
+    if image.display_key is None or writer is None:
         return False
     cfg = validate_pipeline_config(collection.pipeline_config, strict=False)
-    if image.display_step not in cfg.enabled():
+    enabled = [sid for sid in cfg.enabled() if not sid.startswith(registry.PROMPT_PREFIX)]
+    if writer not in enabled:
         return False
-    impl = registry.get_step(image.display_step)
-    return bool(impl.mutates_display) if impl is not None else _unknown(cfg, image.display_step)
+    for sid in enabled:
+        impl = registry.get_step(sid)
+        if impl is None or bool(impl.mutates_display) != (sid == writer):
+            return False
+    return True
 
 
 async def pending(db: Any, collection: Collection, image: Image) -> bool:
