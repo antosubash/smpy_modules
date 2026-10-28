@@ -141,14 +141,41 @@ class ImagesModule(ModuleBase):
 
     async def on_startup(self, app: FastAPI) -> None:
         """Everything that needs the hydrated settings and an open database:
-        the tenancy mode, the fail-closed guard, and the session factory object
-        intents commit through on their own."""
+        the tenancy mode, the fail-closed guard, the session factory object
+        intents commit through on their own, the step registry (built-ins and
+        every installed plugin's ``images_extensions``, then frozen) and the
+        runtime the pipeline's after-commit dispatch runs on."""
         from sm_images import intents, tenancy
+        from sm_images.pipeline.extensions import load_extensions
 
         setattr(app.state, constants.MODULE_ATTR, self)
         tenancy.configure(app)
-        db = getattr(getattr(app.state, "sm", None), "db", None)
+        load_extensions()
+        sm = getattr(app.state, "sm", None)
+        db = getattr(sm, "db", None)
         if (session_class := getattr(db, "sync_session_class", None)) is not None:
             tenancy.install_guard(session_class)
         if (factory := getattr(db, "session_factory", None)) is not None:
             intents.use_session_factory(factory)
+            self._use_runtime(app, factory)
+
+    async def on_shutdown(self, app: FastAPI) -> None:
+        """Forget the runtime: a lifespan restart in one process (tests, dev
+        reload) must not dispatch through the previous app's engine."""
+        from sm_images.pipeline.runtime import use_runtime
+
+        use_runtime(None)
+
+    @staticmethod
+    def _use_runtime(app: FastAPI, factory: object) -> None:
+        from sm_images.pipeline.runtime import Runtime, use_runtime
+        from sm_images.storage import store_for
+
+        use_runtime(
+            Runtime(
+                session_factory=factory,
+                store=lambda: store_for(app),
+                settings=lambda: getattr(app.state, constants.PACKAGE).settings,
+                bus=lambda: getattr(getattr(app.state, "sm", None), "event_bus", None),
+            )
+        )

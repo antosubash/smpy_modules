@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from simple_module_core.events import Event
 
-__all__ = ["CollectionDeleted", "CollectionVisibilityChanged", "ImageAdded"]
+__all__ = ["CollectionDeleted", "CollectionVisibilityChanged", "ImageAdded", "ImageProcessed"]
 
 
 @dataclass
@@ -43,3 +43,21 @@ class ImageAdded(Event):
     collection_id: str
     image_id: str
     source: str
+
+
+@dataclass
+class ImageProcessed(Event):
+    """Every enabled pipeline step of one processing cycle is final (completed,
+    skipped or failed - not necessarily successful).
+
+    Decided once per ``(tenant_id, image_id, processing_generation)``: a retry,
+    force or re-run starts a new cycle and so a new event. Durable subscribers
+    (``subscribe_durable``) get it from the outbox written in the deciding
+    transaction - at least once, so deduplicate on that identity. Ordinary
+    subscribers get a best-effort publish after the commit.
+    """
+
+    tenant_id: str
+    collection_id: str
+    image_id: str
+    processing_generation: int

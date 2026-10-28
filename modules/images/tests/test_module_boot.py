@@ -88,3 +88,24 @@ async def test_on_startup_installs_the_intent_session_factory(images_app):
         assert (await s.execute(select(ObjectIntent.key))).scalars().all() == [
             "images/default/boot"
         ]
+
+
+async def test_on_startup_loads_the_registry_and_sets_the_pipeline_runtime(images_app, storage):
+    from sm_images.pipeline import registry, runtime
+
+    app, db_state = images_app
+    registry.reset_registry()
+    module = ImagesModule()
+    try:
+        await module.on_startup(app)
+        assert registry.is_frozen()
+        assert {"exif", "renditions"} <= set(registry.all_steps())
+        rt = runtime.current_runtime()
+        assert rt.session_factory is db_state.session_factory
+        assert rt.store().backend is storage
+        assert rt.settings() is app.state.sm_images.settings
+        assert rt.bus() is app.state.sm.event_bus
+        await module.on_shutdown(app)
+        assert runtime.current_runtime() is None
+    finally:
+        registry.reset_registry()

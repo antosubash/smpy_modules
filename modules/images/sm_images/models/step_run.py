@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, ClassVar
 
 from simple_module_db.mixins import AuditMixin, MultiTenantMixin
 from sqlalchemy import Column, Index, UniqueConstraint, Uuid
@@ -21,6 +21,8 @@ class StepRun(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[uns
         UniqueConstraint("image_id", "step", name="uq_images_step_run_image_step"),
         Index("ix_images_step_run_status_lease", "status", "lease_expires_at"),
     )
+    # A lease renewal is bookkeeping, not a change anyone audits.
+    __audit_exclude_fields__: ClassVar[set[str]] = {"lease_token", "lease_expires_at"}
 
     id: int | None = Field(default=None, primary_key=True)
     image_id: uuid.UUID = fk_uuid("images_image.id", ondelete="CASCADE")

@@ -1,0 +1,125 @@
+"""A collection's ``pipeline_config``, validated against the step registry.
+
+The stored shape is ``{"steps": {id: {"enabled": bool, ...params}}}``. A step
+is enabled unless ``enabled`` is ``false``; everything else in its object is
+its params, validated by the step's ``params_schema()``.
+
+Two callers, two strictnesses:
+
+* a **save** (``strict=True``, the default) refuses invalid params, a malformed
+  shape and more than one enabled display mutator;
+* the **executor** (``strict=False``) reads whatever was saved: a step whose
+  params no longer validate is ``invalid`` (its run fails), and the extra
+  mutators are ``invalid`` too.
+
+Either way an id with no installed implementation is *kept*, as
+``not_installed``: removing a plugin must not silently rewrite a collection's
+configuration, and its runs settle as skipped rather than waiting forever.
+``prompt:<id>`` steps have no registered implementation yet (Task 22 resolves
+them per execution); until then they are ``not_installed`` too.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Literal
+
+from pydantic import BaseModel, ValidationError
+
+from sm_images.pipeline import registry
+
+__all__ = [
+    "PipelineConfig",
+    "PipelineConfigError",
+    "StepConfig",
+    "validate_pipeline_config",
+]
+
+StepState = Literal["ok", "not_installed", "invalid"]
+
+
+class PipelineConfigError(ValueError):
+    """A pipeline configuration that cannot be saved."""
+
+
+@dataclass(frozen=True)
+class StepConfig:
+    id: str
+    enabled: bool
+    state: StepState
+    params: BaseModel | None = None
+    error: str | None = None
+
+    @property
+    def runnable(self) -> bool:
+        return self.enabled and self.state == "ok"
+
+
+@dataclass(frozen=True)
+class PipelineConfig:
+    steps: dict[str, StepConfig] = field(default_factory=dict)
+
+    def enabled(self) -> list[str]:
+        return [s.id for s in self.steps.values() if s.enabled]
+
+    def runnable(self) -> list[str]:
+        return [s.id for s in self.steps.values() if s.runnable]
+
+    def get(self, step_id: str) -> StepConfig | None:
+        return self.steps.get(step_id)
+
+    def mutators(self) -> list[str]:
+        """Enabled, runnable steps that write the display copy."""
+        out = []
+        for sid in self.runnable():
+            impl = registry.get_step(sid)
+            if impl is not None and impl.mutates_display:
+                out.append(sid)
+        return out
+
+
+def _bad(strict: bool, message: str) -> PipelineConfig:
+    if strict:
+        raise PipelineConfigError(message)
+    return PipelineConfig()
+
+
+def _one(sid: str, raw: dict[str, Any], strict: bool) -> StepConfig:
+    enabled = raw.get("enabled") is not False
+    impl = registry.get_step(sid)
+    if impl is None:
+        return StepConfig(sid, enabled, "not_installed")
+    params = {k: v for k, v in raw.items() if k != "enabled"}
+    try:
+        validated = impl.params_schema().model_validate(params)
+    except ValidationError as exc:
+        if strict:
+            raise PipelineConfigError(f"step {sid!r}: invalid params: {exc}") from exc
+        return StepConfig(sid, enabled, "invalid", error="invalid_params")
+    return StepConfig(sid, enabled, "ok", params=validated)
+
+
+def validate_pipeline_config(cfg: Any, *, strict: bool = True) -> PipelineConfig:
+    """Parse and validate ``cfg`` (a collection's stored ``pipeline_config``)."""
+    from sm_images.pipeline.extensions import load_extensions
+
+    load_extensions()  # the worker's first registry read; a no-op once frozen
+    if cfg is None or cfg == {}:
+        return PipelineConfig()
+    if not isinstance(cfg, dict) or not isinstance(cfg.get("steps", {}), dict):
+        return _bad(strict, "pipeline_config must be {'steps': {id: {...}}}")
+    steps: dict[str, StepConfig] = {}
+    for sid, raw in cfg.get("steps", {}).items():
+        if not isinstance(sid, str) or not isinstance(raw, dict):
+            if strict:
+                raise PipelineConfigError(f"step {sid!r}: its value must be an object")
+            continue
+        steps[sid] = _one(sid, raw, strict)
+    mutators = PipelineConfig(steps).mutators()
+    if len(mutators) > 1:
+        if strict:
+            raise PipelineConfigError(f"at most one step may mutate the display copy: {mutators}")
+        for sid in mutators:
+            old = steps[sid]
+            steps[sid] = StepConfig(sid, old.enabled, "invalid", error="too_many_display_mutators")
+    return PipelineConfig(steps)

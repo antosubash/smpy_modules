@@ -1,33 +1,38 @@
 """The processing pipeline's entry points, as ingest sees them.
 
-**Placeholder until Tasks 9-11.** Two things live here so ingest has a stable
-call site:
-
 * :func:`enabled_steps` - which steps a collection runs, read straight off
-  ``Collection.pipeline_config``. The shape (Task 11 formalises it, with the
-  step registry validating ids and params)::
+  ``Collection.pipeline_config``::
 
       {"steps": {"exif": {}, "renditions": {"enabled": true}, "quality": {"enabled": false, ...}}}
 
   A step is enabled when it appears under ``"steps"`` with an object value
   whose ``"enabled"`` is not ``false``. Everything else in the object is the
-  step's params. Order is the mapping's order; the executor orders by
-  ``requires`` anyway.
-* :func:`dispatch` - hand an image to the workers once its row is durable.
-  Ingest calls it inside the transaction; the send runs only after that
-  transaction commits (``register_on_commit``), and never on a rollback. Task 10
-  replaces :func:`_send` with the real enqueue.
+  step's params (validated by :func:`.config.validate_pipeline_config`).
+  Ingest creates a pending ``StepRun`` for each, ids with no installed
+  implementation included: the executor settles those as skipped.
+* :func:`dispatch` - hand an image to the pipeline once its row is durable.
+  Ingest calls it inside the transaction; :func:`_send` runs only after that
+  transaction commits (``register_on_commit``), never on a rollback, in the
+  tenant bound when it was queued. It plans the image in a fresh session -
+  claims and hands off its ready steps (:mod:`.orchestrate`) - through the web
+  process's runtime, which images' ``on_startup`` sets. With no runtime (a
+  process that never started the module) nothing is sent; the pending rows
+  wait for ``images.reconcile``.
 """
 
 from __future__ import annotations
 
+import logging
 import uuid
 from functools import partial
 from typing import Any
 
 from simple_module_db.callbacks import register_on_commit
+from simple_module_db.listeners import current_tenant_id
 
 __all__ = ["dispatch", "enabled_steps"]
+
+logger = logging.getLogger(__name__)
 
 
 def enabled_steps(config: dict[str, Any] | None) -> list[str]:
@@ -41,16 +46,27 @@ def enabled_steps(config: dict[str, Any] | None) -> list[str]:
     ]
 
 
-async def _send(image_id: uuid.UUID) -> None:
-    """No-op until Task 10 enqueues the image's pending steps."""
-    return
+async def _send(image_id: uuid.UUID, tenant: str) -> None:
+    from sm_images.pipeline.orchestrate import submit_dispatch
+    from sm_images.pipeline.runtime import current_runtime
+
+    runtime = current_runtime()
+    if runtime is None:
+        logger.warning("images.pipeline.no_runtime image=%s: left for reconcile", image_id)
+        return
+    await submit_dispatch(runtime, tenant, image_id)
 
 
 def dispatch(db: Any, image_id: uuid.UUID) -> None:
-    """Queue ``image_id`` for the workers once ``db`` commits."""
-    register_on_commit(db, partial(_dispatch_after_commit, image_id))
+    """Queue ``image_id`` for the pipeline once ``db`` commits."""
+    tenant = current_tenant_id.get()
+    if tenant is None:
+        from sm_images.tenancy import TenantUnbound
+
+        raise TenantUnbound("pipeline.dispatch needs a bound tenant")
+    register_on_commit(db, partial(_dispatch_after_commit, image_id, tenant))
 
 
-async def _dispatch_after_commit(image_id: uuid.UUID) -> None:
-    # Looked up at call time so Task 10 (or a test) can replace ``_send``.
-    await _send(image_id)
+async def _dispatch_after_commit(image_id: uuid.UUID, tenant: str) -> None:
+    # Looked up at call time so a test can replace ``_send``.
+    await _send(image_id, tenant)

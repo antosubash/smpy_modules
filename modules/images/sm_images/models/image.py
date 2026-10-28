@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, ClassVar
 
 from simple_module_db.mixins import AuditMixin, MultiTenantMixin, SoftDeleteMixin
 from sqlalchemy import BigInteger, CheckConstraint, Index, SmallInteger, text
@@ -16,11 +16,13 @@ from sm_images.models.enums import LocationSource
 
 IMAGE_EXTERNAL_INDEX = "uq_images_image_external"
 IMAGE_GALLERY_INDEX = "ix_images_image_gallery"
+IMAGE_UNPROCESSED_INDEX = "ix_images_image_unprocessed"
 IMAGE_COORDS_CHECK = "coords_paired"
 IMAGE_EXTERNAL_CHECK = "external_sourced"
 """An external id without a source would never dedupe (NULL is distinct in a
 unique index), so the pair is enforced together."""
 _HAS_EXTERNAL_ID = text("external_id IS NOT NULL")
+_UNPROCESSED = text("processed_generation < processing_generation")
 
 
 class Image(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
@@ -40,7 +42,16 @@ class Image(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  #
             postgresql_where=_HAS_EXTERNAL_ID,
         ),
         Index(IMAGE_GALLERY_INDEX, "collection_id", "created_at", "id"),
+        # What reconcile scans for a processing cycle that never concluded.
+        Index(
+            IMAGE_UNPROCESSED_INDEX,
+            "tenant_id",
+            "id",
+            sqlite_where=_UNPROCESSED,
+            postgresql_where=_UNPROCESSED,
+        ),
     )
+    __audit_exclude_fields__: ClassVar[set[str]] = {"processing_generation", "processed_generation"}
 
     id: uuid.UUID = pk_uuid()
     collection_id: uuid.UUID = fk_uuid("images_collection.id")
@@ -51,6 +62,12 @@ class Image(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  #
     """``None`` = the original is the display copy."""
     display_generation: int = Field(default=0, sa_column_kwargs={"nullable": False})
     """Fences display publication (``WHERE display_generation = :g - 1``)."""
+    processing_generation: int = Field(default=1, sa_column_kwargs={"nullable": False})
+    """The processing cycle: bumped once by an accepted retry, force or re-run."""
+    processed_generation: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    """The last cycle ``ImageProcessed`` was decided for; equal to
+    ``processing_generation`` once every enabled step of that cycle is final.
+    Conditional ``UPDATE`` on these two is what makes the event fire once."""
     storage_hold_id: str | None = Field(default=None, max_length=64)
     storage_bytes: int = Field(default=0, sa_type=BigInteger, sa_column_kwargs={"nullable": False})
     """Sum of this image's objects, as held against the storage gauge."""

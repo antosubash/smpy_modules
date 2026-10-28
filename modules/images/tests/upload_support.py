@@ -103,7 +103,7 @@ def record_dispatch(monkeypatch) -> list[Any]:
 
     sent: list[Any] = []
 
-    async def fake(image_id):
+    async def fake(image_id, tenant):
         sent.append(image_id)
 
     monkeypatch.setattr(pipeline, "_send", fake)

@@ -29,6 +29,7 @@ from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
 )
 from tests.isolation_support import two_tenants  # noqa: F401 - the tenancy matrix's fixture
 from tests.pg_support import arm_reset, make_db_state
+from tests.pipeline_support import pipe  # noqa: F401 - the pipeline tests' fixture
 from tests.upload_support import uploads  # noqa: F401 - the upload tests' client
 
 
@@ -55,6 +56,14 @@ def _reset_intent_factory(monkeypatch):
     from sm_images import intents
 
     monkeypatch.setattr(intents, "_default_factory", None)
+
+
+@pytest.fixture(autouse=True)
+def _reset_pipeline_runtime(monkeypatch):
+    """The web runtime is process-wide too (``on_startup`` sets it)."""
+    from sm_images.pipeline import runtime
+
+    monkeypatch.setattr(runtime, "_runtime", None)
 
 
 @pytest.fixture(autouse=True)

@@ -244,6 +244,8 @@ def upgrade() -> None:
         sa.Column("storage_key", sa.String(length=500), nullable=False),
         sa.Column("display_key", sa.String(length=500), nullable=True),
         sa.Column("display_generation", sa.Integer(), nullable=False),
+        sa.Column("processing_generation", sa.Integer(), nullable=False),
+        sa.Column("processed_generation", sa.Integer(), nullable=False),
         sa.Column("storage_hold_id", sa.String(length=64), nullable=True),
         sa.Column("storage_bytes", sa.BigInteger(), nullable=False),
         sa.Column("filename", sa.String(length=255), nullable=False),
@@ -302,6 +304,14 @@ def upgrade() -> None:
         unique=True,
         sqlite_where=sa.text("external_id IS NOT NULL"),
         postgresql_where=sa.text("external_id IS NOT NULL"),
+    )
+    op.create_index(
+        "ix_images_image_unprocessed",
+        "images_image",
+        ["tenant_id", "id"],
+        unique=False,
+        sqlite_where=sa.text("processed_generation < processing_generation"),
+        postgresql_where=sa.text("processed_generation < processing_generation"),
     )
     op.create_table(
         "images_import_item",
@@ -616,6 +626,12 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_images_image_sha256"), table_name="images_image")
     op.drop_index(op.f("ix_images_image_group_id"), table_name="images_image")
     op.drop_index("ix_images_image_gallery", table_name="images_image")
+    op.drop_index(
+        "ix_images_image_unprocessed",
+        table_name="images_image",
+        sqlite_where=sa.text("processed_generation < processing_generation"),
+        postgresql_where=sa.text("processed_generation < processing_generation"),
+    )
     op.drop_index(op.f("ix_images_image_collection_id"), table_name="images_image")
     op.drop_table("images_image")
     op.drop_index(op.f("ix_images_prompt_tenant_id"), table_name="images_prompt")
