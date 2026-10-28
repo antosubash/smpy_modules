@@ -23,9 +23,7 @@ Both modes run the same claim, work and completion code.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import sys
 import uuid
 from collections import deque
 from collections.abc import Iterable
@@ -39,6 +37,7 @@ from simple_module_db import finalize_session, tenant_context
 from sm_images.pipeline import advance
 from sm_images.pipeline.claim import load_runs, lock_image
 from sm_images.pipeline.cycle import bump_cycle, reset_runs
+from sm_images.pipeline.eager_drain import IN_DELIVERY, drain_durable, in_delivery
 from sm_images.pipeline.plan import FINAL, is_blocked, is_stale
 from sm_images.pipeline.runtime import Runtime
 
@@ -73,13 +72,6 @@ class RunStep:
 
 
 _drain: ContextVar[Any] = ContextVar("sm_images_drain", default=None)
-# Set while an outermost drain runs inside a durable delivery, so the tasks it
-# (or anything it calls) spawns inherit "inside a delivery" with the context.
-_IN_DELIVERY: ContextVar[bool] = ContextVar("sm_images_in_delivery", default=False)
-
-#: Longest an eager drain waits for durable deliveries (see ``_drain_durable``).
-EAGER_DRAIN_TIMEOUT = 5.0
-_orphans: set[asyncio.Future[Any]] = set()  # shielded drains outliving their wait
 
 
 def utcnow() -> datetime:
@@ -109,8 +101,9 @@ async def submit(runtime: Runtime, items: Iterable[Any]) -> None:
     reset = _drain.set(queue)
     # Reset on exit: an inline delivery runs on a request's task, and the
     # request's own later submits must still wait for their deliveries.
-    mark = _IN_DELIVERY.set(_in_delivery())
+    mark = IN_DELIVERY.set(in_delivery())
     first: BaseException | None = None
+    wait = True
     try:
         while True:
             while queue:
@@ -123,12 +116,16 @@ async def submit(runtime: Runtime, items: Iterable[Any]) -> None:
                     first = first or exc
             # Deliveries started by this work copied this context, so the
             # reruns their handlers submit land in ``queue``: keep it open
-            # while waiting for them, then run whatever they added.
-            if not await _drain_durable(runtime) or not queue:
+            # while waiting for them, then run whatever they added. Only the
+            # wait is bounded: after a timeout (or with nothing to wait for)
+            # it stops, but queued image work still runs before closing.
+            if wait:
+                wait = await drain_durable(runtime)
+            if not queue:  # no await between this check and closing it
                 break
     finally:
         queue.closed = True  # a later submit from a copied context starts afresh
-        _IN_DELIVERY.reset(mark)
+        IN_DELIVERY.reset(mark)
         _drain.reset(reset)
     if first is not None:
         raise first
@@ -136,77 +133,6 @@ async def submit(runtime: Runtime, items: Iterable[Any]) -> None:
 
 class _Queue(deque):
     closed = False
-
-
-def _deliver_code() -> Any:
-    """The code object of the framework coroutine that runs a durable handler."""
-    try:
-        from background_tasks.outbox_dispatch import deliver_one
-    except ImportError:  # pragma: no cover - background_tasks is a dependency
-        return None
-    return deliver_one.__code__
-
-
-def _in_delivery() -> bool:
-    """Is this code running inside a durable delivery (an outbox handler)?
-
-    Decided by the **call path**, not by the transport's global state: while a
-    coroutine runs, its awaiting callers' frames are on the stack, so a
-    handler - delivered on its own task or inline on a request's - finds
-    ``deliver_one`` below it. Waiting for the transport from there would wait
-    on that very delivery (or the dispatcher lock it holds), so the caller
-    leaves delivery to the dispatcher already running. Code that merely runs
-    while some *unrelated* delivery is in flight is not inside one, and waits.
-
-    A task does not inherit its creator's frames, so a task spawned inside a
-    handler is invisible to the walk. ``_IN_DELIVERY`` covers the ones spawned
-    while images code runs inside a delivery; the rest (a handler that spawns
-    a submitting task before calling into images) are caught only by the
-    ``EAGER_DRAIN_TIMEOUT`` bound in :func:`_drain_durable`.
-    """
-    if _IN_DELIVERY.get():
-        return True
-    target = _deliver_code()
-    frame = sys._getframe(1)
-    while frame is not None:
-        if frame.f_code is target:
-            return True
-        frame = frame.f_back
-    return False
-
-
-async def _drain_durable(runtime: Runtime) -> bool:
-    """Wait for the eager durable deliveries the drained work published (the
-    web outbox transport starts them as tasks from ``after_commit``), so an
-    eager caller returns with ``ImageProcessed``'s durable subscribers done.
-    ``False`` when there was nothing to wait for (or it must not wait).
-
-    The wait is bounded and shielded: a submit from a task spawned inside a
-    durable handler cannot tell it is in one, and its ``drain()`` gathers the
-    parent delivery that is awaiting it. After ``EAGER_DRAIN_TIMEOUT`` it gives
-    up (the deliveries carry on uncancelled), turning a deadlock into a delay.
-    """
-    transport = getattr(runtime.bus(), "durable_transport", None)
-    drain = getattr(transport, "drain", None)
-    if drain is None or _in_delivery():
-        return False
-    waiting = asyncio.ensure_future(drain())
-    try:
-        await asyncio.wait_for(asyncio.shield(waiting), timeout=EAGER_DRAIN_TIMEOUT)
-    except TimeoutError:
-        _orphans.add(waiting)
-        waiting.add_done_callback(_orphans.discard)
-        logger.warning(
-            "images.pipeline.eager_drain_timeout after %ss: durable deliveries are "
-            "still running, most likely because this submit runs in a task spawned "
-            "inside a durable handler and is waiting on its own parent delivery; "
-            "returning without them",
-            EAGER_DRAIN_TIMEOUT,
-        )
-        return False
-    except Exception:
-        logger.exception("images.pipeline.durable_drain_failed")
-    return True
 
 
 async def submit_dispatch(runtime: Runtime, tenant: str, image_id: uuid.UUID) -> None:

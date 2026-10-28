@@ -13,7 +13,7 @@ from background_tasks.outbox_transport import OutboxTransport
 from background_tasks.settings import BackgroundTasksSettings
 from simple_module_db import finalize_session
 from sm_images.contracts import ImageProcessed
-from sm_images.pipeline import orchestrate
+from sm_images.pipeline import eager_drain
 from sm_images.tenancy import DEFAULT_TENANT
 
 from tests.pipeline_support import Scripted, use_steps
@@ -41,7 +41,7 @@ def test_the_framework_hooks_relied_on_still_exist():
     assert inspect.iscoroutinefunction(outbox_dispatch.deliver_one)
     assert "sub.handler(event, ctx)" in inspect.getsource(outbox_dispatch.deliver_one)
     assert inspect.iscoroutinefunction(OutboxTransport.drain)
-    assert orchestrate._deliver_code() is outbox_dispatch.deliver_one.__code__
+    assert eager_drain.deliver_code() is outbox_dispatch.deliver_one.__code__
 
 
 async def test_a_durable_handler_sees_itself_inside_a_delivery(pipe):
@@ -49,13 +49,13 @@ async def test_a_durable_handler_sees_itself_inside_a_delivery(pipe):
     seen: list[bool] = []
 
     async def handler(event, ctx):
-        seen.append(orchestrate._in_delivery())
+        seen.append(eager_drain.in_delivery())
 
     pipe.bus.subscribe_durable(ImageProcessed, handler, name="test.where_am_i")
     coll = await pipe.collection({})
     img = await pipe.image(coll)
     await _bounded(transport, pipe.run(img))
-    assert seen == [True] and orchestrate._in_delivery() is False
+    assert seen == [True] and eager_drain.in_delivery() is False
 
 
 async def test_submit_waits_for_its_own_delivery_behind_an_unrelated_one(pipe):

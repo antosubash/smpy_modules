@@ -12,7 +12,7 @@ import time
 from simple_module_db import finalize_session
 from simple_module_db.transaction import SESSION_START_KEY
 from sm_images.contracts import ImageProcessed
-from sm_images.pipeline import orchestrate
+from sm_images.pipeline import eager_drain, orchestrate
 from sm_images.tenancy import DEFAULT_TENANT
 
 from tests.pipeline_support import Scripted, use_steps
@@ -25,7 +25,7 @@ HARD = 15.0  # a regressed deadlock fails here instead of hanging the run
 
 
 async def _setup(pipe, monkeypatch):
-    monkeypatch.setattr(orchestrate, "EAGER_DRAIN_TIMEOUT", BOUND, raising=False)
+    monkeypatch.setattr(eager_drain, "EAGER_DRAIN_TIMEOUT", BOUND)
     transport = await _transport(pipe)
     # Far above the bound, so the handler timeout cannot be what unblocks it.
     transport._services.settings.outbox_handler_timeout_seconds = 60
@@ -60,7 +60,7 @@ async def test_task_spawned_in_a_durable_handler_does_not_deadlock(pipe, monkeyp
     dispatcher lock; the handler's child task submits and its drain gathers
     that very delivery."""
     transport, coll, parent, child, delivered, finished = await _setup(pipe, monkeypatch)
-    caplog.set_level(logging.WARNING, logger=orchestrate.__name__)
+    caplog.set_level(logging.WARNING, logger=eager_drain.__name__)
     await _publish(pipe, coll, parent, request=False)
     await _bounded(transport, asyncio.sleep(0), limit=HARD)
     assert finished and finished[0] < BOUND + 1.0
@@ -84,7 +84,7 @@ async def test_submit_inside_a_delivery_marks_tasks_it_spawns(pipe, monkeypatch)
     seen: list[bool] = []
 
     async def probe():
-        seen.append(orchestrate._in_delivery())
+        seen.append(eager_drain.in_delivery())
 
     async def spawn(runtime, item):
         await asyncio.get_running_loop().create_task(probe())
@@ -99,4 +99,4 @@ async def test_submit_inside_a_delivery_marks_tasks_it_spawns(pipe, monkeypatch)
     pipe.images["x"] = await pipe.image(coll)
     await _publish(pipe, coll, pipe.images["x"], request=False)
     await _bounded(transport, asyncio.sleep(0), limit=HARD)
-    assert seen == [True] and orchestrate._in_delivery() is False
+    assert seen == [True] and eager_drain.in_delivery() is False
