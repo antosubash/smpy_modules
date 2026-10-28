@@ -76,7 +76,7 @@ jobs:
       - name: Upgrade to the newest versions in range
         run: |
           uv lock --upgrade 2>&1 | tee "$RUNNER_TEMP/lock-changes.txt"
-          uv sync --all-packages --all-extras
+          uv sync --all-packages --all-extras --no-extra anonymize
 
       - name: Record the resolved framework versions
         run: |

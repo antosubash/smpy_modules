@@ -6,7 +6,8 @@
 install: install-py install-js sync-module-deps
 
 install-py:
-	uv sync --all-packages --all-extras
+	# Skips the heavy anonymize extra (torch); `uv sync --extra anonymize` installs the models.
+	uv sync --all-packages --all-extras --no-extra anonymize
 
 install-js:
 	npm install
@@ -170,7 +171,7 @@ link-framework:
 	@echo "Framework linked ($(FRAMEWORK_MODULES)). Run 'make unlink-framework' to restore PyPI versions."
 
 unlink-framework:
-	uv sync --all-packages --all-extras --reinstall
+	uv sync --all-packages --all-extras --no-extra anonymize --reinstall
 	@echo "Restored PyPI framework versions."
 
 new-module:

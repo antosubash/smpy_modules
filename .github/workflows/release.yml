@@ -252,7 +252,7 @@ jobs:
       # `--locked` fails the release if uv.lock disagrees with the manifests,
       # rather than building from a silently re-resolved set (#114).
       - name: Sync workspace
-        run: uv sync --locked --all-packages --all-extras
+        run: uv sync --locked --all-packages --all-extras --no-extra anonymize
 
       # The bump rewrites every workspace package's version, and uv.lock
       # records them. Re-lock so the release commit carries a lockfile that
