@@ -32,7 +32,11 @@ def validate_style_url(value: str) -> str:
     value = value.strip()
     if not value:
         return ""
-    parts = urlsplit(value)
+    try:
+        parts = urlsplit(value)
+        parts.port  # noqa: B018 - raises ValueError for a non-numeric / out-of-range port
+    except ValueError:
+        raise ValueError("must be empty or an https:// URL") from None
     if (
         parts.scheme != "https"
         or not parts.hostname
@@ -48,11 +52,15 @@ def style_origin(url: str) -> str | None:
     """``https://host[:port]`` of a style URL, or ``None`` when there is none."""
     if not url:
         return None
-    parts = urlsplit(url)
+    try:
+        parts = urlsplit(url)
+        port = f":{parts.port}" if parts.port else ""
+    except ValueError:  # a stored value that predates validation must not 500 every response
+        return None
     if parts.scheme != "https" or not parts.hostname:
         return None
-    port = f":{parts.port}" if parts.port else ""
-    return f"https://{parts.hostname}{port}"
+    host = f"[{parts.hostname}]" if ":" in parts.hostname else parts.hostname
+    return f"https://{host}{port}"
 
 
 def csp_sources(app: Any) -> Iterable[tuple[str, str]]:

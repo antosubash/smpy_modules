@@ -127,6 +127,11 @@ def test_a_job_cancelled_while_queued_gives_its_slot_back(monkeypatch):
 
         asyncio.run(main())  # queued behind the busy threads, then cancelled
         assert ran == []
+        # the cancel reaches the pool future on a later loop turn, so poll
+        for _ in range(100):
+            if cross_check._SLOTS._value == cross_check.POOL_SIZE:  # type: ignore[attr-defined]
+                break
+            time.sleep(0.05)
         assert cross_check._SLOTS._value == cross_check.POOL_SIZE  # type: ignore[attr-defined]
     finally:
         release.set()

@@ -122,6 +122,9 @@ async def check(
         call = functools.partial(_run_then_release, slot, fn, group, results, max_bytes)
         ctx = contextvars.copy_context()  # as ``asyncio.to_thread`` would
         job = _POOL.submit(ctx.run, call)
+        # Also freed when the job is cancelled while still queued (its body
+        # never runs) - never merely because we stopped waiting for it.
+        job.add_done_callback(slot.release)
     except BaseException:
         # ``submit`` queues the item before it starts a thread, so a failure
         # there may leave it queued: it frees the slot itself if it ever runs.
@@ -129,9 +132,6 @@ async def check(
         # the pool still holds. Only a process that cannot start threads gets here.
         logger.error("images.group.cross_check_submit_failed", exc_info=True)
         raise
-    # Also freed when the job is cancelled while still queued (its body never
-    # runs) - never merely because we stopped waiting for it.
-    job.add_done_callback(slot.release)
     try:
         return await asyncio.wait_for(asyncio.wrap_future(job), limit)
     except TimeoutError as exc:

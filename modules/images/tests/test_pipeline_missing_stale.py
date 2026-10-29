@@ -52,6 +52,21 @@ async def test_newly_enabled_step_is_stale_and_rerun_stale_runs_it(pipe):
         assert (await overview(s, coll))["stale"] == 0
 
 
+async def test_an_enabled_step_that_cannot_run_starts_no_cycle(pipe):
+    """A step enabled but not installed is not stale, and re-running stale
+    must not start a new cycle for it on every click."""
+    x = Scripted("acme.x")
+    use_steps(x)  # "acme.ghost" is never registered
+    coll = await pipe.collection({"acme.x": {}})
+    img = await pipe.image(coll)
+    await pipe.run(img)
+    coll = await _enable(pipe, coll, {"acme.x": {}, "acme.ghost": {}})
+    async with pipe.db_state.session_factory() as s:
+        assert (await overview(s, coll))["stale"] == 0
+    changed = await restart.restart_collection_async(pipe.runtime, DEFAULT_TENANT, coll.id, "stale")
+    assert changed == 0
+
+
 async def test_a_trashed_image_is_not_counted(pipe):
     x, y = Scripted("acme.x"), Scripted("acme.y")
     use_steps(x, y)

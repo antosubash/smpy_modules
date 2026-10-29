@@ -186,8 +186,10 @@ async def reset_image(db: Any, tenant: str, image_id: uuid.UUID, scope: Scope) -
     runs = await load_runs(db, tenant, image_id)
     done = await reset_runs(db, tenant, image_id, _selected(scope, cfg, runs, now), now)
     # A step enabled after the image was planned has no run yet: stale (and part
-    # of "all"); the dispatch that follows inserts it.
-    missing = [s for s in cfg.enabled() if s not in runs] if runs and scope != "retry" else []
+    # of "all"); the dispatch that follows inserts it. Only a runnable one - the
+    # overview counts no other as stale, and an uninstalled step would start a
+    # new cycle on every re-run for nothing.
+    missing = [s for s in cfg.runnable() if s not in runs] if runs and scope != "retry" else []
     if done or missing:
         await bump_cycle(db, tenant, image_id)
     return sorted([*done, *missing])
