@@ -686,7 +686,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 - vitest: the block config.
 - e2e `images-public.spec.ts`: publish, then view anonymously with thumbnails; the map tab renders a canvas.
 
-- [ ] Commit `feat(images): map tab, public page and gallery block`
+- [x] Commit `feat(images): map tab, public page and gallery block`
 
 ---
 
@@ -702,7 +702,7 @@ Not eager. Start dev-services Redis, `make worker worker-imports worker-heavy be
 
 Record the results in `modules/images/docs/worker.md` and stop everything afterwards. Fix whatever breaks.
 
-- [ ] Commit `test(images): real-worker integration notes`
+- [x] Commit `test(images): real-worker integration notes`
 
 ### Task 29: Module docs and repo notes
 
