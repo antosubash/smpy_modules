@@ -85,6 +85,14 @@ WEIGHTS: dict[str, WeightsSpec] = {
 _lock = threading.Lock()
 
 
+def _after_fork_in_child() -> None:
+    global _lock
+    _lock = threading.Lock()  # never inherit one held by a parent thread
+
+
+os.register_at_fork(after_in_child=_after_fork_in_child)
+
+
 def default_cache_dir() -> Path:
     """The worker's own cache: ``~/.cache/simple_module_images/models``."""
     return Path.home() / ".cache" / "simple_module_images" / "models"

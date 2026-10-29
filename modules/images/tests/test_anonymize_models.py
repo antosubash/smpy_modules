@@ -82,6 +82,7 @@ def _yunet(face_at: dict[float, tuple[int, int]], calls: list[Any]):
             out[f"cls_{s}"] = np.zeros((1, n, 1), np.float32)
             out[f"obj_{s}"] = np.zeros((1, n, 1), np.float32)
             out[f"bbox_{s}"] = np.zeros((1, n, 4), np.float32)
+            out[f"kps_{s}"] = np.zeros((1, n, 10), np.float32)
         if w in face_at:
             row, col = face_at[w]
             cell = row * (w // 8) + col

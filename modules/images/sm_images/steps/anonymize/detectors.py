@@ -14,6 +14,7 @@ anonymised.
 
 from __future__ import annotations
 
+import os
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -58,7 +59,9 @@ class OnnxDetector:
     and ``weights``).
 
     Sessions load lazily on first use and stay loaded for the process; CUDA is
-    used when the installed onnxruntime build offers it.
+    used when the installed onnxruntime build offers it. A forked child (Celery's
+    prefork pool) never uses its parent's sessions or lock: they are dropped
+    and recreated in the child on first use.
     """
 
     def __init__(self, configured: str = "", *, cache_dir: Path | None = None) -> None:
@@ -66,8 +69,13 @@ class OnnxDetector:
         self.cache_dir = cache_dir
         self._sessions: dict[str, Any] = {}
         self._lock = threading.Lock()
+        self._pid = os.getpid()
 
     def _session(self, kind: str) -> Any:
+        if self._pid != os.getpid():  # forked: the parent's state is not ours
+            self._lock = threading.Lock()
+            self._sessions = {}
+            self._pid = os.getpid()
         with self._lock:
             session = self._sessions.get(kind)
             if session is None:
@@ -117,3 +125,14 @@ def shared_detector(configured: str) -> OnnxDetector:
         if det is None:
             det = _shared[configured] = OnnxDetector(configured)
         return det
+
+
+def _after_fork_in_child() -> None:
+    """A child starts with no detectors and an unheld lock, whatever another
+    thread of the parent was doing at the fork."""
+    global _shared, _shared_lock
+    _shared = {}
+    _shared_lock = threading.Lock()
+
+
+os.register_at_fork(after_in_child=_after_fork_in_child)

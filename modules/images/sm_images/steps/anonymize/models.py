@@ -26,7 +26,15 @@ from typing import TYPE_CHECKING, Any, Final
 if TYPE_CHECKING:
     from PIL import Image
 
-__all__ = ["FACE_COARSE_DIM", "PLATE_INPUT", "Box", "detect_faces", "detect_plates", "nms"]
+__all__ = [
+    "FACE_COARSE_DIM",
+    "PLATE_INPUT",
+    "Box",
+    "MalformedOutput",
+    "detect_faces",
+    "detect_plates",
+    "nms",
+]
 
 Box = tuple[float, float, float, float, float]
 """``(x, y, w, h, score)``."""
@@ -36,12 +44,33 @@ FaceRun = Callable[[Any], dict[str, Any]]
 """YuNet: an input tensor in, its outputs by name out."""
 
 FACE_STRIDES: Final = (8, 16, 32)
+FACE_PARTS: Final = {"cls": 1, "obj": 1, "bbox": 4, "kps": 10}
+"""YuNet's outputs per stride, and the width of each row."""
+PLATE_COLUMNS: Final = 7
 FACE_COARSE_DIM: Final = 640
 FACE_NMS_IOU: Final = 0.3
 PLATE_INPUT: Final = 608
 """The plate model's square input side (``yolo-v9-s-608``)."""
 PLATE_NMS_IOU: Final = 0.45
 TILE_OVERLAP: Final = 0.2
+
+
+class MalformedOutput(ValueError):  # noqa: N818 - reads as the failure it is
+    """A model answered something other than its contract (a swapped or broken
+    file). The run fails: never "nothing found" for an uninspected picture."""
+
+
+def _array(value: Any, name: str, shape: tuple[int, ...]) -> Any:
+    """*value* as a finite float array of exactly *shape*, or raise."""
+    import numpy as np
+
+    if not isinstance(value, np.ndarray) or not np.issubdtype(value.dtype, np.floating):
+        raise MalformedOutput(f"{name}: expected a float array, got {type(value).__name__}")
+    if value.shape != shape:
+        raise MalformedOutput(f"{name}: shape {value.shape}, expected {shape}")
+    if not np.isfinite(value).all():
+        raise MalformedOutput(f"{name}: non-finite values")
+    return value
 
 
 def nms(boxes: list[Box], iou: float) -> list[Box]:
@@ -83,12 +112,25 @@ def _face_tensor(image: Image.Image) -> tuple[Any, int]:
     return canvas.transpose(2, 0, 1)[None], pw
 
 
-def _decode_faces(outputs: dict[str, Any], cols32: int, conf: float, scale: float) -> list[Box]:
+def _face_outputs(outputs: dict[str, Any], pw: int, ph: int) -> dict[str, Any]:
+    """Every YuNet output present, nothing else, each sized for a *pw* x *ph* input."""
+    expected = {f"{part}_{s}" for part in FACE_PARTS for s in FACE_STRIDES}
+    if set(outputs) != expected:
+        raise MalformedOutput(f"face model outputs {sorted(outputs)}, expected {sorted(expected)}")
+    checked = {}
+    for name in expected:
+        part, stride = name.split("_")
+        cells = (pw // int(stride)) * (ph // int(stride))
+        checked[name] = _array(outputs[name], name, (1, cells, FACE_PARTS[part]))
+    return checked
+
+
+def _decode_faces(outputs: dict[str, Any], pw: int, conf: float, sx: float, sy: float) -> list[Box]:
     import numpy as np
 
     out: list[Box] = []
     for stride in FACE_STRIDES:
-        cols = cols32 * 32 // stride
+        cols = pw // stride
         cls = np.clip(outputs[f"cls_{stride}"][0, :, 0], 0, 1)
         obj = np.clip(outputs[f"obj_{stride}"][0, :, 0], 0, 1)
         score = np.sqrt(cls * obj)
@@ -98,16 +140,15 @@ def _decode_faces(outputs: dict[str, Any], cols32: int, conf: float, scale: floa
             dx, dy, lw, lh = (float(v) for v in bbox[i])
             w, h = math.exp(lw) * stride, math.exp(lh) * stride
             cx, cy = (col + dx) * stride, (row + dy) * stride
-            out.append(
-                ((cx - w / 2) / scale, (cy - h / 2) / scale, w / scale, h / scale, float(score[i]))
-            )
+            out.append(((cx - w / 2) / sx, (cy - h / 2) / sy, w / sx, h / sy, float(score[i])))
     return out
 
 
 def detect_faces(
     run: Callable[[Any], dict[str, Any]], image: Image.Image, conf: float
 ) -> list[Box]:
-    """YuNet at full size and, for a large picture, at :data:`FACE_COARSE_DIM`."""
+    """YuNet at full size and, for a large picture, at :data:`FACE_COARSE_DIM`.
+    Raises :class:`MalformedOutput` when the model's answer is not YuNet's."""
     scales = [1.0]
     if max(image.size) > FACE_COARSE_DIM:
         scales.append(FACE_COARSE_DIM / max(image.size))
@@ -115,15 +156,17 @@ def detect_faces(
     for scale in scales:
         probe = _scaled(image, scale)
         tensor, pw = _face_tensor(probe)
-        sx = probe.width / image.width  # the rounded scale, exact for mapping back
-        found += _decode_faces(run(tensor), pw // 32, conf, sx)
+        outputs = _face_outputs(run(tensor), pw, tensor.shape[2])
+        # Per axis: width and height were rounded independently.
+        sx, sy = probe.width / image.width, probe.height / image.height
+        found += _decode_faces(outputs, pw, conf, sx, sy)
     return nms(found, FACE_NMS_IOU)
 
 
 # --- number plates -----------------------------------------------------------
 
 
-def _letterbox(image: Image.Image, size: int) -> tuple[Any, float, int, int]:
+def _letterbox(image: Image.Image, size: int) -> tuple[Any, float, float, int, int]:
     import numpy as np
 
     r = size / max(image.size)
@@ -132,7 +175,7 @@ def _letterbox(image: Image.Image, size: int) -> tuple[Any, float, int, int]:
     dx, dy = (size - probe.width) // 2, (size - probe.height) // 2
     canvas[dy : dy + probe.height, dx : dx + probe.width] = np.asarray(probe)
     tensor = (canvas.transpose(2, 0, 1)[None] / 255.0).astype(np.float32)
-    return tensor, probe.width / image.width, dx, dy
+    return tensor, probe.width / image.width, probe.height / image.height, dx, dy
 
 
 def _tiles(w: int, h: int, size: int) -> Iterator[tuple[int, int, int, int]]:
@@ -148,16 +191,28 @@ def _tiles(w: int, h: int, size: int) -> Iterator[tuple[int, int, int, int]]:
             yield x0, y0, x0 + tw, y0 + th
 
 
+def _plate_rows(outputs: Any) -> Any:
+    """The one ``[n, 7]`` output, finite floats, or raise."""
+    if not isinstance(outputs, list | tuple) or len(outputs) != 1:
+        raise MalformedOutput("plate model: expected exactly one output")
+    rows = outputs[0]
+    shape = getattr(rows, "shape", None)
+    if shape is None or len(shape) != 2 or shape[1] != PLATE_COLUMNS:
+        raise MalformedOutput(f"plate model: output shape {shape}, expected (n, {PLATE_COLUMNS})")
+    return _array(rows, "plate output", tuple(shape))
+
+
 def detect_plates(run: Run, image: Image.Image, conf: float) -> list[Box]:
-    """The end-to-end YOLOv9 plate model on the frame (and tiles), merged."""
+    """The end-to-end YOLOv9 plate model on the frame (and tiles), merged.
+    Raises :class:`MalformedOutput` when the model's answer is not that."""
     found: list[Box] = []
     for x0, y0, x1, y1 in _tiles(image.width, image.height, PLATE_INPUT):
         crop = image if (x0, y0, x1, y1) == (0, 0, *image.size) else image.crop((x0, y0, x1, y1))
-        tensor, r, dx, dy = _letterbox(crop, PLATE_INPUT)
-        for row in run(tensor)[0]:
+        tensor, rx, ry, dx, dy = _letterbox(crop, PLATE_INPUT)
+        for row in _plate_rows(run(tensor)):
             bx1, by1, bx2, by2, score = (float(v) for v in (*row[1:5], row[6]))
             if score < conf:
                 continue
-            x, y = (bx1 - dx) / r + x0, (by1 - dy) / r + y0
-            found.append((x, y, (bx2 - bx1) / r, (by2 - by1) / r, score))
+            x, y = (bx1 - dx) / rx + x0, (by1 - dy) / ry + y0
+            found.append((x, y, (bx2 - bx1) / rx, (by2 - by1) / ry, score))
     return nms(found, PLATE_NMS_IOU)
