@@ -44,6 +44,20 @@ from sm_ai import constants
 _QTY_MAX = 2**53
 
 
+def _check_qty(qty: int) -> None:
+    if isinstance(qty, bool) or not isinstance(qty, int) or not 1 <= qty <= _QTY_MAX:
+        raise ValueError(f"qty must be an integer from 1 to {_QTY_MAX}")
+
+
+def _installed(name: str) -> bool:
+    """Whether module ``name`` is installed; only a *missing* module (or
+    parent) is ``False`` - any other import error propagates."""
+    try:
+        return find_spec(name) is not None
+    except ModuleNotFoundError:
+        return False
+
+
 def register_meter(app: FastAPI) -> bool:
     """Define ``ai.requests`` on billing's registry, when billing is running.
 
@@ -72,10 +86,7 @@ def billing_metering_installed() -> bool:
     error in an installed billing propagates, rather than quietly turning
     metering off.
     """
-    try:
-        return find_spec(constants.BILLING_QUOTA_MODULE) is not None
-    except ModuleNotFoundError:  # no sm_billing, or one without metering
-        return False
+    return _installed(constants.BILLING_QUOTA_MODULE)  # no sm_billing, or one without metering
 
 
 async def _unmetered() -> None:
@@ -92,8 +103,7 @@ def RequiresAiRequest(qty: int = 1) -> Any:  # noqa: N802 - reads like RequiresQ
     ``None``, as ``RequiresQuota`` does. Without billing (or with a billing
     older than metering) it is a no-op.
     """
-    if isinstance(qty, bool) or not isinstance(qty, int) or not 1 <= qty <= _QTY_MAX:
-        raise ValueError(f"qty must be an integer from 1 to {_QTY_MAX}")
+    _check_qty(qty)
     if not billing_metering_installed():
         return Depends(_unmetered)
     from sm_billing.metering.deps import RequiresQuota
@@ -130,10 +140,7 @@ _engine: tuple[int, str, Any] | None = None  # (pid, url, DatabaseState)
 
 def billing_installed() -> bool:
     """Whether ``sm_billing`` is installed at all: the only case left unmetered."""
-    try:
-        return find_spec(constants.BILLING_PACKAGE) is not None
-    except ModuleNotFoundError:
-        return False
+    return _installed(constants.BILLING_PACKAGE)
 
 
 def _billing_contract() -> Any:
@@ -182,8 +189,7 @@ async def consume_requests(
     the first call's outcome and counts nothing. Use job, image and attempt
     ids in it, never personal data. ``source`` names the caller (``images:classify``).
     """
-    if isinstance(qty, bool) or not isinstance(qty, int) or not 1 <= qty <= _QTY_MAX:
-        raise ValueError(f"qty must be an integer from 1 to {_QTY_MAX}")
+    _check_qty(qty)
     if not idempotency_key or not source:
         raise ValueError("idempotency_key and source are required")
     if not billing_installed():
