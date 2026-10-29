@@ -43,6 +43,9 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
     "simple_module_test>=0.0.41,<0.1",
+    # Reads built archives back in tests/test_map_tippecanoe.py. The module
+    # itself never imports it: map building shells out to tippecanoe.
+    "pmtiles>=3.2",
 ]
 
 # Heavy processors are extras, imported only inside the step that needs them:
@@ -51,7 +54,6 @@ quality = ["opencv-python-headless>=4.9"]
 # facenet-pytorch is deliberately absent: it pins Pillow<10.3 and torch<2.3, which
 # would downgrade Pillow in the one shared uv.lock. Faces and plates are both YOLO.
 anonymize = ["torch>=2.2", "ultralytics>=8.2"]
-map = ["pmtiles>=3.2"]
 
 # Sibling modules, all optional. Must stay 0.0.x ranges: the repo publishes at 0.0.x.
 # floor: 0.0.14 - ``sm_ai.contracts.consume_requests`` (``ai.requests`` metered
@@ -62,10 +64,11 @@ ai = ["simple_module_ai>=0.0.14,<0.1"]
 # ``usage_meter``'s atomic ``swap``, and its upload pre-flight is ``check`` on a
 # gauge; both first ship in 0.0.14, the next lockstep release.
 billing = ["simple_module_billing>=0.0.14,<0.1"]
-# floor: 0.0.13 - images registers blocks from ``pagebuilder-blocks.ts``, which
-# pagebuilder's ``puck-blocks.ts`` globs in (added in 0.0.12), and searches its
-# media through ``pagebuilder.contracts``.
-pagebuilder = ["simple_module_pagebuilder>=0.0.13,<0.1"]
+# floor: 0.0.12 - images imports no pagebuilder Python. It only ships
+# ``pagebuilder-blocks.ts`` (the ImageGallery block, registered through
+# ``components/blockRegistry``), which pagebuilder's ``puck-blocks.ts`` globs in
+# from sibling packages; that glob first shipped in 0.0.12 (#77).
+pagebuilder = ["simple_module_pagebuilder>=0.0.12,<0.1"]
 
 [build-system]
 requires = ["hatchling"]
@@ -83,6 +86,7 @@ exclude = [
     "**/__tests__/**",
     "**/test-dom.tsx",
     "**/*-test-support.ts",
+    "**/page-tests/**",
 ]
 artifacts = ["sm_images/static/dist/**"]
 

@@ -259,7 +259,7 @@ plus `..._TASK_EAGER_PROPAGATES=true`) and tasks run inline. CI installs
 ultralytics are never installed by default.** `make install`, the Python-tests,
 repo-checks, e2e (`.github/actions/e2e-setup`) and `release` jobs and
 `framework-latest` sync with `--all-extras --no-extra anonymize` (the `quality`,
-`map`, `ai`, `billing` and `pagebuilder` extras are installed, `anonymize` is
+`ai`, `billing` and `pagebuilder` extras are installed, `anonymize` is
 not); the Postgres and frontend jobs sync no extras. The anonymize step's default tests use a fake
 detector. Only the weekly/manual `images-models` workflow installs the extra, with
 CPU torch, and runs the `real_models` tests. The extra is AGPL-3.0 (see

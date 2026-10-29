@@ -87,7 +87,10 @@ def test_locate(tmp_path):
 
 
 def _tile_bytes(data: bytes) -> list[bytes]:
-    from pmtiles.reader import MemorySource, all_tiles
+    # ``pmtiles`` is a dev extra; CI's Postgres job installs tippecanoe but syncs
+    # no extras, so the reader may be missing where the binary is present.
+    reader = pytest.importorskip("pmtiles.reader")
+    MemorySource, all_tiles = reader.MemorySource, reader.all_tiles
 
     out = []
     for _, tile in all_tiles(MemorySource(data)):

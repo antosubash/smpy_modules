@@ -35,10 +35,12 @@ extras, imported only inside the step that needs them:
 | --- | --- |
 | `quality` | OpenCV: resolution, blur and exposure metrics |
 | `anonymize` | torch, ultralytics: YOLO face and plate detection, blurred into a display copy (the original is kept); weights from `anonymize_weights_path` or a pinned, checksummed download on first use |
-| `map` | PMTiles support for the map view (also needs the `tippecanoe` binary) |
 | `ai` | `simple_module_ai`: prompt-based image analysis |
 | `billing` | `simple_module_billing`: storage and request metering |
 | `pagebuilder` | `simple_module_pagebuilder`: an image gallery block |
+
+The map view needs no extra: its PMTiles archive is built by the `tippecanoe`
+binary (`tippecanoe_path`), which must be on the worker's machine.
 
 **Licence warning.** The `anonymize` extra installs ultralytics, which is
 AGPL-3.0, and the default weights it downloads are AGPL-3.0 community

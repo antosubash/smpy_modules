@@ -3115,12 +3115,10 @@ billing = [
     { name = "simple-module-billing" },
 ]
 dev = [
+    { name = "pmtiles" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "simple-module-test" },
-]
-map = [
-    { name = "pmtiles" },
 ]
 pagebuilder = [
     { name = "simple-module-pagebuilder" },
@@ -3137,7 +3135,7 @@ requires-dist = [
     { name = "opencv-python-headless", marker = "extra == 'quality'", specifier = ">=4.9" },
     { name = "pillow", specifier = ">=10.0" },
     { name = "pillow-heif", specifier = ">=0.18" },
-    { name = "pmtiles", marker = "extra == 'map'", specifier = ">=3.2" },
+    { name = "pmtiles", marker = "extra == 'dev'", specifier = ">=3.2" },
     { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
@@ -3157,7 +3155,7 @@ requires-dist = [
     { name = "torch", marker = "extra == 'anonymize'", specifier = ">=2.2" },
     { name = "ultralytics", marker = "extra == 'anonymize'", specifier = ">=8.2" },
 ]
-provides-extras = ["dev", "quality", "anonymize", "map", "ai", "billing", "pagebuilder"]
+provides-extras = ["dev", "quality", "anonymize", "ai", "billing", "pagebuilder"]
 
 [[package]]
 name = "simple-module-inertia"

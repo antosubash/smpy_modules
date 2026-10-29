@@ -75,10 +75,12 @@ configuration, its runs settling as `not_installed`.
 | --- | --- |
 | `quality` | OpenCV: resolution, blur and exposure metrics |
 | `anonymize` | torch and ultralytics: face and number-plate detection, blurred into a display copy. **See the licence warning below** |
-| `map` | PMTiles support for the map view; also needs the `tippecanoe` binary |
 | `ai` | `simple_module_ai`: `classify` and prompts |
 | `billing` | `simple_module_billing`: storage and AI-request metering |
 | `pagebuilder` | `simple_module_pagebuilder`: the `ImageGallery` block |
+
+The map view needs no extra: its PMTiles archive is built by the `tippecanoe`
+binary (`tippecanoe_path`), which must be on the worker's machine.
 
 The module depends on the framework's `settings`, `sharing`, `file_storage` and
 `background_tasks` modules. Migrations live in the consuming host
