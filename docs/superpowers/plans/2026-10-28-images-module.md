@@ -570,7 +570,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 
 **Tests:** `test_display_written_original_untouched`, `test_renditions_rerun_from_display`, `test_original_route_permission`, and `@pytest.mark.real_models test_real_face_blur`.
 
-- [ ] Commit `feat(images): anonymization writes a display copy`
+- [x] Commit `feat(images): anonymization writes a display copy`
 
 ---
 
