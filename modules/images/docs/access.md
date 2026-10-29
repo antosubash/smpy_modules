@@ -121,7 +121,10 @@ Caching follows who the answer depends on:
 - Error answers on the public routes carry `no-store`.
 
 `public_asset_base_url`, when set, makes public pages link renditions of public
-collections to that origin (a bucket or CDN) instead of this application.
+collections to that origin (a bucket or CDN) instead of this application. It is
+single-tenant only: on a multi-tenant host the public routes learn the tenant
+from the request's organisation subdomain, which one CDN origin cannot carry,
+so the setting is ignored there and a warning is logged at boot.
 
 ## Tenancy
 

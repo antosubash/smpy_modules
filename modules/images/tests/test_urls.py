@@ -135,3 +135,36 @@ async def test_on_startup_reads_the_public_asset_base(images_app):
     pub = _coll(Visibility.PUBLIC)
     img = _image(pub)
     assert urls.rendition_url(img, _rend(img), collection=pub).startswith(CDN)
+
+
+def test_a_multi_tenant_host_ignores_the_public_asset_base(caplog):
+    """A CDN origin carries no tenant, so on a multi-tenant host every public
+    URL behind it would 404 (``bind_public`` resolves none): ignored, with a
+    warning at boot."""
+    from sm_images.tenancy import TenancyMode
+
+    with caplog.at_level("WARNING", logger="sm_images.urls"):
+        urls.configure(CDN, TenancyMode.MULTI)
+    assert "public_asset_base_url" in caplog.text
+    pub = _coll(Visibility.PUBLIC)
+    img = _image(pub)
+    rend = _rend(img)
+    assert urls.rendition_url(img, rend, collection=pub).startswith("/api/images/images/")
+    assert urls.public_rendition_url(pub, img, rend).startswith("/api/images/public/c/")
+    caplog.clear()
+    urls.configure(CDN, TenancyMode.SINGLE)
+    assert not caplog.records
+    assert urls.public_display_url(pub, img).startswith(CDN)
+
+
+async def test_on_startup_ignores_the_base_on_a_multi_tenant_host(images_app, monkeypatch):
+    from sm_images import tenancy
+    from sm_images.tenancy import TenancyMode
+
+    app, _ = images_app
+    app.state.sm_images.settings.public_asset_base_url = CDN
+    monkeypatch.setattr(tenancy, "configure", lambda _app: TenancyMode.MULTI)
+    await ImagesModule().on_startup(app)
+    pub = _coll(Visibility.PUBLIC)
+    img = _image(pub)
+    assert urls.display_url(img, collection=pub).startswith("/api/images/images/")

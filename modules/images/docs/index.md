@@ -151,7 +151,7 @@ tenant. Workers read the same values (cached for about 30 seconds).
 | `step_lease_seconds` | 1 800 | How long a running step holds its lease |
 | `tippecanoe_path` | `tippecanoe` | The binary that builds PMTiles. **Restart** |
 | `anonymize_weights_path` | empty | Directory with `face.pt` and `plate.pt`. **Restart** |
-| `public_asset_base_url` | empty | Origin that serves public renditions instead of this app. **Restart** |
+| `public_asset_base_url` | empty | Origin that serves public renditions instead of this app; single-tenant hosts only (ignored, with a warning, on a multi-tenant one). **Restart** |
 
 `thumbnail_sizes` and the limits are read per request or per task. The three
 fields marked **Restart** are read once while booting.

@@ -174,9 +174,9 @@ class ImagesModule(ModuleBase):
 
         setattr(app.state, constants.MODULE_ATTR, self)
         billing.register_meter(app)
-        tenancy.configure(app)
+        mode = tenancy.configure(app)
         settings = getattr(app.state, constants.PACKAGE).settings
-        urls.configure(settings.public_asset_base_url)
+        urls.configure(settings.public_asset_base_url, mode)
         self.tippecanoe_path = settings.tippecanoe_path
         load_extensions()
         self.mount_public_pages(app)

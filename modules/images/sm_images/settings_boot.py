@@ -54,5 +54,7 @@ class BootSettings(DbBackedSettings):
 
     Empty (the default) serves them through this application. When set, public
     pages link renditions of public collections to this base instead. Read once,
-    while booting, with the route table.
+    while booting, with the route table. Single-tenant hosts only: a
+    multi-tenant host ignores it (with a boot warning), because a CDN origin
+    carries no tenant and the public routes behind it would 404.
     """

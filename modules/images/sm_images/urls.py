@@ -10,14 +10,20 @@ refuses to call a request "current" unless its ``v`` matches.
 :func:`configure`) puts a CDN in front of the **public twin** for public
 collections only. A private or internal collection's URL is always this app's
 access-checked admin route: a CDN must never hold what the policy guards.
+It is single-tenant only: on a multi-tenant host the anonymous twin learns its
+tenant from the request (the organisation's subdomain), which one CDN origin
+does not carry, so every URL behind it would 404. There the base is ignored,
+with one warning at boot.
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 from urllib.parse import quote
 
 from sm_images import cache, constants
+from sm_images._tenancy_mode import TenancyMode
 from sm_images.models import Visibility
 
 __all__ = [
@@ -30,13 +36,24 @@ __all__ = [
     "rendition_url",
 ]
 
+logger = logging.getLogger("sm_images.urls")
+
 _public_base = ""
 
 
-def configure(public_asset_base_url: str) -> None:
-    """Remember the CDN base (``""`` for none). Called from ``on_startup``."""
+def configure(public_asset_base_url: str, mode: TenancyMode | None = None) -> None:
+    """Remember the CDN base (``""`` for none). Called from ``on_startup`` with
+    the host's tenancy *mode*; on a multi-tenant host the base is ignored."""
     global _public_base
-    _public_base = (public_asset_base_url or "").strip().rstrip("/")
+    base = (public_asset_base_url or "").strip().rstrip("/")
+    if base and mode is TenancyMode.MULTI:
+        logger.warning(
+            "images: public_asset_base_url (%s) is ignored on a multi-tenant host: "
+            "a CDN origin carries no tenant, so the public routes behind it would 404",
+            base,
+        )
+        base = ""
+    _public_base = base
 
 
 def image_path(image_id: Any, tail: str) -> str:
