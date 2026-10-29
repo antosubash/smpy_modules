@@ -150,6 +150,11 @@ runs again on each redirect, and the resolved addresses are the ones dialled, so
 DNS rebinding cannot swap them. Loopback, private, link-local and metadata
 addresses are refused.
 
+A presigned source URL's query string is its credential, so it is kept out of the
+logs: a filter on the `httpx` logger (installed at boot and in every worker)
+logs each request with its scheme, host and path only. Images' own log lines
+name the host, never the URL.
+
 A fetch honours `download_timeout` and the size cap. Transport errors, 408, 429
 and 5xx are retried with backoff, honouring `Retry-After` (a date or seconds; a
 wait over a day fails the item, and a wait too long to sit through leaves the item

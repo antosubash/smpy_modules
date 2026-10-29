@@ -170,7 +170,10 @@ class ImagesModule(ModuleBase):
         after-commit dispatch runs on, and the ``images.storage_bytes`` gauge
         on billing's registry when billing runs."""
         from sm_images import billing, intents, tenancy, urls
+        from sm_images.imports import log_redact
         from sm_images.pipeline.extensions import load_extensions
+
+        log_redact.install()
 
         setattr(app.state, constants.MODULE_ATTR, self)
         billing.register_meter(app)

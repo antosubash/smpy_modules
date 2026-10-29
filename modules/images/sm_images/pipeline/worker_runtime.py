@@ -120,9 +120,11 @@ def _bus() -> Any:
 
 
 def worker_runtime() -> Runtime:
+    from sm_images.imports import log_redact
     from sm_images.pipeline.extensions import load_extensions
     from sm_images.storage import worker_store
 
+    log_redact.install()
     load_extensions()
     return Runtime(
         session_factory=worker_session_factory(),
