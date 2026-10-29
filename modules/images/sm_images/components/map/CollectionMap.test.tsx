@@ -94,4 +94,22 @@ describe('CollectionMap (review of QA round 1)', () => {
     expect(view.find('[data-testid="fake-map"]')).not.toBeNull();
     await view.unmount();
   });
+
+  it("never keeps another collection's map", async () => {
+    vi.mocked(resolveMapSource)
+      .mockResolvedValueOnce({ kind: 'points', features: [point('a')] })
+      .mockRejectedValueOnce(new Error('503'));
+    const el = (pointsUrl: string) => (
+      <CollectionMap pointsUrl={pointsUrl} mapUrl="/m" bbox={null} onSelect={() => {}} />
+    );
+    const view = await mount(el('/p1'));
+    await flush();
+    await flush();
+    await view.render(el('/p2'));
+    expect(view.find('[data-testid="fake-map"]')).toBeNull(); // not /p1's points
+    await flush();
+    await flush();
+    expect(view.find('[data-testid="fake-map"]')).toBeNull();
+    await view.unmount();
+  });
 });

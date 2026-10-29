@@ -20,7 +20,10 @@ type Props = {
   version?: string;
 };
 
-type State = { phase: 'loading' } | { phase: 'failed' } | { phase: 'ready'; source: MapSource };
+type State =
+  | { phase: 'loading' }
+  | { phase: 'failed' }
+  | { phase: 'ready'; source: MapSource; key: string };
 
 /** A collection's map: finds out whether an archive exists, falls back to the
  *  points, and says so when there is nothing to place. */
@@ -38,16 +41,19 @@ export function CollectionMap({
   // biome-ignore lint/correctness/useExhaustiveDependencies: `version` asks for a fresh read
   useEffect(() => {
     const controller = new AbortController();
-    // A refresh keeps the drawn map until the fresh source is in.
-    setState((s) => (s.phase === 'ready' ? s : { phase: 'loading' }));
+    // A refresh of the same collection keeps the drawn map until the fresh
+    // source is in; another collection's map is never kept.
+    const key = `${pointsUrl}|${mapUrl}`;
+    const keep = (s: State, otherwise: State): State =>
+      s.phase === 'ready' && s.key === key ? s : otherwise;
+    setState((s) => keep(s, { phase: 'loading' }));
     resolveMapSource({ pointsUrl, mapUrl }, controller.signal)
       .then((source) => {
-        if (!controller.signal.aborted) setState({ phase: 'ready', source });
+        if (!controller.signal.aborted) setState({ phase: 'ready', source, key });
       })
       .catch(() => {
         // A failed refresh keeps the map already drawn.
-        if (!controller.signal.aborted)
-          setState((s) => (s.phase === 'ready' ? s : { phase: 'failed' }));
+        if (!controller.signal.aborted) setState((s) => keep(s, { phase: 'failed' }));
       });
     return () => controller.abort();
   }, [pointsUrl, mapUrl, version]);
