@@ -61,6 +61,7 @@ READ_ROUTES: list[ReadRoute] = [
     ReadRoute("GET", "/api/images/collections/{collection_id}/prompts", COLLECTION),
     ReadRoute("GET", "/api/images/prompts/{prompt_id}", IMAGE),
     ReadRoute("GET", "/api/images/prompts/{prompt_id}/results", IMAGE),
+    ReadRoute("GET", "/api/images/collections/{collection_id}/review", COLLECTION),
     ReadRoute("GET", "/api/images/presets", GLOBAL),
     ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/r/{size}", PUBLIC),
     ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/display", PUBLIC),

@@ -11,7 +11,13 @@ from dataclasses import dataclass
 
 from simple_module_core.events import Event
 
-__all__ = ["CollectionDeleted", "CollectionVisibilityChanged", "ImageAdded", "ImageProcessed"]
+__all__ = [
+    "CollectionDeleted",
+    "CollectionVisibilityChanged",
+    "ImageAdded",
+    "ImageProcessed",
+    "PromptResultReviewed",
+]
 
 
 @dataclass
@@ -61,3 +67,20 @@ class ImageProcessed(Event):
     collection_id: str
     image_id: str
     processing_generation: int
+
+
+@dataclass
+class PromptResultReviewed(Event):
+    """A person accepted, corrected or rejected an AI result. Exactly one of
+    ``image_id`` and ``group_id`` is set. The reviewed value itself is not
+    carried: read it through :class:`PromptResultRead`."""
+
+    tenant_id: str
+    collection_id: str
+    prompt_id: str
+    result_id: int
+    image_id: str | None
+    group_id: str | None
+    action: str
+    review_status: str
+    reviewed_by: str

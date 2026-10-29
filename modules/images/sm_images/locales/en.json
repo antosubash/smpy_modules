@@ -257,7 +257,10 @@
     "group_too_large": "The group has too many images for one summary.",
     "member_prompt_missing": "The image prompt this group prompt reads is gone.",
     "member_results_missing": "Some images of the group have no result, so the summary is incomplete.",
-    "no_usable_inputs": "Nothing in the group could be sent to the AI provider."
+    "no_usable_inputs": "Nothing in the group could be sent to the AI provider.",
+    "review_stale": "This result changed since you opened it.",
+    "invalid_review_data": "The correction does not match the prompt's output schema.",
+    "invalid_schema": "The prompt's output schema cannot be used to check a correction."
   },
   "tabs": {
     "label": "Collection sections",
@@ -525,5 +528,54 @@
       "go_one": "Run on {count} image",
       "go_other": "Run on {count} images"
     }
+  },
+  "review": {
+    "title": "Review",
+    "open": "Review results",
+    "back": "Back to the collection",
+    "empty": "Nothing to review.",
+    "loading": "Loading…",
+    "queue": "Queue",
+    "position": "{n} of {total}",
+    "more": "Load more",
+    "filter": {
+      "status": "Status",
+      "prompt": "Prompt",
+      "all_prompts": "All prompts",
+      "all": "All",
+      "unreviewed": "Unreviewed",
+      "accepted": "Accepted",
+      "corrected": "Corrected",
+      "rejected": "Rejected"
+    },
+    "status": {
+      "unreviewed": "Unreviewed",
+      "accepted": "Accepted",
+      "corrected": "Corrected",
+      "rejected": "Rejected"
+    },
+    "accept": "Accept",
+    "reject": "Reject",
+    "edit": "Correct",
+    "save": "Save correction",
+    "cancel": "Cancel",
+    "stale_prompt": "Produced under an older version of the prompt.",
+    "model_output": "Model output",
+    "reviewed_value": "Reviewed value",
+    "saved": "Review saved.",
+    "stale": "This result changed since you opened it. The queue was reloaded.",
+    "keys": "Keys: j next, k previous, a accept, r reject, e correct.",
+    "form": {
+      "text": "Text",
+      "json": "Corrected value (JSON)",
+      "json_invalid": "That is not valid JSON.",
+      "json_object": "The value must be a JSON object.",
+      "required": "Required",
+      "number_invalid": "Enter a number.",
+      "list_hint": "One value per line",
+      "choose": "Choose…"
+    },
+    "image": "Image",
+    "group": "Group"
   }
 }

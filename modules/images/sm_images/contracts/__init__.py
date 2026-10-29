@@ -13,6 +13,7 @@ from sm_images.contracts.events import (
     CollectionVisibilityChanged,
     ImageAdded,
     ImageProcessed,
+    PromptResultReviewed,
 )
 from sm_images.contracts.reads import get_collection, list_collections, rendition_url
 from sm_images.contracts.schemas import CollectionPageRead, CollectionRead, ImageRead
@@ -55,6 +56,7 @@ __all__ = [
     "ImageRead",
     "Preset",
     "PromptResultRead",
+    "PromptResultReviewed",
     "PromptSpec",
     "RegistryFrozenError",
     "ReservedStepIdError",

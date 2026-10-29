@@ -101,8 +101,10 @@ async def test_a_slow_download_heartbeats_and_is_not_reclaimed(imp, monkeypatch)
     monkeypatch.setattr(launch, "launch_downloads", _record(sent))
     monkeypatch.setattr(beat, "HEARTBEAT_SECONDS", 0.05)
 
+    release = asyncio.Event()
+
     async def slow(url, limiter, settings, prior):
-        await asyncio.sleep(0.6)  # longer than the (shrunk) stale cutoff below
+        await release.wait()  # held until the test has seen the heartbeat renewed
         return jpeg((8, 6), "blue"), 1
 
     monkeypatch.setattr(download, "fetch_with_retries", slow)
@@ -114,8 +116,16 @@ async def test_a_slow_download_heartbeats_and_is_not_reclaimed(imp, monkeypatch)
     task = asyncio.create_task(
         download.download_items_async(imp.runtime, DEFAULT_TENANT, job.id, row.generation, sent[0])
     )
-    await asyncio.sleep(0.3)
-    await _reconcile(imp, datetime.now(UTC) - timedelta(seconds=0.2))
+    horizon = datetime.now(UTC) - timedelta(seconds=30)
+    for _ in range(400):  # event-driven: until the beat has renewed the 1h-old heartbeat
+        beating = (await imp.reload(job)).heartbeat_at
+        if beating is not None and beating.replace(tzinfo=UTC) > horizon:
+            break
+        await asyncio.sleep(0.05)
+    else:
+        pytest.fail("the heartbeat was never renewed")
+    await _reconcile(imp, horizon)  # a download still held: a stale job would be reclaimed
+    release.set()
     assert await task == 1
     after = await imp.reload(job)
     assert after.generation == row.generation  # never reclaimed

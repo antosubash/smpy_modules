@@ -110,6 +110,16 @@ function Collection({
                 onDone={() => void gallery.reload()}
               />
             )}
+            {can_edit && (
+              <Button
+                type="button"
+                variant="outline"
+                data-testid="images-open-review"
+                onClick={() => router.visit(`/admin/images/${collection.id}/review`)}
+              >
+                {t(keys.images.review.open)}
+              </Button>
+            )}
             {can_share && <ShareDialog collectionId={collection.id} />}
           </>
         }

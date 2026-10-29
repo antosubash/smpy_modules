@@ -257,7 +257,10 @@
     "group_too_large": "Die Gruppe enthält zu viele Bilder für eine Zusammenfassung.",
     "member_prompt_missing": "Der Bild-Prompt, den dieser Gruppen-Prompt liest, existiert nicht mehr.",
     "member_results_missing": "Für einige Bilder der Gruppe fehlt ein Ergebnis, daher ist die Zusammenfassung unvollständig.",
-    "no_usable_inputs": "Aus der Gruppe konnte nichts an den KI-Anbieter gesendet werden."
+    "no_usable_inputs": "Aus der Gruppe konnte nichts an den KI-Anbieter gesendet werden.",
+    "review_stale": "Dieses Ergebnis hat sich seit dem Öffnen geändert.",
+    "invalid_review_data": "Die Korrektur passt nicht zum Ausgabeschema des Prompts.",
+    "invalid_schema": "Mit dem Ausgabeschema des Prompts lässt sich keine Korrektur prüfen."
   },
   "tabs": {
     "label": "Bereiche der Sammlung",
@@ -525,5 +528,54 @@
       "go_one": "Auf {count} Bild ausführen",
       "go_other": "Auf {count} Bildern ausführen"
     }
+  },
+  "review": {
+    "title": "Prüfen",
+    "open": "Ergebnisse prüfen",
+    "back": "Zurück zur Sammlung",
+    "empty": "Nichts zu prüfen.",
+    "loading": "Wird geladen…",
+    "queue": "Warteschlange",
+    "position": "{n} von {total}",
+    "more": "Mehr laden",
+    "filter": {
+      "status": "Status",
+      "prompt": "Prompt",
+      "all_prompts": "Alle Prompts",
+      "all": "Alle",
+      "unreviewed": "Ungeprüft",
+      "accepted": "Akzeptiert",
+      "corrected": "Korrigiert",
+      "rejected": "Abgelehnt"
+    },
+    "status": {
+      "unreviewed": "Ungeprüft",
+      "accepted": "Akzeptiert",
+      "corrected": "Korrigiert",
+      "rejected": "Abgelehnt"
+    },
+    "accept": "Akzeptieren",
+    "reject": "Ablehnen",
+    "edit": "Korrigieren",
+    "save": "Korrektur speichern",
+    "cancel": "Abbrechen",
+    "stale_prompt": "Mit einer älteren Version des Prompts erzeugt.",
+    "model_output": "Ausgabe des Modells",
+    "reviewed_value": "Geprüfter Wert",
+    "saved": "Prüfung gespeichert.",
+    "stale": "Dieses Ergebnis hat sich seit dem Öffnen geändert. Die Warteschlange wurde neu geladen.",
+    "keys": "Tasten: j weiter, k zurück, a akzeptieren, r ablehnen, e korrigieren.",
+    "form": {
+      "text": "Text",
+      "json": "Korrigierter Wert (JSON)",
+      "json_invalid": "Das ist kein gültiges JSON.",
+      "json_object": "Der Wert muss ein JSON-Objekt sein.",
+      "required": "Pflichtfeld",
+      "number_invalid": "Gib eine Zahl ein.",
+      "list_hint": "Ein Wert pro Zeile",
+      "choose": "Auswählen…"
+    },
+    "image": "Bild",
+    "group": "Gruppe"
   }
 }

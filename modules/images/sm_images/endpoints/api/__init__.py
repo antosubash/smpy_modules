@@ -17,6 +17,7 @@ from sm_images.endpoints.api import (
     pipeline,
     presets,
     prompts,
+    review,
     serve,
     shares,
     uploads,
@@ -42,5 +43,6 @@ router.include_router(uploads.router)
 router.include_router(pipeline.router)
 router.include_router(prompts.router)
 router.include_router(presets.router)
+router.include_router(review.router)
 router.include_router(serve.router)
 router.include_router(imports.router)

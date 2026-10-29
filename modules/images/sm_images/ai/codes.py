@@ -14,6 +14,9 @@ CODE_INVALID_RUN_TARGET: Final = "invalid_run_target"
 CODE_AI_UNAVAILABLE: Final = "ai_unavailable"
 CODE_PROMPT_IN_USE: Final = "prompt_in_use"
 CODE_PRESET_NOT_FOUND: Final = "preset_not_found"
+CODE_REVIEW_STALE: Final = "review_stale"
+CODE_INVALID_REVIEW: Final = "invalid_review_data"
+CODE_INVALID_SCHEMA: Final = "invalid_schema"
 GROUP_RUN_CODES: Final = (
     "group_empty",
     "group_too_large",
@@ -31,6 +34,9 @@ AI_CODES: Final = (
     CODE_AI_UNAVAILABLE,
     CODE_PROMPT_IN_USE,
     CODE_PRESET_NOT_FOUND,
+    CODE_REVIEW_STALE,
+    CODE_INVALID_REVIEW,
+    CODE_INVALID_SCHEMA,
     "display_not_ready",
     "ai_not_configured",
     "quota_exceeded",

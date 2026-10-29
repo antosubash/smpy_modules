@@ -23,6 +23,7 @@ from sm_images import constants
 from sm_images import redaction as redaction_state
 from sm_images.access import (
     POLICY,
+    CollectionEdit,
     CollectionView,
     ImageCollectionView,
     can_edit,
@@ -125,4 +126,14 @@ async def collection_page(
             # Where the uploader switches from one multipart request to a direct upload.
             "direct_upload_threshold": get_settings(request).direct_upload_threshold,
         },
+    )
+
+
+@router.get("/{collection_id}/review", response_model=None)
+async def review_page(
+    collection: CollectionEdit, inertia: InertiaDep, who: Principal
+) -> InertiaResponse:
+    """The review queue; the results themselves are fetched by the page."""
+    return await inertia.render(
+        constants.PAGE_REVIEW, {"collection": _out(collection, who).model_dump(mode="json")}
     )

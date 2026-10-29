@@ -14,11 +14,16 @@ from typing import Any
 from simple_module_db.callbacks import register_on_commit
 from simple_module_db.listeners import current_tenant_id
 
-from sm_images.contracts.events import CollectionDeleted, CollectionVisibilityChanged, ImageAdded
-from sm_images.models import Collection, Image
+from sm_images.contracts.events import (
+    CollectionDeleted,
+    CollectionVisibilityChanged,
+    ImageAdded,
+    PromptResultReviewed,
+)
+from sm_images.models import Collection, Image, PromptResult
 from sm_images.tenancy import bound_tenant, tenant_scope
 
-__all__ = ["deleted", "emit", "image_added", "visibility_changed"]
+__all__ = ["deleted", "emit", "image_added", "result_reviewed", "visibility_changed"]
 
 
 async def _publish(bus: Any, event: Any, tenant: str | None) -> None:
@@ -58,4 +63,20 @@ def image_added(image: Image, source: str) -> ImageAdded:
         collection_id=str(image.collection_id),
         image_id=str(image.id),
         source=source,
+    )
+
+
+def result_reviewed(
+    row: PromptResult, collection_id: Any, action: str, reviewer: str
+) -> PromptResultReviewed:
+    return PromptResultReviewed(
+        tenant_id=bound_tenant(),
+        collection_id=str(collection_id),
+        prompt_id=str(row.prompt_id),
+        result_id=int(row.id or 0),
+        image_id=str(row.image_id) if row.image_id else None,
+        group_id=str(row.group_id) if row.group_id else None,
+        action=action,
+        review_status=row.review_status.value,
+        reviewed_by=reviewer,
     )
