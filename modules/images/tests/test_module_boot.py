@@ -17,7 +17,6 @@ EXPECTED_PERMISSIONS = {
     "images.publish",
     "images.manage",
     "images.originals.view",
-    "images.settings",
 }
 
 
@@ -28,6 +27,10 @@ def test_module_registers_permissions():
     (group,) = registry.groups
     assert group.name == constants.PERM_GROUP
     assert group.label_key == "images.permission_group"
+    # Settings are governed by the framework's ``settings.edit``; a permission
+    # that grants nothing must not be offered to admins.
+    assert "images.settings" not in registry.all_permissions
+    assert not hasattr(constants, "PERM_SETTINGS")
 
 
 def test_only_boot_time_fields_ask_for_a_restart():

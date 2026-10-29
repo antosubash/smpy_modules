@@ -114,9 +114,11 @@ The weights are never in the wheel. Where they come from is in
 | `images.publish` | Make a collection `internal` or `public` |
 | `images.manage` | Act on every collection of the tenant as if the owner (it also satisfies `images.publish`) |
 | `images.originals.view` | Download the immutable original of a protected image |
-| `images.settings` | Reserved; grants nothing today. The module's settings are edited on the framework's Settings screen, gated by its `settings.edit` |
 
 [access.md](access.md) has the full table of who may do what.
+
+The module's settings are governed by the framework's `settings.edit`, as every
+other module's are; images has no settings permission of its own.
 
 ## Settings
 

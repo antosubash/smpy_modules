@@ -77,9 +77,11 @@ none).
 | `images.publish` | Make a collection public or internal |
 | `images.manage` | Manage every collection regardless of owner |
 | `images.originals.view` | Download the immutable original |
-| `images.settings` | Reserved; grants nothing today. The module's settings are edited on the framework's Settings screen, gated by its `settings.edit` |
 
 ### Settings
+
+The module's settings are governed by the framework's `settings.edit`, as every
+other module's are; images has no settings permission of its own.
 
 Stored in the database and edited on the Settings screen; there is no
 `SM_IMAGES_*` environment variable. System scope: one configuration for every

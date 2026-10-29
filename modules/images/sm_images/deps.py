@@ -2,9 +2,9 @@
 
 The module's permissions are its static surface; per-collection access
 (owner, shares, visibility) is the access policy added with the collections
-endpoints, and narrows what these admit. ``images.settings`` has no dependency
-here: it is registered but reserved, because the module's settings are written
-through the framework's Settings screen and API, gated by ``settings.edit``.
+endpoints, and narrows what these admit. There is no settings permission: the
+module's settings are written through the framework's Settings screen and API,
+governed by ``settings.edit``.
 """
 
 from __future__ import annotations

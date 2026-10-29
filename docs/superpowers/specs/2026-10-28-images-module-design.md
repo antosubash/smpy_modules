@@ -162,8 +162,10 @@ a bespoke share table here.
 - `images.create`;
 - `images.publish` (internal or public visibility);
 - `images.manage` (bypass across the tenant);
-- `images.originals.view` (see below);
-- `images.settings`.
+- `images.originals.view` (see below).
+
+No settings permission: the module's settings are governed by the framework's
+`settings.edit`, like every other module's (final review).
 
 **Originals.** When an image has a `display_key`, meaning a step produced a
 derivative such as a blurred copy:

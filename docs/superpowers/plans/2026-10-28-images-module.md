@@ -122,7 +122,7 @@
 - Constants:
   - `PACKAGE="sm_images"`, `MODULE_NAME="Images"`, `DISTRIBUTION="simple_module_images"`;
   - `ROUTE_PREFIX_API="/api/images"`, `VIEW_PREFIX="/admin/images"`, `PUBLIC_PREFIX="/images"`;
-  - `PERM_VIEW/CREATE/PUBLISH/MANAGE/ORIGINALS/SETTINGS` = `images.view`, `images.create`, `images.publish`, `images.manage`, `images.originals.view`, `images.settings`.
+  - `PERM_VIEW/CREATE/PUBLISH/MANAGE/ORIGINALS` = `images.view`, `images.create`, `images.publish`, `images.manage`, `images.originals.view` (`images.settings` was dropped in the final review: settings are governed by the framework's `settings.edit`).
 - `ImagesSettings(DbBackedSettings)`:
   - `max_image_bytes=50*2**20`, `batch_max=50`, `upload_body_max_bytes=100*2**20`, `direct_upload_threshold=20*2**20`;
   - `zip_max_bytes=2*2**30`, `zip_max_entries=10_000`, `zip_max_entry_bytes=200*2**20`, `zip_max_total_bytes=8*2**30`, `zip_max_ratio=200`;
