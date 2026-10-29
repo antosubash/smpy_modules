@@ -185,6 +185,7 @@ class ImagesModule(ModuleBase):
                 store=lambda: store_for(app),
                 settings=lambda: getattr(app.state, constants.PACKAGE).settings,
                 bus=lambda: getattr(getattr(app.state, "sm", None), "event_bus", None),
-                multi_tenant=lambda: tenancy_mode(app) is TenancyMode.MULTI,
+                # Anything not clearly single-tenant is multi: fail closed.
+                multi_tenant=lambda: tenancy_mode(app) is not TenancyMode.SINGLE,
             )
         )

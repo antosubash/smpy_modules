@@ -199,6 +199,7 @@ async def make_pipe(tmp_path: Path, db_state: Any = None, **settings: Any) -> Pi
         settings=lambda: cfg,
         bus=lambda: bus,
         eager=True,
+        multi_tenant=lambda: False,  # the harness is a single-tenant host
     )
     return Pipe(state, store, cfg, bus, runtime, backend)
 

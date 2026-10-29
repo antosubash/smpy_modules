@@ -26,7 +26,14 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 
-__all__ = ["Runtime", "bind_runtime", "celery_eager", "current_runtime", "use_runtime"]
+__all__ = [
+    "Runtime",
+    "bind_runtime",
+    "celery_eager",
+    "current_runtime",
+    "use_runtime",
+    "worker_multi_tenant",
+]
 
 
 def celery_eager() -> bool:
@@ -47,7 +54,8 @@ class Runtime:
     eager: bool | None = None
     multi_tenant: Callable[[], bool] | None = None
     """The host's tenancy mode: the framework's in the web process, the worker
-    engine's policy in a worker. Never inferred from a tenant id."""
+    engine's policy in a worker (:func:`worker_multi_tenant`). Never inferred
+    from a tenant id; an unknown mode is multi-tenant (fail closed)."""
 
     def is_eager(self) -> bool:
         return celery_eager() if self.eager is None else self.eager
@@ -55,9 +63,24 @@ class Runtime:
     def is_multi_tenant(self) -> bool:
         if self.multi_tenant is not None:
             return bool(self.multi_tenant())
+        return worker_multi_tenant()
+
+
+def worker_multi_tenant() -> bool:
+    """The worker engine's ``tenant_strict`` (it mirrors the host's
+    ``multi_tenant``) - or ``True`` when there is no policy to read: the engine
+    was never configured (``set_database_url`` not called; read from the
+    framework's ``_url_override``, so its disappearance also fails closed), the
+    policy cannot be built, or it does not say."""
+    try:
         from background_tasks import sync_db
 
-        return bool(sync_db.engine_tenancy().tenant_strict)
+        if getattr(sync_db, "_url_override", None) is None:
+            return True
+        strict = getattr(sync_db.engine_tenancy(), "tenant_strict", None)
+    except Exception:
+        return True
+    return True if strict is None else bool(strict)
 
 
 _runtime: Runtime | None = None

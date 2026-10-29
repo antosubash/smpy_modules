@@ -63,8 +63,8 @@ async def test_a_single_tenant_host_never_checks_membership(imp):
 
 async def test_the_runtime_reports_the_hosts_mode():
     rt = runtime_mod.Runtime(session_factory=None, store=lambda: None, settings=lambda: None)
-    assert rt.is_multi_tenant() is False  # a worker engine without tenant_strict
     assert dataclasses.replace(rt, multi_tenant=lambda: True).is_multi_tenant() is True
+    assert dataclasses.replace(rt, multi_tenant=lambda: False).is_multi_tenant() is False
 
 
 async def test_the_web_runtime_follows_the_frameworks_tenancy_mode():
