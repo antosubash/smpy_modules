@@ -114,7 +114,7 @@ The weights are never in the wheel. Where they come from is in
 | `images.publish` | Make a collection `internal` or `public` |
 | `images.manage` | Act on every collection of the tenant as if the owner (it also satisfies `images.publish`) |
 | `images.originals.view` | Download the immutable original of a protected image |
-| `images.settings` | Edit the module's settings |
+| `images.settings` | Reserved; grants nothing today. The module's settings are edited on the framework's Settings screen, gated by its `settings.edit` |
 
 [access.md](access.md) has the full table of who may do what.
 
@@ -151,7 +151,7 @@ tenant. Workers read the same values (cached for about 30 seconds).
 | `step_output_max_bytes` | 65 536 | Largest JSON a step may store |
 | `step_lease_seconds` | 1 800 | How long a running step holds its lease |
 | `tippecanoe_path` | `tippecanoe` | The binary that builds PMTiles. **Restart** |
-| `anonymize_weights_path` | empty | Directory with `face.pt` and `plate.pt`. **Restart** |
+| `anonymize_weights_path` | empty | Directory with `face.pt` and `plate.pt`; read per run |
 | `public_asset_base_url` | empty | Origin that serves public renditions instead of this app; single-tenant hosts only (ignored, with a warning, on a multi-tenant one). **Restart** |
 
 `thumbnail_sizes` and the limits are read per request or per task. The three

@@ -11,7 +11,7 @@ request, or per task by a worker through
 A base class and not a mixin: pydantic collects fields and validators only from
 ``BaseModel`` subclasses, and ``use_attribute_docstrings`` applies where a field
 is declared, so the config is repeated here or the Settings screen would show
-these three with no explanation.
+these two with no explanation.
 """
 
 from __future__ import annotations
@@ -36,17 +36,6 @@ class BootSettings(DbBackedSettings):
     as booted, so a new value needs a restart) and by each map build in a
     worker. Without it no PMTiles archive is built - the health check reports
     it - and the map falls back to GeoJSON points.
-    """
-
-    anonymize_weights_path: str = Field(default="", json_schema_extra=_RESTART)
-    """Directory holding the ``anonymize`` step's detector weights.
-
-    It must contain ``face.pt`` and ``plate.pt`` (ultralytics YOLO weights).
-    Empty (the default) downloads pinned, checksummed weights once, on first
-    use, to ``~/.cache/simple_module_images/models`` on each worker. The
-    weights are not bundled in the wheel. Read once, while booting, because
-    whether the step is offered at all depends on the ``[anonymize]`` extra and
-    on these files being reachable.
     """
 
     public_asset_base_url: str = Field(default="", json_schema_extra=_RESTART)

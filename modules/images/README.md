@@ -77,14 +77,15 @@ none).
 | `images.publish` | Make a collection public or internal |
 | `images.manage` | Manage every collection regardless of owner |
 | `images.originals.view` | Download the immutable original |
-| `images.settings` | Edit the module's settings |
+| `images.settings` | Reserved; grants nothing today. The module's settings are edited on the framework's Settings screen, gated by its `settings.edit` |
 
 ### Settings
 
 Stored in the database and edited on the Settings screen; there is no
 `SM_IMAGES_*` environment variable. System scope: one configuration for every
 tenant. Fields marked as needing a restart (`tippecanoe_path`,
-`anonymize_weights_path`, `public_asset_base_url`) are read once at boot.
+`public_asset_base_url`) are read once at boot; workers pick up the rest within
+about 30 seconds.
 
 | Setting | Default |
 | --- | --- |

@@ -75,6 +75,7 @@ PERM_PUBLISH: Final = "images.publish"
 PERM_MANAGE: Final = "images.manage"
 PERM_ORIGINALS: Final = "images.originals.view"
 PERM_SETTINGS: Final = "images.settings"
+"""Reserved: settings are written through the framework's ``settings.edit``."""
 PERMISSIONS: Final = (
     PERM_VIEW,
     PERM_CREATE,

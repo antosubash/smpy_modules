@@ -8,7 +8,7 @@ whatever the settings module has stored. The module registers this class in
 from the DB at lifespan start, and the Settings screen writes it back. SYSTEM
 scope: one configuration for the whole deployment, shared by every tenant.
 
-The three fields read while booting are declared on the base class
+The two fields read while booting are declared on the base class
 :class:`~sm_images.settings_boot.BootSettings` and carry ``requires_restart``.
 Everything else is read per request, or per task in a worker.
 """
@@ -31,6 +31,16 @@ class ImagesSettings(BootSettings):
     # ``use_attribute_docstrings`` puts the prose under each field on the
     # Settings screen: the admin UI renders ``FieldInfo.description``.
     model_config = SettingsConfigDict(extra="ignore", use_attribute_docstrings=True)
+
+    anonymize_weights_path: str = ""
+    """Directory holding the ``anonymize`` step's detector weights.
+
+    It must contain ``face.pt`` and ``plate.pt`` (ultralytics YOLO weights).
+    Empty (the default) downloads pinned, checksummed weights once, on first
+    use, to ``~/.cache/simple_module_images/models`` on each worker. The
+    weights are not bundled in the wheel. Read by every anonymize run from the
+    worker's settings, so a change applies within about 30 seconds, no restart.
+    """
 
     max_image_bytes: int = Field(default=50 * _MIB, ge=1)
     """Largest single image accepted, in bytes."""

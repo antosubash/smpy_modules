@@ -30,6 +30,17 @@ def test_module_registers_permissions():
     assert group.label_key == "images.permission_group"
 
 
+def test_only_boot_time_fields_ask_for_a_restart():
+    """``anonymize_weights_path`` is read per run from the worker's settings,
+    so the Settings screen must not tell operators to restart for it."""
+    restart = {
+        name
+        for name, field in ImagesSettings.model_fields.items()
+        if (field.json_schema_extra or {}).get("requires_restart")
+    }
+    assert restart == {"tippecanoe_path", "public_asset_base_url"}
+
+
 def test_settings_ignore_env(monkeypatch):
     monkeypatch.setenv("SM_IMAGES_MAX_IMAGE_BYTES", "1")
     monkeypatch.setenv("MAX_IMAGE_BYTES", "1")

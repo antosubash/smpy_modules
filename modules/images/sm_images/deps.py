@@ -1,8 +1,10 @@
 """Request-scoped dependencies shared by the Images API and view endpoints.
 
-The six permissions are the module's static surface; per-collection access
+The module's permissions are its static surface; per-collection access
 (owner, shares, visibility) is the access policy added with the collections
-endpoints, and narrows what these admit.
+endpoints, and narrows what these admit. ``images.settings`` has no dependency
+here: it is registered but reserved, because the module's settings are written
+through the framework's Settings screen and API, gated by ``settings.edit``.
 """
 
 from __future__ import annotations
@@ -18,7 +20,6 @@ require_create = Depends(RequiresPermission(constants.PERM_CREATE))
 require_publish = Depends(RequiresPermission(constants.PERM_PUBLISH))
 require_manage = Depends(RequiresPermission(constants.PERM_MANAGE))
 require_originals = Depends(RequiresPermission(constants.PERM_ORIGINALS))
-require_settings = Depends(RequiresPermission(constants.PERM_SETTINGS))
 
 
 def get_settings(request: Request) -> ImagesSettings:
