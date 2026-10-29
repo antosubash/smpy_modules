@@ -45,9 +45,19 @@ class Runtime:
     settings: Callable[[], Any]
     bus: Callable[[], Any] = lambda: None
     eager: bool | None = None
+    multi_tenant: Callable[[], bool] | None = None
+    """The host's tenancy mode: the framework's in the web process, the worker
+    engine's policy in a worker. Never inferred from a tenant id."""
 
     def is_eager(self) -> bool:
         return celery_eager() if self.eager is None else self.eager
+
+    def is_multi_tenant(self) -> bool:
+        if self.multi_tenant is not None:
+            return bool(self.multi_tenant())
+        from background_tasks import sync_db
+
+        return bool(sync_db.engine_tenancy().tenant_strict)
 
 
 _runtime: Runtime | None = None

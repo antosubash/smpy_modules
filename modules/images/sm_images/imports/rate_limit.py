@@ -115,9 +115,10 @@ def retry_after_seconds(response: httpx.Response | None) -> float | None:
     if not raw:
         return None
     if raw.isdigit():
-        if len(raw) > _DELTA_DIGITS_MAX:
+        digits = raw.lstrip("0") or "0"  # "0000000120" is 120, not a 10-digit ask
+        if len(digits) > _DELTA_DIGITS_MAX:
             return RETRY_AFTER_CEILING
-        return min(float(raw), RETRY_AFTER_CEILING)
+        return min(float(digits), RETRY_AFTER_CEILING)
     try:
         when = parsedate_to_datetime(raw)
         if when.tzinfo is None:

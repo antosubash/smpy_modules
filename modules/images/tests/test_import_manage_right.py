@@ -4,6 +4,7 @@ cancels it, failing closed, otherwise (``imports.manage_right``)."""
 
 from __future__ import annotations
 
+import dataclasses
 import uuid
 from datetime import UTC, datetime
 
@@ -97,9 +98,10 @@ async def test_a_multi_tenant_manager_must_still_be_a_member(imp):
         s.add(tenant)
         await s.commit()
         acme = tenant.id
-    assert await manager_active(imp.runtime, acme, MAX) is False
+    multi = dataclasses.replace(imp.runtime, multi_tenant=lambda: True)
+    assert await manager_active(multi, acme, MAX) is False
     async with imp.pipe.db_state.session_factory() as s:
         s.add(Membership(tenant_id=acme, user_id=MAX))
         await s.commit()
-    assert await manager_active(imp.runtime, acme, MAX) is True
-    assert await manager_active(imp.runtime, T, MAX) is True  # single-tenant: no membership
+    assert await manager_active(multi, acme, MAX) is True
+    assert await manager_active(imp.runtime, acme, MAX) is True  # single-tenant host

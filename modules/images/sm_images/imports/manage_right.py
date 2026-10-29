@@ -9,8 +9,11 @@ checks only that the user it runs for:
 
 * still has a row in ``users_user`` (deleted users are gone);
 * is active - ``is_active`` and not ``disabled_at``;
-* on a multi-tenant host (any tenant but :data:`~sm_images.tenancy.DEFAULT_TENANT`),
-  is still a member of the job's tenant (``tenants_membership``).
+* on a multi-tenant host, is still a member of the job's tenant
+  (``tenants_membership``) - whatever that tenant's id, ``default`` included.
+  The mode is the host's (``Runtime.is_multi_tenant``: the framework's tenancy
+  mode in the web process, the worker engine's ``tenant_strict`` in a worker),
+  never guessed from the id.
 
 It **fails closed**: a missing row, an unreadable table, a module that is not
 installed or an id that is not a uuid all answer ``False``, and the job is
@@ -33,7 +36,6 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from sm_images.pipeline.runtime import Runtime
-from sm_images.tenancy import DEFAULT_TENANT
 
 __all__ = ["manager_active"]
 
@@ -63,7 +65,7 @@ async def _active(runtime: Runtime, uid: uuid.UUID) -> bool:
 
 
 async def _member(runtime: Runtime, tenant: str, user_id: str) -> bool:
-    if tenant == DEFAULT_TENANT:
+    if not runtime.is_multi_tenant():
         return True  # a single-tenant host: everyone is a member
     try:
         from tenants.models import Membership

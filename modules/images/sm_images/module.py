@@ -174,6 +174,8 @@ class ImagesModule(ModuleBase):
 
     @staticmethod
     def _use_runtime(app: FastAPI, factory: object) -> None:
+        from simple_module_hosting.tenancy import TenancyMode, tenancy_mode
+
         from sm_images.pipeline.runtime import Runtime, use_runtime
         from sm_images.storage import store_for
 
@@ -183,5 +185,6 @@ class ImagesModule(ModuleBase):
                 store=lambda: store_for(app),
                 settings=lambda: getattr(app.state, constants.PACKAGE).settings,
                 bus=lambda: getattr(getattr(app.state, "sm", None), "event_bus", None),
+                multi_tenant=lambda: tenancy_mode(app) is TenancyMode.MULTI,
             )
         )

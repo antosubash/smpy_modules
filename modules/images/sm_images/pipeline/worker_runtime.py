@@ -119,6 +119,13 @@ def _bus() -> Any:
     return worker_bus()
 
 
+def _multi_tenant() -> bool:
+    """The worker engine's policy, which mirrors the host's ``multi_tenant``."""
+    from background_tasks import sync_db
+
+    return bool(sync_db.engine_tenancy().tenant_strict)
+
+
 def worker_runtime() -> Runtime:
     from sm_images.pipeline.extensions import load_extensions
     from sm_images.storage import worker_store
@@ -129,6 +136,7 @@ def worker_runtime() -> Runtime:
         store=worker_store,
         settings=worker_settings,
         bus=_bus,
+        multi_tenant=_multi_tenant,
     )
 
 
