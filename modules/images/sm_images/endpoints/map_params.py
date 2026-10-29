@@ -1,24 +1,39 @@
 """What the admin map routes (``endpoints/api/map.py``) and their anonymous
 twins (``endpoints/public.py``) share: the ``…/points`` query parameters and
-the points answer. Its own module, so neither surface imports the other."""
+the points answer, plus the ``GET``/``HEAD`` registration and rendition
+``Size`` the byte routes (``endpoints/api/serve.py``) share with them. Its own
+module, so neither surface imports the other."""
 
 from __future__ import annotations
 
 import json
-from typing import Any
+from collections.abc import Callable
+from typing import Annotated, Any
 
-from fastapi import Query, Request, Response
+from fastapi import APIRouter, Path, Query, Request, Response
 from fastapi.encoders import jsonable_encoder
 
 from sm_images import cache, constants
 from sm_images.map import points
 
-__all__ = ["BBox", "Cursor", "Limit", "points_response"]
+__all__ = ["BBox", "Cursor", "Limit", "Size", "get_and_head", "points_response"]
 
 Limit = Query(constants.POINTS_LIMIT_DEFAULT, ge=1)
 """Clamped to ``POINTS_LIMIT_MAX`` rather than refused: follow ``next_cursor``."""
 BBox = Query(None, max_length=constants.BBOX_MAX_CHARS, description="minx,miny,maxx,maxy")
 Cursor = Query(None, max_length=200)
+Size = Annotated[str, Path(max_length=constants.RENDITION_SIZE_MAX)]
+
+
+def get_and_head(router: APIRouter, path: str, **kw: Any) -> Callable[[Any], Any]:
+    """``GET`` plus ``HEAD`` (same access and cache path, no body). ``HEAD`` is
+    kept out of the OpenAPI document, where it would duplicate the operation."""
+
+    def register(endpoint: Any) -> Any:
+        router.head(path, include_in_schema=False, response_model=None, **kw)(endpoint)
+        return router.get(path, response_model=None, **kw)(endpoint)
+
+    return register
 
 
 async def points_response(

@@ -17,7 +17,7 @@ from simple_module_db.deps import get_db
 from sm_images import serving
 from sm_images.access import CollectionView
 from sm_images.deps import require_view
-from sm_images.endpoints.map_params import BBox, Cursor, Limit, points_response
+from sm_images.endpoints.map_params import BBox, Cursor, Limit, get_and_head, points_response
 
 router = APIRouter(prefix="/collections", tags=["images-map"])
 
@@ -44,7 +44,4 @@ async def collection_map(request: Request, collection: CollectionView) -> Respon
 
 
 _MAP = "/{collection_id}/map.pmtiles"
-router.head(_MAP, include_in_schema=False, response_model=None, dependencies=[require_view])(
-    collection_map
-)
-router.get(_MAP, response_model=None, dependencies=[require_view])(collection_map)
+get_and_head(router, _MAP, dependencies=[require_view])(collection_map)

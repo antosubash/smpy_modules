@@ -11,37 +11,25 @@ who asks (``sm_images.cache``).
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Path, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal
 
-from sm_images import cache, constants, serving
+from sm_images import cache, serving
 from sm_images.access import ImageCollectionView
 from sm_images.deps import require_view
+from sm_images.endpoints.map_params import Size, get_and_head
 
 router = APIRouter(tags=["images"])
 
 
-def _get_and_head(path: str, **kw: Any) -> Callable[[Any], Any]:
-    """``GET`` plus ``HEAD`` (same access and cache path, no body). ``HEAD`` is
-    kept out of the OpenAPI document, where it would duplicate the operation."""
-
-    def register(endpoint: Any) -> Any:
-        router.head(path, include_in_schema=False, response_model=None, **kw)(endpoint)
-        return router.get(path, response_model=None, **kw)(endpoint)
-
-    return register
-
-
 Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
-Size = Annotated[str, Path(max_length=constants.RENDITION_SIZE_MAX)]
 
 
-@_get_and_head("/images/{image_id}/r/{size}", dependencies=[require_view])
+@get_and_head(router, "/images/{image_id}/r/{size}", dependencies=[require_view])
 async def rendition(
     request: Request,
     image_id: uuid.UUID,
@@ -55,7 +43,7 @@ async def rendition(
     )
 
 
-@_get_and_head("/images/{image_id}/display", dependencies=[require_view])
+@get_and_head(router, "/images/{image_id}/display", dependencies=[require_view])
 async def display(
     request: Request,
     image_id: uuid.UUID,
@@ -66,7 +54,7 @@ async def display(
     return await serving.serve(request, db, collection, image_id, who, cache.DISPLAY, twin=False)
 
 
-@_get_and_head("/images/{image_id}/original", dependencies=[require_view])
+@get_and_head(router, "/images/{image_id}/original", dependencies=[require_view])
 async def original(
     request: Request,
     image_id: uuid.UUID,

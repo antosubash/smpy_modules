@@ -24,14 +24,21 @@ import uuid
 from collections.abc import Callable, Coroutine
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Path, Query, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.routing import APIRoute
 from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.deps import get_db
 
 from sm_images import cache, constants, serving
 from sm_images.access import public_collection
-from sm_images.endpoints.map_params import BBox, Cursor, Limit, points_response
+from sm_images.endpoints.map_params import (
+    BBox,
+    Cursor,
+    Limit,
+    Size,
+    get_and_head,
+    points_response,
+)
 from sm_images.errors import ImagesError, render
 from sm_images.models import Collection
 from sm_images.services import public_gallery
@@ -64,23 +71,11 @@ router = APIRouter(
 )
 
 
-def _get_and_head(path: str, **kw: Any) -> Callable[[Any], Any]:
-    """``GET`` plus ``HEAD`` (same access and cache path, no body). ``HEAD`` is
-    kept out of the OpenAPI document, where it would duplicate the operation."""
-
-    def register(endpoint: Any) -> Any:
-        router.head(path, include_in_schema=False, response_model=None, **kw)(endpoint)
-        return router.get(path, response_model=None, **kw)(endpoint)
-
-    return register
-
-
 Public = Annotated[Collection, Depends(public_collection)]
-Size = Annotated[str, Path(max_length=constants.RENDITION_SIZE_MAX)]
 _BASE = "/c/{slug}/images/{image_id}"
 
 
-@_get_and_head(f"{_BASE}/r/{{size}}")
+@get_and_head(router, f"{_BASE}/r/{{size}}")
 async def public_rendition(
     request: Request, image_id: uuid.UUID, size: Size, collection: Public, db: Any = Depends(get_db)
 ) -> Response:
@@ -89,7 +84,7 @@ async def public_rendition(
     )
 
 
-@_get_and_head(f"{_BASE}/display")
+@get_and_head(router, f"{_BASE}/display")
 async def public_display(
     request: Request, image_id: uuid.UUID, collection: Public, db: Any = Depends(get_db)
 ) -> Response:
@@ -98,7 +93,7 @@ async def public_display(
     )
 
 
-@_get_and_head(f"{_BASE}/original")
+@get_and_head(router, f"{_BASE}/original")
 async def public_original(
     request: Request, image_id: uuid.UUID, collection: Public, db: Any = Depends(get_db)
 ) -> Response:
@@ -140,7 +135,7 @@ async def public_points(
     )
 
 
-@_get_and_head("/c/{slug}/map.pmtiles")
+@get_and_head(router, "/c/{slug}/map.pmtiles")
 async def public_map(request: Request, collection: Public) -> Response:
     """Re-checked as public on every request, every range of a viewer included:
     a collection made private stops here at once (and its archive was withdrawn
