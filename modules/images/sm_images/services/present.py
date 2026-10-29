@@ -51,7 +51,8 @@ async def present_detail(
 
     Output (region coordinates, extracted text) and error messages (internals)
     are for those who can edit the collection; a viewer gets the step, its
-    status and its error code only."""
+    status and its error code only - and a prompt step's answer once the
+    picture may be shown (``services.prompt_answers``)."""
     out = await present_one(db, collection, image)
     detailed = await access.can_edit(db, who, collection)
     stmt = select(StepRun).where(StepRun.image_id == image.id).order_by(StepRun.step)
@@ -62,10 +63,14 @@ async def present_detail(
         out.group_key = (await db.execute(key)).scalar_one_or_none()
     rows = list((await db.execute(stmt)).scalars())
     names = await prompt_names(db, collection, [r.step for r in rows])
+    from sm_images.services.prompt_answers import answers
+
+    said = await answers(db, collection, image, editor=detailed)
     out.step_runs = [
         StepRunOut(
             step=r.step,
             label=names.get(r.step),
+            answer=said.get(r.step),
             status=r.status.value,
             error_code=r.error_code,
             step_version=r.step_version if detailed else None,

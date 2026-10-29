@@ -40,6 +40,8 @@ export type StepRun = {
   output_visible?: boolean;
   /** A prompt step's prompt name (null for a built-in step or a deleted prompt). */
   label?: string | null;
+  /** A prompt step's answer, when the caller may see it. */
+  answer?: { data: Record<string, unknown> | null; text: string | null } | null;
 };
 
 export type ImageItem = {

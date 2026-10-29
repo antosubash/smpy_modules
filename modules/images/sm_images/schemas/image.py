@@ -36,6 +36,8 @@ class StepRunOut(BaseModel):
     label: str | None = None
     """A prompt step's prompt name; ``None`` for a built-in step (the client
     names it) and for a deleted prompt (the step id is the fallback)."""
+    answer: dict[str, Any] | None = None
+    """A prompt step's answer: ``{"data", "text"}`` (``services.prompt_answers``)."""
 
 
 class ImageOut(BaseModel):

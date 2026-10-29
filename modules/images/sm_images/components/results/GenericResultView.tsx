@@ -1,5 +1,6 @@
 import { keys, type Translate } from '../../utils/i18n';
 import { errorCodeLabel } from '../../utils/labels';
+import { PromptAnswer } from './PromptAnswer';
 import type { ResultViewProps } from './registry';
 
 function show(value: unknown): string {
@@ -18,9 +19,11 @@ function fieldLabel(t: Translate, step: string, name: string): string {
 
 /** The fallback for a result with no view of its own: its status, and its
  *  output as plain key/value rows (empty values left out). A prompt step is
- *  named by its prompt (`run.label`), its id kept as the tooltip. */
+ *  named by its prompt (`run.label`), its id kept as the tooltip, and shows
+ *  its answer (`run.answer`) in place of the run's bookkeeping output. */
 export function GenericResultView({ id, output, run, t }: ResultViewProps) {
-  const rows = Object.entries(output ?? {}).filter(
+  const answer = run?.answer ?? null;
+  const rows = Object.entries(answer ? {} : (output ?? {})).filter(
     ([, value]) => value !== null && value !== undefined,
   );
   return (
@@ -37,6 +40,7 @@ export function GenericResultView({ id, output, run, t }: ResultViewProps) {
         )}
       </div>
       {run?.error_message && <p className="text-destructive">{run.error_message}</p>}
+      {answer && <PromptAnswer answer={answer} t={t} />}
       {rows.length > 0 && (
         <dl className="mt-1 grid grid-cols-[minmax(0,10rem)_1fr] gap-x-3 gap-y-1">
           {rows.map(([name, value]) => (

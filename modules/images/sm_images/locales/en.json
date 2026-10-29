@@ -319,6 +319,8 @@
   },
   "results": {
     "withheld": "The output of this step is only shown to people who can edit the collection.",
+    "show_more": "Show more",
+    "show_less": "Show less",
     "exif": {
       "lat": "Latitude",
       "lng": "Longitude",

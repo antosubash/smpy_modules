@@ -319,6 +319,8 @@
   },
   "results": {
     "withheld": "Die Ausgabe dieses Schritts sehen nur Personen, die die Sammlung bearbeiten dürfen.",
+    "show_more": "Mehr anzeigen",
+    "show_less": "Weniger anzeigen",
     "exif": {
       "lat": "Breitengrad",
       "lng": "Längengrad",
