@@ -24,7 +24,15 @@ import re
 from typing import Annotated, Any, Literal, Union
 
 import annotated_types
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, create_model
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    TypeAdapter,
+    ValidationError,
+    create_model,
+)
 
 __all__ = ["build_model", "definitions", "ref_name"]
 
@@ -64,8 +72,10 @@ class _Builder:
                 self.built[(ns, ref)] = self.type_of(self.defs[ns][ref], label)
             return self.built[(ns, ref)]
         if "const" in node:
+            self._check_values(node, [node["const"]], name)
             return Literal[node["const"]]
         if "enum" in node:
+            self._check_values(node, node["enum"], name)
             return Literal[tuple(node["enum"])]
         if "anyOf" in node:
             return _union([self.type_of(m, f"{name}_{i}") for i, m in enumerate(node["anyOf"])])
@@ -103,9 +113,28 @@ class _Builder:
             item = self.type_of(node["items"], f"{name}_item") if "items" in node else Any
             size = annotated_types.Len(node.get("minItems", 0), node.get("maxItems"))
             return Annotated[list[item], size]
-        if node.get("properties"):
-            return self.model(node, name)
+        if node.get("properties") or node.get("additionalProperties") is False:
+            return self.model(node, name)  # an empty one forbids every key
         return dict[str, Any]
+
+    def _check_values(self, node: dict[str, Any], values: list[Any], name: str) -> None:
+        """Every ``enum``/``const`` value must satisfy the node's own constraints
+        (type, lengths, pattern, bounds): a ``Literal`` alone would admit a value
+        the schema forbids. ``ValueError`` for an inconsistent schema."""
+        kind = node.get("type")
+        declared = kind if isinstance(kind, list) else [kind] if kind else None
+        for value in values:
+            if declared is not None:
+                kinds = declared
+            elif isinstance(value, bool) or value is None:
+                continue
+            else:
+                kinds = ["string" if isinstance(value, str) else "number"]
+            allowed = _union([self._single(node, k, name) for k in kinds])
+            try:
+                TypeAdapter(allowed).validate_python(value, strict=True)
+            except ValidationError as exc:
+                raise ValueError(f"enum value {value!r} breaks the schema's own rules") from exc
 
     def model(self, node: dict[str, Any], name: str) -> type[BaseModel]:
         required = set(node.get("required", []))

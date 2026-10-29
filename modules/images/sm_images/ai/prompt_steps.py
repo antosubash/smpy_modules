@@ -81,7 +81,7 @@ class PromptStep:
         return True
 
     async def run(self, ctx: StepContext) -> StepOutcome:
-        from sm_images.ai.results import PromptWrite, encoded_size
+        from sm_images.ai.results import PromptWrite, write_size
         from sm_images.ai.runner import ai_call
         from sm_images.ai.schema_safety import UnsafeSchema, output_model
 
@@ -106,17 +106,18 @@ class PromptStep:
         if isinstance(result, StepOutcome):
             return result
         data, model_name = result
-        limit = ctx._staging.settings.step_output_max_bytes
-        size = encoded_size(data)
-        if size > limit:  # the stored result obeys the cap step outputs do
-            return failure("output_too_large", f"the result is {size} bytes; the limit is {limit}")
-        ctx._staging.prompt = PromptWrite(
+        write = PromptWrite(
             prompt_id=spec.id,
             revision=spec.revision,
             data=data if isinstance(data, dict) else None,
             text=data if isinstance(data, str) else None,
             model_name=model_name,
         )
+        limit = ctx._staging.settings.step_output_max_bytes
+        size = write_size(write)
+        if size > limit:  # the stored result obeys the cap step outputs do
+            return failure("output_too_large", f"the result is {size} bytes; the limit is {limit}")
+        ctx._staging.prompt = write
         return StepOutcome.completed({"model": model_name, "structured": schema is not None})
 
 

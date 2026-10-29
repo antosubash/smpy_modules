@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
     from sm_ai.settings import AiSettings
 
+
 def slot_inputs(
     settings: AiSettings,
     slot: str,
@@ -35,16 +36,12 @@ def slot_inputs(
     """
     provider_id = getattr(settings, f"{slot}_provider").strip().lower()
     if not provider_id and slot == constants.SLOT_EMBEDDING:
-        raise AiNotConfiguredError(
-            "embedding_provider", "The embedding slot is not configured."
-        )
+        raise AiNotConfiguredError("embedding_provider", "The embedding slot is not configured.")
     if provider_id not in allowed:
         hint = (
             "Anthropic does not offer an embeddings API."
-            if slot == constants.SLOT_EMBEDDING
-            and provider_id == constants.PROVIDER_ANTHROPIC
-            else f"Unknown provider {provider_id!r}; expected one of "
-            f"{', '.join(allowed)}."
+            if slot == constants.SLOT_EMBEDDING and provider_id == constants.PROVIDER_ANTHROPIC
+            else f"Unknown provider {provider_id!r}; expected one of {', '.join(allowed)}."
         )
         raise AiNotConfiguredError(f"{slot}_provider", hint)
     model = (model_override or getattr(settings, f"{slot}_model")).strip()
@@ -68,25 +65,34 @@ def slot_inputs(
     return provider_id, model, key, base_url
 
 
-def build_chat_model(settings: AiSettings, model_name: str | None = None) -> Model:
+def build_chat_model(
+    settings: AiSettings, model_name: str | None = None, *, max_retries: int | None = None
+) -> Model:
     """A ready chat model for the configured provider.
 
     ``model_name`` overrides the configured name for same-endpoint
     multi-model setups (e.g. a vision and a text model on one vLLM server).
+    ``max_retries`` sets the provider SDK's own transport retries (``None``:
+    the SDK default). A caller that meters each call passes ``0``, so one
+    charge is at most one provider request.
     """
     provider_id, name, key, base_url = slot_inputs(
         settings, constants.SLOT_CHAT, constants.CHAT_PROVIDERS, model_name
     )
 
     if provider_id in (constants.PROVIDER_OPENAI, constants.PROVIDER_OPENAI_COMPATIBLE):
-        return _openai_chat(name, base_url, key)
+        return _openai_chat(name, base_url, key, max_retries)
 
     if provider_id == constants.PROVIDER_ANTHROPIC:
         from pydantic_ai.models.anthropic import AnthropicModel
         from pydantic_ai.providers.anthropic import AnthropicProvider
 
         kwargs = {"base_url": base_url} if base_url else {}
-        return AnthropicModel(name, provider=AnthropicProvider(api_key=key, **kwargs))
+        provider = AnthropicProvider(api_key=key, **kwargs)
+        if max_retries is not None:
+            client = provider.client.with_options(max_retries=max_retries)
+            provider = AnthropicProvider(anthropic_client=client)
+        return AnthropicModel(name, provider=provider)
 
     # google — GoogleProvider wires base_url into the genai client's
     # http_options, so a gateway override routes exactly like the other
@@ -94,16 +100,25 @@ def build_chat_model(settings: AiSettings, model_name: str | None = None) -> Mod
     from pydantic_ai.models.google import GoogleModel
     from pydantic_ai.providers.google import GoogleProvider
 
-    kwargs = {"base_url": base_url} if base_url else {}
+    kwargs: dict = {"base_url": base_url} if base_url else {}
+    if max_retries is not None:  # genai counts attempts, the first included
+        from google.genai.types import HttpRetryOptions
+
+        kwargs["retry_options"] = HttpRetryOptions(attempts=max_retries + 1)
     return GoogleModel(name, provider=GoogleProvider(api_key=key, **kwargs))
 
 
-def _openai_chat(name: str, base_url: str, key: str) -> Model:
+def _openai_chat(name: str, base_url: str, key: str, max_retries: int | None = None) -> Model:
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.openai import OpenAIProvider
 
     kwargs = {"base_url": base_url} if base_url else {}
-    return OpenAIChatModel(name, provider=OpenAIProvider(api_key=key, **kwargs))
+    provider = OpenAIProvider(api_key=key, **kwargs)
+    if max_retries is not None:  # a copy sharing the pooled HTTP client
+        provider = OpenAIProvider(
+            openai_client=provider.client.with_options(max_retries=max_retries)
+        )
+    return OpenAIChatModel(name, provider=provider)
 
 
 def build_embedder(settings: AiSettings) -> Embedder:
@@ -121,9 +136,7 @@ def build_embedder(settings: AiSettings) -> Embedder:
     from pydantic_ai.providers.google import GoogleProvider
 
     kwargs = {"base_url": base_url} if base_url else {}
-    return Embedder(
-        GoogleEmbeddingModel(name, provider=GoogleProvider(api_key=key, **kwargs))
-    )
+    return Embedder(GoogleEmbeddingModel(name, provider=GoogleProvider(api_key=key, **kwargs)))
 
 
 def _openai_embedding(name: str, base_url: str, key: str):

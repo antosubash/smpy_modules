@@ -35,7 +35,13 @@ from sm_images.pipeline.claim import LostLease, renew
 from sm_images.pipeline.finish import complete_step
 from sm_images.pipeline.load import Loaded, load_run
 from sm_images.pipeline.runtime import Runtime
-from sm_images.pipeline.step import MESSAGE_MAX, StepContext, StepOutcome, failure
+from sm_images.pipeline.step import (
+    MESSAGE_MAX,
+    StepContext,
+    StepOutcome,
+    failure,
+    sends_display_out,
+)
 
 __all__ = ["Loaded", "Staging", "bounded", "run_step_async"]
 
@@ -176,6 +182,10 @@ async def _work(runtime: Runtime, loaded: Loaded, staging: Staging) -> StepOutco
         return failure("step_error", exc)
     if not applies:
         return StepOutcome.skipped("not_applicable")
+    if sends_display_out(impl) and not loaded.display_safe:
+        # Before ``run()``: a step that sends the display copy out (built-in or
+        # plugin) never gets to read one that may be unredacted.
+        return failure("display_not_ready", "the display copy is not redacted yet")
     return await _run(runtime, loaded, impl, staging)
 
 

@@ -29,11 +29,18 @@ if TYPE_CHECKING:
     from pydantic_ai.models import Model
 
 
-def resolve_model(model_name: str | None = None) -> Model:
-    """A ready chat model built from the host's AI settings."""
+def resolve_model(model_name: str | None = None, *, max_retries: int | None = None) -> Model:
+    """A ready chat model built from the host's AI settings.
+
+    ``max_retries=0`` turns off the provider SDK's transport retries: a caller
+    that meters each call (``consume_requests``) wants one charge to be at
+    most one provider request. ``None`` keeps the SDK default.
+    """
     from sm_ai import resolve, services
 
-    return resolve.build_chat_model(services.current_settings(), model_name)
+    return resolve.build_chat_model(
+        services.current_settings(), model_name, max_retries=max_retries
+    )
 
 
 def resolve_embedder() -> Embedder:

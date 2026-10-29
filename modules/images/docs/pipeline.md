@@ -72,19 +72,23 @@ Both need the `[ai]` extra (the `ai` module and Pydantic AI). Without it,
   `all`, and switching `auto_run` on are the owner's or `images.manage`'s.
 - **Privacy.** A step that declares `sends_display_out = True` (`classify`,
   every prompt step, and any plugin step that opts in) is ordered after the
-  display mutator, as renditions are. The executor also refuses
-  (`display_not_ready`) to send a display copy that serving would not trust.
+  display mutator, as renditions are. When the display copy is one serving
+  would not trust, the executor fails the run `display_not_ready` without
+  invoking the step at all, so it never reads those bytes.
   The original is never sent.
 - **Metering.** Each call charges one `ai.requests` through
   `sm_ai.contracts.consume_requests`, keyed
   `images:{tenant}:{image}:{step}:{version}:{lease token}`. Before the call,
   the run claims `step_run.ai_started_at` once per lease, so a redelivered
   message for the same lease neither calls the provider nor pays again.
-  Pydantic AI's output retries are off: one charge is one provider request,
-  and a reply that does not fit fails `invalid_output`. A refusal fails the
-  step with `quota_exceeded`, and nothing retries it automatically. A prompt
-  result larger than `step_output_max_bytes` fails `output_too_large` and
-  keeps the previous result.
+  Pydantic AI's output retries and the provider SDK's transport retries
+  (`resolve_model(max_retries=0)`) are off: one charge is at most one
+  provider request, and a reply that does not fit fails `invalid_output`. A refusal fails the
+  step with `quota_exceeded`, and nothing retries it automatically. A stored
+  prompt result (output, metadata and review history) is held to
+  `step_output_max_bytes` by dropping the oldest history first; an output
+  that cannot fit on its own fails `output_too_large` and keeps the previous
+  result.
 - **Output schemas** are user input. `schema_safety.check` caps size, depth
   (as written and through references), properties, `$ref` count and pattern
   length. It allows only local `$ref` with no sibling keywords, keeping

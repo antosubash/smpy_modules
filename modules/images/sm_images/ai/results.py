@@ -8,6 +8,10 @@ lock), so a run whose lease was lost writes nothing:
   ``unreviewed``. A review that had been given is kept in ``history``
   (newest first, the last :data:`HISTORY_MAX`) with the output it judged;
   an entry over ``step_output_max_bytes`` keeps the verdict and drops the data.
+  The whole stored result (output, metadata and history) is then held to
+  ``step_output_max_bytes``: the oldest history entries go first. The step
+  itself fails ``output_too_large`` when the new output alone cannot fit
+  (:func:`stored_size` of the write with no history).
 * **failed** - ``status`` and ``error`` only: the previous output and its
   review stay, so a provider outage never erases accepted work.
 
@@ -34,6 +38,7 @@ __all__ = [
     "encoded_size",
     "record_prompt_run",
     "reset_review",
+    "stored_size",
     "upsert_result",
 ]
 
@@ -54,6 +59,37 @@ class PromptWrite:
 def encoded_size(value: Any) -> int:
     """Bytes of ``value`` as the compact JSON it is stored as."""
     return len(json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode())
+
+
+def stored_size(row: Any, history: list[dict[str, Any]] | None = None) -> int:
+    """Bytes of what a result row stores for the model: its output, metadata
+    and history (``history`` overrides the row's, e.g. ``[]`` for a new write)."""
+    return encoded_size(
+        {
+            "result_data": getattr(row, "result_data", None),
+            "result_text": getattr(row, "result_text", None),
+            "model_name": getattr(row, "model_name", None),
+            "prompt_revision": getattr(row, "prompt_revision", None),
+            "history": list(row.history or []) if history is None else history,
+        }
+    )
+
+
+def write_size(write: PromptWrite) -> int:
+    """:func:`stored_size` of ``write`` on its own (no history)."""
+    return stored_size(
+        type(
+            "W",
+            (),
+            {
+                "result_data": write.data,
+                "result_text": write.text,
+                "model_name": write.model_name[:MODEL_MAX] or None,
+                "prompt_revision": write.revision,
+            },
+        ),
+        history=[],
+    )
 
 
 def _snapshot(row: PromptResult, max_bytes: int | None) -> dict[str, Any]:
@@ -113,6 +149,11 @@ async def upsert_result(
     row.model_name = write.model_name[:MODEL_MAX] or None
     row.error = None
     row.prompt_revision = write.revision
+    if max_bytes is not None:  # oldest first, until the whole row fits
+        history = list(row.history or [])
+        while history and stored_size(row, history) > max_bytes:
+            history.pop()
+        row.history = history
     await db.flush()
     return row
 

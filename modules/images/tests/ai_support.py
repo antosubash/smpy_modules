@@ -36,6 +36,8 @@ class FakeAi:
     charges: list[dict[str, Any]] = field(default_factory=list)
     pictures: list[PILImage.Image] = field(default_factory=list)
     prompts: list[str] = field(default_factory=list)
+    resolved: list[dict[str, Any]] = field(default_factory=list)
+    """The keyword arguments of each ``resolve_model`` call."""
 
     @property
     def calls(self) -> int:
@@ -72,7 +74,12 @@ def ai(monkeypatch) -> FakeAi:
     from sm_ai import contracts
 
     fake = FakeAi()
-    monkeypatch.setattr(contracts, "resolve_model", lambda model_name=None: fake.model())
+
+    def resolve(model_name=None, **kw):
+        fake.resolved.append(kw)
+        return fake.model()
+
+    monkeypatch.setattr(contracts, "resolve_model", resolve)
     monkeypatch.setattr(contracts, "consume_requests", fake.consume)
     return fake
 

@@ -33,7 +33,13 @@ slot and build the object. Provider and authentication failures surface later,
 when you call the provider (`agent.run()`, `embed_documents()` and so on), as
 whatever exception Pydantic AI raises.
 
-### `resolve_model(model_name: str | None = None) -> pydantic_ai.models.Model`
+### `resolve_model(model_name: str | None = None, *, max_retries: int | None = None) -> pydantic_ai.models.Model`
+
+`max_retries` sets the provider SDK's own transport retries on the client it
+builds (OpenAI and OpenAI-compatible, Anthropic: the client's `max_retries`;
+Google: `HttpRetryOptions(attempts=max_retries + 1)`). `None` keeps the SDK
+default. A caller that meters each call with `consume_requests` passes `0`,
+so one charge is at most one provider request.
 
 Builds a chat model from the **chat** slot:
 

@@ -23,7 +23,9 @@ from the prompt's JSON Schema after ``schema_safety.check``) or ``str``.
 5. the **picture** - the display copy, EXIF-orientation applied, scaled to
    ``max_side`` and re-encoded as a metadata-free JPEG, off the event loop;
 6. the call - exactly one provider request: Pydantic AI's output-validation
-   retries are off (``retries=0``), since each would be an unmetered request.
+   retries are off (``retries=0``) and so are the provider SDK's transport
+   retries (``resolve_model(max_retries=0)``), since each would be an
+   unmetered request.
    A reply that does not fit the output type is ``invalid_output``, a
    provider error ``ai_error``. Anything else propagates to the executor.
 """
@@ -72,7 +74,7 @@ async def run_structured(
     from pydantic_ai import Agent, BinaryContent
     from sm_ai import contracts
 
-    model = model if model is not None else contracts.resolve_model()
+    model = model if model is not None else contracts.resolve_model(max_retries=0)
     agent = Agent(model, output_type=output_type, retries=0)  # one request per charge
     parts: list[Any] = [instruction]
     parts += [BinaryContent(data=img, media_type="image/jpeg") for img in images]
@@ -122,10 +124,10 @@ async def ai_call(
     staging = getattr(ctx, "_staging", None)
     if staging is None:
         raise RuntimeError(f"step {ctx.step.id!r} runs only under the pipeline executor")
-    if not staging.display_safe:
+    if not staging.display_safe:  # the executor refuses first; kept as a second guard
         return failure("display_not_ready", "the display copy is not redacted yet")
     try:
-        model = contracts.resolve_model()
+        model = contracts.resolve_model(max_retries=0)  # no SDK retries: one charge, one request
     except contracts.AiError as exc:
         return failure("ai_not_configured", exc)
     await _start_once(ctx, staging)

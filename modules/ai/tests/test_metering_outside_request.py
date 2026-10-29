@@ -59,19 +59,30 @@ async def billing_db(tmp_path, monkeypatch):
     await state.engine.dispose()
 
 
-async def test_unmetered_without_billing(monkeypatch):
+async def test_unmetered_without_billing(billing_absent):
     """No ``sm_billing`` at all: nothing is metered (runs with or without billing)."""
-    monkeypatch.setattr(metering, "find_spec", lambda name: None)
     assert await consume_requests("t", idempotency_key="k", source="images:test") is True
 
 
-async def test_an_installed_billing_without_the_entry_fails_closed(monkeypatch):
+@pytest.fixture
+def billing_absent(monkeypatch):
+    """What a checkout without ``sm_billing`` looks like to the module."""
+    monkeypatch.setattr(metering, "find_spec", lambda name: None)
+
+
+@pytest.fixture
+def billing_present(monkeypatch):
+    """An installed billing, whether or not this checkout has one."""
+    monkeypatch.setattr(metering, "billing_installed", lambda: True)
+
+
+async def test_an_installed_billing_without_the_entry_fails_closed(monkeypatch, billing_present):
     monkeypatch.setattr(metering, "_billing_contract", lambda: types.SimpleNamespace())
     with pytest.raises(RuntimeError, match="usage_meter"):
         await consume_requests("t", idempotency_key="k", source="images:test")
 
 
-async def test_a_broken_billing_import_fails_closed(monkeypatch):
+async def test_a_broken_billing_import_fails_closed(monkeypatch, billing_present):
     def broken():
         raise ImportError("sm_billing is half installed")
 

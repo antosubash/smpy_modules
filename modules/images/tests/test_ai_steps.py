@@ -80,7 +80,7 @@ async def test_quota_exceeded_fails_step(pipe, ai):
 async def test_unconfigured_ai_fails_without_charging(pipe, ai, monkeypatch):
     from sm_ai import contracts
 
-    def unconfigured(model_name=None):
+    def unconfigured(model_name=None, **kw):
         raise AiNotConfiguredError("chat_model", "Set a model.")
 
     monkeypatch.setattr(contracts, "resolve_model", unconfigured)
