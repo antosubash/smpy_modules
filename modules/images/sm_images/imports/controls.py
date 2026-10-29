@@ -131,9 +131,15 @@ async def _enter_reset(
     return await get(runtime, tenant, row.id)
 
 
-def job_errors(row: ImportJob) -> list[dict[str, Any]]:
-    """``row``'s errors without the failed rows' (``item_errors``)."""
-    return [e for e in row.errors or [] if "item" not in e]
+def job_errors(row: ImportJob, *, keep_parse: bool = False) -> list[dict[str, Any]]:
+    """``row``'s errors without the failed rows' (``item_errors``) - except, with
+    ``keep_parse``, the rows the parser refused: a retry (or a restart from the
+    recorded rows) leaves those failed and never records them again."""
+    return [
+        e
+        for e in row.errors or []
+        if "item" not in e or (keep_parse and e.get("code") in PARSE_CODES)
+    ]
 
 
 def _recorded(row: ImportJob) -> bool:
@@ -147,7 +153,8 @@ async def restart(
     zero = {"done_count": 0, "duplicate_count": 0, "failed_count": 0}
     if row.source_key is None and row.source_url is None:
         if row.kind is ImportKind.GEOJSON_URL and _recorded(row):
-            return await _enter_reset(runtime, tenant, row, MODE_ROWS, {}, launch, actor)
+            kept = {"errors": job_errors(row, keep_parse=True)}
+            return await _enter_reset(runtime, tenant, row, MODE_ROWS, kept, launch, actor)
         raise conflict("source_gone", "The source of this import is no longer stored")
     extra: dict[str, Any] = {**zero, "checkpoint_index": 0, "errors": job_errors(row)}
     if row.source_key is None:
@@ -183,5 +190,5 @@ async def retry_failed(
         raise conflict("job_incomplete", "This import never finished reading its source")
     if not await _retryable(runtime, tenant, row):
         return row
-    extra = {"errors": job_errors(row)}  # the rows' reasons are recorded again
+    extra = {"errors": job_errors(row, keep_parse=True)}  # retried rows say why again
     return await _enter_reset(runtime, tenant, row, MODE_RETRY, extra, launch, actor)

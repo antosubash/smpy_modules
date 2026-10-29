@@ -14,6 +14,7 @@ from sm_images.imports import item_errors
 
 from tests.fetch_support import body
 from tests.import_support import HOST, URL, feature, serve_images
+from tests.pipeline_support import jpeg
 
 pytestmark = pytest.mark.asyncio
 
@@ -58,6 +59,29 @@ async def test_rows_refused_while_parsing_say_why_too(imp, resolver, inner):
     rows = [e for e in (await imp.reload(job)).errors if "item" in e]
     assert sorted((e["item"], e["code"]) for e in rows) == [(0, "missing_url"), (1, "missing_url")]
     assert all(set(e) <= {"code", "item", "where", "at"} for e in rows)
+
+
+async def test_a_retry_keeps_the_reasons_of_rows_it_leaves_failed(imp, resolver, inner):
+    """Review: retry-failed cleared every row reason, but a row the parser
+    refused is never retried, so its reason was lost for good."""
+    from sm_images.imports import controls
+    from sm_images.tenancy import DEFAULT_TENANT
+
+    state = {"down": True}
+    serve_images(
+        resolver,
+        inner,
+        fail={"/x.jpg": lambda r: httpx.Response(404) if state["down"] else body(jpeg())},
+    )
+    job = await imp.job(
+        [feature({"name": "no url"}), feature({"url": f"https://{HOST}/x.jpg"})], URL
+    )
+    await imp.run(job)
+    codes = lambda j: sorted((e["item"], e["code"]) for e in j.errors if "item" in e)  # noqa: E731
+    assert codes(await imp.reload(job)) == [(0, "missing_url"), (1, "http_404")]
+    state["down"] = False
+    await controls.retry_failed(imp.runtime, DEFAULT_TENANT, job.id)
+    assert codes(await imp.reload(job)) == [(0, "missing_url")]  # the retried row came good
 
 
 async def test_only_the_first_rows_are_kept(imp, resolver, inner, monkeypatch):
