@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import uuid
 
-from sm_images.models import Prompt, StepRun, StepStatus
+from sm_images.models import Collection, Prompt, StepRun, StepStatus
 from sm_images.tenancy import DEFAULT_TENANT
+from sqlalchemy import update
 
 from tests.upload_support import OLGA, jpeg, make_collection, post_files
 
@@ -60,3 +61,30 @@ async def test_the_pipeline_overview_names_prompt_steps(uploads):
     labels = {s["id"]: s.get("label") for s in body["steps"]}
     assert labels[f"prompt:{pid}"] == "Land cover"
     assert labels["exif"] is None
+
+
+async def test_an_enabled_prompt_step_is_listed_once(uploads):
+    """QA round 2: enabling a prompt step listed it twice (it is in both the
+    configured steps and the prompt steps), with a duplicate React key."""
+    cid = await make_collection(uploads, OLGA)
+    pid = uuid.uuid4()
+    async with uploads.db_state.session_factory() as s:
+        s.add(
+            Prompt(
+                id=pid,
+                tenant_id=DEFAULT_TENANT,
+                collection_id=uuid.UUID(cid),
+                name="Land cover",
+                instruction="What land cover?",
+            )
+        )
+        await s.execute(
+            update(Collection)
+            .where(Collection.id == uuid.UUID(cid))
+            .values(pipeline_config={"steps": {f"prompt:{pid}": {"enabled": True}}})
+        )
+        await s.commit()
+    body = (await uploads.get(f"/api/images/collections/{cid}/pipeline", headers=OLGA)).json()
+    ids = [s["id"] for s in body["steps"]]
+    assert ids.count(f"prompt:{pid}") == 1
+    assert len(ids) == len(set(ids))

@@ -98,8 +98,8 @@ async def overview(db: Any, collection: Collection) -> dict[str, Any]:
 
     prompts = await prompt_steps.resolve(db, collection.id, tenant=collection.tenant_id)
     cfg = validate_pipeline_config(collection.pipeline_config, strict=False, prompts=prompts)
-    ids = list(registry.all_steps())
-    ids += [sid for sid in [*cfg.steps, *cfg.prompts] if sid not in ids]
+    # An enabled prompt step is in both ``cfg.steps`` and ``cfg.prompts``: list it once.
+    ids = list(dict.fromkeys([*registry.all_steps(), *cfg.steps, *cfg.prompts]))
     status: dict[str, dict[str, int]] = {}
     stale = not_installed = 0
     for step, st, version, code, n in await _run_groups(db, collection.id):
