@@ -33,7 +33,7 @@ from sqlalchemy import update
 
 from sm_images import constants
 from sm_images.errors import ImagesError
-from sm_images.imports import jobs
+from sm_images.imports import item_errors, jobs
 from sm_images.imports.chunk import pending_items
 from sm_images.imports.features import Parsed
 from sm_images.ingest import Duplicate, IngestMeta, IngestService
@@ -147,6 +147,8 @@ async def fail_item(
         if moved and not await jobs.bump(db, tenant, job_id, {ItemStatus.FAILED: 1}, generation):
             await db.rollback()
             return False
+        if moved:  # why, on the job's card
+            await item_errors.record(db, tenant, job_id, item_id, code)
         await finalize_session(db)
     return moved
 

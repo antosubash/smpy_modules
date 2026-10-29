@@ -443,7 +443,12 @@
       "delete_title": "Delete this import?",
       "delete_body": "The job and its records are removed. Images it already added stay in the collection.",
       "delete_confirm": "Delete import",
-      "control_failed": "The import could not be changed: {reason}"
+      "control_failed": "The import could not be changed: {reason}",
+      "failures_one": "Why {count} row failed",
+      "failures_other": "Why {count} rows failed",
+      "failure_row": "Row {row}: {why}",
+      "failure_http": "HTTP {status} {reason}",
+      "failures_more": "…and {count} more"
     }
   },
   "prompts": {

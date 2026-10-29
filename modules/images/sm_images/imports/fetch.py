@@ -47,10 +47,10 @@ from sm_images.imports.url_safety import DEFAULT_ALLOWED_PORTS, UnsafeURLError, 
 
 __all__ = [
     "MAX_REDIRECTS",
+    "USER_AGENT",
     "FetchError",
     "FetchTimeoutError",
     "FetchTooLargeError",
-    "USER_AGENT",
     "PinnedTransport",
     "safe_stream",
 ]

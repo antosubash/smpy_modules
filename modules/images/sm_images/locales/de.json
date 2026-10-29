@@ -443,7 +443,12 @@
       "delete_title": "Diesen Import löschen?",
       "delete_body": "Der Auftrag und seine Datensätze werden entfernt. Bereits hinzugefügte Bilder bleiben in der Sammlung.",
       "delete_confirm": "Import löschen",
-      "control_failed": "Der Import konnte nicht geändert werden: {reason}"
+      "control_failed": "Der Import konnte nicht geändert werden: {reason}",
+      "failures_one": "Warum {count} Zeile fehlschlug",
+      "failures_other": "Warum {count} Zeilen fehlschlugen",
+      "failure_row": "Zeile {row}: {why}",
+      "failure_http": "HTTP {status} {reason}",
+      "failures_more": "…und {count} weitere"
     }
   },
   "prompts": {

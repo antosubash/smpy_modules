@@ -131,6 +131,11 @@ async def _enter_reset(
     return await get(runtime, tenant, row.id)
 
 
+def job_errors(row: ImportJob) -> list[dict[str, Any]]:
+    """``row``'s errors without the failed rows' (``item_errors``)."""
+    return [e for e in row.errors or [] if "item" not in e]
+
+
 def _recorded(row: ImportJob) -> bool:
     return row.total_count > 0 and row.checkpoint_index >= row.total_count
 
@@ -144,7 +149,7 @@ async def restart(
         if row.kind is ImportKind.GEOJSON_URL and _recorded(row):
             return await _enter_reset(runtime, tenant, row, MODE_ROWS, {}, launch, actor)
         raise conflict("source_gone", "The source of this import is no longer stored")
-    extra: dict[str, Any] = {**zero, "checkpoint_index": 0}
+    extra: dict[str, Any] = {**zero, "checkpoint_index": 0, "errors": job_errors(row)}
     if row.source_key is None:
         extra["total_count"] = 0  # re-staged from its URL, and counted again
     return await _enter_reset(runtime, tenant, row, MODE_RESTART, extra, launch, actor)
@@ -178,4 +183,5 @@ async def retry_failed(
         raise conflict("job_incomplete", "This import never finished reading its source")
     if not await _retryable(runtime, tenant, row):
         return row
-    return await _enter_reset(runtime, tenant, row, MODE_RETRY, {}, launch, actor)
+    extra = {"errors": job_errors(row)}  # the rows' reasons are recorded again
+    return await _enter_reset(runtime, tenant, row, MODE_RETRY, extra, launch, actor)

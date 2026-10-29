@@ -7,6 +7,9 @@ import { keys, useT } from '../../utils/i18n';
 import { errorCodeLabel, importKindLabel, jobStatusLabel } from '../../utils/labels';
 import type { ImportControl, ImportJob } from '../../utils/types';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { ImportFailures, isRowError } from './ImportFailures';
+
+export { FAILURES_SHOWN } from './ImportFailures';
 
 /** The controls the API permits for a job in this state. */
 export function allowedControls(job: ImportJob, stalled: boolean): ImportControl[] {
@@ -43,6 +46,7 @@ export function JobRow({
   const stalled = isStalled(job);
   const processed = job.done_count + job.duplicate_count + job.failed_count;
   const known = job.total_count > 0;
+  const jobErrors = job.errors.filter((e) => !isRowError(e));
   const percent = known ? Math.min(100, Math.round((processed / job.total_count) * 100)) : null;
 
   const run = async (control: ImportControl) => {
@@ -94,9 +98,9 @@ export function JobRow({
           failed: job.failed_count,
         })}
       </p>
-      {job.errors.length > 0 && (job.status === 'failed' || stalled || job.failed_count > 0) && (
+      {jobErrors.length > 0 && (job.status === 'failed' || stalled || job.failed_count > 0) && (
         <ul className="text-sm text-destructive" data-testid="images-import-errors">
-          {job.errors.map((e, i) => (
+          {jobErrors.map((e, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: a job's error log is append-only
             <li key={`${e.code}-${i}`} title={e.code}>
               {errorCodeLabel(t, e.code)}
@@ -104,6 +108,7 @@ export function JobRow({
           ))}
         </ul>
       )}
+      <ImportFailures errors={job.errors} failed={job.failed_count} />
       {canEdit && (
         <div className="flex flex-wrap gap-2">
           {allowedControls(job, stalled).map((control) => (

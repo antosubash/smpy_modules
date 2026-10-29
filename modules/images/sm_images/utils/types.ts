@@ -187,11 +187,21 @@ export type ImportJob = {
   done_count: number;
   duplicate_count: number;
   failed_count: number;
-  errors: { code: string; at?: string }[];
+  errors: ImportError[];
   auto_run_prompts: boolean;
   created_at: string;
   updated_at: string | null;
   heartbeat_at: string | null;
+};
+
+/** A job-level error, or a failed row's (`item` set; see `imports/item_errors.py`). */
+export type ImportError = {
+  code: string;
+  at?: string;
+  item?: number;
+  status?: number;
+  reason?: string;
+  where?: string;
 };
 
 export type ImportControl = 'pause' | 'resume' | 'restart' | 'retry-failed';

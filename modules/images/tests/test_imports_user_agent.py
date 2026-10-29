@@ -21,7 +21,9 @@ async def _fetch(url: str) -> bytes:
 
 
 def test_the_user_agent_is_descriptive() -> None:
-    assert re.fullmatch(r"SimpleModule-Images/\S+ \(\+https://\S+\) python-httpx/\S+", fetch.USER_AGENT)
+    assert re.fullmatch(
+        r"SimpleModule-Images/\S+ \(\+https://\S+\) python-httpx/\S+", fetch.USER_AGENT
+    )
 
 
 async def test_every_hop_sends_it(resolver, inner):
