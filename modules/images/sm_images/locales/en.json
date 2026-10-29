@@ -573,7 +573,8 @@
       "required": "Required",
       "number_invalid": "Enter a number.",
       "list_hint": "One value per line",
-      "choose": "Choose…"
+      "choose": "Choose…",
+      "integer_invalid": "Enter a whole number."
     },
     "image": "Image",
     "group": "Group"

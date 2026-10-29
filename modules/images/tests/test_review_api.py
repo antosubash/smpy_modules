@@ -102,7 +102,6 @@ async def test_accept_stores_the_model_output_and_leaves_the_queue(queue):
     got = await _review(queue, queue.rid, EDITOR, action="accept", version=item["version"])
     assert got.status_code == 200, got.text
     row = await _row(queue, queue.rid)
-    assert (row.review_status, row.reviewed_data) is not None
     assert row.review_status is ReviewStatus.ACCEPTED
     assert row.reviewed_data == {"n": 3, "kind": "a"} and row.reviewed_by
     assert [i["id"] for i in await _items(queue)] == [queue.gid]

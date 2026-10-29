@@ -11,10 +11,15 @@ import {
 
 export type ReviewOutcome = { outcome: 'saved' | 'stale' | 'failed'; message?: string };
 
+/** The queue is topped up from the next page when fewer than this are left. */
+export const REFILL_BELOW = 10;
+
 export type ReviewQueue = {
   items: ReviewItem[] | null;
   error: string | null;
   hasMore: boolean;
+  /** A page is being read: an empty list is not final yet. */
+  loading: boolean;
   busy: boolean;
   loadMore: () => void;
   reload: () => Promise<void>;
@@ -31,7 +36,18 @@ function message(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-/** A collection's review queue for one status and prompt, paged by cursor. */
+/** `more` after `before`, each id once (a page can overlap a reload). */
+function append(before: ReviewItem[], more: ReviewItem[]): ReviewItem[] {
+  const seen = new Set(before.map((i) => i.id));
+  return [...before, ...more.filter((i) => !seen.has(i.id))];
+}
+
+/**
+ * A collection's review queue for one status and prompt, paged by cursor.
+ * One page is read at a time, and the next is read by itself when reviewing
+ * has left fewer than :data:`REFILL_BELOW`, so the queue is never empty while
+ * the server still holds more.
+ */
 export function useReviewQueue(
   collectionId: string,
   status: ReviewFilter,
@@ -41,10 +57,13 @@ export function useReviewQueue(
   const [cursor, setCursor] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const latest = useRef(0);
+  const paging = useRef(0); // the ticket a page read is running under, else 0
 
   const reload = useCallback(async () => {
     const ticket = ++latest.current;
+    setLoading(true);
     try {
       const page = await listReview(collectionId, { status, prompt });
       if (ticket !== latest.current) return;
@@ -53,6 +72,8 @@ export function useReviewQueue(
       setError(null);
     } catch (e) {
       if (ticket === latest.current) setError(message(e));
+    } finally {
+      if (ticket === latest.current) setLoading(false);
     }
   }, [collectionId, status, prompt]);
 
@@ -61,16 +82,29 @@ export function useReviewQueue(
   }, [reload]);
 
   const loadMore = useCallback(() => {
-    if (cursor === null) return;
+    if (cursor === null || paging.current === latest.current) return;
     const ticket = latest.current;
+    paging.current = ticket;
+    setLoading(true);
     listReview(collectionId, { status, prompt, after: cursor })
       .then((page) => {
         if (ticket !== latest.current) return;
-        setItems((before) => [...(before ?? []), ...page.items]);
+        setItems((before) => append(before ?? [], page.items));
         setCursor(page.next_cursor);
       })
-      .catch((e) => setError(message(e)));
+      .catch((e) => {
+        if (ticket === latest.current) setError(message(e));
+      })
+      .finally(() => {
+        if (paging.current === ticket) paging.current = 0;
+        if (ticket === latest.current) setLoading(false);
+      });
   }, [collectionId, status, prompt, cursor]);
+
+  const remaining = items?.length ?? null;
+  useEffect(() => {
+    if (remaining !== null && remaining < REFILL_BELOW && cursor !== null && !error) loadMore();
+  }, [remaining, cursor, error, loadMore]);
 
   const review = useCallback(
     async (item: ReviewItem, action: ReviewAction, data?: Record<string, unknown>) => {
@@ -96,5 +130,14 @@ export function useReviewQueue(
     [status, reload],
   );
 
-  return { items, error, hasMore: cursor !== null, busy, loadMore, reload, review };
+  return {
+    items,
+    error,
+    hasMore: cursor !== null,
+    loading,
+    busy,
+    loadMore,
+    reload,
+    review,
+  };
 }

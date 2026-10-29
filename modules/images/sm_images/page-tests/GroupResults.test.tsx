@@ -200,4 +200,40 @@ describe('group results panel', () => {
     expect(byId(view, 'images-group-results-more-g1')).toBeNull();
     await view.unmount();
   });
+
+  it('a poll due while a "load more" is pending waits for it, then re-reads both pages', async () => {
+    let release: (() => void) | null = null;
+    let hold: Promise<void> | null = null;
+    const { view, calls } = await open({
+      [RESULTS]: (call: { url: string }) =>
+        call.url.includes('after=1')
+          ? { items: [result(2, 'completed', { verdict: 'b' })], next_cursor: null }
+          : { items: [result(1, 'running', null)], next_cursor: 1 },
+    });
+    const routed = globalThis.fetch;
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await routed(input, init);
+      if (hold && String(input).includes('after=')) await hold;
+      return response;
+    });
+    hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const firstPages = () =>
+      calls.filter((c) => c.url.includes('/results') && !c.url.includes('after=')).length;
+    const before = firstPages();
+    await click(byId(view, 'images-group-results-more-g1'));
+    await act(async () => vi.advanceTimersByTimeAsync(3100)); // the poll is due, but waits
+    expect(firstPages()).toBe(before);
+    hold = null;
+    await act(async () => {
+      (release as (() => void) | null)?.();
+    });
+    await settle();
+    await act(async () => vi.advanceTimersByTimeAsync(10));
+    expect(byId(view, 'images-group-result-2')).not.toBeNull();
+    expect(firstPages()).toBeGreaterThan(before); // the poll ran after the page arrived
+    expect(byId(view, 'images-group-result-2')).not.toBeNull();
+    await view.unmount();
+  });
 });

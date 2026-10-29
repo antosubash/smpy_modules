@@ -69,6 +69,10 @@ def _invalid(detail: str, code: str = codes.CODE_INVALID_REVIEW) -> Invalid:
     return err
 
 
+def _where(error: Any) -> str:
+    return ".".join(map(str, error["loc"]))
+
+
 def _corrected(prompt: Prompt, data: dict[str, Any] | None) -> dict[str, Any]:
     if data is None:
         raise _invalid("a correction needs data")
@@ -81,8 +85,7 @@ def _corrected(prompt: Prompt, data: dict[str, Any] | None) -> dict[str, Any]:
         model: type[BaseModel] = build_model(schema)
         checked = model.model_validate(data, strict=True)
     except ValidationError as exc:
-        where = lambda e: ".".join(map(str, e["loc"]))  # noqa: E731
-        raise _invalid("; ".join(f"{where(e)}: {e['msg']}" for e in exc.errors())) from exc
+        raise _invalid("; ".join(f"{_where(e)}: {e['msg']}" for e in exc.errors())) from exc
     except Exception as exc:  # a schema the builder cannot realise
         raise _invalid(str(exc), codes.CODE_INVALID_SCHEMA) from exc
     return checked.model_dump(mode="json", by_alias=True, exclude_unset=True)
@@ -138,8 +141,10 @@ async def apply(
     reviewed = _corrected(prompt, data) if action == "correct" else None
     if reviewed is not None and max_bytes is not None and encoded_size(reviewed) > max_bytes:
         raise _invalid("the correction is too large")
-    if action == "accept":
+    if action == "accept":  # the model's answer, structured or free text
         reviewed = locked.result_data
+        if reviewed is None and locked.result_text is not None:
+            reviewed = {"text": locked.result_text}
     reset_review(locked, max_bytes)  # a given review moves into history
     locked.review_status = _STATUS[action]
     locked.reviewed_data = reviewed

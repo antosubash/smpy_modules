@@ -14,8 +14,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import re
 import sys
 import uuid
+from collections.abc import Mapping
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -27,6 +30,32 @@ from sm_images.models import Image, Prompt, PromptResult  # noqa: E402
 from sm_images.models.enums import StepStatus  # noqa: E402
 from sm_images.tenancy import DEFAULT_TENANT, tenant_scope  # noqa: E402
 from sqlalchemy import select  # noqa: E402
+
+E2E_DB = re.compile(r"(^|[_-])(test|e2e)([_.-]|$)")
+"""A database name the e2e suite owns: ``test.db``, ``smpy_e2e``, ``..._test``."""
+
+
+def guard(env: Mapping[str, str]) -> str | None:
+    """Why this script must not run against ``env``, or ``None``.
+
+    It writes rows straight to the database, so it needs an explicit opt-in
+    (``SM_E2E_SEED=1``), a non-production environment and a database that is
+    named like the e2e one - never whatever a developer's shell points at.
+    """
+    if env.get("SM_E2E_SEED") != "1":
+        return "set SM_E2E_SEED=1 to seed (test databases only)"
+    if env.get("SM_ENVIRONMENT", "").lower() == "production":
+        return "refusing to seed with SM_ENVIRONMENT=production"
+    url = env.get("SM_DATABASE_URL", "").strip()
+    if not url:
+        return "SM_DATABASE_URL must name the e2e database"
+    from sqlalchemy.engine import make_url
+
+    database = make_url(url).database or ""
+    if not E2E_DB.search(Path(database).name):
+        return f"{database!r} is not an e2e database (its name needs 'test' or 'e2e')"
+    return None
+
 
 SCHEMA = {
     "type": "object",
@@ -78,6 +107,10 @@ def main(argv: list[str]) -> int:
     if len(argv) != 1:
         print("usage: seed_images_review.py <collection_id>", file=sys.stderr)
         return 2
+    refusal = guard(os.environ)
+    if refusal:
+        print(refusal, file=sys.stderr)
+        return 1
     print(json.dumps(asyncio.run(_seed(uuid.UUID(argv[0])))))
     return 0
 

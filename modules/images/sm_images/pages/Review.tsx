@@ -77,7 +77,7 @@ function Review({ collection }: { collection: Collection }) {
     previous: () => move(at - 1),
     accept: () => void act('accept'),
     reject: () => void act('reject'),
-    edit: () => item && setEditing(true),
+    edit: () => item && !queue.busy && setEditing(true),
     cancel: () => setEditing(false),
   });
 
@@ -103,6 +103,7 @@ function Review({ collection }: { collection: Collection }) {
                 data-testid="images-review-status-filter"
                 value={status}
                 onChange={(e) => {
+                  e.target.blur(); // a focused select would swallow j/k/a/r/e
                   setStatus(e.target.value as ReviewFilter);
                   setIndex(0);
                   setEditing(false);
@@ -122,6 +123,7 @@ function Review({ collection }: { collection: Collection }) {
                 data-testid="images-review-prompt-filter"
                 value={prompt ?? ''}
                 onChange={(e) => {
+                  e.target.blur();
                   setPrompt(e.target.value || null);
                   setIndex(0);
                   setEditing(false);
@@ -147,13 +149,24 @@ function Review({ collection }: { collection: Collection }) {
           </div>
           <p className="text-xs text-muted-foreground">{t(keys.images.review.keys)}</p>
           {queue.error && <p className="text-sm text-destructive">{queue.error}</p>}
-          {queue.items === null && !queue.error && (
+          {!item && !queue.error && (queue.items === null || queue.loading || queue.hasMore) && (
             <p className="text-sm text-muted-foreground">{t(keys.images.review.loading)}</p>
           )}
-          {queue.items !== null && !item && (
+          {queue.items !== null && !item && !queue.loading && !queue.hasMore && (
             <p className="text-sm text-muted-foreground" data-testid="images-review-empty">
               {t(keys.images.review.empty)}
             </p>
+          )}
+          {queue.hasMore && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={queue.loading}
+              onClick={queue.loadMore}
+              data-testid="images-review-more"
+            >
+              {t(keys.images.review.more)}
+            </Button>
           )}
           {item && (
             <ReviewPanel

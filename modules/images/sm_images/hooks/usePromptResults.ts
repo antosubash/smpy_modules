@@ -53,6 +53,9 @@ export function usePromptResults(promptId: string, version: number): PromptResul
   // Bumped whenever the shown rows are committed and when a "load more" starts:
   // a read that began under an older value is a stale snapshot and is dropped.
   const snapshot = useRef(0);
+  // The "load more" in flight, if any. A poll waits for it, so the two never
+  // overlap: the poll then re-reads every page now on screen.
+  const paging = useRef<Promise<void> | null>(null);
   shown.current = rows?.length ?? 0;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `version` asks for a fresh read
@@ -75,7 +78,10 @@ export function usePromptResults(promptId: string, version: number): PromptResul
   const polling = rows !== null && (active || (launched && polls < LAUNCH_POLLS));
   useEffect(() => {
     if (!polling || polls >= POLL_LIMIT) return;
-    const timer = window.setTimeout(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      await paging.current;
+      if (cancelled) return;
       const ticket = latest.current;
       const started = snapshot.current;
       readThrough(promptId, shown.current)
@@ -83,6 +89,7 @@ export function usePromptResults(promptId: string, version: number): PromptResul
           if (ticket !== latest.current) return;
           if (started === snapshot.current) {
             snapshot.current += 1;
+            shown.current = page.items.length;
             setRows(page.items);
             setCursor(page.next_cursor);
           } // else a "load more" came first: its rows stay; this poll still counts
@@ -90,21 +97,29 @@ export function usePromptResults(promptId: string, version: number): PromptResul
         })
         .catch((e) => setError(message(e)));
     }, POLL_MS);
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [polling, polls, promptId]);
 
   const loadMore = useCallback(() => {
-    if (cursor === null) return;
+    if (cursor === null || paging.current) return;
     const ticket = latest.current;
     const started = ++snapshot.current;
-    listPromptResults(promptId, cursor)
+    const request = listPromptResults(promptId, cursor)
       .then((page) => {
         if (ticket !== latest.current || started !== snapshot.current) return;
         snapshot.current += 1;
+        shown.current += page.items.length;
         setRows((before) => [...(before ?? []), ...page.items]);
         setCursor(page.next_cursor);
       })
-      .catch((e) => setError(message(e)));
+      .catch((e) => setError(message(e)))
+      .finally(() => {
+        if (paging.current === request) paging.current = null;
+      });
+    paging.current = request;
   }, [promptId, cursor]);
 
   return { rows, error, hasMore: cursor !== null, loadMore };

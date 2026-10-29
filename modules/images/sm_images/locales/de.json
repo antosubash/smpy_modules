@@ -571,9 +571,10 @@
       "json_invalid": "Das ist kein gültiges JSON.",
       "json_object": "Der Wert muss ein JSON-Objekt sein.",
       "required": "Pflichtfeld",
-      "number_invalid": "Gib eine Zahl ein.",
+      "number_invalid": "Geben Sie eine Zahl ein.",
       "list_hint": "Ein Wert pro Zeile",
-      "choose": "Auswählen…"
+      "choose": "Auswählen…",
+      "integer_invalid": "Geben Sie eine ganze Zahl ein."
     },
     "image": "Bild",
     "group": "Gruppe"

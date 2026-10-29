@@ -40,7 +40,11 @@ function read(field: SchemaField, raw: string | boolean): { value?: unknown; err
   if (text === '') return field.required ? { error: keys.images.review.form.required } : {};
   if (field.type === 'string') return { value: text };
   const n = Number(text);
-  return Number.isFinite(n) ? { value: n } : { error: keys.images.review.form.number_invalid };
+  if (!Number.isFinite(n)) return { error: keys.images.review.form.number_invalid };
+  if (field.type === 'integer' && !Number.isInteger(n)) {
+    return { error: keys.images.review.form.integer_invalid };
+  }
+  return { value: n };
 }
 
 /**

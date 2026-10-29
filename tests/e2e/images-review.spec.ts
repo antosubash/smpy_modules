@@ -38,6 +38,8 @@ function seed(collectionId: string) {
         SM_BG_TASKS_BROKER_URL: 'memory://',
         SM_BG_TASKS_RESULT_BACKEND: 'cache+memory://',
         SM_BG_TASKS_BROADCAST_INVALIDATIONS: 'false',
+        SM_E2E_SEED: '1',
+        SM_ENVIRONMENT: 'development',
       },
     },
   );
