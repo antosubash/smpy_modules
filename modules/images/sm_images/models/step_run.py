@@ -22,7 +22,11 @@ class StepRun(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[uns
         Index("ix_images_step_run_status_lease", "status", "lease_expires_at"),
     )
     # A lease renewal is bookkeeping, not a change anyone audits.
-    __audit_exclude_fields__: ClassVar[set[str]] = {"lease_token", "lease_expires_at"}
+    __audit_exclude_fields__: ClassVar[set[str]] = {
+        "lease_token",
+        "lease_expires_at",
+        "ai_started_at",
+    }
 
     id: int | None = Field(default=None, primary_key=True)
     image_id: uuid.UUID = fk_uuid("images_image.id", ondelete="CASCADE")
@@ -39,4 +43,8 @@ class StepRun(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[uns
     lease_token: uuid.UUID | None = Field(default=None, sa_column=Column(Uuid, nullable=True))
     """Fences a stale worker: every completion/publish is conditional on it."""
     lease_expires_at: datetime | None = dt_col()
+    ai_started_at: datetime | None = dt_col()
+    """Set once per lease before an AI step calls its provider: a redelivered
+    message for the same lease finds it set and makes no second (paid) call.
+    Cleared by every claim and reset."""
     output: dict[str, Any] | None = json_null()

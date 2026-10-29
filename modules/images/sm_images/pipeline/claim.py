@@ -175,6 +175,7 @@ async def claim(
             error_code=None,
             error_message=None,
             output=None,
+            ai_started_at=None,
         )
         .returning(StepRun.step, StepRun.lease_token)
         .execution_options(**_SYNC)

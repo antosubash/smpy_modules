@@ -95,6 +95,8 @@ def _check_protocol(step: Any) -> None:
         raise InvalidStepError(f"step {sid!r}: requires must be a tuple of str")
     if not isinstance(getattr(step, "mutates_display", None), bool):
         raise InvalidStepError(f"step {sid!r}: mutates_display must be a bool")
+    if not isinstance(getattr(step, "sends_display_out", False), bool):
+        raise InvalidStepError(f"step {sid!r}: sends_display_out must be a bool")
     for method in ("params_schema", "applies", "run"):
         if not callable(getattr(step, method, None)):
             raise InvalidStepError(f"step {sid!r}: {method}() is missing")

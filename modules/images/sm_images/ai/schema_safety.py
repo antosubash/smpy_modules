@@ -2,20 +2,26 @@
 
 :func:`check` runs at create/update (422 ``unsafe_output_schema``) and again
 before every run, so a schema stored before a cap existed is refused too. It
-admits only what :mod:`.schema_model` understands, with caps:
+admits only what :mod:`.schema_model` builds faithfully, with caps:
 
-* size (:data:`MAX_BYTES` encoded), nesting (:data:`MAX_DEPTH`, through
-  references), :data:`MAX_PROPERTIES` properties, :data:`MAX_REFS` ``$ref``,
-  :data:`MAX_ENUM` enum values and :data:`MAX_PATTERN` characters per pattern;
-* ``$ref`` only into the root's ``$defs``/``definitions`` - never a URL, a
-  file or another document, and never a cycle - so nothing is ever fetched
-  and resolution terminates;
-* any other keyword (``allOf``, ``not``, ``patternProperties``,
-  ``$dynamicRef``, ...) is refused rather than silently ignored.
+* size (:data:`MAX_BYTES` encoded), nesting (:data:`MAX_DEPTH`, both as
+  written and through references), :data:`MAX_PROPERTIES` properties,
+  :data:`MAX_REFS` ``$ref``, :data:`MAX_ENUM` enum values and
+  :data:`MAX_PATTERN` characters per pattern;
+* ``$ref`` only into the root's ``$defs`` or ``definitions`` (separate
+  namespaces) - never a URL, a file or another document, never a cycle, and
+  never beside other structure keywords - so nothing is fetched and
+  resolution terminates;
+* anything the model would not enforce is ``unsupported_schema`` rather than
+  silently ignored: other keywords (``allOf``, ``not``, ``format``,
+  ``patternProperties``, ``$dynamicRef``, ...) and ``required`` names that are
+  not properties.
 
-Then the model is built; anything pydantic refuses (a pattern its regex
+The walk is bounded by the depth cap before it recurses, so a deeply nested
+schema under the size cap is ``too_deep``, never a ``RecursionError``. Then
+the model is built once; anything pydantic refuses (a pattern its regex
 engine rejects) is ``invalid_schema``. :func:`output_model` is the
-deterministic per-``(prompt id, revision)`` cache of the result.
+deterministic per-``(prompt id, revision)`` cache of that model.
 """
 
 from __future__ import annotations
@@ -27,7 +33,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from sm_images.ai.schema_model import build_model, ref_name
+from sm_images.ai.schema_model import build_model, definitions, ref_name
 
 __all__ = ["MAX_DEPTH", "UnsafeSchema", "check", "output_model"]
 
@@ -41,9 +47,7 @@ MAX_ANY_OF = 20
 CACHE_SIZE = 256
 
 TYPES = frozenset({"object", "string", "integer", "number", "boolean", "array", "null"})
-ANNOTATIONS = frozenset(
-    {"title", "description", "examples", "default", "format", "$schema", "$comment"}
-)
+ANNOTATIONS = frozenset({"title", "description", "examples", "default", "$schema", "$comment"})
 STRUCTURE = frozenset(
     {"type", "properties", "required", "items", "enum", "const", "anyOf", "$ref"}
     | {"additionalProperties", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum"}
@@ -59,29 +63,42 @@ class UnsafeSchema(ValueError):  # noqa: N818 - reads as the verdict
         self.detail = detail
 
 
+def _too_deep() -> UnsafeSchema:
+    return UnsafeSchema("too_deep", f"at most {MAX_DEPTH} levels")
+
+
 class _Walk:
     def __init__(self, root: dict[str, Any]) -> None:
-        self.defs = {**root.get("definitions", {}), **root.get("$defs", {})}
+        self.defs = definitions(root)
         self.properties = 0
         self.refs = 0
-        self.heights: dict[str, int] = {}
+        self.heights: dict[tuple[str, str], int] = {}
 
-    def raw(self, node: Any, *, root: bool = False) -> None:
-        """Keywords, references, patterns and counts, without following refs."""
+    def raw(self, node: Any, depth: int = 0, *, root: bool = False) -> None:
+        """Keywords, references, patterns and counts as written (refs not followed)."""
+        if depth > MAX_DEPTH:
+            raise _too_deep()
         if not isinstance(node, dict):
             raise UnsafeSchema("invalid_schema", "a subschema must be an object")
+        if "$ref" in node and STRUCTURE.intersection(node) - {"$ref"}:
+            raise UnsafeSchema("unsupported_schema", "$ref takes no sibling keywords")
         for key, value in node.items():
             if key in ANNOTATIONS:
                 continue
             if key in ROOT_ONLY and root and isinstance(value, dict):
                 for sub in value.values():
-                    self.raw(sub)
+                    self.raw(sub, depth + 1)
             elif key in STRUCTURE:
-                self._keyword(key, value)
+                self._keyword(key, value, depth)
             else:
-                raise UnsafeSchema("unsupported_keyword", str(key)[:100])
+                raise UnsafeSchema("unsupported_schema", f"keyword {str(key)[:100]!r}")
+        missing = set(node.get("required") or ()) - set(node.get("properties") or {})
+        if missing:
+            raise UnsafeSchema(
+                "unsupported_schema", f"required but not a property: {sorted(missing)[:5]}"
+            )
 
-    def _keyword(self, key: str, value: Any) -> None:
+    def _keyword(self, key: str, value: Any, depth: int) -> None:
         if key == "properties":
             if not isinstance(value, dict):
                 raise UnsafeSchema("invalid_schema", "properties must be an object")
@@ -89,35 +106,37 @@ class _Walk:
             if self.properties > MAX_PROPERTIES:
                 raise UnsafeSchema("too_many_properties", f"at most {MAX_PROPERTIES}")
             for sub in value.values():
-                self.raw(sub)
+                self.raw(sub, depth + 1)
         elif key == "items":
-            self.raw(value)
+            self.raw(value, depth + 1)
         elif key == "anyOf":
             if not isinstance(value, list) or not 0 < len(value) <= MAX_ANY_OF:
                 raise UnsafeSchema("invalid_schema", f"anyOf takes 1 to {MAX_ANY_OF} schemas")
             for sub in value:
-                self.raw(sub)
+                self.raw(sub, depth + 1)
         elif key == "$ref":
             self.refs += 1
             if self.refs > MAX_REFS:
                 raise UnsafeSchema("too_many_refs", f"at most {MAX_REFS}")
-            name = ref_name(value) if isinstance(value, str) else None
-            if name is None:
+            target = ref_name(value) if isinstance(value, str) else None
+            if target is None:
                 raise UnsafeSchema("remote_ref", "only #/$defs/<name> references are allowed")
-            if name not in self.defs:
-                raise UnsafeSchema("invalid_schema", f"unknown reference {name[:100]!r}")
+            if target[1] not in self.defs[target[0]]:
+                raise UnsafeSchema("invalid_schema", f"unknown reference {value[:100]!r}")
         else:
             _scalar_keyword(key, value)
 
-    def height(self, node: dict[str, Any], stack: tuple[str, ...] = ()) -> int:
-        """Nesting below ``node``, following references once each (memoised)."""
+    def height(self, node: dict[str, Any], stack: tuple[tuple[str, str], ...] = ()) -> int:
+        """Nesting below ``node``, following references once each (memoised).
+        Bounded: ``raw`` already capped the nesting as written."""
         if "$ref" in node:
-            name = ref_name(node["$ref"]) or ""
-            if name in stack:
-                raise UnsafeSchema("recursive_ref", name[:100])
-            if name not in self.heights:
-                self.heights[name] = self.height(self.defs[name], (*stack, name))
-            return self.heights[name]
+            target = ref_name(node["$ref"]) or ("", "")
+            if target in stack:
+                raise UnsafeSchema("recursive_ref", target[1][:100])
+            if target not in self.heights:
+                found = self.height(self.defs[target[0]][target[1]], (*stack, target))
+                self.heights[target] = found
+            return self.heights[target]
         kids = list(node.get("properties", {}).values()) + list(node.get("anyOf", []))
         if isinstance(node.get("items"), dict):
             kids.append(node["items"])
@@ -153,22 +172,26 @@ def _scalar(value: Any) -> bool:
     return value is None or isinstance(value, str | int | float | bool)
 
 
-def check(schema: Any) -> None:
-    """Raise :class:`UnsafeSchema` unless ``schema`` is admitted (see the module)."""
+def check(schema: Any) -> type[BaseModel]:
+    """The model for ``schema``, or :class:`UnsafeSchema` (see the module)."""
     if not isinstance(schema, dict) or schema.get("type") != "object":
         raise UnsafeSchema("not_an_object", "the root must be {'type': 'object', ...}")
     try:
         size = len(json.dumps(schema, allow_nan=False).encode())
+        if size > MAX_BYTES:
+            raise UnsafeSchema("too_large", f"at most {MAX_BYTES} bytes")
+        walk = _Walk(schema)
+        walk.raw(schema, root=True)
+        if walk.height(schema) > MAX_DEPTH:
+            raise _too_deep()
+    except RecursionError as exc:  # defence in depth: the depth cap comes first
+        raise UnsafeSchema("invalid_schema", "nested too deeply") from exc
     except (TypeError, ValueError) as exc:
+        if isinstance(exc, UnsafeSchema):
+            raise
         raise UnsafeSchema("invalid_schema", "not JSON") from exc
-    if size > MAX_BYTES:
-        raise UnsafeSchema("too_large", f"at most {MAX_BYTES} bytes")
-    walk = _Walk(schema)
-    walk.raw(schema, root=True)
-    if walk.height(schema) > MAX_DEPTH:
-        raise UnsafeSchema("too_deep", f"at most {MAX_DEPTH} levels")
     try:
-        build_model(schema)
+        return build_model(schema)
     except Exception as exc:  # pydantic refused it (a pattern its engine rejects)
         raise UnsafeSchema("invalid_schema", f"{type(exc).__name__}: {exc}"[:500]) from exc
 
@@ -178,15 +201,14 @@ _lock = threading.Lock()
 
 
 def output_model(schema: Any, *, key: Any = None) -> type[BaseModel]:
-    """:func:`check`, then the model; cached under ``key`` (prompt id, revision)."""
+    """:func:`check`'s model, cached under ``key`` (prompt id, revision)."""
     if key is not None:
         with _lock:
             found = _cache.get(key)
             if found is not None:
                 _cache.move_to_end(key)
                 return found
-    check(schema)
-    model = build_model(schema)
+    model = check(schema)
     if key is not None:
         with _lock:
             _cache[key] = model

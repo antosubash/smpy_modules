@@ -83,6 +83,8 @@ class JobSnap:
     source_url: str | None
     total_count: int
     checkpoint_index: int
+    auto_run_prompts: bool = True
+    """Whether the job's images get the collection's ``auto_run`` prompts."""
 
 
 def snapshot(row: ImportJob) -> JobSnap:
@@ -97,6 +99,7 @@ def snapshot(row: ImportJob) -> JobSnap:
         row.source_url,
         row.total_count,
         row.checkpoint_index,
+        row.auto_run_prompts,
     )
 
 
@@ -121,7 +124,7 @@ async def create_job(
     job_id: uuid.UUID | None = None,
     staged: tuple[str, int] | None = None,
     source_url: str | None = None,
-    auto_run_prompts: bool = False,
+    auto_run_prompts: bool = True,
     created_by: str | None = None,
     access_basis: str | None = None,
 ) -> ImportJob:

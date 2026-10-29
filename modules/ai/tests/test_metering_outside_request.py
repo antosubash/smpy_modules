@@ -4,18 +4,22 @@ A Celery worker (images' ``classify`` and prompt steps) never builds the app,
 so ``RequiresAiRequest`` cannot reach it. ``consume_requests`` charges the
 meter through billing's ``usage_meter`` in its own short transaction - on the
 caller's session factory, or, in a bare worker, on an engine of its own over
-the host's database URL - and is unmetered (``True``) without billing.
+the host's database URL - and is unmetered (``True``) only when billing is
+not installed at all: an installed billing that cannot meter fails closed.
 """
 
 from __future__ import annotations
 
+import types
 import uuid
 
 import pytest
 from sm_ai import metering
 from sm_ai.contracts import consume_requests
 
-pytest.importorskip("sm_billing.contracts.metering")
+
+def _needs_billing() -> None:
+    pytest.importorskip("sm_billing.contracts.metering")
 
 
 async def _seed(factory, limit: int) -> str:
@@ -41,6 +45,7 @@ async def _seed(factory, limit: int) -> str:
 
 @pytest.fixture
 async def billing_db(tmp_path, monkeypatch):
+    _needs_billing()
     from simple_module_db import init_db
     from sm_billing.models import Base
 
@@ -55,8 +60,24 @@ async def billing_db(tmp_path, monkeypatch):
 
 
 async def test_unmetered_without_billing(monkeypatch):
-    monkeypatch.setattr(metering, "billing_usage_installed", lambda: False)
+    """No ``sm_billing`` at all: nothing is metered (runs with or without billing)."""
+    monkeypatch.setattr(metering, "find_spec", lambda name: None)
     assert await consume_requests("t", idempotency_key="k", source="images:test") is True
+
+
+async def test_an_installed_billing_without_the_entry_fails_closed(monkeypatch):
+    monkeypatch.setattr(metering, "_billing_contract", lambda: types.SimpleNamespace())
+    with pytest.raises(RuntimeError, match="usage_meter"):
+        await consume_requests("t", idempotency_key="k", source="images:test")
+
+
+async def test_a_broken_billing_import_fails_closed(monkeypatch):
+    def broken():
+        raise ImportError("sm_billing is half installed")
+
+    monkeypatch.setattr(metering, "_billing_contract", broken)
+    with pytest.raises(ImportError):
+        await consume_requests("t", idempotency_key="k", source="images:test")
 
 
 async def test_charges_through_the_callers_session_factory(billing_db):

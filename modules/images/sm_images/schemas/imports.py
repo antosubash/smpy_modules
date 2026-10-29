@@ -48,7 +48,7 @@ class ZipCreate(BaseModel):
     filename: Filename
     size: int = Field(ge=1)
     mapping: dict[str, Any] | None = None
-    auto_run_prompts: bool = False
+    auto_run_prompts: bool = True
 
 
 class ZipCreated(BaseModel):

@@ -168,7 +168,9 @@ async def _duplicate(runtime: Runtime, tenant: str, job: tuple, coll, item, toke
     return dup is not None
 
 
-async def _one(runtime, tenant, job: tuple, coll, claimed, limiter, settings, db_lock) -> None:
+async def _one(
+    runtime, tenant, job: tuple, coll, claimed, limiter, settings, db_lock, *, auto_run: bool
+) -> None:
     """One item. Its database phases hold ``db_lock`` (one transaction at a time
     per batch - short ones); the fetch runs outside it, concurrently."""
     job_id, generation = job
@@ -209,6 +211,7 @@ async def _one(runtime, tenant, job: tuple, coll, claimed, limiter, settings, db
             data,
             filename=url_filename(item.url),
             meta=settle.item_meta(item),
+            auto_run=auto_run,
             attempts=attempts,
             token=token,
         )
@@ -216,7 +219,7 @@ async def _one(runtime, tenant, job: tuple, coll, claimed, limiter, settings, db
 
 async def _run(runtime, tenant, job_id, generation, ids) -> int:
     async with runtime.session_factory() as db:
-        stmt = select(ImportJob.collection_id).where(
+        stmt = select(ImportJob.collection_id, ImportJob.auto_run_prompts).where(
             ImportJob.id == job_id, ImportJob.tenant_id == tenant
         )
         job_row = (await db.execute(stmt)).first()
@@ -238,11 +241,15 @@ async def _run(runtime, tenant, job_id, generation, ids) -> int:
     held = [c for c in claims if c is not None]
     db_lock = asyncio.Lock()
     job = (job_id, generation)
+    auto = bool(job_row[1])
     # A fetch settles nothing for up to ``download_timeout`` per attempt: beat
     # meanwhile, or reconcile would take a healthy job for a dead one.
     async with beating(runtime, tenant, job_id, generation):
         results = await asyncio.gather(
-            *(_one(runtime, tenant, job, coll, c, limiter, settings, db_lock) for c in held),
+            *(
+                _one(runtime, tenant, job, coll, c, limiter, settings, db_lock, auto_run=auto)
+                for c in held
+            ),
             return_exceptions=True,
         )
     for result in results:

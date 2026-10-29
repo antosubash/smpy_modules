@@ -62,19 +62,36 @@ Both need the `[ai]` extra (the `ai` module and Pydantic AI). Without it,
   previous output.
 - A prompt runs on every image when the collection's config enables
   `prompt:<id>`. It runs on demand when a run is *requested*: `auto_run`
-  prompts on each new image (uploads always; imports when the job's
-  `auto_run_prompts` is set), and `POST /api/images/prompts/{id}/run`
-  (`missing`, `stale` or `all`, optionally limited to `image_ids`).
-- **Privacy.** The planner orders AI steps after the display mutator, as it
-  does renditions. The executor also refuses (`display_not_ready`) to send a
-  display copy that serving would not trust. The original is never sent.
+  prompts on each new image (uploads always; imports too, unless the import
+  opts out with `auto_run_prompts: false`), and
+  `POST /api/images/prompts/{id}/run` (`missing`, `stale` or `all`,
+  optionally limited to `image_ids`). A requested run whose prompt is gone
+  settles as `not_installed`.
+- **Who may spend.** An edit share may run a prompt on named `image_ids`
+  with `missing` or `stale`. A run over the whole collection, a run with
+  `all`, and switching `auto_run` on are the owner's or `images.manage`'s.
+- **Privacy.** A step that declares `sends_display_out = True` (`classify`,
+  every prompt step, and any plugin step that opts in) is ordered after the
+  display mutator, as renditions are. The executor also refuses
+  (`display_not_ready`) to send a display copy that serving would not trust.
+  The original is never sent.
 - **Metering.** Each call charges one `ai.requests` through
   `sm_ai.contracts.consume_requests`, keyed
-  `images:{tenant}:{image}:{step}:{version}:{lease token}`, so redelivering
-  one claim is free. A refusal fails the step with `quota_exceeded`, and
-  nothing retries it automatically.
-- **Output schemas** are user input. `schema_safety.check` caps size, depth,
-  properties, `$ref` count and pattern length, allows only local `$ref`, and
-  refuses keywords the model builder does not understand. The check runs on
-  save and again before every run. A pydantic model is then built from the
-  schema and cached per prompt id and revision.
+  `images:{tenant}:{image}:{step}:{version}:{lease token}`. Before the call,
+  the run claims `step_run.ai_started_at` once per lease, so a redelivered
+  message for the same lease neither calls the provider nor pays again.
+  Pydantic AI's output retries are off: one charge is one provider request,
+  and a reply that does not fit fails `invalid_output`. A refusal fails the
+  step with `quota_exceeded`, and nothing retries it automatically. A prompt
+  result larger than `step_output_max_bytes` fails `output_too_large` and
+  keeps the previous result.
+- **Output schemas** are user input. `schema_safety.check` caps size, depth
+  (as written and through references), properties, `$ref` count and pattern
+  length. It allows only local `$ref` with no sibling keywords, keeping
+  `$defs` and `definitions` apart, and refuses what the model would not
+  enforce (`format`, `allOf`, unknown keywords, `required` names that are
+  not properties) as `unsupported_schema`. An optional property may be
+  omitted but is null only where its type allows it, and unlisted properties
+  are kept unless `additionalProperties` is `false`. The check runs on save
+  and again before every run; it builds the pydantic model once, cached per
+  prompt id and revision.

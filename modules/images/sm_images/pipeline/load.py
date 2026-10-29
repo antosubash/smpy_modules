@@ -6,8 +6,8 @@ the image, its collection's validated config - prompt steps resolved, and this
 run's own prompt step even when the config does not enable it (a requested
 run) - and an immutable :class:`ImageRead`. The session closes before any work.
 
-For a step that sends the display copy out of the system (``classify``,
-``prompt:*``) it also decides :attr:`Loaded.display_safe` the way serving
+For a step that declares ``sends_display_out`` (``classify``, ``prompt:*``,
+a plugin's) it also decides :attr:`Loaded.display_safe` the way serving
 does: a trusted (redacted) display copy, or nothing pending redaction. The
 planner already orders these steps after the display mutator; this catches
 the cases it cannot see, such as a mutator whose plugin was uninstalled.
@@ -30,10 +30,9 @@ from sm_images.pipeline import registry
 from sm_images.pipeline.advance import collection_config
 from sm_images.pipeline.config import StepConfig
 from sm_images.pipeline.runtime import Runtime
+from sm_images.pipeline.step import sends_display_out
 
-__all__ = ["Loaded", "load_run", "sends_display_out"]
-
-CLASSIFY = "classify"
+__all__ = ["Loaded", "load_run"]
 
 
 @dataclass(frozen=True)
@@ -52,10 +51,6 @@ class Loaded:
     impl: Any = None
     """The registered step, or the prompt step resolved for this execution."""
     display_safe: bool = True
-
-
-def sends_display_out(step: str) -> bool:
-    return step == CLASSIFY or step.startswith(registry.PROMPT_PREFIX)
 
 
 async def _display_safe(db: Any, tenant: str, image: Image) -> bool:
@@ -103,7 +98,7 @@ async def load_run(
 
                 impl = await prompt_steps.full(db, tenant, impl)
             safe = True
-            if sends_display_out(step):
+            if sends_display_out(impl):
                 safe = await _display_safe(db, tenant, image)
             loaded = Loaded(
                 tenant=tenant,

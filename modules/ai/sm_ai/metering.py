@@ -119,23 +119,26 @@ def RequiresAiRequest(qty: int = 1) -> Any:  # noqa: N802 - reads like RequiresQ
 # body runs on its own ``asyncio.run`` loop and a pooled asyncpg connection
 # belongs to the loop that opened it.
 #
-# Without billing - or with a billing older than ``usage_meter`` - nothing is
-# metered and every call is admitted. A worker treats an *installed* billing as
+# Without billing nothing is metered and every call is admitted. An installed
+# billing that cannot meter (older than ``usage_meter``, or broken) raises:
+# AI calls are never free because billing failed to load. A worker treats an *installed* billing as
 # running: it cannot ask the web host's module list.
 
 _lock = threading.Lock()
 _engine: tuple[int, str, Any] | None = None  # (pid, url, DatabaseState)
 
 
-def billing_usage_installed() -> bool:
-    """Whether a billing with the worker-side ``usage_meter`` is installed."""
+def billing_installed() -> bool:
+    """Whether ``sm_billing`` is installed at all: the only case left unmetered."""
     try:
-        spec = find_spec(constants.BILLING_USAGE_MODULE)
+        return find_spec(constants.BILLING_PACKAGE) is not None
     except ModuleNotFoundError:
         return False
-    if spec is None:
-        return False
-    return hasattr(importlib.import_module(constants.BILLING_USAGE_MODULE), "usage_meter")
+
+
+def _billing_contract() -> Any:
+    """Billing's metering contract; any import error propagates (fail closed)."""
+    return importlib.import_module(constants.BILLING_USAGE_MODULE)
 
 
 def _own_factory() -> Any:
@@ -183,10 +186,14 @@ async def consume_requests(
         raise ValueError(f"qty must be an integer from 1 to {_QTY_MAX}")
     if not idempotency_key or not source:
         raise ValueError("idempotency_key and source are required")
-    if not billing_usage_installed():
+    if not billing_installed():
         return True
-    from sm_billing.contracts.metering import usage_meter
-
+    usage_meter = getattr(_billing_contract(), "usage_meter", None)
+    if usage_meter is None:  # installed, but cannot meter here: refuse, never run free
+        raise RuntimeError(
+            "the installed billing has no usage_meter (older than 0.0.14): "
+            "AI requests outside a request cannot be metered"
+        )
     meter = usage_meter(session_factory or _own_factory())
     outcome = await meter.consume(
         tenant_id, constants.METER_REQUESTS, qty, idempotency_key, source=source

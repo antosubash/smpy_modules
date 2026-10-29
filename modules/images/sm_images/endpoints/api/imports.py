@@ -7,7 +7,8 @@ edit is a 404, exactly like an id that never existed.
 
 Starting a job takes multipart form fields - ``kind`` (``geojson_url`` or
 ``geojson_base64``), ``mapping`` (JSON, :class:`~sm_images.imports.mapping.Mapping`),
-``auto_run_prompts`` - and exactly one source: ``file`` (the GeoJSON, held
+``auto_run_prompts`` (default true; false opts this import out) - and
+exactly one source: ``file`` (the GeoJSON, held
 by the request's spooled upload, inside the upload body limit) or
 ``source_url`` (fetched by the runner through the SSRF guard). The answer is
 202 with the job; on an eager host (tests, dev without a broker) the import
@@ -102,7 +103,7 @@ async def create_import(
     kind: Annotated[str, Form(max_length=40)],
     mapping: Annotated[str, Form(max_length=20_000)] = "{}",
     source_url: Annotated[str | None, Form(max_length=2000)] = None,
-    auto_run_prompts: Annotated[bool, Form()] = False,
+    auto_run_prompts: Annotated[bool, Form()] = True,
     file: Annotated[UploadFile | None, File()] = None,
 ) -> ImportJobOut:
     user, basis = await _actor(db, who, collection)

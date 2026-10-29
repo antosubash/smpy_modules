@@ -74,7 +74,7 @@ export function ImportWizard({
   const [pattern, setPattern] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
   const [zip, setZip] = useState<File | null>(null);
-  const [autoRun, setAutoRun] = useState(false);
+  const [autoRun, setAutoRun] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

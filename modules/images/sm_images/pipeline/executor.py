@@ -35,12 +35,11 @@ from sm_images.pipeline.claim import LostLease, renew
 from sm_images.pipeline.finish import complete_step
 from sm_images.pipeline.load import Loaded, load_run
 from sm_images.pipeline.runtime import Runtime
-from sm_images.pipeline.step import StepContext, StepOutcome
+from sm_images.pipeline.step import MESSAGE_MAX, StepContext, StepOutcome, failure
 
 __all__ = ["Loaded", "Staging", "bounded", "run_step_async"]
 
 logger = logging.getLogger(__name__)
-MESSAGE_MAX = 2000
 
 
 @dataclass
@@ -66,11 +65,6 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
-def _failed(code: str, exc: BaseException | str) -> StepOutcome:
-    text = exc if isinstance(exc, str) else f"{type(exc).__name__}: {exc}"
-    return StepOutcome.failed(code, text[:MESSAGE_MAX])
-
-
 def bounded(outcome: StepOutcome, max_bytes: int) -> StepOutcome:
     """Strict, compact JSON within ``max_bytes``; otherwise a failed outcome."""
     if outcome.status == "skipped" and outcome.reason and len(outcome.reason) > MESSAGE_MAX:
@@ -82,9 +76,9 @@ def bounded(outcome: StepOutcome, max_bytes: int) -> StepOutcome:
             outcome.output, allow_nan=False, separators=(",", ":"), ensure_ascii=False
         ).encode()
     except (TypeError, ValueError) as exc:
-        return _failed("invalid_output", exc)
+        return failure("invalid_output", exc)
     if len(encoded) > max_bytes:
-        return _failed(
+        return failure(
             "output_too_large", f"output is {len(encoded)} bytes; the limit is {max_bytes}"
         )
     return StepOutcome.completed(json.loads(encoded))
@@ -157,7 +151,7 @@ async def _run(runtime: Runtime, loaded: Loaded, impl: Any, staging: Staging) ->
         if isinstance(exc, SoftTimeLimitExceeded):
             raise
         logger.warning("images.pipeline.step_raised step=%s", loaded.step, exc_info=True)
-        outcome = _failed("step_error", exc)
+        outcome = failure("step_error", exc)
     finally:
         keeper.cancel()
         with contextlib.suppress(asyncio.CancelledError):
@@ -165,7 +159,7 @@ async def _run(runtime: Runtime, loaded: Loaded, impl: Any, staging: Staging) ->
     if lease.lost:
         return None
     if not isinstance(outcome, StepOutcome):
-        return _failed("invalid_outcome", f"run() returned {type(outcome).__name__}")
+        return failure("invalid_outcome", f"run() returned {type(outcome).__name__}")
     return outcome
 
 
@@ -175,11 +169,11 @@ async def _work(runtime: Runtime, loaded: Loaded, staging: Staging) -> StepOutco
     if impl is None or cfg is None or not cfg.enabled or cfg.state == "not_installed":
         return StepOutcome("skipped", reason="not_installed", code="not_installed")
     if cfg.state == "invalid":
-        return _failed(cfg.error or "invalid_config", "the saved params no longer validate")
+        return failure(cfg.error or "invalid_config", "the saved params no longer validate")
     try:
         applies = impl.applies(loaded.image, cfg.params)
     except Exception as exc:
-        return _failed("step_error", exc)
+        return failure("step_error", exc)
     if not applies:
         return StepOutcome.skipped("not_applicable")
     return await _run(runtime, loaded, impl, staging)
@@ -204,8 +198,8 @@ async def run_step_async(
         # Record a fenced failure either way. A soft time limit is re-raised
         # for Celery; anything else is an executor bug, logged, not a time limit.
         timed_out = isinstance(exc, SoftTimeLimitExceeded)
-        failure = _failed("time_limit" if timed_out else "internal_error", exc)
-        await complete_step(runtime, loaded, failure, Staging(settings), version=version)
+        fenced = failure("time_limit" if timed_out else "internal_error", exc)
+        await complete_step(runtime, loaded, fenced, Staging(settings), version=version)
         if timed_out:
             raise
         logger.exception("images.pipeline.internal_error step=%s image=%s", step, image_id)

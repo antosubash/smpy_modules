@@ -29,7 +29,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from simple_module_db import finalize_session
-from sqlalchemy import select, update
+from sqlalchemy import update
 
 from sm_images import constants
 from sm_images.errors import ImagesError
@@ -38,7 +38,7 @@ from sm_images.imports.chunk import pending_items
 from sm_images.imports.features import Parsed
 from sm_images.ingest import Duplicate, IngestMeta, IngestService
 from sm_images.ingest.b64 import decode_base64
-from sm_images.models import Collection, Image, ImportItem, ImportJob
+from sm_images.models import Collection, Image, ImportItem
 from sm_images.models.enums import ItemStatus, LocationSource
 from sm_images.pipeline.runtime import Runtime
 
@@ -129,18 +129,6 @@ async def ingest_item(
     )
 
 
-async def _auto_run(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> bool:
-    """The job's ``auto_run_prompts``, read in a session of its own: the settling
-    one must not read before ingest records its intent (SQLite snapshots)."""
-    async with runtime.session_factory() as db:
-        stmt = select(ImportJob.auto_run_prompts).where(
-            ImportJob.id == job_id, ImportJob.tenant_id == tenant
-        )
-        flag = (await db.execute(stmt)).scalar_one_or_none()
-        await finalize_session(db)
-    return bool(flag)
-
-
 async def fail_item(
     runtime: Runtime,
     tenant: str,
@@ -182,13 +170,14 @@ async def settle_bytes(
     *,
     filename: str | None,
     meta: IngestMeta,
+    auto_run: bool,
     attempts: int = 1,
     token: str | None = None,
 ) -> ItemStatus | None:
     """Ingest ``data`` as item ``item_id``; its final status, or ``None`` when it
-    lost (settled elsewhere, claim lost, job moved on) and nothing was kept."""
+    lost (settled elsewhere, claim lost, job moved on) and nothing was kept.
+    ``auto_run`` is the job's ``auto_run_prompts``, read once per job."""
     created: Image | None = None
-    auto_run = await _auto_run(runtime, tenant, job_id)
     async with runtime.session_factory() as db:
         ingest = IngestService(
             db,
@@ -268,6 +257,7 @@ async def ingest_chunk(
             data,
             filename=p.filename,
             meta=item_meta(p),
+            auto_run=job.auto_run_prompts,
         )
         settled += outcome is not None
     return settled

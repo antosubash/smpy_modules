@@ -34,7 +34,7 @@ from sm_images.pipeline.claim import (
 )
 from sm_images.pipeline.config import validate_pipeline_config
 from sm_images.pipeline.cycle import bump_cycle, mark_processed, reset_runs
-from sm_images.pipeline.plan import RunView, plan
+from sm_images.pipeline.plan import NOT_INSTALLED, RunView, plan
 from sm_images.pipeline.reopen import reopenable
 from sm_images.pipeline.runtime import Runtime
 
@@ -100,7 +100,15 @@ async def advance_locked(
     db: Any, tenant: str, image_id: uuid.UUID, locked: LockedImage, now: datetime, lease_s: int
 ) -> Advanced:
     runs = await load_runs(db, tenant, image_id)
-    cfg = await collection_config(db, tenant, locked.collection_id, requested_prompts(runs))
+    requested = requested_prompts(runs)
+    cfg = await collection_config(db, tenant, locked.collection_id, requested)
+    # A requested prompt that no longer resolves (deleted, or no ``[ai]``) and
+    # that the config does not name: ``not_installed``, so reconcile stops
+    # re-sending it (a config-named one is the planner's to settle).
+    gone = [sid for sid in requested if sid not in cfg.steps]
+    for sid in gone:
+        await settle(db, tenant, image_id, sid, StepStatus.SKIPPED, NOT_INSTALLED, now)
+    runs = {sid: r for sid, r in runs.items() if sid not in gone}
     reopen = reopenable(cfg, {sid: view(r, now) for sid, r in runs.items()})
     if reopen and await reset_runs(db, tenant, image_id, reopen, now):
         await bump_cycle(db, tenant, image_id)  # ``ImageProcessed`` once more

@@ -64,7 +64,7 @@ async def start(
     mapping: dict[str, Any] | None,
     owner: str,
     secret: str,
-    auto_run_prompts: bool = False,
+    auto_run_prompts: bool = True,
     access_basis: str | None = None,
 ) -> tuple[ImportJob, tuple[str, Ticket, list[str], bool]]:
     """The ``uploading`` job and its upload: ``(job, (upload_id, ticket, part_urls, direct))``."""

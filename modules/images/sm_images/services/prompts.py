@@ -70,10 +70,18 @@ async def get(db: Any, collection: Collection, prompt_id: uuid.UUID) -> Prompt:
     return row
 
 
+def _inputs(scope: Any, inputs: str | None) -> str | None:
+    try:
+        return check_inputs(scope, inputs)
+    except ValueError as exc:
+        raise _invalid(str(exc), constants.CODE_INVALID_INPUTS) from exc
+
+
 async def create(db: Any, collection: Collection, body: PromptCreate) -> Prompt:
     _check_schema(body.output_schema)
+    inputs = _inputs(body.scope, body.inputs)
     await _name_free(db, collection, body.name, None)
-    row = Prompt(collection_id=collection.id, **body.model_dump())
+    row = Prompt(collection_id=collection.id, **{**body.model_dump(), "inputs": inputs})
     db.add(row)
     await db.flush()
     return row
@@ -89,10 +97,7 @@ async def update(db: Any, collection: Collection, row: Prompt, changes: dict[str
         _check_schema(changes["output_schema"])
     if "name" in changes:
         await _name_free(db, collection, changes["name"], row.id)
-    try:
-        inputs = check_inputs(row.scope, changes.get("inputs", row.inputs))
-    except ValueError as exc:
-        raise _invalid(str(exc), constants.CODE_INVALID_INPUTS) from exc
+    inputs = _inputs(row.scope, changes.get("inputs", row.inputs))
     revised = any(k in changes and changes[k] != getattr(row, k) for k in REVISING)
     for key, value in changes.items():
         setattr(row, key, value)
@@ -104,14 +109,11 @@ async def update(db: Any, collection: Collection, row: Prompt, changes: dict[str
 
 
 async def delete_prompt(db: Any, collection: Collection, row: Prompt) -> None:
-    images = select(Image.id).where(Image.collection_id == collection.id)
+    # By step id alone: the id names this prompt, and a trashed image's runs
+    # (which an image subquery would filter out) must go too.
     sid = prompt_steps.step_id(row.id)
     sync = {"synchronize_session": False}
-    await db.execute(
-        delete(StepRun)
-        .where(StepRun.step == sid, StepRun.image_id.in_(images))
-        .execution_options(**sync)
-    )
+    await db.execute(delete(StepRun).where(StepRun.step == sid).execution_options(**sync))
     await db.execute(
         delete(PromptResult).where(PromptResult.prompt_id == row.id).execution_options(**sync)
     )

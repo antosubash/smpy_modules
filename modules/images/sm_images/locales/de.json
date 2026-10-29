@@ -245,7 +245,6 @@
     "ai_unavailable": "Das KI-Modul ist nicht installiert.",
     "display_not_ready": "Das Bild ist noch nicht geschwärzt und wurde daher nicht an den KI-Anbieter gesendet.",
     "ai_not_configured": "Die KI ist nicht eingerichtet. Lege in den KI-Einstellungen einen Anbieter und ein Modell fest.",
-    "invalid_ai_output": "Die Antwort der KI hatte nicht das erwartete Format.",
     "ai_error": "Der KI-Anbieter hat einen Fehler gemeldet."
   },
   "tabs": {

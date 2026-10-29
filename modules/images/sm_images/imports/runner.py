@@ -20,9 +20,9 @@ on the collection (:mod:`.access`); a lost right cancels the job.
 Permanent problems with the source (bad JSON, too many features, an unsafe or
 failing URL) fail the job with a code; anything else (storage or database
 trouble) propagates, leaving the job for reconcile to reclaim once its
-heartbeat is stale. ``auto_run_prompts`` is stored on the job for the prompts
-that arrive with Task 22; the collection's pipeline runs for every imported
-image through ingest's own dispatch.
+heartbeat is stale. The collection's pipeline runs for every imported image
+through ingest's own dispatch, and its ``auto_run`` prompts too unless the
+job's ``auto_run_prompts`` is off (it travels on the ``JobSnap``).
 """
 
 from __future__ import annotations

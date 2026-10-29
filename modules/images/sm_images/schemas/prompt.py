@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from sm_images.ai.run import IDS_MAX
 from sm_images.models.enums import PromptScope, ReviewStatus, StepStatus
@@ -46,11 +46,7 @@ class PromptCreate(BaseModel):
     """A JSON Schema (checked by ``schema_safety``); ``null`` = free text."""
     inputs: Inputs | None = None
     auto_run: bool = False
-
-    @model_validator(mode="after")
-    def _inputs(self) -> PromptCreate:
-        self.inputs = check_inputs(self.scope, self.inputs)  # type: ignore[assignment]
-        return self
+    """Owner or ``images.manage`` only: it spends AI requests on every new image."""
 
 
 class PromptUpdate(BaseModel):

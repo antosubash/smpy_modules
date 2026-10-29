@@ -76,6 +76,7 @@ class ClassifyStep:
     requires: tuple[str, ...] = ()
     """The planner adds the enabled display mutator: the picture sent is redacted."""
     mutates_display = False
+    sends_display_out = True
     queue = "images_heavy"
 
     def params_schema(self) -> type[BaseModel]:

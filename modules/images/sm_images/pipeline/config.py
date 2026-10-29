@@ -18,10 +18,11 @@ Either way an id with no installed implementation is *kept*, as
 configuration, and its runs settle as skipped rather than waiting forever.
 ``prompt:<id>`` steps are never registered: the caller resolves them from the
 database per execution (:func:`sm_images.ai.prompt_steps.resolve`) and passes
-them as ``prompts``; one it did not pass (a deleted prompt, no ``ai``) is
-``not_installed`` too. :meth:`PipelineConfig.with_requested` adds the prompt
-runs requested for one image (auto-run, the run route) that the collection's
-config does not enable.
+them as ``prompts``. A config-named one it did not pass (a deleted prompt, no
+``ai``) is ``not_installed`` too. :meth:`PipelineConfig.with_requested` adds
+the resolved prompt runs requested for one image (auto-run, the run route)
+that the config does not enable; a requested one that no longer resolves is
+not added, and ``advance.advance_locked`` settles its run ``not_installed``.
 """
 
 from __future__ import annotations
@@ -75,7 +76,8 @@ class PipelineConfig:
 
     def with_requested(self, step_ids: Iterable[str]) -> PipelineConfig:
         """Enable resolved prompt steps requested for one image, whatever the
-        collection's config says; an unresolved id is left out (it settles)."""
+        collection's config says. An id that does not resolve is left out:
+        ``advance_locked`` settles its run as ``not_installed``."""
         steps = dict(self.steps)
         for sid in step_ids:
             impl = self.prompts.get(sid)

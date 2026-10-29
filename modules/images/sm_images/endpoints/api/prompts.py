@@ -1,8 +1,10 @@
 """Prompts: CRUD, their results, and running an image prompt (spec §3, §8).
 
 Reading is a ``view`` on the collection; creating, editing, deleting and
-running are an ``edit`` (owner, an edit share, ``images.manage``) - a prompt
-run costs AI requests, which is the same trust as uploading. A prompt is
+running on named images are an ``edit`` (owner, an edit share,
+``images.manage``). What can spend AI requests without bound is the owner's or
+a manager's, like a collection restart or a forced reprocess: a run over the
+whole collection, a run with scope ``all``, and switching ``auto_run`` on. A prompt is
 reachable exactly when its collection is, so a stranger gets the 404 an
 unknown id gets. The console's prompt manager is Task 23.
 """
@@ -13,9 +15,14 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response
-from simple_module_core.resources import ACTION_EDIT, ACTION_VIEW
+from simple_module_core.resources import (
+    ACTION_DELETE,
+    ACTION_EDIT,
+    ACTION_VIEW,
+    ResourcePrincipal,
+)
 from simple_module_db.deps import get_db
-from simple_module_hosting.resource_deps import RequiresResource
+from simple_module_hosting.resource_deps import RequiresResource, resource_principal
 from sqlalchemy import select
 
 from sm_images import ai, constants
@@ -23,7 +30,7 @@ from sm_images.access import POLICY, CollectionEdit, CollectionView
 from sm_images.ai import run as runs
 from sm_images.deps import require_view
 from sm_images.endpoints.api._runtime import runtime, tenant
-from sm_images.errors import Invalid, ServiceUnavailable
+from sm_images.errors import Forbidden, Invalid, ServiceUnavailable
 from sm_images.models import Collection, Prompt, PromptResult
 from sm_images.models.enums import PromptScope
 from sm_images.schemas.prompt import (
@@ -39,6 +46,7 @@ from sm_images.schemas.prompt import (
 from sm_images.services import prompts as service
 
 router = APIRouter(tags=["prompts"])
+Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
 
 
 def prompt_collection_stmt(prompt_id: uuid.UUID):
@@ -56,6 +64,12 @@ PromptCollectionView = Annotated[
 PromptCollectionEdit = Annotated[
     Collection, Depends(RequiresResource(POLICY, ACTION_EDIT, prompt_collection_stmt))
 ]
+
+
+def _owner_or_manager(who: ResourcePrincipal, collection: Collection, what: str) -> None:
+    # Delete is never granted by a share, so the in-memory ``can`` is exact.
+    if not POLICY.can(who, ACTION_DELETE, collection):
+        raise Forbidden(f"only the owner or a manager can {what}")
 
 
 def _out(row: Prompt) -> PromptOut:
@@ -76,8 +90,10 @@ async def list_prompts(collection: CollectionView, db=Depends(get_db)) -> Prompt
 
 @router.post("/collections/{collection_id}/prompts", status_code=201, dependencies=[require_view])
 async def create_prompt(
-    body: PromptCreate, collection: CollectionEdit, db=Depends(get_db)
+    body: PromptCreate, collection: CollectionEdit, who: Principal, db=Depends(get_db)
 ) -> PromptOut:
+    if body.auto_run:
+        _owner_or_manager(who, collection, "switch auto-run on")
     return _out(await service.create(db, collection, body))
 
 
@@ -90,10 +106,16 @@ async def get_prompt(
 
 @router.patch("/prompts/{prompt_id}", dependencies=[require_view])
 async def patch_prompt(
-    prompt_id: uuid.UUID, body: PromptUpdate, collection: PromptCollectionEdit, db=Depends(get_db)
+    prompt_id: uuid.UUID,
+    body: PromptUpdate,
+    collection: PromptCollectionEdit,
+    who: Principal,
+    db=Depends(get_db),
 ) -> PromptOut:
     row = await service.get(db, collection, prompt_id)
     changes = body.model_dump(exclude_unset=True)
+    if changes.get("auto_run") is True and not row.auto_run:
+        _owner_or_manager(who, collection, "switch auto-run on")
     return _out(await service.update(db, collection, row, changes))
 
 
@@ -120,10 +142,16 @@ async def list_results(
 
 @router.post("/prompts/{prompt_id}/run", status_code=202, dependencies=[require_view])
 async def run_prompt(
-    prompt_id: uuid.UUID, body: PromptRunIn, collection: PromptCollectionEdit, db=Depends(get_db)
+    prompt_id: uuid.UUID,
+    body: PromptRunIn,
+    collection: PromptCollectionEdit,
+    who: Principal,
+    db=Depends(get_db),
 ) -> PromptRunOut:
     """Request the prompt's run on the collection's images (``scope``) or on
     ``image_ids`` of it, and plan them; a whole collection may be queued."""
+    if body.image_ids is None or body.scope == "all":
+        _owner_or_manager(who, collection, "run a prompt on the whole collection or on everything")
     if not ai.ai_available():
         err = ServiceUnavailable("the ai module is not installed")
         err.code = constants.CODE_AI_UNAVAILABLE

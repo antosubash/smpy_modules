@@ -18,7 +18,7 @@ from sm_images.models import Image, StepRun
 from sm_images.models.enums import StepStatus
 from sm_images.pipeline.claim import _owned, _run
 
-__all__ = ["bump_cycle", "mark_processed", "release", "reset_runs"]
+__all__ = ["bump_cycle", "mark_processed", "release", "reset_runs", "start_external_call"]
 
 _SYNC = {"synchronize_session": False}
 
@@ -30,7 +30,9 @@ async def release(
     stmt = (
         update(StepRun)
         .where(*_run(tenant, image_id, step), *_owned(token, now))
-        .values(status=StepStatus.PENDING, lease_token=None, lease_expires_at=None)
+        .values(
+            status=StepStatus.PENDING, lease_token=None, lease_expires_at=None, ai_started_at=None
+        )
         .returning(StepRun.id)
         .execution_options(**_SYNC)
     )
@@ -57,6 +59,7 @@ async def reset_runs(
             output=None,
             started_at=None,
             finished_at=None,
+            ai_started_at=None,
         )
         .returning(StepRun.step)
         .execution_options(**_SYNC)
@@ -90,3 +93,19 @@ async def mark_processed(db: Any, tenant: str, image_id: uuid.UUID) -> tuple[Any
     )
     row = (await db.execute(stmt)).first()
     return None if row is None else (row[0], row[1])
+
+
+async def start_external_call(
+    db: Any, tenant: str, image_id: uuid.UUID, step: str, token: uuid.UUID, now: datetime
+) -> bool:
+    """Claim "the provider call started" for this lease, once. ``False`` for a
+    second execution of the same lease (a redelivered message): it must not
+    call (and pay) again. Also ``False`` once the lease is lost."""
+    stmt = (
+        update(StepRun)
+        .where(*_run(tenant, image_id, step), *_owned(token, now), StepRun.ai_started_at.is_(None))
+        .values(ai_started_at=now)
+        .returning(StepRun.id)
+        .execution_options(**_SYNC)
+    )
+    return (await db.execute(stmt)).first() is not None

@@ -34,6 +34,7 @@ from tests.isolation_support import two_tenants  # noqa: F401 - the tenancy matr
 from tests.pg_support import arm_reset, make_db_state
 from tests.pipeline_api_support import world  # noqa: F401 - the pipeline API tests' fixture
 from tests.pipeline_support import pipe  # noqa: F401 - the pipeline tests' fixture
+from tests.prompts_support import prompts_world  # noqa: F401 - the prompt route tests' fixture
 from tests.upload_support import uploads  # noqa: F401 - the upload tests' client
 
 

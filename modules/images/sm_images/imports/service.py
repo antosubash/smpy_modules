@@ -81,7 +81,7 @@ async def start_import(
     mapping: str,
     source_url: str | None,
     upload: IO[bytes] | None,
-    auto_run_prompts: bool = False,
+    auto_run_prompts: bool = True,
     created_by: str | None = None,
     access_basis: str | None = None,
 ) -> ImportJob:

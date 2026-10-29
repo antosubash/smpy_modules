@@ -255,7 +255,6 @@ AI_CODES: Final = (
     "display_not_ready",
     "ai_not_configured",
     "quota_exceeded",
-    "invalid_ai_output",
     "ai_error",
 )
 """What the prompt routes answer and an AI step's run can end with."""

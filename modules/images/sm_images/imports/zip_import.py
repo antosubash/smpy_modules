@@ -168,6 +168,7 @@ async def _settle_chunk(
                 data,
                 filename=p.filename,
                 meta=settle.item_meta(p, located_by=LocationSource.MANUAL),
+                auto_run=job.auto_run_prompts,
             )
         if outcome is None and not await jobs.heartbeat(runtime, tenant, job.id, job.generation):
             raise chunk.Stopped()  # paused, restarted, reclaimed or deleted meanwhile

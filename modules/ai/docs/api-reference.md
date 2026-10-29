@@ -140,8 +140,11 @@ billing's conditional upsert, in its own short transaction finished with
 `finalize_session`. `session_factory` is the caller's (images passes its
 pipeline's); without one, the process opens a `NullPool` engine of its own
 on the host's database URL (`SM_DATABASE_URL`, else the project `.env`, read
-through `BootstrapSettings`). Without billing, or with one older than
-`usage_meter`, it returns `True` and imports nothing. A worker cannot see the
+through `BootstrapSettings`). Only when `sm_billing` is not installed at all
+does it return `True` (and import nothing). An installed billing that cannot
+meter fails closed: one older than `usage_meter` raises `RuntimeError`, and an
+import error propagates, so a call is never free because billing failed to
+load. A worker cannot see the
 web host's module list, so an *installed* billing counts as running there.
 
 `idempotency_key` makes a retry of the same call free: a replay answers the

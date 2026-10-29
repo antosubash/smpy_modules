@@ -10,7 +10,9 @@ Property names are user data, so fields get generated names (``f0``, ``f1``,
 ...) with the JSON name as the alias: a property called ``model_config`` or
 ``schema`` cannot shadow pydantic. The model's JSON schema (what the provider
 is shown) and its validation both use the aliases; dump with
-``by_alias=True``. ``pattern`` is checked by pydantic-core's Rust regex
+``by_alias=True``. An optional property may be omitted but is null only when
+its type allows it; properties the schema does not list are kept unless
+``additionalProperties`` is ``false``. ``pattern`` is checked by pydantic-core's Rust regex
 engine, which has no backtracking, so a user pattern cannot pin a worker.
 Each ``$defs`` entry is built once, so a schema that references one
 definition many times stays linear.
@@ -24,14 +26,20 @@ from typing import Annotated, Any, Literal, Union
 import annotated_types
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, create_model
 
-__all__ = ["build_model", "ref_name"]
+__all__ = ["build_model", "definitions", "ref_name"]
 
 REF = re.compile(r"^#/(\$defs|definitions)/([^/]+)$")
 
 
-def ref_name(ref: str) -> str | None:
+def ref_name(ref: str) -> tuple[str, str] | None:
+    """``(namespace, name)`` of a local reference: ``$defs`` and ``definitions``
+    are separate namespaces, as in JSON Schema."""
     match = REF.match(ref)
-    return match.group(2) if match else None
+    return (match.group(1), match.group(2)) if match else None
+
+
+def definitions(root: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {ns: dict(root.get(ns) or {}) for ns in ("$defs", "definitions")}
 
 
 def _ident(text: str) -> str:
@@ -45,15 +53,16 @@ def _union(members: list[Any]) -> Any:
 
 class _Builder:
     def __init__(self, root: dict[str, Any]) -> None:
-        self.defs: dict[str, Any] = {**root.get("definitions", {}), **root.get("$defs", {})}
-        self.built: dict[str, Any] = {}
+        self.defs = definitions(root)
+        self.built: dict[tuple[str, str], Any] = {}
 
     def type_of(self, node: dict[str, Any], name: str) -> Any:
         if "$ref" in node:
-            key = ref_name(node["$ref"]) or ""
-            if key not in self.built:
-                self.built[key] = self.type_of(self.defs[key], f"{name}_{key}")
-            return self.built[key]
+            ns, ref = ref_name(node["$ref"]) or ("", "")
+            if (ns, ref) not in self.built:
+                label = f"{name}_{_ident(ref)}"
+                self.built[(ns, ref)] = self.type_of(self.defs[ns][ref], label)
+            return self.built[(ns, ref)]
         if "const" in node:
             return Literal[node["const"]]
         if "enum" in node:
@@ -107,8 +116,11 @@ class _Builder:
             if prop in required:
                 fields[f"f{i}"] = (kind, Field(..., alias=prop, description=desc))
             else:
-                fields[f"f{i}"] = (kind | None, Field(None, alias=prop, description=desc))
-        extra = "forbid" if node.get("additionalProperties") is False else "ignore"
+                # Omitted is fine; an explicit null only where the schema allows it
+                # (the default is never validated, so it need not fit ``kind``).
+                fields[f"f{i}"] = (kind, Field(None, alias=prop, description=desc))
+        # JSON Schema allows other properties unless ``additionalProperties: false``.
+        extra = "forbid" if node.get("additionalProperties") is False else "allow"
         config = ConfigDict(extra=extra, title=node.get("title") or name)
         return create_model(_ident(name), __config__=config, **fields)
 

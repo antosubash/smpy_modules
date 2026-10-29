@@ -68,4 +68,4 @@ class ImportJob(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[u
     failed_count: int = Field(default=0, sa_column_kwargs={"nullable": False})
     errors: list[dict[str, Any]] = json_col(list)
     """Capped list of per-item errors."""
-    auto_run_prompts: bool = Field(default=False)
+    auto_run_prompts: bool = Field(default=True)

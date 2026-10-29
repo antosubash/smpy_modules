@@ -43,6 +43,8 @@ describe('Import wizard', () => {
 
     // The suggestion can be changed, and survives the edit (the file is not re-read).
     await setValue(view.find<HTMLInputElement>('[data-testid="images-map-lng_prop"]') as HTMLInputElement, 'lng');
+    // Auto-run is on by default; this import opts out.
+    expect(view.find<HTMLInputElement>('[data-testid="images-import-auto-run"]')?.checked).toBe(true);
     await click(view.find('[data-testid="images-import-auto-run"]'));
     await click(view.find('[data-testid="images-import-submit"]'));
     await flush();
@@ -56,7 +58,7 @@ describe('Import wizard', () => {
       lng_prop: 'lng',
       external_id_prop: 'id',
     });
-    expect(form.get('auto_run_prompts')).toBe('true');
+    expect(form.get('auto_run_prompts')).toBe('false');
     expect((form.get('file') as File).name).toBe('trees.geojson');
     // The wizard closes and the list is fetched again.
     expect(view.find('[data-testid="images-import-wizard"]')).toBeNull();

@@ -30,9 +30,9 @@ from sm_images import ai
 from sm_images.models import Prompt, StepRun
 from sm_images.models.enums import PromptScope
 from sm_images.pipeline import registry
-from sm_images.pipeline.step import StepContext, StepOutcome
+from sm_images.pipeline.step import StepContext, StepOutcome, failure
 
-__all__ = ["PromptStep", "full", "request_auto_run", "resolve", "step_id"]
+__all__ = ["PromptStep", "full", "prompt_id_of", "request_auto_run", "resolve", "step_id"]
 
 MAX_SIDE = 1024
 
@@ -66,6 +66,7 @@ class PromptStep:
     requires: tuple[str, ...] = ()
     """The planner adds the enabled display mutator: the picture sent is redacted."""
     mutates_display = False
+    sends_display_out = True
     queue = "images_heavy"
 
     def __init__(self, spec: PromptSpec) -> None:
@@ -80,7 +81,7 @@ class PromptStep:
         return True
 
     async def run(self, ctx: StepContext) -> StepOutcome:
-        from sm_images.ai.results import PromptWrite
+        from sm_images.ai.results import PromptWrite, encoded_size
         from sm_images.ai.runner import ai_call
         from sm_images.ai.schema_safety import UnsafeSchema, output_model
 
@@ -105,6 +106,10 @@ class PromptStep:
         if isinstance(result, StepOutcome):
             return result
         data, model_name = result
+        limit = ctx._staging.settings.step_output_max_bytes
+        size = encoded_size(data)
+        if size > limit:  # the stored result obeys the cap step outputs do
+            return failure("output_too_large", f"the result is {size} bytes; the limit is {limit}")
         ctx._staging.prompt = PromptWrite(
             prompt_id=spec.id,
             revision=spec.revision,

@@ -245,7 +245,6 @@
     "ai_unavailable": "The AI module is not installed.",
     "display_not_ready": "The picture is not redacted yet, so it was not sent to the AI provider.",
     "ai_not_configured": "AI is not configured. Set a provider and a model in the AI settings.",
-    "invalid_ai_output": "The AI answer did not match the expected format.",
     "ai_error": "The AI provider returned an error."
   },
   "tabs": {

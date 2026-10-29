@@ -12,12 +12,13 @@ The status rules (spec §3, which fix the portal's SKIPPED re-run bug):
 
 A step is **ready** when every effective dependency is completed or ordinarily
 skipped *at the current version*. Effective dependencies are the declared
-``requires`` plus, for ``renditions``, ``classify`` and every ``prompt:*``
-step, the enabled display mutator: thumbnails are cut from the display copy,
-and an AI step sends it to a provider, so neither may read it before the
-redaction settled. A declared requirement the collection does not
-enable is **unmet**: the dependant settles as ``dependency_unavailable`` (a
-save refuses such a config; one saved before a plugin changed still settles).
+``requires`` plus, for ``renditions`` and every step that declares
+``sends_display_out`` (``classify``, ``prompt:*``, a plugin's), the enabled
+display mutator: thumbnails are cut from the display copy, and those steps
+send it out of the system, so none may read it before the redaction
+settled. A declared requirement the collection does not enable is
+**unmet**: the dependant settles as ``dependency_unavailable`` (a save
+refuses such a config; one saved before a plugin changed still settles).
 
 The implicit rendition edge is added after the registry validated its graph,
 so a mutator that requires ``renditions`` would close a cycle the registry
@@ -32,6 +33,7 @@ from dataclasses import dataclass, field
 from sm_images.models.enums import StepStatus
 from sm_images.pipeline import registry
 from sm_images.pipeline.config import PipelineConfig
+from sm_images.pipeline.step import sends_display_out
 
 __all__ = [
     "BLOCKED_CODES",
@@ -47,7 +49,6 @@ __all__ = [
 ]
 
 RENDITIONS = "renditions"
-CLASSIFY = "classify"
 FINAL = frozenset({StepStatus.COMPLETED, StepStatus.SKIPPED, StepStatus.FAILED})
 
 DEPENDENCY_FAILED = "dependency_failed"
@@ -100,15 +101,16 @@ def is_stale(run: RunView, cfg: PipelineConfig | None = None) -> bool:
     return impl is not None and run.step_version != impl.version
 
 
-def reads_redacted_display(step_id: str) -> bool:
-    """Steps that must wait for the display mutator (see the module docstring)."""
-    return step_id in (RENDITIONS, CLASSIFY) or step_id.startswith(registry.PROMPT_PREFIX)
+def waits_for_display(cfg: PipelineConfig, step_id: str) -> bool:
+    """Steps that must wait for the display mutator (see the module docstring):
+    ``renditions``, and every step that ``sends_display_out``."""
+    return step_id == RENDITIONS or sends_display_out(cfg.impl(step_id))
 
 
 def effective_deps(cfg: PipelineConfig, step_id: str) -> list[str]:
     impl = cfg.impl(step_id)
     deps = [r for r in (impl.requires if impl else ()) if r != step_id]
-    if reads_redacted_display(step_id):
+    if waits_for_display(cfg, step_id):
         deps += [m for m in cfg.mutators() if m not in deps and m != step_id]
     return deps
 

@@ -546,6 +546,7 @@ def upgrade() -> None:
         sa.Column("prompt_revision", sa.Integer(), nullable=True),
         sa.Column("lease_token", sa.Uuid(), nullable=True),
         sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("ai_started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("output", sa.JSON(), nullable=True),
         sa.ForeignKeyConstraint(
             ["image_id"],

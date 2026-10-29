@@ -17,7 +17,18 @@ from pydantic import BaseModel
 if TYPE_CHECKING:
     from sm_images.contracts.schemas import ImageRead  # runtime import would cycle via contracts
 
-__all__ = ["DisplayNotAllowed", "DisplayWriterMissing", "Step", "StepContext", "StepOutcome"]
+__all__ = [
+    "MESSAGE_MAX",
+    "DisplayNotAllowed",
+    "DisplayWriterMissing",
+    "Step",
+    "StepContext",
+    "StepOutcome",
+    "failure",
+    "sends_display_out",
+]
+
+MESSAGE_MAX = 2000
 
 
 class DisplayNotAllowed(PermissionError):  # noqa: N818 - name fixed by the plan
@@ -26,6 +37,14 @@ class DisplayNotAllowed(PermissionError):  # noqa: N818 - name fixed by the plan
 
 class DisplayWriterMissing(RuntimeError):  # noqa: N818 - pairs with DisplayNotAllowed
     """A display mutator ran with no writer: the executor's bug, not the step's."""
+
+
+def sends_display_out(step: object) -> bool:
+    """A step's optional ``sends_display_out`` flag (default ``False``): it sends
+    the display copy outside the system (``classify``, ``prompt:*``, a plugin's
+    external service). The planner orders it after the display mutator, and
+    the executor decides whether the copy is safe to send."""
+    return getattr(step, "sends_display_out", False) is True
 
 
 @runtime_checkable
@@ -64,6 +83,12 @@ class StepOutcome:
     @classmethod
     def failed(cls, code: str, message: str) -> StepOutcome:
         return cls("failed", code=code, message=message)
+
+
+def failure(code: str, exc: BaseException | str) -> StepOutcome:
+    """A failed outcome whose message is ``exc`` (type and text), bounded."""
+    text = exc if isinstance(exc, str) else f"{type(exc).__name__}: {exc}"
+    return StepOutcome.failed(code, text[:MESSAGE_MAX])
 
 
 class StepContext:
