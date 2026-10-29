@@ -52,7 +52,7 @@ async def swap(factory: Any, tenant: str, op: Op, mine: Any, meter: Any) -> None
     except StorageQuotaExceeded as exc:  # nothing changed: the old hold still counts
         await finish_op(factory, mine, None, f"{type(exc).__name__}: {exc}")
         return
-    except billing.SwapExpired:  # past the deadline: billing changed nothing
+    except billing.SwapExpired:  # past the deadline, or closed: billing changed nothing
         await expire(factory, tenant, mine, meter)
         return
     if hold is None:
@@ -156,13 +156,17 @@ async def _install(
 
 
 async def expire(factory: Any, tenant: str, mine: Any, meter: Any) -> None:
-    """Finish an op at its deadline, without a billing write. Billing refuses
-    every call under the key from now on, so the outcome it recorded - read
-    here - is final: a hold the key made is kept on the op (``hold_id``) for
-    the repair to install or release; none means the call never landed."""
-    found = await meter.get_hold_by_key(tenant, billing.METER, mine.key)
-    hold_id = getattr(found, "id", None)
-    await finish_op(factory, mine, hold_id, OP_EXPIRED)
+    """Finish an op at its deadline (or once billing answered its key is
+    expired or closed), without a hold of its own - only after billing gave
+    the key a terminal outcome: ``close_key`` returns the hold a swap made
+    under it (waiting for one in flight), the refusal or expiry it recorded,
+    or closes it, so no call under the key can write after this. A hold it
+    returns is kept on the op (``hold_id``) for the repair to install or
+    release. If billing cannot answer, this raises and the op stays
+    unfinished, to be retried. The decision may come from our clock: closing
+    early only refuses a late call, and the repair then looks at the image."""
+    found = await billing.close_key(factory, tenant, mine.key, meter)
+    await finish_op(factory, mine, billing.held_by(found), OP_EXPIRED)
 
 
 async def release_hold(meter: Any, hold_id: str | None) -> None:

@@ -54,17 +54,16 @@ async def test_race_r_a_stale_repair_never_releases_what_another_installed(
     size = (await pipe.row(img)).storage_bytes
     orphan = await gauge.swap(T, billing.METER, None, size, "lost", source=billing.SOURCE)
     await _done_op(pipe, img, orphan.id, size, key="lost")
-    factory, real, state = pipe.db_state.session_factory, billing_repair._committed, {}
+    factory, real, state = pipe.db_state.session_factory, billing_repair._decide, {}
 
-    async def stall(meter, tenant, hold_id):
-        counted = await real(meter, tenant, hold_id)
+    async def stall(*args, **kwargs):
         if not state:  # the first repair has decided "the image is counted": it stalls
             state["stalled"] = True
             gauge.holds[seed] = gauge._set(gauge.holds[seed], "released")
             assert await billing_repair.repair(factory, T) == 1  # installs the orphan
-        return counted
+        return await real(*args, **kwargs)
 
-    monkeypatch.setattr(billing_repair, "_committed", stall)
+    monkeypatch.setattr(billing_repair, "_decide", stall)
     await billing_repair.repair(factory, T)
     row = await pipe.row(img)
     assert row.storage_hold_id == orphan.id

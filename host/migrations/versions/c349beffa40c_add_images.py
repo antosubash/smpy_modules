@@ -146,6 +146,7 @@ def upgrade() -> None:
         sa.Column("tenant_id", sa.String(length=50), nullable=False),
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("last_op_id", sa.Integer(), nullable=False),
+        sa.Column("lap_end", sa.Integer(), nullable=True),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_images_billing_cursor")),
         sa.UniqueConstraint("tenant_id", name="uq_images_billing_cursor_tenant"),
     )

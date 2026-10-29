@@ -1,5 +1,5 @@
 """The result types of the usage-metering contract (``Allowed``, ``Exceeded``,
-``Refunded``, ``Hold``, ``Expired``, ``Refused``) - split from ``metering`` for
+``Refunded``, ``Hold``, ``Expired``, ``Refused``, ``Closed``) - split from ``metering`` for
 size. Import them from ``sm_billing.contracts.metering``, which re-exports
 them."""
 
@@ -20,6 +20,8 @@ class HoldStatus(StrEnum):
     REFUSED = "refused"
     #: A ``swap`` that arrived after its ``not_after``: the key's outcome, nothing written.
     EXPIRED_CALL = "expired_call"
+    #: ``close_key``: the key was closed before any call landed - its outcome.
+    CLOSED = "closed"
 
 
 #: The statuses whose quantity counts toward the gauge.
@@ -104,10 +106,21 @@ class Expired:
 
 @dataclass(frozen=True)
 class Refused:
-    """``get_hold_by_key``: the key's swap was refused - ``reason`` is
-    ``"limit"`` (``Exceeded``) or ``"deadline"`` (``Expired``)."""
+    """``close_key``: the key's ``swap`` was refused by the limit (its outcome,
+    the ``Exceeded`` the swap answered). ``reason`` is always ``"limit"``."""
 
     idempotency_key: str
-    reason: str
+    reason: str = "limit"
+
+    ok: ClassVar[bool] = False
+
+
+@dataclass(frozen=True)
+class Closed:
+    """``close_key`` closed the key before any call landed: from now on every
+    ``swap`` under it answers ``Closed`` and writes nothing. Key-wide - it
+    carries no quantity, source or deadline."""
+
+    idempotency_key: str
 
     ok: ClassVar[bool] = False

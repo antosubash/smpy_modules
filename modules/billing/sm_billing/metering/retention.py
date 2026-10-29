@@ -18,6 +18,13 @@
   the ``DELETE`` is the write session's first statement: a write transaction
   that read first can fail on SQLite with ``SQLITE_BUSY_SNAPSHOT``. Two
   instances purging at once delete the same rows; the second matches none.
+- **A key's outcome outlives its deadline.** A settled hold row - released,
+  expired, ``refused``, ``expired_call``, ``closed`` - is a key's outcome, the
+  only thing that answers a delayed call under that key. It goes once it
+  settled ``SETTLED_HOLD_DAYS`` ago *and* its ``not_after`` (if any) passed a
+  day ago, both by the database's clock (``dbtime``, the clock ``swap``
+  admits by): from then on the deadline alone refuses the key. A caller that
+  invents a new deadline for an old key whose row is gone cannot be stopped.
 """
 
 from __future__ import annotations
@@ -31,6 +38,7 @@ from sqlalchemy import delete, or_, select, tuple_
 from sqlalchemy.orm import aliased
 
 from sm_billing.contracts.metering import HoldStatus
+from sm_billing.metering import dbtime
 from sm_billing.metering.validate import REFUND, REFUND_SUFFIX
 from sm_billing.models import UsageEvent, UsageHold
 
@@ -45,11 +53,14 @@ PURGE_BATCH = 1000
 MAX_BATCHES = 20
 #: Released and expired holds are kept this long, for the admin screens.
 SETTLED_HOLD_DAYS = 30
+#: A settled row is kept at least this long past its ``not_after``.
+DEADLINE_GRACE = timedelta(days=1)
 _SETTLED = (
     HoldStatus.RELEASED.value,
     HoldStatus.EXPIRED.value,
     HoldStatus.REFUSED.value,
     HoldStatus.EXPIRED_CALL.value,
+    HoldStatus.CLOSED.value,
 )
 
 
@@ -123,14 +134,21 @@ async def _event_batch(factory: async_sessionmaker, cutoff: datetime, size: int)
     return len(rows), await delete_charges(factory, rows, cutoff)
 
 
-async def _hold_batch(factory: async_sessionmaker, cutoff: datetime, size: int) -> tuple[int, int]:
-    stmt = (
-        select(UsageHold.id)
-        .where(UsageHold.status.in_(_SETTLED), UsageHold.settled_at < cutoff)
-        .order_by(UsageHold.settled_at)
-        .limit(size)
-    )
+async def _hold_batch(factory: async_sessionmaker, _cutoff: object, size: int) -> tuple[int, int]:
+    """One batch of settled holds past retention, by the database's clock."""
     async with factory() as session:
+        now = await dbtime.now(session)
+        settled = now - timedelta(days=SETTLED_HOLD_DAYS)
+        stmt = (
+            select(UsageHold.id)
+            .where(
+                UsageHold.status.in_(_SETTLED),
+                UsageHold.settled_at < settled,
+                or_(UsageHold.not_after.is_(None), UsageHold.not_after < now - DEADLINE_GRACE),
+            )
+            .order_by(UsageHold.settled_at)
+            .limit(size)
+        )
         ids = list((await session.scalars(stmt)).all())
     if not ids:
         return 0, 0
@@ -148,12 +166,13 @@ async def purge(
     max_batches: int | None = None,
 ) -> Purged:
     """Delete ledger rows past ``retention_days`` (``0``: keep them) and holds
-    settled more than ``SETTLED_HOLD_DAYS`` ago, at most ``max_batches``
+    settled more than ``SETTLED_HOLD_DAYS`` ago (and a day past their
+    ``not_after``), by the database's clock, at most ``max_batches``
     transactions of ``batch`` rows for each of the two tables."""
     size = batch or PURGE_BATCH
     budget = max_batches or MAX_BATCHES
     now, factory, out = usage.now(), usage.session_factory, Purged()
-    work = [(_hold_batch, now - timedelta(days=SETTLED_HOLD_DAYS), "holds")]
+    work = [(_hold_batch, None, "holds")]  # its cutoff is the database's
     if retention_days > 0:
         work.insert(0, (_event_batch, now - timedelta(days=retention_days), "events"))
     for run, cutoff, field in work:

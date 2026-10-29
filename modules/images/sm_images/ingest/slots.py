@@ -8,7 +8,8 @@ a committed hold for the original, or a refusal - under a key of this
 attempt's own (two ``complete`` calls for one image never share one). The
 image insert marks the op done in its savepoint (:func:`keep_hold`); a
 duplicate or a failed insert hands the op back (:func:`drop_hold`) and the
-settler releases the hold. A writer that dies keeps its claim for
+settler releases the hold. Every outcome billing gives the key (a hold, a
+refusal, an expiry or a closure) is final. A writer that dies keeps its claim for
 :data:`INGEST_CLAIM`; a settler then takes the op over and releases the hold -
 and an insert still running after that cannot finish the op, so it fails
 rather than naming a released hold.
@@ -25,7 +26,7 @@ from simple_module_db import finalize_session
 
 from sm_images import billing, billing_ops
 from sm_images.errors import StorageQuotaExceeded
-from sm_images.models.billing_op import OP_INGEST
+from sm_images.models.billing_op import OP_EXPIRED, OP_INGEST
 
 __all__ = [
     "INGEST_CLAIM",
@@ -91,6 +92,11 @@ async def hold_slot(factory: Any, tenant: str, slot: Slot, size: int) -> Slot:
             await billing_ops.finish(db, op, None, f"{type(exc).__name__}: {exc}")
             await finalize_session(db)
         return replace(slot, refused=True)
+    except billing.SwapExpired:  # expired or closed: the key's outcome, no hold
+        async with factory() as db:
+            await billing_ops.finish(db, op, None, OP_EXPIRED)
+            await finalize_session(db)
+        raise
     except Exception:
         async with factory() as db:  # whatever billing did is the settler's now
             await billing_ops.hand_back(db, op, factory)

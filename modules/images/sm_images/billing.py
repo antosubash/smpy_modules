@@ -40,10 +40,13 @@ from sm_images import constants
 from sm_images.errors import StorageQuotaExceeded
 
 __all__ = [
+    "KeyClosed",
     "SwapExpired",
     "billing_installed",
     "check",
+    "close_key",
     "factory_of",
+    "held_by",
     "hold_key",
     "on_commit",
     "register_meter",
@@ -107,6 +110,11 @@ class SwapExpired(Exception):  # noqa: N818 - reads as the condition
     """Billing refused the swap: it arrived after its op's deadline."""
 
 
+class KeyClosed(SwapExpired):
+    """Billing refused the swap: its key was closed (``close_key``) - the op it
+    belongs to was finished without it. Nothing changed, as for an expiry."""
+
+
 async def swap(
     session_factory: Any,
     tenant: str,
@@ -121,19 +129,40 @@ async def swap(
     ``old`` (billing's ``Hold``), or ``None`` without billing (or nothing to
     hold). :class:`StorageQuotaExceeded` when the net delta does not fit -
     ``old`` then still counts; :class:`SwapExpired` when the call reached
-    billing after ``not_after`` (nothing changed). A replayed ``key`` returns
-    the same outcome."""
+    billing after ``not_after``, :class:`KeyClosed` when its key was closed
+    (nothing changed). A replayed ``key`` returns the same outcome; every
+    outcome is final for its key."""
     meter = meter or storage_meter(session_factory)
     if meter is None or qty < 1:
         return None
     outcome = await meter.swap(
         tenant, METER, old, int(qty), key, source=SOURCE, not_after=not_after
     )
-    if not outcome.ok and getattr(outcome, "not_after", None) is not None:
+    kind = type(outcome).__name__
+    if kind == "Closed":
+        raise KeyClosed(key)
+    if kind == "Expired":
         raise SwapExpired(key)
-    if not outcome.ok and getattr(outcome, "id", None) is None:
+    if kind != "Hold":  # Exceeded: refused by the limit
         raise StorageQuotaExceeded(FULL)
     return outcome
+
+
+async def close_key(session_factory: Any, tenant: str, key: str, meter: Any = None) -> Any:
+    """The terminal outcome of the swap under ``key`` (billing's ``close_key``):
+    its ``Hold``, ``Refused``, ``Expired``, or ``Closed`` - committed now, so no
+    call under the key will ever write. Waits for a swap in flight. ``None``
+    without billing. Raises when billing cannot answer: the caller's op must
+    then stay unfinished, to be retried."""
+    meter = meter or storage_meter(session_factory)
+    if meter is None:
+        return None
+    return await meter.close_key(tenant, METER, key)
+
+
+def held_by(outcome: Any) -> str | None:
+    """The hold a key's outcome made: a ``Hold``'s id, never anything else's."""
+    return outcome.id if type(outcome).__name__ == "Hold" else None
 
 
 def on_commit(db: Any, call: Any, *args: Any) -> None:

@@ -19,13 +19,13 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from simple_module_db import finalize_session, init_db
 from simple_module_db.listeners import attach_session_listeners
-from sm_images import billing, billing_ops
+from sm_images import billing, billing_ops, billing_repair
 from sm_images.errors import StorageQuotaExceeded
 from sm_images.ingest.slots import Slot, hold_slot, keep_hold
 from sm_images.models import BillingOp, Collection, Image
 from sm_images.models.billing_op import OP_SWAP
 from sm_images.tenancy import DEFAULT_TENANT as T
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 LIMIT = 1000
 
@@ -140,7 +140,7 @@ async def test_codex_trace_t_against_real_billing(real):
     async with factory() as db:
         old = (await db.execute(select(Image.storage_hold_id))).scalar_one()
         key, claim = billing.hold_key(image, "grow"), timedelta(minutes=5)
-        await billing_ops.open_op(db, OP_SWAP, image, 1200, key, claim=claim, old=old)
+        op = await billing_ops.open_op(db, OP_SWAP, image, 1200, key, claim=claim, old=old)
         await finalize_session(db)
     later = datetime.now(UTC) + timedelta(minutes=6)
     assert await billing_ops.settle(factory, T, now=later) == 1  # the takeover: refused
@@ -149,7 +149,38 @@ async def test_codex_trace_t_against_real_billing(real):
         plan.limits = {billing.METER: 5000}
         await s.commit()
     with pytest.raises(StorageQuotaExceeded):  # the delayed call: the key's outcome
-        await billing.swap(factory, T, old, 1200, key, not_after=datetime.now(UTC) + claim)
+        await billing.swap(factory, T, old, 1200, key, not_after=op.not_after)
     holds = await _holds(factory)
     assert holds[old][:2] == ("committed", 900) and await _level(factory) == 900
     assert sorted(h[0] for h in holds.values()) == ["committed", "refused"]
+
+
+async def test_codex_p1_2_an_early_expiry_closes_the_key(real):
+    """Images' clock is past an op's deadline while the database's is not, so
+    its settler expires an op billing would still admit, and the repair then
+    finds the image counted. The expiry closed the key first: the paused
+    executor's late swap under it writes nothing, instead of releasing the
+    image's hold after the op was finished and examined."""
+    factory = real.session_factory
+    image = await _ingest(factory, 300)
+    async with factory() as db:
+        old = (await db.execute(select(Image.storage_hold_id))).scalar_one()
+        key, claim = billing.hold_key(image, "grow"), timedelta(minutes=5)
+        op = await billing_ops.open_op(db, OP_SWAP, image, 700, key, claim=claim, old=old)
+        await finalize_session(db)
+    soon, lapsed = datetime.now(UTC) + timedelta(seconds=30), datetime.now(UTC)
+    async with factory() as db:  # its deadline is near, and the executor's claim lapsed
+        await db.execute(
+            update(BillingOp)
+            .where(BillingOp.id == op.op_id)
+            .values(not_after=soon, claim_expires_at=lapsed)
+        )
+        await finalize_session(db)
+    ahead = soon + timedelta(seconds=2)  # images' clock: 2 s past the deadline
+    assert await billing_ops.settle(factory, T, now=ahead) == 1
+    assert await billing_repair.repair(factory, T) == 0  # counted right: nothing to do
+    with pytest.raises(billing.SwapExpired):  # the executor's late call: Closed
+        await billing.swap(factory, T, old, 700, key, not_after=soon)
+    holds = await _holds(factory)
+    assert holds[old][:2] == ("committed", 300) and await _level(factory) == 300
+    assert sorted(h[0] for h in holds.values()) == ["closed", "committed"]

@@ -8,7 +8,8 @@ what is held, and make billing fail (``fail_swap``, ``fail_release``).
 
 Its ``swap`` is billing's: one atomic step (no ``await`` between the check
 and the write), the limit on the net delta, a replayed key returning the
-same hold. :func:`assert_counted_once` is the invariant every test ends on.
+same hold, a closed key (``close_key``) answering ``Closed`` to any call.
+:func:`assert_counted_once` is the invariant every test ends on.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from typing import Any
 import pytest
 from sm_billing.contracts.metering import (
     Allowed,
+    Closed,
     Exceeded,
     Expired,
     Hold,
@@ -42,12 +44,13 @@ class FakeGauge:
     limit: int | None = None
     holds: dict[str, Hold] = field(default_factory=dict)
     keys: dict[str, Any] = field(default_factory=dict)
-    """Each key's outcome: its hold id, or the ``Exceeded``/``Expired`` answered."""
+    """Each key's outcome: its hold id, or the ``Exceeded``/``Expired``/``Closed``."""
     calls_by_key: dict[str, tuple] = field(default_factory=dict)
     calls: list[tuple[str, ...]] = field(default_factory=list)
     fail_swap: int = 0
     """The next N swaps raise (billing unreachable)."""
     fail_release: int = 0
+    fail_close: int = 0
     delay: float = 0.0
     """Seconds a swap takes before billing decides: concurrent swaps interleave."""
     later: timedelta = timedelta(0)
@@ -86,7 +89,9 @@ class FakeGauge:
         if self.fail_swap:
             self.fail_swap -= 1
             raise RuntimeError("billing is down")
-        call = (old_hold_id, quantity, source)
+        call = (old_hold_id, quantity, source, not_after)
+        if isinstance(self.keys.get(idempotency_key), Closed):  # key-wide: any call
+            return self.keys[idempotency_key]
         if idempotency_key in self.keys:  # a replay: the key's outcome, for the same call
             outcome, first = self.keys[idempotency_key], self.calls_by_key[idempotency_key]
             if first != call:
@@ -113,15 +118,16 @@ class FakeGauge:
         self.keys[idempotency_key] = hold.id
         return hold
 
-    async def get_hold_by_key(self, tenant_id: str, meter: str, key: str):
-        self.calls.append(("get_hold_by_key", key))
-        outcome = self.keys.get(key)
-        if outcome is None:
-            return None
+    async def close_key(self, tenant_id: str, meter: str, key: str):
+        """The key's outcome, or ``Closed`` committed now (billing's ``close_key``)."""
+        self.calls.append(("close_key", key))
+        if self.fail_close:
+            self.fail_close -= 1
+            raise RuntimeError("billing is down")
+        outcome = self.keys.setdefault(key, Closed(key))
         if isinstance(outcome, str):
-            hold = self.holds[outcome]
-            return hold if hold.tenant_id == tenant_id else None
-        return Refused(key, "deadline" if isinstance(outcome, Expired) else "limit")
+            return self.holds[outcome]
+        return Refused(key) if isinstance(outcome, Exceeded) else outcome
 
     async def get_hold(self, tenant_id: str, hold_id: str) -> Hold | None:
         self.calls.append(("get_hold", hold_id))

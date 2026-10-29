@@ -210,36 +210,62 @@ all the same.
   stalls past its claim cannot also install what a settler installed. An
   image's swaps run one at a time, oldest first. Each op has one key and one
   old hold, fixed before billing first hears of it, and every retry repeats
-  both: billing keeps each key's outcome - the hold, or the refusal - so a
+  both. Billing commits exactly one outcome per key - the hold, a refusal,
+  an expiry or a closure - in the transaction that claimed the key, so a
   retry, or a call delayed past its claim, gets the same answer and never
-  changes anything twice. A refused op is finished; nothing retries it.
-  Every op carries a deadline, `not_after` = its creation plus 7 days
-  (`BILLING_OP_MAX_AGE`), and passes it to billing with every call; billing
-  itself refuses a call that arrives later (`Expired`, nothing written, kept
-  under the key), so no code path - an executor paused for a month, a settler,
-  the repair - can change a hold after the deadline, even once billing's
-  30-day retention has purged the key's earlier outcome. A settler that finds
-  an op past its deadline finishes it `op_expired`, first reading the key's
-  final outcome (`get_hold_by_key`) and keeping any hold it made on the op.
-  `images.reconcile` then repairs an image that lost a committed swap (billing
-  reports the op's hold committed but the image names another), or whose op
-  expired leaving it counted by nothing: the hold is installed (or a swap
-  queued) where the image's own no longer counts, else released. Every such
-  decision - the repair's, and a settler's "the image moved on" - is taken
-  under the image's row lock, re-reading the hold it names and its unfinished
-  ops, and a release is recorded there as a `release` op. The repair scans
-  each tenant's done ops from a persisted cursor, 200 per tick, wrapping to
-  the start at the end, so every op is examined and a deferred one is
-  revisited on the next lap; the janitor deletes done ops after
+  changes anything twice.
+- **Deadlines, on the database's clock.** Every op carries `not_after`: the
+  database's time when the op was written, plus 7 days
+  (`BILLING_OP_MAX_AGE`). It never changes, and every billing call for the
+  op passes it unchanged (billing treats another deadline as another call:
+  `IdempotencyConflict`). Billing admits a call only after claiming its key,
+  by its database's clock (`clock_timestamp()` on Postgres): a call admitted
+  past the deadline is `Expired`, nothing written, kept under the key. So no
+  code path - an executor paused for a month between its check and its
+  write, a settler, the repair - can change a hold after the deadline, even
+  once billing's retention has purged the key's earlier outcome (it keeps a
+  settled outcome 30 days, and at least a day past its `not_after`). No
+  worker's clock decides what billing admits.
+- **Nothing finishes an op without billing's answer.** An op ends with the
+  outcome billing gave its key: the swap's own (a hold, a refusal, an
+  expiry), or - wherever images would finish it without one - `close_key`'s.
+  `close_key` returns the key's outcome if it has one (waiting for a swap
+  still in flight under it) and otherwise commits `Closed`, after which every
+  call under the key answers `Closed` and writes nothing. The settler calls
+  it before finishing an op past its deadline (`op_expired`; deciding that
+  by its own clock is safe, since closing early only refuses a late call),
+  and the repair calls it for an op expired with its outcome unknown. A hold
+  it returns is recorded on the op before anything else; if billing cannot
+  answer, the op stays unfinished and is retried. A `release` op is finished
+  only once billing has answered that the hold no longer counts (released
+  now, settled already, or unknown to it); it has no deadline.
+- **The repair** (`images.reconcile`, after the settler) examines every done
+  `swap` and `ingest` op once, whatever it ended with, and declares an image
+  correct only when it names a committed hold of exactly its
+  `storage_bytes` and nothing else of the op's still counts. Otherwise: an
+  op's committed hold the image does not name is installed where the image's
+  own no longer counts, else released; and an image counted by nothing, or
+  by a hold of the wrong size (a refusal, an expired shrink that left an
+  oversized hold), gets a swap to `storage_bytes` queued. If that swap is
+  refused too, its op is examined on the next lap, so the image is tried
+  again until it is counted right. Every such decision - the repair's, and
+  a settler's "the image moved on" - is taken under the image's row lock,
+  re-reading what it names and stores and its unfinished ops, and a release
+  is recorded there as a `release` op. The scan walks bounded laps: a lap
+  covers each tenant's done ops up to the highest op id when it began
+  (`images_billing_cursor.lap_end`), 200 per tick, so it ends however fast
+  new ops arrive, and the next lap revisits whatever was deferred; the cursor
+  moves only by compare-and-set. The janitor deletes done ops after
   `janitor_grace_days` once the repair has examined them.
 - **Recovery bound.** A healthy op settles in the settle pass after its
   commit. A crashed one is taken over once its claim expires (5 minutes for
   a publication, 30 for an ingest) and settled by the next reconcile tick
   (5 minutes). An op that cannot reach billing at all settles at its
-  deadline (7 days) as `op_expired`; the repair then reaches its image within
-  one lap of the tenant's backlog (200 ops a tick). Until then the image is
-  counted by its old hold, or by the new one, never by both for longer than
-  that lap.
+  deadline (7 days) once `close_key` answers; the repair then reaches its
+  image within one lap of the tenant's backlog (200 ops a tick). Until then
+  the image is counted by its old hold, or by the new one, never by both for
+  longer than that lap. While billing refuses the correcting swap (the
+  tenant is full), the image is retried once a lap.
 - **A lowered plan limit evicts nothing.** Stored images keep their holds; a
   swap that does not grow an image is always admitted, one that grows it is
   refused until the tenant is under the limit again.

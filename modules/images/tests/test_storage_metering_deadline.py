@@ -7,7 +7,7 @@ sweep and the repair scan never lose a candidate.
   executor resumes. Billing refuses the call itself - it is past the op's
   ``not_after`` - so no hold is created that nothing could install.
 * An op expired after billing swapped it, before anything recorded the hold:
-  the key's outcome (``get_hold_by_key``) is kept on the op, and the repair
+  the key's outcome (``close_key``) is kept on the op, and the repair
   installs it.
 * The sweep's predicate is NULL-safe; the repair's scan has a cursor, so a page
   of deferred candidates does not block the ones after it.
@@ -94,17 +94,17 @@ async def test_an_expired_op_keeps_the_hold_its_key_made(pipe, gauge):
 async def test_the_sweep_keeps_exactly_what_the_repair_needs(pipe, gauge):
     done, img = datetime.now(UTC) - timedelta(days=30), uuid.uuid4()
     base = {"image_id": img, "done_at": done, "quantity": 1}
-    plain = await _op(pipe, op=OP_SWAP, **base)  # NULL hold and error: nothing to repair
+    plain = await _op(pipe, op=OP_SWAP, **base)  # NULL hold and error: still examined
     expired = await _op(pipe, op=OP_SWAP, last_error=OP_EXPIRED, **base)
     holding = await _op(pipe, op=OP_SWAP, hold_id="h1", **base)
     examined = await _op(pipe, op=OP_SWAP, hold_id="h2", repaired_at=done, **base)
     released = await _op(pipe, op=OP_RELEASE, hold_id="h3", **base)
     factory = pipe.db_state.session_factory
-    assert await billing_ops.sweep(factory, T, datetime.now(UTC)) == 3
+    assert await billing_ops.sweep(factory, T, datetime.now(UTC)) == 2
     async with factory() as s:
         kept = set((await s.execute(select(BillingOp.id))).scalars())
-    assert kept == {expired, holding}
-    assert {plain, examined, released}.isdisjoint(kept)
+    assert kept == {plain, expired, holding}  # every done op is examined before it goes
+    assert {examined, released}.isdisjoint(kept)
 
 
 async def test_the_scan_moves_past_a_page_of_deferred_candidates(pipe, gauge):

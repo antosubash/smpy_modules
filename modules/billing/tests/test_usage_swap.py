@@ -17,7 +17,6 @@ from sm_billing.contracts.metering import (
     Hold,
     HoldNotFound,
     IdempotencyConflict,
-    Refused,
 )
 from sm_billing.models import Plan, UsageHold
 from sqlalchemy import select, update
@@ -223,22 +222,19 @@ async def test_a_call_past_its_deadline_is_expired_and_changes_nothing(factory, 
     assert late == Expired(idempotency_key="k", not_after=deadline)
     assert not late.ok and await in_use(factory, tenant) == 4
     assert await _statuses(factory, old.id) == ["committed"]
-    again = await usage.swap(tenant, GAUGE, old.id, 9, "k", source="t", not_after=FAR)
-    assert again == late  # the key's outcome, even with a later deadline
+    again = await usage.swap(tenant, GAUGE, old.id, 9, "k", source="t", not_after=deadline)
+    assert again == late  # the key's outcome
+    with pytest.raises(IdempotencyConflict):  # the deadline is part of the call
+        await usage.swap(tenant, GAUGE, old.id, 9, "k", source="t", not_after=FAR)
     assert await hold_statuses(factory, tenant) == ["committed", "expired_call"]
 
 
-async def test_get_hold_by_key_reports_the_keys_outcome(factory, usage, clock):
-    tenant = await seed_limits(factory, {GAUGE: 5})
-    held = await usage.swap(tenant, GAUGE, None, 4, "a", source="t", not_after=FAR)
-    await usage.swap(tenant, GAUGE, held.id, 9, "b", source="t", not_after=FAR)  # refused
-    past = clock.now - timedelta(seconds=1)
-    await usage.swap(tenant, GAUGE, held.id, 5, "c", source="t", not_after=past)
-    found = await usage.get_hold_by_key(tenant, GAUGE, "a")
-    assert isinstance(found, Hold) and (found.id, found.status) == (held.id, "committed")
-    assert await usage.get_hold_by_key(tenant, GAUGE, "b") == Refused("b", "limit")
-    assert await usage.get_hold_by_key(tenant, GAUGE, "c") == Refused("c", "deadline")
-    assert await usage.get_hold_by_key(tenant, GAUGE, "nope") is None
-    other = await seed_limits(factory, {GAUGE: 5})
-    assert await usage.get_hold_by_key(other, GAUGE, "a") is None  # tenant-scoped
-    assert await in_use(factory, tenant) == 4  # read-only
+async def test_a_replay_with_another_deadline_conflicts(factory, usage):
+    """A later deadline is another call: it must not extend the key's life."""
+    tenant = await seed_limits(factory, {GAUGE: 50})
+    first = await usage.swap(tenant, GAUGE, None, 4, "a", source="t", not_after=FAR)
+    assert (await usage.swap(tenant, GAUGE, None, 4, "a", source="t", not_after=FAR)).id == first.id
+    for other in (FAR + timedelta(seconds=1), FAR - timedelta(days=1)):
+        with pytest.raises(IdempotencyConflict):
+            await usage.swap(tenant, GAUGE, None, 4, "a", source="t", not_after=other)
+    assert await in_use(factory, tenant) == 4

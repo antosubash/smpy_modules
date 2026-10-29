@@ -27,9 +27,11 @@ OP_RELEASE = "release"
 OP_EXPIRED = "op_expired"
 """``last_error`` of an op finished at its deadline, without billing."""
 BILLING_OP_MAX_AGE = timedelta(days=7)
-"""An op's deadline (``not_after``) is its creation plus this. Billing refuses
-any call after it (``Expired``), and keeps a key's outcome 30 days after it
-settles, so every call that can still mutate is answered by its key."""
+"""An op's deadline (``not_after``) is the database's time at its insert plus
+this. Billing admits a call by its database's clock, after the key is
+claimed, and refuses one past it (``Expired``); it keeps a key's outcome 30
+days after it settles and a day past its deadline, so every call that can
+still mutate is answered by its key."""
 NO_HOLD = "-"
 """``old_hold_id`` of a swap from no hold (``NULL`` is: not fixed yet)."""
 
@@ -60,15 +62,20 @@ class BillingOp(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[u
     repaired_at: datetime | None = dt_col()
     """When the repair (``sm_images.billing_repair``) examined this done op."""
     not_after: datetime | None = dt_col()
-    """The op's deadline, passed to billing with every call it makes."""
-    """When the repair (``sm_images.billing_repair``) examined this done op."""
+    """The op's deadline: the database's time when the op was written, plus
+    :data:`BILLING_OP_MAX_AGE`. Immutable; passed unchanged to billing with
+    every call the op makes (billing refuses a replay naming another)."""
 
 
 class BillingRepairCursor(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
-    """How far the repair's scan of a tenant's done ops has got (op id)."""
+    """How far the repair's scan of a tenant's done ops has got: a lap runs
+    over ``last_op_id < id <= lap_end``, ``lap_end`` the tenant's highest op
+    id when the lap began (``NULL``: between laps). Moved only by a
+    compare-and-set on both."""
 
     __tablename__ = "images_billing_cursor"
     __table_args__ = (UniqueConstraint("tenant_id", name="uq_images_billing_cursor_tenant"),)
 
     id: int | None = Field(default=None, primary_key=True)
     last_op_id: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    lap_end: int | None = Field(default=None, nullable=True)

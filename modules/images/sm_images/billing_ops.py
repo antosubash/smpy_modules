@@ -32,6 +32,7 @@ from simple_module_db import finalize_session
 from sqlalchemy import delete, select, update
 
 from sm_images import billing
+from sm_images.db_time import db_now
 from sm_images.models import BillingOp
 from sm_images.models.billing_op import BILLING_OP_MAX_AGE, NO_HOLD, OP_RELEASE, OP_SWAP
 
@@ -86,18 +87,23 @@ async def open_op(
         quantity=qty,
         idempotency_key=key,
         old_hold_id=old or NO_HOLD,
-        not_after=_deadline(),
         claim_token=token,
         claim_expires_at=datetime.now(UTC) + claim,
     )
-    db.add(row)
-    await db.flush()
+    not_after = await _deadline(db, row)
     assert row.id is not None
-    return Claimed(row.id, token, key, row.not_after)
+    return Claimed(row.id, token, key, not_after)
 
 
-def _deadline() -> datetime:
-    return datetime.now(UTC) + BILLING_OP_MAX_AGE
+async def _deadline(db: Any, row: BillingOp) -> datetime:
+    """Insert ``row`` and fix its deadline: the database's time at the insert
+    plus :data:`BILLING_OP_MAX_AGE`. Immutable from here; every billing call
+    for the op passes it unchanged."""
+    db.add(row)
+    await db.flush()  # the write first (SQLite), then the clock
+    row.not_after = await db_now(db) + BILLING_OP_MAX_AGE
+    await db.flush()
+    return row.not_after
 
 
 def _mine(claimed: Claimed) -> list[Any]:
@@ -143,10 +149,8 @@ async def add_swap(db: Any, image_id: uuid.UUID, qty: int, *, factory: Any = Non
         image_id=image_id,
         quantity=qty,
         idempotency_key=billing.hold_key(image_id, f"swap-{uuid.uuid4().hex}"),
-        not_after=_deadline(),
     )
-    db.add(row)
-    await db.flush()
+    await _deadline(db, row)
     assert row.id is not None
     _settle_after(db, [row.id], factory)
     return row

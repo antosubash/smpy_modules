@@ -10,7 +10,9 @@ one transaction. When it runs depends on the direction:
   the image has no swap still pending (one is settled inline first; if it
   stays pending, :class:`HoldBusy`). Then billing swaps. A refusal is
   ``StorageQuotaExceeded``: the old hold still counts, the staged objects are
-  deleted, the step fails ``quota_exceeded`` and nothing is published.
+  deleted, the step fails ``quota_exceeded`` and nothing is published. Each
+  outcome billing gives the key (a hold, a refusal, an expiry or a closure)
+  is final; only a call whose outcome is unknown hands the op to the settler.
 * **The image shrinks** (or keeps its size): nothing is asked of billing
   before; the completion queues the swap with its writes, and it settles after
   the commit. A shrink always fits.
@@ -40,7 +42,7 @@ from sm_images import billing, billing_ops
 from sm_images.billing_settle import CLAIM
 from sm_images.errors import StorageQuotaExceeded
 from sm_images.models import Image, Rendition
-from sm_images.models.billing_op import OP_SWAP
+from sm_images.models.billing_op import OP_EXPIRED, OP_SWAP
 from sm_images.pipeline.claim import lock_image
 from sm_images.pipeline.runtime import Runtime
 
@@ -110,11 +112,12 @@ async def reserve(runtime: Runtime, loaded: Any, staged: Any) -> Planned | None:
             factory, loaded.tenant, old, planned, op.key, meter, not_after=op.not_after
         )
     except StorageQuotaExceeded as exc:  # nothing changed: the old hold still counts
-        async with factory() as db:
-            await billing_ops.finish(db, op, None, f"{type(exc).__name__}: {exc}")
-            await finalize_session(db)
+        await _finish(factory, op, f"{type(exc).__name__}: {exc}")
         raise
-    except Exception:
+    except billing.SwapExpired:  # expired or closed: the key's outcome, no hold
+        await _finish(factory, op, OP_EXPIRED)
+        raise
+    except Exception:  # outcome unknown: the settler obtains it
         await _hand_back(factory, op)
         raise
     return Planned(planned, hold.id, old, op)
@@ -183,6 +186,15 @@ async def abandon(runtime: Runtime, planned: Planned | None) -> None:
     installs its hold and shrinks it back to what the image stores."""
     if planned is not None and planned.op is not None:
         await _hand_back(runtime.session_factory, planned.op)
+
+
+async def _finish(factory: Any, op: billing_ops.Claimed, error: str) -> None:
+    """Finish our op without a hold, on billing's terminal answer for its key
+    (a refusal, an expiry, a closure). Not ours any more: whoever took it over
+    finishes it from the same answer."""
+    async with factory() as db:
+        await billing_ops.finish(db, op, None, error)
+        await finalize_session(db)
 
 
 async def _hand_back(factory: Any, op: billing_ops.Claimed) -> None:

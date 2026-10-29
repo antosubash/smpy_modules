@@ -249,3 +249,6 @@ class UsageHold(Base, table=True):  # ty: ignore[unsupported-base]
     refused_used: int | None = Field(default=None, sa_column=Column(BigInteger, nullable=True))
     refused_limit: int | None = Field(default=None, sa_column=Column(BigInteger, nullable=True))
     refused_requested: int | None = Field(default=None, sa_column=Column(BigInteger, nullable=True))
+    # A ``swap``'s deadline, part of the call (a replay with another is a
+    # conflict); the purge keeps the row until a day past it.
+    not_after: datetime | None = Field(default=None, sa_column=_tz_column())

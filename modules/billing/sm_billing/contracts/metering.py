@@ -40,6 +40,7 @@ from sm_billing.contracts.metering_errors import (
 from sm_billing.contracts.metering_results import (
     LIVE_HOLD_STATUSES,
     Allowed,
+    Closed,
     Exceeded,
     Expired,
     Hold,
@@ -176,7 +177,7 @@ class UsageMeter(Protocol):
         *,
         source: str,
         not_after: datetime,
-    ) -> Hold | Exceeded | Expired:
+    ) -> Hold | Exceeded | Expired | Closed:
         """Reserve and commit a hold of ``quantity`` and release ``old_hold_id``,
         in one transaction (its own). The limit is checked on the net delta
         (``quantity`` less the old hold's): a delta of zero or less is always
@@ -184,18 +185,23 @@ class UsageMeter(Protocol):
         plain reserve and commit; one of another tenant or meter raises
         ``HoldNotFound`` and writes nothing. ``Exceeded`` (``requested`` = the
         delta) leaves the old hold counting. ``not_after`` is the caller's
-        deadline: a call arriving later is ``Expired`` and writes nothing to the
-        gauge. Every outcome is kept under the key, and a replay of the same
-        call (quantity, ``source``, old hold) returns it; another call under
-        the key is an ``IdempotencyConflict``."""
+        deadline, compared with the database's clock after the key is claimed:
+        a call admitted later is ``Expired`` and writes nothing to the gauge.
+        Exactly one outcome is ever committed under a key, in the transaction
+        that claimed it; a replay of the same call (quantity, ``source``, old
+        hold, ``not_after``) returns it, another call under the key is an
+        ``IdempotencyConflict``, and a key ``close_key`` closed answers
+        ``Closed`` to any call, writing nothing."""
         ...
 
-    async def get_hold_by_key(
+    async def close_key(
         self, tenant_id: str, meter: str, idempotency_key: str
-    ) -> Hold | Refused | None:
-        """Read-only: the outcome a ``swap`` (or ``reserve``) recorded under the
-        key - its ``Hold``, in its current state, or ``Refused`` - or ``None``
-        when the tenant has no such key (never made, or purged by retention)."""
+    ) -> Hold | Refused | Expired | Closed:
+        """The key's terminal outcome, committing ``Closed`` when it has none:
+        its ``Hold`` (in its current state), ``Refused`` (the limit refused
+        it), ``Expired`` (it arrived past its deadline), or ``Closed`` - then
+        no ``swap`` under the key will ever write. A ``swap`` in flight under
+        the key is waited for, and its outcome returned. Idempotent."""
         ...
 
     async def get_hold(self, tenant_id: str, hold_id: str) -> Hold | None:
@@ -240,6 +246,7 @@ def usage_meter(session_factory: async_sessionmaker) -> UsageMeter:
 __all__ = [
     "LIVE_HOLD_STATUSES",
     "Allowed",
+    "Closed",
     "Exceeded",
     "Expired",
     "Hold",
