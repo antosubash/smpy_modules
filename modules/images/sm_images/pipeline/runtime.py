@@ -26,11 +26,14 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 
+from simple_module_db import finalize_session
+
 __all__ = [
     "Runtime",
     "bind_runtime",
     "celery_eager",
     "current_runtime",
+    "first_row",
     "use_runtime",
     "worker_multi_tenant",
 ]
@@ -111,3 +114,11 @@ def bind_runtime(runtime: Runtime) -> Iterator[Runtime]:
 
 def current_runtime() -> Runtime | None:
     return _bound.get() or _runtime
+
+
+async def first_row(runtime: Runtime, stmt: Any) -> Any:
+    """``stmt``'s first row (or ``None``), read in a session of its own."""
+    async with runtime.session_factory() as db:
+        found = (await db.execute(stmt)).first()
+        await finalize_session(db)
+    return found

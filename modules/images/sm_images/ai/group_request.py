@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -21,8 +21,10 @@ from simple_module_db import finalize_session, tenant_context
 from sqlalchemy import and_, func, or_, select
 
 from sm_images.ai import group_lease
+from sm_images.ai.run import _ids
 from sm_images.models import Collection, Group, Prompt, PromptResult
 from sm_images.models.enums import PromptScope, StepStatus
+from sm_images.pipeline.runtime import first_row
 
 __all__ = ["CHUNK", "GROUP_QUEUE", "dispatch_group", "recover_group_runs", "request_groups"]
 
@@ -30,31 +32,6 @@ logger = logging.getLogger(__name__)
 
 CHUNK = 500
 GROUP_QUEUE = "images_heavy"
-
-
-async def _groups(
-    runtime: Any, tenant: str, collection_id: uuid.UUID, only: Sequence[uuid.UUID] | None
-) -> AsyncIterator[uuid.UUID]:
-    after: uuid.UUID | None = None
-    while True:
-        stmt = (
-            select(Group.id)
-            .where(Group.collection_id == collection_id, Group.tenant_id == tenant)
-            .order_by(Group.id)
-            .limit(CHUNK)
-        )
-        if only is not None:
-            stmt = stmt.where(Group.id.in_(list(only)))
-        if after is not None:
-            stmt = stmt.where(Group.id > after)
-        async with runtime.session_factory() as db:
-            ids = list((await db.execute(stmt)).scalars())
-            await finalize_session(db)
-        for group_id in ids:
-            yield group_id
-        if len(ids) < CHUNK:
-            return
-        after = ids[-1]
 
 
 async def dispatch_group(
@@ -93,13 +70,13 @@ async def request_groups(
         stmt = select(Prompt.collection_id, Prompt.revision).where(
             Prompt.id == prompt_id, Prompt.tenant_id == tenant, Prompt.scope == PromptScope.GROUP
         )
-        async with runtime.session_factory() as db:
-            found = (await db.execute(stmt)).first()
-            await finalize_session(db)
+        found = await first_row(runtime, stmt)
         if found is None:
             return 0
         count = seen = 0
-        async for group_id in _groups(runtime, tenant, found.collection_id, group_ids):
+        async for group_id in _ids(
+            runtime, Group, tenant, found.collection_id, group_ids, chunk=CHUNK
+        ):
             seen += 1
             if allowed is not None and seen > 1 and (seen - 1) % CHUNK == 0 and not await allowed():
                 logger.info("images.prompt_run.access_revoked prompt=%s", prompt_id)

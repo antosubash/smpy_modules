@@ -43,7 +43,7 @@ from sm_images.imports.zip_entries import entry_item, parse_metadata
 from sm_images.imports.zip_safety import Entry, Limits, ZipRejected, inspect, read_entry
 from sm_images.models import Collection, ImportJob
 from sm_images.models.enums import ImportKind, JobStatus, LocationSource
-from sm_images.pipeline.runtime import Runtime, bind_runtime
+from sm_images.pipeline.runtime import Runtime, bind_runtime, first_row
 
 __all__ = ["ENTRY_BATCH", "import_zip_async", "launch_sealed", "run_import"]
 
@@ -79,9 +79,7 @@ async def launch_sealed(runtime: Runtime, tenant: str, job_id: uuid.UUID, genera
 
 async def _sealed(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> tuple[str, int]:
     stmt = select(ImportJob.source_etag, ImportJob.source_size).where(*jobs.where(tenant, job_id))
-    async with runtime.session_factory() as db:
-        found = (await db.execute(stmt)).first()
-        await finalize_session(db)
+    found = await first_row(runtime, stmt)
     if found is None or found[0] is None or found[1] is None:
         raise ZipRejected("source_missing")
     return str(found[0]), int(found[1])

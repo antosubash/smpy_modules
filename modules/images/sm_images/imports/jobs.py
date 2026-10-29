@@ -33,7 +33,7 @@ from sm_images.imports.mapping import Mapping
 from sm_images.intents import clear_intents
 from sm_images.models import Collection, ImportItem, ImportJob
 from sm_images.models.enums import ImportKind, ItemStatus, JobStatus
-from sm_images.pipeline.runtime import Runtime
+from sm_images.pipeline.runtime import Runtime, first_row
 
 __all__ = [
     "ACTIVE",
@@ -156,10 +156,7 @@ async def create_job(
 
 
 async def returning_one(runtime: Runtime, stmt: Any) -> Any:
-    async with runtime.session_factory() as db:
-        found = (await db.execute(stmt.execution_options(**SYNC))).first()
-        await finalize_session(db)
-    return found
+    return await first_row(runtime, stmt.execution_options(**SYNC))
 
 
 def needs_staging(row: Any) -> bool:

@@ -36,7 +36,7 @@ from sm_images.models.enums import PromptScope, StepStatus
 from sm_images.pipeline.claim import insert_missing, load_runs, lock_image
 from sm_images.pipeline.cycle import reset_runs
 from sm_images.pipeline.orchestrate import submit_dispatch
-from sm_images.pipeline.runtime import Runtime
+from sm_images.pipeline.runtime import Runtime, first_row
 from sm_images.starter_right import holds_right
 
 __all__ = ["CHUNK", "IDS_MAX", "RunScope", "launch", "run_prompt", "wanted"]
@@ -75,27 +75,36 @@ async def _request(
     return bool(await reset_runs(db, tenant, image_id, [sid], now))
 
 
-async def _images(
-    runtime: Runtime, tenant: str, collection_id: uuid.UUID, only: Sequence[uuid.UUID] | None
+async def _ids(
+    runtime: Any,
+    model: Any,
+    tenant: str,
+    collection_id: uuid.UUID,
+    only: Sequence[uuid.UUID] | None,
+    *,
+    chunk: int,
 ) -> AsyncIterator[uuid.UUID]:
+    """The ids of ``model`` (images or groups) in the collection, optionally
+    limited to ``only``, walked in keyset chunks of ``chunk`` (the caller's
+    ``CHUNK``, read at call time)."""
     after: uuid.UUID | None = None
     while True:
         stmt = (
-            select(Image.id)
-            .where(Image.collection_id == collection_id, Image.tenant_id == tenant)
-            .order_by(Image.id)
-            .limit(CHUNK)
+            select(model.id)
+            .where(model.collection_id == collection_id, model.tenant_id == tenant)
+            .order_by(model.id)
+            .limit(chunk)
         )
         if only is not None:
-            stmt = stmt.where(Image.id.in_(list(only)))
+            stmt = stmt.where(model.id.in_(list(only)))
         if after is not None:
-            stmt = stmt.where(Image.id > after)
+            stmt = stmt.where(model.id > after)
         async with runtime.session_factory() as db:
             ids = list((await db.execute(stmt)).scalars())
             await finalize_session(db)
-        for image_id in ids:
-            yield image_id
-        if len(ids) < CHUNK:
+        for found in ids:
+            yield found
+        if len(ids) < chunk:
             return
         after = ids[-1]
 
@@ -104,10 +113,7 @@ async def _prompt(runtime: Runtime, tenant: str, prompt_id: uuid.UUID) -> Any:
     stmt = select(Prompt.collection_id, Prompt.revision, Prompt.scope).where(
         Prompt.id == prompt_id, Prompt.tenant_id == tenant
     )
-    async with runtime.session_factory() as db:
-        row = (await db.execute(stmt)).first()
-        await finalize_session(db)
-    return row
+    return await first_row(runtime, stmt)
 
 
 async def run_prompt(
@@ -144,7 +150,7 @@ async def run_prompt(
         return await request_groups(runtime, tenant, prompt_id, scope, group_ids, allowed=allowed)
     sid = step_id(prompt_id)
     count = seen = 0
-    async for image_id in _images(runtime, tenant, found.collection_id, image_ids):
+    async for image_id in _ids(runtime, Image, tenant, found.collection_id, image_ids, chunk=CHUNK):
         seen += 1
         if seen > 1 and (seen - 1) % CHUNK == 0 and not await allowed():
             logger.info("images.prompt_run.access_revoked prompt=%s", prompt_id)

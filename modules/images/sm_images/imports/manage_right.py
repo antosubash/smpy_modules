@@ -31,11 +31,10 @@ import logging
 import uuid
 from typing import Any
 
-from simple_module_db import finalize_session
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
-from sm_images.pipeline.runtime import Runtime
+from sm_images.pipeline.runtime import Runtime, first_row
 
 __all__ = ["manager_active"]
 
@@ -45,10 +44,7 @@ logger = logging.getLogger(__name__)
 async def _first(runtime: Runtime, stmt: Any) -> Any:
     """``stmt``'s first row, in a session of its own; ``None`` when unreadable."""
     try:
-        async with runtime.session_factory() as db:
-            row = (await db.execute(stmt)).first()
-            await finalize_session(db)
-        return row
+        return await first_row(runtime, stmt)
     except SQLAlchemyError:
         logger.warning("images.import.manager_unreadable", exc_info=True)
         return None

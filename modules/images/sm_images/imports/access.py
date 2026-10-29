@@ -34,7 +34,7 @@ from sm_images.imports.manage_right import manager_active
 from sm_images.imports.terminal import ERRORS_MAX, release_staging
 from sm_images.models import Collection, ImportJob
 from sm_images.models.enums import JobStatus
-from sm_images.pipeline.runtime import Runtime
+from sm_images.pipeline.runtime import Runtime, first_row
 from sm_images.starter_right import MANAGE, OWNER, SHARE, holds_right, shared_edit
 
 __all__ = [
@@ -71,9 +71,7 @@ async def may_edit(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> bool:
     stmt = select(ImportJob.run_as, ImportJob.access_basis, ImportJob.collection_id).where(
         *where(tenant, job_id)
     )
-    async with runtime.session_factory() as db:
-        row = (await db.execute(stmt)).first()
-        await finalize_session(db)
+    row = await first_row(runtime, stmt)
     if row is None:
         return True  # gone: the runner's own checks stop it
     run_as, recorded, collection_id = row
