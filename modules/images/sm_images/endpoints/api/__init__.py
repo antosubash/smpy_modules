@@ -22,6 +22,7 @@ from sm_images.endpoints.api import (
     shares,
     uploads,
 )
+from sm_images.endpoints.api import map as map_api
 from sm_images.tenancy import bind_admin
 
 # The tenant binding is the router's **first** dependency, and FastAPI puts a
@@ -46,3 +47,4 @@ router.include_router(presets.router)
 router.include_router(review.router)
 router.include_router(serve.router)
 router.include_router(imports.router)
+router.include_router(map_api.router)

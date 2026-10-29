@@ -30,15 +30,16 @@ STRANGER = as_user("sam", ("images.view", "images.create"))
 
 @pytest_asyncio.fixture
 async def secret(client, storage):
-    """olga's private collection and an image in it (stored, with a ``small``
-    rendition, so the byte routes have something to serve its owner), plus one
-    public collection."""
+    """olga's private collection and a located image in it (stored, with a
+    ``small`` rendition and a built map, so the byte routes have something to
+    serve its owner), plus one public collection."""
     private = collection("secret-trees", Visibility.PRIVATE, OWNER)
     public = collection("open-trees", Visibility.PUBLIC, OWNER)
     async with client.db_state.session_factory() as s:
         s.add_all([private, public])
         await s.flush()
-        pic = image(private, "secret-photo.jpg")
+        private.map_key = "k/map"  # a built map, so its owner gets a 200 from the archive route
+        pic = image(private, "secret-photo.jpg", lat=48.2, lng=16.37)
         s.add(pic)
         await s.flush()
         site = Group(collection_id=private.id, key="secret-site")
@@ -54,7 +55,7 @@ async def secret(client, storage):
         s.add(prompt)
         await s.commit()
     store = ImageStore(storage)
-    for key in (pic.storage_key, "k/small"):
+    for key in (pic.storage_key, "k/small", "k/map"):
         await store.put(key, b"secret-bytes", content_type="image/jpeg", size=12)
     return {
         "collection_id": str(private.id),

@@ -1,7 +1,7 @@
 """The one object-key layout (spec §1). Pure functions; nothing here touches storage.
 
 ``images/<tenant>/<collection>/<image>/original.<ext>``, ``display.<gen>.jpg``,
-``r/<size>.<gen>.jpg``, ``images/<tenant>/<collection>/map.pmtiles`` and
+``r/<size>.<gen>.jpg``, ``images/<tenant>/<collection>/map.<gen>.pmtiles`` and
 ``images/<tenant>/imports/<job>/<name>``. Display and rendition keys carry the
 display generation (for caches) **and the attempt** - the step run's lease
 token - because two attempts can load the same generation: a stale worker and
@@ -48,8 +48,10 @@ def rendition_key(
     return f"{prefix}/r/{size}.{generation}.{_attempt(attempt)}.jpg"
 
 
-def map_key(tenant: str, collection: str) -> str:
-    return f"{ROOT}/{tenant}/{collection}/map.pmtiles"
+def map_key(tenant: str, collection: str, generation: int, attempt: str) -> str:
+    """One build's archive. Never overwritten: a reader mid-way through a range
+    sequence of one generation never gets another's bytes under the same name."""
+    return f"{ROOT}/{tenant}/{collection}/map.{int(generation)}.{_attempt(attempt)}.pmtiles"
 
 
 def import_key(tenant: str, job: str, name: str) -> str:

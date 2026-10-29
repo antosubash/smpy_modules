@@ -66,6 +66,10 @@ READ_ROUTES: list[ReadRoute] = [
     ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/r/{size}", PUBLIC),
     ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/display", PUBLIC),
     ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/original", PUBLIC),
+    ReadRoute("GET", "/api/images/collections/{collection_id}/points", COLLECTION),
+    ReadRoute("GET", "/api/images/collections/{collection_id}/map.pmtiles", COLLECTION),
+    ReadRoute("GET", "/api/images/public/c/{slug}/points", PUBLIC),
+    ReadRoute("GET", "/api/images/public/c/{slug}/map.pmtiles", PUBLIC),
 ]
 
 NOT_A_LEAK_SURFACE: frozenset[str] = frozenset()

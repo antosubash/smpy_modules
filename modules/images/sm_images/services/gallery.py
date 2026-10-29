@@ -16,6 +16,7 @@ from sqlalchemy import exists, func, select, update
 
 from sm_images import constants
 from sm_images.errors import Conflict, NotFound
+from sm_images.map import schedule as map_schedule
 from sm_images.models import (
     Collection,
     Image,
@@ -124,12 +125,18 @@ async def set_location(
         await stats.on_location_changed(db, collection.id, old, new)
     elif old != new:
         await stats.recompute(db, collection.id)
+    if old != new:  # a move never waits for the map's rebuild threshold
+        await map_schedule.changed(db, collection.id, urgent=True)
     await db.refresh(image)
     return image
 
 
 async def delete(db: Any, collection: Collection, image: Image) -> None:
-    """Soft delete (the janitor purges after the grace period); stats recomputed."""
+    """Soft delete (the janitor purges after the grace period); stats recomputed,
+    and a located image's point taken off the map without waiting for the threshold."""
+    located = image.lat is not None
     await db.delete(image)
     await db.flush()
     await stats.recompute(db, collection.id)
+    if located:
+        await map_schedule.changed(db, collection.id, urgent=True)

@@ -30,11 +30,12 @@ from sqlalchemy import select
 from sm_images import constants, intents, urls
 from sm_images.access import POLICY
 from sm_images.contracts.schemas import CollectionPageRead, CollectionRead
+from sm_images.map import points as map_points
 from sm_images.models import Collection
 from sm_images.services import collections as service
 from sm_images.tenancy import tenant_scope
 
-__all__ = ["get_collection", "list_collections", "rendition_url"]
+__all__ = ["get_collection", "list_collections", "points", "rendition_url"]
 
 
 @asynccontextmanager
@@ -85,6 +86,38 @@ async def list_collections(
             return CollectionPageRead(
                 items=[CollectionRead.from_row(r) for r in rows], next_cursor=token, total=total
             )
+
+
+async def points(
+    tenant_id: str,
+    collection_id: uuid.UUID,
+    principal: ResourcePrincipal,
+    *,
+    bbox: tuple[float, float, float, float] | None = None,
+    limit: int = constants.POINTS_LIMIT_DEFAULT,
+    cursor: str | None = None,
+    db: Any = None,
+) -> dict[str, Any] | None:
+    """The collection's map points as a GeoJSON ``FeatureCollection`` (what
+    ``GET …/collections/{id}/points`` answers), or ``None`` when *principal*
+    may not view it in *tenant_id*.
+
+    Each point carries ``id``, ``captured_at`` and ``group_id`` only; an image
+    whose picture may not be shown yet (redaction pending) is not a point.
+    ``bbox`` is ``(minx, miny, maxx, maxy)`` in degrees (``minx > maxx``
+    crosses the antimeridian; out of range raises ``Invalid``); ``limit`` is
+    clamped to ``POINTS_LIMIT_MAX``. Follow ``next_cursor`` for the rest.
+    """
+    box = None if bbox is None else map_points.check_bbox(tuple(bbox))
+    with tenant_scope(tenant_id):
+        async with _session(db) as session:
+            stmt = POLICY.filter(
+                principal, ACTION_VIEW, select(Collection).where(Collection.id == collection_id)
+            )
+            row = (await session.execute(stmt)).scalars().first()
+            if row is None:
+                return None
+            return await map_points.page(session, row, bbox=box, limit=limit, cursor=cursor)
 
 
 def rendition_url(image: Any, rendition: Any, *, collection: Any = None) -> str:

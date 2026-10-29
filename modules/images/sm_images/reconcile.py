@@ -32,7 +32,10 @@ isolation applying as in a request:
   its backoff (:func:`sm_images.billing_ops.settle`);
 * every live collection's stats are recomputed (the only way a box shrinks
   after deletes; there is no durable "touched" marker yet, so all of them,
-  in batches).
+  in batches);
+* maps that are due and not claimed - a lost ``images.build_map``, a claim
+  that expired, a withdrawn map - are requested again
+  (:func:`sm_images.map.schedule.reconcile_maps`).
 """
 
 from __future__ import annotations
@@ -49,6 +52,7 @@ from sqlalchemy import and_, or_, select, update
 from sm_images import billing_ops
 from sm_images.ai.group_request import recover_group_runs
 from sm_images.imports.recover import recover_imports
+from sm_images.map.schedule import reconcile_maps
 from sm_images.models import (
     BillingOp,
     Collection,
@@ -235,6 +239,7 @@ async def reconcile_tenant(runtime: Runtime, tenant: str, now: datetime) -> Coun
     done["group_runs"] = await recover_group_runs(runtime, tenant, now, cutoff)
     done["billing_ops"] = await billing_ops.settle(runtime.session_factory, tenant, now=now)
     done["collections"] = await _recompute_stats(runtime, tenant)
+    done["maps"] = await reconcile_maps(runtime, tenant, now)
     return done
 
 

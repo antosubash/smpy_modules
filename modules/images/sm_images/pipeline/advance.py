@@ -144,10 +144,17 @@ async def claim_ready(db: Any, image_id: uuid.UUID, now: datetime, lease_s: int)
 
 async def _processed(db: Any, runtime: Runtime, tenant: str, image_id: uuid.UUID) -> None:
     won = await mark_processed(db, tenant, image_id)
-    bus = runtime.bus()
-    if won is None or bus is None:
+    if won is None:
         return
     collection_id, cycle = won
+    # A located image's cycle is a map change (a new point, a blur settled):
+    # counted with the event, and the map rebuilt once that crosses the threshold.
+    from sm_images.map.schedule import changed
+
+    await changed(db, collection_id, image_id=image_id, runtime=runtime, tenant=tenant)
+    bus = runtime.bus()
+    if bus is None:
+        return
     event = ImageProcessed(tenant, str(collection_id), str(image_id), cycle)
     if bus.durable.handler_names(ImageProcessed):
         await bus.publish_durable_or_inline(event, db)

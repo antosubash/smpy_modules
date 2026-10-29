@@ -24,7 +24,7 @@ from sm_images.models import (
 from sm_images.pipeline.orchestrate import rerun_image
 from sm_images.storage import ImageStore
 from sm_images.tenancy import DEFAULT_TENANT
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from tests.pipeline_support import Blur, use_steps
 
@@ -120,11 +120,12 @@ async def test_purge_of_a_collection_takes_its_map_and_import_staging(pipe, blur
     await pipe.run(img)
     job_id = uuid.uuid4()
     staged = storage_keys.import_key(T, str(job_id), "feed.geojson")
-    map_key = storage_keys.map_key(T, str(coll.id))
+    map_key = storage_keys.map_key(T, str(coll.id), 1, "a1")
     for key in (staged, map_key):
         await pipe.store.put(key, b"x", content_type="application/octet-stream", size=1)
     async with pipe.db_state.session_factory() as s:
         s.add(ImportJob(id=job_id, collection_id=coll.id, source_key=staged, staged_keys=[staged]))
+        await s.execute(update(Collection).where(Collection.id == coll.id).values(map_key=map_key))
         await s.commit()
     await pipe.trash(Collection, coll.id, OLD)  # its image itself is not trashed
 

@@ -19,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sm_images import constants
 from sm_images.errors import Conflict, GroupExists, InvalidGroup, NotFound
 from sm_images.imports.filename_pattern import canonical_role
+from sm_images.map import schedule as map_schedule
 from sm_images.models import Collection, Group, Image
 
 __all__ = [
@@ -161,12 +162,13 @@ async def update_group(
 async def delete_group(db: Any, collection: Collection, group: Group) -> None:
     """Free the members first (``images_image.group_id`` has no ``ON DELETE``),
     trashed ones too, then drop the group."""
-    await db.execute(
+    freed = await db.execute(
         update(Image)
         .where(Image.collection_id == collection.id, Image.group_id == group.id)
         .values(group_id=None, group_role=None)
         .execution_options(include_deleted=True, synchronize_session=False)
     )
+    await map_schedule.changed(db, collection.id, count=int(freed.rowcount or 0))
     await db.execute(
         delete(Group)
         .where(Group.id == group.id, Group.collection_id == collection.id)
@@ -218,6 +220,8 @@ async def assign(
         err = Conflict(_MOVED)
         err.code = constants.CODE_CONFLICT
         raise err
+    if target != image.group_id:  # the point's group_id
+        await map_schedule.changed(db, collection.id)
     await db.refresh(image)
     return image
 

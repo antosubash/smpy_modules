@@ -1,7 +1,8 @@
-"""The anonymous twins of the byte routes, under ``/api/images/public/`` (spec §5).
+"""The anonymous twins of the byte and map routes, under ``/api/images/public/`` (spec §5).
 
-``/public/c/{slug}/images/{image_id}/r/{size}``, ``…/display`` and
-``…/original``: a **public** collection's images for anyone, through
+``/public/c/{slug}/images/{image_id}/r/{size}``, ``…/display``,
+``…/original``, ``/public/c/{slug}/points`` and ``…/map.pmtiles`` (``GET``
+and ``HEAD`` only): a **public** collection's images and map for anyone, through
 ``bind_public`` and :func:`~sm_images.access.public_collection`. A private or
 internal collection is the 404 an unknown slug gets, whoever asks - the owner
 included, who has the admin routes.
@@ -30,6 +31,7 @@ from simple_module_db.deps import get_db
 
 from sm_images import cache, constants, serving
 from sm_images.access import public_collection
+from sm_images.endpoints.api.map import BBox, Cursor, Limit, points_response
 from sm_images.errors import ImagesError, render
 from sm_images.models import Collection
 from sm_images.tenancy import bind_public
@@ -102,3 +104,26 @@ async def public_original(
     return await serving.serve(
         request, db, collection, image_id, ANONYMOUS, cache.ORIGINAL, twin=True
     )
+
+
+@router.get("/c/{slug}/points")
+async def public_points(
+    request: Request,
+    response: Response,
+    collection: Public,
+    db: Any = Depends(get_db),
+    bbox: str | None = BBox,
+    limit: int = Limit,
+    cursor: str | None = Cursor,
+) -> dict[str, Any]:
+    return await points_response(
+        request, response, db, collection, bbox=bbox, limit=limit, cursor=cursor, twin=True
+    )
+
+
+@_get_and_head("/c/{slug}/map.pmtiles")
+async def public_map(request: Request, collection: Public) -> Response:
+    """Re-checked as public on every request, every range of a viewer included:
+    a collection made private stops here at once (and its archive was withdrawn
+    with the change, ``sm_images.map.schedule.withdraw``)."""
+    return await serving.serve_map(request, collection, twin=True)

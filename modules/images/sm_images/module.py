@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import APIRouter
 from simple_module_core.body_limits import BodyLimitRegistry
+from simple_module_core.health import HealthCheck, HealthCheckResult, HealthRegistry, HealthStatus
 from simple_module_core.menu import MenuRegistry
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
@@ -48,6 +49,8 @@ class ImagesModule(ModuleBase):
         # ``register_settings`` hands it to the services container instead of
         # the pydantic defaults.
         self.settings = None
+        # ``tippecanoe_path`` as booted (a restart field); the health check asks.
+        self.tippecanoe_path = "tippecanoe"
 
     def register_settings(self, app: FastAPI) -> None:
         """Register the settings class and mount the services container.
@@ -90,6 +93,21 @@ class ImagesModule(ModuleBase):
         from sm_images.request_context import RequestContextMiddleware
 
         app.add_middleware(RequestContextMiddleware)
+
+    def register_health_checks(self, registry: HealthRegistry) -> None:
+        """``images.tippecanoe``: degraded while the binary that builds map tiles
+        cannot be found. Points still work; no PMTiles archive is built."""
+        registry.add(HealthCheck(name="images.tippecanoe", check=self._tippecanoe_health))
+
+    async def _tippecanoe_health(self) -> HealthCheckResult:
+        from sm_images.map import pmtiles_build
+
+        if pmtiles_build.locate(self.tippecanoe_path) is not None:
+            return HealthCheckResult(HealthStatus.HEALTHY)
+        return HealthCheckResult(
+            HealthStatus.DEGRADED,
+            f"tippecanoe not found ({self.tippecanoe_path!r}): map tiles are not built",
+        )
 
     def register_exception_handlers(self, app: FastAPI) -> None:
         from sm_images.errors import install_exception_handlers
@@ -157,7 +175,9 @@ class ImagesModule(ModuleBase):
         setattr(app.state, constants.MODULE_ATTR, self)
         billing.register_meter(app)
         tenancy.configure(app)
-        urls.configure(getattr(app.state, constants.PACKAGE).settings.public_asset_base_url)
+        settings = getattr(app.state, constants.PACKAGE).settings
+        urls.configure(settings.public_asset_base_url)
+        self.tippecanoe_path = settings.tippecanoe_path
         load_extensions()
         sm = getattr(app.state, "sm", None)
         db = getattr(sm, "db", None)

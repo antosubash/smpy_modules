@@ -169,7 +169,7 @@ async def _row_keys(db: Any, sel: Selection, out: Keys) -> dict[str, uuid.UUID]:
                 out.images[image_id].add(key)
     jobs: dict[str, uuid.UUID] = {}
     for coll in sel.whole:
-        out.collections[coll.id] = {storage_keys.map_key(coll.tenant_id, str(coll.id))}
+        out.collections[coll.id] = {coll.map_key} if coll.map_key else set()
     whole_ids = list(out.collections)
     if whole_ids:
         stmt = select(UploadSession.collection_id, UploadSession.storage_key).where(

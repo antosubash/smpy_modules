@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import uuid
 
+from sm_images.map import pmtiles_build
 from sm_images.models import Collection, Image, StepRun
 from sm_images.module import ImagesModule
 from sm_images.pipeline.cycle import mark_processed
@@ -37,7 +38,12 @@ async def test_an_upload_runs_its_pipeline_after_the_commit(uploads):
     assert runs == {"exif": "completed", "renditions": "completed"}
     assert row.camera_make == "Acme" and row.lat is not None
     assert row.processed_generation == 1
-    assert len(stored(uploads.storage)) == 1 + 4  # original + the default four sizes
+    objects = stored(uploads.storage)
+    maps = [k for k in objects if k.endswith(".pmtiles")]
+    assert len(objects) - len(maps) == 1 + 4  # original + the default four sizes
+    # a located image's concluded cycle is the first map change: the eager host
+    # builds the collection's map after the commit (when tippecanoe is here)
+    assert len(maps) == (1 if pmtiles_build.locate("tippecanoe") else 0)
 
 
 async def test_a_failing_step_does_not_fail_the_upload(uploads, monkeypatch):

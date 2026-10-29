@@ -105,6 +105,15 @@ DISPLAY_CONTENT_TYPE: Final = "image/jpeg"
 """Display copies and renditions are always JPEG (``storage_keys``)."""
 ORIGINAL_FORBIDDEN_DETAIL: Final = "The original of this image is not available to you"
 
+# --- The map: ``…/points`` and ``…/map.pmtiles`` (spec §5, ``sm_images.map``) ---
+
+POINTS_LIMIT_DEFAULT: Final = 1000
+POINTS_LIMIT_MAX: Final = 5000
+"""A larger ``limit`` is clamped to this; ``next_cursor`` pages past it."""
+BBOX_MAX_CHARS: Final = 200
+BAD_BBOX_DETAIL: Final = "bbox must be minx,miny,maxx,maxy in degrees (lng -180..180, lat -90..90)"
+PMTILES_CONTENT_TYPE: Final = "application/vnd.pmtiles"
+
 # --- Request-body ceilings: the routes that take an upload. ---
 
 UPLOAD_ROUTE_PATTERNS: Final = (

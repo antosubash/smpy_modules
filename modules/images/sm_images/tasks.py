@@ -23,7 +23,8 @@ Celery here, everything else inside the bodies. Routing and beat are in
 * ``images.janitor(dry_run=False)`` - the daily clean-up beat: abandoned
   uploads and trashed rows per tenant, then orphaned objects (:mod:`sm_images.janitor`).
 * ``images.import_geojson`` and ``images.download_items`` - GeoJSON imports,
-  defined in :mod:`sm_images.imports.tasks` and registered by the import below.
+  defined in :mod:`sm_images.imports.tasks` and registered by the import below;
+  ``images.build_map`` likewise, from :mod:`sm_images.map.tasks`.
 
 Bodies run through :mod:`sm_images.pipeline.worker_runtime`: no app, the
 message's tenant (restored by ``background_tasks``' ``task_prerun``), a fresh
@@ -41,6 +42,7 @@ from celery import shared_task
 from celery.signals import worker_process_init, worker_ready
 
 from sm_images.imports import tasks as _import_tasks  # noqa: F401 - registers the import tasks
+from sm_images.map import tasks as _map_tasks  # noqa: F401 - registers images.build_map
 from sm_images.task_config import (
     JANITOR,
     QUEUE_DEFAULT,

@@ -1,8 +1,8 @@
 """Light Celery configuration, read by ``background_tasks`` without importing tasks.
 
 * ``images`` - light steps (``exif``, ``renditions``), ``images.reconcile``
-  (routed here rather than behind a long import) and the daily
-  ``images.janitor``;
+  (routed here rather than behind a long import), the daily
+  ``images.janitor`` and ``images.build_map`` (a collection's PMTiles);
 * ``images_imports`` - the orchestrators (``images.restart_collection``,
   ``images.run_prompt``,
   ``images.import_geojson``, ``images.reset_import``); run its worker with concurrency 1. Downloads
@@ -28,6 +28,7 @@ RESET_IMPORT = "images.reset_import"
 RUN_REGROUP = "images.run_regroup"
 RUN_PROMPT = "images.run_prompt"
 RUN_GROUP_PROMPT = "images.run_group_prompt"
+BUILD_MAP = "images.build_map"
 
 QUEUE_DEFAULT = "images"
 QUEUE_IMPORTS = "images_imports"
@@ -44,6 +45,7 @@ TASK_ROUTES = {
     RUN_REGROUP: {"queue": QUEUE_IMPORTS},
     RUN_PROMPT: {"queue": QUEUE_IMPORTS},
     RUN_GROUP_PROMPT: {"queue": "images_heavy"},
+    BUILD_MAP: {"queue": QUEUE_DEFAULT},
 }
 
 RECONCILE_INTERVAL_SECONDS = 300.0

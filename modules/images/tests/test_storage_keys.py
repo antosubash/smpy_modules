@@ -35,7 +35,7 @@ def test_attempt_is_sanitised():
 
 
 def test_map_and_import_keys():
-    assert k.map_key(T, C) == "images/t1/c1/map.pmtiles"
+    assert k.map_key(T, C, 3, "AB/x") == "images/t1/c1/map.3.abx.pmtiles"
     assert k.import_key(T, "j1", "source.json") == "images/t1/imports/j1/source.json"
 
 

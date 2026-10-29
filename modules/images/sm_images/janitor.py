@@ -107,14 +107,14 @@ async def _owned(db: Any, keys: list[str]) -> set[str]:
             UploadSession.storage_key.in_(keys), UploadSession.status.in_(_LIVE_UPLOADS)
         ),
     )
+    # A map archive is owned while its collection names it: one a build never
+    # published, or one a rebuild or a visibility change replaced, is not.
+    found |= await _scalars(db, select(Collection.map_key).where(Collection.map_key.in_(keys)))
     jobs: dict[uuid.UUID, list[str]] = {}
-    maps: dict[uuid.UUID, list[str]] = {}
-    for key in keys:  # images/<tenant>/imports/<job>/... and images/<tenant>/<coll>/map.pmtiles
+    for key in keys:  # images/<tenant>/imports/<job>/...
         parts = key.split("/")
         if len(parts) >= 5 and parts[2] == "imports" and (job := _uuid(parts[3])):
             jobs.setdefault(job, []).append(key)
-        elif len(parts) == 4 and parts[3] == "map.pmtiles" and (coll := _uuid(parts[2])):
-            maps.setdefault(coll, []).append(key)
     if jobs:
         # Owned only while its job still names it: a terminal job *detaches*
         # its staged keys before deleting them, so a failed delete is reaped here.
@@ -125,9 +125,6 @@ async def _owned(db: Any, keys: list[str]) -> set[str]:
         for source_key, staged in (await db.execute(tagged(stmt))).all():
             named.update(k for k in [source_key, *(staged or [])] if k)
         found.update(k for keys in jobs.values() for k in keys if k in named)
-    if maps:
-        for coll in await _scalars(db, select(Collection.id).where(Collection.id.in_(list(maps)))):
-            found.update(maps[coll])
     return found
 
 

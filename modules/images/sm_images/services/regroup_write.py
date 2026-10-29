@@ -23,6 +23,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from sm_images import constants
+from sm_images.map import schedule as map_schedule
 from sm_images.models import Group, Image
 
 __all__ = ["Change", "apply_chunk", "ensure_groups", "keys_to_ids", "settle"]
@@ -153,4 +154,5 @@ async def settle(
     for i in range(0, len(changes), constants.REGROUP_CHUNK):
         part = changes[i : i + constants.REGROUP_CHUNK]
         assigned += await apply_chunk(db, collection_id, part, groups, reassign)
+    await map_schedule.changed(db, collection_id, count=assigned)  # each point's group_id
     return assigned, created, existing

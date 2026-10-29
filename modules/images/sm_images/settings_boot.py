@@ -32,9 +32,10 @@ class BootSettings(DbBackedSettings):
     tippecanoe_path: str = Field(default="tippecanoe", json_schema_extra=_RESTART)
     """The ``tippecanoe`` binary that builds PMTiles for the map view.
 
-    A bare name is looked up on ``PATH``. Located once, while booting: the map
-    tiles step is registered only when the binary is found, so a new value needs
-    a restart. Without it the map falls back to GeoJSON points.
+    A bare name is looked up on ``PATH``, by the web process (the health check,
+    as booted, so a new value needs a restart) and by each map build in a
+    worker. Without it no PMTiles archive is built - the health check reports
+    it - and the map falls back to GeoJSON points.
     """
 
     anonymize_weights_path: str = Field(default="", json_schema_extra=_RESTART)

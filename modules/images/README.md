@@ -92,3 +92,21 @@ Upload routes (`/api/images/collections/{id}/images`, `.../imports`,
 `upload_body_max_bytes` plus multipart framing; the rest use the host's global
 limit. Public exemptions are `GET`/`HEAD` only, under `/images/c/` and
 `/api/images/public/`.
+
+### Map
+
+- `GET /api/images/collections/{id}/points?bbox=minx,miny,maxx,maxy&limit=&cursor=`
+  (anonymous twin: `/api/images/public/c/{slug}/points`) answers a GeoJSON
+  `FeatureCollection`. Each point carries only `id`, `captured_at` and
+  `group_id`; an image whose display mutator has not settled is not a point.
+  `limit` is clamped to 5000; follow `next_cursor` for the rest.
+- `GET|HEAD …/collections/{id}/map.pmtiles` (twin: `/api/images/public/c/{slug}/map.pmtiles`)
+  serves the collection's PMTiles archive with `Range`, checking access on
+  every request. It is a 404 until a map is built.
+- `images.build_map` (queue `images`) builds the archive with `tippecanoe`.
+  A rebuild starts once the changes since the last build reach
+  `map_rebuild_threshold_abs` or `map_rebuild_threshold_pct` percent of its
+  points. A move or a removal does not wait for the threshold. A visibility
+  change withdraws the archive in the same transaction and builds a fresh one.
+- The `images.tippecanoe` health check is degraded while the binary cannot be
+  found. Points keep working.

@@ -20,7 +20,14 @@ COLLECTION_SLUG_INDEX = "uq_images_collection_tenant_slug"
 class Collection(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     __tablename__ = "images_collection"
     __table_args__ = (Index(COLLECTION_SLUG_INDEX, "tenant_id", "slug", unique=True),)
-    __audit_exclude_fields__: ClassVar[set[str]] = {"purge_failed_at"}
+    __audit_exclude_fields__: ClassVar[set[str]] = {
+        "purge_failed_at",
+        "map_claimed_until",
+        "map_changes",
+        "map_built_changes",
+        "map_urgent_mark",
+        "map_generation",
+    }
 
     id: uuid.UUID = pk_uuid()
     slug: str = Field(max_length=100)
@@ -41,10 +48,27 @@ class Collection(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True
     bbox_miny: float | None = Field(default=None)
     bbox_maxx: float | None = Field(default=None)
     bbox_maxy: float | None = Field(default=None)
+    # The map (``sm_images.map``): one PMTiles archive per collection.
     map_built_at: datetime | None = dt_col()
+    """When the current map's snapshot was taken (``None``: no map)."""
     map_image_count: int = Field(default=0, sa_column_kwargs={"nullable": False})
-    """Located-image count the current map was built from; a drift from
-    ``located_count`` is what tells the scheduler the map is stale."""
+    """Points the current map holds: the baseline of the rebuild threshold."""
+    map_key: str | None = Field(default=None, max_length=500)
+    """The published archive (generation- and attempt-specific); ``None`` is
+    served as a 404. Withdrawn in the same transaction as a visibility change."""
+    map_generation: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    """Bumped by every build request and every withdrawal; a build publishes
+    only while it is still the current generation."""
+    map_claimed_until: datetime | None = dt_col()
+    """A build is queued or running until then: requests in between coalesce."""
+    map_changes: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    """Map-relevant changes so far (processed located images, moves, removals,
+    group changes, visibility changes); only ever grows."""
+    map_built_changes: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    """``map_changes`` as the current map's snapshot saw it."""
+    map_urgent_mark: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    """``map_changes`` at the last change that may not wait for the threshold
+    (a removal, a move, a visibility change)."""
     protect_originals: bool = Field(default=False, sa_column_kwargs={"nullable": False})
     """Set when a saved pipeline enabled a step registered as a display mutator.
     Serving reads this, not the live registry, so uninstalling the plugin never

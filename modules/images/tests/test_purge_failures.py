@@ -20,7 +20,7 @@ from sm_images import purge, purge_select, storage_keys
 from sm_images.models import Collection, Image, ObjectIntent, UploadSession, UploadStatus
 from sm_images.storage import ImageStore
 from sm_images.tenancy import DEFAULT_TENANT
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from tests.pg_support import USING_POSTGRES
 from tests.pipeline_support import use_steps
@@ -51,8 +51,11 @@ def _skip_locked(monkeypatch, *ids: uuid.UUID) -> set[uuid.UUID]:
 
 
 async def _with_map(pipe, coll) -> str:
-    key = storage_keys.map_key(T, str(coll.id))
+    key = storage_keys.map_key(T, str(coll.id), 1, "a1")
     await pipe.store.put(key, b"m", content_type="application/octet-stream", size=1)
+    async with pipe.db_state.session_factory() as s:
+        await s.execute(update(Collection).where(Collection.id == coll.id).values(map_key=key))
+        await s.commit()
     return key
 
 

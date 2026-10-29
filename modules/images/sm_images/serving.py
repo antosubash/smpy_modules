@@ -54,7 +54,7 @@ from sm_images.models import Collection, Image, Rendition
 from sm_images.ranges import RangeNotSatisfiable, parse_range
 from sm_images.storage import ImageStore, store_for
 
-__all__ = ["Target", "resolve", "serve"]
+__all__ = ["Target", "resolve", "serve", "serve_map"]
 
 
 @dataclass(frozen=True)
@@ -183,3 +183,23 @@ async def serve(
     )
     ranged = route != cache.RENDITION
     return await _respond(request, store_for(request.app), target, policy, ranged)
+
+
+async def serve_map(request: Request, collection: Collection, *, twin: bool) -> Response:
+    """The collection's PMTiles archive (``sm_images.map``), already authorised.
+
+    ``collection`` was just re-read through the policy (admin) or as public
+    (twin), so a visibility change stops the next range request. No archive -
+    never built, or withdrawn by a visibility change and not rebuilt yet - is
+    the plain 404. Ranges as above; the ETag digests the archive's key, which
+    names its build generation, so a rebuild is a new ETag and a stale
+    ``If-Range`` gets the whole new archive rather than a splice of two.
+    ``no-cache`` on both surfaces (Task 12's ``public``/``private`` split):
+    the URL is stable, so every cache revalidates, and a withdrawn map stops
+    being served by caches too.
+    """
+    if not collection.map_key:
+        raise _missing()
+    policy = cache.cache_headers(request, collection, cache.DISPLAY, twin=twin, current=False)
+    target = Target(collection.map_key, constants.PMTILES_CONTENT_TYPE, False)
+    return await _respond(request, store_for(request.app), target, policy, True)

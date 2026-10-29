@@ -37,7 +37,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import and_, exists, false, or_, select, true
 
 from sm_images.models import Collection, Image, StepRun
 from sm_images.models.enums import StepStatus
@@ -45,7 +45,7 @@ from sm_images.pipeline import registry
 from sm_images.pipeline.config import validate_pipeline_config
 from sm_images.pipeline.plan import BLOCKED_CODES
 
-__all__ = ["pending", "trusts_display"]
+__all__ = ["pending", "ready_clause", "trusts_display"]
 
 
 def _settles(status: StepStatus, code: str | None) -> bool:
@@ -86,15 +86,9 @@ def trusts_display(collection: Collection, image: Image) -> bool:
 
 
 async def pending(db: Any, collection: Collection, image: Image) -> bool:
-    cfg = validate_pipeline_config(collection.pipeline_config, strict=False)
-    enabled = cfg.enabled()
-    if any(_unknown(cfg, sid) for sid in enabled):
+    mutators = _mutators(collection)
+    if mutators is None:
         return True
-    mutators = {
-        sid: impl
-        for sid in enabled
-        if (impl := registry.get_step(sid)) is not None and impl.mutates_display
-    }
     if not mutators:
         return bool(collection.protect_originals)
     stmt = select(StepRun.step, StepRun.status, StepRun.error_code, StepRun.step_version).where(
@@ -106,3 +100,56 @@ async def pending(db: Any, collection: Collection, image: Image) -> bool:
         if version == mutators[step].version and _settles(StepStatus(status), code)
     }
     return any(sid not in settled for sid in mutators)
+
+
+def _mutators(collection: Collection) -> dict[str, Any] | None:
+    """The enabled, installed display mutators; ``None`` when an enabled step
+    is not installed (it might be one: everything is pending)."""
+    cfg = validate_pipeline_config(collection.pipeline_config, strict=False)
+    enabled = cfg.enabled()
+    if any(_unknown(cfg, sid) for sid in enabled):
+        return None
+    return {
+        sid: impl
+        for sid in enabled
+        if (impl := registry.get_step(sid)) is not None and impl.mutates_display
+    }
+
+
+def ready_clause(collection: Collection) -> Any:
+    """SQL twin of ``trusts_display(...) or not pending(...)`` over the images of
+    *collection*: the ones whose picture may be shown, and so the only ones the
+    map may place (``sm_images.map``). Decided per collection in Python, then
+    per image in SQL; ``tests/test_map_points.py`` checks it against the gate."""
+    mutators = _mutators(collection)
+    if mutators is None:
+        return false()
+    if not mutators:
+        return false() if collection.protect_originals else true()
+    settled = and_(
+        *[
+            exists(
+                select(StepRun.id).where(
+                    StepRun.image_id == Image.id,
+                    StepRun.step == sid,
+                    StepRun.step_version == impl.version,
+                    or_(
+                        StepRun.status == StepStatus.COMPLETED,
+                        and_(
+                            StepRun.status == StepStatus.SKIPPED,
+                            or_(
+                                StepRun.error_code.is_(None),
+                                StepRun.error_code.not_in(sorted(BLOCKED_CODES)),
+                            ),
+                        ),
+                    ),
+                )
+            )
+            for sid, impl in mutators.items()
+        ]
+    )
+    if len(mutators) != 1:  # two mutators: no display copy is trusted
+        return settled
+    (writer,) = mutators
+    trusted = and_(Image.display_key.is_not(None), Image.display_step == writer)
+    return or_(trusted, settled)

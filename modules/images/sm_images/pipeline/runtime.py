@@ -56,6 +56,10 @@ class Runtime:
     """The host's tenancy mode: the framework's in the web process, the worker
     engine's policy in a worker (:func:`worker_multi_tenant`). Never inferred
     from a tenant id; an unknown mode is multi-tenant (fail closed)."""
+    maps: bool = True
+    """Whether this runtime hands map builds off (``sm_images.map.schedule``).
+    Changes are counted either way; a test pipeline turns hand-offs off so a
+    test that is not about the map never runs tippecanoe."""
 
     def is_eager(self) -> bool:
         return celery_eager() if self.eager is None else self.eager
