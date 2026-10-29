@@ -129,6 +129,8 @@ async def collection_page(
             "direct_upload_threshold": get_settings(request).direct_upload_threshold,
             # The basemap the Map tab draws under the points; empty is a flat background.
             "map_style_url": get_settings(request).map_style_url,
+            # Linked (and copyable) on the page while the collection is public.
+            "public_path": f"{constants.PUBLIC_COLLECTION_PREFIX}{collection.slug}",
         },
     )
 

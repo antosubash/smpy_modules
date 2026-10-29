@@ -34,7 +34,11 @@
     "private": "Privat",
     "internal": "Intern",
     "public": "Öffentlich",
-    "changed": "Sichtbarkeit aktualisiert"
+    "changed": "Sichtbarkeit aktualisiert",
+    "public_link": "Öffentliche Seite:",
+    "copy_link": "Link kopieren",
+    "link_copied": "Link kopiert",
+    "link_copy_failed": "Der Link konnte nicht kopiert werden."
   },
   "create": {
     "title": "Neue Sammlung",

@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { PublicLink } from '../components/collections/PublicLink';
 import { VisibilitySelect } from '../components/collections/VisibilitySelect';
 import { Gallery } from '../components/gallery/Gallery';
 import { UploadButton } from '../components/gallery/UploadButton';
@@ -32,6 +33,8 @@ type Props = {
   direct_upload_threshold: number;
   /** The map's basemap style; empty is a flat background. */
   map_style_url?: string;
+  /** The public page's path (`/images/c/{slug}`), linked while it is public. */
+  public_path?: string;
 };
 
 type Tab = 'gallery' | 'map' | 'groups' | 'pipeline' | 'prompts' | 'imports';
@@ -47,6 +50,7 @@ function Collection({
   can_publish,
   direct_upload_threshold,
   map_style_url = '',
+  public_path = '',
 }: Props) {
   const { t } = useT();
   const gallery = useImages(collection.id);
@@ -137,6 +141,7 @@ function Collection({
           <Link href="/admin/images/" className="text-sm text-primary hover:underline">
             {t(keys.images.common.back_to_collections)}
           </Link>
+          {visibility === 'public' && public_path && <PublicLink path={public_path} />}
           {can_manage && (
             <div className="flex flex-wrap items-end gap-4">
               <div className="grid gap-2">
