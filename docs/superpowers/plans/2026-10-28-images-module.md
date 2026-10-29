@@ -625,7 +625,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 
 **Tests:** one consolidation per group; members reused; the cross-check stored or its error captured; applying a preset is idempotent; the test plugin's preset is listed.
 
-- [ ] Commit `feat(images): group prompts, presets and cross-check`
+- [x] Commit `feat(images): group prompts, presets and cross-check`
 
 ### Task 24: Review queue
 
@@ -641,7 +641,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 - vitest: the keyboard flow.
 - e2e `images-review.spec.ts`: seed results with a test-only script (no AI call), accept one and correct one.
 
-- [ ] Commit `feat(images): review queue`
+- [x] Commit `feat(images): review queue`
 
 ### Task 25: Storage billing gauge
 
