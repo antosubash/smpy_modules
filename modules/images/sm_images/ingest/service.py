@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import logging
 import uuid
 from collections.abc import Iterable
 from typing import Any
@@ -55,6 +56,8 @@ from sm_images.storage import ImageStore
 from sm_images.tenancy import bound_tenant
 
 __all__ = ["Duplicate", "IngestService", "Slot", "safe_filename"]
+
+logger = logging.getLogger(__name__)
 
 
 class IngestService:
@@ -103,6 +106,11 @@ class IngestService:
         """After a rollback (no write lock held): hand every op taken back on its own."""
         await holds.release_after_rollback(self._factory(), self.acquired)
 
+    async def finalize(self) -> None:
+        """Finalize the caller's transaction; its holds follow the outcome
+        (:func:`~sm_images.ingest.slots.finalize_or_release`)."""
+        await holds.finalize_or_release(self.db, self._factory(), self.acquired)
+
     def _factory(self) -> Any:
         """Where billing's own short transactions run (``sm_images.billing``)."""
         return billing.factory_of(self.db, self.intent_factory)
@@ -143,30 +151,34 @@ class IngestService:
         if staged_key is not None:
             data = await read_staged(self.store, staged_key, self.settings.max_image_bytes)
         assert data is not None
-        info = inspected or self.inspect(data)
-        sha = hashlib.sha256(data).hexdigest()
-        meta = normalise(meta, source)
+        try:  # until the insert takes the op over, a failure hands this file's back
+            info = inspected or self.inspect(data)
+            sha = hashlib.sha256(data).hexdigest()
+            meta = normalise(meta, source)
 
-        found = await self._seen.precheck(self.db, collection.id, meta, sha, self.settings)
-        if found is not None:
-            if staged_key is None or not await dedupe.find_id(self.db, image_id):
-                await self._discard(staged_key, slot)
-            await holds.drop_slot(self.db, self._factory(), slot)
-            return Duplicate(found)
+            found = await self._seen.precheck(self.db, collection.id, meta, sha, self.settings)
+            if found is not None:
+                if staged_key is None or not await dedupe.find_id(self.db, image_id):
+                    await self._discard(staged_key, slot)
+                await holds.drop_slot(self.db, self._factory(), slot)
+                return Duplicate(found)
 
-        if staged_key is not None:
-            assert image_id is not None
-            key, new_id = staged_key, image_id
-            slot = await self._hold(Slot(new_id, key), len(data))
-            if slot.refused:  # the caller removes its staged object
-                raise StorageQuotaExceeded(billing.FULL)
-        else:
-            slot = slot or (await self.reserve(collection, [info.ext], [len(data)]))[0]
-            key, new_id = slot.key, slot.image_id
-            if slot.refused:
-                await self._discard(None, slot)
-                raise StorageQuotaExceeded(billing.FULL)
-            await self.store.put(key, data, content_type=info.content_type, size=len(data))
+            if staged_key is not None:
+                assert image_id is not None
+                key, new_id = staged_key, image_id
+                slot = await self._hold(Slot(new_id, key), len(data))
+                if slot.refused:  # the caller removes its staged object
+                    raise StorageQuotaExceeded(billing.FULL)
+            else:
+                slot = slot or (await self.reserve(collection, [info.ext], [len(data)]))[0]
+                key, new_id = slot.key, slot.image_id
+                if slot.refused:
+                    await self._discard(None, slot)
+                    raise StorageQuotaExceeded(billing.FULL)
+                await self.store.put(key, data, content_type=info.content_type, size=len(data))
+        except Exception:
+            await self._drop_unused(slot)
+            raise
 
         row = Image(
             id=new_id,
@@ -236,6 +248,14 @@ class IngestService:
             await stats.on_image_added(self.db, collection.id, row.lat, row.lng)
             await clear_intents(self.db, [key])
             await holds.keep_hold(self.db, slot.op, row.storage_hold_id)  # with the row
+
+    async def _drop_unused(self, slot: Slot | None) -> None:
+        """Hand back the op of a slot no row will name; never masks the failure
+        (a broken transaction fails its commit, which hands every op back)."""
+        try:
+            await holds.drop_slot(self.db, self._factory(), slot)
+        except Exception:
+            logger.exception("images.ingest.drop_failed")
 
     async def _delete_object(self, key: str) -> None:
         """Best effort: if it fails, the intent (still recorded) lets the janitor reap it."""

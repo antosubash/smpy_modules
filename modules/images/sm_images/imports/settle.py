@@ -219,7 +219,7 @@ async def settle_bytes(
                 await db.rollback()
                 await _discard(runtime, created)
                 return None
-            await finalize_session(db)
+            await ingest.finalize()  # the holds follow the commit's outcome
             committed = True
         finally:  # any rollback took the ops' finish with it: hand them back now
             if not committed:

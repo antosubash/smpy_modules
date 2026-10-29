@@ -57,10 +57,14 @@ _FAILED = "The file could not be stored"
 async def ingest_service(
     request: Request, db: Any = Depends(get_db)
 ) -> AsyncIterator[IngestService]:
-    """The request's ingest. A request that fails after taking storage holds is
-    rolled back here, and every hold it took is handed back on its own (the
-    rollback took the ops' finish with it). It exits before the response is
-    sent, so a client's retry finds the holds released."""
+    """The request's ingest. Its transaction is finalized here, at the last
+    point inside the request (after the response is built, before it is sent),
+    because the holds follow its outcome: a request that fails, or whose commit
+    fails, is rolled back and every hold it took is handed back on its own (the
+    rollback took the ops' finish with it). The framework offers no rollback
+    hook, and its own commit at ``http.response.start`` turns a failure into a
+    500 without raising, so it cannot be left to finalize this session. A
+    client's retry finds the holds released."""
     sm = getattr(request.app.state, "sm", None)
     ingest = IngestService(
         db, store_for(request.app), get_settings(request), bus=getattr(sm, "event_bus", None)
@@ -71,6 +75,7 @@ async def ingest_service(
         await db.rollback()  # first: on SQLite the release must not wait on our lock
         await ingest.release_holds()
         raise
+    await ingest.finalize()  # the middleware's commit is then a no-op
 
 
 Ingest = Annotated[IngestService, Depends(ingest_service, scope="function")]

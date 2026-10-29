@@ -24,6 +24,7 @@ from datetime import timedelta
 from typing import Any
 
 from simple_module_db import finalize_session, mark_written
+from sqlalchemy import event
 
 from sm_images import billing, billing_ops
 from sm_images.errors import StorageQuotaExceeded
@@ -35,6 +36,7 @@ __all__ = [
     "Slot",
     "drop_hold",
     "drop_slot",
+    "finalize_or_release",
     "hold_slot",
     "keep_hold",
     "release_after_rollback",
@@ -147,3 +149,27 @@ async def release_after_rollback(factory: Any, acquired: list[billing_ops.Claime
         await release_dropped(factory, acquired)
     except Exception:
         logger.exception("images.ingest.release_failed")
+
+
+async def finalize_or_release(db: Any, factory: Any, acquired: list[billing_ops.Claimed]) -> None:
+    """Finalize ``db`` (the caller's transaction) and tie the holds to its
+    outcome: unless it really commits, every op in ``acquired`` is handed back
+    at once. That covers a commit that fails (``finalize_session`` has rolled
+    back before raising) and a transaction ``finalize_session`` rolls back as
+    read-only - an in-transaction hand-back is Core DML, which it does not see.
+    After a commit nothing runs: each op is finished or handed back already."""
+    committed: list[bool] = []
+
+    def _committed(_session: Any) -> None:  # the outermost commit only
+        committed.append(True)
+
+    event.listen(db.sync_session, "after_commit", _committed)
+    try:
+        await finalize_session(db)
+    except Exception:
+        await release_after_rollback(factory, acquired)
+        raise
+    finally:
+        event.remove(db.sync_session, "after_commit", _committed)
+    if not committed:
+        await release_after_rollback(factory, acquired)

@@ -12,14 +12,24 @@ event loop - the lease keeps renewing - and under :data:`CROSS_CHECK_TIMEOUT_S`.
 A hook past it is :class:`CrossCheckTimedOut`, which fails the group run
 ``time_limit``: it is left running in its thread (Python cannot stop one), but
 nothing waits for it and its value is never stored.
+
+The thread is one of :data:`_POOL`'s, not the loop's default executor: a task
+body runs under ``asyncio.run`` (``worker_runtime.run_task``), whose shutdown
+joins every default-executor thread, so an abandoned hook there would hold the
+Celery task until it returned. A hung hook keeps its pool thread until it
+returns, so at most :data:`POOL_SIZE` hang at once; while all of them do,
+further cross-checks queue behind them and time out.
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextvars
+import functools
 import json
 import logging
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from sm_images.ai.reads import GroupRead, PromptResultRead
@@ -30,6 +40,8 @@ logger = logging.getLogger(__name__)
 ERROR_MAX = 1000
 CROSS_CHECK_TIMEOUT_S = 30.0
 """How long a group run waits for its preset's cross-check."""
+POOL_SIZE = 4
+_POOL = ThreadPoolExecutor(max_workers=POOL_SIZE, thread_name_prefix="images-cross-check")
 
 
 class CrossCheckTimedOut(Exception):  # noqa: N818 - reads as the condition
@@ -70,7 +82,9 @@ async def check(
     if fn is None:
         return None
     limit = CROSS_CHECK_TIMEOUT_S
-    work = asyncio.to_thread(run_cross_check, fn, group, results, max_bytes)
+    call = functools.partial(run_cross_check, fn, group, results, max_bytes)
+    ctx = contextvars.copy_context()  # as ``asyncio.to_thread`` would
+    work = asyncio.get_running_loop().run_in_executor(_POOL, ctx.run, call)
     try:
         return await asyncio.wait_for(work, limit)
     except TimeoutError as exc:
