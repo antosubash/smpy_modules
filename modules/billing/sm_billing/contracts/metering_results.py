@@ -15,6 +15,8 @@ class HoldStatus(StrEnum):
     COMMITTED = "committed"
     RELEASED = "released"
     EXPIRED = "expired"
+    #: A ``swap`` the limit refused: its key's outcome, kept so a replay is refused too.
+    REFUSED = "refused"
 
 
 #: The statuses whose quantity counts toward the gauge.

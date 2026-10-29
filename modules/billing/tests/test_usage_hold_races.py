@@ -125,7 +125,7 @@ async def _two_swaps_of_one_old_hold_free_it_once(race: Race) -> None:
         )
         assert sum(isinstance(o, Hold) for o in outcomes) == 1, outcomes
         assert await in_use(race.factory, tenant) == 9
-        assert await hold_statuses(race.factory, tenant) == ["committed", "released"]
+        assert await hold_statuses(race.factory, tenant) == ["committed", "refused", "released"]
     free = await seed_limits(race.factory, {})
     old = await race.pick(0).swap(free, GAUGE, None, 6, "o", source="t")
     both = await asyncio.gather(

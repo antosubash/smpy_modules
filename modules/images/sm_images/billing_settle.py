@@ -46,6 +46,7 @@ _COLUMNS = (
     BillingOp.op,
     BillingOp.image_id,
     BillingOp.hold_id,
+    BillingOp.old_hold_id,
     BillingOp.quantity,
     BillingOp.idempotency_key,
     BillingOp.attempts,
@@ -60,6 +61,7 @@ class Op:
     op: str
     image_id: uuid.UUID | None
     hold_id: str | None
+    old_hold_id: str | None
     quantity: int
     idempotency_key: str | None
     attempts: int

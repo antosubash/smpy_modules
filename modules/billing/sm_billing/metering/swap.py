@@ -18,9 +18,14 @@ would fit. ``swap`` does it in one transaction:
    admitted even over the limit (a plan lowered under the tenant must not stop
    a resource from shrinking).
 
-A refusal rolls everything back, so the old hold still counts. On Postgres
-two swaps of one old hold serialise on its row: the second finds it settled
-and has to fit its whole quantity.
+A refusal rolls everything back, so the old hold still counts - and then the
+key's outcome is made durable: a ``refused`` row under the key (counted by
+nothing). A later call with the same key - a retry, or a delayed duplicate of
+the first call - returns the same refusal and never mutates; and a replay must
+be the same call (quantity, source *and* old hold), else
+``IdempotencyConflict``. Two calls with one key: the first durable row wins
+and both answer with it. On Postgres two swaps of one old hold serialise on
+its row: the second finds it settled and has to fit its whole quantity.
 """
 
 from __future__ import annotations
@@ -37,10 +42,11 @@ from sm_billing.contracts.metering import (
     Hold,
     HoldNotFound,
     HoldStatus,
+    IdempotencyConflict,
     MeterKind,
 )
 from sm_billing.metering import hold_sql
-from sm_billing.metering.holds import HoldsMixin
+from sm_billing.metering.holds import HoldsMixin, _hold
 from sm_billing.metering.tx import Counted, run_write
 from sm_billing.metering.validate import check_call, check_hold_id
 from sm_billing.models import UsageHold
@@ -95,6 +101,7 @@ class SwapMixin(HoldsMixin):
             "expires_at": None,
             "created_at": now,
             "source": source,
+            "replaces_hold_id": old_hold_id,
         }
         freed = 0
 
@@ -130,12 +137,45 @@ class SwapMixin(HoldsMixin):
             return Hold(values["id"], tenant_id, meter, quantity, values["status"], None)
         if outcome == _FOREIGN:
             raise HoldNotFound(old_hold_id or "")
-        if outcome == _REPLAY:
-            replayed = await self._replay_hold(values)
-            if replayed is not None:
-                return replayed
-        level = await self.in_use(tenant_id, meter)
-        return Exceeded(level, limit or 0, quantity - freed, None)
+        if outcome != _REPLAY:
+            outcome = await run_write(self._factory, None, self._refusal(values, now))
+            if isinstance(outcome, Counted):  # the key's outcome is this refusal
+                level = await self.in_use(tenant_id, meter)
+                return Exceeded(level, limit or 0, quantity - freed, None)
+        return await self._replay_swap(values, limit)
+
+    @staticmethod
+    def _refusal(values: dict, now: datetime) -> Any:
+        """Record the refusal under the key, unless another call's row has it."""
+        row = {**values, "id": uuid4().hex, "status": HoldStatus.REFUSED.value, "settled_at": now}
+
+        async def apply(session: AsyncSession) -> Counted | None:
+            dialect = session.get_bind().dialect.name
+            claimed = await session.execute(hold_sql.insert_hold(dialect, **row))
+            return None if claimed.scalar_one_or_none() is None else Counted(0)
+
+        return apply
+
+    async def _replay_swap(self, call: dict, limit: int | None) -> Hold | Exceeded:
+        """The outcome first recorded under ``call``'s key, if it is the same call."""
+        async with self._factory() as session:
+            stmt = select(
+                *hold_sql.HOLD_COLUMNS, UsageHold.source, UsageHold.replaces_hold_id
+            ).where(
+                UsageHold.tenant_id == call["tenant_id"],
+                UsageHold.meter == call["meter"],
+                UsageHold.idempotency_key == call["idempotency_key"],
+            )
+            row = (await session.execute(stmt)).one_or_none()
+        if row is None:  # purged by retention since: nothing to replay
+            raise IdempotencyConflict(call["idempotency_key"])
+        same = (int(row.quantity), row.source, row.replaces_hold_id)
+        if same != (call["quantity"], call["source"], call["replaces_hold_id"]):
+            raise IdempotencyConflict(call["idempotency_key"])
+        if row.status == HoldStatus.REFUSED.value:
+            level = await self.in_use(call["tenant_id"], call["meter"])
+            return Exceeded(level, limit or 0, call["quantity"], None)
+        return _hold(row, replayed=True)
 
     @staticmethod
     async def _foreign(session: AsyncSession, hold_id: str, tenant_id: str, meter: str) -> bool:

@@ -18,7 +18,13 @@ import uuid
 from dataclasses import dataclass, field
 
 import pytest
-from sm_billing.contracts.metering import Allowed, Exceeded, Hold, HoldNotFound
+from sm_billing.contracts.metering import (
+    Allowed,
+    Exceeded,
+    Hold,
+    HoldNotFound,
+    IdempotencyConflict,
+)
 from sm_images import billing
 from sm_images.models import BillingOp, Image
 from sm_images.tenancy import DEFAULT_TENANT
@@ -31,7 +37,9 @@ LIVE = ("held", "committed")
 class FakeGauge:
     limit: int | None = None
     holds: dict[str, Hold] = field(default_factory=dict)
-    keys: dict[str, str] = field(default_factory=dict)
+    keys: dict[str, str | None] = field(default_factory=dict)
+    """Each key's outcome: its hold, or ``None`` for a refusal."""
+    calls_by_key: dict[str, tuple] = field(default_factory=dict)
     calls: list[tuple[str, ...]] = field(default_factory=list)
     fail_swap: int = 0
     """The next N swaps raise (billing unreachable)."""
@@ -65,14 +73,22 @@ class FakeGauge:
         if self.fail_swap:
             self.fail_swap -= 1
             raise RuntimeError("billing is down")
-        if idempotency_key in self.keys:  # a replay: the same hold, whatever its state
-            return self.holds[self.keys[idempotency_key]]
+        call = (old_hold_id, quantity, source)
+        if idempotency_key in self.keys:  # a replay: the key's outcome, for the same call
+            outcome, first = self.keys[idempotency_key], self.calls_by_key[idempotency_key]
+            if first != call:
+                raise IdempotencyConflict(idempotency_key)
+            if outcome is None:
+                return Exceeded(self.level, self.limit or 0, quantity, None)
+            return self.holds[outcome]
         old = self.holds.get(old_hold_id) if old_hold_id else None
         if old is not None and old.tenant_id != tenant_id:
             raise HoldNotFound(old_hold_id)
+        self.calls_by_key[idempotency_key] = call
         freed = old.quantity if old is not None and old.status in LIVE else 0
         grows = quantity > freed and self.limit is not None
         if grows and self.level - freed + quantity > self.limit:
+            self.keys[idempotency_key] = None  # the refusal is the key's outcome
             return Exceeded(self.level, self.limit, quantity - freed, None)
         if freed:
             self._set(old, "released")
@@ -80,6 +96,11 @@ class FakeGauge:
         self.holds[hold.id] = hold
         self.keys[idempotency_key] = hold.id
         return hold
+
+    async def get_hold(self, tenant_id: str, hold_id: str) -> Hold | None:
+        self.calls.append(("get_hold", hold_id))
+        hold = self.holds.get(hold_id)
+        return None if hold is None or hold.tenant_id != tenant_id else hold
 
     async def release(self, hold_id: str) -> bool:
         self.calls.append(("release", hold_id))

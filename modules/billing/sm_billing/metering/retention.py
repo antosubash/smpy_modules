@@ -45,7 +45,7 @@ PURGE_BATCH = 1000
 MAX_BATCHES = 20
 #: Released and expired holds are kept this long, for the admin screens.
 SETTLED_HOLD_DAYS = 30
-_SETTLED = (HoldStatus.RELEASED.value, HoldStatus.EXPIRED.value)
+_SETTLED = (HoldStatus.RELEASED.value, HoldStatus.EXPIRED.value, HoldStatus.REFUSED.value)
 
 
 @dataclass

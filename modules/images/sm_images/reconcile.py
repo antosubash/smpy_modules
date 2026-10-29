@@ -29,7 +29,8 @@ isolation applying as in a request:
   (:func:`sm_images.ai.group_request.recover_group_runs`);
 * storage-gauge settlements left pending in the outbox (billing was down, a
   worker died after the commit) are retried in bounded pages, each op after
-  its backoff (:func:`sm_images.billing_ops.settle`);
+  its backoff (:func:`sm_images.billing_ops.settle`), and an image that lost
+  a committed swap is reconciled (:func:`sm_images.billing_repair.repair`);
 * every live collection's stats are recomputed (the only way a box shrinks
   after deletes; there is no durable "touched" marker yet, so all of them,
   in batches);
@@ -49,7 +50,7 @@ from typing import Any
 from simple_module_db import all_tenants, finalize_session, tenant_context
 from sqlalchemy import and_, or_, select, update
 
-from sm_images import billing_ops
+from sm_images import billing_ops, billing_repair
 from sm_images.ai.group_request import recover_group_runs
 from sm_images.imports.recover import recover_imports
 from sm_images.map.recover import reconcile_maps
@@ -238,6 +239,7 @@ async def reconcile_tenant(runtime: Runtime, tenant: str, now: datetime) -> Coun
     done["import_jobs"], done["import_items"] = await recover_imports(runtime, tenant, cutoff)
     done["group_runs"] = await recover_group_runs(runtime, tenant, now, cutoff)
     done["billing_ops"] = await billing_ops.settle(runtime.session_factory, tenant, now=now)
+    done["billing_repaired"] = await billing_repair.repair(runtime.session_factory, tenant, now)
     done["collections"] = await _recompute_stats(runtime, tenant)
     done["maps"] = await reconcile_maps(runtime, tenant, now)
     return done

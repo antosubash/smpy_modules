@@ -20,6 +20,7 @@ import pytest
 from simple_module_db import finalize_session, init_db
 from simple_module_db.listeners import attach_session_listeners
 from sm_images import billing, billing_ops
+from sm_images.errors import StorageQuotaExceeded
 from sm_images.ingest.slots import Slot, hold_slot, keep_hold
 from sm_images.models import BillingOp, Collection, Image
 from sm_images.models.billing_op import OP_SWAP
@@ -104,12 +105,10 @@ async def test_codex_v_trace_no_images_hold_can_lapse(real):
     # A publication grew the image to 700: its executor wrote the op, billing
     # swapped, and the worker died before the image update.
     async with factory() as db:
-        op = await billing_ops.open_op(
-            db, OP_SWAP, image, 700, billing.hold_key(image, "grow"), claim=timedelta(minutes=5)
-        )
-        await finalize_session(db)
-    async with factory() as db:
         old = (await db.execute(select(Image.storage_hold_id))).scalar_one()
+        key, claim = billing.hold_key(image, "grow"), timedelta(minutes=5)
+        op = await billing_ops.open_op(db, OP_SWAP, image, 700, key, claim=claim, old=old)
+        await finalize_session(db)
     grown = await billing.swap(factory, T, old, 700, op.key)
     assert await _level(factory) == 700  # counted once, by the swapped hold
     later = datetime.now(UTC) + timedelta(minutes=6)
@@ -128,3 +127,29 @@ async def test_codex_v_trace_no_images_hold_can_lapse(real):
     # The room left is exactly the limit less what the image stores.
     assert (await hold_slot(factory, T, Slot(uuid.uuid4(), "k"), LIMIT - 300 + 1)).refused
     assert not (await hold_slot(factory, T, Slot(uuid.uuid4(), "k"), LIMIT - 300)).refused
+
+
+async def test_codex_trace_t_against_real_billing(real):
+    """The executor's call is delayed past its claim; the takeover's swap is
+    refused and the op finished; room comes back; the delayed call lands with
+    the same key - and billing answers the same refusal, changing nothing."""
+    from sm_billing.models import Plan
+
+    factory = real.session_factory
+    image = await _ingest(factory, 900)
+    async with factory() as db:
+        old = (await db.execute(select(Image.storage_hold_id))).scalar_one()
+        key, claim = billing.hold_key(image, "grow"), timedelta(minutes=5)
+        await billing_ops.open_op(db, OP_SWAP, image, 1200, key, claim=claim, old=old)
+        await finalize_session(db)
+    later = datetime.now(UTC) + timedelta(minutes=6)
+    assert await billing_ops.settle(factory, T, now=later) == 1  # the takeover: refused
+    async with factory() as s:  # room again
+        plan = (await s.execute(select(Plan).where(Plan.key == "images"))).scalar_one()
+        plan.limits = {billing.METER: 5000}
+        await s.commit()
+    with pytest.raises(StorageQuotaExceeded):  # the delayed call: the key's outcome
+        await billing.swap(factory, T, old, 1200, key)
+    holds = await _holds(factory)
+    assert holds[old][:2] == ("committed", 900) and await _level(factory) == 900
+    assert sorted(h[0] for h in holds.values()) == ["committed", "refused"]

@@ -119,6 +119,7 @@ def upgrade() -> None:
         sa.Column("image_id", sa.Uuid(), nullable=True),
         sa.Column("op", sa.String(length=16), nullable=False),
         sa.Column("hold_id", sa.String(length=64), nullable=True),
+        sa.Column("old_hold_id", sa.String(length=64), nullable=True),
         sa.Column("quantity", sa.BigInteger(), nullable=False),
         sa.Column("idempotency_key", sa.String(length=128), nullable=True),
         sa.Column("attempts", sa.Integer(), nullable=False),

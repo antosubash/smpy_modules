@@ -25,8 +25,8 @@ from sqlalchemy import select, update
 from sm_images import billing, billing_ops
 from sm_images.billing_settle import ClaimLost, Op
 from sm_images.errors import StorageQuotaExceeded
-from sm_images.models import Image
-from sm_images.models.billing_op import OP_SWAP
+from sm_images.models import BillingOp, Image
+from sm_images.models.billing_op import NO_HOLD, OP_SWAP
 
 __all__ = ["finish_op", "release_hold", "swap"]
 
@@ -34,9 +34,14 @@ logger = logging.getLogger(__name__)
 
 
 async def swap(factory: Any, tenant: str, op: Op, mine: Any, meter: Any) -> None:
-    present, old = False, None
+    present, named = False, None
     if op.op == OP_SWAP and op.image_id is not None:
-        present, old = await _names(factory, tenant, op.image_id)
+        present, named = await _names(factory, tenant, op.image_id)
+    fixed = op.old_hold_id
+    if fixed is None:  # a queued swap: fix its old hold before billing hears of it
+        fixed = named or NO_HOLD
+        await _fix_old(factory, mine, fixed)
+    old = None if fixed == NO_HOLD else fixed
     try:
         hold = await billing.swap(factory, tenant, old, op.quantity, mine.key, meter)
     except StorageQuotaExceeded as exc:  # nothing changed: the old hold still counts
@@ -47,6 +52,25 @@ async def swap(factory: Any, tenant: str, op: Op, mine: Any, meter: Any) -> None
     elif not present or not await _install(factory, tenant, op, mine, old, hold):
         await release_hold(meter, hold.id)  # named by no image, and never will be
         await finish_op(factory, mine, hold.id)
+
+
+async def _fix_old(factory: Any, mine: Any, old: str) -> None:
+    async with factory() as db:
+        got = await db.execute(
+            update(BillingOp)
+            .where(
+                BillingOp.id == mine.op_id,
+                BillingOp.claim_token == mine.token,
+                BillingOp.done_at.is_(None),
+            )
+            .values(old_hold_id=old)
+            .returning(BillingOp.id)
+            .execution_options(synchronize_session=False)
+        )
+        if got.first() is None:
+            await db.rollback()
+            raise ClaimLost(mine.op_id)
+        await finalize_session(db)
 
 
 async def _names(factory: Any, tenant: str, image_id: uuid.UUID) -> tuple[bool, str | None]:

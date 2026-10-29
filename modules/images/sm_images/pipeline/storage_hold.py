@@ -137,7 +137,9 @@ async def _open(
             waiting = await billing_ops.pending_swaps(db, tenant, image_id)
             if not waiting:
                 key = billing.hold_key(image_id, attempt)
-                op = await billing_ops.open_op(db, OP_SWAP, image_id, planned, key, claim=CLAIM)
+                op = await billing_ops.open_op(
+                    db, OP_SWAP, image_id, planned, key, claim=CLAIM, old=found[3]
+                )
                 await finalize_session(db)
                 return op, found[3]
             await db.rollback()

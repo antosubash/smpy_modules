@@ -243,3 +243,5 @@ class UsageHold(Base, table=True):  # ty: ignore[unsupported-base]
     # When it was released or expired; the purge drops settled rows after 30 days.
     settled_at: datetime | None = Field(default=None, sa_column=_tz_column())
     source: str = Field(max_length=64)
+    # A ``swap``'s old hold: a replay naming another is an idempotency conflict.
+    replaces_hold_id: str | None = Field(default=None, max_length=32)

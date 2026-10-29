@@ -46,7 +46,7 @@ async def test_without_an_old_hold_it_reserves_and_commits(factory, usage):
     assert await in_use(factory, tenant) == 5
     refused = await usage.swap(tenant, GAUGE, None, 1, "b", source="t")
     assert isinstance(refused, Exceeded) and refused.requested == 1
-    assert await hold_statuses(factory, tenant) == ["committed"]
+    assert await hold_statuses(factory, tenant) == ["committed", "refused"]
 
 
 async def test_the_old_quantity_counts_as_freed_at_the_limit(factory, usage):
@@ -62,7 +62,12 @@ async def test_the_old_quantity_counts_as_freed_at_the_limit(factory, usage):
     # Refused: nothing written, the old hold still counts.
     assert await in_use(factory, tenant) == 10
     assert await _statuses(factory, new.id) == ["committed"]
-    assert sorted(await hold_statuses(factory, tenant)) == ["committed", "held", "released"]
+    assert sorted(await hold_statuses(factory, tenant)) == [
+        "committed",
+        "held",
+        "refused",
+        "released",
+    ]
 
 
 async def test_a_shrink_is_admitted_even_over_the_limit(factory, usage):
@@ -88,7 +93,7 @@ async def test_a_replayed_key_returns_the_same_hold(factory, usage):
     with pytest.raises(IdempotencyConflict):
         await usage.swap(tenant, GAUGE, old.id, 7, "b", source="t")
     await usage.release(first.id)
-    late = await usage.swap(tenant, GAUGE, None, 6, "b", source="t")  # still the same hold
+    late = await usage.swap(tenant, GAUGE, old.id, 6, "b", source="t")  # still the same hold
     assert (late.id, late.ok) == (first.id, False)
     assert await in_use(factory, tenant) == 0
 
@@ -127,3 +132,35 @@ async def test_another_tenants_old_hold_is_refused(factory, usage):
     assert await in_use(factory, mine) is None and await hold_statuses(factory, mine) == []
     with pytest.raises(HoldNotFound):  # an id longer than any issued names no hold
         await usage.swap(mine, GAUGE, "x" * 40, 5, "c", source="t")
+
+
+async def test_a_refused_key_stays_refused(factory, usage):
+    """The refusal is the key's outcome: a delayed duplicate of the call, or a
+    retry once there is room, is refused again and changes nothing."""
+    tenant = await seed_limits(factory, {GAUGE: 5})
+    old = await usage.swap(tenant, GAUGE, None, 4, "a", source="t")
+    assert isinstance(await usage.swap(tenant, GAUGE, old.id, 6, "k", source="t"), Exceeded)
+    async with factory() as s:  # room now
+        await s.execute(
+            update(Plan).where(Plan.key == f"p-{tenant[:8]}").values(limits={GAUGE: 50})
+        )
+        await s.commit()
+    assert isinstance(await usage.swap(tenant, GAUGE, old.id, 6, "k", source="t"), Exceeded)
+    assert await in_use(factory, tenant) == 4
+    assert await hold_statuses(factory, tenant) == ["committed", "refused"]
+    assert await _statuses(factory, old.id) == ["committed"]
+    fresh = await usage.swap(tenant, GAUGE, old.id, 6, "k2", source="t")  # a new key may
+    assert isinstance(fresh, Hold) and await in_use(factory, tenant) == 6
+
+
+async def test_a_replay_must_be_the_same_call(factory, usage):
+    tenant = await seed_limits(factory, {GAUGE: 10})
+    old = await usage.swap(tenant, GAUGE, None, 2, "a", source="t")
+    new = await usage.swap(tenant, GAUGE, old.id, 3, "b", source="t")
+    for other_old, source in ((None, "t"), ("e" * 32, "t"), (old.id, "u")):
+        with pytest.raises(IdempotencyConflict):
+            await usage.swap(tenant, GAUGE, other_old, 3, "b", source=source)
+    assert (await usage.swap(tenant, GAUGE, old.id, 3, "b", source="t")).id == new.id
+    assert isinstance(await usage.swap(tenant, GAUGE, new.id, 20, "c", source="t"), Exceeded)
+    with pytest.raises(IdempotencyConflict):  # a refused key answers only its own call
+        await usage.swap(tenant, GAUGE, new.id, 19, "c", source="t")

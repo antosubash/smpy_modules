@@ -24,6 +24,8 @@ from sm_images.models._cols import dt_col
 OP_INGEST = "ingest"
 OP_SWAP = "swap"
 OP_RELEASE = "release"
+NO_HOLD = "-"
+"""``old_hold_id`` of a swap from no hold (``NULL`` is: not fixed yet)."""
 
 
 class BillingOp(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
@@ -36,6 +38,10 @@ class BillingOp(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[u
     op: str = Field(max_length=16)
     hold_id: str | None = Field(default=None, max_length=64)
     """A ``release``'s hold; a ``swap``'s new hold, recorded when it is installed."""
+    old_hold_id: str | None = Field(default=None, max_length=64)
+    """The hold a ``swap`` replaces, fixed before billing first hears of it (every
+    retry names the same one: billing refuses a replay naming another);
+    :data:`NO_HOLD` for none."""
     quantity: int = Field(default=0, sa_type=BigInteger, sa_column_kwargs={"nullable": False})
     idempotency_key: str | None = Field(default=None, max_length=128)
     attempts: int = Field(default=0, sa_column_kwargs={"nullable": False})

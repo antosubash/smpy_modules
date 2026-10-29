@@ -208,8 +208,17 @@ all the same.
   retries each tenant's due ops. Every op is claimed before it runs (a token
   with an expiry), and only its claimant may finish it, so an executor that
   stalls past its claim cannot also install what a settler installed. An
-  image's swaps run one at a time, oldest first, and a retry repeats the
-  swap's key, so billing returns the same hold. The janitor deletes done ops
-  after `janitor_grace_days`.
+  image's swaps run one at a time, oldest first. Each op has one key and one
+  old hold, fixed before billing first hears of it, and every retry repeats
+  both: billing keeps each key's outcome - the hold, or the refusal - so a
+  retry, or a call delayed past its claim, gets the same answer and never
+  changes anything twice. A refused op is finished; nothing retries it.
+  `images.reconcile` also repairs an image that lost a committed swap (billing
+  reports the op's hold committed but the image names another): the hold is
+  installed where the image's own no longer counts, else released. The
+  janitor deletes done ops after `janitor_grace_days`.
+- **A lowered plan limit evicts nothing.** Stored images keep their holds; a
+  swap that does not grow an image is always admitted, one that grows it is
+  refused until the tenant is under the limit again.
 - **Fail closed.** An installed billing that cannot meter raises: an upload
   fails, and a step fails `storage_error` without publishing.

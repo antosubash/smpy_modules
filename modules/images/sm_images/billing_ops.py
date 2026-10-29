@@ -33,7 +33,7 @@ from sqlalchemy import delete, select, update
 
 from sm_images import billing
 from sm_images.models import BillingOp
-from sm_images.models.billing_op import OP_RELEASE, OP_SWAP
+from sm_images.models.billing_op import NO_HOLD, OP_RELEASE, OP_SWAP
 
 __all__ = [
     "Claimed",
@@ -64,15 +64,24 @@ class Claimed:
 
 
 async def open_op(
-    db: Any, op: str, image_id: uuid.UUID, qty: int, key: str, *, claim: timedelta
+    db: Any,
+    op: str,
+    image_id: uuid.UUID,
+    qty: int,
+    key: str,
+    *,
+    claim: timedelta,
+    old: str | None,
 ) -> Claimed:
-    """Write an op claimed by the caller for ``claim``, in ``db``'s transaction."""
+    """Write an op claimed by the caller for ``claim``, in ``db``'s transaction,
+    replacing ``old`` (``None``: no hold)."""
     token = uuid.uuid4().hex
     row = BillingOp(
         op=op,
         image_id=image_id,
         quantity=qty,
         idempotency_key=key,
+        old_hold_id=old or NO_HOLD,
         claim_token=token,
         claim_expires_at=datetime.now(UTC) + claim,
     )
