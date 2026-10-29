@@ -122,4 +122,50 @@ describe('group results panel', () => {
     expect(byId(view, 'images-group-results-more-g1')).toBeNull();
     await view.unmount();
   });
+
+  it('keeps polling after a queued launch whose rows do not exist yet', async () => {
+    let launched = false;
+    let after = 0;
+    const { view } = await open({
+      [RESULTS]: () => {
+        if (!launched) return { items: [], next_cursor: null };
+        after += 1; // the re-read on launch, then the polls
+        if (after === 1) return { items: [], next_cursor: null }; // queued: no row yet
+        if (after === 2) return { items: [result(1, 'pending', null)], next_cursor: null };
+        return { items: [result(1, 'completed', { verdict: 'done' })], next_cursor: null };
+      },
+      'POST /api/images/prompts/g1/run': () => {
+        launched = true;
+        return { status: 'accepted', scope: 'stale', requested: null };
+      },
+    });
+    await setValue(byId(view, 'images-prompt-group-g1') as HTMLSelectElement, 'grp1');
+    await click(byId(view, 'images-prompt-run-group-g1'));
+    await settle();
+    for (let i = 0; i < 3; i++) await act(async () => vi.advanceTimersByTimeAsync(3100));
+    expect(byId(view, 'images-group-result-current-1')?.textContent).toContain('done');
+    await view.unmount();
+  });
+
+  it('refreshes every loaded page while polling', async () => {
+    let polled = 0;
+    const { view } = await open({
+      [RESULTS]: (call: { url: string }) => {
+        if (call.url.includes('after=1')) {
+          polled += 1;
+          const row = polled < 3 ? result(2, 'running', null) : result(2, 'completed', { verdict: 'b' });
+          return { items: [row], next_cursor: null };
+        }
+        return { items: [result(1, 'completed', { verdict: 'a' })], next_cursor: 1 };
+      },
+    });
+    await click(byId(view, 'images-group-results-more-g1'));
+    await settle();
+    expect(byId(view, 'images-group-result-2')?.dataset.status).toBe('running');
+    await act(async () => vi.advanceTimersByTimeAsync(3100));
+    await act(async () => vi.advanceTimersByTimeAsync(3100));
+    expect(byId(view, 'images-group-result-2')?.dataset.status).toBe('completed');
+    expect(byId(view, 'images-group-result-current-2')?.textContent).toContain('b');
+    await view.unmount();
+  });
 });
