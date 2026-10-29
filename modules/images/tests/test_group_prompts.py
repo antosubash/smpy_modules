@@ -199,3 +199,37 @@ async def test_scope_missing_skips_a_completed_group(pipe, ai):
     assert await _run(pipe, prompt, group, "missing") == 0
     assert await _run(pipe, prompt, group, "stale") == 0
     assert ai.calls == 1
+
+
+async def test_a_whole_collection_group_run_stops_once_its_starter_lost_the_right(
+    pipe, ai, monkeypatch
+):
+    """M7 for group scope: the starter is re-checked before each chunk of
+    groups, so a revoked owner's run makes no further provider calls."""
+    from sm_images.ai import group_request
+    from sm_images.ai import run as prompt_run
+    from sm_images.imports.access import OWNER
+    from sm_images.models import Collection
+    from sqlalchemy import update
+
+    ai.answer = {"verdict": "ok"}
+    coll = await pipe.collection({}, group_roles=ROLES)
+    for _ in range(3):
+        await group_with(pipe, coll, ROLES)
+    prompt = await group_prompt(pipe, coll, inputs="images")
+    monkeypatch.setattr(group_request, "CHUNK", 1)
+    real = group_request.dispatch_group
+
+    async def then_revoke(*a, **k):
+        await real(*a, **k)
+        async with pipe.db_state.session_factory() as s:
+            await s.execute(
+                update(Collection).where(Collection.id == coll.id).values(owner_id="gone")
+            )
+            await s.commit()
+
+    monkeypatch.setattr(group_request, "dispatch_group", then_revoke)
+    got = await prompt_run.run_prompt(
+        pipe.runtime, "default", prompt.id, "missing", run_as="olga", access_basis=OWNER
+    )
+    assert (got, ai.calls) == (1, 1)

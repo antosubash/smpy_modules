@@ -109,6 +109,25 @@ async def test_a_queued_prompt_run_stops_once_its_starter_lost_the_right(pipe, m
     assert got == 1 and len(sent) == 1
 
 
+async def test_a_prompt_run_rechecks_before_each_later_chunk(pipe, monkeypatch):
+    coll = await pipe.collection({})
+    for _ in range(3):
+        await pipe.image(coll)
+    prompt = await add_prompt(pipe, coll)
+    monkeypatch.setattr(prompt_run, "CHUNK", 1)
+    sent: list[uuid.UUID] = []
+
+    async def dispatch_then_revoke(runtime, tenant, image_id):
+        sent.append(image_id)
+        await _give_away(pipe, coll)
+
+    monkeypatch.setattr(prompt_run, "submit_dispatch", dispatch_then_revoke)
+    got = await prompt_run.run_prompt(
+        pipe.runtime, T, prompt.id, "all", run_as="olga", access_basis=OWNER
+    )
+    assert (got, len(sent)) == (1, 1)
+
+
 async def test_the_restart_route_records_its_starter(world):
     r = await world.c.post(url(world, "/restart"), json={"scope": "all"}, headers=headers(OLGA))
     assert r.status_code == 202, r.text

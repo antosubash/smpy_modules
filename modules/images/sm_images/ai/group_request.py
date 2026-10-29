@@ -11,8 +11,9 @@ in keyset chunks of :data:`CHUNK` groups (by ``images.run_prompt`` on a broker).
 
 from __future__ import annotations
 
+import logging
 import uuid
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -24,6 +25,8 @@ from sm_images.models import Collection, Group, Prompt, PromptResult
 from sm_images.models.enums import PromptScope, StepStatus
 
 __all__ = ["CHUNK", "GROUP_QUEUE", "dispatch_group", "recover_group_runs", "request_groups"]
+
+logger = logging.getLogger(__name__)
 
 CHUNK = 500
 GROUP_QUEUE = "images_heavy"
@@ -77,8 +80,14 @@ async def request_groups(
     prompt_id: uuid.UUID,
     scope: str,
     group_ids: Sequence[uuid.UUID] | None = None,
+    *,
+    allowed: Callable[[], Awaitable[bool]] | None = None,
 ) -> int:
-    """Request and dispatch; returns how many groups got a new run."""
+    """Request and dispatch; returns how many groups got a new run.
+
+    ``allowed``: the starter's right (``sm_images.starter_right``), asked
+    before each chunk of :data:`CHUNK` groups after the first (the caller
+    asked before the first); ``False`` stops the run where it is."""
     lease_s = runtime.settings().step_lease_seconds
     with tenant_context(tenant):
         stmt = select(Prompt.collection_id, Prompt.revision).where(
@@ -89,8 +98,12 @@ async def request_groups(
             await finalize_session(db)
         if found is None:
             return 0
-        count = 0
+        count = seen = 0
         async for group_id in _groups(runtime, tenant, found.collection_id, group_ids):
+            seen += 1
+            if allowed is not None and seen > 1 and (seen - 1) % CHUNK == 0 and not await allowed():
+                logger.info("images.prompt_run.access_revoked prompt=%s", prompt_id)
+                return count
             async with runtime.session_factory() as db:
                 now = datetime.now(UTC)
                 changed = await group_lease.request(

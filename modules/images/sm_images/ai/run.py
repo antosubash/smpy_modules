@@ -141,12 +141,12 @@ async def run_prompt(
     if found.scope is PromptScope.GROUP:  # per group (``image_ids`` do not apply)
         from sm_images.ai.group_request import request_groups
 
-        return await request_groups(runtime, tenant, prompt_id, scope, group_ids)
+        return await request_groups(runtime, tenant, prompt_id, scope, group_ids, allowed=allowed)
     sid = step_id(prompt_id)
     count = seen = 0
     async for image_id in _images(runtime, tenant, found.collection_id, image_ids):
         seen += 1
-        if seen % CHUNK == 1 and seen > 1 and not await allowed():
+        if seen > 1 and (seen - 1) % CHUNK == 0 and not await allowed():
             logger.info("images.prompt_run.access_revoked prompt=%s", prompt_id)
             return count
         async with runtime.session_factory() as db:
