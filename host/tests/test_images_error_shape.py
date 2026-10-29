@@ -6,16 +6,17 @@ are not exercised there. This boots ``main:app`` (``create_app``) with a real
 sign-in: a view-only user reads a public collection whose images are all
 withheld (``protect_originals`` with no display mutator), and each route is
 compared for the *same URL* while the image or group exists and after it is
-deleted. Only ``props.correlation_id`` and request-id/Date headers differ.
+deleted, from identical copies of one signed-in session, with a fixed
+``X-Correlation-ID``: raw body bytes, every header (Content-Length included)
+and the decoded cookies must be equal. Only Date and Server-Timing are ignored,
+plus the session cookie's ``expires_at`` deadline.
 """
 
 from __future__ import annotations
 
 import asyncio
-import gzip
 import importlib
 import json
-import re
 import subprocess
 import sys
 import uuid
@@ -23,6 +24,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+from shape_compare import shape as _shape
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "host"))
@@ -30,9 +32,9 @@ import records_collections  # noqa: E402, F401
 
 ADMIN = ("admin@example.test", "Admin-pass-12345!")
 VIEWER = ("viewer@example.test", "Viewer-pass-12345!")
-# Per-request values only: the clock, the request/correlation ids and timings.
-IGNORED = {"date", "x-request-id", "x-correlation-id", "server-timing"}
-CID = "[0-9a-f]{32}"
+# Sent on every request and echoed back: the one per-request value in an error page
+# (its ``props.correlation_id``) is then fixed, so bodies compare byte for byte.
+CID = "c0ffee00c0ffee00c0ffee00c0ffee00"
 NEGOTIATIONS = {
     "plain": {},
     "html": {"Accept": "text/html"},
@@ -121,69 +123,6 @@ async def _delete(app, ids, what):
             await s.commit()
 
 
-def _cookies(response: httpx.Response) -> list[tuple[str, str]]:
-    """Set-Cookie as (name, attributes): the value is a signed session blob that
-    differs per request; the name and every attribute (path, max-age, samesite,
-    httponly, secure) must match."""
-    out = []
-    for raw in response.headers.get_list("set-cookie"):
-        first, _, attrs = raw.partition(";")
-        out.append((first.partition("=")[0].strip(), attrs.strip()))
-    return sorted(out)
-
-
-def _normalise(response: httpx.Response):
-    """Everything must match except the correlation id VALUE (32 hex digits, under
-    exactly its JSON key or its HTML-escaped prop key) and the ignored headers."""
-    body = response.text
-    body = re.sub(rf'("correlation_id":\s*")({CID})(")', r"\1CID\3", body)
-    body = re.sub(rf"(&quot;correlation_id&quot;:&quot;)({CID})(&quot;)", r"\1CID\3", body)
-    headers = {k: v for k, v in response.headers.items() if k not in IGNORED and k != "set-cookie"}
-    if "content-encoding" in headers:
-        # A compressed length varies with the bytes of the (random) ids inside; the
-        # decoded body is compared in full instead.
-        headers.pop("content-length", None)
-    return response.status_code, body, headers, _cookies(response)
-
-
-def test_the_comparator_catches_what_it_must():
-    """Guard the guard: a differing detail text, Content-Length, cookie attribute
-    or a non-id after ``correlation_id`` must not compare equal."""
-
-    def resp(text="{}", headers=None, status=404):
-        return httpx.Response(status, text=text, headers=headers or {})
-
-    same = '{"detail":"x","correlation_id":"%s"}'
-    assert _normalise(resp(same % ("a" * 32))) == _normalise(resp(same % ("b" * 32)))
-    assert _normalise(resp('{"detail":"correlation_id withheld"}')) != _normalise(
-        resp('{"detail":"correlation_id absent"}')
-    )
-    assert _normalise(resp('{"detail":"a"}')) != _normalise(resp('{"detail":"b"}'))
-    assert _normalise(resp("", {"content-length": "5"})) != _normalise(
-        resp("", {"content-length": "6"})
-    )
-    one = resp(headers={"set-cookie": "session=abc; path=/; httponly"})
-    other = resp(headers={"set-cookie": "session=xyz; path=/; httponly"})
-    assert _normalise(one) == _normalise(other)
-    assert _normalise(one) != _normalise(resp(headers={"set-cookie": "session=abc; path=/"}))
-    assert _normalise(one) != _normalise(resp())
-
-    def zipped(text: str, length: str):
-        return httpx.Response(
-            404,
-            content=gzip.compress(text.encode()),
-            headers={"content-encoding": "gzip", "content-length": length},
-        )
-
-    # compressed lengths are not compared (they vary with the ids inside); bodies are
-    assert _normalise(zipped("a", "5")) == _normalise(zipped("a", "6"))
-    assert _normalise(zipped("a", "5")) != _normalise(zipped("b", "5"))
-    # an id-shaped value under another key is not the correlation id
-    assert _normalise(resp('{"detail":"%s"}' % ("a" * 32))) != _normalise(
-        resp('{"detail":"%s"}' % ("b" * 32))
-    )
-
-
 ROUTES = [
     ("get", "/api/images/images/{i}/original"),
     ("head", "/api/images/images/{i}/original"),
@@ -229,34 +168,53 @@ def _negotiate(app, negotiation: str) -> dict[str, str]:
     return extra
 
 
-async def _run(app, negotiation, method, route, what):
-    ids = await _seed(app)
+async def _sign_in(app, ids) -> httpx.Cookies:
+    """Sign the viewer in once and return the cookie jar. The session carries a
+    CSRF token that is embedded in every page, so both states must start
+    from this one session: each gets a fresh client holding an identical copy."""
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:
         signed = await http.post(
             "/api/users/auth/login", data={"username": VIEWER[0], "password": VIEWER[1]}
         )
         assert signed.status_code in (200, 204), signed.text
-        # Positive control: the viewer does see the collection, so a 404 below is the gate.
+        # Positive control: the viewer does see the collection, so a 404 later is the gate.
         seen = await http.get(f"/api/images/collections/{ids['cid']}")
         assert seen.status_code == 200, seen.text
-        url = route.format(i=ids["iid"], g=ids["gid"], s=ids["slug"])
-        if "/public/" in url:
-            http.cookies.clear()  # the anonymous twin: no session at all
-            # The first anonymous request mints the locale cookie (and its
-            # `Vary: Cookie`); take that out of the comparison.
-            await http.get("/api/images/public/c/none/images", headers=_negotiate(app, negotiation))
+        # Render one console page: the session mints its CSRF token on the first
+        # render, so the snapshot must already hold it.
+        page = await http.get(f"/admin/images/{ids['cid']}", headers={"Accept": "text/html"})
+        assert page.status_code == 200, page.text[:300]
+        return httpx.Cookies(http.cookies)
+
+
+async def _answers(app, jar, negotiation, method, url):
+    """A fresh client from the jar snapshot, then the same request twice: the
+    FIRST answer and the steady-state one are both returned."""
+    transport = httpx.ASGITransport(app=app)
+    extra = {**_negotiate(app, negotiation), "X-Correlation-ID": CID}
+    cookies = httpx.Cookies(jar) if "/public/" not in url else None
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", cookies=cookies
+    ) as http:
         call = getattr(http, method)
-        extra = _negotiate(app, negotiation)
-        await call(url, headers=extra)  # the rolling session cookie is refreshed here
-        withheld = await call(url, headers=extra)
-        await _delete(app, ids, what)
-        await call(url, headers=extra)
-        absent = await call(url, headers=extra)
-        _expect_shape(negotiation, withheld, method, url)
-        _expect_shape(negotiation, absent, method, url)
-        assert _normalise(withheld) == _normalise(absent)
-        assert withheld.headers.get("vary") == absent.headers.get("vary")
+        first = await call(url, headers=extra)
+        second = await call(url, headers=extra)
+    return first, second
+
+
+async def _run(app, negotiation, method, route, what):
+    ids = await _seed(app)
+    secret = app.state.sm.settings.secret_key
+    url = route.format(i=ids["iid"], g=ids["gid"], s=ids["slug"])
+    jar = await _sign_in(app, ids)
+    withheld = await _answers(app, jar, negotiation, method, url)
+    await _delete(app, ids, what)
+    absent = await _answers(app, jar, negotiation, method, url)
+    for w, a in zip(withheld, absent, strict=True):
+        _expect_shape(negotiation, w, method, url)
+        _expect_shape(negotiation, a, method, url)
+        assert _shape(w, secret) == _shape(a, secret)
 
 
 @pytest.mark.parametrize("negotiation", sorted(NEGOTIATIONS))
