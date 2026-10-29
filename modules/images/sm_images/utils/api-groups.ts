@@ -1,17 +1,11 @@
 /** `/api/images` group endpoints: list, create, edit, delete, regroup and a member's assignment. */
 
-import { send } from './api';
+import { json, send } from './api';
 import type { GroupItem, ImageItem, Page, RegroupJob, RegroupResult } from './types';
 
 const BASE = '/api/images';
 
 type GroupPage = { items: GroupItem[]; next_cursor: string | null };
-
-const jsonBody = (method: string, body: unknown): RequestInit => ({
-  method,
-  body: JSON.stringify(body),
-  headers: { 'Content-Type': 'application/json' },
-});
 
 /** A page of groups; `after` is the cursor (the last key of the previous page). */
 export async function listGroups(
@@ -31,14 +25,14 @@ export function createGroup(
   collectionId: string,
   body: { key: string; name?: string | null },
 ): Promise<GroupItem> {
-  return send(`${BASE}/collections/${collectionId}/groups`, jsonBody('POST', body));
+  return send(`${BASE}/collections/${collectionId}/groups`, json('POST', body));
 }
 
 export function updateGroup(
   id: string,
   body: { key?: string; name?: string | null },
 ): Promise<GroupItem> {
-  return send(`${BASE}/groups/${id}`, jsonBody('PATCH', body));
+  return send(`${BASE}/groups/${id}`, json('PATCH', body));
 }
 
 export function deleteGroup(id: string): Promise<void> {
@@ -52,7 +46,7 @@ export function regroup(
   collectionId: string,
   body: RegroupBody,
 ): Promise<RegroupResult | { job_id: string }> {
-  return send(`${BASE}/collections/${collectionId}/regroup`, jsonBody('POST', body));
+  return send(`${BASE}/collections/${collectionId}/regroup`, json('POST', body));
 }
 
 export function getRegroup(id: string): Promise<RegroupJob> {
@@ -68,5 +62,5 @@ export function assignImage(
   imageId: string,
   change: { group_id?: string | null; group_role?: string | null },
 ): Promise<ImageItem> {
-  return send(`${BASE}/images/${imageId}`, jsonBody('PATCH', change));
+  return send(`${BASE}/images/${imageId}`, json('PATCH', change));
 }

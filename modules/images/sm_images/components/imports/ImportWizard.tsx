@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 import { useGeoJsonPreview } from '../../hooks/useGeoJsonPreview';
 import { startGeoJsonImport, startZipImport } from '../../utils/api-imports';
+import { errorText } from '../../utils/api-net';
 import type { GeoJsonPreview } from '../../utils/geojsonPreview';
 import { keys, useT } from '../../utils/i18n';
 import type { ImportKind, ImportMapping } from '../../utils/types';
@@ -133,7 +134,7 @@ export function ImportWizard({
       onStarted();
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }

@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import { useRegroupJob } from '../../hooks/useRegroupJob';
 import { cancelRegroup, regroup } from '../../utils/api-groups';
+import { errorText } from '../../utils/api-net';
 import { keys, useT } from '../../utils/i18n';
 import { errorCodeLabel } from '../../utils/labels';
 import type { RegroupResult } from '../../utils/types';
@@ -46,7 +47,7 @@ export function RegroupPanel({
         if (!dryRun) onApplied();
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -57,7 +58,7 @@ export function RegroupPanel({
     try {
       await cancelRegroup(job.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   };
 

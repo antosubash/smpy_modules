@@ -47,7 +47,8 @@ export async function send<T>(url: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
-function json(method: string, body: unknown): RequestInit {
+/** A JSON request body; exported for the `api-*.ts` clients. */
+export function json(method: string, body: unknown): RequestInit {
   return {
     method,
     body: JSON.stringify(body),

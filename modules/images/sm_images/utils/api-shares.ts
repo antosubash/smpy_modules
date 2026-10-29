@@ -5,7 +5,7 @@
  * resource type's loader (`sm_images/resource_types.py`) parses.
  */
 
-import { send } from './api';
+import { json, send } from './api';
 import type { Share, ShareCandidate, ShareRole } from './types';
 
 export const RESOURCE_TYPE = 'images.collection';
@@ -21,16 +21,15 @@ export function grantShare(
   subjectId: string,
   role: ShareRole,
 ): Promise<Share> {
-  return send(SHARES, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  return send(
+    SHARES,
+    json('POST', {
       resource_type: RESOURCE_TYPE,
       resource_id: collectionId,
       subject_id: subjectId,
       role,
     }),
-  });
+  );
 }
 
 export function revokeShare(shareId: string): Promise<void> {

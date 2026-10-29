@@ -66,6 +66,11 @@ export function handleUnauthorized(): void {
   window.setTimeout(() => window.location.assign(target), REDIRECT_DELAY_MS);
 }
 
+/** What to show for a caught value: an `Error`'s message, else its text. */
+export function errorText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 export function offlineError(): ApiError {
   return new ApiError(OFFLINE_STATUS, null, translate(keys.images.errors.offline));
 }

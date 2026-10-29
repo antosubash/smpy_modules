@@ -2,6 +2,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { toast } from 'sonner';
 
 import { isActive, isStalled } from '../../hooks/useImportJobs';
+import { errorText } from '../../utils/api-net';
 import { keys, useT } from '../../utils/i18n';
 import { errorCodeLabel, importKindLabel, jobStatusLabel } from '../../utils/labels';
 import type { ImportControl, ImportJob } from '../../utils/types';
@@ -48,7 +49,7 @@ export function JobRow({
     try {
       await onControl(job, control);
     } catch (e) {
-      toast.error(t(text.control_failed, { reason: e instanceof Error ? e.message : String(e) }));
+      toast.error(t(text.control_failed, { reason: errorText(e) }));
     }
   };
 

@@ -1,13 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-
+import { errorText } from '../utils/api-net';
 import { grantShare, listShares, revokeShare, shareCandidates } from '../utils/api-shares';
 import type { Share, ShareCandidate, ShareRole } from '../utils/types';
 
 const SEARCH_DELAY_MS = 250;
-
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 export type Shares = {
   shares: Share[];
@@ -39,7 +35,7 @@ export function useShares(collectionId: string, open: boolean): Shares {
     setLoading(true);
     refresh()
       .then(() => setError(null))
-      .catch((e) => setError(message(e)))
+      .catch((e) => setError(errorText(e)))
       .finally(() => setLoading(false));
   }, [open, refresh]);
 
@@ -49,7 +45,7 @@ export function useShares(collectionId: string, open: boolean): Shares {
     const timer = window.setTimeout(() => {
       shareCandidates(collectionId, query.trim())
         .then((rows) => current && setFound(rows))
-        .catch((e) => current && setError(message(e)));
+        .catch((e) => current && setError(errorText(e)));
     }, SEARCH_DELAY_MS);
     return () => {
       current = false;

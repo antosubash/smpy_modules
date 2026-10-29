@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { listGroups } from '../../utils/api-groups';
+import { errorText } from '../../utils/api-net';
 import {
   createPrompt,
   deletePrompt,
@@ -20,10 +21,6 @@ import { PromptRow, type RunTarget } from './PromptRow';
 type View = { mode: 'list' } | { mode: 'create' } | { mode: 'edit'; prompt: Prompt };
 
 const GROUPS_SHOWN = 100;
-
-function message(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
 
 /**
  * A collection's prompts (the portal's custom pipeline manager): list,
@@ -54,7 +51,7 @@ export function PromptsTab({
       setPrompts(await listPrompts(collectionId));
       setError(null);
     } catch (e) {
-      setError(message(e));
+      setError(errorText(e));
     }
   }, [collectionId]);
 
@@ -76,7 +73,7 @@ export function PromptsTab({
       await work();
       if (done) toast(done);
     } catch (e) {
-      toast.error(message(e));
+      toast.error(errorText(e));
     } finally {
       setBusy(false);
     }

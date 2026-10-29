@@ -10,7 +10,7 @@ import {
   AlertDialogTrigger,
 } from '@simple-module-py/ui/components/ui/alert-dialog';
 import { type ReactNode, useState } from 'react';
-
+import { errorText } from '../utils/api-net';
 import { keys, useT } from '../utils/i18n';
 
 /**
@@ -45,7 +45,7 @@ export function ConfirmDialog({
       await onConfirm();
       setOpen(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setPending(false);
     }

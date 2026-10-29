@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-
+import { errorText } from '../utils/api-net';
 import { listPromptResults, type PromptResultPage } from '../utils/api-prompts';
 import type { PromptResult } from '../utils/types-prompts';
 
@@ -10,10 +10,6 @@ export const POLL_LIMIT = 20;
 export const LAUNCH_POLLS = 3;
 
 const ACTIVE = new Set(['pending', 'running']);
-
-function message(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
 
 /** Every page from the start until at least `count` rows are read (or none
  *  are left): what is on screen, read again - later pages included. */
@@ -71,7 +67,7 @@ export function usePromptResults(promptId: string, version: number): PromptResul
         setCursor(page.next_cursor);
         setError(null);
       })
-      .catch((e) => setError(message(e)));
+      .catch((e) => setError(errorText(e)));
   }, [promptId, version]);
 
   const active = rows?.some((r) => ACTIVE.has(r.status)) ?? false;
@@ -95,7 +91,7 @@ export function usePromptResults(promptId: string, version: number): PromptResul
           } // else a "load more" came first: its rows stay; this poll still counts
           setPolls((n) => n + 1);
         })
-        .catch((e) => setError(message(e)));
+        .catch((e) => setError(errorText(e)));
     }, POLL_MS);
     return () => {
       cancelled = true;
@@ -115,7 +111,7 @@ export function usePromptResults(promptId: string, version: number): PromptResul
         setRows((before) => [...(before ?? []), ...page.items]);
         setCursor(page.next_cursor);
       })
-      .catch((e) => setError(message(e)))
+      .catch((e) => setError(errorText(e)))
       .finally(() => {
         if (paging.current === request) paging.current = null;
       });

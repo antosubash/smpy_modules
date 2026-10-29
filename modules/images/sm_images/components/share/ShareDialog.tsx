@@ -14,6 +14,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { useShares } from '../../hooks/useShares';
+import { errorText } from '../../utils/api-net';
 import { keys, useT } from '../../utils/i18n';
 import type { Share, ShareCandidate, ShareRole } from '../../utils/types';
 
@@ -30,7 +31,7 @@ export function ShareDialog({ collectionId }: { collectionId: string }) {
   const [role, setRole] = useState<ShareRole>('view');
   const state = useShares(collectionId, open);
 
-  const report = (e: unknown) => toast.error(e instanceof Error ? e.message : String(e));
+  const report = (e: unknown) => toast.error(errorText(e));
 
   const grant = async (candidate: ShareCandidate) => {
     try {

@@ -19,6 +19,7 @@ import { RunOnImages } from '../components/prompts/RunOnImages';
 import { ShareDialog } from '../components/share/ShareDialog';
 import { useImages } from '../hooks/useImages';
 import { deleteCollection, setVisibility } from '../utils/api';
+import { errorText } from '../utils/api-net';
 import { keys, useT } from '../utils/i18n';
 import type { Collection as CollectionRow, Visibility } from '../utils/types';
 
@@ -84,7 +85,7 @@ function Collection({
       setVisible(next);
       toast(t(keys.images.visibility.changed));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
+      toast.error(errorText(e));
     } finally {
       setSaving(false);
     }

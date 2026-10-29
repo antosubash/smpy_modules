@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { getPipeline, restartPipeline, savePipeline } from '../../utils/api';
+import { errorText } from '../../utils/api-net';
 import { keys, useT } from '../../utils/i18n';
 import type { PipelineOverview, RestartScope } from '../../utils/types';
 import { StepCard, type StepDraft } from './StepCard';
@@ -31,10 +32,6 @@ export function payloadOf(overview: PipelineOverview, drafts: Drafts) {
       out[step.id] = { ...draft.params, enabled: draft.enabled };
   }
   return out;
-}
-
-function message(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
 }
 
 /**
@@ -66,7 +63,7 @@ export function PipelineTab({
       setDirty(false);
       setError(null);
     } catch (e) {
-      setError(message(e));
+      setError(errorText(e));
     }
   }, [collectionId]);
 
@@ -86,7 +83,7 @@ export function PipelineTab({
       setOfferRestart(true);
       toast(t(keys.images.pipeline.saved));
     } catch (e) {
-      setError(message(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -100,7 +97,7 @@ export function PipelineTab({
       toast(t(keys.images.pipeline.restarted));
       await load();
     } catch (e) {
-      setError(message(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }

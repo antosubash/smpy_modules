@@ -1,6 +1,6 @@
 /** `/api/images` import endpoints: start (GeoJSON or ZIP), list and control jobs. */
 
-import { send } from './api';
+import { json, send } from './api';
 import { putParts, type Started } from './direct-upload';
 import type { ImportControl, ImportJob, ImportKind, ImportMapping } from './types';
 
@@ -31,12 +31,6 @@ export function startGeoJsonImport(collectionId: string, start: GeoJsonStart): P
 
 type ZipCreated = { job_id: string; upload: Started };
 
-const jsonPost = (body: unknown): RequestInit => ({
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(body),
-});
-
 /** A ZIP goes up like a direct upload through the ZIP endpoints: `create` opens
  *  the job and the upload, the parts follow, `extract` seals the archive. */
 export async function startZipImport(
@@ -46,7 +40,7 @@ export async function startZipImport(
 ): Promise<ImportJob> {
   const created = await send<ZipCreated>(
     `${BASE}/collections/${collectionId}/imports/zip`,
-    jsonPost({
+    json('POST', {
       filename: file.name,
       size: file.size,
       mapping: options.mapping ?? null,
@@ -54,7 +48,7 @@ export async function startZipImport(
     }),
   );
   const parts = await putParts(created.upload, file);
-  return send(`${BASE}/imports/${created.job_id}/extract`, jsonPost({ parts }));
+  return send(`${BASE}/imports/${created.job_id}/extract`, json('POST', { parts }));
 }
 
 export function controlImport(jobId: string, control: ImportControl): Promise<ImportJob> {

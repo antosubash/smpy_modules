@@ -2,7 +2,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { useState } from 'react';
-
+import { errorText } from '../../utils/api-net';
 import { keys, useT } from '../../utils/i18n';
 
 /** Create a group (key + optional name) or edit one (the same two fields).
@@ -32,7 +32,7 @@ export function GroupForm({
     try {
       await onSubmit({ key: key.trim(), name: name.trim() || null });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }

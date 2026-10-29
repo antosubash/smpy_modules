@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { assignImage, listGroups } from '../../utils/api-groups';
+import { errorText } from '../../utils/api-net';
 import { keys, useT } from '../../utils/i18n';
 import type { GroupItem, ImageItem } from '../../utils/types';
 
@@ -45,7 +46,7 @@ export function GroupEditor({
     try {
       setGroups((await listGroups(collectionId, null, GROUP_PAGE)).items);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   };
 
@@ -65,7 +66,7 @@ export function GroupEditor({
       const chosen = groups?.find((g) => g.id === groupId);
       onSaved({ ...saved, group_key: chosen?.key ?? null });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-
+import { errorText } from '../utils/api-net';
 import type { Page } from '../utils/types';
 
 export type CursorList<T> = {
@@ -48,7 +48,7 @@ export function useCursorList<T>(
       setTotal(page.total);
       setError(null);
     } catch (e) {
-      if (ticket === latest.current) setError(e instanceof Error ? e.message : String(e));
+      if (ticket === latest.current) setError(errorText(e));
     } finally {
       if (ticket === latest.current) setLoading(false);
     }
@@ -77,7 +77,7 @@ export function useCursorList<T>(
         setError(null);
       })
       .catch((e) => {
-        if (ticket === latest.current) setError(e instanceof Error ? e.message : String(e));
+        if (ticket === latest.current) setError(errorText(e));
       })
       .finally(() => {
         if (ticket === latest.current) setLoading(false);

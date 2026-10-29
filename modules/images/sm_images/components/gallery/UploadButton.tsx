@@ -1,7 +1,7 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { codeMessage } from '../../utils/api-net';
+import { codeMessage, errorText } from '../../utils/api-net';
 import { uploadFile } from '../../utils/direct-upload';
 import { keys, useT } from '../../utils/i18n';
 import type { UploadResult } from '../../utils/types';
@@ -29,7 +29,7 @@ export function UploadButton({
     try {
       for (const file of files) results.push(await uploadFile(collectionId, file, directThreshold));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
+      toast.error(errorText(e));
     } finally {
       setBusy(false);
       if (input.current) input.current.value = '';

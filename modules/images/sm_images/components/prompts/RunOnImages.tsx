@@ -2,7 +2,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { useState } from 'react';
 import { toast } from 'sonner';
-
+import { errorText } from '../../utils/api-net';
 import { listPrompts, runPrompt } from '../../utils/api-prompts';
 import { keys, useT } from '../../utils/i18n';
 import type { Prompt, PromptRunScope } from '../../utils/types-prompts';
@@ -37,7 +37,7 @@ export function RunOnImages({
     try {
       setPrompts((await listPrompts(collectionId)).filter((p) => p.scope === 'image'));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
+      toast.error(errorText(e));
     }
   };
 
@@ -49,7 +49,7 @@ export function RunOnImages({
       setPrompts(null);
       onDone();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
+      toast.error(errorText(e));
     } finally {
       setBusy(false);
     }

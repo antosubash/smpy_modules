@@ -10,7 +10,7 @@
  * answers `{etag}`.
  */
 
-import { ApiError, failedUpload, send, uploadImage } from './api';
+import { ApiError, failedUpload, json, send, uploadImage } from './api';
 import { messageFor, offlineError, parseBody } from './api-net';
 import type { UploadResult } from './types';
 
@@ -60,21 +60,19 @@ export async function putParts(started: Started, file: Blob): Promise<Part[]> {
 
 export async function uploadDirect(collectionId: string, file: File): Promise<UploadResult> {
   try {
-    const started = await send<Started>(`${BASE}/collections/${collectionId}/uploads`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const started = await send<Started>(
+      `${BASE}/collections/${collectionId}/uploads`,
+      json('POST', {
         filename: file.name,
         size: file.size,
         content_type: file.type || undefined,
       }),
-    });
+    );
     const parts = await putParts(started, file);
-    return await send<UploadResult>(`${BASE}/uploads/${started.upload_id}/complete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parts, filename: file.name }),
-    });
+    return await send<UploadResult>(
+      `${BASE}/uploads/${started.upload_id}/complete`,
+      json('POST', { parts, filename: file.name }),
+    );
   } catch (error) {
     return failedUpload(file, error);
   }

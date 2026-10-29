@@ -1,6 +1,6 @@
 /** `/api/images` review endpoints (`sm_images/endpoints/api/review.py`). */
 
-import { send } from './api';
+import { json, send } from './api';
 import type { JsonSchema, PromptResult } from './types-prompts';
 
 const BASE = '/api/images';
@@ -40,10 +40,9 @@ export async function reviewResult(
   version: string,
   data?: Record<string, unknown>,
 ): Promise<ReviewItem> {
-  const { item } = await send<{ item: ReviewItem }>(`${BASE}/prompt-results/${id}/review`, {
-    method: 'POST',
-    body: JSON.stringify({ action, version, ...(data ? { data } : {}) }),
-    headers: { 'Content-Type': 'application/json' },
-  });
+  const { item } = await send<{ item: ReviewItem }>(
+    `${BASE}/prompt-results/${id}/review`,
+    json('POST', { action, version, ...(data ? { data } : {}) }),
+  );
   return item;
 }

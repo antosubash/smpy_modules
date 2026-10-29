@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ApiError } from '../utils/api';
+import { errorText } from '../utils/api-net';
 import {
   listReview,
   type ReviewAction,
@@ -31,10 +32,6 @@ export type ReviewQueue = {
     data?: Record<string, unknown>,
   ) => Promise<ReviewOutcome>;
 };
-
-function message(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
 
 /** `more` after `before`, each id once (a page can overlap a reload). */
 function append(before: ReviewItem[], more: ReviewItem[]): ReviewItem[] {
@@ -79,7 +76,7 @@ export function useReviewQueue(
       setLoaded(filter);
       setError(null);
     } catch (e) {
-      if (ticket === latest.current) setError(message(e));
+      if (ticket === latest.current) setError(errorText(e));
     } finally {
       if (ticket === latest.current) setLoading(false);
     }
@@ -101,7 +98,7 @@ export function useReviewQueue(
         setCursor(page.next_cursor);
       })
       .catch((e) => {
-        if (ticket === latest.current) setError(message(e));
+        if (ticket === latest.current) setError(errorText(e));
       })
       .finally(() => {
         if (paging.current === ticket) paging.current = 0;
@@ -130,7 +127,7 @@ export function useReviewQueue(
           await reload();
           return { outcome: 'stale' as const };
         }
-        return { outcome: 'failed' as const, message: message(e) };
+        return { outcome: 'failed' as const, message: errorText(e) };
       } finally {
         setBusy(false);
       }

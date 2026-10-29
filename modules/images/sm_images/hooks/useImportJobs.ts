@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { controlImport, deleteImport, listImports } from '../utils/api-imports';
+import { errorText } from '../utils/api-net';
 import type { ImportControl, ImportJob, JobStatus } from '../utils/types';
 
 /** Statuses in which the server is still working on a job. */
@@ -61,7 +62,7 @@ export function useImportJobs(
       apply(items);
       setError(null);
     } catch (e) {
-      if (mine === ticket.current) setError(e instanceof Error ? e.message : String(e));
+      if (mine === ticket.current) setError(errorText(e));
     } finally {
       if (mine === ticket.current) setLoading(false);
     }

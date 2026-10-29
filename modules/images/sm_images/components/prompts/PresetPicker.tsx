@@ -3,7 +3,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-
+import { errorText } from '../../utils/api-net';
 import { applyPreset, listPresets } from '../../utils/api-prompts';
 import { keys, type Translate, useT } from '../../utils/i18n';
 import type { Preset } from '../../utils/types-prompts';
@@ -52,7 +52,7 @@ export function PresetPicker({
       );
       onApplied();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
+      toast.error(errorText(e));
     } finally {
       setBusy(false);
     }
