@@ -157,6 +157,8 @@ async def record(
 
 
 async def unhold(runtime: Runtime, loaded: Any, planned: Planned | None) -> None:
-    """Nothing was published: give the reserved capacity back (outbox)."""
+    """Nothing was published: give the reserved capacity back (outbox). The
+    hold was never installed, so its release names no image and waits on
+    nothing (the image's current hold may need the very quota it holds)."""
     if planned is not None and planned.hold is not None:
-        await billing_ops.release_now(runtime.session_factory, loaded.image_id, planned.hold)
+        await billing_ops.release_now(runtime.session_factory, None, planned.hold)

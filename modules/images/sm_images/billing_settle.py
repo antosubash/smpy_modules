@@ -10,10 +10,12 @@ the claim expires (:data:`CLAIM`).
 
 **A release waits** for two things: the op named by ``after_id`` is done, and
 billing confirms that the hold the image names *now* is committed
-(:func:`_safe_to_release`). The first alone is not enough: a ``rehold`` that
-found the image naming a newer hold is done without having installed
-anything, and releasing the old hold then would leave the image counted by
-nothing until the newer hold's own commit lands.
+(:func:`sm_images.billing_waits.safe_to_release`). The first alone is not
+enough: a ``rehold`` that found the image naming a newer hold is done without
+having installed anything, and releasing the old hold then would leave the
+image counted by nothing until the newer hold's own commit lands.
+
+**A release never waits on quota** (:mod:`sm_images.billing_waits`).
 
 Ops are tenant rows; every statement here also names the tenant.
 :data:`HOOK` is a test seam called at each step (deterministic interleavings).
@@ -34,7 +36,8 @@ from sqlalchemy import exists, or_, select, update
 from sqlalchemy.orm import aliased
 
 from sm_images import billing, hold_refs
-from sm_images.models import BillingOp, Image
+from sm_images.billing_waits import blocked, safe_to_release
+from sm_images.models import BillingOp
 from sm_images.models.billing_op import OP_COMMIT, OP_REHOLD, OP_RELEASE
 
 __all__ = ["CLAIM", "HOOK", "ClaimLost", "Op", "claim", "hook", "save", "settle"]
@@ -87,7 +90,9 @@ async def hook(point: str, op: Any) -> None:
 
 def _due(tenant: str, now: datetime, ids: list[int] | None) -> Any:
     prior = aliased(BillingOp)
-    waited = exists().where(prior.id == BillingOp.after_id, prior.done_at.is_not(None))
+    waited = exists().where(
+        prior.id == BillingOp.after_id, or_(prior.done_at.is_not(None), blocked(prior))
+    )
     stmt = select(BillingOp.id).where(
         BillingOp.tenant_id == tenant,
         BillingOp.done_at.is_(None),
@@ -201,7 +206,7 @@ async def _apply(factory: Any, tenant: str, op: Any, token: str, meter: Any) -> 
     from sm_images import billing_rehold
 
     if op.op == OP_RELEASE:
-        if not await _safe_to_release(factory, tenant, op, meter):
+        if not await safe_to_release(factory, tenant, op, meter):
             return _WAIT
         await hold_refs.release(factory, tenant, op.hold_id, meter)  # no-op if installed
         return _DONE
@@ -214,26 +219,6 @@ async def _apply(factory: Any, tenant: str, op: Any, token: str, meter: Any) -> 
             op = replace(op, op=OP_REHOLD)
     await billing_rehold.run(factory, tenant, op, token, meter)
     return _FINISHED
-
-
-async def _safe_to_release(factory: Any, tenant: str, op: Any, meter: Any) -> bool:
-    """The image is gone, names no hold, names this very hold, or names a hold
-    billing confirms committed."""
-    if op.image_id is None:
-        return True
-    async with factory() as db:
-        current = (
-            await db.execute(
-                select(Image.storage_hold_id)
-                .where(Image.id == op.image_id, Image.tenant_id == tenant)
-                .execution_options(include_deleted=True)
-            )
-        ).first()
-        await finalize_session(db)
-    if current is None or current[0] is None or current[0] == op.hold_id:
-        return True
-    hold = await meter.get_hold(tenant, current[0])
-    return hold is not None and hold.status == "committed"
 
 
 async def _failed(factory: Any, op: Any, token: str, now: datetime, exc: Exception) -> None:

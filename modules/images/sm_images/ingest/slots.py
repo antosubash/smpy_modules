@@ -79,9 +79,10 @@ async def keep_hold(
 
 
 async def drop_hold(db: Any, factory: Any, image_id: uuid.UUID, hold: str | None) -> None:
-    """Nothing kept ``hold``: its ``release``, with the caller's transaction."""
+    """Nothing kept ``hold``: its ``release``, with the caller's transaction.
+    It was never installed, so the op names no image and waits on nothing."""
     if hold is not None:
-        await billing_ops.add(db, OP_RELEASE, image_id=image_id, hold_id=hold, factory=factory)
+        await billing_ops.add(db, OP_RELEASE, image_id=None, hold_id=hold, factory=factory)
 
 
 async def drop_slot(db: Any, factory: Any, slot: Slot | None) -> None:

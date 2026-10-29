@@ -187,11 +187,14 @@ async def _swap(
                 await db.rollback()
                 return False
             await hold_refs.orphan(db, tenant, op.hold_id)
-            spare = op.hold_id
+            spare, depends = op.hold_id, op.image_id
         else:  # the image moved on: the replacement is ours and unreferenced
             await hold_refs.orphan_reserved(db, tenant, replacement)
-            spare = replacement
-        await billing_ops.add(db, OP_RELEASE, image_id=op.image_id, hold_id=spare, factory=factory)
+            # Never installed, so it waits on nothing (as in ``_lost``): were
+            # it to wait for the image's newer hold, whose rehold may need the
+            # very quota it holds, the two would wait on each other.
+            spare, depends = replacement, None
+        await billing_ops.add(db, OP_RELEASE, image_id=depends, hold_id=spare, factory=factory)
         await _claimed(db, op, token, done_at=datetime.now(UTC), last_error=None, claim_token=None)
         await finalize_session(db)
     return True

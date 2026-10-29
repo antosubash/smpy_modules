@@ -221,6 +221,13 @@ all the same.
   was committed but lost the install (a release won it first) gets a durable
   `release` op in the same transaction that moves the rehold to its next
   generation, so it is released even if the releaser that beat it died.
+- **No release waits on quota.** A hold that was never installed (a spare
+  replacement, a rolled-back completion, a duplicate at ingest) is released
+  with no dependency at all. An old hold waits for the image's current hold
+  only while that hold is `held` (its commit needs no room); once the
+  current hold lapsed and its rehold was refused for quota, the old hold is
+  released, so the room it holds lets the rehold through. The image is
+  under-counted meanwhile, never deadlocked.
 - **The reservation's deadline.** A publication reserves for the step lease
   plus five minutes (at least billing's 15-minute default): a completion is
   accepted only within its lease, so the hold outlives any completion that can
