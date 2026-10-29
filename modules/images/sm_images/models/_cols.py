@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import UTC, datetime
 from typing import Any
 
 from simple_module_db.types import AwareDateTime
@@ -13,10 +12,6 @@ from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field
 
 from sm_images import constants
-
-
-def utcnow() -> datetime:
-    return datetime.now(UTC)
 
 
 def pk_uuid() -> Any:

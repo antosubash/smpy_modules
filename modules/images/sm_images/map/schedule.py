@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from functools import partial
 from typing import Any, Final
 
@@ -37,6 +37,7 @@ from simple_module_db import tenant_context
 from simple_module_db.callbacks import register_on_commit
 from sqlalchemy import or_, select, update
 
+from sm_images.clock import utcnow as now
 from sm_images.models import Collection, Image
 from sm_images.pipeline.runtime import Runtime, current_runtime
 
@@ -64,10 +65,6 @@ MAP_STATE: Final = (
     Collection.map_urgent_mark,
     Collection.map_image_count,
 )
-
-
-def now() -> datetime:
-    return datetime.now(UTC)
 
 
 def due(pending: int, baseline: int, *, urgent: bool, pct: int, abs_: int) -> bool:

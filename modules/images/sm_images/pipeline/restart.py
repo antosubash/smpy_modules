@@ -16,12 +16,12 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import UTC, datetime
 from typing import Any
 
 from simple_module_db import finalize_session
 from sqlalchemy import select, update
 
+from sm_images.clock import utcnow as _now
 from sm_images.models import Image, PipelineRestart
 from sm_images.pipeline.orchestrate import Scope, reset_image, submit_dispatch
 from sm_images.pipeline.runtime import Runtime
@@ -33,10 +33,6 @@ logger = logging.getLogger(__name__)
 
 CHUNK = 1000
 _SYNC = {"synchronize_session": False}
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 async def start_restart(

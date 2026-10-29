@@ -29,11 +29,12 @@ from collections import deque
 from collections.abc import Iterable
 from contextvars import ContextVar
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, Literal
 
 from simple_module_db import finalize_session, tenant_context
 
+from sm_images.clock import utcnow
 from sm_images.pipeline import advance
 from sm_images.pipeline.claim import load_runs, lock_image
 from sm_images.pipeline.cycle import bump_cycle, reset_runs
@@ -72,10 +73,6 @@ class RunStep:
 
 
 _drain: ContextVar[Any] = ContextVar("sm_images_drain", default=None)
-
-
-def utcnow() -> datetime:
-    return datetime.now(UTC)
 
 
 async def _execute(runtime: Runtime, item: Any) -> None:

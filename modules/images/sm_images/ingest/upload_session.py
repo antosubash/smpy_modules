@@ -36,13 +36,14 @@ back off instead of acting on the same object:
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Any, Final
 
 from simple_module_db.independent import independent_session
 from sqlalchemy import select, update
 
 from sm_images import constants
+from sm_images.clock import utcnow as _now
 from sm_images.errors import UploadInProgress, UploadNotFound, UploadNotOpen
 from sm_images.ingest.dedupe import find_id
 from sm_images.models import UploadSession, UploadStatus
@@ -67,10 +68,6 @@ COMPLETE_LEASE: Final = timedelta(minutes=15)
 _GONE = "Upload not found"
 _BUSY = "This upload is being completed"
 _CLOSED = "This upload no longer accepts parts"
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 def new_session(ticket: Any, collection_id: uuid.UUID) -> UploadSession:

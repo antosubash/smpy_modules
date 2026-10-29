@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 from simple_module_db import finalize_session
@@ -20,6 +20,7 @@ from sqlalchemy import exists, select, update
 from sqlalchemy.exc import IntegrityError
 
 from sm_images import constants
+from sm_images.clock import utcnow as now
 from sm_images.errors import Conflict
 from sm_images.models import Collection, RegroupJob
 from sm_images.models.regroup_job import CANCELLED, COMPLETED, RUNNING
@@ -39,10 +40,6 @@ __all__ = [
 SYNC = {"synchronize_session": False}
 COUNTERS = tuple(vars(Tally()))
 STALLED = "stalled"
-
-
-def now() -> datetime:
-    return datetime.now(UTC)
 
 
 def _where(tenant: str, job_id: uuid.UUID) -> list[Any]:

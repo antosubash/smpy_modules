@@ -22,12 +22,12 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from typing import Any, Final
 
 from simple_module_db import finalize_session
 from sqlalchemy import case, func, select, update
 
+from sm_images.clock import utcnow as now
 from sm_images.imports.mapping import Mapping
 from sm_images.intents import clear_intents
 from sm_images.models import Collection, ImportItem, ImportJob
@@ -63,10 +63,6 @@ COUNTERS: Final = {
     ItemStatus.FAILED: "failed_count",
 }
 SYNC: Final = {"synchronize_session": False}
-
-
-def now() -> datetime:
-    return datetime.now(UTC)
 
 
 @dataclass(frozen=True)

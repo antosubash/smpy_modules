@@ -18,11 +18,13 @@ import asyncio
 import random
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC
 from email.utils import parsedate_to_datetime
 from typing import Final, Protocol
 
 import httpx
+
+from sm_images.clock import utcnow as _utcnow
 
 __all__ = [
     "MAX_BACKOFF_SECONDS",
@@ -100,10 +102,6 @@ class DomainLimiter:
 def is_retryable_status(status: int) -> bool:
     """429, 408 and every 5xx are worth another try; other 4xx are permanent."""
     return status in _RETRYABLE or status >= 500
-
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC)
 
 
 def retry_after_seconds(response: httpx.Response | None) -> float | None:

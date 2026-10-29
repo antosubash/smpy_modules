@@ -31,7 +31,6 @@ import asyncio
 import contextlib
 import logging
 import uuid
-from datetime import UTC, datetime
 from typing import Any
 
 from simple_module_db import finalize_session, tenant_context
@@ -41,6 +40,7 @@ from sm_images.ai.cross_check import run_cross_check
 from sm_images.ai.group_store import GroupOutcome
 from sm_images.ai.reads import PromptResultRead
 from sm_images.ai.results import PromptWrite, write_size
+from sm_images.clock import utcnow as _now
 from sm_images.pipeline import registry
 from sm_images.pipeline.claim import LostLease
 
@@ -50,10 +50,6 @@ logger = logging.getLogger(__name__)
 SOURCE = "images:group_prompt"
 NEEDS_MEMBERS = ("results", "both")
 SENDS_IMAGES = ("images", "both")
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 def metering_key(tenant: str, job: Any, group_id: uuid.UUID, token: uuid.UUID) -> str:

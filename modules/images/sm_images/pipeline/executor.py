@@ -26,11 +26,11 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from typing import Any
 
 from simple_module_db import finalize_session
 
+from sm_images.clock import utcnow as _now
 from sm_images.pipeline.claim import LostLease, renew
 from sm_images.pipeline.finish import complete_step
 from sm_images.pipeline.load import Loaded, load_run
@@ -65,10 +65,6 @@ class Staging:
     """The runtime's sessions, for metering outside a request."""
     display_safe: bool = True
     """Whether the display copy may leave the system (``Loaded.display_safe``)."""
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 def bounded(outcome: StepOutcome, max_bytes: int) -> StepOutcome:

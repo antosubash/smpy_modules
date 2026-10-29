@@ -15,8 +15,8 @@ from datetime import datetime
 from simple_module_db.types import AwareDateTime
 from sqlmodel import Field
 
+from sm_images.clock import utcnow
 from sm_images.models._base import Base
-from sm_images.models._cols import utcnow
 
 
 class ObjectIntent(Base, table=True):  # ty: ignore[unsupported-base]
