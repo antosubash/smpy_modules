@@ -45,7 +45,7 @@ from sm_images.schemas.image import (
     ImagePatch,
     UploadResult,
 )
-from sm_images.services import gallery, present
+from sm_images.services import gallery, groups, present
 from sm_images.storage import store_for
 
 logger = logging.getLogger(__name__)
@@ -185,10 +185,27 @@ async def get_image(
 async def patch_image(
     image_id: uuid.UUID, body: ImagePatch, collection: ImageCollectionEdit, db=Depends(get_db)
 ) -> ImageOut:
-    if (body.lat is None) != (body.lng is None):
+    sent = body.model_fields_set
+    if not sent:
+        raise InvalidUpload("Nothing to change", constants.CODE_INVALID_METADATA)
+    located = bool(sent & {"lat", "lng"})
+    if located and (
+        "lat" not in sent or "lng" not in sent or (body.lat is None) != (body.lng is None)
+    ):
         raise InvalidUpload("lat and lng are set together", constants.CODE_INVALID_METADATA)
     image = await gallery.get(db, collection, image_id)
-    image = await gallery.set_location(db, collection, image, body.lat, body.lng)
+    if located:
+        image = await gallery.set_location(db, collection, image, body.lat, body.lng)
+    if sent & {"group_id", "group_role"}:
+        image = await groups.assign(
+            db,
+            collection,
+            image,
+            group_id=body.group_id,
+            group_role=body.group_role,
+            set_group="group_id" in sent,
+            set_role="group_role" in sent,
+        )
     return await present.present_one(db, collection, image)
 
 

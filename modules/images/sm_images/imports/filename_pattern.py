@@ -31,6 +31,7 @@ __all__ = [
     "PatternError",
     "canonical_role",
     "compile_pattern",
+    "derive",
     "group_key",
     "match_group",
 ]
@@ -91,22 +92,41 @@ def canonical_role(raw: object, roles: Sequence[str]) -> str | None:
     return role if len(role) <= constants.GROUP_ROLE_MAX else None
 
 
-def match_group(pattern: str, filename: str, roles: Sequence[str]) -> tuple[str | None, str | None]:
-    """``(group_key, role)`` the pattern derives from ``filename``; ``(None, None)``
-    for no match, an over-long input, an invalid pattern or a timeout."""
+TIMED_OUT: Final = "timed_out"
+NO_MATCH: Final = "no_match"
+MATCHED: Final = "matched"
+
+
+def derive(
+    compiled: regex.Pattern[str], filename: str, roles: Sequence[str]
+) -> tuple[str, str | None, str | None]:
+    """``(outcome, group_key, role)`` of an already compiled pattern on ``filename``.
+
+    The outcome tells a timeout from a plain non-match, which a regroup reports
+    apart. ``group_key`` is ``None`` unless the outcome is ``matched``.
+    """
     if not filename or len(filename) > MAX_INPUT_LENGTH:
-        return None, None
+        return NO_MATCH, None, None
     try:
-        found = compile_pattern(pattern).match(filename, timeout=MATCH_TIMEOUT_SECONDS)
-    except PatternError:
-        return None, None
+        found = compiled.match(filename, timeout=MATCH_TIMEOUT_SECONDS)
     except TimeoutError:
         logger.warning("images.import.pattern_timeout filename=%s", filename[:200])
-        return None, None
+        return TIMED_OUT, None, None
     if found is None:
-        return None, None
+        return NO_MATCH, None, None
     parts = found.groupdict()
     key = group_key(parts.get("group"))
     if key is None:
+        return NO_MATCH, None, None
+    return MATCHED, key, canonical_role(parts.get("role"), roles)
+
+
+def match_group(pattern: str, filename: str, roles: Sequence[str]) -> tuple[str | None, str | None]:
+    """``(group_key, role)`` the pattern derives from ``filename``; ``(None, None)``
+    for no match, an over-long input, an invalid pattern or a timeout."""
+    try:
+        compiled = compile_pattern(pattern)
+    except PatternError:
         return None, None
-    return key, canonical_role(parts.get("role"), roles)
+    _, key, role = derive(compiled, filename, roles)
+    return key, role

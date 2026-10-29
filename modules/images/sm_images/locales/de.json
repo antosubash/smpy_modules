@@ -136,6 +136,11 @@
     "upload_failed": "Die Datei konnte nicht gespeichert werden. Versuchen Sie es erneut.",
     "upload_in_progress": "Dieser Upload wird gerade abgeschlossen. Versuchen Sie es gleich noch einmal.",
     "upload_not_open": "Dieser Upload nimmt keine Teile mehr an.",
+    "group_not_found": "Diese Gruppe gibt es in dieser Sammlung nicht.",
+    "group_exists": "Diese Sammlung hat bereits eine Gruppe mit diesem Schlüssel.",
+    "invalid_role": "Diese Rolle gehört nicht zu den Gruppenrollen der Sammlung.",
+    "invalid_pattern": "Das Dateinamenmuster ist ungültig. Es braucht einen Teil (?P<group>...) und darf höchstens 500 Zeichen lang sein.",
+    "regroup_too_slow": "Das Muster hat für diese Sammlung zu lange gebraucht. Vereinfachen Sie es und versuchen Sie es erneut; es wurde nichts geändert.",
     "session_expired": "Ihre Sitzung ist abgelaufen. Sie werden zur Anmeldung weitergeleitet…",
     "server_error": "Auf dem Server ist ein Problem aufgetreten. Nichts ging verloren; versuchen Sie es gleich noch einmal.",
     "offline": "Sie scheinen offline zu sein. Nichts wurde gespeichert; versuchen Sie es erneut, sobald Sie verbunden sind.",
@@ -222,6 +227,37 @@
     "gallery": "Galerie",
     "pipeline": "Pipeline",
     "imports": "Importe"
+,
+    "groups": "Gruppen"
+  },
+  "groups": {
+    "description": "Fotos eines Standorts, je mit einer Rolle. Die Mitglieder erscheinen in der Rollenreihenfolge der Sammlung.",
+    "loading": "Gruppen werden geladen…",
+    "empty": "Diese Sammlung hat noch keine Gruppen.",
+    "refresh_failed": "Die Gruppen konnten nicht geladen werden.",
+    "load_more": "Mehr laden",
+    "image_count_one": "{count} Bild",
+    "image_count_other": "{count} Bilder",
+    "more_members": "+{count} weitere",
+    "no_members": "Keine Bilder in dieser Gruppe.",
+    "no_role": "Keine Rolle",
+    "open": "{name} öffnen",
+    "delete": "Gruppe löschen",
+    "delete_title": "Diese Gruppe löschen?",
+    "delete_body": "Die Gruppe wird entfernt. Ihre Bilder bleiben ohne Gruppe in der Sammlung.",
+    "delete_confirm": "Löschen",
+    "regroup": {
+      "open": "Nach Dateinamen gruppieren",
+      "title": "Bilder nach Dateinamen gruppieren",
+      "help": "Ein Muster mit einem Teil (?P<group>...) und optional (?P<role>...). Beispiel: (?P<group>[a-z0-9]+)_(?P<role>[a-z]+)(?=_|\\.|$)",
+      "pattern": "Dateinamenmuster",
+      "reassign": "Auch Bilder neu gruppieren, die schon eine Gruppe haben",
+      "preview": "Vorschau",
+      "apply": "Anwenden",
+      "close": "Schließen",
+      "result": "{matched} von {scanned} Dateinamen passten: {assigned} zuzuweisen, {unchanged} bereits wie abgeleitet, {already_grouped} in ihrer Gruppe belassen, {no_match} ohne Treffer, {timed_out} mit Zeitüberschreitung. {groups_created} neue Gruppen.",
+      "applied": "Bilder gruppiert"
+    }
   },
   "results": {
     "withheld": "Die Ausgabe dieses Schritts sehen nur Personen, die die Sammlung bearbeiten dürfen."

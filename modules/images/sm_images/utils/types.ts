@@ -189,3 +189,26 @@ export type ImportJob = {
 };
 
 export type ImportControl = 'pause' | 'resume' | 'restart' | 'retry-failed';
+
+export type GroupItem = {
+  id: string;
+  collection_id: string;
+  key: string;
+  name: string | null;
+  description: string | null;
+  image_count: number;
+  /** In the collection's role order; the list carries the first few only. */
+  members: ImageItem[];
+};
+
+export type RegroupResult = {
+  dry_run: boolean;
+  scanned: number;
+  matched: number;
+  no_match: number;
+  timed_out: number;
+  already_grouped: number;
+  unchanged: number;
+  assigned: number;
+  groups_created: number;
+};

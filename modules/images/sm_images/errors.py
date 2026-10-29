@@ -82,6 +82,18 @@ class InvalidUpload(ImagesError):  # noqa: N818 - HTTP vocabulary, deliberately
         self.code = code
 
 
+class InvalidGroup(Invalid):
+    """A 422 about a group, role or regroup pattern, with a code the console words."""
+
+    def __init__(self, detail: str, code: str) -> None:
+        super().__init__(detail)
+        self.code = code
+
+
+class GroupExists(Conflict):
+    code = constants.CODE_GROUP_EXISTS
+
+
 class UploadFailed(ImagesError):  # noqa: N818 - HTTP vocabulary, deliberately
     """A file of a batch failed for a reason that is not the client's."""
 

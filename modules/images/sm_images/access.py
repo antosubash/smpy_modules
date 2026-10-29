@@ -44,7 +44,7 @@ from sqlmodel import select
 
 from sm_images import constants
 from sm_images.errors import NotFound
-from sm_images.models import Collection, Image, Visibility
+from sm_images.models import Collection, Group, Image, Visibility
 
 COLLECTION_RESOURCE = "images.collection"
 """The ``sharing`` resource type, and ``ResourceShare.resource_type``."""
@@ -164,6 +164,24 @@ ImageCollectionOwner = Annotated[
 ]
 
 
+def group_collection_stmt(group_id: uuid.UUID) -> Any:
+    """The collection holding group ``group_id``, for the ``/groups/{group_id}``
+    routes: a group is reachable exactly when its collection is."""
+    return (
+        select(Collection)
+        .join(Group, Group.collection_id == Collection.id)
+        .where(Group.id == group_id)
+    )
+
+
+GroupCollectionView = Annotated[
+    Collection, Depends(RequiresResource(POLICY, ACTION_VIEW, group_collection_stmt))
+]
+GroupCollectionEdit = Annotated[
+    Collection, Depends(RequiresResource(POLICY, ACTION_EDIT, group_collection_stmt))
+]
+
+
 def can_view_original(
     who: ResourcePrincipal, image: Image, collection: Collection, *, protected: bool | None = None
 ) -> bool:
@@ -217,6 +235,8 @@ __all__ = [
     "CollectionEdit",
     "CollectionOwner",
     "CollectionView",
+    "GroupCollectionEdit",
+    "GroupCollectionView",
     "ImageCollectionEdit",
     "ImageCollectionOwner",
     "ImageCollectionView",

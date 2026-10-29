@@ -153,9 +153,13 @@ class DirectComplete(BaseModel):
 
 
 class ImagePatch(BaseModel):
-    """Set or clear the manual location. Both or neither."""
+    """Edit an image: its manual location (``lat`` and ``lng`` together, ``null``
+    clears) and/or its group (``group_id``, ``null`` leaves the group and so the
+    role) and ``group_role``. Only the fields sent change."""
 
     model_config = ConfigDict(extra="forbid")
 
-    lat: float | None = Field(ge=-90, le=90)
-    lng: float | None = Field(ge=-180, le=180)
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lng: float | None = Field(default=None, ge=-180, le=180)
+    group_id: uuid.UUID | None = None
+    group_role: str | None = Field(default=None, max_length=constants.GROUP_ROLE_MAX)

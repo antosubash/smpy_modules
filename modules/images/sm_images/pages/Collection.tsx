@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { VisibilitySelect } from '../components/collections/VisibilitySelect';
 import { Gallery } from '../components/gallery/Gallery';
 import { UploadButton } from '../components/gallery/UploadButton';
+import { GroupsTab } from '../components/groups/GroupsTab';
 import { ImagesLayout } from '../components/ImagesLayout';
 import { ImportsTab } from '../components/imports/ImportsTab';
 import { PipelineTab } from '../components/pipeline/PipelineTab';
@@ -27,7 +28,7 @@ type Props = {
   direct_upload_threshold: number;
 };
 
-type Tab = 'gallery' | 'pipeline' | 'imports';
+type Tab = 'gallery' | 'groups' | 'pipeline' | 'imports';
 
 /** `Images/Collection` - `/admin/images/{id}`. Tabs: the gallery, the pipeline
  *  and (for an editor) the imports; map and review arrive with their own tasks. */
@@ -45,7 +46,9 @@ function Collection({
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<Tab>('gallery');
   // The import routes are an edit on the collection, so the tab is an editor's.
-  const tabs: Tab[] = can_edit ? ['gallery', 'pipeline', 'imports'] : ['gallery', 'pipeline'];
+  const tabs: Tab[] = can_edit
+    ? ['gallery', 'groups', 'pipeline', 'imports']
+    : ['gallery', 'groups', 'pipeline'];
 
   const changeVisibility = async (next: Visibility) => {
     setSaving(true);
@@ -143,6 +146,13 @@ function Collection({
           </div>
           <div role="tabpanel" id="images-tabpanel" aria-labelledby={`images-tab-${tab}`}>
             {tab === 'gallery' && <Gallery gallery={gallery} />}
+            {tab === 'groups' && (
+              <GroupsTab
+                collectionId={collection.id}
+                canEdit={can_edit}
+                onChanged={() => void gallery.reload()}
+              />
+            )}
             {tab === 'pipeline' && (
               <PipelineTab collectionId={collection.id} canManage={can_manage} />
             )}

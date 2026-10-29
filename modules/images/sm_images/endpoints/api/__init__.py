@@ -11,6 +11,7 @@ from simple_module_hosting.csrf import RequiresCsrf
 
 from sm_images.endpoints.api import (
     collections,
+    groups,
     images,
     imports,
     pipeline,
@@ -34,6 +35,7 @@ router = APIRouter(dependencies=[Depends(bind_admin), Depends(RequiresCsrf())])
 router.include_router(collections.router)
 router.include_router(shares.router)
 router.include_router(images.router)
+router.include_router(groups.router)
 router.include_router(uploads.router)
 router.include_router(pipeline.router)
 router.include_router(serve.router)

@@ -142,6 +142,7 @@ CANDIDATES_SCAN: Final = 100
 non-members does not hide the members behind them."""
 SLUG_TAKEN_DETAIL: Final = "That slug is already in use"
 PUBLISH_REQUIRED_DETAIL: Final = "Publishing a collection needs the images.publish permission"
+GROUP_EXISTS_DETAIL: Final = "This collection already has a group with that key"
 BAD_CURSOR_DETAIL: Final = "Invalid cursor"
 DIRECTORY_UNAVAILABLE_CODE: Final = "user_directory_unavailable"
 DIRECTORY_UNAVAILABLE_DETAIL: Final = "No user directory is installed on this host"
@@ -161,6 +162,12 @@ EXTERNAL_SOURCE_MAX: Final = 100
 EXTERNAL_ID_MAX: Final = 255
 GROUP_KEY_MAX: Final = 200
 GROUP_ROLE_MAX: Final = 50
+GROUP_PREVIEW_MEMBERS: Final = 8
+"""Members a group in the list carries (the first by role order); the detail has them all."""
+GROUP_DETAIL_MEMBERS: Final = 500
+REGROUP_BUDGET_SECONDS: Final = 5.0
+"""How long planning a regroup may take before it is refused with nothing written."""
+REGROUP_CHUNK: Final = 500
 PROPERTIES_MAX_BYTES: Final = 16 * 1024
 """Largest ``properties`` object one image's metadata may carry, as compact JSON."""
 METADATA_MAX_BYTES: Final = 1024 * 1024
@@ -195,6 +202,11 @@ CODE_DIRECT_UNSUPPORTED: Final = "direct_upload_unsupported"
 CODE_UPLOAD_FAILED: Final = "upload_failed"
 CODE_UPLOAD_IN_PROGRESS: Final = "upload_in_progress"
 CODE_UPLOAD_NOT_OPEN: Final = "upload_not_open"
+CODE_GROUP_NOT_FOUND: Final = "group_not_found"
+CODE_GROUP_EXISTS: Final = "group_exists"
+CODE_INVALID_ROLE: Final = "invalid_role"
+CODE_INVALID_PATTERN: Final = "invalid_pattern"
+CODE_REGROUP_TOO_SLOW: Final = "regroup_too_slow"
 ERROR_CODES: Final = (
     CODE_UNSUPPORTED_TYPE,
     CODE_TOO_MANY_PIXELS,
@@ -209,6 +221,11 @@ ERROR_CODES: Final = (
     CODE_UPLOAD_FAILED,
     CODE_UPLOAD_IN_PROGRESS,
     CODE_UPLOAD_NOT_OPEN,
+    CODE_GROUP_NOT_FOUND,
+    CODE_GROUP_EXISTS,
+    CODE_INVALID_ROLE,
+    CODE_INVALID_PATTERN,
+    CODE_REGROUP_TOO_SLOW,
 )
 """Every code an upload can answer with; each has a translated sentence."""
 
