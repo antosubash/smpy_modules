@@ -1,6 +1,7 @@
 """The result types of the usage-metering contract (``Allowed``, ``Exceeded``,
-``Refunded``, ``Hold``) - split from ``metering`` for size. Import them from
-``sm_billing.contracts.metering``, which re-exports them."""
+``Refunded``, ``Hold``, ``Expired``, ``Refused``) - split from ``metering`` for
+size. Import them from ``sm_billing.contracts.metering``, which re-exports
+them."""
 
 from __future__ import annotations
 
@@ -17,6 +18,8 @@ class HoldStatus(StrEnum):
     EXPIRED = "expired"
     #: A ``swap`` the limit refused: its key's outcome, kept so a replay is refused too.
     REFUSED = "refused"
+    #: A ``swap`` that arrived after its ``not_after``: the key's outcome, nothing written.
+    EXPIRED_CALL = "expired_call"
 
 
 #: The statuses whose quantity counts toward the gauge.
@@ -86,3 +89,25 @@ class Hold:
     @property
     def ok(self) -> bool:
         return self.status in LIVE_HOLD_STATUSES
+
+
+@dataclass(frozen=True)
+class Expired:
+    """A ``swap`` that reached billing after its caller's ``not_after``: refused
+    without a write to the gauge, and kept as its key's outcome."""
+
+    idempotency_key: str
+    not_after: datetime
+
+    ok: ClassVar[bool] = False
+
+
+@dataclass(frozen=True)
+class Refused:
+    """``get_hold_by_key``: the key's swap was refused - ``reason`` is
+    ``"limit"`` (``Exceeded``) or ``"deadline"`` (``Expired``)."""
+
+    idempotency_key: str
+    reason: str
+
+    ok: ClassVar[bool] = False

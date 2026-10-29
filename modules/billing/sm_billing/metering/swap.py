@@ -26,6 +26,11 @@ be the same call (quantity, source *and* old hold), else
 ``IdempotencyConflict``. Two calls with one key: the first durable row wins
 and both answer with it. On Postgres two swaps of one old hold serialise on
 its row: the second finds it settled and has to fit its whole quantity.
+
+**The caller's deadline.** ``not_after`` is part of every call: one arriving
+later is ``Expired`` - no write to the gauge, recorded under the key - so a
+caller's delayed duplicate can never mutate after the deadline, even once
+its key's earlier outcome was purged by retention.
 """
 
 from __future__ import annotations
@@ -39,14 +44,17 @@ from sqlalchemy import select, update
 from sm_billing.contracts.metering import (
     LIVE_HOLD_STATUSES,
     Exceeded,
+    Expired,
     Hold,
     HoldNotFound,
     HoldStatus,
     IdempotencyConflict,
     MeterKind,
+    Refused,
 )
 from sm_billing.metering import hold_sql
 from sm_billing.metering.holds import HoldsMixin, _hold
+from sm_billing.metering.periods import as_utc
 from sm_billing.metering.tx import Counted, run_write
 from sm_billing.metering.validate import check_call, check_hold_id
 from sm_billing.models import UsageHold
@@ -55,6 +63,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 _REPLAY, _FOREIGN = "replay", "foreign"
+_REASONS = {HoldStatus.REFUSED.value: "limit", HoldStatus.EXPIRED_CALL.value: "deadline"}
 _REFUSAL = (UsageHold.refused_used, UsageHold.refused_limit, UsageHold.refused_requested)
 
 
@@ -85,7 +94,8 @@ class SwapMixin(HoldsMixin):
         idempotency_key: str,
         *,
         source: str,
-    ) -> Hold | Exceeded:
+        not_after: datetime,
+    ) -> Hold | Exceeded | Expired:
         check_call(tenant_id, meter, quantity, idempotency_key, source)
         if old_hold_id is not None:
             check_hold_id(old_hold_id)
@@ -105,6 +115,13 @@ class SwapMixin(HoldsMixin):
             "replaces_hold_id": old_hold_id,
         }
         freed = 0
+        if now > as_utc(not_after):  # the caller's deadline passed: nothing may change
+            late = self._record(
+                values, now, status=HoldStatus.EXPIRED_CALL.value, expires_at=as_utc(not_after)
+            )
+            if isinstance(await run_write(self._factory, None, late), Counted):
+                return Expired(idempotency_key, as_utc(not_after))
+            return await self._replay_swap(values)
 
         async def apply(session: AsyncSession) -> Counted | str | None:
             nonlocal freed
@@ -141,23 +158,18 @@ class SwapMixin(HoldsMixin):
         if outcome != _REPLAY:
             level = await self.in_use(tenant_id, meter)
             refused = Exceeded(level, limit or 0, quantity - freed, None)
-            outcome = await run_write(self._factory, None, self._refusal(values, now, refused))
+            fields = {"refused_" + k: getattr(refused, k) for k in ("used", "limit", "requested")}
+            record = self._record(values, now, status=HoldStatus.REFUSED.value, **fields)
+            outcome = await run_write(self._factory, None, record)
             if isinstance(outcome, Counted):  # the key's outcome is this refusal
                 return refused
         return await self._replay_swap(values)
 
     @staticmethod
-    def _refusal(values: dict, now: datetime, refused: Exceeded) -> Any:
-        """Record the refusal under the key, unless another call's row has it."""
-        row = {
-            **values,
-            "id": uuid4().hex,
-            "status": HoldStatus.REFUSED.value,
-            "settled_at": now,
-            "refused_used": refused.used,
-            "refused_limit": refused.limit,
-            "refused_requested": refused.requested,
-        }
+    def _record(values: dict, now: datetime, **outcome: Any) -> Any:
+        """Record a refusal (``outcome``) under the key, unless another call's row
+        has it: a settled row, counted by nothing."""
+        row = {**values, "id": uuid4().hex, "settled_at": now, **outcome}
 
         async def apply(session: AsyncSession) -> Counted | None:
             dialect = session.get_bind().dialect.name
@@ -166,7 +178,7 @@ class SwapMixin(HoldsMixin):
 
         return apply
 
-    async def _replay_swap(self, call: dict) -> Hold | Exceeded:
+    async def _replay_swap(self, call: dict) -> Hold | Exceeded | Expired:
         """The outcome first recorded under ``call``'s key, if it is the same call."""
         async with self._factory() as session:
             columns = (UsageHold.source, UsageHold.replaces_hold_id, *_REFUSAL)
@@ -184,7 +196,25 @@ class SwapMixin(HoldsMixin):
         if row.status == HoldStatus.REFUSED.value:  # as first answered
             used, limit, requested = row.refused_used, row.refused_limit, row.refused_requested
             return Exceeded(int(used), int(limit), int(requested), None)
+        if row.status == HoldStatus.EXPIRED_CALL.value:
+            return Expired(call["idempotency_key"], as_utc(row.expires_at))
         return _hold(row, replayed=True)
+
+    async def get_hold_by_key(
+        self, tenant_id: str, meter: str, idempotency_key: str
+    ) -> Hold | Refused | None:
+        """Read-only: the outcome recorded under the tenant's key, if any."""
+        async with self._factory() as session:
+            stmt = select(*hold_sql.HOLD_COLUMNS).where(
+                UsageHold.tenant_id == tenant_id,
+                UsageHold.meter == meter,
+                UsageHold.idempotency_key == idempotency_key,
+            )
+            row = (await session.execute(stmt)).one_or_none()
+        if row is None:
+            return None
+        reason = _REASONS.get(row.status)
+        return _hold(row) if reason is None else Refused(idempotency_key, reason)
 
     @staticmethod
     async def _foreign(session: AsyncSession, hold_id: str, tenant_id: str, meter: str) -> bool:

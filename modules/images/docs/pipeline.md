@@ -213,18 +213,33 @@ all the same.
   both: billing keeps each key's outcome - the hold, or the refusal - so a
   retry, or a call delayed past its claim, gets the same answer and never
   changes anything twice. A refused op is finished; nothing retries it.
-  Images never calls billing for an op older than 7 days
-  (`BILLING_OP_MAX_AGE`), far inside billing's 30-day retention of a key's
-  outcome: such an op is finished `op_expired`. `images.reconcile` also
-  repairs an image that lost a committed swap (billing reports the op's hold
-  committed but the image names another), or whose op expired leaving it
-  counted by nothing: the hold is installed (or a swap queued) where the
-  image's own no longer counts, else released. Every such decision - the
-  repair's, and a settler's "the image moved on" - is taken under the image's
-  row lock, re-reading the hold it names and its unfinished ops, and a release
-  is recorded there as a `release` op. The repair examines every done op once,
-  oldest first (200 per tenant per tick), and the janitor deletes done ops
-  after `janitor_grace_days` once the repair has examined them.
+  Every op carries a deadline, `not_after` = its creation plus 7 days
+  (`BILLING_OP_MAX_AGE`), and passes it to billing with every call; billing
+  itself refuses a call that arrives later (`Expired`, nothing written, kept
+  under the key), so no code path - an executor paused for a month, a settler,
+  the repair - can change a hold after the deadline, even once billing's
+  30-day retention has purged the key's earlier outcome. A settler that finds
+  an op past its deadline finishes it `op_expired`, first reading the key's
+  final outcome (`get_hold_by_key`) and keeping any hold it made on the op.
+  `images.reconcile` then repairs an image that lost a committed swap (billing
+  reports the op's hold committed but the image names another), or whose op
+  expired leaving it counted by nothing: the hold is installed (or a swap
+  queued) where the image's own no longer counts, else released. Every such
+  decision - the repair's, and a settler's "the image moved on" - is taken
+  under the image's row lock, re-reading the hold it names and its unfinished
+  ops, and a release is recorded there as a `release` op. The repair scans
+  each tenant's done ops from a persisted cursor, 200 per tick, wrapping to
+  the start at the end, so every op is examined and a deferred one is
+  revisited on the next lap; the janitor deletes done ops after
+  `janitor_grace_days` once the repair has examined them.
+- **Recovery bound.** A healthy op settles in the settle pass after its
+  commit. A crashed one is taken over once its claim expires (5 minutes for
+  a publication, 30 for an ingest) and settled by the next reconcile tick
+  (5 minutes). An op that cannot reach billing at all settles at its
+  deadline (7 days) as `op_expired`; the repair then reaches its image within
+  one lap of the tenant's backlog (200 ops a tick). Until then the image is
+  counted by its old hold, or by the new one, never by both for longer than
+  that lap.
 - **A lowered plan limit evicts nothing.** Stored images keep their holds; a
   swap that does not grow an image is always admitted, one that grows it is
   refused until the tenant is under the limit again.

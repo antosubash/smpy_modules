@@ -85,7 +85,7 @@ async def hold_slot(factory: Any, tenant: str, slot: Slot, size: int) -> Slot:
         )
         await finalize_session(db)
     try:
-        hold = await billing.swap(factory, tenant, None, size, key, meter)
+        hold = await billing.swap(factory, tenant, None, size, key, meter, not_after=op.not_after)
     except StorageQuotaExceeded as exc:
         async with factory() as db:
             await billing_ops.finish(db, op, None, f"{type(exc).__name__}: {exc}")

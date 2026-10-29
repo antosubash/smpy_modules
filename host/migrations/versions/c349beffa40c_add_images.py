@@ -129,6 +129,7 @@ def upgrade() -> None:
         sa.Column("claim_token", sa.String(length=64), nullable=True),
         sa.Column("claim_expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("repaired_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("not_after", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_images_billing_op")),
     )
     op.create_index(
@@ -139,6 +140,20 @@ def upgrade() -> None:
     )
     op.create_index(
         op.f("ix_images_billing_op_tenant_id"), "images_billing_op", ["tenant_id"], unique=False
+    )
+    op.create_table(
+        "images_billing_cursor",
+        sa.Column("tenant_id", sa.String(length=50), nullable=False),
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("last_op_id", sa.Integer(), nullable=False),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_images_billing_cursor")),
+        sa.UniqueConstraint("tenant_id", name="uq_images_billing_cursor_tenant"),
+    )
+    op.create_index(
+        op.f("ix_images_billing_cursor_tenant_id"),
+        "images_billing_cursor",
+        ["tenant_id"],
+        unique=False,
     )
     op.create_table(
         "images_group",
@@ -908,6 +923,8 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_images_group_tenant_id"), table_name="images_group")
     op.drop_index(op.f("ix_images_group_collection_id"), table_name="images_group")
     op.drop_table("images_group")
+    op.drop_index(op.f("ix_images_billing_cursor_tenant_id"), table_name="images_billing_cursor")
+    op.drop_table("images_billing_cursor")
     op.drop_index(op.f("ix_images_billing_op_tenant_id"), table_name="images_billing_op")
     op.drop_index("ix_images_billing_op_due", table_name="images_billing_op")
     op.drop_table("images_billing_op")

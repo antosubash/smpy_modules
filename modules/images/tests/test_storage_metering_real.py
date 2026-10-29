@@ -109,7 +109,7 @@ async def test_codex_v_trace_no_images_hold_can_lapse(real):
         key, claim = billing.hold_key(image, "grow"), timedelta(minutes=5)
         op = await billing_ops.open_op(db, OP_SWAP, image, 700, key, claim=claim, old=old)
         await finalize_session(db)
-    grown = await billing.swap(factory, T, old, 700, op.key)
+    grown = await billing.swap(factory, T, old, 700, op.key, not_after=op.not_after)
     assert await _level(factory) == 700  # counted once, by the swapped hold
     later = datetime.now(UTC) + timedelta(minutes=6)
     assert await billing_ops.settle(factory, T, now=later) >= 1  # takeover, then the shrink
@@ -149,7 +149,7 @@ async def test_codex_trace_t_against_real_billing(real):
         plan.limits = {billing.METER: 5000}
         await s.commit()
     with pytest.raises(StorageQuotaExceeded):  # the delayed call: the key's outcome
-        await billing.swap(factory, T, old, 1200, key)
+        await billing.swap(factory, T, old, 1200, key, not_after=datetime.now(UTC) + claim)
     holds = await _holds(factory)
     assert holds[old][:2] == ("committed", 900) and await _level(factory) == 900
     assert sorted(h[0] for h in holds.values()) == ["committed", "refused"]

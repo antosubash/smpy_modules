@@ -26,12 +26,12 @@ from simple_module_db import finalize_session
 from sqlalchemy import select, update
 
 from sm_images import billing, billing_ops
-from sm_images.billing_settle import ClaimLost, Op
+from sm_images.billing_settle import OP_EXPIRED, ClaimLost, Op, deadline
 from sm_images.errors import StorageQuotaExceeded
 from sm_images.models import BillingOp, Image
 from sm_images.models.billing_op import NO_HOLD, OP_SWAP
 
-__all__ = ["finish_op", "lock", "release_hold", "swap"]
+__all__ = ["expire", "finish_op", "lock", "release_hold", "swap"]
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +46,14 @@ async def swap(factory: Any, tenant: str, op: Op, mine: Any, meter: Any) -> None
         await _fix_old(factory, mine, fixed)
     old = None if fixed == NO_HOLD else fixed
     try:
-        hold = await billing.swap(factory, tenant, old, op.quantity, mine.key, meter)
+        hold = await billing.swap(
+            factory, tenant, old, op.quantity, mine.key, meter, not_after=deadline(op)
+        )
     except StorageQuotaExceeded as exc:  # nothing changed: the old hold still counts
         await finish_op(factory, mine, None, f"{type(exc).__name__}: {exc}")
+        return
+    except billing.SwapExpired:  # past the deadline: billing changed nothing
+        await expire(factory, tenant, mine, meter)
         return
     if hold is None:
         await finish_op(factory, mine, None)
@@ -148,6 +153,16 @@ async def _install(
             await db.rollback()
             raise ClaimLost(op.id)
         await finalize_session(db)
+
+
+async def expire(factory: Any, tenant: str, mine: Any, meter: Any) -> None:
+    """Finish an op at its deadline, without a billing write. Billing refuses
+    every call under the key from now on, so the outcome it recorded - read
+    here - is final: a hold the key made is kept on the op (``hold_id``) for
+    the repair to install or release; none means the call never landed."""
+    found = await meter.get_hold_by_key(tenant, billing.METER, mine.key)
+    hold_id = getattr(found, "id", None)
+    await finish_op(factory, mine, hold_id, OP_EXPIRED)
 
 
 async def release_hold(meter: Any, hold_id: str | None) -> None:

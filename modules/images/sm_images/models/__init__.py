@@ -7,7 +7,7 @@ imports the package - Alembic autogenerate and the test harness rely on it.
 from __future__ import annotations
 
 from sm_images.models._base import Base
-from sm_images.models.billing_op import BillingOp
+from sm_images.models.billing_op import BillingOp, BillingRepairCursor
 from sm_images.models.collection import Collection
 from sm_images.models.enums import (
     ImportKind,
@@ -36,6 +36,7 @@ from sm_images.models.upload_session import UploadSession
 __all__ = [
     "Base",
     "BillingOp",
+    "BillingRepairCursor",
     "Collection",
     "Group",
     "Image",

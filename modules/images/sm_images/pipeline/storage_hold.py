@@ -106,7 +106,9 @@ async def reserve(runtime: Runtime, loaded: Any, staged: Any) -> Planned | None:
         return Planned(planned, queue=True)
     op, old = opened
     try:
-        hold = await billing.swap(factory, loaded.tenant, old, planned, op.key, meter)
+        hold = await billing.swap(
+            factory, loaded.tenant, old, planned, op.key, meter, not_after=op.not_after
+        )
     except StorageQuotaExceeded as exc:  # nothing changed: the old hold still counts
         async with factory() as db:
             await billing_ops.finish(db, op, None, f"{type(exc).__name__}: {exc}")

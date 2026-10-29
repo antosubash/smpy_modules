@@ -33,7 +33,7 @@ from sqlalchemy import delete, select, update
 
 from sm_images import billing
 from sm_images.models import BillingOp
-from sm_images.models.billing_op import NO_HOLD, OP_RELEASE, OP_SWAP
+from sm_images.models.billing_op import BILLING_OP_MAX_AGE, NO_HOLD, OP_RELEASE, OP_SWAP
 
 __all__ = [
     "Claimed",
@@ -63,6 +63,8 @@ class Claimed:
     op_id: int
     token: str
     key: str
+    not_after: datetime | None = None
+    """The op's deadline, passed to billing with its call."""
 
 
 async def open_op(
@@ -84,13 +86,18 @@ async def open_op(
         quantity=qty,
         idempotency_key=key,
         old_hold_id=old or NO_HOLD,
+        not_after=_deadline(),
         claim_token=token,
         claim_expires_at=datetime.now(UTC) + claim,
     )
     db.add(row)
     await db.flush()
     assert row.id is not None
-    return Claimed(row.id, token, key)
+    return Claimed(row.id, token, key, row.not_after)
+
+
+def _deadline() -> datetime:
+    return datetime.now(UTC) + BILLING_OP_MAX_AGE
 
 
 def _mine(claimed: Claimed) -> list[Any]:
@@ -136,6 +143,7 @@ async def add_swap(db: Any, image_id: uuid.UUID, qty: int, *, factory: Any = Non
         image_id=image_id,
         quantity=qty,
         idempotency_key=billing.hold_key(image_id, f"swap-{uuid.uuid4().hex}"),
+        not_after=_deadline(),
     )
     db.add(row)
     await db.flush()

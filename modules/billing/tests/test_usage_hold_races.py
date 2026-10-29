@@ -19,7 +19,7 @@ from sm_billing.metering.service import UsageService
 from sm_billing.metering.sweeper import expire_due
 from sm_billing.models import Base
 from sqlalchemy.pool import NullPool
-from usage_helpers import GAUGE, Clock, gauge_service, hold_statuses, in_use, seed_limits
+from usage_helpers import FAR, GAUGE, Clock, gauge_service, hold_statuses, in_use, seed_limits
 
 ROUNDS = 20
 postgres_only = pytest.mark.skipif(not database_is_postgres(), reason="SM_TEST_DATABASE_URL")
@@ -116,10 +116,14 @@ async def _two_swaps_of_one_old_hold_free_it_once(race: Race) -> None:
     and the old hold's quantity comes back exactly once."""
     for round_ in range(ROUNDS // 2):
         tenant = await seed_limits(race.factory, {GAUGE: 10})
-        old = await race.pick(0).swap(tenant, GAUGE, None, 6, f"o{round_}", source="t")
+        old = await race.pick(0).swap(
+            tenant, GAUGE, None, 6, f"o{round_}", source="t", not_after=FAR
+        )
         outcomes = await asyncio.gather(
             *(
-                race.pick(i).swap(tenant, GAUGE, old.id, 9, f"w{round_}-{i}", source="t")
+                race.pick(i).swap(
+                    tenant, GAUGE, old.id, 9, f"w{round_}-{i}", source="t", not_after=FAR
+                )
                 for i in (0, 1)
             )
         )
@@ -127,9 +131,12 @@ async def _two_swaps_of_one_old_hold_free_it_once(race: Race) -> None:
         assert await in_use(race.factory, tenant) == 9
         assert await hold_statuses(race.factory, tenant) == ["committed", "refused", "released"]
     free = await seed_limits(race.factory, {})
-    old = await race.pick(0).swap(free, GAUGE, None, 6, "o", source="t")
+    old = await race.pick(0).swap(free, GAUGE, None, 6, "o", source="t", not_after=FAR)
     both = await asyncio.gather(
-        *(race.pick(i).swap(free, GAUGE, old.id, 4, f"u{i}", source="t") for i in (0, 1))
+        *(
+            race.pick(i).swap(free, GAUGE, old.id, 4, f"u{i}", source="t", not_after=FAR)
+            for i in (0, 1)
+        )
     )
     assert all(isinstance(o, Hold) for o in both)
     assert await in_use(race.factory, free) == 8  # 6 freed once, 4 + 4 held

@@ -41,9 +41,11 @@ from sm_billing.contracts.metering_results import (
     LIVE_HOLD_STATUSES,
     Allowed,
     Exceeded,
+    Expired,
     Hold,
     HoldStatus,
     Refunded,
+    Refused,
 )
 
 if TYPE_CHECKING:
@@ -173,15 +175,27 @@ class UsageMeter(Protocol):
         idempotency_key: str,
         *,
         source: str,
-    ) -> Hold | Exceeded:
+        not_after: datetime,
+    ) -> Hold | Exceeded | Expired:
         """Reserve and commit a hold of ``quantity`` and release ``old_hold_id``,
         in one transaction (its own). The limit is checked on the net delta
         (``quantity`` less the old hold's): a delta of zero or less is always
         admitted. An old hold already settled, or unknown, frees nothing - a
         plain reserve and commit; one of another tenant or meter raises
         ``HoldNotFound`` and writes nothing. ``Exceeded`` (``requested`` = the
-        delta) leaves the old hold counting. A replayed key returns the same
-        hold, in its current state, whatever ``old_hold_id`` it names."""
+        delta) leaves the old hold counting. ``not_after`` is the caller's
+        deadline: a call arriving later is ``Expired`` and writes nothing to the
+        gauge. Every outcome is kept under the key, and a replay of the same
+        call (quantity, ``source``, old hold) returns it; another call under
+        the key is an ``IdempotencyConflict``."""
+        ...
+
+    async def get_hold_by_key(
+        self, tenant_id: str, meter: str, idempotency_key: str
+    ) -> Hold | Refused | None:
+        """Read-only: the outcome a ``swap`` (or ``reserve``) recorded under the
+        key - its ``Hold``, in its current state, or ``Refused`` - or ``None``
+        when the tenant has no such key (never made, or purged by retention)."""
         ...
 
     async def get_hold(self, tenant_id: str, hold_id: str) -> Hold | None:
@@ -227,6 +241,7 @@ __all__ = [
     "LIVE_HOLD_STATUSES",
     "Allowed",
     "Exceeded",
+    "Expired",
     "Hold",
     "HoldExpired",
     "HoldNotFound",
@@ -236,6 +251,7 @@ __all__ = [
     "MeterKind",
     "QuotaExceededError",
     "Refunded",
+    "Refused",
     "UnknownMeterError",
     "UsageMeter",
     "usage_meter",

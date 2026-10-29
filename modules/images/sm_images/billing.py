@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import importlib
 import uuid
+from datetime import datetime
 from functools import partial
 from importlib.util import find_spec
 from typing import Any
@@ -39,6 +40,7 @@ from sm_images import constants
 from sm_images.errors import StorageQuotaExceeded
 
 __all__ = [
+    "SwapExpired",
     "billing_installed",
     "check",
     "factory_of",
@@ -101,17 +103,34 @@ async def check(app: Any, tenant: str, qty: int) -> None:
         raise StorageQuotaExceeded(FULL)
 
 
+class SwapExpired(Exception):  # noqa: N818 - reads as the condition
+    """Billing refused the swap: it arrived after its op's deadline."""
+
+
 async def swap(
-    session_factory: Any, tenant: str, old: str | None, qty: int, key: str, meter: Any = None
+    session_factory: Any,
+    tenant: str,
+    old: str | None,
+    qty: int,
+    key: str,
+    meter: Any = None,
+    *,
+    not_after: datetime,
 ) -> Any:
     """Billing's atomic swap: a committed hold of ``qty`` bytes in place of
     ``old`` (billing's ``Hold``), or ``None`` without billing (or nothing to
     hold). :class:`StorageQuotaExceeded` when the net delta does not fit -
-    ``old`` then still counts. A replayed ``key`` returns the same hold."""
+    ``old`` then still counts; :class:`SwapExpired` when the call reached
+    billing after ``not_after`` (nothing changed). A replayed ``key`` returns
+    the same outcome."""
     meter = meter or storage_meter(session_factory)
     if meter is None or qty < 1:
         return None
-    outcome = await meter.swap(tenant, METER, old, int(qty), key, source=SOURCE)
+    outcome = await meter.swap(
+        tenant, METER, old, int(qty), key, source=SOURCE, not_after=not_after
+    )
+    if not outcome.ok and getattr(outcome, "not_after", None) is not None:
+        raise SwapExpired(key)
     if not outcome.ok and getattr(outcome, "id", None) is None:
         raise StorageQuotaExceeded(FULL)
     return outcome

@@ -16,14 +16,18 @@ from __future__ import annotations
 import asyncio
 import uuid
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 from sm_billing.contracts.metering import (
     Allowed,
     Exceeded,
+    Expired,
     Hold,
     HoldNotFound,
     IdempotencyConflict,
+    Refused,
 )
 from sm_images import billing
 from sm_images.models import BillingOp, Image
@@ -37,8 +41,8 @@ LIVE = ("held", "committed")
 class FakeGauge:
     limit: int | None = None
     holds: dict[str, Hold] = field(default_factory=dict)
-    keys: dict[str, str | None] = field(default_factory=dict)
-    """Each key's outcome: its hold, or ``None`` for a refusal."""
+    keys: dict[str, Any] = field(default_factory=dict)
+    """Each key's outcome: its hold id, or the ``Exceeded``/``Expired`` answered."""
     calls_by_key: dict[str, tuple] = field(default_factory=dict)
     calls: list[tuple[str, ...]] = field(default_factory=list)
     fail_swap: int = 0
@@ -46,6 +50,13 @@ class FakeGauge:
     fail_release: int = 0
     delay: float = 0.0
     """Seconds a swap takes before billing decides: concurrent swaps interleave."""
+    later: timedelta = timedelta(0)
+    """How far billing's clock runs ahead of real time (days passing)."""
+
+    def forget(self, key: str) -> None:
+        """Billing's retention purged the key's settled outcome."""
+        self.keys.pop(key, None)
+        self.calls_by_key.pop(key, None)
 
     @property
     def level(self) -> int:
@@ -66,7 +77,9 @@ class FakeGauge:
             return Exceeded(self.level, self.limit, qty, None)
         return Allowed(self.level, self.limit, None)
 
-    async def swap(self, tenant_id, meter, old_hold_id, quantity, idempotency_key, *, source):
+    async def swap(
+        self, tenant_id, meter, old_hold_id, quantity, idempotency_key, *, source, not_after=None
+    ):
         self.calls.append(("swap", str(old_hold_id), str(quantity), idempotency_key))
         if self.delay:
             await asyncio.sleep(self.delay)
@@ -78,24 +91,37 @@ class FakeGauge:
             outcome, first = self.keys[idempotency_key], self.calls_by_key[idempotency_key]
             if first != call:
                 raise IdempotencyConflict(idempotency_key)
-            if outcome is None:
-                return Exceeded(self.level, self.limit or 0, quantity, None)
-            return self.holds[outcome]
+            return outcome if not isinstance(outcome, str) else self.holds[outcome]
         old = self.holds.get(old_hold_id) if old_hold_id else None
         if old is not None and old.tenant_id != tenant_id:
             raise HoldNotFound(old_hold_id)
         self.calls_by_key[idempotency_key] = call
+        late = not_after is not None and datetime.now(UTC) + self.later > not_after
+        if late:  # billing enforces the deadline (``None``: a test seeding, no deadline)
+            self.keys[idempotency_key] = Expired(idempotency_key, not_after)
+            return self.keys[idempotency_key]
         freed = old.quantity if old is not None and old.status in LIVE else 0
         grows = quantity > freed and self.limit is not None
         if grows and self.level - freed + quantity > self.limit:
-            self.keys[idempotency_key] = None  # the refusal is the key's outcome
-            return Exceeded(self.level, self.limit, quantity - freed, None)
+            refused = Exceeded(self.level, self.limit, quantity - freed, None)
+            self.keys[idempotency_key] = refused  # the refusal is the key's outcome
+            return refused
         if freed:
             self._set(old, "released")
         hold = Hold(uuid.uuid4().hex, tenant_id, meter, quantity, "committed", None)
         self.holds[hold.id] = hold
         self.keys[idempotency_key] = hold.id
         return hold
+
+    async def get_hold_by_key(self, tenant_id: str, meter: str, key: str):
+        self.calls.append(("get_hold_by_key", key))
+        outcome = self.keys.get(key)
+        if outcome is None:
+            return None
+        if isinstance(outcome, str):
+            hold = self.holds[outcome]
+            return hold if hold.tenant_id == tenant_id else None
+        return Refused(key, "deadline" if isinstance(outcome, Expired) else "limit")
 
     async def get_hold(self, tenant_id: str, hold_id: str) -> Hold | None:
         self.calls.append(("get_hold", hold_id))

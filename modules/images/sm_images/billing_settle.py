@@ -29,9 +29,14 @@ from sqlalchemy.orm import aliased
 
 from sm_images import billing, billing_ops
 from sm_images.models import BillingOp
-from sm_images.models.billing_op import OP_RELEASE, OP_SWAP
+from sm_images.models.billing_op import (  # noqa: F401 - re-exported
+    BILLING_OP_MAX_AGE,
+    OP_EXPIRED,
+    OP_RELEASE,
+    OP_SWAP,
+)
 
-__all__ = ["CLAIM", "ClaimLost", "Op", "claim", "settle"]
+__all__ = ["CLAIM", "ClaimLost", "Op", "claim", "deadline", "settle"]
 
 logger = logging.getLogger(__name__)
 PAGE = 100
@@ -39,10 +44,6 @@ PAGES = 10
 CLAIM = timedelta(minutes=5)
 BACKOFF = timedelta(minutes=1)
 BACKOFF_MAX = timedelta(hours=1)
-BILLING_OP_MAX_AGE = timedelta(days=7)
-"""No op older than this calls billing: billing keeps a key's outcome for 30
-days after it settles (its retention), so a call is always answered by it."""
-OP_EXPIRED = "op_expired"
 
 
 _COLUMNS = (
@@ -55,6 +56,7 @@ _COLUMNS = (
     BillingOp.idempotency_key,
     BillingOp.attempts,
     BillingOp.created_at,
+    BillingOp.not_after,
 )
 
 
@@ -71,6 +73,7 @@ class Op:
     idempotency_key: str | None
     attempts: int
     created_at: datetime
+    not_after: datetime | None
 
 
 class ClaimLost(Exception):  # noqa: N818 - reads as the condition
@@ -150,8 +153,8 @@ async def _attempt(factory: Any, tenant: str, op_id: int, now: datetime) -> bool
         meter = billing.storage_meter(factory)
         if meter is None:
             await run.finish_op(factory, mine, None)
-        elif op.op != OP_RELEASE and _expired(op, now):
-            await run.finish_op(factory, mine, None, OP_EXPIRED)  # the repair takes over
+        elif op.op != OP_RELEASE and now > deadline(op):
+            await run.expire(factory, tenant, mine, meter)  # the repair takes over
         elif op.op == OP_RELEASE:
             await run.release_hold(meter, op.hold_id)
             await run.finish_op(factory, mine, op.hold_id)
@@ -166,9 +169,16 @@ async def _attempt(factory: Any, tenant: str, op_id: int, now: datetime) -> bool
     return True
 
 
-def _expired(op: Op, now: datetime) -> bool:
-    created = op.created_at if op.created_at.tzinfo else op.created_at.replace(tzinfo=UTC)
-    return created < now - BILLING_OP_MAX_AGE
+def _utc(at: datetime) -> datetime:
+    return at if at.tzinfo else at.replace(tzinfo=UTC)
+
+
+def deadline(op: Op) -> datetime:
+    """The op's ``not_after`` (an op written before it had one: creation plus
+    :data:`BILLING_OP_MAX_AGE`)."""
+    if op.not_after is not None:
+        return _utc(op.not_after)
+    return _utc(op.created_at) + BILLING_OP_MAX_AGE
 
 
 async def _failed(factory: Any, op: Op, token: str, now: datetime, exc: Exception) -> None:
