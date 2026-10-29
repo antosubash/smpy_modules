@@ -13,8 +13,11 @@ Celery here, everything else inside the bodies. Routing and beat are in
 * ``images.run_regroup(job_id, generation)`` - one filename-pattern regroup of a
   big collection, in fenced chunks (:mod:`sm_images.regroup`); a stale
   ``generation`` does nothing.
-* ``images.run_prompt(prompt_id, scope)`` - request an image prompt's runs
-  over a whole collection and dispatch them (:mod:`sm_images.ai.run`).
+* ``images.run_prompt(prompt_id, scope)`` - request a prompt's runs over a
+  whole collection (its images, or its groups for a group prompt) and
+  dispatch them (:mod:`sm_images.ai.run`).
+* ``images.run_group_prompt(prompt_id, group_id)`` - claim and execute one
+  requested group run (:mod:`sm_images.ai.group_run`).
 * ``images.reconcile()`` - the five-minute recovery beat, also sent once when a
   worker comes up (``worker_ready``).
 * ``images.janitor(dry_run=False)`` - the daily clean-up beat: abandoned
@@ -43,6 +46,7 @@ from sm_images.task_config import (
     QUEUE_DEFAULT,
     RECONCILE,
     RESTART_COLLECTION,
+    RUN_GROUP_PROMPT,
     RUN_PROMPT,
     RUN_REGROUP,
     RUN_STEP,
@@ -102,6 +106,18 @@ def run_prompt_task(prompt_id: str, scope: str) -> int:
         raise ValueError(f"unknown prompt run scope {scope!r}")
     return run_task(
         lambda runtime, tenant: run_prompt(runtime, tenant, uuid.UUID(prompt_id), scope)
+    )
+
+
+@shared_task(name=RUN_GROUP_PROMPT, stuck_after=STUCK_AFTER_SECONDS)
+def run_group_prompt_task(prompt_id: str, group_id: str) -> bool:
+    from sm_images.ai.group_run import run_group
+    from sm_images.pipeline.worker_runtime import run_task
+
+    return run_task(
+        lambda runtime, tenant: run_group(
+            runtime, tenant, uuid.UUID(prompt_id), uuid.UUID(group_id)
+        )
     )
 
 

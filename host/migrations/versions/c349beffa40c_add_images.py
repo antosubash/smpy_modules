@@ -228,13 +228,31 @@ def upgrade() -> None:
         sa.Column("inputs", sa.String(length=20), nullable=True),
         sa.Column("auto_run", sa.Boolean(), nullable=False),
         sa.Column("preset_id", sa.String(length=100), nullable=True),
+        sa.Column("preset_prompt_id", sa.String(length=200), nullable=True),
+        sa.Column("member_prompt_id", sa.Uuid(), nullable=True),
         sa.Column("revision", sa.Integer(), nullable=False),
         sa.ForeignKeyConstraint(
             ["collection_id"],
             ["images_collection.id"],
             name=op.f("fk_images_prompt_collection_id_images_collection"),
         ),
+        sa.ForeignKeyConstraint(
+            ["member_prompt_id"],
+            ["images_prompt.id"],
+            name=op.f("fk_images_prompt_member_prompt_id_images_prompt"),
+            ondelete="SET NULL",
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_images_prompt")),
+        sa.UniqueConstraint("tenant_id", "collection_id", "name", name="uq_images_prompt_name"),
+        sa.UniqueConstraint(
+            "tenant_id", "collection_id", "preset_prompt_id", name="uq_images_prompt_preset_prompt"
+        ),
+    )
+    op.create_index(
+        op.f("ix_images_prompt_member_prompt_id"),
+        "images_prompt",
+        ["member_prompt_id"],
+        unique=False,
     )
     op.create_index(
         op.f("ix_images_prompt_collection_id"), "images_prompt", ["collection_id"], unique=False
@@ -441,6 +459,9 @@ def upgrade() -> None:
         sa.Column("reviewed_by", sa.String(length=255), nullable=True),
         sa.Column("reviewed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("history", sa.JSON(), nullable=False),
+        sa.Column("lease_token", sa.Uuid(), nullable=True),
+        sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("ai_started_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(
             ["group_id"],
             ["images_group.id"],
@@ -829,6 +850,7 @@ def downgrade() -> None:
     )
     op.drop_index(op.f("ix_images_image_collection_id"), table_name="images_image")
     op.drop_table("images_image")
+    op.drop_index(op.f("ix_images_prompt_member_prompt_id"), table_name="images_prompt")
     op.drop_index(op.f("ix_images_prompt_tenant_id"), table_name="images_prompt")
     op.drop_index(op.f("ix_images_prompt_collection_id"), table_name="images_prompt")
     op.drop_table("images_prompt")

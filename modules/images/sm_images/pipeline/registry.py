@@ -18,6 +18,7 @@ __all__ = [
     "STEP_QUEUES",
     "CyclicRequiresError",
     "DuplicateStepError",
+    "InvalidPresetError",
     "InvalidStepError",
     "RegistryFrozenError",
     "ReservedStepIdError",
@@ -66,6 +67,22 @@ class TooManyDisplayMutators(ValueError):  # noqa: N818 - name fixed by the plan
 
 class InvalidStepError(TypeError):
     """An object registered as a step does not satisfy the ``Step`` protocol."""
+
+
+class InvalidPresetError(ValueError):
+    """A preset whose prompt schema ``schema_safety`` refuses (it fails at boot)."""
+
+
+def _check_schemas(preset: Preset) -> None:
+    from sm_images.ai.schema_safety import UnsafeSchema, check
+
+    for spec in preset.prompts:
+        if spec.output_schema is None:
+            continue
+        try:
+            check(spec.output_schema)
+        except UnsafeSchema as exc:
+            raise InvalidPresetError(f"preset {preset.id!r}, prompt {spec.id}: {exc}") from exc
 
 
 _lock = threading.RLock()
@@ -138,6 +155,7 @@ def register_preset(preset: Preset) -> None:
             raise ReservedStepIdError(f"preset id {preset.id!r} must match [a-z][a-z0-9_]*")
         if preset.id in _presets:
             raise DuplicateStepError(f"preset {preset.id!r} is already registered")
+        _check_schemas(preset)
         _presets[preset.id] = preset
 
 

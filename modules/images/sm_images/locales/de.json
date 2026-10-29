@@ -240,19 +240,27 @@
     "retry_after_too_long": "Der Server wollte mehr als einen Tag Wartezeit vor einem neuen Versuch; das Bild wurde übersprungen.",
     "unsafe_output_schema": "Das Ausgabeschema ist nicht zulässig: Es ist zu groß oder zu tief verschachtelt, verweist nach außen oder nutzt ein nicht unterstütztes Schlüsselwort.",
     "prompt_name_taken": "In dieser Sammlung gibt es bereits einen Prompt mit diesem Namen.",
-    "invalid_prompt_inputs": "Eingaben gelten nur für Gruppen-Prompts.",
-    "group_prompt_run_unsupported": "Gruppen-Prompts laufen pro Gruppe, nicht pro Bild.",
+    "invalid_prompt_inputs": "Eingaben gelten nur für Gruppen-Prompts, und ein Gruppen-Prompt über Ergebnisse braucht einen Bild-Prompt dieser Sammlung.",
     "ai_unavailable": "Das KI-Modul ist nicht installiert.",
     "display_not_ready": "Das Bild ist noch nicht geschwärzt und wurde daher nicht an den KI-Anbieter gesendet.",
     "ai_not_configured": "Die KI ist nicht eingerichtet. Lege in den KI-Einstellungen einen Anbieter und ein Modell fest.",
-    "ai_error": "Der KI-Anbieter hat einen Fehler gemeldet."
+    "ai_error": "Der KI-Anbieter hat einen Fehler gemeldet.",
+    "invalid_run_target": "Ein Bild-Prompt läuft auf Bildern, ein Gruppen-Prompt auf Gruppen.",
+    "prompt_in_use": "Ein Gruppen-Prompt verwendet die Ergebnisse dieses Prompts. Ändern Sie zuerst diesen Gruppen-Prompt.",
+    "preset_not_found": "Diese Vorlage ist nicht installiert.",
+    "group_empty": "Die Gruppe enthält keine Bilder.",
+    "group_too_large": "Die Gruppe enthält zu viele Bilder für eine Zusammenfassung.",
+    "member_prompt_missing": "Der Bild-Prompt, den dieser Gruppen-Prompt liest, existiert nicht mehr.",
+    "member_results_missing": "Für einige Bilder der Gruppe fehlt ein Ergebnis, daher ist die Zusammenfassung unvollständig.",
+    "no_usable_inputs": "Aus der Gruppe konnte nichts an den KI-Anbieter gesendet werden."
   },
   "tabs": {
     "label": "Bereiche der Sammlung",
     "gallery": "Galerie",
     "pipeline": "Pipeline",
     "imports": "Importe",
-    "groups": "Gruppen"
+    "groups": "Gruppen",
+    "prompts": "Prompts"
   },
   "groups": {
     "description": "Fotos eines Standorts, je mit einer Rolle. Die Mitglieder erscheinen in der Rollenreihenfolge der Sammlung.",
@@ -414,6 +422,86 @@
       "delete_body": "Der Auftrag und seine Datensätze werden entfernt. Bereits hinzugefügte Bilder bleiben in der Sammlung.",
       "delete_confirm": "Import löschen",
       "control_failed": "Der Import konnte nicht geändert werden: {reason}"
+    }
+  },
+  "prompts": {
+    "intro": "Fragen Sie ein KI-Modell zu jedem Bild oder zu jeder Bildgruppe. Ein Schema macht die Antwort strukturiert.",
+    "empty": "Noch keine Prompts.",
+    "new": "Neuer Prompt",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "delete_title": "Diesen Prompt löschen?",
+    "delete_body": "Seine Ergebnisse werden mit gelöscht.",
+    "delete_confirm": "Prompt löschen",
+    "deleted": "Prompt gelöscht",
+    "saved": "Prompt gespeichert",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "create": "Erstellen",
+    "name": "Name",
+    "instruction": "Anweisung",
+    "scope": {
+      "label": "Läuft auf",
+      "image": "Jedem Bild",
+      "group": "Jeder Gruppe"
+    },
+    "inputs": {
+      "label": "Fasst zusammen",
+      "images": "Die Bilder der Gruppe",
+      "results": "Das Ergebnis jedes Bildes",
+      "both": "Bilder und Ergebnisse"
+    },
+    "member": {
+      "label": "Bild-Prompt, dessen Ergebnisse zusammengefasst werden",
+      "none": "Prompt wählen"
+    },
+    "output": {
+      "label": "Antwort",
+      "text": "Freier Text",
+      "structured": "Strukturiert (ein Schema)"
+    },
+    "auto_run": "Für jedes neue Bild ausführen",
+    "auto_run_manager": "Nur die Eigentümerin oder ein Manager kann dies einschalten.",
+    "badge_auto": "Automatisch",
+    "revision": "Revision {revision}",
+    "run": {
+      "missing": "Wo fehlend ausführen",
+      "stale": "Veraltete neu ausführen",
+      "all": "Alle neu ausführen",
+      "started_one": "{count} Lauf angefordert",
+      "started_other": "{count} Läufe angefordert",
+      "queued": "Der Lauf ist eingereiht",
+      "pick_group": "Gruppe wählen",
+      "on_group": "Auf Gruppe ausführen"
+    },
+    "preset": {
+      "label": "Vorlage",
+      "pick": "Vorlage wählen",
+      "apply": "Vorlage anwenden",
+      "applied_one": "{count} Prompt hinzugefügt",
+      "applied_other": "{count} Prompts hinzugefügt",
+      "none_added": "Diese Vorlage wurde bereits angewendet.",
+      "none": "Es sind keine Vorlagen installiert."
+    },
+    "schema": {
+      "fields": "Felder",
+      "json": "JSON",
+      "field_name": "Feldname",
+      "field_type": "Feldtyp",
+      "type": {
+        "string": "Text",
+        "integer": "Ganzzahl",
+        "number": "Zahl",
+        "boolean": "Ja/Nein",
+        "string_list": "Textliste"
+      },
+      "description": "Beschreibung (hilft der KI)",
+      "choices": "Erlaubte Werte, durch Kommas getrennt",
+      "required": "Pflichtfeld",
+      "add_field": "Feld hinzufügen",
+      "remove_field": "Entfernen",
+      "advanced": "Dieses Schema nutzt mehr, als der Feld-Editor zeigen kann, daher wird es als JSON bearbeitet.",
+      "invalid_json": "Das Schema ist kein gültiges JSON."
     }
   }
 }

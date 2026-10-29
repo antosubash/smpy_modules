@@ -1,5 +1,7 @@
 """``POST /prompts/{id}/run``: request a prompt's run on images, then plan them.
 
+A group-scope prompt is handed to :mod:`sm_images.ai.group_request` instead.
+
 Per image, one short transaction under the image lock (the lock order every
 inserter and reset follows): a run with none yet gets a pending row, a final
 run the ``scope`` selects goes back to ``pending``, and a pending or live run
@@ -110,11 +112,16 @@ async def run_prompt(
     prompt_id: uuid.UUID,
     scope: RunScope,
     image_ids: Sequence[uuid.UUID] | None = None,
+    group_ids: Sequence[uuid.UUID] | None = None,
 ) -> int:
-    """Request and dispatch; returns how many images got a new run."""
+    """Request and dispatch; returns how many images (or groups) got a new run."""
     found = await _prompt(runtime, tenant, prompt_id)
-    if found is None or found.scope is not PromptScope.IMAGE:
+    if found is None:
         return 0
+    if found.scope is PromptScope.GROUP:  # per group (``image_ids`` do not apply)
+        from sm_images.ai.group_request import request_groups
+
+        return await request_groups(runtime, tenant, prompt_id, scope, group_ids)
     sid = step_id(prompt_id)
     count = 0
     async for image_id in _images(runtime, tenant, found.collection_id, image_ids):
@@ -133,10 +140,11 @@ async def launch(
     prompt_id: uuid.UUID,
     scope: RunScope,
     image_ids: Sequence[uuid.UUID] | None,
+    group_ids: Sequence[uuid.UUID] | None = None,
 ) -> int | None:
     """Inline for a list or an eager runtime (the count); else queued (``None``)."""
-    if image_ids is not None or runtime.is_eager():
-        return await run_prompt(runtime, tenant, prompt_id, scope, image_ids)
+    if image_ids is not None or group_ids is not None or runtime.is_eager():
+        return await run_prompt(runtime, tenant, prompt_id, scope, image_ids, group_ids)
     from background_tasks.tenant_context import TENANT_HEADER
 
     from sm_images.task_config import QUEUE_IMPORTS

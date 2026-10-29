@@ -35,6 +35,7 @@ from sm_images.models.enums import ReviewStatus, StepStatus
 __all__ = [
     "HISTORY_MAX",
     "PromptWrite",
+    "apply_write",
     "encoded_size",
     "record_prompt_run",
     "reset_review",
@@ -143,6 +144,15 @@ async def upsert_result(
         db.add(row)
     else:
         reset_review(row, max_bytes)
+    apply_write(row, write, max_bytes)
+    await db.flush()
+    return row
+
+
+def apply_write(row: PromptResult, write: PromptWrite, max_bytes: int | None) -> None:
+    """``write`` as ``row``'s completed output (the review already reset), the
+    history trimmed until the whole row fits ``max_bytes``. Shared by image and
+    group results (:mod:`sm_images.ai.group_store`)."""
     row.status = StepStatus.COMPLETED
     row.result_data = write.data
     row.result_text = write.text
@@ -154,8 +164,6 @@ async def upsert_result(
         while history and stored_size(row, history) > max_bytes:
             history.pop()
         row.history = history
-    await db.flush()
-    return row
 
 
 async def _record_failure(

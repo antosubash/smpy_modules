@@ -15,6 +15,9 @@ without an entry fails ``test_every_get_route_is_listed``. An entry is
 * ``"public"`` - anonymous surface (``{slug}``); anonymous gets 404.
 * ``"job"`` - the path names an import job (``{job_id}``) of such a
   collection; same expectation as ``"collection"``.
+* ``"global"`` - deployment-wide, about no collection (the installed
+  presets); a stranger gets 200 and nothing of the private collection, the
+  anonymous a 401.
 
 Placeholders: ``{collection_id}``, ``{image_id}``, ``{group_id}``, ``{regroup_id}``, ``{job_id}``,
 ``{prompt_id}``,
@@ -31,6 +34,7 @@ IMAGE = "image"
 LIST = "list"
 PUBLIC = "public"
 JOB = "job"
+GLOBAL = "global"
 
 
 class ReadRoute(NamedTuple):
@@ -57,6 +61,7 @@ READ_ROUTES: list[ReadRoute] = [
     ReadRoute("GET", "/api/images/collections/{collection_id}/prompts", COLLECTION),
     ReadRoute("GET", "/api/images/prompts/{prompt_id}", IMAGE),
     ReadRoute("GET", "/api/images/prompts/{prompt_id}/results", IMAGE),
+    ReadRoute("GET", "/api/images/presets", GLOBAL),
     ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/r/{size}", PUBLIC),
     ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/display", PUBLIC),
     ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/original", PUBLIC),

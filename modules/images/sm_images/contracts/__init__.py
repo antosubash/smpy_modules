@@ -7,6 +7,7 @@ map tables).
 
 from __future__ import annotations
 
+from sm_images.ai.reads import GroupMemberRead, GroupRead, PromptResultRead
 from sm_images.contracts.events import (
     CollectionDeleted,
     CollectionVisibilityChanged,
@@ -47,10 +48,13 @@ __all__ = [
     "DisplayNotAllowed",
     "DisplayWriterMissing",
     "DuplicateStepError",
+    "GroupMemberRead",
+    "GroupRead",
     "ImageAdded",
     "ImageProcessed",
     "ImageRead",
     "Preset",
+    "PromptResultRead",
     "PromptSpec",
     "RegistryFrozenError",
     "ReservedStepIdError",

@@ -13,6 +13,7 @@ import { GroupsTab } from '../components/groups/GroupsTab';
 import { ImagesLayout } from '../components/ImagesLayout';
 import { ImportsTab } from '../components/imports/ImportsTab';
 import { PipelineTab } from '../components/pipeline/PipelineTab';
+import { PromptsTab } from '../components/prompts/PromptsTab';
 import { ShareDialog } from '../components/share/ShareDialog';
 import { useImages } from '../hooks/useImages';
 import { deleteCollection, setVisibility } from '../utils/api';
@@ -28,10 +29,11 @@ type Props = {
   direct_upload_threshold: number;
 };
 
-type Tab = 'gallery' | 'groups' | 'pipeline' | 'imports';
+type Tab = 'gallery' | 'groups' | 'pipeline' | 'prompts' | 'imports';
 
-/** `Images/Collection` - `/admin/images/{id}`. Tabs: the gallery, the pipeline
- *  and (for an editor) the imports; map and review arrive with their own tasks. */
+/** `Images/Collection` - `/admin/images/{id}`. Tabs: the gallery, the groups,
+ *  the pipeline, the prompts and (for an editor) the imports; map and review
+ *  arrive with their own tasks. */
 function Collection({
   collection,
   can_edit,
@@ -47,8 +49,8 @@ function Collection({
   const [tab, setTab] = useState<Tab>('gallery');
   // The import routes are an edit on the collection, so the tab is an editor's.
   const tabs: Tab[] = can_edit
-    ? ['gallery', 'groups', 'pipeline', 'imports']
-    : ['gallery', 'groups', 'pipeline'];
+    ? ['gallery', 'groups', 'pipeline', 'prompts', 'imports']
+    : ['gallery', 'groups', 'pipeline', 'prompts'];
 
   const changeVisibility = async (next: Visibility) => {
     setSaving(true);
@@ -155,6 +157,9 @@ function Collection({
             )}
             {tab === 'pipeline' && (
               <PipelineTab collectionId={collection.id} canManage={can_manage} />
+            )}
+            {tab === 'prompts' && (
+              <PromptsTab collectionId={collection.id} canEdit={can_edit} canManage={can_manage} />
             )}
             {tab === 'imports' && (
               <ImportsTab

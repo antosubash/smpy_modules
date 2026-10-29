@@ -19,7 +19,7 @@ from sm_images.storage import ImageStore
 from tests import read_routes
 from tests.access_support import OWNER, collection, image
 from tests.isolation_support import ACME, as_
-from tests.read_routes import COLLECTION, IMAGE, JOB, LIST, PUBLIC, READ_ROUTES
+from tests.read_routes import COLLECTION, GLOBAL, IMAGE, JOB, LIST, PUBLIC, READ_ROUTES
 from tests.stub_auth import as_user
 
 ROUTES = pytest.mark.parametrize("route", READ_ROUTES, ids=lambda r: f"{r.method} {r.path}")
@@ -132,6 +132,11 @@ async def test_every_read_route_hides_private_collection(client, secret, route):
         assert secret["public_slug"] in got.text  # not vacuous: the list has rows
         anon = await client.request(url=url, **sent)
         assert anon.status_code == 401
+    elif route.needs == GLOBAL:
+        got = await client.request(url=url, headers=STRANGER, **sent)
+        assert got.status_code == 200, got.text
+        assert leaks(got.text, secret) == []
+        assert (await client.request(url=url, **sent)).status_code == 401
     elif route.needs == PUBLIC:
         for headers in ({}, STRANGER):
             got = await client.request(url=url, headers=headers, **sent)

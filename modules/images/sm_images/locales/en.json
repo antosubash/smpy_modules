@@ -240,19 +240,27 @@
     "retry_after_too_long": "The server asked to wait more than a day before retrying, so the image was skipped.",
     "unsafe_output_schema": "The output schema is not allowed: it is too large or too deep, refers outside itself, or uses a keyword that is not supported.",
     "prompt_name_taken": "A prompt with this name already exists in the collection.",
-    "invalid_prompt_inputs": "Inputs apply to group prompts only.",
-    "group_prompt_run_unsupported": "Group prompts run per group, not per image.",
+    "invalid_prompt_inputs": "Inputs apply to group prompts only, and a group prompt over results needs an image prompt of this collection.",
     "ai_unavailable": "The AI module is not installed.",
     "display_not_ready": "The picture is not redacted yet, so it was not sent to the AI provider.",
     "ai_not_configured": "AI is not configured. Set a provider and a model in the AI settings.",
-    "ai_error": "The AI provider returned an error."
+    "ai_error": "The AI provider returned an error.",
+    "invalid_run_target": "An image prompt runs on images and a group prompt on groups.",
+    "prompt_in_use": "A group prompt uses this prompt's results. Change that group prompt first.",
+    "preset_not_found": "That preset is not installed.",
+    "group_empty": "The group has no images.",
+    "group_too_large": "The group has too many images for one summary.",
+    "member_prompt_missing": "The image prompt this group prompt reads is gone.",
+    "member_results_missing": "Some images of the group have no result, so the summary is incomplete.",
+    "no_usable_inputs": "Nothing in the group could be sent to the AI provider."
   },
   "tabs": {
     "label": "Collection sections",
     "gallery": "Gallery",
     "pipeline": "Pipeline",
     "imports": "Imports",
-    "groups": "Groups"
+    "groups": "Groups",
+    "prompts": "Prompts"
   },
   "groups": {
     "description": "Photos of one site, with a role each. Members are shown in the collection's role order.",
@@ -414,6 +422,86 @@
       "delete_body": "The job and its records are removed. Images it already added stay in the collection.",
       "delete_confirm": "Delete import",
       "control_failed": "The import could not be changed: {reason}"
+    }
+  },
+  "prompts": {
+    "intro": "Ask an AI model about each image, or about each group of images. A schema makes the answer structured.",
+    "empty": "No prompts yet.",
+    "new": "New prompt",
+    "edit": "Edit",
+    "delete": "Delete",
+    "delete_title": "Delete this prompt?",
+    "delete_body": "Its results are deleted with it.",
+    "delete_confirm": "Delete prompt",
+    "deleted": "Prompt deleted",
+    "saved": "Prompt saved",
+    "cancel": "Cancel",
+    "save": "Save",
+    "create": "Create",
+    "name": "Name",
+    "instruction": "Instruction",
+    "scope": {
+      "label": "Runs on",
+      "image": "Each image",
+      "group": "Each group"
+    },
+    "inputs": {
+      "label": "Summarises",
+      "images": "The group's pictures",
+      "results": "Each image's result",
+      "both": "Pictures and results"
+    },
+    "member": {
+      "label": "Image prompt whose results are summarised",
+      "none": "Choose a prompt"
+    },
+    "output": {
+      "label": "Answer",
+      "text": "Free text",
+      "structured": "Structured (a schema)"
+    },
+    "auto_run": "Run on every new image",
+    "auto_run_manager": "Only the owner or a manager can turn this on.",
+    "badge_auto": "Auto-run",
+    "revision": "Revision {revision}",
+    "run": {
+      "missing": "Run where missing",
+      "stale": "Re-run outdated",
+      "all": "Re-run all",
+      "started_one": "{count} run requested",
+      "started_other": "{count} runs requested",
+      "queued": "The run is queued",
+      "pick_group": "Choose a group",
+      "on_group": "Run on group"
+    },
+    "preset": {
+      "label": "Preset",
+      "pick": "Choose a preset",
+      "apply": "Apply preset",
+      "applied_one": "{count} prompt added",
+      "applied_other": "{count} prompts added",
+      "none_added": "This preset was already applied.",
+      "none": "No presets are installed."
+    },
+    "schema": {
+      "fields": "Fields",
+      "json": "JSON",
+      "field_name": "Field name",
+      "field_type": "Field type",
+      "type": {
+        "string": "Text",
+        "integer": "Whole number",
+        "number": "Number",
+        "boolean": "Yes/no",
+        "string_list": "List of text"
+      },
+      "description": "Description (helps the AI)",
+      "choices": "Allowed values, separated by commas",
+      "required": "Required",
+      "add_field": "Add field",
+      "remove_field": "Remove",
+      "advanced": "This schema uses more than the field editor can show, so it is edited as JSON.",
+      "invalid_json": "The schema is not valid JSON."
     }
   }
 }

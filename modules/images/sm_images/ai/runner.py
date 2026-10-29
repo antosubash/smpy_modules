@@ -69,8 +69,10 @@ async def run_structured(
     images: list[bytes],
     *,
     model: Any = None,
+    temperature: float | None = None,
 ) -> tuple[Any, str]:
-    """``(data, model_name)``: a dict (by alias) for a model output type, else text."""
+    """``(data, model_name)``: a dict (by alias) for a model output type, else text.
+    ``temperature`` is sent when given (a group consolidation asks for 0)."""
     from pydantic_ai import Agent, BinaryContent
     from sm_ai import contracts
 
@@ -78,7 +80,8 @@ async def run_structured(
     agent = Agent(model, output_type=output_type, retries=0)  # one request per charge
     parts: list[Any] = [instruction]
     parts += [BinaryContent(data=img, media_type="image/jpeg") for img in images]
-    result = await agent.run(parts)
+    settings: Any = None if temperature is None else {"temperature": temperature}
+    result = await agent.run(parts, model_settings=settings)
     out = result.output
     if isinstance(out, BaseModel):
         out = out.model_dump(mode="json", by_alias=True, exclude_unset=True)

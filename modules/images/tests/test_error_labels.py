@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 from sm_images import constants
+from sm_images.ai.codes import AI_CODES
 from sm_images.endpoints.api.pipeline import CODE_INVALID_CONFIG
 from sm_images.imports import access, recover, retrying
 from sm_images.imports.features import PARSE_CODES
@@ -66,7 +67,7 @@ def _every_code() -> set[str]:
         *PLACEHOLDER_CODES,
         *PARSE_CODES,
         *constants.ERROR_CODES,
-        *constants.AI_CODES,
+        *AI_CODES,
         constants.TENANT_REQUIRED_CODE,
         constants.DIRECTORY_UNAVAILABLE_CODE,
         CODE_INVALID_CONFIG,

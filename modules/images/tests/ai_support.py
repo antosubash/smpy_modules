@@ -38,6 +38,8 @@ class FakeAi:
     prompts: list[str] = field(default_factory=list)
     resolved: list[dict[str, Any]] = field(default_factory=list)
     """The keyword arguments of each ``resolve_model`` call."""
+    settings: list[Any] = field(default_factory=list)
+    """The model settings of each call (``temperature``)."""
 
     @property
     def calls(self) -> int:
@@ -47,6 +49,8 @@ class FakeAi:
         def reply(messages: list[Any], info: AgentInfo) -> ModelResponse:
             if self.fail is not None:
                 raise self.fail
+            self.settings.append(info.model_settings)
+            sent = len(self.prompts)
             for part in messages[0].parts:
                 content = getattr(part, "content", None)
                 if isinstance(content, list):
@@ -55,10 +59,14 @@ class FakeAi:
                             self.pictures.append(PILImage.open(io.BytesIO(item.data)))
                         elif isinstance(item, str):
                             self.prompts.append(item)
-            if isinstance(self.answer, str):
-                return ModelResponse(parts=[TextPart(self.answer)])
+            # A callable answer is asked with this call's instruction.
+            answer = (
+                self.answer(" ".join(self.prompts[sent:])) if callable(self.answer) else self.answer
+            )
+            if isinstance(answer, str):
+                return ModelResponse(parts=[TextPart(answer)])
             tool = info.output_tools[0].name
-            return ModelResponse(parts=[ToolCallPart(tool, json.dumps(self.answer))])
+            return ModelResponse(parts=[ToolCallPart(tool, json.dumps(answer))])
 
         return FunctionModel(reply, model_name="fake-vision")
 

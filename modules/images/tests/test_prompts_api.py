@@ -70,15 +70,20 @@ async def test_inputs_belong_to_group_prompts(prompts_world):
     group = await _create(prompts_world, name="site", scope="group")
     assert group.json()["inputs"] == "images"
     pid = group.json()["id"]
+    photo = (await _create(prompts_world, name="photo")).json()["id"]
     got = await prompts_world.c.patch(
-        f"{BASE}/prompts/{pid}", json={"inputs": "both"}, headers=headers(OWNER)
+        f"{BASE}/prompts/{pid}",
+        json={"inputs": "both", "member_prompt_id": photo},
+        headers=headers(OWNER),
     )
     assert got.json()["inputs"] == "both"
     assert (
         await _create(prompts_world, name="bad", scope="group", inputs="everything")
     ).status_code == 422
-    run = await prompts_world.c.post(f"{BASE}/prompts/{pid}/run", json={}, headers=headers(OWNER))
-    assert (run.status_code, run.json()["code"]) == (422, "group_prompt_run_unsupported")
+    run = await prompts_world.c.post(
+        f"{BASE}/prompts/{pid}/run", json={"image_ids": [prompts_world.iid]}, headers=headers(OWNER)
+    )
+    assert (run.status_code, run.json()["code"]) == (422, "invalid_run_target")
 
 
 async def test_names_are_unique_per_collection(prompts_world):

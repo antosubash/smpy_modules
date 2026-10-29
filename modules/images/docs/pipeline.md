@@ -99,3 +99,54 @@ Both need the `[ai]` extra (the `ai` module and Pydantic AI). Without it,
   are kept unless `additionalProperties` is `false`. The check runs on save
   and again before every run; it builds the pydantic model once, cached per
   prompt id and revision.
+
+## Group prompts
+
+A group-scope prompt runs once per group (`POST /api/images/prompts/{id}/run`
+with `group_ids`, or the whole collection). Its `inputs` say what it
+summarises: the members' display copies (`images`), each member's result of
+the image prompt named by `member_prompt_id` (`results`), or `both`. That
+image prompt cannot be deleted while a group prompt reads it
+(`prompt_in_use`).
+
+- **The run.** The group's `images_prompt_result` row is the run record: a
+  request marks it `pending` for one lease period (a lost message blocks
+  nothing longer), a worker claims it with a lease token, and the store is
+  fenced by that token, as for image steps.
+- **Members.** A stored result is reused when it is completed, has content
+  and was made under the member prompt's current revision. Each other member
+  runs through the executor, at most 4 at a time, with exactly an image
+  prompt run's claim, metering (`images:prompt`) and retry rules.
+- **Privacy.** Every member's display copy must be one serving would trust;
+  otherwise the whole run fails `display_not_ready` before anything is sent
+  or charged. Originals are never sent.
+- **The consolidation** is one provider request at temperature 0, claimed
+  once per lease and metered once (`images:group_prompt`, key
+  `images:{tenant}:group:{group}:prompt:{prompt}:{revision}:{lease token}`).
+  Its output is validated against the prompt's schema. When some members
+  have no usable result the summary is stored anyway, but the run is `failed`
+  with `member_results_missing` naming them, so it is never mistaken for a
+  complete verdict. Nothing usable at all fails `no_usable_inputs`, uncharged.
+- **The cross-check.** A prompt applied from a preset carries its
+  `preset_id`; that preset's `cross_check(group, results)` is called after
+  the consolidation, with no session open. `group` is a `GroupRead` (members
+  in role order); `results` are the usable member results in role order and
+  then the group's own summary (`group_id` set). Its return value is stored
+  in `cross_check`; an exception, a non-dict, non-JSON or a value over
+  `step_output_max_bytes` is stored as `{"error": "..."}` instead.
+
+## Presets
+
+`GET /api/images/presets` lists what installed plugins registered.
+`POST /api/images/collections/{id}/apply-preset {"preset_id"}` (owner or
+`images.manage`: it can switch `auto_run` on) seeds the collection and is
+idempotent: each `PromptSpec` becomes one prompt, recognised by its spec id
+(`Prompt.preset_prompt_id`, unique per collection), and a spec applied before
+is left as edited. Pipeline steps the collection does not configure are
+added; group roles are set only while the collection has none. A spec's name
+already used by another prompt refuses the whole application with 409
+`prompt_name_taken`. Prompt names are unique per collection in the database
+too (`uq_images_prompt_name`). A `PromptSpec` of a group prompt over
+`results` names its image spec in `member`, which may be left out when the
+preset has exactly one image spec. `register_preset` runs every spec's schema
+through `schema_safety` and refuses an unsafe one at boot.

@@ -8,8 +8,8 @@
   ``images.import_geojson``, ``images.reset_import``); run its worker with concurrency 1. Downloads
   (``images.download_items``) go to ``images``, so a long import stream never
   blocks its own downloads;
-* ``images_heavy`` / ``images_gpu`` - ``classify``, ``prompt:*`` and the
-  steps that declare them.
+* ``images_heavy`` / ``images_gpu`` - ``classify``, ``prompt:*``,
+  ``images.run_group_prompt`` and the steps that declare them.
 
 ``images.run_step``'s route is only a default: each message carries the queue
 of the step it runs (``step.queue``), which wins over a route. Beat lives here
@@ -27,6 +27,7 @@ DOWNLOAD_ITEMS = "images.download_items"
 RESET_IMPORT = "images.reset_import"
 RUN_REGROUP = "images.run_regroup"
 RUN_PROMPT = "images.run_prompt"
+RUN_GROUP_PROMPT = "images.run_group_prompt"
 
 QUEUE_DEFAULT = "images"
 QUEUE_IMPORTS = "images_imports"
@@ -42,6 +43,7 @@ TASK_ROUTES = {
     RESET_IMPORT: {"queue": QUEUE_IMPORTS},
     RUN_REGROUP: {"queue": QUEUE_IMPORTS},
     RUN_PROMPT: {"queue": QUEUE_IMPORTS},
+    RUN_GROUP_PROMPT: {"queue": "images_heavy"},
 }
 
 RECONCILE_INTERVAL_SECONDS = 300.0

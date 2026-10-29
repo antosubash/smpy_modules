@@ -6,7 +6,9 @@ running on named images are an ``edit`` (owner, an edit share,
 a manager's, like a collection restart or a forced reprocess: a run over the
 whole collection, a run with scope ``all``, and switching ``auto_run`` on. A prompt is
 reachable exactly when its collection is, so a stranger gets the 404 an
-unknown id gets. The console's prompt manager is Task 23.
+unknown id gets. An image prompt runs on ``image_ids``, a group prompt on
+``group_ids`` (:mod:`sm_images.ai.group_request`); the other list is a 422
+``invalid_run_target``.
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ from sqlalchemy import select
 
 from sm_images import ai, constants
 from sm_images.access import POLICY, CollectionEdit, CollectionView
+from sm_images.ai import codes
 from sm_images.ai import run as runs
 from sm_images.deps import require_view
 from sm_images.endpoints.api._runtime import runtime, tenant
@@ -148,19 +151,24 @@ async def run_prompt(
     who: Principal,
     db=Depends(get_db),
 ) -> PromptRunOut:
-    """Request the prompt's run on the collection's images (``scope``) or on
-    ``image_ids`` of it, and plan them; a whole collection may be queued."""
-    if body.image_ids is None or body.scope == "all":
+    """Request the prompt's run on the collection's images or groups
+    (``scope``), or on ``image_ids``/``group_ids`` of it, and dispatch them; a
+    whole collection may be queued."""
+    row = await service.get(db, collection, prompt_id)
+    group = row.scope is PromptScope.GROUP
+    if (body.image_ids if group else body.group_ids) is not None:
+        err = Invalid("an image prompt runs on image_ids, a group prompt on group_ids")
+        err.code = codes.CODE_INVALID_RUN_TARGET
+        raise err
+    named = body.group_ids if group else body.image_ids
+    if named is None or body.scope == "all":
         _owner_or_manager(who, collection, "run a prompt on the whole collection or on everything")
     if not ai.ai_available():
         err = ServiceUnavailable("the ai module is not installed")
-        err.code = constants.CODE_AI_UNAVAILABLE
+        err.code = codes.CODE_AI_UNAVAILABLE
         raise err
-    row = await service.get(db, collection, prompt_id)
-    if row.scope is not PromptScope.IMAGE:
-        err = Invalid("group-scope prompts are run per group")
-        err.code = constants.CODE_GROUP_RUN_UNSUPPORTED
-        raise err
-    await db.rollback()  # read-only so far: release it before the per-image transactions
-    requested = await runs.launch(runtime(), tenant(), prompt_id, body.scope, body.image_ids)
+    await db.rollback()  # read-only so far: release it before the per-item transactions
+    requested = await runs.launch(
+        runtime(), tenant(), prompt_id, body.scope, body.image_ids, body.group_ids
+    )
     return PromptRunOut(scope=body.scope, requested=requested)

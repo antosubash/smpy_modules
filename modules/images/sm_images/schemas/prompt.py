@@ -45,6 +45,9 @@ class PromptCreate(BaseModel):
     output_schema: dict[str, Any] | None = None
     """A JSON Schema (checked by ``schema_safety``); ``null`` = free text."""
     inputs: Inputs | None = None
+    member_prompt_id: uuid.UUID | None = None
+    """Group scope with ``inputs`` ``results``/``both`` (required then): the
+    collection's image-scope prompt whose per-member results are consolidated."""
     auto_run: bool = False
     """Owner or ``images.manage`` only: it spends AI requests on every new image."""
 
@@ -59,6 +62,7 @@ class PromptUpdate(BaseModel):
     instruction: Instruction | None = None
     output_schema: dict[str, Any] | None = None
     inputs: Inputs | None = None
+    member_prompt_id: uuid.UUID | None = None
     auto_run: bool | None = None
 
 
@@ -70,8 +74,10 @@ class PromptOut(BaseModel):
     instruction: str
     output_schema: dict[str, Any] | None
     inputs: str | None
+    member_prompt_id: uuid.UUID | None = None
     auto_run: bool
     preset_id: str | None
+    preset_prompt_id: str | None = None
     revision: int
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -86,14 +92,16 @@ class PromptRunIn(BaseModel):
 
     scope: Literal["missing", "stale", "all"] = "missing"
     image_ids: list[uuid.UUID] | None = Field(default=None, min_length=1, max_length=IDS_MAX)
-    """Only these images of the prompt's collection; all of them when absent."""
+    """An image prompt: only these images of its collection; all of them when absent."""
+    group_ids: list[uuid.UUID] | None = Field(default=None, min_length=1, max_length=IDS_MAX)
+    """A group prompt: only these groups of its collection; all of them when absent."""
 
 
 class PromptRunOut(BaseModel):
     status: Literal["accepted"] = "accepted"
     scope: str
     requested: int | None
-    """Images given a new run; ``null`` when the walk was queued."""
+    """Images (or groups) given a new run; ``null`` when the walk was queued."""
 
 
 class PromptResultOut(BaseModel):
@@ -106,6 +114,8 @@ class PromptResultOut(BaseModel):
     result_data: dict[str, Any] | None
     model_name: str | None
     error: str | None
+    cross_check: dict[str, Any] | None = None
+    """A group result's preset cross-check (``{"error": ...}`` when it failed)."""
     prompt_revision: int | None
     stale: bool
     """Produced under an older revision of the prompt."""
