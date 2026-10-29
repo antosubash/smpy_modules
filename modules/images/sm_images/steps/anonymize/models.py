@@ -47,6 +47,9 @@ FACE_STRIDES: Final = (8, 16, 32)
 FACE_PARTS: Final = {"cls": 1, "obj": 1, "bbox": 4, "kps": 10}
 """YuNet's outputs per stride, and the width of each row."""
 PLATE_COLUMNS: Final = 7
+BOX_SLACK: Final = 0.25
+"""How far past the model's input (a fraction of its side) a confident box may
+reach: an object cut by the frame is predicted whole. Further is a broken model."""
 FACE_COARSE_DIM: Final = 640
 FACE_NMS_IOU: Final = 0.3
 PLATE_INPUT: Final = 608
@@ -71,6 +74,18 @@ def _array(value: Any, name: str, shape: tuple[int, ...]) -> Any:
     if not np.isfinite(value).all():
         raise MalformedOutput(f"{name}: non-finite values")
     return value
+
+
+def _confident_box(
+    x1: float, y1: float, x2: float, y2: float, width: int, height: int, what: str
+) -> None:
+    """A box at or above the threshold must have an area and lie on (or just
+    past) the *width* x *height* input the model saw, or the model is broken."""
+    if not (x2 > x1 and y2 > y1):
+        raise MalformedOutput(f"{what}: empty box ({x1}, {y1}, {x2}, {y2})")
+    sx, sy = width * BOX_SLACK, height * BOX_SLACK
+    if x1 < -sx or y1 < -sy or x2 > width + sx or y2 > height + sy:
+        raise MalformedOutput(f"{what}: box ({x1}, {y1}, {x2}, {y2}) outside the input")
 
 
 def nms(boxes: list[Box], iou: float) -> list[Box]:
@@ -125,7 +140,9 @@ def _face_outputs(outputs: dict[str, Any], pw: int, ph: int) -> dict[str, Any]:
     return checked
 
 
-def _decode_faces(outputs: dict[str, Any], pw: int, conf: float, sx: float, sy: float) -> list[Box]:
+def _decode_faces(
+    outputs: dict[str, Any], pw: int, ph: int, conf: float, sx: float, sy: float
+) -> list[Box]:
     import numpy as np
 
     out: list[Box] = []
@@ -140,6 +157,7 @@ def _decode_faces(outputs: dict[str, Any], pw: int, conf: float, sx: float, sy: 
             dx, dy, lw, lh = (float(v) for v in bbox[i])
             w, h = math.exp(lw) * stride, math.exp(lh) * stride
             cx, cy = (col + dx) * stride, (row + dy) * stride
+            _confident_box(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, pw, ph, "face model")
             out.append(((cx - w / 2) / sx, (cy - h / 2) / sy, w / sx, h / sy, float(score[i])))
     return out
 
@@ -159,7 +177,7 @@ def detect_faces(
         outputs = _face_outputs(run(tensor), pw, tensor.shape[2])
         # Per axis: width and height were rounded independently.
         sx, sy = probe.width / image.width, probe.height / image.height
-        found += _decode_faces(outputs, pw, conf, sx, sy)
+        found += _decode_faces(outputs, pw, tensor.shape[2], conf, sx, sy)
     return nms(found, FACE_NMS_IOU)
 
 
@@ -212,7 +230,8 @@ def detect_plates(run: Run, image: Image.Image, conf: float) -> list[Box]:
         for row in _plate_rows(run(tensor)):
             bx1, by1, bx2, by2, score = (float(v) for v in (*row[1:5], row[6]))
             if score < conf:
-                continue
+                continue  # under the threshold: noise, however odd its box
+            _confident_box(bx1, by1, bx2, by2, PLATE_INPUT, PLATE_INPUT, "plate model")
             x, y = (bx1 - dx) / rx + x0, (by1 - dy) / ry + y0
             found.append((x, y, (bx2 - bx1) / rx, (by2 - by1) / ry, score))
     return nms(found, PLATE_NMS_IOU)

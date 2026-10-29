@@ -26,8 +26,9 @@ Needs the ``[anonymize]`` extra (onnxruntime, which brings numpy);
 from __future__ import annotations
 
 import asyncio
-import importlib.util
+import importlib
 import io
+import logging
 import math
 from typing import Any, Final
 
@@ -41,6 +42,8 @@ from sm_images.steps.anonymize.detectors import Detection, Detector
 from sm_images.steps.anonymize.weights import WeightsUnavailable
 
 __all__ = ["MAX_DETECTION_DIM", "AnonymizeParams", "AnonymizeStep", "register_anonymize"]
+
+logger = logging.getLogger(__name__)
 
 MAX_DETECTION_DIM: Final = 1600
 """The detector sees the picture scaled to at most this many pixels a side."""
@@ -95,7 +98,7 @@ def find_regions(img: Any, p: AnonymizeParams, detector: Detector) -> list[Regio
     found = detector.detect(probe, faces=p.faces, plates=p.plates, min_confidence=p.min_confidence)
     regions = []
     for d in found:
-        _check(d)
+        _check(d, p.min_confidence)
         if d.kind not in wanted or d.score < p.min_confidence:
             continue
         box = pad_and_clamp(d.x * sx, d.y * sy, d.w * sx, d.h * sy, width, height, p.padding)
@@ -104,11 +107,13 @@ def find_regions(img: Any, p: AnonymizeParams, detector: Detector) -> list[Regio
     return regions
 
 
-def _check(d: Detection) -> None:
+def _check(d: Detection, min_confidence: float) -> None:
+    """Non-finite or negative is malformed at any score; an empty box only when
+    confident (one that would be blurred, had it an area)."""
     values = (d.x, d.y, d.w, d.h, d.score)
     if d.kind not in ("face", "plate") or not all(math.isfinite(float(v)) for v in values):
         raise ValueError(f"malformed detection {d!r}")
-    if d.w < 0 or d.h < 0:
+    if d.w < 0 or d.h < 0 or (d.score >= min_confidence and (d.w == 0 or d.h == 0)):
         raise ValueError(f"malformed detection {d!r}")
 
 
@@ -179,6 +184,13 @@ class AnonymizeStep:
 
 def register_anonymize() -> None:
     """A ``_BUILTIN_LOADERS`` entry: registers ``anonymize`` only when the
-    ``[anonymize]`` extra (onnxruntime, numpy) is installed."""
-    if all(importlib.util.find_spec(m) is not None for m in EXTRA_MODULES):
-        registry.register_builtin(AnonymizeStep())
+    ``[anonymize]`` extra (onnxruntime, numpy) is installed **and imports**: a
+    broken native build (a missing shared library) leaves the step unregistered
+    rather than failing every run."""
+    for name in EXTRA_MODULES:
+        try:
+            importlib.import_module(name)
+        except (ImportError, OSError) as exc:
+            logger.warning("anonymize step not registered: %s does not import (%s)", name, exc)
+            return
+    registry.register_builtin(AnonymizeStep())

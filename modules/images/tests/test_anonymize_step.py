@@ -185,18 +185,47 @@ def clean():
     registry.reset_registry()
 
 
-def _specs(monkeypatch, present: set[str]) -> None:
-    import importlib.util
+class _Loader:
+    """Imports a heavy module as an empty stand-in, or raises *error* (a broken
+    native build: ``ImportError``, ``OSError`` from a missing shared library)."""
 
-    real = importlib.util.find_spec
+    def __init__(self, error: BaseException | None) -> None:
+        self.error = error
+
+    def create_module(self, spec):
+        return None
+
+    def exec_module(self, module) -> None:
+        if self.error is not None:
+            raise self.error
+
+
+def _specs(monkeypatch, present: set[str], broken: dict[str, BaseException] | None = None) -> None:
+    """``onnxruntime`` and ``numpy`` as installed (*present*), missing, or
+    installed but failing on import (*broken*) - found by ``find_spec`` either way."""
+    import importlib.machinery
+    import sys
+
+    broken = broken or {}
     heavy = {"onnxruntime", "numpy"}
 
-    def fake(name, *a):
-        if name in heavy:
-            return real("json") if name in present else None
-        return real(name, *a)
+    class Finder:
+        @staticmethod
+        def find_spec(name, path=None, target=None):
+            if name not in heavy:
+                return None
+            if name in broken:
+                return importlib.machinery.ModuleSpec(name, _Loader(broken[name]))
+            if name in present:
+                return importlib.machinery.ModuleSpec(name, _Loader(None))
+            raise ModuleNotFoundError(name)
 
-    monkeypatch.setattr(importlib.util, "find_spec", fake)
+    for name in heavy:
+        # setitem first: on undo the stand-in an import adds is removed too,
+        # and the real module (if it was loaded) comes back.
+        monkeypatch.setitem(sys.modules, name, sys.modules.get(name))
+        monkeypatch.delitem(sys.modules, name)
+    monkeypatch.setattr(sys, "meta_path", [Finder(), *sys.meta_path])
 
 
 def test_registered_when_the_extra_is_installed(clean, monkeypatch):
@@ -210,6 +239,16 @@ def test_registered_when_the_extra_is_installed(clean, monkeypatch):
 @pytest.mark.parametrize("missing", ["onnxruntime", "numpy"])
 def test_absent_without_the_extra(clean, monkeypatch, missing):
     _specs(monkeypatch, {"onnxruntime", "numpy"} - {missing})
+    extensions.load_extensions()
+    assert registry.get_step("anonymize") is None
+    assert registry.get_step("renditions") is not None
+
+
+@pytest.mark.parametrize(
+    "error", [ImportError("libonnxruntime.so: undefined symbol"), OSError("libgomp.so.1")]
+)
+def test_absent_when_onnxruntime_is_installed_but_cannot_import(clean, monkeypatch, error):
+    _specs(monkeypatch, {"numpy"}, broken={"onnxruntime": error})
     extensions.load_extensions()
     assert registry.get_step("anonymize") is None
     assert registry.get_step("renditions") is not None
