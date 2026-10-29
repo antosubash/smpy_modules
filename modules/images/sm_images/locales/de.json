@@ -237,7 +237,16 @@
     "tenant_required": "Wählen Sie zuerst eine Organisation aus.",
     "user_directory_unavailable": "Auf diesem Server können keine Personen gesucht werden.",
     "not_applicable": "Der Schritt ist für dieses Bild nicht anwendbar.",
-    "retry_after_too_long": "Der Server wollte mehr als einen Tag Wartezeit vor einem neuen Versuch; das Bild wurde übersprungen."
+    "retry_after_too_long": "Der Server wollte mehr als einen Tag Wartezeit vor einem neuen Versuch; das Bild wurde übersprungen.",
+    "unsafe_output_schema": "Das Ausgabeschema ist nicht zulässig: Es ist zu groß oder zu tief verschachtelt, verweist nach außen oder nutzt ein nicht unterstütztes Schlüsselwort.",
+    "prompt_name_taken": "In dieser Sammlung gibt es bereits einen Prompt mit diesem Namen.",
+    "invalid_prompt_inputs": "Eingaben gelten nur für Gruppen-Prompts.",
+    "group_prompt_run_unsupported": "Gruppen-Prompts laufen pro Gruppe, nicht pro Bild.",
+    "ai_unavailable": "Das KI-Modul ist nicht installiert.",
+    "display_not_ready": "Das Bild ist noch nicht geschwärzt und wurde daher nicht an den KI-Anbieter gesendet.",
+    "ai_not_configured": "Die KI ist nicht eingerichtet. Lege in den KI-Einstellungen einen Anbieter und ein Modell fest.",
+    "invalid_ai_output": "Die Antwort der KI hatte nicht das erwartete Format.",
+    "ai_error": "Der KI-Anbieter hat einen Fehler gemeldet."
   },
   "tabs": {
     "label": "Bereiche der Sammlung",

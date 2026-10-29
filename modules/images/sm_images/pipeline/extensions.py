@@ -45,10 +45,17 @@ def _load_anonymize_step() -> None:
     register_anonymize()  # only when the [anonymize] extra (torch, ultralytics) is installed
 
 
+def _load_classify_step() -> None:
+    from sm_images.steps.classify import register_classify
+
+    register_classify()  # only when the [ai] extra (the ai module, Pydantic AI) is installed
+
+
 _BUILTIN_LOADERS: list[Callable[[], None]] = [
     _load_builtin_steps,
     _load_quality_step,
     _load_anonymize_step,
+    _load_classify_step,
 ]
 """Callables that ``register_builtin`` the reserved-id steps, run before plugins."""
 

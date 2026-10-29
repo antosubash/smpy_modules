@@ -4,10 +4,12 @@
   (routed here rather than behind a long import) and the daily
   ``images.janitor``;
 * ``images_imports`` - the orchestrators (``images.restart_collection``,
+  ``images.run_prompt``,
   ``images.import_geojson``, ``images.reset_import``); run its worker with concurrency 1. Downloads
   (``images.download_items``) go to ``images``, so a long import stream never
   blocks its own downloads;
-* ``images_heavy`` / ``images_gpu`` - plugin steps that declare them.
+* ``images_heavy`` / ``images_gpu`` - ``classify``, ``prompt:*`` and the
+  steps that declare them.
 
 ``images.run_step``'s route is only a default: each message carries the queue
 of the step it runs (``step.queue``), which wins over a route. Beat lives here
@@ -24,6 +26,7 @@ IMPORT_GEOJSON = "images.import_geojson"
 DOWNLOAD_ITEMS = "images.download_items"
 RESET_IMPORT = "images.reset_import"
 RUN_REGROUP = "images.run_regroup"
+RUN_PROMPT = "images.run_prompt"
 
 QUEUE_DEFAULT = "images"
 QUEUE_IMPORTS = "images_imports"
@@ -38,6 +41,7 @@ TASK_ROUTES = {
     DOWNLOAD_ITEMS: {"queue": QUEUE_DEFAULT},
     RESET_IMPORT: {"queue": QUEUE_IMPORTS},
     RUN_REGROUP: {"queue": QUEUE_IMPORTS},
+    RUN_PROMPT: {"queue": QUEUE_IMPORTS},
 }
 
 RECONCILE_INTERVAL_SECONDS = 300.0

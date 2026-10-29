@@ -66,6 +66,7 @@ def _every_code() -> set[str]:
         *PLACEHOLDER_CODES,
         *PARSE_CODES,
         *constants.ERROR_CODES,
+        *constants.AI_CODES,
         constants.TENANT_REQUIRED_CODE,
         constants.DIRECTORY_UNAVAILABLE_CODE,
         CODE_INVALID_CONFIG,

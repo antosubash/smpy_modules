@@ -20,6 +20,7 @@ import pytest_asyncio
 from sm_images.tenancy import DEFAULT_TENANT, tenant_scope
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tests.ai_support import ai  # noqa: F401 - the AI step tests' fixture
 from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
     ADMIN_PERMS,
     as_user,

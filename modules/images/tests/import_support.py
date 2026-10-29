@@ -63,6 +63,7 @@ class Imp:
         features: list[Any],
         kind: ImportKind = B64,
         coll: Collection | None = None,
+        auto_run_prompts: bool = False,
         **mapping: Any,
     ) -> ImportJob:
         """A job whose source is staged, as the route leaves it (not yet run)."""
@@ -80,6 +81,7 @@ class Imp:
             mapping=Mapping(**mapping),
             job_id=job_id,
             staged=(key, total),
+            auto_run_prompts=auto_run_prompts,
         )
 
     async def run(self, job: ImportJob, generation: int | None = None) -> str:

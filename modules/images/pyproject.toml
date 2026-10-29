@@ -54,8 +54,9 @@ anonymize = ["torch>=2.2", "ultralytics>=8.2"]
 map = ["pmtiles>=3.2"]
 
 # Sibling modules, all optional. Must stay 0.0.x ranges: the repo publishes at 0.0.x.
-# floor: 0.0.14 - Task 22 adds ``consume_requests`` to ai's metering, the next
-# lockstep release; an older ai has no worker-side AI metering for images.
+# floor: 0.0.14 - ``sm_ai.contracts.consume_requests`` (``ai.requests`` metered
+# outside a request, which classify and the prompt steps need in a worker) first
+# ships in 0.0.14, the next lockstep release.
 ai = ["simple_module_ai>=0.0.14,<0.1"]
 # floor: 0.0.13 - the gauge meter and committed holds images bills storage with
 # (``context.billing_context``, the ``finalize_session`` commit path).

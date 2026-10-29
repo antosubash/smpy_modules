@@ -13,7 +13,8 @@ are decided once:
    unique-index loss to a concurrent duplicate re-checks identity and answers
    :class:`Duplicate`;
 8. after the commit: ``ImageAdded``, ``pipeline.dispatch`` and
-   ``pipeline.queue_auto_run`` (a no-op until prompts exist).
+   ``pipeline.queue_auto_run`` (the collection's ``auto_run`` prompts; an
+   import passes its job's ``auto_run_prompts`` as ``auto_run``).
 
 **The intent ordering rule (Task 5).** An intent commits through its own
 session, so it must be written before the caller's session first writes:
@@ -121,6 +122,7 @@ class IngestService:
         meta: IngestMeta,
         source: str,
         inspected: Inspected | None = None,
+        auto_run: bool = True,
     ) -> Image | Duplicate:
         """Add one image; ``data`` *or* ``staged_key`` (+ its ``image_id``).
 
@@ -200,7 +202,7 @@ class IngestService:
         self._remember(collection.id, meta, sha, row.id)
         events.emit(self.db, self.bus, events.image_added(row, source))
         pipeline.dispatch(self.db, row.id)
-        pipeline.queue_auto_run(self.db, collection, row.id)
+        await pipeline.queue_auto_run(self.db, collection, row.id, enabled=auto_run)
         return row
 
     # -- steps -------------------------------------------------------------

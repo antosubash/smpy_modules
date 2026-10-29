@@ -239,6 +239,27 @@ ERROR_CODES: Final = (
 )
 """Every code an upload can answer with; each has a translated sentence."""
 
+# --- AI steps and prompts (``sm_images.ai``) ---
+
+CODE_UNSAFE_SCHEMA: Final = "unsafe_output_schema"
+CODE_PROMPT_NAME_TAKEN: Final = "prompt_name_taken"
+CODE_INVALID_INPUTS: Final = "invalid_prompt_inputs"
+CODE_GROUP_RUN_UNSUPPORTED: Final = "group_prompt_run_unsupported"
+CODE_AI_UNAVAILABLE: Final = "ai_unavailable"
+AI_CODES: Final = (
+    CODE_UNSAFE_SCHEMA,
+    CODE_PROMPT_NAME_TAKEN,
+    CODE_INVALID_INPUTS,
+    CODE_GROUP_RUN_UNSUPPORTED,
+    CODE_AI_UNAVAILABLE,
+    "display_not_ready",
+    "ai_not_configured",
+    "quota_exceeded",
+    "invalid_ai_output",
+    "ai_error",
+)
+"""What the prompt routes answer and an AI step's run can end with."""
+
 # --- Console pages (Inertia names: ``<module>/<file under pages/>``) ---
 
 PAGE_COLLECTIONS: Final = f"{MODULE_NAME}/Collections"

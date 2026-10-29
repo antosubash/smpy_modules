@@ -202,9 +202,11 @@ async def test_every_imported_image_gets_its_steps_planned_and_auto_run_queued(i
     from sm_images import pipeline
 
     queued = []
-    monkeypatch.setattr(
-        pipeline, "queue_auto_run", lambda db, coll, image_id: queued.append(image_id)
-    )
+
+    async def queue(db, coll, image_id, *, enabled=True):
+        queued.append(image_id)
+
+    monkeypatch.setattr(pipeline, "queue_auto_run", queue)
     coll = await imp.pipe.collection({"exif": {"enabled": True}})
     job = await imp.job([feature({"img": b64("red")}), feature({"img": b64("blue")})], coll=coll)
     assert await imp.run(job) == "completed"

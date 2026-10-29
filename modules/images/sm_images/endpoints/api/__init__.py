@@ -15,6 +15,7 @@ from sm_images.endpoints.api import (
     images,
     imports,
     pipeline,
+    prompts,
     serve,
     shares,
     uploads,
@@ -38,5 +39,6 @@ router.include_router(images.router)
 router.include_router(groups.router)
 router.include_router(uploads.router)
 router.include_router(pipeline.router)
+router.include_router(prompts.router)
 router.include_router(serve.router)
 router.include_router(imports.router)

@@ -1,9 +1,9 @@
 """Run one claimed step: load, work, store (spec §3's three phases).
 
-* **Load** - one short read session: the run must still be ``running`` under
-  this token with an unexpired lease (else the claim was lost and nothing
-  happens), then the image, its collection's validated config and an
-  immutable :class:`ImageRead`. The session closes before any work.
+* **Load** - one short read session (:mod:`.load`): the run must still be
+  ``running`` under this token with an unexpired lease (else the claim was
+  lost and nothing happens), then the image, its collection's validated config
+  and an immutable :class:`ImageRead`. The session closes before any work.
 * **Work** - no session open. The step sees bytes only through its
   :class:`StepContext`; a long step renews its lease with
   ``await ctx.progress(pct)``, and an executor-owned coroutine renews it too
@@ -30,16 +30,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 from simple_module_db import finalize_session
-from sqlalchemy import select
 
-from sm_images.contracts.schemas import ImageRead
-from sm_images.models import Image, StepRun
-from sm_images.models.enums import StepStatus
-from sm_images.pipeline import registry
-from sm_images.pipeline.advance import collection_config
 from sm_images.pipeline.claim import LostLease, renew
-from sm_images.pipeline.config import StepConfig
 from sm_images.pipeline.finish import complete_step
+from sm_images.pipeline.load import Loaded, load_run
 from sm_images.pipeline.runtime import Runtime
 from sm_images.pipeline.step import StepContext, StepOutcome
 
@@ -51,67 +45,25 @@ MESSAGE_MAX = 2000
 
 @dataclass
 class Staging:
-    """Executor-only writes a step leaves behind (``ctx._staging``)."""
+    """Executor-only state a built-in step reads and the writes it leaves
+    behind (``ctx._staging``)."""
 
     settings: Any
     display: tuple[bytes, str] | None = None
     renditions: dict[str, tuple[bytes, int, int]] | None = None
     exif: Any = None
-
-
-@dataclass(frozen=True)
-class Loaded:
-    tenant: str
-    image_id: uuid.UUID
-    step: str
-    token: uuid.UUID
-    image: ImageRead
-    collection_id: uuid.UUID
-    storage_key: str
-    display_key: str | None
-    display_generation: int
-    config: StepConfig | None
-    mutates_display: bool = False
+    prompt: Any = None
+    """A prompt step's result (``sm_images.ai.results.PromptWrite``)."""
+    token: uuid.UUID | None = None
+    """The run's lease token: part of an AI step's metering idempotency key."""
+    session_factory: Any = None
+    """The runtime's sessions, for metering outside a request."""
+    display_safe: bool = True
+    """Whether the display copy may leave the system (``Loaded.display_safe``)."""
 
 
 def _now() -> datetime:
     return datetime.now(UTC)
-
-
-async def _load(runtime: Runtime, tenant: str, image_id: uuid.UUID, step: str, token: uuid.UUID):
-    now = _now()
-    async with runtime.session_factory() as db:
-        where = [StepRun.tenant_id == tenant, StepRun.image_id == image_id, StepRun.step == step]
-        run = (await db.execute(select(StepRun).where(*where))).scalar_one_or_none()
-        owned = (
-            run is not None
-            and run.status is StepStatus.RUNNING
-            and run.lease_token == token
-            and run.lease_expires_at is not None
-            and run.lease_expires_at >= now
-        )
-        image = None
-        if owned:
-            stmt = select(Image).where(Image.id == image_id, Image.tenant_id == tenant)
-            image = (await db.execute(stmt)).scalar_one_or_none()
-        loaded = None
-        if image is not None:
-            cfg = await collection_config(db, tenant, image.collection_id)
-            loaded = Loaded(
-                tenant=tenant,
-                image_id=image_id,
-                step=step,
-                token=token,
-                image=ImageRead.from_row(image),
-                collection_id=image.collection_id,
-                storage_key=image.storage_key,
-                display_key=image.display_key,
-                display_generation=image.display_generation,
-                config=cfg.get(step),
-                mutates_display=bool(getattr(registry.get_step(step), "mutates_display", False)),
-            )
-        await finalize_session(db)  # read-only: closes the transaction before any work
-    return loaded
 
 
 def _failed(code: str, exc: BaseException | str) -> StepOutcome:
@@ -190,6 +142,9 @@ async def _run(runtime: Runtime, loaded: Loaded, impl: Any, staging: Staging) ->
         write_display=write_display if impl.mutates_display else None,
         on_progress=lease.renew,
     )
+    staging.token = loaded.token
+    staging.session_factory = runtime.session_factory
+    staging.display_safe = loaded.display_safe
     ctx._staging = staging
     keeper = asyncio.ensure_future(lease.keep_alive())
     try:
@@ -215,7 +170,7 @@ async def _run(runtime: Runtime, loaded: Loaded, impl: Any, staging: Staging) ->
 
 
 async def _work(runtime: Runtime, loaded: Loaded, staging: Staging) -> StepOutcome | None:
-    impl = registry.get_step(loaded.step)
+    impl = loaded.impl
     cfg = loaded.config
     if impl is None or cfg is None or not cfg.enabled or cfg.state == "not_installed":
         return StepOutcome("skipped", reason="not_installed", code="not_installed")
@@ -235,12 +190,11 @@ async def run_step_async(
 ) -> bool:
     """Execute one claimed run; ``True`` when its result was recorded."""
     settings = runtime.settings()
-    loaded = await _load(runtime, tenant, image_id, step, token)
+    loaded = await load_run(runtime, tenant, image_id, step, token)
     if loaded is None:
         logger.info("images.pipeline.claim_lost step=%s image=%s", step, image_id)
         return False
-    impl = registry.get_step(step)
-    version = impl.version if impl is not None else None
+    version = loaded.impl.version if loaded.impl is not None else None
     staging = Staging(settings)
     try:
         outcome = await _work(runtime, loaded, staging)

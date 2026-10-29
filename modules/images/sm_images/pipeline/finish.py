@@ -9,6 +9,9 @@
    writes of the built-in steps, the intents of the new keys cleared and those
    of the replaced keys added, then the next planning round - dependants
    claimed, ``ImageProcessed`` decided - all committing together.
+   A ``prompt:*`` run also writes its ``images_prompt_result`` row there
+   (:func:`sm_images.ai.results.record_prompt_run`), and records the prompt's
+   revision as the run's version.
 3. **After the commit**, the replaced objects are deleted. A failed delete
    leaves its intent for the janitor.
 """
@@ -29,7 +32,7 @@ from sqlalchemy import delete
 from sm_images import storage_keys
 from sm_images.intents import clear_intents, object_intent
 from sm_images.models import ObjectIntent
-from sm_images.pipeline import publish
+from sm_images.pipeline import publish, registry
 from sm_images.pipeline.advance import advance_locked, conclude
 from sm_images.pipeline.claim import complete, lock_image
 from sm_images.pipeline.cycle import release
@@ -146,6 +149,7 @@ async def complete_step(
     """Stage, then complete in one transaction. ``False``: the lease was lost or
     a fence failed, and nothing this attempt produced was kept."""
     lease_s = runtime.settings().step_lease_seconds
+    prompt = loaded.step.startswith(registry.PROMPT_PREFIX)
     staged = Staged()
     if outcome.status == "completed":
         try:
@@ -168,6 +172,7 @@ async def complete_step(
             outcome,
             now,
             version=version,
+            revision=version if prompt else None,
         )
         writes = staging if outcome.status == "completed" else None
         replaced = await _publish(db, loaded, locked, staged, writes, version) if ok else None
@@ -175,6 +180,10 @@ async def complete_step(
             await db.rollback()
             requeue = ok  # still ours: only the display fence failed
         else:
+            if prompt:
+                from sm_images.ai.results import record_prompt_run
+
+                await record_prompt_run(db, loaded, outcome, writes)
             await clear_intents(db, staged.keys)
             await publish.add_intents(db, replaced)
             advanced = await advance_locked(

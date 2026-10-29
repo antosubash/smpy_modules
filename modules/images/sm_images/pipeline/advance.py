@@ -9,6 +9,7 @@ and no crash can fall between them.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import partial
@@ -37,9 +38,19 @@ from sm_images.pipeline.plan import RunView, plan
 from sm_images.pipeline.reopen import reopenable
 from sm_images.pipeline.runtime import Runtime
 
-__all__ = ["Advanced", "advance_locked", "claim_ready", "conclude", "plan_and_claim", "view"]
+__all__ = [
+    "Advanced",
+    "advance_locked",
+    "claim_ready",
+    "collection_config",
+    "conclude",
+    "plan_and_claim",
+    "requested_prompts",
+    "view",
+]
 
 DEFAULT_QUEUE = "images"
+AI_QUEUE = "images_heavy"
 
 
 @dataclass(frozen=True)
@@ -58,18 +69,38 @@ def view(run: StepRun, now: datetime) -> RunView:
     return RunView(run.step, run.status, run.step_version, run.error_code, live)
 
 
-async def collection_config(db: Any, tenant: str, collection_id: uuid.UUID) -> Any:
+async def collection_config(
+    db: Any, tenant: str, collection_id: uuid.UUID, requested: Iterable[str] = ()
+) -> Any:
+    """The collection's validated config with its prompt steps resolved, plus
+    the ``requested`` prompt runs of one image (:func:`requested_prompts`)."""
+    from sm_images.ai import prompt_steps
+
     stmt = select(Collection.pipeline_config).where(
         Collection.id == collection_id, Collection.tenant_id == tenant
     )
-    return validate_pipeline_config((await db.execute(stmt)).scalar_one_or_none(), strict=False)
+    raw = (await db.execute(stmt)).scalar_one_or_none()
+    prompts = await prompt_steps.resolve(db, collection_id, tenant=tenant)
+    cfg = validate_pipeline_config(raw, strict=False, prompts=prompts)
+    return cfg.with_requested(requested)
+
+
+def requested_prompts(runs: dict[str, StepRun]) -> list[str]:
+    """An image's prompt runs waiting to run (auto-run, the run route): a
+    pending or running row is a request whatever the collection enables."""
+    return [
+        sid
+        for sid, r in runs.items()
+        if sid.startswith(registry.PROMPT_PREFIX)
+        and r.status in (StepStatus.PENDING, StepStatus.RUNNING)
+    ]
 
 
 async def advance_locked(
     db: Any, tenant: str, image_id: uuid.UUID, locked: LockedImage, now: datetime, lease_s: int
 ) -> Advanced:
-    cfg = await collection_config(db, tenant, locked.collection_id)
     runs = await load_runs(db, tenant, image_id)
+    cfg = await collection_config(db, tenant, locked.collection_id, requested_prompts(runs))
     reopen = reopenable(cfg, {sid: view(r, now) for sid, r in runs.items()})
     if reopen and await reset_runs(db, tenant, image_id, reopen, now):
         await bump_cycle(db, tenant, image_id)  # ``ImageProcessed`` once more
@@ -132,7 +163,10 @@ def _schedule(
 
     for c in claims:
         impl = registry.get_step(c.step)
-        queue = impl.queue if impl is not None else DEFAULT_QUEUE
+        if impl is not None:
+            queue = impl.queue
+        else:  # a prompt step (resolved per execution) or one the executor settles
+            queue = AI_QUEUE if c.step.startswith(registry.PROMPT_PREFIX) else DEFAULT_QUEUE
         sig = run_step.s().set(queue=queue, headers={TENANT_HEADER: tenant})
         enqueue_after_commit(db, sig, str(image_id), c.step, str(c.token))
 

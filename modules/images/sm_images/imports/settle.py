@@ -29,7 +29,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from simple_module_db import finalize_session
-from sqlalchemy import update
+from sqlalchemy import select, update
 
 from sm_images import constants
 from sm_images.errors import ImagesError
@@ -38,7 +38,7 @@ from sm_images.imports.chunk import pending_items
 from sm_images.imports.features import Parsed
 from sm_images.ingest import Duplicate, IngestMeta, IngestService
 from sm_images.ingest.b64 import decode_base64
-from sm_images.models import Collection, Image, ImportItem
+from sm_images.models import Collection, Image, ImportItem, ImportJob
 from sm_images.models.enums import ItemStatus, LocationSource
 from sm_images.pipeline.runtime import Runtime
 
@@ -110,12 +110,35 @@ async def mark_item(
 
 
 async def ingest_item(
-    ingest: IngestService, collection: Collection, *, data: bytes, filename: str | None, meta
+    ingest: IngestService,
+    collection: Collection,
+    *,
+    data: bytes,
+    filename: str | None,
+    meta,
+    auto_run: bool = False,
 ) -> Image | Duplicate:
     """The one ingest call (a seam for the replay tests)."""
     return await ingest.add_image(
-        collection, data=data, filename=filename, meta=meta, source=constants.SOURCE_IMPORT
+        collection,
+        data=data,
+        filename=filename,
+        meta=meta,
+        source=constants.SOURCE_IMPORT,
+        auto_run=auto_run,
     )
+
+
+async def _auto_run(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> bool:
+    """The job's ``auto_run_prompts``, read in a session of its own: the settling
+    one must not read before ingest records its intent (SQLite snapshots)."""
+    async with runtime.session_factory() as db:
+        stmt = select(ImportJob.auto_run_prompts).where(
+            ImportJob.id == job_id, ImportJob.tenant_id == tenant
+        )
+        flag = (await db.execute(stmt)).scalar_one_or_none()
+        await finalize_session(db)
+    return bool(flag)
 
 
 async def fail_item(
@@ -165,6 +188,7 @@ async def settle_bytes(
     """Ingest ``data`` as item ``item_id``; its final status, or ``None`` when it
     lost (settled elsewhere, claim lost, job moved on) and nothing was kept."""
     created: Image | None = None
+    auto_run = await _auto_run(runtime, tenant, job_id)
     async with runtime.session_factory() as db:
         ingest = IngestService(
             db,
@@ -174,7 +198,9 @@ async def settle_bytes(
             intent_factory=runtime.session_factory,
         )
         try:
-            outcome = await ingest_item(ingest, collection, data=data, filename=filename, meta=meta)
+            outcome = await ingest_item(
+                ingest, collection, data=data, filename=filename, meta=meta, auto_run=auto_run
+            )
         except ImagesError as exc:
             await db.rollback()
             code = exc.code or "rejected"

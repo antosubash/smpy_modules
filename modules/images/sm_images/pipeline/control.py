@@ -34,7 +34,7 @@ RESTART_SCOPES: dict[str, Scope] = {"failed": "retry", "stale": "stale", "all": 
 
 
 def _step_entry(step_id: str, cfg: Any) -> dict[str, Any]:
-    impl = registry.get_step(step_id)
+    impl = cfg.impl(step_id)
     stored = cfg.get(step_id)
     enabled = stored.enabled if stored is not None else False
     params = stored.params.model_dump() if stored is not None and stored.params else {}
@@ -73,16 +73,19 @@ async def _run_groups(db: Any, collection_id: uuid.UUID) -> list[Any]:
 async def overview(db: Any, collection: Collection) -> dict[str, Any]:
     """The saved config, every registered step with its JSON schema, and the
     results' status, stale and not-installed counts (trashed images excluded)."""
-    cfg = validate_pipeline_config(collection.pipeline_config, strict=False)
+    from sm_images.ai import prompt_steps
+
+    prompts = await prompt_steps.resolve(db, collection.id, tenant=collection.tenant_id)
+    cfg = validate_pipeline_config(collection.pipeline_config, strict=False, prompts=prompts)
     ids = list(registry.all_steps())
-    ids += [sid for sid in cfg.steps if sid not in registry.all_steps()]
+    ids += [sid for sid in [*cfg.steps, *cfg.prompts] if sid not in ids]
     status: dict[str, dict[str, int]] = {}
     stale = not_installed = 0
     for step, st, version, code, n in await _run_groups(db, collection.id):
         status.setdefault(step, {})[st.value] = status.get(step, {}).get(st.value, 0) + n
         run = SimpleNamespace(step=step, status=st, step_version=version, error_code=code)
-        stale += n if is_stale(run) else 0  # type: ignore[arg-type]
-        not_installed += n if registry.get_step(step) is None else 0
+        stale += n if is_stale(run, cfg) else 0  # type: ignore[arg-type]
+        not_installed += n if cfg.impl(step) is None else 0
     return {
         "config": collection.pipeline_config or {"steps": {}},
         "preset_id": collection.preset_id,

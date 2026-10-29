@@ -429,6 +429,7 @@ def upgrade() -> None:
         sa.Column("result_text", sa.String(), nullable=True),
         sa.Column("result_data", sa.JSON(), nullable=True),
         sa.Column("model_name", sa.String(length=100), nullable=True),
+        sa.Column("prompt_revision", sa.Integer(), nullable=True),
         sa.Column("error", sa.String(length=2000), nullable=True),
         sa.Column("cross_check", sa.JSON(), nullable=True),
         sa.Column(

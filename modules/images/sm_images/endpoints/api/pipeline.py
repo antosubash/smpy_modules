@@ -51,9 +51,12 @@ async def put_pipeline(
     """Save the config after a **strict** validation: params, the shape, one
     display mutator, and the dependency graph (an enabled step whose
     ``requires`` is off or unregistered, or a cycle, is a 422)."""
+    from sm_images.ai import prompt_steps
+
     config = {"steps": body.steps}
+    prompts = await prompt_steps.resolve(db, collection.id, tenant=collection.tenant_id)
     try:
-        parsed = validate_pipeline_config(config, strict=True)
+        parsed = validate_pipeline_config(config, strict=True, prompts=prompts)
     except PipelineConfigError as exc:
         err = Invalid(str(exc)[:1000])
         err.code = CODE_INVALID_CONFIG

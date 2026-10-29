@@ -237,7 +237,16 @@
     "tenant_required": "Choose an organisation first.",
     "user_directory_unavailable": "People cannot be looked up on this server.",
     "not_applicable": "The step does not apply to this image.",
-    "retry_after_too_long": "The server asked to wait more than a day before retrying, so the image was skipped."
+    "retry_after_too_long": "The server asked to wait more than a day before retrying, so the image was skipped.",
+    "unsafe_output_schema": "The output schema is not allowed: it is too large or too deep, refers outside itself, or uses a keyword that is not supported.",
+    "prompt_name_taken": "A prompt with this name already exists in the collection.",
+    "invalid_prompt_inputs": "Inputs apply to group prompts only.",
+    "group_prompt_run_unsupported": "Group prompts run per group, not per image.",
+    "ai_unavailable": "The AI module is not installed.",
+    "display_not_ready": "The picture is not redacted yet, so it was not sent to the AI provider.",
+    "ai_not_configured": "AI is not configured. Set a provider and a model in the AI settings.",
+    "invalid_ai_output": "The AI answer did not match the expected format.",
+    "ai_error": "The AI provider returned an error."
   },
   "tabs": {
     "label": "Collection sections",

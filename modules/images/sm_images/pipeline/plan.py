@@ -12,8 +12,10 @@ The status rules (spec §3, which fix the portal's SKIPPED re-run bug):
 
 A step is **ready** when every effective dependency is completed or ordinarily
 skipped *at the current version*. Effective dependencies are the declared
-``requires`` plus, for ``renditions``, the enabled display mutator: thumbnails
-are cut from the display copy. A declared requirement the collection does not
+``requires`` plus, for ``renditions``, ``classify`` and every ``prompt:*``
+step, the enabled display mutator: thumbnails are cut from the display copy,
+and an AI step sends it to a provider, so neither may read it before the
+redaction settled. A declared requirement the collection does not
 enable is **unmet**: the dependant settles as ``dependency_unavailable`` (a
 save refuses such a config; one saved before a plugin changed still settles).
 
@@ -45,6 +47,7 @@ __all__ = [
 ]
 
 RENDITIONS = "renditions"
+CLASSIFY = "classify"
 FINAL = frozenset({StepStatus.COMPLETED, StepStatus.SKIPPED, StepStatus.FAILED})
 
 DEPENDENCY_FAILED = "dependency_failed"
@@ -88,18 +91,24 @@ def is_blocked(run: RunView) -> bool:
     return run.status is StepStatus.SKIPPED and run.error_code in BLOCKED_CODES
 
 
-def is_stale(run: RunView) -> bool:
-    """A final result produced by an older version of an installed step."""
+def is_stale(run: RunView, cfg: PipelineConfig | None = None) -> bool:
+    """A final result produced by an older version of an installed step (a
+    ``prompt:*`` step's version is its prompt's revision: ``cfg`` resolves it)."""
     if run.status not in (StepStatus.COMPLETED, StepStatus.SKIPPED) or is_blocked(run):
         return False
-    impl = registry.get_step(run.step)
+    impl = cfg.impl(run.step) if cfg is not None else registry.get_step(run.step)
     return impl is not None and run.step_version != impl.version
 
 
+def reads_redacted_display(step_id: str) -> bool:
+    """Steps that must wait for the display mutator (see the module docstring)."""
+    return step_id in (RENDITIONS, CLASSIFY) or step_id.startswith(registry.PROMPT_PREFIX)
+
+
 def effective_deps(cfg: PipelineConfig, step_id: str) -> list[str]:
-    impl = registry.get_step(step_id)
+    impl = cfg.impl(step_id)
     deps = [r for r in (impl.requires if impl else ()) if r != step_id]
-    if step_id == RENDITIONS:
+    if reads_redacted_display(step_id):
         deps += [m for m in cfg.mutators() if m not in deps and m != step_id]
     return deps
 
@@ -149,7 +158,7 @@ def _order(cfg: PipelineConfig, cyclic: set[str]) -> list[str]:
     return order
 
 
-def _dep_state(run: RunView | None) -> str:
+def _dep_state(run: RunView | None, cfg: PipelineConfig | None = None) -> str:
     if run is None:  # required, but not enabled in this collection
         return "unavailable"
     if run.status in (StepStatus.PENDING, StepStatus.RUNNING):
@@ -158,7 +167,7 @@ def _dep_state(run: RunView | None) -> str:
         return "failed"
     if is_blocked(run):
         return "stale" if run.error_code == DEPENDENCY_STALE else "unavailable"
-    return "stale" if is_stale(run) else "ok"
+    return "stale" if is_stale(run, cfg) else "ok"
 
 
 def _blocked_code(states: list[str]) -> str | None:
@@ -214,7 +223,7 @@ def plan(cfg: PipelineConfig, runs: dict[str, RunView]) -> Plan:
         # its old run says: a completed result from before it was disabled
         # does not satisfy anything under this configuration.
         states = [
-            _dep_state(state.get(d)) if d in enabled else "unavailable"
+            _dep_state(state.get(d), cfg) if d in enabled else "unavailable"
             for d in effective_deps(cfg, sid)
         ]
         code = _blocked_code(states)

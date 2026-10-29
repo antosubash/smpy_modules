@@ -16,18 +16,24 @@ Two callers, two strictnesses:
 Either way an id with no installed implementation is *kept*, as
 ``not_installed``: removing a plugin must not silently rewrite a collection's
 configuration, and its runs settle as skipped rather than waiting forever.
-``prompt:<id>`` steps have no registered implementation yet (Task 22 resolves
-them per execution); until then they are ``not_installed`` too.
+``prompt:<id>`` steps are never registered: the caller resolves them from the
+database per execution (:func:`sm_images.ai.prompt_steps.resolve`) and passes
+them as ``prompts``; one it did not pass (a deleted prompt, no ``ai``) is
+``not_installed`` too. :meth:`PipelineConfig.with_requested` adds the prompt
+runs requested for one image (auto-run, the run route) that the collection's
+config does not enable.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections.abc import Iterable
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
 from pydantic import BaseModel, ValidationError
 
 from sm_images.pipeline import registry
+from sm_images.pipeline.step import Step
 
 __all__ = [
     "PipelineConfig",
@@ -60,6 +66,22 @@ class StepConfig:
 @dataclass(frozen=True)
 class PipelineConfig:
     steps: dict[str, StepConfig] = field(default_factory=dict)
+    prompts: dict[str, Step] = field(default_factory=dict)
+    """The collection's ``prompt:<id>`` steps, resolved from the database."""
+
+    def impl(self, step_id: str) -> Step | None:
+        """The registered step, else the resolved prompt step, else ``None``."""
+        return registry.get_step(step_id) or self.prompts.get(step_id)
+
+    def with_requested(self, step_ids: Iterable[str]) -> PipelineConfig:
+        """Enable resolved prompt steps requested for one image, whatever the
+        collection's config says; an unresolved id is left out (it settles)."""
+        steps = dict(self.steps)
+        for sid in step_ids:
+            impl = self.prompts.get(sid)
+            if impl is not None and not (sid in steps and steps[sid].runnable):
+                steps[sid] = StepConfig(sid, True, "ok", params=impl.params_schema()())
+        return replace(self, steps=steps)
 
     def enabled(self) -> list[str]:
         return [s.id for s in self.steps.values() if s.enabled]
@@ -86,9 +108,9 @@ def _bad(strict: bool, message: str) -> PipelineConfig:
     return PipelineConfig()
 
 
-def _one(sid: str, raw: dict[str, Any], strict: bool) -> StepConfig:
+def _one(sid: str, raw: dict[str, Any], strict: bool, prompts: dict[str, Step]) -> StepConfig:
     enabled = raw.get("enabled") is not False
-    impl = registry.get_step(sid)
+    impl = registry.get_step(sid) or prompts.get(sid)
     if impl is None:
         return StepConfig(sid, enabled, "not_installed")
     params = {k: v for k, v in raw.items() if k != "enabled"}
@@ -101,13 +123,17 @@ def _one(sid: str, raw: dict[str, Any], strict: bool) -> StepConfig:
     return StepConfig(sid, enabled, "ok", params=validated)
 
 
-def validate_pipeline_config(cfg: Any, *, strict: bool = True) -> PipelineConfig:
-    """Parse and validate ``cfg`` (a collection's stored ``pipeline_config``)."""
+def validate_pipeline_config(
+    cfg: Any, *, strict: bool = True, prompts: Iterable[Step] = ()
+) -> PipelineConfig:
+    """Parse and validate ``cfg`` (a collection's stored ``pipeline_config``);
+    ``prompts`` are the collection's resolved ``prompt:<id>`` steps."""
     from sm_images.pipeline.extensions import load_extensions
 
     load_extensions()  # the worker's first registry read; a no-op once frozen
+    found = {p.id: p for p in prompts}
     if cfg is None or cfg == {}:
-        return PipelineConfig()
+        return PipelineConfig(prompts=found)
     if not isinstance(cfg, dict) or not isinstance(cfg.get("steps", {}), dict):
         return _bad(strict, "pipeline_config must be {'steps': {id: {...}}}")
     steps: dict[str, StepConfig] = {}
@@ -116,7 +142,7 @@ def validate_pipeline_config(cfg: Any, *, strict: bool = True) -> PipelineConfig
             if strict:
                 raise PipelineConfigError(f"step {sid!r}: its value must be an object")
             continue
-        steps[sid] = _one(sid, raw, strict)
+        steps[sid] = _one(sid, raw, strict, found)
     mutators = PipelineConfig(steps).mutators()
     if len(mutators) > 1:
         if strict:
@@ -124,7 +150,7 @@ def validate_pipeline_config(cfg: Any, *, strict: bool = True) -> PipelineConfig
         for sid in mutators:
             old = steps[sid]
             steps[sid] = StepConfig(sid, old.enabled, "invalid", error="too_many_display_mutators")
-    out = PipelineConfig(steps)
+    out = PipelineConfig(steps, found)
     if strict:
         _check_unknown_beside_mutator(out)
         _check_graph(out)

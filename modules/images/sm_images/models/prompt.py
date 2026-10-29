@@ -48,6 +48,8 @@ class PromptResult(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignor
     result_text: str | None = Field(default=None)
     result_data: dict[str, Any] | None = json_null()
     model_name: str | None = Field(default=None, max_length=100)
+    prompt_revision: int | None = Field(default=None)
+    """The ``Prompt.revision`` the output was produced under; older is stale."""
     error: str | None = Field(default=None, max_length=2000)
     cross_check: dict[str, Any] | None = json_null()
     review_status: ReviewStatus = enum_col(ReviewStatus, "review_status", ReviewStatus.UNREVIEWED)

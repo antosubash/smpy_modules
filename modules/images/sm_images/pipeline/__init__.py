@@ -67,13 +67,23 @@ def dispatch(db: Any, image_id: uuid.UUID) -> None:
     register_on_commit(db, partial(_dispatch_after_commit, image_id, tenant))
 
 
-def queue_auto_run(db: Any, collection: Any, image_id: uuid.UUID) -> None:
-    """Queue the collection's ``auto_run`` prompts for ``image_id`` after commit.
+async def queue_auto_run(
+    db: Any, collection: Any, image_id: uuid.UUID, *, enabled: bool = True
+) -> None:
+    """Request the collection's ``auto_run`` image prompts for ``image_id``.
 
-    A no-op until prompts exist (Task 22). It is called by the one ingest
-    entry point, next to :func:`dispatch`, so every path - multipart, base64,
-    direct upload, GeoJSON (URL and base64) and ZIP - reaches it the same way.
+    Pending ``prompt:<id>`` rows in ``db``'s transaction, which the image's
+    :func:`dispatch` plans after the commit (behind the display mutator, like
+    every AI step). Called by the one ingest entry point next to
+    :func:`dispatch`, so every path - multipart, base64, direct upload,
+    GeoJSON (URL and base64) and ZIP - reaches it; an import passes its job's
+    ``auto_run_prompts`` as ``enabled``. A no-op without the ``[ai]`` extra.
     """
+    if not enabled:
+        return
+    from sm_images.ai import prompt_steps
+
+    await prompt_steps.request_auto_run(db, collection, image_id)
 
 
 async def _dispatch_after_commit(image_id: uuid.UUID, tenant: str) -> None:

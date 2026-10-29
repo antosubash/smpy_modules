@@ -30,7 +30,11 @@ def _cleared(cfg: PipelineConfig, sid: str, state: dict[str, RunView]) -> bool:
     enabled prerequisite with no run yet is about to get one: it waits."""
     enabled = set(cfg.enabled())
     states = [
-        "unavailable" if d not in enabled else "wait" if d not in state else _dep_state(state[d])
+        "unavailable"
+        if d not in enabled
+        else "wait"
+        if d not in state
+        else _dep_state(state[d], cfg)
         for d in effective_deps(cfg, sid)
     ]
     if state[sid].error_code == DEPENDENCY_STALE:

@@ -172,7 +172,7 @@ def _selected(scope: Scope, cfg: Any, runs: dict[str, Any], now: datetime) -> li
         elif scope == "retry":
             pick = v.status.value == "failed" or is_blocked(v) or abandoned
         else:  # stale
-            pick = (v.status in FINAL and is_stale(v)) or is_blocked(v)
+            pick = (v.status in FINAL and is_stale(v, cfg)) or is_blocked(v)
         if pick:
             out.append(sid)
     return out
