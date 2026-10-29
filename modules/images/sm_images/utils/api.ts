@@ -69,8 +69,9 @@ function query(params: Record<string, string | number | undefined | null>): stri
 export function listCollections(
   filter: CollectionFilter,
   cursor?: string | null,
+  signal?: AbortSignal,
 ): Promise<Page<Collection>> {
-  return send(`${BASE}/collections${query({ filter, cursor })}`);
+  return send(`${BASE}/collections${query({ filter, cursor })}`, { signal });
 }
 
 export type CreateCollection = {

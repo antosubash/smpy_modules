@@ -16,7 +16,7 @@ from typing import Any
 from sqlalchemy import case, delete, func, literal, select, update
 from sqlalchemy.exc import IntegrityError
 
-from sm_images import constants
+from sm_images import constants, redaction
 from sm_images.errors import Conflict, GroupExists, InvalidGroup, NotFound
 from sm_images.imports.filename_pattern import canonical_role
 from sm_images.map import schedule as map_schedule
@@ -59,8 +59,11 @@ async def get(db: Any, collection: Collection, group_id: uuid.UUID) -> Group:
     return found
 
 
-async def counts(db: Any, groups: Sequence[Group]) -> dict[uuid.UUID, int]:
-    """Members per group (trashed images excluded)."""
+async def counts(
+    db: Any, groups: Sequence[Group], *, gate: Collection | None = None
+) -> dict[uuid.UUID, int]:
+    """Members per group (trashed images excluded). With ``gate`` (a viewer's
+    read of that collection) only display-safe images count."""
     if not groups:
         return {}
     stmt = (
@@ -68,24 +71,31 @@ async def counts(db: Any, groups: Sequence[Group]) -> dict[uuid.UUID, int]:
         .where(Image.group_id.in_([g.id for g in groups]))
         .group_by(Image.group_id)
     )
+    if gate is not None:
+        stmt = stmt.where(redaction.ready_clause(gate))
     return {gid: int(n) for gid, n in (await db.execute(stmt)).all()}
 
 
 async def members(
-    db: Any, collection: Collection, group_ids: Sequence[uuid.UUID], per_group: int
+    db: Any,
+    collection: Collection,
+    group_ids: Sequence[uuid.UUID],
+    per_group: int,
+    *,
+    gated: bool = False,
 ) -> dict[uuid.UUID, list[Image]]:
-    """The first ``per_group`` members of each group, in role order."""
+    """The first ``per_group`` members of each group, in role order (only the
+    display-safe ones when ``gated``)."""
     if not group_ids:
         return {}
     ordering = member_order(list(collection.group_roles or []))
-    numbered = (
-        select(
-            Image.id.label("iid"),
-            func.row_number().over(partition_by=Image.group_id, order_by=ordering).label("rn"),
-        )
-        .where(Image.collection_id == collection.id, Image.group_id.in_(group_ids))
-        .subquery()
-    )
+    numbered = select(
+        Image.id.label("iid"),
+        func.row_number().over(partition_by=Image.group_id, order_by=ordering).label("rn"),
+    ).where(Image.collection_id == collection.id, Image.group_id.in_(group_ids))
+    if gated:
+        numbered = numbered.where(redaction.ready_clause(collection))
+    numbered = numbered.subquery()
     stmt = (
         select(Image)
         .join(numbered, numbered.c.iid == Image.id)

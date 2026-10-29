@@ -9,8 +9,18 @@ vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock(
 const Collection = (await import('../pages/Collection')).default;
 
 const LIST = 'GET /api/images/collections/c1/images';
-const page = (...ids: string[]) => ({ items: ids.map((id) => image(id)), next_cursor: null, total: ids.length });
-const rights = { can_edit: true, can_manage: true, can_share: true, can_publish: false, direct_upload_threshold: 1024 };
+const page = (...ids: string[]) => ({
+  items: ids.map((id) => image(id)),
+  next_cursor: null,
+  total: ids.length,
+});
+const rights = {
+  can_edit: true,
+  can_manage: true,
+  can_share: true,
+  can_publish: false,
+  direct_upload_threshold: 1024,
+};
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -19,15 +29,24 @@ describe('Collection gallery', () => {
     stubFetch({ [LIST]: page('i1', 'i2') });
     const view = await mount(<Collection collection={collection()} {...rights} />);
     await flush();
-    const srcs = view.all<HTMLImageElement>('[data-testid="images-gallery-tile"] img').map((i) => i.getAttribute('src'));
-    expect(srcs).toEqual(['/api/images/images/i1/r/small?v=1', '/api/images/images/i2/r/small?v=1']);
-    const hrefs = view.all<HTMLAnchorElement>('[data-testid="images-gallery-tile"]').map((a) => a.getAttribute('href'));
+    const srcs = view
+      .all<HTMLImageElement>('[data-testid="images-gallery-tile"] img')
+      .map((i) => i.getAttribute('src'));
+    expect(srcs).toEqual([
+      '/api/images/images/i1/r/small?v=1',
+      '/api/images/images/i2/r/small?v=1',
+    ]);
+    const hrefs = view
+      .all<HTMLAnchorElement>('[data-testid="images-gallery-tile"]')
+      .map((a) => a.getAttribute('href'));
     expect(hrefs[0]).toBe('/admin/images/images/i1');
     await view.unmount();
   });
 
   it('holds a placeholder for an image whose rendition is not ready', async () => {
-    stubFetch({ [LIST]: { items: [image('i1', { thumb_url: null })], next_cursor: null, total: 1 } });
+    stubFetch({
+      [LIST]: { items: [image('i1', { thumb_url: null })], next_cursor: null, total: 1 },
+    });
     const view = await mount(<Collection collection={collection()} {...rights} />);
     await flush();
     expect(view.find('[data-testid="images-gallery-tile"] img')).toBeNull();
@@ -86,30 +105,70 @@ describe('Collection gallery', () => {
     await flush();
     release?.();
     await flush();
-    const ids = view.all('[data-testid="images-gallery-tile"]').map((a) => a.getAttribute('data-image-id'));
+    const ids = view
+      .all('[data-testid="images-gallery-tile"]')
+      .map((a) => a.getAttribute('data-image-id'));
     expect(ids).toEqual(['fresh']);
     await view.unmount();
   });
 });
 
-describe('Collection actions follow the caller\'s rights', () => {
+describe("Collection actions follow the caller's rights", () => {
   it('hides upload, share, visibility and delete from a read-only viewer', async () => {
     stubFetch({ [LIST]: page('i1') });
     const view = await mount(
-      <Collection collection={collection()} can_edit={false} can_manage={false} can_share={false} can_publish={false} direct_upload_threshold={1024} />,
+      <Collection
+        collection={collection()}
+        can_edit={false}
+        can_manage={false}
+        can_share={false}
+        can_publish={false}
+        direct_upload_threshold={1024}
+      />,
     );
     await flush();
-    for (const id of ['images-upload', 'images-share', 'images-visibility', 'images-delete-collection']) {
+    for (const id of [
+      'images-upload',
+      'images-share',
+      'images-visibility',
+      'images-delete-collection',
+    ]) {
       expect(view.find(`[data-testid="${id}"]`), id).toBeNull();
     }
     await view.unmount();
+  });
+
+  it('hides the pipeline tab from a viewer: its counts cover withheld images', async () => {
+    stubFetch({ [LIST]: page('i1') });
+    const viewer = await mount(
+      <Collection
+        collection={collection()}
+        can_edit={false}
+        can_manage={false}
+        can_share={false}
+        can_publish={false}
+        direct_upload_threshold={1024}
+      />,
+    );
+    await flush();
+    expect(viewer.find('[data-testid="images-tab-pipeline"]')).toBeNull();
+    await viewer.unmount();
+    const owner = await mount(<Collection collection={collection()} {...rights} />);
+    await flush();
+    expect(owner.find('[data-testid="images-tab-pipeline"]')).not.toBeNull();
+    await owner.unmount();
   });
 
   it('offers all four to the owner', async () => {
     stubFetch({ [LIST]: page('i1') });
     const view = await mount(<Collection collection={collection()} {...rights} />);
     await flush();
-    for (const id of ['images-upload', 'images-share', 'images-visibility', 'images-delete-collection']) {
+    for (const id of [
+      'images-upload',
+      'images-share',
+      'images-visibility',
+      'images-delete-collection',
+    ]) {
       expect(view.find(`[data-testid="${id}"]`), id).not.toBeNull();
     }
     await view.unmount();

@@ -29,7 +29,6 @@ export interface ImageGalleryProps {
 export const COUNT_MIN = 1;
 export const COUNT_MAX = 48;
 export const COUNT_DEFAULT = 8;
-const MAX_PICKER_PAGES = 100;
 const SIZES: TileSize[] = ['small', 'medium', 'large'];
 
 /** Stored props may predate the editor's constraints, and a fractional or
@@ -68,19 +67,19 @@ function buildFields(tr: Translate, collections: { label: string; value: string 
 /** Public collections only: a gallery of a private one would render nothing for
  *  a visitor, and offering it would be a trap. Empty when the editor is
  *  offline or signed out, which must not break the editor. */
-async function publicCollections() {
+async function publicCollections(signal: AbortSignal) {
   const found: { label: string; value: string }[] = [];
   try {
     let cursor: string | null = null;
-    // Bounded: a cursor that never ends must not hang the editor.
-    for (let i = 0; i < MAX_PICKER_PAGES; i++) {
-      const page: Page<Collection> = await listCollections('public', cursor);
+    // Every page, however many: a cap would hide collections with no sign of it.
+    // A repeated cursor would loop forever, and a newer picker aborts this one.
+    do {
+      const page: Page<Collection> = await listCollections('public', cursor, signal);
       for (const c of page.items) {
         if (c.visibility === 'public') found.push({ label: c.name, value: c.slug });
       }
-      cursor = page.next_cursor;
-      if (!cursor) break;
-    }
+      cursor = page.next_cursor && page.next_cursor !== cursor ? page.next_cursor : null;
+    } while (cursor && !signal.aborted);
   } catch {
     // Keep what loaded: a later page failing must not empty the picker.
   }
@@ -100,12 +99,19 @@ export function ImageGalleryRender({ collection, size, count }: ImageGalleryProp
   );
 }
 
+/** The picker load in flight; the next `resolveFields` supersedes it. */
+let picker: AbortController | null = null;
+
 export const ImageGalleryBlock: ComponentConfig<ImageGalleryProps> = {
   label: keys.images.block.label,
   // Static labels are keys; `resolveFields` below replaces them with text.
   fields: buildFields((key) => key, []),
   defaultProps: { collection: '', size: 'medium', count: COUNT_DEFAULT },
-  resolveFields: async () => buildFields(translate, await publicCollections()),
+  resolveFields: async () => {
+    picker?.abort();
+    picker = new AbortController();
+    return buildFields(translate, await publicCollections(picker.signal));
+  },
   resolveData: ({ props }, { trigger }) =>
     trigger === 'load' ? { props: { ...props, count: clampCount(props.count) } } : { props },
   render: ImageGalleryRender,

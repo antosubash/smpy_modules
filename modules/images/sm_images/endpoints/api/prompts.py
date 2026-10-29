@@ -47,6 +47,7 @@ from sm_images.schemas.prompt import (
     PromptUpdate,
 )
 from sm_images.services import prompts as service
+from sm_images.services.viewer_stats import viewer_only
 
 router = APIRouter(tags=["prompts"])
 Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
@@ -134,12 +135,14 @@ async def delete_prompt(
 async def list_results(
     prompt_id: uuid.UUID,
     collection: PromptCollectionView,
+    who: Principal,
     db=Depends(get_db),
     limit: int = Query(constants.PAGE_DEFAULT, ge=1, le=constants.PAGE_MAX),
     after: int | None = Query(None, ge=0),
 ) -> PromptResultPageOut:
     row = await service.get(db, collection, prompt_id)
-    found, cursor = await service.results_page(db, row, limit=limit, after=after)
+    gate = collection if await viewer_only(db, who, collection) else None
+    found, cursor = await service.results_page(db, row, limit=limit, after=after, gate=gate)
     return PromptResultPageOut(items=[_result(r, row.revision) for r in found], next_cursor=cursor)
 
 

@@ -72,9 +72,9 @@ async def test_not_installed_step_reported_never_scheduled(world):
 
 @pytest.mark.parametrize(
     ("who", "expected"),
-    [(OWNER, 200), (MANAGER, 200), (EDITOR, 200), (VIEWER, 200), (STRANGER, 404), (None, 401)],
+    [(OWNER, 200), (MANAGER, 200), (EDITOR, 200), (VIEWER, 403), (STRANGER, 404), (None, 401)],
 )
-async def test_get_is_a_view_on_the_collection(world, who, expected):
+async def test_get_is_an_edit_on_the_collection(world, who, expected):
     r = await world.c.get(url(world), headers=headers(who))
     assert r.status_code == expected, r.text
 

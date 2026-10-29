@@ -1,7 +1,8 @@
 """``/api/images/collections/{id}/pipeline`` and ``/api/images/images/{id}/reprocess``.
 
-Reading the pipeline is a ``view`` on the collection; saving it and restarting
-the whole collection are owner or ``images.manage`` (``CollectionOwner``);
+Reading the pipeline is an ``edit`` on the collection: its progress counts cover
+every image, including ones whose redaction has not settled, so a viewer gets none.
+Saving it and restarting the whole collection are owner or ``images.manage`` (``CollectionOwner``);
 reprocessing one image is an ``edit`` - and ``force`` (re-run every step,
 including the ones that completed) is the owner's or manager's only.
 
@@ -21,7 +22,7 @@ from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal
 
 from sm_images import redaction
-from sm_images.access import POLICY, CollectionOwner, CollectionView, ImageCollectionEdit
+from sm_images.access import POLICY, CollectionEdit, CollectionOwner, ImageCollectionEdit
 from sm_images.deps import require_view
 from sm_images.endpoints.api._runtime import runtime, tenant
 from sm_images.errors import Forbidden, Invalid
@@ -42,7 +43,7 @@ CODE_INVALID_CONFIG = "invalid_pipeline_config"
 
 
 @router.get("/collections/{collection_id}/pipeline", dependencies=[require_view])
-async def get_pipeline(collection: CollectionView, db=Depends(get_db)) -> dict[str, Any]:
+async def get_pipeline(collection: CollectionEdit, db=Depends(get_db)) -> dict[str, Any]:
     return await control.overview(db, collection)
 
 

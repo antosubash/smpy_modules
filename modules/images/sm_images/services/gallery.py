@@ -14,7 +14,7 @@ from typing import Any
 
 from sqlalchemy import exists, func, select, update
 
-from sm_images import constants
+from sm_images import constants, redaction
 from sm_images.errors import Conflict, NotFound
 from sm_images.map import revoke as map_revoke
 from sm_images.map import schedule as map_schedule
@@ -71,9 +71,15 @@ async def list_page(
     *,
     limit: int = constants.PAGE_DEFAULT,
     cursor: str | None = None,
+    gated: bool = False,
 ) -> tuple[list[Image], str | None, int | None]:
-    """``(rows, next_cursor, total)``, newest first; ``total`` on the first page only."""
+    """``(rows, next_cursor, total)``, newest first; ``total`` on the first page only.
+
+    ``gated`` (a viewer who cannot edit) keeps only the display-safe images, in
+    the rows, the total and the filters alike."""
     stmt = _where(select(Image).where(Image.collection_id == collection.id), filters)
+    if gated:
+        stmt = stmt.where(redaction.ready_clause(collection))
     total = None
     if cursor is None:
         counted = select(func.count()).select_from(stmt.subquery())
@@ -88,8 +94,12 @@ async def list_page(
     return rows, token, total
 
 
-async def get(db: Any, collection: Collection, image_id: uuid.UUID) -> Image:
+async def get(
+    db: Any, collection: Collection, image_id: uuid.UUID, *, gated: bool = False
+) -> Image:
     stmt = select(Image).where(Image.id == image_id, Image.collection_id == collection.id)
+    if gated:  # a withheld image is the 404 an unknown id gets
+        stmt = stmt.where(redaction.ready_clause(collection))
     found = (await db.execute(stmt)).scalars().first()
     if found is None:
         raise NotFound(constants.NOT_FOUND_DETAIL)

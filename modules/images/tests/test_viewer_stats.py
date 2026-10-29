@@ -112,3 +112,68 @@ async def test_a_trashed_image_does_not_count(client, seeded):
     got = await client.get(f"/images/c/{seeded.slug}", headers=INERTIA)
     shown = got.json()["props"]["collection"]
     assert shown["bbox"] is None and shown["image_count"] == 0
+
+
+# ---- fix round 2: the image reads --------------------------------------------
+
+
+async def _group_pending(client, seeded):
+    """Put both images in one group; returns (group id, pending image id)."""
+    from sm_images.models import Group
+    from sqlalchemy import select
+
+    with tenant_scope(DEFAULT_TENANT):
+        async with client.db_state.session_factory() as s:
+            group = Group(collection_id=seeded.id, key="site")
+            s.add(group)
+            await s.flush()
+            await s.execute(
+                update(Image).where(Image.collection_id == seeded.id).values(group_id=group.id)
+            )
+            pending = (
+                await s.execute(select(Image.id).where(Image.filename == "pending.jpg"))
+            ).scalar_one()
+            await s.commit()
+            return group.id, pending
+
+
+async def test_image_list_hides_a_pending_image_from_a_viewer(client, seeded):
+    url = f"/api/images/collections/{seeded.id}/images"
+    viewer = (await client.get(url, headers=headers(STRANGER))).json()
+    assert viewer["total"] == 1
+    assert [i["lat"] for i in viewer["items"]] == [SAFE[0]]
+    assert "pending.jpg" not in str(viewer)
+    only_far = await client.get(url + "?has_location=true&limit=1", headers=headers(STRANGER))
+    assert only_far.json()["total"] == 1
+    owner = (await client.get(url, headers=headers(OWNER))).json()
+    assert owner["total"] == 2
+
+
+async def test_image_detail_of_a_pending_image_is_404_for_a_viewer(client, seeded):
+    _, pending = await _group_pending(client, seeded)
+    url = f"/api/images/images/{pending}"
+    assert (await client.get(url, headers=headers(STRANGER))).status_code == 404
+    assert (await client.get(url, headers=headers(OWNER))).status_code == 200
+    page = await client.get(
+        f"/admin/images/images/{pending}", headers={**headers(STRANGER), **INERTIA}
+    )
+    assert page.status_code == 404
+
+
+async def test_groups_count_and_show_only_ready_members_to_a_viewer(client, seeded):
+    group_id, pending = await _group_pending(client, seeded)
+    base = f"/api/images/collections/{seeded.id}/groups"
+    for url in (base, f"/api/images/groups/{group_id}"):
+        got = (await client.get(url, headers=headers(STRANGER))).json()
+        row = got["items"][0] if "items" in got else got
+        assert row["image_count"] == 1
+        assert [m["lat"] for m in row["members"]] == [SAFE[0]]
+        assert str(pending) not in str(got)
+    owner = (await client.get(base, headers=headers(OWNER))).json()["items"][0]
+    assert owner["image_count"] == 2
+
+
+async def test_pipeline_overview_is_editor_only(client, seeded):
+    url = f"/api/images/collections/{seeded.id}/pipeline"
+    assert (await client.get(url, headers=headers(STRANGER))).status_code in (403, 404)
+    assert (await client.get(url, headers=headers(OWNER))).status_code == 200

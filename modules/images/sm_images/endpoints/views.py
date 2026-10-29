@@ -34,7 +34,7 @@ from sm_images.deps import get_settings, require_view
 from sm_images.schemas.collection import CollectionOut, CollectionPageOut
 from sm_images.services import collections as collection_service
 from sm_images.services import gallery, present
-from sm_images.services.viewer_stats import collection_outs
+from sm_images.services.viewer_stats import collection_outs, viewer_only
 from sm_images.tenancy import bind_admin
 
 # ``bind_admin`` first, for the reason ``endpoints.api``'s router gives.
@@ -90,7 +90,7 @@ async def image(
     settled), so the toggle is offered exactly when ``/original`` would answer
     200. ``display_pending`` is when ``…/display`` would 404 (redaction has not
     settled), so the page says so instead of showing a broken picture."""
-    row = await gallery.get(db, collection, image_id)
+    row = await gallery.get(db, collection, image_id, gated=await viewer_only(db, who, collection))
     withheld = not redaction_state.trusts_display(
         collection, row
     ) and await redaction_state.pending(db, collection, row)

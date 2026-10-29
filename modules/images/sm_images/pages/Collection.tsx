@@ -71,10 +71,11 @@ function Collection({
         ),
       }
     : undefined;
-  // The import routes are an edit on the collection, so the tab is an editor's.
+  // The import routes and the pipeline overview (its progress counts cover images
+  // still withheld) are an edit on the collection, so those tabs are an editor's.
   const tabs: Tab[] = can_edit
     ? ['gallery', 'map', 'groups', 'pipeline', 'prompts', 'imports']
-    : ['gallery', 'map', 'groups', 'pipeline', 'prompts'];
+    : ['gallery', 'map', 'groups', 'prompts'];
 
   const changeVisibility = async (next: Visibility) => {
     setSaving(true);

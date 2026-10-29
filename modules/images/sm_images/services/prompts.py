@@ -28,6 +28,7 @@ from typing import Any
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 
+from sm_images import redaction
 from sm_images.ai import codes, prompt_steps
 from sm_images.ai.schema_safety import UnsafeSchema, check
 from sm_images.errors import Conflict, Invalid, NotFound
@@ -187,9 +188,11 @@ async def delete_prompt(db: Any, collection: Collection, row: Prompt) -> None:
 
 
 async def results_page(
-    db: Any, row: Prompt, *, limit: int, after: int | None
+    db: Any, row: Prompt, *, limit: int, after: int | None, gate: Collection | None = None
 ) -> tuple[list[PromptResult], int | None]:
-    """Results of untrashed images (and groups), by id."""
+    """Results of untrashed images (and groups), by id. With ``gate`` (a viewer's
+    read of that collection) only results of display-safe images: a group's
+    result summarises members that may be withheld, so it is left out."""
     stmt = (
         select(PromptResult)
         .outerjoin(Image, Image.id == PromptResult.image_id)
@@ -198,6 +201,8 @@ async def results_page(
         .order_by(PromptResult.id)
         .limit(limit + 1)
     )
+    if gate is not None:
+        stmt = stmt.where(Image.id.is_not(None), redaction.ready_clause(gate))
     if after is not None:
         stmt = stmt.where(PromptResult.id > after)
     rows = list((await db.execute(stmt)).scalars())

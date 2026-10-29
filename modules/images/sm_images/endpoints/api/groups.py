@@ -24,7 +24,6 @@ from sm_images.access import (
     GroupCollectionEdit,
     GroupCollectionView,
     RegroupCollectionEdit,
-    RegroupCollectionView,
 )
 from sm_images.deps import require_view
 from sm_images.endpoints.api._runtime import runtime, tenant
@@ -44,14 +43,18 @@ from sm_images.schemas.group import (
 from sm_images.services import groups as service
 from sm_images.services import present
 from sm_images.services import regroup as regrouping
+from sm_images.services.viewer_stats import viewer_only
 
 router = APIRouter(tags=["groups"])
 Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
 
 
-async def _out(db, collection: Collection, rows: list[Group], per_group: int) -> list[GroupOut]:
-    counts = await service.counts(db, rows)
-    found = await service.members(db, collection, [g.id for g in rows], per_group)
+async def _out(
+    db, collection: Collection, rows: list[Group], per_group: int, *, gated: bool = False
+) -> list[GroupOut]:
+    """``gated``: a viewer, who counts and sees only the display-safe members."""
+    counts = await service.counts(db, rows, gate=collection if gated else None)
+    found = await service.members(db, collection, [g.id for g in rows], per_group, gated=gated)
     return [
         GroupOut(
             id=g.id,
@@ -69,12 +72,19 @@ async def _out(db, collection: Collection, rows: list[Group], per_group: int) ->
 @router.get("/collections/{collection_id}/groups", dependencies=[require_view])
 async def list_groups(
     collection: CollectionView,
+    who: Principal,
     db=Depends(get_db),
     limit: int = Query(constants.PAGE_DEFAULT, ge=1, le=constants.PAGE_MAX),
     after: str | None = Query(None, max_length=constants.GROUP_KEY_MAX),
 ) -> GroupPageOut:
     rows, token = await service.list_page(db, collection, limit=limit, after=after)
-    items = await _out(db, collection, rows, constants.GROUP_PREVIEW_MEMBERS)
+    items = await _out(
+        db,
+        collection,
+        rows,
+        constants.GROUP_PREVIEW_MEMBERS,
+        gated=await viewer_only(db, who, collection),
+    )
     return GroupPageOut(items=items, next_cursor=token)
 
 
@@ -148,7 +158,7 @@ async def _job_out(db, job_id: uuid.UUID) -> RegroupJobOut:
 
 @router.get("/regroups/{regroup_id}", dependencies=[require_view])
 async def get_regroup(
-    regroup_id: uuid.UUID, collection: RegroupCollectionView, db=Depends(get_db)
+    regroup_id: uuid.UUID, collection: RegroupCollectionEdit, db=Depends(get_db)
 ) -> RegroupJobOut:
     return await _job_out(db, regroup_id)
 
@@ -165,10 +175,11 @@ async def cancel_regroup(
 
 @router.get("/groups/{group_id}", dependencies=[require_view])
 async def get_group(
-    group_id: uuid.UUID, collection: GroupCollectionView, db=Depends(get_db)
+    group_id: uuid.UUID, collection: GroupCollectionView, who: Principal, db=Depends(get_db)
 ) -> GroupOut:
     row = await service.get(db, collection, group_id)
-    return (await _out(db, collection, [row], constants.GROUP_DETAIL_MEMBERS))[0]
+    gated = await viewer_only(db, who, collection)
+    return (await _out(db, collection, [row], constants.GROUP_DETAIL_MEMBERS, gated=gated))[0]
 
 
 @router.patch("/groups/{group_id}", dependencies=[require_view])

@@ -46,6 +46,7 @@ from sm_images.schemas.image import (
     UploadResult,
 )
 from sm_images.services import gallery, groups, present
+from sm_images.services.viewer_stats import viewer_only
 from sm_images.storage import store_for
 from sm_images.tenancy import bound_tenant
 
@@ -160,6 +161,7 @@ async def upload_base64(
 @router.get("/collections/{collection_id}/images", dependencies=[require_view])
 async def list_images(
     collection: CollectionView,
+    who: Principal,
     db=Depends(get_db),
     has_location: bool | None = None,
     step: str | None = Query(None, max_length=100),
@@ -171,7 +173,12 @@ async def list_images(
 ) -> ImagePageOut:
     filters = gallery.Filters(has_location, step, step_status, review_status, group)
     rows, token, total = await gallery.list_page(
-        db, collection, filters, limit=limit, cursor=cursor
+        db,
+        collection,
+        filters,
+        limit=limit,
+        cursor=cursor,
+        gated=await viewer_only(db, who, collection),
     )
     return ImagePageOut(
         items=await present.present(db, collection, rows), next_cursor=token, total=total
@@ -182,7 +189,7 @@ async def list_images(
 async def get_image(
     image_id: uuid.UUID, collection: ImageCollectionView, who: Principal, db=Depends(get_db)
 ) -> ImageOut:
-    row = await gallery.get(db, collection, image_id)
+    row = await gallery.get(db, collection, image_id, gated=await viewer_only(db, who, collection))
     return await present.present_detail(db, collection, row, who)
 
 

@@ -22,7 +22,7 @@ from sm_images.contracts.schemas import collection_fields
 from sm_images.models import Collection, Image
 from sm_images.schemas.collection import CollectionOut
 
-__all__ = ["collection_outs", "public_fields", "viewer_fields"]
+__all__ = ["collection_outs", "public_fields", "viewer_fields", "viewer_only"]
 
 
 async def _gated(db: Any, collection: Collection) -> dict[str, Any]:
@@ -58,6 +58,13 @@ async def _editable(db: Any, who: ResourcePrincipal, rows: Sequence[Collection])
         who, ACTION_EDIT, select(Collection.id).where(Collection.id.in_([r.id for r in rows]))
     )
     return set((await db.execute(stmt)).scalars())
+
+
+async def viewer_only(db: Any, who: ResourcePrincipal, collection: Collection) -> bool:
+    """True when *who* cannot edit *collection*: every read of its images then
+    applies the redaction gate (``redaction.ready_clause``) before selecting
+    or counting. Owner, an edit share and ``images.manage`` keep the raw view."""
+    return collection.id not in await _editable(db, who, [collection])
 
 
 async def viewer_fields(

@@ -84,6 +84,28 @@ describe('ImageGalleryBlock config', () => {
     ]);
   });
 
+  it('follows next_cursor without a page cap', async () => {
+    let n = 0;
+    const calls = stubFetch({
+      'GET /api/images/collections': () => {
+        n += 1;
+        const last = n === 150;
+        return {
+          items: [{ id: String(n), slug: `s${n}`, name: `S${n}`, visibility: 'public' }],
+          next_cursor: last ? null : `p${n}`,
+          total: null,
+        };
+      },
+    });
+    const fields = await (
+      ImageGalleryBlock.resolveFields as unknown as () => Promise<
+        Record<string, { options?: Opt[] }>
+      >
+    )();
+    expect(calls).toHaveLength(150);
+    expect(fields.collection.options).toHaveLength(151); // 150 + the placeholder
+  });
+
   it('asks the server for public collections', async () => {
     const calls = stubFetch({
       'GET /api/images/collections': { items: [], next_cursor: null, total: 0 },
