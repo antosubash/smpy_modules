@@ -612,7 +612,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 - `test_quota_exceeded_fails_step`;
 - `test_absent_without_ai_module`.
 
-- [ ] Commit `feat(images,ai): classify, prompts and metering outside requests`
+- [x] Commit `feat(images,ai): classify, prompts and metering outside requests`
 
 ### Task 23: Group prompts, presets, cross-check, prompt manager UI
 
