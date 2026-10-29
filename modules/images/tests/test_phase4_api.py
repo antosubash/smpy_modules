@@ -16,8 +16,10 @@ from sm_images.module import ImagesModule
 
 from tests.access_support import share
 from tests.import_support import b64, feature, geojson
+from tests.pipeline_support import jpeg
 from tests.stub_auth import as_user, user_uuid
 from tests.upload_support import OLGA, WRITER, all_rows, make_collection
+from tests.zip_support import make_zip
 
 pytestmark = pytest.mark.asyncio
 EDDIE = as_user("eddie", WRITER)
@@ -99,3 +101,26 @@ async def test_trashing_a_collection_cancels_its_unfinished_imports(api):
     cancelled = [r for r in await all_rows(api, ImportJob) if r.status is JobStatus.CANCELLED]
     assert [r.generation for r in cancelled] == [4, 4]
     assert rows[JobStatus.COMPLETED].generation == 3
+
+
+async def test_the_zip_extractor_takes_the_job_over(api):
+    await _share_eddie(api)
+    data = make_zip([("a.jpg", jpeg((16, 12), "red"))])
+    body = {"filename": "a.zip", "size": len(data)}
+    opened = await api.post(
+        f"/api/images/collections/{api.cid}/imports/zip", json=body, headers=OLGA
+    )
+    assert opened.status_code == 201, opened.text
+    created = opened.json()
+    upload, parts = created["upload"], []
+    size = upload["part_size"]
+    for n, url in enumerate(upload["part_urls"], start=1):
+        put = await api.put(url, content=data[(n - 1) * size : n * size], headers=OLGA)
+        parts.append({"no": n, "etag": put.json()["etag"]})
+    url = f"/api/images/imports/{created['job_id']}/extract"
+    got = await api.post(url, json={"parts": parts}, headers=EDDIE)
+    assert got.status_code == 202, got.text
+    assert got.json()["status"] == "completed"
+    row = await _job(api, created["job_id"])
+    assert (row.run_as, row.access_basis) == (user_uuid("eddie"), access.SHARE)
+    assert row.created_by == user_uuid("olga")

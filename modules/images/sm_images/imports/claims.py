@@ -25,10 +25,11 @@ __all__ = ["claim_stale", "progress"]
 
 def progress() -> Any:
     """How far a job has got, as one number: what the poison-job breaker watches.
-    Every settlement counts (done, duplicate or failed), and so does a reset batch."""
+    Every settlement counts (done, duplicate or failed), and so do a reset batch
+    and a deferral (the server named a time to come back: not a failure)."""
     j = ImportJob
     settled = j.done_count + j.duplicate_count + j.failed_count
-    return j.checkpoint_index + settled + j.reset_progress
+    return j.checkpoint_index + settled + j.reset_progress + j.defer_progress
 
 
 def _relaunches() -> Any:

@@ -17,7 +17,8 @@ A ZIP goes in two calls (``imports.zip_upload``): ``POST
 /collections/{id}/imports/zip`` opens the job and a direct upload for the
 archive (presigned parts, or the relay route); ``POST /imports/{job}/extract``
 - an ``edit`` on the collection again, so a share revoked meanwhile stops it -
-seals the uploaded archive to the job and starts the extraction.
+seals the uploaded archive to the job and starts the extraction, under the
+extractor's right from then on.
 """
 
 from __future__ import annotations
@@ -155,10 +156,16 @@ async def create_zip_import(
 
 @router.post("/imports/{job_id}/extract", status_code=202, dependencies=[require_view])
 async def extract_zip_import(
-    job_id: uuid.UUID, body: ZipExtract, collection: JobCollection
+    job_id: uuid.UUID,
+    body: ZipExtract,
+    collection: JobCollection,
+    who: Principal,
+    db=Depends(get_db),
 ) -> ImportJobOut:
     runtime, tenant = _runtime(), _tenant()
-    generation = await zip_upload.seal(runtime, tenant, job_id, {p.no: p.etag for p in body.parts})
+    actor = await _actor(db, who, collection)  # the extractor takes the job over
+    claimed = {p.no: p.etag for p in body.parts}
+    generation = await zip_upload.seal(runtime, tenant, job_id, claimed, actor)
     await launch_sealed(runtime, tenant, job_id, generation)
     return job_out(await controls.get(runtime, tenant, job_id))
 

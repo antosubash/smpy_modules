@@ -5,7 +5,8 @@
   :data:`INLINE_ATTEMPTS` times in one go. A wait longer than
   :data:`INLINE_WAIT_SECONDS`, or ``None`` (the server asked for more than we
   wait), raises :class:`Defer`: the item stays ``pending`` for reconcile,
-  which re-sends it no earlier than the wait (``next_attempt_at``).
+  which re-sends it no earlier than the wait (``next_attempt_at``). A
+  Retry-After beyond :data:`MAX_RETRY_AFTER_SECONDS` fails the item instead.
 * **Permanent** - an unsafe URL, too large, a content encoding, any other 4xx,
   a protocol error (a broken redirect or framing: one try), anything
   unexpected: :class:`Fail`. :data:`MAX_ATTEMPTS` caps an item's lifetime.
@@ -37,6 +38,8 @@ __all__ = [
     "INLINE_ATTEMPTS",
     "INLINE_WAIT_SECONDS",
     "MAX_ATTEMPTS",
+    "MAX_RETRY_AFTER_SECONDS",
+    "RETRY_AFTER_TOO_LONG",
     "Defer",
     "Fail",
     "Stop",
@@ -48,6 +51,10 @@ logger = logging.getLogger(__name__)
 INLINE_ATTEMPTS: Final = 3
 INLINE_WAIT_SECONDS: Final = 30.0
 MAX_ATTEMPTS: Final = 8
+MAX_RETRY_AFTER_SECONDS: Final = 86400
+"""The longest Retry-After an item is deferred for; beyond it the item fails
+:data:`RETRY_AFTER_TOO_LONG` rather than sitting pending for days."""
+RETRY_AFTER_TOO_LONG: Final = "retry_after_too_long"
 _sleep = asyncio.sleep
 
 
@@ -141,9 +148,11 @@ async def fetch_with_retries(
             made = attempt + 1
             if not retryable or prior + made >= MAX_ATTEMPTS:
                 raise Fail(code, made) from exc
+            asked = retry_after_seconds(response)
+            if asked is not None and asked > MAX_RETRY_AFTER_SECONDS:
+                raise Fail(RETRY_AFTER_TOO_LONG, made) from exc
             wait = backoff(response, prior + attempt)
             if wait is None or wait > INLINE_WAIT_SECONDS or made == INLINE_ATTEMPTS:
-                delay = retry_after_seconds(response) if wait is None else wait
-                raise Defer(code, made, delay) from exc
+                raise Defer(code, made, asked if wait is None else wait) from exc
             await _sleep(wait)
     raise AssertionError("unreachable")  # pragma: no cover

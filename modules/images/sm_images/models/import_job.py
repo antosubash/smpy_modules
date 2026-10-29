@@ -49,6 +49,8 @@ class ImportJob(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[u
     """:func:`~sm_images.imports.claims.progress` at the last relaunch."""
     reset_progress: int = Field(default=0, sa_column_kwargs={"nullable": False})
     """Items reset so far (restart, retry-failed): a reset's own progress."""
+    defer_progress: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    """Downloads deferred so far (a Retry-After, a backoff): progress too."""
     started_generation: int | None = Field(default=None)
     """The last generation a worker actually started (``jobs.start``, a reset's
     first batch): a relaunch whose message never ran is no strike against it."""

@@ -12,10 +12,10 @@ What still counts as edit, from a worker:
 * ``run_as`` owns the collection;
 * an active (unexpired) edit share names them - the same ``EXISTS`` the access
   policy builds (``sharing.policy.share_exists_for``);
-* the right came from ``images.manage`` and :func:`holds_manage` confirms it
-  still holds (``imports.manage_right``: the framework has no request-free
-  permission resolver, so it reads the grant tables). An answer of "cannot
-  tell" keeps the job.
+* the right came from ``images.manage`` and the user still exists, is active
+  and (multi-tenant) still a member of the job's tenant
+  (:func:`manager_active`, ``imports.manage_right``). The permission itself is
+  not re-resolved in a worker; that module says why, and what that leaves.
 
 A job with no ``run_as`` (made by code, or before this existed) is not checked.
 A lost right cancels the job like a delete would: fenced on the generation,
@@ -37,7 +37,7 @@ from sqlalchemy import select
 from sm_images.access import COLLECTION_RESOURCE
 from sm_images.imports.chunk import Stopped
 from sm_images.imports.jobs import CLAIMABLE, load, now, where
-from sm_images.imports.manage_right import holds_manage
+from sm_images.imports.manage_right import manager_active
 from sm_images.imports.terminal import ERRORS_MAX, release_staging
 from sm_images.models import Collection, ImportJob
 from sm_images.models.enums import JobStatus
@@ -50,7 +50,7 @@ __all__ = [
     "SHARE",
     "basis",
     "guard",
-    "holds_manage",
+    "manager_active",
     "may_edit",
     "revoke",
 ]
@@ -100,10 +100,7 @@ async def may_edit(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> bool:
     if run_as is None or owner == run_as or shared is not None:
         return True
     if recorded == MANAGE:
-        held = await holds_manage(runtime, tenant, run_as)
-        if held is None:
-            logger.info("images.import.manage_unverifiable job=%s", job_id)
-        return held is not False
+        return await manager_active(runtime, tenant, run_as)
     return False
 
 

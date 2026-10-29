@@ -1,67 +1,105 @@
-"""``imports.manage_right.holds_manage``: the worker's re-check of
-``images.manage`` against the framework's grant tables."""
+"""A job that runs on an ``images.manage`` right: the worker checks only that
+its user still exists, is active and (multi-tenant) is still a member - and
+cancels it, failing closed, otherwise (``imports.manage_right``)."""
 
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
 import pytest
-from sm_images.imports.manage_right import holds_manage
+from sm_images.imports import access
+from sm_images.imports.manage_right import manager_active
+from sm_images.models import ImportJob
+from sm_images.models.enums import JobStatus
 from sm_images.tenancy import DEFAULT_TENANT
-from sqlalchemy import delete, select
+from sqlalchemy import update
 
+from tests.import_support import b64, feature
 from tests.pg_support import USING_POSTGRES
 from tests.stub_auth import user_uuid
 
 pytestmark = pytest.mark.asyncio
 T = DEFAULT_TENANT
+MAX = user_uuid("max")
+ad_hoc = pytest.mark.skipif(USING_POSTGRES, reason="creates the users/tenants tables ad hoc")
 
 
-async def test_an_unreadable_source_means_cannot_tell(imp):
-    # The harness creates no users or tenants tables.
-    assert await holds_manage(imp.runtime, T, user_uuid("max")) is None
-    assert await holds_manage(imp.runtime, T, "svc:worker") is None
-
-
-@pytest.mark.skipif(USING_POSTGRES, reason="creates the users/tenants tables ad hoc")
-async def test_holds_manage_reads_the_framework_grant_tables(imp):
-    from permissions.models import RolePermission, UserPermission
+async def _tables(imp) -> None:
     from tenants.models import Base as TenantsBase
     from users.models._base import Base as UsersBase
-    from users.models.role import Role
-    from users.models.user import User
-    from users.models.user_role import UserRole
 
-    rt, uid = imp.runtime, user_uuid("max")
     async with imp.pipe.db_state.engine.begin() as conn:
         await conn.run_sync(UsersBase.metadata.create_all)
         await conn.run_sync(TenantsBase.metadata.create_all)
-    assert await holds_manage(rt, T, uid) is None  # an external principal: no local row
-    role = Role(name="curators")
+
+
+async def _user(imp, **kw) -> None:
+    from users.models.user import User
+
     async with imp.pipe.db_state.session_factory() as s:
-        s.add_all([User(id=uuid.UUID(uid), email="max@example.org"), role])
+        s.add(User(id=uuid.UUID(MAX), email="max@example.org", **kw))
         await s.commit()
-        role_id = role.id
-    assert await holds_manage(rt, T, uid) is False
+
+
+async def _managed_job(imp):
+    job = await imp.job([feature({"img": b64()})])
     async with imp.pipe.db_state.session_factory() as s:
-        s.add(UserRole(user_id=uuid.UUID(uid), role_id=role_id))
-        s.add(RolePermission(role_name="curators", permission_key="images.manage"))
+        stmt = update(ImportJob).where(ImportJob.id == job.id)
+        await s.execute(stmt.values(run_as=MAX, access_basis=access.MANAGE))
         await s.commit()
-    assert await holds_manage(rt, T, uid) is True
+    return job
+
+
+async def test_no_user_table_fails_closed(imp):
+    assert await manager_active(imp.runtime, T, MAX) is False
+    assert await manager_active(imp.runtime, T, "svc:worker") is False
+    job = await _managed_job(imp)
+    assert await imp.run(job) == "cancelled"
+    row = await imp.reload(job)
+    assert (row.status, row.errors[-1]["code"]) == (JobStatus.CANCELLED, access.ACCESS_REVOKED)
+
+
+@ad_hoc
+async def test_a_deleted_user_is_cancelled(imp):
+    await _tables(imp)
+    job = await _managed_job(imp)
+    assert await imp.run(job) == "cancelled"
+    assert await imp.images() == []
+
+
+@ad_hoc
+@pytest.mark.parametrize("state", [{"disabled_at": datetime.now(UTC)}, {"is_active": False}])
+async def test_a_disabled_user_is_cancelled(imp, state):
+    await _tables(imp)
+    await _user(imp, **state)
+    job = await _managed_job(imp)
+    assert await imp.run(job) == "cancelled"
+
+
+@ad_hoc
+async def test_a_code_mapped_manager_keeps_running(imp):
+    # No role or grant row anywhere: the right came from a map_role in code.
+    await _tables(imp)
+    await _user(imp)
+    job = await _managed_job(imp)
+    assert await imp.run(job) == "completed"
+
+
+@ad_hoc
+async def test_a_multi_tenant_manager_must_still_be_a_member(imp):
+    from tenants.models import Membership, Tenant
+
+    await _tables(imp)
+    await _user(imp)
+    tenant = Tenant(slug="acme", name="Acme")
     async with imp.pipe.db_state.session_factory() as s:
-        await s.execute(delete(RolePermission))
+        s.add(tenant)
         await s.commit()
-    assert await holds_manage(rt, T, uid) is False
+        acme = tenant.id
+    assert await manager_active(imp.runtime, acme, MAX) is False
     async with imp.pipe.db_state.session_factory() as s:
-        s.add(UserPermission(user_id=uuid.UUID(uid), permission_key="images.manage"))
+        s.add(Membership(tenant_id=acme, user_id=MAX))
         await s.commit()
-    assert await holds_manage(rt, T, uid) is True
-    async with imp.pipe.db_state.session_factory() as s:
-        await s.execute(delete(UserPermission))
-        s.add(Role(name="admin"))
-        await s.commit()
-    async with imp.pipe.db_state.session_factory() as s:
-        admin = (await s.execute(select(Role.id).where(Role.name == "admin"))).scalar_one()
-        s.add(UserRole(user_id=uuid.UUID(uid), role_id=admin))
-        await s.commit()
-    assert await holds_manage(rt, T, uid) is True
+    assert await manager_active(imp.runtime, acme, MAX) is True
+    assert await manager_active(imp.runtime, T, MAX) is True  # single-tenant: no membership

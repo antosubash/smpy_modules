@@ -173,6 +173,7 @@ def upgrade() -> None:
         sa.Column("relaunches", sa.Integer(), nullable=False),
         sa.Column("progress_mark", sa.Integer(), nullable=False),
         sa.Column("reset_progress", sa.Integer(), nullable=False),
+        sa.Column("defer_progress", sa.Integer(), nullable=False),
         sa.Column("started_generation", sa.Integer(), nullable=True),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("run_as", sa.String(length=255), nullable=True),

@@ -43,7 +43,7 @@ SWEEP_CAP: Final = 200
 async def delete_job(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> None:
     row = await get(runtime, tenant, job_id)
     if row.status is JobStatus.UPLOADING:
-        from sm_images.imports.zip_upload import abort_upload
+        from sm_images.imports.zip_abort import abort_upload
 
         await abort_upload(runtime, tenant, row)  # a seal holding it: 409, nothing deleted
     async with runtime.session_factory() as db:

@@ -16,6 +16,11 @@ Delivery is at-most-once, so two things can be lost:
   the job's current generation; the claim makes a surfacing original skip it.
   An item deferred until a time (a Retry-After) waits for it (``next_attempt_at``).
 
+**Deferred work waits.** A running job whose every feature is recorded and
+whose every pending item is deferred into the future (a Retry-After) is not
+reclaimed until the earliest of them is due, and each deferral counts as
+progress (``defer_progress``), so a long Retry-After is never a strike.
+
 **Bounded passes.** One tenant's pass reclaims at most :data:`JOBS_PER_PASS`
 jobs and re-sends at most :data:`ITEMS_PER_PASS` items, the longest-waiting
 first; what it sends is freshened, so the next pass continues with the rest.
@@ -43,10 +48,10 @@ import logging
 import uuid
 from collections import defaultdict
 from datetime import UTC, datetime
-from typing import Final
+from typing import Any, Final
 
 from simple_module_db import finalize_session
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, exists, or_, select, update
 
 from sm_images.imports import claims, jobs, terminal
 from sm_images.imports import launch as handoff
@@ -78,8 +83,26 @@ RELAUNCH_LIMIT: Final = 5
 STALLED: Final = "stalled"
 
 
+def _waiting(tenant: str, now: datetime) -> Any:
+    """A job with nothing to do before a time the server named: every feature
+    recorded, and every pending item deferred (``next_attempt_at``) into the
+    future. Relaunching it would only re-find that - and count a strike."""
+    pending = (
+        ImportItem.job_id == ImportJob.id,
+        ImportItem.tenant_id == tenant,
+        ImportItem.status == ItemStatus.PENDING,
+    )
+    due = or_(ImportItem.next_attempt_at.is_(None), ImportItem.next_attempt_at <= now)
+    return and_(
+        ImportJob.status == JobStatus.RUNNING,
+        ImportJob.checkpoint_index >= ImportJob.total_count,
+        exists().where(*pending, ImportItem.next_attempt_at > now),
+        ~exists().where(*pending, due),
+    )
+
+
 async def _stale_jobs(
-    runtime: Runtime, tenant: str, cutoff: datetime
+    runtime: Runtime, tenant: str, cutoff: datetime, now: datetime
 ) -> list[tuple[uuid.UUID, JobStatus]]:
     stmt = (
         select(ImportJob.id, ImportJob.status)
@@ -87,6 +110,7 @@ async def _stale_jobs(
             ImportJob.tenant_id == tenant,
             ImportJob.status.in_(jobs.CLAIMABLE),
             or_(ImportJob.heartbeat_at.is_(None), ImportJob.heartbeat_at < cutoff),
+            ~_waiting(tenant, now),
         )
         .order_by(ImportJob.heartbeat_at)
         .limit(JOBS_PER_PASS)
@@ -131,7 +155,11 @@ async def _mark_sent(
 ) -> None:
     """Freshen re-sent items, so the next pass moves on to the rest (the
     continuation) instead of sending these again before a worker got to them.
-    Only items still pending and unclaimed, of the job at this generation."""
+    An expired claim among them is cleared in the same step - its holder can no
+    longer settle (settlement needs the token) - or the item would be selected
+    again, unfreshened, every pass. Only items still pending, of the job at
+    this generation, held by no live claim."""
+    stamp = jobs.now()
     current = select(ImportJob.id).where(
         *jobs.where(tenant, job_id), ImportJob.generation == generation
     )
@@ -141,10 +169,15 @@ async def _mark_sent(
             ImportItem.id.in_(ids),
             ImportItem.tenant_id == tenant,
             ImportItem.status == ItemStatus.PENDING,
-            ImportItem.claim_token.is_(None),
+            or_(ImportItem.claim_token.is_(None), ImportItem.claim_expires_at < stamp),
             ImportItem.job_id.in_(current.scalar_subquery()),
         )
-        .values(updated_at=jobs.now())
+        .values(
+            updated_at=stamp,
+            claim_token=None,
+            claim_expires_at=None,
+            claim_generation=None,
+        )
         .execution_options(**jobs.SYNC)
     )
     async with runtime.session_factory() as db:
@@ -193,7 +226,8 @@ async def recover_imports(runtime: Runtime, tenant: str, cutoff: datetime) -> tu
     except Exception:
         logger.exception("images.reconcile.expire_uploads_failed tenant=%s", tenant)
     relaunched = 0
-    for job_id, status in await _stale_jobs(runtime, tenant, cutoff):
+    now = datetime.now(UTC)
+    for job_id, status in await _stale_jobs(runtime, tenant, cutoff, now):
         generation = await claims.claim_stale(runtime, tenant, job_id, cutoff)
         if generation is None:
             continue  # someone else claimed it, or it moved on
@@ -216,7 +250,7 @@ async def recover_imports(runtime: Runtime, tenant: str, cutoff: datetime) -> tu
         except Exception:
             logger.exception("images.reconcile.import_runner_failed job=%s", job_id)
     sent = 0
-    stale = await _stale_items(runtime, tenant, cutoff, datetime.now(UTC))
+    stale = await _stale_items(runtime, tenant, cutoff, now)
     for (job_id, generation), ids in stale.items():
         sent += len(ids)
         try:

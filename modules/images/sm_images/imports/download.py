@@ -113,7 +113,8 @@ async def _defer(
 ) -> None:
     """Leave the item ``pending`` and release the claim, for reconcile to re-send
     once ``delay`` seconds have passed - only while this claim, of this
-    generation, is still the job's current one."""
+    generation, is still the job's current one. A deferral is progress for the
+    poison-job breaker (``defer_progress``): the server said when to come back."""
     job_id, generation = job
     current = select(ImportJob.id).where(
         ImportJob.id == job_id,
@@ -121,7 +122,7 @@ async def _defer(
         ImportJob.generation == generation,
     )
     async with runtime.session_factory() as db:
-        await db.execute(
+        deferred = await db.execute(
             update(ImportItem)
             .where(
                 ImportItem.id == item_id,
@@ -140,8 +141,13 @@ async def _defer(
                 claim_generation=None,
                 updated_at=now(),
             )
+            .returning(ImportItem.id)
             .execution_options(**SYNC)
         )
+        if deferred.first() is not None:
+            counted = ImportJob.defer_progress + 1
+            stmt = update(ImportJob).where(ImportJob.id.in_(current.scalar_subquery()))
+            await db.execute(stmt.values(defer_progress=counted).execution_options(**SYNC))
         await finalize_session(db)
 
 

@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from sm_images import constants
 from sm_images.endpoints.api.pipeline import CODE_INVALID_CONFIG
-from sm_images.imports import access, recover
+from sm_images.imports import access, recover, retrying
 from sm_images.imports.features import PARSE_CODES
 from sm_images.imports.filename_pattern import MAX_PATTERN_LENGTH
 from sm_images.imports.mapping import Mapping, Prop
@@ -40,6 +40,7 @@ JOB_CODES = frozenset(
     {
         recover.STALLED,
         access.ACCESS_REVOKED,
+        retrying.RETRY_AFTER_TOO_LONG,
         "dispatch_failed",
         "upload_expired",
         "seal_failed",

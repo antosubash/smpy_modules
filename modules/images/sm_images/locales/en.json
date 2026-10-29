@@ -212,7 +212,8 @@
     "invalid_pipeline_config": "The pipeline settings are not valid.",
     "tenant_required": "Choose an organisation first.",
     "user_directory_unavailable": "People cannot be looked up on this server.",
-    "not_applicable": "The step does not apply to this image."
+    "not_applicable": "The step does not apply to this image.",
+    "retry_after_too_long": "The server asked to wait more than a day before retrying, so the image was skipped."
   },
   "tabs": {
     "label": "Collection sections",

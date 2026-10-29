@@ -26,6 +26,7 @@ import httpx
 
 __all__ = [
     "MAX_BACKOFF_SECONDS",
+    "RETRY_AFTER_CEILING",
     "DomainLimiter",
     "SlotLimiter",
     "backoff",
@@ -35,6 +36,10 @@ __all__ = [
 ]
 
 MAX_BACKOFF_SECONDS: Final = 300
+RETRY_AFTER_CEILING: Final = 2 * 86400.0
+"""The most a Retry-After is read as: a larger ask (a 400-digit delta, a date in
+the year 9999) is this, so nothing downstream overflows a ``timedelta``."""
+_DELTA_DIGITS_MAX: Final = 9
 _BASE_SECONDS: Final = 1.0
 _JITTER: Final = 0.25
 _MAX_EXPONENT: Final = 16
@@ -102,21 +107,25 @@ def _utcnow() -> datetime:
 
 
 def retry_after_seconds(response: httpx.Response | None) -> float | None:
-    """Retry-After as seconds (delta or HTTP date; a past date is 0), or ``None``."""
+    """Retry-After as seconds (delta or HTTP date; a past date is 0), at most
+    :data:`RETRY_AFTER_CEILING`, or ``None``."""
     if response is None:
         return None
     raw = response.headers.get("retry-after", "").strip()
     if not raw:
         return None
     if raw.isdigit():
-        return float(raw)
+        if len(raw) > _DELTA_DIGITS_MAX:
+            return RETRY_AFTER_CEILING
+        return min(float(raw), RETRY_AFTER_CEILING)
     try:
         when = parsedate_to_datetime(raw)
-    except (TypeError, ValueError, IndexError):
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=UTC)
+        seconds = (when - _utcnow()).total_seconds()
+    except (TypeError, ValueError, IndexError, OverflowError):
         return None
-    if when.tzinfo is None:
-        when = when.replace(tzinfo=UTC)
-    return max(0.0, (when - _utcnow()).total_seconds())
+    return min(max(0.0, seconds), RETRY_AFTER_CEILING)
 
 
 def backoff(response: httpx.Response | None, attempt: int) -> float | None:

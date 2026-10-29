@@ -169,13 +169,13 @@ async def test_the_owner_and_a_live_share_keep_running(imp):
     assert await imp.run(job2) == "completed"
 
 
-async def test_a_manage_right_is_re_verified(imp, monkeypatch):
+async def test_a_manager_who_leaves_mid_run_is_stopped(imp, monkeypatch):
     held = {"v": True}
 
-    async def holds(runtime, tenant, user_id):
+    async def active(runtime, tenant, user_id):
         return held["v"]
 
-    monkeypatch.setattr(access, "holds_manage", holds)
+    monkeypatch.setattr(access, "manager_active", active)
     job = await imp.job(_three())
     await _run_as(imp, job, user_uuid("max"), access.MANAGE)
     monkeypatch.setattr(runner, "CHUNK", 1)
@@ -190,16 +190,6 @@ async def test_a_manage_right_is_re_verified(imp, monkeypatch):
     assert await imp.run(job) == "stopped"
     assert (await imp.reload(job)).status is JobStatus.CANCELLED
     assert len(await imp.images()) == 1
-
-
-async def test_an_unverifiable_manage_right_is_kept(imp, monkeypatch):
-    async def unknown(runtime, tenant, user_id):
-        return None
-
-    monkeypatch.setattr(access, "holds_manage", unknown)
-    job = await imp.job(_three())
-    await _run_as(imp, job, user_uuid("max"), access.MANAGE)
-    assert await imp.run(job) == "completed"
 
 
 async def test_a_download_batch_checks_the_right_first(imp, monkeypatch):

@@ -48,7 +48,7 @@ from sm_images.models import Collection, ImportJob, UploadSession, UploadStatus
 from sm_images.models.enums import ImportKind, JobStatus
 from sm_images.pipeline.runtime import Runtime
 
-__all__ = ["ZIP_CONTENT_TYPE", "abort_upload", "fail_upload", "seal", "session_ticket", "start"]
+__all__ = ["ZIP_CONTENT_TYPE", "fail_upload", "seal", "session_ticket", "start"]
 
 ZIP_CONTENT_TYPE: Final = "application/zip"
 _GONE = "Upload not found"
@@ -161,6 +161,8 @@ async def _measure(runtime: Runtime, ticket: Ticket, parts: list[Any]) -> tuple[
 async def _seal_row(
     db: Any, tenant: str, row: ImportJob, ticket: Ticket, token: uuid.UUID, size: int, fp: str
 ) -> int:
+    """The seal's job CAS; with ``row.run_as`` set by :func:`seal`, the job runs
+    under the extractor's right from here on (``imports.access``)."""
     stmt = (
         update(ImportJob)
         .where(
@@ -175,6 +177,8 @@ async def _seal_row(
             staged_keys=[ticket.key],
             source_etag=fp,
             source_size=size,
+            run_as=row.run_as,
+            access_basis=row.access_basis,
             heartbeat_at=now(),
             updated_at=now(),
         )
@@ -212,11 +216,18 @@ async def fail_upload(runtime: Runtime, tenant: str, row: ImportJob, code: str) 
 
 
 async def seal(
-    runtime: Runtime, tenant: str, job_id: uuid.UUID, claimed: dict[int, str | None]
+    runtime: Runtime,
+    tenant: str,
+    job_id: uuid.UUID,
+    claimed: dict[int, str | None],
+    actor: tuple[str, str] | None = None,
 ) -> int:
-    """Seal the uploaded archive to its job; the generation to run it under."""
+    """Seal the uploaded archive to its job; the generation to run it under.
+    ``actor`` - the extractor and the basis of their right - takes the job over."""
     with tenant_context(tenant):
-        row = await get(runtime, tenant, job_id)
+        row = await get(runtime, tenant, job_id)  # detached: safe to amend
+        if actor is not None:
+            row.run_as, row.access_basis = actor
         if row.kind is not ImportKind.ZIP or row.upload_session_id is None:
             raise conflict("not_a_zip_import", "This import does not take an archive")
         if row.status is not JobStatus.UPLOADING:
@@ -245,34 +256,3 @@ async def seal(
                     code = exc.code if isinstance(exc, ImagesError) and exc.code else "seal_failed"
                     await fail_upload(runtime, tenant, row, code)
                 raise
-
-
-async def abort_upload(runtime: Runtime, tenant: str, row: ImportJob) -> None:
-    """Abort an ``uploading`` job's upload before the job goes: the session
-    ``open -> aborted`` (a compare-and-set; a seal holding it is a 409
-    ``upload_in_progress`` and the delete waits), then its parts and staged
-    object are discarded and the session recorded clean. A cleanup that fails
-    leaves ``cleaned_at`` NULL for the reaper."""
-    if row.upload_session_id is None:
-        return
-    try:
-        ticket = await session_ticket(runtime, tenant, row)
-    except Gone:
-        return
-    async with runtime.session_factory() as db:
-        try:
-            claimed = await state.claim_abort(db, ticket)
-        except Gone:
-            claimed = False
-        if not claimed:
-            await db.rollback()
-            return  # completed: the job owns the object now
-        try:
-            await state.discard(
-                db, runtime.store(), ticket.key, ticket.upload, uuid.UUID(ticket.image)
-            )
-        except Exception:
-            await db.rollback()
-            return
-        await state.mark_cleaned(db, uuid.UUID(ticket.session))
-        await finalize_session(db)

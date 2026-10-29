@@ -212,7 +212,8 @@
     "invalid_pipeline_config": "Die Pipeline-Einstellungen sind ungültig.",
     "tenant_required": "Wählen Sie zuerst eine Organisation aus.",
     "user_directory_unavailable": "Auf diesem Server können keine Personen gesucht werden.",
-    "not_applicable": "Der Schritt ist für dieses Bild nicht anwendbar."
+    "not_applicable": "Der Schritt ist für dieses Bild nicht anwendbar.",
+    "retry_after_too_long": "Der Server wollte mehr als einen Tag Wartezeit vor einem neuen Versuch; das Bild wurde übersprungen."
   },
   "tabs": {
     "label": "Bereiche der Sammlung",
