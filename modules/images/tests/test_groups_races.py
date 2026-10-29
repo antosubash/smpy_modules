@@ -79,7 +79,7 @@ async def test_ensure_groups_tells_a_competing_insert_from_its_own(
             db, "default", uuid.UUID(cid), ["mine", "rival"]
         )
         await db.commit()
-    assert (created, existing) == (1, 1) and set(ids) == {"mine", "rival"}
+    assert (created, len(existing)) == (1, 1) and set(ids) == {"mine", "rival"}
     assert ids["mine"] != ids["rival"]
     assert ids["rival"] == rival.id
 

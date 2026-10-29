@@ -18,7 +18,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import Uuid, case, func, literal, select, update
+from sqlalchemy import Uuid, case, literal, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
@@ -50,12 +50,12 @@ async def ensure_groups(
     collection_id: uuid.UUID,
     keys: Sequence[str],
     since: datetime | None = None,
-) -> tuple[dict[str, uuid.UUID], int, int]:
-    """``(key -> group id, created, existing)`` for ``keys``.
+) -> tuple[dict[str, uuid.UUID], int, list[uuid.UUID]]:
+    """``(key -> group id, created, existing ids)`` for ``keys``.
 
     ``created`` counts only the rows this call inserted: a key another writer
     inserted between the read and the insert comes back from ``ON CONFLICT DO
-    NOTHING`` without a row, so it is not ours. ``existing`` counts the groups
+    NOTHING`` without a row, so it is not ours. ``existing`` lists the groups
     not inserted here that were already there when the regroup began (``since``;
     ``None`` = all of them) - a group an earlier chunk of the same job made is
     neither.
@@ -93,19 +93,14 @@ async def ensure_groups(
         if lost:
             ids.update(await keys_to_ids(db, collection_id, lost))
     others = [k for k in keys if k not in inserted_keys]
-    existing = len(others)
-    if since is not None and others:
-        stmt = (
-            select(func.count())
-            .select_from(Group)
-            .where(
-                Group.collection_id == collection_id,
-                Group.key.in_(others),
-                Group.created_at < since,
-            )
-        )
-        existing = int((await db.execute(stmt)).scalar_one())
-    return ids, len(inserted_keys), existing
+    if since is None:
+        return ids, len(inserted_keys), [ids[k] for k in others]
+    stmt = select(Group.id).where(
+        Group.collection_id == collection_id,
+        Group.key.in_(others),
+        Group.created_at < since,
+    )
+    return ids, len(inserted_keys), list((await db.execute(stmt)).scalars()) if others else []
 
 
 async def apply_chunk(
@@ -143,16 +138,16 @@ async def settle(
     reassign: bool,
     dry_run: bool,
     since: datetime | None = None,
-) -> tuple[int, int, int]:
+) -> tuple[int, int, list[uuid.UUID]]:
     """Resolve the groups ``changes`` name and write them (``dry_run``: only
-    count). Returns ``(assigned, groups_created, groups_existing)``; ``assigned``
-    is the rows actually changed."""
+    count). Returns ``(assigned, groups_created, existing group ids)``;
+    ``assigned`` is the rows actually changed."""
     if not changes:
-        return 0, 0, 0
+        return 0, 0, []
     keys = sorted({c[1] for c in changes})
     if dry_run:
         known = await keys_to_ids(db, collection_id, keys)
-        return len(changes), len(keys) - len(known), len(known)
+        return len(changes), len(keys) - len(known), list(known.values())
     groups, created, existing = await ensure_groups(db, tenant, collection_id, keys, since)
     assigned = 0
     for i in range(0, len(changes), constants.REGROUP_CHUNK):

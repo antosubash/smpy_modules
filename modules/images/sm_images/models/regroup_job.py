@@ -15,7 +15,7 @@ import uuid
 from datetime import datetime
 
 from simple_module_db.mixins import AuditMixin, MultiTenantMixin
-from sqlalchemy import Boolean, Column, Index, String, Uuid, text
+from sqlalchemy import Boolean, Column, ForeignKey, Index, String, Uuid, text
 from sqlmodel import Field
 
 from sm_images.models._base import Base
@@ -76,3 +76,19 @@ class RegroupJob(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[
     error_code: str | None = Field(default=None, max_length=50)
     heartbeat_at: datetime | None = dt_col(index=True)
     finished_at: datetime | None = dt_col()
+
+
+class RegroupJobGroup(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
+    """A pre-existing group a regroup job has used: what makes the job's
+    ``groups_existing`` a count of distinct groups across chunks and resumes."""
+
+    __tablename__ = "images_regroup_job_group"
+
+    job_id: uuid.UUID = Field(
+        sa_column=Column(
+            Uuid, ForeignKey("images_regroup_job.id", ondelete="CASCADE"), primary_key=True
+        )
+    )
+    group_id: uuid.UUID = Field(
+        sa_column=Column(Uuid, ForeignKey("images_group.id", ondelete="CASCADE"), primary_key=True)
+    )

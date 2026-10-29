@@ -737,8 +737,38 @@ def upgrade() -> None:
         postgresql_where=sa.text("finished_at IS NULL"),
     )
 
+    op.create_table(
+        "images_regroup_job_group",
+        sa.Column("tenant_id", sa.String(length=50), nullable=False),
+        sa.Column("job_id", sa.Uuid(), nullable=False),
+        sa.Column("group_id", sa.Uuid(), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["group_id"],
+            ["images_group.id"],
+            name=op.f("fk_images_regroup_job_group_group_id_images_group"),
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["job_id"],
+            ["images_regroup_job.id"],
+            name=op.f("fk_images_regroup_job_group_job_id_images_regroup_job"),
+            ondelete="CASCADE",
+        ),
+        sa.PrimaryKeyConstraint("job_id", "group_id", name=op.f("pk_images_regroup_job_group")),
+    )
+    op.create_index(
+        op.f("ix_images_regroup_job_group_tenant_id"),
+        "images_regroup_job_group",
+        ["tenant_id"],
+        unique=False,
+    )
+
 
 def downgrade() -> None:
+    op.drop_index(
+        op.f("ix_images_regroup_job_group_tenant_id"), table_name="images_regroup_job_group"
+    )
+    op.drop_table("images_regroup_job_group")
     op.drop_index("uq_images_regroup_job_active", table_name="images_regroup_job")
     op.drop_index(op.f("ix_images_regroup_job_tenant_id"), table_name="images_regroup_job")
     op.drop_index(op.f("ix_images_regroup_job_heartbeat_at"), table_name="images_regroup_job")

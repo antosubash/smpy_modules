@@ -22,7 +22,7 @@ from sm_images import constants
 from sm_images.imports.access import ACCESS_REVOKED, MANAGE, manager_active, shared_edit
 from sm_images.models import Collection
 from sm_images.pipeline.runtime import Runtime
-from sm_images.regroup import jobs
+from sm_images.regroup import control, jobs
 from sm_images.services import regroup as plan
 from sm_images.services import regroup_write as write
 
@@ -78,7 +78,7 @@ async def _chunk(runtime: Runtime, tenant: str, job: jobs.Snap, generation: int)
         compiled = plan.compile_or_422(job.pattern)
         chunk = await plan.derive_chunk(compiled, list(coll.group_roles or []), rows, job.reassign)
         tally = chunk.tally
-        tally.assigned, created, existing = await write.settle(
+        tally.assigned, created, existing_ids = await write.settle(
             db,
             tenant,
             coll.id,
@@ -87,8 +87,9 @@ async def _chunk(runtime: Runtime, tenant: str, job: jobs.Snap, generation: int)
             dry_run=job.dry_run,
             since=job.began,
         )
-        if not job.dry_run:  # a preview would count a group once per chunk it appears in
-            tally.groups_created, tally.groups_existing = created, existing
+        if not job.dry_run:  # a preview keeps no per-job set, so it would count a group per chunk
+            tally.groups_created = created
+            tally.groups_existing = await control.note_groups(db, tenant, job.id, existing_ids)
         cursor = (rows[-1][1], rows[-1][0])
         if not await jobs.advance(db, tenant, job, generation, cursor, tally):
             await db.rollback()
@@ -106,7 +107,9 @@ async def run_regroup(runtime: Runtime, tenant: str, job_id: uuid.UUID, generati
         if job is None or job.generation != generation:
             return chunks  # deleted, or a newer runner owns it
         if not await may_edit(runtime, tenant, job):
-            if await jobs.cancel(runtime, tenant, job_id, error_code=ACCESS_REVOKED):
+            if await jobs.cancel(
+                runtime, tenant, job_id, generation=generation, error_code=ACCESS_REVOKED
+            ):
                 logger.info("images.regroup.access_revoked job=%s", job_id)
             return chunks
         if not await _chunk(runtime, tenant, job, generation):

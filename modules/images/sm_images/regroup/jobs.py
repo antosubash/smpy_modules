@@ -16,13 +16,13 @@ from datetime import UTC, datetime
 from typing import Any
 
 from simple_module_db import finalize_session
-from sqlalchemy import case, or_, select, update
+from sqlalchemy import exists, select, update
 from sqlalchemy.exc import IntegrityError
 
 from sm_images import constants
 from sm_images.errors import Conflict
-from sm_images.models import RegroupJob
-from sm_images.models.regroup_job import CANCELLED, COMPLETED, FAILED, RUNNING
+from sm_images.models import Collection, RegroupJob
+from sm_images.models.regroup_job import CANCELLED, COMPLETED, RUNNING
 from sm_images.pipeline.runtime import Runtime
 from sm_images.services.regroup import Tally
 
@@ -30,7 +30,6 @@ __all__ = [
     "Snap",
     "advance",
     "cancel",
-    "claim_stale",
     "create",
     "finish",
     "launch",
@@ -161,9 +160,15 @@ async def advance(
         else RegroupJob.cursor_id == job.cursor[1]
     )
     values = {name: getattr(RegroupJob, name) + getattr(tally, name) for name in COUNTERS}
+    # The collection must still be live: a chunk never commits into a trashed one.
+    live_collection = exists().where(
+        Collection.id == RegroupJob.collection_id,
+        Collection.tenant_id == tenant,
+        Collection.is_deleted.is_(False),
+    )
     stmt = (
         update(RegroupJob)
-        .where(*_where(tenant, job.id), *_live(generation), at)
+        .where(*_where(tenant, job.id), *_live(generation), at, live_collection)
         .values(
             cursor_at=cursor[0], cursor_id=cursor[1], heartbeat_at=now(), updated_at=now(), **values
         )
@@ -202,13 +207,22 @@ async def finish(
 
 
 async def cancel(
-    runtime: Runtime, tenant: str, job_id: uuid.UUID, *, error_code: str | None = None
+    runtime: Runtime,
+    tenant: str,
+    job_id: uuid.UUID,
+    *,
+    generation: int | None = None,
+    error_code: str | None = None,
 ) -> bool:
     """Stop an unfinished job: the generation moves on, so a runner mid-chunk
-    loses at its next write. ``False`` when it had already finished."""
+    loses at its next write. With ``generation`` only that generation's job is
+    stopped - a worker cancelling on its own authority (a revoked right) must
+    not cancel the runner that replaced it. ``False`` when it had already
+    finished or moved on."""
+    fence = [] if generation is None else [RegroupJob.generation == generation]
     stmt = (
         update(RegroupJob)
-        .where(*_where(tenant, job_id), RegroupJob.finished_at.is_(None))
+        .where(*_where(tenant, job_id), RegroupJob.finished_at.is_(None), *fence)
         .values(
             status=CANCELLED,
             error_code=error_code,
@@ -223,46 +237,6 @@ async def cancel(
         done = (await db.execute(stmt)).first() is not None
         await finalize_session(db)
     return done
-
-
-async def claim_stale(
-    runtime: Runtime, tenant: str, stale_before: datetime
-) -> list[tuple[uuid.UUID, int]]:
-    """Take over every running job whose heartbeat is older than ``stale_before``:
-    a new generation each (the old runner, if alive, stops). A claim with no
-    progress since the last one is a strike; past the limit the job fails as
-    ``stalled`` instead of being relaunched. Returns ``(job_id, generation)``."""
-    stmt = (
-        update(RegroupJob)
-        .where(
-            RegroupJob.tenant_id == tenant,
-            RegroupJob.status == RUNNING,
-            RegroupJob.finished_at.is_(None),
-            or_(RegroupJob.heartbeat_at.is_(None), RegroupJob.heartbeat_at < stale_before),
-        )
-        .values(
-            generation=RegroupJob.generation + 1,
-            heartbeat_at=now(),
-            updated_at=now(),
-            relaunches=case(
-                (RegroupJob.scanned == RegroupJob.progress_mark, RegroupJob.relaunches + 1),
-                else_=1,
-            ),
-            progress_mark=RegroupJob.scanned,
-        )
-        .returning(RegroupJob.id, RegroupJob.generation, RegroupJob.relaunches)
-        .execution_options(**SYNC)
-    )
-    async with runtime.session_factory() as db:
-        rows = list((await db.execute(stmt)).all())
-        await finalize_session(db)
-    live: list[tuple[uuid.UUID, int]] = []
-    for job_id, generation, relaunches in rows:
-        if relaunches > constants.REGROUP_RELAUNCH_LIMIT:
-            await finish(runtime, tenant, job_id, generation, status=FAILED, error_code=STALLED)
-        else:
-            live.append((job_id, generation))
-    return live
 
 
 async def launch(runtime: Runtime, tenant: str, job_id: uuid.UUID, generation: int) -> None:

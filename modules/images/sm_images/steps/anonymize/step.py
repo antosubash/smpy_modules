@@ -92,9 +92,7 @@ def find_regions(img: Any, p: AnonymizeParams, detector: Detector) -> list[Regio
         probe = img.resize(size, Image.Resampling.LANCZOS)
     sx, sy = width / probe.size[0], height / probe.size[1]
     wanted = {k for k, on in (("face", p.faces), ("plate", p.plates)) if on}
-    found = detector.detect(
-        probe, faces=p.faces, plates=p.plates, min_confidence=p.min_confidence
-    )
+    found = detector.detect(probe, faces=p.faces, plates=p.plates, min_confidence=p.min_confidence)
     regions = []
     for d in found:
         _check(d)

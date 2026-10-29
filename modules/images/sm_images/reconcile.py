@@ -54,6 +54,7 @@ from sm_images.models.enums import StepStatus
 from sm_images.pipeline.orchestrate import submit_dispatch
 from sm_images.pipeline.runtime import Runtime
 from sm_images.placeholders import reopenable_images
+from sm_images.regroup import control as regroup_control
 from sm_images.regroup import jobs as regroup_jobs
 from sm_images.services import stats
 from sm_images.tenancy import all_tenants as tagged
@@ -180,7 +181,7 @@ async def _restarts(runtime: Runtime, tenant: str, now: datetime, cutoff: dateti
 
 async def _regroups(runtime: Runtime, tenant: str, cutoff: datetime) -> int:
     """Relaunch regroup jobs nobody is advancing (a new generation each)."""
-    claimed = await regroup_jobs.claim_stale(runtime, tenant, cutoff)
+    claimed = await regroup_control.claim_stale(runtime, tenant, cutoff)
     for job_id, generation in claimed:
         await regroup_jobs.launch(runtime, tenant, job_id, generation)
     return len(claimed)

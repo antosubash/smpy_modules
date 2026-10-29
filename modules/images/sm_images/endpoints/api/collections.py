@@ -22,6 +22,7 @@ from sm_images.contracts.schemas import collection_fields
 from sm_images.deps import require_create, require_view
 from sm_images.imports.cleanup import cancel_for_collection
 from sm_images.models import Collection
+from sm_images.regroup.control import cancel_for_collection as cancel_regroups
 from sm_images.schemas.collection import (
     CollectionCreate,
     CollectionOut,
@@ -106,7 +107,8 @@ async def delete_collection(
     request: Request, collection: CollectionOwner, db=Depends(get_db)
 ) -> Response:
     events.emit(db, _bus(request), events.deleted(collection))
-    # Same transaction as the trash: no import keeps writing into it.
+    # Same transaction as the trash: no import or regroup keeps writing into it.
     await cancel_for_collection(db, collection.tenant_id, collection.id)
+    await cancel_regroups(db, collection.tenant_id, collection.id)
     await db.delete(collection)
     return Response(status_code=204)

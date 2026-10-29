@@ -190,8 +190,9 @@ async def regroup_now(
         plan = await derive_chunk(compiled, roles, rows, reassign, deadline)
         _add(total, plan.tally)
         changes += plan.changes
-    assigned, created, existing = await settle(
+    assigned, created, existing_ids = await settle(
         db, tenant, collection.id, changes, reassign=reassign, dry_run=dry_run, since=began
     )
-    total.assigned, total.groups_created, total.groups_existing = assigned, created, existing
+    total.assigned, total.groups_created = assigned, created
+    total.groups_existing = len(existing_ids)
     return RegroupResult(dry_run, total)
