@@ -14,6 +14,8 @@ export type ResultViewProps = {
   run: StepRun | null;
   /** The image the result belongs to (spec §8.4: `{output, image, t}`). */
   image: ImageItem | null;
+  /** A human name for the result (a prompt's name) where `run` carries none. */
+  label?: string;
   t: Translate;
 };
 

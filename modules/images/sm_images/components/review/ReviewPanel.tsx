@@ -67,6 +67,7 @@ export function ReviewPanel({
         <ResultView
           kind="prompt_result"
           id={item.prompt_id}
+          label={item.prompt_name}
           output={output}
           run={null}
           image={null}
@@ -78,6 +79,7 @@ export function ReviewPanel({
           <ResultView
             kind="prompt_result"
             id={item.prompt_id}
+            label={item.prompt_name}
             output={item.reviewed_data}
             run={null}
             image={null}

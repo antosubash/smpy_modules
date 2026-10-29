@@ -21,7 +21,7 @@ function fieldLabel(t: Translate, step: string, name: string): string {
  *  output as plain key/value rows (empty values left out). A prompt step is
  *  named by its prompt (`run.label`), its id kept as the tooltip, and shows
  *  its answer (`run.answer`) in place of the run's bookkeeping output. */
-export function GenericResultView({ id, output, run, t }: ResultViewProps) {
+export function GenericResultView({ id, output, run, label, t }: ResultViewProps) {
   const answer = run?.answer ?? null;
   const rows = Object.entries(answer ? {} : (output ?? {})).filter(
     ([, value]) => value !== null && value !== undefined,
@@ -30,7 +30,7 @@ export function GenericResultView({ id, output, run, t }: ResultViewProps) {
     <div className="py-2 text-sm" data-testid="images-result-generic" data-result-id={id}>
       <div className="flex flex-wrap items-center gap-2 font-medium">
         <span className="min-w-0 break-words" title={id} data-testid="images-result-title">
-          {run?.label || id}
+          {run?.label || label || id}
         </span>
         {run && <span className="text-muted-foreground">{run.status}</span>}
         {run?.error_code && (
