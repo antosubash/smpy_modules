@@ -62,3 +62,20 @@ def test_a_lookalike_postgres_name_is_not_enough(guard):
     prod_like = "postgresql+asyncpg://u:p@db.prod/smpy_modules_test"
     assert guard({**OK, "SM_DATABASE_URL": prod_like})
     assert guard({**OK, "SM_DATABASE_URL": prod_like, "SM_E2E_DATABASE": PG})
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "mysql+aiomysql://u:p@localhost/smpy_modules_e2e",
+        "mssql+aioodbc://u:p@localhost/smpy_modules_e2e",
+        "oracle+oracledb://u:p@localhost/smpy_modules_e2e",
+    ],
+)
+def test_another_dialect_is_refused_even_when_the_spec_names_it(guard, url):
+    assert guard({**OK, "SM_DATABASE_URL": url, "SM_E2E_DATABASE": url})
+
+
+def test_plain_postgresql_driver_is_allowed(guard):
+    url = "postgresql://u:p@localhost/smpy_modules_e2e"
+    assert guard({**OK, "SM_DATABASE_URL": url, "SM_E2E_DATABASE": url}) is None

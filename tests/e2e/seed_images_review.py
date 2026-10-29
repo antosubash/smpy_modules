@@ -60,6 +60,8 @@ def guard(env: Mapping[str, str]) -> str | None:
         if Path(parsed.database or "").resolve() != E2E_SQLITE.resolve():
             return f"{parsed.database!r} is not the e2e database {str(E2E_SQLITE)!r}"
         return None
+    if parsed.get_backend_name() != "postgresql":
+        return f"unsupported database backend {parsed.get_backend_name()!r} (sqlite or postgresql)"
     named = env.get("SM_E2E_DATABASE", "").strip()
     if not named or make_url(named) != parsed:
         return "SM_DATABASE_URL is not the database SM_E2E_DATABASE names"
