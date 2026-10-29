@@ -122,11 +122,13 @@ async def test_an_orphan_of_a_gone_image_is_released(pipe, blur, gauge):
     assert gauge.live() == []
 
 
-async def test_a_healthy_tenant_costs_no_billing_read(pipe, blur, gauge):
+async def test_a_healthy_tenant_costs_only_billing_reads(pipe, blur, gauge):
+    """The repair verifies each op's image against billing (its named hold may
+    have been released since), but a healthy tenant gets reads, no writes."""
     coll = await pipe.collection({"acme.blur": {}})
     img, _ = await held_image(pipe, gauge, coll)
     await pipe.run(img)
     calls = len(gauge.calls)
     assert await billing_repair.repair(pipe.db_state.session_factory, T) == 0
-    assert len(gauge.calls) == calls
+    assert {c[0] for c in gauge.calls[calls:]} <= {"get_hold"}
     await assert_counted_once(pipe.db_state, gauge)

@@ -179,3 +179,19 @@ async def test_a_stale_repair_never_moves_the_cursor_back(pipe, gauge, monkeypat
     await billing_repair.repair(factory, T)  # A: its compare-and-set fails
     assert state["A"].last == 0
     assert await _cursor(pipe) == (ids[3], ids[5])  # where B left it
+
+
+async def test_a_named_hold_released_by_an_admin_is_held_again(pipe, gauge):
+    """The op's hold is the one the image names, of its size - but an admin
+    released it in billing before the repair looked. The repair must not take
+    the op as healthy: it re-holds the image instead of leaving it uncounted."""
+    coll = await pipe.collection({})
+    img, seed = await held_image(pipe, gauge, coll)
+    size = (await pipe.row(img)).storage_bytes
+    await _op(pipe, **_done(op="ingest", image_id=img, hold_id=seed, quantity=size))
+    await gauge.release(seed)  # billing's admin release
+    await _repair_laps(pipe)
+    row = await pipe.row(img)
+    assert row.storage_hold_id != seed
+    assert gauge.holds[row.storage_hold_id].status == "committed"
+    await assert_counted_once(pipe.db_state, gauge)

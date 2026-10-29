@@ -4,8 +4,10 @@
 Every done ``swap`` or ``ingest`` op is examined once - whatever it ended
 with: its hold, a refusal, an expiry or a closure. It is decided **correct**
 only when the image's named hold is committed and of exactly the image's
-``storage_bytes`` (a healthy op - its own hold named, of that size - costs no
-billing read), and nothing else of the op's still counts. Otherwise:
+``storage_bytes`` - as billing reports it now, read for every op: an op whose
+own hold the image names, at the right size, is not taken on trust, since
+that hold may have been released since (an admin's release) - and nothing
+else of the op's still counts. Otherwise:
 
 * the op's own hold still counts but the image does not name it (a lost
   swap) → installed where the image's named hold no longer counts, released
@@ -118,14 +120,11 @@ async def repair(factory: Any, tenant: str, now: datetime | None = None) -> int:
 
 
 async def _examine(factory: Any, tenant: str, meter: Any, row: Any, now: datetime) -> int | None:
-    op_id, image_id, hold_id, qty, key, error, present, named, stored = row
+    op_id, image_id, hold_id, _qty, key, error, present, named, stored = row
     if hold_id is None and error == OP_EXPIRED and key:  # outcome unknown: get a final one
         hold_id = billing.held_by(await billing.close_key(factory, tenant, key, meter))
         if hold_id is not None:
             await _record_hold(factory, op_id, hold_id)
-    if present is not None and named == hold_id is not None and int(stored) == int(qty):
-        await _decided(factory, op_id, now)  # healthy: no billing read
-        return 0
     orphan = None
     if hold_id is not None and hold_id != named:
         found = await meter.get_hold(tenant, hold_id)
