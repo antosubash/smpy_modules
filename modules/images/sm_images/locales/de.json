@@ -318,7 +318,18 @@
     "saved": "Gruppe gespeichert"
   },
   "results": {
-    "withheld": "Die Ausgabe dieses Schritts sehen nur Personen, die die Sammlung bearbeiten dürfen."
+    "withheld": "Die Ausgabe dieses Schritts sehen nur Personen, die die Sammlung bearbeiten dürfen.",
+    "exif": {
+      "lat": "Breitengrad",
+      "lng": "Längengrad",
+      "altitude": "Höhe",
+      "heading": "Blickrichtung",
+      "captured_at": "Aufgenommen",
+      "captured_at_zone_known": "Zeitzone bekannt",
+      "make": "Kamerahersteller",
+      "model": "Kameramodell",
+      "orientation": "Ausrichtung"
+    }
   },
   "pipeline": {
     "title": "Verarbeitungs-Pipeline",

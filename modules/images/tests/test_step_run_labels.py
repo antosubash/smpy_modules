@@ -1,0 +1,41 @@
+"""A prompt step's run is labelled with the prompt's name in the viewer (QA TEST-014).
+
+The viewer listed it as ``prompt:<uuid>``. The detail response now carries a
+``label``: the prompt's name, ``None`` for a built-in step (the client names
+those) and for a prompt that was deleted (the id stays the fallback).
+"""
+
+from __future__ import annotations
+
+import uuid
+
+from sm_images.models import Prompt, StepRun, StepStatus
+from sm_images.tenancy import DEFAULT_TENANT
+
+from tests.upload_support import OLGA, jpeg, make_collection, post_files
+
+
+async def test_prompt_runs_carry_the_prompt_name(uploads):
+    cid = await make_collection(uploads, OLGA)
+    got = await post_files(uploads, cid, [("a.jpg", jpeg(), "image/jpeg")])
+    iid = uuid.UUID(got.json()["results"][0]["id"])
+    kept, gone = uuid.uuid4(), uuid.uuid4()
+    async with uploads.db_state.session_factory() as s:
+        s.add(
+            Prompt(
+                id=kept,
+                tenant_id=DEFAULT_TENANT,
+                collection_id=uuid.UUID(cid),
+                name="Land cover",
+                instruction="What land cover?",
+            )
+        )
+        for pid in (kept, gone):
+            s.add(StepRun(image_id=iid, step=f"prompt:{pid}", status=StepStatus.COMPLETED))
+        await s.commit()
+
+    body = (await uploads.get(f"/api/images/images/{iid}", headers=OLGA)).json()
+    labels = {r["step"]: r["label"] for r in body["step_runs"]}
+    assert labels[f"prompt:{kept}"] == "Land cover"
+    assert labels[f"prompt:{gone}"] is None
+    assert all(label is None for step, label in labels.items() if not step.startswith("prompt:"))

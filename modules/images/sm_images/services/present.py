@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Sequence
 from typing import Any
 
@@ -9,7 +10,7 @@ from simple_module_core.resources import ResourcePrincipal
 from sqlalchemy import select
 
 from sm_images import access, constants, urls
-from sm_images.models import Collection, Group, Image, Rendition, StepRun
+from sm_images.models import Collection, Group, Image, Prompt, Rendition, StepRun
 from sm_images.schemas.image import ImageOut, StepRunOut
 
 __all__ = ["present", "present_detail", "present_one"]
@@ -59,9 +60,12 @@ async def present_detail(
             Group.id == image.group_id, Group.collection_id == collection.id
         )
         out.group_key = (await db.execute(key)).scalar_one_or_none()
+    rows = list((await db.execute(stmt)).scalars())
+    names = await _prompt_names(db, collection, [r.step for r in rows])
     out.step_runs = [
         StepRunOut(
             step=r.step,
+            label=names.get(r.step),
             status=r.status.value,
             error_code=r.error_code,
             step_version=r.step_version if detailed else None,
@@ -70,6 +74,23 @@ async def present_detail(
             output=r.output if detailed else None,
             output_visible=detailed,
         )
-        for r in (await db.execute(stmt)).scalars()
+        for r in rows
     ]
     return out
+
+
+async def _prompt_names(db: Any, collection: Collection, steps: list[str]) -> dict[str, str]:
+    """``{"prompt:<id>": name}`` for the collection's prompts among ``steps``."""
+    from sm_images.ai.prompt_steps import prompt_id_of
+
+    ids: dict[uuid.UUID, str] = {}
+    for step in steps:
+        pid = prompt_id_of(step)
+        if pid is not None:
+            ids[pid] = step
+    if not ids:
+        return {}
+    stmt = select(Prompt.id, Prompt.name).where(
+        Prompt.id.in_(list(ids)), Prompt.collection_id == collection.id
+    )
+    return {ids[pid]: name for pid, name in (await db.execute(stmt)).all()}

@@ -38,6 +38,8 @@ export type StepRun = {
   output: Record<string, unknown> | null;
   /** True for an editor: `output === null` then means the step made none. */
   output_visible?: boolean;
+  /** A prompt step's prompt name (null for a built-in step or a deleted prompt). */
+  label?: string | null;
 };
 
 export type ImageItem = {

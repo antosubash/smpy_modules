@@ -318,7 +318,18 @@
     "saved": "Group saved"
   },
   "results": {
-    "withheld": "The output of this step is only shown to people who can edit the collection."
+    "withheld": "The output of this step is only shown to people who can edit the collection.",
+    "exif": {
+      "lat": "Latitude",
+      "lng": "Longitude",
+      "altitude": "Altitude",
+      "heading": "Heading",
+      "captured_at": "Captured",
+      "captured_at_zone_known": "Time zone known",
+      "make": "Camera make",
+      "model": "Camera model",
+      "orientation": "Orientation"
+    }
   },
   "pipeline": {
     "title": "Processing pipeline",

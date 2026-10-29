@@ -33,6 +33,9 @@ class StepRunOut(BaseModel):
     output_visible: bool = False
     """True when the caller may see ``output``/``error_message`` (an editor), so
     ``output is None`` then means the step produced none, not that it is withheld."""
+    label: str | None = None
+    """A prompt step's prompt name; ``None`` for a built-in step (the client
+    names it) and for a deleted prompt (the step id is the fallback)."""
 
 
 class ImageOut(BaseModel):
