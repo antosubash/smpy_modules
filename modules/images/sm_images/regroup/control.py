@@ -10,10 +10,9 @@ from typing import Any
 
 from simple_module_db import finalize_session
 from sqlalchemy import case, or_, update
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from sm_images import constants
+from sm_images.db_time import dialect_insert
 from sm_images.models import RegroupJob, RegroupJobGroup
 from sm_images.models.regroup_job import CANCELLED, FAILED, RUNNING
 from sm_images.pipeline.runtime import Runtime
@@ -31,7 +30,7 @@ async def note_groups(
     resumed job never counts a group twice."""
     if not group_ids:
         return 0
-    insert = pg_insert if db.get_bind().dialect.name == "postgresql" else sqlite_insert
+    insert = dialect_insert(db)
     stmt = (
         insert(RegroupJobGroup)
         .values([{"tenant_id": tenant, "job_id": job_id, "group_id": g} for g in group_ids])

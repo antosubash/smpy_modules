@@ -19,10 +19,9 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import Uuid, case, literal, select, update
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from sm_images import constants
+from sm_images.db_time import dialect_insert
 from sm_images.map import schedule as map_schedule
 from sm_images.models import Group, Image
 
@@ -30,10 +29,6 @@ __all__ = ["Change", "apply_chunk", "ensure_groups", "keys_to_ids", "settle"]
 
 Change = tuple[uuid.UUID, str, str | None]
 """``(image_id, group_key, role-or-None-to-keep)``."""
-
-
-def _insert(db: Any) -> Any:
-    return pg_insert if db.get_bind().dialect.name == "postgresql" else sqlite_insert
 
 
 async def keys_to_ids(
@@ -82,7 +77,7 @@ async def ensure_groups(
             for k in missing
         ]
         stmt = (
-            _insert(db)(Group)
+            dialect_insert(db)(Group)
             .values(rows)
             .on_conflict_do_nothing(index_elements=["collection_id", "key"])
             .returning(Group.key, Group.id)

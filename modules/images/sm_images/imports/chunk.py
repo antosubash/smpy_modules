@@ -25,10 +25,9 @@ from typing import Any
 
 from simple_module_db import finalize_session
 from sqlalchemy import case, func, select, update
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from sm_images import constants
+from sm_images.db_time import dialect_insert
 from sm_images.imports.features import Parsed
 from sm_images.imports.jobs import COUNTERS, SYNC, JobSnap, now, where
 from sm_images.ingest import dedupe
@@ -41,10 +40,6 @@ __all__ = ["Stopped", "advance_checkpoint", "pending_items", "record_chunk"]
 
 class Stopped(Exception):  # noqa: N818 - a signal, not an error
     """The runner no longer owns the job (paused, restarted, deleted)."""
-
-
-def _insert(db: Any) -> Any:
-    return pg_insert if db.get_bind().dialect.name == "postgresql" else sqlite_insert
 
 
 async def _seen_in_job(
@@ -169,7 +164,7 @@ async def record_chunk(
             await dedupe.ensure_group(db, job.collection_id, key)
         rows = await _classify(db, tenant, job, parsed)
         stmt = (
-            _insert(db)(ImportItem)
+            dialect_insert(db)(ImportItem)
             .values(rows)
             .on_conflict_do_nothing(index_elements=["job_id", "feature_index"])
             .returning(ImportItem.feature_index)

@@ -7,6 +7,9 @@ no worker's skew moves an op's deadline. Postgres: ``clock_timestamp()``;
 SQLite: ``strftime`` in UTC. Read it after the
 transaction's first write (SQLite: a transaction that reads first can fail
 to write with ``SQLITE_BUSY_SNAPSHOT``).
+
+Also :func:`dialect_insert`, the ``INSERT … ON CONFLICT`` construct of the
+session's dialect.
 """
 
 from __future__ import annotations
@@ -15,8 +18,16 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-__all__ = ["db_now"]
+__all__ = ["db_now", "dialect_insert"]
+
+
+def dialect_insert(db: Any) -> Any:
+    """``insert`` of ``db``'s dialect (Postgres or SQLite), which has
+    ``on_conflict_do_nothing``/``on_conflict_do_update``."""
+    return pg_insert if db.get_bind().dialect.name == "postgresql" else sqlite_insert
 
 
 async def db_now(db: Any) -> datetime:
