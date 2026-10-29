@@ -31,7 +31,7 @@ from simple_module_db.callbacks import register_on_commit
 from sqlalchemy import delete
 
 from sm_images import storage_keys
-from sm_images.errors import StorageQuotaExceeded
+from sm_images.errors import QuotaBusy, StorageQuotaExceeded
 from sm_images.intents import clear_intents, object_intent
 from sm_images.models import ObjectIntent
 from sm_images.pipeline import publish, registry, storage_hold
@@ -159,9 +159,14 @@ async def _hold(
     runtime: Runtime, loaded: Any, staged: Staged, outcome: StepOutcome
 ) -> tuple[storage_hold.Planned | None, Staged, StepOutcome]:
     """Reserve the storage the staged objects add. Refused, or billing unusable
-    (fail closed): the objects go, nothing is published, the step fails."""
+    (fail closed): the objects go, nothing is published, the step fails. The
+    quota lease busy: the objects go and it raises - the run keeps its lease
+    until it lapses, then reconcile runs the step again."""
     try:
         return await storage_hold.reserve(runtime, loaded, staged), staged, outcome
+    except QuotaBusy:
+        await _drop(runtime, staged.keys)
+        raise
     except StorageQuotaExceeded as exc:
         failed = StepOutcome.failed("quota_exceeded", exc.detail)
     except Exception as exc:

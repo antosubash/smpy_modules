@@ -113,7 +113,7 @@ async def check(app: Any, tenant: str, qty: int, db: Any) -> None:
     usage = getattr(app.state, constants.BILLING_USAGE_ATTR, None)
     if usage is None or qty < 1:
         return
-    under = await billing_guard.under_counted_bytes(factory_of(db), tenant)
+    under = await billing_guard.under_counted_bytes(factory_of(db), tenant, usage)
     outcome = await usage.check(tenant, METER, int(qty) + under)
     if not outcome.ok:
         raise StorageQuotaExceeded(FULL)
@@ -134,15 +134,19 @@ async def reserve(
     :class:`StorageQuotaExceeded` when it does not fit - counting the
     under-counted images other than ``image_id`` unless ``guarded`` is off (a
     rehold: :mod:`sm_images.billing_guard`); :class:`HoldSpent` when the key's
-    hold was since released or lapsed (a key is never reused)."""
+    hold was since released or lapsed (a key is never reused). The guard and
+    the reserve run under the tenant's quota lease when its plan sets a limit
+    (:func:`sm_images.billing_guard.serialized`; ``QuotaBusy`` if not had in
+    time) - every reservation takes it, a rehold included."""
     meter = storage_meter(session_factory)
     if meter is None or qty < 1:
         return None
-    if guarded and not await billing_guard.guard(
-        meter, session_factory, tenant, METER, qty, exclude=image_id
-    ):
-        raise StorageQuotaExceeded(FULL)
-    outcome = await meter.reserve(tenant, METER, int(qty), key, source=SOURCE, ttl=ttl)
+    async with billing_guard.serialized(meter, tenant, METER):
+        if guarded and not await billing_guard.guard(
+            meter, session_factory, tenant, METER, qty, exclude=image_id
+        ):
+            raise StorageQuotaExceeded(FULL)
+        outcome = await meter.reserve(tenant, METER, int(qty), key, source=SOURCE, ttl=ttl)
     if not outcome.ok:
         if getattr(outcome, "id", None) is not None:
             raise HoldSpent(key)

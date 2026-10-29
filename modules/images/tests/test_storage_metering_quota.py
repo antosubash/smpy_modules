@@ -64,9 +64,7 @@ async def test_codex_trace_a_moved_on_replacement_never_waits(pipe, blur, gauge,
         n = await gauge.reserve(T, billing.METER, total, "N", source="t")
         gauge.expire(n.id)  # N lapses before its commit
         async with pipe.db_state.session_factory() as s:
-            await s.execute(
-                update(Image).where(Image.id == img).values(storage_hold_id=n.id)
-            )
+            await s.execute(update(Image).where(Image.id == img).values(storage_hold_id=n.id))
             await hold_refs.installed(s, n.id, img)
             await hold_refs.orphan(s, T, h)
             first = BillingOp(

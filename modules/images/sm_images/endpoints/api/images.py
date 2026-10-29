@@ -104,9 +104,7 @@ async def upload_images(
         except ImagesError as exc:
             read.append(exc)
     good = [r[1] for r in read if isinstance(r, tuple)]
-    await billing.check(
-        request.app, bound_tenant(), sum(len(data) for data, _ in good), ingest.db
-    )
+    await billing.check(request.app, bound_tenant(), sum(len(data) for data, _ in good), ingest.db)
     # Every intent and storage hold before the first insert (IngestService.reserve).
     slots = iter(
         await ingest.reserve(collection, [i.ext for _, i in good], [len(d) for d, _ in good])

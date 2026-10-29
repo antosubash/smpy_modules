@@ -69,7 +69,7 @@ async def test_room_freed_for_a_refused_rehold_is_not_given_to_an_upload(pipe, b
     await _settle(pipe, LATER + WAIT)  # O gives way; the rehold is still backing off
     assert gauge.holds[o].status == "released"
     assert (await pipe.row(img)).storage_hold_id == h  # still under-counted
-    assert await billing_guard.under_counted_bytes(factory, T) == total
+    assert await billing_guard.under_counted_bytes(factory, T, gauge) == total
 
     assert (await hold_slot(factory, T, _slot(), freed)).refused
     with pytest.raises(StorageQuotaExceeded):
@@ -81,7 +81,7 @@ async def test_room_freed_for_a_refused_rehold_is_not_given_to_an_upload(pipe, b
     row = await pipe.row(img)
     assert row.storage_hold_id not in (o, h)
     assert gauge.holds[row.storage_hold_id].status == "committed"
-    assert await billing_guard.under_counted_bytes(factory, T) == 0
+    assert await billing_guard.under_counted_bytes(factory, T, gauge) == 0
     assert sorted(x.id for x in gauge.live()) == sorted([row.storage_hold_id, d])
     assert gauge.limit - gauge.level == freed - 1  # what is left is new room again
     assert not (await hold_slot(factory, T, _slot(), freed - 1)).refused
@@ -93,10 +93,11 @@ async def test_a_healthy_quota_takes_no_extra_billing_call(pipe, blur, gauge):
     await held_image(pipe, gauge, coll)
     gauge.limit = gauge.level + 10
     gauge.calls.clear()
-    assert await billing_guard.under_counted_bytes(factory, T) == 0
+    assert await billing_guard.under_counted_bytes(factory, T, gauge) == 0
     await _web_check(pipe, gauge, 10)
     assert not (await hold_slot(factory, T, _slot(), 10)).refused
-    assert [c[0] for c in gauge.calls] == ["check", "reserve"]
+    # the web check; the plan's limit (whether to take the quota lease); the reserve
+    assert [c[0] for c in gauge.calls] == ["check", "check", "reserve"]
     assert (await hold_slot(factory, T, _slot(), 1)).refused  # the gauge itself still binds
 
 
@@ -110,5 +111,5 @@ async def test_an_image_does_not_count_against_its_own_publication(pipe, blur, g
     await _settle(pipe, LATER)
     assert (await pipe.row(img)).storage_hold_id == h
     total = gauge.holds[h].quantity
-    assert await billing_guard.under_counted_bytes(factory, T) == total
-    assert await billing_guard.under_counted_bytes(factory, T, exclude=img) == 0
+    assert await billing_guard.under_counted_bytes(factory, T, gauge) == total
+    assert await billing_guard.under_counted_bytes(factory, T, gauge, exclude=img) == 0

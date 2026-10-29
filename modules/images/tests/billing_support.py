@@ -10,6 +10,7 @@ what is held, and make billing fail (``fail_commit``, ``fail_release``, ``expire
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -40,9 +41,12 @@ class FakeGauge:
     refuse_commit: set[str] = field(default_factory=set)
     """Commits of these holds raise (billing unreachable for them)."""
     next_seconds: list[int] = field(default_factory=list)
+    """TTLs (seconds) the next reservations get instead of the one asked for."""
     lie_expired: set[str] = field(default_factory=set)
     """The next ``get_hold`` of these reads ``expired`` (a stalled reader's view)."""
-    """TTLs (seconds) the next reservations get instead of the one asked for."""
+    reserve_delay: float = 0.0
+    """Seconds a real (non-probe) reserve takes before billing decides: the
+    window in which concurrent reservations interleave."""
 
     @property
     def level(self) -> int:
@@ -74,6 +78,8 @@ class FakeGauge:
     async def reserve(self, tenant_id, meter, qty, idempotency_key, *, source, ttl=None):
         self.calls.append(("reserve", meter, str(qty), idempotency_key))
         self.ttls.append(ttl)
+        if self.reserve_delay and source != "images:guard":
+            await asyncio.sleep(self.reserve_delay)
         if idempotency_key in self.keys:
             return self.holds[self.keys[idempotency_key]]
         if self.limit is not None and self.level + qty > self.limit:
@@ -147,6 +153,18 @@ def _billing_off():
     with pytest.MonkeyPatch.context() as patcher:
         patcher.setattr(billing, "billing_installed", lambda: False)
         yield
+
+
+@pytest.fixture(autouse=True)
+def _leases_in_process():
+    """The quota lease (``billing_guard.serialized``) on a fresh in-process
+    backend: a test that built an app must not leave the next one a database
+    backend bound to its (disposed) engine."""
+    from simple_module_core.leases import configure_leases
+
+    configure_leases(None)
+    yield
+    configure_leases(None)
 
 
 @pytest.fixture

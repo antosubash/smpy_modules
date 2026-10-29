@@ -109,6 +109,13 @@ class StorageQuotaExceeded(ImagesError):  # noqa: N818 - billing's vocabulary
     code = constants.CODE_QUOTA_EXCEEDED
 
 
+class QuotaBusy(ServiceUnavailable):
+    """The tenant's storage quota is being checked and reserved by another
+    request (``images:quota:{tenant}`` lease) for longer than the wait: retry."""
+
+    code = constants.CODE_QUOTA_BUSY
+
+
 class UploadNotFound(NotFound):
     code = constants.CODE_UPLOAD_NOT_FOUND
 

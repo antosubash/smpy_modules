@@ -172,6 +172,7 @@
     "unreadable_image": "Das Bild konnte nicht gelesen werden.",
     "output_too_large": "Der Schritt hat ein Ergebnis erzeugt, das zu groß zum Speichern ist.",
     "quota_exceeded": "Das Kontingent des Tarifs ist aufgebraucht.",
+    "quota_busy": "Speicher wird gerade für andere Uploads zugeteilt. Versuchen Sie es gleich noch einmal.",
     "time_limit": "Der Schritt hat zu lange gedauert und wurde abgebrochen.",
     "internal_error": "Der Schritt ist unerwartet fehlgeschlagen.",
     "dependency_unavailable": "Ein Schritt, von dem dieser abhängt, hat kein Ergebnis geliefert.",

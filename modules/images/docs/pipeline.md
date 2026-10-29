@@ -234,9 +234,13 @@ all the same.
   would be refused for good and the tenant would store the image for free.
   So every quota pre-check (upload, batch, base64, direct-upload complete,
   import start, each ingested original and each publication's reserve)
-  counts the gauge **plus** the bytes of the tenant's under-counted images:
-  those naming a hold whose `rehold` op is pending with no replacement
-  reserved (one indexed aggregate over the tenant's pending ops). A new
+  counts the gauge **plus** the bytes of the tenant's under-counted images.
+  An image is in doubt while its current hold has a pending `commit` or
+  `rehold` op, and it counts as covered only when its hold ref is `installed`
+  and billing confirms the hold: a commit's hold `committed` (or `held` and
+  unexpired), a rehold's recorded replacement likewise. An expired, released
+  or unknown hold, or a rehold with no replacement, is under-counted. At most
+  50 holds are asked about per check (the rest count as under-counted). A new
   reservation fits only if `gauge + under-counted + new ≤ limit`; otherwise
   it is refused 402 `quota_exceeded` (a step fails `quota_exceeded`). A
   publication does not count its own image, whose new hold replaces the
@@ -244,8 +248,16 @@ all the same.
   restores the count. In a worker billing has no gauge-aware check, so the
   guard reserves a short-lived probe of `new + under-counted` and releases it
   at once; a tenant with nothing under-counted pays no extra billing call.
-  Like every pre-check it is application-level and can race a concurrent
-  reservation between the probe and the real hold.
+- **One reservation per tenant at a time.** When the tenant's plan limits
+  `images.storage_bytes`, the guard and the reservation after it (ingest,
+  direct complete, publication, rehold, import items) run under the lease
+  `images:quota:{tenant}` (the framework's leases: Redis, else `sm_lease`),
+  held for those two billing calls only, never across the caller's
+  transaction. Two reservations can no longer both pass the probe before
+  either reserves. Without billing, or without a limit, no lease is taken.
+  A request that cannot get the lease within 10 s answers 503 `quota_busy`
+  (a direct upload stays open to retry); a worker raises, and the step run or
+  import item is handed out again by reconcile, a rehold by its backoff.
 - **The reservation's deadline.** A publication reserves for the step lease
   plus five minutes (at least billing's 15-minute default): a completion is
   accepted only within its lease, so the hold outlives any completion that can
