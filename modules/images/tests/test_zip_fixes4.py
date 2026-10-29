@@ -103,7 +103,8 @@ async def test_a_slow_download_heartbeats_and_is_not_reclaimed(imp, monkeypatch)
 
     release = asyncio.Event()
 
-    async def slow(url, limiter, settings, prior):
+    async def slow(url, limiter, settings, prior, *, before):
+        await before()  # the item is claimed in its slot, then the fetch stalls
         await release.wait()  # held until the test has seen the heartbeat renewed
         return jpeg((8, 6), "blue"), 1
 

@@ -37,6 +37,10 @@ isolation applying as in a request:
 * maps that are due and not claimed - a lost ``images.build_map``, a claim
   that expired, a withdrawn map - are requested again
   (:func:`sm_images.map.recover.reconcile_maps`).
+
+Each of these is a phase of its own (:func:`sm_images.phases.run_phases`): one
+that raises is logged and counted as ``failed_phases``, and the rest still run.
+The image dispatches - each on its own - are :mod:`sm_images.reconcile_dispatch`.
 """
 
 from __future__ import annotations
@@ -45,10 +49,9 @@ import logging
 from collections import Counter
 from datetime import datetime, timedelta
 from functools import partial
-from typing import Any
 
 from simple_module_db import all_tenants, finalize_session, tenant_context
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import or_, select, update
 
 from sm_images import billing_ops, billing_repair
 from sm_images.ai.group_request import recover_group_runs
@@ -64,10 +67,9 @@ from sm_images.models import (
     RegroupJob,
     StepRun,
 )
-from sm_images.models.enums import StepStatus
-from sm_images.pipeline.orchestrate import submit_dispatch
+from sm_images.phases import run_phases
 from sm_images.pipeline.runtime import Runtime
-from sm_images.placeholders import reopenable_images
+from sm_images.reconcile_dispatch import dispatch_images, ids, repair_unleased
 from sm_images.regroup import control as regroup_control
 from sm_images.regroup import jobs as regroup_jobs
 from sm_images.services import stats
@@ -79,7 +81,6 @@ __all__ = ["CUTOFF", "reconcile_async", "reconcile_tenant", "tenants"]
 logger = logging.getLogger(__name__)
 
 CUTOFF = timedelta(minutes=5)
-BATCH = 500
 STATS_BATCH = 100
 _OWNERS = (
     Collection,
@@ -103,70 +104,6 @@ async def tenants(runtime: Runtime) -> list[str]:
                 found.update((await db.execute(tagged(stmt))).scalars())
             await finalize_session(db)
     return sorted(t for t in found if valid_tenant(t))
-
-
-async def _ids(runtime: Runtime, stmt: Any, column: Any) -> list[Any]:
-    """Every id ``stmt`` selects, in keyset batches."""
-    out: list[Any] = []
-    after = None
-    while True:
-        page = stmt.order_by(column).limit(BATCH)
-        if after is not None:
-            page = page.where(column > after)
-        async with runtime.session_factory() as db:
-            rows = list((await db.execute(page)).scalars())
-            await finalize_session(db)
-        out += rows
-        if len(rows) < BATCH:
-            return out
-        after = rows[-1]
-
-
-async def _repair_unleased(runtime: Runtime, tenant: str, cutoff: datetime) -> int:
-    async with runtime.session_factory() as db:
-        stmt = (
-            update(StepRun)
-            .where(
-                StepRun.tenant_id == tenant,
-                StepRun.status == StepStatus.RUNNING,
-                StepRun.lease_expires_at.is_(None),
-                or_(StepRun.started_at.is_(None), StepRun.started_at < cutoff),
-            )
-            .values(status=StepStatus.PENDING, lease_token=None)
-            .returning(StepRun.id)
-            .execution_options(synchronize_session=False)
-        )
-        n = len((await db.execute(stmt)).all())
-        await finalize_session(db)
-    return n
-
-
-def _stranded(tenant: str, now: datetime, cutoff: datetime) -> Any:
-    """Runs of live images in live collections only: dead work is not re-sent."""
-    return (
-        select(StepRun.image_id)
-        .distinct()
-        .join(Image, Image.id == StepRun.image_id)
-        .join(Collection, Collection.id == Image.collection_id)
-        .where(
-            StepRun.tenant_id == tenant,
-            Image.tenant_id == tenant,
-            Image.is_deleted.is_(False),
-            Collection.is_deleted.is_(False),
-            or_(
-                and_(StepRun.status == StepStatus.PENDING, StepRun.created_at < cutoff),
-                and_(StepRun.status == StepStatus.RUNNING, StepRun.lease_expires_at < now),
-            ),
-        )
-    )
-
-
-def _unconcluded(tenant: str, cutoff: datetime) -> Any:
-    return select(Image.id).where(
-        Image.tenant_id == tenant,
-        Image.processed_generation < Image.processing_generation,
-        Image.created_at < cutoff,
-    )
 
 
 async def _restarts(runtime: Runtime, tenant: str, now: datetime, cutoff: datetime) -> int:
@@ -210,38 +147,42 @@ async def _regroups(runtime: Runtime, tenant: str, cutoff: datetime) -> int:
     return len(claimed)
 
 
+async def _imports(runtime: Runtime, tenant: str, cutoff: datetime) -> dict[str, int]:
+    jobs, items = await recover_imports(runtime, tenant, cutoff)
+    return {"import_jobs": jobs, "import_items": items}
+
+
 async def _recompute_stats(runtime: Runtime, tenant: str) -> int:
-    ids = await _ids(
+    found = await ids(
         runtime, select(Collection.id).where(Collection.tenant_id == tenant), Collection.id
     )
-    for start in range(0, len(ids), STATS_BATCH):
+    for start in range(0, len(found), STATS_BATCH):
         async with runtime.session_factory() as db:
-            for collection_id in ids[start : start + STATS_BATCH]:
+            for collection_id in found[start : start + STATS_BATCH]:
                 await stats.recompute(db, collection_id)
             await finalize_session(db)
-    return len(ids)
+    return len(found)
 
 
 async def reconcile_tenant(runtime: Runtime, tenant: str, now: datetime) -> Counter[str]:
     """One tenant's recovery; the caller has bound ``tenant``."""
     cutoff = now - CUTOFF
+    factory = runtime.session_factory
     done: Counter[str] = Counter()
-    done["repaired"] = await _repair_unleased(runtime, tenant, cutoff)
-    stranded = await _ids(runtime, _stranded(tenant, now, cutoff), StepRun.image_id)
-    unconcluded = await _ids(runtime, _unconcluded(tenant, cutoff), Image.id)
-    reopen = await reopenable_images(runtime, tenant, partial(_ids, runtime))
-    done["reopened"] = len(reopen)
-    for image_id in dict.fromkeys([*stranded, *unconcluded, *reopen]):
-        await submit_dispatch(runtime, tenant, image_id)
-        done["dispatched"] += 1
-    done["restarts"] = await _restarts(runtime, tenant, now, cutoff)
-    done["regroups"] = await _regroups(runtime, tenant, cutoff)
-    done["import_jobs"], done["import_items"] = await recover_imports(runtime, tenant, cutoff)
-    done["group_runs"] = await recover_group_runs(runtime, tenant, now, cutoff)
-    done["billing_ops"] = await billing_ops.settle(runtime.session_factory, tenant, now=now)
-    done["billing_repaired"] = await billing_repair.repair(runtime.session_factory, tenant, now)
-    done["collections"] = await _recompute_stats(runtime, tenant)
-    done["maps"] = await reconcile_maps(runtime, tenant, now)
+    # Looked up here, at call time, so each phase is the module's current one.
+    phases = [
+        ("repaired", partial(repair_unleased, runtime, tenant, cutoff)),
+        ("dispatch", partial(dispatch_images, runtime, tenant, now, cutoff)),
+        ("restarts", partial(_restarts, runtime, tenant, now, cutoff)),
+        ("regroups", partial(_regroups, runtime, tenant, cutoff)),
+        ("import_jobs", partial(_imports, runtime, tenant, cutoff)),
+        ("group_runs", partial(recover_group_runs, runtime, tenant, now, cutoff)),
+        ("billing_ops", partial(billing_ops.settle, factory, tenant)),  # the database's clock
+        ("billing_repaired", partial(billing_repair.repair, factory, tenant, now)),
+        ("collections", partial(_recompute_stats, runtime, tenant)),
+        ("maps", partial(reconcile_maps, runtime, tenant, now)),
+    ]
+    await run_phases(done, "reconcile", tenant, phases)
     return done
 
 

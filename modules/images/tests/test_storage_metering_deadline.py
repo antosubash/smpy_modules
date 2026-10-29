@@ -100,7 +100,7 @@ async def test_the_sweep_keeps_exactly_what_the_repair_needs(pipe, gauge):
     examined = await _op(pipe, op=OP_SWAP, hold_id="h2", repaired_at=done, **base)
     released = await _op(pipe, op=OP_RELEASE, hold_id="h3", **base)
     factory = pipe.db_state.session_factory
-    assert await billing_ops.sweep(factory, T, datetime.now(UTC)) == 2
+    assert await billing_ops.sweep(factory, T, timedelta(days=1)) == 2
     async with factory() as s:
         kept = set((await s.execute(select(BillingOp.id))).scalars())
     assert kept == {plain, expired, holding}  # every done op is examined before it goes

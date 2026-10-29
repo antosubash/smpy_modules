@@ -22,7 +22,11 @@ what arrived, as in ``file_storage``'s own sessions; the database never
 mirrors it.
 
 Replay is safe: once the image row exists, ``complete`` answers with it again,
-and nothing here deletes a key a row references.
+and nothing here deletes a key a row references. So is a retry: only a refusal
+of the bytes themselves (sniffed type, size, the decode guards) aborts the
+session; any other failure - a full quota, a database or storage blip - hands
+it back ``open`` with the assembled object kept. The failed attempt's storage
+hold was handed to the settler, which releases it; the retry takes its own.
 
 **The token is signed, not encrypted.** Anyone holding it can read the key,
 ids and size inside (base64 JSON); only forging or altering it is prevented.
@@ -46,9 +50,9 @@ from sqlalchemy import select
 from sm_images import constants, storage_keys
 from sm_images.errors import (
     FileTooLarge,
-    ImagesError,
+    ImageTooLarge,
+    InvalidUpload,
     PartsMismatch,
-    StorageQuotaExceeded,
     UnsupportedType,
     UploadNotFound,
 )
@@ -80,6 +84,11 @@ __all__ = [
 ]
 
 _ABORTED = UploadStatus.ABORTED
+_INVALID = (UnsupportedType, ImageTooLarge, FileTooLarge, InvalidUpload, PartsMismatch)
+"""The upload's own refusals: the bytes are not the declared or an acceptable
+image. Its staged object is dropped and the session aborted."""
+_REFUSALS = (*_INVALID, UploadNotFound)
+"""What aborts a ``complete`` after assembly (``UploadNotFound``: the object is gone)."""
 _TOO_LARGE = "The upload is larger than the image size limit"
 _SIZE_MISMATCH = "The stored upload is not the declared size"
 
@@ -166,9 +175,11 @@ async def complete(
         await state.renew(ingest.db, ticket, token)  # each phase is bounded by the lease
         outcome = await _ingest(ingest, collection, ticket, token, filename=filename, meta=meta)
     except Exception as exc:
-        # A full storage quota keeps the upload: the session stays open to retry.
-        retry = not assembled or isinstance(exc, StorageQuotaExceeded)
-        await state.settle(ingest.db, ticket, token, UploadStatus.OPEN if retry else _ABORTED)
+        # Only a refusal of the upload itself (it is not what was declared, or
+        # not an acceptable image) ends it; anything else - a full quota, a
+        # database or storage blip - keeps it open for a retried ``complete``.
+        final = assembled and isinstance(exc, _REFUSALS)
+        await state.settle(ingest.db, ticket, token, _ABORTED if final else UploadStatus.OPEN)
         raise
     await state.finish(ingest.db, ticket, token)
     return outcome
@@ -206,11 +217,10 @@ async def _ingest(
             meta=meta,
             source=constants.SOURCE_UPLOAD,
         )
-    except StorageQuotaExceeded:
-        raise  # the staged object is kept for a retry once there is room
-    except ImagesError:
+    except _INVALID:
         await _drop(ingest, ticket)
         raise
+    # Anything else (a full quota, a blip) keeps the staged object for a retry.
 
 
 async def _drop(ingest: IngestService, ticket: Ticket) -> None:

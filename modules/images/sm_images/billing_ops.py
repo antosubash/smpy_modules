@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from simple_module_db import finalize_session
@@ -88,20 +88,23 @@ async def open_op(
         idempotency_key=key,
         old_hold_id=old or NO_HOLD,
         claim_token=token,
-        claim_expires_at=datetime.now(UTC) + claim,
     )
-    not_after = await _deadline(db, row)
+    not_after = await _deadline(db, row, claim)
     assert row.id is not None
     return Claimed(row.id, token, key, not_after)
 
 
-async def _deadline(db: Any, row: BillingOp) -> datetime:
+async def _deadline(db: Any, row: BillingOp, claim: timedelta | None = None) -> datetime:
     """Insert ``row`` and fix its deadline: the database's time at the insert
     plus :data:`BILLING_OP_MAX_AGE`. Immutable from here; every billing call
-    for the op passes it unchanged."""
+    for the op passes it unchanged. A writer's ``claim`` runs on the same
+    clock, which is the one settlers judge it by (``billing_settle``)."""
     db.add(row)
     await db.flush()  # the write first (SQLite), then the clock
-    row.not_after = await db_now(db) + BILLING_OP_MAX_AGE
+    at = await db_now(db)
+    row.not_after = at + BILLING_OP_MAX_AGE
+    if claim is not None:
+        row.claim_expires_at = at + claim
     await db.flush()
     return row.not_after
 
@@ -120,11 +123,19 @@ async def finish(db: Any, claimed: Claimed, hold_id: str | None, error: str | No
     got = await db.execute(
         update(BillingOp)
         .where(*_mine(claimed))
-        .values(done_at=datetime.now(UTC), hold_id=hold_id, last_error=error, claim_token=None)
+        .values(hold_id=hold_id, last_error=error, claim_token=None)
         .returning(BillingOp.id)
         .execution_options(synchronize_session=False)
     )
-    return got.first() is not None
+    if got.first() is None:
+        return False
+    # The write first (SQLite), then the database's clock: ``done_at`` is what
+    # the sweep's retention compares, on that same clock.
+    stamp = update(BillingOp).where(BillingOp.id == claimed.op_id)
+    await db.execute(
+        stamp.values(done_at=await db_now(db)).execution_options(synchronize_session=False)
+    )
+    return True
 
 
 async def hand_back(db: Any, claimed: Claimed | None, factory: Any = None) -> None:
@@ -221,12 +232,16 @@ async def settle(
     return await billing_settle.settle(factory, tenant, ids, now)
 
 
-async def sweep(factory: Any, tenant: str, cutoff: datetime) -> int:
-    """Delete ops done before ``cutoff``, :data:`SWEEP_BATCH` per transaction and
-    at most :data:`SWEEP_BATCHES` transactions per call - never one the repair
-    has yet to examine (``sm_images.billing_repair``)."""
+async def sweep(factory: Any, tenant: str, older_than: timedelta) -> int:
+    """Delete ops done more than ``older_than`` ago by the database's clock (the
+    one ``done_at`` is written on), :data:`SWEEP_BATCH` per transaction and at
+    most :data:`SWEEP_BATCHES` transactions per call - never one the repair has
+    yet to examine (``sm_images.billing_repair``)."""
     from sm_images.billing_repair import candidate
 
+    async with factory() as db:  # a read-only transaction of its own (SQLite)
+        cutoff = await db_now(db) - older_than
+        await finalize_session(db)
     removed = 0
     for _ in range(SWEEP_BATCHES):
         async with factory() as db:

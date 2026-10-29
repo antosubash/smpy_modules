@@ -13,6 +13,9 @@ enumeration (:func:`sm_images.reconcile.tenants`). Per tenant, under
 * storage-billing outbox ops done before the grace period are deleted
   (:func:`sm_images.billing_ops.sweep`).
 
+Each is a phase of its own (:func:`sm_images.phases.run_phases`): one that
+raises is logged and counted as ``failed_phases``, and the rest still run.
+
 Then **one narrow platform pass**, under ``all_tenants()``, over the
 write-ahead intents (:class:`ObjectIntent` has no tenant - the key embeds it):
 :func:`reap_intents` deletes the objects of intents older than the grace
@@ -27,6 +30,7 @@ import uuid
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from functools import partial
 from typing import Any
 
 from simple_module_db import all_tenants, finalize_session, tenant_context
@@ -44,6 +48,7 @@ from sm_images.models import (
     UploadSession,
     UploadStatus,
 )
+from sm_images.phases import Phase, run_phases
 from sm_images.pipeline.runtime import Runtime
 from sm_images.purge import MIN_INTENT_AGE, PurgeReport, purge_expired
 from sm_images.reconcile import tenants
@@ -186,21 +191,37 @@ async def janitor_tenant(
 ) -> Counter[str]:
     """One tenant's clean-up; the caller has bound ``tenant``."""
     store, grace = runtime.store(), runtime.settings().janitor_grace_days
-    done: Counter[str] = Counter()
-    if not dry_run:
-        async with runtime.session_factory() as db:
-            done["uploads_reaped"] = await reap_expired_uploads(db, store, now, CAP)
+    factory = runtime.session_factory
+
+    async def uploads() -> int:
+        async with factory() as db:
+            reaped = await reap_expired_uploads(db, store, now, CAP)
             await finalize_session(db)
-    async with runtime.session_factory() as db:
-        report = await purge_expired(db, store, now=now, grace_days=grace, dry_run=dry_run, cap=CAP)
-        await finalize_session(db)
+        return reaped
+
+    async def purge() -> dict[str, int]:
+        async with factory() as db:
+            report = await purge_expired(
+                db, store, now=now, grace_days=grace, dry_run=dry_run, cap=CAP
+            )
+            await finalize_session(db)
+        return {
+            "images_purged": len(report.images),
+            "collections_purged": len(report.collections),
+            "objects_deleted": len(report.keys),
+        }
+
+    age = timedelta(days=grace)  # measured on the database's clock, as done_at is
+    phases: list[Phase] = [("purge", purge)]
     if not dry_run:
-        done["import_staging_reaped"] = await reap_staging(runtime, tenant, now, grace)
-        cutoff = now - timedelta(days=grace)
-        done["billing_ops_swept"] = await billing_ops.sweep(runtime.session_factory, tenant, cutoff)
-    done["images_purged"] = len(report.images)
-    done["collections_purged"] = len(report.collections)
-    done["objects_deleted"] = len(report.keys)
+        phases = [
+            ("uploads_reaped", uploads),
+            *phases,
+            ("import_staging_reaped", partial(reap_staging, runtime, tenant, now, grace)),
+            ("billing_ops_swept", partial(billing_ops.sweep, factory, tenant, age)),
+        ]
+    done: Counter[str] = Counter()
+    await run_phases(done, "janitor", tenant, phases)
     return done
 
 

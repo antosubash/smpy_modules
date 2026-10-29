@@ -12,13 +12,16 @@
   unexpected: :class:`Fail`. :data:`MAX_ATTEMPTS` caps an item's lifetime.
 
 Every hop holds a limiter slot for its own host: the first URL's, then each
-redirect target's (:class:`_HopSlot`).
+redirect target's (:class:`_HopSlot`). A caller's ``before`` hook runs once
+the first attempt holds its slot - the download claims its item there, so a
+claim never ages while the item queues behind the limiter.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
 from typing import Any, Final
 
@@ -40,6 +43,7 @@ __all__ = [
     "MAX_ATTEMPTS",
     "MAX_RETRY_AFTER_SECONDS",
     "RETRY_AFTER_TOO_LONG",
+    "Before",
     "Defer",
     "Fail",
     "Stop",
@@ -56,6 +60,9 @@ MAX_RETRY_AFTER_SECONDS: Final = 86400
 :data:`RETRY_AFTER_TOO_LONG` rather than sitting pending for days."""
 RETRY_AFTER_TOO_LONG: Final = "retry_after_too_long"
 _sleep = asyncio.sleep
+
+Before = Callable[[], Awaitable[int]]
+"""Run in the first attempt's slot, just before the fetch; the item's attempts so far."""
 
 
 class Stop(Exception):  # noqa: N818 - a signal
@@ -118,9 +125,13 @@ class _HopSlot:
             await held.__aexit__(None, None, None)
 
 
-async def _fetch(url: str, settings: Any, limiter: SlotLimiter) -> bytes:
-    hop = _HopSlot(limiter)
-    await hop.enter(url)
+async def _fetch(
+    url: str, settings: Any, limiter: SlotLimiter, hop: _HopSlot | None = None
+) -> bytes:
+    """One attempt; ``hop`` is the first URL's slot when the caller already holds it."""
+    if hop is None:
+        hop = _HopSlot(limiter)
+        await hop.enter(url)
     try:
         parts = [
             c
@@ -136,13 +147,32 @@ async def _fetch(url: str, settings: Any, limiter: SlotLimiter) -> bytes:
     return b"".join(parts)
 
 
+async def _first_slot(url: str, limiter: SlotLimiter, before: Before) -> tuple[_HopSlot, int]:
+    """Wait for the first URL's slot, then run ``before`` in it (the caller's
+    claim, just before the fetch); its exceptions give the slot back and
+    propagate unclassified."""
+    hop = _HopSlot(limiter)
+    await hop.enter(url)
+    try:
+        return hop, await before()
+    except BaseException:
+        await hop.leave()
+        raise
+
+
 async def fetch_with_retries(
-    url: str, limiter: SlotLimiter, settings: Any, prior: int
+    url: str, limiter: SlotLimiter, settings: Any, prior: int, *, before: Before | None = None
 ) -> tuple[bytes, int]:
-    """The body, and how many attempts it took; raises ``Fail`` or ``Defer``."""
+    """The body, and how many attempts it took; raises ``Fail`` or ``Defer``.
+
+    ``before``, when given, runs once the first attempt holds its slot and
+    returns the item's attempts so far (replacing ``prior``)."""
     for attempt in range(INLINE_ATTEMPTS):
+        hop = None
+        if attempt == 0 and before is not None:
+            hop, prior = await _first_slot(url, limiter, before)
         try:
-            return await _fetch(url, settings, limiter), attempt + 1
+            return await _fetch(url, settings, limiter, hop), attempt + 1
         except Exception as exc:
             retryable, code, response = _classify(exc)
             made = attempt + 1

@@ -28,6 +28,7 @@ from sqlalchemy import exists, or_, select, update
 from sqlalchemy.orm import aliased
 
 from sm_images import billing, billing_ops
+from sm_images.db_time import db_now
 from sm_images.models import BillingOp
 from sm_images.models.billing_op import (  # noqa: F401 - re-exported
     BILLING_OP_MAX_AGE,
@@ -105,14 +106,18 @@ async def settle(
     factory: Any, tenant: str, ids: list[int] | None = None, now: datetime | None = None
 ) -> int:
     """Claim and run the due ops (``ids`` only, when given); how many finished.
-    Bounded to :data:`PAGES` pages; a page that finished nothing ends it."""
-    now = now or datetime.now(UTC)
+    Bounded to :data:`PAGES` pages; a page that finished nothing ends it.
+
+    Claims, backoffs and deadlines are judged by the database's clock - the
+    one writers stamp them with (``billing_ops``) - read afresh per page;
+    ``now`` overrides it (tests that move time)."""
     done = 0
     for _ in range(PAGES):
-        async with factory() as db:
-            found = list((await db.execute(_due(tenant, now, ids))).scalars())
+        async with factory() as db:  # read-only: the clock may be read first
+            at = now or await db_now(db)
+            found = list((await db.execute(_due(tenant, at, ids))).scalars())
             await finalize_session(db)
-        ran = [await _attempt(factory, tenant, op_id, now) for op_id in found]
+        ran = [await _attempt(factory, tenant, op_id, at) for op_id in found]
         done += sum(ran)
         if not any(ran):
             break
