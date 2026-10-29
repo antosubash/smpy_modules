@@ -36,6 +36,8 @@
     "vector_dimension": "Vector dimension",
     "vector_dimension_hint": "Vector stores fix collection width to this — changing it means re-indexing.",
     "test_connection": "Test connection",
+    "testing": "Testing…",
+    "testing_hint": "Waiting for the model to answer…",
     "save_first": "Save your changes first — the test runs against saved settings.",
     "test_ok": "OK — {model} ({latency} ms)",
     "load_models": "Load models",

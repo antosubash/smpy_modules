@@ -54,6 +54,7 @@ function Settings() {
   const [busy, setBusy] = useState(false);
   const [chatTest, setChatTest] = useState<TestResult | null>(null);
   const [embeddingTest, setEmbeddingTest] = useState<TestResult | null>(null);
+  const [testing, setTesting] = useState<'chat' | 'embedding' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // One hydration path for both the initial load and the post-save read-back,
@@ -122,11 +123,20 @@ function Settings() {
     (slot.dim ?? 0) !== (saved.dim ?? 0);
   const savedSlots = useMemo(() => (loaded ? fromSettings(loaded) : null), [loaded]);
 
-  const test = (slot: 'chat' | 'embedding') =>
-    run(async () => {
-      const result = await testSlot(slot);
-      (slot === 'chat' ? setChatTest : setEmbeddingTest)(result);
+  // The previous answer is cleared at once and the card says it is testing:
+  // a slow model can take up to the probe's timeout to answer.
+  const test = (slot: 'chat' | 'embedding') => {
+    const setResult = slot === 'chat' ? setChatTest : setEmbeddingTest;
+    setResult(null);
+    setTesting(slot);
+    return run(async () => {
+      try {
+        setResult(await testSlot(slot));
+      } finally {
+        setTesting(null);
+      }
     }, t(keys.ai.settings.test_failed));
+  };
 
   return (
     <>
@@ -148,6 +158,7 @@ function Settings() {
               hasStoredKey={loaded.has_chat_api_key}
               dirty={isDirty(chat, savedSlots.chat)}
               busy={busy}
+              testing={testing === 'chat'}
               testResult={chatTest}
               onChange={setChat}
               onTest={() => test('chat')}
@@ -163,6 +174,7 @@ function Settings() {
               hasStoredKey={loaded.has_embedding_api_key}
               dirty={isDirty(embedding, savedSlots.embedding)}
               busy={busy}
+              testing={testing === 'embedding'}
               testResult={embeddingTest}
               onChange={setEmbedding}
               onTest={() => test('embedding')}

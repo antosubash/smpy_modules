@@ -30,6 +30,7 @@ export function SlotCard({
   hasStoredKey,
   dirty,
   busy,
+  testing = false,
   testResult,
   onChange,
   onTest,
@@ -46,6 +47,8 @@ export function SlotCard({
   /** Unsaved edits present — the probe would test the old saved settings. */
   dirty: boolean;
   busy: boolean;
+  /** This slot's probe is in flight (it can take as long as the model does). */
+  testing?: boolean;
   testResult: TestResult | null;
   onChange: (next: SlotValues) => void;
   onTest: () => void;
@@ -214,8 +217,9 @@ export function SlotCard({
             size="sm"
             disabled={busy || dirty}
             onClick={onTest}
+            data-testid={`${idPrefix}-test-button`}
           >
-            {t(c.test_connection)}
+            {testing ? t(c.testing) : t(c.test_connection)}
           </Button>
           <Button
             type="button"
@@ -227,16 +231,23 @@ export function SlotCard({
             {t(c.load_models)}
           </Button>
           {dirty && <span className="text-xs text-muted-foreground">{t(c.save_first)}</span>}
-          {!dirty && testResult && (
-            <span
-              data-testid={`${idPrefix}-test-result`}
-              className={testResult.ok ? 'text-sm text-emerald-600' : 'text-sm text-destructive'}
-            >
-              {testResult.ok
-                ? t(c.test_ok, { model: testResult.model, latency: testResult.latency_ms })
-                : testResult.error}
-            </span>
-          )}
+          <span aria-live="polite">
+            {testing && (
+              <span data-testid={`${idPrefix}-test-pending`} className="text-sm text-muted-foreground">
+                {t(c.testing_hint)}
+              </span>
+            )}
+            {!dirty && !testing && testResult && (
+              <span
+                data-testid={`${idPrefix}-test-result`}
+                className={testResult.ok ? 'text-sm text-emerald-600' : 'text-sm text-destructive'}
+              >
+                {testResult.ok
+                  ? t(c.test_ok, { model: testResult.model, latency: testResult.latency_ms })
+                  : testResult.error}
+              </span>
+            )}
+          </span>
         </div>
         {!dirty && models && (
           <p
