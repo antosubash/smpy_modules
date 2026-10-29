@@ -7,7 +7,7 @@ review focus 4 ("an interrupted import replays") lives here.
 from __future__ import annotations
 
 import pytest
-from sm_images.imports import chunk, jobs, runner, settle
+from sm_images.imports import chunk, claims, runner, settle
 from sm_images.models import LocationSource
 from sm_images.tenancy import DEFAULT_TENANT
 
@@ -86,7 +86,7 @@ async def test_resume_after_kill_no_duplicates_base64_without_ids(imp, monkeypat
     monkeypatch.undo()
     monkeypatch.setattr(runner, "CHUNK", 2)
     calls = kill_after(monkeypatch, settle, "ingest_item", 100)
-    claimed = await jobs.claim_stale(imp.runtime, DEFAULT_TENANT, job.id)
+    claimed = await claims.claim_stale(imp.runtime, DEFAULT_TENANT, job.id)
     assert claimed == job.generation + 1
     assert await imp.run(job, claimed) == "completed"
     assert calls["n"] == 2  # only the two items that never got an image
@@ -107,7 +107,7 @@ async def test_kill_between_image_commit_and_item_is_impossible(imp, monkeypatch
     assert await imp.statuses(job) == ["pending"]
     monkeypatch.undo()
     assert (
-        await imp.run(job, await jobs.claim_stale(imp.runtime, DEFAULT_TENANT, job.id))
+        await imp.run(job, await claims.claim_stale(imp.runtime, DEFAULT_TENANT, job.id))
         == "completed"
     )
     assert len(await imp.images()) == 1
@@ -125,7 +125,7 @@ async def test_checkpoint_atomic_with_items(imp, monkeypatch):
     assert (await imp.reload(job)).checkpoint_index == 2
     monkeypatch.undo()
     assert (
-        await imp.run(job, await jobs.claim_stale(imp.runtime, DEFAULT_TENANT, job.id))
+        await imp.run(job, await claims.claim_stale(imp.runtime, DEFAULT_TENANT, job.id))
         == "completed"
     )
     assert await imp.counts(job) == ("completed", 3, 3, 3, 0, 0)

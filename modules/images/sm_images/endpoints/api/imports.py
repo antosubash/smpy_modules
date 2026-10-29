@@ -37,7 +37,7 @@ from sm_images.access import POLICY, CollectionEdit
 from sm_images.deps import require_view
 from sm_images.endpoints.api.uploads import host_secret
 from sm_images.errors import ServiceUnavailable, UploadNotFound
-from sm_images.imports import controls, zip_upload
+from sm_images.imports import access, controls, zip_upload
 from sm_images.imports.service import start_import
 from sm_images.imports.zip_import import launch_sealed
 from sm_images.models import Collection, ImportJob
@@ -86,16 +86,25 @@ JobCollection = Annotated[
 ]
 
 
+async def _actor(db: Any, who: ResourcePrincipal, collection: Collection) -> tuple[str, str]:
+    """``(user, basis)``: whose edit right a job runs under (``imports.access``)."""
+    if who.user_id is None:  # pragma: no cover - require_view admits only signed-in callers
+        raise UploadNotFound("Upload not found")
+    return who.user_id, await access.basis(db, who, collection)
+
+
 @router.post("/collections/{collection_id}/imports", status_code=202, dependencies=[require_view])
 async def create_import(
     collection: CollectionEdit,
     who: Principal,
+    db: Annotated[Any, Depends(get_db)],
     kind: Annotated[str, Form(max_length=40)],
     mapping: Annotated[str, Form(max_length=20_000)] = "{}",
     source_url: Annotated[str | None, Form(max_length=2000)] = None,
     auto_run_prompts: Annotated[bool, Form()] = False,
     file: Annotated[UploadFile | None, File()] = None,
 ) -> ImportJobOut:
+    user, basis = await _actor(db, who, collection)
     row = await start_import(
         _runtime(),
         _tenant(),
@@ -105,7 +114,8 @@ async def create_import(
         source_url=source_url or None,
         upload=file.file if file is not None else None,
         auto_run_prompts=auto_run_prompts,
-        created_by=who.user_id,
+        created_by=user,
+        access_basis=basis,
     )
     return job_out(row)
 
@@ -114,10 +124,13 @@ async def create_import(
     "/collections/{collection_id}/imports/zip", status_code=201, dependencies=[require_view]
 )
 async def create_zip_import(
-    body: ZipCreate, request: Request, collection: CollectionEdit, who: Principal
+    body: ZipCreate,
+    request: Request,
+    collection: CollectionEdit,
+    who: Principal,
+    db: Annotated[Any, Depends(get_db)],
 ) -> ZipCreated:
-    if who.user_id is None:  # pragma: no cover - require_view admits only signed-in callers
-        raise UploadNotFound("Upload not found")
+    user, basis = await _actor(db, who, collection)
     job, (token, ticket, urls, presigned) = await zip_upload.start(
         _runtime(),
         _tenant(),
@@ -125,9 +138,10 @@ async def create_zip_import(
         filename=body.filename,
         size=body.size,
         mapping=body.mapping,
-        owner=who.user_id,
+        owner=user,
         secret=host_secret(request),
         auto_run_prompts=body.auto_run_prompts,
+        access_basis=basis,
     )
     upload = DirectCreated(
         upload_id=token,
@@ -174,18 +188,27 @@ async def pause_import(job_id: uuid.UUID, collection: JobCollection) -> ImportJo
 
 
 @router.post("/imports/{job_id}/resume", status_code=202, dependencies=[require_view])
-async def resume_import(job_id: uuid.UUID, collection: JobCollection) -> ImportJobOut:
-    return job_out(await controls.resume(_runtime(), _tenant(), job_id))
+async def resume_import(
+    job_id: uuid.UUID, collection: JobCollection, who: Principal, db=Depends(get_db)
+) -> ImportJobOut:
+    actor = await _actor(db, who, collection)
+    return job_out(await controls.resume(_runtime(), _tenant(), job_id, actor=actor))
 
 
 @router.post("/imports/{job_id}/restart", status_code=202, dependencies=[require_view])
-async def restart_import(job_id: uuid.UUID, collection: JobCollection) -> ImportJobOut:
-    return job_out(await controls.restart(_runtime(), _tenant(), job_id))
+async def restart_import(
+    job_id: uuid.UUID, collection: JobCollection, who: Principal, db=Depends(get_db)
+) -> ImportJobOut:
+    actor = await _actor(db, who, collection)
+    return job_out(await controls.restart(_runtime(), _tenant(), job_id, actor=actor))
 
 
 @router.post("/imports/{job_id}/retry-failed", status_code=202, dependencies=[require_view])
-async def retry_failed_import(job_id: uuid.UUID, collection: JobCollection) -> ImportJobOut:
-    return job_out(await controls.retry_failed(_runtime(), _tenant(), job_id))
+async def retry_failed_import(
+    job_id: uuid.UUID, collection: JobCollection, who: Principal, db=Depends(get_db)
+) -> ImportJobOut:
+    actor = await _actor(db, who, collection)
+    return job_out(await controls.retry_failed(_runtime(), _tenant(), job_id, actor=actor))
 
 
 @router.delete("/imports/{job_id}", status_code=204, dependencies=[require_view])

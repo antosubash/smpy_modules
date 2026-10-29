@@ -4,23 +4,33 @@
   :func:`~sm_images.imports.rate_limit.backoff`, at most
   :data:`INLINE_ATTEMPTS` times in one go. A wait longer than
   :data:`INLINE_WAIT_SECONDS`, or ``None`` (the server asked for more than we
-  wait), raises :class:`Defer`: the item stays ``pending`` for reconcile.
+  wait), raises :class:`Defer`: the item stays ``pending`` for reconcile,
+  which re-sends it no earlier than the wait (``next_attempt_at``).
 * **Permanent** - an unsafe URL, too large, a content encoding, any other 4xx,
   a protocol error (a broken redirect or framing: one try), anything
   unexpected: :class:`Fail`. :data:`MAX_ATTEMPTS` caps an item's lifetime.
+
+Every hop holds a limiter slot for its own host: the first URL's, then each
+redirect target's (:class:`_HopSlot`).
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+from contextlib import AbstractAsyncContextManager
 from typing import Any, Final
 
 import httpx
 
 from sm_images.imports.errors import FetchError, FetchTimeoutError
 from sm_images.imports.fetch import safe_stream
-from sm_images.imports.rate_limit import DomainLimiter, backoff, is_retryable_status
+from sm_images.imports.rate_limit import (
+    SlotLimiter,
+    backoff,
+    is_retryable_status,
+    retry_after_seconds,
+)
 from sm_images.imports.url_safety import UnsafeURLError
 
 __all__ = [
@@ -42,14 +52,16 @@ _sleep = asyncio.sleep
 
 
 class Stop(Exception):  # noqa: N818 - a signal
-    def __init__(self, code: str, attempts: int) -> None:
+    def __init__(self, code: str, attempts: int, delay: float | None = None) -> None:
         super().__init__(code)
         self.code = code
         self.attempts = attempts
+        self.delay = delay
 
 
 class Defer(Stop):
-    """Retry later (reconcile re-dispatches the pending item)."""
+    """Retry later (reconcile re-dispatches the pending item), not before
+    ``delay`` seconds when known - the server's Retry-After, or our backoff."""
 
 
 class Fail(Stop):
@@ -77,24 +89,53 @@ def _classify(exc: BaseException) -> tuple[bool, str, httpx.Response | None]:
     return False, "fetch_failed", None
 
 
-async def _fetch(url: str, settings: Any) -> bytes:
-    parts = [
-        c
-        async for c in safe_stream(
-            url, max_bytes=settings.max_image_bytes, timeout=settings.download_timeout
-        )
-    ]
+class _HopSlot:
+    """The limiter slot of the hop being fetched. A redirect gives up the
+    previous hop's slot *before* waiting for the next host's - holding one
+    while waiting for another could deadlock a batch whose every fetch
+    redirects - so each hop counts against its own host's cap."""
+
+    def __init__(self, limiter: SlotLimiter) -> None:
+        self._limiter = limiter
+        self._held: AbstractAsyncContextManager[None] | None = None
+
+    async def enter(self, url: str) -> None:
+        await self.leave()
+        held = self._limiter.slot(url)
+        await held.__aenter__()
+        self._held = held
+
+    async def leave(self) -> None:
+        held, self._held = self._held, None
+        if held is not None:
+            await held.__aexit__(None, None, None)
+
+
+async def _fetch(url: str, settings: Any, limiter: SlotLimiter) -> bytes:
+    hop = _HopSlot(limiter)
+    await hop.enter(url)
+    try:
+        parts = [
+            c
+            async for c in safe_stream(
+                url,
+                max_bytes=settings.max_image_bytes,
+                timeout=settings.download_timeout,
+                on_redirect=lambda target: hop.enter(str(target)),
+            )
+        ]
+    finally:
+        await hop.leave()
     return b"".join(parts)
 
 
 async def fetch_with_retries(
-    url: str, limiter: DomainLimiter, settings: Any, prior: int
+    url: str, limiter: SlotLimiter, settings: Any, prior: int
 ) -> tuple[bytes, int]:
     """The body, and how many attempts it took; raises ``Fail`` or ``Defer``."""
     for attempt in range(INLINE_ATTEMPTS):
         try:
-            async with limiter.slot(url):
-                return await _fetch(url, settings), attempt + 1
+            return await _fetch(url, settings, limiter), attempt + 1
         except Exception as exc:
             retryable, code, response = _classify(exc)
             made = attempt + 1
@@ -102,6 +143,7 @@ async def fetch_with_retries(
                 raise Fail(code, made) from exc
             wait = backoff(response, prior + attempt)
             if wait is None or wait > INLINE_WAIT_SECONDS or made == INLINE_ATTEMPTS:
-                raise Defer(code, made) from exc
+                delay = retry_after_seconds(response) if wait is None else wait
+                raise Defer(code, made, delay) from exc
             await _sleep(wait)
     raise AssertionError("unreachable")  # pragma: no cover

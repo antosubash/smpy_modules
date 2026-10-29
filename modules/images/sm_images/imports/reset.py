@@ -62,7 +62,12 @@ async def _fence(db: Any, tenant: str, job_id: uuid.UUID, generation: int) -> An
             ImportJob.generation == generation,
             ImportJob.status == JobStatus.RESETTING,
         )
-        .values(heartbeat_at=now(), updated_at=now())
+        .values(
+            heartbeat_at=now(),
+            updated_at=now(),
+            started_generation=generation,  # this reset ran: a breaker strike
+            started_at=now(),
+        )
         .returning(ImportJob.reset_mode, ImportJob.kind)
         .execution_options(**SYNC)
     )
@@ -107,6 +112,7 @@ async def reset_batch(runtime: Runtime, tenant: str, job_id: uuid.UUID, generati
                         claim_token=None,
                         claim_expires_at=None,
                         claim_generation=None,
+                        next_attempt_at=None,
                         updated_at=now(),
                     )
                 )

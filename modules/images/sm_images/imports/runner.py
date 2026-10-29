@@ -3,8 +3,8 @@
 1. **Fence.** :func:`jobs.start` takes the job only for the runner holding its
    current ``generation``; a message from before a restart, resume or reclaim
    answers ``stale`` and writes nothing.
-2. **Stage** (source URL only): fetch through ``safe_stream`` into a spool,
-   validate and count it, store it, record key and count.
+2. **Stage** (source URL only, :mod:`.stage`): fetch through ``safe_stream``
+   into a spool, validate and count it, store it, record key and count.
 3. **Stream** from the resume index, one feature at a time, buffering at most
    :data:`CHUNK` features (or :data:`CHUNK_BYTES` of base64) - each buffer is
    recorded and checkpointed in one transaction (:mod:`.chunk`), then worked:
@@ -13,6 +13,9 @@
    :data:`CEILING` items of the job are pending (backpressure, heartbeating
    while it waits, bounded by :data:`CAPACITY_WAIT_SECONDS`).
 4. **Complete** when everything is recorded and settled (:mod:`.terminal`).
+
+At the start and before every chunk the job's ``run_as`` must still hold edit
+on the collection (:mod:`.access`); a lost right cancels the job.
 
 Permanent problems with the source (bad JSON, too many features, an unsafe or
 failing URL) fail the job with a code; anything else (storage or database
@@ -33,15 +36,15 @@ import httpx
 from simple_module_db import finalize_session, tenant_context
 from sqlalchemy import or_, update
 
-from sm_images.imports import chunk, jobs, launch, lookup, settle, staging, terminal
+from sm_images.imports import access, chunk, jobs, launch, lookup, settle, staging, terminal
 from sm_images.imports.beat import beating
 from sm_images.imports.errors import FetchError
 from sm_images.imports.features import Parsed, extract
 from sm_images.imports.geojson_stream import GeoJSONError, Oversize, Tick, iter_features
 from sm_images.imports.mapping import Mapping
+from sm_images.imports.stage import stage_source
 from sm_images.imports.url_safety import UnsafeURLError
-from sm_images.intents import clear_intents
-from sm_images.models import ImportItem, ImportJob
+from sm_images.models import ImportItem
 from sm_images.models.enums import ImportKind, ItemStatus, JobStatus
 from sm_images.pipeline.runtime import Runtime, bind_runtime
 
@@ -73,65 +76,6 @@ def _permanent(exc: BaseException) -> str | None:
     if isinstance(exc, httpx.TransportError):
         return "source_unreachable"
     return None
-
-
-async def _stage(
-    runtime: Runtime, tenant: str, job: jobs.JobSnap
-) -> tuple[IO[bytes], jobs.JobSnap]:
-    """Fetch, count and store a URL source; the job moves to ``running``."""
-    settings = runtime.settings()
-
-    async def beat() -> None:
-        if not await jobs.heartbeat(runtime, tenant, job.id, job.generation):
-            raise chunk.Stopped()
-
-    assert job.source_url is not None
-    source = await staging.fetch_source(
-        job.source_url, max_bytes=settings.geojson_max_bytes, beat=beat
-    )
-    try:
-
-        def beat_now():
-            return beating(runtime, tenant, job.id, job.generation)
-
-        async with beat_now():  # counting makes no database call
-            total = await staging.count(source, settings.geojson_max_features)
-        key = await staging.put_spool(
-            runtime, tenant, job.id, source, job.generation, during=beat_now
-        )
-        async with runtime.session_factory() as db:
-            stmt = (
-                update(ImportJob)
-                .where(
-                    *jobs.where(tenant, job.id),
-                    ImportJob.generation == job.generation,
-                    ImportJob.status == JobStatus.STAGING,
-                )
-                .values(
-                    source_key=key,
-                    staged_keys=[key],
-                    total_count=total,
-                    checkpoint_index=0,
-                    status=JobStatus.RUNNING,
-                    heartbeat_at=jobs.now(),
-                    updated_at=jobs.now(),
-                )
-                .returning(ImportJob.id)
-                .execution_options(**jobs.SYNC)
-            )
-            if (await db.execute(stmt)).first() is None:
-                await db.rollback()
-                # A newer generation staged (or will stage) its own key; this
-                # attempt's object stays behind its intent for the janitor.
-                raise chunk.Stopped()
-            await clear_intents(db, [key])
-            await finalize_session(db)
-    except BaseException:
-        source.close()
-        raise
-    return source, jobs.JobSnap(
-        **{**job.__dict__, "source_key": key, "total_count": total, "status": JobStatus.RUNNING}
-    )
 
 
 async def _hand_out_pending(runtime: Runtime, tenant: str, job: jobs.JobSnap, below: int) -> None:
@@ -187,6 +131,7 @@ async def _wait_for_capacity(runtime: Runtime, tenant: str, job: jobs.JobSnap) -
 
 
 async def _work(runtime: Runtime, tenant: str, job: jobs.JobSnap, coll, buf: list[Parsed]) -> None:
+    await access.guard(runtime, tenant, job.id, job.generation)
     await chunk.record_chunk(runtime, tenant, job, buf)
     if job.kind is ImportKind.GEOJSON_BASE64:
         await settle.ingest_chunk(runtime, tenant, job, coll, buf)
@@ -236,8 +181,12 @@ async def _run(runtime: Runtime, tenant: str, job_id: uuid.UUID, generation: int
         return "cancelled"
     source: IO[bytes] | None = None
     try:
+        await access.guard(runtime, tenant, job_id, generation)
+    except chunk.Stopped:
+        return "cancelled"
+    try:
         if job.status is JobStatus.STAGING:
-            source, job = await _stage(runtime, tenant, job)
+            source, job = await stage_source(runtime, tenant, job)
         start = await lookup.resume_index(runtime, tenant, job)
         if job.kind is ImportKind.GEOJSON_URL:
             await _hand_out_pending(runtime, tenant, job, start)

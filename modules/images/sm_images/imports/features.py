@@ -101,8 +101,25 @@ def _text_id(raw: Any) -> str | None:
     return text or None
 
 
+def _without(properties: dict[str, Any], path: str) -> dict[str, Any]:
+    """``properties`` minus the value at ``path``: the exact key (which
+    :func:`lookup` prefers) *and* the dotted path into nested objects, so the
+    image payload survives under neither spelling. Copies along the path only;
+    a parent the removal empties goes too."""
+    kept = {k: v for k, v in properties.items() if k != path}
+    head, dot, rest = path.partition(".")
+    child = kept.get(head)
+    if dot and isinstance(child, dict):
+        pruned = _without(child, rest)
+        if pruned:
+            kept[head] = pruned
+        else:
+            del kept[head]
+    return kept
+
+
 def _bounded(properties: dict[str, Any], drop: str | None) -> dict[str, Any] | None:
-    kept = {k: v for k, v in properties.items() if k != drop}
+    kept = _without(properties, drop) if drop else dict(properties)
     if not kept:
         return None
     size = len(json.dumps(kept, separators=(",", ":"), default=str).encode())

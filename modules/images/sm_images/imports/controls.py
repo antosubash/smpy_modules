@@ -56,6 +56,15 @@ async def _cas(runtime: Runtime, tenant: str, job_id: uuid.UUID, conds: list, va
     return await jobs.returning_one(runtime, stmt)
 
 
+Actor = tuple[str, str] | None
+"""``(user id, access basis)`` of whoever used a control that reopens a job: it
+runs under their right from then on (``imports.access``)."""
+
+
+def _as(actor: Actor) -> dict[str, Any]:
+    return {} if actor is None else {"run_as": actor[0], "access_basis": actor[1]}
+
+
 def _unchanged(row: ImportJob) -> list[Any]:
     same_source = (
         ImportJob.source_key.is_(None)
@@ -75,7 +84,7 @@ async def pause(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> ImportJob:
 
 
 async def resume(
-    runtime: Runtime, tenant: str, job_id: uuid.UUID, *, launch: bool = True
+    runtime: Runtime, tenant: str, job_id: uuid.UUID, *, launch: bool = True, actor: Actor = None
 ) -> ImportJob:
     silent = ImportJob.heartbeat_at.is_(None) | (ImportJob.heartbeat_at < now() - STALE_AFTER)
     resumable = (ImportJob.status == JobStatus.PAUSED) | (ImportJob.status.in_(ACTIVE) & silent)
@@ -84,6 +93,7 @@ async def resume(
         "generation": ImportJob.generation + 1,
         "heartbeat_at": now(),
         "relaunches": 0,
+        **_as(actor),
     }
     found = await _cas(runtime, tenant, job_id, [resumable], values)
     if found is None:
@@ -95,7 +105,13 @@ async def resume(
 
 
 async def _enter_reset(
-    runtime: Runtime, tenant: str, row: ImportJob, mode: str, extra: dict, launch: bool
+    runtime: Runtime,
+    tenant: str,
+    row: ImportJob,
+    mode: str,
+    extra: dict,
+    launch: bool,
+    actor: Actor = None,
 ) -> ImportJob:
     values = {
         "status": JobStatus.RESETTING,
@@ -105,6 +121,7 @@ async def _enter_reset(
         "heartbeat_at": now(),
         "relaunches": 0,
         **extra,
+        **_as(actor),
     }
     found = await _cas(runtime, tenant, row.id, _unchanged(row), values)
     if found is None:
@@ -119,18 +136,18 @@ def _recorded(row: ImportJob) -> bool:
 
 
 async def restart(
-    runtime: Runtime, tenant: str, job_id: uuid.UUID, *, launch: bool = True
+    runtime: Runtime, tenant: str, job_id: uuid.UUID, *, launch: bool = True, actor: Actor = None
 ) -> ImportJob:
     row = await get(runtime, tenant, job_id)
     zero = {"done_count": 0, "duplicate_count": 0, "failed_count": 0}
     if row.source_key is None and row.source_url is None:
         if row.kind is ImportKind.GEOJSON_URL and _recorded(row):
-            return await _enter_reset(runtime, tenant, row, MODE_ROWS, {}, launch)
+            return await _enter_reset(runtime, tenant, row, MODE_ROWS, {}, launch, actor)
         raise conflict("source_gone", "The source of this import is no longer stored")
     extra: dict[str, Any] = {**zero, "checkpoint_index": 0}
     if row.source_key is None:
         extra["total_count"] = 0  # re-staged from its URL, and counted again
-    return await _enter_reset(runtime, tenant, row, MODE_RESTART, extra, launch)
+    return await _enter_reset(runtime, tenant, row, MODE_RESTART, extra, launch, actor)
 
 
 async def _retryable(runtime: Runtime, tenant: str, row: ImportJob) -> int:
@@ -149,7 +166,7 @@ async def _retryable(runtime: Runtime, tenant: str, row: ImportJob) -> int:
 
 
 async def retry_failed(
-    runtime: Runtime, tenant: str, job_id: uuid.UUID, *, launch: bool = True
+    runtime: Runtime, tenant: str, job_id: uuid.UUID, *, launch: bool = True, actor: Actor = None
 ) -> ImportJob:
     row = await get(runtime, tenant, job_id)
     url = row.kind is ImportKind.GEOJSON_URL
@@ -161,4 +178,4 @@ async def retry_failed(
         raise conflict("job_incomplete", "This import never finished reading its source")
     if not await _retryable(runtime, tenant, row):
         return row
-    return await _enter_reset(runtime, tenant, row, MODE_RETRY, {}, launch)
+    return await _enter_reset(runtime, tenant, row, MODE_RETRY, {}, launch, actor)

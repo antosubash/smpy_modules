@@ -83,6 +83,7 @@ async def start_import(
     upload: IO[bytes] | None,
     auto_run_prompts: bool = False,
     created_by: str | None = None,
+    access_basis: str | None = None,
 ) -> ImportJob:
     parsed_kind, parsed = _mapping(kind, mapping)
     if (upload is None) == (not source_url):
@@ -106,6 +107,7 @@ async def start_import(
             staged=staged,
             auto_run_prompts=auto_run_prompts,
             created_by=created_by,
+            access_basis=access_basis,
             **common,
         )
     else:
@@ -118,6 +120,7 @@ async def start_import(
             source_url=url,
             auto_run_prompts=auto_run_prompts,
             created_by=created_by,
+            access_basis=access_basis,
             **common,
         )
     try:

@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sm_images.imports import controls, jobs, recover, settle, zip_import
+from sm_images.imports import claims, controls, recover, settle, zip_import
 from sm_images.models import ImportJob, UploadSession
 from sm_images.models.enums import JobStatus
 from sm_images.tenancy import DEFAULT_TENANT
@@ -45,7 +45,7 @@ async def test_zip_resume_after_kill_no_duplicates(imp, monkeypatch):
     monkeypatch.undo()
     monkeypatch.setattr(zip_import, "ENTRY_BATCH", 2)
     calls = kill_after(monkeypatch, settle, "ingest_item", 100)
-    claimed = await jobs.claim_stale(imp.runtime, DEFAULT_TENANT, job.id)
+    claimed = await claims.claim_stale(imp.runtime, DEFAULT_TENANT, job.id)
     assert await run_zip(imp, job, generation) == "stale"  # the old generation writes nothing
     assert await run_zip(imp, job, claimed) == "completed"
     assert calls["n"] == 2

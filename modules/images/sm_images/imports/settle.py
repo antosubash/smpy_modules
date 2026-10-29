@@ -84,6 +84,7 @@ async def mark_item(
         "claim_token": None,
         "claim_expires_at": None,
         "claim_generation": None,
+        "next_attempt_at": None,
     }
     if image_id is not None:
         values["image_id"] = image_id

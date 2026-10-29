@@ -6,7 +6,17 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from sm_images.errors import Conflict
-from sm_images.imports import controls, jobs, launch, reset, retrying, settle, staging, terminal
+from sm_images.imports import (
+    claims,
+    controls,
+    jobs,
+    launch,
+    reset,
+    retrying,
+    settle,
+    staging,
+    terminal,
+)
 from sm_images.imports.mapping import Mapping
 from sm_images.models import ImportItem, ImportJob, ObjectIntent
 from sm_images.tenancy import DEFAULT_TENANT
@@ -77,7 +87,7 @@ async def test_a_base64_settlement_after_the_generation_moved_rolls_back(imp, mo
 
     async def restart_meanwhile(*a, **k):
         rows = await real(*a, **k)
-        await jobs.claim_stale(imp.runtime, T, job.id)  # reconcile took the job over
+        await claims.claim_stale(imp.runtime, T, job.id)  # reconcile took the job over
         return rows
 
     monkeypatch.setattr(settle, "pending_items", restart_meanwhile)
@@ -192,7 +202,7 @@ async def test_a_staging_race_never_shares_or_overwrites_a_key(imp, resolver, in
     async def overtaken(*a, **k):
         key = await real(*a, **k)
         loser.append(key)
-        await jobs.claim_stale(imp.runtime, T, job.id)  # another runner took over
+        await claims.claim_stale(imp.runtime, T, job.id)  # another runner took over
         return key
 
     monkeypatch.setattr(staging, "put_spool", overtaken)

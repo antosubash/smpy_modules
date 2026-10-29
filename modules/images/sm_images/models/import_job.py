@@ -46,9 +46,19 @@ class ImportJob(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[u
     """Reconcile relaunches since the job last made progress (the poison-job
     breaker, ``recover.RELAUNCH_LIMIT``); an operator's control resets it."""
     progress_mark: int = Field(default=0, sa_column_kwargs={"nullable": False})
-    """:func:`~sm_images.imports.jobs.progress` at the last relaunch."""
+    """:func:`~sm_images.imports.claims.progress` at the last relaunch."""
     reset_progress: int = Field(default=0, sa_column_kwargs={"nullable": False})
     """Items reset so far (restart, retry-failed): a reset's own progress."""
+    started_generation: int | None = Field(default=None)
+    """The last generation a worker actually started (``jobs.start``, a reset's
+    first batch): a relaunch whose message never ran is no strike against it."""
+    started_at: datetime | None = dt_col()
+    run_as: str | None = Field(default=None, max_length=255)
+    """Whose edit right the job runs under: its creator, or whoever last
+    resumed, restarted or retried it. Workers re-check that right (``imports.access``)."""
+    access_basis: str | None = Field(default=None, max_length=10)
+    """Where ``run_as``'s right came from when it was recorded: ``owner``,
+    ``share`` or ``manage``."""
     checkpoint_index: int = Field(default=0, sa_column_kwargs={"nullable": False})
     total_count: int = Field(default=0, sa_column_kwargs={"nullable": False})
     done_count: int = Field(default=0, sa_column_kwargs={"nullable": False})

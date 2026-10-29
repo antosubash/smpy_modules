@@ -202,7 +202,17 @@
     "metadata_invalid": "The archive's metadata file is not valid.",
     "invalid_zip": "This file is not a valid ZIP archive.",
     "invalid_archive": "The archive could not be read.",
-    "archive_changed": "The archive changed while it was being read."
+    "archive_changed": "The archive changed while it was being read.",
+    "access_revoked": "The import was cancelled: the person it runs for can no longer edit this collection.",
+    "dependency_failed": "A step this one depends on failed.",
+    "dependency_stale": "A step this one depends on has changed since; this result will be redone.",
+    "not_installed": "This step is not installed on the server.",
+    "disabled": "This step is turned off in the collection's pipeline.",
+    "invalid_params": "The step's settings are not valid.",
+    "invalid_pipeline_config": "The pipeline settings are not valid.",
+    "tenant_required": "Choose an organisation first.",
+    "user_directory_unavailable": "People cannot be looked up on this server.",
+    "not_applicable": "The step does not apply to this image."
   },
   "tabs": {
     "label": "Collection sections",

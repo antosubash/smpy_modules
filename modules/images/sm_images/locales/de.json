@@ -202,7 +202,17 @@
     "metadata_invalid": "Die Metadatendatei des Archivs ist ungültig.",
     "invalid_zip": "Diese Datei ist kein gültiges ZIP-Archiv.",
     "invalid_archive": "Das Archiv konnte nicht gelesen werden.",
-    "archive_changed": "Das Archiv hat sich während des Lesens geändert."
+    "archive_changed": "Das Archiv hat sich während des Lesens geändert.",
+    "access_revoked": "Der Import wurde abgebrochen: Die Person, für die er läuft, darf diese Sammlung nicht mehr bearbeiten.",
+    "dependency_failed": "Ein Schritt, von dem dieser abhängt, ist fehlgeschlagen.",
+    "dependency_stale": "Ein Schritt, von dem dieser abhängt, hat sich seitdem geändert; dieses Ergebnis wird neu berechnet.",
+    "not_installed": "Dieser Schritt ist auf dem Server nicht installiert.",
+    "disabled": "Dieser Schritt ist in der Pipeline der Sammlung ausgeschaltet.",
+    "invalid_params": "Die Einstellungen des Schritts sind ungültig.",
+    "invalid_pipeline_config": "Die Pipeline-Einstellungen sind ungültig.",
+    "tenant_required": "Wählen Sie zuerst eine Organisation aus.",
+    "user_directory_unavailable": "Auf diesem Server können keine Personen gesucht werden.",
+    "not_applicable": "Der Schritt ist für dieses Bild nicht anwendbar."
   },
   "tabs": {
     "label": "Bereiche der Sammlung",

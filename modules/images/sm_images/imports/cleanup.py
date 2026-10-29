@@ -20,7 +20,7 @@ import contextlib
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Final
+from typing import Any, Final
 
 from simple_module_db import finalize_session
 from sqlalchemy import String, cast, delete, or_, select, update
@@ -33,7 +33,7 @@ from sm_images.models import ImportItem, ImportJob
 from sm_images.models.enums import JobStatus
 from sm_images.pipeline.runtime import Runtime
 
-__all__ = ["SWEEP_CAP", "delete_job", "reap_staging"]
+__all__ = ["SWEEP_CAP", "cancel_for_collection", "delete_job", "reap_staging"]
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +83,26 @@ async def delete_job(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> None:
         async with runtime.session_factory() as db:
             await clear_intents(db, keys)
             await finalize_session(db)
+
+
+async def cancel_for_collection(db: Any, tenant: str, collection_id: uuid.UUID) -> int:
+    """Cancel every unfinished import of a collection being trashed, in the
+    caller's transaction - the one that trashes it - bumping each generation,
+    so a runner, reset or download in flight loses at its next fenced write
+    (and a seal finds no ``uploading`` job). Their staged sources are terminal
+    jobs' now: :func:`reap_staging` deletes them after the grace period. How many."""
+    stmt = (
+        update(ImportJob)
+        .where(
+            ImportJob.tenant_id == tenant,
+            ImportJob.collection_id == collection_id,
+            ImportJob.status.not_in(TERMINAL),
+        )
+        .values(status=JobStatus.CANCELLED, generation=ImportJob.generation + 1, updated_at=now())
+        .returning(ImportJob.id)
+        .execution_options(**SYNC)
+    )
+    return len((await db.execute(stmt)).all())
 
 
 async def reap_staging(runtime: Runtime, tenant: str, now_: datetime, grace_days: int) -> int:

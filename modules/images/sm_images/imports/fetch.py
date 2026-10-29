@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Final
 
 import httpx
@@ -146,8 +146,13 @@ async def safe_stream(
     timeout: float,
     max_redirects: int = MAX_REDIRECTS,
     allowed_ports: frozenset[int] = DEFAULT_ALLOWED_PORTS,
+    on_redirect: Callable[[httpx.URL], Awaitable[None]] | None = None,
 ) -> AsyncIterator[bytes]:
     """GET ``url`` and yield its body as delivered, at most ``max_bytes`` of it.
+
+    ``on_redirect(target)`` is awaited before each redirect hop is requested,
+    inside the deadline - the caller's chance to take that host's download
+    slot (``retrying``), so a redirect cannot bypass a per-domain cap.
 
     ``timeout`` is both httpx's per-operation timeout and one absolute deadline
     for the whole fetch: every hop's resolution, connects, headers and each body
@@ -180,6 +185,12 @@ async def safe_stream(
                     current = current.join(response.headers["location"])
                     check_url(current, allowed_ports=allowed_ports)  # the transport re-checks
                     logger.info("Following redirect", extra={"hop": hop + 1, "host": current.host})
+                    if on_redirect is not None:
+                        try:
+                            async with asyncio.timeout_at(deadline):
+                                await on_redirect(current)
+                        except TimeoutError as error:
+                            raise FetchTimeoutError() from error
                     continue
                 _check_final(response, max_bytes)
                 async for chunk in _capped_body(response, max_bytes, deadline):

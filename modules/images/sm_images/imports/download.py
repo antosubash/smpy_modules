@@ -35,8 +35,9 @@ from simple_module_db import finalize_session, tenant_context
 from sqlalchemy import or_, select, update
 
 from sm_images import constants
-from sm_images.imports import jobs, settle, terminal
+from sm_images.imports import access, jobs, settle, terminal
 from sm_images.imports.beat import beating
+from sm_images.imports.chunk import Stopped
 from sm_images.imports.features import url_filename
 from sm_images.imports.jobs import SYNC, now
 from sm_images.imports.lookup import live_collection
@@ -76,6 +77,7 @@ async def _claim(
             ImportItem.job_id == job_id,
             ImportItem.status == ItemStatus.PENDING,
             or_(ImportItem.claim_token.is_(None), ImportItem.claim_expires_at < stamp),
+            or_(ImportItem.next_attempt_at.is_(None), ImportItem.next_attempt_at <= stamp),
             ImportItem.job_id.in_(running.scalar_subquery()),
         )
         .values(
@@ -107,9 +109,11 @@ async def _defer(
     token: str,
     code: str,
     attempts: int,
+    delay: float | None = None,
 ) -> None:
-    """Leave the item ``pending`` and release the claim, for reconcile to re-send -
-    only while this claim, of this generation, is still the job's current one."""
+    """Leave the item ``pending`` and release the claim, for reconcile to re-send
+    once ``delay`` seconds have passed - only while this claim, of this
+    generation, is still the job's current one."""
     job_id, generation = job
     current = select(ImportJob.id).where(
         ImportJob.id == job_id,
@@ -130,6 +134,7 @@ async def _defer(
             .values(
                 attempts=ImportItem.attempts + attempts,
                 last_error=code,
+                next_attempt_at=None if delay is None else now() + timedelta(seconds=delay),
                 claim_token=None,
                 claim_expires_at=None,
                 claim_generation=None,
@@ -184,7 +189,8 @@ async def _one(runtime, tenant, job: tuple, coll, claimed, limiter, settings, db
         return
     except Defer as deferred:
         async with db_lock:
-            await _defer(runtime, tenant, job, item.id, token, deferred.code, deferred.attempts)
+            args = (deferred.code, deferred.attempts, deferred.delay)
+            await _defer(runtime, tenant, job, item.id, token, *args)
         return
     async with db_lock:
         await settle.settle_bytes(
@@ -213,6 +219,10 @@ async def _run(runtime, tenant, job_id, generation, ids) -> int:
         return 0
     coll = await live_collection(runtime, tenant, job_row[0])
     if coll is None:
+        return 0
+    try:
+        await access.guard(runtime, tenant, job_id, generation)
+    except Stopped:
         return 0
     settings = runtime.settings()
     limiter = DomainLimiter(

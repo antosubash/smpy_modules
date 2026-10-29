@@ -39,6 +39,8 @@ class ImportItem(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[
     claim_generation: int | None = Field(default=None)
     """The job generation the claim was taken under: a new run releases only
     claims older than its own."""
+    next_attempt_at: datetime | None = dt_col()
+    """A deferred fetch (Retry-After, backoff) is not claimed or re-sent before this."""
     last_error: str | None = Field(default=None, max_length=2000)
     lat: float | None = Field(default=None)
     lng: float | None = Field(default=None)

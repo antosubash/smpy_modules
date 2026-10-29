@@ -34,7 +34,7 @@ from sqlalchemy import select, update
 
 from sm_images import constants
 from sm_images.errors import ServiceUnavailable
-from sm_images.imports import chunk, jobs, launch, lookup, settle, terminal, zip_source
+from sm_images.imports import access, chunk, jobs, launch, lookup, settle, terminal, zip_source
 from sm_images.imports.beat import beating
 from sm_images.imports.features import Parsed
 from sm_images.imports.mapping import Mapping
@@ -197,6 +197,7 @@ async def _import(
         for lo in range(start, len(plan.entries), ENTRY_BATCH):
             batch = plan.entries[lo : lo + ENTRY_BATCH]
             parsed = [_item(e, metadata, mapping, job.id, roles) for e in batch]
+            await access.guard(runtime, tenant, job.id, job.generation)
             await chunk.record_chunk(runtime, tenant, job, parsed)
             await _settle_chunk(runtime, tenant, job, coll, zf, plan.entries, parsed)
 
@@ -210,6 +211,7 @@ async def _run(runtime: Runtime, tenant: str, job_id: uuid.UUID, generation: int
         await terminal.finish(runtime, tenant, job_id, generation, JobStatus.CANCELLED)
         return "cancelled"
     try:
+        await access.guard(runtime, tenant, job_id, generation)
         with tempfile.TemporaryDirectory(prefix="sm-images-zip-") as tmp:
             await _import(runtime, tenant, job, coll, Path(tmp))
     except chunk.Stopped:

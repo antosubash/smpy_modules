@@ -65,6 +65,7 @@ async def start(
     owner: str,
     secret: str,
     auto_run_prompts: bool = False,
+    access_basis: str | None = None,
 ) -> tuple[ImportJob, tuple[str, Ticket, list[str], bool]]:
     """The ``uploading`` job and its upload: ``(job, (upload_id, ticket, part_urls, direct))``."""
     try:
@@ -103,6 +104,8 @@ async def start(
                     heartbeat_at=now(),
                     auto_run_prompts=auto_run_prompts,
                     created_by=owner,
+                    run_as=owner,
+                    access_basis=access_basis,
                 )
             )
             await finalize_session(db)

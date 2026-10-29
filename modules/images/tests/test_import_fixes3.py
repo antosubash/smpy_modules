@@ -7,7 +7,7 @@ import uuid
 
 import httpx
 import pytest
-from sm_images.imports import beat, download, jobs, launch, terminal
+from sm_images.imports import beat, claims, download, jobs, launch, terminal
 from sm_images.tenancy import DEFAULT_TENANT
 
 from tests.import_support import HOST, URL, b64, feature, serve_images
@@ -37,7 +37,7 @@ async def test_a_deferral_after_the_generation_moved_writes_nothing(
     real = retrying._fetch
 
     async def reclaimed_meanwhile(*a, **k):
-        await jobs.claim_stale(imp.runtime, T, job.id)  # reconcile took the job over
+        await claims.claim_stale(imp.runtime, T, job.id)  # reconcile took the job over
         return await real(*a, **k)
 
     monkeypatch.setattr(retrying, "_fetch", reclaimed_meanwhile)
@@ -53,13 +53,13 @@ async def test_a_deferral_after_the_generation_moved_writes_nothing(
 async def test_a_stale_caller_cannot_complete_a_newer_generation(imp):
     job = await imp.job([feature({"img": b64()})])
     old = job.generation
-    newer = await jobs.claim_stale(imp.runtime, T, job.id)
+    newer = await claims.claim_stale(imp.runtime, T, job.id)
     assert await imp.run(job, newer) == "completed"  # the newer run did the work ...
     # ... on a fresh, eligible job a stale caller is refused:
     job2 = await imp.job([])
     started = await jobs.start(imp.runtime, T, job2.id, job2.generation)
     assert started is not None
-    bumped = await jobs.claim_stale(imp.runtime, T, job2.id)
+    bumped = await claims.claim_stale(imp.runtime, T, job2.id)
     assert bumped == job2.generation + 1
     assert await terminal.try_complete(imp.runtime, T, job2.id, old) is False
     assert (await imp.reload(job2)).status.value == "running"

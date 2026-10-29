@@ -30,7 +30,7 @@ from sqlalchemy import case, func, select, update
 
 from sm_images.imports.mapping import Mapping
 from sm_images.intents import clear_intents
-from sm_images.models import ImportItem, ImportJob
+from sm_images.models import Collection, ImportItem, ImportJob
 from sm_images.models.enums import ImportKind, ItemStatus, JobStatus
 from sm_images.pipeline.runtime import Runtime
 
@@ -42,13 +42,11 @@ __all__ = [
     "TERMINAL",
     "JobSnap",
     "bump",
-    "claim_stale",
     "create_job",
     "heartbeat",
     "load",
     "now",
     "pending_count",
-    "progress",
     "returning_one",
     "snapshot",
     "start",
@@ -125,6 +123,7 @@ async def create_job(
     source_url: str | None = None,
     auto_run_prompts: bool = False,
     created_by: str | None = None,
+    access_basis: str | None = None,
 ) -> ImportJob:
     """A ``pending`` job whose source is ``staged`` (its key and feature count,
     the key's intent cleared in this transaction), or a ``staging`` one the
@@ -144,6 +143,8 @@ async def create_job(
         heartbeat_at=now(),
         auto_run_prompts=auto_run_prompts,
         created_by=created_by,
+        run_as=created_by,
+        access_basis=access_basis,
     )
     async with runtime.session_factory() as db:
         db.add(row)
@@ -179,7 +180,8 @@ async def start(
             await db.rollback()
             return None
         row.status = JobStatus.STAGING if needs_staging(row) else JobStatus.RUNNING
-        row.heartbeat_at = row.updated_at = now()
+        row.heartbeat_at = row.updated_at = row.started_at = now()
+        row.started_generation = generation  # this relaunch ran (``claims``)
         snap = snapshot(row)
         await finalize_session(db)
     return snap
@@ -198,44 +200,6 @@ async def heartbeat(runtime: Runtime, tenant: str, job_id: uuid.UUID, generation
         .returning(ImportJob.id)
     )
     return await returning_one(runtime, stmt) is not None
-
-
-def progress() -> Any:
-    """How far a job has got, as one number: what the poison-job breaker watches.
-    Every settlement counts (done, duplicate or failed), and so does a reset batch."""
-    j = ImportJob
-    settled = j.done_count + j.duplicate_count + j.failed_count
-    return j.checkpoint_index + settled + j.reset_progress
-
-
-async def claim_stale(
-    runtime: Runtime, tenant: str, job_id: uuid.UUID, stale_before: datetime | None = None
-) -> int | None:
-    """Take over an active or resetting job whose worker is gone: bump its
-    generation (the old one, if alive, stops at its next write) and return the
-    new one. With
-    ``stale_before`` only a heartbeat older than it qualifies - one claim wins.
-    The same ``UPDATE`` counts the relaunch: ``relaunches + 1`` when nothing
-    progressed since the last one (:func:`progress`), else back to 1."""
-    conds = [*where(tenant, job_id), ImportJob.status.in_(CLAIMABLE)]
-    if stale_before is not None:
-        conds.append(ImportJob.heartbeat_at.is_(None) | (ImportJob.heartbeat_at < stale_before))
-    stmt = (
-        update(ImportJob)
-        .where(*conds)
-        .values(
-            generation=ImportJob.generation + 1,
-            heartbeat_at=now(),
-            updated_at=now(),
-            relaunches=case(
-                (progress() == ImportJob.progress_mark, ImportJob.relaunches + 1), else_=1
-            ),
-            progress_mark=progress(),
-        )
-        .returning(ImportJob.generation)
-    )
-    found = await returning_one(runtime, stmt)
-    return None if found is None else int(found[0])
 
 
 async def pending_count(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> int:
@@ -258,7 +222,8 @@ async def bump(
     generation: int,
 ) -> bool:
     """Add to the job's counters (in the caller's transaction) and heartbeat it -
-    only while the job is ``running`` in ``generation``. ``False`` otherwise,
+    only while the job is ``running`` in ``generation`` and its collection is
+    not in the trash. ``False`` otherwise,
     and the caller rolls its whole transaction back (the fence every item
     settlement commits behind)."""
     values: dict[str, Any] = {"heartbeat_at": now(), "updated_at": now()}
@@ -269,10 +234,14 @@ async def bump(
             values[COUNTERS[status]] = (
                 column + n if n > 0 else case((column + n < 0, 0), else_=column + n)
             )
+    live = select(Collection.id).where(
+        Collection.tenant_id == tenant, Collection.is_deleted.is_(False)
+    )
     conds = [
         *where(tenant, job_id),
         ImportJob.generation == generation,
         ImportJob.status == JobStatus.RUNNING,
+        ImportJob.collection_id.in_(live.scalar_subquery()),  # not trashed meanwhile
     ]
     stmt = update(ImportJob).where(*conds).values(**values).returning(ImportJob.id)
     return (await db.execute(stmt.execution_options(**SYNC))).first() is not None
