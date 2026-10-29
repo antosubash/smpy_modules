@@ -38,6 +38,20 @@ _BAD_METADATA = "The image metadata is not valid"
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
+def external_id_text(value: object) -> object:
+    """An integer external id as text. Integer ids are common in exports;
+    booleans are not ids."""
+    if isinstance(value, int) and not isinstance(value, bool):
+        return str(value)
+    return value
+
+
+def properties_fit(value: dict[str, Any]) -> bool:
+    """Whether ``properties`` serialise within ``PROPERTIES_MAX_BYTES``."""
+    size = len(json.dumps(value, separators=(",", ":"), default=str).encode())
+    return size <= constants.PROPERTIES_MAX_BYTES
+
+
 @dataclass(frozen=True)
 class IngestMeta:
     lat: float | None = None
@@ -71,18 +85,12 @@ class UploadMeta(BaseModel):
     @field_validator("external_id", mode="before")
     @classmethod
     def _id_as_text(cls, value: object) -> object:
-        # Integer ids are common in exports; booleans are not ids.
-        if isinstance(value, int) and not isinstance(value, bool):
-            return str(value)
-        return value
+        return external_id_text(value)
 
     @field_validator("properties")
     @classmethod
     def _bounded(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
-        if value is None:
-            return None
-        size = len(json.dumps(value, separators=(",", ":"), default=str).encode())
-        if size > constants.PROPERTIES_MAX_BYTES:
+        if value is not None and not properties_fit(value):
             raise ValueError("properties is too large")
         return value
 

@@ -17,7 +17,6 @@ id; content dedupe is ``dedupe_by_hash``'s job, on the decoded bytes).
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import posixpath
 import uuid
@@ -31,6 +30,7 @@ from sm_images import constants
 from sm_images.imports.filename_pattern import canonical_role, group_key, match_group
 from sm_images.imports.mapping import Mapping
 from sm_images.imports.values import coordinates, lookup, parse_datetime
+from sm_images.ingest.meta import properties_fit
 from sm_images.models.enums import ImportKind
 
 __all__ = [
@@ -122,8 +122,7 @@ def _bounded(properties: dict[str, Any], drop: str | None) -> dict[str, Any] | N
     kept = _without(properties, drop) if drop else dict(properties)
     if not kept:
         return None
-    size = len(json.dumps(kept, separators=(",", ":"), default=str).encode())
-    return kept if size <= constants.PROPERTIES_MAX_BYTES else None
+    return kept if properties_fit(kept) else None
 
 
 def url_filename(url: str) -> str:

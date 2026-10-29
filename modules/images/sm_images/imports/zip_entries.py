@@ -22,7 +22,6 @@ from the mapping's ``filename_pattern`` matched against the basename
 
 from __future__ import annotations
 
-import json
 import uuid
 from collections.abc import Sequence
 from typing import Annotated, Any
@@ -32,7 +31,6 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    StringConstraints,
     TypeAdapter,
     ValidationError,
     field_validator,
@@ -45,10 +43,9 @@ from sm_images.imports.mapping import Mapping, MappingError
 from sm_images.imports.values import parse_datetime
 from sm_images.imports.zip_eocd import ZipRejected
 from sm_images.imports.zip_safety import Entry
+from sm_images.ingest.meta import Text, external_id_text, properties_fit
 
 __all__ = ["ZipMeta", "entry_item", "parse_metadata", "zip_mapping"]
-
-Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class ZipMeta(BaseModel):
@@ -72,17 +69,12 @@ class ZipMeta(BaseModel):
     @field_validator("external_id", mode="before")
     @classmethod
     def _id_as_text(cls, value: object) -> object:
-        if isinstance(value, int) and not isinstance(value, bool):
-            return str(value)
-        return value
+        return external_id_text(value)
 
     @field_validator("properties")
     @classmethod
     def _bounded(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
-        if value is None:
-            return None
-        size = len(json.dumps(value, separators=(",", ":"), default=str).encode())
-        if size > constants.PROPERTIES_MAX_BYTES:
+        if value is not None and not properties_fit(value):
             raise ValueError("properties is too large")
         return value
 
