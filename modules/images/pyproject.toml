@@ -22,7 +22,7 @@ dependencies = [
     "pydantic-settings>=2.0",
     "httpx>=0.27",
     "Pillow>=10.0",
-    "pillow-heif>=0.18",
+    "pillow-heif>=1.4",  # cp314 wheels (the Docker runtime is Python 3.14)
     "ijson>=3.2",
     # Time-bounded matching of user filename patterns (a catastrophic pattern
     # must not pin an import worker); `re` has no timeout.
