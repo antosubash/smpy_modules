@@ -52,6 +52,7 @@ from sm_images.access import can_view_original
 from sm_images.errors import Forbidden, NotFound
 from sm_images.models import Collection, Image, Rendition
 from sm_images.ranges import RangeNotSatisfiable, parse_range
+from sm_images.services.viewer_stats import viewer_only
 from sm_images.storage import ImageStore, store_for
 
 __all__ = ["Target", "resolve", "serve", "serve_map"]
@@ -65,6 +66,8 @@ class Target:
     version: str | None = None
     """What ``?v=`` must say for the request to be "current"; ``None`` for an
     original, whose bytes never change."""
+    withheld: bool = False
+    """Redaction is still pending: the picture itself may not be shown yet."""
 
 
 def _missing() -> NotFound:
@@ -106,7 +109,7 @@ async def resolve(
         kind = constants.DISPLAY_CONTENT_TYPE if image.display_key else image.content_type
         return image, Target(key, kind, False, cache.version(image.display_generation, key))
     protected = image.display_key is not None or pending
-    return image, Target(image.storage_key, image.content_type, protected)
+    return image, Target(image.storage_key, image.content_type, protected, withheld=pending)
 
 
 async def _closing(source: AsyncIterator[bytes]) -> AsyncIterator[bytes]:
@@ -173,6 +176,10 @@ async def serve(
 ) -> Response:
     """Authorised bytes of *route* for *image_id*, inside an authorised *collection*."""
     image, target = await resolve(db, collection, image_id, route, size)
+    # A viewer's gate comes first: a withheld image is the 404 an absent id gets,
+    # not a 403 that says it exists.
+    if route == cache.ORIGINAL and target.withheld and await viewer_only(db, who, collection):
+        raise _missing()
     if route == cache.ORIGINAL and not can_view_original(
         who, image, collection, protected=target.protected
     ):

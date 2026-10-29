@@ -77,14 +77,9 @@ async def list_groups(
     limit: int = Query(constants.PAGE_DEFAULT, ge=1, le=constants.PAGE_MAX),
     after: str | None = Query(None, max_length=constants.GROUP_KEY_MAX),
 ) -> GroupPageOut:
-    rows, token = await service.list_page(db, collection, limit=limit, after=after)
-    items = await _out(
-        db,
-        collection,
-        rows,
-        constants.GROUP_PREVIEW_MEMBERS,
-        gated=await viewer_only(db, who, collection),
-    )
+    gated = await viewer_only(db, who, collection)
+    rows, token = await service.list_page(db, collection, limit=limit, after=after, gated=gated)
+    items = await _out(db, collection, rows, constants.GROUP_PREVIEW_MEMBERS, gated=gated)
     return GroupPageOut(items=items, next_cursor=token)
 
 
@@ -177,8 +172,8 @@ async def cancel_regroup(
 async def get_group(
     group_id: uuid.UUID, collection: GroupCollectionView, who: Principal, db=Depends(get_db)
 ) -> GroupOut:
-    row = await service.get(db, collection, group_id)
     gated = await viewer_only(db, who, collection)
+    row = await service.get(db, collection, group_id, gated=gated)
     return (await _out(db, collection, [row], constants.GROUP_DETAIL_MEMBERS, gated=gated))[0]
 
 

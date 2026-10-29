@@ -13,7 +13,7 @@ import uuid
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import case, delete, func, literal, select, update
+from sqlalchemy import case, delete, exists, func, literal, select, update
 from sqlalchemy.exc import IntegrityError
 
 from sm_images import constants, redaction
@@ -51,8 +51,20 @@ def member_order(roles: Sequence[str]) -> list[Any]:
     return [rank, Image.group_role.is_(None), Image.group_role, Image.created_at, Image.id]
 
 
-async def get(db: Any, collection: Collection, group_id: uuid.UUID) -> Group:
+def _has_ready_member(collection: Collection) -> Any:
+    """A group's key comes from the metadata of its images, so a group of
+    withheld images is withheld too."""
+    return exists(
+        select(Image.id).where(Image.group_id == Group.id, redaction.ready_clause(collection))
+    )
+
+
+async def get(
+    db: Any, collection: Collection, group_id: uuid.UUID, *, gated: bool = False
+) -> Group:
     stmt = select(Group).where(Group.id == group_id, Group.collection_id == collection.id)
+    if gated:
+        stmt = stmt.where(_has_ready_member(collection))
     found = (await db.execute(stmt)).scalars().first()
     if found is None:
         raise NotFound(constants.NOT_FOUND_DETAIL)
@@ -109,10 +121,13 @@ async def members(
 
 
 async def list_page(
-    db: Any, collection: Collection, *, limit: int, after: str | None
+    db: Any, collection: Collection, *, limit: int, after: str | None, gated: bool = False
 ) -> tuple[list[Group], str | None]:
-    """Groups by key; ``after`` is the last key of the previous page."""
+    """Groups by key; ``after`` is the last key of the previous page. ``gated``
+    (a viewer) keeps only groups with a display-safe member, before paging."""
     stmt = select(Group).where(Group.collection_id == collection.id)
+    if gated:
+        stmt = stmt.where(_has_ready_member(collection))
     if after is not None:
         stmt = stmt.where(Group.key > after)
     rows = list((await db.execute(stmt.order_by(Group.key).limit(limit + 1))).scalars())

@@ -61,7 +61,7 @@ async def test_unsettled_mutator_withholds_the_original(client, g, status):
     assert (owner.status_code, owner.headers["cache-control"]) == (200, NO_STORE)
     public = await client.get(g.public_url("pub", "plain", "display"))
     assert public.status_code == 404
-    assert (await client.get(g.public_url("pub", "plain", "original"))).status_code == 403
+    assert (await client.get(g.public_url("pub", "plain", "original"))).status_code == 404
 
 
 @pytest.mark.parametrize("status", [StepStatus.COMPLETED, StepStatus.SKIPPED])
