@@ -17,7 +17,7 @@ from sqlalchemy import case, delete, exists, func, literal, select, update
 from sqlalchemy.exc import IntegrityError
 
 from sm_images import constants, redaction
-from sm_images.errors import Conflict, GroupExists, InvalidGroup, NotFound
+from sm_images.errors import Conflict, GroupExists, InvalidGroup, NotFound, absent
 from sm_images.imports.filename_pattern import canonical_role
 from sm_images.map import schedule as map_schedule
 from sm_images.models import Collection, Group, Image
@@ -67,7 +67,7 @@ async def get(
         stmt = stmt.where(_has_ready_member(collection))
     found = (await db.execute(stmt)).scalars().first()
     if found is None:
-        raise NotFound(constants.NOT_FOUND_DETAIL)
+        raise absent() if gated else NotFound(constants.NOT_FOUND_DETAIL)
     return found
 
 

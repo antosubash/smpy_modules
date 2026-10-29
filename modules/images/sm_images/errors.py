@@ -8,7 +8,7 @@ another with the same status.
 
 from __future__ import annotations
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 
 from sm_images import constants
@@ -139,6 +139,14 @@ class TenantRequired(Forbidden):
     status and code as pagebuilder's, news' and records' admin refusal."""
 
     code = constants.TENANT_REQUIRED_CODE
+
+
+def absent() -> HTTPException:
+    """What the framework's ``RequiresResource`` raises for an id the caller
+    cannot see. Withheld (redaction pending) and nonexistent must fail the same
+    way in every negotiation (JSON, HTML, Inertia), so the withheld paths raise
+    this rather than a module ``NotFound``."""
+    return HTTPException(status_code=404, detail="Not found")
 
 
 async def _error_page(request: Request, exc: ImagesError) -> Response | None:

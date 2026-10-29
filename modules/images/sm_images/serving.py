@@ -47,7 +47,7 @@ from file_storage.contracts.service import StorageNotFoundError
 from simple_module_core.resources import ResourcePrincipal
 from sqlalchemy import and_, select
 
-from sm_images import cache, constants, redaction
+from sm_images import cache, constants, errors, redaction
 from sm_images.access import can_view_original
 from sm_images.errors import Forbidden, NotFound
 from sm_images.models import Collection, Image, Rendition
@@ -70,8 +70,13 @@ class Target:
     """Redaction is still pending: the picture itself may not be shown yet."""
 
 
-def _missing() -> NotFound:
-    return NotFound(constants.NOT_FOUND_DETAIL)
+def _missing(twin: bool = True) -> Exception:
+    """The 404 of every "no such picture". On the authenticated routes it is the
+    one the framework's ``RequiresResource`` raises for an unknown id (so the
+    host negotiates JSON, HTML and Inertia the same way, ``Vary`` included); a
+    module ``NotFound`` would render differently and tell a withheld image from
+    an absent one. The anonymous twin's absent id is the module's own."""
+    return NotFound(constants.NOT_FOUND_DETAIL) if twin else errors.absent()
 
 
 async def _load(db: Any, collection: Collection, image_id: uuid.UUID, size: str | None) -> Any:
@@ -87,11 +92,17 @@ async def _load(db: Any, collection: Collection, image_id: uuid.UUID, size: str 
 
 
 async def resolve(
-    db: Any, collection: Collection, image_id: uuid.UUID, route: str, size: str | None
+    db: Any,
+    collection: Collection,
+    image_id: uuid.UUID,
+    route: str,
+    size: str | None,
+    *,
+    twin: bool = True,
 ) -> tuple[Image, Target]:
     loaded = await _load(db, collection, image_id, size if route == cache.RENDITION else None)
     if loaded is None:
-        raise _missing()
+        raise _missing(twin)
     image, rendition = loaded
     # A display copy the current mutator wrote is redacted; anything else -
     # the original, or a copy from another step - waits for the gate.
@@ -99,12 +110,12 @@ async def resolve(
     pending = not trusted and await redaction.pending(db, collection, image)
     if route == cache.RENDITION:
         if rendition is None or pending or rendition.source_generation != image.display_generation:
-            raise _missing()
+            raise _missing(twin)
         v = cache.version(rendition.source_generation, rendition.storage_key)
         return image, Target(rendition.storage_key, constants.DISPLAY_CONTENT_TYPE, False, v)
     if route == cache.DISPLAY:
         if pending:
-            raise _missing()
+            raise _missing(twin)
         key = image.display_key or image.storage_key
         kind = constants.DISPLAY_CONTENT_TYPE if image.display_key else image.content_type
         return image, Target(key, kind, False, cache.version(image.display_generation, key))
@@ -124,11 +135,16 @@ async def _closing(source: AsyncIterator[bytes]) -> AsyncIterator[bytes]:
 
 
 async def _respond(
-    request: Request, store: ImageStore, target: Target, policy: str, ranged: bool
+    request: Request,
+    store: ImageStore,
+    target: Target,
+    policy: str,
+    ranged: bool,
+    twin: bool = True,
 ) -> Response:
     head = await store.head(target.key)
     if head is None:
-        raise _missing()
+        raise _missing(twin)
     size = head[0]
     tag = cache.etag(target.key, size)
     headers = {"ETag": tag, "Cache-Control": policy, "X-Content-Type-Options": "nosniff"}
@@ -157,7 +173,7 @@ async def _respond(
         else:
             body = await store.stream_range(target.key, wanted.start, wanted.end)
     except StorageNotFoundError:
-        raise _missing() from None
+        raise _missing(twin) from None
     return StreamingResponse(
         _closing(body), status_code=status, media_type=target.content_type, headers=headers
     )
@@ -175,11 +191,11 @@ async def serve(
     twin: bool,
 ) -> Response:
     """Authorised bytes of *route* for *image_id*, inside an authorised *collection*."""
-    image, target = await resolve(db, collection, image_id, route, size)
+    image, target = await resolve(db, collection, image_id, route, size, twin=twin)
     # A viewer's gate comes first: a withheld image is the 404 an absent id gets,
     # not a 403 that says it exists.
     if route == cache.ORIGINAL and target.withheld and await viewer_only(db, who, collection):
-        raise _missing()
+        raise _missing(twin)
     if route == cache.ORIGINAL and not can_view_original(
         who, image, collection, protected=target.protected
     ):
@@ -189,7 +205,7 @@ async def serve(
         request, collection, route, twin=twin, protected=target.protected, current=current
     )
     ranged = route != cache.RENDITION
-    return await _respond(request, store_for(request.app), target, policy, ranged)
+    return await _respond(request, store_for(request.app), target, policy, ranged, twin)
 
 
 async def serve_map(request: Request, collection: Collection, *, twin: bool) -> Response:

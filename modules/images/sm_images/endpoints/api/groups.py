@@ -55,6 +55,11 @@ async def _out(
     """``gated``: a viewer, who counts and sees only the display-safe members."""
     counts = await service.counts(db, rows, gate=collection if gated else None)
     found = await service.members(db, collection, [g.id for g in rows], per_group, gated=gated)
+    # One rendition query for the whole page's members, not one per group.
+    flat = [image for g in rows for image in found.get(g.id, [])]
+    shown = dict(
+        zip((i.id for i in flat), await present.present(db, collection, flat), strict=True)
+    )
     return [
         GroupOut(
             id=g.id,
@@ -63,7 +68,7 @@ async def _out(
             name=g.name,
             description=g.description,
             image_count=counts.get(g.id, 0),
-            members=await present.present(db, collection, found.get(g.id, [])),
+            members=[shown[i.id] for i in found.get(g.id, [])],
         )
         for g in rows
     ]

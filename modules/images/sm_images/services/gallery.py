@@ -15,7 +15,7 @@ from typing import Any
 from sqlalchemy import exists, func, select, update
 
 from sm_images import constants, redaction
-from sm_images.errors import Conflict, NotFound
+from sm_images.errors import Conflict, NotFound, absent
 from sm_images.map import revoke as map_revoke
 from sm_images.map import schedule as map_schedule
 from sm_images.models import (
@@ -102,7 +102,7 @@ async def get(
         stmt = stmt.where(redaction.ready_clause(collection))
     found = (await db.execute(stmt)).scalars().first()
     if found is None:
-        raise NotFound(constants.NOT_FOUND_DETAIL)
+        raise absent() if gated else NotFound(constants.NOT_FOUND_DETAIL)
     return found
 
 
