@@ -43,7 +43,7 @@ def test_the_comparator_catches_what_it_must():
     one = resp(headers={"set-cookie": f"session={_session(key, payload)}; path=/"})
     later = {**payload, "expires_at": payload["expires_at"] + 5}
     two = resp(headers={"set-cookie": f"session={_session(key, later)}; path=/"})
-    assert shape(one) == shape(two)  # only the deadline moved
+    assert shape(one) != shape(two)  # a moved deadline counts too
     other = resp(
         headers={"set-cookie": f"session={_session(key, {**payload, 'user_id': 'v'})}; path=/"}
     )

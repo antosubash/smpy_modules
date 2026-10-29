@@ -4,27 +4,22 @@ from __future__ import annotations
 
 import base64
 import json
-import time
 
 import httpx
 from itsdangerous import TimestampSigner
 
 # Only the clock and server timings differ between two answers; nothing else is dropped.
-IGNORED = {"date", "x-request-id", "server-timing"}
+IGNORED = {"date", "server-timing"}
 SESSION_COOKIE = "session"
 
 
 def session_payload(value: str, secret: str) -> dict:
     """The signed session cookie's contents. The signature is verified with the
     app's own secret (Starlette's itsdangerous signer), so a forged or truncated
-    value fails here. Only ``expires_at`` is volatile (a wall-clock deadline): it
-    must be a recent timestamp and is then normalised."""
+    value fails here. Nothing is normalised: the framework stamps ``expires_at``
+    at sign-in and keeps it, so identical snapshots carry the same deadline."""
     raw = TimestampSigner(secret).unsign(value.encode(), max_age=14 * 24 * 3600)
-    payload = json.loads(base64.b64decode(raw))
-    if "expires_at" in payload:
-        assert abs(payload["expires_at"] - time.time()) < 15 * 24 * 3600, payload
-        payload["expires_at"] = "<deadline>"
-    return payload
+    return json.loads(base64.b64decode(raw))
 
 
 def cookies(response: httpx.Response, secret: str) -> list[tuple]:

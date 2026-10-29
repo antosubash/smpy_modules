@@ -8,8 +8,7 @@ withheld (``protect_originals`` with no display mutator), and each route is
 compared for the *same URL* while the image or group exists and after it is
 deleted, from identical copies of one signed-in session, with a fixed
 ``X-Correlation-ID``: raw body bytes, every header (Content-Length included)
-and the decoded cookies must be equal. Only Date and Server-Timing are ignored,
-plus the session cookie's ``expires_at`` deadline.
+and the decoded cookies must be equal. Only Date and Server-Timing are ignored.
 """
 
 from __future__ import annotations
