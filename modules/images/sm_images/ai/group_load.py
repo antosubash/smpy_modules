@@ -22,7 +22,7 @@ from sm_images.models import Collection, Group, Image, Prompt
 from sm_images.models.enums import PromptScope
 from sm_images.services.groups import member_order
 
-__all__ = ["MAX_MEMBERS", "GroupJob", "MemberPrompt", "load"]
+__all__ = ["MAX_MEMBERS", "GroupJob", "MemberPrompt", "display_now", "load"]
 
 MAX_MEMBERS = 50
 """Most members one consolidation is made over; a bigger group fails ``group_too_large``."""
@@ -147,3 +147,28 @@ async def load(
             )
         await finalize_session(db)  # read-only: closes the transaction before any work
     return job
+
+
+async def display_now(
+    runtime: Any, tenant: str, group_id: uuid.UUID, image_id: uuid.UUID
+) -> tuple[str, bool] | None:
+    """A member's display copy re-read mid-run (the one loaded was replaced):
+    ``(key, safe)``, or ``None`` once it is no longer an untrashed member."""
+    async with runtime.session_factory() as db:
+        stmt = select(Image, Collection).join(Collection, Collection.id == Image.collection_id)
+        found = (
+            await db.execute(
+                stmt.where(
+                    Image.id == image_id,
+                    Image.group_id == group_id,
+                    Image.tenant_id == tenant,
+                    Image.is_deleted.is_(False),
+                )
+            )
+        ).first()
+        now = None
+        if found is not None:
+            image, collection = found
+            now = (image.display_key or image.storage_key, await _safe(db, collection, image))
+        await finalize_session(db)
+    return now

@@ -111,9 +111,16 @@ export default function MapCanvas({ source, bbox, label, onSelect }: Props) {
     });
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     setFailed(false);
-    // A worker that never starts, a tile or archive that does not load: say so.
-    map.on('error', () => setFailed(true));
+    // Only an error before the first `load` (the style, the worker) means the
+    // map failed; one after it (a tile that did not load) is logged, not shown.
+    let loaded = false;
+    map.on('error', (event) => {
+      if (!loaded) setFailed(true);
+      else console.warn('images map error', event?.error ?? event);
+    });
     map.on('load', () => {
+      loaded = true;
+      setFailed(false);
       addLayers(map, source);
       const bounds = boundsOf(bbox);
       if (bounds) {

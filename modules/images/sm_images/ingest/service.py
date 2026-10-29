@@ -24,7 +24,8 @@ waits on it. A caller adding several images in one transaction calls
 :class:`Slot` in. The storage hold (``sm_images.billing``) follows the same
 rule, so ``reserve(..., sizes=)`` takes it there too (committed at once by
 billing's swap); the insert finishes its op, or hands it back to be released
-when nothing kept it.
+when nothing kept it - in the caller's transaction, so a caller that rolls
+back for any reason calls :meth:`IngestService.release_holds` afterwards.
 
 The savepoint is also the per-file isolation of a batch: a file that fails
 rolls back its own rows only, and its object is deleted again.
@@ -71,9 +72,8 @@ class IngestService:
         self.settings = settings
         self.bus = bus
         self.intent_factory = intent_factory
-        self._seen_external: dict[tuple[uuid.UUID, str, str], uuid.UUID] = {}
-        self._seen_hash: dict[tuple[uuid.UUID, str], uuid.UUID] = {}
-        self.dropped: list[Any] = []  # ops handed back in ``db`` (``holds.release_dropped``)
+        self._seen = dedupe.Seen()
+        self.acquired: list[Any] = []  # every op held in ``db`` (:meth:`release_holds`)
 
     # -- intents ---------------------------------------------------------
 
@@ -92,10 +92,16 @@ class IngestService:
             pass
         if sizes is None:
             return slots
-        factory = self._factory()
-        return [
-            await holds.hold_slot(factory, tenant, s, n) for s, n in zip(slots, sizes, strict=True)
-        ]
+        return [await self._hold(s, n) for s, n in zip(slots, sizes, strict=True)]
+
+    async def _hold(self, slot: Slot, size: int) -> Slot:
+        held = await holds.hold_slot(self._factory(), bound_tenant(), slot, size)
+        self.acquired += [held.op] if held.op is not None else []
+        return held
+
+    async def release_holds(self) -> None:
+        """After a rollback (no write lock held): hand every op taken back on its own."""
+        await holds.release_after_rollback(self._factory(), self.acquired)
 
     def _factory(self) -> Any:
         """Where billing's own short transactions run (``sm_images.billing``)."""
@@ -141,7 +147,7 @@ class IngestService:
         sha = hashlib.sha256(data).hexdigest()
         meta = normalise(meta, source)
 
-        found = await self._precheck(collection.id, meta, sha)
+        found = await self._seen.precheck(self.db, collection.id, meta, sha, self.settings)
         if found is not None:
             if staged_key is None or not await dedupe.find_id(self.db, image_id):
                 await self._discard(staged_key, slot)
@@ -151,9 +157,7 @@ class IngestService:
         if staged_key is not None:
             assert image_id is not None
             key, new_id = staged_key, image_id
-            slot = await holds.hold_slot(
-                self._factory(), bound_tenant(), Slot(new_id, key), len(data)
-            )
+            slot = await self._hold(Slot(new_id, key), len(data))
             if slot.refused:  # the caller removes its staged object
                 raise StorageQuotaExceeded(billing.FULL)
         else:
@@ -191,11 +195,11 @@ class IngestService:
             if staged_key is not None:
                 if await dedupe.find_id(self.db, new_id):
                     return Duplicate(new_id)  # a concurrent complete won; its object stays
-                again = await self._recheck(collection.id, meta)
+                again = await dedupe.recheck(self.db, collection.id, meta)
                 if again is None:
                     raise
                 return Duplicate(again)  # the staged object is left to the janitor
-            again = await self._recheck(collection.id, meta)
+            again = await dedupe.recheck(self.db, collection.id, meta)
             if again is None:
                 await self._delete_object(key)
                 raise
@@ -205,7 +209,7 @@ class IngestService:
             if staged_key is None:
                 await self._delete_object(key)
             raise
-        self._remember(collection.id, meta, sha, row.id)
+        self._seen.remember(collection.id, meta, sha, row.id)
         events.emit(self.db, self.bus, events.image_added(row, source))
         pipeline.dispatch(self.db, row.id)
         await pipeline.queue_auto_run(self.db, collection, row.id, enabled=auto_run)
@@ -213,34 +217,11 @@ class IngestService:
 
     # -- steps -------------------------------------------------------------
 
-    async def _precheck(self, collection_id: uuid.UUID, meta: IngestMeta, sha: str):
-        if meta.external_id is not None:
-            assert meta.external_source is not None
-            ident = (collection_id, meta.external_source, meta.external_id)
-            if ident in self._seen_external:
-                return self._seen_external[ident]
-            found = await dedupe.find_external(self.db, *ident)
-            if found is not None:
-                return found
-        if self.settings.dedupe_by_hash:
-            if (collection_id, sha) in self._seen_hash:
-                return self._seen_hash[(collection_id, sha)]
-            return await dedupe.find_hash(self.db, collection_id, sha)
-        return None
-
-    async def _recheck(self, collection_id: uuid.UUID, meta: IngestMeta) -> uuid.UUID | None:
-        if meta.external_id is None or meta.external_source is None:
-            return None
-        return await dedupe.find_external(
-            self.db, collection_id, meta.external_source, meta.external_id
-        )
-
     async def _insert(self, collection: Collection, row: Image, meta, key: str, slot: Slot):
         try:
             await self._insert_rows(collection, row, meta, key, slot)
         except Exception:  # handed back outside the rolled-back savepoint
             await holds.drop_slot(self.db, self._factory(), slot)
-            self.dropped += [slot.op] if slot.op is not None else []
             raise
 
     async def _insert_rows(self, collection: Collection, row: Image, meta, key: str, slot):
@@ -255,11 +236,6 @@ class IngestService:
             await stats.on_image_added(self.db, collection.id, row.lat, row.lng)
             await clear_intents(self.db, [key])
             await holds.keep_hold(self.db, slot.op, row.storage_hold_id)  # with the row
-
-    def _remember(self, collection_id: uuid.UUID, meta: IngestMeta, sha: str, image_id) -> None:
-        if meta.external_id is not None and meta.external_source is not None:
-            self._seen_external[(collection_id, meta.external_source, meta.external_id)] = image_id
-        self._seen_hash[(collection_id, sha)] = image_id
 
     async def _delete_object(self, key: str) -> None:
         """Best effort: if it fails, the intent (still recorded) lets the janitor reap it."""

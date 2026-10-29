@@ -186,31 +186,45 @@ async def settle_bytes(
             bus=runtime.bus(),
             intent_factory=runtime.session_factory,
         )
+        committed = False
         try:
-            outcome = await ingest_item(
-                ingest, collection, data=data, filename=filename, meta=meta, auto_run=auto_run
+            try:
+                outcome = await ingest_item(
+                    ingest, collection, data=data, filename=filename, meta=meta, auto_run=auto_run
+                )
+            except ImagesError as exc:
+                await db.rollback()
+                code = exc.code or "rejected"
+                failed = await fail_item(
+                    runtime,
+                    tenant,
+                    job_id,
+                    generation,
+                    item_id,
+                    code,
+                    attempts=attempts,
+                    token=token,
+                )
+                return ItemStatus.FAILED if failed else None
+            if isinstance(outcome, Duplicate):
+                status, image_id = ItemStatus.DUPLICATE, outcome.image_id
+            else:
+                status, image_id, created = ItemStatus.DONE, outcome.id, outcome
+            kept = await mark_item(
+                db, tenant, item_id, status, image_id=image_id, attempts=attempts, token=token
             )
-        except ImagesError as exc:
-            await db.rollback()
-            code = exc.code or "rejected"
-            failed = await fail_item(
-                runtime, tenant, job_id, generation, item_id, code, attempts=attempts, token=token
-            )
-            return ItemStatus.FAILED if failed else None
-        if isinstance(outcome, Duplicate):
-            status, image_id = ItemStatus.DUPLICATE, outcome.image_id
-        else:
-            status, image_id, created = ItemStatus.DONE, outcome.id, outcome
-        kept = await mark_item(
-            db, tenant, item_id, status, image_id=image_id, attempts=attempts, token=token
-        )
-        if kept:
-            kept = await jobs.bump(db, tenant, job_id, {status: 1}, generation)
-        if not kept:
-            await db.rollback()
-            await _discard(runtime, created)
-            return None
-        await finalize_session(db)
+            if kept:
+                kept = await jobs.bump(db, tenant, job_id, {status: 1}, generation)
+            if not kept:
+                await db.rollback()
+                await _discard(runtime, created)
+                return None
+            await finalize_session(db)
+            committed = True
+        finally:  # any rollback took the ops' finish with it: hand them back now
+            if not committed:
+                await db.rollback()  # first: on SQLite the release must not wait on it
+                await ingest.release_holds()
     return status
 
 

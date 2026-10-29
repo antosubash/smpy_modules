@@ -1,6 +1,12 @@
 """What a group run consolidates (split from :mod:`.group_run`): the
 members' image-scope results (stored ones reused, the rest run through
-:mod:`.group_members`) and their display-copy pictures."""
+:mod:`.group_members`) and their display-copy pictures.
+
+The display keys are the load's: a copy replaced since (a re-run redaction)
+is gone from storage, so a missing object is re-resolved once
+(:func:`.group_load.display_now`). A member no longer in the group is left
+out, as the load would have; one whose current copy may not leave yet is
+:class:`DisplayNotReady`, the load gate's ``display_not_ready``."""
 
 from __future__ import annotations
 
@@ -9,12 +15,18 @@ import json
 import uuid
 from typing import Any
 
-from sm_images.ai import group_members
+from file_storage.contracts.service import StorageNotFoundError
+
+from sm_images.ai import group_load, group_members
 from sm_images.ai.reads import PromptResultRead
 
-__all__ = ["MAX_SIDE", "instruction", "member_results", "needed", "pictures"]
+__all__ = ["MAX_SIDE", "DisplayNotReady", "instruction", "member_results", "needed", "pictures"]
 
 MAX_SIDE = 1024
+
+
+class DisplayNotReady(Exception):  # noqa: N818 - reads as the condition
+    """A member's replaced display copy may not leave the system yet."""
 
 
 async def needed(runtime: Any, job: Any) -> tuple[dict[uuid.UUID, Any], list[uuid.UUID]]:
@@ -60,12 +72,24 @@ async def pictures(runtime: Any, job: Any) -> list[bytes]:
     store = runtime.store()
     gate = asyncio.Semaphore(group_members.MEMBER_CONCURRENCY)
 
-    async def one(image_id: uuid.UUID) -> bytes:
-        async with gate:
-            data = await store.read(job.display_keys[image_id])
-            return await asyncio.to_thread(prepare_image, data, MAX_SIDE)
+    async def read(image_id: uuid.UUID) -> bytes | None:
+        try:
+            return await store.read(job.display_keys[image_id])
+        except StorageNotFoundError:
+            now = await group_load.display_now(runtime, job.tenant, job.group.id, image_id)
+        if now is None:
+            return None
+        if not now[1]:
+            raise DisplayNotReady(str(image_id))
+        return await store.read(now[0])
 
-    return list(await asyncio.gather(*(one(m.image_id) for m in job.group.members)))
+    async def one(image_id: uuid.UUID) -> bytes | None:
+        async with gate:
+            data = await read(image_id)
+            return None if data is None else await asyncio.to_thread(prepare_image, data, MAX_SIDE)
+
+    found = await asyncio.gather(*(one(m.image_id) for m in job.group.members))
+    return [p for p in found if p is not None]
 
 
 def instruction(job: Any, reads: list[PromptResultRead]) -> str:

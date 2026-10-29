@@ -17,6 +17,7 @@ rather than naming a released hold.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass, replace
 from datetime import timedelta
@@ -36,9 +37,12 @@ __all__ = [
     "drop_slot",
     "hold_slot",
     "keep_hold",
+    "release_after_rollback",
     "release_dropped",
     "safe_filename",
 ]
+
+logger = logging.getLogger(__name__)
 
 INGEST_CLAIM = timedelta(minutes=30)
 """How long an ingest owns its op: from the hold to the image insert."""
@@ -123,8 +127,8 @@ async def drop_slot(db: Any, factory: Any, slot: Slot | None) -> None:
 
 
 async def release_dropped(factory: Any, dropped: list[billing_ops.Claimed]) -> None:
-    """For a caller whose transaction is rolled back after a failed insert
-    (``direct.complete``): its in-transaction hand-back went with it, so the op
+    """For a caller whose transaction is rolled back after taking holds: the
+    insert's finish (or its in-transaction hand-back) went with it, so the op
     would stay claimed for :data:`INGEST_CLAIM` and a retry would hold twice.
     Hand each back again in a short transaction of its own - a no-op for one
     already handed back or finished - whose commit settles it, releasing the
@@ -134,3 +138,12 @@ async def release_dropped(factory: Any, dropped: list[billing_ops.Claimed]) -> N
             await billing_ops.hand_back(db, dropped.pop(), factory)
             mark_written(db)  # Core DML: flag it, or finalize_session sees nothing
             await finalize_session(db)
+
+
+async def release_after_rollback(factory: Any, acquired: list[billing_ops.Claimed]) -> None:
+    """:func:`release_dropped` that never masks the caller's failure: an op
+    whose hand-back fails here is the settler's once its claim expires."""
+    try:
+        await release_dropped(factory, acquired)
+    except Exception:
+        logger.exception("images.ingest.release_failed")

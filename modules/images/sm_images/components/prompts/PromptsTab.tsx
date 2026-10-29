@@ -98,8 +98,13 @@ export function PromptsTab({
       );
     });
 
-  if (error) return <p className="text-sm text-destructive">{error}</p>;
-  if (prompts === null) return null;
+  const banner = error && (
+    <p className="text-sm text-destructive" role="alert" data-testid="images-prompts-error">
+      {error}
+    </p>
+  );
+  // Only a failed first load replaces the tab; a failed reload keeps the list.
+  if (prompts === null) return banner || null;
 
   if (view.mode !== 'list') {
     return (
@@ -116,6 +121,7 @@ export function PromptsTab({
 
   return (
     <div className="space-y-4" data-testid="images-prompts">
+      {banner}
       <p className="text-sm text-muted-foreground">{t(keys.images.prompts.intro)}</p>
       <div className="flex flex-wrap items-end justify-between gap-4">
         {canManage ? (

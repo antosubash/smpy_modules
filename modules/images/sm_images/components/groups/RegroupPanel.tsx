@@ -31,7 +31,7 @@ export function RegroupPanel({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<RegroupResult | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
-  const job = useRegroupJob(jobId, onApplied);
+  const { job, gone, error: pollError } = useRegroupJob(jobId, onApplied);
 
   const run = async (dryRun: boolean) => {
     setBusy(true);
@@ -62,7 +62,7 @@ export function RegroupPanel({
     }
   };
 
-  const running = job?.status === 'running';
+  const running = job?.status === 'running' && !gone && !pollError;
 
   return (
     <div className="space-y-3 rounded-md border p-4" data-testid="images-regroup">
@@ -101,6 +101,11 @@ export function RegroupPanel({
       {result && (
         <p className="text-sm" role="status" data-testid="images-regroup-result">
           {t(text.result, { ...result })}
+        </p>
+      )}
+      {(gone || pollError) && (
+        <p className="text-sm text-destructive" role="alert" data-testid="images-regroup-lost">
+          {gone ? t(progress.gone) : t(progress.lost, { reason: pollError ?? '' })}
         </p>
       )}
       {job && (

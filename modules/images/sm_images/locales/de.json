@@ -302,7 +302,9 @@
         "failed": "Angehalten: {reason}",
         "cancelled": "Nach {scanned} Bildern abgebrochen.",
         "cancel": "Neugruppierung abbrechen",
-        "preview_note": "Das war eine Vorschau; es wurde nichts geändert."
+        "preview_note": "Das war eine Vorschau; es wurde nichts geändert.",
+        "gone": "Diesen Neugruppierungsauftrag gibt es nicht mehr.",
+        "lost": "Der Fortschritt der Neugruppierung ist nicht mehr abrufbar: {reason}"
       }
     },
     "create": "Neue Gruppe",

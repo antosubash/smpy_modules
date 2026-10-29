@@ -42,3 +42,30 @@ describe('PublicGallery load more', () => {
     await view.unmount();
   });
 });
+
+describe('PublicGallery load more twice', () => {
+  it('reads a cursor once however often "load more" is clicked', async () => {
+    let more = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        if (String(input).includes('cursor=more')) {
+          more += 1;
+          return new Promise(() => {}); // still in flight for the second click
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ items: [tile('a')], next_cursor: 'more' }), {
+            status: 200,
+          }),
+        );
+      }),
+    );
+    const view = await mount(<PublicGallery slug="one" name="One" />);
+    await flush();
+    const button = view.find('[data-testid="images-public-more"]');
+    await click(button);
+    await click(button);
+    expect(more).toBe(1);
+    await view.unmount();
+  });
+});

@@ -17,8 +17,9 @@ export function GalleryTile({
   onPick?: (id: string) => void;
 }) {
   const { t } = useT();
-  const [broken, setBroken] = useState(false);
-  const showImage = image.thumb_url !== null && !broken;
+  // The URL that failed, not a flag: a new (versioned) thumbnail gets another try.
+  const [broken, setBroken] = useState<string | null>(null);
+  const showImage = image.thumb_url !== null && image.thumb_url !== broken;
 
   const tile = (
     <Link
@@ -34,7 +35,7 @@ export function GalleryTile({
           alt={image.filename}
           loading="lazy"
           className="size-full object-cover transition-transform group-hover:scale-105"
-          onError={() => setBroken(true)}
+          onError={() => setBroken(image.thumb_url)}
         />
       ) : (
         <span className="flex size-full items-center justify-center p-2 text-center text-xs text-muted-foreground">

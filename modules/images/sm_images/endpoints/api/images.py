@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import AsyncIterator
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile
@@ -53,17 +54,26 @@ _TOO_MANY = "Too many files in one upload"
 _FAILED = "The file could not be stored"
 
 
-def ingest_service(request: Request, db: Any = Depends(get_db)) -> IngestService:
+async def ingest_service(
+    request: Request, db: Any = Depends(get_db)
+) -> AsyncIterator[IngestService]:
+    """The request's ingest. A request that fails after taking storage holds is
+    rolled back here, and every hold it took is handed back on its own (the
+    rollback took the ops' finish with it). It exits before the response is
+    sent, so a client's retry finds the holds released."""
     sm = getattr(request.app.state, "sm", None)
-    return IngestService(
-        db,
-        store_for(request.app),
-        get_settings(request),
-        bus=getattr(sm, "event_bus", None),
+    ingest = IngestService(
+        db, store_for(request.app), get_settings(request), bus=getattr(sm, "event_bus", None)
     )
+    try:
+        yield ingest
+    except Exception:
+        await db.rollback()  # first: on SQLite the release must not wait on our lock
+        await ingest.release_holds()
+        raise
 
 
-Ingest = Annotated[IngestService, Depends(ingest_service)]
+Ingest = Annotated[IngestService, Depends(ingest_service, scope="function")]
 
 
 def result(outcome: Image | Duplicate, filename: str | None = None) -> UploadResult:

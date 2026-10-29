@@ -106,6 +106,10 @@ export function GroupEditor({
               onChange={(e) => setGroupId(e.target.value)}
             >
               <option value={NONE}>{groups === null ? t(text.loading) : t(text.none)}</option>
+              {/* Beyond the first page of groups: still the current choice, not "none". */}
+              {groups !== null && groupId && !groups.some((g) => g.id === groupId) && (
+                <option value={groupId}>{image.group_key ?? groupId}</option>
+              )}
               {(groups ?? []).map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name ?? g.key}

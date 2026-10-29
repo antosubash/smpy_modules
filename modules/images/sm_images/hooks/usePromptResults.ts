@@ -54,7 +54,6 @@ export function usePromptResults(promptId: string, version: number): PromptResul
   const paging = useRef<Promise<void> | null>(null);
   shown.current = rows?.length ?? 0;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `version` asks for a fresh read
   useEffect(() => {
     const ticket = ++latest.current;
     setPolls(0);

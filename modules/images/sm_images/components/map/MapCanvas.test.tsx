@@ -44,7 +44,39 @@ vi.mock('./mapWorker', () => ({ installMapWorker: vi.fn() }));
 const MapCanvas = (await import('./MapCanvas')).default;
 const source = { kind: 'points', features: [] } as never;
 
+const errorShown = (view: { find: (s: string) => HTMLElement | null }) =>
+  view.find('[data-testid="images-map-error"]') !== null;
+
 describe('MapCanvas', () => {
+  it('only logs an error after the map loaded (a failed tile is not a failed map)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const view = await mount(
+      <MapCanvas source={source} bbox={null} label="m" onSelect={() => {}} />,
+    );
+    await flush();
+    handlers.load?.();
+    handlers.error?.({ error: new Error('tile 404') });
+    await flush();
+    expect(errorShown(view)).toBe(false);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+    await view.unmount();
+  });
+
+  it('clears an early error once the map loads after all', async () => {
+    const view = await mount(
+      <MapCanvas source={source} bbox={null} label="m" onSelect={() => {}} />,
+    );
+    await flush();
+    handlers.error?.({ error: new Error('style blip') });
+    await flush();
+    expect(errorShown(view)).toBe(true);
+    handlers.load?.();
+    await flush();
+    expect(errorShown(view)).toBe(false);
+    await view.unmount();
+  });
+
   it('says so when the map reports an error', async () => {
     const view = await mount(
       <MapCanvas source={source} bbox={null} label="m" onSelect={() => {}} />,

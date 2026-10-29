@@ -20,8 +20,9 @@
    once (``images:{tenant}:group:{group}:prompt:{prompt}:{revision}:{token}``),
    one provider request at temperature 0 with no retries, its output validated
    against the prompt's schema;
-7. **the cross-check** - the prompt's preset's hook, pure, with no session open
-   (:mod:`.cross_check`), its failure stored as ``{"error"}``;
+7. **the cross-check** - the prompt's preset's hook, pure, with no session open,
+   in a worker thread under a timeout (:mod:`.cross_check`), its failure stored
+   as ``{"error"}``; past the timeout the run fails ``time_limit``;
 8. **store** (:mod:`.group_store`), fenced by the lease.
 """
 
@@ -34,8 +35,7 @@ from typing import Any
 
 from simple_module_db import finalize_session, tenant_context
 
-from sm_images.ai import group_inputs, group_lease, group_load, group_store
-from sm_images.ai.cross_check import run_cross_check
+from sm_images.ai import cross_check, group_inputs, group_lease, group_load, group_store
 from sm_images.ai.group_store import GroupOutcome
 from sm_images.ai.reads import PromptResultRead
 from sm_images.ai.results import PromptWrite, write_size
@@ -124,7 +124,10 @@ async def _work(runtime: Any, job: Any, lease: _Lease) -> GroupOutcome:
     missing: list[str] = []
     if job.inputs in NEEDS_MEMBERS:
         reads, missing = await group_inputs.member_results(runtime, job, found, need)
-    pictures = await group_inputs.pictures(runtime, job) if job.inputs in SENDS_IMAGES else []
+    try:
+        pictures = await group_inputs.pictures(runtime, job) if job.inputs in SENDS_IMAGES else []
+    except group_inputs.DisplayNotReady as exc:
+        return GroupOutcome.failed("display_not_ready", f"{exc} not redacted yet")
     if not reads and not pictures:
         return GroupOutcome.failed("no_usable_inputs", f"missing: {', '.join(missing)}")
     await lease.start_call()
@@ -164,7 +167,10 @@ async def _work(runtime: Any, job: Any, lease: _Lease) -> GroupOutcome:
     )
     preset = registry.get_preset(job.preset_id) if job.preset_id else None
     hook = getattr(preset, "cross_check", None)
-    checked = run_cross_check(hook, job.group, [*reads, summary], limit)
+    try:
+        checked = await cross_check.check(hook, job.group, [*reads, summary], limit)
+    except cross_check.CrossCheckTimedOut as exc:
+        return GroupOutcome.failed("time_limit", exc)
     if missing:
         return GroupOutcome(write, checked, "member_results_missing", ", ".join(missing))
     return GroupOutcome(write, checked)

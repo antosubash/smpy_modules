@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
 
-import { act, mount, press } from '../../test-dom';
+import { act, click, mount, press } from '../../test-dom';
 import { Lightbox } from './Lightbox';
 
 function Page({ onClose }: { onClose: () => void }) {
@@ -35,6 +35,16 @@ describe('Lightbox', () => {
     await press(window, { key: 'Escape' });
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledTimes(1);
+    await view.unmount();
+  });
+
+  it('closes on a click outside the picture, not on the picture', async () => {
+    const onClose = vi.fn();
+    const view = await mount(<Lightbox src="/x.jpg" alt="x" onClose={onClose} />);
+    await click(view.find('[data-testid="images-lightbox-image"]'));
+    expect(onClose).not.toHaveBeenCalled();
+    await click(view.find('[data-testid="images-lightbox"]'));
+    expect(onClose).toHaveBeenCalledTimes(1);
     await view.unmount();
   });
 

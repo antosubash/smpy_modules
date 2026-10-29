@@ -302,7 +302,9 @@
         "failed": "Stopped: {reason}",
         "cancelled": "Cancelled after {scanned} images.",
         "cancel": "Cancel regroup",
-        "preview_note": "This was a preview; nothing was changed."
+        "preview_note": "This was a preview; nothing was changed.",
+        "gone": "This regroup job no longer exists.",
+        "lost": "Lost track of the regroup: {reason}"
       }
     },
     "create": "New group",

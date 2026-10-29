@@ -46,9 +46,15 @@ export function PublicGallery({
   // Aborts every request of the current slug (the first page and each "load
   // more") when the slug changes or the gallery unmounts.
   const controller = useRef<AbortController | null>(null);
+  // The cursor being read: a second click on "load more" must not append the page twice.
+  const reading = useRef<string | null>(null);
 
   const load = useCallback(
     async (cursor: string | null, signal?: AbortSignal) => {
+      if (cursor !== null) {
+        if (reading.current === cursor) return;
+        reading.current = cursor;
+      }
       try {
         const page = await listPublicImages(slug, { limit: count, cursor, signal });
         if (signal?.aborted) return;
@@ -57,6 +63,8 @@ export function PublicGallery({
         setState('ready');
       } catch {
         if (!signal?.aborted) setState('failed');
+      } finally {
+        if (reading.current === cursor) reading.current = null;
       }
     },
     [slug, count],
@@ -65,6 +73,7 @@ export function PublicGallery({
   useEffect(() => {
     const own = new AbortController();
     controller.current = own;
+    reading.current = null;
     setItems([]);
     setNext(null);
     setState('loading');

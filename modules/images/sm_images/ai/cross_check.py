@@ -6,10 +6,17 @@ group run (and it gets deep copies, so mutating its arguments changes nothing
 that is stored): an exception, a value that is not a dict, one that is not strict
 JSON, or one over ``step_output_max_bytes`` once encoded - the cap every step
 output and prompt result obeys.
+
+It runs in a worker thread (:func:`check`), so a slow hook never blocks the
+event loop - the lease keeps renewing - and under :data:`CROSS_CHECK_TIMEOUT_S`.
+A hook past it is :class:`CrossCheckTimedOut`, which fails the group run
+``time_limit``: it is left running in its thread (Python cannot stop one), but
+nothing waits for it and its value is never stored.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import Sequence
@@ -17,10 +24,16 @@ from typing import Any
 
 from sm_images.ai.reads import GroupRead, PromptResultRead
 
-__all__ = ["ERROR_MAX", "run_cross_check"]
+__all__ = ["CROSS_CHECK_TIMEOUT_S", "ERROR_MAX", "CrossCheckTimedOut", "check", "run_cross_check"]
 
 logger = logging.getLogger(__name__)
 ERROR_MAX = 1000
+CROSS_CHECK_TIMEOUT_S = 30.0
+"""How long a group run waits for its preset's cross-check."""
+
+
+class CrossCheckTimedOut(Exception):  # noqa: N818 - reads as the condition
+    """The hook did not return within :data:`CROSS_CHECK_TIMEOUT_S`."""
 
 
 def _error(message: str) -> dict[str, Any]:
@@ -48,3 +61,17 @@ def run_cross_check(
     if size > max_bytes:
         return _error(f"cross_check_too_large: {size} bytes; the limit is {max_bytes}")
     return json.loads(encoded)
+
+
+async def check(
+    fn: Any, group: GroupRead, results: Sequence[PromptResultRead], max_bytes: int
+) -> dict[str, Any] | None:
+    """:func:`run_cross_check` off the event loop, bounded by the timeout."""
+    if fn is None:
+        return None
+    limit = CROSS_CHECK_TIMEOUT_S
+    work = asyncio.to_thread(run_cross_check, fn, group, results, max_bytes)
+    try:
+        return await asyncio.wait_for(work, limit)
+    except TimeoutError as exc:
+        raise CrossCheckTimedOut(f"the cross-check took longer than {limit:g} s") from exc

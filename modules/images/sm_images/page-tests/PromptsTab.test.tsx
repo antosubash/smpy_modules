@@ -173,4 +173,39 @@ describe('PromptsTab', () => {
     expect(byId(view, 'images-prompt-auto-run')).toBeNull();
     await view.unmount();
   });
+
+  it('keeps the list when a reload fails, with an error above it', async () => {
+    let reads = 0;
+    stubFetch({
+      [`GET ${LIST}`]: () => {
+        reads += 1;
+        if (reads > 1) throw new Error('offline');
+        return { items: [prompt()] };
+      },
+      [`GET ${PRESETS}`]: { items: [PRESET] },
+      'POST /api/images/collections/c1/apply-preset': { preset_id: 'acme', created: [] },
+    });
+    const view = await mount(<PromptsTab collectionId="c1" canEdit canManage />);
+    await flush();
+    await setValue(view.find('#images-preset') as HTMLSelectElement, 'acme');
+    await click(byId(view, 'images-preset-apply'));
+    await flush();
+    expect(reads).toBe(2);
+    expect(byId(view, 'images-prompt-p1')).not.toBeNull(); // the stale list stays
+    expect(byId(view, 'images-prompts-error')).not.toBeNull();
+    await view.unmount();
+  });
+
+  it('replaces the tab with the error only when the first load fails', async () => {
+    stubFetch({
+      [`GET ${LIST}`]: () => {
+        throw new Error('offline');
+      },
+    });
+    const view = await mount(<PromptsTab collectionId="c1" canEdit canManage />);
+    await flush();
+    expect(byId(view, 'images-prompts')).toBeNull();
+    expect(byId(view, 'images-prompts-error')).not.toBeNull();
+    await view.unmount();
+  });
 });

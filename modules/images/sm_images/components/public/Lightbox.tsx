@@ -54,7 +54,10 @@ export function Lightbox({ src, alt, onClose }: { src: string; alt: string; onCl
       aria-label={t(keys.images.public.viewer)}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
       data-testid="images-lightbox"
-      onClick={onClose}
+      onClick={(event) => {
+        // Only the backdrop: a click on the picture itself keeps it open.
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
       <button
         ref={close}

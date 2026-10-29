@@ -7,8 +7,9 @@ import type { ImageItem } from '../../utils/types';
 /** A member's thumbnail with its role under it. */
 export function MemberThumb({ image }: { image: ImageItem }) {
   const { t } = useT();
-  const [broken, setBroken] = useState(false);
-  const show = image.thumb_url !== null && !broken;
+  // The URL that failed, not a flag: a new (versioned) thumbnail gets another try.
+  const [broken, setBroken] = useState<string | null>(null);
+  const show = image.thumb_url !== null && image.thumb_url !== broken;
 
   return (
     <li className="w-20" data-testid="images-group-member" data-role={image.group_role ?? ''}>
@@ -23,7 +24,7 @@ export function MemberThumb({ image }: { image: ImageItem }) {
             alt={image.filename}
             loading="lazy"
             className="size-full object-cover"
-            onError={() => setBroken(true)}
+            onError={() => setBroken(image.thumb_url)}
           />
         )}
       </Link>
