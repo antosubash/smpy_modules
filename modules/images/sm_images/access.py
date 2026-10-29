@@ -145,7 +145,8 @@ def image_collection_stmt(image_id: uuid.UUID) -> Any:
     """The collection holding ``image_id`` (an untrashed image), for the
     ``/images/{image_id}`` routes: the image is reachable exactly when its
     collection is, so the same policy decides, and a stranger's 404 is the one
-    an unknown id gets."""
+    an unknown id gets. The write dependencies, which also hide a withheld
+    image from a viewer, are in :mod:`sm_images.access_write`."""
     return (
         select(Collection)
         .join(Image, Image.collection_id == Collection.id)
@@ -156,17 +157,12 @@ def image_collection_stmt(image_id: uuid.UUID) -> Any:
 ImageCollectionView = Annotated[
     Collection, Depends(RequiresResource(POLICY, ACTION_VIEW, image_collection_stmt))
 ]
-ImageCollectionEdit = Annotated[
-    Collection, Depends(RequiresResource(POLICY, ACTION_EDIT, image_collection_stmt))
-]
-ImageCollectionOwner = Annotated[
-    Collection, Depends(RequiresResource(POLICY, ACTION_DELETE, image_collection_stmt))
-]
 
 
 def group_collection_stmt(group_id: uuid.UUID) -> Any:
     """The collection holding group ``group_id``, for the ``/groups/{group_id}``
-    routes: a group is reachable exactly when its collection is."""
+    routes: a group is reachable exactly when its collection is. The write
+    dependencies (edit, delete) are in :mod:`sm_images.access_write`."""
     return (
         select(Collection)
         .join(Group, Group.collection_id == Collection.id)
@@ -176,9 +172,6 @@ def group_collection_stmt(group_id: uuid.UUID) -> Any:
 
 GroupCollectionView = Annotated[
     Collection, Depends(RequiresResource(POLICY, ACTION_VIEW, group_collection_stmt))
-]
-GroupCollectionEdit = Annotated[
-    Collection, Depends(RequiresResource(POLICY, ACTION_EDIT, group_collection_stmt))
 ]
 
 
@@ -253,16 +246,14 @@ __all__ = [
     "CollectionEdit",
     "CollectionOwner",
     "CollectionView",
-    "GroupCollectionEdit",
     "GroupCollectionView",
-    "ImageCollectionEdit",
-    "ImageCollectionOwner",
     "ImageCollectionView",
     "ImagesCollectionPolicy",
     "RegroupCollectionEdit",
     "RegroupCollectionView",
     "can_view_original",
     "collection_stmt",
+    "group_collection_stmt",
     "image_collection_stmt",
     "public_collection",
     "visible_collections",

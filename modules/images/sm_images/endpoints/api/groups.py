@@ -21,10 +21,10 @@ from sm_images import constants
 from sm_images.access import (
     CollectionEdit,
     CollectionView,
-    GroupCollectionEdit,
     GroupCollectionView,
     RegroupCollectionEdit,
 )
+from sm_images.access_write import GroupCollectionEdit
 from sm_images.deps import require_view
 from sm_images.endpoints.api._runtime import runtime, tenant
 from sm_images.imports.access import basis

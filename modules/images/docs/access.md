@@ -83,6 +83,9 @@ alone, so it fails closed:
 - A withheld image is a **404 for everyone who may not edit the collection**,
   with the same body and negotiation (JSON, HTML or Inertia) as an id that does
   not exist, so the two cannot be told apart. Editors see it, marked as pending.
+  That holds for writes too: a viewer's `PATCH`/`DELETE` of a withheld image or
+  of a group whose images are all withheld (and `POST …/reprocess`) is that 404,
+  not the 403 an image they can see gets.
 - A viewer's counts, bounding box, gallery, groups, map points and PMTiles cover
   only display-safe images. An editor sees the raw numbers.
 - A viewer's prompt-result list leaves out **group-level** results, because a

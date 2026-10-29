@@ -92,3 +92,52 @@ async def test_a_group_of_withheld_images_is_hidden_from_a_viewer(client, seeded
     assert (
         await client.get(f"/api/images/groups/{group_id}", headers=headers(OWNER))
     ).status_code == 200
+
+
+async def _ids(client, seeded) -> dict[str, uuid.UUID]:
+    """The safe and the pending image, each in a group of its own."""
+    with tenant_scope(DEFAULT_TENANT):
+        async with client.db_state.session_factory() as s:
+            out: dict[str, uuid.UUID] = {}
+            for name in ("safe", "pending"):
+                group = Group(collection_id=seeded.id, key=f"{name}-site")
+                s.add(group)
+                await s.flush()
+                img = (
+                    await s.execute(select(Image).where(Image.filename == f"{name}.jpg"))
+                ).scalar_one()
+                img.group_id = group.id
+                out[name], out[f"{name}_group"] = img.id, group.id
+            await s.commit()
+    return out
+
+
+WRITES = [
+    ("PATCH", "/api/images/images/{}", {"lat": 1.0, "lng": 2.0}, "image"),
+    ("DELETE", "/api/images/images/{}", None, "image"),
+    ("POST", "/api/images/images/{}/reprocess", {}, "image"),
+    ("PATCH", "/api/images/groups/{}", {"name": "x"}, "group"),
+    ("DELETE", "/api/images/groups/{}", None, "group"),
+]
+
+
+@pytest.mark.parametrize(("method", "path", "body", "kind"), WRITES)
+async def test_a_viewer_write_on_a_withheld_target_is_the_absent_404(
+    client, seeded, method, path, body, kind
+):
+    """S3: the action's 403 would say the id exists. A viewer (who cannot
+    edit) gets the absent 404 for a withheld image or group, and the 403 only
+    for one they can see."""
+    ids = await _ids(client, seeded)
+    key = "pending" if kind == "image" else "pending_group"
+    shown = "safe" if kind == "image" else "safe_group"
+    kw = {} if body is None else {"json": body}
+
+    async def call(target):
+        return await client.request(method, path.format(target), headers=headers(STRANGER), **kw)
+
+    withheld, absent = await call(ids[key]), await call(uuid.uuid4())
+    assert withheld.status_code == 404, withheld.text
+    assert _shape(withheld) == _shape(absent)
+    visible = await call(ids[shown])
+    assert visible.status_code == 403, visible.text

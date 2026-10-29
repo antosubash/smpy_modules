@@ -22,7 +22,8 @@ from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal
 
 from sm_images import redaction
-from sm_images.access import POLICY, CollectionEdit, CollectionOwner, ImageCollectionEdit
+from sm_images.access import POLICY, CollectionEdit, CollectionOwner
+from sm_images.access_write import ImageCollectionEdit
 from sm_images.deps import require_view
 from sm_images.endpoints.api._runtime import runtime, tenant
 from sm_images.errors import Forbidden, Invalid

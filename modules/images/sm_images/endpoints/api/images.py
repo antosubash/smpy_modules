@@ -24,13 +24,8 @@ from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal
 
 from sm_images import billing, constants
-from sm_images.access import (
-    CollectionEdit,
-    CollectionView,
-    ImageCollectionEdit,
-    ImageCollectionOwner,
-    ImageCollectionView,
-)
+from sm_images.access import CollectionEdit, CollectionView, ImageCollectionView
+from sm_images.access_write import ImageCollectionEdit, ImageCollectionOwner
 from sm_images.deps import get_settings, require_view
 from sm_images.errors import ImagesError, InvalidUpload, UploadFailed, UseDirectUpload
 from sm_images.ingest import Duplicate, IngestMeta, IngestService, parse_batch_metadata

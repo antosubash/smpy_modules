@@ -23,6 +23,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+from shape_compare import session_payload
 from shape_compare import shape as _shape
 
 REPO = Path(__file__).resolve().parents[2]
@@ -136,7 +137,19 @@ ROUTES = [
     ("head", "/api/images/public/c/{s}/images/{i}/original"),
     ("get", "/api/images/public/c/{s}/images/{i}/display"),
     ("get", "/api/images/public/c/{s}/images/{i}/r/small"),
+    # Writes: the viewer may view the collection but not edit it. A withheld
+    # target must be the absent 404 before the 403 refusal of the action (S3).
+    ("patch", "/api/images/images/{i}"),
+    ("delete", "/api/images/images/{i}"),
+    ("post", "/api/images/images/{i}/reprocess"),
+    ("patch", "/api/images/groups/{g}"),
+    ("delete", "/api/images/groups/{g}"),
 ]
+BODIES = {
+    ("patch", "/api/images/images/{i}"): {"lat": 1.0, "lng": 2.0},
+    ("post", "/api/images/images/{i}/reprocess"): {},
+    ("patch", "/api/images/groups/{g}"): {"name": "renamed"},
+}
 
 
 def _expect_shape(negotiation: str, response: httpx.Response, method: str, url: str):
@@ -187,18 +200,29 @@ async def _sign_in(app, ids) -> httpx.Cookies:
         return httpx.Cookies(http.cookies)
 
 
-async def _answers(app, jar, negotiation, method, url):
+def _csrf(app, jar) -> dict[str, str]:
+    """The session's CSRF token (minted by the console render in ``_sign_in``),
+    read from the signed cookie, so a write reaches the resource check."""
+    from simple_module_hosting.csrf import _SESSION_KEY, CSRF_HEADER
+
+    payload = session_payload(jar["session"], app.state.sm.settings.secret_key)
+    return {CSRF_HEADER: payload[_SESSION_KEY]}
+
+
+async def _answers(app, jar, negotiation, method, url, body=None):
     """A fresh client from the jar snapshot, then the same request twice: the
     FIRST answer and the steady-state one are both returned."""
     transport = httpx.ASGITransport(app=app)
     extra = {**_negotiate(app, negotiation), "X-Correlation-ID": CID}
+    if method not in ("get", "head"):
+        extra.update(_csrf(app, jar))
     cookies = httpx.Cookies(jar) if "/public/" not in url else None
+    kwargs = {} if body is None else {"json": body}
     async with httpx.AsyncClient(
         transport=transport, base_url="http://test", cookies=cookies
     ) as http:
-        call = getattr(http, method)
-        first = await call(url, headers=extra)
-        second = await call(url, headers=extra)
+        first = await http.request(method.upper(), url, headers=extra, **kwargs)
+        second = await http.request(method.upper(), url, headers=extra, **kwargs)
     return first, second
 
 
@@ -207,9 +231,10 @@ async def _run(app, negotiation, method, route, what):
     secret = app.state.sm.settings.secret_key
     url = route.format(i=ids["iid"], g=ids["gid"], s=ids["slug"])
     jar = await _sign_in(app, ids)
-    withheld = await _answers(app, jar, negotiation, method, url)
+    body = BODIES.get((method, route))
+    withheld = await _answers(app, jar, negotiation, method, url, body)
     await _delete(app, ids, what)
-    absent = await _answers(app, jar, negotiation, method, url)
+    absent = await _answers(app, jar, negotiation, method, url, body)
     for w, a in zip(withheld, absent, strict=True):
         _expect_shape(negotiation, w, method, url)
         _expect_shape(negotiation, a, method, url)
