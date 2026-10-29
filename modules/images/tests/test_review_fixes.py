@@ -4,15 +4,13 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
 from sm_images.ai import review as review_service
-from sm_images.errors import NotFound
 from sm_images.models import Collection, Group, Image, Prompt, PromptResult, Visibility
-from sm_images.models.enums import StepStatus
+from sm_images.models.enums import ReviewStatus, StepStatus
 from sqlalchemy import event, select
 from sqlalchemy.engine import Engine
 
-from tests.access_support import OWNER, collection, headers, image
+from tests.access_support import EDITOR, OWNER, collection, headers, image
 from tests.prompts_support import BASE
 from tests.test_review_api import _items, _review, _row, queue  # noqa: F401
 
@@ -34,17 +32,27 @@ async def test_a_trashed_images_result_cannot_be_reviewed(queue):  # noqa: F811
     assert got.status_code == 404, got.text
 
 
-async def test_a_result_of_another_collections_prompt_is_not_found(queue):  # noqa: F811
+async def test_a_result_of_a_collection_the_caller_cannot_edit_is_404(queue):  # noqa: F811
+    """eddie edits collection A only; a result of olga's collection B is not found."""
     async with queue.c.db_state.session_factory() as s:
         other = collection("elsewhere", Visibility.PRIVATE, OWNER)
         s.add(other)
+        await s.flush()
+        prompt = Prompt(collection_id=other.id, name="theirs", instruction="x")
+        s.add(prompt)
+        await s.flush()
+        theirs = PromptResult(
+            prompt_id=prompt.id, group_id=None, image_id=None, status=StepStatus.COMPLETED,
+            result_text="secret",
+        )  # fmt: skip
+        s.add(theirs)
         await s.commit()
-        other_id = other.id
-        with pytest.raises(NotFound):
-            await review_service.apply(
-                s, "default", queue.rid, other_id,
-                action="reject", data=None, version="x", reviewer="u", max_bytes=None,
-            )  # fmt: skip
+        rid = theirs.id
+    version = review_service.version_of(await _row(queue, rid))
+    got = await _review(queue, rid, EDITOR, action="reject", version=version)
+    assert got.status_code == 404, got.text
+    assert (await _row(queue, rid)).review_status is ReviewStatus.UNREVIEWED
+    assert "secret" not in got.text
 
 
 async def test_an_oversized_correction_is_422(queue):  # noqa: F811

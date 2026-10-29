@@ -58,31 +58,39 @@ export function useReviewQueue(
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  // The filter whose first page is on screen. A cursor belongs to it alone, so
+  // nothing pages until it is the current one (a filter change in between
+  // would send the old cursor with the new filter and skip rows).
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const filter = `${collectionId}|${status}|${prompt ?? ''}`;
   const latest = useRef(0);
   const paging = useRef(0); // the ticket a page read is running under, else 0
 
   const reload = useCallback(async () => {
     const ticket = ++latest.current;
     setLoading(true);
+    setLoaded(null);
+    setCursor(null);
     try {
       const page = await listReview(collectionId, { status, prompt });
       if (ticket !== latest.current) return;
       setItems(page.items);
       setCursor(page.next_cursor);
+      setLoaded(filter);
       setError(null);
     } catch (e) {
       if (ticket === latest.current) setError(message(e));
     } finally {
       if (ticket === latest.current) setLoading(false);
     }
-  }, [collectionId, status, prompt]);
+  }, [collectionId, status, prompt, filter]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
 
   const loadMore = useCallback(() => {
-    if (cursor === null || paging.current === latest.current) return;
+    if (cursor === null || loaded !== filter || paging.current === latest.current) return;
     const ticket = latest.current;
     paging.current = ticket;
     setLoading(true);
@@ -99,7 +107,7 @@ export function useReviewQueue(
         if (paging.current === ticket) paging.current = 0;
         if (ticket === latest.current) setLoading(false);
       });
-  }, [collectionId, status, prompt, cursor]);
+  }, [collectionId, status, prompt, cursor, loaded, filter]);
 
   const remaining = items?.length ?? null;
   useEffect(() => {

@@ -21,6 +21,9 @@ const REPO_ROOT = resolve(here, '..', '..');
 const fixture = (name: string) => resolve(REPO_ROOT, 'modules/images/tests/fixtures', name);
 
 function seed(collectionId: string) {
+  const database =
+    process.env.SM_DATABASE_URL?.trim() ||
+    `sqlite+aiosqlite:///${resolve(REPO_ROOT, 'host', 'test.db')}`;
   const out = execFileSync(
     'uv',
     ['run', 'python', 'tests/e2e/seed_images_review.py', collectionId],
@@ -29,9 +32,8 @@ function seed(collectionId: string) {
       encoding: 'utf8',
       env: {
         ...process.env,
-        SM_DATABASE_URL:
-          process.env.SM_DATABASE_URL?.trim() ||
-          `sqlite+aiosqlite:///${resolve(REPO_ROOT, 'host', 'test.db')}`,
+        SM_DATABASE_URL: database,
+        SM_E2E_DATABASE: database,
         SM_SECRET_KEY: 'e2e-test-secret-key-not-for-production-use',
         SM_PROJECT_ROOT: REPO_ROOT,
         SM_BG_TASKS_TASK_ALWAYS_EAGER: 'true',

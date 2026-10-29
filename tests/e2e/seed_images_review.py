@@ -15,7 +15,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import re
 import sys
 import uuid
 from collections.abc import Mapping
@@ -25,35 +24,45 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from headless_settings import headless_settings  # noqa: E402
+from simple_module_core.environments import NON_PROD_ENVIRONMENTS  # noqa: E402
 from simple_module_hosting.app_builder import create_app  # noqa: E402
 from sm_images.models import Image, Prompt, PromptResult  # noqa: E402
 from sm_images.models.enums import StepStatus  # noqa: E402
 from sm_images.tenancy import DEFAULT_TENANT, tenant_scope  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
-E2E_DB = re.compile(r"(^|[_-])(test|e2e)([_.-]|$)")
-"""A database name the e2e suite owns: ``test.db``, ``smpy_e2e``, ``..._test``."""
+E2E_SQLITE = ROOT / "host" / "test.db"
+"""The SQLite file ``playwright.config.ts`` gives the e2e server."""
 
 
 def guard(env: Mapping[str, str]) -> str | None:
     """Why this script must not run against ``env``, or ``None``.
 
     It writes rows straight to the database, so it needs an explicit opt-in
-    (``SM_E2E_SEED=1``), a non-production environment and a database that is
-    named like the e2e one - never whatever a developer's shell points at.
+    (``SM_E2E_SEED=1``), one of the framework's non-production environments
+    (``NON_PROD_ENVIRONMENTS``: everything else, ``staging`` included, counts
+    as production) and *exactly* the e2e database: the SQLite file above, or,
+    for a Postgres run, the URL the spec names in ``SM_E2E_DATABASE``. A look-alike
+    name is not enough.
     """
     if env.get("SM_E2E_SEED") != "1":
         return "set SM_E2E_SEED=1 to seed (test databases only)"
-    if env.get("SM_ENVIRONMENT", "").lower() == "production":
-        return "refusing to seed with SM_ENVIRONMENT=production"
+    environment = env.get("SM_ENVIRONMENT", "").strip().lower()
+    if environment not in NON_PROD_ENVIRONMENTS:
+        return f"refusing to seed with SM_ENVIRONMENT={environment!r} (production-like)"
     url = env.get("SM_DATABASE_URL", "").strip()
     if not url:
         return "SM_DATABASE_URL must name the e2e database"
     from sqlalchemy.engine import make_url
 
-    database = make_url(url).database or ""
-    if not E2E_DB.search(Path(database).name):
-        return f"{database!r} is not an e2e database (its name needs 'test' or 'e2e')"
+    parsed = make_url(url)
+    if parsed.get_backend_name() == "sqlite":
+        if Path(parsed.database or "").resolve() != E2E_SQLITE.resolve():
+            return f"{parsed.database!r} is not the e2e database {str(E2E_SQLITE)!r}"
+        return None
+    named = env.get("SM_E2E_DATABASE", "").strip()
+    if not named or make_url(named) != parsed:
+        return "SM_DATABASE_URL is not the database SM_E2E_DATABASE names"
     return None
 
 
