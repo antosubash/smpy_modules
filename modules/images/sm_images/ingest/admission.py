@@ -17,10 +17,10 @@ their holds. So :func:`admit` refuses, before the session row is inserted:
 Postgres, the database write lock on SQLite. The caller inserts the session row
 in the same transaction and commits, which releases the lock, so the next
 admission counts it. The cap is therefore hard. The quota check is soft:
-the headroom was read before the lock, so holds that ``complete`` takes between
-that read and the lock are not seen - an overshoot of at most the declared
-sizes of the uploads completing in that window, which their own holds then
-refuse or count. Run :func:`admit` as the transaction's first statement
+the headroom was read before the lock, so any gauge growth between that read
+and the lock (a ``complete``, a form upload, a step that grows an image) is not
+seen - an overshoot of at most the sum of those concurrent increases, each of
+which its own hold then refuses or counts. Run :func:`admit` as the transaction's first statement
 (SQLite: a transaction that read first can fail to take the write lock with
 ``SQLITE_BUSY_SNAPSHOT`` instead of waiting).
 

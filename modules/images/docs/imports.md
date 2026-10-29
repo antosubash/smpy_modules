@@ -88,9 +88,10 @@ the write lock on SQLite) and holds it until its session row is committed, so th
 next open counts it. The cap is hard. The quota check is soft: the gauge's
 headroom is read from billing *before* the lock (so no billing connection is ever
 opened while it is held), then compared under the lock with the declared sizes
-of every open upload. Only holds that `complete` takes between that read and the
-lock go unseen, an overshoot of at most the declared sizes of the uploads
-completing in that window; their own holds are still the enforcement. A refused
+of every open upload. Any growth of the storage gauge between that read and the
+lock goes unseen — a `complete`, a plain form upload, a pipeline step that
+grows an image — so the overshoot is at most the sum of those concurrent
+increases; each of them takes its own hold, which is still the enforcement. A refused
 open releases the lock, then aborts the backend's multipart upload it had
 started. While the lock is held, nothing but the admission session's connection
 is used: the backend's multipart upload is started and its parts presigned
