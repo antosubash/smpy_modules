@@ -106,6 +106,20 @@ async def check(app: Any, tenant: str, qty: int) -> None:
         raise StorageQuotaExceeded(FULL)
 
 
+async def headroom(app: Any, tenant: str, qty: int) -> int | None:
+    """Bytes the gauge has left (``limit - level``), after refusing (402) a
+    *qty* that does not fit even now; ``None`` without billing or without a
+    limit. Read once, before upload admission takes its lock, so no billing
+    connection is ever opened while that lock is held."""
+    usage = getattr(app.state, constants.BILLING_USAGE_ATTR, None)
+    if usage is None:
+        return None
+    outcome = await usage.check(tenant, METER, max(1, int(qty)))
+    if not outcome.ok:
+        raise StorageQuotaExceeded(FULL)
+    return None if outcome.limit is None else int(outcome.limit) - int(outcome.used)
+
+
 class SwapExpired(Exception):  # noqa: N818 - reads as the condition
     """Billing refused the swap: it arrived after its op's deadline."""
 

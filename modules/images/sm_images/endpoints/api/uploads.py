@@ -28,7 +28,7 @@ from sm_images.deps import require_view
 from sm_images.endpoints.api.images import Ingest, result
 from sm_images.errors import UploadNotFound, UploadNotOpen
 from sm_images.ingest import direct
-from sm_images.ingest.admission import admitter
+from sm_images.ingest.admission import prepare
 from sm_images.intents import current_factory
 from sm_images.models import Collection
 from sm_images.schemas.image import (
@@ -77,7 +77,7 @@ async def start_upload(
 ) -> DirectCreated:
     if who.user_id is None:  # pragma: no cover - require_view admits only signed-in callers
         raise UploadNotFound("Upload not found")
-    admission = admitter(
+    admission = await prepare(
         request.app, bound_tenant(), body.size, cap=ingest.settings.max_open_uploads_per_tenant
     )
     # A session of its own: the admission lock must be its first statement

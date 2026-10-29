@@ -83,28 +83,39 @@ async def open_upload(
         content_type=content_type,
         kind=kind,
     )
+    token = signer.dumps(asdict(ticket))
+    # Part URLs before the admission lock: nothing but ``db`` runs while it is held.
+    urls, presigned = await _part_urls(backend, ticket, token)
     if admission is not None:
         try:
             await admission(db)
         except BaseException:
+            await db.rollback()  # release the admission lock before any further I/O
             with suppress(Exception):
                 await backend.abort_multipart(key, upload)
             raise
     db.add(state.new_session(ticket, collection.id))
     await db.flush()
-    token = signer.dumps(asdict(ticket))
+    return token, ticket, urls, presigned
+
+
+async def _part_urls(backend: Any, ticket: Ticket, token: str) -> tuple[list[str], bool]:
+    """Presigned part URLs, or this app's relay URLs on a backend that cannot presign."""
     numbers = range(1, ticket.parts + 1)
     try:
         urls = [
             await backend.presign_part(
-                key, upload, n, constants.DIRECT_PRESIGN_TTL_SECONDS, ticket.part_bytes(n)
+                ticket.key,
+                ticket.upload,
+                n,
+                constants.DIRECT_PRESIGN_TTL_SECONDS,
+                ticket.part_bytes(n),
             )
             for n in numbers
         ]
-        return token, ticket, urls, True
+        return urls, True
     except NotSupportedError:
-        relay = [constants.PART_PATH.format(upload_id=token, part_no=n) for n in numbers]
-        return token, ticket, relay, False
+        return [constants.PART_PATH.format(upload_id=token, part_no=n) for n in numbers], False
 
 
 async def write_part(

@@ -85,10 +85,16 @@ binding: every part must be exactly its expected size and `complete` refuses a
 missing, short or extra part. Admission is **serialised per tenant**: each open
 first writes the tenant's `images_upload_admission` row (a row lock on Postgres,
 the write lock on SQLite) and holds it until its session row is committed, so the
-next open counts it. The cap is hard. The quota check counts every open upload;
-only a `complete` taking its hold at the same moment can overshoot it, by at most
-that upload's declared size, and that hold is still the enforcement. A refused
-open aborts the backend's multipart upload it had started.
+next open counts it. The cap is hard. The quota check is soft: the gauge's
+headroom is read from billing *before* the lock (so no billing connection is ever
+opened while it is held), then compared under the lock with the declared sizes
+of every open upload. Only holds that `complete` takes between that read and the
+lock go unseen, an overshoot of at most the declared sizes of the uploads
+completing in that window; their own holds are still the enforcement. A refused
+open releases the lock, then aborts the backend's multipart upload it had
+started. While the lock is held, nothing but the admission session's connection
+is used: the backend's multipart upload is started and its parts presigned
+before it is taken.
 
 > **Bucket CORS (S3 and MinIO).** The browser talks to the bucket directly, so
 > the bucket's CORS configuration must allow the **`PUT`** method from the

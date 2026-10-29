@@ -41,7 +41,7 @@ from sm_images.errors import ServiceUnavailable, UploadNotFound
 from sm_images.imports import access, controls, zip_upload
 from sm_images.imports.service import start_import
 from sm_images.imports.zip_import import launch_sealed
-from sm_images.ingest.admission import admitter
+from sm_images.ingest.admission import prepare
 from sm_images.models import Collection, ImportJob
 from sm_images.pipeline.runtime import Runtime, current_runtime
 from sm_images.schemas.image import DirectCreated
@@ -128,11 +128,8 @@ async def create_zip_import(
     who: Principal,
     db: Annotated[Any, Depends(get_db)],
 ) -> ZipCreated:
-    # A cheap refusal up front; the locked check in the upload's own
-    # transaction (``admission``) is the one that counts.
-    await billing.check(request.app, bound_tenant(), body.size)
     cap = get_settings(request).max_open_uploads_per_tenant
-    admission = admitter(request.app, bound_tenant(), body.size, cap=cap)
+    admission = await prepare(request.app, bound_tenant(), body.size, cap=cap)
     user, basis = await _actor(db, who, collection)
     job, (token, ticket, urls, presigned) = await zip_upload.start(
         _runtime(),
