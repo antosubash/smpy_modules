@@ -328,6 +328,7 @@
     "offer": "Gespeichert. Bilder, die schon in dieser Sammlung sind, übernehmen neu aktivierte Schritte erst nach einem Neustart.",
     "later": "Jetzt nicht",
     "invalid_json": "Das ist kein gültiges JSON und wurde nicht übernommen.",
+    "list_hint": "Eine Angabe pro Zeile oder durch Kommas getrennt.",
     "requires": "Benötigt: {steps}",
     "not_installed": "Dieser Schritt ist nicht mehr installiert. Seine gespeicherten Einstellungen bleiben erhalten.",
     "remove": "Aus der Pipeline entfernen",
@@ -335,8 +336,8 @@
     "undo": "Rückgängig",
     "results_not_installed_one": "{count} Ergebnis gehört zu einem Schritt, der nicht installiert ist.",
     "results_not_installed_other": "{count} Ergebnisse gehören zu Schritten, die nicht installiert sind.",
-    "stale_one": "{count} Ergebnis stammt von einer älteren Version seines Schritts.",
-    "stale_other": "{count} Ergebnisse stammen von einer älteren Version ihres Schritts.",
+    "stale_one": "{count} Ergebnis ist veraltet: von einer älteren Version seines Schritts erzeugt oder es fehlt für einen inzwischen aktivierten Schritt.",
+    "stale_other": "{count} Ergebnisse sind veraltet: von einer älteren Version ihres Schritts erzeugt oder sie fehlen für einen inzwischen aktivierten Schritt.",
     "restart": {
       "failed": "Fehlgeschlagene wiederholen",
       "stale": "Veraltete neu berechnen",

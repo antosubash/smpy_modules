@@ -158,8 +158,8 @@ export function failedUpload(file: File, error: unknown): UploadResult {
 
 // ---- Pipeline ------------------------------------------------------------
 
-export function getPipeline(collectionId: string): Promise<PipelineOverview> {
-  return send(`${BASE}/collections/${collectionId}/pipeline`);
+export function getPipeline(collectionId: string, signal?: AbortSignal): Promise<PipelineOverview> {
+  return send(`${BASE}/collections/${collectionId}/pipeline`, signal ? { signal } : {});
 }
 
 /** `steps` is `{id: {enabled, ...params}}`, the shape the server validates. */

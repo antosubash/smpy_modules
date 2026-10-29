@@ -70,6 +70,21 @@ async def _run_groups(db: Any, collection_id: uuid.UUID) -> list[Any]:
     return list((await db.execute(stmt)).all())
 
 
+async def _missing(db: Any, collection_id: uuid.UUID, steps: list[str]) -> int:
+    """Planned images (any run) with no run of an enabled step: a step enabled
+    after they were processed. Stale - "Re-run stale" plans it for them."""
+    total = 0
+    for sid in steps:
+        has = select(StepRun.id).where(StepRun.image_id == Image.id)
+        stmt = select(func.count(Image.id)).where(
+            Image.collection_id == collection_id,
+            has.exists(),
+            ~has.where(StepRun.step == sid).exists(),
+        )
+        total += int((await db.execute(stmt)).scalar_one())
+    return total
+
+
 async def overview(db: Any, collection: Collection) -> dict[str, Any]:
     """The saved config, every registered step with its JSON schema, and the
     results' status, stale and not-installed counts (trashed images excluded)."""
@@ -86,6 +101,7 @@ async def overview(db: Any, collection: Collection) -> dict[str, Any]:
         run = SimpleNamespace(step=step, status=st, step_version=version, error_code=code)
         stale += n if is_stale(run, cfg) else 0  # type: ignore[arg-type]
         not_installed += n if cfg.impl(step) is None else 0
+    stale += await _missing(db, collection.id, list(cfg.runnable()))
     return {
         "config": collection.pipeline_config or {"steps": {}},
         "preset_id": collection.preset_id,

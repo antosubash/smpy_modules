@@ -183,11 +183,14 @@ async def reset_image(db: Any, tenant: str, image_id: uuid.UUID, scope: Scope) -
         return []
     now = utcnow()
     cfg = await advance.collection_config(db, tenant, locked.collection_id)
-    steps = _selected(scope, cfg, await load_runs(db, tenant, image_id), now)
-    done = await reset_runs(db, tenant, image_id, steps, now)
-    if done:
+    runs = await load_runs(db, tenant, image_id)
+    done = await reset_runs(db, tenant, image_id, _selected(scope, cfg, runs, now), now)
+    # A step enabled after the image was planned has no run yet: stale (and part
+    # of "all"); the dispatch that follows inserts it.
+    missing = [s for s in cfg.enabled() if s not in runs] if runs and scope != "retry" else []
+    if done or missing:
         await bump_cycle(db, tenant, image_id)
-    return done
+    return sorted([*done, *missing])
 
 
 async def rerun_image(

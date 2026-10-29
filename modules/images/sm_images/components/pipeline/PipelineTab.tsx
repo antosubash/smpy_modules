@@ -1,7 +1,8 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { hasActiveRuns, usePipelinePoll } from '../../hooks/usePipelinePoll';
 import { getPipeline, restartPipeline, savePipeline } from '../../utils/api';
 import { errorText } from '../../utils/api-net';
 import { keys, useT } from '../../utils/i18n';
@@ -38,7 +39,9 @@ export function payloadOf(overview: PipelineOverview, drafts: Drafts) {
  * A collection's pipeline: each step's toggle and params, the stale banner and
  * the restart actions. Saving only stores the config - the server plans newly
  * enabled steps on the next dispatch or restart - so a successful save offers
- * a restart for the existing images.
+ * a restart for the existing images. While runs are pending or running (or a
+ * restart request is outstanding - an eager host runs it inline) the counts
+ * are read again every few seconds; a draft being edited is kept.
  */
 export function PipelineTab({
   collectionId,
@@ -51,7 +54,11 @@ export function PipelineTab({
   const [overview, setOverview] = useState<PipelineOverview | null>(null);
   const [drafts, setDrafts] = useState<Drafts>({});
   const [dirty, setDirty] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirty;
+  const [saving, setSaving] = useState(false);
+  const [restarting, setRestarting] = useState(false);
+  const busy = saving || restarting;
   const [error, setError] = useState<string | null>(null);
   const [offerRestart, setOfferRestart] = useState(false);
 
@@ -71,9 +78,14 @@ export function PipelineTab({
     void load();
   }, [load]);
 
+  usePipelinePoll(collectionId, restarting || hasActiveRuns(overview), (next) => {
+    setOverview(next);
+    if (!dirtyRef.current) setDrafts(draftsOf(next));
+  });
+
   const save = async () => {
     if (!overview) return;
-    setBusy(true);
+    setSaving(true);
     try {
       const next = await savePipeline(collectionId, payloadOf(overview, drafts));
       setOverview(next);
@@ -85,12 +97,12 @@ export function PipelineTab({
     } catch (e) {
       setError(errorText(e));
     } finally {
-      setBusy(false);
+      setSaving(false);
     }
   };
 
   const restart = async (scope: RestartScope) => {
-    setBusy(true);
+    setRestarting(true);
     try {
       await restartPipeline(collectionId, scope);
       setOfferRestart(false);
@@ -99,7 +111,7 @@ export function PipelineTab({
     } catch (e) {
       setError(errorText(e));
     } finally {
-      setBusy(false);
+      setRestarting(false);
     }
   };
 
@@ -182,7 +194,7 @@ export function PipelineTab({
             data-testid="images-pipeline-save"
             onClick={() => void save()}
           >
-            {busy ? t(keys.images.common.saving) : t(keys.images.pipeline.save)}
+            {saving ? t(keys.images.common.saving) : t(keys.images.pipeline.save)}
           </Button>
           {restartButtons(['failed', 'stale', 'all'])}
         </div>
