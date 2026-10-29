@@ -1,7 +1,14 @@
 /** `/api/images` prompt and preset endpoints. */
 
 import { send } from './api';
-import type { Preset, Prompt, PromptFields, PromptRun, PromptRunScope } from './types-prompts';
+import type {
+  Preset,
+  Prompt,
+  PromptFields,
+  PromptResult,
+  PromptRun,
+  PromptRunScope,
+} from './types-prompts';
 
 const BASE = '/api/images';
 
@@ -30,15 +37,25 @@ export function deletePrompt(id: string): Promise<void> {
   return send(`${BASE}/prompts/${id}`, { method: 'DELETE' });
 }
 
-/** The whole collection (owner or manager), or named groups of a group prompt
- *  (`groupIds`; with `missing`/`stale` an editor may too). */
+/** The whole collection (owner or manager), or named images of an image
+ *  prompt / groups of a group prompt (with `missing`/`stale`, an editor too). */
 export function runPrompt(
   id: string,
   scope: PromptRunScope,
-  groupIds?: string[],
+  target: { imageIds?: string[]; groupIds?: string[] } = {},
 ): Promise<PromptRun> {
-  const body = groupIds ? { scope, group_ids: groupIds } : { scope };
+  const body: Record<string, unknown> = { scope };
+  if (target.imageIds) body.image_ids = target.imageIds;
+  if (target.groupIds) body.group_ids = target.groupIds;
   return send(`${BASE}/prompts/${id}/run`, jsonBody('POST', body));
+}
+
+/** The first page of a prompt's results (each image's, or each group's). */
+export async function listPromptResults(id: string): Promise<PromptResult[]> {
+  const { items } = await send<{ items: PromptResult[] }>(
+    `${BASE}/prompts/${id}/results?limit=100`,
+  );
+  return items;
 }
 
 export async function listPresets(): Promise<Preset[]> {

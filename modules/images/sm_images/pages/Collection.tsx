@@ -14,6 +14,7 @@ import { ImagesLayout } from '../components/ImagesLayout';
 import { ImportsTab } from '../components/imports/ImportsTab';
 import { PipelineTab } from '../components/pipeline/PipelineTab';
 import { PromptsTab } from '../components/prompts/PromptsTab';
+import { RunOnImages } from '../components/prompts/RunOnImages';
 import { ShareDialog } from '../components/share/ShareDialog';
 import { useImages } from '../hooks/useImages';
 import { deleteCollection, setVisibility } from '../utils/api';
@@ -47,6 +48,28 @@ function Collection({
   const [visibility, setVisible] = useState<Visibility>(collection.visibility);
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<Tab>('gallery');
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  // An editor picks images to run an image prompt on (missing or stale only).
+  const pick = can_edit
+    ? {
+        active: picking,
+        setActive: (active: boolean) => {
+          setPicking(active);
+          if (!active) setPicked([]);
+        },
+        ids: picked,
+        toggle: (id: string) =>
+          setPicked((ids) => (ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id])),
+        actions: (
+          <RunOnImages
+            collectionId={collection.id}
+            imageIds={picked}
+            onDone={() => setPicked([])}
+          />
+        ),
+      }
+    : undefined;
   // The import routes are an edit on the collection, so the tab is an editor's.
   const tabs: Tab[] = can_edit
     ? ['gallery', 'groups', 'pipeline', 'prompts', 'imports']
@@ -147,7 +170,7 @@ function Collection({
             ))}
           </div>
           <div role="tabpanel" id="images-tabpanel" aria-labelledby={`images-tab-${tab}`}>
-            {tab === 'gallery' && <Gallery gallery={gallery} />}
+            {tab === 'gallery' && <Gallery gallery={gallery} pick={pick} />}
             {tab === 'groups' && (
               <GroupsTab
                 collectionId={collection.id}

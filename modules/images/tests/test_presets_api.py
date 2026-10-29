@@ -121,3 +121,34 @@ async def test_a_taken_name_refuses_the_whole_preset(plugin):
     assert (got.status_code, got.json()["code"]) == (409, "prompt_name_taken")
     coll, prompts = await _state(plugin)
     assert [p.name for p in prompts] == ["Trees per site"] and coll.preset_id is None
+
+
+async def test_the_presets_group_prompt_runs_its_own_cross_check(plugin, ai):
+    """End to end: the applied preset's group prompt summarises its image
+    prompt's results, and the plugin's real ``agreement`` hook is stored."""
+    from sm_images.models import Group, Image
+    from sqlalchemy import update
+
+    ai.answer = {"trees": 3}
+    assert (await _apply(plugin)).status_code == 200
+    _, (photo, site) = await _state(plugin)
+    assert site.preset_id == "testplugin" and site.member_prompt_id == photo.id
+    async with plugin.c.db_state.session_factory() as s:
+        group = Group(collection_id=uuid.UUID(plugin.cid), key="site-1")
+        s.add(group)
+        await s.flush()
+        await s.execute(
+            update(Image)
+            .where(Image.id == uuid.UUID(plugin.iid))
+            .values(group_id=group.id, group_role="centre")
+        )
+        await s.commit()
+    ran = await plugin.c.post(
+        f"{BASE}/prompts/{site.id}/run", json={"group_ids": [str(group.id)]}, headers=headers(OWNER)
+    )
+    assert (ran.status_code, ran.json()["requested"]) == (202, 1), ran.text
+    got = await plugin.c.get(f"{BASE}/prompts/{site.id}/results", headers=headers(OWNER))
+    (row,) = got.json()["items"]
+    assert (row["status"], row["result_data"]) == ("completed", {"trees": 3})
+    assert row["cross_check"] == {"members": 1, "total": 3, "agrees": True}
+    assert [c["source"] for c in ai.charges] == ["images:prompt", "images:group_prompt"]

@@ -117,9 +117,16 @@ image prompt cannot be deleted while a group prompt reads it
   and was made under the member prompt's current revision. Each other member
   runs through the executor, at most 4 at a time, with exactly an image
   prompt run's claim, metering (`images:prompt`) and retry rules.
-- **Privacy.** Every member's display copy must be one serving would trust;
-  otherwise the whole run fails `display_not_ready` before anything is sent
-  or charged. Originals are never sent.
+- **Privacy.** Every picture this run would send must be a display copy
+  serving would trust: all members' with `images`/`both`, otherwise those of
+  the members that need a call. If one is not, the whole run fails
+  `display_not_ready` before anything is sent or charged. A member whose
+  stored result is reused sends nothing and needs no safe copy. Originals
+  are never sent. Whether a member needs a call is decided again under its
+  image lock, so two group prompts over one image prompt call it once.
+- **Recovery.** `images.reconcile` dispatches again a group run requested
+  more than 5 minutes ago and never claimed, or claimed under an expired
+  lease; the claim is fenced, so a duplicate is harmless.
 - **The consolidation** is one provider request at temperature 0, claimed
   once per lease and metered once (`images:group_prompt`, key
   `images:{tenant}:group:{group}:prompt:{prompt}:{revision}:{lease token}`).
@@ -132,7 +139,8 @@ image prompt cannot be deleted while a group prompt reads it
   the consolidation, with no session open. `group` is a `GroupRead` (members
   in role order); `results` are the usable member results in role order and
   then the group's own summary (`group_id` set). Its return value is stored
-  in `cross_check`; an exception, a non-dict, non-JSON or a value over
+  in `cross_check` (the hook gets deep copies, so it cannot alter the stored
+  summary); an exception, a non-dict, non-JSON or a value over
   `step_output_max_bytes` is stored as `{"error": "..."}` instead.
 
 ## Presets

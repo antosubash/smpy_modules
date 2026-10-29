@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildJsonSchema, emptyField, schemaToFields } from './schemaFields';
+import { buildJsonSchema, emptyField, fieldNameError, schemaToFields } from './schemaFields';
 
 describe('schemaFields', () => {
   it('round-trips what the field editor can express', () => {
@@ -41,6 +41,17 @@ describe('schemaFields', () => {
     ]) {
       expect(schemaToFields(schema as never)).toBeNull();
     }
+  });
+
+  it('builds properties with no prototype and refuses prototype key names', () => {
+    const built = buildJsonSchema([{ ...emptyField(), name: 'toString' }]);
+    expect(Object.getPrototypeOf(built.properties)).toBeNull();
+    for (const name of ['__proto__', 'constructor', 'prototype', ' __proto__ ']) {
+      expect(fieldNameError(name)).not.toBeNull();
+    }
+    expect(fieldNameError('kind')).toBeNull();
+    const own = JSON.parse('{"type":"object","properties":{"__proto__":{"type":"string"}}}');
+    expect(schemaToFields(own)).toBeNull();
   });
 
   it('leaves out an unnamed field and adds required only when set', () => {

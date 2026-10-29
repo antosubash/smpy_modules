@@ -82,15 +82,44 @@ async def fetch(
     return {r.image_id: r for r in rows}
 
 
-async def run_member(runtime: Any, tenant: str, image_id: uuid.UUID, sid: str) -> bool:
-    """Request, claim and execute one member's run; ``False`` when someone else
-    holds it (or the image is gone)."""
+async def _answered(
+    db: Any, tenant: str, prompt_id: uuid.UUID, image_id: uuid.UUID, revision: int
+) -> bool:
+    stmt = select(
+        PromptResult.image_id,
+        PromptResult.status,
+        PromptResult.result_data,
+        PromptResult.result_text,
+        PromptResult.model_name,
+        PromptResult.prompt_revision,
+    ).where(
+        PromptResult.tenant_id == tenant,
+        PromptResult.prompt_id == prompt_id,
+        PromptResult.image_id == image_id,
+    )
+    row = (await db.execute(stmt)).first()
+    return row is not None and usable(MemberResult(*row), revision)
+
+
+async def run_member(
+    runtime: Any, tenant: str, image_id: uuid.UUID, prompt_id: uuid.UUID, revision: int
+) -> bool:
+    """Request, claim and execute one member's run; ``False`` when it is not
+    needed after all, someone else holds it, or the image is gone.
+
+    The need is decided again under the image lock: another group run (a
+    second group prompt over the same member prompt) may have answered this
+    member since the caller looked, and its result is then reused - no reset,
+    no call, no charge."""
     from sm_images.pipeline.executor import run_step_async
 
+    sid = step_id(prompt_id)
     lease_s = runtime.settings().step_lease_seconds
     claims: list[Any] = []
     async with runtime.session_factory() as db:
-        if await lock_image(db, tenant, image_id) is not None:
+        if await lock_image(db, tenant, image_id) is not None and not await _answered(
+            db, tenant, prompt_id, image_id, revision
+        ):
             now = datetime.now(UTC)
             run = (await load_runs(db, tenant, image_id)).get(sid)
             if run is None:
@@ -105,15 +134,19 @@ async def run_member(runtime: Any, tenant: str, image_id: uuid.UUID, sid: str) -
 
 
 async def run_members(
-    runtime: Any, tenant: str, prompt_id: uuid.UUID, image_ids: Sequence[uuid.UUID]
+    runtime: Any,
+    tenant: str,
+    prompt_id: uuid.UUID,
+    revision: int,
+    image_ids: Sequence[uuid.UUID],
 ) -> None:
-    """Run the member prompt on ``image_ids``, at most :data:`MEMBER_CONCURRENCY` at once."""
-    sid = step_id(prompt_id)
+    """Run the member prompt (at ``revision``) on ``image_ids``, at most
+    :data:`MEMBER_CONCURRENCY` at once."""
     gate = asyncio.Semaphore(MEMBER_CONCURRENCY)
 
     async def one(image_id: uuid.UUID) -> None:
         async with gate:
-            await run_member(runtime, tenant, image_id, sid)
+            await run_member(runtime, tenant, image_id, prompt_id, revision)
 
     # A member that raised is simply missing; the others still finish.
     done = await asyncio.gather(*(one(i) for i in image_ids), return_exceptions=True)

@@ -103,9 +103,7 @@ async def _read(db: Any, tenant: str, prompt_id: uuid.UUID, group_id: uuid.UUID)
         return None
     stmt = (
         select(Image)
-        .where(
-            Image.group_id == group_id, Image.tenant_id == tenant, Image.is_deleted.is_(False)
-        )
+        .where(Image.group_id == group_id, Image.tenant_id == tenant, Image.is_deleted.is_(False))
         .order_by(*member_order(list(collection.group_roles or [])))
         .limit(MAX_MEMBERS + 1)
     )

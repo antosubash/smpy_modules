@@ -69,7 +69,12 @@
       "failed": "Failed"
     },
     "thumb_pending": "Preparing preview…",
-    "open": "Open {name}"
+    "open": "Open {name}",
+    "select": "Select images",
+    "select_done": "Done",
+    "picked_one": "{count} image selected",
+    "picked_other": "{count} images selected",
+    "pick": "Select {name}"
   },
   "upload": {
     "button": "Upload images",
@@ -501,7 +506,23 @@
       "add_field": "Add field",
       "remove_field": "Remove",
       "advanced": "This schema uses more than the field editor can show, so it is edited as JSON.",
-      "invalid_json": "The schema is not valid JSON."
+      "invalid_json": "The schema is not valid JSON.",
+      "reserved_name": "“{name}” cannot be a field name."
+    },
+    "results": {
+      "show": "Results",
+      "hide": "Hide results",
+      "empty": "No results yet.",
+      "previous": "Previous result (the last run did not finish):",
+      "cross_check": "Cross-check",
+      "stale": "outdated"
+    },
+    "on_images": {
+      "open": "Run prompt…",
+      "prompt": "Choose an image prompt",
+      "scope": "Which results",
+      "go_one": "Run on {count} image",
+      "go_other": "Run on {count} images"
     }
   }
 }

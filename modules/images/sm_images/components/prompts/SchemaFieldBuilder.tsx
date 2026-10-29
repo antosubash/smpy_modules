@@ -7,6 +7,7 @@ import {
   emptyField,
   FIELD_TYPES,
   type FieldType,
+  fieldNameError,
   type SchemaField,
 } from '../../utils/schemaFields';
 
@@ -75,6 +76,14 @@ export function SchemaFieldBuilder({
               {t(keys.images.prompts.schema.remove_field)}
             </Button>
           </div>
+          {fieldNameError(field.name) && (
+            <p
+              className="text-sm text-destructive"
+              data-testid={`images-schema-field-error-${index}`}
+            >
+              {t(fieldNameError(field.name) as string, { name: field.name.trim() })}
+            </p>
+          )}
           <Input
             aria-label={t(keys.images.prompts.schema.description)}
             placeholder={t(keys.images.prompts.schema.description)}

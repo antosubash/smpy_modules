@@ -7,6 +7,7 @@ import { keys, useT } from '../../utils/i18n';
 import type { GroupItem } from '../../utils/types';
 import type { Prompt, PromptRunScope } from '../../utils/types-prompts';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { GroupResults } from './GroupResults';
 
 const RUN = {
   missing: keys.images.prompts.run.missing,
@@ -47,6 +48,7 @@ export function PromptRow({
 }) {
   const { t } = useT();
   const [group, setGroup] = useState('');
+  const [results, setResults] = useState(false);
   const isGroup = prompt.scope === 'group';
   return (
     <li className="space-y-2 rounded-md border p-3" data-testid={`images-prompt-${prompt.id}`}>
@@ -103,6 +105,18 @@ export function PromptRow({
             </Button>
           </>
         )}
+        {isGroup && (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            aria-expanded={results}
+            data-testid={`images-prompt-results-${prompt.id}`}
+            onClick={() => setResults((open) => !open)}
+          >
+            {t(results ? keys.images.prompts.results.hide : keys.images.prompts.results.show)}
+          </Button>
+        )}
         {canEdit && (
           <>
             <Button
@@ -133,6 +147,7 @@ export function PromptRow({
           </>
         )}
       </div>
+      {results && <GroupResults promptId={prompt.id} groups={groups} />}
     </li>
   );
 }

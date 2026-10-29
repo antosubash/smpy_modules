@@ -159,12 +159,14 @@ export function PromptForm({
           <option value="text">{t(keys.images.prompts.output.text)}</option>
           <option value="structured">{t(keys.images.prompts.output.structured)}</option>
         </NativeSelect>
-        {structured && (
+        {/* Kept mounted while the answer is free text, so the draft - even
+            JSON that does not parse yet - is still there on the way back. */}
+        <div hidden={!structured}>
           <SchemaEditor
             initial={initial?.output_schema ?? STARTER}
             onChange={(draft) => setSchema(draft.schema)}
           />
-        )}
+        </div>
       </div>
       {!group && (
         <label className="flex items-center gap-2 text-sm">

@@ -1,0 +1,92 @@
+import { useEffect, useState } from 'react';
+
+import { listPromptResults } from '../../utils/api-prompts';
+import { keys, useT } from '../../utils/i18n';
+import { errorCodeLabel } from '../../utils/labels';
+import type { GroupItem } from '../../utils/types';
+import type { PromptResult } from '../../utils/types-prompts';
+
+function show(value: unknown): string {
+  return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+}
+
+/** `quota_exceeded: the plan's …` → its code. */
+function codeOf(error: string): string {
+  return error.split(':')[0].trim();
+}
+
+/**
+ * A group prompt's results, one per group. A `failed` row still carries the
+ * output of the last run that worked: it is shown as the previous result,
+ * under the failure, never as this run's answer. (A run that is missing
+ * members also stores its partial summary as `failed`, and reads the same.)
+ */
+export function GroupResults({ promptId, groups }: { promptId: string; groups: GroupItem[] }) {
+  const { t } = useT();
+  const [rows, setRows] = useState<PromptResult[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    listPromptResults(promptId)
+      .then(setRows)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  }, [promptId]);
+
+  if (error) return <p className="text-sm text-destructive">{error}</p>;
+  if (rows === null) return null;
+  if (rows.length === 0) {
+    return <p className="text-sm text-muted-foreground">{t(keys.images.prompts.results.empty)}</p>;
+  }
+  const names = new Map(groups.map((g) => [g.id, g.name || g.key]));
+  return (
+    <ul className="space-y-2 text-sm" data-testid={`images-group-results-${promptId}`}>
+      {rows.map((row) => {
+        const data = row.result_data ?? row.result_text;
+        const failed = row.status === 'failed';
+        return (
+          <li
+            key={row.id}
+            className="rounded-md border p-2"
+            data-testid={`images-group-result-${row.id}`}
+            data-status={row.status}
+          >
+            <div className="flex flex-wrap gap-2 font-medium">
+              <span>{(row.group_id && names.get(row.group_id)) || row.group_id}</span>
+              <span className="text-muted-foreground">{row.status}</span>
+              {row.stale && (
+                <span className="text-muted-foreground">
+                  {t(keys.images.prompts.results.stale)}
+                </span>
+              )}
+            </div>
+            {failed && row.error && (
+              <p className="text-destructive">{errorCodeLabel(t, codeOf(row.error))}</p>
+            )}
+            {data !== null && data !== undefined && failed && (
+              <div data-testid={`images-group-result-previous-${row.id}`}>
+                <p className="text-muted-foreground">{t(keys.images.prompts.results.previous)}</p>
+                <pre className="whitespace-pre-wrap text-xs opacity-70">{show(data)}</pre>
+              </div>
+            )}
+            {data !== null && data !== undefined && !failed && (
+              <pre
+                className="whitespace-pre-wrap text-xs"
+                data-testid={`images-group-result-current-${row.id}`}
+              >
+                {show(data)}
+              </pre>
+            )}
+            {!failed && row.cross_check && (
+              <div>
+                <p className="text-muted-foreground">
+                  {t(keys.images.prompts.results.cross_check)}
+                </p>
+                <pre className="whitespace-pre-wrap text-xs">{show(row.cross_check)}</pre>
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}

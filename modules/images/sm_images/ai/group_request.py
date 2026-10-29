@@ -17,13 +17,13 @@ from datetime import UTC, datetime
 from typing import Any
 
 from simple_module_db import finalize_session, tenant_context
-from sqlalchemy import select
+from sqlalchemy import and_, func, or_, select
 
 from sm_images.ai import group_lease
-from sm_images.models import Group, Prompt
-from sm_images.models.enums import PromptScope
+from sm_images.models import Collection, Group, Prompt, PromptResult
+from sm_images.models.enums import PromptScope, StepStatus
 
-__all__ = ["CHUNK", "GROUP_QUEUE", "dispatch_group", "request_groups"]
+__all__ = ["CHUNK", "GROUP_QUEUE", "dispatch_group", "recover_group_runs", "request_groups"]
 
 CHUNK = 500
 GROUP_QUEUE = "images_heavy"
@@ -101,3 +101,54 @@ async def request_groups(
                 count += 1
                 await dispatch_group(runtime, tenant, prompt_id, group_id)
         return count
+
+
+def _lost(tenant: str, now: datetime, cutoff: datetime) -> Any:
+    """Group runs of live collections that nobody is carrying: requested
+    longer than ``cutoff`` ago and never claimed (a lost dispatch), or claimed
+    under a lease that has expired (a dead worker)."""
+    return (
+        select(PromptResult.id, PromptResult.prompt_id, PromptResult.group_id)
+        .join(Group, Group.id == PromptResult.group_id)
+        .join(Collection, Collection.id == Group.collection_id)
+        .where(
+            PromptResult.tenant_id == tenant,
+            PromptResult.group_id.is_not(None),
+            Collection.is_deleted.is_(False),
+            or_(
+                and_(
+                    PromptResult.status == StepStatus.PENDING,
+                    # a first request inserts the row: no ``updated_at`` yet
+                    func.coalesce(PromptResult.updated_at, PromptResult.created_at) < cutoff,
+                ),
+                and_(
+                    PromptResult.status == StepStatus.RUNNING,
+                    PromptResult.lease_expires_at < now,
+                ),
+            ),
+        )
+        .order_by(PromptResult.id)
+        .limit(CHUNK)
+    )
+
+
+async def recover_group_runs(runtime: Any, tenant: str, now: datetime, cutoff: datetime) -> int:
+    """Dispatch every lost group run again (``images.reconcile``), in pages.
+    The claim is fenced, so a run that is in fact still on its way is not
+    executed twice. The caller has bound ``tenant``."""
+    found: list[tuple[uuid.UUID, uuid.UUID]] = []
+    after = None
+    while True:
+        stmt = _lost(tenant, now, cutoff)
+        if after is not None:
+            stmt = stmt.where(PromptResult.id > after)
+        async with runtime.session_factory() as db:
+            rows = list((await db.execute(stmt)).all())
+            await finalize_session(db)
+        found += [(prompt_id, group_id) for _, prompt_id, group_id in rows]
+        if len(rows) < CHUNK:
+            break
+        after = rows[-1][0]
+    for prompt_id, group_id in found:
+        await dispatch_group(runtime, tenant, prompt_id, group_id)
+    return len(found)

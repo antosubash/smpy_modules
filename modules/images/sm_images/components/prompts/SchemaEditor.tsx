@@ -3,7 +3,12 @@ import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { useState } from 'react';
 
 import { keys, useT } from '../../utils/i18n';
-import { buildJsonSchema, type SchemaField, schemaToFields } from '../../utils/schemaFields';
+import {
+  buildJsonSchema,
+  fieldNameError,
+  type SchemaField,
+  schemaToFields,
+} from '../../utils/schemaFields';
 import type { JsonSchema } from '../../utils/types-prompts';
 import { SchemaFieldBuilder } from './SchemaFieldBuilder';
 
@@ -45,7 +50,9 @@ export function SchemaEditor({
 
   const editFields = (next: SchemaField[]) => {
     setFields(next);
-    onChange({ schema: buildJsonSchema(next) });
+    // A reserved name is refused: nothing to save until it is renamed.
+    const refused = next.some((f) => fieldNameError(f.name));
+    onChange({ schema: refused ? null : buildJsonSchema(next) });
   };
   const editText = (next: string) => {
     setText(next);

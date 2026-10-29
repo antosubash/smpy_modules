@@ -2,7 +2,8 @@
 
 The hook (spec §8.3) is plugin code run inside the group-run task. Whatever it
 does wrong becomes the stored value ``{"error": "..."}`` and never fails the
-group run: an exception, a value that is not a dict, one that is not strict
+group run (and it gets deep copies, so mutating its arguments changes nothing
+that is stored): an exception, a value that is not a dict, one that is not strict
 JSON, or one over ``step_output_max_bytes`` once encoded - the cap every step
 output and prompt result obeys.
 """
@@ -32,8 +33,8 @@ def run_cross_check(
     """``fn(group, results)`` bounded as above; ``None`` without a hook."""
     if fn is None:
         return None
-    try:
-        out = fn(group, list(results))
+    try:  # copies: the hook must never reach the summary about to be stored
+        out = fn(group.model_copy(deep=True), [r.model_copy(deep=True) for r in results])
     except Exception as exc:  # plugin code: captured, never the run's failure
         logger.warning("images.group.cross_check_raised", exc_info=True)
         return _error(f"{type(exc).__name__}: {exc}")

@@ -69,7 +69,12 @@
       "failed": "Fehlgeschlagen"
     },
     "thumb_pending": "Vorschau wird erstellt…",
-    "open": "{name} öffnen"
+    "open": "{name} öffnen",
+    "select": "Bilder auswählen",
+    "select_done": "Fertig",
+    "picked_one": "{count} Bild ausgewählt",
+    "picked_other": "{count} Bilder ausgewählt",
+    "pick": "{name} auswählen"
   },
   "upload": {
     "button": "Bilder hochladen",
@@ -501,7 +506,23 @@
       "add_field": "Feld hinzufügen",
       "remove_field": "Entfernen",
       "advanced": "Dieses Schema nutzt mehr, als der Feld-Editor zeigen kann, daher wird es als JSON bearbeitet.",
-      "invalid_json": "Das Schema ist kein gültiges JSON."
+      "invalid_json": "Das Schema ist kein gültiges JSON.",
+      "reserved_name": "„{name}“ kann kein Feldname sein."
+    },
+    "results": {
+      "show": "Ergebnisse",
+      "hide": "Ergebnisse ausblenden",
+      "empty": "Noch keine Ergebnisse.",
+      "previous": "Vorheriges Ergebnis (der letzte Lauf wurde nicht abgeschlossen):",
+      "cross_check": "Gegenprüfung",
+      "stale": "veraltet"
+    },
+    "on_images": {
+      "open": "Prompt ausführen…",
+      "prompt": "Bild-Prompt wählen",
+      "scope": "Welche Ergebnisse",
+      "go_one": "Auf {count} Bild ausführen",
+      "go_other": "Auf {count} Bildern ausführen"
     }
   }
 }

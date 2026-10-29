@@ -5,9 +5,11 @@
 
 1. **load** (:mod:`.group_load`) - the prompt, the members in role order;
 2. **gates**, before anything is sent or charged: an empty or oversized group,
-   a member whose display copy may not leave yet (``display_not_ready`` - the
-   whole run, not that member: a consolidation never silently skips a photo
-   for privacy), an unsafe stored schema, an unconfigured model;
+   a member whose picture this run would send but whose display copy may not
+   leave yet (``display_not_ready`` - the whole run, not that member: a
+   consolidation never silently skips a photo for privacy; a member whose
+   stored result is reused and whose picture is not sent needs no safe copy),
+   an unsafe stored schema, an unconfigured model;
 3. **members** (``inputs`` ``results``/``both``, :mod:`.group_members`) -
    stored current-revision results reused, the rest run through the executor,
    at most four at a time, each metered as an image prompt run;
@@ -27,7 +29,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import logging
 import uuid
 from datetime import UTC, datetime
@@ -35,7 +36,7 @@ from typing import Any
 
 from simple_module_db import finalize_session, tenant_context
 
-from sm_images.ai import group_lease, group_load, group_members, group_store
+from sm_images.ai import group_inputs, group_lease, group_load, group_store
 from sm_images.ai.cross_check import run_cross_check
 from sm_images.ai.group_store import GroupOutcome
 from sm_images.ai.reads import PromptResultRead
@@ -47,7 +48,6 @@ __all__ = ["SOURCE", "execute", "metering_key", "run_group"]
 
 logger = logging.getLogger(__name__)
 SOURCE = "images:group_prompt"
-MAX_SIDE = 1024
 NEEDS_MEMBERS = ("results", "both")
 SENDS_IMAGES = ("images", "both")
 
@@ -85,59 +85,6 @@ class _Lease:
                 logger.warning("images.group.renew_failed", exc_info=True)
 
 
-async def _member_results(runtime: Any, job: Any) -> tuple[list[PromptResultRead], list[str]]:
-    members = job.group.members
-    ids = [m.image_id for m in members]
-    found = await group_members.fetch(runtime, job.tenant, job.member.id, ids)
-    need = [i for i in ids if not group_members.usable(found.get(i), job.member.revision)]
-    if need:
-        await group_members.run_members(runtime, job.tenant, job.member.id, need)
-        found = await group_members.fetch(runtime, job.tenant, job.member.id, ids)
-    reads, missing = [], []
-    for m in members:
-        row = found.get(m.image_id)
-        if not group_members.usable(row, job.member.revision):
-            missing.append(m.role or str(m.image_id))
-            continue
-        reads.append(
-            PromptResultRead(
-                prompt_id=job.member.id,
-                image_id=m.image_id,
-                role=m.role,
-                result_data=row.result_data,
-                result_text=row.result_text,
-                model_name=row.model_name,
-                prompt_revision=row.prompt_revision,
-            )
-        )
-    return reads, missing
-
-
-async def _pictures(runtime: Any, job: Any) -> list[bytes]:
-    from sm_images.ai.runner import prepare_image
-
-    store = runtime.store()
-    gate = asyncio.Semaphore(group_members.MEMBER_CONCURRENCY)
-
-    async def one(image_id: uuid.UUID) -> bytes:
-        async with gate:
-            data = await store.read(job.display_keys[image_id])
-            return await asyncio.to_thread(prepare_image, data, MAX_SIDE)
-
-    return list(await asyncio.gather(*(one(m.image_id) for m in job.group.members)))
-
-
-def _instruction(job: Any, reads: list[PromptResultRead]) -> str:
-    if not reads:
-        return job.instruction
-    lines = [
-        f"- {r.role or r.image_id}: "
-        + json.dumps(r.result_data if r.result_data else {"text": r.result_text})
-        for r in reads
-    ]
-    return job.instruction + "\n\nPer-image results:\n" + "\n".join(lines)
-
-
 def _output_type(job: Any) -> Any:
     from sm_images.ai.schema_safety import output_model
 
@@ -158,8 +105,17 @@ async def _work(runtime: Any, job: Any, lease: _Lease) -> GroupOutcome:
         return GroupOutcome.failed("group_empty", "the group has no images")
     if job.too_many:
         return GroupOutcome.failed("group_too_large", f"over {group_load.MAX_MEMBERS} images")
-    if job.unsafe:
-        return GroupOutcome.failed("display_not_ready", f"{len(job.unsafe)} not redacted yet")
+    found: dict[uuid.UUID, Any] = {}
+    need: list[uuid.UUID] = []
+    if job.inputs in NEEDS_MEMBERS:
+        if job.member is None:
+            return GroupOutcome.failed("member_prompt_missing", "no image prompt to consolidate")
+        found, need = await group_inputs.needed(runtime, job)
+    # Only a picture that is sent must be safe to send: every member's when the
+    # pictures go with the summary, otherwise those of the members that need a call.
+    sent = {m.image_id for m in members} if job.inputs in SENDS_IMAGES else set(need)
+    if unsafe := [i for i in job.unsafe if i in sent]:
+        return GroupOutcome.failed("display_not_ready", f"{len(unsafe)} not redacted yet")
     try:  # stored before a cap existed, or edited in the database: refused here too
         out_type = _output_type(job)
     except UnsafeSchema as exc:
@@ -171,10 +127,8 @@ async def _work(runtime: Any, job: Any, lease: _Lease) -> GroupOutcome:
     reads: list[PromptResultRead] = []
     missing: list[str] = []
     if job.inputs in NEEDS_MEMBERS:
-        if job.member is None:
-            return GroupOutcome.failed("member_prompt_missing", "no image prompt to consolidate")
-        reads, missing = await _member_results(runtime, job)
-    pictures = await _pictures(runtime, job) if job.inputs in SENDS_IMAGES else []
+        reads, missing = await group_inputs.member_results(runtime, job, found, need)
+    pictures = await group_inputs.pictures(runtime, job) if job.inputs in SENDS_IMAGES else []
     if not reads and not pictures:
         return GroupOutcome.failed("no_usable_inputs", f"missing: {', '.join(missing)}")
     await lease.start_call()
@@ -188,7 +142,7 @@ async def _work(runtime: Any, job: Any, lease: _Lease) -> GroupOutcome:
         return GroupOutcome.failed("quota_exceeded", "the plan's AI request limit is used up")
     try:
         data, model_name = await run_structured(
-            _instruction(job, reads), out_type, pictures, model=model, temperature=0.0
+            group_inputs.instruction(job, reads), out_type, pictures, model=model, temperature=0.0
         )
     except UnexpectedModelBehavior as exc:
         return GroupOutcome.failed("invalid_output", exc)

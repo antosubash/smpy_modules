@@ -24,6 +24,9 @@ isolation applying as in a request:
   imports queue in broker mode, inline when eager);
 * regroup jobs of big collections whose heartbeat is stale are claimed (a new
   generation) and relaunched from their cursor (:mod:`sm_images.regroup`);
+* group prompt runs requested longer than :data:`CUTOFF` ago and never
+  claimed, or claimed under an expired lease, are dispatched again
+  (:func:`sm_images.ai.group_request.recover_group_runs`);
 * every live collection's stats are recomputed (the only way a box shrinks
   after deletes; there is no durable "touched" marker yet, so all of them,
   in batches).
@@ -40,6 +43,7 @@ from typing import Any
 from simple_module_db import all_tenants, finalize_session, tenant_context
 from sqlalchemy import and_, or_, select, update
 
+from sm_images.ai.group_request import recover_group_runs
 from sm_images.imports.recover import recover_imports
 from sm_images.models import (
     Collection,
@@ -214,6 +218,7 @@ async def reconcile_tenant(runtime: Runtime, tenant: str, now: datetime) -> Coun
     done["restarts"] = await _restarts(runtime, tenant, now, cutoff)
     done["regroups"] = await _regroups(runtime, tenant, cutoff)
     done["import_jobs"], done["import_items"] = await recover_imports(runtime, tenant, cutoff)
+    done["group_runs"] = await recover_group_runs(runtime, tenant, now, cutoff)
     done["collections"] = await _recompute_stats(runtime, tenant)
     return done
 

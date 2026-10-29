@@ -62,11 +62,11 @@ export function PromptsTab({
 
   const hasGroupPrompt = prompts?.some((p) => p.scope === 'group') ?? false;
   useEffect(() => {
-    if (!canEdit || !hasGroupPrompt) return;
+    if (!hasGroupPrompt) return; // names for the results, and the editor's group picker
     listGroups(collectionId, null, GROUPS_SHOWN)
       .then((page) => setGroups(page.items))
       .catch(() => setGroups([]));
-  }, [collectionId, canEdit, hasGroupPrompt]);
+  }, [collectionId, hasGroupPrompt]);
 
   const act = async (work: () => Promise<unknown>, done?: string) => {
     setBusy(true);
@@ -90,7 +90,7 @@ export function PromptsTab({
 
   const run = (prompt: Prompt, target: RunTarget) =>
     act(async () => {
-      const { requested } = await runPrompt(prompt.id, target.scope, target.groupIds);
+      const { requested } = await runPrompt(prompt.id, target.scope, { groupIds: target.groupIds });
       toast(
         requested === null
           ? t(keys.images.prompts.run.queued)

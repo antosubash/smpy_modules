@@ -52,3 +52,19 @@ export type Preset = {
   prompts: PresetPrompt[];
   has_cross_check: boolean;
 };
+
+/** One result row (`GET /prompts/{id}/results`). A `failed` row keeps the
+ *  output of the last run that worked: it is the previous result, not this one. */
+export type PromptResult = {
+  id: number;
+  prompt_id: string;
+  image_id: string | null;
+  group_id: string | null;
+  status: string;
+  result_text: string | null;
+  result_data: Record<string, unknown> | null;
+  error: string | null;
+  cross_check: Record<string, unknown> | null;
+  stale: boolean;
+  review_status: string;
+};

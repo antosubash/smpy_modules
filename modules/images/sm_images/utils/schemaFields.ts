@@ -8,6 +8,7 @@
  * building it back and comparing - and the editor then edits the JSON itself.
  */
 
+import { keys } from './i18n';
 import type { JsonSchema } from './types-prompts';
 
 export type FieldType = 'string' | 'integer' | 'number' | 'boolean' | 'string_list';
@@ -23,6 +24,15 @@ export type SchemaField = {
    *  entries (mid-typing) are ignored. */
   choices: string[];
 };
+
+/** Names an object's prototype answers to: refused as field names, so no
+ *  schema built here (or read back) can reach `Object.prototype`. */
+const RESERVED = new Set(['__proto__', 'constructor', 'prototype']);
+
+/** The catalogue key of what is wrong with a field name, or `null`. */
+export function fieldNameError(name: string): string | null {
+  return RESERVED.has(name.trim()) ? keys.images.prompts.schema.reserved_name : null;
+}
 
 export function emptyField(): SchemaField {
   return { name: '', type: 'string', description: '', required: false, choices: [] };
@@ -44,13 +54,14 @@ function definition(field: SchemaField): JsonSchema {
   return description ? { ...out, description } : out;
 }
 
-/** The JSON Schema of `fields`; a field with no name is left out. */
+/** The JSON Schema of `fields`; a field with no name, or a reserved one
+ *  ({@link fieldNameError}), is left out. `properties` has no prototype. */
 export function buildJsonSchema(fields: SchemaField[]): JsonSchema {
-  const properties: Record<string, JsonSchema> = {};
+  const properties: Record<string, JsonSchema> = Object.create(null);
   const required: string[] = [];
   for (const field of fields) {
     const name = field.name.trim();
-    if (!name) continue;
+    if (!name || fieldNameError(name)) continue;
     properties[name] = definition(field);
     if (field.required) required.push(name);
   }
@@ -100,6 +111,7 @@ export function schemaToFields(schema: JsonSchema | null | undefined): SchemaFie
   if (!isRecord(properties) || required === null) return null;
   const fields: SchemaField[] = [];
   for (const [name, def] of Object.entries(properties)) {
+    if (fieldNameError(name)) return null;
     const field = fieldOf(name, def, required.includes(name));
     if (field === null) return null;
     fields.push(field);
