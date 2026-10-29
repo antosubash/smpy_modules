@@ -138,4 +138,43 @@ describe('progress while runs are in flight (QA TEST-007)', () => {
     await act(async () => vi.advanceTimersByTimeAsync(PIPELINE_POLL_MS * 3));
     expect(gets(calls)).toBe(1);
   });
+
+  it('a poll begun before a save and answered after it does not restore the older state', async () => {
+    vi.useFakeTimers();
+    const old = overview({ pending: 1 });
+    const saved = overview({
+      pending: 1,
+      steps: overview().steps.map((s) => ({ ...s, enabled: true })),
+    });
+    stubFetch({ [`GET ${URL}`]: old, [`PUT ${URL}`]: saved });
+    const routed = globalThis.fetch;
+    let reads = 0;
+    let answer: (() => void) | null = null;
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      if ((init?.method ?? 'GET') === 'GET' && ++reads === 2) {
+        const response = await routed(input, init); // the older state, read before the save
+        await new Promise<void>((resolve) => {
+          answer = resolve;
+        });
+        return response;
+      }
+      return routed(input, init);
+    });
+    const view = await mount(<PipelineTab collectionId="c1" canManage={true} />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    await act(async () => vi.advanceTimersByTimeAsync(PIPELINE_POLL_MS)); // the poll is now in flight
+    await click(get(view, 'images-step-toggle-classify'));
+    await click(get(view, 'images-pipeline-save'));
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    const toggle = () => get(view, 'images-step-toggle-classify') as HTMLInputElement;
+    const before = toggle().getAttribute('aria-checked') ?? String(toggle().checked);
+    await act(async () => {
+      (answer as (() => void) | null)?.(); // the stale poll resolves after the save
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    const after = toggle().getAttribute('aria-checked') ?? String(toggle().checked);
+    expect(after).toBe(before);
+    expect(after).toMatch(/true/);
+    await view.unmount();
+  });
 });

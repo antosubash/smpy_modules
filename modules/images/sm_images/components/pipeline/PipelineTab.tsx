@@ -62,6 +62,8 @@ export function PipelineTab({
   const [dirty, setDirty] = useState(false);
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
+  // Bumped around every write of ours: a poll read begun before it is stale.
+  const epoch = useRef(0);
   const [saving, setSaving] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const busy = saving || restarting;
@@ -96,16 +98,23 @@ export function PipelineTab({
   }, [watch]);
 
   const polling = restarting || watch !== null || hasActiveRuns(overview);
-  usePipelinePoll(collectionId, polling, (next) => {
-    setOverview(next);
-    if (!dirtyRef.current) setDrafts(draftsOf(next));
-  });
+  usePipelinePoll(
+    collectionId,
+    polling,
+    (next) => {
+      setOverview(next);
+      if (!dirtyRef.current) setDrafts(draftsOf(next));
+    },
+    epoch,
+  );
 
   const save = async () => {
     if (!overview) return;
     setSaving(true);
+    epoch.current += 1;
     try {
       const next = await savePipeline(collectionId, payloadOf(overview, drafts));
+      epoch.current += 1;
       setOverview(next);
       setDrafts(draftsOf(next));
       setDirty(false);
@@ -121,8 +130,10 @@ export function PipelineTab({
 
   const restart = async (scope: RestartScope) => {
     setRestarting(true);
+    epoch.current += 1;
     try {
       await restartPipeline(collectionId, scope);
+      epoch.current += 1;
       setWatch({ until: Date.now() + RESTART_WATCH_MS }); // a fresh object per request
       setOfferRestart(false);
       toast(t(keys.images.pipeline.restarted));

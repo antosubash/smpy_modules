@@ -45,7 +45,9 @@ export function CollectionMap({
         if (!controller.signal.aborted) setState({ phase: 'ready', source });
       })
       .catch(() => {
-        if (!controller.signal.aborted) setState({ phase: 'failed' });
+        // A failed refresh keeps the map already drawn.
+        if (!controller.signal.aborted)
+          setState((s) => (s.phase === 'ready' ? s : { phase: 'failed' }));
       });
     return () => controller.abort();
   }, [pointsUrl, mapUrl, version]);

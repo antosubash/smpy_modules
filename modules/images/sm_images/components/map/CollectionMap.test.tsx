@@ -77,4 +77,21 @@ describe('CollectionMap (review of QA round 1)', () => {
     expect(view.find('[data-testid="fake-map"]')?.getAttribute('data-count')).toBe('2');
     await view.unmount();
   });
+
+  it('keeps the drawn map when a refresh fails', async () => {
+    vi.mocked(resolveMapSource)
+      .mockResolvedValueOnce({ kind: 'points', features: [point('a')] })
+      .mockRejectedValueOnce(new Error('503'));
+    const el = (version: string) => (
+      <CollectionMap pointsUrl="/p" mapUrl="/m" bbox={null} onSelect={() => {}} version={version} />
+    );
+    const view = await mount(el('1'));
+    await flush();
+    await flush();
+    await view.render(el('2'));
+    await flush();
+    await flush();
+    expect(view.find('[data-testid="fake-map"]')).not.toBeNull();
+    await view.unmount();
+  });
 });
