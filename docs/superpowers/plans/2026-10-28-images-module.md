@@ -542,7 +542,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 - `test_zip_metadata_json_applied`;
 - `test_zip_groups_by_pattern`.
 
-- [ ] Commit `feat(images): ZIP import`
+- [x] Commit `feat(images): ZIP import`
 
 ### Task 19: Import wizard, jobs panel, auto-run
 
