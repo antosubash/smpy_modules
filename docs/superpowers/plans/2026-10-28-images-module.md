@@ -676,7 +676,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 
 **Tests:** the bbox filter; points hide a private collection; `test_range_request_206`; `test_tiles_have_no_filenames` (skipped if tippecanoe is absent); the rebuild threshold.
 
-- [ ] Commit `feat(images): points and PMTiles`
+- [x] Commit `feat(images): points and PMTiles`
 
 ### Task 27: Map tab, public page, pagebuilder block
 
