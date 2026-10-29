@@ -16,7 +16,7 @@ from tests.access_support import EDITOR, MANAGER, OWNER, STRANGER, headers
 from tests.serve_support import seed_gallery
 from tests.stub_auth import as_user
 
-PRIVATE = "private, max-age=3600"
+PRIVATE = "private, no-cache"
 NO_STORE = "private, no-store"
 ORIGINALS = as_user("orla", ("images.view", "images.originals.view"))
 

@@ -2,6 +2,7 @@
 
 Shareable needs all four: a public collection, a rendition or display copy,
 the public twin, and a tenant nothing request-specific chose (records #196).
+Everything revalidates (``no-cache``): a later change can revoke any of it.
 """
 
 from __future__ import annotations
@@ -19,8 +20,8 @@ from tests.access_support import collection
 # the request-specific sources ``note_tenant_source`` records.
 pytestmark = pytest.mark.unbound_tenant
 
-SHARED = "public, max-age=31536000, immutable"
-PRIVATE = "private, max-age=3600"
+SHARED = "public, no-cache"
+PRIVATE = "private, no-cache"
 NO_STORE = "private, no-store"
 
 
@@ -35,7 +36,7 @@ def _request(tenant: str | None = None) -> Request:
 
 
 def _cc(req, coll, route, **kw):
-    return cache.cache_headers(req, coll, route, **{"current": True, **kw})
+    return cache.cache_headers(req, coll, route, **kw)
 
 
 @pytest.mark.parametrize("route", [cache.RENDITION, cache.DISPLAY])
@@ -85,18 +86,15 @@ def test_a_request_bind_public_never_saw_fails_closed():
     assert _cc(req, coll, cache.RENDITION, twin=True) == PRIVATE
 
 
-@pytest.mark.parametrize(
-    ("twin", "want"), [(True, "public, no-cache"), (False, "private, no-cache")]
-)
-def test_a_url_not_naming_the_current_bytes_is_no_cache(twin, want):
+@pytest.mark.parametrize(("twin", "want"), [(True, SHARED), (False, PRIVATE)])
+def test_nothing_is_immutable_or_kept_without_revalidating(twin, want):
+    """S1: every byte response can be revoked later, so all revalidate."""
     coll = collection("p", Visibility.PUBLIC)
-    for route in (cache.RENDITION, cache.DISPLAY):
-        assert _cc(_request(), coll, route, twin=twin, current=False) == want
-
-
-def test_a_non_public_stale_url_is_private_no_cache():
-    coll = collection("p", Visibility.PRIVATE)
-    assert _cc(_request(), coll, cache.DISPLAY, twin=True, current=False) == "private, no-cache"
+    for route in (cache.RENDITION, cache.DISPLAY, cache.ORIGINAL):
+        got = _cc(_request(), coll, route, twin=twin)
+        assert "no-cache" in got and "max-age" not in got and "immutable" not in got
+        if route != cache.ORIGINAL:
+            assert got == want
 
 
 def test_the_version_is_generation_and_key_digest():

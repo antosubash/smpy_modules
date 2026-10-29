@@ -21,8 +21,8 @@ from tests.access_support import OWNER, STRANGER, collection, headers, image
 from tests.isolation_support import ACME
 from tests.serve_support import seed_gallery
 
-SHARED = "public, max-age=31536000, immutable"
-PRIVATE = "private, max-age=3600"
+SHARED = "public, no-cache"
+PRIVATE = "private, no-cache"
 
 
 @pytest_asyncio.fixture

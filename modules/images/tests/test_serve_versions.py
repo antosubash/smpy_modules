@@ -3,10 +3,9 @@
 4. A tenant something upstream put on the request - even ``default`` - is
    request-specific: never ``public``. Only the host-wide single-tenant
    fallback is (records #196).
-5. ``?v=`` names the bytes (generation plus a digest of the key). Only a
-   request whose ``v`` is the current representation is cacheable as such; a
-   stale or missing one gets the current bytes with ``no-cache``, so a URL is
-   never cached ``immutable`` for bytes it does not name.
+5. ``?v=`` names the bytes (generation plus a digest of the key). Since S1
+   every answer is ``no-cache`` whatever ``v`` says: a stale or missing one
+   gets the current bytes and revalidates like a current one.
 6. ``HEAD`` answers every byte route with the same access and cache decisions
    and no body.
 """
@@ -20,8 +19,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from tests.access_support import EDITOR, OWNER, STRANGER, headers
 from tests.serve_support import seed_gallery
 
-SHARED = "public, max-age=31536000, immutable"
-PRIVATE = "private, max-age=3600"
+SHARED = "public, no-cache"
+PRIVATE = "private, no-cache"
 PUBLIC_NO_CACHE = "public, no-cache"
 PRIVATE_NO_CACHE = "private, no-cache"
 

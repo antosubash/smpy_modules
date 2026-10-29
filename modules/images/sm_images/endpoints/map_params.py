@@ -35,6 +35,6 @@ async def points_response(
     box = points.parse_bbox(bbox)
     body = await points.page(db, collection, bbox=box, limit=limit, cursor=cursor)
     response.headers["Cache-Control"] = cache.cache_headers(
-        request, collection, cache.DISPLAY, twin=twin, current=False
+        request, collection, cache.DISPLAY, twin=twin
     )
     return body

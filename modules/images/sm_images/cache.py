@@ -1,6 +1,15 @@
 """How an image response may be cached, and its validator.
 
-**Shareable** - ``public, max-age=31536000, immutable`` - only when all four hold:
+**Everything revalidates.** Every byte response can be revoked later: the
+collection goes private, ``protect_originals`` is switched on, a display
+mutator (anonymization) is enabled, a share is withdrawn. A cache that keeps a
+response without asking would go on serving it, so nothing is ``immutable`` or
+carries a ``max-age``: every response is ``no-cache`` with a strong ETag, each
+reuse is a conditional request, and the route answers 304 only after the full
+access and redaction check (``sm_images.serving``). The cost is one small
+round trip per reuse.
+
+**Shareable** - ``public, no-cache`` - only when all four hold:
 
 * the collection is ``public``;
 * the route is a rendition or the display copy (never an original);
@@ -16,23 +25,20 @@
   per tenant, and a shared cache keyed by URL would hand one tenant's answer
   to another.
 
-**And the URL names the bytes.** ``?v=`` is :func:`version` - the generation
-plus a digest of the object key - and the bytes behind a key never change
-(keys are generation- and attempt-specific, ``storage_keys``). A request whose
-``v`` is missing or is not the current representation's gets the current
-bytes with ``no-cache`` (``public`` or ``private`` as above): a stale URL is
-never stored ``immutable`` for bytes it does not name, and an unversioned one
-always revalidates.
-
-Everything else is ``private, max-age=3600``, except a **protected original**
-(the image has a display copy, or a display mutator has not settled), which is
+Everything else is ``private, no-cache``, except a **protected original** (the
+image has a display copy, or a display mutator has not settled), which is
 ``private, no-store`` for everyone, the owner included: the browser of someone
 allowed to see it once must not keep the unredacted picture.
+
+``?v=`` (:func:`version` - the generation plus a digest of the object key)
+still names the bytes in every URL, so a regenerated object gets a new URL
+and a client never revalidates a stale one into the wrong bytes.
 
 The **ETag** is strong: a digest of the object key and its size. The key is
 generation- and attempt-specific, so a regenerated object always gets a new
 tag; the digest keeps the key (tenant, collection and image ids) out of the
-header.
+header. No ``Last-Modified``: the storage backends' ``head`` reports no
+modification time, and the ETag alone validates.
 """
 
 from __future__ import annotations
@@ -56,7 +62,8 @@ __all__ = [
     "ORIGINAL",
     "PRIVATE",
     "RENDITION",
-    "SHARED",
+    "PRIVATE_NO_CACHE",
+    "PUBLIC_NO_CACHE",
     "cache_headers",
     "etag",
     "if_range_ok",
@@ -68,11 +75,11 @@ RENDITION: Final = "rendition"
 DISPLAY: Final = "display"
 ORIGINAL: Final = "original"
 
-SHARED: Final = "public, max-age=31536000, immutable"
-PRIVATE: Final = "private, max-age=3600"
-NO_STORE: Final = "private, no-store"
 PUBLIC_NO_CACHE: Final = "public, no-cache"
 PRIVATE_NO_CACHE: Final = "private, no-cache"
+NO_STORE: Final = "private, no-store"
+PRIVATE: Final = PRIVATE_NO_CACHE
+"""Everything not shareable and not a protected original."""
 
 _WEAK: Final = "W/"
 _DIGEST_CHARS: Final = 32
@@ -94,20 +101,15 @@ def cache_headers(
     *,
     twin: bool = False,
     protected: bool = False,
-    current: bool = False,
 ) -> str:
     """The ``Cache-Control`` for serving *route* of an image in *collection*.
 
-    ``current``: the request's ``?v=`` names the representation being served
-    (ignored for an original, whose bytes never change). Decided before the
-    conditional-request check, so a 304 carries it too.
+    Decided before the conditional-request check, so a 304 carries it too.
     """
     if route == ORIGINAL:
         return NO_STORE if protected else PRIVATE
     shared = twin and collection.visibility == Visibility.PUBLIC and _shared_tenant(request)
-    if not current:
-        return PUBLIC_NO_CACHE if shared else PRIVATE_NO_CACHE
-    return SHARED if shared else PRIVATE
+    return PUBLIC_NO_CACHE if shared else PRIVATE
 
 
 def version(generation: int, key: str) -> str:

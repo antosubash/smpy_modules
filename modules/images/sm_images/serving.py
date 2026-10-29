@@ -28,10 +28,12 @@ portal's "thumbnail not available", and the original is protected. A
 rendition is also a 404 unless it was cut from the current display
 generation.
 
-**Versions.** The display copy and each rendition carry a version
-(:func:`sm_images.cache.version`); a request whose ``?v=`` is not it is served
-the current bytes with ``no-cache`` (``sm_images.cache``). ``HEAD`` takes the
-same path and sends the headers without opening the object.
+**Caching.** Every answer is ``no-cache`` with a strong ETag
+(``sm_images.cache``), and the 304 for ``If-None-Match`` is decided only here,
+after the access and redaction checks above, so a revoked image stops
+answering conditional requests too. ``?v=`` in a URL only busts caches: the
+current bytes are served whatever it says. ``HEAD`` takes the same path and
+sends the headers without opening the object.
 """
 
 from __future__ import annotations
@@ -63,9 +65,6 @@ class Target:
     key: str
     content_type: str
     protected: bool
-    version: str | None = None
-    """What ``?v=`` must say for the request to be "current"; ``None`` for an
-    original, whose bytes never change."""
     withheld: bool = False
     """Redaction is still pending: the picture itself may not be shown yet."""
 
@@ -111,14 +110,13 @@ async def resolve(
     if route == cache.RENDITION:
         if rendition is None or pending or rendition.source_generation != image.display_generation:
             raise _missing(twin)
-        v = cache.version(rendition.source_generation, rendition.storage_key)
-        return image, Target(rendition.storage_key, constants.DISPLAY_CONTENT_TYPE, False, v)
+        return image, Target(rendition.storage_key, constants.DISPLAY_CONTENT_TYPE, False)
     if route == cache.DISPLAY:
         if pending:
             raise _missing(twin)
         key = image.display_key or image.storage_key
         kind = constants.DISPLAY_CONTENT_TYPE if image.display_key else image.content_type
-        return image, Target(key, kind, False, cache.version(image.display_generation, key))
+        return image, Target(key, kind, False)
     protected = image.display_key is not None or pending
     return image, Target(image.storage_key, image.content_type, protected, withheld=pending)
 
@@ -200,10 +198,7 @@ async def serve(
         who, image, collection, protected=target.protected
     ):
         raise Forbidden(constants.ORIGINAL_FORBIDDEN_DETAIL)
-    current = target.version is not None and request.query_params.get("v") == target.version
-    policy = cache.cache_headers(
-        request, collection, route, twin=twin, protected=target.protected, current=current
-    )
+    policy = cache.cache_headers(request, collection, route, twin=twin, protected=target.protected)
     ranged = route != cache.RENDITION
     return await _respond(request, store_for(request.app), target, policy, ranged, twin)
 
@@ -228,6 +223,6 @@ async def serve_map(request: Request, collection: Collection, *, twin: bool) -> 
     """
     if not collection.map_key or collection.map_policy_rev != redaction.gate_key(collection):
         raise _missing()
-    policy = cache.cache_headers(request, collection, cache.DISPLAY, twin=twin, current=False)
+    policy = cache.cache_headers(request, collection, cache.DISPLAY, twin=twin)
     target = Target(collection.map_key, constants.PMTILES_CONTENT_TYPE, False)
     return await _respond(request, store_for(request.app), target, policy, True)

@@ -19,7 +19,7 @@ from tests.pipeline_support import Blur, use_steps
 from tests.serve_support import seed_gallery
 
 NO_STORE = "private, no-store"
-PRIVATE = "private, max-age=3600"
+PRIVATE = "private, no-cache"
 
 
 @pytest.fixture

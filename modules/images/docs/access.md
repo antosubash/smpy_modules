@@ -111,16 +111,23 @@ Public routes are `GET` and `HEAD` only: the collection page, the gallery
 `r/{size}`, `display` and `original` byte routes. An unknown slug, a foreign
 tenant and an unbound tenant all get the one 404 body.
 
-Caching follows who the answer depends on:
+Every byte response can be revoked later (the collection goes private,
+`protect_originals` is switched on, anonymization is enabled, a share is
+withdrawn), so **every response revalidates**: nothing is `immutable` or carries
+a `max-age`. Each one has a strong `ETag`, a cache must send `If-None-Match`
+before reusing it, and the 304 is answered only after the full access and
+redaction check, so a revoked image stops being served from caches too. The
+cost is one small round trip (a 304) per reuse. `?v=` in a URL still names the
+bytes, so a regenerated rendition or display copy gets a new URL.
 
-- `public, max-age=31536000, immutable` only for a rendition or display copy of
-  a public collection through the anonymous twin, when the request's tenant was
-  not picked by anything request-specific (a multi-tenant host never qualifies),
-  and the URL names the bytes with `?v=`. A stale or missing `v` gets the
-  current bytes with `no-cache`.
-- Everything else is `private, max-age=3600`.
+Who may share the answer:
+
+- `public, no-cache` only for a rendition or display copy of a public
+  collection through the anonymous twin, when the request's tenant was not
+  picked by anything request-specific (a multi-tenant host never qualifies).
+- Everything else is `private, no-cache`.
 - A protected original is `private, no-store` for everyone, the owner included.
-- The map surfaces are `no-cache` so a withdrawn archive stops being served.
+- The map surfaces (points, `map.pmtiles`) follow the same split.
 - Error answers on the public routes carry `no-store`.
 
 `public_asset_base_url`, when set, makes public pages link renditions of public

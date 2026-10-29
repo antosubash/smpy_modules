@@ -120,7 +120,7 @@ async def public_images(
     filename or metadata. Only images whose ``small`` rendition may be shown."""
     body = await public_gallery.page(db, collection, limit=limit, cursor=cursor)
     response.headers["Cache-Control"] = cache.cache_headers(
-        request, collection, cache.DISPLAY, twin=True, current=False
+        request, collection, cache.DISPLAY, twin=True
     )
     return body
 

@@ -54,9 +54,7 @@ class RequiresWritable:
     """``RequiresResource(POLICY, action, loader)``, but a caller who cannot
     edit is refused a withheld target with the absent 404, not the 403."""
 
-    def __init__(
-        self, action: str, loader: Callable[..., Any], param: str, probe: Probe
-    ) -> None:
+    def __init__(self, action: str, loader: Callable[..., Any], param: str, probe: Probe) -> None:
         self.action, self.param, self.probe = action, param, probe
 
         async def dependency(

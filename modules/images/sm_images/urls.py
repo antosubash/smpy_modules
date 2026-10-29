@@ -2,9 +2,9 @@
 
 Every URL carries ``?v=`` naming the exact bytes - :func:`sm_images.cache.version`,
 the generation plus a digest of the object key. A regenerated rendition or a
-new display copy lives under a new key, so it gets a new URL, and an old URL
-may stay cached forever (``cache.SHARED`` is ``immutable``) because the route
-refuses to call a request "current" unless its ``v`` matches.
+new display copy lives under a new key, so it gets a new URL. Caches still
+revalidate every use (``sm_images.cache``: ``no-cache`` with a strong ETag), so
+a revoked image stops being served from them.
 
 ``public_asset_base_url`` (a boot-time setting, read in ``on_startup`` through
 :func:`configure`) puts a CDN in front of the **public twin** for public
