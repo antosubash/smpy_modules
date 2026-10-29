@@ -56,6 +56,46 @@ async def test_a_failing_reconcile_phase_does_not_starve_the_later_ones(pipe, mo
     assert "import_jobs" not in done
 
 
+async def test_dispatch_waits_for_a_successful_lease_repair(pipe, monkeypatch):
+    """A legacy RUNNING row with no lease is still running until the repair
+    leases it: dispatching after a failed repair could conclude it (and send
+    ``ImageProcessed``) under the worker's feet. Unrelated phases still run."""
+    ran: list[str] = []
+
+    async def dispatch(runtime, tenant, now, cutoff):
+        ran.append("dispatch")
+        return {"dispatched": 1}
+
+    async def maps(runtime, tenant, now):
+        ran.append("maps")
+        return 3
+
+    monkeypatch.setattr(reconcile, "repair_unleased", _aboom)
+    monkeypatch.setattr(reconcile, "dispatch_images", dispatch)
+    monkeypatch.setattr(reconcile, "reconcile_maps", maps)
+    done = await reconcile.reconcile_tenant(pipe.runtime, T, LATER)
+    assert ran == ["maps"] and done["maps"] == 3
+    assert (done["failed_phases"], done["skipped_phases"]) == (1, 1)
+    assert "dispatched" not in done
+
+
+async def test_dispatch_runs_once_the_repair_succeeded(pipe, monkeypatch):
+    ran: list[str] = []
+
+    async def repair(runtime, tenant, cutoff):
+        ran.append("repaired")
+        return 0
+
+    async def dispatch(runtime, tenant, now, cutoff):
+        ran.append("dispatch")
+
+    monkeypatch.setattr(reconcile, "repair_unleased", repair)
+    monkeypatch.setattr(reconcile, "dispatch_images", dispatch)
+    done = await reconcile.reconcile_tenant(pipe.runtime, T, LATER)
+    assert ran == ["repaired", "dispatch"]
+    assert "skipped_phases" not in done
+
+
 async def test_a_failing_janitor_phase_does_not_stop_the_rest(pipe, monkeypatch):
     ran: list[str] = []
 

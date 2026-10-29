@@ -36,11 +36,11 @@ from sm_billing.contracts.metering import (
     QuotaExceededError,
 )
 from sm_billing.metering import hold_sql
-from sm_billing.metering.core import MeteringCore
 from sm_billing.metering.errors import IdempotencyReplay
+from sm_billing.metering.hold_repair import HoldRepairMixin
 from sm_billing.metering.periods import as_utc
 from sm_billing.metering.tx import Counted, run_write
-from sm_billing.metering.validate import check_call, check_hold_id, check_text, check_ttl
+from sm_billing.metering.validate import check_call, check_hold_id, check_ttl
 from sm_billing.models import UsageGauge, UsageHold
 
 if TYPE_CHECKING:
@@ -61,6 +61,13 @@ class _Kept(Counted):
     row: Any = None
 
 
+@dataclass(frozen=True)
+class _Refused:
+    """A refusal (rolled back), carrying the level the refusing read saw."""
+
+    level: int
+
+
 def _hold(row: Any, *, replayed: bool = False) -> Hold:
     return Hold(
         id=row.id,
@@ -73,7 +80,7 @@ def _hold(row: Any, *, replayed: bool = False) -> Hold:
     )
 
 
-class HoldsMixin(MeteringCore):
+class HoldsMixin(HoldRepairMixin):
     """The gauge half of ``UsageService``."""
 
     # ── reads ────────────────────────────────────────────────────────
@@ -128,7 +135,11 @@ class HoldsMixin(MeteringCore):
             else:
                 stmt = hold_sql.upsert_gauge(dialect, **fields, limit=limit)
             level = (await session.execute(stmt)).scalar_one_or_none()
-            return None if level is None else Counted(int(level))
+            if level is not None:
+                return Counted(int(level))
+            # The level that refused, read under the refusing write's lock.
+            refusing = select(UsageGauge.in_use).where(*hold_sql.gauge_of(tenant_id, meter))
+            return _Refused(int((await session.execute(refusing)).scalar_one_or_none() or 0))
 
         outcome = await run_write(self._factory, None, apply)
         if isinstance(outcome, Counted):
@@ -139,14 +150,13 @@ class HoldsMixin(MeteringCore):
             replayed = await self._replay_hold(values)
             if replayed is not None:
                 return replayed
-        level = await self.in_use(tenant_id, meter)
+        if isinstance(outcome, _Refused):
+            level = outcome.level
+        else:  # a replay whose row was purged between the claim and the read
+            level = await self.in_use(tenant_id, meter)
         logger.info(
             "billing: hold refused tenant=%s meter=%s in_use=%s qty=%s limit=%s",
-            tenant_id,
-            meter,
-            level,
-            qty,
-            limit,
+            *(tenant_id, meter, level, qty, limit),
         )
         return Exceeded(level, limit or 0, qty, None)
 
@@ -274,25 +284,3 @@ class HoldsMixin(MeteringCore):
                 await asyncio.shield(self.release(outcome.id))
             except Exception:
                 logger.exception("billing: hold release failed hold=%s", outcome.id)
-
-    # ── repair ───────────────────────────────────────────────────────
-    async def recount(self, tenant_id: str, meter: str) -> int:
-        """Rebuild the level from the live (held and committed) holds; returns it.
-
-        The admin repair for drift (a bug that bypassed the service). Lapsed
-        holds the sweeper has not expired yet still count, as they do in the
-        gauge until it does.
-        """
-        check_text("tenant_id", tenant_id, 32)
-        self._require(meter, _GAUGE)
-        now = self._clock()
-        fields = {"tenant_id": tenant_id, "meter": meter, "now": now}
-
-        async def apply(session: AsyncSession) -> Counted:
-            dialect = session.get_bind().dialect.name
-            await session.execute(hold_sql.touch_gauge(dialect, **fields))
-            level = (await session.execute(hold_sql.recount(**fields))).scalar_one()
-            return Counted(int(level))
-
-        outcome = await run_write(self._factory, None, apply)
-        return outcome.used

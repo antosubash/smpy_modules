@@ -52,8 +52,8 @@ def domain_of(url: str) -> str:
     """``url``'s host as one key per host: IDNA (punycode), lowercased, without a
     trailing dot - or ``"unknown"``."""
     try:
-        host = httpx.URL(url).raw_host.decode("ascii")
-    except (httpx.InvalidURL, TypeError, ValueError, UnicodeDecodeError):
+        host = httpx.URL(url.strip()).raw_host.decode("ascii")
+    except (httpx.InvalidURL, TypeError, ValueError, UnicodeDecodeError, AttributeError):
         return "unknown"
     return host.lower().rstrip(".") or "unknown"
 

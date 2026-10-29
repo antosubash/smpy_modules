@@ -60,6 +60,20 @@ async def test_the_limit_holds_and_a_release_frees_it(factory, usage):
     assert isinstance(await usage.reserve(tenant, GAUGE, 1, "b", source="t"), Hold)
 
 
+async def test_a_refusal_reports_the_level_that_refused_it(factory, usage, monkeypatch):
+    """The payload's level is read in the refusing transaction, not afterwards:
+    a release landing between the two must not report room that refused."""
+    tenant = await seed_limits(factory, {GAUGE: 2})
+    await usage.reserve(tenant, GAUGE, 2, "a", source="t")
+
+    async def later_read(*_args):  # what a separate read sees after a release
+        return 0
+
+    monkeypatch.setattr(usage, "in_use", later_read)
+    refused = await usage.reserve(tenant, GAUGE, 1, "b", source="t")
+    assert refused == Exceeded(used=2, limit=2, requested=1, period_end=None)
+
+
 async def test_more_than_the_limit_and_zero_forbid(factory, usage):
     tenant = await seed_limits(factory, {GAUGE: 2})
     assert isinstance(await usage.reserve(tenant, GAUGE, 3, "big", source="t"), Exceeded)

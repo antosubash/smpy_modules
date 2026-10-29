@@ -67,6 +67,49 @@ async def test_saturated_dns_pool_fails_closed_without_queueing(hung_dns, monkey
 
 
 @pytest.fixture
+def no_polling(monkeypatch):
+    """Records every ``asyncio.sleep`` while admission waits: it must park, not poll."""
+    calls: list[float] = []
+    real_sleep = asyncio.sleep
+
+    async def sleep(delay, *args, **kwargs):
+        calls.append(delay)
+        return await real_sleep(delay, *args, **kwargs)
+
+    monkeypatch.setattr(dns.asyncio, "sleep", sleep)
+    return calls
+
+
+async def test_a_waiter_is_woken_by_a_release_from_a_worker_thread(hung_dns, no_polling):
+    for _ in range(dns.POOL_SIZE):
+        assert dns._try_admit()
+    try:
+        waiter = asyncio.ensure_future(dns._admit())
+        done, _ = await asyncio.wait({waiter}, timeout=0.05)
+        assert not done  # parked: every slot is held
+        threading.Thread(target=dns._release).start()  # as a done-callback would
+        await asyncio.wait_for(waiter, 1)
+        assert dns.busy() == dns.POOL_SIZE  # the freed slot went to the waiter
+        assert no_polling == []
+    finally:
+        for _ in range(dns.busy()):
+            dns._release()
+
+
+async def test_saturated_admission_still_times_out_without_polling(hung_dns, no_polling):
+    for _ in range(dns.POOL_SIZE):
+        assert dns._try_admit()
+    try:
+        with pytest.raises(FetchTimeoutError):
+            await _fetch("http://tenth.example/a.jpg", 0.2)
+        assert no_polling == []
+        assert dns.busy() == dns.POOL_SIZE  # a timed-out waiter takes no slot
+    finally:
+        for _ in range(dns.busy()):
+            dns._release()
+
+
+@pytest.fixture
 async def stalling_server(resolver, monkeypatch):
     """Accepts TCP on 127.0.0.1 and never answers the TLS ClientHello; records
     when the client's side of each connection is closed (EOF)."""

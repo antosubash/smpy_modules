@@ -182,6 +182,8 @@ async def safe_stream(
                 raise FetchTimeoutError() from error
             try:
                 if response.has_redirect_location:
+                    if hop == max_redirects:  # before the hook: no slot for a hop never fetched
+                        raise UnsafeURLError("too_many_redirects")
                     current = current.join(response.headers["location"])
                     check_url(current, allowed_ports=allowed_ports)  # the transport re-checks
                     logger.info("Following redirect", extra={"hop": hop + 1, "host": current.host})
@@ -198,7 +200,7 @@ async def safe_stream(
                 return
             finally:
                 await response.aclose()
-    raise UnsafeURLError("too_many_redirects")
+    raise AssertionError("unreachable")  # pragma: no cover - the last hop returns or raises
 
 
 def _check_final(response: httpx.Response, max_bytes: int) -> None:

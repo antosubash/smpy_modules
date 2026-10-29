@@ -26,7 +26,8 @@ and nothing here deletes a key a row references. So is a retry: only a refusal
 of the bytes themselves (sniffed type, size, the decode guards) aborts the
 session; any other failure - a full quota, a database or storage blip - hands
 it back ``open`` with the assembled object kept. The failed attempt's storage
-hold was handed to the settler, which releases it; the retry takes its own.
+hold is handed back in a transaction of its own after the request's rollback
+and released at once (``slots.release_dropped``); the retry takes its own.
 
 **The token is signed, not encrypted.** Anyone holding it can read the key,
 ids and size inside (base64 JSON); only forging or altering it is prevented.
@@ -41,6 +42,7 @@ sniffed bytes are another type - so the key's extension, the row's
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any
 
@@ -61,6 +63,7 @@ from sm_images.ingest.meta import IngestMeta
 from sm_images.ingest.multipart import assemble as _assemble
 from sm_images.ingest.multipart import backend_of, open_upload, write_part
 from sm_images.ingest.service import Duplicate, IngestService
+from sm_images.ingest.slots import release_dropped
 from sm_images.ingest.sniff import EXTENSIONS, sniff
 from sm_images.ingest.ticket import (
     _BAD_TYPE,
@@ -83,6 +86,7 @@ __all__ = [
     "write_part",
 ]
 
+logger = logging.getLogger(__name__)
 _ABORTED = UploadStatus.ABORTED
 _INVALID = (UnsupportedType, ImageTooLarge, FileTooLarge, InvalidUpload, PartsMismatch)
 """The upload's own refusals: the bytes are not the declared or an acceptable
@@ -180,9 +184,21 @@ async def complete(
         # database or storage blip - keeps it open for a retried ``complete``.
         final = assembled and isinstance(exc, _REFUSALS)
         await state.settle(ingest.db, ticket, token, _ABORTED if final else UploadStatus.OPEN)
+        # The rollback took the insert's hand-back with it: redo it on its own
+        # and release the hold now, so a retry is admitted and holds once.
+        await _release_dropped(ingest)
         raise
     await state.finish(ingest.db, ticket, token)
     return outcome
+
+
+async def _release_dropped(ingest: IngestService) -> None:
+    """Never masks the failure: a hand-back that fails here is the settler's
+    once the op's claim expires."""
+    try:
+        await release_dropped(ingest._factory(), ingest.dropped)
+    except Exception:
+        logger.exception("images.upload.release_dropped_failed")
 
 
 async def _ingest(

@@ -44,7 +44,7 @@ from sm_images import billing, events, pipeline, storage_keys
 from sm_images.errors import StorageQuotaExceeded
 from sm_images.ingest import dedupe
 from sm_images.ingest import slots as holds
-from sm_images.ingest.guards import Inspected, inspect
+from sm_images.ingest.guards import Inspected, inspect, read_staged
 from sm_images.ingest.meta import IngestMeta, normalise
 from sm_images.ingest.slots import Duplicate, Slot, safe_filename
 from sm_images.intents import clear_intents, object_intent
@@ -73,6 +73,7 @@ class IngestService:
         self.intent_factory = intent_factory
         self._seen_external: dict[tuple[uuid.UUID, str, str], uuid.UUID] = {}
         self._seen_hash: dict[tuple[uuid.UUID, str], uuid.UUID] = {}
+        self.dropped: list[Any] = []  # ops handed back in ``db`` (``holds.release_dropped``)
 
     # -- intents ---------------------------------------------------------
 
@@ -134,7 +135,7 @@ class IngestService:
         if staged_key is not None and image_id is None:
             raise TypeError("a staged key needs the image_id it was minted for")
         if staged_key is not None:
-            data = await self.store.read(staged_key)
+            data = await read_staged(self.store, staged_key, self.settings.max_image_bytes)
         assert data is not None
         info = inspected or self.inspect(data)
         sha = hashlib.sha256(data).hexdigest()
@@ -239,6 +240,7 @@ class IngestService:
             await self._insert_rows(collection, row, meta, key, slot)
         except Exception:  # handed back outside the rolled-back savepoint
             await holds.drop_slot(self.db, self._factory(), slot)
+            self.dropped += [slot.op] if slot.op is not None else []
             raise
 
     async def _insert_rows(self, collection: Collection, row: Image, meta, key: str, slot):

@@ -39,7 +39,9 @@ isolation applying as in a request:
   (:func:`sm_images.map.recover.reconcile_maps`).
 
 Each of these is a phase of its own (:func:`sm_images.phases.run_phases`): one
-that raises is logged and counted as ``failed_phases``, and the rest still run.
+that raises is logged and counted as ``failed_phases``, and the rest still run -
+except the image dispatch, which runs only once ``repair_unleased`` succeeded
+in the same pass (a legacy RUNNING row without a lease is still running).
 The image dispatches - each on its own - are :mod:`sm_images.reconcile_dispatch`.
 """
 
@@ -172,7 +174,8 @@ async def reconcile_tenant(runtime: Runtime, tenant: str, now: datetime) -> Coun
     # Looked up here, at call time, so each phase is the module's current one.
     phases = [
         ("repaired", partial(repair_unleased, runtime, tenant, cutoff)),
-        ("dispatch", partial(dispatch_images, runtime, tenant, now, cutoff)),
+        # Only after a successful repair: an unleased RUNNING row is still running.
+        ("dispatch", partial(dispatch_images, runtime, tenant, now, cutoff), "repaired"),
         ("restarts", partial(_restarts, runtime, tenant, now, cutoff)),
         ("regroups", partial(_regroups, runtime, tenant, cutoff)),
         ("import_jobs", partial(_imports, runtime, tenant, cutoff)),

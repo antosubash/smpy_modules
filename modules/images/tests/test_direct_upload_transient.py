@@ -78,6 +78,32 @@ async def test_a_transient_failure_keeps_the_upload_open_and_a_retry_is_idempote
     assert held == {row.storage_hold_id: "committed"}  # the first attempt's hold went back
 
 
+async def test_a_retry_after_a_late_failure_ends_with_one_hold(
+    uploads, gauge, small_parts, monkeypatch
+):
+    """The failure comes after billing committed the attempt's hold (in the
+    insert). The request's rollback must not swallow the hand-back: the hold
+    is released before the retry takes its own, so a quota that fits one
+    upload admits the retry and exactly one hold is left committed."""
+    data = jpeg(size=(64, 48))
+    cid = await make_collection(uploads)
+    created = (await start(uploads, cid, data)).json()
+    parts = await send_parts(uploads, created, data)
+    gauge.limit = len(data)  # room for exactly one upload
+    _once_async(monkeypatch, stats, "on_image_added", RuntimeError("database blip"))
+    with pytest.raises(Exception):  # noqa: B017 - an unhandled 500, raised through the transport
+        await complete(uploads, created["upload_id"], parts)
+    assert await _status(uploads) is UploadStatus.OPEN
+
+    retried = await complete(uploads, created["upload_id"], parts)
+    assert retried.status_code == 200, retried.text
+    (row,) = await all_rows(uploads)
+    live = {h.id: h.status for h in gauge.holds.values() if h.status != "released"}
+    assert live == {row.storage_hold_id: "committed"}
+    async with uploads.db_state.session_factory() as db:
+        assert await billing_ops.unfinished(db, T, row.id) == []
+
+
 async def test_an_unavailable_service_keeps_the_upload_open(
     uploads, gauge, small_parts, monkeypatch
 ):

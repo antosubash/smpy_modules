@@ -22,7 +22,7 @@ from dataclasses import dataclass, replace
 from datetime import timedelta
 from typing import Any
 
-from simple_module_db import finalize_session
+from simple_module_db import finalize_session, mark_written
 
 from sm_images import billing, billing_ops
 from sm_images.errors import StorageQuotaExceeded
@@ -36,6 +36,7 @@ __all__ = [
     "drop_slot",
     "hold_slot",
     "keep_hold",
+    "release_dropped",
     "safe_filename",
 ]
 
@@ -119,3 +120,17 @@ async def drop_hold(db: Any, factory: Any, slot_op: billing_ops.Claimed | None) 
 async def drop_slot(db: Any, factory: Any, slot: Slot | None) -> None:
     if slot is not None:
         await drop_hold(db, factory, slot.op)
+
+
+async def release_dropped(factory: Any, dropped: list[billing_ops.Claimed]) -> None:
+    """For a caller whose transaction is rolled back after a failed insert
+    (``direct.complete``): its in-transaction hand-back went with it, so the op
+    would stay claimed for :data:`INGEST_CLAIM` and a retry would hold twice.
+    Hand each back again in a short transaction of its own - a no-op for one
+    already handed back or finished - whose commit settles it, releasing the
+    hold before any retry. Call it with no write transaction open on SQLite."""
+    while dropped:
+        async with factory() as db:
+            await billing_ops.hand_back(db, dropped.pop(), factory)
+            mark_written(db)  # Core DML: flag it, or finalize_session sees nothing
+            await finalize_session(db)

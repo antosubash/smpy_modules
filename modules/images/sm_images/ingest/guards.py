@@ -67,15 +67,28 @@ def guard_pixels(data: bytes) -> tuple[int, int]:
     return width, height
 
 
+def check_size(size: int, *, max_bytes: int) -> None:
+    if size > max_bytes:
+        raise FileTooLarge(_TOO_LARGE)
+
+
 def inspect(data: bytes, *, max_bytes: int) -> Inspected:
     """Everything an original must pass, cheapest first."""
-    if len(data) > max_bytes:
-        raise FileTooLarge(_TOO_LARGE)
+    check_size(len(data), max_bytes=max_bytes)
     content_type = sniff(data)
     if content_type is None:
         raise UnsupportedType(_NOT_AN_IMAGE)
     width, height = guard_pixels(data)
     return Inspected(content_type, EXTENSIONS[content_type], width, height)
+
+
+async def read_staged(store: Any, key: str, max_bytes: int) -> bytes:
+    """A staged object, capped by its stored size before it is loaded; a
+    missing one (``head`` is ``None``) fails in ``read`` as it always did."""
+    head = await store.head(key)
+    if head is not None:
+        check_size(head[0], max_bytes=max_bytes)
+    return await store.read(key)
 
 
 async def read_bounded(file: Any, limit: int, *, over: type[Exception] = FileTooLarge) -> bytes:

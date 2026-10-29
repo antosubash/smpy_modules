@@ -8,6 +8,8 @@ real socket and a real TLS handshake.
 
 from __future__ import annotations
 
+import asyncio
+
 import httpx
 import pytest
 from sm_images.imports import fetch
@@ -129,6 +131,24 @@ async def test_at_most_five_redirects(resolver, inner):
     with pytest.raises(UnsafeURLError, match="too_many_redirects"):
         await _fetch("http://cdn.example/a.jpg")
     assert len(seen) == 6  # the request and five redirects
+
+
+async def test_one_redirect_too_many_takes_no_slot(resolver, inner):
+    """The sixth redirect is refused before the hook: with the limiter busy it
+    must not wait for (or take) a slot for a hop that will never be fetched."""
+    resolver["cdn.example"] = [PUBLIC_IP]
+    inner(lambda r: httpx.Response(302, headers={"location": "/again"}))
+    entered: list[str] = []
+    busy = asyncio.Event()  # never set: the next host's slot is never free
+
+    async def on_redirect(target: httpx.URL) -> None:
+        entered.append(str(target))
+        if len(entered) > fetch.MAX_REDIRECTS:
+            await busy.wait()
+
+    with pytest.raises(UnsafeURLError, match="too_many_redirects"):
+        await asyncio.wait_for(_fetch("http://cdn.example/a.jpg", on_redirect=on_redirect), 2)
+    assert len(entered) == fetch.MAX_REDIRECTS
 
 
 async def test_five_redirects_are_allowed(resolver, inner):

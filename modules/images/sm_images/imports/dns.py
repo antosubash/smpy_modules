@@ -11,12 +11,16 @@ and the loop's default executor is never involved.
 
 The slot count is a thread-safe counter rather than an ``asyncio.Semaphore``:
 it is released from worker threads, and it outlives any one event loop (each
-Celery task runs its own).
+Celery task runs its own). A lookup waiting for a slot parks on its own
+``asyncio.Event``, registered with the loop it runs on; a release sets every
+parked waiter's event through ``call_soon_threadsafe`` and they race for the
+slot again - no polling.
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import functools
 import logging
 import threading
@@ -35,11 +39,11 @@ logger = logging.getLogger(__name__)
 
 POOL_SIZE: Final = 8
 DNS_TIMEOUT_SECONDS: float = 5.0
-_ADMIT_POLL_SECONDS: Final = 0.01
 _POOL: Final = ThreadPoolExecutor(max_workers=POOL_SIZE, thread_name_prefix="sm-images-dns")
 
 _lock = threading.Lock()
 _admitted = 0
+_waiters: set[tuple[asyncio.AbstractEventLoop, asyncio.Event]] = set()
 
 
 def busy() -> int:
@@ -60,6 +64,10 @@ def _release(_future: Future | None = None) -> None:
     global _admitted
     with _lock:
         _admitted -= 1
+        waiters = list(_waiters)
+    for loop, event in waiters:
+        with contextlib.suppress(RuntimeError):  # that loop has closed
+            loop.call_soon_threadsafe(event.set)
 
 
 async def _admit() -> None:
@@ -70,8 +78,18 @@ async def _admit() -> None:
         "DNS resolver pool saturated; waiting for a slot until the deadline",
         extra={"pool_size": POOL_SIZE},
     )
-    while not _try_admit():
-        await asyncio.sleep(_ADMIT_POLL_SECONDS)
+    loop = asyncio.get_running_loop()
+    while True:
+        waiter = (loop, asyncio.Event())
+        with _lock:
+            _waiters.add(waiter)
+        try:
+            if _try_admit():  # registered first, so a release in between still wakes us
+                return
+            await waiter[1].wait()
+        finally:
+            with _lock:
+                _waiters.discard(waiter)
 
 
 async def _run[T](job: Callable[[], T]) -> T:
