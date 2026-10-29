@@ -80,8 +80,29 @@ def run_cross_check(
     return json.loads(encoded)
 
 
-def _release_slot(_done: object) -> None:
-    _SLOTS.release()
+class _Slot:
+    """One admission slot, given back exactly once whichever path gets there first."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._held = True
+
+    def release(self, _done: object = None) -> None:
+        with self._lock:
+            if not self._held:
+                return
+            self._held = False
+        _SLOTS.release()
+
+
+def _run_then_release(
+    slot: _Slot, fn: Any, group: GroupRead, results: Sequence[PromptResultRead], max_bytes: int
+) -> dict[str, Any] | None:
+    """In the worker thread: the slot is free once the hook returns."""
+    try:
+        return run_cross_check(fn, group, results, max_bytes)
+    finally:
+        slot.release()
 
 
 async def check(
@@ -92,21 +113,25 @@ async def check(
         return None
     limit = CROSS_CHECK_TIMEOUT_S
     if not _SLOTS.acquire(blocking=False):
-        raise CrossCheckTimedOut(f"the cross-check pool is full; no slot within {limit:g} s")
-    call = functools.partial(run_cross_check, fn, group, results, max_bytes)
-    ctx = contextvars.copy_context()  # as ``asyncio.to_thread`` would
+        # Every slot is held by a hook that has not returned: an operator should
+        # know, because only a worker restart frees a hook that never returns.
+        logger.warning("images.group.cross_check_pool_full", extra={"pool_size": POOL_SIZE})
+        raise CrossCheckTimedOut(f"the cross-check pool is full ({POOL_SIZE} still running)")
+    slot = _Slot()
     try:
+        call = functools.partial(_run_then_release, slot, fn, group, results, max_bytes)
+        ctx = contextvars.copy_context()  # as ``asyncio.to_thread`` would
         job = _POOL.submit(ctx.run, call)
     except BaseException:
         # ``submit`` queues the item before it starts a thread, so a failure
-        # here may leave it queued and still holding its arguments: keep the
-        # slot (fail closed) rather than admit work the pool still holds. Only
-        # a process that cannot start threads gets here.
+        # there may leave it queued: it frees the slot itself if it ever runs.
+        # Before that the slot stays taken (fail closed) rather than admit work
+        # the pool still holds. Only a process that cannot start threads gets here.
         logger.error("images.group.cross_check_submit_failed", exc_info=True)
         raise
-    # Freed when the job is done - returned, raised, or cancelled while still
-    # queued (then its body never runs) - never merely because we stopped waiting.
-    job.add_done_callback(_release_slot)
+    # Also freed when the job is cancelled while still queued (its body never
+    # runs) - never merely because we stopped waiting for it.
+    job.add_done_callback(slot.release)
     try:
         return await asyncio.wait_for(asyncio.wrap_future(job), limit)
     except TimeoutError as exc:

@@ -44,6 +44,16 @@ def test_a_hung_hook_does_not_delay_the_loops_shutdown(monkeypatch):
         release.set()  # the abandoned thread returns; nothing waits for it
     assert entered.is_set()
     assert elapsed < 5, f"asyncio.run waited {elapsed:.1f} s for the abandoned hook"
+    _wait_for_free_slots()  # the next test must start with every slot free
+
+
+def _wait_for_free_slots(timeout: float = 5.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if cross_check._SLOTS._value == cross_check.POOL_SIZE:  # type: ignore[attr-defined]
+            return
+        time.sleep(0.01)
+    raise AssertionError("cross-check slots were not given back")
 
 
 def test_a_hook_that_returns_in_time_is_stored():
@@ -122,3 +132,24 @@ def test_a_job_cancelled_while_queued_gives_its_slot_back(monkeypatch):
         release.set()
         for job in busy:
             job.result(5)
+
+
+def test_a_failed_submit_that_left_the_item_queued_frees_its_slot_when_it_runs(monkeypatch):
+    """The item ``submit`` queued before failing releases its own slot once it runs."""
+    real = cross_check._POOL.submit
+
+    def queued_then_failed(*args, **kwargs):
+        real(*args, **kwargs)
+        raise RuntimeError("can't start new thread")
+
+    monkeypatch.setattr(cross_check._POOL, "submit", queued_then_failed)
+
+    async def main() -> None:
+        with pytest.raises(RuntimeError):
+            await cross_check.check(lambda g, r: {}, _stand_in(), [], 1000)
+
+    asyncio.run(main())
+    deadline = time.monotonic() + 5
+    while cross_check._SLOTS._value != cross_check.POOL_SIZE and time.monotonic() < deadline:  # type: ignore[attr-defined]
+        time.sleep(0.01)
+    assert cross_check._SLOTS._value == cross_check.POOL_SIZE  # type: ignore[attr-defined]
