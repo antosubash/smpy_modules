@@ -12,6 +12,7 @@ deleted. Only ``props.correlation_id`` and request-id/Date headers differ.
 from __future__ import annotations
 
 import asyncio
+import gzip
 import importlib
 import json
 import re
@@ -29,14 +30,9 @@ import records_collections  # noqa: E402, F401
 
 ADMIN = ("admin@example.test", "Admin-pass-12345!")
 VIEWER = ("viewer@example.test", "Viewer-pass-12345!")
-IGNORED = {
-    "date",
-    "x-request-id",
-    "x-correlation-id",
-    "server-timing",
-    "content-length",
-    "set-cookie",
-}
+# Per-request values only: the clock, the request/correlation ids and timings.
+IGNORED = {"date", "x-request-id", "x-correlation-id", "server-timing"}
+CID = "[0-9a-f]{32}"
 NEGOTIATIONS = {
     "plain": {},
     "html": {"Accept": "text/html"},
@@ -125,13 +121,67 @@ async def _delete(app, ids, what):
             await s.commit()
 
 
+def _cookies(response: httpx.Response) -> list[tuple[str, str]]:
+    """Set-Cookie as (name, attributes): the value is a signed session blob that
+    differs per request; the name and every attribute (path, max-age, samesite,
+    httponly, secure) must match."""
+    out = []
+    for raw in response.headers.get_list("set-cookie"):
+        first, _, attrs = raw.partition(";")
+        out.append((first.partition("=")[0].strip(), attrs.strip()))
+    return sorted(out)
+
+
 def _normalise(response: httpx.Response):
+    """Everything must match except the correlation id VALUE (32 hex digits, under
+    exactly its JSON key or its HTML-escaped prop key) and the ignored headers."""
     body = response.text
-    body = re.sub(r"&quot;correlation_id&quot;:&quot;[^&]*&quot;", "CID", body)
-    body = re.sub(r'"correlation_id":\s*"[^"]*"', "CID", body)
-    body = re.sub(r"correlation_id[^,}]*", "CID", body)
-    headers = {k: v for k, v in response.headers.items() if k not in IGNORED}
-    return response.status_code, body, headers
+    body = re.sub(rf'("correlation_id":\s*")({CID})(")', r"\1CID\3", body)
+    body = re.sub(rf"(&quot;correlation_id&quot;:&quot;)({CID})(&quot;)", r"\1CID\3", body)
+    headers = {k: v for k, v in response.headers.items() if k not in IGNORED and k != "set-cookie"}
+    if "content-encoding" in headers:
+        # A compressed length varies with the bytes of the (random) ids inside; the
+        # decoded body is compared in full instead.
+        headers.pop("content-length", None)
+    return response.status_code, body, headers, _cookies(response)
+
+
+def test_the_comparator_catches_what_it_must():
+    """Guard the guard: a differing detail text, Content-Length, cookie attribute
+    or a non-id after ``correlation_id`` must not compare equal."""
+
+    def resp(text="{}", headers=None, status=404):
+        return httpx.Response(status, text=text, headers=headers or {})
+
+    same = '{"detail":"x","correlation_id":"%s"}'
+    assert _normalise(resp(same % ("a" * 32))) == _normalise(resp(same % ("b" * 32)))
+    assert _normalise(resp('{"detail":"correlation_id withheld"}')) != _normalise(
+        resp('{"detail":"correlation_id absent"}')
+    )
+    assert _normalise(resp('{"detail":"a"}')) != _normalise(resp('{"detail":"b"}'))
+    assert _normalise(resp("", {"content-length": "5"})) != _normalise(
+        resp("", {"content-length": "6"})
+    )
+    one = resp(headers={"set-cookie": "session=abc; path=/; httponly"})
+    other = resp(headers={"set-cookie": "session=xyz; path=/; httponly"})
+    assert _normalise(one) == _normalise(other)
+    assert _normalise(one) != _normalise(resp(headers={"set-cookie": "session=abc; path=/"}))
+    assert _normalise(one) != _normalise(resp())
+
+    def zipped(text: str, length: str):
+        return httpx.Response(
+            404,
+            content=gzip.compress(text.encode()),
+            headers={"content-encoding": "gzip", "content-length": length},
+        )
+
+    # compressed lengths are not compared (they vary with the ids inside); bodies are
+    assert _normalise(zipped("a", "5")) == _normalise(zipped("a", "6"))
+    assert _normalise(zipped("a", "5")) != _normalise(zipped("b", "5"))
+    # an id-shaped value under another key is not the correlation id
+    assert _normalise(resp('{"detail":"%s"}' % ("a" * 32))) != _normalise(
+        resp('{"detail":"%s"}' % ("b" * 32))
+    )
 
 
 ROUTES = [
@@ -198,8 +248,10 @@ async def _run(app, negotiation, method, route, what):
             await http.get("/api/images/public/c/none/images", headers=_negotiate(app, negotiation))
         call = getattr(http, method)
         extra = _negotiate(app, negotiation)
+        await call(url, headers=extra)  # the rolling session cookie is refreshed here
         withheld = await call(url, headers=extra)
         await _delete(app, ids, what)
+        await call(url, headers=extra)
         absent = await call(url, headers=extra)
         _expect_shape(negotiation, withheld, method, url)
         _expect_shape(negotiation, absent, method, url)
