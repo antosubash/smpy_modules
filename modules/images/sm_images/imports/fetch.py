@@ -35,6 +35,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
+from importlib import metadata
 from typing import Final
 
 import httpx
@@ -49,6 +50,7 @@ __all__ = [
     "FetchError",
     "FetchTimeoutError",
     "FetchTooLargeError",
+    "USER_AGENT",
     "PinnedTransport",
     "safe_stream",
 ]
@@ -58,6 +60,20 @@ logger = logging.getLogger(__name__)
 MAX_REDIRECTS: Final = 5
 MAX_ADDRESSES_PER_HOP: Final = 4
 _IDENTITY: Final = frozenset({"", "identity"})
+
+
+def _user_agent() -> str:
+    try:
+        version = metadata.version("simple_module_images")
+    except metadata.PackageNotFoundError:  # a source checkout without metadata
+        version = "dev"
+    return f"SimpleModule-Images/{version} (+{REPOSITORY_URL}) python-httpx/{httpx.__version__}"
+
+
+REPOSITORY_URL: Final = "https://github.com/antosubash/simple_module_python_modules"
+USER_AGENT: Final = _user_agent()
+"""Sent on every hop: hosts such as Wikimedia refuse the library's default
+(their policy asks for ``<client>/<version> (<contact>)``)."""
 
 
 def _inner_transport() -> httpx.AsyncBaseTransport:
@@ -128,7 +144,7 @@ def _client(timeout: float, allowed_ports: frozenset[int]) -> httpx.AsyncClient:
         timeout=timeout,
         follow_redirects=False,
         trust_env=False,
-        headers={"accept-encoding": "identity"},
+        headers={"accept-encoding": "identity", "user-agent": USER_AGENT},
     )
 
 
