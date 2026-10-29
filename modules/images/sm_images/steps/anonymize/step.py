@@ -101,9 +101,13 @@ def find_regions(img: Any, p: AnonymizeParams, detector: Detector) -> list[Regio
         _check(d, p.min_confidence)
         if d.kind not in wanted or d.score < p.min_confidence:
             continue
-        box = pad_and_clamp(d.x * sx, d.y * sy, d.w * sx, d.h * sy, width, height, p.padding)
-        if box[2] > 0 and box[3] > 0:
-            regions.append(Region(d.kind, *box, score=float(d.score)))
+        x, y, w, h = d.x * sx, d.y * sy, d.w * sx, d.h * sy
+        # Confident, so it must show on the picture: a box that lies wholly off
+        # it once mapped back is a broken detector, never "nothing to blur".
+        if min(x + w, width) <= max(x, 0) or min(y + h, height) <= max(y, 0):
+            raise ValueError(f"confident {d.kind} box off the picture: {d!r}")
+        box = pad_and_clamp(x, y, w, h, width, height, p.padding)
+        regions.append(Region(d.kind, *box, score=float(d.score)))
     return regions
 
 
