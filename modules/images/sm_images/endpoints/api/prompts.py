@@ -161,9 +161,10 @@ async def run_prompt(
     row = await service.get(db, collection, prompt_id)
     group = row.scope is PromptScope.GROUP
     if (body.image_ids if group else body.group_ids) is not None:
-        err = Invalid("an image prompt runs on image_ids, a group prompt on group_ids")
-        err.code = codes.CODE_INVALID_RUN_TARGET
-        raise err
+        raise Invalid(
+            "an image prompt runs on image_ids, a group prompt on group_ids",
+            code=codes.CODE_INVALID_RUN_TARGET,
+        )
     named = body.group_ids if group else body.image_ids
     # A manager's run re-checks their right in the worker; a named list (an
     # editor may run one) is handled inside this request.
@@ -172,9 +173,7 @@ async def run_prompt(
         _owner_or_manager(who, collection, "run a prompt on the whole collection or on everything")
         starter = {"run_as": who.user_id, "access_basis": owner_or_manage_basis(who, collection)}
     if not ai.ai_available():
-        err = ServiceUnavailable("the ai module is not installed")
-        err.code = codes.CODE_AI_UNAVAILABLE
-        raise err
+        raise ServiceUnavailable("the ai module is not installed", code=codes.CODE_AI_UNAVAILABLE)
     await db.rollback()  # read-only so far: release it before the per-item transactions
     requested = await runs.launch(
         runtime(),

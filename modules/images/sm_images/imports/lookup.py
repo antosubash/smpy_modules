@@ -19,9 +19,7 @@ __all__ = ["conflict", "get", "live_collection", "resume_index"]
 
 def conflict(code: str, detail: str) -> Conflict:
     """A 409 whose ``code`` tells the console which control was refused and why."""
-    err = Conflict(detail)
-    err.code = code
-    return err
+    return Conflict(detail, code=code)
 
 
 async def get(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> ImportJob:

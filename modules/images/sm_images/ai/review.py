@@ -64,9 +64,7 @@ def version_of(row: PromptResult) -> str:
 
 
 def _invalid(detail: str, code: str = codes.CODE_INVALID_REVIEW) -> Invalid:
-    err = Invalid(detail[:1000])
-    err.code = code
-    return err
+    return Invalid(detail[:1000], code=code)
 
 
 def _where(error: Any) -> str:
@@ -135,9 +133,7 @@ async def apply(
     if locked is None:
         raise NotFound("result not found")
     if locked.status is not StepStatus.COMPLETED or version_of(locked) != version:
-        err = Conflict("the result changed since it was loaded")
-        err.code = codes.CODE_REVIEW_STALE
-        raise err
+        raise Conflict("the result changed since it was loaded", code=codes.CODE_REVIEW_STALE)
     reviewed = _corrected(prompt, data) if action == "correct" else None
     if reviewed is not None and max_bytes is not None and encoded_size(reviewed) > max_bytes:
         raise _invalid("the correction is too large")

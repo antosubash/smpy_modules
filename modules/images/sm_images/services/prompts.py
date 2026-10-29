@@ -53,15 +53,14 @@ NEEDS_MEMBER = ("results", "both")
 
 
 def _invalid(detail: str, code: str) -> Invalid:
-    err = Invalid(detail[:1000])
-    err.code = code
-    return err
+    return Invalid(detail[:1000], code=code)
 
 
 def name_taken() -> Conflict:
-    err = Conflict("a prompt with this name already exists in the collection")
-    err.code = codes.CODE_PROMPT_NAME_TAKEN
-    return err
+    return Conflict(
+        "a prompt with this name already exists in the collection",
+        code=codes.CODE_PROMPT_NAME_TAKEN,
+    )
 
 
 def check_schema(schema: Any) -> None:
@@ -172,9 +171,10 @@ async def delete_prompt(db: Any, collection: Collection, row: Prompt) -> None:
         Prompt.collection_id == collection.id, Prompt.member_prompt_id == row.id
     )
     if (await db.execute(users)).first() is not None:
-        err = Conflict("a group prompt consolidates this prompt's results; change it first")
-        err.code = codes.CODE_PROMPT_IN_USE
-        raise err
+        raise Conflict(
+            "a group prompt consolidates this prompt's results; change it first",
+            code=codes.CODE_PROMPT_IN_USE,
+        )
     # By step id alone: the id names this prompt, and a trashed image's runs
     # (which an image subquery would filter out) must go too.
     sid = prompt_steps.step_id(row.id)

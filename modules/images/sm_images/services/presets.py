@@ -77,9 +77,7 @@ def _get(preset_id: str) -> Preset:
     load_extensions()
     found = registry.get_preset(preset_id)
     if found is None:
-        err = NotFound("no such preset is installed")
-        err.code = codes.CODE_PRESET_NOT_FOUND
-        raise err
+        raise NotFound("no such preset is installed", code=codes.CODE_PRESET_NOT_FOUND)
     return found
 
 
@@ -143,9 +141,7 @@ async def _pipeline(db: Any, collection: Collection, preset: Preset) -> None:
     try:
         parsed = validate_pipeline_config(config, strict=True, prompts=prompts)
     except PipelineConfigError as exc:
-        err = Invalid(str(exc)[:1000])
-        err.code = CODE_INVALID_CONFIG
-        raise err from exc
+        raise Invalid(str(exc)[:1000], code=CODE_INVALID_CONFIG) from exc
     collection.pipeline_config = config
     collection.protect_originals = protect_originals(collection.protect_originals, parsed)
 

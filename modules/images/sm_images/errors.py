@@ -20,9 +20,11 @@ class ImagesError(Exception):
     status_code: int = 400
     code: str | None = None
 
-    def __init__(self, detail: str) -> None:
+    def __init__(self, detail: str, code: str | None = None) -> None:
         self.detail = detail
         super().__init__(detail)
+        if code is not None:  # else the class default stands
+            self.code = code
 
 
 class NotFound(ImagesError):  # noqa: N818 - HTTP vocabulary, deliberately
@@ -78,16 +80,14 @@ class InvalidUpload(ImagesError):  # noqa: N818 - HTTP vocabulary, deliberately
     status_code = 422
 
     def __init__(self, detail: str, code: str) -> None:
-        super().__init__(detail)
-        self.code = code
+        super().__init__(detail, code)
 
 
 class InvalidGroup(Invalid):
     """A 422 about a group, role or regroup pattern, with a code the console words."""
 
     def __init__(self, detail: str, code: str) -> None:
-        super().__init__(detail)
-        self.code = code
+        super().__init__(detail, code)
 
 
 class GroupExists(Conflict):

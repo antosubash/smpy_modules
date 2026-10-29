@@ -40,9 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 def invalid(code: str, detail: str) -> Invalid:
-    err = Invalid(detail)
-    err.code = code
-    return err
+    return Invalid(detail, code=code)
 
 
 def _mapping(kind: str, raw: str) -> tuple[ImportKind, Mapping]:

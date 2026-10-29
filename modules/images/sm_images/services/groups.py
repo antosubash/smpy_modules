@@ -242,9 +242,7 @@ async def assign(
         .execution_options(synchronize_session=False)
     )
     if result.rowcount != 1:  # someone else moved or re-roled it since we read it
-        err = Conflict(_MOVED)
-        err.code = constants.CODE_CONFLICT
-        raise err
+        raise Conflict(_MOVED, code=constants.CODE_CONFLICT)
     if target != image.group_id:  # the point's group_id
         await map_schedule.changed(db, collection.id)
     await db.refresh(image)

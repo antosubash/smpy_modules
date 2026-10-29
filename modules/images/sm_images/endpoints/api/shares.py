@@ -45,9 +45,9 @@ async def share_candidates(
 ) -> list[ShareCandidate]:
     directory = get_user_directory(request.app)
     if isinstance(directory, NullUserDirectory):
-        error = ServiceUnavailable(constants.DIRECTORY_UNAVAILABLE_DETAIL)
-        error.code = constants.DIRECTORY_UNAVAILABLE_CODE
-        raise error
+        raise ServiceUnavailable(
+            constants.DIRECTORY_UNAVAILABLE_DETAIL, code=constants.DIRECTORY_UNAVAILABLE_CODE
+        )
     found = await directory.search(db, q.strip() or None, limit=constants.CANDIDATES_SCAN)
     users = [u for u in found if u.is_active and u.id != collection.owner_id]
     if not _unscoped_single(request):
