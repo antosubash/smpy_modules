@@ -194,3 +194,22 @@ async def test_a_job_whose_collection_is_trashed_is_cancelled(imp):
     assert await imp.run(job) == "cancelled"
     assert (await imp.reload(job)).status.value == "cancelled"
     assert await imp.images() == []
+
+
+async def test_every_imported_image_gets_its_steps_planned_and_auto_run_queued(imp, monkeypatch):
+    """Imports ingest through the one entry point, so an imported image is
+    planned (its step rows) and handed to the auto-run hook like an upload."""
+    from sm_images import pipeline
+
+    queued = []
+    monkeypatch.setattr(
+        pipeline, "queue_auto_run", lambda db, coll, image_id: queued.append(image_id)
+    )
+    coll = await imp.pipe.collection({"exif": {"enabled": True}})
+    job = await imp.job([feature({"img": b64("red")}), feature({"img": b64("blue")})], coll=coll)
+    assert await imp.run(job) == "completed"
+    images = await imp.images(coll)
+    assert len(images) == 2
+    assert sorted(queued) == sorted(i.id for i in images)
+    for image in images:
+        assert "exif" in await imp.pipe.runs(image.id)

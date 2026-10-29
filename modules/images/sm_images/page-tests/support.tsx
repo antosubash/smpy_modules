@@ -3,7 +3,7 @@
 import { vi } from 'vitest';
 
 import { act } from '../test-dom';
-import type { Collection, ImageItem } from '../utils/types';
+import type { Collection, ImageItem, ImportJob } from '../utils/types';
 
 export type Call = { url: string; method: string; body: unknown };
 type Handler = (call: Call) => unknown;
@@ -100,3 +100,45 @@ export function inertiaMock() {
     ),
   };
 }
+
+// ---- Import fixtures -----------------------------------------------------
+
+export function job(overrides: Partial<ImportJob> = {}): ImportJob {
+  return {
+    id: 'j1',
+    collection_id: 'c1',
+    kind: 'geojson_base64',
+    status: 'completed',
+    mapping: {},
+    source_url: null,
+    total_count: 3,
+    checkpoint_index: 3,
+    done_count: 3,
+    duplicate_count: 0,
+    failed_count: 0,
+    errors: [],
+    auto_run_prompts: false,
+    created_at: '2026-10-29T10:00:00Z',
+    updated_at: null,
+    heartbeat_at: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+export const GEOJSON = JSON.stringify({
+  type: 'FeatureCollection',
+  features: [1, 2, 3].map((i) => ({
+    type: 'Feature',
+    properties: { image: `/9j/${'A'.repeat(40)}`, lat: 47 + i, lng: 8 + i, id: i },
+    geometry: { type: 'Point', coordinates: [8, 47] },
+  })),
+});
+
+export async function pickFile(input: HTMLInputElement, file: File) {
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  await act(async () => {
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await flush(20);
+}
+

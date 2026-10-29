@@ -1,5 +1,6 @@
+import { codeMessage } from './api-net';
 import { keys, type Translate } from './i18n';
-import type { GalleryFilter, Visibility } from './types';
+import type { GalleryFilter, ImportKind, JobStatus, Visibility } from './types';
 
 /** Choices whose labels are looked up at render time are a `Record` of `keys.…`
  *  leaves, not a template literal, so `tsc` still checks every key. */
@@ -46,4 +47,40 @@ export function collectionFilterLabel(
   filter: keyof typeof COLLECTION_FILTER,
 ): string {
   return t(COLLECTION_FILTER[filter]);
+}
+
+const JOB_STATUS = {
+  uploading: keys.images.imports.status.uploading,
+  pending: keys.images.imports.status.pending,
+  staging: keys.images.imports.status.staging,
+  running: keys.images.imports.status.running,
+  paused: keys.images.imports.status.paused,
+  resetting: keys.images.imports.status.resetting,
+  completed: keys.images.imports.status.completed,
+  failed: keys.images.imports.status.failed,
+  cancelled: keys.images.imports.status.cancelled,
+} satisfies Record<JobStatus, string>;
+
+/** A job's status, or `stalled` for an active job whose runner went silent. */
+export function jobStatusLabel(t: Translate, status: JobStatus, stalled = false): string {
+  return t(stalled ? keys.images.imports.status.stalled : JOB_STATUS[status]);
+}
+
+const IMPORT_KIND = {
+  geojson_url: keys.images.imports.kind.geojson_url,
+  geojson_base64: keys.images.imports.kind.geojson_base64,
+  zip: keys.images.imports.kind.zip,
+} satisfies Record<ImportKind, string>;
+
+export function importKindLabel(t: Translate, kind: ImportKind): string {
+  return t(IMPORT_KIND[kind]);
+}
+
+/** The sentence for an error `code` of a step, an import job or a ZIP: its
+ *  catalogue entry, `source_http_<status>` as the source's own answer, or the
+ *  bare code for one this console has no words for yet. */
+export function errorCodeLabel(t: Translate, code: string): string {
+  const http = /^source_http_(\d{3})$/.exec(code);
+  if (http) return t(keys.images.errors.source_http, { status: http[1] });
+  return codeMessage(code) ?? code;
 }

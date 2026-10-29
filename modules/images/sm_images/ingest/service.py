@@ -12,7 +12,8 @@ are decided once:
    collection's enabled steps, the collection stats, and clear the intent. A
    unique-index loss to a concurrent duplicate re-checks identity and answers
    :class:`Duplicate`;
-8. after the commit: ``ImageAdded`` and ``pipeline.dispatch``.
+8. after the commit: ``ImageAdded``, ``pipeline.dispatch`` and
+   ``pipeline.queue_auto_run`` (a no-op until prompts exist).
 
 **The intent ordering rule (Task 5).** An intent commits through its own
 session, so it must be written before the caller's session first writes:
@@ -199,6 +200,7 @@ class IngestService:
         self._remember(collection.id, meta, sha, row.id)
         events.emit(self.db, self.bus, events.image_added(row, source))
         pipeline.dispatch(self.db, row.id)
+        pipeline.queue_auto_run(self.db, collection, row.id)
         return row
 
     # -- steps -------------------------------------------------------------

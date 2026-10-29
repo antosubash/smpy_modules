@@ -10,6 +10,7 @@ import { VisibilitySelect } from '../components/collections/VisibilitySelect';
 import { Gallery } from '../components/gallery/Gallery';
 import { UploadButton } from '../components/gallery/UploadButton';
 import { ImagesLayout } from '../components/ImagesLayout';
+import { ImportsTab } from '../components/imports/ImportsTab';
 import { PipelineTab } from '../components/pipeline/PipelineTab';
 import { ShareDialog } from '../components/share/ShareDialog';
 import { useImages } from '../hooks/useImages';
@@ -26,8 +27,10 @@ type Props = {
   direct_upload_threshold: number;
 };
 
-/** `Images/Collection` - `/admin/images/{id}`. Tabs: the gallery and the
- *  pipeline; map, imports and review arrive with their own tasks. */
+type Tab = 'gallery' | 'pipeline' | 'imports';
+
+/** `Images/Collection` - `/admin/images/{id}`. Tabs: the gallery, the pipeline
+ *  and (for an editor) the imports; map and review arrive with their own tasks. */
 function Collection({
   collection,
   can_edit,
@@ -40,7 +43,9 @@ function Collection({
   const gallery = useImages(collection.id);
   const [visibility, setVisible] = useState<Visibility>(collection.visibility);
   const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState<'gallery' | 'pipeline'>('gallery');
+  const [tab, setTab] = useState<Tab>('gallery');
+  // The import routes are an edit on the collection, so the tab is an editor's.
+  const tabs: Tab[] = can_edit ? ['gallery', 'pipeline', 'imports'] : ['gallery', 'pipeline'];
 
   const changeVisibility = async (next: Visibility) => {
     setSaving(true);
@@ -115,7 +120,7 @@ function Collection({
             aria-label={t(keys.images.tabs.label)}
             className="flex gap-2 border-b"
           >
-            {(['gallery', 'pipeline'] as const).map((name) => (
+            {tabs.map((name) => (
               <button
                 key={name}
                 type="button"
@@ -126,17 +131,27 @@ function Collection({
                 tabIndex={tab === name ? 0 : -1}
                 data-testid={`images-tab-${name}`}
                 className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === name ? 'border-primary font-medium' : 'border-transparent text-muted-foreground'}`}
-                onClick={() => setTab(name)}
+                onClick={() => {
+                  // Images may have arrived (an import, an upload elsewhere) while away.
+                  if (name === 'gallery' && tab !== 'gallery') void gallery.reload();
+                  setTab(name);
+                }}
               >
                 {t(keys.images.tabs[name])}
               </button>
             ))}
           </div>
           <div role="tabpanel" id="images-tabpanel" aria-labelledby={`images-tab-${tab}`}>
-            {tab === 'gallery' ? (
-              <Gallery gallery={gallery} />
-            ) : (
+            {tab === 'gallery' && <Gallery gallery={gallery} />}
+            {tab === 'pipeline' && (
               <PipelineTab collectionId={collection.id} canManage={can_manage} />
+            )}
+            {tab === 'imports' && (
+              <ImportsTab
+                collectionId={collection.id}
+                canEdit={can_edit}
+                onSettled={() => void gallery.reload()}
+              />
             )}
           </div>
         </div>

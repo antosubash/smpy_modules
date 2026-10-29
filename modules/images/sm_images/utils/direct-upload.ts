@@ -16,14 +16,14 @@ import type { UploadResult } from './types';
 
 const BASE = '/api/images';
 
-type Started = {
+export type Started = {
   upload_id: string;
   part_size: number;
   part_urls: string[];
   direct: boolean;
 };
 
-type Part = { no: number; etag: string };
+export type Part = { no: number; etag: string };
 
 async function putPresigned(url: string, chunk: Blob): Promise<string> {
   let response: Response;
@@ -41,11 +41,21 @@ async function putPresigned(url: string, chunk: Blob): Promise<string> {
   return etag;
 }
 
-async function putPart(started: Started, no: number, chunk: Blob): Promise<Part> {
+export async function putPart(started: Started, no: number, chunk: Blob): Promise<Part> {
   const url = started.part_urls[no - 1];
   if (started.direct) return { no, etag: await putPresigned(url, chunk) };
   const done = await send<{ etag: string }>(url, { method: 'PUT', body: chunk });
   return { no, etag: done.etag };
+}
+
+/** Send every part of *file*, in order; the etags `complete`/`extract` claim. */
+export async function putParts(started: Started, file: Blob): Promise<Part[]> {
+  const parts: Part[] = [];
+  for (let no = 1; no <= started.part_urls.length; no++) {
+    const from = (no - 1) * started.part_size;
+    parts.push(await putPart(started, no, file.slice(from, from + started.part_size)));
+  }
+  return parts;
 }
 
 export async function uploadDirect(collectionId: string, file: File): Promise<UploadResult> {
@@ -59,11 +69,7 @@ export async function uploadDirect(collectionId: string, file: File): Promise<Up
         content_type: file.type || undefined,
       }),
     });
-    const parts: Part[] = [];
-    for (let no = 1; no <= started.part_urls.length; no++) {
-      const from = (no - 1) * started.part_size;
-      parts.push(await putPart(started, no, file.slice(from, from + started.part_size)));
-    }
+    const parts = await putParts(started, file);
     return await send<UploadResult>(`${BASE}/uploads/${started.upload_id}/complete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

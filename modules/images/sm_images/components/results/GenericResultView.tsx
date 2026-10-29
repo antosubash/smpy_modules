@@ -1,4 +1,5 @@
 import { keys } from '../../utils/i18n';
+import { errorCodeLabel } from '../../utils/labels';
 import type { ResultViewProps } from './registry';
 
 function show(value: unknown): string {
@@ -14,7 +15,11 @@ export function GenericResultView({ id, output, run, t }: ResultViewProps) {
       <div className="flex flex-wrap items-center gap-2 font-medium">
         <span>{id}</span>
         {run && <span className="text-muted-foreground">{run.status}</span>}
-        {run?.error_code && <span className="text-destructive">{run.error_code}</span>}
+        {run?.error_code && (
+          <span className="text-destructive" title={run.error_code}>
+            {errorCodeLabel(t, run.error_code)}
+          </span>
+        )}
       </div>
       {run?.error_message && <p className="text-destructive">{run.error_message}</p>}
       {rows.length > 0 && (

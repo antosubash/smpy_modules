@@ -140,3 +140,52 @@ export type PipelineOverview = {
 };
 
 export type RestartScope = 'failed' | 'stale' | 'all';
+
+// ---- Imports -------------------------------------------------------------
+
+export type ImportKind = 'geojson_url' | 'geojson_base64' | 'zip';
+
+export type JobStatus =
+  | 'uploading'
+  | 'pending'
+  | 'staging'
+  | 'running'
+  | 'paused'
+  | 'resetting'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+/** The mapping the server takes (`sm_images.imports.mapping.Mapping`). */
+export type ImportMapping = {
+  url_prop?: string;
+  image_prop?: string;
+  lat_prop?: string;
+  lng_prop?: string;
+  datetime_prop?: string;
+  external_id_prop?: string;
+  group_key_prop?: string;
+  group_role_prop?: string;
+  filename_pattern?: string;
+};
+
+export type ImportJob = {
+  id: string;
+  collection_id: string;
+  kind: ImportKind;
+  status: JobStatus;
+  mapping: ImportMapping;
+  source_url: string | null;
+  total_count: number;
+  checkpoint_index: number;
+  done_count: number;
+  duplicate_count: number;
+  failed_count: number;
+  errors: { code: string; at?: string }[];
+  auto_run_prompts: boolean;
+  created_at: string;
+  updated_at: string | null;
+  heartbeat_at: string | null;
+};
+
+export type ImportControl = 'pause' | 'resume' | 'restart' | 'retry-failed';

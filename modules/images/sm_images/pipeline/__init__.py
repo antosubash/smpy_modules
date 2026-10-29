@@ -30,7 +30,7 @@ from typing import Any
 from simple_module_db.callbacks import register_on_commit
 from simple_module_db.listeners import current_tenant_id
 
-__all__ = ["dispatch", "enabled_steps"]
+__all__ = ["dispatch", "enabled_steps", "queue_auto_run"]
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +65,15 @@ def dispatch(db: Any, image_id: uuid.UUID) -> None:
 
         raise TenantUnbound("pipeline.dispatch needs a bound tenant")
     register_on_commit(db, partial(_dispatch_after_commit, image_id, tenant))
+
+
+def queue_auto_run(db: Any, collection: Any, image_id: uuid.UUID) -> None:
+    """Queue the collection's ``auto_run`` prompts for ``image_id`` after commit.
+
+    A no-op until prompts exist (Task 22). It is called by the one ingest
+    entry point, next to :func:`dispatch`, so every path - multipart, base64,
+    direct upload, GeoJSON (URL and base64) and ZIP - reaches it the same way.
+    """
 
 
 async def _dispatch_after_commit(image_id: uuid.UUID, tenant: str) -> None:
