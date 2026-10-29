@@ -11,7 +11,7 @@ from sqlalchemy import false, func, select
 from sqlalchemy.exc import IntegrityError
 
 from sm_images import constants
-from sm_images.access import COLLECTION_RESOURCE, POLICY
+from sm_images.access import COLLECTION_RESOURCE, visible_collections
 from sm_images.errors import Conflict, Forbidden, Invalid
 from sm_images.map.revoke import withdraw
 from sm_images.models import Collection, Visibility
@@ -152,7 +152,7 @@ async def list_page(
 ) -> tuple[list[Collection], str | None, int | None]:
     """``(rows, next_cursor, total)``; ``total`` is counted on the first page
     only. Every filter is ANDed with the view policy, in SQL."""
-    stmt = POLICY.filter(who, ACTION_VIEW, select(Collection))
+    stmt = visible_collections(who, ACTION_VIEW)
     extra = _filter_clause(filter_, who)
     if extra is not None:
         stmt = stmt.where(extra)

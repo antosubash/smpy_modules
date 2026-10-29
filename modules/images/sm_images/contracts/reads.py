@@ -25,10 +25,9 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from simple_module_core.resources import ACTION_VIEW, ResourcePrincipal
-from sqlalchemy import select
 
 from sm_images import constants, intents, urls
-from sm_images.access import POLICY
+from sm_images.access import visible_collections
 from sm_images.contracts.schemas import CollectionPageRead, CollectionRead
 from sm_images.map import points as map_points
 from sm_images.models import Collection
@@ -57,9 +56,7 @@ async def get_collection(
     """The collection if *principal* may view it in *tenant_id*, else ``None``."""
     with tenant_scope(tenant_id):
         async with _session(db) as session:
-            stmt = POLICY.filter(
-                principal, ACTION_VIEW, select(Collection).where(Collection.id == collection_id)
-            )
+            stmt = visible_collections(principal, ACTION_VIEW).where(Collection.id == collection_id)
             row = (await session.execute(stmt)).scalars().first()
             return (
                 None
@@ -118,9 +115,7 @@ async def points(
     box = None if bbox is None else map_points.check_bbox(tuple(bbox))
     with tenant_scope(tenant_id):
         async with _session(db) as session:
-            stmt = POLICY.filter(
-                principal, ACTION_VIEW, select(Collection).where(Collection.id == collection_id)
-            )
+            stmt = visible_collections(principal, ACTION_VIEW).where(Collection.id == collection_id)
             row = (await session.execute(stmt)).scalars().first()
             if row is None:
                 return None
