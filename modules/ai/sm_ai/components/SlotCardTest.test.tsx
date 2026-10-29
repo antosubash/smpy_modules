@@ -66,14 +66,19 @@ describe('SlotCard — Test connection feedback', () => {
   });
 
   it('shows the model that answered once it succeeded', async () => {
-    await mount(false, { ok: true, model: 'qwen', latency_ms: 812, error: null } as TestResult);
+    await mount(false, { ok: true, model: 'qwen', latency_ms: 812, error: '' });
     expect(q('chat-test-button')?.textContent).toBe('Test connection');
     expect(q('chat-test-pending')).toBeNull();
     expect(q('chat-test-result')?.textContent).toBe('OK — qwen (812 ms)');
   });
 
   it('shows the error when it failed', async () => {
-    await mount(false, { ok: false, model: 'qwen', latency_ms: null, error: 'Timed out after 30s.' } as TestResult);
+    await mount(false, {
+      ok: false,
+      model: 'qwen',
+      latency_ms: 0,
+      error: 'Timed out after 30s.',
+    });
     expect(q('chat-test-result')?.textContent).toBe('Timed out after 30s.');
   });
 });

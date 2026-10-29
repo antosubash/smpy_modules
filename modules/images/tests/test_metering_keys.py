@@ -11,7 +11,6 @@ import uuid
 from types import SimpleNamespace
 
 from sm_billing.metering.validate import KEY_MAX, check_text
-
 from sm_images import billing
 from sm_images.ai import group_run, runner
 
@@ -21,7 +20,9 @@ STEP = f"prompt:{uuid.uuid4()}"
 
 def _ctx(tenant: str = TENANT, image: uuid.UUID | None = None, step: str = STEP):
     return SimpleNamespace(
-        tenant_id=tenant, image=SimpleNamespace(id=image or uuid.uuid4()), step=SimpleNamespace(id=step)
+        tenant_id=tenant,
+        image=SimpleNamespace(id=image or uuid.uuid4()),
+        step=SimpleNamespace(id=step),
     )
 
 

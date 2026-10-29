@@ -154,7 +154,11 @@ export function PromptsTab({
               canManage={canManage}
               groups={groups}
               runCount={
-                p.scope === 'group' ? (groups.length < GROUPS_SHOWN ? groups.length : null) : imageCount
+                p.scope === 'group'
+                  ? groups.length < GROUPS_SHOWN
+                    ? groups.length
+                    : null
+                  : imageCount
               }
               busy={busy}
               onEdit={() => setView({ mode: 'edit', prompt: p })}

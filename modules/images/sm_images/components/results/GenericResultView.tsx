@@ -20,7 +20,9 @@ function fieldLabel(t: Translate, step: string, name: string): string {
  *  output as plain key/value rows (empty values left out). A prompt step is
  *  named by its prompt (`run.label`), its id kept as the tooltip. */
 export function GenericResultView({ id, output, run, t }: ResultViewProps) {
-  const rows = Object.entries(output ?? {}).filter(([, value]) => value !== null && value !== undefined);
+  const rows = Object.entries(output ?? {}).filter(
+    ([, value]) => value !== null && value !== undefined,
+  );
   return (
     <div className="py-2 text-sm" data-testid="images-result-generic" data-result-id={id}>
       <div className="flex flex-wrap items-center gap-2 font-medium">

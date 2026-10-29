@@ -19,7 +19,9 @@ from tests.pipeline_support import Scripted, use_steps
 async def _enable(pipe, coll, steps: dict) -> Collection:
     async with pipe.db_state.session_factory() as s:
         await s.execute(
-            update(Collection).where(Collection.id == coll.id).values(pipeline_config={"steps": steps})
+            update(Collection)
+            .where(Collection.id == coll.id)
+            .values(pipeline_config={"steps": steps})
         )
         await s.commit()
         return await s.get(Collection, coll.id)

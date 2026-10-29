@@ -67,12 +67,19 @@ export async function resolveMapSource(
 }
 
 /** The box around `features`, as MapLibre's bounds; `null` without any. */
-export function pointsBounds(features: PointFeature[]): [[number, number], [number, number]] | null {
+export function pointsBounds(
+  features: PointFeature[],
+): [[number, number], [number, number]] | null {
   if (features.length === 0) return null;
   let [minx, miny, maxx, maxy] = [Infinity, Infinity, -Infinity, -Infinity];
   for (const { geometry } of features) {
     const [x, y] = geometry.coordinates;
-    [minx, miny, maxx, maxy] = [Math.min(minx, x), Math.min(miny, y), Math.max(maxx, x), Math.max(maxy, y)];
+    [minx, miny, maxx, maxy] = [
+      Math.min(minx, x),
+      Math.min(miny, y),
+      Math.max(maxx, x),
+      Math.max(maxy, y),
+    ];
   }
   return boundsOf([minx, miny, maxx, maxy]);
 }

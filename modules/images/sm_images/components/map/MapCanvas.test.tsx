@@ -83,7 +83,10 @@ describe('MapCanvas', () => {
     );
     await flush();
     handlers.load?.();
-    const [bounds, opts] = fitBounds.mock.calls[0] as [unknown, { padding: Record<string, number> }];
+    const [bounds, opts] = fitBounds.mock.calls[0] as [
+      unknown,
+      { padding: Record<string, number> },
+    ];
     expect(bounds).toEqual([
       [-8, 53],
       [25, 65],

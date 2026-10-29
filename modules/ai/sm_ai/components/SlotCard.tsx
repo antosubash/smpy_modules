@@ -233,7 +233,10 @@ export function SlotCard({
           {dirty && <span className="text-xs text-muted-foreground">{t(c.save_first)}</span>}
           <span aria-live="polite">
             {testing && (
-              <span data-testid={`${idPrefix}-test-pending`} className="text-sm text-muted-foreground">
+              <span
+                data-testid={`${idPrefix}-test-pending`}
+                className="text-sm text-muted-foreground"
+              >
                 {t(c.testing_hint)}
               </span>
             )}

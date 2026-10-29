@@ -16,10 +16,16 @@ const run = {
 };
 
 describe('generic result view (QA TEST-014)', () => {
-  it("names a prompt step by its prompt, and falls back to the id when it was deleted", async () => {
+  it('names a prompt step by its prompt, and falls back to the id when it was deleted', async () => {
     const step = 'prompt:646b48c4-0000-4000-8000-000000000000';
     const named = await mount(
-      <ResultView kind="step" id={step} output={{ n: 1 }} run={{ ...run, step, label: 'Land cover' }} image={null} />,
+      <ResultView
+        kind="step"
+        id={step}
+        output={{ n: 1 }}
+        run={{ ...run, step, label: 'Land cover' }}
+        image={null}
+      />,
     );
     const title = named.find('[data-testid="images-result-title"]');
     expect(title?.textContent).toBe('Land cover');
@@ -27,7 +33,13 @@ describe('generic result view (QA TEST-014)', () => {
     await named.unmount();
 
     const orphan = await mount(
-      <ResultView kind="step" id={step} output={{ n: 1 }} run={{ ...run, step, label: null }} image={null} />,
+      <ResultView
+        kind="step"
+        id={step}
+        output={{ n: 1 }}
+        run={{ ...run, step, label: null }}
+        image={null}
+      />,
     );
     expect(orphan.find('[data-testid="images-result-title"]')?.textContent).toBe(step);
     await orphan.unmount();
@@ -46,7 +58,13 @@ describe('generic result view (QA TEST-014)', () => {
       <ResultView kind="step" id="exif" output={output} run={{ ...run, output }} image={null} />,
     );
     const terms = view.all('dt').map((d) => d.textContent);
-    expect(terms).toEqual(['Latitude', 'Captured', 'Time zone known', 'Camera make', 'some_plugin_field']);
+    expect(terms).toEqual([
+      'Latitude',
+      'Captured',
+      'Time zone known',
+      'Camera make',
+      'some_plugin_field',
+    ]);
     for (const dt of view.all('dt')) expect(dt.className).toContain('break-words');
     await view.unmount();
   });

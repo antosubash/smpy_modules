@@ -36,7 +36,9 @@ describe('resolveMapSource', () => {
     // while the other 16 waited for the rebuild. One page of points is always
     // fresh and complete; and an empty collection probes no archive (TEST-011).
     const fetchMock = stub((_url, init) =>
-      isHead(init) ? new Response(null, { status: 200 }) : json({ features: [point('a')], next_cursor: null }),
+      isHead(init)
+        ? new Response(null, { status: 200 })
+        : json({ features: [point('a')], next_cursor: null }),
     );
     const source = await resolveMapSource(urls);
     expect(source).toEqual({ kind: 'points', features: [point('a')] });
@@ -45,7 +47,9 @@ describe('resolveMapSource', () => {
 
   it('prefers the PMTiles archive for a collection past one page', async () => {
     const fetchMock = stub((_url, init) =>
-      isHead(init) ? new Response(null, { status: 200 }) : json({ features: [point('a')], next_cursor: 'next' }),
+      isHead(init)
+        ? new Response(null, { status: 200 })
+        : json({ features: [point('a')], next_cursor: 'next' }),
     );
     const source = await resolveMapSource(urls);
     expect(source.kind).toBe('tiles');
@@ -80,7 +84,9 @@ describe('resolveMapSource', () => {
 
   it('stops paging at the cap rather than looping on a cursor that never ends', async () => {
     const fetchMock = stub((_url, init) =>
-      isHead(init) ? new Response(null, { status: 404 }) : json({ features: [], next_cursor: 'again' }),
+      isHead(init)
+        ? new Response(null, { status: 404 })
+        : json({ features: [], next_cursor: 'again' }),
     );
     await resolveMapSource(urls);
     expect(fetchMock).toHaveBeenCalledTimes(1 + MAX_POINT_PAGES);
@@ -104,7 +110,10 @@ describe('resolveMapSource', () => {
 
 describe('pointsBounds', () => {
   it('boxes the points it is given, and none without points', () => {
-    const at = (x: number, y: number) => ({ ...point('p'), geometry: { type: 'Point', coordinates: [x, y] } });
+    const at = (x: number, y: number) => ({
+      ...point('p'),
+      geometry: { type: 'Point', coordinates: [x, y] },
+    });
     expect(pointsBounds([at(14, 60), at(-8, 53), at(25, 65)] as never)).toEqual([
       [-8, 53],
       [25, 65],
