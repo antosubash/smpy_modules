@@ -2,25 +2,33 @@
 taken before the caller's transaction writes), a :class:`Duplicate` answer,
 and the file name a row keeps.
 
-The storage hold follows ``sm_images.billing``'s order: reserved here, before
-any write, under a key of this attempt's own (a concurrent attempt for the same
-image - two ``complete`` calls - never shares it, so a loser releases only its
-own hold); its ``commit`` written to the outbox with the image row
-(:func:`keep_hold`), or its ``release`` when nothing kept it
-(:func:`drop_hold`). A rollback discards both and the ``held`` hold lapses.
+The storage hold (``sm_images.billing``): an ``ingest`` op is written and
+claimed in a short transaction of its own, then billing swaps from no hold -
+a committed hold for the original, or a refusal - under a key of this
+attempt's own (two ``complete`` calls for one image never share one). The
+image insert marks the op done in its savepoint (:func:`keep_hold`); a
+duplicate or a failed insert hands the op back (:func:`drop_hold`) and the
+settler releases the hold. A writer that dies keeps its claim for
+:data:`INGEST_CLAIM`; a settler then takes the op over and releases the hold -
+and an insert still running after that cannot finish the op, so it fails
+rather than naming a released hold.
 """
 
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, replace
+from datetime import timedelta
 from typing import Any
 
-from sm_images import billing, billing_ops, hold_refs
+from simple_module_db import finalize_session
+
+from sm_images import billing, billing_ops
 from sm_images.errors import StorageQuotaExceeded
-from sm_images.models.billing_op import OP_COMMIT, OP_RELEASE
+from sm_images.models.billing_op import OP_INGEST
 
 __all__ = [
+    "INGEST_CLAIM",
     "Duplicate",
     "Slot",
     "drop_hold",
@@ -29,6 +37,9 @@ __all__ = [
     "keep_hold",
     "safe_filename",
 ]
+
+INGEST_CLAIM = timedelta(minutes=30)
+"""How long an ingest owns its op: from the hold to the image insert."""
 
 
 @dataclass(frozen=True)
@@ -41,13 +52,18 @@ class Duplicate:
 @dataclass(frozen=True)
 class Slot:
     """An image id and its original's key, with the intent already recorded,
-    and - once sized (:func:`hold_slot`) - its storage hold, or ``refused``
-    when the plan's storage had no room for it."""
+    and - once sized (:func:`hold_slot`) - its storage hold and the op that
+    took it, or ``refused`` when the plan's storage had no room for it."""
 
     image_id: uuid.UUID
     key: str
     hold: str | None = None
     refused: bool = False
+    op: billing_ops.Claimed | None = None
+
+
+class HoldTakenOver(Exception):  # noqa: N818 - reads as the condition
+    """The ingest outlived its claim and a settler released the hold."""
 
 
 def safe_filename(name: str | None, fallback: str = "upload") -> str:
@@ -58,33 +74,40 @@ def safe_filename(name: str | None, fallback: str = "upload") -> str:
 
 
 async def hold_slot(factory: Any, tenant: str, slot: Slot, size: int) -> Slot:
-    """Reserve ``size`` bytes for the slot's original, keyed by this attempt."""
+    """Hold ``size`` bytes for the slot's original (committed), keyed by this attempt."""
+    meter = billing.storage_meter(factory)
+    if meter is None or size < 1:
+        return slot
     key = billing.hold_key(slot.image_id, f"0-{uuid.uuid4().hex}")
+    async with factory() as db:
+        op = await billing_ops.open_op(db, OP_INGEST, slot.image_id, size, key, claim=INGEST_CLAIM)
+        await finalize_session(db)
     try:
-        hold = await billing.reserve(factory, tenant, size, key)
-    except StorageQuotaExceeded:
+        hold = await billing.swap(factory, tenant, None, size, key, meter)
+    except StorageQuotaExceeded as exc:
+        async with factory() as db:
+            await billing_ops.finish(db, op, None, f"{type(exc).__name__}: {exc}")
+            await finalize_session(db)
         return replace(slot, refused=True)
-    return replace(slot, hold=None if hold is None else hold.id)
+    except Exception:
+        async with factory() as db:  # whatever billing did is the settler's now
+            await billing_ops.hand_back(db, op, factory)
+            await finalize_session(db)
+        raise
+    return replace(slot, hold=hold.id, op=op)
 
 
-async def keep_hold(
-    db: Any, factory: Any, image_id: uuid.UUID, hold: str | None, size: int
-) -> None:
-    """The image row holds ``hold``: its ``commit``, with the row."""
-    if hold is not None:
-        await billing_ops.add(
-            db, OP_COMMIT, image_id=image_id, hold_id=hold, quantity=size, factory=factory
-        )
-        await hold_refs.installed(db, hold, image_id)
+async def keep_hold(db: Any, slot_op: billing_ops.Claimed | None, hold: str | None) -> None:
+    """The image row names ``hold``: its op is done, with the row."""
+    if slot_op is not None and not await billing_ops.finish(db, slot_op, hold):
+        raise HoldTakenOver(slot_op.op_id)
 
 
-async def drop_hold(db: Any, factory: Any, image_id: uuid.UUID, hold: str | None) -> None:
-    """Nothing kept ``hold``: its ``release``, with the caller's transaction.
-    It was never installed, so the op names no image and waits on nothing."""
-    if hold is not None:
-        await billing_ops.add(db, OP_RELEASE, image_id=None, hold_id=hold, factory=factory)
+async def drop_hold(db: Any, factory: Any, slot_op: billing_ops.Claimed | None) -> None:
+    """Nothing keeps the hold: hand its op to the settler, which releases it."""
+    await billing_ops.hand_back(db, slot_op, factory)
 
 
 async def drop_slot(db: Any, factory: Any, slot: Slot | None) -> None:
     if slot is not None:
-        await drop_hold(db, factory, slot.image_id, slot.hold)
+        await drop_hold(db, factory, slot.op)

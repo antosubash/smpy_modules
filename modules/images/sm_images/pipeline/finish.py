@@ -12,7 +12,8 @@
    A ``prompt:*`` run also writes its ``images_prompt_result`` row there
    (:func:`sm_images.ai.results.record_prompt_run`), and records the prompt's
    revision as the run's version. ``storage_bytes`` and the storage hold move
-   here too, the hold reserved between the two phases (``storage_hold``).
+   here too; a growing image's hold is swapped between the two phases
+   (``storage_hold``).
 3. **After the commit**, the replaced objects are deleted. A failed delete
    leaves its intent for the janitor.
 """
@@ -31,7 +32,7 @@ from simple_module_db.callbacks import register_on_commit
 from sqlalchemy import delete
 
 from sm_images import storage_keys
-from sm_images.errors import QuotaBusy, StorageQuotaExceeded
+from sm_images.errors import StorageQuotaExceeded
 from sm_images.intents import clear_intents, object_intent
 from sm_images.models import ObjectIntent
 from sm_images.pipeline import publish, registry, storage_hold
@@ -158,13 +159,14 @@ async def _publish(
 async def _hold(
     runtime: Runtime, loaded: Any, staged: Staged, outcome: StepOutcome
 ) -> tuple[storage_hold.Planned | None, Staged, StepOutcome]:
-    """Reserve the storage the staged objects add. Refused, or billing unusable
-    (fail closed): the objects go, nothing is published, the step fails. The
-    quota lease busy: the objects go and it raises - the run keeps its lease
-    until it lapses, then reconcile runs the step again."""
+    """Swap the image's hold first when the staged objects grow it. Refused, or
+    billing unusable (fail closed): the objects go, nothing is published, the
+    step fails. A swap of the image still pending: the objects go and it
+    raises - the run keeps its lease until it lapses, then reconcile runs the
+    step again."""
     try:
         return await storage_hold.reserve(runtime, loaded, staged), staged, outcome
-    except QuotaBusy:
+    except storage_hold.HoldBusy:
         await _drop(runtime, staged.keys)
         raise
     except StorageQuotaExceeded as exc:
@@ -191,7 +193,6 @@ async def complete_step(
             logger.warning("images.pipeline.stage_failed step=%s", loaded.step, exc_info=True)
             outcome = StepOutcome.failed("storage_error", f"{type(exc).__name__}: {exc}"[:2000])
     planned, staged, outcome = await _hold(runtime, loaded, staged, outcome)
-    planned = await storage_hold.renew(runtime, planned)
     requeue = False
     async with runtime.session_factory() as db:
         locked = await lock_image(db, loaded.tenant, loaded.image_id)
@@ -211,10 +212,8 @@ async def complete_step(
         )
         writes = staging if outcome.status == "completed" else None
         replaced = await _publish(db, loaded, locked, staged, writes, version) if ok else None
-        if replaced is not None and not await storage_hold.record(
-            db, runtime, loaded, planned, now
-        ):
-            replaced = None  # the hold lapsed, or the total moved since: plan again
+        if replaced is not None and not await storage_hold.record(db, runtime, loaded, planned):
+            replaced = None  # the total or the hold moved since: plan again
         if replaced is None:
             await db.rollback()
             requeue = ok  # still ours: only the display fence failed
@@ -234,7 +233,7 @@ async def complete_step(
         await finalize_session(db)
     if replaced is None:
         await _drop(runtime, staged.keys)
-        await storage_hold.unhold(runtime, loaded, planned)
+        await storage_hold.abandon(runtime, planned)
         if requeue:
             try:
                 await _requeue(runtime, loaded, lease_s)

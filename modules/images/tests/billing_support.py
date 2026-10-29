@@ -4,8 +4,11 @@
 seam then answers as on a host without billing. ``gauge`` installs this fake
 instead - the hold calls (``sm_images.billing.storage_meter``) and the web
 pre-flight (``app.state.billing_usage``) - so a test can set a limit, read
-what is held, and make billing fail (``fail_commit``, ``fail_release``, ``expire_on_commit``,
-``next_seconds``).
+what is held, and make billing fail (``fail_swap``, ``fail_release``).
+
+Its ``swap`` is billing's: one atomic step (no ``await`` between the check
+and the write), the limit on the net delta, a replayed key returning the
+same hold. :func:`assert_counted_once` is the invariant every test ends on.
 """
 
 from __future__ import annotations
@@ -13,17 +16,15 @@ from __future__ import annotations
 import asyncio
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
 
 import pytest
-from sm_billing.contracts.metering import Allowed, Exceeded, Hold, HoldExpired, HoldNotFound
+from sm_billing.contracts.metering import Allowed, Exceeded, Hold, HoldNotFound
 from sm_images import billing
-from sm_images.models import Image
+from sm_images.models import BillingOp, Image
 from sm_images.tenancy import DEFAULT_TENANT
-from sqlalchemy import update
+from sqlalchemy import select, update
 
 LIVE = ("held", "committed")
-DEFAULT_TTL = 900
 
 
 @dataclass
@@ -32,21 +33,11 @@ class FakeGauge:
     holds: dict[str, Hold] = field(default_factory=dict)
     keys: dict[str, str] = field(default_factory=dict)
     calls: list[tuple[str, ...]] = field(default_factory=list)
-    ttls: list[int | None] = field(default_factory=list)
-    fail_commit: int = 0
-    """The next N commits raise (billing unreachable)."""
+    fail_swap: int = 0
+    """The next N swaps raise (billing unreachable)."""
     fail_release: int = 0
-    expire_on_commit: int = 0
-    """The next N commits find their hold lapsed (``HoldExpired``)."""
-    refuse_commit: set[str] = field(default_factory=set)
-    """Commits of these holds raise (billing unreachable for them)."""
-    next_seconds: list[int] = field(default_factory=list)
-    """TTLs (seconds) the next reservations get instead of the one asked for."""
-    lie_expired: set[str] = field(default_factory=set)
-    """The next ``get_hold`` of these reads ``expired`` (a stalled reader's view)."""
-    reserve_delay: float = 0.0
-    """Seconds a real (non-probe) reserve takes before billing decides: the
-    window in which concurrent reservations interleave."""
+    delay: float = 0.0
+    """Seconds a swap takes before billing decides: concurrent swaps interleave."""
 
     @property
     def level(self) -> int:
@@ -56,18 +47,10 @@ class FakeGauge:
         want = (status,) if status else LIVE
         return [h for h in self.holds.values() if h.status in want]
 
-    def _set(self, hold: Hold, status: str, expires_at: datetime | None = None) -> Hold:
-        new = Hold(hold.id, hold.tenant_id, hold.meter, hold.quantity, status, expires_at)
+    def _set(self, hold: Hold, status: str) -> Hold:
+        new = Hold(hold.id, hold.tenant_id, hold.meter, hold.quantity, status, None)
         self.holds[hold.id] = new
         return new
-
-    def expire(self, hold_id: str) -> None:
-        self._set(self.holds[hold_id], "expired")
-
-    def _lapse(self, hold: Hold) -> Hold:
-        if hold.status == "held" and hold.expires_at and hold.expires_at <= datetime.now(UTC):
-            return self._set(hold, "expired")
-        return hold
 
     async def check(self, tenant_id: str, meter: str, qty: int = 1):
         self.calls.append(("check", meter, str(qty)))
@@ -75,56 +58,28 @@ class FakeGauge:
             return Exceeded(self.level, self.limit, qty, None)
         return Allowed(self.level, self.limit, None)
 
-    async def reserve(self, tenant_id, meter, qty, idempotency_key, *, source, ttl=None):
-        self.calls.append(("reserve", meter, str(qty), idempotency_key))
-        self.ttls.append(ttl)
-        if self.reserve_delay and source != "images:guard":
-            await asyncio.sleep(self.reserve_delay)
-        if idempotency_key in self.keys:
+    async def swap(self, tenant_id, meter, old_hold_id, quantity, idempotency_key, *, source):
+        self.calls.append(("swap", str(old_hold_id), str(quantity), idempotency_key))
+        if self.delay:
+            await asyncio.sleep(self.delay)
+        if self.fail_swap:
+            self.fail_swap -= 1
+            raise RuntimeError("billing is down")
+        if idempotency_key in self.keys:  # a replay: the same hold, whatever its state
             return self.holds[self.keys[idempotency_key]]
-        if self.limit is not None and self.level + qty > self.limit:
-            return Exceeded(self.level, self.limit, qty, None)
-        seconds = self.next_seconds.pop(0) if self.next_seconds else (ttl or DEFAULT_TTL)
-        expires = datetime.now(UTC) + timedelta(seconds=seconds)
-        hold = Hold(uuid.uuid4().hex, tenant_id, meter, qty, "held", expires)
+        old = self.holds.get(old_hold_id) if old_hold_id else None
+        if old is not None and old.tenant_id != tenant_id:
+            raise HoldNotFound(old_hold_id)
+        freed = old.quantity if old is not None and old.status in LIVE else 0
+        grows = quantity > freed and self.limit is not None
+        if grows and self.level - freed + quantity > self.limit:
+            return Exceeded(self.level, self.limit, quantity - freed, None)
+        if freed:
+            self._set(old, "released")
+        hold = Hold(uuid.uuid4().hex, tenant_id, meter, quantity, "committed", None)
         self.holds[hold.id] = hold
         self.keys[idempotency_key] = hold.id
         return hold
-
-    async def commit(self, hold_id: str) -> Hold:
-        self.calls.append(("commit", hold_id))
-        if self.fail_commit or hold_id in self.refuse_commit:
-            self.fail_commit = max(self.fail_commit - 1, 0)
-            raise RuntimeError("billing is down")
-        if hold_id not in self.holds:
-            raise HoldNotFound(hold_id)
-        hold = self._lapse(self.holds[hold_id])
-        if self.expire_on_commit and hold.status == "held":
-            self.expire_on_commit -= 1
-            hold = self._set(hold, "expired")
-        if hold.status not in LIVE:
-            raise HoldExpired(hold_id, hold.status)
-        return self._set(hold, "committed")
-
-    async def get_hold(self, tenant_id: str, hold_id: str) -> Hold | None:
-        """Billing's signature: a hold of another tenant reads as unknown."""
-        self.calls.append(("get_hold", hold_id))
-        hold = self.holds.get(hold_id)
-        if hold is None or hold.tenant_id != tenant_id:
-            return None
-        if hold_id in self.lie_expired:  # a reader whose clock is past the expiry
-            self.lie_expired.discard(hold_id)
-            return Hold(hold.id, hold.tenant_id, hold.meter, hold.quantity, "expired", None)
-        if hold.status == "held" and hold.expires_at and hold.expires_at <= datetime.now(UTC):
-            return Hold(hold.id, hold.tenant_id, hold.meter, hold.quantity, "expired", None)
-        return hold
-
-    async def extend(self, hold_id: str, ttl: int) -> Hold:
-        self.calls.append(("extend", hold_id, str(ttl)))
-        hold = self._lapse(self.holds[hold_id])
-        if hold.status != "held":
-            raise HoldExpired(hold_id, hold.status)
-        return self._set(hold, "held", datetime.now(UTC) + timedelta(seconds=ttl))
 
     async def release(self, hold_id: str) -> bool:
         self.calls.append(("release", hold_id))
@@ -139,38 +94,18 @@ class FakeGauge:
         self._set(hold, "released")
         return True
 
-    def forget(self, hold_id: str) -> None:
-        """Billing lost the hold (its ledger purged): it reads as unknown."""
-        self.holds.pop(hold_id)
-
 
 @pytest.fixture(autouse=True)
 def _billing_off():
     """Every test runs as on a host without billing unless it asks for ``gauge``.
     Its own patcher: a test's ``monkeypatch.undo()`` must not turn billing on."""
-    from sm_images import billing
-
     with pytest.MonkeyPatch.context() as patcher:
         patcher.setattr(billing, "billing_installed", lambda: False)
         yield
 
 
-@pytest.fixture(autouse=True)
-def _leases_in_process():
-    """The quota lease (``billing_guard.serialized``) on a fresh in-process
-    backend: a test that built an app must not leave the next one a database
-    backend bound to its (disposed) engine."""
-    from simple_module_core.leases import configure_leases
-
-    configure_leases(None)
-    yield
-    configure_leases(None)
-
-
 @pytest.fixture
 def gauge(monkeypatch) -> FakeGauge:
-    from sm_images import billing
-
     fake = FakeGauge()
     monkeypatch.setattr(billing, "storage_meter", lambda factory: fake)
     monkeypatch.setattr(billing, "billing_installed", lambda: True)
@@ -179,9 +114,6 @@ def gauge(monkeypatch) -> FakeGauge:
 
 async def ops(db_state) -> list:
     """Every outbox row, oldest first."""
-    from sm_images.models import BillingOp
-    from sqlalchemy import select
-
     async with db_state.session_factory() as s:
         return list((await s.execute(select(BillingOp).order_by(BillingOp.id))).scalars())
 
@@ -190,8 +122,7 @@ async def held_image(pipe, gauge, coll):
     """An ingested image: its original under a committed hold, as ingest leaves it."""
     img = await pipe.image(coll)
     row = await pipe.row(img)
-    hold = await gauge.reserve(DEFAULT_TENANT, billing.METER, row.size_bytes, "seed", source="t")
-    await gauge.commit(hold.id)
+    hold = await gauge.swap(DEFAULT_TENANT, billing.METER, None, row.size_bytes, "seed", source="t")
     async with pipe.db_state.session_factory() as s:
         await s.execute(
             update(Image)
@@ -202,28 +133,21 @@ async def held_image(pipe, gauge, coll):
     return img, hold.id
 
 
-async def lapsed_image(pipe, gauge, coll):
-    """A published image whose new hold lapsed before its commit: a pending
-    ``commit`` op (it becomes a rehold) and the seed's ``release`` after it."""
-    img, seed = await held_image(pipe, gauge, coll)
-    gauge.fail_commit = 1
-    await pipe.run(img)
-    lapsed = (await pipe.row(img)).storage_hold_id
-    gauge.expire(lapsed)
-    return img, seed, lapsed
-
-
-@pytest.fixture
-def hooks(monkeypatch):
-    """``hooks[point] = async fn(op)`` on ``billing_settle.HOOK``, each run once."""
-    from sm_images import billing_settle
-
-    table: dict = {}
-
-    async def hook(point, op):
-        fn = table.pop(point, None)
-        if fn is not None:
-            await fn(op)
-
-    monkeypatch.setattr(billing_settle, "HOOK", hook)
-    return table
+async def assert_counted_once(db_state, gauge) -> None:
+    """The invariant: no op pending, and every image (trashed included) is
+    counted by exactly one live hold - the one it names, of its
+    ``storage_bytes`` - and nothing else is held."""
+    async with db_state.session_factory() as s:
+        images = (
+            await s.execute(
+                select(Image.storage_hold_id, Image.storage_bytes).execution_options(
+                    include_deleted=True
+                )
+            )
+        ).all()
+        pending = (await s.execute(select(BillingOp).where(BillingOp.done_at.is_(None)))).all()
+    assert pending == []
+    named = {hold: size for hold, size in images if hold is not None}
+    assert len(named) == len(images)
+    assert {h.id: h.quantity for h in gauge.live()} == named
+    assert all(h.status == "committed" for h in gauge.live())

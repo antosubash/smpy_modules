@@ -4,26 +4,18 @@ Billing is optional. Without it nothing here does anything and storage is
 unlimited; ``Image.storage_bytes`` is kept by the callers either way.
 
 **One committed hold per image**, sized to the sum of its objects (original,
-display copy, renditions) and named by ``Image.storage_hold_id``. Ingest holds
-the original's size; a published display copy or rendition set takes a hold
-for the new total and then releases the old one; the janitor releases the hold
-of a hard-deleted image.
+display copy, renditions) and named by ``Image.storage_hold_id``. Every hold
+images takes comes from billing's atomic :func:`swap`: the new hold is
+committed and the image's old one released in **one** billing transaction,
+with the quota checked on the net delta. So no images hold is ever ``held``
+(nothing lapses), and replacing an image's hold never leaves it counted twice
+or by nothing. Ingest swaps from no hold (a plain reserve and commit).
 
 **Every billing write is its own short transaction** (billing finishes each
 with ``finalize_session``), so none may run while the caller's session holds a
-write lock - on file-backed SQLite it would wait on that lock and fail. Hence
-the order every caller follows, the same as for object intents:
-
-1. :func:`reserve` (a ``held`` hold) *before* the caller's transaction first
-   writes. A refusal is :class:`StorageQuotaExceeded`. Each attempt reserves
-   under a key of its own, so it never shares - and never releases - another
-   attempt's hold.
-2. The caller records the hold id on the image and writes the settlement -
-   ``commit`` the new hold, then ``release`` the old one - to the durable
-   outbox in the same transaction (:mod:`sm_images.billing_ops`). A rollback
-   discards both, and the ``held`` hold lapses at its TTL.
-
-This module is the thin seam to billing; settlement lives in the outbox.
+write lock - on file-backed SQLite it would wait on that lock and fail. The
+swap is therefore driven by a durable op row (:mod:`sm_images.billing_ops`):
+op row, then billing, then the image row, each its own transaction.
 
 **Fail closed.** An installed billing that cannot meter (no ``usage_meter``,
 or a broken import) raises: images never stores for free because billing
@@ -43,29 +35,23 @@ from typing import Any
 
 from simple_module_db.callbacks import register_on_commit
 
-from sm_images import billing_guard, constants
+from sm_images import constants
 from sm_images.errors import StorageQuotaExceeded
 
 __all__ = [
-    "HoldSpent",
     "billing_installed",
     "check",
-    "extend",
     "factory_of",
     "hold_key",
     "on_commit",
     "register_meter",
-    "reserve",
     "storage_meter",
+    "swap",
 ]
 
 METER = constants.METER_STORAGE
 SOURCE = "images:storage"
 FULL = "The plan's image storage is used up"
-
-
-class HoldSpent(Exception):  # noqa: N818 - reads as the condition
-    """The key's hold was released or lapsed: the key is spent, a retry needs a new one."""
 
 
 def register_meter(app: Any) -> bool:
@@ -99,66 +85,36 @@ def storage_meter(session_factory: Any) -> Any:
 
 
 def hold_key(image_id: uuid.UUID | str, attempt: str | int) -> str:
-    """The idempotency key of one hold: an image and the attempt that took it
-    (a fresh nonce per attempt; a rehold names its outbox op)."""
+    """The idempotency key of one swap: an image and the attempt that asked."""
     return f"images:{image_id}:storage:{attempt}"
 
 
-async def check(app: Any, tenant: str, qty: int, db: Any) -> None:
-    """Refuse up front (402) what would not fit the gauge now, counting the
-    under-counted images (:mod:`sm_images.billing_guard`; read in a session of
-    its own from ``db``'s factory). Advisory: the hold taken afterwards is the
-    enforcement. Billing not running in this process (as ``RequiresQuota``
-    answers then), or nothing to store → no-op."""
+async def check(app: Any, tenant: str, qty: int) -> None:
+    """Refuse up front (402) what would not fit the gauge now. Advisory: the
+    swap taken afterwards is the enforcement. Billing not running in this
+    process (as ``RequiresQuota`` answers then), or nothing to store → no-op."""
     usage = getattr(app.state, constants.BILLING_USAGE_ATTR, None)
     if usage is None or qty < 1:
         return
-    under = await billing_guard.under_counted_bytes(factory_of(db), tenant, usage)
-    outcome = await usage.check(tenant, METER, int(qty) + under)
+    outcome = await usage.check(tenant, METER, int(qty))
     if not outcome.ok:
         raise StorageQuotaExceeded(FULL)
 
 
-async def reserve(
-    session_factory: Any,
-    tenant: str,
-    qty: int,
-    key: str,
-    *,
-    ttl: int | None = None,
-    guarded: bool = True,
-    image_id: Any = None,
+async def swap(
+    session_factory: Any, tenant: str, old: str | None, qty: int, key: str, meter: Any = None
 ) -> Any:
-    """Hold ``qty`` bytes (``held``, for ``ttl`` seconds or billing's default);
-    billing's ``Hold`` (``id``, ``expires_at``), or ``None`` without billing.
-    :class:`StorageQuotaExceeded` when it does not fit - counting the
-    under-counted images other than ``image_id`` unless ``guarded`` is off (a
-    rehold: :mod:`sm_images.billing_guard`); :class:`HoldSpent` when the key's
-    hold was since released or lapsed (a key is never reused). The guard and
-    the reserve run under the tenant's quota lease when its plan sets a limit
-    (:func:`sm_images.billing_guard.serialized`; ``QuotaBusy`` if not had in
-    time) - every reservation takes it, a rehold included."""
-    meter = storage_meter(session_factory)
+    """Billing's atomic swap: a committed hold of ``qty`` bytes in place of
+    ``old`` (billing's ``Hold``), or ``None`` without billing (or nothing to
+    hold). :class:`StorageQuotaExceeded` when the net delta does not fit -
+    ``old`` then still counts. A replayed ``key`` returns the same hold."""
+    meter = meter or storage_meter(session_factory)
     if meter is None or qty < 1:
         return None
-    async with billing_guard.serialized(meter, tenant, METER):
-        if guarded and not await billing_guard.guard(
-            meter, session_factory, tenant, METER, qty, exclude=image_id
-        ):
-            raise StorageQuotaExceeded(FULL)
-        outcome = await meter.reserve(tenant, METER, int(qty), key, source=SOURCE, ttl=ttl)
-    if not outcome.ok:
-        if getattr(outcome, "id", None) is not None:
-            raise HoldSpent(key)
+    outcome = await meter.swap(tenant, METER, old, int(qty), key, source=SOURCE)
+    if not outcome.ok and getattr(outcome, "id", None) is None:
         raise StorageQuotaExceeded(FULL)
     return outcome
-
-
-async def extend(session_factory: Any, hold_id: str, ttl: int) -> Any:
-    """Push a ``held`` hold's expiry to ``ttl`` seconds from now (billing's
-    ``Hold``); ``HoldExpired`` once it lapsed."""
-    meter = storage_meter(session_factory)
-    return None if meter is None else await meter.extend(hold_id, ttl)
 
 
 def on_commit(db: Any, call: Any, *args: Any) -> None:

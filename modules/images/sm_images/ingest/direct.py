@@ -48,7 +48,6 @@ from sm_images.errors import (
     FileTooLarge,
     ImagesError,
     PartsMismatch,
-    QuotaBusy,
     StorageQuotaExceeded,
     UnsupportedType,
     UploadNotFound,
@@ -170,8 +169,8 @@ async def complete(
         await state.renew(ingest.db, ticket, token)  # each phase is bounded by the lease
         outcome = await _ingest(ingest, collection, ticket, token, filename=filename, meta=meta)
     except Exception as exc:
-        # A full (or busy) storage quota keeps the upload: open to retry.
-        retry = not assembled or isinstance(exc, (StorageQuotaExceeded, QuotaBusy))
+        # A full storage quota keeps the upload: the session stays open to retry.
+        retry = not assembled or isinstance(exc, StorageQuotaExceeded)
         await state.settle(ingest.db, ticket, token, UploadStatus.OPEN if retry else _ABORTED)
         raise
     await state.finish(ingest.db, ticket, token)
@@ -210,7 +209,7 @@ async def _ingest(
             meta=meta,
             source=constants.SOURCE_UPLOAD,
         )
-    except (StorageQuotaExceeded, QuotaBusy):
+    except StorageQuotaExceeded:
         raise  # the staged object is kept for a retry once there is room
     except ImagesError:
         await _drop(ingest, ticket)

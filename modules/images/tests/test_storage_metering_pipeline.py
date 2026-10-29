@@ -1,9 +1,10 @@
 """The storage gauge at the executor's fenced publication and the janitor's purge.
 
-A published display copy or rendition set takes a hold for the image's new
-total, then releases the old one; a hold that does not fit fails the step
-``quota_exceeded`` with the new objects gone and the previous display kept;
-the purge releases the hold; ``storage_bytes`` is right with or without billing.
+A published display copy or rendition set swaps the image's hold to the new
+total (billing commits the new hold and releases the old one at once); one
+that does not fit fails the step ``quota_exceeded`` with the new objects gone
+and the previous display kept; the purge releases the hold;
+``storage_bytes`` is right with or without billing.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ from sm_images.pipeline.orchestrate import rerun_image
 from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import select
 
-from tests.billing_support import held_image
+from tests.billing_support import assert_counted_once, held_image
 from tests.pipeline_support import Blur, use_steps
 
 QUOTA = "quota_exceeded"
@@ -61,14 +62,16 @@ async def test_a_regenerated_display_moves_the_hold(pipe, blur, gauge):
     assert (live.id, live.status) == (row.storage_hold_id, "committed")
     assert live.quantity == row.storage_bytes == _expected(row, rends)
     assert gauge.holds[first].status == "released"
-    # Regenerated: a new display copy and new renditions, one hold again.
+    # Regenerated: a new display copy and new renditions of the same total -
+    # the hold already fits it, so billing is not asked again.
+    swaps = len(gauge.calls)
     await rerun_image(pipe.runtime, DEFAULT_TENANT, img, "force")
     again = await pipe.row(img)
     assert again.display_generation == 2
-    (moved,) = gauge.live()
-    assert moved.id == again.storage_hold_id != live.id
-    assert moved.quantity == again.storage_bytes == _expected(again, await pipe.renditions(img))
-    assert gauge.holds[live.id].status == "released"
+    (same,) = gauge.live()
+    assert same.id == again.storage_hold_id == live.id and len(gauge.calls) == swaps
+    assert same.quantity == again.storage_bytes == _expected(again, await pipe.renditions(img))
+    await assert_counted_once(pipe.db_state, gauge)
 
 
 async def test_a_hold_that_does_not_fit_fails_the_step_and_keeps_the_display(pipe, blur, gauge):
@@ -88,7 +91,7 @@ async def test_a_hold_that_does_not_fit_fails_the_step_and_keeps_the_display(pip
     assert [h.id for h in gauge.live()] == [first]
 
 
-async def test_a_lost_fence_releases_the_new_hold(pipe, blur, gauge, monkeypatch):
+async def test_a_lost_fence_shrinks_the_swapped_hold_back(pipe, blur, gauge, monkeypatch):
     from sm_images.pipeline import finish
 
     coll = await pipe.collection({"acme.blur": {}})
@@ -103,10 +106,12 @@ async def test_a_lost_fence_releases_the_new_hold(pipe, blur, gauge, monkeypatch
     await pipe.run(img)  # the first attempt loses the fence and is requeued
     assert len(calls) == 2
     row = await pipe.row(img)
+    # The seed, the lost attempt's swap, its shrink back, the winner's swap.
     statuses = sorted(h.status for h in gauge.holds.values())
-    assert statuses == ["committed", "released", "released"]  # seed, lost attempt, winner
+    assert statuses == ["committed", "released", "released", "released"]
     assert [h.id for h in gauge.live()] == [row.storage_hold_id]
     assert gauge.holds[first].status == "released"
+    await assert_counted_once(pipe.db_state, gauge)
 
 
 async def test_the_purge_releases_the_hold(pipe, blur, gauge):

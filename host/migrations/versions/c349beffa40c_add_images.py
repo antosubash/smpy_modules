@@ -121,15 +121,12 @@ def upgrade() -> None:
         sa.Column("hold_id", sa.String(length=64), nullable=True),
         sa.Column("quantity", sa.BigInteger(), nullable=False),
         sa.Column("idempotency_key", sa.String(length=128), nullable=True),
-        sa.Column("after_id", sa.Integer(), nullable=True),
         sa.Column("attempts", sa.Integer(), nullable=False),
         sa.Column("next_attempt_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("done_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_error", sa.String(length=500), nullable=True),
         sa.Column("claim_token", sa.String(length=64), nullable=True),
         sa.Column("claim_expires_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("replacement_hold_id", sa.String(length=64), nullable=True),
-        sa.Column("generation", sa.Integer(), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_images_billing_op")),
     )
     op.create_index(
@@ -140,17 +137,6 @@ def upgrade() -> None:
     )
     op.create_index(
         op.f("ix_images_billing_op_tenant_id"), "images_billing_op", ["tenant_id"], unique=False
-    )
-    op.create_table(
-        "images_hold_ref",
-        sa.Column("tenant_id", sa.String(length=50), nullable=False),
-        sa.Column("hold_id", sa.String(length=64), nullable=False),
-        sa.Column("image_id", sa.Uuid(), nullable=True),
-        sa.Column("state", sa.String(length=16), nullable=False),
-        sa.PrimaryKeyConstraint("hold_id", name=op.f("pk_images_hold_ref")),
-    )
-    op.create_index(
-        op.f("ix_images_hold_ref_tenant_id"), "images_hold_ref", ["tenant_id"], unique=False
     )
     op.create_table(
         "images_group",
@@ -920,8 +906,6 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_images_group_tenant_id"), table_name="images_group")
     op.drop_index(op.f("ix_images_group_collection_id"), table_name="images_group")
     op.drop_table("images_group")
-    op.drop_index(op.f("ix_images_hold_ref_tenant_id"), table_name="images_hold_ref")
-    op.drop_table("images_hold_ref")
     op.drop_index(op.f("ix_images_billing_op_tenant_id"), table_name="images_billing_op")
     op.drop_index("ix_images_billing_op_due", table_name="images_billing_op")
     op.drop_table("images_billing_op")

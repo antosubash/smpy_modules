@@ -30,9 +30,7 @@ from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
 )
 from tests.billing_support import (  # noqa: F401 - billing off unless asked
     _billing_off,
-    _leases_in_process,
     gauge,
-    hooks,
 )
 from tests.direct_support import small_parts  # noqa: F401 - two parts per test image
 from tests.fetch_support import inner, resolver  # noqa: F401 - the safe-fetch tests' fixtures

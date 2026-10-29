@@ -164,6 +164,26 @@ class UsageMeter(Protocol):
         """Push a held hold's expiry to ``ttl`` seconds from now (a heartbeat)."""
         ...
 
+    async def swap(
+        self,
+        tenant_id: str,
+        meter: str,
+        old_hold_id: str | None,
+        quantity: int,
+        idempotency_key: str,
+        *,
+        source: str,
+    ) -> Hold | Exceeded:
+        """Reserve and commit a hold of ``quantity`` and release ``old_hold_id``,
+        in one transaction (its own). The limit is checked on the net delta
+        (``quantity`` less the old hold's): a delta of zero or less is always
+        admitted. An old hold already settled, or unknown, frees nothing - a
+        plain reserve and commit; one of another tenant or meter raises
+        ``HoldNotFound`` and writes nothing. ``Exceeded`` (``requested`` = the
+        delta) leaves the old hold counting. A replayed key returns the same
+        hold, in its current state, whatever ``old_hold_id`` it names."""
+        ...
+
     async def get_hold(self, tenant_id: str, hold_id: str) -> Hold | None:
         """The hold's current state, read-only; ``None`` for an unknown id or
         one reserved for another tenant than ``tenant_id``. A

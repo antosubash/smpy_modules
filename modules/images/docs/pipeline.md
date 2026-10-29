@@ -169,100 +169,47 @@ organisation may store). Without it nothing is limited, and
 all the same.
 
 - **One committed hold per image**, sized to `storage_bytes` and named by
-  `storage_hold_id`. Ingest holds the original; a published display copy or
-  rendition set takes a hold for the new total and then releases the old one;
-  the janitor's purge releases it once the image is gone. Every hold is keyed
-  by the attempt that took it (`images:{image}:storage:{nonce}`), so two
-  concurrent completes of one upload never share a hold, and the loser
-  releases only its own.
+  `storage_hold_id`. Every hold comes from billing's atomic `swap`: the new
+  hold is committed and the image's old hold released in one billing
+  transaction, and the quota is checked on the net delta (new less old). No
+  images hold is ever `held`, so none can lapse; replacing an image's hold
+  never counts it twice or by nothing. The janitor's purge releases the hold
+  once the image is gone.
+- **Ingest** swaps from no hold (a plain reserve and commit) under a key of
+  its attempt (`images:{image}:storage:0-{nonce}`), before the insert: two
+  concurrent completes of one upload never share a hold. The insert marks the
+  `ingest` op done with the row; a duplicate or a failed insert hands the op
+  to the settler, which releases the hold.
+- **A publication that grows the image** swaps before it publishes: a `swap`
+  op is written under the image's lock (only when no other swap of the image
+  is pending; one is settled first, else the step runs again later), then
+  billing swaps. Refused: the old hold still counts, the step fails
+  `quota_exceeded`, its objects are deleted and the previous display copy is
+  kept. Granted: the fenced completion writes the new hold onto the image and
+  finishes the op in one transaction. A completion that keeps nothing hands
+  the op to the settler, which installs the swapped hold and queues a swap
+  back down to what the image stores - a shrink, which billing never
+  refuses.
+- **A publication that shrinks the image** (or keeps its size) asks nothing
+  of billing first: the completion queues the swap with its writes, and it
+  runs after the commit.
 - **Refusals.** Upload, base64 upload, direct-upload complete and import start
   check the gauge first and answer 402 `quota_exceeded`. The check is
   advisory: a batch checks the sum of its files, duplicates included, so it
-  can refuse a batch whose new images would have fit. A replayed complete of
-  a finished upload answers its image before any check, and a complete whose
-  hold is refused keeps the assembled upload, so it can be retried once
-  there is room. An import item that
-  does not fit fails `quota_exceeded`; a step whose new objects do not fit
-  fails `quota_exceeded`, its objects deleted and the previous display copy
-  kept.
-- **Order.** Billing writes in its own short transactions, so a hold is
-  reserved (`held`) before the caller's transaction writes - on SQLite it
-  would otherwise wait on the caller's lock. A rollback leaves a `held` hold
-  to lapse at billing's TTL; capacity is never leaked. Taking the new hold
-  before releasing the old one means a regenerated image briefly needs room
-  for both.
-- **Durable settlement.** Committing the new hold and releasing the old one
-  are rows in `images_billing_op`, written in the same transaction as the
-  change they settle (the ingest insert, the fenced completion, the purge).
-  They are attempted right after the commit; what fails stays pending with a
-  backoff, and `images.reconcile` retries each tenant's due ops until billing
-  confirms. Every op is claimed before it runs (a token with an expiry), so two
-  settlers never run one twice. An image's release of its old hold waits until
-  the op it follows is done and billing confirms the hold the image names now
-  is committed. A new hold that lapsed before its commit becomes a `rehold`:
-  a replacement for the image's current total is reserved under
-  `rehold-{op}-{generation}`, recorded on the op, committed, and swapped onto
-  the image only while the image still names the lapsed hold; a spent
-  replacement is released and the generation moves on, so no key is reused.
-  The janitor deletes done ops after `janitor_grace_days`, keeping any a
-  pending op still waits for. A release that has to wait is pushed back 30
-  seconds without counting as a failure, and due ops are taken oldest-due
-  first, so waiting releases never starve the commits behind them. A
-  replacement billing no longer knows counts as released.
-- **Hold ownership.** Every hold images keeps has a row in `images_hold_ref`
-  (`reserved`, `installed`, `orphan`, `releasing`, `released`). Installing a
-  hold on an image is a compare-and-set `reserved|orphan → installed` in the
-  same transaction as the image update; releasing one first wins
-  `reserved|orphan → releasing`, and only the winner calls billing. A stalled
-  settler releasing a replacement and a newer settler installing it can
-  therefore never both win, and a hold an image names is never released.
-  A release that finds the row `released` already counts as done, so a
-  settler that died after the release committed resumes. A replacement that
-  was committed but lost the install (a release won it first) gets a durable
-  `release` op in the same transaction that moves the rehold to its next
-  generation, so it is released even if the releaser that beat it died.
-- **No release waits on quota.** A hold that was never installed (a spare
-  replacement, a rolled-back completion, a duplicate at ingest) is released
-  with no dependency at all. An old hold waits for the image's current hold
-  only while that hold is `held` (its commit needs no room); once the
-  current hold lapsed and its rehold was refused for quota, the old hold is
-  released, so the room it holds lets the rehold through. The image is
-  under-counted meanwhile, never deadlocked.
-- **Freed room goes to the rehold first.** That under-count is a window: the
-  gauge counts the image by no hold from the moment its old hold is released
-  until its rehold installs. If anything else took the freed room, the rehold
-  would be refused for good and the tenant would store the image for free.
-  So every quota pre-check (upload, batch, base64, direct-upload complete,
-  import start, each ingested original and each publication's reserve)
-  counts the gauge **plus** the bytes of the tenant's under-counted images.
-  An image is in doubt while its current hold has a pending `commit` or
-  `rehold` op, and it counts as covered only when its hold ref is `installed`
-  and billing confirms the hold: a commit's hold `committed` (or `held` and
-  unexpired), a rehold's recorded replacement likewise. An expired, released
-  or unknown hold, or a rehold with no replacement, is under-counted. At most
-  50 holds are asked about per check (the rest count as under-counted). A new
-  reservation fits only if `gauge + under-counted + new ≤ limit`; otherwise
-  it is refused 402 `quota_exceeded` (a step fails `quota_exceeded`). A
-  publication does not count its own image, whose new hold replaces the
-  lapsed one, and a rehold does not count the term at all, since it is what
-  restores the count. In a worker billing has no gauge-aware check, so the
-  guard reserves a short-lived probe of `new + under-counted` and releases it
-  at once; a tenant with nothing under-counted pays no extra billing call.
-- **One reservation per tenant at a time.** When the tenant's plan limits
-  `images.storage_bytes`, the guard and the reservation after it (ingest,
-  direct complete, publication, rehold, import items) run under the lease
-  `images:quota:{tenant}` (the framework's leases: Redis, else `sm_lease`),
-  held for those two billing calls only, never across the caller's
-  transaction. Two reservations can no longer both pass the probe before
-  either reserves. Without billing, or without a limit, no lease is taken.
-  A request that cannot get the lease within 10 s answers 503 `quota_busy`
-  (a direct upload stays open to retry); a worker raises, and the step run or
-  import item is handed out again by reconcile, a rehold by its backoff.
-- **The reservation's deadline.** A publication reserves for the step lease
-  plus five minutes (at least billing's 15-minute default): a completion is
-  accepted only within its lease, so the hold outlives any completion that can
-  still succeed. It is extended when within a minute of lapsing before the
-  image lock is taken, and a lapsed one is refused under the lock (rolled
-  back and planned again, like a lost fence).
+  can refuse a batch whose new images would have fit; the swap is the
+  enforcement, atomic in billing. A replayed complete of a finished upload
+  answers its image before any check, and a complete whose hold is refused
+  keeps the assembled upload, so it can be retried once there is room. An
+  import item that does not fit fails `quota_exceeded`.
+- **Durable settlement.** Every billing call is driven by a row in
+  `images_billing_op` (`ingest`, `swap` or `release`), written before the
+  call or in the transaction of the change it settles, and attempted right
+  after; what fails stays pending with a backoff, and `images.reconcile`
+  retries each tenant's due ops. Every op is claimed before it runs (a token
+  with an expiry), and only its claimant may finish it, so an executor that
+  stalls past its claim cannot also install what a settler installed. An
+  image's swaps run one at a time, oldest first, and a retry repeats the
+  swap's key, so billing returns the same hold. The janitor deletes done ops
+  after `janitor_grace_days`.
 - **Fail closed.** An installed billing that cannot meter raises: an upload
   fails, and a step fails `storage_error` without publishing.

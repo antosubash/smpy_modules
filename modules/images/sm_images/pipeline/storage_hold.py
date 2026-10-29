@@ -1,74 +1,77 @@
 """The storage gauge at the executor's fenced publication (plan decision 10).
 
 A step that publishes objects (a display copy, a rendition set) changes what
-the image stores, so ``Image.storage_bytes`` and its hold move with it:
+the image stores, so ``Image.storage_bytes`` and its hold move with it - by
+billing's atomic swap, which commits the new hold and releases the old one in
+one transaction. When it runs depends on the direction:
 
-1. **Before the completion** (:func:`reserve`): the new total - the original,
-   the display copy and the renditions, with this attempt's objects in place
-   of the ones they replace - is reserved as a ``held`` hold, keyed by the
-   attempt's nonce. Not inside the completion transaction: billing writes in
-   its own transaction, which on file-backed SQLite would wait on the image
-   lock the completion holds (the object intents' rule, ``finish.stage``). A
-   refusal is ``StorageQuotaExceeded``: the caller deletes the staged objects
-   and fails the step ``quota_exceeded``; nothing is published.
+* **The image grows** (:func:`reserve`, before the completion): a ``swap`` op
+  is written, claimed by this attempt, under the image's row lock - only when
+  the image has no swap still pending (one is settled inline first; if it
+  stays pending, :class:`HoldBusy`). Then billing swaps. A refusal is
+  ``StorageQuotaExceeded``: the old hold still counts, the staged objects are
+  deleted, the step fails ``quota_exceeded`` and nothing is published.
+* **The image shrinks** (or keeps its size): nothing is asked of billing
+  before; the completion queues the swap with its writes, and it settles after
+  the commit. A shrink always fits.
 
-   **The reservation's TTL** is the step lease plus :data:`SLACK` (at least
-   billing's default). A completion is accepted only within its lease, and the
-   reservation is taken after the step ran, so it outlives every completion
-   that can still succeed; the slack covers the outbox's commit right after.
-   :func:`renew` extends it anyway when it is within :data:`MARGIN` of lapsing
-   before the image lock is taken.
-2. **In the completion, under the image lock and after the fenced writes**
-   (:func:`record`): a reservation past its deadline is refused, and so is one
-   for another total than the rows now add up to (another publication moved it
-   in between) - both are treated like a lost fence: rolled back, planned
-   again. Otherwise ``storage_bytes`` and ``storage_hold_id`` are written, and
-   the settlement - ``commit`` the new hold, then ``release`` the old one - goes
-   to the outbox in the same transaction (:mod:`sm_images.billing_ops`).
-3. **A completion that keeps nothing** releases the new hold through the
-   outbox (:func:`unhold`).
+**In the completion, under the image lock and after the fenced writes**
+(:func:`record`): the total the rows now add up to must be the one planned,
+and a grown image must still name the hold the swap replaced - else it is
+treated like a lost fence (rolled back, planned again). Then
+``storage_bytes``, the new hold and the op's completion (conditional on our
+claim) commit together. **A completion that keeps nothing** hands its op to
+the settler (:func:`abandon`), which installs the swapped hold and queues the
+correcting shrink back to what the image stores.
 
-Without billing the hold is ``None`` and only ``storage_bytes`` is written.
+Without billing only ``storage_bytes`` is written.
 """
 
 from __future__ import annotations
 
-import logging
 import uuid
-from dataclasses import dataclass, replace
-from datetime import UTC, datetime, timedelta
+from dataclasses import dataclass
 from typing import Any
 
+from simple_module_db import finalize_session
 from sqlalchemy import func, select, update
 
-from sm_images import billing, billing_ops, hold_refs
+from sm_images import billing, billing_ops
+from sm_images.billing_settle import CLAIM
+from sm_images.errors import StorageQuotaExceeded
 from sm_images.models import Image, Rendition
+from sm_images.models.billing_op import OP_SWAP
+from sm_images.pipeline.claim import lock_image
 from sm_images.pipeline.runtime import Runtime
 
-__all__ = ["MARGIN", "SLACK", "Planned", "parts", "record", "renew", "reserve", "unhold"]
+__all__ = ["HoldBusy", "Planned", "abandon", "parts", "record", "reserve"]
 
-logger = logging.getLogger(__name__)
-SLACK = 300
-MIN_TTL = 900
-MARGIN = timedelta(seconds=60)
+
+class HoldBusy(Exception):  # noqa: N818 - reads as the condition
+    """The image's hold has a swap still pending: the step runs again later."""
 
 
 @dataclass(frozen=True)
 class Planned:
     total: int
-    hold: str | None
-    expires_at: datetime | None = None
+    hold: str | None = None
+    """A grown image's new hold (committed by billing already)."""
+    old: str | None = None
+    """The hold that swap replaced: what the image must still name."""
+    op: billing_ops.Claimed | None = None
+    queue: bool = False
+    """Shrinking (or same size) with billing: the completion queues the swap."""
 
 
 async def parts(
-    db: Any, tenant: str, image_id: uuid.UUID, *, include_deleted: bool = False
-) -> tuple[int, int, int, str | None] | None:
-    """``(original, display copy, renditions, hold)`` of the image's stored
-    bytes; ``None`` when there is no such image."""
-    stmt = select(Image.size_bytes, Image.display_bytes, Image.storage_hold_id).where(
-        Image.id == image_id, Image.tenant_id == tenant
-    )
-    image = (await db.execute(stmt.execution_options(include_deleted=include_deleted))).first()
+    db: Any, tenant: str, image_id: uuid.UUID
+) -> tuple[int, int, int, str | None, int] | None:
+    """``(original, display copy, renditions, hold, storage_bytes)`` of the
+    image's stored bytes; ``None`` when there is no such image."""
+    stmt = select(
+        Image.size_bytes, Image.display_bytes, Image.storage_hold_id, Image.storage_bytes
+    ).where(Image.id == image_id, Image.tenant_id == tenant)
+    image = (await db.execute(stmt)).first()
     if image is None:
         return None
     rendered = await db.execute(
@@ -76,82 +79,92 @@ async def parts(
             Rendition.image_id == image_id, Rendition.tenant_id == tenant
         )
     )
-    return int(image[0]), int(image[1]), int(rendered.scalar_one()), image[2]
-
-
-def ttl_for(runtime: Runtime) -> int:
-    return max(int(runtime.settings().step_lease_seconds) + SLACK, MIN_TTL)
+    return int(image[0]), int(image[1]), int(rendered.scalar_one()), image[2], int(image[3])
 
 
 async def reserve(runtime: Runtime, loaded: Any, staged: Any) -> Planned | None:
-    """Reserve the total the image will store once ``staged`` is published;
-    ``None`` when the step stages no object."""
+    """Plan the total the image will store once ``staged`` is published, and
+    swap its hold first when that grows it; ``None`` when nothing is staged."""
     if not staged.keys:
         return None
-    async with runtime.session_factory() as db:
+    factory = runtime.session_factory
+    async with factory() as db:
         found = await parts(db, loaded.tenant, loaded.image_id)
     if found is None:
         raise LookupError("the image is gone")
-    original, display, renditions, _ = found
+    original, display, renditions, _, _ = found
     if staged.display_key is not None:
         display = staged.display_bytes
     if staged.renditions:
         renditions = sum(r[3] for r in staged.renditions.values())
     planned = original + display + renditions
-    key = billing.hold_key(loaded.image_id, staged.attempt)
-    hold = await billing.reserve(
-        runtime.session_factory,
-        loaded.tenant,
-        planned,
-        key,
-        ttl=ttl_for(runtime),
-        image_id=loaded.image_id,
-    )
-    if hold is None:
-        return Planned(planned, None)
-    return Planned(planned, hold.id, hold.expires_at)
-
-
-async def renew(runtime: Runtime, planned: Planned | None) -> Planned | None:
-    """Extend a reservation close to lapsing, before the image lock is taken.
-    A failure is left to :func:`record`, which then refuses it."""
-    if planned is None or planned.hold is None or planned.expires_at is None:
-        return planned
-    if planned.expires_at - datetime.now(UTC) > MARGIN:
-        return planned
+    meter = billing.storage_meter(factory)
+    if meter is None:
+        return Planned(planned)
+    opened = await _open(factory, loaded, planned, staged.attempt)
+    if opened is None:
+        return Planned(planned, queue=True)
+    op, old = opened
     try:
-        hold = await billing.extend(runtime.session_factory, planned.hold, ttl_for(runtime))
+        hold = await billing.swap(factory, loaded.tenant, old, planned, op.key, meter)
+    except StorageQuotaExceeded as exc:  # nothing changed: the old hold still counts
+        async with factory() as db:
+            await billing_ops.finish(db, op, None, f"{type(exc).__name__}: {exc}")
+            await finalize_session(db)
+        raise
     except Exception:
-        logger.warning("images.storage_hold.renew_failed hold=%s", planned.hold, exc_info=True)
-        return planned
-    return planned if hold is None else replace(planned, expires_at=hold.expires_at)
+        await _hand_back(factory, op)
+        raise
+    return Planned(planned, hold.id, old, op)
 
 
-async def record(
-    db: Any, runtime: Runtime, loaded: Any, planned: Planned | None, now: datetime
-) -> bool:
-    """Write the image's new total (under the lock, after the publication) and
-    its settlement; ``False`` when the reservation lapsed or was for another
-    total - the caller must roll back."""
+async def _open(
+    factory: Any, loaded: Any, planned: int, attempt: str
+) -> tuple[billing_ops.Claimed, str | None] | None:
+    """Write our claimed ``swap`` op when ``planned`` grows the image; ``None``
+    when it does not. Settles a pending swap of the image once first;
+    :class:`HoldBusy` when one is still pending."""
+    tenant, image_id = loaded.tenant, loaded.image_id
+    for first in (True, False):
+        async with factory() as db:
+            if await lock_image(db, tenant, image_id) is None:
+                raise LookupError("the image is gone")
+            found = await parts(db, tenant, image_id)
+            assert found is not None
+            if planned <= found[4]:
+                await db.rollback()
+                return None
+            waiting = await billing_ops.pending_swaps(db, tenant, image_id)
+            if not waiting:
+                key = billing.hold_key(image_id, attempt)
+                op = await billing_ops.open_op(db, OP_SWAP, image_id, planned, key, claim=CLAIM)
+                await finalize_session(db)
+                return op, found[3]
+            await db.rollback()
+        if first:
+            await billing_ops.settle(factory, tenant, waiting)
+    raise HoldBusy(str(image_id))
+
+
+async def record(db: Any, runtime: Runtime, loaded: Any, planned: Planned | None) -> bool:
+    """Write the image's new total (under the lock, after the publication)
+    and settle its hold; ``False`` when the total is not the one planned, the
+    image names another hold, or our op was taken over - roll back."""
     if planned is None:
         return True
-    if planned.hold is not None and planned.expires_at is not None and now >= planned.expires_at:
-        return False
     found = await parts(db, loaded.tenant, loaded.image_id)
     assert found is not None  # the caller holds its lock
-    original, display, renditions, old = found
+    original, display, renditions, hold, stored = found
     total = original + display + renditions
-    if planned.hold is not None and total != planned.total:
+    if total != planned.total:
         return False
     values: dict[str, Any] = {"storage_bytes": total}
-    if planned.hold is not None:
+    if planned.op is not None:
+        if hold != planned.old or not await billing_ops.finish(db, planned.op, planned.hold):
+            return False
         values["storage_hold_id"] = planned.hold
-        await billing_ops.add_swap(
-            db, loaded.image_id, planned.hold, total, old, factory=runtime.session_factory
-        )
-        await hold_refs.installed(db, planned.hold, loaded.image_id)
-        if old != planned.hold:
-            await hold_refs.orphan(db, loaded.tenant, old)
+    elif planned.queue and total != stored:
+        await billing_ops.add_swap(db, loaded.image_id, total, factory=runtime.session_factory)
     await db.execute(
         update(Image)
         .where(Image.id == loaded.image_id, Image.tenant_id == loaded.tenant)
@@ -161,9 +174,14 @@ async def record(
     return True
 
 
-async def unhold(runtime: Runtime, loaded: Any, planned: Planned | None) -> None:
-    """Nothing was published: give the reserved capacity back (outbox). The
-    hold was never installed, so its release names no image and waits on
-    nothing (the image's current hold may need the very quota it holds)."""
-    if planned is not None and planned.hold is not None:
-        await billing_ops.release_now(runtime.session_factory, None, planned.hold)
+async def abandon(runtime: Runtime, planned: Planned | None) -> None:
+    """Nothing was published: hand a grown image's swap to the settler, which
+    installs its hold and shrinks it back to what the image stores."""
+    if planned is not None and planned.op is not None:
+        await _hand_back(runtime.session_factory, planned.op)
+
+
+async def _hand_back(factory: Any, op: billing_ops.Claimed) -> None:
+    async with factory() as db:
+        await billing_ops.hand_back(db, op, factory)
+        await finalize_session(db)

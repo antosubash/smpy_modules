@@ -22,8 +22,9 @@ on file-backed SQLite the caller then holds the writer lock and the intent
 waits on it. A caller adding several images in one transaction calls
 :meth:`IngestService.reserve` for all of them first and passes each
 :class:`Slot` in. The storage hold (``sm_images.billing``) follows the same
-rule, so ``reserve(..., sizes=)`` takes it there too; it is committed with
-the row's commit, or released after it when nothing kept it.
+rule, so ``reserve(..., sizes=)`` takes it there too (committed at once by
+billing's swap); the insert finishes its op, or hands it back to be released
+when nothing kept it.
 
 The savepoint is also the per-file isolation of a batch: a file that fails
 rolls back its own rows only, and its object is deleted again.
@@ -184,7 +185,7 @@ class IngestService:
             group_role=meta.group_role,
         )
         try:
-            await self._insert(collection, row, meta, key)
+            await self._insert(collection, row, meta, key, slot)
         except IntegrityError:
             if staged_key is not None:
                 if await dedupe.find_id(self.db, new_id):
@@ -233,14 +234,14 @@ class IngestService:
             self.db, collection_id, meta.external_source, meta.external_id
         )
 
-    async def _insert(self, collection: Collection, row: Image, meta: IngestMeta, key: str) -> None:
+    async def _insert(self, collection: Collection, row: Image, meta, key: str, slot: Slot):
         try:
-            await self._insert_rows(collection, row, meta, key)
-        except Exception:  # released outside the rolled-back savepoint
-            await holds.drop_hold(self.db, self._factory(), row.id, row.storage_hold_id)
+            await self._insert_rows(collection, row, meta, key, slot)
+        except Exception:  # handed back outside the rolled-back savepoint
+            await holds.drop_slot(self.db, self._factory(), slot)
             raise
 
-    async def _insert_rows(self, collection: Collection, row: Image, meta, key: str) -> None:
+    async def _insert_rows(self, collection: Collection, row: Image, meta, key: str, slot):
         async with self.db.begin_nested():
             if meta.group_key is not None:
                 row.group_id = await dedupe.ensure_group(self.db, collection.id, meta.group_key)
@@ -251,9 +252,7 @@ class IngestService:
             await self.db.flush()
             await stats.on_image_added(self.db, collection.id, row.lat, row.lng)
             await clear_intents(self.db, [key])
-            await holds.keep_hold(  # rolled back with the savepoint
-                self.db, self._factory(), row.id, row.storage_hold_id, row.storage_bytes
-            )
+            await holds.keep_hold(self.db, slot.op, row.storage_hold_id)  # with the row
 
     def _remember(self, collection_id: uuid.UUID, meta: IngestMeta, sha: str, image_id) -> None:
         if meta.external_id is not None and meta.external_source is not None:

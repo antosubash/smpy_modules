@@ -7,16 +7,12 @@ from __future__ import annotations
 import base64
 import sys
 import types
-import uuid
 
 import pytest
-from simple_module_db import finalize_session
-from sm_images import billing, billing_ops, constants
+from sm_images import billing, constants
 from sm_images.models import Image
-from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import select
 
-from tests.billing_support import ops
 from tests.direct_support import complete, send_parts, start
 from tests.import_support import b64, feature
 from tests.upload_support import BASE, OLGA, all_rows, jpeg, make_collection, post_files, stored
@@ -152,44 +148,3 @@ def test_an_installed_billing_that_cannot_meter_fails_closed(monkeypatch):
     monkeypatch.setitem(sys.modules, constants.BILLING_USAGE_MODULE, types.ModuleType("old"))
     with pytest.raises(RuntimeError, match="usage_meter"):
         billing.storage_meter(object())
-
-
-async def test_the_outbox_settles_against_real_billing(tmp_path, monkeypatch):
-    """``usage_meter`` (a worker's view: no registry) reserves with a TTL,
-    extends, and the outbox commits the new hold before releasing the old one,
-    in billing's own tables."""
-    from simple_module_db import init_db
-    from simple_module_db.listeners import attach_session_listeners
-    from sm_billing.models import Base, UsageGauge, UsageHold
-    from sm_billing.plans import seed_default_plan
-    from sm_images.models import Base as ImagesBase
-
-    monkeypatch.setattr(billing, "billing_installed", lambda: True)
-    state = init_db(f"sqlite+aiosqlite:///{tmp_path / 'billing.db'}")
-    attach_session_listeners(state.sync_session_class)  # stamps the bound tenant
-    async with state.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        await conn.run_sync(ImagesBase.metadata.create_all)
-    factory = state.session_factory
-    await seed_default_plan(factory)
-    image_id, tenant = uuid.uuid4(), DEFAULT_TENANT
-    try:
-        first = await billing.reserve(
-            factory, tenant, 100, billing.hold_key(image_id, "a"), ttl=1200
-        )
-        assert first.expires_at is not None
-        assert (await billing.extend(factory, first.id, 1800)).expires_at > first.expires_at
-        async with factory() as db:
-            await billing_ops.add_swap(db, image_id, first.id, 100, None, factory=factory)
-            await finalize_session(db)
-        second = await billing.reserve(factory, tenant, 150, billing.hold_key(image_id, "b"))
-        async with factory() as db:
-            await billing_ops.add_swap(db, image_id, second.id, 150, first.id, factory=factory)
-            await finalize_session(db)
-        async with factory() as s:
-            holds = dict((await s.execute(select(UsageHold.id, UsageHold.status))).all())
-            level = (await s.execute(select(UsageGauge.in_use))).scalar_one()
-        assert holds == {first.id: "released", second.id: "committed"} and level == 150
-        assert all(o.done_at for o in await ops(state))
-    finally:
-        await state.engine.dispose()

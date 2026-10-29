@@ -32,7 +32,7 @@ from simple_module_db import finalize_session
 from sqlalchemy import update
 
 from sm_images import constants
-from sm_images.errors import ImagesError, QuotaBusy
+from sm_images.errors import ImagesError
 from sm_images.imports import jobs
 from sm_images.imports.chunk import pending_items
 from sm_images.imports.features import Parsed
@@ -190,9 +190,6 @@ async def settle_bytes(
             outcome = await ingest_item(
                 ingest, collection, data=data, filename=filename, meta=meta, auto_run=auto_run
             )
-        except QuotaBusy:
-            await db.rollback()
-            raise  # the item stays pending: reconcile hands it out again
         except ImagesError as exc:
             await db.rollback()
             code = exc.code or "rejected"

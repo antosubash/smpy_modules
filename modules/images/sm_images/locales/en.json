@@ -172,7 +172,6 @@
     "unreadable_image": "The image could not be read.",
     "output_too_large": "The step produced a result that is too large to keep.",
     "quota_exceeded": "The plan's quota is used up.",
-    "quota_busy": "Storage is being allocated for other uploads. Try again in a moment.",
     "time_limit": "The step took too long and was stopped.",
     "internal_error": "The step failed unexpectedly.",
     "dependency_unavailable": "A step this one depends on did not produce a result.",

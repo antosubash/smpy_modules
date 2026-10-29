@@ -104,7 +104,7 @@ async def upload_images(
         except ImagesError as exc:
             read.append(exc)
     good = [r[1] for r in read if isinstance(r, tuple)]
-    await billing.check(request.app, bound_tenant(), sum(len(data) for data, _ in good), ingest.db)
+    await billing.check(request.app, bound_tenant(), sum(len(data) for data, _ in good))
     # Every intent and storage hold before the first insert (IngestService.reserve).
     slots = iter(
         await ingest.reserve(collection, [i.ext for _, i in good], [len(d) for d, _ in good])
@@ -146,7 +146,7 @@ async def upload_base64(
     request: Request, body: Base64Upload, collection: CollectionEdit, ingest: Ingest
 ) -> UploadResult:
     data = decode_base64(body.data, ingest.settings.max_image_bytes)
-    await billing.check(request.app, bound_tenant(), len(data), ingest.db)
+    await billing.check(request.app, bound_tenant(), len(data))
     outcome = await ingest.add_image(
         collection,
         data=data,

@@ -1,45 +1,52 @@
-"""The storage gauge's durable settlement outbox (``images_billing_op``).
+"""The storage gauge's durable outbox (``images_billing_op``): writing ops.
 
-Every settlement of a hold - ``commit`` the new one, ``release`` the old one -
-is a row written **in the same transaction** as the state change it settles:
-ingest's insert, the executor's fenced completion, the janitor's purge. So a
-crash, a rollback or a billing outage never loses one, and nothing releases a
-hold in a path that could only log a failure.
+Billing writes in its own transaction, so a change of what an image stores
+and the billing call that settles it cannot commit together. Every billing
+call images makes is therefore driven by an op row, written first:
 
-* After the commit a best-effort attempt runs the transaction's own ops.
-* Whatever fails stays pending with a backoff; ``images.reconcile`` retries
-  each tenant's due ops in bounded pages until billing confirms. Every op is
-  **claimed** before it runs, so two settlers never run one twice
-  (:mod:`sm_images.billing_settle`).
-* **Order.** An image's ``release`` of its old hold names the ``commit`` of its
-  new one in ``after_id``, and runs only once that is done *and* billing
-  confirms the hold the image names now is committed.
-* **A new hold that lapsed** before its commit turns the op into a ``rehold``
-  (:mod:`sm_images.billing_rehold`).
-* The janitor deletes done ops after the grace period (:func:`sweep`).
+* ``ingest`` - a new image's first hold, ``swap`` from no hold. Written and
+  claimed before the billing call (:func:`open_op`); the image insert marks it
+  done in its own transaction (:func:`finish`). An insert that does not
+  happen hands it back (:func:`hand_back`), and the settler releases its hold.
+* ``swap`` - move an image's hold to a new quantity. A publication that grows
+  the image writes it claimed and calls billing *before* publishing (a refusal
+  publishes nothing); one that shrinks it (or a correction) writes it in its
+  own transaction, settled after the commit (:func:`add_swap`) - a shrink
+  always fits.
+* ``release`` - a purged image's hold (:func:`release_storage`).
 
-Ops are tenant rows (``MultiTenantMixin``); every query here also names the
-tenant, which the caller has bound.
+Settling - claims, the per-image order, installing the new hold on the image -
+is :mod:`sm_images.billing_settle`; reconcile retries what is left, and the
+janitor deletes done ops after the grace period (:func:`sweep`). Ops are
+tenant rows (``MultiTenantMixin``); every query also names the tenant.
 """
 
 from __future__ import annotations
 
-import logging
 import uuid
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from simple_module_db import finalize_session
-from sqlalchemy import delete, exists, select
-from sqlalchemy.orm import aliased
+from sqlalchemy import delete, select, update
 
 from sm_images import billing
 from sm_images.models import BillingOp
-from sm_images.models.billing_op import OP_COMMIT, OP_RELEASE
+from sm_images.models.billing_op import OP_RELEASE, OP_SWAP
 
-__all__ = ["add", "add_swap", "release_now", "release_storage", "settle", "sweep"]
+__all__ = [
+    "Claimed",
+    "add_swap",
+    "finish",
+    "hand_back",
+    "open_op",
+    "pending_swaps",
+    "release_storage",
+    "settle",
+    "sweep",
+]
 
-logger = logging.getLogger(__name__)
 SWEEP_BATCH = 500
 SWEEP_BATCHES = 20
 
@@ -47,70 +54,118 @@ StorageHold = tuple[uuid.UUID, str | None, int]
 """``(image_id, storage_hold_id, storage_bytes)`` of a hard-deleted image."""
 
 
-# -- writing ops (in the caller's transaction) --------------------------------
+@dataclass(frozen=True)
+class Claimed:
+    """An op its writer claimed: only ``token`` may finish it."""
+
+    op_id: int
+    token: str
+    key: str
 
 
-async def add(
-    db: Any,
-    op: str,
-    *,
-    image_id: uuid.UUID | None,
-    hold_id: str,
-    quantity: int = 0,
-    after: BillingOp | None = None,
-    factory: Any = None,
-) -> BillingOp:
-    """Write one op and queue its attempt for after ``db`` commits."""
+async def open_op(
+    db: Any, op: str, image_id: uuid.UUID, qty: int, key: str, *, claim: timedelta
+) -> Claimed:
+    """Write an op claimed by the caller for ``claim``, in ``db``'s transaction."""
+    token = uuid.uuid4().hex
     row = BillingOp(
         op=op,
         image_id=image_id,
-        hold_id=hold_id,
-        quantity=quantity,
-        after_id=None if after is None else after.id,
+        quantity=qty,
+        idempotency_key=key,
+        claim_token=token,
+        claim_expires_at=datetime.now(UTC) + claim,
     )
     db.add(row)
     await db.flush()
-    tenant = row.tenant_id
-    billing.on_commit(db, settle, billing.factory_of(db, factory), tenant, [row.id])
-    return row
+    assert row.id is not None
+    return Claimed(row.id, token, key)
 
 
-async def add_swap(
-    db: Any, image_id: uuid.UUID, new: str, quantity: int, old: str | None, *, factory: Any = None
-) -> None:
-    """``commit`` the image's new hold, then ``release`` its old one."""
-    first = await add(
-        db, OP_COMMIT, image_id=image_id, hold_id=new, quantity=quantity, factory=factory
+def _mine(claimed: Claimed) -> list[Any]:
+    return [
+        BillingOp.id == claimed.op_id,
+        BillingOp.claim_token == claimed.token,
+        BillingOp.done_at.is_(None),
+    ]
+
+
+async def finish(db: Any, claimed: Claimed, hold_id: str | None, error: str | None = None) -> bool:
+    """Mark our op done, in ``db``'s transaction; ``False`` when it is no
+    longer ours (a settler took it over: the caller must not commit)."""
+    got = await db.execute(
+        update(BillingOp)
+        .where(*_mine(claimed))
+        .values(done_at=datetime.now(UTC), hold_id=hold_id, last_error=error, claim_token=None)
+        .returning(BillingOp.id)
+        .execution_options(synchronize_session=False)
     )
-    if old is not None and old != new:
-        await add(db, OP_RELEASE, image_id=image_id, hold_id=old, after=first, factory=factory)
+    return got.first() is not None
+
+
+async def hand_back(db: Any, claimed: Claimed | None, factory: Any = None) -> None:
+    """Give our op to the settler (after ``db`` commits): whatever billing did
+    under its key is settled from there."""
+    if claimed is None:
+        return
+    await db.execute(
+        update(BillingOp)
+        .where(*_mine(claimed))
+        .values(claim_token=None, claim_expires_at=None)
+        .execution_options(synchronize_session=False)
+    )
+    _settle_after(db, [claimed.op_id], factory)
+
+
+async def add_swap(db: Any, image_id: uuid.UUID, qty: int, *, factory: Any = None) -> BillingOp:
+    """Move the image's hold to ``qty`` once ``db`` commits (a shrink or a
+    correction: never refused). Runs after the image's earlier swaps."""
+    row = BillingOp(
+        op=OP_SWAP,
+        image_id=image_id,
+        quantity=qty,
+        idempotency_key=billing.hold_key(image_id, f"swap-{uuid.uuid4().hex}"),
+    )
+    db.add(row)
+    await db.flush()
+    assert row.id is not None
+    _settle_after(db, [row.id], factory)
+    return row
 
 
 async def release_storage(db: Any, holds: list[StorageHold], factory: Any = None) -> None:
     """The janitor's purge: the hard-deleted images' holds, released once its
     transaction commits (the op keeps the hold id; the row is gone)."""
-    from sm_images import hold_refs
-    from sm_images.tenancy import bound_tenant
-
+    ids = []
     for image_id, hold, size in holds:
         if hold:
-            await hold_refs.orphan(db, bound_tenant(), hold)
-            await add(
-                db, OP_RELEASE, image_id=image_id, hold_id=hold, quantity=size, factory=factory
-            )
+            row = BillingOp(op=OP_RELEASE, image_id=image_id, hold_id=hold, quantity=size)
+            db.add(row)
+            await db.flush()
+            ids.append(row.id)
+    if ids:
+        _settle_after(db, ids, factory)
 
 
-async def release_now(factory: Any, image_id: uuid.UUID | None, hold: str | None) -> None:
-    """Outside any transaction (the caller rolled back): a ``release`` op in a
-    short transaction of its own, then its attempt."""
-    if hold is None:
-        return
-    async with factory() as db:
-        await add(db, OP_RELEASE, image_id=image_id, hold_id=hold, factory=factory)
-        await finalize_session(db)
+async def pending_swaps(db: Any, tenant: str, image_id: uuid.UUID) -> list[int]:
+    """The image's ``swap`` ops not done yet, oldest first."""
+    stmt = (
+        select(BillingOp.id)
+        .where(
+            BillingOp.tenant_id == tenant,
+            BillingOp.image_id == image_id,
+            BillingOp.op == OP_SWAP,
+            BillingOp.done_at.is_(None),
+        )
+        .order_by(BillingOp.id)
+    )
+    return list((await db.execute(stmt)).scalars())
 
 
-# -- settling and sweeping ---------------------------------------------------
+def _settle_after(db: Any, ids: list[int], factory: Any) -> None:
+    from sm_images.tenancy import bound_tenant
+
+    billing.on_commit(db, settle, billing.factory_of(db, factory), bound_tenant(), ids)
 
 
 async def settle(
@@ -124,10 +179,7 @@ async def settle(
 
 async def sweep(factory: Any, tenant: str, cutoff: datetime) -> int:
     """Delete ops done before ``cutoff``, :data:`SWEEP_BATCH` per transaction and
-    at most :data:`SWEEP_BATCHES` transactions per call - never one a pending op
-    still waits for (``after_id``)."""
-    waiting = aliased(BillingOp)
-    needed = exists().where(waiting.after_id == BillingOp.id, waiting.done_at.is_(None))
+    at most :data:`SWEEP_BATCHES` transactions per call."""
     removed = 0
     for _ in range(SWEEP_BATCHES):
         async with factory() as db:
@@ -135,7 +187,6 @@ async def sweep(factory: Any, tenant: str, cutoff: datetime) -> int:
                 BillingOp.tenant_id == tenant,
                 BillingOp.done_at.is_not(None),
                 BillingOp.done_at < cutoff,
-                ~needed,
             )
             batch = list(
                 (await db.execute(ids.order_by(BillingOp.id).limit(SWEEP_BATCH))).scalars()

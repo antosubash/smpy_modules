@@ -110,12 +110,38 @@ async def _release_races_the_sweeper(race: Race) -> None:
     assert await in_use(race.factory, tenant) == 0
 
 
+async def _two_swaps_of_one_old_hold_free_it_once(race: Race) -> None:
+    """Two swaps of the same old hold: only one frees it. At the limit, the
+    other needs its whole quantity and is refused; without one, both commit
+    and the old hold's quantity comes back exactly once."""
+    for round_ in range(ROUNDS // 2):
+        tenant = await seed_limits(race.factory, {GAUGE: 10})
+        old = await race.pick(0).swap(tenant, GAUGE, None, 6, f"o{round_}", source="t")
+        outcomes = await asyncio.gather(
+            *(
+                race.pick(i).swap(tenant, GAUGE, old.id, 9, f"w{round_}-{i}", source="t")
+                for i in (0, 1)
+            )
+        )
+        assert sum(isinstance(o, Hold) for o in outcomes) == 1, outcomes
+        assert await in_use(race.factory, tenant) == 9
+        assert await hold_statuses(race.factory, tenant) == ["committed", "released"]
+    free = await seed_limits(race.factory, {})
+    old = await race.pick(0).swap(free, GAUGE, None, 6, "o", source="t")
+    both = await asyncio.gather(
+        *(race.pick(i).swap(free, GAUGE, old.id, 4, f"u{i}", source="t") for i in (0, 1))
+    )
+    assert all(isinstance(o, Hold) for o in both)
+    assert await in_use(race.factory, free) == 8  # 6 freed once, 4 + 4 held
+
+
 CASES = [
     _two_reserves_admit_one,
     _many_reserves_fill_exactly,
     _sweepers_expire_once,
     _release_and_commit_are_idempotent,
     _release_races_the_sweeper,
+    _two_swaps_of_one_old_hold_free_it_once,
 ]
 
 
