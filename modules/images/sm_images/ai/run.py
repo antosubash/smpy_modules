@@ -21,6 +21,7 @@ image "processed" again.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import AsyncIterator, Sequence
 from datetime import UTC, datetime
@@ -36,8 +37,11 @@ from sm_images.pipeline.claim import insert_missing, load_runs, lock_image
 from sm_images.pipeline.cycle import reset_runs
 from sm_images.pipeline.orchestrate import submit_dispatch
 from sm_images.pipeline.runtime import Runtime
+from sm_images.starter_right import holds_right
 
 __all__ = ["CHUNK", "IDS_MAX", "RunScope", "launch", "run_prompt", "wanted"]
+
+logger = logging.getLogger(__name__)
 
 RunScope = Literal["missing", "stale", "all"]
 CHUNK = 500
@@ -113,18 +117,38 @@ async def run_prompt(
     scope: RunScope,
     image_ids: Sequence[uuid.UUID] | None = None,
     group_ids: Sequence[uuid.UUID] | None = None,
+    *,
+    run_as: str | None = None,
+    access_basis: str | None = None,
 ) -> int:
-    """Request and dispatch; returns how many images (or groups) got a new run."""
+    """Request and dispatch; returns how many images (or groups) got a new run.
+
+    ``run_as``/``access_basis``: the starter of a queued whole-collection run
+    (owner or ``images.manage``), re-checked first and before each chunk of
+    :data:`CHUNK` images; a lost right stops the run where it is."""
     found = await _prompt(runtime, tenant, prompt_id)
     if found is None:
+        return 0
+
+    async def allowed() -> bool:
+        return await holds_right(
+            runtime, tenant, found.collection_id, run_as, access_basis, shares=False
+        )
+
+    if not await allowed():
+        logger.info("images.prompt_run.access_revoked prompt=%s", prompt_id)
         return 0
     if found.scope is PromptScope.GROUP:  # per group (``image_ids`` do not apply)
         from sm_images.ai.group_request import request_groups
 
         return await request_groups(runtime, tenant, prompt_id, scope, group_ids)
     sid = step_id(prompt_id)
-    count = 0
+    count = seen = 0
     async for image_id in _images(runtime, tenant, found.collection_id, image_ids):
+        seen += 1
+        if seen % CHUNK == 1 and seen > 1 and not await allowed():
+            logger.info("images.prompt_run.access_revoked prompt=%s", prompt_id)
+            return count
         async with runtime.session_factory() as db:
             changed = await _request(db, tenant, image_id, sid, found.revision, scope)
             await finalize_session(db)
@@ -141,16 +165,21 @@ async def launch(
     scope: RunScope,
     image_ids: Sequence[uuid.UUID] | None,
     group_ids: Sequence[uuid.UUID] | None = None,
+    *,
+    run_as: str | None = None,
+    access_basis: str | None = None,
 ) -> int | None:
-    """Inline for a list or an eager runtime (the count); else queued (``None``)."""
+    """Inline for a list or an eager runtime (the count); else queued (``None``),
+    carrying the starter so the worker re-checks their right."""
+    starter = {"run_as": run_as, "access_basis": access_basis}
     if image_ids is not None or group_ids is not None or runtime.is_eager():
-        return await run_prompt(runtime, tenant, prompt_id, scope, image_ids, group_ids)
+        return await run_prompt(runtime, tenant, prompt_id, scope, image_ids, group_ids, **starter)
     from background_tasks.tenant_context import TENANT_HEADER
 
     from sm_images.task_config import QUEUE_IMPORTS
     from sm_images.tasks import run_prompt_task
 
-    run_prompt_task.s(str(prompt_id), scope).apply_async(
+    run_prompt_task.s(str(prompt_id), scope, **starter).apply_async(
         queue=QUEUE_IMPORTS, headers={TENANT_HEADER: tenant}
     )
     return None

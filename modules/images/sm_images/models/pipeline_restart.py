@@ -5,6 +5,7 @@ same transaction as that reset, conditionally on its previous value, so each
 image is reset at most once per restart even if two runners (a live worker
 and reconcile) race on one record. ``heartbeat_at`` moves with every image;
 reconcile picks up records whose heartbeat is stale and not ``finished_at``.
+A restart whose starter lost the right is finished early, never resumed.
 """
 
 from __future__ import annotations
@@ -29,3 +30,8 @@ class PipelineRestart(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ig
     cursor: uuid.UUID | None = Field(default=None, sa_column=Column(Uuid, nullable=True))
     heartbeat_at: datetime | None = dt_col(index=True)
     finished_at: datetime | None = dt_col()
+    run_as: str | None = Field(default=None, max_length=255)
+    """Who started the restart. Owner or ``images.manage`` only; the runner
+    re-checks it before each chunk (``sm_images.starter_right``)."""
+    access_basis: str | None = Field(default=None, max_length=10)
+    """``owner`` or ``manage``: where ``run_as``'s right came from."""

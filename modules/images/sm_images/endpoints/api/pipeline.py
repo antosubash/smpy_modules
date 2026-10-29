@@ -36,6 +36,7 @@ from sm_images.pipeline.config import (
 )
 from sm_images.schemas.pipeline import PipelineConfigIn, ReprocessIn, RestartIn
 from sm_images.services import gallery
+from sm_images.starter_right import owner_or_manage_basis
 
 router = APIRouter(tags=["pipeline"])
 
@@ -76,8 +77,17 @@ async def put_pipeline(
 @router.post(
     "/collections/{collection_id}/pipeline/restart", status_code=202, dependencies=[require_view]
 )
-async def restart_pipeline(body: RestartIn, collection: CollectionOwner) -> dict[str, str]:
-    await control.launch_restart(runtime(), tenant(), collection.id, body.scope)
+async def restart_pipeline(
+    body: RestartIn, collection: CollectionOwner, who: Principal
+) -> dict[str, str]:
+    await control.launch_restart(
+        runtime(),
+        tenant(),
+        collection.id,
+        body.scope,
+        run_as=who.user_id,
+        access_basis=owner_or_manage_basis(who, collection),
+    )
     return {"status": "accepted", "scope": body.scope}
 
 

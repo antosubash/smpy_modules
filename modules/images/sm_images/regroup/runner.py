@@ -19,12 +19,13 @@ from simple_module_db import finalize_session
 from sqlalchemy import select
 
 from sm_images import constants
-from sm_images.imports.access import ACCESS_REVOKED, MANAGE, manager_active, shared_edit
+from sm_images.imports.access import ACCESS_REVOKED
 from sm_images.models import Collection
 from sm_images.pipeline.runtime import Runtime
 from sm_images.regroup import control, jobs
 from sm_images.services import regroup as plan
 from sm_images.services import regroup_write as write
+from sm_images.starter_right import holds_right
 
 __all__ = ["may_edit", "run_regroup"]
 
@@ -33,24 +34,9 @@ COLLECTION_GONE = "collection_gone"
 
 
 async def may_edit(runtime: Runtime, tenant: str, job: jobs.Snap) -> bool:
-    """Whether the job's ``run_as`` still holds edit on its collection (the
-    import jobs' re-check, ``imports.access``). A job with no ``run_as`` is not checked."""
-    if job.run_as is None:
-        return True
-    stmt = select(Collection.owner_id).where(
-        Collection.id == job.collection_id, Collection.tenant_id == tenant
-    )
-    async with runtime.session_factory() as db:
-        owner = (await db.execute(stmt)).scalar_one_or_none()
-        shared = None
-        if owner is not None and owner != job.run_as:
-            shared = (await db.execute(shared_edit(job.run_as, job.collection_id))).first()
-        await finalize_session(db)
-    if owner is None or owner == job.run_as or shared is not None:
-        return True  # a missing collection is reported by the chunk itself
-    if job.access_basis == MANAGE:
-        return await manager_active(runtime, tenant, job.run_as)
-    return False
+    """Whether the job's ``run_as`` still holds edit on its collection
+    (``starter_right``, as for imports). A job with no ``run_as`` is not checked."""
+    return await holds_right(runtime, tenant, job.collection_id, job.run_as, job.access_basis)
 
 
 async def _chunk(runtime: Runtime, tenant: str, job: jobs.Snap, generation: int) -> bool:

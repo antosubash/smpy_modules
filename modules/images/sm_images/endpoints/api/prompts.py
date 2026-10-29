@@ -48,6 +48,7 @@ from sm_images.schemas.prompt import (
 )
 from sm_images.services import prompts as service
 from sm_images.services.viewer_stats import viewer_only
+from sm_images.starter_right import owner_or_manage_basis
 
 router = APIRouter(tags=["prompts"])
 Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
@@ -164,14 +165,24 @@ async def run_prompt(
         err.code = codes.CODE_INVALID_RUN_TARGET
         raise err
     named = body.group_ids if group else body.image_ids
+    # A manager's run re-checks their right in the worker; a named list (an
+    # editor may run one) is handled inside this request.
+    starter: dict[str, str | None] = {"run_as": None, "access_basis": None}
     if named is None or body.scope == "all":
         _owner_or_manager(who, collection, "run a prompt on the whole collection or on everything")
+        starter = {"run_as": who.user_id, "access_basis": owner_or_manage_basis(who, collection)}
     if not ai.ai_available():
         err = ServiceUnavailable("the ai module is not installed")
         err.code = codes.CODE_AI_UNAVAILABLE
         raise err
     await db.rollback()  # read-only so far: release it before the per-item transactions
     requested = await runs.launch(
-        runtime(), tenant(), prompt_id, body.scope, body.image_ids, body.group_ids
+        runtime(),
+        tenant(),
+        prompt_id,
+        body.scope,
+        body.image_ids,
+        body.group_ids,
+        **starter,
     )
     return PromptRunOut(scope=body.scope, requested=requested)

@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from sharing.models import ResourceShare
+from sm_images import starter_right
 from sm_images.imports import access, features, launch, recover, runner, settle
 from sm_images.imports.mapping import Mapping
 from sm_images.models import ImportJob
@@ -175,7 +176,7 @@ async def test_a_manager_who_leaves_mid_run_is_stopped(imp, monkeypatch):
     async def active(runtime, tenant, user_id):
         return held["v"]
 
-    monkeypatch.setattr(access, "manager_active", active)
+    monkeypatch.setattr(starter_right, "manager_active", active)  # the shared re-check
     job = await imp.job(_three())
     await _run_as(imp, job, user_uuid("max"), access.MANAGE)
     monkeypatch.setattr(runner, "CHUNK", 1)

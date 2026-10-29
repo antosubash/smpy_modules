@@ -7,15 +7,10 @@ re-checked by the worker (:func:`guard`) when a runner starts, before each
 chunk it records and before each download batch fetches anything. Without
 it, an editor whose share is revoked keeps importing into the collection.
 
-What still counts as edit, from a worker:
-
-* ``run_as`` owns the collection;
-* an active (unexpired) edit share names them - the same ``EXISTS`` the access
-  policy builds (``sharing.policy.share_exists_for``);
-* the right came from ``images.manage`` and the user still exists, is active
-  and (multi-tenant) still a member of the job's tenant
-  (:func:`manager_active`, ``imports.manage_right``). The permission itself is
-  not re-resolved in a worker; that module says why, and what that leaves.
+What still counts as edit, from a worker, is decided by
+:func:`sm_images.starter_right.holds_right` (shared with regroups,
+whole-collection restarts and prompt runs): ownership, an active edit share, or
+``images.manage`` for a user still active in the tenant.
 
 A job with no ``run_as`` (made by code, or before this existed) is not checked.
 A lost right cancels the job like a delete would: fenced on the generation,
@@ -29,12 +24,10 @@ import logging
 import uuid
 from typing import Any, Final
 
-from sharing.policy import share_exists_for
-from simple_module_core.resources import ACTION_EDIT, ResourcePrincipal
+from simple_module_core.resources import ResourcePrincipal
 from simple_module_db import finalize_session
 from sqlalchemy import select
 
-from sm_images.access import COLLECTION_RESOURCE
 from sm_images.imports.chunk import Stopped
 from sm_images.imports.jobs import CLAIMABLE, load, now, where
 from sm_images.imports.manage_right import manager_active
@@ -42,6 +35,7 @@ from sm_images.imports.terminal import ERRORS_MAX, release_staging
 from sm_images.models import Collection, ImportJob
 from sm_images.models.enums import JobStatus
 from sm_images.pipeline.runtime import Runtime
+from sm_images.starter_right import MANAGE, OWNER, SHARE, holds_right, shared_edit
 
 __all__ = [
     "ACCESS_REVOKED",
@@ -58,17 +52,7 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-OWNER: Final = "owner"
-SHARE: Final = "share"
-MANAGE: Final = "manage"
 ACCESS_REVOKED: Final = "access_revoked"
-
-_SHARES = share_exists_for(COLLECTION_RESOURCE, Collection.id)
-
-
-def shared_edit(user_id: str, collection_id: uuid.UUID) -> Any:
-    clause = _SHARES(ResourcePrincipal(user_id=user_id), ACTION_EDIT)
-    return select(Collection.id).where(Collection.id == collection_id, clause)
 
 
 async def basis(db: Any, who: ResourcePrincipal, collection: Collection) -> str:
@@ -84,25 +68,16 @@ async def basis(db: Any, who: ResourcePrincipal, collection: Collection) -> str:
 
 async def may_edit(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> bool:
     """Whether the job's ``run_as`` still holds edit on its collection."""
-    stmt = (
-        select(ImportJob.run_as, ImportJob.access_basis, Collection.id, Collection.owner_id)
-        .join(Collection, Collection.id == ImportJob.collection_id)
-        .where(*where(tenant, job_id))
+    stmt = select(ImportJob.run_as, ImportJob.access_basis, ImportJob.collection_id).where(
+        *where(tenant, job_id)
     )
     async with runtime.session_factory() as db:
         row = (await db.execute(stmt)).first()
-        shared = None
-        if row is not None and row[0] is not None and row[3] != row[0]:
-            shared = (await db.execute(shared_edit(row[0], row[2]))).first()
         await finalize_session(db)
     if row is None:
-        return True  # gone, or its collection is: the runner's own checks stop it
-    run_as, recorded, _, owner = row
-    if run_as is None or owner == run_as or shared is not None:
-        return True
-    if recorded == MANAGE:
-        return await manager_active(runtime, tenant, run_as)
-    return False
+        return True  # gone: the runner's own checks stop it
+    run_as, recorded, collection_id = row
+    return await holds_right(runtime, tenant, collection_id, run_as, recorded)
 
 
 async def revoke(runtime: Runtime, tenant: str, job_id: uuid.UUID, generation: int) -> bool:

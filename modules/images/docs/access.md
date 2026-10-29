@@ -152,6 +152,14 @@ edit share, or `images.manage`) is recorded on the job and re-checked by the
 worker when a runner starts, before each chunk and before each download batch.
 When the right is gone the job is cancelled with `access_revoked`.
 
+A whole-collection pipeline restart and a queued whole-collection prompt run
+(either needs the owner or `images.manage`; a share never suffices) record who
+started them in the same way. The runner re-checks that right when it starts
+and before each chunk (1000 images for a restart, 500 for a prompt run); once
+it is gone the run stops where it is, so a manager who has left the tenant does
+not keep spending its AI quota. A stopped restart is marked finished and is not
+resumed by `images.reconcile`.
+
 For a job started under `images.manage`, the worker does not re-resolve the
 permission: it checks that the user still exists, is active and (multi-tenant)
 is still a member. A manager who loses `images.manage` but keeps membership

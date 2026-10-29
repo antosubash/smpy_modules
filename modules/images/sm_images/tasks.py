@@ -100,14 +100,23 @@ def run_regroup_task(job_id: str, generation: int) -> int:
 
 
 @shared_task(name=RUN_PROMPT, stuck_after=STUCK_AFTER_SECONDS)
-def run_prompt_task(prompt_id: str, scope: str) -> int:
+def run_prompt_task(
+    prompt_id: str, scope: str, run_as: str | None = None, access_basis: str | None = None
+) -> int:
     from sm_images.ai.run import run_prompt
     from sm_images.pipeline.worker_runtime import run_task
 
     if scope not in ("missing", "stale", "all"):
         raise ValueError(f"unknown prompt run scope {scope!r}")
     return run_task(
-        lambda runtime, tenant: run_prompt(runtime, tenant, uuid.UUID(prompt_id), scope)
+        lambda runtime, tenant: run_prompt(
+            runtime,
+            tenant,
+            uuid.UUID(prompt_id),
+            scope,
+            run_as=run_as,
+            access_basis=access_basis,
+        )
     )
 
 

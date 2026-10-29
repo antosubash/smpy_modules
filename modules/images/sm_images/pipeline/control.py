@@ -98,24 +98,36 @@ async def overview(db: Any, collection: Collection) -> dict[str, Any]:
 
 
 async def launch_restart(
-    runtime: Runtime, tenant: str, collection_id: uuid.UUID, scope: ApiScope
+    runtime: Runtime,
+    tenant: str,
+    collection_id: uuid.UUID,
+    scope: ApiScope,
+    *,
+    run_as: str | None = None,
+    access_basis: str | None = None,
 ) -> None:
     """Re-run a collection's steps: inline when eager, else on ``images_imports``.
 
     In broker mode the :class:`PipelineRestart` record commits *before* the
     message is published, and the message names it: a first delivery that is
     lost leaves a record whose heartbeat goes stale, and reconcile resumes it.
+    ``run_as``/``access_basis`` (the starter's right) are recorded on it and
+    re-checked by the runner.
     """
     inner = RESTART_SCOPES[scope]
     if runtime.is_eager():
-        await restart_collection_async(runtime, tenant, collection_id, inner)
+        await restart_collection_async(
+            runtime, tenant, collection_id, inner, run_as=run_as, access_basis=access_basis
+        )
         return
     from background_tasks.tenant_context import TENANT_HEADER
 
     from sm_images.task_config import QUEUE_IMPORTS
     from sm_images.tasks import restart_collection
 
-    restart_id = await start_restart(runtime, tenant, collection_id, inner)
+    restart_id = await start_restart(
+        runtime, tenant, collection_id, inner, run_as=run_as, access_basis=access_basis
+    )
     restart_collection.s(str(collection_id), inner, str(restart_id)).apply_async(
         queue=QUEUE_IMPORTS, headers={TENANT_HEADER: tenant}
     )
