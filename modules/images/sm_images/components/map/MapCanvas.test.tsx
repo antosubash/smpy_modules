@@ -10,6 +10,7 @@ let drawn = 0;
 let options: { style?: unknown } = {};
 const setStyle = vi.fn();
 const addLayer = vi.fn();
+const fitBounds = vi.fn();
 const controls: unknown[] = [];
 
 vi.mock('maplibre-gl', () => ({
@@ -46,7 +47,9 @@ vi.mock('maplibre-gl', () => ({
     getCanvas() {
       return { style: { setProperty() {}, removeProperty() {} } };
     }
-    fitBounds() {}
+    fitBounds(...args: unknown[]) {
+      fitBounds(...args);
+    }
     remove() {}
   },
 }));
@@ -65,6 +68,31 @@ const errorShown = (view: { find: (s: string) => HTMLElement | null }) =>
   view.find('[data-testid="images-map-error"]') !== null;
 
 describe('MapCanvas', () => {
+  it('fits the points it draws, clear of the zoom control, not the page-load box', async () => {
+    // QA TEST-003: the box came from the page props, read before the upload's
+    // other points were located; and a marker sat under the top-right control.
+    const at = (x: number, y: number) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [x, y] },
+      properties: { id: `${x}`, captured_at: null, group_id: null },
+    });
+    const points = { kind: 'points', features: [at(14, 60), at(-8, 53), at(25, 65)] } as never;
+    fitBounds.mockClear();
+    const view = await mount(
+      <MapCanvas source={points} bbox={[14, 59, 15, 60]} label="m" onSelect={() => {}} />,
+    );
+    await flush();
+    handlers.load?.();
+    const [bounds, opts] = fitBounds.mock.calls[0] as [unknown, { padding: Record<string, number> }];
+    expect(bounds).toEqual([
+      [-8, 53],
+      [25, 65],
+    ]);
+    expect(opts.padding.right).toBeGreaterThanOrEqual(56);
+    expect(opts.padding.top).toBeGreaterThanOrEqual(48);
+    await view.unmount();
+  });
+
   it('only logs an error after the map loaded (a failed tile is not a failed map)', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const view = await mount(

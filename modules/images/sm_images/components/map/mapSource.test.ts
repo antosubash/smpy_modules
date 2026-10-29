@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { boundsOf, MAX_POINT_PAGES, resolveMapSource } from './mapSource';
+import { boundsOf, MAX_POINT_PAGES, pointsBounds, resolveMapSource } from './mapSource';
 
 const urls = {
   pointsUrl: '/api/images/public/c/s/points',
@@ -20,54 +20,96 @@ const json = (body: unknown) =>
 
 afterEach(() => vi.unstubAllGlobals());
 
+type Route = (url: string, init?: RequestInit) => Response | Promise<Response>;
+const stub = (route: Route) => {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+    route(String(input), init),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+};
+const isHead = (init?: RequestInit) => init?.method === 'HEAD';
+
 describe('resolveMapSource', () => {
-  it('prefers the PMTiles archive when the route answers a HEAD', async () => {
-    const fetchMock = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(null, { status: 200 }),
+  it('uses the points, with no archive probe, when they fit in one page', async () => {
+    // QA TEST-003: an archive built from the first 4 located images was drawn
+    // while the other 16 waited for the rebuild. One page of points is always
+    // fresh and complete; and an empty collection probes no archive (TEST-011).
+    const fetchMock = stub((_url, init) =>
+      isHead(init) ? new Response(null, { status: 200 }) : json({ features: [point('a')], next_cursor: null }),
     );
-    vi.stubGlobal('fetch', fetchMock);
+    const source = await resolveMapSource(urls);
+    expect(source).toEqual({ kind: 'points', features: [point('a')] });
+    expect(fetchMock.mock.calls.some(([, init]) => isHead(init))).toBe(false);
+  });
+
+  it('prefers the PMTiles archive for a collection past one page', async () => {
+    const fetchMock = stub((_url, init) =>
+      isHead(init) ? new Response(null, { status: 200 }) : json({ features: [point('a')], next_cursor: 'next' }),
+    );
     const source = await resolveMapSource(urls);
     expect(source.kind).toBe('tiles');
     expect(source.kind === 'tiles' && source.url).toMatch(
       /^http.*\/api\/images\/public\/c\/s\/map\.pmtiles$/,
     );
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: 'HEAD' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: 'HEAD' });
   });
 
-  it('falls back to paged points when there is no archive', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (init?.method === 'HEAD') return new Response(null, { status: 404 });
+  it('reads the points instead of an archive a rebuild is pending for', async () => {
+    stub((url, init) => {
+      if (isHead(init)) return new Response(null, { status: 200, headers: { 'X-Map-Stale': '1' } });
       return url.includes('cursor=next')
         ? json({ features: [point('b')], next_cursor: null })
         : json({ features: [point('a')], next_cursor: 'next' });
     });
-    vi.stubGlobal('fetch', fetchMock);
+    const source = await resolveMapSource(urls);
+    expect(source).toEqual({ kind: 'points', features: [point('a'), point('b')] });
+  });
+
+  it('falls back to paged points when there is no archive', async () => {
+    stub((url, init) => {
+      if (isHead(init)) return new Response(null, { status: 404 });
+      return url.includes('cursor=next')
+        ? json({ features: [point('b')], next_cursor: null })
+        : json({ features: [point('a')], next_cursor: 'next' });
+    });
     const source = await resolveMapSource(urls);
     expect(source).toEqual({ kind: 'points', features: [point('a'), point('b')] });
   });
 
   it('stops paging at the cap rather than looping on a cursor that never ends', async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
-      init?.method === 'HEAD'
-        ? new Response(null, { status: 404 })
-        : json({ features: [], next_cursor: 'again' }),
+    const fetchMock = stub((_url, init) =>
+      isHead(init) ? new Response(null, { status: 404 }) : json({ features: [], next_cursor: 'again' }),
     );
-    vi.stubGlobal('fetch', fetchMock);
     await resolveMapSource(urls);
     expect(fetchMock).toHaveBeenCalledTimes(1 + MAX_POINT_PAGES);
   });
 
-  it('treats a failing HEAD as no archive and surfaces a failing points read', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (_i: RequestInfo | URL, init?: RequestInit) => {
-        if (init?.method === 'HEAD') throw new Error('offline');
-        return new Response('nope', { status: 500 });
-      }),
-    );
+  it('surfaces a failing points read', async () => {
+    stub(() => new Response('nope', { status: 500 }));
     await expect(resolveMapSource(urls)).rejects.toThrow('500');
+  });
+
+  it('treats a failing HEAD as no archive', async () => {
+    stub((url, init) => {
+      if (isHead(init)) throw new Error('offline');
+      return url.includes('cursor=next')
+        ? json({ features: [point('b')], next_cursor: null })
+        : json({ features: [point('a')], next_cursor: 'next' });
+    });
+    expect((await resolveMapSource(urls)).kind).toBe('points');
+  });
+});
+
+describe('pointsBounds', () => {
+  it('boxes the points it is given, and none without points', () => {
+    const at = (x: number, y: number) => ({ ...point('p'), geometry: { type: 'Point', coordinates: [x, y] } });
+    expect(pointsBounds([at(14, 60), at(-8, 53), at(25, 65)] as never)).toEqual([
+      [-8, 53],
+      [25, 65],
+    ]);
+    expect(pointsBounds([])).toBeNull();
   });
 });
 

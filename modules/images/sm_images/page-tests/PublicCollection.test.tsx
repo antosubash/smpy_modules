@@ -84,7 +84,7 @@ describe('PublicCollection', () => {
     stubFetch({
       [LIST]: { items: [tile('i1'), tile('i2')], next_cursor: null },
       [MAP]: { ok: true },
-      [POINTS]: { features: [point], next_cursor: null },
+      [POINTS]: { features: [point], next_cursor: 'more' }, // past one page: the archive,
     });
     const view = await mount(
       <PublicCollection collection={info} map_style_url="https://tiles.example.org/s" />,

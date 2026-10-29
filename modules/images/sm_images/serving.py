@@ -219,10 +219,16 @@ async def serve_map(request: Request, collection: Collection, *, twin: bool) -> 
     ``If-Range`` gets the whole new archive rather than a splice of two.
     ``no-cache`` on both surfaces (Task 12's ``public``/``private`` split):
     the URL is stable, so every cache revalidates, and a withdrawn map stops
-    being served by caches too.
+    being served by caches too. An archive that predates changes a rebuild
+    is pending for (``schedule.rebuild_pending``) carries ``X-Map-Stale: 1``.
     """
     if not collection.map_key or collection.map_policy_rev != redaction.gate_key(collection):
         raise _missing(twin)
     policy = cache.cache_headers(request, collection, cache.DISPLAY, twin=twin)
     target = Target(collection.map_key, constants.PMTILES_CONTENT_TYPE, False)
-    return await _respond(request, store_for(request.app), target, policy, True, twin)
+    response = await _respond(request, store_for(request.app), target, policy, True, twin)
+    from sm_images.map.schedule import rebuild_pending
+
+    if rebuild_pending(collection):  # older than the points: the client reads those instead
+        response.headers["X-Map-Stale"] = "1"
+    return response

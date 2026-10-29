@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from functools import partial
 from typing import Any, Final
 
@@ -49,6 +49,7 @@ __all__ = [
     "changed",
     "due",
     "due_row",
+    "rebuild_pending",
     "request",
     "request_if_due",
 ]
@@ -72,6 +73,22 @@ def due(pending: int, baseline: int, *, urgent: bool, pct: int, abs_: int) -> bo
     if pending <= 0:
         return False
     return urgent or pending >= abs_ or pending * 100 >= pct * baseline
+
+
+def rebuild_pending(collection: Collection, at: datetime | None = None) -> bool:
+    """Whether the served archive predates changes a rebuild is on its way for:
+    one is claimed (queued or running), or the changes are due (a request
+    reconcile has not made yet). A viewer should read the points then."""
+    if collection.map_changes <= collection.map_built_changes:
+        return False
+    claimed = collection.map_claimed_until
+    if claimed is not None and claimed.replace(tzinfo=claimed.tzinfo or UTC) > (at or now()):
+        return True
+    runtime = current_runtime()
+    if runtime is None:
+        return False
+    row = tuple(getattr(collection, c.key) for c in MAP_STATE)
+    return due_row(row, runtime.settings())
 
 
 def due_row(row: Any, settings: Any) -> bool:

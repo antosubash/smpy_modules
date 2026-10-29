@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { keys, useT } from '../../utils/i18n';
 
-import { boundsOf, type MapSource } from './mapSource';
+import { boundsOf, type MapSource, pointsBounds } from './mapSource';
 import { installMapWorker } from './mapWorker';
 
 /** The tippecanoe layer name (`-l images`), and the sources and layers we add. */
@@ -20,6 +20,8 @@ const TILE_LAYER = 'images';
 const SOURCE = 'images';
 const CLUSTERS = 'images-clusters';
 const POINTS = 'images-points';
+/** Room around the fitted points; more on the top right, where the zoom control sits. */
+const FIT_PADDING = { top: 56, right: 64, bottom: 40, left: 40 };
 
 // The flat, tile-server-free background: drawn when no basemap is configured
 // (`map_style_url` empty, no third-party request at all) and when the configured
@@ -153,9 +155,12 @@ export default function MapCanvas({ source, styleUrl = '', bbox, label, onSelect
       // Added after the style loaded and with no `beforeId`: above every
       // basemap layer, labels included.
       addLayers(map, source);
-      const bounds = boundsOf(bbox);
+      // Points drawn from GeoJSON are fitted themselves: `bbox` comes from the
+      // page props, which may predate the points an upload just located.
+      const bounds = (source.kind === 'points' && pointsBounds(source.features)) || boundsOf(bbox);
       if (bounds) {
-        map.fitBounds(bounds as LngLatBoundsLike, { padding: 40, maxZoom: 14, animate: false });
+        const fit = { padding: FIT_PADDING, maxZoom: 14, animate: false };
+        map.fitBounds(bounds as LngLatBoundsLike, fit);
       }
       host.current?.setAttribute('data-map-ready', source.kind);
     });

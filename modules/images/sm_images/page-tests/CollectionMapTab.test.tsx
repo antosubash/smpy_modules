@@ -44,6 +44,8 @@ describe('Collection map tab', () => {
     const calls = stubFetch({
       'GET /api/images/collections/c1/images': { items: [], next_cursor: null, total: 0 },
       'HEAD /api/images/collections/c1/map.pmtiles': null,
+      // past one page of points: the archive is read
+      'GET /api/images/collections/c1/points': { features: [], next_cursor: 'more' },
     });
     const view = await mount(
       <Collection
