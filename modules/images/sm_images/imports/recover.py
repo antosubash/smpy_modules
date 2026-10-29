@@ -16,8 +16,9 @@ Delivery is at-most-once, so two things can be lost:
   the job's current generation; the claim makes a surfacing original skip it.
 
 **The poison-job breaker.** Each claim counts the relaunch, in the same
-``UPDATE`` (``jobs.claim_stale``): ``relaunches`` grows while ``checkpoint_index
-+ done_count`` stays where it was at the last one, and resets to 1 when it
+``UPDATE`` (``jobs.claim_stale``): ``relaunches`` grows while ``jobs.progress``
+(the checkpoint, every settlement - done, duplicate or failed - and the items a
+reset changed) stays where it was at the last one, and resets to 1 when it
 moved. A job found stale again after :data:`RELAUNCH_LIMIT` relaunches without
 progress is failed ``stalled`` under the generation just claimed (an ERROR is
 logged) instead of relaunched, so no unanticipated failure loops forever. A

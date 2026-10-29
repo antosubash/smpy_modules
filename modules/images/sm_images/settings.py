@@ -18,6 +18,7 @@ from __future__ import annotations
 from pydantic import Field
 from pydantic_settings import SettingsConfigDict
 
+from sm_images.constants import DOWNLOAD_TIMEOUT_MAX
 from sm_images.settings_boot import BootSettings
 
 __all__ = ["ImagesSettings"]
@@ -76,8 +77,9 @@ class ImagesSettings(BootSettings):
     download_concurrency_total: int = Field(default=32, ge=1)
     """Simultaneous image downloads across all hosts during an import."""
 
-    download_timeout: int = Field(default=60, ge=1)
-    """Seconds one image download may take."""
+    download_timeout: int = Field(default=60, ge=1, le=DOWNLOAD_TIMEOUT_MAX)
+    """Seconds one image download may take (at most 240: under reconcile's
+    5-minute stale cutoff, and three tries fit inside an item's claim)."""
 
     thumbnail_sizes: dict[str, int] = Field(
         default_factory=lambda: {"marker": 64, "small": 160, "medium": 400, "large": 1024}

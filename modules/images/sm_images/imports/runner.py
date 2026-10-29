@@ -179,7 +179,7 @@ async def _wait_for_capacity(runtime: Runtime, tenant: str, job: jobs.JobSnap) -
     while await jobs.pending_count(runtime, tenant, job.id) > CEILING:
         if waited >= CAPACITY_WAIT_SECONDS:
             logger.warning("images.import.capacity_wait_timeout job=%s", job.id)
-            return
+            return  # deliberate: CEILING is soft backpressure, never a stall
         if not await jobs.heartbeat(runtime, tenant, job.id, job.generation):
             raise chunk.Stopped()
         await _sleep(POLL_SECONDS)

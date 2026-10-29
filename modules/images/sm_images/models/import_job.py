@@ -46,7 +46,9 @@ class ImportJob(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[u
     """Reconcile relaunches since the job last made progress (the poison-job
     breaker, ``recover.RELAUNCH_LIMIT``); an operator's control resets it."""
     progress_mark: int = Field(default=0, sa_column_kwargs={"nullable": False})
-    """``checkpoint_index + done_count`` at the last relaunch."""
+    """:func:`~sm_images.imports.jobs.progress` at the last relaunch."""
+    reset_progress: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    """Items reset so far (restart, retry-failed): a reset's own progress."""
     checkpoint_index: int = Field(default=0, sa_column_kwargs={"nullable": False})
     total_count: int = Field(default=0, sa_column_kwargs={"nullable": False})
     done_count: int = Field(default=0, sa_column_kwargs={"nullable": False})

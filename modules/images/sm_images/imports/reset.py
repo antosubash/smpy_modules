@@ -111,6 +111,9 @@ async def reset_batch(runtime: Runtime, tenant: str, job_id: uuid.UUID, generati
                     )
                 )
             await db.execute(stmt.execution_options(**SYNC))
+            counted = ImportJob.reset_progress + len(ids)  # the poison-job breaker's progress
+            bump = update(ImportJob).where(*where(tenant, job_id)).values(reset_progress=counted)
+            await db.execute(bump.execution_options(**SYNC))
         await finalize_session(db)
     return len(ids)
 

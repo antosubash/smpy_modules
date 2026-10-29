@@ -201,8 +201,11 @@ async def heartbeat(runtime: Runtime, tenant: str, job_id: uuid.UUID, generation
 
 
 def progress() -> Any:
-    """How far a job has got, as one number: what the poison-job breaker watches."""
-    return ImportJob.checkpoint_index + ImportJob.done_count
+    """How far a job has got, as one number: what the poison-job breaker watches.
+    Every settlement counts (done, duplicate or failed), and so does a reset batch."""
+    j = ImportJob
+    settled = j.done_count + j.duplicate_count + j.failed_count
+    return j.checkpoint_index + settled + j.reset_progress
 
 
 async def claim_stale(

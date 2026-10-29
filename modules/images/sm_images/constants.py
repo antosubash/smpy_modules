@@ -26,6 +26,11 @@ TABLE_PREFIX: Final = "images_"
 BASE_NAME: Final = "images"
 """The argument of ``create_module_base``."""
 
+DOWNLOAD_TIMEOUT_MAX: Final = 240
+"""Ceiling of the ``download_timeout`` setting, in seconds: a minute under
+``reconcile.CUTOFF``, and ``INLINE_ATTEMPTS`` tries plus their waits stay inside
+``download.CLAIM_SECONDS`` (``tests/test_zip_fixes4.py`` checks both)."""
+
 ROUTE_PREFIX_API: Final = "/api/images"
 VIEW_PREFIX: Final = "/admin/images"
 PUBLIC_PREFIX: Final = "/images"

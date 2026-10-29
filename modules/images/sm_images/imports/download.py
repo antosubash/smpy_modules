@@ -14,7 +14,7 @@ Per item, with no transaction open while the network is used:
 3. **Fetch** with ``safe_stream`` (``max_image_bytes``, ``download_timeout``)
    inside a :class:`DomainLimiter` slot, under the retry policy of
    :mod:`.retrying`; a deferred item stays ``pending`` (its claim released)
-   for reconcile.
+   for reconcile. The batch heartbeats its job meanwhile (:mod:`.beat`).
 4. **Settle** through ingest (:func:`settle.settle_bytes`) - sniff, decode
    guards and the unique index, so a payload that is not an image fails with
    ingest's code.
@@ -36,6 +36,7 @@ from sqlalchemy import or_, select, update
 
 from sm_images import constants
 from sm_images.imports import jobs, settle, terminal
+from sm_images.imports.beat import beating
 from sm_images.imports.features import url_filename
 from sm_images.imports.jobs import SYNC, now
 from sm_images.imports.lookup import live_collection
@@ -221,10 +222,13 @@ async def _run(runtime, tenant, job_id, generation, ids) -> int:
     held = [c for c in claims if c is not None]
     db_lock = asyncio.Lock()
     job = (job_id, generation)
-    results = await asyncio.gather(
-        *(_one(runtime, tenant, job, coll, c, limiter, settings, db_lock) for c in held),
-        return_exceptions=True,
-    )
+    # A fetch settles nothing for up to ``download_timeout`` per attempt: beat
+    # meanwhile, or reconcile would take a healthy job for a dead one.
+    async with beating(runtime, tenant, job_id, generation):
+        results = await asyncio.gather(
+            *(_one(runtime, tenant, job, coll, c, limiter, settings, db_lock) for c in held),
+            return_exceptions=True,
+        )
     for result in results:
         if isinstance(result, BaseException):
             logger.warning("images.import.download_failed job=%s", job_id, exc_info=result)
