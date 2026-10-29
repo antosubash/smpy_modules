@@ -3,8 +3,9 @@
 **Counting.** Every map-relevant change bumps ``Collection.map_changes`` in the
 transaction that makes it (:func:`changed`): a located image's processing
 cycle concluding (``ImageProcessed`` - new points, a blur settling), a move, a
-removal, a group change. A move or a removal also sets ``map_urgent_mark``:
-those must not wait for the threshold. The current map remembers the count its
+removal, a group change. A first location also sets ``map_urgent_mark``; a
+move or a removal goes further and withdraws the archive (``map.revoke``):
+the old point must not stay served. The current map remembers the count its
 snapshot saw (``map_built_changes``).
 
 **The threshold** (spec §5): rebuild once the changes since the snapshot reach

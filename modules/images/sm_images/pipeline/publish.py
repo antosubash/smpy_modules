@@ -14,9 +14,10 @@ from typing import Any
 from sqlalchemy import delete, or_, select, update
 
 from sm_images.intents import add_intents
-from sm_images.map.revoke import gate_reopened, may_mutate
+from sm_images.map.revoke import gate_reopened, may_mutate, withdraw
 from sm_images.models import Image, Rendition, StepRun
 from sm_images.models.enums import LocationSource, StepStatus
+from sm_images.pipeline.runtime import current_runtime
 from sm_images.processing.exif import ExifData
 from sm_images.services import stats
 
@@ -185,6 +186,8 @@ async def _location(db: Any, tenant: str, image_id: uuid.UUID, data: ExifData) -
         return False
     before = None if old.lat is None or old.lng is None else (old.lat, old.lng)
     await stats.on_location_changed(db, old.collection_id, before, (data.lat, data.lng))
+    if before is not None and before != (data.lat, data.lng):  # moved: off the map now
+        await withdraw(db, old.collection_id, runtime=current_runtime(), tenant=tenant)
     return True
 
 

@@ -126,9 +126,9 @@ async def set_location(
         await stats.on_location_changed(db, collection.id, old, new)
     elif old != new:
         await stats.recompute(db, collection.id)
-    if old is not None and new is None:  # the point leaves the published map now
+    if old is not None and old != new:  # cleared or moved: the old point goes now
         await map_revoke.point_removed(db, collection)
-    elif old != new:  # a move never waits for the map's rebuild threshold
+    elif old != new:  # a new point only arrives; it never waits for the threshold
         await map_schedule.changed(db, collection.id, urgent=True)
     await db.refresh(image)
     return image

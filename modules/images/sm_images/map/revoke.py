@@ -8,11 +8,12 @@ transaction that makes it leave and :func:`withdraw` the archive there:
   build publishes) and the generation moves on (a build that snapshotted
   before the change can never publish), then a fresh build is requested.
   Callers: a visibility change (``services.collections.set_visibility``), a
-  located image trashed or its location cleared (:func:`point_removed`), a
-  pipeline save that changes the redaction gate (:func:`gate_saved`).
+  located image trashed, its location cleared or moved (:func:`point_removed`;
+  a move by a later EXIF read too, ``pipeline.publish``), a pipeline save that
+  changes the redaction gate (:func:`gate_saved`).
 * :func:`gate_reopened` - a located image whose display mutator's settled run
-  goes back to ``pending`` leaves the map too (``redaction.ready_clause``); it
-  counts as an urgent change, so the rebuild does not wait for the threshold.
+  goes back to ``pending`` leaves the map too (``redaction.ready_clause``), so
+  it withdraws as well; the rebuild is deferred to the next check.
 
 A change of the gate that no transaction makes - a mutator plugin installed,
 removed or bumped - is caught when serving (an archive stamped with another
@@ -32,7 +33,7 @@ from sqlalchemy import select, update
 from sm_images import redaction
 from sm_images.intents import add_intents
 from sm_images.map.objects import drop_objects
-from sm_images.map.schedule import changed, request
+from sm_images.map.schedule import request
 from sm_images.models import Collection, Image, StepRun
 from sm_images.models.enums import StepStatus
 from sm_images.pipeline import registry
@@ -72,7 +73,8 @@ async def withdraw(
 
 
 async def point_removed(db: Any, collection: Collection) -> None:
-    """A located image was trashed or lost its location: off the map now."""
+    """A located image was trashed, lost its location or moved: its point (at
+    the old place) is off the map now."""
     await withdraw(db, collection.id, runtime=current_runtime(), tenant=collection.tenant_id)
 
 
@@ -96,12 +98,13 @@ def may_mutate(step: str) -> bool:
 async def gate_reopened(db: Any, tenant: str, image_id: uuid.UUID, steps: list[str]) -> None:
     """Call *before* the runs of ``steps`` go back to ``pending``: if one of them
     is a (possible) display mutator that had settled and the image is located,
-    the image may just have left the map - an urgent change. Over-counts a run
-    whose image keeps a trusted display copy: an extra rebuild, never a missed one.
+    the image may just have left the map: the archive is withdrawn and a build
+    in flight fenced. Over-withdraws when the image keeps a trusted display
+    copy: an extra rebuild, never a point served that should not be.
 
-    Only counted: these resets run deep in the pipeline, with no runtime to
-    hand a build to. The urgent mark makes the map due at the next check - the
-    reopened cycle's own ``ImageProcessed``, or ``images.reconcile``."""
+    These resets run deep in the pipeline, with no runtime to hand a build to,
+    so the fresh generation stays unclaimed and ``images.reconcile`` requests
+    it; the withdrawn archive's intent lets the janitor delete it."""
     mutators = [s for s in steps if may_mutate(s)]
     if not mutators:
         return
@@ -116,4 +119,4 @@ async def gate_reopened(db: Any, tenant: str, image_id: uuid.UUID, steps: list[s
     )
     collection_id = (await db.execute(stmt)).scalar_one_or_none()
     if collection_id is not None:
-        await changed(db, collection_id, urgent=True, tenant=tenant, request_build=False)
+        await withdraw(db, collection_id, runtime=None, tenant=tenant)
