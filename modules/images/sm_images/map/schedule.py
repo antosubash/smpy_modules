@@ -38,6 +38,7 @@ from simple_module_db.callbacks import register_on_commit
 from sqlalchemy import or_, select, update
 
 from sm_images.clock import utcnow as now
+from sm_images.constants import NO_SYNC
 from sm_images.models import Collection, Image
 from sm_images.pipeline.runtime import Runtime, current_runtime
 
@@ -58,7 +59,6 @@ QUEUED_TTL: Final = timedelta(minutes=10)
 """How long a request's claim holds before the build itself extends it."""
 FAILED_COOLDOWN: Final = timedelta(minutes=15)
 """A failed or impossible build (no tippecanoe) is not retried before this."""
-_SYNC: Final = {"synchronize_session": False}
 MAP_STATE: Final = (
     Collection.map_changes,
     Collection.map_built_changes,
@@ -134,7 +134,7 @@ async def request(
         map_generation=Collection.map_generation + 1,
         map_claimed_until=at + QUEUED_TTL if runtime is not None else None,
     )
-    stmt = stmt.returning(Collection.map_generation).execution_options(**_SYNC)
+    stmt = stmt.returning(Collection.map_generation).execution_options(**NO_SYNC)
     gen = (await db.execute(stmt)).scalar_one_or_none()
     if gen is not None and runtime is not None:
         hand_off(db, runtime, tenant, collection_id, gen)
@@ -166,7 +166,7 @@ async def changed(
     if image_id is not None:
         placed = select(Image.id).where(Image.id == image_id, Image.lat.is_not(None))
         stmt = stmt.where(placed.exists())
-    stmt = stmt.values(**values).returning(*MAP_STATE).execution_options(**_SYNC)
+    stmt = stmt.values(**values).returning(*MAP_STATE).execution_options(**NO_SYNC)
     row = (await db.execute(stmt)).first()
     if not request_build:
         return

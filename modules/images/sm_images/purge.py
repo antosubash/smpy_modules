@@ -31,6 +31,7 @@ from simple_module_db.independent import independent_session
 from sqlalchemy import and_, delete, or_, select, update
 
 from sm_images import billing_ops
+from sm_images.constants import NO_SYNC
 from sm_images.ingest.upload_session import mark_cleaned, move
 from sm_images.models import (
     Collection,
@@ -54,7 +55,6 @@ __all__ = ["FAILURE_LIMIT", "MIN_INTENT_AGE", "PurgeReport", "purge_expired"]
 
 logger = logging.getLogger(__name__)
 
-_SYNC = {"synchronize_session": False}
 _UNSETTLED = or_(
     UploadSession.status.in_((UploadStatus.OPEN, UploadStatus.COMPLETING)),
     and_(UploadSession.status == UploadStatus.ABORTED, UploadSession.cleaned_at.is_(None)),
@@ -126,7 +126,7 @@ async def _delete_rows(
     db: Any, image_ids: list, whole_ids: list, keys: list[str], keep_sessions: list
 ) -> None:
     async def run(stmt: Any) -> None:
-        await db.execute(stmt.execution_options(**_SYNC))
+        await db.execute(stmt.execution_options(**NO_SYNC))
 
     for chunk in chunks(image_ids):
         await run(update(ImportItem).where(ImportItem.image_id.in_(chunk)).values(image_id=None))
@@ -162,7 +162,7 @@ async def _record(db: Any, model: Any, ids: set, now: datetime) -> None:
             update(model)
             .where(model.id.in_(sorted(ids)))
             .values(purge_failed_at=now)
-            .execution_options(**_SYNC, include_deleted=True)
+            .execution_options(**NO_SYNC, include_deleted=True)
         )
 
 

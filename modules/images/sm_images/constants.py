@@ -18,6 +18,10 @@ MODULE_NAME: Final = "Images"
 
 DISTRIBUTION: Final = "simple_module_images"
 
+NO_SYNC: Final = {"synchronize_session": False}
+"""``execution_options`` of a bulk ``UPDATE``/``DELETE``: the session's
+identity map is not synchronised with the statement."""
+
 LOCALE_NAMESPACE: Final = "images"
 """The namespace ``locale_dirs`` registers the catalogue under, and the prefix
 of every key in ``locales/*.json``."""

@@ -31,6 +31,7 @@ from simple_module_db.callbacks import register_on_commit
 from sqlalchemy import select, update
 
 from sm_images import redaction
+from sm_images.constants import NO_SYNC
 from sm_images.intents import add_intents
 from sm_images.map.objects import drop_objects
 from sm_images.map.schedule import request
@@ -40,8 +41,6 @@ from sm_images.pipeline import registry
 from sm_images.pipeline.runtime import Runtime, current_runtime
 
 __all__ = ["gate_reopened", "gate_saved", "may_mutate", "point_removed", "withdraw"]
-
-_SYNC = {"synchronize_session": False}
 
 
 async def withdraw(
@@ -63,7 +62,7 @@ async def withdraw(
             map_changes=Collection.map_changes + 1,
             map_urgent_mark=Collection.map_changes + 1,
         )
-        .execution_options(**_SYNC)
+        .execution_options(**NO_SYNC)
     )
     if old:
         await add_intents(db, [old])

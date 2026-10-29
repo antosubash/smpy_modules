@@ -28,6 +28,7 @@ from simple_module_db import finalize_session
 from sqlalchemy import case, func, select, update
 
 from sm_images.clock import utcnow as now
+from sm_images.constants import NO_SYNC
 from sm_images.imports.mapping import Mapping
 from sm_images.intents import clear_intents
 from sm_images.models import Collection, ImportItem, ImportJob
@@ -62,7 +63,7 @@ COUNTERS: Final = {
     ItemStatus.DUPLICATE: "duplicate_count",
     ItemStatus.FAILED: "failed_count",
 }
-SYNC: Final = {"synchronize_session": False}
+SYNC: Final = NO_SYNC  # re-exported: the import modules spell it ``jobs.SYNC``
 
 
 @dataclass(frozen=True)

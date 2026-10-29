@@ -22,6 +22,7 @@ from simple_module_db import finalize_session
 from sqlalchemy import select, update
 
 from sm_images.clock import utcnow as _now
+from sm_images.constants import NO_SYNC
 from sm_images.models import Image, PipelineRestart
 from sm_images.pipeline.orchestrate import Scope, reset_image, submit_dispatch
 from sm_images.pipeline.runtime import Runtime
@@ -32,7 +33,6 @@ __all__ = ["CHUNK", "restart_collection_async", "resume_restart", "start_restart
 logger = logging.getLogger(__name__)
 
 CHUNK = 1000
-_SYNC = {"synchronize_session": False}
 
 
 async def start_restart(
@@ -85,7 +85,7 @@ async def _advance(db: Any, tenant: str, restart_id: uuid.UUID, prev: Any, image
         .where(*_record(tenant, restart_id), PipelineRestart.finished_at.is_(None), at)
         .values(cursor=image_id, heartbeat_at=_now())
         .returning(PipelineRestart.id)
-        .execution_options(**_SYNC)
+        .execution_options(**NO_SYNC)
     )
     return (await db.execute(stmt)).first() is not None
 
@@ -138,7 +138,7 @@ async def _finish(
             update(PipelineRestart)
             .where(*_record(tenant, restart_id))
             .values(finished_at=_now(), heartbeat_at=_now())
-            .execution_options(**_SYNC)
+            .execution_options(**NO_SYNC)
         )
         await finalize_session(db)
     if revoked:

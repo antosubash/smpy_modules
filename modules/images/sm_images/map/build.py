@@ -39,6 +39,7 @@ from simple_module_db import finalize_session
 from sqlalchemy import select, update
 
 from sm_images import constants, redaction, storage_keys
+from sm_images.constants import NO_SYNC
 from sm_images.intents import add_intents, clear_intents, object_intent
 from sm_images.map import pmtiles_build
 from sm_images.map.objects import drop_objects
@@ -58,7 +59,6 @@ FAILED: Final = "failed"
 CHUNK: Final = 5000
 UPLOAD_MARGIN: Final = timedelta(minutes=10)
 _READ_BYTES: Final = 1024 * 1024
-_SYNC: Final = {"synchronize_session": False}
 
 
 @dataclass(frozen=True)
@@ -80,7 +80,7 @@ async def _cool_down(runtime: Runtime, collection_id: uuid.UUID, gen: int) -> No
             update(Collection)
             .where(*_ours(collection_id, gen))
             .values(map_claimed_until=datetime.now(UTC) + FAILED_COOLDOWN)
-            .execution_options(**_SYNC)
+            .execution_options(**NO_SYNC)
         )
         await finalize_session(db)
 
@@ -101,7 +101,7 @@ async def _snapshot(
             update(Collection)
             .where(*_ours(collection_id, gen))
             .values(map_claimed_until=taken_at + budget)
-            .execution_options(**_SYNC)
+            .execution_options(**NO_SYNC)
         )
         await finalize_session(db)
     count, after = 0, None
@@ -157,7 +157,7 @@ async def _publish(
                 map_policy_rev=snap.policy,
                 map_claimed_until=None,
             )
-            .execution_options(**_SYNC)
+            .execution_options(**NO_SYNC)
         )
         if key:
             await clear_intents(db, [key])
