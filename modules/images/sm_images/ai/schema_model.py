@@ -72,11 +72,10 @@ class _Builder:
                 self.built[(ns, ref)] = self.type_of(self.defs[ns][ref], label)
             return self.built[(ns, ref)]
         if "const" in node:
-            self._check_values(node, [node["const"]], name)
-            return Literal[node["const"]]
+            (value,) = self._check_values(node, [node["const"]], name)
+            return Literal[value]
         if "enum" in node:
-            self._check_values(node, node["enum"], name)
-            return Literal[tuple(node["enum"])]
+            return Literal[tuple(self._check_values(node, node["enum"], name))]
         if "anyOf" in node:
             return _union([self.type_of(m, f"{name}_{i}") for i, m in enumerate(node["anyOf"])])
         kind = node.get("type")
@@ -117,13 +116,26 @@ class _Builder:
             return self.model(node, name)  # an empty one forbids every key
         return dict[str, Any]
 
-    def _check_values(self, node: dict[str, Any], values: list[Any], name: str) -> None:
+    def _check_values(self, node: dict[str, Any], values: list[Any], name: str) -> list[Any]:
         """Every ``enum``/``const`` value must satisfy the node's own constraints
         (type, lengths, pattern, bounds): a ``Literal`` alone would admit a value
-        the schema forbids. ``ValueError`` for an inconsistent schema."""
+        the schema forbids. ``ValueError`` for an inconsistent schema.
+
+        Returns the values normalised: under ``type: integer`` a mathematically
+        integral float (``1.0``) is the integer ``1``, as JSON Schema counts it;
+        ``1.5`` stays a float and is refused."""
         kind = node.get("type")
         declared = kind if isinstance(kind, list) else [kind] if kind else None
+        out: list[Any] = []
         for value in values:
+            if (
+                declared is not None
+                and "integer" in declared
+                and isinstance(value, float)
+                and value.is_integer()
+            ):
+                value = int(value)
+            out.append(value)
             if declared is not None:
                 kinds = declared
             elif isinstance(value, bool) or value is None:
@@ -135,6 +147,7 @@ class _Builder:
                 TypeAdapter(allowed).validate_python(value, strict=True)
             except ValidationError as exc:
                 raise ValueError(f"enum value {value!r} breaks the schema's own rules") from exc
+        return out
 
     def model(self, node: dict[str, Any], name: str) -> type[BaseModel]:
         required = set(node.get("required", []))

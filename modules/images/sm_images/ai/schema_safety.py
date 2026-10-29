@@ -13,9 +13,9 @@ admits only what :mod:`.schema_model` builds faithfully, with caps:
   never beside other structure keywords - so nothing is fetched and
   resolution terminates;
 * anything the model would not enforce is ``unsupported_schema`` rather than
-  silently ignored: other keywords (``allOf``, ``not``, ``format``,
-  ``patternProperties``, ``$dynamicRef``, ...) and ``required`` names that are
-  not properties.
+  silently ignored: ``enum``/``const`` beside ``anyOf``/``oneOf``/``allOf``,
+  other keywords (``allOf``, ``not``, ``format``, ``patternProperties``,
+  ``$dynamicRef``, ...) and ``required`` names that are not properties.
 
 The walk is bounded by the depth cap before it recurses, so a deeply nested
 schema under the size cap is ``too_deep``, never a ``RecursionError``. Then
@@ -54,6 +54,7 @@ STRUCTURE = frozenset(
     | {"minLength", "maxLength", "minItems", "maxItems", "pattern"}
 )
 ROOT_ONLY = frozenset({"$defs", "definitions"})
+COMBINATORS = frozenset({"anyOf", "oneOf", "allOf"})
 
 
 class UnsafeSchema(ValueError):  # noqa: N818 - reads as the verdict
@@ -82,6 +83,9 @@ class _Walk:
             raise UnsafeSchema("invalid_schema", "a subschema must be an object")
         if "$ref" in node and STRUCTURE.intersection(node) - {"$ref"}:
             raise UnsafeSchema("unsupported_schema", "$ref takes no sibling keywords")
+        if ("enum" in node or "const" in node) and COMBINATORS.intersection(node):
+            # A Literal of the values would bypass the combinator: not modelled.
+            raise UnsafeSchema("unsupported_schema", "enum/const beside anyOf/oneOf/allOf")
         for key, value in node.items():
             if key in ANNOTATIONS:
                 continue
