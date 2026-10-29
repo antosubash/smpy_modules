@@ -55,6 +55,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 _REPLAY, _FOREIGN = "replay", "foreign"
+_REFUSAL = (UsageHold.refused_used, UsageHold.refused_limit, UsageHold.refused_requested)
 
 
 def _release_old(old: str, tenant_id: str, meter: str, now: datetime) -> Any:
@@ -138,16 +139,25 @@ class SwapMixin(HoldsMixin):
         if outcome == _FOREIGN:
             raise HoldNotFound(old_hold_id or "")
         if outcome != _REPLAY:
-            outcome = await run_write(self._factory, None, self._refusal(values, now))
+            level = await self.in_use(tenant_id, meter)
+            refused = Exceeded(level, limit or 0, quantity - freed, None)
+            outcome = await run_write(self._factory, None, self._refusal(values, now, refused))
             if isinstance(outcome, Counted):  # the key's outcome is this refusal
-                level = await self.in_use(tenant_id, meter)
-                return Exceeded(level, limit or 0, quantity - freed, None)
-        return await self._replay_swap(values, limit)
+                return refused
+        return await self._replay_swap(values)
 
     @staticmethod
-    def _refusal(values: dict, now: datetime) -> Any:
+    def _refusal(values: dict, now: datetime, refused: Exceeded) -> Any:
         """Record the refusal under the key, unless another call's row has it."""
-        row = {**values, "id": uuid4().hex, "status": HoldStatus.REFUSED.value, "settled_at": now}
+        row = {
+            **values,
+            "id": uuid4().hex,
+            "status": HoldStatus.REFUSED.value,
+            "settled_at": now,
+            "refused_used": refused.used,
+            "refused_limit": refused.limit,
+            "refused_requested": refused.requested,
+        }
 
         async def apply(session: AsyncSession) -> Counted | None:
             dialect = session.get_bind().dialect.name
@@ -156,12 +166,11 @@ class SwapMixin(HoldsMixin):
 
         return apply
 
-    async def _replay_swap(self, call: dict, limit: int | None) -> Hold | Exceeded:
+    async def _replay_swap(self, call: dict) -> Hold | Exceeded:
         """The outcome first recorded under ``call``'s key, if it is the same call."""
         async with self._factory() as session:
-            stmt = select(
-                *hold_sql.HOLD_COLUMNS, UsageHold.source, UsageHold.replaces_hold_id
-            ).where(
+            columns = (UsageHold.source, UsageHold.replaces_hold_id, *_REFUSAL)
+            stmt = select(*hold_sql.HOLD_COLUMNS, *columns).where(
                 UsageHold.tenant_id == call["tenant_id"],
                 UsageHold.meter == call["meter"],
                 UsageHold.idempotency_key == call["idempotency_key"],
@@ -172,9 +181,9 @@ class SwapMixin(HoldsMixin):
         same = (int(row.quantity), row.source, row.replaces_hold_id)
         if same != (call["quantity"], call["source"], call["replaces_hold_id"]):
             raise IdempotencyConflict(call["idempotency_key"])
-        if row.status == HoldStatus.REFUSED.value:
-            level = await self.in_use(call["tenant_id"], call["meter"])
-            return Exceeded(level, limit or 0, call["quantity"], None)
+        if row.status == HoldStatus.REFUSED.value:  # as first answered
+            used, limit, requested = row.refused_used, row.refused_limit, row.refused_requested
+            return Exceeded(int(used), int(limit), int(requested), None)
         return _hold(row, replayed=True)
 
     @staticmethod

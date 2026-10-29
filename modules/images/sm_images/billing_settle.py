@@ -39,6 +39,10 @@ PAGES = 10
 CLAIM = timedelta(minutes=5)
 BACKOFF = timedelta(minutes=1)
 BACKOFF_MAX = timedelta(hours=1)
+BILLING_OP_MAX_AGE = timedelta(days=7)
+"""No op older than this calls billing: billing keeps a key's outcome for 30
+days after it settles (its retention), so a call is always answered by it."""
+OP_EXPIRED = "op_expired"
 
 
 _COLUMNS = (
@@ -50,6 +54,7 @@ _COLUMNS = (
     BillingOp.quantity,
     BillingOp.idempotency_key,
     BillingOp.attempts,
+    BillingOp.created_at,
 )
 
 
@@ -65,6 +70,7 @@ class Op:
     quantity: int
     idempotency_key: str | None
     attempts: int
+    created_at: datetime
 
 
 class ClaimLost(Exception):  # noqa: N818 - reads as the condition
@@ -144,6 +150,8 @@ async def _attempt(factory: Any, tenant: str, op_id: int, now: datetime) -> bool
         meter = billing.storage_meter(factory)
         if meter is None:
             await run.finish_op(factory, mine, None)
+        elif op.op != OP_RELEASE and _expired(op, now):
+            await run.finish_op(factory, mine, None, OP_EXPIRED)  # the repair takes over
         elif op.op == OP_RELEASE:
             await run.release_hold(meter, op.hold_id)
             await run.finish_op(factory, mine, op.hold_id)
@@ -156,6 +164,11 @@ async def _attempt(factory: Any, tenant: str, op_id: int, now: datetime) -> bool
         await _failed(factory, op, token, now, exc)
         return False
     return True
+
+
+def _expired(op: Op, now: datetime) -> bool:
+    created = op.created_at if op.created_at.tzinfo else op.created_at.replace(tzinfo=UTC)
+    return created < now - BILLING_OP_MAX_AGE
 
 
 async def _failed(factory: Any, op: Op, token: str, now: datetime, exc: Exception) -> None:

@@ -128,6 +128,7 @@ def upgrade() -> None:
         sa.Column("last_error", sa.String(length=500), nullable=True),
         sa.Column("claim_token", sa.String(length=64), nullable=True),
         sa.Column("claim_expires_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("repaired_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_images_billing_op")),
     )
     op.create_index(

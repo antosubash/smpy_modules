@@ -245,3 +245,7 @@ class UsageHold(Base, table=True):  # ty: ignore[unsupported-base]
     source: str = Field(max_length=64)
     # A ``swap``'s old hold: a replay naming another is an idempotency conflict.
     replaces_hold_id: str | None = Field(default=None, max_length=32)
+    # A ``refused`` key's refusal, as first answered: a replay answers the same.
+    refused_used: int | None = Field(default=None, sa_column=Column(BigInteger, nullable=True))
+    refused_limit: int | None = Field(default=None, sa_column=Column(BigInteger, nullable=True))
+    refused_requested: int | None = Field(default=None, sa_column=Column(BigInteger, nullable=True))

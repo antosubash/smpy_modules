@@ -51,3 +51,5 @@ class BillingOp(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[u
     claim_token: str | None = Field(default=None, max_length=64)
     """The settler (or executor, or ingest) running this op; only it may finish it."""
     claim_expires_at: datetime | None = dt_col()
+    repaired_at: datetime | None = dt_col()
+    """When the repair (``sm_images.billing_repair``) examined this done op."""

@@ -37,6 +37,7 @@ from sm_images.models.billing_op import NO_HOLD, OP_RELEASE, OP_SWAP
 
 __all__ = [
     "Claimed",
+    "add_release",
     "add_swap",
     "finish",
     "hand_back",
@@ -45,6 +46,7 @@ __all__ = [
     "release_storage",
     "settle",
     "sweep",
+    "unfinished",
 ]
 
 SWEEP_BATCH = 500
@@ -156,6 +158,27 @@ async def release_storage(db: Any, holds: list[StorageHold], factory: Any = None
         _settle_after(db, ids, factory)
 
 
+async def add_release(
+    db: Any, image_id: uuid.UUID | None, hold_id: str, *, factory: Any = None
+) -> None:
+    """Release ``hold_id`` once ``db`` commits: the intent, recorded where the
+    decision was taken (under the image's row lock)."""
+    row = BillingOp(op=OP_RELEASE, image_id=image_id, hold_id=hold_id)
+    db.add(row)
+    await db.flush()
+    _settle_after(db, [row.id], factory)
+
+
+async def unfinished(db: Any, tenant: str, image_id: uuid.UUID) -> list[int]:
+    """Every op of the image not done yet (any kind)."""
+    stmt = select(BillingOp.id).where(
+        BillingOp.tenant_id == tenant,
+        BillingOp.image_id == image_id,
+        BillingOp.done_at.is_(None),
+    )
+    return list((await db.execute(stmt)).scalars())
+
+
 async def pending_swaps(db: Any, tenant: str, image_id: uuid.UUID) -> list[int]:
     """The image's ``swap`` ops not done yet, oldest first."""
     stmt = (
@@ -188,7 +211,10 @@ async def settle(
 
 async def sweep(factory: Any, tenant: str, cutoff: datetime) -> int:
     """Delete ops done before ``cutoff``, :data:`SWEEP_BATCH` per transaction and
-    at most :data:`SWEEP_BATCHES` transactions per call."""
+    at most :data:`SWEEP_BATCHES` transactions per call - never one the repair
+    has yet to examine (``sm_images.billing_repair``)."""
+    from sm_images.billing_repair import candidate
+
     removed = 0
     for _ in range(SWEEP_BATCHES):
         async with factory() as db:
@@ -196,6 +222,7 @@ async def sweep(factory: Any, tenant: str, cutoff: datetime) -> int:
                 BillingOp.tenant_id == tenant,
                 BillingOp.done_at.is_not(None),
                 BillingOp.done_at < cutoff,
+                ~candidate(),
             )
             batch = list(
                 (await db.execute(ids.order_by(BillingOp.id).limit(SWEEP_BATCH))).scalars()

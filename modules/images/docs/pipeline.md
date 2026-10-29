@@ -213,10 +213,18 @@ all the same.
   both: billing keeps each key's outcome - the hold, or the refusal - so a
   retry, or a call delayed past its claim, gets the same answer and never
   changes anything twice. A refused op is finished; nothing retries it.
-  `images.reconcile` also repairs an image that lost a committed swap (billing
-  reports the op's hold committed but the image names another): the hold is
-  installed where the image's own no longer counts, else released. The
-  janitor deletes done ops after `janitor_grace_days`.
+  Images never calls billing for an op older than 7 days
+  (`BILLING_OP_MAX_AGE`), far inside billing's 30-day retention of a key's
+  outcome: such an op is finished `op_expired`. `images.reconcile` also
+  repairs an image that lost a committed swap (billing reports the op's hold
+  committed but the image names another), or whose op expired leaving it
+  counted by nothing: the hold is installed (or a swap queued) where the
+  image's own no longer counts, else released. Every such decision - the
+  repair's, and a settler's "the image moved on" - is taken under the image's
+  row lock, re-reading the hold it names and its unfinished ops, and a release
+  is recorded there as a `release` op. The repair examines every done op once,
+  oldest first (200 per tenant per tick), and the janitor deletes done ops
+  after `janitor_grace_days` once the repair has examined them.
 - **A lowered plan limit evicts nothing.** Stored images keep their holds; a
   swap that does not grow an image is always admitted, one that grows it is
   refused until the tenant is under the limit again.

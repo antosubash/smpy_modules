@@ -7,8 +7,10 @@ Create Date: 2026-10-29 09:42:27.975058
 ``billing_usage_hold.replaces_hold_id``: the old hold a ``swap`` named, so a
 replay of its key that names another is an ``IdempotencyConflict``. A swap the
 limit refused now leaves a ``refused`` row under its key (``status`` is a
-plain string column: no constraint to change). A nullable column only: no
-data migration. Chained after the images revision to keep one head.
+plain string column: no constraint to change), with the refusal as first
+answered (``refused_used``, ``refused_limit``, ``refused_requested``) so a
+replay answers the same. Nullable columns only: no data migration. Chained
+after the images revision to keep one head.
 """
 
 from collections.abc import Sequence
@@ -28,7 +30,11 @@ def upgrade() -> None:
     op.add_column(
         'billing_usage_hold', sa.Column('replaces_hold_id', sa.String(length=32), nullable=True)
     )
+    for name in ('refused_used', 'refused_limit', 'refused_requested'):
+        op.add_column('billing_usage_hold', sa.Column(name, sa.BigInteger(), nullable=True))
 
 
 def downgrade() -> None:
+    for name in ('refused_requested', 'refused_limit', 'refused_used'):
+        op.drop_column('billing_usage_hold', name)
     op.drop_column('billing_usage_hold', 'replaces_hold_id')

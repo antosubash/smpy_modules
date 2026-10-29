@@ -164,3 +164,20 @@ async def test_a_replay_must_be_the_same_call(factory, usage):
     assert isinstance(await usage.swap(tenant, GAUGE, new.id, 20, "c", source="t"), Exceeded)
     with pytest.raises(IdempotencyConflict):  # a refused key answers only its own call
         await usage.swap(tenant, GAUGE, new.id, 19, "c", source="t")
+
+
+async def test_a_refused_replay_answers_the_original_refusal(factory, usage):
+    """The refusal's details are the key's, not the moment's: the same
+    ``used``, ``limit`` and ``requested`` (the delta) however the gauge moved."""
+    tenant = await seed_limits(factory, {GAUGE: 10})
+    old = await usage.swap(tenant, GAUGE, None, 4, "a", source="t")
+    other = await usage.reserve(tenant, GAUGE, 3, "other", source="t")  # level 7
+    first = await usage.swap(tenant, GAUGE, old.id, 9, "k", source="t")
+    assert first == Exceeded(used=7, limit=10, requested=5, period_end=None)
+    await usage.release(other.id)
+    async with factory() as s:
+        await s.execute(
+            update(Plan).where(Plan.key == f"p-{tenant[:8]}").values(limits={GAUGE: 50})
+        )
+        await s.commit()
+    assert await usage.swap(tenant, GAUGE, old.id, 9, "k", source="t") == first

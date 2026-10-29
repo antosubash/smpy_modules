@@ -6,10 +6,13 @@ written onto the image (only while it still names that old hold) and the op
 done. When the image's ``storage_bytes`` is not what the op held (a
 publication that grew the hold, then lost its fence) and no later swap is
 queued, a correcting swap to ``storage_bytes`` is queued with it - a shrink,
-which billing never refuses. An image that is gone gets nothing installed:
-the new hold is released. An ``ingest`` op reaching a settler means its image
-was never inserted (that insert finishes the op itself), so its hold is
-released. A ``release`` op returns a purged image's hold.
+which billing never refuses. An image that is gone, or names another hold,
+gets nothing installed: the new hold's release is recorded (a ``release`` op)
+under that same lock, in the transaction that finishes this op - the only op
+that could have installed it. An ``ingest`` op reaching a settler means its
+image was never inserted (that insert finishes the op itself, and cannot
+while we hold the claim), so its release is recorded the same way. A
+``release`` op is billing's ``release``, after the commit that decided it.
 """
 
 from __future__ import annotations
@@ -28,7 +31,7 @@ from sm_images.errors import StorageQuotaExceeded
 from sm_images.models import BillingOp, Image
 from sm_images.models.billing_op import NO_HOLD, OP_SWAP
 
-__all__ = ["finish_op", "release_hold", "swap"]
+__all__ = ["finish_op", "lock", "release_hold", "swap"]
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +52,10 @@ async def swap(factory: Any, tenant: str, op: Op, mine: Any, meter: Any) -> None
         return
     if hold is None:
         await finish_op(factory, mine, None)
-    elif not present or not await _install(factory, tenant, op, mine, old, hold):
-        await release_hold(meter, hold.id)  # named by no image, and never will be
-        await finish_op(factory, mine, hold.id)
+    elif not present:  # never inserted (fenced by our claim), or gone
+        await _spare(factory, op, mine, hold.id)
+    else:
+        await _install(factory, tenant, op, mine, old, hold)
 
 
 async def _fix_old(factory: Any, mine: Any, old: str) -> None:
@@ -87,29 +91,48 @@ async def _names(factory: Any, tenant: str, image_id: uuid.UUID) -> tuple[bool, 
     return (False, None) if row is None else (True, row[0])
 
 
+async def lock(db: Any, tenant: str, image_id: uuid.UUID) -> Any:
+    """Take the image's row lock (trashed included: the same lock the executor's
+    completion takes); ``(storage_hold_id, storage_bytes)``, or ``None`` when it
+    is gone. Every decision to install or release an image's hold is taken
+    under it."""
+    return (
+        await db.execute(
+            update(Image)
+            .where(Image.id == image_id, Image.tenant_id == tenant)
+            .values(updated_at=Image.updated_at)
+            .returning(Image.storage_hold_id, Image.storage_bytes)
+            .execution_options(include_deleted=True, synchronize_session=False)
+        )
+    ).first()
+
+
+async def _spare(factory: Any, op: Op, mine: Any, hold_id: str) -> None:
+    """Our swap's hold will be named by no image: record its release and
+    finish the op, one transaction (billing is called after the commit)."""
+    async with factory() as db:
+        await billing_ops.add_release(db, op.image_id, hold_id, factory=factory)
+        if not await billing_ops.finish(db, mine, hold_id):
+            await db.rollback()
+            raise ClaimLost(op.id)
+        await finalize_session(db)
+
+
 async def _install(
     factory: Any, tenant: str, op: Op, mine: Any, old: str | None, hold: Any
-) -> bool:
-    """Write ``hold`` onto the image (still naming ``old``) and finish the op,
-    one transaction; ``False`` (nothing written) when the image is gone or
-    names another hold. :class:`ClaimLost` when the op is no longer ours."""
+) -> None:
+    """Under the image's row lock: write ``hold`` onto the image while it still
+    names ``old``; else (gone, or moved on) record ``hold``'s release - this op,
+    finished in the same transaction, is the only one that could install it.
+    :class:`ClaimLost` when the op is no longer ours."""
     assert op.image_id is not None
     async with factory() as db:
-        row = (
-            await db.execute(
-                update(Image)
-                .where(Image.id == op.image_id, Image.tenant_id == tenant)
-                .values(updated_at=Image.updated_at)  # the image's row lock
-                .returning(Image.storage_hold_id, Image.storage_bytes)
-                .execution_options(include_deleted=True, synchronize_session=False)
-            )
-        ).first()
+        row = await lock(db, tenant, op.image_id)
         if row is None or row[0] not in (old, hold.id):
-            await db.rollback()
             if row is not None:
                 logger.warning("images.billing_op.moved op=%s image=%s", op.id, op.image_id)
-            return False
-        if row[0] == old:
+            await billing_ops.add_release(db, op.image_id, hold.id, factory=factory)
+        elif row[0] == old:
             await db.execute(
                 update(Image)
                 .where(Image.id == op.image_id, Image.tenant_id == tenant)
@@ -125,7 +148,6 @@ async def _install(
             await db.rollback()
             raise ClaimLost(op.id)
         await finalize_session(db)
-    return True
 
 
 async def release_hold(meter: Any, hold_id: str | None) -> None:
