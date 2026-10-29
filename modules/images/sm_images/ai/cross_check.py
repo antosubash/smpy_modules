@@ -16,9 +16,11 @@ nothing waits for it and its value is never stored.
 The thread is one of :data:`_POOL`'s, not the loop's default executor: a task
 body runs under ``asyncio.run`` (``worker_runtime.run_task``), whose shutdown
 joins every default-executor thread, so an abandoned hook there would hold the
-Celery task until it returned. A hung hook keeps its pool thread until it
-returns, so at most :data:`POOL_SIZE` hang at once; while all of them do,
-further cross-checks queue behind them and time out.
+Celery task until it returned. A hung hook keeps its pool thread - and its
+admission slot - until it returns, so at most :data:`POOL_SIZE` are ever
+submitted; while all of them hang, further cross-checks are refused at once as
+a timeout rather than queued (a timed-out queued item would keep its arguments
+alive in the executor's unbounded queue).
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ import contextvars
 import functools
 import json
 import logging
+import threading
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
@@ -42,6 +45,8 @@ CROSS_CHECK_TIMEOUT_S = 30.0
 """How long a group run waits for its preset's cross-check."""
 POOL_SIZE = 4
 _POOL = ThreadPoolExecutor(max_workers=POOL_SIZE, thread_name_prefix="images-cross-check")
+_SLOTS = threading.BoundedSemaphore(POOL_SIZE)
+"""Admission: one slot per submitted hook, freed only when it really returns."""
 
 
 class CrossCheckTimedOut(Exception):  # noqa: N818 - reads as the condition
@@ -75,6 +80,16 @@ def run_cross_check(
     return json.loads(encoded)
 
 
+def _run_and_release(
+    fn: Any, group: GroupRead, results: Sequence[PromptResultRead], max_bytes: int
+) -> dict[str, Any] | None:
+    """In the worker thread: free the slot when the hook finishes, not at timeout."""
+    try:
+        return run_cross_check(fn, group, results, max_bytes)
+    finally:
+        _SLOTS.release()
+
+
 async def check(
     fn: Any, group: GroupRead, results: Sequence[PromptResultRead], max_bytes: int
 ) -> dict[str, Any] | None:
@@ -82,9 +97,15 @@ async def check(
     if fn is None:
         return None
     limit = CROSS_CHECK_TIMEOUT_S
-    call = functools.partial(run_cross_check, fn, group, results, max_bytes)
+    if not _SLOTS.acquire(blocking=False):
+        raise CrossCheckTimedOut(f"the cross-check pool is full; no slot within {limit:g} s")
+    call = functools.partial(_run_and_release, fn, group, results, max_bytes)
     ctx = contextvars.copy_context()  # as ``asyncio.to_thread`` would
-    work = asyncio.get_running_loop().run_in_executor(_POOL, ctx.run, call)
+    try:
+        work = asyncio.get_running_loop().run_in_executor(_POOL, ctx.run, call)
+    except BaseException:  # never submitted: the wrapper will not release
+        _SLOTS.release()
+        raise
     try:
         return await asyncio.wait_for(work, limit)
     except TimeoutError as exc:

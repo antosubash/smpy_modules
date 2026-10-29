@@ -51,3 +51,53 @@ def test_a_hook_that_returns_in_time_is_stored():
         return await cross_check.check(lambda g, r: {"ok": True}, _stand_in(), [], 1000)
 
     assert asyncio.run(main()) == {"ok": True}
+
+
+def test_admission_is_bounded_when_every_pool_thread_hangs(monkeypatch):
+    """A 5th call fails at once as a timeout and never reaches the executor queue."""
+    monkeypatch.setattr(cross_check, "CROSS_CHECK_TIMEOUT_S", 0.1)
+    release = threading.Event()
+    entered = threading.Semaphore(0)
+    calls: list[int] = []
+
+    def hung(group, results):
+        entered.release()
+        release.wait(30)
+        return {}
+
+    def fifth(group, results):
+        calls.append(1)
+        return {}
+
+    async def run(fn):
+        return await cross_check.check(fn, _stand_in(), [], 1000)
+
+    async def main() -> None:
+        for _ in range(cross_check.POOL_SIZE):
+            with pytest.raises(cross_check.CrossCheckTimedOut):
+                await run(hung)
+        started = time.monotonic()
+        with pytest.raises(cross_check.CrossCheckTimedOut):
+            await run(fifth)
+        assert time.monotonic() - started < 0.05
+        assert cross_check._POOL._work_queue.qsize() == 0
+
+    try:
+        asyncio.run(main())
+        assert calls == []
+        release.set()
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:  # the slots free as the hooks return
+            if cross_check._SLOTS.acquire(blocking=False):
+                cross_check._SLOTS.release()
+                break
+            time.sleep(0.01)
+        monkeypatch.setattr(cross_check, "CROSS_CHECK_TIMEOUT_S", 5.0)
+        # a freed slot admits work again (may need every hung hook to finish)
+        for _ in range(100):
+            if cross_check._SLOTS._value == cross_check.POOL_SIZE:  # type: ignore[attr-defined]
+                break
+            time.sleep(0.01)
+        assert asyncio.run(run(lambda g, r: {"ok": 1})) == {"ok": 1}
+    finally:
+        release.set()

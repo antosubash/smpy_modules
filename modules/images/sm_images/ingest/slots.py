@@ -160,8 +160,11 @@ async def finalize_or_release(db: Any, factory: Any, acquired: list[billing_ops.
     After a commit nothing runs: each op is finished or handed back already."""
     committed: list[bool] = []
 
-    def _committed(_session: Any) -> None:  # the outermost commit only
-        committed.append(True)
+    def _committed(session: Any) -> None:
+        # ``after_commit`` also fires when a SAVEPOINT is released, with the
+        # nested transaction still reported; only the outermost commit counts.
+        if not session.in_nested_transaction():
+            committed.append(True)
 
     event.listen(db.sync_session, "after_commit", _committed)
     try:
