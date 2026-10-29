@@ -74,10 +74,20 @@ def register(registry) -> None:
             group_roles=["point", "north", "east", "south", "west"],
             filename_patterns=[r"^(?P<group>.+?)LCLU_(?P<role>Point|North|South|East|West)"],
             prompts=[
-                PromptSpec(id="lucas.photo", scope="image", instruction=PHOTO_PROMPT,
-                           output_schema=LUCAS_PHOTO_SCHEMA, auto_run=True),
-                PromptSpec(id="lucas.summary", scope="group", inputs="results",
-                           instruction=SUMMARY_PROMPT, output_schema=LUCAS_SUMMARY_SCHEMA),
+                PromptSpec(
+                    id="lucas.photo",
+                    scope="image",
+                    instruction=PHOTO_PROMPT,
+                    output_schema=LUCAS_PHOTO_SCHEMA,
+                    auto_run=True,
+                ),
+                PromptSpec(
+                    id="lucas.summary",
+                    scope="group",
+                    inputs="results",
+                    instruction=SUMMARY_PROMPT,
+                    output_schema=LUCAS_SUMMARY_SCHEMA,
+                ),
             ],
             cross_check=lucas_cross_check,
         )

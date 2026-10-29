@@ -85,6 +85,8 @@ def declared_type(filename: str, content_type: str | None) -> str:
     suffix = PurePosixPath(filename).suffix.lower().lstrip(".")
     by_ext = {ext: ctype for ctype, ext in EXTENSIONS.items()}
     by_ext |= {"jpeg": "image/jpeg", "tiff": "image/tiff", "heif": "image/heif"}
-    if content_type is None and suffix in by_ext:
+    # Browsers send octet-stream for types they do not know (HEIC): the extension
+    # decides, and ``complete`` holds the sniffed bytes to that type.
+    if content_type in (None, "application/octet-stream") and suffix in by_ext:
         return by_ext[suffix]
     raise UnsupportedType(_BAD_TYPE)

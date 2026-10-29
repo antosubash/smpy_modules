@@ -21,7 +21,6 @@ result.
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
 import logging
 import uuid
@@ -33,6 +32,7 @@ from simple_module_db import finalize_session
 from sm_images.clock import utcnow as _now
 from sm_images.pipeline.claim import LostLease, renew
 from sm_images.pipeline.finish import complete_step
+from sm_images.pipeline.keeper import stop as stop_keeper
 from sm_images.pipeline.load import Loaded, load_run
 from sm_images.pipeline.runtime import Runtime
 from sm_images.pipeline.step import (
@@ -155,9 +155,7 @@ async def _run(runtime: Runtime, loaded: Loaded, impl: Any, staging: Staging) ->
         logger.warning("images.pipeline.step_raised step=%s", loaded.step, exc_info=True)
         outcome = failure("step_error", exc)
     finally:
-        keeper.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await keeper
+        await stop_keeper(keeper)
     if lease.lost:
         return None
     if not isinstance(outcome, StepOutcome):

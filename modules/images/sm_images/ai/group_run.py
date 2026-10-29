@@ -28,7 +28,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import logging
 import uuid
 from typing import Any
@@ -43,6 +42,7 @@ from sm_images.ai.results import PromptWrite, write_size
 from sm_images.clock import utcnow as _now
 from sm_images.pipeline import registry
 from sm_images.pipeline.claim import LostLease
+from sm_images.pipeline.keeper import stop as stop_keeper
 
 __all__ = ["SOURCE", "execute", "metering_key", "run_group"]
 
@@ -194,9 +194,7 @@ async def execute(
             logger.exception("images.group.internal_error prompt=%s group=%s", prompt_id, group_id)
             outcome = GroupOutcome.failed("internal_error", exc)
         finally:
-            keeper.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await keeper
+            await stop_keeper(keeper)
         if lease.lost:
             return False
         return await group_store.finish(runtime, tenant, prompt_id, group_id, token, outcome)

@@ -34,21 +34,16 @@ def _small_parts(monkeypatch):
 
 
 def blind_first_existing(monkeypatch) -> list[int]:
-    """The first ``_existing`` check misses, as when the winner had not committed.
-    The route's replay check (``existing``) runs earlier still, so it misses too."""
+    """The route's replay check and ``complete``'s first check both miss, as when
+    the winner had not committed; the lost insert then re-reads the row by id."""
     calls: list[int] = []
-    real = direct._existing
-
-    async def unseen(db, ticket):
-        return None
-
-    monkeypatch.setattr(direct, "existing", unseen)
+    real = direct.existing
 
     async def blinded(db, ticket):
         calls.append(1)
-        return None if len(calls) == 1 else await real(db, ticket)
+        return None if len(calls) <= 2 else await real(db, ticket)
 
-    monkeypatch.setattr(direct, "_existing", blinded)
+    monkeypatch.setattr(direct, "existing", blinded)
     return calls
 
 
@@ -78,7 +73,7 @@ async def test_losing_complete_keeps_the_winners_original(uploads, monkeypatch):
     got = await complete(uploads, body["upload_id"], parts)
     assert got.status_code == 200, got.text
     assert (got.json()["status"], got.json()["id"]) == ("duplicate", ticket.image)
-    assert calls == [1]  # blinded once; the lost insert re-read the row by id (find_id)
+    assert calls == [1, 1]  # blinded twice (route, complete); the lost insert re-reads by id
     assert stored(uploads.storage) == [ticket.key]  # the winner's object is still there
     assert [str(r.id) for r in await all_rows(uploads)] == [ticket.image]
 

@@ -84,18 +84,21 @@ async def open_upload(
         kind=kind,
     )
     token = signer.dumps(asdict(ticket))
-    # Part URLs before the admission lock: nothing but ``db`` runs while it is held.
-    urls, presigned = await _part_urls(backend, ticket, token)
-    if admission is not None:
-        try:
-            await admission(db)
-        except BaseException:
-            await db.rollback()  # release the admission lock before any further I/O
-            with suppress(Exception):
-                await backend.abort_multipart(key, upload)
-            raise
-    db.add(state.new_session(ticket, collection.id))
-    await db.flush()
+    try:
+        # Part URLs before the admission lock: nothing but ``db`` runs while it is held.
+        urls, presigned = await _part_urls(backend, ticket, token)
+        if admission is not None:
+            try:
+                await admission(db)
+            except BaseException:
+                await db.rollback()  # release the admission lock before any further I/O
+                raise
+        db.add(state.new_session(ticket, collection.id))
+        await db.flush()
+    except BaseException:  # the backend upload exists: never leave its parts billed
+        with suppress(Exception):
+            await backend.abort_multipart(key, upload)
+        raise
     return token, ticket, urls, presigned
 
 

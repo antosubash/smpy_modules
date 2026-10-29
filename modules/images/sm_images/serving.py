@@ -222,7 +222,7 @@ async def serve_map(request: Request, collection: Collection, *, twin: bool) -> 
     being served by caches too.
     """
     if not collection.map_key or collection.map_policy_rev != redaction.gate_key(collection):
-        raise _missing()
+        raise _missing(twin)
     policy = cache.cache_headers(request, collection, cache.DISPLAY, twin=twin)
     target = Target(collection.map_key, constants.PMTILES_CONTENT_TYPE, False)
-    return await _respond(request, store_for(request.app), target, policy, True)
+    return await _respond(request, store_for(request.app), target, policy, True, twin)

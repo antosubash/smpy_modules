@@ -131,6 +131,8 @@ def check_url(
         raise UnsafeURLError("invalid_url") from error
     if not host:
         raise UnsafeURLError("missing_host")
+    if parsed.port == 0:
+        raise UnsafeURLError("invalid_url")
     port = parsed.port or _DEFAULT_PORTS[scheme]
     if port not in allowed_ports:
         raise UnsafeURLError("port_not_allowed")

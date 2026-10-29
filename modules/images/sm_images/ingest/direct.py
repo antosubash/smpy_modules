@@ -134,11 +134,6 @@ async def existing(db: Any, ticket: Ticket) -> Image | None:
     return (await db.execute(stmt.execution_options(include_deleted=True))).scalars().first()
 
 
-async def _existing(db: Any, ticket: Ticket) -> Image | None:
-    stmt = select(Image).where(Image.id == uuid.UUID(ticket.image))
-    return (await db.execute(stmt.execution_options(include_deleted=True))).scalars().first()
-
-
 async def complete(
     ingest: IngestService,
     collection: Collection,
@@ -151,15 +146,15 @@ async def complete(
     """Claim the session, assemble, re-check the *stored* object (the declared
     size was only a claim) and ingest it in place; ``completed`` commits with
     the row. A failure hands the claim back (``state.settle``)."""
-    existing = await _existing(ingest.db, ticket)
-    if existing is not None:
-        return existing
+    found = await existing(ingest.db, ticket)
+    if found is not None:
+        return found
     token = await state.claim_complete(ingest.db, ticket)
     if token is None:
-        existing = await _existing(ingest.db, ticket)
-        if existing is None:
+        found = await existing(ingest.db, ticket)
+        if found is None:
             raise UploadNotFound(_GONE)
-        return existing
+        return found
     assembled = False
     try:
         if await ingest.store.head(ticket.key) is None:  # else: a retry after a refusal
@@ -220,7 +215,7 @@ async def _ingest(
 
 async def _drop(ingest: IngestService, ticket: Ticket) -> None:
     """Delete the staged object - unless a row (a concurrent winner) owns it."""
-    if await _existing(ingest.db, ticket) is None:
+    if await existing(ingest.db, ticket) is None:
         await ingest.store.delete_keys([ticket.key])
 
 
