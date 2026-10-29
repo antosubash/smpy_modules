@@ -268,7 +268,8 @@
     "pipeline": "Pipeline",
     "imports": "Importe",
     "groups": "Gruppen",
-    "prompts": "Prompts"
+    "prompts": "Prompts",
+    "map": "Karte"
   },
   "groups": {
     "description": "Fotos eines Standorts, je mit einer Rolle. Die Mitglieder erscheinen in der Rollenreihenfolge der Sammlung.",
@@ -581,5 +582,36 @@
   },
   "meters": {
     "storage_bytes": "Bildspeicher"
+  },
+  "map": {
+    "loading": "Karte wird geladen…",
+    "failed": "Die Karte konnte nicht geladen werden.",
+    "empty": "Noch kein Bild dieser Sammlung hat einen Standort.",
+    "label": "Karte der Bilder mit Standort",
+    "cluster": "{count} Bilder"
+  },
+  "public": {
+    "gallery": "Galerie",
+    "map": "Karte",
+    "empty": "Diese Sammlung enthält noch keine Bilder.",
+    "load_more": "Mehr laden",
+    "open": "Bild öffnen",
+    "close": "Schließen",
+    "image_alt": "Bild {index} von {name}",
+    "count_one": "1 Bild",
+    "count_other": "{count} Bilder",
+    "failed": "Die Bilder konnten nicht geladen werden.",
+    "viewer": "Bildbetrachter"
+  },
+  "block": {
+    "label": "Bildergalerie",
+    "palette_group": "Bilder",
+    "collection": "Sammlung",
+    "choose": "Öffentliche Sammlung wählen",
+    "size": "Kachelgröße",
+    "size_small": "Klein",
+    "size_medium": "Mittel",
+    "size_large": "Groß",
+    "count": "Anzahl der Bilder"
   }
 }

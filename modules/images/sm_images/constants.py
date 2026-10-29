@@ -265,6 +265,7 @@ PAGE_COLLECTIONS: Final = f"{MODULE_NAME}/Collections"
 PAGE_COLLECTION: Final = f"{MODULE_NAME}/Collection"
 PAGE_IMAGE: Final = f"{MODULE_NAME}/Image"
 PAGE_REVIEW: Final = f"{MODULE_NAME}/Review"
+PAGE_PUBLIC_COLLECTION: Final = f"{MODULE_NAME}/PublicCollection"
 PERM_SHARE: Final = "sharing.share"
 """The framework's share permission (``sharing.constants.PERM_SHARE``): the
 share dialog is offered only to a holder who also owns the collection."""

@@ -66,6 +66,7 @@ async def build_app(
     module.register_routes(api_router, view_router)
     app.include_router(api_router)
     app.include_router(view_router)
+    module.mount_public_pages(app)
 
     if db_state is None:
         # The suite's one place that decides which backend a test runs on, and

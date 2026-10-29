@@ -179,6 +179,7 @@ class ImagesModule(ModuleBase):
         urls.configure(settings.public_asset_base_url)
         self.tippecanoe_path = settings.tippecanoe_path
         load_extensions()
+        self.mount_public_pages(app)
         sm = getattr(app.state, "sm", None)
         db = getattr(sm, "db", None)
         if (session_class := getattr(db, "sync_session_class", None)) is not None:
@@ -186,6 +187,14 @@ class ImagesModule(ModuleBase):
         if (factory := getattr(db, "session_factory", None)) is not None:
             intents.use_session_factory(factory)
             self._use_runtime(app, factory)
+
+    @staticmethod
+    def mount_public_pages(app: FastAPI) -> None:
+        """``/images/c/{slug}`` at the app root, beside the console's prefix
+        (``register_routes`` hands out only prefixed routers)."""
+        from sm_images.endpoints.public_views import router
+
+        app.include_router(router)
 
     async def on_shutdown(self, app: FastAPI) -> None:
         """Forget the runtime: a lifespan restart in one process (tests, dev

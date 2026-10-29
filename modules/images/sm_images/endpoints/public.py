@@ -24,7 +24,7 @@ import uuid
 from collections.abc import Callable, Coroutine
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Path, Request, Response
+from fastapi import APIRouter, Depends, Path, Query, Request, Response
 from fastapi.routing import APIRoute
 from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.deps import get_db
@@ -34,13 +34,14 @@ from sm_images.access import public_collection
 from sm_images.endpoints.map_params import BBox, Cursor, Limit, points_response
 from sm_images.errors import ImagesError, render
 from sm_images.models import Collection
+from sm_images.services import public_gallery
 from sm_images.tenancy import bind_public
 
 _NO_STORE = "no-store"
 ANONYMOUS = ResourcePrincipal(user_id=None)
 
 
-class _PublicRoute(APIRoute):
+class PublicRoute(APIRoute):
     def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
         handler = super().get_route_handler()
 
@@ -59,7 +60,7 @@ router = APIRouter(
     prefix=constants.PUBLIC_API_ROUTER_PREFIX,
     tags=["images-public"],
     dependencies=[Depends(bind_public)],
-    route_class=_PublicRoute,
+    route_class=PublicRoute,
 )
 
 
@@ -104,6 +105,24 @@ async def public_original(
     return await serving.serve(
         request, db, collection, image_id, ANONYMOUS, cache.ORIGINAL, twin=True
     )
+
+
+@router.get("/c/{slug}/images")
+async def public_images(
+    request: Request,
+    response: Response,
+    collection: Public,
+    db: Any = Depends(get_db),
+    limit: int = Query(constants.PAGE_DEFAULT, ge=1, le=constants.PAGE_MAX),
+    cursor: str | None = Query(None, max_length=200),
+) -> dict[str, Any]:
+    """The gallery of a public collection: ids, sizes and anonymous URLs, never a
+    filename or metadata. Only images whose ``small`` rendition may be shown."""
+    body = await public_gallery.page(db, collection, limit=limit, cursor=cursor)
+    response.headers["Cache-Control"] = cache.cache_headers(
+        request, collection, cache.DISPLAY, twin=True, current=False
+    )
+    return body
 
 
 @router.get("/c/{slug}/points")

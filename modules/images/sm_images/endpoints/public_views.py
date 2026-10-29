@@ -1,0 +1,48 @@
+"""The public collection page, ``/images/c/{slug}`` (spec §6, Public).
+
+An Inertia screen for anyone, through ``bind_public`` and
+:func:`~sm_images.access.public_collection`: a private or internal collection is
+the 404 an unknown slug gets, whoever asks. The screen reads the gallery and map
+from the anonymous twins in :mod:`sm_images.endpoints.public`; this route only
+names the collection. Mounted at the app root by ``ImagesModule.on_startup``
+(the console router is hard-prefixed with ``VIEW_PREFIX``).
+
+The HTML carries the viewer's shared props, so it is never shareable-cached,
+whichever way the tenant was chosen: the shareable rule is for the byte routes.
+"""
+
+from __future__ import annotations
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Response
+from simple_module_hosting.inertia_deps import InertiaDep
+
+from sm_images import cache, constants
+from sm_images.access import public_collection
+from sm_images.contracts.schemas import collection_fields
+from sm_images.endpoints.public import PublicRoute
+from sm_images.models import Collection
+from sm_images.tenancy import bind_public
+
+router = APIRouter(
+    prefix=constants.PUBLIC_COLLECTION_PREFIX.rstrip("/"),
+    tags=["images-public"],
+    dependencies=[Depends(bind_public)],
+    route_class=PublicRoute,
+)
+
+# Never the owner, the id or the timestamps: a visitor needs only what the page shows.
+_SHOWN = ("slug", "name", "description", "image_count", "located_count", "bbox")
+Public = Annotated[Collection, Depends(public_collection)]
+
+
+@router.get("/{slug}", response_model=None)
+async def public_collection_page(collection: Public, inertia: InertiaDep) -> Response:
+    shown = collection_fields(collection)
+    response = await inertia.render(
+        constants.PAGE_PUBLIC_COLLECTION,
+        {"collection": {name: shown[name] for name in _SHOWN}},
+    )
+    response.headers["Cache-Control"] = cache.PRIVATE_NO_CACHE
+    return response

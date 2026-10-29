@@ -12,6 +12,7 @@ import { UploadButton } from '../components/gallery/UploadButton';
 import { GroupsTab } from '../components/groups/GroupsTab';
 import { ImagesLayout } from '../components/ImagesLayout';
 import { ImportsTab } from '../components/imports/ImportsTab';
+import { CollectionMap } from '../components/map/CollectionMap';
 import { PipelineTab } from '../components/pipeline/PipelineTab';
 import { PromptsTab } from '../components/prompts/PromptsTab';
 import { RunOnImages } from '../components/prompts/RunOnImages';
@@ -30,11 +31,11 @@ type Props = {
   direct_upload_threshold: number;
 };
 
-type Tab = 'gallery' | 'groups' | 'pipeline' | 'prompts' | 'imports';
+type Tab = 'gallery' | 'map' | 'groups' | 'pipeline' | 'prompts' | 'imports';
 
 /** `Images/Collection` - `/admin/images/{id}`. Tabs: the gallery, the groups,
- *  the pipeline, the prompts and (for an editor) the imports; map and review
- *  arrive with their own tasks. */
+ *  the map, the pipeline, the prompts and (for an editor) the imports. Review
+ *  is a screen of its own. */
 function Collection({
   collection,
   can_edit,
@@ -72,8 +73,8 @@ function Collection({
     : undefined;
   // The import routes are an edit on the collection, so the tab is an editor's.
   const tabs: Tab[] = can_edit
-    ? ['gallery', 'groups', 'pipeline', 'prompts', 'imports']
-    : ['gallery', 'groups', 'pipeline', 'prompts'];
+    ? ['gallery', 'map', 'groups', 'pipeline', 'prompts', 'imports']
+    : ['gallery', 'map', 'groups', 'pipeline', 'prompts'];
 
   const changeVisibility = async (next: Visibility) => {
     setSaving(true);
@@ -181,6 +182,14 @@ function Collection({
           </div>
           <div role="tabpanel" id="images-tabpanel" aria-labelledby={`images-tab-${tab}`}>
             {tab === 'gallery' && <Gallery gallery={gallery} pick={pick} />}
+            {tab === 'map' && (
+              <CollectionMap
+                pointsUrl={`/api/images/collections/${collection.id}/points`}
+                mapUrl={`/api/images/collections/${collection.id}/map.pmtiles`}
+                bbox={collection.bbox}
+                onSelect={(id) => router.visit(`/admin/images/images/${id}`)}
+              />
+            )}
             {tab === 'groups' && (
               <GroupsTab
                 collectionId={collection.id}

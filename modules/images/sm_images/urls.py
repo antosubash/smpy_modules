@@ -24,6 +24,7 @@ __all__ = [
     "configure",
     "display_url",
     "image_path",
+    "public_display_url",
     "public_image_path",
     "public_rendition_url",
     "rendition_url",
@@ -95,3 +96,11 @@ def public_rendition_url(collection: Any, image: Any, rendition: Any) -> str:
         raise ValueError("only a public collection is served anonymously")
     tail = _rendition_tail(image, rendition)
     return _public_base + public_image_path(collection.slug, image.id, tail)
+
+
+def public_display_url(collection: Any, image: Any) -> str:
+    """The anonymous twin's URL of *image*'s display copy, for a public page."""
+    _check(collection, image)
+    if collection.visibility != Visibility.PUBLIC:
+        raise ValueError("only a public collection is served anonymously")
+    return _public_base + public_image_path(collection.slug, image.id, _display_tail(image))

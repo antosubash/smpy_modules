@@ -268,7 +268,8 @@
     "pipeline": "Pipeline",
     "imports": "Imports",
     "groups": "Groups",
-    "prompts": "Prompts"
+    "prompts": "Prompts",
+    "map": "Map"
   },
   "groups": {
     "description": "Photos of one site, with a role each. Members are shown in the collection's role order.",
@@ -581,5 +582,36 @@
   },
   "meters": {
     "storage_bytes": "Image storage"
+  },
+  "map": {
+    "loading": "Loading the map…",
+    "failed": "The map could not be loaded.",
+    "empty": "No image of this collection has a location yet.",
+    "label": "Map of the collection's located images",
+    "cluster": "{count} images"
+  },
+  "public": {
+    "gallery": "Gallery",
+    "map": "Map",
+    "empty": "This collection has no images yet.",
+    "load_more": "Load more",
+    "open": "Open image",
+    "close": "Close",
+    "image_alt": "Image {index} of {name}",
+    "count_one": "1 image",
+    "count_other": "{count} images",
+    "failed": "The images could not be loaded.",
+    "viewer": "Image viewer"
+  },
+  "block": {
+    "label": "Image gallery",
+    "palette_group": "Images",
+    "collection": "Collection",
+    "choose": "Choose a public collection",
+    "size": "Tile size",
+    "size_small": "Small",
+    "size_medium": "Medium",
+    "size_large": "Large",
+    "count": "Number of images"
   }
 }

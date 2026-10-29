@@ -157,7 +157,8 @@ async def _error_page(request: Request, exc: ImagesError) -> Response | None:
 
 
 async def render(request: Request, exc: ImagesError) -> Response:
-    if request.url.path.startswith(f"{constants.VIEW_PREFIX}/"):
+    path = request.url.path
+    if path.startswith((f"{constants.VIEW_PREFIX}/", constants.PUBLIC_COLLECTION_PREFIX)):
         page = await _error_page(request, exc)
         if page is not None:
             return page
