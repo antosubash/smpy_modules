@@ -46,4 +46,22 @@ describe('viewer previous / next (QA TEST-006h)', () => {
     expect(router.visit).not.toHaveBeenCalled();
     await view.unmount();
   });
+
+  it('leaves the arrows to an open dialog (QA R3-ARROW-DIALOG)', async () => {
+    const view = await mount(
+      <Image image={image('i2')} neighbors={{ prev: 'i1', next: 'i3' }} {...props} />,
+    );
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'alertdialog');
+    const button = document.createElement('button');
+    dialog.append(button);
+    document.body.append(dialog);
+    await press(button, { key: 'ArrowRight' }); // focus inside the dialog
+    await press(window, { key: 'ArrowLeft' }); // focus elsewhere, dialog still open
+    expect(router.visit).not.toHaveBeenCalled();
+    dialog.remove();
+    await press(window, { key: 'ArrowRight' });
+    expect(router.visit).toHaveBeenLastCalledWith('/admin/images/images/i3');
+    await view.unmount();
+  });
 });

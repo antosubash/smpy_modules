@@ -55,6 +55,7 @@ function Image({
       <Head title={image.filename} />
       <PageShell
         title={image.filename}
+        titleClassName="break-all"
         description={collection.name}
         back={back}
         actions={

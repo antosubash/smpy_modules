@@ -15,10 +15,20 @@ function typing(target: EventTarget | null): boolean {
   return ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable;
 }
 
+const OVERLAY =
+  '[role="dialog"],[role="alertdialog"],[role="menu"],[role="listbox"],[aria-modal="true"]';
+
+/** An open dialog or menu owns the keyboard, wherever the focus happens to be. */
+function overlayOpen(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (el && typeof el.closest === 'function' && el.closest(OVERLAY)) return true;
+  return document.querySelector(OVERLAY) !== null;
+}
+
 /**
  * Previous / next image in the gallery's order (`neighbors`, from the server:
  * only images this person may open), as buttons and as ← / → anywhere on the
- * page except inside a field.
+ * page except inside a field or while a dialog or menu is open.
  */
 export function NeighborNav({ neighbors }: { neighbors: Neighbors }) {
   const { t } = useT();
@@ -27,7 +37,7 @@ export function NeighborNav({ neighbors }: { neighbors: Neighbors }) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-      if (typing(event.target)) return;
+      if (event.defaultPrevented || typing(event.target) || overlayOpen(event.target)) return;
       const to = event.key === 'ArrowLeft' ? prev : event.key === 'ArrowRight' ? next : null;
       if (!to) return;
       event.preventDefault();
