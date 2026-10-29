@@ -59,7 +59,7 @@ async def test_metered_per_call(pipe, ai):
     await rerun_image(pipe.runtime, "default", img, "force")
     assert len(ai.charges) == 2
     keys = [c["key"] for c in ai.charges]
-    assert keys[0].startswith(f"images:default:{img}:classify:1:")
+    assert all(k.startswith("images:step:") and len(k) <= 121 for k in keys)
     assert keys[0] != keys[1]  # a new claim, a new charge; a redelivery of one is free
     assert all(c["source"] == "images:classify" for c in ai.charges)
     assert all(c["sf"] is pipe.runtime.session_factory for c in ai.charges)
@@ -123,7 +123,7 @@ async def test_prompt_step_stores_a_structured_result(pipe, ai):
     )
     assert row.prompt_revision == 1 and row.review_status is ReviewStatus.UNREVIEWED
     assert ai.charges[0]["source"] == "images:prompt"
-    assert ai.charges[0]["key"].startswith(f"images:default:{img}:{sid}:1:")
+    assert ai.charges[0]["key"].startswith("images:prompt:")
 
 
 async def test_prompt_step_free_text(pipe, ai):

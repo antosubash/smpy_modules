@@ -71,6 +71,9 @@ class FakeAi:
         return FunctionModel(reply, model_name="fake-vision")
 
     async def consume(self, tenant_id, qty=1, *, idempotency_key, source, session_factory=None):
+        from sm_billing.metering.validate import check_call
+
+        check_call(tenant_id, "ai.requests", qty, idempotency_key, source)  # billing's own checks
         self.charges.append(
             {"tenant": tenant_id, "key": idempotency_key, "source": source, "sf": session_factory}
         )

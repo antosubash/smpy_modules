@@ -16,8 +16,8 @@ from the prompt's JSON Schema after ``schema_safety.check``) or ``str``.
    of the same lease (a redelivered message) loses it and stops as if its
    lease were lost: no provider call, no result; the first one's stands;
 4. **metering** - one ``ai.requests`` per call through
-   ``sm_ai.contracts.consume_requests``, keyed
-   ``images:{tenant}:{image}:{step}:{version}:{lease token}`` so a retry of
+   ``sm_ai.contracts.consume_requests``, keyed by a digest of
+   ``(tenant, image, step, version, lease token)`` so a retry of
    the same claim is never charged twice; a refusal fails ``quota_exceeded``
    (final until someone retries it: nothing re-queues a failed run);
 5. the **picture** - the display copy, EXIF-orientation applied, scaled to
@@ -89,7 +89,12 @@ async def run_structured(
 
 
 def metering_key(ctx: StepContext, version: int, token: Any) -> str:
-    return f"images:{ctx.tenant_id}:{ctx.image.id}:{ctx.step.id}:{version}:{token}"
+    """``images:prompt:<digest>`` (``images:step:`` for a built-in AI step) of
+    tenant, image, step, version and lease token: see :mod:`sm_images.metering_keys`."""
+    from sm_images.metering_keys import digest_key
+
+    kind = "images:prompt" if ctx.step.id.startswith("prompt:") else "images:step"
+    return digest_key(kind, ctx.tenant_id, ctx.image.id, ctx.step.id, version, token)
 
 
 async def _start_once(ctx: StepContext, staging: Any) -> None:

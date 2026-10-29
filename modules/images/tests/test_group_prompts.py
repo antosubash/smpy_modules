@@ -51,7 +51,7 @@ async def test_one_consolidation_per_group_with_images(pipe, ai):
     assert ai.settings[0]["temperature"] == 0.0
     (charge,) = ai.charges
     assert charge["source"] == "images:group_prompt"
-    assert charge["key"].startswith(f"images:default:group:{group.id}:prompt:{prompt.id}:1:")
+    assert charge["key"].startswith("images:group:")
     assert row.lease_token is None and row.lease_expires_at is None
 
 

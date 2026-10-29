@@ -53,7 +53,10 @@ SENDS_IMAGES = ("images", "both")
 
 
 def metering_key(tenant: str, job: Any, group_id: uuid.UUID, token: uuid.UUID) -> str:
-    return f"images:{tenant}:group:{group_id}:prompt:{job.prompt_id}:{job.revision}:{token}"
+    """``images:group:<digest>``: see :mod:`sm_images.metering_keys`."""
+    from sm_images.metering_keys import digest_key
+
+    return digest_key("images:group", tenant, group_id, job.prompt_id, job.revision, token)
 
 
 class _Lease:
