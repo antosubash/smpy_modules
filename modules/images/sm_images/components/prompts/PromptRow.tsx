@@ -8,6 +8,7 @@ import type { GroupItem } from '../../utils/types';
 import type { Prompt, PromptRunScope } from '../../utils/types-prompts';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { GroupResults } from './GroupResults';
+import { RunConfirm } from './RunConfirm';
 
 const RUN = {
   missing: keys.images.prompts.run.missing,
@@ -32,6 +33,7 @@ export function PromptRow({
   canEdit,
   canManage,
   groups,
+  runCount,
   busy,
   onEdit,
   onDelete,
@@ -42,6 +44,9 @@ export function PromptRow({
   canEdit: boolean;
   canManage: boolean;
   groups: GroupItem[];
+  /** The most a collection-wide run can request (its images or groups);
+   *  `null` when unknown. Shown in the confirmation. */
+  runCount: number | null;
   busy: boolean;
   onEdit: () => void;
   onDelete: () => Promise<void>;
@@ -69,17 +74,25 @@ export function PromptRow({
       <div className="flex flex-wrap items-center gap-2">
         {canManage &&
           SCOPES.map((scope) => (
-            <Button
+            <RunConfirm
               key={scope}
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={busy}
-              data-testid={`images-prompt-run-${scope}-${prompt.id}`}
-              onClick={() => onRun({ scope })}
-            >
-              {t(RUN[scope])}
-            </Button>
+              name={prompt.name}
+              scope={scope}
+              group={isGroup}
+              count={runCount}
+              onConfirm={() => onRun({ scope })}
+              trigger={
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  data-testid={`images-prompt-run-${scope}-${prompt.id}`}
+                >
+                  {t(RUN[scope])}
+                </Button>
+              }
+            />
           ))}
         {canEdit && isGroup && groups.length > 0 && (
           <>

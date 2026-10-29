@@ -32,10 +32,13 @@ export function PromptsTab({
   collectionId,
   canEdit,
   canManage,
+  imageCount = null,
 }: {
   collectionId: string;
   canEdit: boolean;
   canManage: boolean;
+  /** The collection's images: the most an image prompt's run can request. */
+  imageCount?: number | null;
 }) {
   const { t } = useT();
   const [prompts, setPrompts] = useState<Prompt[] | null>(null);
@@ -150,6 +153,9 @@ export function PromptsTab({
               canEdit={canEdit}
               canManage={canManage}
               groups={groups}
+              runCount={
+                p.scope === 'group' ? (groups.length < GROUPS_SHOWN ? groups.length : null) : imageCount
+              }
               busy={busy}
               onEdit={() => setView({ mode: 'edit', prompt: p })}
               onDelete={async () => {

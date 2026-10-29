@@ -207,7 +207,12 @@ function Collection({
               <PipelineTab collectionId={collection.id} canManage={can_manage} />
             )}
             {tab === 'prompts' && (
-              <PromptsTab collectionId={collection.id} canEdit={can_edit} canManage={can_manage} />
+              <PromptsTab
+                collectionId={collection.id}
+                canEdit={can_edit}
+                canManage={can_manage}
+                imageCount={collection.image_count}
+              />
             )}
             {tab === 'imports' && (
               <ImportsTab

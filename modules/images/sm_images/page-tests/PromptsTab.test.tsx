@@ -58,6 +58,8 @@ describe('PromptsTab', () => {
     const view = await mount(<PromptsTab collectionId="c1" canEdit canManage />);
     await flush();
     await click(byId(view, 'images-prompt-run-stale-p1'));
+    await flush();
+    await click(document.querySelector('[data-testid="images-prompt-run-confirm-go"]'));
     expect(calls.at(-1)).toMatchObject({ method: 'POST', body: { scope: 'stale' } });
     await setValue(view.find('#images-preset') as HTMLSelectElement, 'acme');
     await click(byId(view, 'images-preset-apply'));

@@ -483,7 +483,19 @@
       "started_other": "{count} Läufe angefordert",
       "queued": "Der Lauf ist eingereiht",
       "pick_group": "Gruppe wählen",
-      "on_group": "Auf Gruppe ausführen"
+      "on_group": "Auf Gruppe ausführen",
+      "confirm": {
+        "title": "„{name}“ ausführen?",
+        "images_one": "Das fordert bis zu {count} KI-Lauf an, einen pro Bild.",
+        "images_other": "Das fordert bis zu {count} KI-Läufe an, einen pro Bild.",
+        "groups_one": "Das fordert bis zu {count} KI-Lauf an, einen pro Gruppe.",
+        "groups_other": "Das fordert bis zu {count} KI-Läufe an, einen pro Gruppe.",
+        "groups_unknown": "Das fordert einen KI-Lauf pro Gruppe dieser Sammlung an.",
+        "missing": "Nur Bilder oder Gruppen ohne Ergebnis werden ausgeführt.",
+        "stale": "Nur Ergebnisse einer älteren Revision des Prompts werden erneut ausgeführt.",
+        "all": "Alle Ergebnisse werden ersetzt, auch die aktuellen.",
+        "go": "Läufe starten"
+      }
     },
     "preset": {
       "label": "Vorlage",

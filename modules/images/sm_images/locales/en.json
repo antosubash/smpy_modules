@@ -483,7 +483,19 @@
       "started_other": "{count} runs requested",
       "queued": "The run is queued",
       "pick_group": "Choose a group",
-      "on_group": "Run on group"
+      "on_group": "Run on group",
+      "confirm": {
+        "title": "Run “{name}”?",
+        "images_one": "This requests up to {count} AI run, one per image.",
+        "images_other": "This requests up to {count} AI runs, one per image.",
+        "groups_one": "This requests up to {count} AI run, one per group.",
+        "groups_other": "This requests up to {count} AI runs, one per group.",
+        "groups_unknown": "This requests one AI run per group of this collection.",
+        "missing": "Only images or groups without a result are run.",
+        "stale": "Only results from an older revision of the prompt are run again.",
+        "all": "Every result is replaced, including the current ones.",
+        "go": "Start runs"
+      }
     },
     "preset": {
       "label": "Preset",
