@@ -58,9 +58,10 @@ map = ["pmtiles>=3.2"]
 # outside a request, which classify and the prompt steps need in a worker) and
 # ``resolve_model(max_retries=...)`` first ship in 0.0.14, the next lockstep release.
 ai = ["simple_module_ai>=0.0.14,<0.1"]
-# floor: 0.0.13 - the gauge meter and committed holds images bills storage with
-# (``context.billing_context``, the ``finalize_session`` commit path).
-billing = ["simple_module_billing>=0.0.13,<0.1"]
+# floor: 0.0.14 - ``images.storage_bytes`` is a gauge held through
+# ``usage_meter`` (reserve/commit/release), and its upload pre-flight is
+# ``check`` on a gauge, which first ships in 0.0.14, the next lockstep release.
+billing = ["simple_module_billing>=0.0.14,<0.1"]
 # floor: 0.0.13 - images registers blocks from ``pagebuilder-blocks.ts``, which
 # pagebuilder's ``puck-blocks.ts`` globs in (added in 0.0.12), and searches its
 # media through ``pagebuilder.contracts``.

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 
 from simple_module_db.mixins import AuditMixin, MultiTenantMixin
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import BigInteger, UniqueConstraint
 from sqlmodel import Field
 
 from sm_images.models._base import Base
@@ -22,6 +22,8 @@ class Rendition(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[u
     storage_key: str = Field(max_length=500)
     width: int = Field(sa_column_kwargs={"nullable": False})
     height: int = Field(sa_column_kwargs={"nullable": False})
+    size_bytes: int = Field(default=0, sa_type=BigInteger, sa_column_kwargs={"nullable": False})
+    """Counted in ``Image.storage_bytes``."""
     source_generation: int = Field(default=0, sa_column_kwargs={"nullable": False})
     """The ``Image.display_generation`` this was cut from. Served only while it
     equals the image's current one: a rendition of an older (unredacted)

@@ -107,7 +107,7 @@ class UsageService(HoldsMixin):
         )
         return Exceeded(used, res.limit or 0, qty, res.period[1])
 
-    async def check(self, tenant_id: str, meter: str, qty: int = 1) -> Allowed | Exceeded:
+    async def _check_counter(self, tenant_id: str, meter: str, qty: int) -> Allowed | Exceeded:
         self._require(meter, _COUNTER)
         async with self._factory() as session:  # one connection for both reads
             res = await self._resolve(tenant_id, meter, session)

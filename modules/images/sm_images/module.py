@@ -148,12 +148,14 @@ class ImagesModule(ModuleBase):
         the tenancy mode, the CDN base public URLs use, the fail-closed guard,
         the session factory object intents commit through on their own, the
         step registry (built-ins and every installed plugin's
-        ``images_extensions``, then frozen) and the runtime the pipeline's
-        after-commit dispatch runs on."""
-        from sm_images import intents, tenancy, urls
+        ``images_extensions``, then frozen), the runtime the pipeline's
+        after-commit dispatch runs on, and the ``images.storage_bytes`` gauge
+        on billing's registry when billing runs."""
+        from sm_images import billing, intents, tenancy, urls
         from sm_images.pipeline.extensions import load_extensions
 
         setattr(app.state, constants.MODULE_ATTR, self)
+        billing.register_meter(app)
         tenancy.configure(app)
         urls.configure(getattr(app.state, constants.PACKAGE).settings.public_asset_base_url)
         load_extensions()

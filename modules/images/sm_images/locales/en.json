@@ -171,7 +171,7 @@
     "image_too_large": "This image is too large for this step to process.",
     "unreadable_image": "The image could not be read.",
     "output_too_large": "The step produced a result that is too large to keep.",
-    "quota_exceeded": "The quota for this step is used up.",
+    "quota_exceeded": "The plan's quota is used up.",
     "time_limit": "The step took too long and was stopped.",
     "internal_error": "The step failed unexpectedly.",
     "dependency_unavailable": "A step this one depends on did not produce a result.",
@@ -578,5 +578,8 @@
     },
     "image": "Image",
     "group": "Group"
+  },
+  "meters": {
+    "storage_bytes": "Image storage"
   }
 }

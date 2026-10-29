@@ -23,7 +23,7 @@ from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal
 
-from sm_images import constants
+from sm_images import billing, constants
 from sm_images.access import (
     CollectionEdit,
     CollectionView,
@@ -47,6 +47,7 @@ from sm_images.schemas.image import (
 )
 from sm_images.services import gallery, groups, present
 from sm_images.storage import store_for
+from sm_images.tenancy import bound_tenant
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["images"])
@@ -87,6 +88,7 @@ async def _read(ingest: IngestService, file: UploadFile) -> tuple[bytes, Any]:
 
 @router.post("/collections/{collection_id}/images", dependencies=[require_view])
 async def upload_images(
+    request: Request,
     collection: CollectionEdit,
     ingest: Ingest,
     files: Annotated[list[UploadFile], File()],
@@ -101,9 +103,11 @@ async def upload_images(
             read.append((file, await _read(ingest, file)))
         except ImagesError as exc:
             read.append(exc)
-    # Every intent before the first insert (see IngestService.reserve).
+    good = [r[1] for r in read if isinstance(r, tuple)]
+    await billing.check(request.app, bound_tenant(), sum(len(data) for data, _ in good))
+    # Every intent and storage hold before the first insert (IngestService.reserve).
     slots = iter(
-        await ingest.reserve(collection, [r[1][1].ext for r in read if isinstance(r, tuple)])
+        await ingest.reserve(collection, [i.ext for _, i in good], [len(d) for d, _ in good])
     )
     results: list[UploadResult] = []
     errors: list[ImagesError] = []
@@ -139,9 +143,10 @@ async def upload_images(
 
 @router.post("/collections/{collection_id}/images/base64", dependencies=[require_view])
 async def upload_base64(
-    body: Base64Upload, collection: CollectionEdit, ingest: Ingest
+    request: Request, body: Base64Upload, collection: CollectionEdit, ingest: Ingest
 ) -> UploadResult:
     data = decode_base64(body.data, ingest.settings.max_image_bytes)
+    await billing.check(request.app, bound_tenant(), len(data))
     outcome = await ingest.add_image(
         collection,
         data=data,

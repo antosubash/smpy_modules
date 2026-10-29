@@ -287,6 +287,7 @@ def upgrade() -> None:
         sa.Column("purge_failed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("storage_hold_id", sa.String(length=64), nullable=True),
         sa.Column("storage_bytes", sa.BigInteger(), nullable=False),
+        sa.Column("display_bytes", sa.BigInteger(), nullable=False),
         sa.Column("filename", sa.String(length=255), nullable=False),
         sa.Column("content_type", sa.String(length=100), nullable=False),
         sa.Column("size_bytes", sa.BigInteger(), nullable=False),
@@ -521,6 +522,7 @@ def upgrade() -> None:
         sa.Column("storage_key", sa.String(length=500), nullable=False),
         sa.Column("width", sa.Integer(), nullable=False),
         sa.Column("height", sa.Integer(), nullable=False),
+        sa.Column("size_bytes", sa.BigInteger(), nullable=False),
         sa.Column("source_generation", sa.Integer(), nullable=False),
         sa.ForeignKeyConstraint(
             ["image_id"],

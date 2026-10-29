@@ -28,6 +28,7 @@ from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
     images_app,
     storage,
 )
+from tests.billing_support import _billing_off, gauge  # noqa: F401 - billing off unless asked
 from tests.fetch_support import inner, resolver  # noqa: F401 - the safe-fetch tests' fixtures
 from tests.group_support import file_pipe  # noqa: F401 - the group-run tests' fixture
 from tests.import_support import imp  # noqa: F401 - the import tests' fixture

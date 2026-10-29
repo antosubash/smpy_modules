@@ -159,3 +159,30 @@ too (`uq_images_prompt_name`). A `PromptSpec` of a group prompt over
 `results` names its image spec in `member`, which may be left out when the
 preset has exactly one image spec. `register_preset` runs every spec's schema
 through `schema_safety` and refuses an unsafe one at boot.
+
+## Storage metering
+
+With `billing` installed, an image's stored bytes count against the
+`images.storage_bytes` gauge (unit bytes; a plan's limit is the most an
+organisation may store). Without it nothing is limited, and
+`images_image.storage_bytes` (original + display copy + renditions) is kept
+all the same.
+
+- **One committed hold per image**, sized to `storage_bytes` and named by
+  `storage_hold_id`. Ingest holds the original (key
+  `images:{image}:storage:0`). A published display copy or rendition set
+  takes a hold for the new total (keyed by the attempt) and then releases the
+  old one; the janitor's purge releases it once the image is gone.
+- **Refusals.** Upload, base64 upload, direct-upload complete and import start
+  check the gauge first and answer 402 `quota_exceeded`. An import item that
+  does not fit fails `quota_exceeded`; a step whose new objects do not fit
+  fails `quota_exceeded`, its objects deleted and the previous display copy
+  kept.
+- **Order.** Billing writes in its own short transactions, so a hold is
+  reserved (`held`) before the caller's transaction writes - on SQLite it
+  would otherwise wait on the caller's lock - and committed, or released,
+  after that transaction commits. A rollback leaves a `held` hold to lapse at
+  billing's TTL; capacity is never leaked. Taking the new hold before
+  releasing the old one means a regenerated image briefly needs room for both.
+- **Fail closed.** An installed billing that cannot meter raises: an upload
+  fails, and a step fails `storage_error` without publishing.

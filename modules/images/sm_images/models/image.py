@@ -83,7 +83,10 @@ class Image(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  #
     such images go to the back of later purge passes (``sm_images.purge``)."""
     storage_hold_id: str | None = Field(default=None, max_length=64)
     storage_bytes: int = Field(default=0, sa_type=BigInteger, sa_column_kwargs={"nullable": False})
-    """Sum of this image's objects, as held against the storage gauge."""
+    """Sum of this image's objects (original, display copy, renditions), as held
+    against the storage gauge (``sm_images.billing``)."""
+    display_bytes: int = Field(default=0, sa_type=BigInteger, sa_column_kwargs={"nullable": False})
+    """The display copy's size; ``0`` while the original is the display copy."""
 
     filename: str = Field(max_length=255)
     content_type: str = Field(max_length=100)

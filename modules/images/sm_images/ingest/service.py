@@ -21,7 +21,9 @@ session, so it must be written before the caller's session first writes:
 on file-backed SQLite the caller then holds the writer lock and the intent
 waits on it. A caller adding several images in one transaction calls
 :meth:`IngestService.reserve` for all of them first and passes each
-:class:`Slot` in.
+:class:`Slot` in. The storage hold (``sm_images.billing``) follows the same
+rule, so ``reserve(..., sizes=)`` takes it there too; it is committed with
+the row's commit, or released after it when nothing kept it.
 
 The savepoint is also the per-file isolation of a batch: a file that fails
 rolls back its own rows only, and its object is deleted again.
@@ -33,44 +35,30 @@ import contextlib
 import hashlib
 import uuid
 from collections.abc import Iterable
-from dataclasses import dataclass, replace
 from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 
-from sm_images import events, pipeline, storage_keys
+from sm_images import billing, events, pipeline, storage_keys
+from sm_images.errors import StorageQuotaExceeded
 from sm_images.ingest import dedupe
 from sm_images.ingest.guards import Inspected, inspect
-from sm_images.ingest.meta import IngestMeta
+from sm_images.ingest.meta import IngestMeta, normalise
+from sm_images.ingest.slots import (
+    Duplicate,
+    Slot,
+    drop_hold,
+    hold_slot,
+    keep_hold,
+    safe_filename,
+)
 from sm_images.intents import clear_intents, object_intent
-from sm_images.models import Collection, Image, LocationSource, StepRun
+from sm_images.models import Collection, Image, StepRun
 from sm_images.services import stats
 from sm_images.storage import ImageStore
 from sm_images.tenancy import bound_tenant
 
 __all__ = ["Duplicate", "IngestService", "Slot", "safe_filename"]
-
-
-@dataclass(frozen=True)
-class Duplicate:
-    """The upload is an image the collection already holds."""
-
-    image_id: uuid.UUID
-
-
-@dataclass(frozen=True)
-class Slot:
-    """An image id and its original's key, with the intent already recorded."""
-
-    image_id: uuid.UUID
-    key: str
-
-
-def safe_filename(name: str | None, fallback: str = "upload") -> str:
-    """The last path segment, without control characters, at most 255 characters."""
-    base = (name or "").replace("\\", "/").rsplit("/", 1)[-1]
-    base = "".join(ch for ch in base if ch.isprintable()).strip()
-    return base[:255] or fallback
 
 
 class IngestService:
@@ -93,8 +81,11 @@ class IngestService:
 
     # -- intents ---------------------------------------------------------
 
-    async def reserve(self, collection: Collection, exts: Iterable[str]) -> list[Slot]:
-        """Mint ids and keys for originals and record their intents in one go."""
+    async def reserve(
+        self, collection: Collection, exts: Iterable[str], sizes: Iterable[int] | None = None
+    ) -> list[Slot]:
+        """Mint ids and keys for originals and record their intents in one go;
+        with ``sizes``, also reserve each original's storage hold (``slots``)."""
         tenant = bound_tenant()
         slots = []
         for ext in exts:
@@ -103,7 +94,14 @@ class IngestService:
             slots.append(Slot(image_id, key))
         async with object_intent([s.key for s in slots], session_factory=self.intent_factory):
             pass
-        return slots
+        if sizes is None:
+            return slots
+        factory = self._factory()
+        return [await hold_slot(factory, tenant, s, n) for s, n in zip(slots, sizes, strict=True)]
+
+    def _factory(self) -> Any:
+        """Where billing's own short transactions run (``sm_images.billing``)."""
+        return billing.factory_of(self.db, self.intent_factory)
 
     def inspect(self, data: bytes) -> Inspected:
         return inspect(data, max_bytes=self.settings.max_image_bytes)
@@ -143,20 +141,27 @@ class IngestService:
         assert data is not None
         info = inspected or self.inspect(data)
         sha = hashlib.sha256(data).hexdigest()
-        meta = self._normalise(meta, source)
+        meta = normalise(meta, source)
 
         found = await self._precheck(collection.id, meta, sha)
         if found is not None:
             if staged_key is None or not await dedupe.find_id(self.db, image_id):
                 await self._discard(staged_key, slot)
+            drop_hold(self.db, self._factory(), slot.hold if slot else None)
             return Duplicate(found)
 
         if staged_key is not None:
             assert image_id is not None
             key, new_id = staged_key, image_id
+            slot = await hold_slot(self._factory(), bound_tenant(), Slot(new_id, key), len(data))
+            if slot.refused:  # the caller removes its staged object
+                raise StorageQuotaExceeded(billing.FULL)
         else:
-            slot = slot or (await self.reserve(collection, [info.ext]))[0]
+            slot = slot or (await self.reserve(collection, [info.ext], [len(data)]))[0]
             key, new_id = slot.key, slot.image_id
+            if slot.refused:
+                await self._discard(None, slot)
+                raise StorageQuotaExceeded(billing.FULL)
             await self.store.put(key, data, content_type=info.content_type, size=len(data))
 
         row = Image(
@@ -164,6 +169,7 @@ class IngestService:
             collection_id=collection.id,
             storage_key=key,
             storage_bytes=len(data),
+            storage_hold_id=slot.hold,
             filename=safe_filename(filename),
             content_type=info.content_type,
             size_bytes=len(data),
@@ -207,16 +213,6 @@ class IngestService:
 
     # -- steps -------------------------------------------------------------
 
-    @staticmethod
-    def _normalise(meta: IngestMeta, source: str) -> IngestMeta:
-        """An external id always has a source: a NULL source never dedupes."""
-        changes: dict[str, Any] = {}
-        if meta.external_id is not None and meta.external_source is None:
-            changes["external_source"] = source
-        if meta.location_source is None:
-            changes["location_source"] = LocationSource.MANUAL
-        return replace(meta, **changes) if changes else meta
-
     async def _precheck(self, collection_id: uuid.UUID, meta: IngestMeta, sha: str):
         if meta.external_id is not None:
             assert meta.external_source is not None
@@ -240,6 +236,13 @@ class IngestService:
         )
 
     async def _insert(self, collection: Collection, row: Image, meta: IngestMeta, key: str) -> None:
+        try:
+            await self._insert_rows(collection, row, meta, key)
+        except Exception:  # released outside the rolled-back savepoint
+            drop_hold(self.db, self._factory(), row.storage_hold_id)
+            raise
+
+    async def _insert_rows(self, collection: Collection, row: Image, meta, key: str) -> None:
         async with self.db.begin_nested():
             if meta.group_key is not None:
                 row.group_id = await dedupe.ensure_group(self.db, collection.id, meta.group_key)
@@ -250,6 +253,7 @@ class IngestService:
             await self.db.flush()
             await stats.on_image_added(self.db, collection.id, row.lat, row.lng)
             await clear_intents(self.db, [key])
+            keep_hold(self.db, self._factory(), row.storage_hold_id)  # dropped with the savepoint
 
     def _remember(self, collection_id: uuid.UUID, meta: IngestMeta, sha: str, image_id) -> None:
         if meta.external_id is not None and meta.external_source is not None:

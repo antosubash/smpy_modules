@@ -75,7 +75,7 @@ that treats billing as optional checks `find_spec` first, as
 | `consume(tenant, meter, qty, key, *, source, db=None)` | atomic check-and-count against the current period → `Allowed(used, limit, period_end, replayed)`, `Exceeded(used, limit, requested, period_end)` or, for a refunded key, `Refunded`; a refusal writes nothing |
 | `record(tenant, meter, qty, key, *, source, occurred_at=None, db=None)` | count usage reported after the fact, unconditionally (may pass the limit; the next `consume` is then refused) |
 | `refund(tenant, meter, key)` | reverse that call in the period it counted against; idempotent |
-| `check(tenant, meter, qty=1)` | advisory and read-only — a UI hint, never enforcement |
+| `check(tenant, meter, qty=1)` | advisory and read-only — a UI hint, never enforcement. On a registered gauge it compares the level held plus `qty` with the limit (`period_end` `None`); `usage_meter(factory)` knows no registry, so there it checks a counter |
 
 The meter key is a `Plan.limits` key, exactly like an entitlement: absent is
 unlimited, `0` forbids. Quantities are positive integers in the meter's minor

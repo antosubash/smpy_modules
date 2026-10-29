@@ -13,7 +13,7 @@ location.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
@@ -117,3 +117,13 @@ def parse_batch_metadata(raw: str | None) -> dict[str, IngestMeta]:
     except ValidationError as exc:
         raise InvalidUpload(_BAD_METADATA, constants.CODE_INVALID_METADATA) from exc
     return {name: meta.to_ingest() for name, meta in parsed.items()}
+
+
+def normalise(meta: IngestMeta, source: str) -> IngestMeta:
+    """An external id always has a source: a NULL source never dedupes."""
+    changes: dict[str, Any] = {}
+    if meta.external_id is not None and meta.external_source is None:
+        changes["external_source"] = source
+    if meta.location_source is None:
+        changes["location_source"] = LocationSource.MANUAL
+    return replace(meta, **changes) if changes else meta

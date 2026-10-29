@@ -20,7 +20,7 @@ from simple_module_core.resources import ACTION_EDIT, ResourcePrincipal
 from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import RequiresResource, resource_principal
 
-from sm_images import constants
+from sm_images import billing, constants
 from sm_images.access import POLICY, CollectionEdit, collection_stmt
 from sm_images.deps import require_view
 from sm_images.endpoints.api.images import Ingest, result
@@ -35,6 +35,7 @@ from sm_images.schemas.image import (
     UploadResult,
 )
 from sm_images.storage import store_for
+from sm_images.tenancy import bound_tenant
 
 router = APIRouter(tags=["uploads"])
 
@@ -108,10 +109,15 @@ async def put_part(
 
 @router.post(f"{constants.UPLOADS_PATH}/{{upload_id}}/complete", dependencies=[require_view])
 async def complete_upload(
-    body: DirectComplete, ticket: Ticket, collection: TicketCollection, ingest: Ingest
+    request: Request,
+    body: DirectComplete,
+    ticket: Ticket,
+    collection: TicketCollection,
+    ingest: Ingest,
 ) -> UploadResult:
     if ticket.kind != "image":  # a ZIP is sealed by its import's extract, never here
         raise UploadNotOpen("This upload is completed by its import's extract")
+    await billing.check(request.app, bound_tenant(), ticket.size)
     meta = body.metadata.to_ingest() if body.metadata else direct.IngestMeta()
     outcome = await direct.complete(
         ingest,

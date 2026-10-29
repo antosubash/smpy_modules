@@ -13,13 +13,17 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from sqlalchemy import select
+
+from sm_billing.contracts.metering import Allowed, Exceeded, MeterKind
 from sm_billing.metering.periods import as_utc, current_period, provider_period
+from sm_billing.models import UsageGauge
 from sm_billing.resolve import effective_plan
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-    from sm_billing.contracts.metering import MeterDefinition, MeterKind
+    from sm_billing.contracts.metering import MeterDefinition
     from sm_billing.metering.registry import MeterRegistry
 
 #: The hold TTL when neither the caller, the meter nor a setting gives one.
@@ -65,6 +69,28 @@ class MeteringCore:
     def _require(self, meter: str, kind: MeterKind) -> MeterDefinition | None:
         """``UnknownMeterError`` unless ``meter`` is a registered ``kind`` meter."""
         return None if self._meters is None else self._meters.require(meter, kind)
+
+    async def check(self, tenant_id: str, meter: str, qty: int = 1) -> Allowed | Exceeded:
+        """A registered gauge compares its level held; anything else is a counter."""
+        definition = None if self._meters is None else self._meters.get(meter)
+        if definition is not None and definition.kind is MeterKind.GAUGE:
+            return await self._check_level(tenant_id, meter, qty)
+        return await self._check_counter(tenant_id, meter, qty)
+
+    async def _check_counter(self, tenant_id: str, meter: str, qty: int) -> Allowed | Exceeded:
+        raise NotImplementedError  # UsageService
+
+    async def _check_level(self, tenant_id: str, meter: str, qty: int) -> Allowed | Exceeded:
+        """Would holding ``qty`` more fit the gauge's limit right now? Read-only."""
+        async with self._factory() as session:
+            res = await self._resolve(tenant_id, meter, session)
+            stmt = select(UsageGauge.in_use).where(
+                UsageGauge.tenant_id == tenant_id, UsageGauge.meter == meter
+            )
+            level = int((await session.execute(stmt)).scalar_one_or_none() or 0)
+        if res.limit is not None and level + qty > res.limit:
+            return Exceeded(level, res.limit, qty, None)
+        return Allowed(level, res.limit, None)
 
     def _default_ttl(self, definition: MeterDefinition | None) -> int:
         if definition is not None and definition.hold_ttl_seconds is not None:

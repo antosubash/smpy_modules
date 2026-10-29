@@ -171,7 +171,7 @@
     "image_too_large": "Dieses Bild ist für diesen Schritt zu groß.",
     "unreadable_image": "Das Bild konnte nicht gelesen werden.",
     "output_too_large": "Der Schritt hat ein Ergebnis erzeugt, das zu groß zum Speichern ist.",
-    "quota_exceeded": "Das Kontingent für diesen Schritt ist aufgebraucht.",
+    "quota_exceeded": "Das Kontingent des Tarifs ist aufgebraucht.",
     "time_limit": "Der Schritt hat zu lange gedauert und wurde abgebrochen.",
     "internal_error": "Der Schritt ist unerwartet fehlgeschlagen.",
     "dependency_unavailable": "Ein Schritt, von dem dieser abhängt, hat kein Ergebnis geliefert.",
@@ -578,5 +578,8 @@
     },
     "image": "Bild",
     "group": "Gruppe"
+  },
+  "meters": {
+    "storage_bytes": "Bildspeicher"
   }
 }

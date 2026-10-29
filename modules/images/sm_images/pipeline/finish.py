@@ -11,7 +11,8 @@
    claimed, ``ImageProcessed`` decided - all committing together.
    A ``prompt:*`` run also writes its ``images_prompt_result`` row there
    (:func:`sm_images.ai.results.record_prompt_run`), and records the prompt's
-   revision as the run's version.
+   revision as the run's version. ``storage_bytes`` and the storage hold move
+   here too, the hold reserved between the two phases (``storage_hold``).
 3. **After the commit**, the replaced objects are deleted. A failed delete
    leaves its intent for the janitor.
 """
@@ -30,9 +31,10 @@ from simple_module_db.callbacks import register_on_commit
 from sqlalchemy import delete
 
 from sm_images import storage_keys
+from sm_images.errors import StorageQuotaExceeded
 from sm_images.intents import clear_intents, object_intent
 from sm_images.models import ObjectIntent
-from sm_images.pipeline import publish, registry
+from sm_images.pipeline import publish, registry, storage_hold
 from sm_images.pipeline.advance import advance_locked, conclude
 from sm_images.pipeline.claim import complete, lock_image
 from sm_images.pipeline.cycle import release
@@ -51,7 +53,9 @@ RENDITIONS = "renditions"
 class Staged:
     keys: list[str] = field(default_factory=list)
     display_key: str | None = None
-    renditions: dict[str, tuple[str, int, int]] = field(default_factory=dict)
+    display_bytes: int = 0
+    renditions: dict[str, tuple[str, int, int, int]] = field(default_factory=dict)
+    attempt: str = ""
 
 
 async def _drop(runtime: Runtime, keys: list[str]) -> None:
@@ -74,16 +78,17 @@ async def stage(runtime: Runtime, loaded: Any, staging: Any) -> Staged:
     # A fresh nonce per execution, not the lease token: a redelivered message
     # runs twice under one token, and its loser must never share (and so
     # delete) the winner's keys. The token only fences the database.
-    attempt = uuid.uuid4().hex
+    attempt = out.attempt = uuid.uuid4().hex
     writes: list[tuple[str, bytes, str]] = []
     if staging.display is not None and loaded.mutates_display:
         data, content_type = staging.display
         out.display_key = storage_keys.display_key(*ids, loaded.display_generation + 1, attempt)
+        out.display_bytes = len(data)
         writes.append((out.display_key, data, content_type))
     renditions = staging.renditions if loaded.step == RENDITIONS else None
     for size, (data, width, height) in (renditions or {}).items():
         key = storage_keys.rendition_key(*ids, size, loaded.display_generation, attempt)
-        out.renditions[size] = (key, width, height)
+        out.renditions[size] = (key, width, height, len(data))
         writes.append((key, data, JPEG))
     out.keys = [w[0] for w in writes]
     if not writes:
@@ -124,7 +129,14 @@ async def _publish(
     if staged.display_key is not None:
         generation = loaded.display_generation + 1
         if not await publish.publish_display(
-            db, tenant, image_id, staged.display_key, generation, loaded.step, version
+            db,
+            tenant,
+            image_id,
+            staged.display_key,
+            generation,
+            loaded.step,
+            version,
+            staged.display_bytes,
         ):
             return None
         if locked.display_key:
@@ -143,6 +155,22 @@ async def _publish(
     return replaced
 
 
+async def _hold(
+    runtime: Runtime, loaded: Any, staged: Staged, outcome: StepOutcome
+) -> tuple[storage_hold.Planned | None, Staged, StepOutcome]:
+    """Reserve the storage the staged objects add. Refused, or billing unusable
+    (fail closed): the objects go, nothing is published, the step fails."""
+    try:
+        return await storage_hold.reserve(runtime, loaded, staged), staged, outcome
+    except StorageQuotaExceeded as exc:
+        failed = StepOutcome.failed("quota_exceeded", exc.detail)
+    except Exception as exc:
+        logger.warning("images.pipeline.storage_hold_failed step=%s", loaded.step, exc_info=True)
+        failed = StepOutcome.failed("storage_error", f"{type(exc).__name__}: {exc}"[:2000])
+    await _drop(runtime, staged.keys)
+    return None, Staged(), failed
+
+
 async def complete_step(
     runtime: Runtime, loaded: Any, outcome: StepOutcome, staging: Any, *, version: int | None
 ) -> bool:
@@ -157,6 +185,7 @@ async def complete_step(
         except Exception as exc:
             logger.warning("images.pipeline.stage_failed step=%s", loaded.step, exc_info=True)
             outcome = StepOutcome.failed("storage_error", f"{type(exc).__name__}: {exc}"[:2000])
+    planned, staged, outcome = await _hold(runtime, loaded, staged, outcome)
     requeue = False
     async with runtime.session_factory() as db:
         locked = await lock_image(db, loaded.tenant, loaded.image_id)
@@ -176,6 +205,8 @@ async def complete_step(
         )
         writes = staging if outcome.status == "completed" else None
         replaced = await _publish(db, loaded, locked, staged, writes, version) if ok else None
+        if replaced is not None and not await storage_hold.record(db, runtime, loaded, planned):
+            replaced = None  # the total moved since the hold was reserved: plan again
         if replaced is None:
             await db.rollback()
             requeue = ok  # still ours: only the display fence failed
@@ -195,6 +226,7 @@ async def complete_step(
         await finalize_session(db)
     if replaced is None:
         await _drop(runtime, staged.keys)
+        await storage_hold.unhold(runtime, planned)
         if requeue:
             try:
                 await _requeue(runtime, loaded, lease_s)

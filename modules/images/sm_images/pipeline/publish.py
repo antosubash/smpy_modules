@@ -45,9 +45,10 @@ async def publish_display(
     generation: int,
     step: str,
     version: int | None,
+    size: int = 0,
 ) -> bool:
-    """Swap in the new display copy, fenced on the generation it was made from,
-    recording the *step* (and its *version*) that wrote it."""
+    """Swap in the new display copy (``size`` bytes), fenced on the generation
+    it was made from, recording the *step* (and its *version*) that wrote it."""
     stmt = (
         update(Image)
         .where(*_image(tenant, image_id), Image.display_generation == generation - 1)
@@ -56,6 +57,7 @@ async def publish_display(
             display_generation=generation,
             display_step=step,
             display_step_version=version,
+            display_bytes=size,
         )
         .returning(Image.id)
         .execution_options(**_SYNC)
@@ -122,18 +124,18 @@ async def replace_renditions(
     db: Any,
     tenant: str,
     image_id: uuid.UUID,
-    made: dict[str, tuple[str, int, int]],
+    made: dict[str, tuple[str, int, int, int]],
     generation: int,
 ) -> list[str]:
-    """Replace the image's rendition rows with ``made`` (size -> key, w, h), cut
-    from display ``generation`` (stamped as ``source_generation``).
+    """Replace the image's rendition rows with ``made`` (size -> key, w, h,
+    bytes), cut from display ``generation`` (stamped as ``source_generation``).
 
     Returns the keys no longer referenced, for deletion after the commit.
     """
     where = [Rendition.tenant_id == tenant, Rendition.image_id == image_id]
     old = (await db.execute(select(Rendition.storage_key).where(*where))).scalars().all()
     await db.execute(delete(Rendition).where(*where).execution_options(**_SYNC))
-    for size, (key, width, height) in made.items():
+    for size, (key, width, height, size_bytes) in made.items():
         db.add(
             Rendition(
                 image_id=image_id,
@@ -141,11 +143,12 @@ async def replace_renditions(
                 storage_key=key,
                 width=width,
                 height=height,
+                size_bytes=size_bytes,
                 source_generation=generation,
             )
         )
     await db.flush()
-    keep = {key for key, _, _ in made.values()}
+    keep = {made_key for made_key, *_ in made.values()}
     return [k for k in old if k not in keep]
 
 

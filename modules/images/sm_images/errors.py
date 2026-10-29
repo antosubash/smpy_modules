@@ -101,6 +101,14 @@ class UploadFailed(ImagesError):  # noqa: N818 - HTTP vocabulary, deliberately
     code = constants.CODE_UPLOAD_FAILED
 
 
+class StorageQuotaExceeded(ImagesError):  # noqa: N818 - billing's vocabulary
+    """The plan's ``images.storage_bytes`` limit leaves no room (402, as
+    billing's own refusals answer)."""
+
+    status_code = 402
+    code = constants.CODE_QUOTA_EXCEEDED
+
+
 class UploadNotFound(NotFound):
     code = constants.CODE_UPLOAD_NOT_FOUND
 

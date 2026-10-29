@@ -214,6 +214,7 @@ CODE_REGROUP_TOO_SLOW: Final = "regroup_too_slow"
 CODE_REGROUP_ACTIVE: Final = "regroup_active"
 CODE_ROLE_NEEDS_GROUP: Final = "role_needs_group"
 CODE_CONFLICT: Final = "conflict"
+CODE_QUOTA_EXCEEDED: Final = "quota_exceeded"
 ERROR_CODES: Final = (
     CODE_UNSUPPORTED_TYPE,
     CODE_TOO_MANY_PIXELS,
@@ -236,8 +237,18 @@ ERROR_CODES: Final = (
     CODE_REGROUP_ACTIVE,
     CODE_ROLE_NEEDS_GROUP,
     CODE_CONFLICT,
+    CODE_QUOTA_EXCEEDED,
 )
 """Every code an upload can answer with; each has a translated sentence."""
+
+# Storage metering (decision 10, ``sm_images.billing``): a billing gauge in
+# bytes. The key is a ``Plan.limits`` key, so renaming it orphans every limit.
+METER_STORAGE: Final = "images.storage_bytes"
+METER_STORAGE_LABEL_KEY: Final = "images.meters.storage_bytes"
+BILLING_PACKAGE: Final = "sm_billing"
+BILLING_USAGE_MODULE: Final = "sm_billing.contracts.metering"
+BILLING_METERS_ATTR: Final = "billing_meters"
+BILLING_USAGE_ATTR: Final = "billing_usage"
 
 # --- Console pages (Inertia names: ``<module>/<file under pages/>``) ---
 

@@ -6,6 +6,7 @@ from datetime import timedelta
 
 import pytest
 from sm_billing.contracts.metering import (
+    Allowed,
     Exceeded,
     Hold,
     HoldExpired,
@@ -219,3 +220,16 @@ async def test_recount_repairs_drift(factory, usage):
     assert await in_use(factory, tenant) == 4
     fresh = await seed_limits(factory, {})
     assert await usage.recount(fresh, GAUGE) == 0  # creates the row
+
+
+async def test_check_on_a_gauge_compares_the_level_held(factory, usage):
+    """``check`` on a registered gauge answers from the level held now (a
+    consumer's pre-flight before it reserves), never from a period counter."""
+    tenant = await seed_limits(factory, {GAUGE: 5})
+    assert await usage.check(tenant, GAUGE, 5) == Allowed(0, 5, None)
+    await usage.reserve(tenant, GAUGE, 3, "a", source="t")
+    assert await usage.check(tenant, GAUGE, 2) == Allowed(3, 5, None)
+    assert await usage.check(tenant, GAUGE, 3) == Exceeded(3, 5, 3, None)
+    assert await hold_statuses(factory, tenant) == ["held"]  # read-only
+    unlimited = await seed_limits(factory, {})
+    assert await usage.check(unlimited, GAUGE, 10**9) == Allowed(0, None, None)

@@ -34,7 +34,7 @@ from simple_module_db.listeners import current_tenant_id
 from simple_module_hosting.resource_deps import RequiresResource, resource_principal
 from sqlalchemy import select
 
-from sm_images import constants
+from sm_images import billing, constants
 from sm_images.access import POLICY, CollectionEdit
 from sm_images.deps import require_view
 from sm_images.endpoints.api.uploads import host_secret
@@ -97,6 +97,7 @@ async def _actor(db: Any, who: ResourcePrincipal, collection: Collection) -> tup
 
 @router.post("/collections/{collection_id}/imports", status_code=202, dependencies=[require_view])
 async def create_import(
+    request: Request,
     collection: CollectionEdit,
     who: Principal,
     db: Annotated[Any, Depends(get_db)],
@@ -106,6 +107,7 @@ async def create_import(
     auto_run_prompts: Annotated[bool, Form()] = True,
     file: Annotated[UploadFile | None, File()] = None,
 ) -> ImportJobOut:
+    await billing.check(request.app, _tenant(), 1)  # a full gauge refuses the job up front
     user, basis = await _actor(db, who, collection)
     row = await start_import(
         _runtime(),
@@ -132,6 +134,7 @@ async def create_zip_import(
     who: Principal,
     db: Annotated[Any, Depends(get_db)],
 ) -> ZipCreated:
+    await billing.check(request.app, _tenant(), 1)
     user, basis = await _actor(db, who, collection)
     job, (token, ticket, urls, presigned) = await zip_upload.start(
         _runtime(),

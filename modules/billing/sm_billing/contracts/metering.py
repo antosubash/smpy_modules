@@ -153,7 +153,8 @@ class UsageMeter(Protocol):
 
     async def check(self, tenant_id: str, meter: str, qty: int = 1) -> Allowed | Exceeded:
         """Would ``qty`` fit right now? Advisory and read-only: a UI hint, never
-        enforcement, since another call can consume between this and yours."""
+        enforcement, since another call can consume between this and yours.
+        A registered gauge compares its level held (``period_end`` ``None``)."""
         ...
 
     async def consume(
