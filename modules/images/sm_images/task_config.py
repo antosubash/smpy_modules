@@ -23,6 +23,7 @@ JANITOR = "images.janitor"
 IMPORT_GEOJSON = "images.import_geojson"
 DOWNLOAD_ITEMS = "images.download_items"
 RESET_IMPORT = "images.reset_import"
+RUN_REGROUP = "images.run_regroup"
 
 QUEUE_DEFAULT = "images"
 QUEUE_IMPORTS = "images_imports"
@@ -36,6 +37,7 @@ TASK_ROUTES = {
     IMPORT_GEOJSON: {"queue": QUEUE_IMPORTS},
     DOWNLOAD_ITEMS: {"queue": QUEUE_DEFAULT},
     RESET_IMPORT: {"queue": QUEUE_IMPORTS},
+    RUN_REGROUP: {"queue": QUEUE_IMPORTS},
 }
 
 RECONCILE_INTERVAL_SECONDS = 300.0

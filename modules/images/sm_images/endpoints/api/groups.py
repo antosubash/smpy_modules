@@ -9,9 +9,13 @@ and in which role, is set through ``PATCH /images/{id}``.
 from __future__ import annotations
 
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response
+from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.deps import get_db
+from simple_module_hosting.resource_deps import resource_principal
+from sqlalchemy import select
 
 from sm_images import constants
 from sm_images.access import (
@@ -19,22 +23,30 @@ from sm_images.access import (
     CollectionView,
     GroupCollectionEdit,
     GroupCollectionView,
+    RegroupCollectionEdit,
+    RegroupCollectionView,
 )
 from sm_images.deps import require_view
-from sm_images.models import Collection, Group
+from sm_images.endpoints.api._runtime import runtime, tenant
+from sm_images.imports.access import basis
+from sm_images.models import Collection, Group, RegroupJob
+from sm_images.regroup import jobs
 from sm_images.schemas.group import (
     GroupCreate,
     GroupOut,
     GroupPageOut,
     GroupUpdate,
     RegroupIn,
+    RegroupJobOut,
     RegroupOut,
+    RegroupStarted,
 )
 from sm_images.services import groups as service
 from sm_images.services import present
 from sm_images.services import regroup as regrouping
 
 router = APIRouter(tags=["groups"])
+Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
 
 
 async def _out(db, collection: Collection, rows: list[Group], per_group: int) -> list[GroupOut]:
@@ -76,11 +88,79 @@ async def create_group(
     return (await _out(db, collection, [row], constants.GROUP_PREVIEW_MEMBERS))[0]
 
 
+def _result(done: regrouping.RegroupResult) -> RegroupOut:
+    return RegroupOut(dry_run=done.dry_run, **vars(done.tally))
+
+
 @router.post("/collections/{collection_id}/regroup", dependencies=[require_view])
-async def regroup(body: RegroupIn, collection: CollectionEdit, db=Depends(get_db)) -> RegroupOut:
-    return await regrouping.regroup(
-        db, collection, body.pattern, reassign=body.reassign, dry_run=body.dry_run
+async def regroup(
+    body: RegroupIn,
+    collection: CollectionEdit,
+    who: Principal,
+    response: Response,
+    db=Depends(get_db),
+) -> RegroupOut | RegroupStarted:
+    """A small collection is regrouped (or previewed) now and answered with the
+    counts; a big one becomes a background job: 202 and its id, polled at
+    ``GET /regroups/{id}`` (one unfinished job per collection, else 409)."""
+    if await regrouping.count_images(db, collection.id) <= constants.REGROUP_SYNC_MAX:
+        done = await regrouping.regroup_now(
+            db,
+            tenant(),
+            collection,
+            body.pattern,
+            reassign=body.reassign,
+            dry_run=body.dry_run,
+        )
+        return _result(done)
+    regrouping.compile_or_422(body.pattern)
+    job_id = await jobs.create(
+        runtime(),
+        tenant(),
+        collection.id,
+        pattern=body.pattern,
+        reassign=body.reassign,
+        dry_run=body.dry_run,
+        run_as=who.user_id,
+        access_basis=await basis(db, who, collection),
     )
+    await jobs.launch(runtime(), tenant(), job_id, 0)
+    response.status_code = 202
+    return RegroupStarted(job_id=job_id)
+
+
+async def _job_out(db, job_id: uuid.UUID) -> RegroupJobOut:
+    row = (await db.execute(select(RegroupJob).where(RegroupJob.id == job_id))).scalar_one()
+    counters = {name: getattr(row, name) for name in vars(regrouping.Tally())}
+    return RegroupJobOut(
+        id=row.id,
+        collection_id=row.collection_id,
+        status=row.status,
+        error_code=row.error_code,
+        pattern=row.pattern,
+        reassign=row.reassign,
+        dry_run=row.dry_run,
+        created_at=row.created_at,
+        finished_at=row.finished_at,
+        **counters,
+    )
+
+
+@router.get("/regroups/{regroup_id}", dependencies=[require_view])
+async def get_regroup(
+    regroup_id: uuid.UUID, collection: RegroupCollectionView, db=Depends(get_db)
+) -> RegroupJobOut:
+    return await _job_out(db, regroup_id)
+
+
+@router.post("/regroups/{regroup_id}/cancel", dependencies=[require_view])
+async def cancel_regroup(
+    regroup_id: uuid.UUID, collection: RegroupCollectionEdit, db=Depends(get_db)
+) -> RegroupJobOut:
+    """Stop a running regroup. What it already committed stays; a finished job is unchanged."""
+    await jobs.cancel(runtime(), tenant(), regroup_id)
+    await db.rollback()  # re-read: the cancel committed in its own session
+    return await _job_out(db, regroup_id)
 
 
 @router.get("/groups/{group_id}", dependencies=[require_view])

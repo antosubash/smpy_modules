@@ -17,15 +17,15 @@ from sqlalchemy import case, delete, func, literal, select, update
 from sqlalchemy.exc import IntegrityError
 
 from sm_images import constants
-from sm_images.errors import GroupExists, InvalidGroup, NotFound
+from sm_images.errors import Conflict, GroupExists, InvalidGroup, NotFound
 from sm_images.imports.filename_pattern import canonical_role
 from sm_images.models import Collection, Group, Image
 
 __all__ = [
     "assign",
+    "counts",
     "create",
     "delete_group",
-    "ensure_free_key",
     "get",
     "list_page",
     "member_order",
@@ -34,6 +34,8 @@ __all__ = [
 ]
 
 _NO_GROUP = "That group does not exist in this collection"
+_NEEDS_GROUP = "A role can only be set on an image that is in a group"
+_MOVED = "The image changed while it was being edited; reload and try again"
 _BAD_ROLE = "That role is not one of the collection's group roles"
 
 
@@ -56,10 +58,13 @@ async def get(db: Any, collection: Collection, group_id: uuid.UUID) -> Group:
     return found
 
 
-async def _counts(db: Any, group_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, int]:
+async def counts(db: Any, groups: Sequence[Group]) -> dict[uuid.UUID, int]:
+    """Members per group (trashed images excluded)."""
+    if not groups:
+        return {}
     stmt = (
         select(Image.group_id, func.count())
-        .where(Image.group_id.in_(group_ids))
+        .where(Image.group_id.in_([g.id for g in groups]))
         .group_by(Image.group_id)
     )
     return {gid: int(n) for gid, n in (await db.execute(stmt)).all()}
@@ -103,10 +108,6 @@ async def list_page(
     more = len(rows) > limit
     rows = rows[:limit]
     return rows, rows[-1].key if more else None
-
-
-async def counts(db: Any, groups: Sequence[Group]) -> dict[uuid.UUID, int]:
-    return await _counts(db, [g.id for g in groups]) if groups else {}
 
 
 async def _key_taken(
@@ -198,16 +199,25 @@ async def assign(
     role = image.group_role
     if target is None:
         if set_role and group_role is not None:
-            raise InvalidGroup(_NO_GROUP, constants.CODE_GROUP_NOT_FOUND)
+            raise InvalidGroup(_NEEDS_GROUP, constants.CODE_ROLE_NEEDS_GROUP)
         role = None
     elif set_role:
         role = _role(collection, group_role)
-    await db.execute(
+    result = await db.execute(
         update(Image)
-        .where(Image.id == image.id, Image.collection_id == collection.id)
+        .where(
+            Image.id == image.id,
+            Image.collection_id == collection.id,
+            Image.group_id.is_not_distinct_from(image.group_id),
+            Image.group_role.is_not_distinct_from(image.group_role),
+        )
         .values(group_id=target, group_role=role)
         .execution_options(synchronize_session=False)
     )
+    if result.rowcount != 1:  # someone else moved or re-roled it since we read it
+        err = Conflict(_MOVED)
+        err.code = constants.CODE_CONFLICT
+        raise err
     await db.refresh(image)
     return image
 

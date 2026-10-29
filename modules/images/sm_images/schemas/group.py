@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from datetime import datetime
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
@@ -63,6 +64,8 @@ class RegroupIn(BaseModel):
 
 
 class RegroupOut(BaseModel):
+    """What a regroup did (or, for a preview, would do)."""
+
     dry_run: bool
     scanned: int
     matched: int
@@ -73,4 +76,25 @@ class RegroupOut(BaseModel):
     unchanged: int
     """Matched and already exactly as derived."""
     assigned: int
+    """Images actually changed (a write that lost a race is not counted)."""
     groups_created: int
+    """Groups this regroup inserted."""
+    groups_existing: int
+    """Groups it used that were already there (including one a competing writer inserted)."""
+
+
+class RegroupJobOut(RegroupOut):
+    """A background regroup's progress: the counters so far and its state."""
+
+    id: uuid.UUID
+    collection_id: uuid.UUID
+    status: Literal["running", "completed", "failed", "cancelled"]
+    error_code: str | None
+    pattern: str
+    reassign: bool
+    created_at: datetime | None
+    finished_at: datetime | None
+
+
+class RegroupStarted(BaseModel):
+    job_id: uuid.UUID

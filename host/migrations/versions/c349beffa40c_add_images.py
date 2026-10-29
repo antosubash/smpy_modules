@@ -668,8 +668,82 @@ def upgrade() -> None:
         unique=False,
     )
 
+    op.create_table(
+        "images_regroup_job",
+        sa.Column("tenant_id", sa.String(length=50), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("(CURRENT_TIMESTAMP)"),
+            nullable=False,
+        ),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_by", sa.String(length=255), nullable=True),
+        sa.Column("updated_by", sa.String(length=255), nullable=True),
+        sa.Column("id", sa.Uuid(), nullable=False),
+        sa.Column("collection_id", sa.Uuid(), nullable=False),
+        sa.Column("pattern", sa.String(length=500), nullable=False),
+        sa.Column("reassign", sa.Boolean(), nullable=False),
+        sa.Column("dry_run", sa.Boolean(), nullable=False),
+        sa.Column("status", sa.String(length=12), nullable=False),
+        sa.Column("generation", sa.Integer(), nullable=False),
+        sa.Column("run_as", sa.String(length=255), nullable=True),
+        sa.Column("access_basis", sa.String(length=10), nullable=True),
+        sa.Column("cursor_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("cursor_id", sa.Uuid(), nullable=True),
+        sa.Column("scanned", sa.Integer(), nullable=False),
+        sa.Column("matched", sa.Integer(), nullable=False),
+        sa.Column("no_match", sa.Integer(), nullable=False),
+        sa.Column("timed_out", sa.Integer(), nullable=False),
+        sa.Column("already_grouped", sa.Integer(), nullable=False),
+        sa.Column("unchanged", sa.Integer(), nullable=False),
+        sa.Column("assigned", sa.Integer(), nullable=False),
+        sa.Column("groups_created", sa.Integer(), nullable=False),
+        sa.Column("groups_existing", sa.Integer(), nullable=False),
+        sa.Column("relaunches", sa.Integer(), nullable=False),
+        sa.Column("progress_mark", sa.Integer(), nullable=False),
+        sa.Column("error_code", sa.String(length=50), nullable=True),
+        sa.Column("heartbeat_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(
+            ["collection_id"],
+            ["images_collection.id"],
+            name=op.f("fk_images_regroup_job_collection_id_images_collection"),
+            ondelete="CASCADE",
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_images_regroup_job")),
+    )
+    op.create_index(
+        op.f("ix_images_regroup_job_collection_id"),
+        "images_regroup_job",
+        ["collection_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_images_regroup_job_heartbeat_at"),
+        "images_regroup_job",
+        ["heartbeat_at"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_images_regroup_job_tenant_id"), "images_regroup_job", ["tenant_id"], unique=False
+    )
+    op.create_index(
+        "uq_images_regroup_job_active",
+        "images_regroup_job",
+        ["collection_id"],
+        unique=True,
+        sqlite_where=sa.text("finished_at IS NULL"),
+        postgresql_where=sa.text("finished_at IS NULL"),
+    )
+
 
 def downgrade() -> None:
+    op.drop_index("uq_images_regroup_job_active", table_name="images_regroup_job")
+    op.drop_index(op.f("ix_images_regroup_job_tenant_id"), table_name="images_regroup_job")
+    op.drop_index(op.f("ix_images_regroup_job_heartbeat_at"), table_name="images_regroup_job")
+    op.drop_index(op.f("ix_images_regroup_job_collection_id"), table_name="images_regroup_job")
+    op.drop_table("images_regroup_job")
     op.drop_index(
         op.f("ix_images_pipeline_restart_tenant_id"), table_name="images_pipeline_restart"
     )

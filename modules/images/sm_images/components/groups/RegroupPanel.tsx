@@ -3,12 +3,15 @@ import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { useState } from 'react';
 
-import { regroup } from '../../utils/api-groups';
+import { useRegroupJob } from '../../hooks/useRegroupJob';
+import { cancelRegroup, regroup } from '../../utils/api-groups';
 import { keys, useT } from '../../utils/i18n';
+import { errorCodeLabel } from '../../utils/labels';
 import type { RegroupResult } from '../../utils/types';
 
 /** Group the collection's images by a filename pattern. "Preview" counts what
- *  would change and writes nothing; "Apply" does it (and is safe to repeat). */
+ *  would change and writes nothing; "Apply" does it (and is safe to repeat). A
+ *  big collection answers with a background job, whose progress is shown here. */
 export function RegroupPanel({
   collectionId,
   onApplied,
@@ -20,26 +23,45 @@ export function RegroupPanel({
 }) {
   const { t } = useT();
   const text = keys.images.groups.regroup;
+  const progress = text.progress;
   const [pattern, setPattern] = useState('');
   const [reassign, setReassign] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<RegroupResult | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const job = useRegroupJob(jobId, onApplied);
 
   const run = async (dryRun: boolean) => {
     setBusy(true);
     setError(null);
+    setResult(null);
+    setJobId(null);
     try {
       const done = await regroup(collectionId, { pattern, reassign, dry_run: dryRun });
-      setResult(done);
-      if (!dryRun) onApplied();
+      if ('job_id' in done) {
+        setJobId(done.job_id);
+      } else {
+        setResult(done);
+        if (!dryRun) onApplied();
+      }
     } catch (e) {
-      setResult(null);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   };
+
+  const stop = async () => {
+    if (!job) return;
+    try {
+      await cancelRegroup(job.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const running = job?.status === 'running';
 
   return (
     <div className="space-y-3 rounded-md border p-4" data-testid="images-regroup">
@@ -80,11 +102,35 @@ export function RegroupPanel({
           {t(text.result, { ...result })}
         </p>
       )}
+      {job && (
+        <div className="space-y-2" role="status" data-testid="images-regroup-job">
+          <p className="text-sm" data-testid="images-regroup-progress">
+            {t(progress[job.status], {
+              ...job,
+              reason: job.error_code ? errorCodeLabel(t, job.error_code) : '',
+            })}
+          </p>
+          {job.dry_run && job.status === 'completed' && (
+            <p className="text-xs text-muted-foreground">{t(progress.preview_note)}</p>
+          )}
+          {running && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              data-testid="images-regroup-cancel"
+              onClick={() => void stop()}
+            >
+              {t(progress.cancel)}
+            </Button>
+          )}
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
           variant="outline"
-          disabled={busy || !pattern.trim()}
+          disabled={busy || running || !pattern.trim()}
           data-testid="images-regroup-preview"
           onClick={() => void run(true)}
         >
@@ -92,7 +138,7 @@ export function RegroupPanel({
         </Button>
         <Button
           type="button"
-          disabled={busy || !pattern.trim()}
+          disabled={busy || running || !pattern.trim()}
           data-testid="images-regroup-apply"
           onClick={() => void run(false)}
         >

@@ -67,6 +67,8 @@ export type ImageItem = {
   thumb_url: string | null;
   /** The versioned display copy (the original's bytes when there is none). */
   display_url: string | null;
+  /** Detail response only: the key of the group `group_id` names. */
+  group_key?: string | null;
   /** Detail response only. */
   step_runs?: StepRun[] | null;
 };
@@ -201,6 +203,7 @@ export type GroupItem = {
   members: ImageItem[];
 };
 
+/** What a regroup did; a big collection answers with a job (`RegroupJob`) instead. */
 export type RegroupResult = {
   dry_run: boolean;
   scanned: number;
@@ -211,4 +214,16 @@ export type RegroupResult = {
   unchanged: number;
   assigned: number;
   groups_created: number;
+  groups_existing: number;
+};
+
+export type RegroupJob = RegroupResult & {
+  id: string;
+  collection_id: string;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  error_code: string | null;
+  pattern: string;
+  reassign: boolean;
+  created_at: string | null;
+  finished_at: string | null;
 };

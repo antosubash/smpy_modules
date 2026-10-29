@@ -10,6 +10,9 @@ Celery here, everything else inside the bodies. Routing and beat are in
 * ``images.restart_collection(collection_id, scope, restart_id=None)`` - reset
   and re-dispatch a collection in chunks (``images_imports``), recorded so a
   lost one is resumed (``restart_id``) by reconcile.
+* ``images.run_regroup(job_id, generation)`` - one filename-pattern regroup of a
+  big collection, in fenced chunks (:mod:`sm_images.regroup`); a stale
+  ``generation`` does nothing.
 * ``images.reconcile()`` - the five-minute recovery beat, also sent once when a
   worker comes up (``worker_ready``).
 * ``images.janitor(dry_run=False)`` - the daily clean-up beat: abandoned
@@ -38,6 +41,7 @@ from sm_images.task_config import (
     QUEUE_DEFAULT,
     RECONCILE,
     RESTART_COLLECTION,
+    RUN_REGROUP,
     RUN_STEP,
 )
 
@@ -73,6 +77,16 @@ def restart_collection(collection_id: str, scope: str, restart_id: str | None = 
             scope,
             restart_id=uuid.UUID(restart_id) if restart_id else None,
         )
+    )
+
+
+@shared_task(name=RUN_REGROUP, stuck_after=STUCK_AFTER_SECONDS)
+def run_regroup_task(job_id: str, generation: int) -> int:
+    from sm_images.pipeline.worker_runtime import run_task
+    from sm_images.regroup.runner import run_regroup
+
+    return run_task(
+        lambda runtime, tenant: run_regroup(runtime, tenant, uuid.UUID(job_id), int(generation))
     )
 
 

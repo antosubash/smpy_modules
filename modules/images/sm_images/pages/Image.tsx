@@ -1,10 +1,12 @@
 import { Head, router } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ImagesLayout } from '../components/ImagesLayout';
+import { GroupEditor } from '../components/viewer/GroupEditor';
 import { ImageMeta } from '../components/viewer/ImageMeta';
 import { ImageViewer } from '../components/viewer/ImageViewer';
 import { deleteImage } from '../utils/api';
@@ -19,12 +21,23 @@ type Props = {
   display_pending?: boolean;
   can_edit: boolean;
   can_manage: boolean;
+  /** The collection's ordered role list, offered when assigning a role. */
+  group_roles?: string[];
 };
 
 /** `Images/Image` - `/admin/images/images/{id}`. `can_view_original` is the
  *  server's answer, computed with the serving route's own rule. */
-function Image({ image, collection, can_view_original, display_pending, can_manage }: Props) {
+function Image({
+  image: loaded,
+  collection,
+  can_view_original,
+  display_pending,
+  can_edit,
+  can_manage,
+  group_roles = [],
+}: Props) {
   const { t } = useT();
+  const [image, setImage] = useState(loaded);
   const back = `/admin/images/${collection.id}`;
 
   const remove = async () => {
@@ -68,7 +81,19 @@ function Image({ image, collection, can_view_original, display_pending, can_mana
             canViewOriginal={can_view_original}
             displayPending={display_pending}
           />
-          <ImageMeta image={image} />
+          <div className="space-y-6">
+            <GroupEditor
+              key={`${image.id}:${image.group_id}:${image.group_role}`}
+              image={image}
+              collectionId={collection.id}
+              roles={group_roles}
+              canEdit={can_edit}
+              onSaved={(saved) =>
+                setImage((now) => ({ ...now, ...saved, step_runs: now.step_runs }))
+              }
+            />
+            <ImageMeta image={image} />
+          </div>
         </div>
       </PageShell>
     </>

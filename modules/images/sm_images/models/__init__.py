@@ -27,6 +27,7 @@ from sm_images.models.import_job import ImportJob
 from sm_images.models.object_intent import ObjectIntent
 from sm_images.models.pipeline_restart import PipelineRestart
 from sm_images.models.prompt import Prompt, PromptResult
+from sm_images.models.regroup_job import RegroupJob
 from sm_images.models.rendition import Rendition
 from sm_images.models.step_run import StepRun
 from sm_images.models.upload_session import UploadSession
@@ -48,6 +49,7 @@ __all__ = [
     "PromptInputs",
     "PromptResult",
     "PromptScope",
+    "RegroupJob",
     "Rendition",
     "ReviewStatus",
     "StepRun",

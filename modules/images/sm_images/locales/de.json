@@ -101,7 +101,20 @@
     "delete_title": "Dieses Bild löschen?",
     "delete_body": "Das Bild wird in den Papierkorb verschoben.",
     "delete_confirm": "Löschen",
-    "deleted": "Bild gelöscht"
+    "deleted": "Bild gelöscht",
+    "group": {
+      "title": "Gruppe",
+      "none": "Keine Gruppe",
+      "group": "Gruppe",
+      "role": "Rolle",
+      "role_custom": "Andere Rolle…",
+      "role_none": "Keine Rolle",
+      "edit": "Gruppe ändern",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "saved": "Gruppe gespeichert",
+      "loading": "Gruppen werden geladen…"
+    }
   },
   "share": {
     "button": "Teilen",
@@ -141,6 +154,10 @@
     "invalid_role": "Diese Rolle gehört nicht zu den Gruppenrollen der Sammlung.",
     "invalid_pattern": "Das Dateinamenmuster ist ungültig. Es braucht einen Teil (?P<group>...) und darf höchstens 500 Zeichen lang sein.",
     "regroup_too_slow": "Das Muster hat für diese Sammlung zu lange gebraucht. Vereinfachen Sie es und versuchen Sie es erneut; es wurde nichts geändert.",
+    "regroup_active": "Für diese Sammlung läuft bereits eine Neugruppierung.",
+    "role_needs_group": "Eine Rolle kann nur bei einem Bild in einer Gruppe gesetzt werden.",
+    "conflict": "Dieses Bild wurde während der Bearbeitung geändert. Laden Sie neu und versuchen Sie es erneut.",
+    "collection_gone": "Die Sammlung existiert nicht mehr.",
     "session_expired": "Ihre Sitzung ist abgelaufen. Sie werden zur Anmeldung weitergeleitet…",
     "server_error": "Auf dem Server ist ein Problem aufgetreten. Nichts ging verloren; versuchen Sie es gleich noch einmal.",
     "offline": "Sie scheinen offline zu sein. Nichts wurde gespeichert; versuchen Sie es erneut, sobald Sie verbunden sind.",
@@ -226,8 +243,7 @@
     "label": "Bereiche der Sammlung",
     "gallery": "Galerie",
     "pipeline": "Pipeline",
-    "imports": "Importe"
-,
+    "imports": "Importe",
     "groups": "Gruppen"
   },
   "groups": {
@@ -256,8 +272,24 @@
       "apply": "Anwenden",
       "close": "Schließen",
       "result": "{matched} von {scanned} Dateinamen passten: {assigned} zuzuweisen, {unchanged} bereits wie abgeleitet, {already_grouped} in ihrer Gruppe belassen, {no_match} ohne Treffer, {timed_out} mit Zeitüberschreitung. {groups_created} neue Gruppen.",
-      "applied": "Bilder gruppiert"
-    }
+      "progress": {
+        "running": "Läuft: {scanned} Bilder geprüft, {assigned} zugewiesen.",
+        "completed": "Fertig: {scanned} Bilder geprüft, {assigned} zugewiesen, {groups_created} neue Gruppen.",
+        "failed": "Angehalten: {reason}",
+        "cancelled": "Nach {scanned} Bildern abgebrochen.",
+        "cancel": "Neugruppierung abbrechen",
+        "preview_note": "Das war eine Vorschau; es wurde nichts geändert."
+      }
+    },
+    "create": "Neue Gruppe",
+    "key": "Gruppenschlüssel",
+    "name": "Name (optional)",
+    "create_submit": "Gruppe anlegen",
+    "created": "Gruppe angelegt",
+    "edit": "Bearbeiten",
+    "edit_save": "Speichern",
+    "edit_cancel": "Abbrechen",
+    "saved": "Gruppe gespeichert"
   },
   "results": {
     "withheld": "Die Ausgabe dieses Schritts sehen nur Personen, die die Sammlung bearbeiten dürfen."

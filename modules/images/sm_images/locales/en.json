@@ -101,7 +101,20 @@
     "delete_title": "Delete this image?",
     "delete_body": "The image moves to the trash.",
     "delete_confirm": "Delete",
-    "deleted": "Image deleted"
+    "deleted": "Image deleted",
+    "group": {
+      "title": "Group",
+      "none": "No group",
+      "group": "Group",
+      "role": "Role",
+      "role_custom": "Another role…",
+      "role_none": "No role",
+      "edit": "Change group",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Group saved",
+      "loading": "Loading groups…"
+    }
   },
   "share": {
     "button": "Share",
@@ -141,6 +154,10 @@
     "invalid_role": "That role is not one of the collection's group roles.",
     "invalid_pattern": "The filename pattern is not valid. It needs a (?P<group>...) part and may not be longer than 500 characters.",
     "regroup_too_slow": "The pattern took too long to run over this collection. Simplify it and try again; nothing was changed.",
+    "regroup_active": "A regroup is already running for this collection.",
+    "role_needs_group": "A role can only be set on an image that is in a group.",
+    "conflict": "This image changed while you were editing it. Reload and try again.",
+    "collection_gone": "The collection no longer exists.",
     "session_expired": "Your session has expired. Redirecting you to sign in…",
     "server_error": "The server had a problem. Nothing was lost; try again in a moment.",
     "offline": "You appear to be offline. Nothing was saved; try again once you are connected.",
@@ -226,8 +243,7 @@
     "label": "Collection sections",
     "gallery": "Gallery",
     "pipeline": "Pipeline",
-    "imports": "Imports"
-,
+    "imports": "Imports",
     "groups": "Groups"
   },
   "groups": {
@@ -256,8 +272,24 @@
       "apply": "Apply",
       "close": "Close",
       "result": "{matched} of {scanned} filenames matched: {assigned} to assign, {unchanged} already as derived, {already_grouped} left in their group, {no_match} without a match, {timed_out} timed out. {groups_created} new groups.",
-      "applied": "Images grouped"
-    }
+      "progress": {
+        "running": "Running: {scanned} images checked, {assigned} assigned.",
+        "completed": "Done: {scanned} images checked, {assigned} assigned, {groups_created} new groups.",
+        "failed": "Stopped: {reason}",
+        "cancelled": "Cancelled after {scanned} images.",
+        "cancel": "Cancel regroup",
+        "preview_note": "This was a preview; nothing was changed."
+      }
+    },
+    "create": "New group",
+    "key": "Group key",
+    "name": "Name (optional)",
+    "create_submit": "Create group",
+    "created": "Group created",
+    "edit": "Edit",
+    "edit_save": "Save",
+    "edit_cancel": "Cancel",
+    "saved": "Group saved"
   },
   "results": {
     "withheld": "The output of this step is only shown to people who can edit the collection."

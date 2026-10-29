@@ -63,6 +63,8 @@ class ImageOut(BaseModel):
     pipeline has produced one for the current display copy."""
     display_url: str | None = None
     """The versioned display copy; the original's bytes when there is none."""
+    group_key: str | None = None
+    """Only on the detail response: the key of the group ``group_id`` names."""
     step_runs: list[StepRunOut] | None = None
     """Only on the detail response (``present_detail``); lists leave it ``None``."""
 
@@ -80,7 +82,14 @@ class ImageOut(BaseModel):
         )
 
 
-_COMPUTED = {"has_display", "location_source", "thumb_url", "display_url", "step_runs"}
+_COMPUTED = {
+    "has_display",
+    "location_source",
+    "thumb_url",
+    "display_url",
+    "group_key",
+    "step_runs",
+}
 _PLAIN = tuple(name for name in ImageOut.model_fields if name not in _COMPUTED)
 
 

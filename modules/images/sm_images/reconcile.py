@@ -22,6 +22,8 @@ isolation applying as in a request:
   handed to ``images.download_items`` again (:mod:`sm_images.imports.recover`);
 * unfinished collection restarts whose heartbeat is stale are resumed (on the
   imports queue in broker mode, inline when eager);
+* regroup jobs of big collections whose heartbeat is stale are claimed (a new
+  generation) and relaunched from their cursor (:mod:`sm_images.regroup`);
 * every live collection's stats are recomputed (the only way a box shrinks
   after deletes; there is no durable "touched" marker yet, so all of them,
   in batches).
@@ -39,11 +41,20 @@ from simple_module_db import all_tenants, finalize_session, tenant_context
 from sqlalchemy import and_, or_, select, update
 
 from sm_images.imports.recover import recover_imports
-from sm_images.models import Collection, Image, ImportItem, ImportJob, PipelineRestart, StepRun
+from sm_images.models import (
+    Collection,
+    Image,
+    ImportItem,
+    ImportJob,
+    PipelineRestart,
+    RegroupJob,
+    StepRun,
+)
 from sm_images.models.enums import StepStatus
 from sm_images.pipeline.orchestrate import submit_dispatch
 from sm_images.pipeline.runtime import Runtime
 from sm_images.placeholders import reopenable_images
+from sm_images.regroup import jobs as regroup_jobs
 from sm_images.services import stats
 from sm_images.tenancy import all_tenants as tagged
 from sm_images.tenancy import valid_tenant
@@ -55,7 +66,7 @@ logger = logging.getLogger(__name__)
 CUTOFF = timedelta(minutes=5)
 BATCH = 500
 STATS_BATCH = 100
-_OWNERS = (Collection, Image, StepRun, ImportJob, ImportItem, PipelineRestart)
+_OWNERS = (Collection, Image, StepRun, ImportJob, ImportItem, PipelineRestart, RegroupJob)
 
 
 async def tenants(runtime: Runtime) -> list[str]:
@@ -167,6 +178,14 @@ async def _restarts(runtime: Runtime, tenant: str, now: datetime, cutoff: dateti
     return len(rows)
 
 
+async def _regroups(runtime: Runtime, tenant: str, cutoff: datetime) -> int:
+    """Relaunch regroup jobs nobody is advancing (a new generation each)."""
+    claimed = await regroup_jobs.claim_stale(runtime, tenant, cutoff)
+    for job_id, generation in claimed:
+        await regroup_jobs.launch(runtime, tenant, job_id, generation)
+    return len(claimed)
+
+
 async def _recompute_stats(runtime: Runtime, tenant: str) -> int:
     ids = await _ids(
         runtime, select(Collection.id).where(Collection.tenant_id == tenant), Collection.id
@@ -192,6 +211,7 @@ async def reconcile_tenant(runtime: Runtime, tenant: str, now: datetime) -> Coun
         await submit_dispatch(runtime, tenant, image_id)
         done["dispatched"] += 1
     done["restarts"] = await _restarts(runtime, tenant, now, cutoff)
+    done["regroups"] = await _regroups(runtime, tenant, cutoff)
     done["import_jobs"], done["import_items"] = await recover_imports(runtime, tenant, cutoff)
     done["collections"] = await _recompute_stats(runtime, tenant)
     return done

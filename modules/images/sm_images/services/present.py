@@ -9,7 +9,7 @@ from simple_module_core.resources import ResourcePrincipal
 from sqlalchemy import select
 
 from sm_images import access, constants, urls
-from sm_images.models import Collection, Image, Rendition, StepRun
+from sm_images.models import Collection, Group, Image, Rendition, StepRun
 from sm_images.schemas.image import ImageOut, StepRunOut
 
 __all__ = ["present", "present_detail", "present_one"]
@@ -54,6 +54,11 @@ async def present_detail(
     out = await present_one(db, collection, image)
     detailed = await access.can_edit(db, who, collection)
     stmt = select(StepRun).where(StepRun.image_id == image.id).order_by(StepRun.step)
+    if image.group_id is not None:
+        key = select(Group.key).where(
+            Group.id == image.group_id, Group.collection_id == collection.id
+        )
+        out.group_key = (await db.execute(key)).scalar_one_or_none()
     out.step_runs = [
         StepRunOut(
             step=r.step,

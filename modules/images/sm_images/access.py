@@ -44,7 +44,7 @@ from sqlmodel import select
 
 from sm_images import constants
 from sm_images.errors import NotFound
-from sm_images.models import Collection, Group, Image, Visibility
+from sm_images.models import Collection, Group, Image, RegroupJob, Visibility
 
 COLLECTION_RESOURCE = "images.collection"
 """The ``sharing`` resource type, and ``ResourceShare.resource_type``."""
@@ -182,6 +182,24 @@ GroupCollectionEdit = Annotated[
 ]
 
 
+def regroup_collection_stmt(regroup_id: uuid.UUID) -> Any:
+    """The collection a regroup job belongs to, for the ``/regroups/{regroup_id}``
+    routes: a job is reachable exactly when its collection is."""
+    return (
+        select(Collection)
+        .join(RegroupJob, RegroupJob.collection_id == Collection.id)
+        .where(RegroupJob.id == regroup_id)
+    )
+
+
+RegroupCollectionView = Annotated[
+    Collection, Depends(RequiresResource(POLICY, ACTION_VIEW, regroup_collection_stmt))
+]
+RegroupCollectionEdit = Annotated[
+    Collection, Depends(RequiresResource(POLICY, ACTION_EDIT, regroup_collection_stmt))
+]
+
+
 def can_view_original(
     who: ResourcePrincipal, image: Image, collection: Collection, *, protected: bool | None = None
 ) -> bool:
@@ -241,6 +259,8 @@ __all__ = [
     "ImageCollectionOwner",
     "ImageCollectionView",
     "ImagesCollectionPolicy",
+    "RegroupCollectionEdit",
+    "RegroupCollectionView",
     "can_view_original",
     "collection_stmt",
     "image_collection_stmt",

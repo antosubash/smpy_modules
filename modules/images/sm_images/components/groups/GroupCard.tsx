@@ -1,23 +1,29 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
+import { useState } from 'react';
 
 import { keys, useT } from '../../utils/i18n';
 import type { GroupItem } from '../../utils/types';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { GroupForm } from './GroupForm';
 import { MemberThumb } from './MemberThumb';
 
 /** One group: its name (or key), how many images it holds and the first few
- *  members as thumbnails, already in the collection's role order. */
+ *  members as thumbnails, already in the collection's role order. An editor can
+ *  rename it and delete it. */
 export function GroupCard({
   group,
   canEdit,
+  onEdit,
   onDelete,
 }: {
   group: GroupItem;
   canEdit: boolean;
+  onEdit: (group: GroupItem, value: { key: string; name: string | null }) => Promise<unknown>;
   onDelete: (group: GroupItem) => Promise<void>;
 }) {
   const { t } = useT();
   const text = keys.images.groups;
+  const [editing, setEditing] = useState(false);
   const hidden = group.image_count - group.members.length;
 
   return (
@@ -34,20 +40,42 @@ export function GroupCard({
             {t(text.image_count, { count: group.image_count })}
           </p>
         </div>
-        {canEdit && (
-          <ConfirmDialog
-            trigger={
-              <Button type="button" variant="outline" size="sm" data-testid="images-group-delete">
-                {t(text.delete)}
-              </Button>
-            }
-            title={t(text.delete_title)}
-            description={t(text.delete_body)}
-            confirmLabel={t(text.delete_confirm)}
-            onConfirm={() => onDelete(group)}
-          />
+        {canEdit && !editing && (
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              data-testid="images-group-edit"
+              onClick={() => setEditing(true)}
+            >
+              {t(text.edit)}
+            </Button>
+            <ConfirmDialog
+              trigger={
+                <Button type="button" variant="outline" size="sm" data-testid="images-group-delete">
+                  {t(text.delete)}
+                </Button>
+              }
+              title={t(text.delete_title)}
+              description={t(text.delete_body)}
+              confirmLabel={t(text.delete_confirm)}
+              onConfirm={() => onDelete(group)}
+            />
+          </div>
         )}
       </div>
+      {editing && (
+        <GroupForm
+          initial={group}
+          submitLabel={t(text.edit_save)}
+          onSubmit={async (value) => {
+            await onEdit(group, value);
+            setEditing(false);
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      )}
       {group.members.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t(text.no_members)}</p>
       ) : (

@@ -102,6 +102,7 @@ async def image(
             "collection": _out(collection, who).model_dump(mode="json"),
             "can_view_original": can_view_original(who, row, collection, protected=protected),
             "display_pending": withheld,
+            "group_roles": list(collection.group_roles or []),
             "can_edit": rights["can_edit"],
             "can_manage": rights["can_manage"],
         },

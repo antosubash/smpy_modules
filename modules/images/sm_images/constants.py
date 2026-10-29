@@ -168,6 +168,10 @@ GROUP_DETAIL_MEMBERS: Final = 500
 REGROUP_BUDGET_SECONDS: Final = 5.0
 """How long planning a regroup may take before it is refused with nothing written."""
 REGROUP_CHUNK: Final = 500
+REGROUP_SYNC_MAX: Final = 2000
+"""A collection with more images than this regroups as a background job."""
+REGROUP_RELAUNCH_LIMIT: Final = 5
+"""Reconcile relaunches without progress before a regroup job fails as ``stalled``."""
 PROPERTIES_MAX_BYTES: Final = 16 * 1024
 """Largest ``properties`` object one image's metadata may carry, as compact JSON."""
 METADATA_MAX_BYTES: Final = 1024 * 1024
@@ -207,6 +211,9 @@ CODE_GROUP_EXISTS: Final = "group_exists"
 CODE_INVALID_ROLE: Final = "invalid_role"
 CODE_INVALID_PATTERN: Final = "invalid_pattern"
 CODE_REGROUP_TOO_SLOW: Final = "regroup_too_slow"
+CODE_REGROUP_ACTIVE: Final = "regroup_active"
+CODE_ROLE_NEEDS_GROUP: Final = "role_needs_group"
+CODE_CONFLICT: Final = "conflict"
 ERROR_CODES: Final = (
     CODE_UNSUPPORTED_TYPE,
     CODE_TOO_MANY_PIXELS,
@@ -226,6 +233,9 @@ ERROR_CODES: Final = (
     CODE_INVALID_ROLE,
     CODE_INVALID_PATTERN,
     CODE_REGROUP_TOO_SLOW,
+    CODE_REGROUP_ACTIVE,
+    CODE_ROLE_NEEDS_GROUP,
+    CODE_CONFLICT,
 )
 """Every code an upload can answer with; each has a translated sentence."""
 

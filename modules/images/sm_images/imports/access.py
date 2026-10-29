@@ -53,6 +53,7 @@ __all__ = [
     "manager_active",
     "may_edit",
     "revoke",
+    "shared_edit",
 ]
 
 logger = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ ACCESS_REVOKED: Final = "access_revoked"
 _SHARES = share_exists_for(COLLECTION_RESOURCE, Collection.id)
 
 
-def _shared(user_id: str, collection_id: uuid.UUID) -> Any:
+def shared_edit(user_id: str, collection_id: uuid.UUID) -> Any:
     clause = _SHARES(ResourcePrincipal(user_id=user_id), ACTION_EDIT)
     return select(Collection.id).where(Collection.id == collection_id, clause)
 
@@ -77,7 +78,7 @@ async def basis(db: Any, who: ResourcePrincipal, collection: Collection) -> str:
         return MANAGE
     if collection.owner_id == who.user_id:
         return OWNER
-    shared = (await db.execute(_shared(who.user_id, collection.id))).first()
+    shared = (await db.execute(shared_edit(who.user_id, collection.id))).first()
     return SHARE if shared is not None else MANAGE
 
 
@@ -92,7 +93,7 @@ async def may_edit(runtime: Runtime, tenant: str, job_id: uuid.UUID) -> bool:
         row = (await db.execute(stmt)).first()
         shared = None
         if row is not None and row[0] is not None and row[3] != row[0]:
-            shared = (await db.execute(_shared(row[0], row[2]))).first()
+            shared = (await db.execute(shared_edit(row[0], row[2]))).first()
         await finalize_session(db)
     if row is None:
         return True  # gone, or its collection is: the runner's own checks stop it

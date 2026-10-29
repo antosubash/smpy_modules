@@ -13,7 +13,7 @@ import uuid
 import pytest
 import pytest_asyncio
 from sm_images import constants
-from sm_images.models import Group, ImportJob, Rendition, Visibility
+from sm_images.models import Group, ImportJob, RegroupJob, Rendition, Visibility
 from sm_images.storage import ImageStore
 
 from tests import read_routes
@@ -45,6 +45,8 @@ async def secret(client, storage):
         s.add(site)
         await s.flush()
         pic.group_id = site.id
+        regroup_job = RegroupJob(collection_id=private.id, pattern="(?P<group>secret-pattern)")
+        s.add(regroup_job)
         s.add(Rendition(image_id=pic.id, size=SIZE, storage_key="k/small", width=1, height=1))
         job = ImportJob(collection_id=private.id, mapping={"url_prop": "url"})
         s.add(job)
@@ -57,6 +59,7 @@ async def secret(client, storage):
         "image_id": str(pic.id),
         "job_id": str(job.id),
         "group_id": str(site.id),
+        "regroup_id": str(regroup_job.id),
         "slug": private.slug,
         "public_slug": public.slug,
         "size": SIZE,
@@ -74,6 +77,7 @@ def absent(route, ids) -> str:
         image_id=uuid.uuid4(),
         job_id=uuid.uuid4(),
         group_id=uuid.uuid4(),
+        regroup_id=uuid.uuid4(),
         slug="no-such-collection",
         size=SIZE,
     )
@@ -87,6 +91,8 @@ def leaks(text: str, ids) -> list[str]:
             ids["image_id"],
             ids["job_id"],
             ids["group_id"],
+            ids["regroup_id"],
+            "secret-pattern",
             "secret-site",
             ids["slug"],
             "secret-photo.jpg",

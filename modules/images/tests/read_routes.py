@@ -6,16 +6,16 @@ without an entry fails ``test_every_get_route_is_listed``. An entry is
 
 * ``"collection"`` - the path names a collection the caller must be allowed to
   see (``{collection_id}``); a stranger gets 404, never 403 and never data.
-* ``"image"`` - the path names an image (``{image_id}``) or a group
-  (``{group_id}``) inside such a collection (and ``{collection_id}`` if it has
-  one); same expectation.
+* ``"image"`` - the path names an image (``{image_id}``), a group
+  (``{group_id}``) or a regroup job (``{regroup_id}``) inside such a collection
+  (and ``{collection_id}`` if it has one); same expectation.
 * ``"list"`` - returns rows; a stranger gets 200 and the private collection's
   slug, id and image id appear nowhere in the body.
 * ``"public"`` - anonymous surface (``{slug}``); anonymous gets 404.
 * ``"job"`` - the path names an import job (``{job_id}``) of such a
   collection; same expectation as ``"collection"``.
 
-Placeholders: ``{collection_id}``, ``{image_id}``, ``{group_id}``, ``{job_id}``,
+Placeholders: ``{collection_id}``, ``{image_id}``, ``{group_id}``, ``{regroup_id}``, ``{job_id}``,
 ``{slug}``, ``{size}`` (a rendition the seeded image has). A route that needs a
 query string appends it to the template.
 """
@@ -51,6 +51,7 @@ READ_ROUTES: list[ReadRoute] = [
     ReadRoute("GET", "/api/images/imports/{job_id}", JOB),
     ReadRoute("GET", "/api/images/collections/{collection_id}/groups", COLLECTION),
     ReadRoute("GET", "/api/images/groups/{group_id}", IMAGE),
+    ReadRoute("GET", "/api/images/regroups/{regroup_id}", IMAGE),
     ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/r/{size}", PUBLIC),
     ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/display", PUBLIC),
     ReadRoute("GET", "/api/images/public/c/{slug}/images/{image_id}/original", PUBLIC),

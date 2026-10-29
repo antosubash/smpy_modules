@@ -98,17 +98,23 @@ MATCHED: Final = "matched"
 
 
 def derive(
-    compiled: regex.Pattern[str], filename: str, roles: Sequence[str]
+    compiled: regex.Pattern[str],
+    filename: str,
+    roles: Sequence[str],
+    *,
+    budget: float | None = None,
 ) -> tuple[str, str | None, str | None]:
     """``(outcome, group_key, role)`` of an already compiled pattern on ``filename``.
 
     The outcome tells a timeout from a plain non-match, which a regroup reports
-    apart. ``group_key`` is ``None`` unless the outcome is ``matched``.
+    apart. ``group_key`` is ``None`` unless the outcome is ``matched``. ``budget``
+    (seconds left of a caller's overall deadline) caps the per-match timeout.
     """
     if not filename or len(filename) > MAX_INPUT_LENGTH:
         return NO_MATCH, None, None
     try:
-        found = compiled.match(filename, timeout=MATCH_TIMEOUT_SECONDS)
+        timeout = MATCH_TIMEOUT_SECONDS if budget is None else min(MATCH_TIMEOUT_SECONDS, budget)
+        found = compiled.match(filename, timeout=timeout)
     except TimeoutError:
         logger.warning("images.import.pattern_timeout filename=%s", filename[:200])
         return TIMED_OUT, None, None
