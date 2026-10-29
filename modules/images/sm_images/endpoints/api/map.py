@@ -9,16 +9,20 @@ are ``private``.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request, Response
+from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.deps import get_db
+from simple_module_hosting.resource_deps import resource_principal
 
 from sm_images import serving
-from sm_images.access import CollectionView
+from sm_images.access import CollectionView, can_edit
 from sm_images.deps import require_view
 from sm_images.endpoints.map_params import BBox, Cursor, Limit, get_and_head, points_response
+from sm_images.map.schedule import rebuild_pending
 
+Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
 router = APIRouter(prefix="/collections", tags=["images-map"])
 
 
@@ -38,9 +42,16 @@ async def collection_points(
     )
 
 
-async def collection_map(request: Request, collection: CollectionView) -> Response:
-    """The collection's PMTiles archive, with ``Range``."""
-    return await serving.serve_map(request, collection, twin=False)
+async def collection_map(
+    request: Request, collection: CollectionView, who: Principal, db: Any = Depends(get_db)
+) -> Response:
+    """The collection's PMTiles archive, with ``Range``; ``X-Map-Stale: 1`` for
+    an editor while a rebuild is pending (they see every point anyway)."""
+
+    async def stale() -> bool:
+        return rebuild_pending(collection) and await can_edit(db, who, collection)
+
+    return await serving.serve_map(request, collection, twin=False, stale=stale)
 
 
 _MAP = "/{collection_id}/map.pmtiles"

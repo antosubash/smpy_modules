@@ -33,8 +33,8 @@ export function StepCard({
     <li className="space-y-3 rounded-md border p-4" data-testid={`images-step-${step.id}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <p id={labelId} className="font-medium">
-            {step.id}
+          <p id={labelId} className="font-medium break-words" title={step.id}>
+            {step.label || step.id}
           </p>
           {step.requires && step.requires.length > 0 && (
             <p className="text-xs text-muted-foreground">

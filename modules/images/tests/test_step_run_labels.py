@@ -39,3 +39,24 @@ async def test_prompt_runs_carry_the_prompt_name(uploads):
     assert labels[f"prompt:{kept}"] == "Land cover"
     assert labels[f"prompt:{gone}"] is None
     assert all(label is None for step, label in labels.items() if not step.startswith("prompt:"))
+
+
+async def test_the_pipeline_overview_names_prompt_steps(uploads):
+    """Review follow-up: the Pipeline tab listed a prompt step as ``prompt:<uuid>``."""
+    cid = await make_collection(uploads, OLGA)
+    pid = uuid.uuid4()
+    async with uploads.db_state.session_factory() as s:
+        s.add(
+            Prompt(
+                id=pid,
+                tenant_id=DEFAULT_TENANT,
+                collection_id=uuid.UUID(cid),
+                name="Land cover",
+                instruction="What land cover?",
+            )
+        )
+        await s.commit()
+    body = (await uploads.get(f"/api/images/collections/{cid}/pipeline", headers=OLGA)).json()
+    labels = {s["id"]: s.get("label") for s in body["steps"]}
+    assert labels[f"prompt:{pid}"] == "Land cover"
+    assert labels["exif"] is None

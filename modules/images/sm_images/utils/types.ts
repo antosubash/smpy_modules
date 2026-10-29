@@ -122,6 +122,8 @@ export type JsonSchema = {
 
 export type PipelineStep = {
   id: string;
+  /** A prompt step's prompt name; absent for a built-in step. */
+  label?: string | null;
   installed: boolean;
   state: string;
   enabled: boolean;

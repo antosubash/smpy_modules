@@ -11,6 +11,12 @@ import { StepCard, type StepDraft } from './StepCard';
 
 type Drafts = Record<string, StepDraft>;
 
+/** How long the counts are watched after a restart request returns, waiting
+ *  for it to show: a broker-queued restart answers before it resets a run. */
+export const RESTART_WATCH_MS = 60_000;
+
+const progressKey = (o: PipelineOverview | null) => JSON.stringify(o?.status ?? {});
+
 function draftsOf(overview: PipelineOverview): Drafts {
   return Object.fromEntries(
     overview.steps.map((s) => [s.id, { enabled: s.enabled, params: { ...(s.params ?? {}) } }]),
@@ -41,7 +47,9 @@ export function payloadOf(overview: PipelineOverview, drafts: Drafts) {
  * enabled steps on the next dispatch or restart - so a successful save offers
  * a restart for the existing images. While runs are pending or running (or a
  * restart request is outstanding - an eager host runs it inline) the counts
- * are read again every few seconds; a draft being edited is kept.
+ * are read again every few seconds; a draft being edited is kept. After a
+ * restart returns they are watched until it shows (a run pending or running,
+ * or the counts changed) or for {@link RESTART_WATCH_MS} at most.
  */
 export function PipelineTab({
   collectionId,
@@ -59,6 +67,10 @@ export function PipelineTab({
   const [saving, setSaving] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const busy = saving || restarting;
+  // The counts as they were before the restart request, while it is watched.
+  const [watch, setWatch] = useState<string | null>(null);
+  const watchRef = useRef(watch);
+  watchRef.current = watch;
   const [error, setError] = useState<string | null>(null);
   const [offerRestart, setOfferRestart] = useState(false);
 
@@ -78,9 +90,18 @@ export function PipelineTab({
     void load();
   }, [load]);
 
-  usePipelinePoll(collectionId, restarting || hasActiveRuns(overview), (next) => {
+  useEffect(() => {
+    if (watch === null) return;
+    const timer = setTimeout(() => setWatch(null), RESTART_WATCH_MS);
+    return () => clearTimeout(timer);
+  }, [watch]);
+
+  const polling = restarting || watch !== null || hasActiveRuns(overview);
+  usePipelinePoll(collectionId, polling, (next) => {
     setOverview(next);
     if (!dirtyRef.current) setDrafts(draftsOf(next));
+    const before = watchRef.current;
+    if (before !== null && (hasActiveRuns(next) || progressKey(next) !== before)) setWatch(null);
   });
 
   const save = async () => {
@@ -102,9 +123,11 @@ export function PipelineTab({
   };
 
   const restart = async (scope: RestartScope) => {
+    const before = progressKey(overview);
     setRestarting(true);
     try {
       await restartPipeline(collectionId, scope);
+      setWatch(before);
       setOfferRestart(false);
       toast(t(keys.images.pipeline.restarted));
       await load();

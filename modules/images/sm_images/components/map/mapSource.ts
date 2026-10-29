@@ -5,11 +5,12 @@
  * it is drawn from them - always fresh and complete, with no archive probe.
  * Past one page a built PMTiles archive (`…/map.pmtiles`, tippecanoe-clustered)
  * is preferred: it scales to any collection and the browser reads only the
- * ranges it draws. An archive answered with `X-Map-Stale: 1` predates points a
- * rebuild is pending for (an upload still being processed), and a collection
- * with no archive (never built, withdrawn by a visibility or point change, or a
- * host without tippecanoe) answers a 404; the map then pages through the rest
- * of the points, which MapLibre clusters itself.
+ * ranges it draws - even one a rebuild is pending for (`X-Map-Stale: 1`, sent
+ * to editors): it is complete, only late, while paging stops at
+ * {@link MAX_POINT_PAGES}. A collection with no archive (never built, withdrawn
+ * by a visibility or point change, or a host without tippecanoe) answers a 404;
+ * the map then pages through the rest of the points, which MapLibre clusters
+ * itself.
  * Both routes re-check access on every request, so neither can show a point the
  * caller may not see.
  */
@@ -27,11 +28,11 @@ export const MAX_POINT_PAGES = 20;
 
 const absolute = (url: string) => new URL(url, window.location.href).toString();
 
-/** A current archive answers the HEAD; a stale one (see above) does not count. */
+/** Whether the archive answers the HEAD. */
 async function hasArchive(mapUrl: string, signal?: AbortSignal): Promise<boolean> {
   try {
     const response = await fetch(mapUrl, { method: 'HEAD', credentials: 'same-origin', signal });
-    return response.ok && response.headers.get('X-Map-Stale') !== '1';
+    return response.ok;
   } catch {
     return false;
   }

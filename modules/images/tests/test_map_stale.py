@@ -11,11 +11,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from sm_images.models import Collection, Visibility
+from sm_images.tenancy import DEFAULT_TENANT, tenant_scope
 from sqlalchemy import update
 
-from tests.access_support import OWNER, headers
-from tests.test_map_tiles import _seed, _url
+from tests.access_support import OWNER, VIEWER, headers
+from tests.test_map_tiles import _public, _seed, _url
 
 
 async def _state(client, coll, **values) -> None:
@@ -41,3 +43,31 @@ async def test_archive_behind_a_pending_rebuild_is_marked_stale(client, storage)
     assert head.headers["x-map-stale"] == "1"
     got = await client.get(_url(coll), headers={**headers(OWNER), "Range": "bytes=0-9"})
     assert got.status_code == 206 and got.headers["x-map-stale"] == "1"
+
+
+async def _stale_public(client, storage):
+    coll, _ = await _seed(client, storage, Visibility.PUBLIC)
+    claimed = datetime.now(UTC) + timedelta(minutes=5)
+    await _state(client, coll, map_changes=20, map_built_changes=4, map_claimed_until=claimed)
+    return coll
+
+
+async def test_only_an_editor_is_told_the_archive_is_stale(client, storage):
+    """Review: a located image withheld from viewers (failed anonymisation)
+    still counts as a map change; the flag would leak that activity."""
+    coll = await _stale_public(client, storage)
+    owner = await client.head(_url(coll), headers=headers(OWNER))
+    assert owner.headers["x-map-stale"] == "1"
+    viewer = await client.head(_url(coll), headers=headers(VIEWER))
+    assert viewer.status_code == 200
+    assert "x-map-stale" not in viewer.headers
+
+
+@pytest.mark.unbound_tenant
+async def test_the_anonymous_twin_never_says_stale(client, storage):
+    with tenant_scope(DEFAULT_TENANT):
+        coll = await _stale_public(client, storage)
+    got = await client.head(_public(coll))
+    assert got.status_code == 200
+    assert "x-map-stale" not in got.headers
+    assert got.headers["cache-control"] == "public, no-cache"

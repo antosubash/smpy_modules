@@ -60,15 +60,17 @@ describe('resolveMapSource', () => {
     expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: 'HEAD' });
   });
 
-  it('reads the points instead of an archive a rebuild is pending for', async () => {
-    stub((url, init) => {
-      if (isHead(init)) return new Response(null, { status: 200, headers: { 'X-Map-Stale': '1' } });
-      return url.includes('cursor=next')
-        ? json({ features: [point('b')], next_cursor: null })
-        : json({ features: [point('a')], next_cursor: 'next' });
-    });
+  it('keeps a stale archive for a collection past one page: paging would truncate it', async () => {
+    // Review: 25 000 points past a stale archive were cut to the 20 000 the
+    // fallback pages; the stale archive is complete, only late.
+    const fetchMock = stub((_url, init) =>
+      isHead(init)
+        ? new Response(null, { status: 200, headers: { 'X-Map-Stale': '1' } })
+        : json({ features: [point('a')], next_cursor: 'next' }),
+    );
     const source = await resolveMapSource(urls);
-    expect(source).toEqual({ kind: 'points', features: [point('a'), point('b')] });
+    expect(source.kind).toBe('tiles');
+    expect(fetchMock.mock.calls.filter(([, init]) => !isHead(init))).toHaveLength(1);
   });
 
   it('falls back to paged points when there is no archive', async () => {

@@ -39,7 +39,7 @@ sends the headers without opening the object.
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -203,7 +203,13 @@ async def serve(
     return await _respond(request, store_for(request.app), target, policy, ranged, twin)
 
 
-async def serve_map(request: Request, collection: Collection, *, twin: bool) -> Response:
+async def serve_map(
+    request: Request,
+    collection: Collection,
+    *,
+    twin: bool,
+    stale: Callable[[], Awaitable[bool]] | None = None,
+) -> Response:
     """The collection's PMTiles archive (``sm_images.map``), already authorised.
 
     ``collection`` was just re-read through the policy (admin) or as public
@@ -219,16 +225,16 @@ async def serve_map(request: Request, collection: Collection, *, twin: bool) -> 
     ``If-Range`` gets the whole new archive rather than a splice of two.
     ``no-cache`` on both surfaces (Task 12's ``public``/``private`` split):
     the URL is stable, so every cache revalidates, and a withdrawn map stops
-    being served by caches too. An archive that predates changes a rebuild
-    is pending for (``schedule.rebuild_pending``) carries ``X-Map-Stale: 1``.
+    being served by caches too. ``stale`` (the admin route, for an editor
+    only) answers whether the archive predates changes a rebuild is pending
+    for; then it carries ``X-Map-Stale: 1``. A viewer or the anonymous twin
+    never gets it: a withheld image's change would show through it.
     """
     if not collection.map_key or collection.map_policy_rev != redaction.gate_key(collection):
         raise _missing(twin)
     policy = cache.cache_headers(request, collection, cache.DISPLAY, twin=twin)
     target = Target(collection.map_key, constants.PMTILES_CONTENT_TYPE, False)
     response = await _respond(request, store_for(request.app), target, policy, True, twin)
-    from sm_images.map.schedule import rebuild_pending
-
-    if rebuild_pending(collection):  # older than the points: the client reads those instead
+    if stale is not None and await stale():  # older than the points: the editor reads those
         response.headers["X-Map-Stale"] = "1"
     return response

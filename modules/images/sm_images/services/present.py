@@ -13,7 +13,7 @@ from sm_images import access, constants, urls
 from sm_images.models import Collection, Group, Image, Prompt, Rendition, StepRun
 from sm_images.schemas.image import ImageOut, StepRunOut
 
-__all__ = ["present", "present_detail", "present_one"]
+__all__ = ["present", "present_detail", "present_one", "prompt_names"]
 
 
 async def present(db: Any, collection: Collection, images: Sequence[Image]) -> list[ImageOut]:
@@ -61,7 +61,7 @@ async def present_detail(
         )
         out.group_key = (await db.execute(key)).scalar_one_or_none()
     rows = list((await db.execute(stmt)).scalars())
-    names = await _prompt_names(db, collection, [r.step for r in rows])
+    names = await prompt_names(db, collection, [r.step for r in rows])
     out.step_runs = [
         StepRunOut(
             step=r.step,
@@ -79,7 +79,7 @@ async def present_detail(
     return out
 
 
-async def _prompt_names(db: Any, collection: Collection, steps: list[str]) -> dict[str, str]:
+async def prompt_names(db: Any, collection: Collection, steps: list[str]) -> dict[str, str]:
     """``{"prompt:<id>": name}`` for the collection's prompts among ``steps``."""
     from sm_images.ai.prompt_steps import prompt_id_of
 

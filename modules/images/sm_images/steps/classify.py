@@ -14,7 +14,6 @@ that enables ``classify`` keeps it and the runs settle as ``not_installed``.
 
 from __future__ import annotations
 
-import re
 from functools import lru_cache
 from typing import Annotated, Any, Literal
 
@@ -51,15 +50,10 @@ class ClassifyParams(BaseModel):
     @field_validator("vocabulary")
     @classmethod
     def _labels(cls, value: list[str]) -> list[str]:
-        # Commas separate labels as well as entries do ("cropland, forest" is
-        # two labels, as in a prompt's allowed values); blanks are dropped.
-        split = (part.strip() for v in value for part in re.split(r"[,\n]", v))
-        cleaned = list(dict.fromkeys(p for p in split if p))
-        if any(len(v) > LABEL_MAX for v in cleaned):
+        cleaned = [v.strip() for v in value]
+        if any(not v or len(v) > LABEL_MAX for v in cleaned):
             raise ValueError(f"each label must be 1 to {LABEL_MAX} characters")
-        if len(cleaned) > VOCABULARY_MAX:
-            raise ValueError(f"at most {VOCABULARY_MAX} labels")
-        return cleaned
+        return list(dict.fromkeys(cleaned))
 
 
 @lru_cache(maxsize=64)

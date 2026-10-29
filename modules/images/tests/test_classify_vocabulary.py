@@ -1,27 +1,27 @@
-"""The classify vocabulary takes commas as well as one label per line (QA TEST-007).
+"""The classify vocabulary is stored and validated as entered (review of QA round 1).
 
-``cropland, forest`` - the format the prompt schema's "Allowed values" uses -
-was stored as one label, so the model was told to answer with that string.
+The form splits commas and newlines when the owner types the list; the server
+does not re-split a stored array, or a saved ``"forest, open canopy"`` would
+change meaning on read without its results being marked stale.
 """
 
 from __future__ import annotations
 
 import pytest
 from pydantic import ValidationError
-from sm_images.steps.classify import LABEL_MAX, VOCABULARY_MAX, ClassifyParams
+from sm_images.steps.classify import LABEL_MAX, ClassifyParams
 
 
-def test_commas_and_newlines_both_separate_labels() -> None:
-    params = ClassifyParams(vocabulary=["cropland, forest,water", " grassland\nforest ", "", " , "])
-    assert params.vocabulary == ["cropland", "forest", "water", "grassland"]
+def test_a_stored_label_with_a_comma_survives_unchanged() -> None:
+    params = ClassifyParams(vocabulary=["forest, open canopy", "cropland"])
+    assert params.vocabulary == ["forest, open canopy", "cropland"]
 
 
-def test_a_too_long_label_is_still_refused() -> None:
-    with pytest.raises(ValidationError):
-        ClassifyParams(vocabulary=["x" * (LABEL_MAX + 1)])
+def test_labels_are_trimmed_and_deduplicated() -> None:
+    assert ClassifyParams(vocabulary=[" water ", "water"]).vocabulary == ["water"]
 
 
-def test_the_label_cap_applies_after_splitting() -> None:
-    pairs = [f"a{i},b{i}" for i in range(VOCABULARY_MAX // 2 + 1)]  # under the cap, unsplit
-    with pytest.raises(ValidationError):
-        ClassifyParams(vocabulary=pairs)
+def test_a_blank_or_too_long_label_is_refused() -> None:
+    for bad in ("  ", "x" * (LABEL_MAX + 1)):
+        with pytest.raises(ValidationError):
+            ClassifyParams(vocabulary=[bad])

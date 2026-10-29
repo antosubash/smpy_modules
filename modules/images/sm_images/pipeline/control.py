@@ -25,6 +25,7 @@ from sm_images.pipeline.orchestrate import Scope, rerun_image
 from sm_images.pipeline.plan import is_stale
 from sm_images.pipeline.restart import restart_collection_async, start_restart
 from sm_images.pipeline.runtime import Runtime
+from sm_images.services.present import prompt_names
 
 __all__ = ["RESTART_SCOPES", "launch_restart", "overview", "reprocess"]
 
@@ -52,6 +53,11 @@ def _step_entry(step_id: str, cfg: Any) -> dict[str, Any]:
         "mutates_display": impl.mutates_display,
         "params_schema": impl.params_schema().model_json_schema(),
     }
+
+
+def _labelled(entry: dict[str, Any], label: str | None) -> dict[str, Any]:
+    """A prompt step's entry carries its prompt's ``label`` (the viewer's too)."""
+    return entry if label is None else {**entry, "label": label}
 
 
 async def _run_groups(db: Any, collection_id: uuid.UUID) -> list[Any]:
@@ -102,10 +108,11 @@ async def overview(db: Any, collection: Collection) -> dict[str, Any]:
         stale += n if is_stale(run, cfg) else 0  # type: ignore[arg-type]
         not_installed += n if cfg.impl(step) is None else 0
     stale += await _missing(db, collection.id, list(cfg.runnable()))
+    names = await prompt_names(db, collection, ids)  # a prompt step by its name
     return {
         "config": collection.pipeline_config or {"steps": {}},
         "preset_id": collection.preset_id,
-        "steps": [_step_entry(sid, cfg) for sid in ids],
+        "steps": [_labelled(_step_entry(sid, cfg), names.get(sid)) for sid in ids],
         "status": status,
         "stale": stale,
         "not_installed": not_installed,
