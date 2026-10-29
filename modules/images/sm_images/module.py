@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import APIRouter
 from simple_module_core.body_limits import BodyLimitRegistry
+from simple_module_core.csp import CspSourceRegistry
 from simple_module_core.health import HealthCheck, HealthCheckResult, HealthRegistry, HealthStatus
 from simple_module_core.menu import MenuRegistry
 from simple_module_core.module import ModuleBase, ModuleMeta
@@ -142,6 +143,16 @@ class ImagesModule(ModuleBase):
             registry.add_regex(pattern, ceiling, methods=methods)
         for prefix in constants.UPLOAD_PREFIXES:
             registry.add_prefix(prefix, ceiling, methods=methods)
+
+    def register_csp_sources(self, registry: CspSourceRegistry) -> None:
+        """Allow the map's basemap host (``map_style_url``'s origin).
+
+        A provider, evaluated per response from the hydrated settings: this
+        runs before they hydrate, and an edit then applies with no restart.
+        """
+        from sm_images.map_style import csp_sources
+
+        registry.add_provider(csp_sources)
 
     def locale_dirs(self) -> dict[str, Path]:
         base = Path(str(importlib.resources.files(__package__) / "locales"))

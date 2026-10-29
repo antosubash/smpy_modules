@@ -15,10 +15,11 @@ Everything else is read per request, or per task in a worker.
 
 from __future__ import annotations
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import SettingsConfigDict
 
 from sm_images.constants import DOWNLOAD_TIMEOUT_MAX
+from sm_images.map_style import DEFAULT_STYLE_URL, validate_style_url
 from sm_images.settings_boot import BootSettings
 
 __all__ = ["ImagesSettings"]
@@ -111,6 +112,19 @@ class ImagesSettings(BootSettings):
     map_rebuild_threshold_abs: int = Field(default=100, ge=1)
     """...or once this many points changed, whichever comes first (at least 1)."""
 
+    map_style_url: str = DEFAULT_STYLE_URL
+    """MapLibre style drawn under the map's points (an ``https://`` URL).
+
+    The default is OpenFreeMap's Positron: free, no API key, OpenStreetMap
+    data. Privacy trade-off: every viewer's browser, on the console and on
+    public pages, requests the style and the tiles for the area it looks at
+    from that host, which so learns their IP address and where they look.
+    Empty draws a flat background with no third-party request at all. The
+    style's origin is added to the Content-Security-Policy; a style that loads
+    tiles from another host needs that host on the same origin. Read per page
+    load, no restart.
+    """
+
     janitor_grace_days: int = Field(default=7, ge=0)
     """Days an unreferenced object is kept before the janitor reaps it."""
 
@@ -119,3 +133,8 @@ class ImagesSettings(BootSettings):
 
     step_lease_seconds: int = Field(default=1800, ge=1)
     """Seconds a step run may hold its lease before another worker reclaims it."""
+
+    @field_validator("map_style_url")
+    @classmethod
+    def _style_url(cls, value: str) -> str:
+        return validate_style_url(value)

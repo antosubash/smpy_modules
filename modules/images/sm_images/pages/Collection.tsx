@@ -30,6 +30,8 @@ type Props = {
   can_share: boolean;
   can_publish: boolean;
   direct_upload_threshold: number;
+  /** The map's basemap style; empty is a flat background. */
+  map_style_url?: string;
 };
 
 type Tab = 'gallery' | 'map' | 'groups' | 'pipeline' | 'prompts' | 'imports';
@@ -44,6 +46,7 @@ function Collection({
   can_share,
   can_publish,
   direct_upload_threshold,
+  map_style_url = '',
 }: Props) {
   const { t } = useT();
   const gallery = useImages(collection.id);
@@ -188,6 +191,7 @@ function Collection({
               <CollectionMap
                 pointsUrl={`/api/images/collections/${collection.id}/points`}
                 mapUrl={`/api/images/collections/${collection.id}/map.pmtiles`}
+                styleUrl={map_style_url}
                 bbox={collection.bbox}
                 onSelect={(id) => router.visit(`/admin/images/images/${id}`)}
               />

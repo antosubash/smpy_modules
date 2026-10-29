@@ -14,7 +14,14 @@ import type { PublicCollectionInfo } from '../utils/types-public';
  *  No admin layout: this is a page of the site, not of the console. Everything
  *  it shows comes from the anonymous routes, which re-check on every request
  *  that the collection is still public. */
-export default function PublicCollection({ collection }: { collection: PublicCollectionInfo }) {
+export default function PublicCollection({
+  collection,
+  map_style_url = '',
+}: {
+  collection: PublicCollectionInfo;
+  /** The map's basemap style; empty is a flat background. */
+  map_style_url?: string;
+}) {
   const { t } = useT();
   const [open, setOpen] = useState<string | null>(null);
 
@@ -53,6 +60,7 @@ export default function PublicCollection({ collection }: { collection: PublicCol
             <CollectionMap
               pointsUrl={publicPointsUrl(collection.slug)}
               mapUrl={publicMapUrl(collection.slug)}
+              styleUrl={map_style_url}
               bbox={collection.bbox}
               onSelect={setOpen}
             />

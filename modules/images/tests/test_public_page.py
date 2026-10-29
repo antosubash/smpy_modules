@@ -77,6 +77,7 @@ async def test_page_is_served_anonymously_with_safe_props(client, g):
     shown = page["props"]["collection"]
     assert shown["slug"] == g.slugs["pub"]
     assert set(shown) == {"slug", "name", "description", "image_count", "located_count", "bbox"}
+    assert page["props"]["map_style_url"] == "https://tiles.openfreemap.org/styles/positron"
     assert got.headers["cache-control"] == "private, no-cache"
 
 

@@ -76,6 +76,7 @@ async def test_collection_screen_rights(uploads):
     mine = props(await uploads.get(f"{VIEWS}/{cid}", headers={**OLGA, **INERTIA}))
     assert mine["collection"]["id"] == cid
     assert mine["direct_upload_threshold"] == 20 * 1024 * 1024
+    assert mine["map_style_url"] == "https://tiles.openfreemap.org/styles/positron"
     assert (mine["can_edit"], mine["can_manage"]) == (True, True)
     # Sharing is the owner's and needs the framework's own permission.
     assert mine["can_share"] is False

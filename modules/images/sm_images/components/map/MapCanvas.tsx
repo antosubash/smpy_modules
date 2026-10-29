@@ -1,4 +1,5 @@
 import {
+  AttributionControl,
   addProtocol,
   type GeoJSONSource,
   type LngLatBoundsLike,
@@ -20,9 +21,10 @@ const SOURCE = 'images';
 const CLUSTERS = 'images-clusters';
 const POINTS = 'images-points';
 
-// A neutral, tile-server-free basemap: a flat background. The images are the
-// content; there is no key to leak and no third-party request to make.
-const STYLE = {
+// The flat, tile-server-free background: drawn when no basemap is configured
+// (`map_style_url` empty, no third-party request at all) and when the configured
+// one cannot be fetched - the points matter more than the streets under them.
+const FLAT = {
   version: 8 as const,
   sources: {},
   layers: [
@@ -40,6 +42,8 @@ function ensureProtocol() {
 
 type Props = {
   source: MapSource;
+  /** The basemap's MapLibre style URL; empty draws the flat background. */
+  styleUrl?: string;
   bbox: number[] | null;
   label: string;
   onSelect: (imageId: string) => void;
@@ -88,9 +92,16 @@ function addLayers(map: MapLibreMap, source: MapSource) {
   });
 }
 
-/** MapLibre on a flat background, with the collection's points as clusters.
- *  A click on a point calls `onSelect(imageId)`; on a cluster it zooms in. */
-export default function MapCanvas({ source, bbox, label, onSelect }: Props) {
+/** Whether an error event came from a tile or source rather than the style. */
+function fromTile(event: unknown): boolean {
+  const e = event as { tile?: unknown; sourceId?: unknown } | undefined;
+  return Boolean(e?.tile || e?.sourceId);
+}
+
+/** MapLibre on the configured basemap (or a flat background), with the
+ *  collection's points as clusters on top of it. A click on a point calls
+ *  `onSelect(imageId)`; on a cluster it zooms in. */
+export default function MapCanvas({ source, styleUrl = '', bbox, label, onSelect }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const select = useRef(onSelect);
   select.current = onSelect;
@@ -104,23 +115,43 @@ export default function MapCanvas({ source, bbox, label, onSelect }: Props) {
     ensureProtocol();
     const map = new MapLibreMap({
       container: host.current,
-      style: STYLE,
+      style: styleUrl || FLAT,
       center: [0, 20],
       zoom: 1,
+      // The basemap's own credits (OpenStreetMap's, for the default), folded
+      // into an (i) button so they do not cover the points.
       attributionControl: false,
     });
+    map.addControl(new AttributionControl({ compact: true }), 'bottom-right');
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     setFailed(false);
+    // The basemap's style document arrived (its tiles may still fail, harmlessly).
+    let styled = false;
+    let basemap = Boolean(styleUrl);
+    map.on('styledata', () => {
+      styled = true;
+    });
     // Only an error before the first `load` (the style, the worker) means the
-    // map failed; one after it (a tile that did not load) is logged, not shown.
+    // map failed; one after it, or a basemap tile's at any time, is logged.
+    // A basemap whose style cannot be fetched (offline, blocked, gone) gives
+    // way to the flat background once, and the points are drawn on that.
     let loaded = false;
     map.on('error', (event) => {
-      if (!loaded) setFailed(true);
-      else console.warn('images map error', event?.error ?? event);
+      if (loaded || fromTile(event)) {
+        console.warn('images map error', event?.error ?? event);
+      } else if (basemap && !styled) {
+        basemap = false;
+        console.warn('images basemap unavailable', event?.error ?? event);
+        map.setStyle(FLAT, { diff: false });
+      } else {
+        setFailed(true);
+      }
     });
     map.on('load', () => {
       loaded = true;
       setFailed(false);
+      // Added after the style loaded and with no `beforeId`: above every
+      // basemap layer, labels included.
       addLayers(map, source);
       const bounds = boundsOf(bbox);
       if (bounds) {
@@ -157,7 +188,7 @@ export default function MapCanvas({ source, bbox, label, onSelect }: Props) {
       map.on('mouseleave', layer, () => map.getCanvas().style.removeProperty('cursor'));
     }
     return () => map.remove();
-  }, [source]);
+  }, [source, styleUrl]);
 
   return (
     <>

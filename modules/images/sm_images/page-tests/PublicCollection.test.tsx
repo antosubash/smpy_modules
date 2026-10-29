@@ -7,11 +7,20 @@ import { flush, stubFetch } from './support';
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
 // WebGL does not exist here: the canvas is the e2e's to prove.
 vi.mock('../components/map/MapCanvas', () => ({
-  default: ({ source, onSelect }: { source: { kind: string }; onSelect: (id: string) => void }) => (
+  default: ({
+    source,
+    styleUrl,
+    onSelect,
+  }: {
+    source: { kind: string };
+    styleUrl?: string;
+    onSelect: (id: string) => void;
+  }) => (
     <button
       type="button"
       data-testid="fake-map"
       data-kind={source.kind}
+      data-style={styleUrl}
       onClick={() => onSelect('i2')}
     />
   ),
@@ -77,11 +86,14 @@ describe('PublicCollection', () => {
       [MAP]: { ok: true },
       [POINTS]: { features: [point], next_cursor: null },
     });
-    const view = await mount(<PublicCollection collection={info} />);
+    const view = await mount(
+      <PublicCollection collection={info} map_style_url="https://tiles.example.org/s" />,
+    );
     await flush();
     await flush();
     const map = view.find('[data-testid="fake-map"]');
     expect(map?.getAttribute('data-kind')).toBe('tiles');
+    expect(map?.getAttribute('data-style')).toBe('https://tiles.example.org/s');
     await click(map as HTMLElement);
     expect(view.find('[data-testid="images-lightbox-image"]')?.getAttribute('src')).toBe(
       tile('i2').display_url,

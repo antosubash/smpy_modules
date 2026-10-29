@@ -104,6 +104,7 @@ about 30 seconds.
 | `dedupe_by_hash` | off |
 | `tippecanoe_path`, `anonymize_weights_path` | `tippecanoe`, empty |
 | `map_rebuild_threshold_pct` / `map_rebuild_threshold_abs` | 5 / 100 |
+| `map_style_url` (basemap; empty = flat, no third-party request) | `https://tiles.openfreemap.org/styles/positron` |
 | `public_asset_base_url` | empty |
 | `janitor_grace_days`, `step_output_max_bytes`, `step_lease_seconds` | 7, 65 536, 1 800 |
 
@@ -136,6 +137,11 @@ limit. Public exemptions are `GET`/`HEAD` only, under `/images/c/` and
   example once a mutator plugin is removed) until `images.reconcile` rebuilds it.
 - The `images.tippecanoe` health check is degraded while the binary cannot be
   found. Points keep working.
+- The points are drawn over the basemap `map_style_url` names (OpenFreeMap's
+  Positron by default; its origin is added to the CSP). Viewers' browsers
+  fetch its tiles from that host, so it sees their IP and the area they view;
+  set it to empty for a flat background with no third-party request. A style
+  that cannot be fetched falls back to the flat background.
 
 ## Documentation
 

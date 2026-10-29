@@ -11,6 +11,8 @@ type Props = {
   /** `…/points` and `…/map.pmtiles` of the collection, admin or anonymous. */
   pointsUrl: string;
   mapUrl: string;
+  /** The basemap's MapLibre style URL (`map_style_url`); empty is a flat background. */
+  styleUrl?: string;
   bbox: number[] | null;
   onSelect: (imageId: string) => void;
 };
@@ -19,7 +21,7 @@ type State = { phase: 'loading' } | { phase: 'failed' } | { phase: 'ready'; sour
 
 /** A collection's map: finds out whether an archive exists, falls back to the
  *  points, and says so when there is nothing to place. */
-export function CollectionMap({ pointsUrl, mapUrl, bbox, onSelect }: Props) {
+export function CollectionMap({ pointsUrl, mapUrl, styleUrl = '', bbox, onSelect }: Props) {
   const { t } = useT();
   const [state, setState] = useState<State>({ phase: 'loading' });
 
@@ -57,6 +59,7 @@ export function CollectionMap({ pointsUrl, mapUrl, bbox, onSelect }: Props) {
     >
       <MapCanvas
         source={state.source}
+        styleUrl={styleUrl}
         bbox={bbox}
         label={t(keys.images.map.label)}
         onSelect={onSelect}

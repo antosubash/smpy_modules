@@ -149,6 +149,7 @@ tenant. Workers read the same values (cached for about 30 seconds).
 | `dedupe_by_hash` | off | Skip an upload whose `sha256` exists in the collection |
 | `map_rebuild_threshold_pct` | 5 | Rebuild the map when this percentage of points changed ... |
 | `map_rebuild_threshold_abs` | 100 | ... or this many, whichever comes first |
+| `map_style_url` | `https://tiles.openfreemap.org/styles/positron` | MapLibre style drawn under the points; empty or `https://` only. See [Basemap](#basemap) |
 | `janitor_grace_days` | 7 | Days an unreferenced object or a trashed row is kept |
 | `step_output_max_bytes` | 65 536 | Largest JSON a step may store |
 | `step_lease_seconds` | 1 800 | How long a running step holds its lease |
@@ -158,6 +159,27 @@ tenant. Workers read the same values (cached for about 30 seconds).
 
 `thumbnail_sizes` and the limits are read per request or per task. The three
 fields marked **Restart** are read once while booting.
+
+### Basemap
+
+The map (the collection's Map tab and the public page) draws its points over
+the MapLibre style named by `map_style_url`. The default is OpenFreeMap's
+Positron: free, no API key, OpenStreetMap data, with its attribution in the
+map's (i) button.
+
+**Privacy trade-off.** With a basemap, every viewer's browser, in the console
+and on public pages, fetches the style and the tiles for the area it looks at
+from that host, which so learns their IP address and roughly where they look.
+Set `map_style_url` to empty for a flat background and no third-party request
+at all; the points work the same either way.
+
+The style's origin (`https://tiles.openfreemap.org` for the default) is added
+to the Content-Security-Policy's `connect-src` and `img-src` through a CSP
+provider, evaluated per response, so a change applies at the next page load
+without a restart. Only that one origin is allowed: a style whose tiles,
+glyphs or sprite live on another host needs them on the same origin. A style
+that cannot be fetched (offline, blocked, gone) falls back to the flat
+background, and the points are still drawn.
 
 ## Events and contracts
 

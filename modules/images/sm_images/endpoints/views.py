@@ -127,6 +127,8 @@ async def collection_page(
             **await _rights(db, who, collection),
             # Where the uploader switches from one multipart request to a direct upload.
             "direct_upload_threshold": get_settings(request).direct_upload_threshold,
+            # The basemap the Map tab draws under the points; empty is a flat background.
+            "map_style_url": get_settings(request).map_style_url,
         },
     )
 
