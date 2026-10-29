@@ -88,6 +88,8 @@
   "viewer": {
     "back": "Zurück zur Sammlung",
     "show_original": "Original anzeigen",
+    "previous": "← Vorheriges",
+    "next": "Nächstes →",
     "show_display": "Anzeigekopie anzeigen",
     "original_failed": "Das Original konnte nicht geladen werden.",
     "display_not_ready": "Anzeigekopie noch nicht bereit",

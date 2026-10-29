@@ -34,6 +34,7 @@ from sm_images.deps import get_settings, require_view
 from sm_images.schemas.collection import CollectionOut, CollectionPageOut
 from sm_images.services import collections as collection_service
 from sm_images.services import gallery, present
+from sm_images.services.neighbors import neighbors
 from sm_images.services.viewer_stats import collection_outs, viewer_only
 from sm_images.tenancy import bind_admin
 
@@ -90,7 +91,8 @@ async def image(
     settled), so the toggle is offered exactly when ``/original`` would answer
     200. ``display_pending`` is when ``…/display`` would 404 (redaction has not
     settled), so the page says so instead of showing a broken picture."""
-    row = await gallery.get(db, collection, image_id, gated=await viewer_only(db, who, collection))
+    gated = await viewer_only(db, who, collection)
+    row = await gallery.get(db, collection, image_id, gated=gated)
     withheld = not redaction_state.trusts_display(
         collection, row
     ) and await redaction_state.pending(db, collection, row)
@@ -106,6 +108,8 @@ async def image(
             "can_view_original": can_view_original(who, row, collection, protected=protected),
             "display_pending": withheld,
             "group_roles": list(collection.group_roles or []),
+            # Previous / next in gallery order, among the images this caller may open.
+            "neighbors": await neighbors(db, collection, row, gated=gated),
             "can_edit": rights["can_edit"],
             "can_manage": rights["can_manage"],
         },

@@ -9,6 +9,7 @@ import { ImagesLayout } from '../components/ImagesLayout';
 import { GroupEditor } from '../components/viewer/GroupEditor';
 import { ImageMeta } from '../components/viewer/ImageMeta';
 import { ImageViewer } from '../components/viewer/ImageViewer';
+import { NeighborNav, type Neighbors } from '../components/viewer/NeighborNav';
 import { deleteImage } from '../utils/api';
 import { keys, useT } from '../utils/i18n';
 import type { Collection, ImageItem } from '../utils/types';
@@ -23,6 +24,8 @@ type Props = {
   can_manage: boolean;
   /** The collection's ordered role list, offered when assigning a role. */
   group_roles?: string[];
+  /** The images before and after this one in the gallery, that the caller may open. */
+  neighbors?: Neighbors;
 };
 
 /** `Images/Image` - `/admin/images/images/{id}`. `can_view_original` is the
@@ -35,6 +38,7 @@ function Image({
   can_edit,
   can_manage,
   group_roles = [],
+  neighbors = { prev: null, next: null },
 }: Props) {
   const { t } = useT();
   const [image, setImage] = useState(loaded);
@@ -55,6 +59,7 @@ function Image({
         back={back}
         actions={
           <>
+            <NeighborNav neighbors={neighbors} />
             <Button type="button" variant="outline" onClick={() => router.visit(back)}>
               {t(keys.images.viewer.back)}
             </Button>

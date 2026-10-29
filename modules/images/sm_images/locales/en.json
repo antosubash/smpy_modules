@@ -88,6 +88,8 @@
   "viewer": {
     "back": "Back to the collection",
     "show_original": "Show original",
+    "previous": "← Previous",
+    "next": "Next →",
     "show_display": "Show display copy",
     "original_failed": "The original could not be loaded.",
     "display_not_ready": "Display copy not ready yet",
