@@ -56,24 +56,39 @@ async function open(reads: () => PipelineOverview) {
 }
 
 describe('after a restart request (review of QA round 1)', () => {
-  it('keeps polling through a broker delay until the restart shows, then until idle', async () => {
-    let restarted = false;
-    let after = 0;
-    const { view, calls } = await open(() => {
-      if (!restarted) return IDLE;
-      after += 1; // the re-read on return, then the polls
-      if (after <= 3) return IDLE; // queued on the broker: nothing reset yet
-      if (after === 4) return overview({ 'prompt:646b48c4': { pending: 3 } }, 3);
-      return IDLE;
+  it('a restart during active runs keeps polling through a broker delay after they finish', async () => {
+    // Review: the old runs being active ended the watch at once; when they
+    // finished, polling stopped before the queued restart reset anything.
+    const RUNNING = overview({ 'prompt:646b48c4': { running: 1, completed: 2 } });
+    let reads = 0;
+    const { view } = await open(() => {
+      reads += 1;
+      if (reads <= 3) return RUNNING; // the old runs
+      if (reads <= 8) return IDLE; // they finished; the restart is still queued
+      return overview({ 'prompt:646b48c4': { pending: 3 } }, 3); // it began
     });
-    restarted = true;
     await click(view.find('[data-testid="images-pipeline-restart-all"]'));
     await act(async () => vi.advanceTimersByTimeAsync(0));
-    const start = gets(calls);
-    for (let i = 0; i < 4; i++) await tick();
-    expect(gets(calls)).toBe(start + 4); // idle, idle, pending, idle
-    await act(async () => vi.advanceTimersByTimeAsync(PIPELINE_POLL_MS * 5));
-    expect(gets(calls)).toBe(start + 4); // done: stopped
+    for (let i = 0; i < 8; i++) await tick();
+    expect(reads).toBeGreaterThanOrEqual(9); // polled through the idle reads
+    expect(view.find('[data-testid="images-step-prompt:646b48c4"]')).not.toBeNull();
+    await view.unmount();
+  });
+
+  it('a second restart renews the watch window', async () => {
+    const { view, calls } = await open(() => IDLE);
+    const button = () => view.find('[data-testid="images-pipeline-restart-stale"]');
+    await click(button());
+    await act(async () => vi.advanceTimersByTimeAsync(50_000));
+    await click(button());
+    await act(async () => vi.advanceTimersByTimeAsync(55_000)); // 105 s after the first
+    const at105 = gets(calls);
+    await act(async () => vi.advanceTimersByTimeAsync(4_000)); // 109 s: still watched
+    expect(gets(calls)).toBeGreaterThan(at105);
+    await act(async () => vi.advanceTimersByTimeAsync(PIPELINE_POLL_MS * 2)); // past 110 s
+    const done = gets(calls);
+    await act(async () => vi.advanceTimersByTimeAsync(PIPELINE_POLL_MS * 10));
+    expect(gets(calls)).toBe(done);
     await view.unmount();
   });
 

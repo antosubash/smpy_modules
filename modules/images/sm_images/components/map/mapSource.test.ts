@@ -90,8 +90,9 @@ describe('resolveMapSource', () => {
         ? new Response(null, { status: 404 })
         : json({ features: [], next_cursor: 'again' }),
     );
-    await resolveMapSource(urls);
+    const source = await resolveMapSource(urls);
     expect(fetchMock).toHaveBeenCalledTimes(1 + MAX_POINT_PAGES);
+    expect(source.kind === 'points' && source.truncated).toBe(true); // and says so
   });
 
   it('surfaces a failing points read', async () => {

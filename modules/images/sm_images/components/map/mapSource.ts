@@ -19,7 +19,12 @@ import type { PointFeature, PointsPage } from '../../utils/types-public';
 
 export type MapSource =
   | { kind: 'tiles'; url: string }
-  | { kind: 'points'; features: PointFeature[] };
+  | {
+      kind: 'points';
+      features: PointFeature[];
+      /** Set when paging stopped at {@link MAX_POINT_PAGES} with points left. */
+      truncated?: true;
+    };
 
 /** Points per request, and how many requests the fallback makes at most
  *  (20 000 points): past that a collection needs its archive. */
@@ -64,7 +69,7 @@ export async function resolveMapSource(
     features.push(...body.features);
     cursor = body.next_cursor;
   }
-  return { kind: 'points', features };
+  return cursor ? { kind: 'points', features, truncated: true } : { kind: 'points', features };
 }
 
 /** The box around `features`, as MapLibre's bounds; `null` without any. */

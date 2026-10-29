@@ -54,16 +54,23 @@ export function CollectionMap({ pointsUrl, mapUrl, styleUrl = '', bbox, onSelect
     );
   }
   return (
-    <Suspense
-      fallback={<p className="text-sm text-muted-foreground">{t(keys.images.map.loading)}</p>}
-    >
-      <MapCanvas
-        source={state.source}
-        styleUrl={styleUrl}
-        bbox={bbox}
-        label={t(keys.images.map.label)}
-        onSelect={onSelect}
-      />
-    </Suspense>
+    <>
+      {state.source.kind === 'points' && state.source.truncated && (
+        <p className="mb-2 text-sm text-muted-foreground" data-testid="images-map-truncated">
+          {t(keys.images.map.truncated, { count: state.source.features.length })}
+        </p>
+      )}
+      <Suspense
+        fallback={<p className="text-sm text-muted-foreground">{t(keys.images.map.loading)}</p>}
+      >
+        <MapCanvas
+          source={state.source}
+          styleUrl={styleUrl}
+          bbox={bbox}
+          label={t(keys.images.map.label)}
+          onSelect={onSelect}
+        />
+      </Suspense>
+    </>
   );
 }

@@ -612,7 +612,8 @@
     "loading": "Karte wird geladen…",
     "failed": "Die Karte konnte nicht geladen werden.",
     "empty": "Noch kein Bild dieser Sammlung hat einen Standort.",
-    "label": "Karte der Bilder mit Standort"
+    "label": "Karte der Bilder mit Standort",
+    "truncated": "Es werden die ersten {count} Bilder mit Standort gezeigt."
   },
   "public": {
     "gallery": "Galerie",
