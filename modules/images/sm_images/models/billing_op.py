@@ -41,3 +41,10 @@ class BillingOp(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[u
     next_attempt_at: datetime | None = dt_col()
     done_at: datetime | None = dt_col()
     last_error: str | None = Field(default=None, max_length=500)
+    claim_token: str | None = Field(default=None, max_length=64)
+    """The settler executing this op; only it may move or finish it."""
+    claim_expires_at: datetime | None = dt_col()
+    replacement_hold_id: str | None = Field(default=None, max_length=64)
+    """A ``rehold``'s replacement, persisted before it is committed."""
+    generation: int = Field(default=0, sa_column_kwargs={"nullable": False})
+    """A ``rehold``'s attempt: its replacement is keyed ``rehold-{id}-{generation}``."""

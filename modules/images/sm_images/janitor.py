@@ -9,7 +9,9 @@ enumeration (:func:`sm_images.reconcile.tenants`). Per tenant, under
 * trashed rows past ``janitor_grace_days`` are purged with their objects
   (:func:`sm_images.purge.purge_expired`);
 * staged sources that a finished import job failed to delete itself are
-  deleted once past the grace period (:func:`sm_images.imports.cleanup.reap_staging`).
+  deleted once past the grace period (:func:`sm_images.imports.cleanup.reap_staging`);
+* storage-billing outbox ops done before the grace period are deleted
+  (:func:`sm_images.billing_ops.sweep`).
 
 Then **one narrow platform pass**, under ``all_tenants()``, over the
 write-ahead intents (:class:`ObjectIntent` has no tenant - the key embeds it):
@@ -30,6 +32,7 @@ from typing import Any
 from simple_module_db import all_tenants, finalize_session, tenant_context
 from sqlalchemy import delete, select, update
 
+from sm_images import billing_ops
 from sm_images.imports.cleanup import reap_staging
 from sm_images.ingest.upload_reaper import reap_expired_uploads
 from sm_images.models import (
@@ -196,6 +199,8 @@ async def janitor_tenant(
         await finalize_session(db)
     if not dry_run:
         done["import_staging_reaped"] = await reap_staging(runtime, tenant, now, grace)
+        cutoff = now - timedelta(days=grace)
+        done["billing_ops_swept"] = await billing_ops.sweep(runtime.session_factory, tenant, cutoff)
     done["images_purged"] = len(report.images)
     done["collections_purged"] = len(report.collections)
     done["objects_deleted"] = len(report.keys)

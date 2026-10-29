@@ -47,10 +47,12 @@ from sm_images import constants
 from sm_images.errors import StorageQuotaExceeded
 
 __all__ = [
+    "HoldSpent",
     "billing_installed",
     "check",
     "extend",
     "factory_of",
+    "get_hold",
     "hold_key",
     "on_commit",
     "register_meter",
@@ -61,6 +63,10 @@ __all__ = [
 METER = constants.METER_STORAGE
 SOURCE = "images:storage"
 FULL = "The plan's image storage is used up"
+
+
+class HoldSpent(Exception):  # noqa: N818 - reads as the condition
+    """The key's hold was released or lapsed: the key is spent, a retry needs a new one."""
 
 
 def register_meter(app: Any) -> bool:
@@ -116,13 +122,15 @@ async def reserve(
 ) -> Any:
     """Hold ``qty`` bytes (``held``, for ``ttl`` seconds or billing's default);
     billing's ``Hold`` (``id``, ``expires_at``), or ``None`` without billing.
-    :class:`StorageQuotaExceeded` when it does not fit - or when the key's hold
-    was since released (a key is never reused)."""
+    :class:`StorageQuotaExceeded` when it does not fit; :class:`HoldSpent` when
+    the key's hold was since released or lapsed (a key is never reused)."""
     meter = storage_meter(session_factory)
     if meter is None or qty < 1:
         return None
     outcome = await meter.reserve(tenant, METER, int(qty), key, source=SOURCE, ttl=ttl)
     if not outcome.ok:
+        if getattr(outcome, "id", None) is not None:
+            raise HoldSpent(key)
         raise StorageQuotaExceeded(FULL)
     return outcome
 
@@ -132,6 +140,13 @@ async def extend(session_factory: Any, hold_id: str, ttl: int) -> Any:
     ``Hold``); ``HoldExpired`` once it lapsed."""
     meter = storage_meter(session_factory)
     return None if meter is None else await meter.extend(hold_id, ttl)
+
+
+async def get_hold(session_factory: Any, hold_id: str) -> Any:
+    """Billing's read of a hold (``status``: held, committed, released, expired);
+    ``None`` for an unknown id or without billing."""
+    meter = storage_meter(session_factory)
+    return None if meter is None else await meter.get_hold(hold_id)
 
 
 def on_commit(db: Any, call: Any, *args: Any) -> None:

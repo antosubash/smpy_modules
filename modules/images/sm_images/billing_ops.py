@@ -7,17 +7,16 @@ crash, a rollback or a billing outage never loses one, and nothing releases a
 hold in a path that could only log a failure.
 
 * After the commit a best-effort attempt runs the transaction's own ops.
-* Whatever fails stays pending with a backoff (``attempts``,
-  ``next_attempt_at``, ``last_error``); ``images.reconcile`` retries each
-  tenant's due ops in bounded pages until billing confirms. Every op is
-  idempotent on billing's side, so a duplicate attempt is harmless.
+* Whatever fails stays pending with a backoff; ``images.reconcile`` retries
+  each tenant's due ops in bounded pages until billing confirms. Every op is
+  **claimed** before it runs, so two settlers never run one twice
+  (:mod:`sm_images.billing_settle`).
 * **Order.** An image's ``release`` of its old hold names the ``commit`` of its
-  new one in ``after_id`` and runs only once that is done: the image is never
-  left holding nothing while billing is down.
-* **A new hold that lapsed** before its commit (``HoldExpired``) turns the op
-  into a ``rehold``: a fresh committed hold for the image's current total
-  (recomputed from its rows), swapped onto the image only while it still names
-  the lapsed one. Then the waiting ``release`` of the old hold runs.
+  new one in ``after_id``, and runs only once that is done *and* billing
+  confirms the hold the image names now is committed.
+* **A new hold that lapsed** before its commit turns the op into a ``rehold``
+  (:mod:`sm_images.billing_rehold`).
+* The janitor deletes done ops after the grace period (:func:`sweep`).
 
 Ops are tenant rows (``MultiTenantMixin``); every query here also names the
 tenant, which the caller has bound.
@@ -27,24 +26,22 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from simple_module_db import finalize_session
-from sqlalchemy import exists, or_, select, update
+from sqlalchemy import delete, exists, select
 from sqlalchemy.orm import aliased
 
 from sm_images import billing
-from sm_images.models import BillingOp, Image
-from sm_images.models.billing_op import OP_COMMIT, OP_REHOLD, OP_RELEASE
+from sm_images.models import BillingOp
+from sm_images.models.billing_op import OP_COMMIT, OP_RELEASE
 
-__all__ = ["add", "add_swap", "release_now", "release_storage", "settle"]
+__all__ = ["add", "add_swap", "release_now", "release_storage", "settle", "sweep"]
 
 logger = logging.getLogger(__name__)
-PAGE = 100
-PAGES = 10
-BACKOFF = timedelta(minutes=1)
-BACKOFF_MAX = timedelta(hours=1)
+SWEEP_BATCH = 500
+SWEEP_BATCHES = 20
 
 StorageHold = tuple[uuid.UUID, str | None, int]
 """``(image_id, storage_hold_id, storage_bytes)`` of a hard-deleted image."""
@@ -109,140 +106,44 @@ async def release_now(factory: Any, image_id: uuid.UUID | None, hold: str | None
         await finalize_session(db)
 
 
-# -- settling -----------------------------------------------------------------
-
-
-_COLUMNS = (BillingOp.id, BillingOp.op, BillingOp.image_id, BillingOp.hold_id, BillingOp.attempts)
-
-
-def _due(tenant: str, now: datetime, ids: list[int] | None) -> Any:
-    prior = aliased(BillingOp)
-    waited = exists().where(prior.id == BillingOp.after_id, prior.done_at.is_not(None))
-    stmt = select(*_COLUMNS).where(
-        BillingOp.tenant_id == tenant,
-        BillingOp.done_at.is_(None),
-        or_(BillingOp.next_attempt_at.is_(None), BillingOp.next_attempt_at <= now),
-        or_(BillingOp.after_id.is_(None), waited),
-    )
-    if ids is not None:
-        stmt = stmt.where(BillingOp.id.in_(ids))
-    return stmt.order_by(BillingOp.id).limit(PAGE)
+# -- settling and sweeping ---------------------------------------------------
 
 
 async def settle(
     factory: Any, tenant: str, ids: list[int] | None = None, now: datetime | None = None
 ) -> int:
-    """Run the due ops (``ids`` only, when given), dependants after what they
-    wait for; how many were confirmed. Bounded to :data:`PAGES` pages."""
-    now = now or datetime.now(UTC)
-    done = 0
-    for _ in range(PAGES):
+    """Claim and run the due ops (:func:`sm_images.billing_settle.settle`)."""
+    from sm_images import billing_settle
+
+    return await billing_settle.settle(factory, tenant, ids, now)
+
+
+async def sweep(factory: Any, tenant: str, cutoff: datetime) -> int:
+    """Delete ops done before ``cutoff``, :data:`SWEEP_BATCH` per transaction and
+    at most :data:`SWEEP_BATCHES` transactions per call - never one a pending op
+    still waits for (``after_id``)."""
+    waiting = aliased(BillingOp)
+    needed = exists().where(waiting.after_id == BillingOp.id, waiting.done_at.is_(None))
+    removed = 0
+    for _ in range(SWEEP_BATCHES):
         async with factory() as db:
-            rows = list((await db.execute(_due(tenant, now, ids))).all())
+            ids = select(BillingOp.id).where(
+                BillingOp.tenant_id == tenant,
+                BillingOp.done_at.is_not(None),
+                BillingOp.done_at < cutoff,
+                ~needed,
+            )
+            batch = list(
+                (await db.execute(ids.order_by(BillingOp.id).limit(SWEEP_BATCH))).scalars()
+            )
+            if batch:
+                await db.execute(
+                    delete(BillingOp)
+                    .where(BillingOp.tenant_id == tenant, BillingOp.id.in_(batch))
+                    .execution_options(synchronize_session=False)
+                )
             await finalize_session(db)
-        ran = [await _run(factory, tenant, row, now) for row in rows]
-        done += sum(ran)
-        if not any(ran):
+        removed += len(batch)
+        if len(batch) < SWEEP_BATCH:
             break
-    return done
-
-
-async def _run(factory: Any, tenant: str, row: Any, now: datetime) -> bool:
-    meter = billing.storage_meter(factory)
-    try:
-        if meter is not None:
-            await _apply(factory, tenant, row, meter)
-    except Exception as exc:
-        logger.warning("images.billing_op.failed op=%s id=%s", row.op, row.id, exc_info=True)
-        await _failed(factory, row, now, exc)
-        return False
-    await _finish(factory, row.id, now)
-    return True
-
-
-async def _apply(factory: Any, tenant: str, row: Any, meter: Any) -> None:
-    from sm_billing.contracts.metering import HoldExpired, HoldNotFound
-
-    if row.op == OP_RELEASE:
-        await meter.release(row.hold_id)
-        return
-    if row.op == OP_COMMIT:
-        try:
-            await meter.commit(row.hold_id)
-            return
-        except (HoldExpired, HoldNotFound):
-            await _become_rehold(factory, row)
-    await _rehold(factory, tenant, row, meter)
-
-
-async def _become_rehold(factory: Any, row: Any) -> None:
-    async with factory() as db:
-        await db.execute(
-            update(BillingOp)
-            .where(BillingOp.id == row.id, BillingOp.done_at.is_(None))
-            .values(op=OP_REHOLD)
-            .execution_options(synchronize_session=False)
-        )
-        await finalize_session(db)
-
-
-async def _rehold(factory: Any, tenant: str, row: Any, meter: Any) -> None:
-    """A fresh committed hold for the image's current total, swapped onto the
-    image only while it still names the lapsed hold ``row.hold_id``."""
-    from sm_images.pipeline.storage_hold import parts
-
-    assert row.image_id is not None
-    async with factory() as db:
-        found = await parts(db, tenant, row.image_id, include_deleted=True)
-        await finalize_session(db)
-    if found is None or found[3] != row.hold_id:
-        return  # purged, or the image moved on: its newer hold's own ops count it
-    total = found[0] + found[1] + found[2]
-    key = billing.hold_key(row.image_id, f"rehold-{row.id}")
-    hold = await billing.reserve(factory, tenant, total, key)
-    if hold is None:
-        return
-    await meter.commit(hold.id)
-    async with factory() as db:
-        moved = await db.execute(
-            update(Image)
-            .where(
-                Image.id == row.image_id,
-                Image.tenant_id == tenant,
-                Image.storage_hold_id == row.hold_id,
-            )
-            .values(storage_hold_id=hold.id, storage_bytes=total)
-            .returning(Image.id)
-            .execution_options(include_deleted=True, synchronize_session=False)
-        )
-        if moved.first() is None:  # lost to a newer hold: give the fresh one back
-            await add(db, OP_RELEASE, image_id=row.image_id, hold_id=hold.id, factory=factory)
-        await finalize_session(db)
-
-
-async def _finish(factory: Any, op_id: int | None, now: datetime) -> None:
-    async with factory() as db:
-        await db.execute(
-            update(BillingOp)
-            .where(BillingOp.id == op_id, BillingOp.done_at.is_(None))
-            .values(done_at=now, last_error=None)
-            .execution_options(synchronize_session=False)
-        )
-        await finalize_session(db)
-
-
-async def _failed(factory: Any, row: Any, now: datetime, exc: Exception) -> None:
-    attempts = row.attempts + 1
-    wait = min(BACKOFF * 2 ** min(attempts - 1, 10), BACKOFF_MAX)
-    async with factory() as db:
-        await db.execute(
-            update(BillingOp)
-            .where(BillingOp.id == row.id, BillingOp.done_at.is_(None))
-            .values(
-                attempts=attempts,
-                next_attempt_at=now + wait,
-                last_error=f"{type(exc).__name__}: {exc}"[:500],
-            )
-            .execution_options(synchronize_session=False)
-        )
-        await finalize_session(db)
+    return removed

@@ -37,6 +37,8 @@ class FakeGauge:
     fail_release: int = 0
     expire_on_commit: int = 0
     """The next N commits find their hold lapsed (``HoldExpired``)."""
+    refuse_commit: set[str] = field(default_factory=set)
+    """Commits of these holds raise (billing unreachable for them)."""
     next_seconds: list[int] = field(default_factory=list)
     """TTLs (seconds) the next reservations get instead of the one asked for."""
 
@@ -83,8 +85,8 @@ class FakeGauge:
 
     async def commit(self, hold_id: str) -> Hold:
         self.calls.append(("commit", hold_id))
-        if self.fail_commit:
-            self.fail_commit -= 1
+        if self.fail_commit or hold_id in self.refuse_commit:
+            self.fail_commit = max(self.fail_commit - 1, 0)
             raise RuntimeError("billing is down")
         hold = self._lapse(self.holds[hold_id])
         if self.expire_on_commit and hold.status == "held":
@@ -93,6 +95,15 @@ class FakeGauge:
         if hold.status not in LIVE:
             raise HoldExpired(hold_id, hold.status)
         return self._set(hold, "committed")
+
+    async def get_hold(self, hold_id: str) -> Hold | None:
+        self.calls.append(("get_hold", hold_id))
+        hold = self.holds.get(hold_id)
+        if hold is None:
+            return None
+        if hold.status == "held" and hold.expires_at and hold.expires_at <= datetime.now(UTC):
+            return Hold(hold.id, hold.tenant_id, hold.meter, hold.quantity, "expired", None)
+        return hold
 
     async def extend(self, hold_id: str, ttl: int) -> Hold:
         self.calls.append(("extend", hold_id, str(ttl)))

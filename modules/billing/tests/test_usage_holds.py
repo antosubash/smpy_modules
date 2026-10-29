@@ -233,3 +233,19 @@ async def test_check_on_a_gauge_compares_the_level_held(factory, usage):
     assert await hold_statuses(factory, tenant) == ["held"]  # read-only
     unlimited = await seed_limits(factory, {})
     assert await usage.check(unlimited, GAUGE, 10**9) == Allowed(0, None, None)
+
+
+async def test_get_hold_reads_the_state_without_writing(factory, usage, clock):
+    tenant = await seed_limits(factory, {GAUGE: 10})
+    assert await usage.get_hold("0" * 32) is None
+    held = await usage.reserve(tenant, GAUGE, 2, "a", source="t", ttl=60)
+    assert (await usage.get_hold(held.id)).status == "held"
+    await usage.commit(held.id)
+    assert (await usage.get_hold(held.id)).status == "committed"
+    lapsing = await usage.reserve(tenant, GAUGE, 1, "b", source="t", ttl=60)
+    clock.now += timedelta(seconds=61)
+    read = await usage.get_hold(lapsing.id)
+    assert (read.status, read.quantity) == ("expired", 1)
+    assert sorted(await hold_statuses(factory, tenant)) == ["committed", "held"]  # no write
+    await usage.release(held.id)
+    assert (await usage.get_hold(held.id)).status == "released"

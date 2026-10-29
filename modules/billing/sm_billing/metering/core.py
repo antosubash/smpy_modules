@@ -16,9 +16,9 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 
-from sm_billing.contracts.metering import Allowed, Exceeded, MeterKind
+from sm_billing.contracts.metering import Allowed, Exceeded, Hold, HoldStatus, MeterKind
 from sm_billing.metering.periods import as_utc, current_period, provider_period
-from sm_billing.models import UsageGauge
+from sm_billing.models import UsageGauge, UsageHold
 from sm_billing.resolve import effective_plan
 
 if TYPE_CHECKING:
@@ -77,6 +77,19 @@ class MeteringCore(ABC):
         if definition is not None and definition.kind is MeterKind.GAUGE:
             return await self._check_level(tenant_id, meter, qty)
         return await self._check_counter(tenant_id, meter, qty)
+
+    async def get_hold(self, hold_id: str) -> Hold | None:
+        """Read-only; a ``held`` hold past its expiry reads as ``expired``."""
+        async with self._factory() as session:
+            row = await session.get(UsageHold, hold_id)
+            if row is None:
+                return None
+            status, expires = row.status, row.expires_at
+            if expires is not None and status == HoldStatus.HELD.value:
+                expires = as_utc(expires)
+                if expires <= self._clock():
+                    status = HoldStatus.EXPIRED.value
+            return Hold(row.id, row.tenant_id, row.meter, int(row.quantity), status, expires)
 
     @abstractmethod
     async def _check_counter(self, tenant_id: str, meter: str, qty: int) -> Allowed | Exceeded:

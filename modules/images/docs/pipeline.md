@@ -196,9 +196,16 @@ all the same.
   change they settle (the ingest insert, the fenced completion, the purge).
   They are attempted right after the commit; what fails stays pending with a
   backoff, and `images.reconcile` retries each tenant's due ops until billing
-  confirms. An image's release waits for its new hold's commit. A new hold
-  that lapsed before its commit is replaced by a fresh committed hold for the
-  image's current total (a `rehold`), and only then is the old one released.
+  confirms. Every op is claimed before it runs (a token with an expiry), so two
+  settlers never run one twice. An image's release of its old hold waits until
+  the op it follows is done and billing confirms the hold the image names now
+  is committed. A new hold that lapsed before its commit becomes a `rehold`:
+  a replacement for the image's current total is reserved under
+  `rehold-{op}-{generation}`, recorded on the op, committed, and swapped onto
+  the image only while the image still names the lapsed hold; a spent
+  replacement is released and the generation moves on, so no key is reused.
+  The janitor deletes done ops after `janitor_grace_days`, keeping any a
+  pending op still waits for.
 - **The reservation's deadline.** A publication reserves for the step lease
   plus five minutes (at least billing's 15-minute default): a completion is
   accepted only within its lease, so the hold outlives any completion that can
