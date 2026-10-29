@@ -50,6 +50,9 @@ function Collection({
 }: Props) {
   const { t } = useT();
   const gallery = useImages(collection.id);
+  // The gallery re-reads while uploads are processed: a change in what it holds,
+  // or in how many of those have a location, re-reads the map's points.
+  const mapVersion = `${gallery.items.length}:${gallery.items.filter((i) => i.lat !== null).length}`;
   const [visibility, setVisible] = useState<Visibility>(collection.visibility);
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<Tab>('gallery');
@@ -193,6 +196,7 @@ function Collection({
                 mapUrl={`/api/images/collections/${collection.id}/map.pmtiles`}
                 styleUrl={map_style_url}
                 bbox={collection.bbox}
+                version={mapVersion}
                 onSelect={(id) => router.visit(`/admin/images/images/${id}`)}
               />
             )}

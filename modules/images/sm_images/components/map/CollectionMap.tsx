@@ -15,26 +15,40 @@ type Props = {
   styleUrl?: string;
   bbox: number[] | null;
   onSelect: (imageId: string) => void;
+  /** Changes when the collection's located images may have (an upload, a
+   *  processed image): the points are read again, the drawn map kept meanwhile. */
+  version?: string;
 };
 
 type State = { phase: 'loading' } | { phase: 'failed' } | { phase: 'ready'; source: MapSource };
 
 /** A collection's map: finds out whether an archive exists, falls back to the
  *  points, and says so when there is nothing to place. */
-export function CollectionMap({ pointsUrl, mapUrl, styleUrl = '', bbox, onSelect }: Props) {
+export function CollectionMap({
+  pointsUrl,
+  mapUrl,
+  styleUrl = '',
+  bbox,
+  onSelect,
+  version = '',
+}: Props) {
   const { t } = useT();
   const [state, setState] = useState<State>({ phase: 'loading' });
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `version` asks for a fresh read
   useEffect(() => {
     const controller = new AbortController();
-    setState({ phase: 'loading' });
+    // A refresh keeps the drawn map until the fresh source is in.
+    setState((s) => (s.phase === 'ready' ? s : { phase: 'loading' }));
     resolveMapSource({ pointsUrl, mapUrl }, controller.signal)
-      .then((source) => setState({ phase: 'ready', source }))
+      .then((source) => {
+        if (!controller.signal.aborted) setState({ phase: 'ready', source });
+      })
       .catch(() => {
         if (!controller.signal.aborted) setState({ phase: 'failed' });
       });
     return () => controller.abort();
-  }, [pointsUrl, mapUrl]);
+  }, [pointsUrl, mapUrl, version]);
 
   if (state.phase === 'loading') {
     return <p className="text-sm text-muted-foreground">{t(keys.images.map.loading)}</p>;

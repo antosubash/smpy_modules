@@ -5,7 +5,11 @@ import { flush } from '../../page-tests/support';
 import { mount } from '../../test-dom';
 
 // WebGL does not exist here: the canvas is the e2e's to prove.
-vi.mock('./MapCanvas', () => ({ default: () => <div data-testid="fake-map" /> }));
+vi.mock('./MapCanvas', () => ({
+  default: ({ source }: { source: { features?: unknown[] } }) => (
+    <div data-testid="fake-map" data-count={source.features?.length ?? 0} />
+  ),
+}));
 vi.mock('./mapSource', async (real) => ({
   ...(await real<typeof import('./mapSource')>()),
   resolveMapSource: vi.fn(),
@@ -50,6 +54,27 @@ describe('CollectionMap (review of QA round 1)', () => {
     const view = await render();
     expect(view.find('[data-testid="fake-map"]')).not.toBeNull();
     expect(view.find('[data-testid="images-map-truncated"]')).toBeNull();
+    await view.unmount();
+  });
+
+  it("reads the points again when the collection's located images change (QA retest 2)", async () => {
+    vi.mocked(resolveMapSource)
+      .mockResolvedValueOnce({ kind: 'points', features: [point('a')] })
+      .mockResolvedValueOnce({ kind: 'points', features: [point('a'), point('b')] });
+    const el = (version: string) => (
+      <CollectionMap pointsUrl="/p" mapUrl="/m" bbox={null} onSelect={() => {}} version={version} />
+    );
+    const view = await mount(el('1'));
+    await flush();
+    await flush();
+    expect(view.find('[data-testid="fake-map"]')?.getAttribute('data-count')).toBe('1');
+    await view.render(el('2'));
+    // the drawn map stays while the fresh points load: no flash of "Loading"
+    expect(view.find('[data-testid="fake-map"]')).not.toBeNull();
+    await flush();
+    await flush();
+    expect(resolveMapSource).toHaveBeenCalledTimes(2);
+    expect(view.find('[data-testid="fake-map"]')?.getAttribute('data-count')).toBe('2');
     await view.unmount();
   });
 });
