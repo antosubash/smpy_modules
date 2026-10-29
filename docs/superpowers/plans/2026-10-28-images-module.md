@@ -552,7 +552,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 - vitest `geojsonPreview.test.ts`.
 - e2e `tests/e2e/images-import.spec.ts`: a base64 GeoJSON of 3 features gives a completed job and 3 located images. Standalone.
 
-- [ ] Commit `feat(images): import wizard and jobs panel`
+- [x] Commit `feat(images): import wizard and jobs panel`
 
 ---
 
