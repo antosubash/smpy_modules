@@ -12,9 +12,11 @@ No database connection is held through tippecanoe or the upload:
    then the archive goes to storage under a write-ahead intent at a key no
    other build uses (``storage_keys.map_key``: generation plus a nonce).
 3. **Publish** - one conditional ``UPDATE ... WHERE map_generation = gen``
-   names the archive. A newer request or a visibility change moved the
-   generation on: nothing is published and the upload is deleted. Published,
-   the previous archive is deleted after the commit.
+   names the archive, stamped with the redaction gate the snapshot used
+   (``redaction.gate_key``; serving refuses it under any other). A newer
+   request or a withdrawal (``map.revoke``) moved the generation on: nothing
+   is published and the upload is deleted. Published, the previous archive is
+   deleted after the commit.
 
 An empty snapshot publishes "no map" (``map_key`` cleared), which also drops
 the previous archive. A failed or impossible build (no tippecanoe) keeps the
@@ -34,19 +36,18 @@ from pathlib import Path
 from typing import Any, Final
 
 from simple_module_db import finalize_session
-from simple_module_db.independent import independent_session
-from sqlalchemy import delete, select, update
+from sqlalchemy import select, update
 
-from sm_images import constants, storage_keys
-from sm_images.intents import clear_intents, object_intent
+from sm_images import constants, redaction, storage_keys
+from sm_images.intents import add_intents, clear_intents, object_intent
 from sm_images.map import pmtiles_build
+from sm_images.map.objects import drop_objects
 from sm_images.map.points import located
 from sm_images.map.schedule import FAILED_COOLDOWN, request_if_due
-from sm_images.models import Collection, Image, ObjectIntent
-from sm_images.pipeline.publish import add_intents
+from sm_images.models import Collection, Image
 from sm_images.pipeline.runtime import Runtime
 
-__all__ = ["FAILED", "PUBLISHED", "SUPERSEDED", "UNAVAILABLE", "build_map_async", "drop_objects"]
+__all__ = ["FAILED", "PUBLISHED", "SUPERSEDED", "UNAVAILABLE", "build_map_async"]
 
 logger = logging.getLogger(__name__)
 
@@ -65,23 +66,12 @@ class Snapshot:
     changes: int
     count: int
     taken_at: datetime
+    policy: str
+    """The redaction gate the points were selected under (``redaction.gate_key``)."""
 
 
 def _ours(collection_id: uuid.UUID, gen: int) -> tuple[Any, ...]:
     return (Collection.id == collection_id, Collection.map_generation == gen)
-
-
-async def drop_objects(runtime: Runtime, keys: list[str]) -> None:
-    """Delete objects nothing references, then their intents. Best effort: one
-    whose delete fails keeps its intent, and the janitor retries."""
-    if not keys:
-        return
-    try:
-        await runtime.store().delete_keys(keys)
-        async with independent_session(runtime.session_factory) as s:
-            await s.execute(delete(ObjectIntent).where(ObjectIntent.key.in_(keys)))
-    except Exception:
-        logger.warning("images.map.object_cleanup_failed keys=%s", keys, exc_info=True)
 
 
 async def _cool_down(runtime: Runtime, collection_id: uuid.UUID, gen: int) -> None:
@@ -105,6 +95,7 @@ async def _snapshot(
             await db.rollback()
             return None
         changes, stmt = coll.map_changes, located(coll)  # the gate, as configured now
+        policy = redaction.gate_key(coll)
         budget = timedelta(seconds=pmtiles_build.timeout_for(coll.located_count)) + UPLOAD_MARGIN
         await db.execute(
             update(Collection)
@@ -124,7 +115,7 @@ async def _snapshot(
                 await db.rollback()
             count += pmtiles_build.write_features(fh, rows)
             if len(rows) < CHUNK:
-                return Snapshot(changes, count, taken_at)
+                return Snapshot(changes, count, taken_at, policy)
             after = rows[-1][0]
 
 
@@ -163,6 +154,7 @@ async def _publish(
                 map_built_at=snap.taken_at,
                 map_image_count=snap.count,
                 map_built_changes=snap.changes,
+                map_policy_rev=snap.policy,
                 map_claimed_until=None,
             )
             .execution_options(**_SYNC)

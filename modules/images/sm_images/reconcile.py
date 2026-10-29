@@ -35,7 +35,7 @@ isolation applying as in a request:
   in batches);
 * maps that are due and not claimed - a lost ``images.build_map``, a claim
   that expired, a withdrawn map - are requested again
-  (:func:`sm_images.map.schedule.reconcile_maps`).
+  (:func:`sm_images.map.recover.reconcile_maps`).
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ from sqlalchemy import and_, or_, select, update
 from sm_images import billing_ops
 from sm_images.ai.group_request import recover_group_runs
 from sm_images.imports.recover import recover_imports
-from sm_images.map.schedule import reconcile_maps
+from sm_images.map.recover import reconcile_maps
 from sm_images.models import (
     BillingOp,
     Collection,

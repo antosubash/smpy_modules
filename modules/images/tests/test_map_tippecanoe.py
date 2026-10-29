@@ -17,7 +17,7 @@ from sm_images.map import build, pmtiles_build
 from sm_images.models import Image
 from sqlalchemy import update
 
-from tests.test_map_build import T, _located, _request, _state
+from tests.map_support import T, located, request, state
 
 # --- tippecanoe ---------------------------------------------------------------
 
@@ -98,13 +98,13 @@ def _tile_bytes(data: bytes) -> list[bytes]:
 @pytest.mark.skipif(pmtiles_build.locate("tippecanoe") is None, reason="tippecanoe not installed")
 async def test_tiles_have_no_filenames(pipe):
     coll = await pipe.collection({})
-    ids = await _located(pipe, coll, 3, properties={"owner": "secret-prop"})
+    ids = await located(pipe, coll, 3, properties={"owner": "secret-prop"})
     async with pipe.db_state.session_factory() as s:
         await s.execute(update(Image).values(filename="secret-name.jpg"))
         await s.commit()
-    gen = await _request(pipe, coll)
+    gen = await request(pipe, coll)
     assert await build.build_map_async(pipe.runtime, T, coll.id, gen) == build.PUBLISHED
-    row = await _state(pipe, coll)
+    row = await state(pipe, coll)
     data = await pipe.store.read(row.map_key)
     assert data[:7] == b"PMTiles"
     tiles = _tile_bytes(data)

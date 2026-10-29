@@ -4,6 +4,8 @@ Ported from the portal's ``range_response.py``. Only a single byte range is
 honoured: a multi-range header, another unit or a malformed spec is ignored and
 the whole object served with 200, which RFC 9110 allows. A well-formed range
 that starts past the end raises :class:`RangeNotSatisfiable` (answer 416).
+A position of any length is well-formed: a huge first-pos is a 416, a huge
+last-pos is clamped to the end, and a huge suffix is the whole object.
 """
 
 from __future__ import annotations
@@ -31,9 +33,19 @@ class ByteRange:
         return self.end - self.start + 1
 
 
+_MAX_DIGITS = 19
+"""More digits than any object can have bytes. A longer number is still a
+well-formed position (RFC 9110 sets no limit), so it is read as "past every
+end" rather than converted: ``int()`` of a few thousand digits raises."""
+_HUGE = 10**_MAX_DIGITS
+
+
 def _int(value: str) -> int | None:
     value = value.strip()
-    return int(value) if value.isascii() and value.isdigit() else None
+    if not (value.isascii() and value.isdigit()):
+        return None
+    significant = value.lstrip("0") or "0"
+    return _HUGE if len(significant) > _MAX_DIGITS else int(significant)
 
 
 def _suffix(raw: str, size: int) -> ByteRange | None:

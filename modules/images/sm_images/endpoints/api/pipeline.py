@@ -20,10 +20,12 @@ from simple_module_core.resources import ACTION_DELETE, ResourcePrincipal
 from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal
 
+from sm_images import redaction
 from sm_images.access import POLICY, CollectionOwner, CollectionView, ImageCollectionEdit
 from sm_images.deps import require_view
 from sm_images.endpoints.api._runtime import runtime, tenant
 from sm_images.errors import Forbidden, Invalid
+from sm_images.map import revoke as map_revoke
 from sm_images.pipeline import control
 from sm_images.pipeline.config import (
     PipelineConfigError,
@@ -61,9 +63,11 @@ async def put_pipeline(
         err = Invalid(str(exc)[:1000])
         err.code = CODE_INVALID_CONFIG
         raise err from exc
+    gate = redaction.gate_key(collection)
     collection.pipeline_config = config
     collection.protect_originals = protect_originals(collection.protect_originals, parsed)
     await db.flush()
+    await map_revoke.gate_saved(db, collection, gate)  # another gate: the map goes now
     return await control.overview(db, collection)
 
 

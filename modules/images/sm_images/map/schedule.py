@@ -16,12 +16,12 @@ rebuilds on the first change.
 collection (``map_claimed_until``) unless a build is already queued or running;
 the build extends the claim while it works and clears it when it publishes.
 A lost message or a dead worker leaves a claim that expires, and
-``images.reconcile`` (:func:`reconcile_maps`) requests what is still due.
+``images.reconcile`` (:func:`sm_images.map.recover.reconcile_maps`) requests
+what is still due.
 
-**A visibility change withdraws the map** (:func:`withdraw`, the portal's
-revocation lesson) in the visibility change's own transaction: ``map_key`` is
-cleared, so nothing is served until a fresh build publishes, and the generation
-moves on, so a build that started before the change can never publish.
+Points that must *leave* the map do not wait for any of this: a visibility
+change, a removed point and a change of the redaction gate withdraw the
+archive in their own transaction (:mod:`sm_images.map.revoke`).
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ from datetime import UTC, datetime, timedelta
 from functools import partial
 from typing import Any, Final
 
-from simple_module_db import finalize_session, tenant_context
+from simple_module_db import tenant_context
 from simple_module_db.callbacks import register_on_commit
 from sqlalchemy import or_, select, update
 
@@ -41,13 +41,13 @@ from sm_images.pipeline.runtime import Runtime, current_runtime
 
 __all__ = [
     "FAILED_COOLDOWN",
+    "MAP_STATE",
     "QUEUED_TTL",
     "changed",
     "due",
-    "reconcile_maps",
+    "due_row",
     "request",
     "request_if_due",
-    "withdraw",
 ]
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ QUEUED_TTL: Final = timedelta(minutes=10)
 FAILED_COOLDOWN: Final = timedelta(minutes=15)
 """A failed or impossible build (no tippecanoe) is not retried before this."""
 _SYNC: Final = {"synchronize_session": False}
-_STATE: Final = (
+MAP_STATE: Final = (
     Collection.map_changes,
     Collection.map_built_changes,
     Collection.map_urgent_mark,
@@ -76,7 +76,7 @@ def due(pending: int, baseline: int, *, urgent: bool, pct: int, abs_: int) -> bo
     return urgent or pending >= abs_ or pending * 100 >= pct * baseline
 
 
-def _due_row(row: Any, settings: Any) -> bool:
+def due_row(row: Any, settings: Any) -> bool:
     changes, built, urgent_mark, baseline = row
     return due(
         changes - built,
@@ -152,10 +152,13 @@ async def changed(
     image_id: uuid.UUID | None = None,
     runtime: Runtime | None = None,
     tenant: str | None = None,
+    request_build: bool = True,
 ) -> None:
     """Count ``count`` map changes in the caller's transaction, and request a
-    build if that makes the map due. With ``image_id``, only if that image has a
-    location (an unlocated image is not on the map)."""
+    build if that makes the map due (unless ``request_build`` is false: the
+    next check - the cycle's ``ImageProcessed``, reconcile - finds it due). With
+    ``image_id``, only if that image has a location (an unlocated image is not
+    on the map)."""
     if count <= 0:
         return
     values: dict[str, Any] = {"map_changes": Collection.map_changes + count}
@@ -165,10 +168,12 @@ async def changed(
     if image_id is not None:
         placed = select(Image.id).where(Image.id == image_id, Image.lat.is_not(None))
         stmt = stmt.where(placed.exists())
-    stmt = stmt.values(**values).returning(*_STATE).execution_options(**_SYNC)
+    stmt = stmt.values(**values).returning(*MAP_STATE).execution_options(**_SYNC)
     row = (await db.execute(stmt)).first()
+    if not request_build:
+        return
     runtime = runtime or current_runtime()
-    if row is None or runtime is None or not _due_row(row, runtime.settings()):
+    if row is None or runtime is None or not due_row(row, runtime.settings()):
         return
     if tenant is None:
         from sm_images.tenancy import bound_tenant
@@ -182,63 +187,7 @@ async def request_if_due(
 ) -> int | None:
     """Request a build if the collection's map is due (a build that just
     published re-checks: changes may have landed while it ran)."""
-    row = (await db.execute(select(*_STATE).where(Collection.id == collection_id))).first()
-    if row is None or not _due_row(row, runtime.settings()):
+    row = (await db.execute(select(*MAP_STATE).where(Collection.id == collection_id))).first()
+    if row is None or not due_row(row, runtime.settings()):
         return None
     return await request(db, runtime, tenant, collection_id)
-
-
-async def withdraw(
-    db: Any, collection_id: uuid.UUID, *, runtime: Runtime | None, tenant: str
-) -> None:
-    """Stop serving the map now and build a fresh one: in the caller's
-    transaction (a visibility change). The withdrawn archive is deleted after
-    the commit; its intent lets the janitor finish if that delete fails."""
-    from sm_images.map.build import drop_objects
-    from sm_images.pipeline.publish import add_intents
-
-    lock = select(Collection.map_key).where(Collection.id == collection_id)
-    old = (await db.execute(lock.with_for_update(key_share=True))).scalar_one_or_none()
-    await db.execute(
-        update(Collection)
-        .where(Collection.id == collection_id)
-        .values(
-            map_key=None,
-            map_built_at=None,
-            map_image_count=0,
-            map_changes=Collection.map_changes + 1,
-            map_urgent_mark=Collection.map_changes + 1,
-        )
-        .execution_options(**_SYNC)
-    )
-    if old:
-        await add_intents(db, [old])
-        if runtime is not None:
-            register_on_commit(db, partial(drop_objects, runtime, [old]))
-    await request(db, runtime, tenant, collection_id, force=True)
-
-
-async def reconcile_maps(runtime: Runtime, tenant: str, at: datetime) -> int:
-    """Request every unclaimed map of ``tenant`` that is due (the caller has
-    bound it). Skipped while tippecanoe cannot be found: nothing could build."""
-    from sm_images.map import pmtiles_build
-
-    settings = runtime.settings()
-    if pmtiles_build.locate(settings.tippecanoe_path) is None:
-        return 0
-    claimed = Collection.map_claimed_until
-    stmt = select(Collection.id, *_STATE).where(
-        Collection.tenant_id == tenant, or_(claimed.is_(None), claimed < at)
-    )
-    async with runtime.session_factory() as db:
-        rows = list((await db.execute(stmt)).all())
-        await finalize_session(db)
-    requested = 0
-    for collection_id, *state in rows:
-        if not _due_row(state, settings):
-            continue
-        async with runtime.session_factory() as db:
-            if await request(db, runtime, tenant, collection_id, at=at) is not None:
-                requested += 1
-            await finalize_session(db)
-    return requested

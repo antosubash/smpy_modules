@@ -13,8 +13,10 @@ from sqlalchemy.exc import IntegrityError
 from sm_images import constants
 from sm_images.access import COLLECTION_RESOURCE, POLICY
 from sm_images.errors import Conflict, Forbidden, Invalid
+from sm_images.map.revoke import withdraw
 from sm_images.models import Collection, Visibility
 from sm_images.models.collection import COLLECTION_SLUG_INDEX
+from sm_images.pipeline.runtime import current_runtime
 from sm_images.services import cursor as cursors
 from sm_images.services.slugs import slugify
 
@@ -106,13 +108,20 @@ def update(row: Collection, fields: dict[str, Any]) -> Collection:
     return row
 
 
-def set_visibility(row: Collection, who: ResourcePrincipal, target: Visibility) -> Visibility:
+async def set_visibility(
+    db: Any, row: Collection, who: ResourcePrincipal, target: Visibility
+) -> Visibility:
     """Move *row* to *target*; returns the visibility it had. The caller has
-    already established owner-or-manager through ``CollectionOwner``."""
+    already established owner-or-manager through ``CollectionOwner``.
+
+    A change withdraws the map in this transaction (``map.revoke.withdraw``):
+    the old archive is never served again, even for a moment, a build in
+    flight cannot publish, and a fresh one is built for the new visibility."""
     before = row.visibility
     if before is not target:
         require_publish(who, target)
         row.visibility = target
+        await withdraw(db, row.id, runtime=current_runtime(), tenant=row.tenant_id)
     return before
 
 

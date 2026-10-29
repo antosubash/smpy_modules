@@ -106,7 +106,11 @@ limit. Public exemptions are `GET`/`HEAD` only, under `/images/c/` and
 - `images.build_map` (queue `images`) builds the archive with `tippecanoe`.
   A rebuild starts once the changes since the last build reach
   `map_rebuild_threshold_abs` or `map_rebuild_threshold_pct` percent of its
-  points. A move or a removal does not wait for the threshold. A visibility
-  change withdraws the archive in the same transaction and builds a fresh one.
+  points (both at least 1). A move does not wait for the threshold. A visibility
+  change, a removed point (an image trashed or its location cleared) and a
+  pipeline save that changes the redaction gate withdraw the archive in the
+  same transaction and build a fresh one. An archive is stamped with the
+  redaction gate it was built under, and is a 404 under any other (for
+  example once a mutator plugin is removed) until `images.reconcile` rebuilds it.
 - The `images.tippecanoe` health check is degraded while the binary cannot be
   found. Points keep working.

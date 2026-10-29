@@ -31,7 +31,7 @@ from simple_module_db.deps import get_db
 
 from sm_images import cache, constants, serving
 from sm_images.access import public_collection
-from sm_images.endpoints.api.map import BBox, Cursor, Limit, points_response
+from sm_images.endpoints.map_params import BBox, Cursor, Limit, points_response
 from sm_images.errors import ImagesError, render
 from sm_images.models import Collection
 from sm_images.tenancy import bind_public
@@ -125,5 +125,5 @@ async def public_points(
 async def public_map(request: Request, collection: Public) -> Response:
     """Re-checked as public on every request, every range of a viewer included:
     a collection made private stops here at once (and its archive was withdrawn
-    with the change, ``sm_images.map.schedule.withdraw``)."""
+    with the change, ``sm_images.map.revoke.withdraw``)."""
     return await serving.serve_map(request, collection, twin=True)

@@ -190,15 +190,20 @@ async def serve_map(request: Request, collection: Collection, *, twin: bool) -> 
 
     ``collection`` was just re-read through the policy (admin) or as public
     (twin), so a visibility change stops the next range request. No archive -
-    never built, or withdrawn by a visibility change and not rebuilt yet - is
-    the plain 404. Ranges as above; the ETag digests the archive's key, which
-    names its build generation, so a rebuild is a new ETag and a stale
+    never built, or withdrawn (a visibility change, a removed point, a new
+    redaction gate) and not rebuilt yet - is the plain 404, and so is an
+    archive built under another redaction gate than the collection has now
+    (``redaction.gate_key``: a mutator installed, removed or bumped since):
+    it may place images that are pending again.
+
+    Ranges as above; the ETag digests the archive's key, which names its
+    build generation, so a rebuild is a new ETag and a stale
     ``If-Range`` gets the whole new archive rather than a splice of two.
     ``no-cache`` on both surfaces (Task 12's ``public``/``private`` split):
     the URL is stable, so every cache revalidates, and a withdrawn map stops
     being served by caches too.
     """
-    if not collection.map_key:
+    if not collection.map_key or collection.map_policy_rev != redaction.gate_key(collection):
         raise _missing()
     policy = cache.cache_headers(request, collection, cache.DISPLAY, twin=twin, current=False)
     target = Target(collection.map_key, constants.PMTILES_CONTENT_TYPE, False)

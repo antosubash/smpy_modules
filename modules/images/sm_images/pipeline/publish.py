@@ -13,9 +13,10 @@ from typing import Any
 
 from sqlalchemy import delete, or_, select, update
 
-from sm_images.models import Image, ObjectIntent, Rendition, StepRun
+from sm_images.intents import add_intents
+from sm_images.map.revoke import gate_reopened, may_mutate
+from sm_images.models import Image, Rendition, StepRun
 from sm_images.models.enums import LocationSource, StepStatus
-from sm_images.pipeline import registry
 from sm_images.processing.exif import ExifData
 from sm_images.services import stats
 
@@ -82,6 +83,7 @@ async def _reopen(db: Any, tenant: str, image_id: uuid.UUID, steps: list[str]) -
     the old leases can no longer complete."""
     if not steps:
         return
+    await gate_reopened(db, tenant, image_id, steps)  # before: it reads what had settled
     await db.execute(
         update(StepRun)
         .where(StepRun.tenant_id == tenant, StepRun.image_id == image_id, StepRun.step.in_(steps))
@@ -95,15 +97,6 @@ async def invalidate_renditions(db: Any, tenant: str, image_id: uuid.UUID) -> No
     await _reopen(db, tenant, image_id, [RENDITIONS])
 
 
-def _may_mutate(step: str) -> bool:
-    """A registered display mutator, or an unknown step that might be one
-    (``prompt:*`` never writes a display copy)."""
-    impl = registry.get_step(step)
-    if impl is None:
-        return not step.startswith(registry.PROMPT_PREFIX)
-    return bool(impl.mutates_display)
-
-
 async def invalidate_other_mutators(
     db: Any, tenant: str, image_id: uuid.UUID, writer: str
 ) -> list[str]:
@@ -115,7 +108,7 @@ async def invalidate_other_mutators(
     stmt = select(StepRun.step).where(
         StepRun.tenant_id == tenant, StepRun.image_id == image_id, StepRun.step != writer
     )
-    steps = sorted(s for s in (await db.execute(stmt)).scalars() if _may_mutate(s))
+    steps = sorted(s for s in (await db.execute(stmt)).scalars() if may_mutate(s))
     await _reopen(db, tenant, image_id, steps)
     return steps
 
@@ -160,13 +153,6 @@ async def touch_image(db: Any, tenant: str, image_id: uuid.UUID, now: datetime) 
         .values(updated_at=now)
         .execution_options(**_SYNC)
     )
-
-
-async def add_intents(db: Any, keys: list[str]) -> None:
-    """Objects about to become unreferenced: if deleting them after the commit
-    fails, the janitor reaps them through these intents."""
-    for key in dict.fromkeys(keys):
-        await db.merge(ObjectIntent(key=key))
 
 
 async def _location(db: Any, tenant: str, image_id: uuid.UUID, data: ExifData) -> bool:

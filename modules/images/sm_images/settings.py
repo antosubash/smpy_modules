@@ -89,11 +89,12 @@ class ImagesSettings(BootSettings):
     dedupe_by_hash: bool = False
     """Skip an upload whose content hash already exists in the collection."""
 
-    map_rebuild_threshold_pct: int = Field(default=5, ge=0)
-    """Rebuild a collection's map tiles once this percentage of points changed."""
+    map_rebuild_threshold_pct: int = Field(default=5, ge=1)
+    """Rebuild a collection's map tiles once this percentage of points changed.
+    At least 1: a 0 would make every single change due."""
 
-    map_rebuild_threshold_abs: int = Field(default=100, ge=0)
-    """...or once this many points changed, whichever comes first."""
+    map_rebuild_threshold_abs: int = Field(default=100, ge=1)
+    """...or once this many points changed, whichever comes first (at least 1)."""
 
     janitor_grace_days: int = Field(default=7, ge=0)
     """Days an unreferenced object is kept before the janitor reaps it."""

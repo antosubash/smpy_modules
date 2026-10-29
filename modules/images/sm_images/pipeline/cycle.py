@@ -14,6 +14,7 @@ from typing import Any
 
 from sqlalchemy import and_, update
 
+from sm_images.map.revoke import gate_reopened
 from sm_images.models import Image, StepRun
 from sm_images.models.enums import StepStatus
 from sm_images.pipeline.claim import _owned, _run
@@ -46,6 +47,7 @@ async def reset_runs(
     the steps actually reset (the guard may refuse some the caller selected)."""
     if not steps:
         return []
+    await gate_reopened(db, tenant, image_id, steps)  # before: it reads what had settled
     live = and_(StepRun.status == StepStatus.RUNNING, StepRun.lease_expires_at >= now)
     stmt = (
         update(StepRun)

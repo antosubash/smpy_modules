@@ -21,9 +21,7 @@ from sm_images.access import CollectionEdit, CollectionOwner, CollectionView
 from sm_images.contracts.schemas import collection_fields
 from sm_images.deps import require_create, require_view
 from sm_images.imports.cleanup import cancel_for_collection
-from sm_images.map import schedule as map_schedule
 from sm_images.models import Collection
-from sm_images.pipeline.runtime import current_runtime
 from sm_images.regroup.control import cancel_for_collection as cancel_regroups
 from sm_images.schemas.collection import (
     CollectionCreate,
@@ -98,14 +96,9 @@ async def set_visibility(
     who: Principal,
     db=Depends(get_db),
 ) -> CollectionOut:
-    before = service.set_visibility(collection, who, body.visibility)
-    if before is not collection.visibility:
+    before = await service.set_visibility(db, collection, who, body.visibility)
+    if before is not collection.visibility:  # the map was withdrawn with it
         events.emit(db, _bus(request), events.visibility_changed(collection, before.value))
-        # Same transaction: the old map is never served again, even for a
-        # moment, and a fresh one is built for the new visibility.
-        await map_schedule.withdraw(
-            db, collection.id, runtime=current_runtime(), tenant=collection.tenant_id
-        )
     return out(collection, who)
 
 

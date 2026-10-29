@@ -42,3 +42,27 @@ def test_empty_object_is_unsatisfiable_for_any_range():
 
 def test_length():
     assert ByteRange(10, 19).length == 10
+
+
+HUGE = "9" * 5000  # past Python's int-from-str digit limit: a ValueError if unbounded
+
+
+@pytest.mark.parametrize(
+    ("header", "want"),
+    [
+        (f"bytes=0-{HUGE}", ByteRange(0, 99)),  # a last-pos past the end is clamped
+        (f"bytes=-{HUGE}", ByteRange(0, 99)),  # a suffix longer than the object: all of it
+        (f"bytes={'0' * 30}5-{HUGE}", ByteRange(5, 99)),  # leading zeros are still small
+    ],
+    ids=["huge-last-pos", "huge-suffix", "zero-padded-first-pos"],
+)
+def test_huge_numbers_are_ranges_not_errors(header, want):
+    assert parse_range(header, 100) == want
+
+
+@pytest.mark.parametrize(
+    "header", [f"bytes={HUGE}-", f"bytes={HUGE}-{HUGE}"], ids=["open", "closed"]
+)
+def test_a_huge_first_pos_is_unsatisfiable(header):
+    with pytest.raises(RangeNotSatisfiable):
+        parse_range(header, 100)

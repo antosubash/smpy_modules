@@ -27,8 +27,10 @@ from typing import Any
 
 from sqlalchemy import select
 
+from sm_images import redaction
 from sm_images.ai import codes
 from sm_images.errors import Invalid, NotFound
+from sm_images.map import revoke
 from sm_images.models import Collection, Prompt
 from sm_images.models.enums import PromptScope
 from sm_images.pipeline import registry
@@ -153,9 +155,11 @@ async def apply_preset(db: Any, collection: Collection, preset_id: str) -> list[
     the prompts it created - none the second time. The caller's session."""
     preset = _get(preset_id)
     created = await _prompts(db, collection, preset)
+    gate = redaction.gate_key(collection)
     await _pipeline(db, collection, preset)
     if not collection.group_roles and preset.group_roles:
         collection.group_roles = list(preset.group_roles)
     collection.preset_id = preset.id
     await db.flush()
+    await revoke.gate_saved(db, collection, gate)  # a preset enabling a mutator
     return created

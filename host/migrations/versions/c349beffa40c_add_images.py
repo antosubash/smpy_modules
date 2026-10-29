@@ -71,6 +71,7 @@ def upgrade() -> None:
         sa.Column("map_built_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("map_image_count", sa.Integer(), nullable=False),
         sa.Column("map_key", sa.String(length=500), nullable=True),
+        sa.Column("map_policy_rev", sa.String(length=64), nullable=True),
         sa.Column("map_generation", sa.Integer(), nullable=False),
         sa.Column("map_claimed_until", sa.DateTime(timezone=True), nullable=True),
         sa.Column("map_changes", sa.Integer(), nullable=False),

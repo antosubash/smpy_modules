@@ -12,7 +12,7 @@ import uuid
 
 import pytest
 import pytest_asyncio
-from sm_images import constants
+from sm_images import constants, redaction
 from sm_images.models import Group, ImportJob, Prompt, RegroupJob, Rendition, Visibility
 from sm_images.storage import ImageStore
 
@@ -39,6 +39,7 @@ async def secret(client, storage):
         s.add_all([private, public])
         await s.flush()
         private.map_key = "k/map"  # a built map, so its owner gets a 200 from the archive route
+        private.map_policy_rev = redaction.gate_key(private)
         pic = image(private, "secret-photo.jpg", lat=48.2, lng=16.37)
         s.add(pic)
         await s.flush()

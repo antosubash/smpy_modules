@@ -35,6 +35,7 @@ which dispatch reopens - and re-runs - when it is enabled again.
 
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
 from sqlalchemy import and_, exists, false, or_, select, true
@@ -45,7 +46,7 @@ from sm_images.pipeline import registry
 from sm_images.pipeline.config import validate_pipeline_config
 from sm_images.pipeline.plan import BLOCKED_CODES
 
-__all__ = ["pending", "ready_clause", "trusts_display"]
+__all__ = ["gate_key", "pending", "ready_clause", "trusts_display"]
 
 
 def _settles(status: StepStatus, code: str | None) -> bool:
@@ -114,6 +115,23 @@ def _mutators(collection: Collection) -> dict[str, Any] | None:
         for sid in enabled
         if (impl := registry.get_step(sid)) is not None and impl.mutates_display
     }
+
+
+def gate_key(collection: Collection) -> str:
+    """The identity of *collection*'s redaction gate: everything
+    :func:`ready_clause` decides in Python - ``protect_originals`` and the
+    enabled, installed mutators at their installed versions, or "an enabled
+    step is unknown". Two equal keys place the same images. A map archive is
+    stamped with the key it was built under (``Collection.map_policy_rev``) and
+    is not served under another: a pipeline save, a plugin installed or
+    removed, a mutator's version bump."""
+    mutators = _mutators(collection)
+    if mutators is None:
+        gate = "unknown"
+    else:
+        gate = ",".join(f"{sid}@{impl.version}" for sid, impl in sorted(mutators.items()))
+    raw = f"{int(bool(collection.protect_originals))}|{gate}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
 
 def ready_clause(collection: Collection) -> Any:

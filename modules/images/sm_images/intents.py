@@ -59,6 +59,13 @@ async def object_intent(keys: Iterable[str], *, session_factory: Any = None) -> 
     yield
 
 
+async def add_intents(db: Any, keys: Iterable[str]) -> None:
+    """Objects about to become unreferenced, in the caller's session: if deleting
+    them after the commit fails, the janitor reaps them through these intents."""
+    for key in dict.fromkeys(keys):
+        await db.merge(ObjectIntent(key=key))
+
+
 async def clear_intents(db: Any, keys: Iterable[str]) -> None:
     """Delete the intents in the caller's session (commit with the referencing row)."""
     unique = list(dict.fromkeys(keys))

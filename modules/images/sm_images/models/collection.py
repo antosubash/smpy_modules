@@ -56,6 +56,9 @@ class Collection(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True
     map_key: str | None = Field(default=None, max_length=500)
     """The published archive (generation- and attempt-specific); ``None`` is
     served as a 404. Withdrawn in the same transaction as a visibility change."""
+    map_policy_rev: str | None = Field(default=None, max_length=64)
+    """The redaction gate the current archive was built under
+    (``redaction.gate_key``); an archive stamped with another is not served."""
     map_generation: int = Field(default=0, sa_column_kwargs={"nullable": False})
     """Bumped by every build request and every withdrawal; a build publishes
     only while it is still the current generation."""

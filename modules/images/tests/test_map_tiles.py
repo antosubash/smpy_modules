@@ -13,7 +13,7 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from sm_images import storage_keys
+from sm_images import redaction, storage_keys
 from sm_images.models import Collection, Group, ObjectIntent, Visibility
 from sm_images.storage import ImageStore
 from sm_images.tenancy import DEFAULT_TENANT, tenant_scope
@@ -31,6 +31,7 @@ async def _seed(client, storage, visibility=Visibility.PUBLIC, *, data=ARCHIVE, 
     coll = collection(f"t-{uuid.uuid4().hex[:8]}", visibility, OWNER)
     key = storage_keys.map_key(DEFAULT_TENANT, str(coll.id), generation, "a1")
     coll.map_key, coll.map_generation, coll.map_image_count = key, generation, 3
+    coll.map_policy_rev = redaction.gate_key(coll)  # built under the current gate
     async with client.db_state.session_factory() as s:
         s.add(coll)
         await s.commit()
@@ -75,6 +76,16 @@ async def test_range_past_the_end_is_416(client, storage):
     )
     assert got.status_code == 416
     assert got.headers["content-range"] == f"bytes */{len(ARCHIVE)}"
+
+
+async def test_a_huge_range_number_is_416_not_500(client, storage):
+    coll, _ = await _seed(client, storage, Visibility.PRIVATE)
+    nines = "9" * 5000
+    got = await client.get(_url(coll), headers={**headers(OWNER), "Range": f"bytes={nines}-"})
+    assert got.status_code == 416
+    assert got.headers["content-range"] == f"bytes */{len(ARCHIVE)}"
+    whole = await client.get(_url(coll), headers={**headers(OWNER), "Range": f"bytes=0-{nines}"})
+    assert (whole.status_code, whole.content) == (206, ARCHIVE)
 
 
 async def test_etag_is_tied_to_the_build_generation(client, storage):
@@ -154,7 +165,9 @@ async def test_the_route_rechecks_visibility_on_every_request(client, storage):
         (Visibility.PRIVATE, Visibility.PUBLIC),
     ],
 )
-async def test_a_visibility_change_withdraws_the_map_until_rebuilt(client, storage, before, after):
+async def test_a_visibility_change_withdraws_the_map_until_rebuilt(
+    client, storage, web_runtime, before, after
+):
     coll, key = await _seed(client, storage, before)
     put = await client.put(
         f"/api/images/collections/{coll.id}/visibility",
@@ -167,13 +180,13 @@ async def test_a_visibility_change_withdraws_the_map_until_rebuilt(client, stora
     assert row.map_urgent_mark == row.map_changes > 0  # a rebuild may not wait
     for url, who in ((_public(coll), None), (_url(coll), OWNER)):
         assert (await client.get(url, headers=headers(who))).status_code == 404
-    # the withdrawn archive is deleted after the commit, or left to the janitor
-    store = ImageStore(storage)
+    # with a runtime the withdrawn archive is deleted after the commit, intent and all
     async with client.db_state.session_factory() as s:
         intent = (
             await s.execute(select(ObjectIntent).where(ObjectIntent.key == key))
         ).scalar_one_or_none()
-    assert intent is not None or not await store.exists(key)
+    assert intent is None
+    assert not await ImageStore(storage).exists(key)
 
 
 async def test_a_move_and_a_removal_do_not_wait_for_the_threshold(client, storage):
@@ -200,3 +213,4 @@ async def test_a_move_and_a_removal_do_not_wait_for_the_threshold(client, storag
     assert (await client.delete(url, headers=headers(OWNER))).status_code == 204
     row = await _row(client, coll)
     assert row.map_changes == row.map_urgent_mark == 3
+    assert row.map_key is None  # a removed point is withdrawn at once (review fix 1)

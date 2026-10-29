@@ -39,6 +39,7 @@ from tests.fetch_support import inner, resolver  # noqa: F401 - the safe-fetch t
 from tests.group_support import file_pipe  # noqa: F401 - the group-run tests' fixture
 from tests.import_support import imp  # noqa: F401 - the import tests' fixture
 from tests.isolation_support import two_tenants  # noqa: F401 - the tenancy matrix's fixture
+from tests.map_support import fake_tippecanoe, web_runtime  # noqa: F401 - the map tests' fixtures
 from tests.pg_support import arm_reset, make_db_state
 from tests.pipeline_api_support import world  # noqa: F401 - the pipeline API tests' fixture
 from tests.pipeline_support import pipe  # noqa: F401 - the pipeline tests' fixture
