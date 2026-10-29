@@ -16,7 +16,7 @@ import uuid
 from dataclasses import dataclass, replace
 from typing import Any
 
-from sm_images import billing, billing_ops
+from sm_images import billing, billing_ops, hold_refs
 from sm_images.errors import StorageQuotaExceeded
 from sm_images.models.billing_op import OP_COMMIT, OP_RELEASE
 
@@ -75,6 +75,7 @@ async def keep_hold(
         await billing_ops.add(
             db, OP_COMMIT, image_id=image_id, hold_id=hold, quantity=size, factory=factory
         )
+        await hold_refs.installed(db, hold, image_id)
 
 
 async def drop_hold(db: Any, factory: Any, image_id: uuid.UUID, hold: str | None) -> None:

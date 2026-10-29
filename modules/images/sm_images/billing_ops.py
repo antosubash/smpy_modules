@@ -89,8 +89,12 @@ async def add_swap(
 async def release_storage(db: Any, holds: list[StorageHold], factory: Any = None) -> None:
     """The janitor's purge: the hard-deleted images' holds, released once its
     transaction commits (the op keeps the hold id; the row is gone)."""
+    from sm_images import hold_refs
+    from sm_images.tenancy import bound_tenant
+
     for image_id, hold, size in holds:
         if hold:
+            await hold_refs.orphan(db, bound_tenant(), hold)
             await add(
                 db, OP_RELEASE, image_id=image_id, hold_id=hold, quantity=size, factory=factory
             )

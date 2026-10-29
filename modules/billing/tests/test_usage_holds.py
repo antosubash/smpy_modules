@@ -237,15 +237,23 @@ async def test_check_on_a_gauge_compares_the_level_held(factory, usage):
 
 async def test_get_hold_reads_the_state_without_writing(factory, usage, clock):
     tenant = await seed_limits(factory, {GAUGE: 10})
-    assert await usage.get_hold("0" * 32) is None
+    assert await usage.get_hold(tenant, "0" * 32) is None
     held = await usage.reserve(tenant, GAUGE, 2, "a", source="t", ttl=60)
-    assert (await usage.get_hold(held.id)).status == "held"
+    assert (await usage.get_hold(tenant, held.id)).status == "held"
     await usage.commit(held.id)
-    assert (await usage.get_hold(held.id)).status == "committed"
+    assert (await usage.get_hold(tenant, held.id)).status == "committed"
     lapsing = await usage.reserve(tenant, GAUGE, 1, "b", source="t", ttl=60)
     clock.now += timedelta(seconds=61)
-    read = await usage.get_hold(lapsing.id)
+    read = await usage.get_hold(tenant, lapsing.id)
     assert (read.status, read.quantity) == ("expired", 1)
     assert sorted(await hold_statuses(factory, tenant)) == ["committed", "held"]  # no write
     await usage.release(held.id)
-    assert (await usage.get_hold(held.id)).status == "released"
+    assert (await usage.get_hold(tenant, held.id)).status == "released"
+
+
+async def test_get_hold_never_reads_another_tenants_hold(factory, usage):
+    mine = await seed_limits(factory, {GAUGE: 10})
+    theirs = await seed_limits(factory, {GAUGE: 10})
+    hold = await usage.reserve(theirs, GAUGE, 2, "a", source="t")
+    assert await usage.get_hold(mine, hold.id) is None
+    assert (await usage.get_hold(theirs, hold.id)).status == "held"

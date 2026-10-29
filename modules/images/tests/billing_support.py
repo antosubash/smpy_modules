@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sm_billing.contracts.metering import Allowed, Exceeded, Hold, HoldExpired
+from sm_billing.contracts.metering import Allowed, Exceeded, Hold, HoldExpired, HoldNotFound
 from sm_images import billing
 from sm_images.models import Image
 from sm_images.tenancy import DEFAULT_TENANT
@@ -40,6 +40,8 @@ class FakeGauge:
     refuse_commit: set[str] = field(default_factory=set)
     """Commits of these holds raise (billing unreachable for them)."""
     next_seconds: list[int] = field(default_factory=list)
+    lie_expired: set[str] = field(default_factory=set)
+    """The next ``get_hold`` of these reads ``expired`` (a stalled reader's view)."""
     """TTLs (seconds) the next reservations get instead of the one asked for."""
 
     @property
@@ -88,6 +90,8 @@ class FakeGauge:
         if self.fail_commit or hold_id in self.refuse_commit:
             self.fail_commit = max(self.fail_commit - 1, 0)
             raise RuntimeError("billing is down")
+        if hold_id not in self.holds:
+            raise HoldNotFound(hold_id)
         hold = self._lapse(self.holds[hold_id])
         if self.expire_on_commit and hold.status == "held":
             self.expire_on_commit -= 1
@@ -96,11 +100,17 @@ class FakeGauge:
             raise HoldExpired(hold_id, hold.status)
         return self._set(hold, "committed")
 
-    async def get_hold(self, hold_id: str) -> Hold | None:
+    async def get_hold(self, *args: str) -> Hold | None:
+        """``(tenant_id, hold_id)``; also takes a bare ``hold_id`` so the
+        regression tests run against the code before the tenant argument."""
+        tenant_id, hold_id = (None, args[0]) if len(args) == 1 else args
         self.calls.append(("get_hold", hold_id))
         hold = self.holds.get(hold_id)
-        if hold is None:
+        if hold is None or (tenant_id is not None and hold.tenant_id != tenant_id):
             return None
+        if hold_id in self.lie_expired:  # a reader whose clock is past the expiry
+            self.lie_expired.discard(hold_id)
+            return Hold(hold.id, hold.tenant_id, hold.meter, hold.quantity, "expired", None)
         if hold.status == "held" and hold.expires_at and hold.expires_at <= datetime.now(UTC):
             return Hold(hold.id, hold.tenant_id, hold.meter, hold.quantity, "expired", None)
         return hold
@@ -118,10 +128,16 @@ class FakeGauge:
             self.fail_release -= 1
             raise RuntimeError("billing is down")
         hold = self.holds.get(hold_id)
-        if hold is None or hold.status not in LIVE:
+        if hold is None:
+            raise HoldNotFound(hold_id)
+        if hold.status not in LIVE:
             return False
         self._set(hold, "released")
         return True
+
+    def forget(self, hold_id: str) -> None:
+        """Billing lost the hold (its ledger purged): it reads as unknown."""
+        self.holds.pop(hold_id)
 
 
 @pytest.fixture(autouse=True)
@@ -168,3 +184,30 @@ async def held_image(pipe, gauge, coll):
         )
         await s.commit()
     return img, hold.id
+
+
+async def lapsed_image(pipe, gauge, coll):
+    """A published image whose new hold lapsed before its commit: a pending
+    ``commit`` op (it becomes a rehold) and the seed's ``release`` after it."""
+    img, seed = await held_image(pipe, gauge, coll)
+    gauge.fail_commit = 1
+    await pipe.run(img)
+    lapsed = (await pipe.row(img)).storage_hold_id
+    gauge.expire(lapsed)
+    return img, seed, lapsed
+
+
+@pytest.fixture
+def hooks(monkeypatch):
+    """``hooks[point] = async fn(op)`` on ``billing_settle.HOOK``, each run once."""
+    from sm_images import billing_settle
+
+    table: dict = {}
+
+    async def hook(point, op):
+        fn = table.pop(point, None)
+        if fn is not None:
+            await fn(op)
+
+    monkeypatch.setattr(billing_settle, "HOOK", hook)
+    return table

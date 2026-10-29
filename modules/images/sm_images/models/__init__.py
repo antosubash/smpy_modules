@@ -22,6 +22,7 @@ from sm_images.models.enums import (
     Visibility,
 )
 from sm_images.models.group import Group
+from sm_images.models.hold_ref import HoldRef
 from sm_images.models.image import Image
 from sm_images.models.import_item import ImportItem
 from sm_images.models.import_job import ImportJob
@@ -38,6 +39,7 @@ __all__ = [
     "BillingOp",
     "Collection",
     "Group",
+    "HoldRef",
     "Image",
     "ImportItem",
     "ImportJob",

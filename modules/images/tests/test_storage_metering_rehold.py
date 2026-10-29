@@ -16,7 +16,7 @@ from sm_images.janitor import janitor_tenant
 from sm_images.models import BillingOp
 from sm_images.tenancy import DEFAULT_TENANT
 
-from tests.billing_support import held_image, ops
+from tests.billing_support import lapsed_image, ops
 from tests.pipeline_support import Blur, use_steps
 
 T = DEFAULT_TENANT
@@ -32,31 +32,6 @@ def blur():
     step = Blur()
     use_steps(step)
     return step
-
-
-@pytest.fixture
-def hooks(monkeypatch):
-    """``hooks[point] = async fn(op)``, each run once."""
-    table: dict = {}
-
-    async def hook(point, op):
-        fn = table.pop(point, None)
-        if fn is not None:
-            await fn(op)
-
-    monkeypatch.setattr(billing_settle, "HOOK", hook)
-    return table
-
-
-async def _lapsed(pipe, gauge, coll):
-    """A published image whose new hold lapsed before its commit: a pending
-    ``commit`` op (it becomes a rehold) and the seed's ``release`` after it."""
-    img, seed = await held_image(pipe, gauge, coll)
-    gauge.fail_commit = 1
-    await pipe.run(img)
-    lapsed = (await pipe.row(img)).storage_hold_id
-    gauge.expire(lapsed)
-    return img, seed, lapsed
 
 
 def _settle(pipe, at: timedelta = LATER):
@@ -78,7 +53,7 @@ async def _assert_one_live_replacement(pipe, gauge, img, seed):
 
 async def test_p1a_a_second_settler_never_runs_a_claimed_op(pipe, blur, gauge, hooks):
     coll = await pipe.collection({"acme.blur": {}})
-    img, seed, _ = await _lapsed(pipe, gauge, coll)
+    img, seed, _ = await lapsed_image(pipe, gauge, coll)
     seen = []
 
     async def race(op):  # while settler 1 holds the op, settler 2 runs
@@ -94,7 +69,7 @@ async def test_p1a_a_second_settler_never_runs_a_claimed_op(pipe, blur, gauge, h
 
 async def test_p1b_a_replacement_lapsing_before_its_commit_gets_a_new_key(pipe, blur, gauge, hooks):
     coll = await pipe.collection({"acme.blur": {}})
-    img, seed, _ = await _lapsed(pipe, gauge, coll)
+    img, seed, _ = await lapsed_image(pipe, gauge, coll)
 
     async def lapse(op):
         (key,) = _rehold_keys(gauge)
@@ -112,7 +87,7 @@ async def test_p1b_a_replacement_lapsing_before_its_commit_gets_a_new_key(pipe, 
 @pytest.mark.parametrize("point", ["rehold.reserved", "rehold.persisted", "rehold.committed"])
 async def test_p1c_a_crash_mid_rehold_resumes_without_an_orphan(pipe, blur, gauge, hooks, point):
     coll = await pipe.collection({"acme.blur": {}})
-    img, seed, _ = await _lapsed(pipe, gauge, coll)
+    img, seed, _ = await lapsed_image(pipe, gauge, coll)
 
     async def crash(op):
         raise Crash()
@@ -130,7 +105,7 @@ async def test_p1c_a_replacement_spent_while_unrecorded_moves_to_a_new_key(
     pipe, blur, gauge, hooks
 ):
     coll = await pipe.collection({"acme.blur": {}})
-    img, seed, _ = await _lapsed(pipe, gauge, coll)
+    img, seed, _ = await lapsed_image(pipe, gauge, coll)
 
     async def crash(op):
         raise Crash()

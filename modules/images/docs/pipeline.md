@@ -205,7 +205,17 @@ all the same.
   the image only while the image still names the lapsed hold; a spent
   replacement is released and the generation moves on, so no key is reused.
   The janitor deletes done ops after `janitor_grace_days`, keeping any a
-  pending op still waits for.
+  pending op still waits for. A release that has to wait is pushed back 30
+  seconds without counting as a failure, and due ops are taken oldest-due
+  first, so waiting releases never starve the commits behind them. A
+  replacement billing no longer knows counts as released.
+- **Hold ownership.** Every hold images keeps has a row in `images_hold_ref`
+  (`reserved`, `installed`, `orphan`, `releasing`, `released`). Installing a
+  hold on an image is a compare-and-set `reserved|orphan → installed` in the
+  same transaction as the image update; releasing one first wins
+  `reserved|orphan → releasing`, and only the winner calls billing. A stalled
+  settler releasing a replacement and a newer settler installing it can
+  therefore never both win, and a hold an image names is never released.
 - **The reservation's deadline.** A publication reserves for the step lease
   plus five minutes (at least billing's 15-minute default): a completion is
   accepted only within its lease, so the hold outlives any completion that can

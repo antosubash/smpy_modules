@@ -9,12 +9,17 @@ crash, a lapse or a second settler at any point resumes from the right step:
    reserve and the persist replays the same key and gets the same hold back.
 2. **Commit** the replacement.
 3. **Swap** it onto the image only while the image still names the lapsed
-   hold (a conditional ``UPDATE``), and in the same transaction: on success a
-   ``release`` of the lapsed hold, otherwise a ``release`` of the replacement
-   (ours, referenced by nothing); and the op done, conditional on the claim.
+   hold (a conditional ``UPDATE``) *and* its ownership row moves
+   ``reserved|orphan → installed`` (``sm_images.hold_refs``), and in the same
+   transaction: on success a ``release`` of the lapsed hold, otherwise a
+   ``release`` of the replacement (ours, referenced by nothing); and the op
+   done, conditional on the claim. A replacement is only ever released
+   through its ownership row, so a stale settler releasing it and a takeover
+   installing it can never both win.
 
 On resume with a replacement recorded, billing is asked for its state: held →
-commit it; committed → swap; released, expired or unknown → the key is spent,
+commit it; committed → swap; released, expired or unknown (``None``,
+``HoldNotFound``: already released) → the key is spent,
 so it is released (a lapsed hold counts until billing's sweeper settles it),
 ``generation`` moves on and a new replacement is reserved under a new key.
 A key is never reused. An image that is gone, or names another hold already,
@@ -30,7 +35,7 @@ from typing import Any
 from simple_module_db import finalize_session
 from sqlalchemy import update
 
-from sm_images import billing, billing_ops
+from sm_images import billing, billing_ops, hold_refs
 from sm_images.billing_settle import ClaimLost, Op, hook, save
 from sm_images.models import BillingOp, Image
 from sm_images.models.billing_op import OP_RELEASE
@@ -63,19 +68,25 @@ async def run(factory: Any, tenant: str, op: Op, token: str, meter: Any) -> None
     replacement, generation = op.replacement_hold_id, op.generation
     for _ in range(STEPS):
         if replacement is not None:
-            state = await meter.get_hold(replacement)
+            state = await meter.get_hold(tenant, replacement)
             status = None if state is None else state.status
             if status == "held":
                 try:
                     await meter.commit(replacement)
                     status = "committed"
-                except (HoldExpired, HoldNotFound):
+                except HoldExpired:
                     status = "expired"
+                except HoldNotFound:
+                    status = None  # billing no longer knows it: already released
                 await hook("rehold.committed", op)
             if status == "committed" and state is not None:
-                await _swap(factory, tenant, op, token, replacement, state.quantity)
-                return
-            await meter.release(replacement)  # a lapsed hold may still count until swept
+                if await _swap(factory, tenant, op, token, replacement, state.quantity):
+                    return
+                # a release won the replacement first: it is spent
+            elif not await hold_refs.release(
+                factory, tenant, replacement, meter, before=lambda: hook("rehold.releasing", op)
+            ):
+                raise ClaimLost(op.id)  # installed by the settler that took this op over
             generation, replacement = generation + 1, None  # spent: never reuse its key
             await save(factory, op.id, token, replacement_hold_id=None, generation=generation)
             continue
@@ -94,7 +105,7 @@ async def run(factory: Any, tenant: str, op: Op, token: str, meter: Any) -> None
             await _done(factory, op, token)
             return
         replacement = hold.id
-        await save(factory, op.id, token, replacement_hold_id=replacement)
+        await _persist(factory, tenant, op, token, replacement)
         await hook("rehold.persisted", op)
     raise RuntimeError(f"rehold of op {op.id} did not settle in {STEPS} steps")
 
@@ -103,12 +114,36 @@ async def _done(factory: Any, op: Op, token: str) -> None:
     await save(factory, op.id, token, done_at=datetime.now(UTC), last_error=None, claim_token=None)
 
 
+async def _claimed(db: Any, op: Op, token: str, **values: Any) -> None:
+    """Write ``values`` on our op in ``db``'s transaction; roll back and raise
+    :class:`ClaimLost` when the claim is no longer ours."""
+    got = await db.execute(
+        update(BillingOp)
+        .where(BillingOp.id == op.id, BillingOp.claim_token == token, BillingOp.done_at.is_(None))
+        .values(**values)
+        .returning(BillingOp.id)
+        .execution_options(synchronize_session=False)
+    )
+    if got.first() is None:
+        await db.rollback()
+        raise ClaimLost(op.id)
+
+
+async def _persist(factory: Any, tenant: str, op: Op, token: str, replacement: str) -> None:
+    """Record the replacement on the op and its ``reserved`` ref, together."""
+    async with factory() as db:
+        await _claimed(db, op, token, replacement_hold_id=replacement)
+        await hold_refs.reserved(db, tenant, replacement, op.image_id)
+        await finalize_session(db)
+
+
 async def _swap(
     factory: Any, tenant: str, op: Op, token: str, replacement: str, quantity: int
-) -> None:
+) -> bool:
     """Install ``replacement`` while the image still names the lapsed hold,
     queue the release of whichever hold is now unreferenced, and finish the op
-    - one transaction, conditional on our claim."""
+    - one transaction, conditional on our claim. ``False`` (nothing written)
+    when a release won the replacement first."""
     async with factory() as db:
         moved = await db.execute(
             update(Image)
@@ -121,20 +156,16 @@ async def _swap(
             .returning(Image.id)
             .execution_options(include_deleted=True, synchronize_session=False)
         )
-        spare = op.hold_id if moved.first() is not None else replacement
+        if moved.first() is not None:
+            if not await hold_refs.install(db, tenant, replacement):
+                await db.rollback()
+                return False
+            await hold_refs.orphan(db, tenant, op.hold_id)
+            spare = op.hold_id
+        else:  # the image moved on: the replacement is ours and unreferenced
+            await hold_refs.orphan_reserved(db, tenant, replacement)
+            spare = replacement
         await billing_ops.add(db, OP_RELEASE, image_id=op.image_id, hold_id=spare, factory=factory)
-        finished = await db.execute(
-            update(BillingOp)
-            .where(
-                BillingOp.id == op.id,
-                BillingOp.claim_token == token,
-                BillingOp.done_at.is_(None),
-            )
-            .values(done_at=datetime.now(UTC), last_error=None, claim_token=None)
-            .returning(BillingOp.id)
-            .execution_options(synchronize_session=False)
-        )
-        if finished.first() is None:
-            await db.rollback()
-            raise ClaimLost(op.id)
+        await _claimed(db, op, token, done_at=datetime.now(UTC), last_error=None, claim_token=None)
         await finalize_session(db)
+    return True

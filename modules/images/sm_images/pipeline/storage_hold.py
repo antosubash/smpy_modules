@@ -41,7 +41,7 @@ from typing import Any
 
 from sqlalchemy import func, select, update
 
-from sm_images import billing, billing_ops
+from sm_images import billing, billing_ops, hold_refs
 from sm_images.models import Image, Rendition
 from sm_images.pipeline.runtime import Runtime
 
@@ -144,6 +144,9 @@ async def record(
         await billing_ops.add_swap(
             db, loaded.image_id, planned.hold, total, old, factory=runtime.session_factory
         )
+        await hold_refs.installed(db, planned.hold, loaded.image_id)
+        if old != planned.hold:
+            await hold_refs.orphan(db, loaded.tenant, old)
     await db.execute(
         update(Image)
         .where(Image.id == loaded.image_id, Image.tenant_id == loaded.tenant)

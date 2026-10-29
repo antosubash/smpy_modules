@@ -164,8 +164,9 @@ class UsageMeter(Protocol):
         """Push a held hold's expiry to ``ttl`` seconds from now (a heartbeat)."""
         ...
 
-    async def get_hold(self, hold_id: str) -> Hold | None:
-        """The hold's current state, read-only; ``None`` for an unknown id. A
+    async def get_hold(self, tenant_id: str, hold_id: str) -> Hold | None:
+        """The hold's current state, read-only; ``None`` for an unknown id or
+        one reserved for another tenant than ``tenant_id``. A
         ``held`` hold past its ``expires_at`` is reported ``expired`` (the
         sweeper may not have settled it yet; a ``commit`` would refuse it)."""
         ...

@@ -33,7 +33,7 @@ from simple_module_db import finalize_session
 from sqlalchemy import exists, or_, select, update
 from sqlalchemy.orm import aliased
 
-from sm_images import billing
+from sm_images import billing, hold_refs
 from sm_images.models import BillingOp, Image
 from sm_images.models.billing_op import OP_COMMIT, OP_REHOLD, OP_RELEASE
 
@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
 PAGE = 100
 PAGES = 10
 CLAIM = timedelta(minutes=5)
+WAIT = timedelta(seconds=30)
 BACKOFF = timedelta(minutes=1)
 BACKOFF_MAX = timedelta(hours=1)
 
@@ -96,7 +97,10 @@ def _due(tenant: str, now: datetime, ids: list[int] | None) -> Any:
     )
     if ids is not None:
         stmt = stmt.where(BillingOp.id.in_(ids))
-    return stmt.order_by(BillingOp.id).limit(PAGE)
+    # Never-tried ops first, then the longest due: a page of waiting ops never
+    # hides the ops behind it (each wait pushes its ``next_attempt_at`` on).
+    order = (BillingOp.next_attempt_at.is_not(None), BillingOp.next_attempt_at, BillingOp.id)
+    return stmt.order_by(*order).limit(PAGE)
 
 
 async def settle(
@@ -105,15 +109,19 @@ async def settle(
     """Claim and run the due ops (``ids`` only, when given), dependants after
     what they wait for; how many finished. Bounded to :data:`PAGES` pages."""
     now = now or datetime.now(UTC)
-    done = 0
+    done, waited = 0, []
     for _ in range(PAGES):
         async with factory() as db:
             found = list((await db.execute(_due(tenant, now, ids))).scalars())
             await finalize_session(db)
         ran = [await _attempt(factory, tenant, op_id, now) for op_id in found]
-        done += sum(ran)
-        if not any(ran):
-            break
+        done += ran.count(_DONE)
+        waited += [op_id for op_id, got in zip(found, ran, strict=True) if got == _WAIT]
+        if not found or not (_DONE in ran or _WAIT in ran):
+            break  # nothing moved; a waiting op is pushed on, so the next page differs
+    if done and waited:  # what they waited for may have just settled: once more
+        again = [await _attempt(factory, tenant, op_id, now) for op_id in waited]
+        done += again.count(_DONE)
     return done
 
 
@@ -159,27 +167,30 @@ async def save(factory: Any, op_id: int, token: str, **values: Any) -> None:
         raise ClaimLost(op_id)
 
 
-async def _attempt(factory: Any, tenant: str, op_id: int, now: datetime) -> bool:
+async def _attempt(factory: Any, tenant: str, op_id: int, now: datetime) -> str | None:
+    """:data:`_DONE`, :data:`_WAIT` (pushed on by :data:`WAIT`, not counted as a
+    failure) or ``None`` (not ours, or failed)."""
     claimed = await claim(factory, tenant, op_id, now)
     if claimed is None:
-        return False
+        return None
     token, op = claimed
     await hook("claimed", op)
     meter = billing.storage_meter(factory)
     try:
         outcome = _DONE if meter is None else await _apply(factory, tenant, op, token, meter)
-        if outcome == _WAIT:  # not safe yet: left for a later pass, no attempt counted
-            await save(factory, op.id, token, claim_token=None, claim_expires_at=None)
-            return False
+        if outcome == _WAIT:  # not safe yet: pushed on, no attempt counted
+            values = {"next_attempt_at": now + WAIT, "claim_token": None, "claim_expires_at": None}
+            await save(factory, op.id, token, **values)
+            return _WAIT
         if outcome == _DONE:  # a rehold finishes in its own swap (_FINISHED)
             await save(factory, op.id, token, done_at=now, last_error=None, claim_token=None)
     except ClaimLost:
-        return False
+        return None
     except Exception as exc:
         logger.warning("images.billing_op.failed op=%s id=%s", op.op, op.id, exc_info=True)
         await _failed(factory, op, token, now, exc)
-        return False
-    return True
+        return None
+    return _DONE
 
 
 async def _apply(factory: Any, tenant: str, op: Any, token: str, meter: Any) -> str:
@@ -192,7 +203,7 @@ async def _apply(factory: Any, tenant: str, op: Any, token: str, meter: Any) -> 
     if op.op == OP_RELEASE:
         if not await _safe_to_release(factory, tenant, op, meter):
             return _WAIT
-        await meter.release(op.hold_id)
+        await hold_refs.release(factory, tenant, op.hold_id, meter)  # no-op if installed
         return _DONE
     if op.op == OP_COMMIT:
         try:
@@ -221,7 +232,7 @@ async def _safe_to_release(factory: Any, tenant: str, op: Any, meter: Any) -> bo
         await finalize_session(db)
     if current is None or current[0] is None or current[0] == op.hold_id:
         return True
-    hold = await meter.get_hold(current[0])
+    hold = await meter.get_hold(tenant, current[0])
     return hold is not None and hold.status == "committed"
 
 
