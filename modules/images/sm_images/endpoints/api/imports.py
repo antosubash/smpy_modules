@@ -107,7 +107,7 @@ async def create_import(
     auto_run_prompts: Annotated[bool, Form()] = True,
     file: Annotated[UploadFile | None, File()] = None,
 ) -> ImportJobOut:
-    await billing.check(request.app, _tenant(), 1)  # a full gauge refuses the job up front
+    await billing.check(request.app, _tenant(), 1, db)  # a full gauge refuses the job up front
     user, basis = await _actor(db, who, collection)
     row = await start_import(
         _runtime(),
@@ -134,7 +134,7 @@ async def create_zip_import(
     who: Principal,
     db: Annotated[Any, Depends(get_db)],
 ) -> ZipCreated:
-    await billing.check(request.app, _tenant(), 1)
+    await billing.check(request.app, _tenant(), 1, db)
     user, basis = await _actor(db, who, collection)
     job, (token, ticket, urls, presigned) = await zip_upload.start(
         _runtime(),

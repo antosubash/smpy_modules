@@ -43,7 +43,7 @@ from typing import Any
 
 from simple_module_db.callbacks import register_on_commit
 
-from sm_images import constants
+from sm_images import billing_guard, constants
 from sm_images.errors import StorageQuotaExceeded
 
 __all__ = [
@@ -104,28 +104,44 @@ def hold_key(image_id: uuid.UUID | str, attempt: str | int) -> str:
     return f"images:{image_id}:storage:{attempt}"
 
 
-async def check(app: Any, tenant: str, qty: int) -> None:
-    """Refuse up front (402) what would not fit the gauge now. Advisory: the
-    hold taken afterwards is the enforcement. Billing not running in this
-    process (as ``RequiresQuota`` answers then), or nothing to store → no-op."""
+async def check(app: Any, tenant: str, qty: int, db: Any) -> None:
+    """Refuse up front (402) what would not fit the gauge now, counting the
+    under-counted images (:mod:`sm_images.billing_guard`; read in a session of
+    its own from ``db``'s factory). Advisory: the hold taken afterwards is the
+    enforcement. Billing not running in this process (as ``RequiresQuota``
+    answers then), or nothing to store → no-op."""
     usage = getattr(app.state, constants.BILLING_USAGE_ATTR, None)
     if usage is None or qty < 1:
         return
-    outcome = await usage.check(tenant, METER, int(qty))
+    under = await billing_guard.under_counted_bytes(factory_of(db), tenant)
+    outcome = await usage.check(tenant, METER, int(qty) + under)
     if not outcome.ok:
         raise StorageQuotaExceeded(FULL)
 
 
 async def reserve(
-    session_factory: Any, tenant: str, qty: int, key: str, *, ttl: int | None = None
+    session_factory: Any,
+    tenant: str,
+    qty: int,
+    key: str,
+    *,
+    ttl: int | None = None,
+    guarded: bool = True,
+    image_id: Any = None,
 ) -> Any:
     """Hold ``qty`` bytes (``held``, for ``ttl`` seconds or billing's default);
     billing's ``Hold`` (``id``, ``expires_at``), or ``None`` without billing.
-    :class:`StorageQuotaExceeded` when it does not fit; :class:`HoldSpent` when
-    the key's hold was since released or lapsed (a key is never reused)."""
+    :class:`StorageQuotaExceeded` when it does not fit - counting the
+    under-counted images other than ``image_id`` unless ``guarded`` is off (a
+    rehold: :mod:`sm_images.billing_guard`); :class:`HoldSpent` when the key's
+    hold was since released or lapsed (a key is never reused)."""
     meter = storage_meter(session_factory)
     if meter is None or qty < 1:
         return None
+    if guarded and not await billing_guard.guard(
+        meter, session_factory, tenant, METER, qty, exclude=image_id
+    ):
+        raise StorageQuotaExceeded(FULL)
     outcome = await meter.reserve(tenant, METER, int(qty), key, source=SOURCE, ttl=ttl)
     if not outcome.ok:
         if getattr(outcome, "id", None) is not None:

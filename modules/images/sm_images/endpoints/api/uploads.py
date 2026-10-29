@@ -120,7 +120,7 @@ async def complete_upload(
     done = await direct.existing(ingest.db, ticket)
     if done is not None:  # a replay is answered before any capacity check
         return result(done, body.filename or ticket.filename)
-    await billing.check(request.app, bound_tenant(), ticket.size)
+    await billing.check(request.app, bound_tenant(), ticket.size, ingest.db)
     meta = body.metadata.to_ingest() if body.metadata else direct.IngestMeta()
     outcome = await direct.complete(
         ingest,

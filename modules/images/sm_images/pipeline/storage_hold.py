@@ -100,7 +100,12 @@ async def reserve(runtime: Runtime, loaded: Any, staged: Any) -> Planned | None:
     planned = original + display + renditions
     key = billing.hold_key(loaded.image_id, staged.attempt)
     hold = await billing.reserve(
-        runtime.session_factory, loaded.tenant, planned, key, ttl=ttl_for(runtime)
+        runtime.session_factory,
+        loaded.tenant,
+        planned,
+        key,
+        ttl=ttl_for(runtime),
+        image_id=loaded.image_id,
     )
     if hold is None:
         return Planned(planned, None)

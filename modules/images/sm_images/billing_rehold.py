@@ -107,7 +107,9 @@ async def run(factory: Any, tenant: str, op: Op, token: str, meter: Any) -> None
             await _done(factory, op, token)  # gone, or moved on: nothing to install
             return
         try:
-            hold = await billing.reserve(factory, tenant, current[1], key(op, generation))
+            hold = await billing.reserve(
+                factory, tenant, current[1], key(op, generation), guarded=False
+            )
         except billing.HoldSpent:
             generation += 1
             await save(factory, op.id, token, generation=generation)

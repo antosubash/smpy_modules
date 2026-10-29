@@ -228,6 +228,24 @@ all the same.
   current hold lapsed and its rehold was refused for quota, the old hold is
   released, so the room it holds lets the rehold through. The image is
   under-counted meanwhile, never deadlocked.
+- **Freed room goes to the rehold first.** That under-count is a window: the
+  gauge counts the image by no hold from the moment its old hold is released
+  until its rehold installs. If anything else took the freed room, the rehold
+  would be refused for good and the tenant would store the image for free.
+  So every quota pre-check (upload, batch, base64, direct-upload complete,
+  import start, each ingested original and each publication's reserve)
+  counts the gauge **plus** the bytes of the tenant's under-counted images:
+  those naming a hold whose `rehold` op is pending with no replacement
+  reserved (one indexed aggregate over the tenant's pending ops). A new
+  reservation fits only if `gauge + under-counted + new ≤ limit`; otherwise
+  it is refused 402 `quota_exceeded` (a step fails `quota_exceeded`). A
+  publication does not count its own image, whose new hold replaces the
+  lapsed one, and a rehold does not count the term at all, since it is what
+  restores the count. In a worker billing has no gauge-aware check, so the
+  guard reserves a short-lived probe of `new + under-counted` and releases it
+  at once; a tenant with nothing under-counted pays no extra billing call.
+  Like every pre-check it is application-level and can race a concurrent
+  reservation between the probe and the real hold.
 - **The reservation's deadline.** A publication reserves for the step lease
   plus five minutes (at least billing's 15-minute default): a completion is
   accepted only within its lease, so the hold outlives any completion that can
