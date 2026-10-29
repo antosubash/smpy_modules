@@ -587,7 +587,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 
 **Tests:** role order; regroup; an edit share manages groups and a view share can't.
 
-- [ ] Commit `feat(images): groups`
+- [x] Commit `feat(images): groups`
 
 ### Task 22: `ai` metering callable, `classify`, image prompts (hard)
 
