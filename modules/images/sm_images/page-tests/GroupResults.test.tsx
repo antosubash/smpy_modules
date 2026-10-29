@@ -168,4 +168,36 @@ describe('group results panel', () => {
     expect(byId(view, 'images-group-result-current-2')?.textContent).toContain('b');
     await view.unmount();
   });
+
+  it('a poll that started before "load more" cannot replace the appended rows', async () => {
+    let hold: (() => void) | null = null;
+    let gate: Promise<void> | null = null;
+    const { view } = await open({
+      [RESULTS]: (call: { url: string }) =>
+        call.url.includes('after=1')
+          ? { items: [result(2, 'completed', { verdict: 'b' })], next_cursor: null }
+          : { items: [result(1, 'running', null)], next_cursor: 1 },
+    });
+    const routed = globalThis.fetch;
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await routed(input, init);
+      if (gate && !String(input).includes('after=')) await gate;
+      return response;
+    });
+    gate = new Promise<void>((resolve) => {
+      hold = resolve;
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(3100)); // the poll starts, held
+    await click(byId(view, 'images-group-results-more-g1'));
+    await settle();
+    expect(byId(view, 'images-group-result-2')).not.toBeNull();
+    gate = null;
+    await act(async () => {
+      (hold as (() => void) | null)?.();
+    });
+    await settle();
+    expect(byId(view, 'images-group-result-2')).not.toBeNull();
+    expect(byId(view, 'images-group-results-more-g1')).toBeNull();
+    await view.unmount();
+  });
 });

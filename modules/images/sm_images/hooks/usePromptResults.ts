@@ -50,6 +50,9 @@ export function usePromptResults(promptId: string, version: number): PromptResul
   const [launched, setLaunched] = useState(false);
   const latest = useRef(0);
   const shown = useRef(0);
+  // Bumped whenever the shown rows are committed and when a "load more" starts:
+  // a read that began under an older value is a stale snapshot and is dropped.
+  const snapshot = useRef(0);
   shown.current = rows?.length ?? 0;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `version` asks for a fresh read
@@ -60,6 +63,7 @@ export function usePromptResults(promptId: string, version: number): PromptResul
     listPromptResults(promptId)
       .then((page) => {
         if (ticket !== latest.current) return;
+        snapshot.current += 1;
         setRows(page.items);
         setCursor(page.next_cursor);
         setError(null);
@@ -73,11 +77,15 @@ export function usePromptResults(promptId: string, version: number): PromptResul
     if (!polling || polls >= POLL_LIMIT) return;
     const timer = window.setTimeout(() => {
       const ticket = latest.current;
+      const started = snapshot.current;
       readThrough(promptId, shown.current)
         .then((page) => {
           if (ticket !== latest.current) return;
-          setRows(page.items);
-          setCursor(page.next_cursor);
+          if (started === snapshot.current) {
+            snapshot.current += 1;
+            setRows(page.items);
+            setCursor(page.next_cursor);
+          } // else a "load more" came first: its rows stay; this poll still counts
           setPolls((n) => n + 1);
         })
         .catch((e) => setError(message(e)));
@@ -88,9 +96,11 @@ export function usePromptResults(promptId: string, version: number): PromptResul
   const loadMore = useCallback(() => {
     if (cursor === null) return;
     const ticket = latest.current;
+    const started = ++snapshot.current;
     listPromptResults(promptId, cursor)
       .then((page) => {
-        if (ticket !== latest.current) return;
+        if (ticket !== latest.current || started !== snapshot.current) return;
+        snapshot.current += 1;
         setRows((before) => [...(before ?? []), ...page.items]);
         setCursor(page.next_cursor);
       })
