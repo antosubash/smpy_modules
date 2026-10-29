@@ -462,6 +462,7 @@ def upgrade() -> None:
         sa.Column("lease_token", sa.Uuid(), nullable=True),
         sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("ai_started_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("requested_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(
             ["group_id"],
             ["images_group.id"],

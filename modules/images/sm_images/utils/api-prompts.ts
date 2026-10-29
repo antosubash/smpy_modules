@@ -11,6 +11,7 @@ import type {
 } from './types-prompts';
 
 const BASE = '/api/images';
+const RESULTS_PAGE = 50;
 
 const jsonBody = (method: string, body: unknown): RequestInit => ({
   method,
@@ -50,12 +51,14 @@ export function runPrompt(
   return send(`${BASE}/prompts/${id}/run`, jsonBody('POST', body));
 }
 
-/** The first page of a prompt's results (each image's, or each group's). */
-export async function listPromptResults(id: string): Promise<PromptResult[]> {
-  const { items } = await send<{ items: PromptResult[] }>(
-    `${BASE}/prompts/${id}/results?limit=100`,
-  );
-  return items;
+export type PromptResultPage = { items: PromptResult[]; next_cursor: number | null };
+
+/** A page of a prompt's results (each image's, or each group's), by id;
+ *  `after` is the previous page's `next_cursor`. */
+export function listPromptResults(id: string, after?: number | null): Promise<PromptResultPage> {
+  const qs = new URLSearchParams({ limit: String(RESULTS_PAGE) });
+  if (after !== undefined && after !== null) qs.set('after', String(after));
+  return send(`${BASE}/prompts/${id}/results?${qs}`);
 }
 
 export async function listPresets(): Promise<Preset[]> {

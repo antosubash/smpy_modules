@@ -123,8 +123,8 @@ async def test_reconcile_recovers_a_lost_group_run(pipe, ai, lost):
                 assert await group_lease.claim(s, "default", prompt.id, group.id, now, 600)
                 await s.commit()
     old = now - timedelta(minutes=30)
-    # a first request inserted the row: only ``created_at`` says when
-    await _age(pipe, prompt.id, created_at=old, updated_at=None, lease_expires_at=old)
+    # requested long ago (and never claimed, or claimed and abandoned)
+    await _age(pipe, prompt.id, requested_at=old, lease_expires_at=old)
     with tenant_context("default"):
         done = await reconcile_tenant(pipe.runtime, "default", datetime.now(UTC))
     assert done["group_runs"] == 1
@@ -177,3 +177,32 @@ async def test_a_member_that_must_be_sent_still_needs_a_safe_display(pipe, ai):
     row = await group_result(pipe, prompt.id, group.id)
     assert (row.status, row.error.split(":")[0]) == (StepStatus.FAILED, "display_not_ready")
     assert ai.calls == 0 and ai.charges == []
+
+
+async def test_recovery_ages_a_pending_run_by_its_request_not_its_last_write(pipe, ai):
+    """Writes to a pending row (audit, a refused re-request) move ``updated_at``;
+    reconcile ages it by ``requested_at``, which only entering pending sets."""
+    ai.answer = {"verdict": "ok"}
+    coll = await pipe.collection({}, group_roles=ROLES)
+    group, _ = await group_with(pipe, coll, ROLES[:1])
+    prompt = await group_prompt(pipe, coll, inputs="images")
+    now = datetime.now(UTC)
+    old = now - timedelta(minutes=30)
+    with tenant_context("default"):
+        async with pipe.db_state.session_factory() as s:
+            await group_lease.request(s, "default", prompt.id, group.id, "missing", 1, old, 3600)
+            await s.commit()
+        for _ in range(3):  # re-requested while its dispatch lease runs: refused
+            async with pipe.db_state.session_factory() as s:
+                again = await group_lease.request(
+                    s, "default", prompt.id, group.id, "all", 1, now, 3600
+                )
+                await s.commit()
+            assert again is False
+    await _age(pipe, prompt.id, created_at=now, updated_at=now)  # recent writes
+    row = await group_result(pipe, prompt.id, group.id)
+    assert row.requested_at == old
+    with tenant_context("default"):
+        done = await reconcile_tenant(pipe.runtime, "default", now)
+    assert done["group_runs"] == 1
+    assert (await group_result(pipe, prompt.id, group.id)).status is StepStatus.COMPLETED

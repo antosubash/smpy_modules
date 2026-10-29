@@ -515,7 +515,8 @@
       "empty": "No results yet.",
       "previous": "Previous result (the last run did not finish):",
       "cross_check": "Cross-check",
-      "stale": "outdated"
+      "stale": "outdated",
+      "more": "Load more"
     },
     "on_images": {
       "open": "Run prompt…",

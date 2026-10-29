@@ -121,6 +121,7 @@ async def request(
         row = PromptResult(prompt_id=prompt_id, group_id=group_id)
         db.add(row)
     row.status = StepStatus.PENDING
+    row.requested_at = now  # what reconcile ages a lost dispatch by
     row.lease_token = None
     row.lease_expires_at = now + timedelta(seconds=lease_s)
     row.ai_started_at = None

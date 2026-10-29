@@ -515,7 +515,8 @@
       "empty": "Noch keine Ergebnisse.",
       "previous": "Vorheriges Ergebnis (der letzte Lauf wurde nicht abgeschlossen):",
       "cross_check": "Gegenprüfung",
-      "stale": "veraltet"
+      "stale": "veraltet",
+      "more": "Mehr laden"
     },
     "on_images": {
       "open": "Prompt ausführen…",

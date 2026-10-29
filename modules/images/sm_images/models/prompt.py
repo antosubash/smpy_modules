@@ -57,6 +57,7 @@ class PromptResult(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignor
         "lease_token",
         "lease_expires_at",
         "ai_started_at",
+        "requested_at",
     }
     __table_args__ = (
         UniqueConstraint("prompt_id", "image_id", name="uq_images_prompt_result_image"),
@@ -87,3 +88,6 @@ class PromptResult(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignor
     """A requested (``pending``) or claimed (``running``) group run is in flight until then."""
     ai_started_at: datetime | None = dt_col()
     """Set once per lease before the consolidation call: a redelivery does not pay twice."""
+    requested_at: datetime | None = dt_col()
+    """When a group run last entered ``pending`` - set by the request alone, so
+    reconcile ages a lost dispatch by it, never by a later write's ``updated_at``."""

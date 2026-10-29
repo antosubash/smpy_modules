@@ -124,7 +124,8 @@ image prompt cannot be deleted while a group prompt reads it
   stored result is reused sends nothing and needs no safe copy. Originals
   are never sent. Whether a member needs a call is decided again under its
   image lock, so two group prompts over one image prompt call it once.
-- **Recovery.** `images.reconcile` dispatches again a group run requested
+- **Recovery.** `images.reconcile` dispatches again a group run requested (by
+  `requested_at`, which only entering `pending` sets - never `updated_at`)
   more than 5 minutes ago and never claimed, or claimed under an expired
   lease; the claim is fenced, so a duplicate is harmless.
 - **The consolidation** is one provider request at temperature 0, claimed

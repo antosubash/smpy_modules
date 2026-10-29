@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
+import { Button } from '@simple-module-py/ui/components/ui/button';
 
-import { listPromptResults } from '../../utils/api-prompts';
+import { usePromptResults } from '../../hooks/usePromptResults';
 import { keys, useT } from '../../utils/i18n';
 import { errorCodeLabel } from '../../utils/labels';
 import type { GroupItem } from '../../utils/types';
-import type { PromptResult } from '../../utils/types-prompts';
 
 function show(value: unknown): string {
   return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
@@ -21,16 +20,18 @@ function codeOf(error: string): string {
  * under the failure, never as this run's answer. (A run that is missing
  * members also stores its partial summary as `failed`, and reads the same.)
  */
-export function GroupResults({ promptId, groups }: { promptId: string; groups: GroupItem[] }) {
+export function GroupResults({
+  promptId,
+  groups,
+  version,
+}: {
+  promptId: string;
+  groups: GroupItem[];
+  /** Bumped when a run of this prompt is launched: the results are read again. */
+  version: number;
+}) {
   const { t } = useT();
-  const [rows, setRows] = useState<PromptResult[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    listPromptResults(promptId)
-      .then(setRows)
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-  }, [promptId]);
+  const { rows, error, hasMore, loadMore } = usePromptResults(promptId, version);
 
   if (error) return <p className="text-sm text-destructive">{error}</p>;
   if (rows === null) return null;
@@ -87,6 +88,19 @@ export function GroupResults({ promptId, groups }: { promptId: string; groups: G
           </li>
         );
       })}
+      {hasMore && (
+        <li>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            data-testid={`images-group-results-more-${promptId}`}
+            onClick={loadMore}
+          >
+            {t(keys.images.prompts.results.more)}
+          </Button>
+        </li>
+      )}
     </ul>
   );
 }

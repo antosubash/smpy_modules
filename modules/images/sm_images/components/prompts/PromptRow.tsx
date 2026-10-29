@@ -36,6 +36,7 @@ export function PromptRow({
   onEdit,
   onDelete,
   onRun,
+  version = 0,
 }: {
   prompt: Prompt;
   canEdit: boolean;
@@ -45,6 +46,8 @@ export function PromptRow({
   onEdit: () => void;
   onDelete: () => Promise<void>;
   onRun: (target: RunTarget) => void;
+  /** Bumped after each run of this prompt is launched (re-reads its results). */
+  version?: number;
 }) {
   const { t } = useT();
   const [group, setGroup] = useState('');
@@ -147,7 +150,7 @@ export function PromptRow({
           </>
         )}
       </div>
-      {results && <GroupResults promptId={prompt.id} groups={groups} />}
+      {results && <GroupResults promptId={prompt.id} groups={groups} version={version} />}
     </li>
   );
 }

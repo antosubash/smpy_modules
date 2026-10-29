@@ -118,8 +118,9 @@ def _lost(tenant: str, now: datetime, cutoff: datetime) -> Any:
             or_(
                 and_(
                     PromptResult.status == StepStatus.PENDING,
-                    # a first request inserts the row: no ``updated_at`` yet
-                    func.coalesce(PromptResult.updated_at, PromptResult.created_at) < cutoff,
+                    # by the request alone: a later write (audit, a refused
+                    # re-request) must not push recovery back
+                    func.coalesce(PromptResult.requested_at, PromptResult.created_at) < cutoff,
                 ),
                 and_(
                     PromptResult.status == StepStatus.RUNNING,

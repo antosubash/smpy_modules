@@ -46,6 +46,8 @@ export function PromptsTab({
   const [view, setView] = useState<View>({ mode: 'list' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Per prompt, how many runs were launched here: its results panel re-reads.
+  const [launched, setLaunched] = useState<Record<string, number>>({});
 
   const load = useCallback(async () => {
     try {
@@ -91,6 +93,7 @@ export function PromptsTab({
   const run = (prompt: Prompt, target: RunTarget) =>
     act(async () => {
       const { requested } = await runPrompt(prompt.id, target.scope, { groupIds: target.groupIds });
+      setLaunched((n) => ({ ...n, [prompt.id]: (n[prompt.id] ?? 0) + 1 }));
       toast(
         requested === null
           ? t(keys.images.prompts.run.queued)
@@ -152,6 +155,7 @@ export function PromptsTab({
                 await load();
               }}
               onRun={(target) => void run(p, target)}
+              version={launched[p.id] ?? 0}
             />
           ))}
         </ul>
