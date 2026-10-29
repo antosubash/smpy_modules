@@ -156,11 +156,14 @@ hydration happens at lifespan start, so a value read earlier is the pydantic
 default no matter what the database says. Mark such fields
 `json_schema_extra=_RESTART` so the Settings screen says a restart is needed.
 These settings are SYSTEM-scope: ai has one provider configuration and one
-API key per slot for the whole deployment, shared by every tenant. The one
-thing ai still reads from the environment is `SM_SECRET_KEY`, for its key
-encryption, and only as the framework's `BootstrapSettings` locates `.env`
-(`SM_PROJECT_ROOT`, else the walk up to the project root) — never a
-cwd-relative file (#124). Images' workers never build the app, so they read
+API key per slot for the whole deployment, shared by every tenant. ai reads
+two things from the environment, both only as the framework's
+`BootstrapSettings` locates `.env` (`SM_PROJECT_ROOT`, else the walk up to the
+project root) — never a cwd-relative file (#124): `SM_SECRET_KEY`, for its key
+encryption, and `SM_DATABASE_URL`, only when `sm_ai.contracts.consume_requests`
+is called without a `session_factory` while billing is installed (it then opens
+its own NullPool engine on the host database, `metering._own_factory`). Images
+always passes its factory, so that fallback is for other callers. Images' workers never build the app, so they read
 the same class with `background_tasks.settings_for(ImagesSettings, "sm_images")`
 (DB-backed, cached about 30 s).
 

@@ -4,8 +4,8 @@
   (routed here rather than behind a long import), the daily
   ``images.janitor`` and ``images.build_map`` (a collection's PMTiles);
 * ``images_imports`` - the orchestrators (``images.restart_collection``,
-  ``images.run_prompt``,
-  ``images.import_geojson``, ``images.reset_import``); run its worker with concurrency 1. Downloads
+  ``images.run_prompt``, ``images.run_regroup``, ``images.import_geojson``,
+  ``images.reset_import``); run its worker with concurrency 1. Downloads
   (``images.download_items``) go to ``images``, so a long import stream never
   blocks its own downloads;
 * ``images_heavy`` / ``images_gpu`` - ``classify``, ``prompt:*``,

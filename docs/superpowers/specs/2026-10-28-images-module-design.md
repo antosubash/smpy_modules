@@ -387,7 +387,7 @@ steps final), `PromptResultReviewed`, `CollectionVisibilityChanged`,
 **Contracts** (`sm_images.contracts`, each call names the tenant):
 - `get_collection`, `list_collections` (policy-filtered);
 - `points(collection, bbox)`;
-- `rendition_url(image, size)`;
+- `rendition_url(image, rendition, *, collection=None)` (a `Rendition` row of the image; with its public `collection`, behind `public_asset_base_url` when set);
 - `register_step`, `register_preset`.
 
 **Billing** is an optional extra. The counter `images.storage_bytes` is

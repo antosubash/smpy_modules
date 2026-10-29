@@ -133,6 +133,13 @@ a 422 with a code before a job exists, including a source that is not a complete
 `FeatureCollection`, more than `geojson_max_features` features, and a `source_url`
 that fails the SSRF check.
 
+> **Size limits.** An uploaded `file` is part of the request body, which the
+> upload routes cap at `upload_body_max_bytes` plus 1 MiB of form framing (about
+> 101 MiB by default), so that is the real ceiling for an uploaded GeoJSON.
+> `geojson_max_bytes` (2 GiB) bounds what is fetched from a `source_url`; it is
+> checked on an upload too, but the body limit refuses first. Host a larger file
+> and import it by URL.
+
 The mapping names properties, as a name or a dotted path (`meta.photo.url`):
 
 | Field | Meaning |

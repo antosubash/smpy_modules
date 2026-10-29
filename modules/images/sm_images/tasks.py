@@ -13,7 +13,8 @@ Celery here, everything else inside the bodies. Routing and beat are in
 * ``images.run_regroup(job_id, generation)`` - one filename-pattern regroup of a
   big collection, in fenced chunks (:mod:`sm_images.regroup`); a stale
   ``generation`` does nothing.
-* ``images.run_prompt(prompt_id, scope)`` - request a prompt's runs over a
+* ``images.run_prompt(prompt_id, scope, run_as=None, access_basis=None)`` -
+  request a prompt's runs (re-checking the starter's right per chunk) over a
   whole collection (its images, or its groups for a group prompt) and
   dispatch them (:mod:`sm_images.ai.run`).
 * ``images.run_group_prompt(prompt_id, group_id)`` - claim and execute one
@@ -22,8 +23,10 @@ Celery here, everything else inside the bodies. Routing and beat are in
   worker comes up (``worker_ready``).
 * ``images.janitor(dry_run=False)`` - the daily clean-up beat: abandoned
   uploads and trashed rows per tenant, then orphaned objects (:mod:`sm_images.janitor`).
-* ``images.import_geojson`` and ``images.download_items`` - GeoJSON imports,
-  defined in :mod:`sm_images.imports.tasks` and registered by the import below;
+* ``images.import_geojson``, ``images.download_items`` and
+  ``images.reset_import`` - imports (a GeoJSON stream, its downloads, and the
+  reset behind restart and retry-failed), defined in
+  :mod:`sm_images.imports.tasks` and registered by the import below;
   ``images.build_map`` likewise, from :mod:`sm_images.map.tasks`.
 
 Bodies run through :mod:`sm_images.pipeline.worker_runtime`: no app, the
