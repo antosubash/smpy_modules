@@ -31,6 +31,7 @@ from sm_images.models.prompt import Prompt, PromptResult
 from sm_images.models.regroup_job import RegroupJob, RegroupJobGroup
 from sm_images.models.rendition import Rendition
 from sm_images.models.step_run import StepRun
+from sm_images.models.upload_admission import UploadAdmission
 from sm_images.models.upload_session import UploadSession
 
 __all__ = [
@@ -58,6 +59,7 @@ __all__ = [
     "ReviewStatus",
     "StepRun",
     "StepStatus",
+    "UploadAdmission",
     "UploadSession",
     "UploadStatus",
     "Visibility",

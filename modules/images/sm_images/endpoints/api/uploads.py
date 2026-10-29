@@ -18,6 +18,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Path, Request, Response
 from simple_module_core.resources import ACTION_EDIT, ResourcePrincipal
+from simple_module_db import finalize_session
 from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import RequiresResource, resource_principal
 
@@ -27,7 +28,8 @@ from sm_images.deps import require_view
 from sm_images.endpoints.api.images import Ingest, result
 from sm_images.errors import UploadNotFound, UploadNotOpen
 from sm_images.ingest import direct
-from sm_images.ingest.admission import admit
+from sm_images.ingest.admission import admitter
+from sm_images.intents import current_factory
 from sm_images.models import Collection
 from sm_images.schemas.image import (
     DirectComplete,
@@ -75,24 +77,25 @@ async def start_upload(
 ) -> DirectCreated:
     if who.user_id is None:  # pragma: no cover - require_view admits only signed-in callers
         raise UploadNotFound("Upload not found")
-    await admit(
-        request.app,
-        ingest.db,
-        bound_tenant(),
-        body.size,
-        cap=ingest.settings.max_open_uploads_per_tenant,
+    admission = admitter(
+        request.app, bound_tenant(), body.size, cap=ingest.settings.max_open_uploads_per_tenant
     )
-    token, ticket, urls, presigned = await direct.start(
-        ingest.db,
-        store_for(request.app),
-        collection,
-        filename=body.filename,
-        size=body.size,
-        content_type=body.content_type,
-        max_bytes=ingest.settings.max_image_bytes,
-        owner=who.user_id,
-        secret=host_secret(request),
-    )
+    # A session of its own: the admission lock must be its first statement
+    # (SQLite), and is released as soon as the session row is committed.
+    async with current_factory()() as db:
+        token, ticket, urls, presigned = await direct.start(
+            db,
+            store_for(request.app),
+            collection,
+            filename=body.filename,
+            size=body.size,
+            content_type=body.content_type,
+            max_bytes=ingest.settings.max_image_bytes,
+            owner=who.user_id,
+            secret=host_secret(request),
+            admission=admission,
+        )
+        await finalize_session(db)
     return DirectCreated(
         upload_id=token,
         part_size=ticket.part_size,

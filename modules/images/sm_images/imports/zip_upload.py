@@ -66,6 +66,7 @@ async def start(
     secret: str,
     auto_run_prompts: bool = True,
     access_basis: str | None = None,
+    admission: Any = None,
 ) -> tuple[ImportJob, tuple[str, Ticket, list[str], bool]]:
     """The ``uploading`` job and its upload: ``(job, (upload_id, ticket, part_urls, direct))``."""
     try:
@@ -91,6 +92,7 @@ async def start(
                 secret=secret,
                 kind="zip",
                 intent_factory=runtime.session_factory,
+                admission=admission,
             )
             db.add(
                 ImportJob(

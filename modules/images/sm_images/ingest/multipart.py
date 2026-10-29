@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
+from contextlib import suppress
 from dataclasses import asdict
 from typing import Any
 
@@ -20,6 +21,7 @@ from file_storage.contracts.service import NotSupportedError, StorageError, Stor
 from sm_images import constants
 from sm_images.errors import DirectUploadUnsupported, InvalidUpload, PartsMismatch, UploadNotFound
 from sm_images.ingest import upload_session as state
+from sm_images.ingest.admission import Admission
 from sm_images.ingest.service import safe_filename
 from sm_images.ingest.ticket import _BAD_PART, _GONE, Ticket, serializer
 from sm_images.intents import object_intent
@@ -52,10 +54,17 @@ async def open_upload(
     secret: str,
     kind: str = "image",
     intent_factory: Any = None,
+    admission: Admission | None = None,
 ) -> tuple[str, Ticket, list[str], bool]:
     """The multipart upload behind every direct upload (an image, an import's
     ZIP): the key's intent, the backend upload, the ``open`` session row (in
-    ``db``'s transaction) and the signed ticket with its part URLs."""
+    ``db``'s transaction) and the signed ticket with its part URLs.
+
+    ``admission`` (``ingest.admission.admitter``) runs in ``db`` just before
+    the row is inserted - as ``db``'s first statement, so give it a fresh
+    session - and holds the tenant's admission lock until ``db`` commits. A
+    refusal aborts the backend upload; the key's intent is left for the
+    janitor."""
     backend = backend_of(store)
     signer = serializer(secret)
     async with object_intent([key], session_factory=intent_factory):
@@ -74,6 +83,13 @@ async def open_upload(
         content_type=content_type,
         kind=kind,
     )
+    if admission is not None:
+        try:
+            await admission(db)
+        except BaseException:
+            with suppress(Exception):
+                await backend.abort_multipart(key, upload)
+            raise
     db.add(state.new_session(ticket, collection.id))
     await db.flush()
     token = signer.dumps(asdict(ticket))

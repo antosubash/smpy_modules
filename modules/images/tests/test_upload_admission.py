@@ -35,6 +35,14 @@ async def api(uploads):
     return uploads
 
 
+def _multipart_uploads(api) -> int:
+    """Open multipart uploads in the filesystem backend's staging area."""
+    from pathlib import Path
+
+    root = Path(api.storage.root)
+    return sum(1 for p in root.rglob("*") if p.is_dir() and p.parent.name == ".multipart")
+
+
 async def _image(api, size: int):
     body = {"filename": "big.jpg", "size": size}
     return await api.post(f"{BASE}/{api.cid}/uploads", json=body, headers=OLGA)
@@ -77,9 +85,12 @@ async def test_the_open_session_cap(api, opener):
     api.app.state.sm_images.settings.max_open_uploads_per_tenant = 2
     assert (await _image(api, 10)).status_code == 201
     assert (await _zip(api, 10)).status_code == 201
+    staged = _multipart_uploads(api)
+    assert staged == 2
     refused = await opener(api, 10)
     assert refused.status_code == 429, refused.text
     assert refused.json()["code"] == TOO_MANY
+    assert _multipart_uploads(api) == staged  # the refused one's backend upload is aborted
 
 
 def test_the_cap_defaults_to_twenty():

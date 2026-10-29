@@ -82,10 +82,13 @@ admitted before the `upload_id` is issued (here and for a ZIP import's upload):
 
 An upload is open until it is completed, aborted or expires. The declared size is
 binding: every part must be exactly its expected size and `complete` refuses a
-missing, short or extra part. The check is **soft**: uploads opened at the same
-moment each see only the others already committed, so they can overshoot by at
-most the cap's worth of declared sizes. The hold taken at `complete` is still the
-enforcement.
+missing, short or extra part. Admission is **serialised per tenant**: each open
+first writes the tenant's `images_upload_admission` row (a row lock on Postgres,
+the write lock on SQLite) and holds it until its session row is committed, so the
+next open counts it. The cap is hard. The quota check counts every open upload;
+only a `complete` taking its hold at the same moment can overshoot it, by at most
+that upload's declared size, and that hold is still the enforcement. A refused
+open aborts the backend's multipart upload it had started.
 
 > **Bucket CORS (S3 and MinIO).** The browser talks to the bucket directly, so
 > the bucket's CORS configuration must allow the **`PUT`** method from the

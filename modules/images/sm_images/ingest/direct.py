@@ -96,6 +96,7 @@ async def start(
     owner: str,
     secret: str,
     intent_factory: Any = None,
+    admission: Any = None,
 ) -> tuple[str, Ticket, list[str], bool]:
     """``(upload_id, ticket, part_urls, direct)``. The key's extension is the
     declared type, which ``complete`` then holds the bytes to."""
@@ -122,6 +123,7 @@ async def start(
         owner=owner,
         secret=secret,
         intent_factory=intent_factory,
+        admission=admission,
     )
 
 
