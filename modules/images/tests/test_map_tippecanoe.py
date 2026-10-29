@@ -90,10 +90,9 @@ def _tile_bytes(data: bytes) -> list[bytes]:
     # ``pmtiles`` is a dev extra; CI's Postgres job installs tippecanoe but syncs
     # no extras, so the reader may be missing where the binary is present.
     reader = pytest.importorskip("pmtiles.reader")
-    MemorySource, all_tiles = reader.MemorySource, reader.all_tiles
 
     out = []
-    for _, tile in all_tiles(MemorySource(data)):
+    for _, tile in reader.all_tiles(reader.MemorySource(data)):
         out.append(gzip.decompress(tile) if tile[:2] == b"\x1f\x8b" else tile)
     return out
 

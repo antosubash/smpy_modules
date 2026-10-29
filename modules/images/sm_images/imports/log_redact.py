@@ -32,7 +32,7 @@ def redact_url(url: Any) -> str:
     """*url* with only its scheme, host, port and path."""
     try:
         parsed = httpx.URL(str(url))
-    except Exception:  # noqa: BLE001 - never let logging fail on a strange value
+    except Exception:  # never let logging fail on a strange value
         return "<url>"
     return str(parsed.copy_with(username=None, password=None, query=None, fragment=None))
 
