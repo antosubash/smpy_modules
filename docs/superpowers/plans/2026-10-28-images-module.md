@@ -657,7 +657,7 @@ Before implementing, a Codex root-cause/design pass over this task's interfaces 
 
 **Tests:** over quota gives 402; a regenerated display moves the hold; a purge releases it; no billing means no-op.
 
-- [ ] Commit `feat(images): storage metering`
+- [x] Commit `feat(images): storage metering`
 
 ---
 
