@@ -91,10 +91,13 @@ async def test_a_broker_that_refuses_fails_the_job_and_deletes_its_staging(imp, 
     assert not [k for k in imp.stored() if "/imports/" in k]
 
 
-async def test_duplicate_download_messages_fetch_an_item_once(imp, resolver, inner, monkeypatch):
+async def test_duplicate_download_messages_fetch_an_item_once(
+    file_imp, resolver, inner, monkeypatch
+):
     """Reconcile's re-send and the original both arrive: the claim lets one fetch."""
-    from sm_images.imports import retrying
+    from sm_images.imports import item_claim, retrying
 
+    imp = file_imp  # two messages settle through sessions of their own
     sent: list[list[int]] = []
 
     async def record(runtime, tenant, job_id, generation, ids):
@@ -104,19 +107,31 @@ async def test_duplicate_download_messages_fetch_an_item_once(imp, resolver, inn
     seen = serve_images(resolver, inner)
     job = await imp.job([feature({"url": f"https://{HOST}/a.jpg"})], URL)
     await imp.run(job)
-    real = retrying._fetch
+    real_claim, real_fetch = item_claim.claim, retrying._fetch
+    claims, both_tried = 0, asyncio.Event()
 
-    async def slow(*a, **k):
-        await asyncio.sleep(0.05)
-        return await real(*a, **k)
+    async def counted(*a, **k):
+        nonlocal claims
+        try:
+            return await real_claim(*a, **k)
+        finally:
+            claims += 1
+            if claims == 2:
+                both_tried.set()
 
-    monkeypatch.setattr(retrying, "_fetch", slow)
+    async def held_until_both_tried(*a, **k):
+        # The winner's fetch outlasts the loser's claim attempt - by event, not by clock.
+        await asyncio.wait_for(both_tried.wait(), timeout=30)
+        return await real_fetch(*a, **k)
+
+    monkeypatch.setattr(item_claim, "claim", counted)
+    monkeypatch.setattr(retrying, "_fetch", held_until_both_tried)
     calls = [
         download.download_items_async(imp.runtime, DEFAULT_TENANT, job.id, job.generation, sent[0])
         for _ in range(2)
     ]
     assert sorted(await asyncio.gather(*calls)) == [0, 1]
-    assert len(seen) == 1 and await imp.statuses(job) == ["done"]
+    assert claims == 2 and len(seen) == 1 and await imp.statuses(job) == ["done"]
 
 
 async def test_an_expired_claim_can_be_taken_over_and_the_old_holder_loses(

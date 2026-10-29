@@ -96,7 +96,8 @@ def _record(sent: list):
     return fake
 
 
-async def test_a_slow_download_heartbeats_and_is_not_reclaimed(imp, monkeypatch):
+async def test_a_slow_download_heartbeats_and_is_not_reclaimed(file_imp, monkeypatch):
+    imp = file_imp  # the beat and the download write from sessions of their own
     sent: list[list[int]] = []
     monkeypatch.setattr(launch, "launch_downloads", _record(sent))
     monkeypatch.setattr(beat, "HEARTBEAT_SECONDS", 0.05)

@@ -35,7 +35,7 @@ from tests.billing_support import (  # noqa: F401 - billing off unless asked
 from tests.direct_support import small_parts  # noqa: F401 - two parts per test image
 from tests.fetch_support import inner, resolver  # noqa: F401 - the safe-fetch tests' fixtures
 from tests.group_support import file_pipe  # noqa: F401 - the group-run tests' fixture
-from tests.import_support import imp  # noqa: F401 - the import tests' fixture
+from tests.import_support import file_imp, imp  # noqa: F401 - the import tests' fixtures
 from tests.isolation_support import two_tenants  # noqa: F401 - the tenancy matrix's fixture
 from tests.map_support import fake_tippecanoe, web_runtime  # noqa: F401 - the map tests' fixtures
 from tests.pg_support import arm_reset, make_db_state

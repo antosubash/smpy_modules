@@ -172,3 +172,23 @@ async def imp(tmp_path):
     yield Imp(pipe, coll)
     await pipe.db_state.engine.dispose()
     registry.reset_registry()
+
+
+@pytest_asyncio.fixture
+async def file_imp(tmp_path):
+    """``imp`` on a file database, for a test that runs sessions concurrently.
+
+    The in-memory database serves every session the same connection, so a
+    concurrent session closing (a heartbeat, a second download) ``ROLLBACK``s or
+    ``COMMIT``s another's half-finished settlement; a file database gives each
+    session its own connection and makes a write wait for SQLite's lock, as on
+    a host (see ``tests/pg_support.make_db_state``, #209)."""
+    from tests.pg_support import make_db_state
+
+    use_steps()
+    pipe = await make_pipe(tmp_path, await make_db_state(file=tmp_path / "imports.db"))
+    use_session_factory(pipe.db_state.session_factory)
+    coll = await pipe.collection({}, group_roles=["point", "north"])
+    yield Imp(pipe, coll)
+    await pipe.db_state.engine.dispose()
+    registry.reset_registry()
