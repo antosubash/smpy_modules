@@ -100,13 +100,11 @@ class FakeGauge:
             raise HoldExpired(hold_id, hold.status)
         return self._set(hold, "committed")
 
-    async def get_hold(self, *args: str) -> Hold | None:
-        """``(tenant_id, hold_id)``; also takes a bare ``hold_id`` so the
-        regression tests run against the code before the tenant argument."""
-        tenant_id, hold_id = (None, args[0]) if len(args) == 1 else args
+    async def get_hold(self, tenant_id: str, hold_id: str) -> Hold | None:
+        """Billing's signature: a hold of another tenant reads as unknown."""
         self.calls.append(("get_hold", hold_id))
         hold = self.holds.get(hold_id)
-        if hold is None or (tenant_id is not None and hold.tenant_id != tenant_id):
+        if hold is None or hold.tenant_id != tenant_id:
             return None
         if hold_id in self.lie_expired:  # a reader whose clock is past the expiry
             self.lie_expired.discard(hold_id)

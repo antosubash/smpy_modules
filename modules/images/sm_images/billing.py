@@ -52,7 +52,6 @@ __all__ = [
     "check",
     "extend",
     "factory_of",
-    "get_hold",
     "hold_key",
     "on_commit",
     "register_meter",
@@ -140,13 +139,6 @@ async def extend(session_factory: Any, hold_id: str, ttl: int) -> Any:
     ``Hold``); ``HoldExpired`` once it lapsed."""
     meter = storage_meter(session_factory)
     return None if meter is None else await meter.extend(hold_id, ttl)
-
-
-async def get_hold(session_factory: Any, hold_id: str) -> Any:
-    """Billing's read of a hold (``status``: held, committed, released, expired);
-    ``None`` for an unknown id or without billing."""
-    meter = storage_meter(session_factory)
-    return None if meter is None else await meter.get_hold(hold_id)
 
 
 def on_commit(db: Any, call: Any, *args: Any) -> None:

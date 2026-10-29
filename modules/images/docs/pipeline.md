@@ -216,6 +216,11 @@ all the same.
   `reserved|orphan → releasing`, and only the winner calls billing. A stalled
   settler releasing a replacement and a newer settler installing it can
   therefore never both win, and a hold an image names is never released.
+  A release that finds the row `released` already counts as done, so a
+  settler that died after the release committed resumes. A replacement that
+  was committed but lost the install (a release won it first) gets a durable
+  `release` op in the same transaction that moves the rehold to its next
+  generation, so it is released even if the releaser that beat it died.
 - **The reservation's deadline.** A publication reserves for the step lease
   plus five minutes (at least billing's 15-minute default): a completion is
   accepted only within its lease, so the hold outlives any completion that can

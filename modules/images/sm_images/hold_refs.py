@@ -13,7 +13,10 @@ compare-and-sets on one row, so they can never both win.
   row (one that was never installed: a duplicate, a rolled-back completion)
   is claimed by inserting its row as ``releasing``. ``releasing`` may be
   re-entered: a releaser that died after winning is retried, and billing's
-  ``release`` is idempotent.
+  ``release`` is idempotent. A hold whose row reads ``released`` already
+  counts as released: :func:`release` answers ``True`` without calling
+  billing, so a releaser that died after the row committed ``released`` (but
+  before it recorded that anywhere else) resumes instead of wedging.
 
 Every statement names the tenant.
 """
@@ -105,7 +108,12 @@ async def install(db: Any, tenant: str, hold_id: str) -> bool:
     return got.first() is not None
 
 
-async def _claim(factory: Any, tenant: str, hold_id: str) -> bool:
+_WON, _GONE, _LOST = "won", "released", "lost"
+
+
+async def _claim(factory: Any, tenant: str, hold_id: str) -> str:
+    """:data:`_WON` (ours to release), :data:`_GONE` (released already) or
+    :data:`_LOST` (an image names it)."""
     async with factory() as db:
         got = await db.execute(
             update(HoldRef)
@@ -118,8 +126,8 @@ async def _claim(factory: Any, tenant: str, hold_id: str) -> bool:
             .returning(HoldRef.hold_id)
             .execution_options(**_SYNC)
         )
-        won = got.first() is not None
-        if not won:
+        won: str | None = _WON if got.first() is not None else _LOST
+        if won == _LOST:
             state = (
                 await db.execute(
                     select(HoldRef.state).where(
@@ -129,12 +137,14 @@ async def _claim(factory: Any, tenant: str, hold_id: str) -> bool:
             ).scalar_one_or_none()
             if state is None:  # never installed anywhere: ours to release
                 db.add(HoldRef(hold_id=hold_id, image_id=None, state=REF_RELEASING))
-                won = True
+                won = _WON
+            elif state == REF_RELEASED:
+                won = _GONE
         try:
             await finalize_session(db)
-        except IntegrityError:  # a concurrent first claim inserted it: theirs
-            return False
-    return won
+        except IntegrityError:  # a concurrent first claim inserted it: re-read
+            won = None
+    return await _claim(factory, tenant, hold_id) if won is None else won
 
 
 async def release(
@@ -144,13 +154,15 @@ async def release(
     meter: Any,
     before: Callable[[], Awaitable[None]] | None = None,
 ) -> bool:
-    """Release ``hold_id`` unless an image names it; ``False`` when one does.
-    A hold billing does not know is released already. ``before`` (tests) runs
-    between winning the row and calling billing."""
+    """Release ``hold_id`` unless an image names it; ``False`` when one does,
+    ``True`` once it is released (by this call or an earlier one). A hold
+    billing does not know is released already. ``before`` (tests) runs between
+    winning the row and calling billing."""
     from sm_billing.contracts.metering import HoldNotFound
 
-    if not await _claim(factory, tenant, hold_id):
-        return False
+    claimed = await _claim(factory, tenant, hold_id)
+    if claimed != _WON:
+        return claimed == _GONE
     if before is not None:
         await before()
     with contextlib.suppress(HoldNotFound):  # already gone on billing's side

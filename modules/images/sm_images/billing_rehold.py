@@ -22,9 +22,14 @@ commit it; committed → swap; released, expired or unknown (``None``,
 ``HoldNotFound``: already released) → the key is spent,
 so it is released (a lapsed hold counts until billing's sweeper settles it),
 ``generation`` moves on and a new replacement is reserved under a new key.
-A key is never reused. An image that is gone, or names another hold already,
-needs nothing installed: the op is done (and ``billing_settle`` makes the old
-hold's release wait until the hold the image names is committed).
+A replacement whose ref reads ``released`` already (a settler died after the
+release committed) counts as released. A committed replacement whose swap
+lost the ref CAS gets a durable ``release`` op in the transaction that moves
+the generation on, so it is released exactly once even if the releaser that
+beat the swap died before calling billing. A key is never reused. An image
+that is gone, or names another hold already, needs nothing installed: the op
+is done (and ``billing_settle`` makes the old hold's release wait until the
+hold the image names is committed).
 """
 
 from __future__ import annotations
@@ -82,13 +87,20 @@ async def run(factory: Any, tenant: str, op: Op, token: str, meter: Any) -> None
             if status == "committed" and state is not None:
                 if await _swap(factory, tenant, op, token, replacement, state.quantity):
                     return
-                # a release won the replacement first: it is spent
-            elif not await hold_refs.release(
-                factory, tenant, replacement, meter, before=lambda: hook("rehold.releasing", op)
-            ):
-                raise ClaimLost(op.id)  # installed by the settler that took this op over
+                # A release won the replacement first; whoever won may die
+                # before billing hears of it, so its release is made durable.
+                await _lost(factory, op, token, replacement, generation + 1)
+                await hook("rehold.swap_lost", op)
+            else:
+                if not await hold_refs.release(
+                    factory, tenant, replacement, meter, before=lambda: hook("rehold.releasing", op)
+                ):
+                    raise ClaimLost(op.id)  # installed by the settler that took this op over
+                await hook("rehold.spent", op)
+                await save(
+                    factory, op.id, token, replacement_hold_id=None, generation=generation + 1
+                )
             generation, replacement = generation + 1, None  # spent: never reuse its key
-            await save(factory, op.id, token, replacement_hold_id=None, generation=generation)
             continue
         current = await _current(factory, tenant, op)
         if current is None or current[0] != op.hold_id:
@@ -134,6 +146,20 @@ async def _persist(factory: Any, tenant: str, op: Op, token: str, replacement: s
     async with factory() as db:
         await _claimed(db, op, token, replacement_hold_id=replacement)
         await hold_refs.reserved(db, tenant, replacement, op.image_id)
+        await finalize_session(db)
+
+
+async def _lost(factory: Any, op: Op, token: str, replacement: str, generation: int) -> None:
+    """The swap lost the install CAS (a release won the replacement): record
+    that - the next generation - together with a durable ``release`` of the
+    replacement, one transaction. The release goes through the ref CAS, so it
+    completes a ``releasing`` row whose winner died, or finds it ``released``.
+    It names no image: the replacement was never counted by one, so it need
+    not wait for the image's current hold (which may be the lapsed one, and a
+    reserve the replacement's own quantity crowds out)."""
+    async with factory() as db:
+        await _claimed(db, op, token, replacement_hold_id=None, generation=generation)
+        await billing_ops.add(db, OP_RELEASE, image_id=None, hold_id=replacement, factory=factory)
         await finalize_session(db)
 
 
