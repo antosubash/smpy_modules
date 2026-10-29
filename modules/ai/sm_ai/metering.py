@@ -22,10 +22,16 @@ The charge is refunded only when the handler *raises*, so a provider error
 must propagate (or be re-raised) rather than be turned into a returned error
 response. A streaming response is charged when the handler returns it: an
 error while the body streams is past the handler and refunds nothing.
+
+Outside a request - a Celery worker - :func:`consume_requests` charges the
+same meter (see its section below).
 """
 
 from __future__ import annotations
 
+import importlib
+import os
+import threading
 from importlib.util import find_spec
 from typing import Any
 
@@ -93,3 +99,96 @@ def RequiresAiRequest(qty: int = 1) -> Any:  # noqa: N802 - reads like RequiresQ
     from sm_billing.metering.deps import RequiresQuota
 
     return RequiresQuota(constants.METER_REQUESTS, qty)
+
+
+# -- outside a request -------------------------------------------------------
+# ``ai.requests`` charged where there is no request: :func:`consume_requests`.
+#
+# A Celery worker never builds the app, so ``RequiresAiRequest`` (a FastAPI
+# dependency) and ``app.state.billing_usage`` are both out of reach there. This
+# calls billing's ``usage_meter(session_factory)`` instead - the same
+# ``UsageService`` - so the charge is billing's own conditional upsert in its
+# own short transaction, finished with ``finalize_session`` (the billing rule:
+# never a bare ``commit()`` outside a request).
+#
+# The session factory is the caller's when it passes one (images passes its
+# pipeline's, which is the app's in the web process and the worker engine's in a
+# worker). Otherwise a per-process ``NullPool`` engine is opened on the host's
+# database URL, read the way ``worker_settings`` reads it (``BootstrapSettings``:
+# ``SM_DATABASE_URL``, else the project ``.env``). ``NullPool`` because each task
+# body runs on its own ``asyncio.run`` loop and a pooled asyncpg connection
+# belongs to the loop that opened it.
+#
+# Without billing - or with a billing older than ``usage_meter`` - nothing is
+# metered and every call is admitted. A worker treats an *installed* billing as
+# running: it cannot ask the web host's module list.
+
+_lock = threading.Lock()
+_engine: tuple[int, str, Any] | None = None  # (pid, url, DatabaseState)
+
+
+def billing_usage_installed() -> bool:
+    """Whether a billing with the worker-side ``usage_meter`` is installed."""
+    try:
+        spec = find_spec(constants.BILLING_USAGE_MODULE)
+    except ModuleNotFoundError:
+        return False
+    if spec is None:
+        return False
+    return hasattr(importlib.import_module(constants.BILLING_USAGE_MODULE), "usage_meter")
+
+
+def _own_factory() -> Any:
+    """This process's factory on the host database (rebuilt in a forked child)."""
+    global _engine
+    from simple_module_db import init_db
+    from simple_module_hosting.bootstrap_settings import BootstrapSettings
+    from sqlalchemy.pool import NullPool
+
+    url = BootstrapSettings().database_url
+    pid = os.getpid()
+    with _lock:
+        if _engine is not None and _engine[:2] == (pid, url):
+            return _engine[2].session_factory
+        state = init_db(url, poolclass=NullPool)
+        _engine = (pid, url, state)
+        return state.session_factory
+
+
+async def dispose_worker_engine() -> None:
+    """Forget the own engine (tests; a worker never needs to)."""
+    global _engine
+    with _lock:
+        found, _engine = _engine, None
+    if found is not None and found[0] == os.getpid():
+        await found[2].engine.dispose()
+
+
+async def consume_requests(
+    tenant_id: str,
+    qty: int = 1,
+    *,
+    idempotency_key: str,
+    source: str,
+    session_factory: Any = None,
+) -> bool:
+    """Charge ``qty`` AI requests to ``tenant_id``; ``False`` when the plan's
+    limit refuses them (or the key was since refunded).
+
+    ``idempotency_key`` makes a retry of the same call free: a replay answers
+    the first call's outcome and counts nothing. Use job, image and attempt
+    ids in it, never personal data. ``source`` names the caller (``images:classify``).
+    """
+    if isinstance(qty, bool) or not isinstance(qty, int) or not 1 <= qty <= _QTY_MAX:
+        raise ValueError(f"qty must be an integer from 1 to {_QTY_MAX}")
+    if not idempotency_key or not source:
+        raise ValueError("idempotency_key and source are required")
+    if not billing_usage_installed():
+        return True
+    from sm_billing.contracts.metering import usage_meter
+
+    meter = usage_meter(session_factory or _own_factory())
+    outcome = await meter.consume(
+        tenant_id, constants.METER_REQUESTS, qty, idempotency_key, source=source
+    )
+    return bool(outcome.ok)

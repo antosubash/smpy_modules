@@ -8,7 +8,9 @@
         result = await agent.run(text, model=resolve_model())
 
 ``RequiresAiRequest`` charges the ``ai.requests`` meter when billing is
-installed and is a no-op otherwise (see ``sm_ai.metering``).
+installed and is a no-op otherwise (see ``sm_ai.metering``). Code that runs
+outside a request (a Celery task) calls ``await consume_requests(tenant_id,
+idempotency_key=..., source=...)`` before each model call instead.
 
 The base module resolves *connections*; consumers own *behaviour* —
 temperature, prompts, retries and streaming belong on the consumer's Agent.
@@ -20,7 +22,7 @@ from typing import TYPE_CHECKING
 
 from sm_ai.constants import METER_REQUESTS
 from sm_ai.contracts.errors import AiError, AiKeyUnreadableError, AiNotConfiguredError
-from sm_ai.metering import RequiresAiRequest
+from sm_ai.metering import RequiresAiRequest, consume_requests
 
 if TYPE_CHECKING:
     from pydantic_ai import Embedder
@@ -57,6 +59,7 @@ __all__ = [
     "AiKeyUnreadableError",
     "AiNotConfiguredError",
     "RequiresAiRequest",
+    "consume_requests",
     "embedding_dim",
     "resolve_embedder",
     "resolve_model",

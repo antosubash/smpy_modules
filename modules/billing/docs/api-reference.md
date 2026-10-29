@@ -61,6 +61,15 @@ if usage is not None:
         raise HTTPException(402, f"limit {outcome.limit} reached")
 ```
 
+**With no app** (a Celery worker never builds one, so `app.state` is not
+there): `usage_meter(session_factory)` from `sm_billing.contracts.metering`
+builds the same service over a session factory the caller owns. Every write
+is still its own short transaction finished with `finalize_session`. It has no
+meter registry, so it accepts any key: use it only for counters the web
+process registers (`ai.requests`). Importing it imports billing, so a module
+that treats billing as optional checks `find_spec` first, as
+`sm_ai.contracts.consume_requests` does.
+
 | Call | Does |
 |---|---|
 | `consume(tenant, meter, qty, key, *, source, db=None)` | atomic check-and-count against the current period → `Allowed(used, limit, period_end, replayed)`, `Exceeded(used, limit, requested, period_end)` or, for a refunded key, `Refunded`; a refusal writes nothing |

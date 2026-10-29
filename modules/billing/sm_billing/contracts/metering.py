@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, ClassVar, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from contextlib import AbstractAsyncContextManager
 
-    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 
 class MeterKind(StrEnum):
@@ -277,6 +277,23 @@ class UsageMeter(Protocol):
         ...
 
 
+def usage_meter(session_factory: async_sessionmaker) -> UsageMeter:
+    """Billing's ``UsageMeter`` over ``session_factory``, for code with no app.
+
+    A Celery worker never builds the app, so ``app.state.billing_usage`` is not
+    there to read. This builds the same service over a factory the caller owns
+    (the worker's engine): every write is still its own short transaction,
+    finished with ``finalize_session``. It knows no meter registry, so it
+    accepts any key - pass only a counter you registered in the web process
+    (``ai.requests``) - and gauge holds use the default TTL. Importing it
+    imports billing; a consumer that treats billing as optional checks
+    ``find_spec`` first.
+    """
+    from sm_billing.metering.service import UsageService
+
+    return UsageService(session_factory)
+
+
 __all__ = [
     "Allowed",
     "Exceeded",
@@ -291,4 +308,5 @@ __all__ = [
     "Refunded",
     "UnknownMeterError",
     "UsageMeter",
+    "usage_meter",
 ]
