@@ -19,7 +19,7 @@ from sm_images.ingest.service import IngestService
 from sm_images.models import UploadStatus
 from sm_images.storage import ImageStore
 
-from tests.test_direct_upload import complete
+from tests.direct_support import complete
 from tests.test_upload_lease import _row, _update
 from tests.test_upload_reaper import _one_part_in, _parts_exist, _reap
 from tests.test_upload_session import _uploaded, ticket_of

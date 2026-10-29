@@ -12,13 +12,13 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from simple_module_db import finalize_session
-from sm_images import billing
 from sm_images.janitor import purge_expired
 from sm_images.models import Image, ObjectIntent
 from sm_images.pipeline.orchestrate import rerun_image
 from sm_images.tenancy import DEFAULT_TENANT
-from sqlalchemy import select, update
+from sqlalchemy import select
 
+from tests.billing_support import held_image
 from tests.pipeline_support import Blur, use_steps
 
 QUOTA = "quota_exceeded"
@@ -29,22 +29,6 @@ def blur():
     step = Blur()
     use_steps(step)
     return step
-
-
-async def _held_image(pipe, gauge, coll):
-    """An ingested image: its original under a committed hold, as ingest leaves it."""
-    img = await pipe.image(coll)
-    row = await pipe.row(img)
-    hold = await gauge.reserve(DEFAULT_TENANT, billing.METER, row.size_bytes, "seed", source="t")
-    await gauge.commit(hold.id)
-    async with pipe.db_state.session_factory() as s:
-        await s.execute(
-            update(Image)
-            .where(Image.id == img)
-            .values(storage_hold_id=hold.id, storage_bytes=row.size_bytes)
-        )
-        await s.commit()
-    return img, hold.id
 
 
 def _expected(row, renditions) -> int:
@@ -70,7 +54,7 @@ async def test_storage_bytes_is_kept_without_billing(pipe, blur):
 
 async def test_a_regenerated_display_moves_the_hold(pipe, blur, gauge):
     coll = await pipe.collection({"acme.blur": {}, "renditions": {}})
-    img, first = await _held_image(pipe, gauge, coll)
+    img, first = await held_image(pipe, gauge, coll)
     await pipe.run(img)
     row, rends = await pipe.row(img), await pipe.renditions(img)
     (live,) = gauge.live()
@@ -89,7 +73,7 @@ async def test_a_regenerated_display_moves_the_hold(pipe, blur, gauge):
 
 async def test_a_hold_that_does_not_fit_fails_the_step_and_keeps_the_display(pipe, blur, gauge):
     coll = await pipe.collection({"acme.blur": {}})
-    img, first = await _held_image(pipe, gauge, coll)
+    img, first = await held_image(pipe, gauge, coll)
     before = set(pipe.keys())
     gauge.limit = (await pipe.row(img)).size_bytes  # no room for a second copy
     await pipe.run(img)
@@ -108,7 +92,7 @@ async def test_a_lost_fence_releases_the_new_hold(pipe, blur, gauge, monkeypatch
     from sm_images.pipeline import finish
 
     coll = await pipe.collection({"acme.blur": {}})
-    img, first = await _held_image(pipe, gauge, coll)
+    img, first = await held_image(pipe, gauge, coll)
     real, calls = finish.publish.publish_display, []
 
     async def fenced_once(*args, **kwargs):
@@ -127,7 +111,7 @@ async def test_a_lost_fence_releases_the_new_hold(pipe, blur, gauge, monkeypatch
 
 async def test_the_purge_releases_the_hold(pipe, blur, gauge):
     coll = await pipe.collection({"acme.blur": {}})
-    img, _ = await _held_image(pipe, gauge, coll)
+    img, _ = await held_image(pipe, gauge, coll)
     await pipe.run(img)
     held = (await pipe.row(img)).storage_hold_id
     assert [h.id for h in gauge.live()] == [held]

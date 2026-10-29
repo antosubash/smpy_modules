@@ -97,6 +97,40 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_table(
+        "images_billing_op",
+        sa.Column("tenant_id", sa.String(length=50), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("(CURRENT_TIMESTAMP)"),
+            nullable=False,
+        ),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_by", sa.String(length=255), nullable=True),
+        sa.Column("updated_by", sa.String(length=255), nullable=True),
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("image_id", sa.Uuid(), nullable=True),
+        sa.Column("op", sa.String(length=16), nullable=False),
+        sa.Column("hold_id", sa.String(length=64), nullable=True),
+        sa.Column("quantity", sa.BigInteger(), nullable=False),
+        sa.Column("idempotency_key", sa.String(length=128), nullable=True),
+        sa.Column("after_id", sa.Integer(), nullable=True),
+        sa.Column("attempts", sa.Integer(), nullable=False),
+        sa.Column("next_attempt_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("done_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("last_error", sa.String(length=500), nullable=True),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_images_billing_op")),
+    )
+    op.create_index(
+        "ix_images_billing_op_due",
+        "images_billing_op",
+        ["tenant_id", "done_at", "id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_images_billing_op_tenant_id"), "images_billing_op", ["tenant_id"], unique=False
+    )
+    op.create_table(
         "images_group",
         sa.Column("tenant_id", sa.String(length=50), nullable=False),
         sa.Column(
@@ -864,6 +898,9 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_images_group_tenant_id"), table_name="images_group")
     op.drop_index(op.f("ix_images_group_collection_id"), table_name="images_group")
     op.drop_table("images_group")
+    op.drop_index(op.f("ix_images_billing_op_tenant_id"), table_name="images_billing_op")
+    op.drop_index("ix_images_billing_op_due", table_name="images_billing_op")
+    op.drop_table("images_billing_op")
     op.drop_index(op.f("ix_images_object_intent_created_at"), table_name="images_object_intent")
     op.drop_table("images_object_intent")
     op.drop_index("uq_images_collection_tenant_slug", table_name="images_collection")

@@ -164,7 +164,7 @@ async def test_an_intent_pass_stops_trying_after_repeated_failures(pipe, monkeyp
 
 
 async def test_purge_dry_run_leaves_intents_and_billing_alone(pipe, monkeypatch):
-    from sm_images import billing, storage_keys
+    from sm_images import billing_ops, storage_keys
     from sm_images.purge import purge_expired
 
     use_steps()
@@ -178,7 +178,7 @@ async def test_purge_dry_run_leaves_intents_and_billing_alone(pipe, monkeypatch)
     async def record(db, holds):
         released.append(holds)
 
-    monkeypatch.setattr(billing, "release_storage", record)
+    monkeypatch.setattr(billing_ops, "release_storage", record)
     async with pipe.db_state.session_factory() as db:
         report = await purge_expired(db, pipe.store, now=NOW, grace_days=7, dry_run=True)
         await db.commit()
@@ -188,7 +188,7 @@ async def test_purge_dry_run_leaves_intents_and_billing_alone(pipe, monkeypatch)
 
 
 async def test_janitor_dry_run_end_to_end_changes_nothing(pipe, monkeypatch):
-    from sm_images import billing
+    from sm_images import billing_ops
 
     use_steps()
     coll = await pipe.collection({})
@@ -202,7 +202,7 @@ async def test_janitor_dry_run_end_to_end_changes_nothing(pipe, monkeypatch):
     async def record(db, holds):
         released.append(holds)
 
-    monkeypatch.setattr(billing, "release_storage", record)
+    monkeypatch.setattr(billing_ops, "release_storage", record)
     summary = await janitor_async(pipe.runtime, NOW, dry_run=True)
     assert summary["images_purged"] == 1 and summary["intents_reaped"] == 1  # would be
     assert pipe.keys() == before and await _intents(pipe) == [orphan]

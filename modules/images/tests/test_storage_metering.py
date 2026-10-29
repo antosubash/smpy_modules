@@ -4,16 +4,21 @@ import item that does not fit, the no-billing no-op and the fail-closed seam."""
 
 from __future__ import annotations
 
+import base64
 import sys
 import types
+import uuid
 
 import pytest
-from sm_images import billing, constants
+from simple_module_db import finalize_session
+from sm_images import billing, billing_ops, constants
 from sm_images.models import Image
+from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import select
 
+from tests.billing_support import ops
+from tests.direct_support import complete, send_parts, start
 from tests.import_support import b64, feature
-from tests.test_direct_upload import complete, send_parts, small_parts, start  # noqa: F401
 from tests.upload_support import BASE, OLGA, all_rows, jpeg, make_collection, post_files, stored
 
 QUOTA = constants.CODE_QUOTA_EXCEEDED
@@ -57,7 +62,8 @@ async def test_upload_takes_one_committed_hold_for_the_original(uploads, gauge):
     (row,) = await _rows(uploads)
     (hold,) = gauge.live()
     assert (hold.id, hold.status, hold.quantity) == (row.storage_hold_id, "committed", len(data))
-    assert gauge.keys == {billing.hold_key(row.id, 0): hold.id}
+    ((key, held),) = gauge.keys.items()
+    assert held == hold.id and key.startswith(billing.hold_key(row.id, "0-"))
 
 
 async def test_upload_over_quota_is_402_and_stores_nothing(uploads, gauge):
@@ -93,7 +99,7 @@ async def test_a_hold_refused_after_the_check_fails_that_file_only(uploads, gaug
     assert len(stored(uploads.storage)) == 1
 
 
-async def test_direct_complete_checks_first(uploads, gauge, small_parts):  # noqa: F811
+async def test_direct_complete_checks_first(uploads, gauge, small_parts):
     uploads.app.state.billing_usage = gauge
     data = jpeg(size=(64, 48))
     cid = await make_collection(uploads)
@@ -131,7 +137,7 @@ async def test_import_start_is_402_when_the_gauge_is_full(uploads, gauge):
 
 async def test_an_import_item_that_does_not_fit_fails_quota_exceeded(imp, gauge):
     small = b64("red")
-    gauge.limit = len(__import__("base64").b64decode(small))
+    gauge.limit = len(base64.b64decode(small))
     job = await imp.job([feature({"img": small}), feature({"img": b64("blue", (16, 12))})])
     assert await imp.run(job) == "completed"
     items = await imp.items(job)
@@ -148,30 +154,42 @@ def test_an_installed_billing_that_cannot_meter_fails_closed(monkeypatch):
         billing.storage_meter(object())
 
 
-async def test_the_seam_holds_against_real_billing(tmp_path, monkeypatch):
-    """``usage_meter`` (a worker's view: no registry) reserves, commits and
-    releases a hold on ``images.storage_bytes`` in billing's own tables."""
+async def test_the_outbox_settles_against_real_billing(tmp_path, monkeypatch):
+    """``usage_meter`` (a worker's view: no registry) reserves with a TTL,
+    extends, and the outbox commits the new hold before releasing the old one,
+    in billing's own tables."""
     from simple_module_db import init_db
+    from simple_module_db.listeners import attach_session_listeners
     from sm_billing.models import Base, UsageGauge, UsageHold
     from sm_billing.plans import seed_default_plan
+    from sm_images.models import Base as ImagesBase
 
     monkeypatch.setattr(billing, "billing_installed", lambda: True)
     state = init_db(f"sqlite+aiosqlite:///{tmp_path / 'billing.db'}")
+    attach_session_listeners(state.sync_session_class)  # stamps the bound tenant
     async with state.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(ImagesBase.metadata.create_all)
     factory = state.session_factory
     await seed_default_plan(factory)
+    image_id, tenant = uuid.uuid4(), DEFAULT_TENANT
     try:
-        first = await billing.reserve(factory, "t1", 100, billing.hold_key("img", 0))
-        await billing.settle(factory, first, None)
-        second = await billing.reserve(factory, "t1", 150, billing.hold_key("img", "a1"))
-        await billing.settle(factory, second, first)
+        first = await billing.reserve(
+            factory, tenant, 100, billing.hold_key(image_id, "a"), ttl=1200
+        )
+        assert first.expires_at is not None
+        assert (await billing.extend(factory, first.id, 1800)).expires_at > first.expires_at
+        async with factory() as db:
+            await billing_ops.add_swap(db, image_id, first.id, 100, None, factory=factory)
+            await finalize_session(db)
+        second = await billing.reserve(factory, tenant, 150, billing.hold_key(image_id, "b"))
+        async with factory() as db:
+            await billing_ops.add_swap(db, image_id, second.id, 150, first.id, factory=factory)
+            await finalize_session(db)
         async with factory() as s:
             holds = dict((await s.execute(select(UsageHold.id, UsageHold.status))).all())
             level = (await s.execute(select(UsageGauge.in_use))).scalar_one()
-        assert holds == {first: "released", second: "committed"} and level == 150
-        await billing.release(factory, [second])
-        async with factory() as s:
-            assert (await s.execute(select(UsageGauge.in_use))).scalar_one() == 0
+        assert holds == {first.id: "released", second.id: "committed"} and level == 150
+        assert all(o.done_at for o in await ops(state))
     finally:
         await state.engine.dispose()

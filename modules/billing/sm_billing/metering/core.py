@@ -7,6 +7,7 @@ Reads run in a short session of their own, closed before any write starts
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -42,7 +43,7 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-class MeteringCore:
+class MeteringCore(ABC):
     def __init__(
         self,
         session_factory: async_sessionmaker,
@@ -77,8 +78,9 @@ class MeteringCore:
             return await self._check_level(tenant_id, meter, qty)
         return await self._check_counter(tenant_id, meter, qty)
 
+    @abstractmethod
     async def _check_counter(self, tenant_id: str, meter: str, qty: int) -> Allowed | Exceeded:
-        raise NotImplementedError  # UsageService
+        """The period counter's check (``UsageService``)."""
 
     async def _check_level(self, tenant_id: str, meter: str, qty: int) -> Allowed | Exceeded:
         """Would holding ``qty`` more fit the gauge's limit right now? Read-only."""

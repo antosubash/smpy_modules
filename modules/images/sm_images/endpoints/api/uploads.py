@@ -117,6 +117,9 @@ async def complete_upload(
 ) -> UploadResult:
     if ticket.kind != "image":  # a ZIP is sealed by its import's extract, never here
         raise UploadNotOpen("This upload is completed by its import's extract")
+    done = await direct.existing(ingest.db, ticket)
+    if done is not None:  # a replay is answered before any capacity check
+        return result(done, body.filename or ticket.filename)
     await billing.check(request.app, bound_tenant(), ticket.size)
     meta = body.metadata.to_ingest() if body.metadata else direct.IngestMeta()
     outcome = await direct.complete(

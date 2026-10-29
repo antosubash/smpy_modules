@@ -48,6 +48,7 @@ from sm_images.errors import (
     FileTooLarge,
     ImagesError,
     PartsMismatch,
+    StorageQuotaExceeded,
     UnsupportedType,
     UploadNotFound,
 )
@@ -72,11 +73,13 @@ __all__ = [
     "Ticket",
     "abort",
     "complete",
+    "existing",
     "load_ticket",
     "start",
     "write_part",
 ]
 
+_ABORTED = UploadStatus.ABORTED
 _TOO_LARGE = "The upload is larger than the image size limit"
 _SIZE_MISMATCH = "The stored upload is not the declared size"
 
@@ -122,6 +125,13 @@ async def start(
     )
 
 
+async def existing(db: Any, ticket: Ticket) -> Image | None:
+    """The image a completed upload created (the route answers a replay with it
+    before any capacity check)."""
+    stmt = select(Image).where(Image.id == uuid.UUID(ticket.image))
+    return (await db.execute(stmt.execution_options(include_deleted=True))).scalars().first()
+
+
 async def _existing(db: Any, ticket: Ticket) -> Image | None:
     stmt = select(Image).where(Image.id == uuid.UUID(ticket.image))
     return (await db.execute(stmt.execution_options(include_deleted=True))).scalars().first()
@@ -150,16 +160,18 @@ async def complete(
         return existing
     assembled = False
     try:
-        try:
-            await _assemble(ingest.store, ticket, claimed)
-        except StorageError as exc:
-            raise UploadNotFound(_GONE) from exc
+        if await ingest.store.head(ticket.key) is None:  # else: a retry after a refusal
+            try:
+                await _assemble(ingest.store, ticket, claimed)
+            except StorageError as exc:
+                raise UploadNotFound(_GONE) from exc
         assembled = True
         await state.renew(ingest.db, ticket, token)  # each phase is bounded by the lease
         outcome = await _ingest(ingest, collection, ticket, token, filename=filename, meta=meta)
-    except Exception:
-        handed_back = UploadStatus.ABORTED if assembled else UploadStatus.OPEN
-        await state.settle(ingest.db, ticket, token, handed_back)
+    except Exception as exc:
+        # A full storage quota keeps the upload: the session stays open to retry.
+        retry = not assembled or isinstance(exc, StorageQuotaExceeded)
+        await state.settle(ingest.db, ticket, token, UploadStatus.OPEN if retry else _ABORTED)
         raise
     await state.finish(ingest.db, ticket, token)
     return outcome
@@ -197,6 +209,8 @@ async def _ingest(
             meta=meta,
             source=constants.SOURCE_UPLOAD,
         )
+    except StorageQuotaExceeded:
+        raise  # the staged object is kept for a retry once there is room
     except ImagesError:
         await _drop(ingest, ticket)
         raise

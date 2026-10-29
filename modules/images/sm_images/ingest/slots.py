@@ -3,9 +3,11 @@ taken before the caller's transaction writes), a :class:`Duplicate` answer,
 and the file name a row keeps.
 
 The storage hold follows ``sm_images.billing``'s order: reserved here, before
-any write; committed after the caller's commit when the image is kept
-(:func:`keep_hold`); released after it when not (:func:`drop_hold`). A
-rollback discards both queued calls and the ``held`` hold lapses by itself.
+any write, under a key of this attempt's own (a concurrent attempt for the same
+image - two ``complete`` calls - never shares it, so a loser releases only its
+own hold); its ``commit`` written to the outbox with the image row
+(:func:`keep_hold`), or its ``release`` when nothing kept it
+(:func:`drop_hold`). A rollback discards both and the ``held`` hold lapses.
 """
 
 from __future__ import annotations
@@ -14,10 +16,19 @@ import uuid
 from dataclasses import dataclass, replace
 from typing import Any
 
-from sm_images import billing
+from sm_images import billing, billing_ops
 from sm_images.errors import StorageQuotaExceeded
+from sm_images.models.billing_op import OP_COMMIT, OP_RELEASE
 
-__all__ = ["Duplicate", "Slot", "drop_hold", "hold_slot", "keep_hold", "safe_filename"]
+__all__ = [
+    "Duplicate",
+    "Slot",
+    "drop_hold",
+    "drop_slot",
+    "hold_slot",
+    "keep_hold",
+    "safe_filename",
+]
 
 
 @dataclass(frozen=True)
@@ -47,21 +58,31 @@ def safe_filename(name: str | None, fallback: str = "upload") -> str:
 
 
 async def hold_slot(factory: Any, tenant: str, slot: Slot, size: int) -> Slot:
-    """Reserve ``size`` bytes for the slot's original (storage generation 0)."""
+    """Reserve ``size`` bytes for the slot's original, keyed by this attempt."""
+    key = billing.hold_key(slot.image_id, f"0-{uuid.uuid4().hex}")
     try:
-        hold = await billing.reserve(factory, tenant, size, billing.hold_key(slot.image_id, 0))
+        hold = await billing.reserve(factory, tenant, size, key)
     except StorageQuotaExceeded:
         return replace(slot, refused=True)
-    return replace(slot, hold=hold)
+    return replace(slot, hold=None if hold is None else hold.id)
 
 
-def keep_hold(db: Any, factory: Any, hold: str | None) -> None:
-    """The image row holds ``hold``: commit it once ``db`` commits."""
+async def keep_hold(
+    db: Any, factory: Any, image_id: uuid.UUID, hold: str | None, size: int
+) -> None:
+    """The image row holds ``hold``: its ``commit``, with the row."""
     if hold is not None:
-        billing.on_commit(db, billing.settle, factory, hold, None)
+        await billing_ops.add(
+            db, OP_COMMIT, image_id=image_id, hold_id=hold, quantity=size, factory=factory
+        )
 
 
-def drop_hold(db: Any, factory: Any, hold: str | None) -> None:
-    """Nothing kept ``hold``: release it once ``db`` commits."""
+async def drop_hold(db: Any, factory: Any, image_id: uuid.UUID, hold: str | None) -> None:
+    """Nothing kept ``hold``: its ``release``, with the caller's transaction."""
     if hold is not None:
-        billing.on_commit(db, billing.release, factory, [hold])
+        await billing_ops.add(db, OP_RELEASE, image_id=image_id, hold_id=hold, factory=factory)
+
+
+async def drop_slot(db: Any, factory: Any, slot: Slot | None) -> None:
+    if slot is not None:
+        await drop_hold(db, factory, slot.image_id, slot.hold)

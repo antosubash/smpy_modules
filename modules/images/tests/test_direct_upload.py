@@ -6,13 +6,12 @@ The image is staged at its final ``original_key`` and ingested in place on
 
 from __future__ import annotations
 
-import pytest
 from sm_images import constants
 from sm_images.models import Image
 
+from tests.direct_support import UPLOADS, complete, send_parts, start
 from tests.stub_auth import as_user
 from tests.upload_support import (
-    BASE,
     OLGA,
     all_rows,
     intents,
@@ -21,36 +20,6 @@ from tests.upload_support import (
     object_bytes,
     stored,
 )
-
-UPLOADS = "/api/images/uploads"
-
-
-async def start(client, cid, data: bytes, headers=OLGA, **extra):
-    body = {"filename": "big.jpg", "size": len(data), **extra}
-    return await client.post(f"{BASE}/{cid}/uploads", json=body, headers=headers)
-
-
-async def send_parts(client, created: dict, data: bytes, headers=OLGA) -> list[dict]:
-    size = created["part_size"]
-    parts = []
-    for n, url in enumerate(created["part_urls"], start=1):
-        chunk = data[(n - 1) * size : n * size]
-        put = await client.put(url, content=chunk, headers=headers)
-        assert put.status_code == 200, put.text
-        parts.append({"no": n, "etag": put.json()["etag"]})
-    return parts
-
-
-async def complete(client, upload_id: str, parts, headers=OLGA, **body):
-    return await client.post(
-        f"{UPLOADS}/{upload_id}/complete", json={"parts": parts, **body}, headers=headers
-    )
-
-
-@pytest.fixture
-def small_parts(monkeypatch):
-    """Two parts for a test-sized image."""
-    monkeypatch.setattr(constants, "DIRECT_PART_BYTES", 400)
 
 
 async def test_direct_upload_relays_parts_and_ingests_in_place(uploads, small_parts):

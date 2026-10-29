@@ -21,8 +21,8 @@ from sm_images.ingest import direct
 from sm_images.ingest.service import IngestService
 from sm_images.models import UploadSession, UploadStatus
 
+from tests.direct_support import UPLOADS, complete, send_parts, start
 from tests.stub_auth import user_uuid
-from tests.test_direct_upload import UPLOADS, complete, send_parts, start
 from tests.upload_support import OLGA, all_rows, jpeg, make_collection, stored
 
 

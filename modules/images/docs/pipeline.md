@@ -169,20 +169,41 @@ organisation may store). Without it nothing is limited, and
 all the same.
 
 - **One committed hold per image**, sized to `storage_bytes` and named by
-  `storage_hold_id`. Ingest holds the original (key
-  `images:{image}:storage:0`). A published display copy or rendition set
-  takes a hold for the new total (keyed by the attempt) and then releases the
-  old one; the janitor's purge releases it once the image is gone.
+  `storage_hold_id`. Ingest holds the original; a published display copy or
+  rendition set takes a hold for the new total and then releases the old one;
+  the janitor's purge releases it once the image is gone. Every hold is keyed
+  by the attempt that took it (`images:{image}:storage:{nonce}`), so two
+  concurrent completes of one upload never share a hold, and the loser
+  releases only its own.
 - **Refusals.** Upload, base64 upload, direct-upload complete and import start
-  check the gauge first and answer 402 `quota_exceeded`. An import item that
+  check the gauge first and answer 402 `quota_exceeded`. The check is
+  advisory: a batch checks the sum of its files, duplicates included, so it
+  can refuse a batch whose new images would have fit. A replayed complete of
+  a finished upload answers its image before any check, and a complete whose
+  hold is refused keeps the assembled upload, so it can be retried once
+  there is room. An import item that
   does not fit fails `quota_exceeded`; a step whose new objects do not fit
   fails `quota_exceeded`, its objects deleted and the previous display copy
   kept.
 - **Order.** Billing writes in its own short transactions, so a hold is
   reserved (`held`) before the caller's transaction writes - on SQLite it
-  would otherwise wait on the caller's lock - and committed, or released,
-  after that transaction commits. A rollback leaves a `held` hold to lapse at
-  billing's TTL; capacity is never leaked. Taking the new hold before
-  releasing the old one means a regenerated image briefly needs room for both.
+  would otherwise wait on the caller's lock. A rollback leaves a `held` hold
+  to lapse at billing's TTL; capacity is never leaked. Taking the new hold
+  before releasing the old one means a regenerated image briefly needs room
+  for both.
+- **Durable settlement.** Committing the new hold and releasing the old one
+  are rows in `images_billing_op`, written in the same transaction as the
+  change they settle (the ingest insert, the fenced completion, the purge).
+  They are attempted right after the commit; what fails stays pending with a
+  backoff, and `images.reconcile` retries each tenant's due ops until billing
+  confirms. An image's release waits for its new hold's commit. A new hold
+  that lapsed before its commit is replaced by a fresh committed hold for the
+  image's current total (a `rehold`), and only then is the old one released.
+- **The reservation's deadline.** A publication reserves for the step lease
+  plus five minutes (at least billing's 15-minute default): a completion is
+  accepted only within its lease, so the hold outlives any completion that can
+  still succeed. It is extended when within a minute of lapsing before the
+  image lock is taken, and a lapsed one is refused under the lock (rolled
+  back and planned again, like a lost fence).
 - **Fail closed.** An installed billing that cannot meter raises: an upload
   fails, and a step fails `storage_error` without publishing.

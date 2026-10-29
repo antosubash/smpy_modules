@@ -21,8 +21,8 @@ from sm_images.storage import ImageStore
 from sqlalchemy import delete
 
 from tests.access_support import share
+from tests.direct_support import UPLOADS, complete, send_parts, start
 from tests.stub_auth import as_user, user_uuid
-from tests.test_direct_upload import UPLOADS, complete, send_parts, start
 from tests.upload_support import OLGA, all_rows, jpeg, make_collection, png, stored
 
 EDDIE = as_user("eddie", ("images.view",))
@@ -34,9 +34,15 @@ def _small_parts(monkeypatch):
 
 
 def blind_first_existing(monkeypatch) -> list[int]:
-    """The first ``_existing`` check misses, as when the winner had not committed."""
+    """The first ``_existing`` check misses, as when the winner had not committed.
+    The route's replay check (``existing``) runs earlier still, so it misses too."""
     calls: list[int] = []
     real = direct._existing
+
+    async def unseen(db, ticket):
+        return None
+
+    monkeypatch.setattr(direct, "existing", unseen)
 
     async def blinded(db, ticket):
         calls.append(1)

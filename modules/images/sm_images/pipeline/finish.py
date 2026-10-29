@@ -186,6 +186,7 @@ async def complete_step(
             logger.warning("images.pipeline.stage_failed step=%s", loaded.step, exc_info=True)
             outcome = StepOutcome.failed("storage_error", f"{type(exc).__name__}: {exc}"[:2000])
     planned, staged, outcome = await _hold(runtime, loaded, staged, outcome)
+    planned = await storage_hold.renew(runtime, planned)
     requeue = False
     async with runtime.session_factory() as db:
         locked = await lock_image(db, loaded.tenant, loaded.image_id)
@@ -205,8 +206,10 @@ async def complete_step(
         )
         writes = staging if outcome.status == "completed" else None
         replaced = await _publish(db, loaded, locked, staged, writes, version) if ok else None
-        if replaced is not None and not await storage_hold.record(db, runtime, loaded, planned):
-            replaced = None  # the total moved since the hold was reserved: plan again
+        if replaced is not None and not await storage_hold.record(
+            db, runtime, loaded, planned, now
+        ):
+            replaced = None  # the hold lapsed, or the total moved since: plan again
         if replaced is None:
             await db.rollback()
             requeue = ok  # still ours: only the display fence failed
@@ -226,7 +229,7 @@ async def complete_step(
         await finalize_session(db)
     if replaced is None:
         await _drop(runtime, staged.keys)
-        await storage_hold.unhold(runtime, planned)
+        await storage_hold.unhold(runtime, loaded, planned)
         if requeue:
             try:
                 await _requeue(runtime, loaded, lease_s)

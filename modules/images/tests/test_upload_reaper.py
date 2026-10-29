@@ -16,7 +16,7 @@ from sm_images.ingest.upload_reaper import reap_expired_uploads
 from sm_images.models import UploadSession, UploadStatus
 from sm_images.storage import ImageStore
 
-from tests.test_direct_upload import start
+from tests.direct_support import start
 from tests.test_upload_session import sessions, ticket_of
 from tests.upload_support import OLGA, intents, jpeg, make_collection
 

@@ -250,11 +250,11 @@ def usage_meter(session_factory: async_sessionmaker) -> UsageMeter:
     A Celery worker never builds the app, so ``app.state.billing_usage`` is not
     there to read. This builds the same service over a factory the caller owns
     (the worker's engine): every write is still its own short transaction,
-    finished with ``finalize_session``. It knows no meter registry, so it
-    accepts any key - pass only a counter you registered in the web process
-    (``ai.requests``) - and gauge holds use the default TTL. Importing it
-    imports billing; a consumer that treats billing as optional checks
-    ``find_spec`` first.
+    finished with ``finalize_session``. It knows no meter registry: it takes
+    any key (pass only meters registered in the web process, e.g.
+    ``ai.requests``, ``images.storage_bytes``), its ``check`` is a counter's,
+    and a hold without ``ttl`` gets the default TTL. Importing it imports
+    billing; a consumer that treats billing as optional checks ``find_spec``.
     """
     from sm_billing.metering.service import UsageService
 

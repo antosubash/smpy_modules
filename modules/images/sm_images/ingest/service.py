@@ -42,16 +42,10 @@ from sqlalchemy.exc import IntegrityError
 from sm_images import billing, events, pipeline, storage_keys
 from sm_images.errors import StorageQuotaExceeded
 from sm_images.ingest import dedupe
+from sm_images.ingest import slots as holds
 from sm_images.ingest.guards import Inspected, inspect
 from sm_images.ingest.meta import IngestMeta, normalise
-from sm_images.ingest.slots import (
-    Duplicate,
-    Slot,
-    drop_hold,
-    hold_slot,
-    keep_hold,
-    safe_filename,
-)
+from sm_images.ingest.slots import Duplicate, Slot, safe_filename
 from sm_images.intents import clear_intents, object_intent
 from sm_images.models import Collection, Image, StepRun
 from sm_images.services import stats
@@ -97,7 +91,9 @@ class IngestService:
         if sizes is None:
             return slots
         factory = self._factory()
-        return [await hold_slot(factory, tenant, s, n) for s, n in zip(slots, sizes, strict=True)]
+        return [
+            await holds.hold_slot(factory, tenant, s, n) for s, n in zip(slots, sizes, strict=True)
+        ]
 
     def _factory(self) -> Any:
         """Where billing's own short transactions run (``sm_images.billing``)."""
@@ -147,13 +143,15 @@ class IngestService:
         if found is not None:
             if staged_key is None or not await dedupe.find_id(self.db, image_id):
                 await self._discard(staged_key, slot)
-            drop_hold(self.db, self._factory(), slot.hold if slot else None)
+            await holds.drop_slot(self.db, self._factory(), slot)
             return Duplicate(found)
 
         if staged_key is not None:
             assert image_id is not None
             key, new_id = staged_key, image_id
-            slot = await hold_slot(self._factory(), bound_tenant(), Slot(new_id, key), len(data))
+            slot = await holds.hold_slot(
+                self._factory(), bound_tenant(), Slot(new_id, key), len(data)
+            )
             if slot.refused:  # the caller removes its staged object
                 raise StorageQuotaExceeded(billing.FULL)
         else:
@@ -239,7 +237,7 @@ class IngestService:
         try:
             await self._insert_rows(collection, row, meta, key)
         except Exception:  # released outside the rolled-back savepoint
-            drop_hold(self.db, self._factory(), row.storage_hold_id)
+            await holds.drop_hold(self.db, self._factory(), row.id, row.storage_hold_id)
             raise
 
     async def _insert_rows(self, collection: Collection, row: Image, meta, key: str) -> None:
@@ -253,7 +251,9 @@ class IngestService:
             await self.db.flush()
             await stats.on_image_added(self.db, collection.id, row.lat, row.lng)
             await clear_intents(self.db, [key])
-            keep_hold(self.db, self._factory(), row.storage_hold_id)  # dropped with the savepoint
+            await holds.keep_hold(  # rolled back with the savepoint
+                self.db, self._factory(), row.id, row.storage_hold_id, row.storage_bytes
+            )
 
     def _remember(self, collection_id: uuid.UUID, meta: IngestMeta, sha: str, image_id) -> None:
         if meta.external_id is not None and meta.external_source is not None:

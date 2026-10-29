@@ -11,7 +11,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sm_images import billing, storage_keys
+from sm_images import billing_ops, storage_keys
 from sm_images.janitor import purge_expired
 from sm_images.models import (
     Collection,
@@ -100,7 +100,7 @@ async def test_purge_removes_storage_and_rows(pipe, blur, monkeypatch):
     async def record(db, holds):
         released.extend(holds)
 
-    monkeypatch.setattr(billing, "release_storage", record)
+    monkeypatch.setattr(billing_ops, "release_storage", record)
     # A day on: the replaced generations' intents are past ``MIN_INTENT_AGE``.
     report = await _purge(pipe, now=NOW + timedelta(days=1, minutes=1))
 

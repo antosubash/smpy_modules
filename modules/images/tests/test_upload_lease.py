@@ -21,8 +21,8 @@ from sm_images.ingest import upload_session as state
 from sm_images.ingest.service import IngestService
 from sm_images.models import Image, UploadSession, UploadStatus
 
+from tests.direct_support import UPLOADS, complete, send_parts, start
 from tests.pg_support import USING_POSTGRES
-from tests.test_direct_upload import UPLOADS, complete, send_parts, start
 from tests.test_upload_reaper import _one_part_in, _parts_exist, _reap
 from tests.test_upload_session import _uploaded, ticket_of
 from tests.upload_support import OLGA, all_rows, jpeg, make_collection, stored

@@ -14,14 +14,16 @@ with ``finalize_session``), so none may run while the caller's session holds a
 write lock - on file-backed SQLite it would wait on that lock and fail. Hence
 the order every caller follows, the same as for object intents:
 
-1. :func:`reserve` (a ``held`` hold with billing's TTL) *before* the caller's
-   transaction first writes. A refusal is :class:`StorageQuotaExceeded`.
-2. The caller records the hold id on the image in its transaction and queues
-   :func:`settle` with :func:`on_commit`: after the commit the new hold is
-   committed and the old one released.
-3. A caller that does not keep the hold queues :func:`release` the same way.
-   A rollback discards the queued call, and the ``held`` hold lapses at its TTL
-   - capacity comes back by itself, never leaks.
+1. :func:`reserve` (a ``held`` hold) *before* the caller's transaction first
+   writes. A refusal is :class:`StorageQuotaExceeded`. Each attempt reserves
+   under a key of its own, so it never shares - and never releases - another
+   attempt's hold.
+2. The caller records the hold id on the image and writes the settlement -
+   ``commit`` the new hold, then ``release`` the old one - to the durable
+   outbox in the same transaction (:mod:`sm_images.billing_ops`). A rollback
+   discards both, and the ``held`` hold lapses at its TTL.
+
+This module is the thin seam to billing; settlement lives in the outbox.
 
 **Fail closed.** An installed billing that cannot meter (no ``usage_meter``,
 or a broken import) raises: images never stores for free because billing
@@ -34,9 +36,7 @@ process's ``app.state.billing_usage``, whose meter registry knows the gauge.
 from __future__ import annotations
 
 import importlib
-import logging
 import uuid
-from collections.abc import Sequence
 from functools import partial
 from importlib.util import find_spec
 from typing import Any
@@ -47,26 +47,20 @@ from sm_images import constants
 from sm_images.errors import StorageQuotaExceeded
 
 __all__ = [
-    "StorageHold",
     "billing_installed",
     "check",
+    "extend",
+    "factory_of",
     "hold_key",
     "on_commit",
     "register_meter",
-    "release",
-    "release_storage",
     "reserve",
-    "settle",
     "storage_meter",
 ]
 
-logger = logging.getLogger(__name__)
 METER = constants.METER_STORAGE
 SOURCE = "images:storage"
 FULL = "The plan's image storage is used up"
-
-StorageHold = tuple[uuid.UUID, str | None, int]
-"""``(image_id, storage_hold_id, storage_bytes)`` of a hard-deleted image."""
 
 
 def register_meter(app: Any) -> bool:
@@ -99,10 +93,10 @@ def storage_meter(session_factory: Any) -> Any:
     return usage_meter(session_factory)
 
 
-def hold_key(image_id: uuid.UUID | str, generation: str | int) -> str:
-    """The idempotency key of one hold: an image and its storage generation
-    (``0`` at ingest, the attempt's nonce at a publication)."""
-    return f"images:{image_id}:storage:{generation}"
+def hold_key(image_id: uuid.UUID | str, attempt: str | int) -> str:
+    """The idempotency key of one hold: an image and the attempt that took it
+    (a fresh nonce per attempt; a rehold names its outbox op)."""
+    return f"images:{image_id}:storage:{attempt}"
 
 
 async def check(app: Any, tenant: str, qty: int) -> None:
@@ -117,47 +111,27 @@ async def check(app: Any, tenant: str, qty: int) -> None:
         raise StorageQuotaExceeded(FULL)
 
 
-async def reserve(session_factory: Any, tenant: str, qty: int, key: str) -> str | None:
-    """Hold ``qty`` bytes (``held``, billing's TTL); the hold id, or ``None``
-    without billing. :class:`StorageQuotaExceeded` when it does not fit - or
-    when the key's hold was since released (a key is never reused)."""
+async def reserve(
+    session_factory: Any, tenant: str, qty: int, key: str, *, ttl: int | None = None
+) -> Any:
+    """Hold ``qty`` bytes (``held``, for ``ttl`` seconds or billing's default);
+    billing's ``Hold`` (``id``, ``expires_at``), or ``None`` without billing.
+    :class:`StorageQuotaExceeded` when it does not fit - or when the key's hold
+    was since released (a key is never reused)."""
     meter = storage_meter(session_factory)
     if meter is None or qty < 1:
         return None
-    outcome = await meter.reserve(tenant, METER, int(qty), key, source=SOURCE)
+    outcome = await meter.reserve(tenant, METER, int(qty), key, source=SOURCE, ttl=ttl)
     if not outcome.ok:
         raise StorageQuotaExceeded(FULL)
-    return outcome.id
+    return outcome
 
 
-async def settle(session_factory: Any, new: str | None, old: str | None) -> None:
-    """Commit ``new``, then release ``old`` (decision 10's order). Runs after
-    the caller's commit; a failure is logged, never raised - the row is durable.
-    ``old`` is released even when ``new`` could not be committed: the gauge
-    may then under-count this image, but capacity never leaks."""
+async def extend(session_factory: Any, hold_id: str, ttl: int) -> Any:
+    """Push a ``held`` hold's expiry to ``ttl`` seconds from now (billing's
+    ``Hold``); ``HoldExpired`` once it lapsed."""
     meter = storage_meter(session_factory)
-    if meter is None:
-        return
-    if new is not None:
-        try:
-            await meter.commit(new)
-        except Exception:
-            logger.warning("images.billing.commit_failed hold=%s", new, exc_info=True)
-    if old is not None and old != new:
-        await release(session_factory, [old])
-
-
-async def release(session_factory: Any, hold_ids: Sequence[str | None]) -> None:
-    """Return each hold's capacity; best effort (a settled hold is a no-op)."""
-    ids = [h for h in dict.fromkeys(hold_ids) if h]
-    meter = storage_meter(session_factory) if ids else None
-    if meter is None:
-        return
-    for hold_id in ids:
-        try:
-            await meter.release(hold_id)
-        except Exception:
-            logger.warning("images.billing.release_failed hold=%s", hold_id, exc_info=True)
+    return None if meter is None else await meter.extend(hold_id, ttl)
 
 
 def on_commit(db: Any, call: Any, *args: Any) -> None:
@@ -177,13 +151,3 @@ def factory_of(db: Any, fallback: Any = None) -> Any:
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
     return async_sessionmaker(db.bind, expire_on_commit=False)
-
-
-async def release_storage(
-    db: Any, holds: Sequence[StorageHold], session_factory: Any = None
-) -> None:
-    """The janitor's purge: release the hard-deleted images' holds once its
-    transaction (objects already deleted, rows now deleted) commits."""
-    ids = [hold for _, hold, _ in holds if hold]
-    if ids:
-        on_commit(db, release, factory_of(db, session_factory), ids)

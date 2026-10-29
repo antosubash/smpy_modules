@@ -15,7 +15,7 @@ turn); :mod:`sm_images.purge_select` decides the rows and their keys. One pass:
    the back of later passes) and its collection is not removed. After
    :data:`FAILURE_LIMIT` failures a pass stops trying (storage is down).
 3. **Rows** of what was cleared, children first; the intents of the deleted
-   keys; the images' storage holds (:mod:`sm_images.billing`). The caller
+   keys; the images' storage-hold releases (:mod:`sm_images.billing_ops`). The caller
    commits.
 """
 
@@ -30,7 +30,7 @@ from typing import Any
 from simple_module_db.independent import independent_session
 from sqlalchemy import and_, delete, or_, select, update
 
-from sm_images import billing
+from sm_images import billing_ops
 from sm_images.ingest.upload_session import mark_cleaned, move
 from sm_images.models import (
     Collection,
@@ -210,5 +210,7 @@ async def purge_expired(
     report.images, report.collections = [i.id for i in images], sorted(whole)
     report.keys, report.failed = sorted(deleted), sorted(failed)
     await _delete_rows(db, report.images, report.collections, report.keys, [u.id for u in stuck])
-    await billing.release_storage(db, [(i.id, i.storage_hold_id, i.storage_bytes) for i in images])
+    await billing_ops.release_storage(
+        db, [(i.id, i.storage_hold_id, i.storage_bytes) for i in images]
+    )
     return report
