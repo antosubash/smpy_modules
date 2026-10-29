@@ -66,10 +66,12 @@ class YoloDetector:
         with self._lock:
             model = self._models.get(kind)
             if model is None:
-                path = weights_file(kind, self.configured, cache_dir=self.cache_dir)
                 from ultralytics import YOLO  # the [anonymize] extra
 
-                model = self._models[kind] = YOLO(str(path))
+                # Loaded inside the ``with``: YOLO reads the verified snapshot,
+                # which is removed as soon as the model is in memory.
+                with weights_file(kind, self.configured, cache_dir=self.cache_dir) as path:
+                    model = self._models[kind] = YOLO(str(path))
             return model
 
     def _boxes(self, kind: str, image: Image.Image, conf: float) -> list[Detection]:

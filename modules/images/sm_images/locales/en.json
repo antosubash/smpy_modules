@@ -83,6 +83,7 @@
     "show_display": "Show display copy",
     "loading_original": "Loading the original…",
     "original_failed": "The original could not be loaded.",
+    "display_not_ready": "Display copy not ready yet",
     "display_pending": "This image is still being anonymised. It is shown once that has finished.",
     "metadata": "Details",
     "filename": "File name",

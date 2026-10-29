@@ -72,7 +72,11 @@ export function ImageViewer({
               setOriginal((on) => !on);
             }}
           >
-            {original ? t(keys.images.viewer.show_display) : t(keys.images.viewer.show_original)}
+            {!original
+              ? t(keys.images.viewer.show_original)
+              : displayPending
+                ? t(keys.images.viewer.display_not_ready)
+                : t(keys.images.viewer.show_display)}
           </Button>
         </div>
       )}

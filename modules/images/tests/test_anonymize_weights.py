@@ -4,6 +4,8 @@ cached once. Never bundled in the wheel."""
 from __future__ import annotations
 
 import hashlib
+import stat
+from pathlib import Path
 
 import httpx
 import pytest
@@ -44,44 +46,103 @@ def test_every_pinned_url_is_https_and_checksummed():
         assert len(spec.sha256) == 64 and spec.size > 0
 
 
+def load(kind: str = "face", configured: str = "", **kw) -> tuple[bytes, Path, int]:
+    """What a loader would read: the bytes, the path it was handed, its mode."""
+    with weights.weights_file(kind, configured, **kw) as path:
+        return path.read_bytes(), path, stat.S_IMODE(path.stat().st_mode)
+
+
 def test_a_configured_directory_is_used_as_is(tmp_path, served):
     (tmp_path / "face.pt").write_bytes(b"operator's own weights")
-    assert weights.weights_file("face", str(tmp_path)) == tmp_path / "face.pt"
+    with weights.weights_file("face", str(tmp_path)) as path:
+        assert path == tmp_path / "face.pt"
     assert served["requests"] == 0  # never downloaded, never checksummed
 
 
 def test_a_configured_directory_without_the_file_fails_closed(tmp_path, served):
     with pytest.raises(WeightsUnavailable, match=r"face\.pt"):
-        weights.weights_file("face", str(tmp_path))
+        load("face", str(tmp_path))
     assert served["requests"] == 0
 
 
-def test_downloaded_once_then_served_from_the_cache(tmp_path, served):
+def test_downloaded_once_then_loaded_from_a_private_snapshot(tmp_path, served):
     cache = tmp_path / "cache"
-    path = weights.weights_file("face", "", cache_dir=cache)
-    assert path == cache / "face.pt" and path.read_bytes() == BLOB
-    assert weights.weights_file("face", "", cache_dir=cache) == path
+    data, path, mode = load(cache_dir=cache)
+    assert data == BLOB and (cache / "face.pt").read_bytes() == BLOB
+    # The loader never gets the cache path: a private 0600 copy in a 0700
+    # directory, removed once loaded.
+    assert path.parent != cache and mode == 0o600
+    assert not path.exists() and not path.parent.exists()
+    assert stat.S_IMODE(cache.stat().st_mode) == 0o700
+    assert load(cache_dir=cache)[0] == BLOB
     assert served["requests"] == 1
+
+
+def test_a_file_swapped_after_verification_is_never_loaded(tmp_path, served, monkeypatch):
+    """The hash covers the bytes the loader reads, not a path reopened later."""
+    cache = tmp_path / "cache"
+    load(cache_dir=cache)
+    real = weights._matches
+
+    def swap_after_hashing(data: bytes, spec) -> bool:
+        ok = real(data, spec)
+        (cache / "face.pt").write_bytes(b"evil" * (len(BLOB) // 4) + b"e")
+        return ok
+
+    monkeypatch.setattr(weights, "_matches", swap_after_hashing)
+    assert load(cache_dir=cache)[0] == BLOB
+    monkeypatch.setattr(weights, "_matches", real)
+    # Re-verified on every load, never trusted by name: the swapped file is
+    # refused and the pinned one fetched again.
+    assert load(cache_dir=cache)[0] == BLOB
+    assert served["requests"] == 2
+
+
+def test_a_symlink_in_the_cache_is_refused(tmp_path, served):
+    cache = tmp_path / "cache"
+    cache.mkdir(mode=0o700)
+    target = tmp_path / "elsewhere.pt"
+    target.write_bytes(BLOB)
+    (cache / "face.pt").symlink_to(target)
+    with pytest.raises(WeightsUnavailable, match="symlink"):
+        load(cache_dir=cache)
+    assert served["requests"] == 0
+
+
+def test_a_symlinked_cache_directory_is_refused(tmp_path, served):
+    real_dir = tmp_path / "real"
+    real_dir.mkdir()
+    (tmp_path / "cache").symlink_to(real_dir)
+    with pytest.raises(WeightsUnavailable, match="symlink"):
+        load(cache_dir=tmp_path / "cache")
+
+
+def test_a_loose_cache_directory_is_tightened(tmp_path, served):
+    cache = tmp_path / "cache"
+    cache.mkdir(mode=0o755)
+    cache.chmod(0o755)
+    load(cache_dir=cache)
+    assert stat.S_IMODE(cache.stat().st_mode) == 0o700
 
 
 def test_a_checksum_mismatch_is_refused_and_leaves_nothing(tmp_path, served):
     served["body"] = b"pretend these are WEIGHTS"  # same size, other bytes
     cache = tmp_path / "cache"
     with pytest.raises(WeightsUnavailable, match="checksum"):
-        weights.weights_file("face", "", cache_dir=cache)
+        load(cache_dir=cache)
     assert list(cache.iterdir()) == []
 
 
 def test_an_oversized_download_is_cut_off(tmp_path, served):
     served["body"] = BLOB * 10
     with pytest.raises(WeightsUnavailable):
-        weights.weights_file("face", "", cache_dir=tmp_path)
+        load(cache_dir=tmp_path)
     assert not (tmp_path / "face.pt").exists()
 
 
 def test_a_tampered_cache_file_is_fetched_again(tmp_path, served):
     (tmp_path / "face.pt").write_bytes(b"x" * len(BLOB))
-    assert weights.weights_file("face", "", cache_dir=tmp_path).read_bytes() == BLOB
+    assert load(cache_dir=tmp_path)[0] == BLOB
     assert served["requests"] == 1
 
 

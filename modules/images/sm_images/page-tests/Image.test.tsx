@@ -29,6 +29,7 @@ describe('Image viewer', () => {
     const toggle = () => view.find('[data-testid="images-original-toggle"]');
     expect(view.host.innerHTML).not.toContain('/original');
     await click(toggle());
+    expect(toggle()?.textContent).toBe('Show display copy');
     expect(view.find('[data-testid="images-viewer-image"]')?.getAttribute('src')).toBe(
       '/api/images/images/i1/original',
     );
@@ -57,11 +58,14 @@ describe('Image viewer', () => {
     );
     const toggle = () => view.find('[data-testid="images-original-toggle"]');
     expect(view.find('[data-testid="images-display-pending"]')).not.toBeNull();
+    expect(toggle()?.textContent).toBe('Show original');
     await click(toggle());
     expect(view.find('[data-testid="images-display-pending"]')).toBeNull();
     expect(view.find('[data-testid="images-viewer-image"]')?.getAttribute('src')).toBe(
       '/api/images/images/i1/original',
     );
+    // Toggling back leads to no picture yet, and the label says so.
+    expect(toggle()?.textContent).toBe('Display copy not ready yet');
     await click(toggle());
     expect(view.find('[data-testid="images-display-pending"]')).not.toBeNull();
     expect(view.host.innerHTML).not.toContain('/display');

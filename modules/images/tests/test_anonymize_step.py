@@ -7,6 +7,7 @@ never touched, the blurred picture is a display copy.
 
 from __future__ import annotations
 
+import io
 from types import SimpleNamespace
 
 import pytest
@@ -159,7 +160,7 @@ async def test_regions_are_on_the_exif_transposed_image():
     fake = FakeDetector([Detection("face", 0, 0, 10, 10, 0.9)])
     outcome, written = await run(fake, data=picture(exif_orientation=6), padding=0)
     assert fake.calls[0]["size"] == (48, 64)
-    shown = PILImage.open(__import__("io").BytesIO(written[0][0]))
+    shown = PILImage.open(io.BytesIO(written[0][0]))
     assert shown.size == (48, 64)
     assert shown.getexif().get(0x0112) in (None, 1)
     assert outcome.output["regions"][0]["w"] == 10
