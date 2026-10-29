@@ -42,7 +42,7 @@ def _load_quality_step() -> None:
 def _load_anonymize_step() -> None:
     from sm_images.steps.anonymize import register_anonymize
 
-    register_anonymize()  # only when the [anonymize] extra (torch, ultralytics) is installed
+    register_anonymize()  # only when the [anonymize] extra (onnxruntime) is installed
 
 
 def _load_classify_step() -> None:

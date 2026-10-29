@@ -36,7 +36,8 @@ class ImagesSettings(BootSettings):
     anonymize_weights_path: str = ""
     """Directory holding the ``anonymize`` step's detector weights.
 
-    It must contain ``face.pt`` and ``plate.pt`` (ultralytics YOLO weights).
+    It must contain ``face.onnx`` (a YuNet face model) and ``plate.onnx`` (an
+    end-to-end YOLOv9 plate model, open-image-models layout).
     Empty (the default) downloads pinned, checksummed weights once, on first
     use, to ``~/.cache/simple_module_images/models`` on each worker. The
     weights are not bundled in the wheel. Read by every anonymize run from the

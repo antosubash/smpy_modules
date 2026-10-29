@@ -1,8 +1,8 @@
-"""What finds faces and plates: the :class:`Detector` protocol and the YOLO one.
+"""What finds faces and plates: the :class:`Detector` protocol and the ONNX one.
 
 The step depends on the protocol only, so a test (or a host with a detector
-of its own) injects one; :class:`YoloDetector` is the default. It imports
-ultralytics (and through it torch) inside its methods, never at module load:
+of its own) injects one; :class:`OnnxDetector` is the default. It imports
+onnxruntime (and numpy) inside its methods, never at module load:
 ``pip install simple_module_images`` without the ``[anonymize]`` extra still
 imports this file.
 
@@ -19,12 +19,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from sm_images.steps.anonymize.weights import weights_file
+from sm_images.steps.anonymize.models import detect_faces, detect_plates
+from sm_images.steps.anonymize.weights import weights_bytes
 
 if TYPE_CHECKING:
     from PIL import Image
 
-__all__ = ["Detection", "Detector", "YoloDetector"]
+__all__ = ["Detection", "Detector", "OnnxDetector"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,61 +50,70 @@ class Detector(Protocol):
         ...
 
 
-class YoloDetector:
-    """ultralytics YOLO for both kinds, one model file each (see ``weights``).
+_PREFERRED_PROVIDERS = ("CUDAExecutionProvider", "CPUExecutionProvider")
 
-    Models load lazily on first use and stay loaded for the process; the GPU is
-    used when torch sees one.
+
+class OnnxDetector:
+    """YuNet for faces, YOLOv9 for plates, both on onnxruntime (see ``models``
+    and ``weights``).
+
+    Sessions load lazily on first use and stay loaded for the process; CUDA is
+    used when the installed onnxruntime build offers it.
     """
 
     def __init__(self, configured: str = "", *, cache_dir: Path | None = None) -> None:
         self.configured = configured
         self.cache_dir = cache_dir
-        self._models: dict[str, Any] = {}
+        self._sessions: dict[str, Any] = {}
         self._lock = threading.Lock()
 
-    def _model(self, kind: str) -> Any:
+    def _session(self, kind: str) -> Any:
         with self._lock:
-            model = self._models.get(kind)
-            if model is None:
-                from ultralytics import YOLO  # the [anonymize] extra
+            session = self._sessions.get(kind)
+            if session is None:
+                import onnxruntime as ort  # the [anonymize] extra
 
-                # Loaded inside the ``with``: YOLO reads the verified snapshot,
-                # which is removed as soon as the model is in memory.
-                with weights_file(kind, self.configured, cache_dir=self.cache_dir) as path:
-                    model = self._models[kind] = YOLO(str(path))
-            return model
+                data = weights_bytes(kind, self.configured, cache_dir=self.cache_dir)
+                available = set(ort.get_available_providers())
+                providers = [p for p in _PREFERRED_PROVIDERS if p in available]
+                session = self._sessions[kind] = ort.InferenceSession(data, providers=providers)
+            return session
 
-    def _boxes(self, kind: str, image: Image.Image, conf: float) -> list[Detection]:
-        out: list[Detection] = []
-        for result in self._model(kind).predict(image, conf=conf, verbose=False):
-            boxes = result.boxes
-            if boxes is None:
-                continue
-            corners, scores = boxes.xyxy.tolist(), boxes.conf.tolist()
-            for (x1, y1, x2, y2), score in zip(corners, scores, strict=True):
-                out.append(Detection(kind, x1, y1, x2 - x1, y2 - y1, float(score)))
-        return out
+    def _faces(self, image: Image.Image, conf: float) -> list[Detection]:
+        session = self._session("face")
+        names = [o.name for o in session.get_outputs()]
+        feed = session.get_inputs()[0].name
+
+        def run(tensor: Any) -> dict[str, Any]:
+            return dict(zip(names, session.run(None, {feed: tensor}), strict=True))
+
+        return [Detection("face", *box) for box in detect_faces(run, image, conf)]
+
+    def _plates(self, image: Image.Image, conf: float) -> list[Detection]:
+        session = self._session("plate")
+        feed = session.get_inputs()[0].name
+        boxes = detect_plates(lambda t: session.run(None, {feed: t}), image, conf)
+        return [Detection("plate", *box) for box in boxes]
 
     def detect(
         self, image: Image.Image, *, faces: bool, plates: bool, min_confidence: float
     ) -> list[Detection]:
         found: list[Detection] = []
         if faces:
-            found += self._boxes("face", image, min_confidence)
+            found += self._faces(image, min_confidence)
         if plates:
-            found += self._boxes("plate", image, min_confidence)
+            found += self._plates(image, min_confidence)
         return found
 
 
-_shared: dict[str, YoloDetector] = {}
+_shared: dict[str, OnnxDetector] = {}
 _shared_lock = threading.Lock()
 
 
-def shared_detector(configured: str) -> YoloDetector:
+def shared_detector(configured: str) -> OnnxDetector:
     """The process's detector for a weights setting: models load once per worker."""
     with _shared_lock:
         det = _shared.get(configured)
         if det is None:
-            det = _shared[configured] = YoloDetector(configured)
+            det = _shared[configured] = OnnxDetector(configured)
         return det

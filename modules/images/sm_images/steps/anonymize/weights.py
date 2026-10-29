@@ -1,22 +1,25 @@
 """Where the detectors' weights come from. Never from the wheel.
 
-* ``anonymize_weights_path`` set - a directory holding ``face.pt`` and
-  ``plate.pt`` (ultralytics YOLO weights), used as they are: the operator
+* ``anonymize_weights_path`` set - a directory holding ``face.onnx`` (a
+  YuNet-compatible face model) and ``plate.onnx`` (an end-to-end YOLOv9 plate
+  model with the open-image-models layout), used as they are: the operator
   chose them, so they are not checksummed against the defaults. A missing file
   fails the run (``weights_unavailable``) rather than skipping a detector.
 * unset - the pinned files below are downloaded once into
   :func:`default_cache_dir` (``0700``, symlinks refused) and verified by size
-  and SHA-256 on **every** load, never trusted by name: a ``.pt`` file is a
-  pickle. The hash covers the very bytes the loader reads - they are read once,
-  hashed, and written to a private ``0600`` snapshot in a fresh ``0700``
-  directory, whose path is what YOLO gets; the snapshot is gone once loaded.
-  So a cache file swapped after verification is never loaded. The URLs are
-  constants, so this is a plain HTTPS fetch, not the import module's
-  safe-fetch, which exists for URLs a user supplies.
+  and SHA-256 on **every** load, never trusted by name. The hash covers the
+  very bytes the runtime loads: they are read once, hashed, and handed to
+  onnxruntime as bytes, so a cache file swapped after verification is never
+  loaded. The URLs are constants, so this is a plain HTTPS fetch, not the
+  import module's safe-fetch, which exists for URLs a user supplies.
 
-Both defaults are AGPL-3.0 checkpoints from Hugging Face, pinned to a commit:
-``arnabdhar/YOLOv8-Face-Detection`` (faces) and
-``morsetechlab/yolov11-license-plate-detection`` (plates, the ``s`` size).
+The defaults (licences and attribution in ``docs/index.md`` and ``NOTICE``):
+
+* faces - YuNet ``face_detection_yunet_2026may.onnx`` from OpenCV Zoo, MIT
+  (Shiqi Yu), pinned to an opencv_zoo commit;
+* plates - ``yolo-v9-s-608-license-plates-end2end.onnx`` from
+  ankandrew/open-image-models, MIT, a release asset (the release is not
+  immutable, so the SHA-256 is what pins it: a replaced file fails closed).
 """
 
 from __future__ import annotations
@@ -24,13 +27,9 @@ from __future__ import annotations
 import errno
 import hashlib
 import os
-import shutil
 import stat
-import tempfile
 import threading
 import uuid
-from collections.abc import Iterator
-from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -41,10 +40,14 @@ __all__ = [
     "WeightsSpec",
     "WeightsUnavailable",
     "default_cache_dir",
-    "weights_file",
+    "weights_bytes",
 ]
 
-_HF = "https://huggingface.co"
+_ZOO = (
+    "https://github.com/opencv/opencv_zoo/raw/eb9f4f2d4b79b58e5513b5d25d5f0243a8357bf4"
+    "/models/face_detection_yunet"
+)
+_OIM = "https://github.com/ankandrew/open-image-models/releases/download/assets"
 _TIMEOUT = httpx.Timeout(30.0, read=120.0)
 _CHUNK = 1 << 20
 
@@ -65,19 +68,17 @@ class WeightsSpec:
 WEIGHTS: dict[str, WeightsSpec] = {
     "face": WeightsSpec(
         kind="face",
-        filename="face.pt",
-        url=f"{_HF}/arnabdhar/YOLOv8-Face-Detection/resolve/"
-        "52fa54977207fa4f021de949b515fb19dcab4488/model.pt",
-        sha256="37396ac6a9601ab9f5177e4231b09d81cf6f65a7f22db99ec3b36ab63f674e71",
-        size=6_247_065,
+        filename="face.onnx",
+        url=f"{_ZOO}/face_detection_yunet_2026may.onnx",
+        sha256="ebafce4e3c118d6554634be5c27ab333b4c047a9a8c3faf1d7cf93101c22f0f0",
+        size=229_738,
     ),
     "plate": WeightsSpec(
         kind="plate",
-        filename="plate.pt",
-        url=f"{_HF}/morsetechlab/yolov11-license-plate-detection/resolve/"
-        "251a30d7daedca065f56e04b0af04052c907c68f/license-plate-finetune-v1s.pt",
-        sha256="95e50c25ab7066dd0ca5aec18fa80349676db08697780d1149576461174d2381",
-        size=19_173_715,
+        filename="plate.onnx",
+        url=f"{_OIM}/yolo-v9-s-608-license-plates-end2end.onnx",
+        sha256="2b878b38d9aa07b6ddc3ea75c4ffcb39869bc5c218e0a14002f60ab2f7b0be9a",
+        size=28_612_350,
     ),
 }
 
@@ -167,28 +168,16 @@ def _verified_bytes(spec: WeightsSpec, cache_dir: Path) -> bytes:
         return _download(spec, path)
 
 
-@contextmanager
-def weights_file(
-    kind: str, configured: str = "", *, cache_dir: Path | None = None
-) -> Iterator[Path]:
-    """A path to load *kind*'s weights from, valid inside the ``with``.
+def weights_bytes(kind: str, configured: str = "", *, cache_dir: Path | None = None) -> bytes:
+    """*kind*'s model, as the bytes onnxruntime loads.
 
-    Configured: the operator's file, as is. Otherwise a private snapshot of the
-    pinned bytes, verified this very call and removed on exit."""
+    Configured: the operator's file, as is. Otherwise the pinned bytes,
+    verified this very call."""
     spec = WEIGHTS[kind]
     if configured:
         path = Path(configured).expanduser() / spec.filename
-        if not path.is_file():
-            raise WeightsUnavailable(f"{path} not found (anonymize_weights_path)")
-        yield path
-        return
-    data = _verified_bytes(spec, cache_dir or default_cache_dir())
-    snap_dir = Path(tempfile.mkdtemp(prefix="sm-images-weights-"))  # 0700, ours
-    try:
-        snap = snap_dir / spec.filename
-        fd = os.open(snap, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-        with os.fdopen(fd, "wb") as fh:
-            fh.write(data)
-        yield snap
-    finally:
-        shutil.rmtree(snap_dir, ignore_errors=True)
+        try:
+            return path.read_bytes()
+        except OSError as exc:
+            raise WeightsUnavailable(f"{path} not found (anonymize_weights_path)") from exc
+    return _verified_bytes(spec, cache_dir or default_cache_dir())

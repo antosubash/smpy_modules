@@ -19,8 +19,8 @@ Output ``{regions: [{kind, x, y, w, h, score}], faces, plates}``, in the
 display copy's pixels. Region coordinates are visible to editors only
 (``present_detail``'s ``output_visible``).
 
-Needs the ``[anonymize]`` extra (torch, ultralytics); :func:`register_anonymize`
-registers the step only when both are importable.
+Needs the ``[anonymize]`` extra (onnxruntime, which brings numpy);
+:func:`register_anonymize` registers the step only when both are importable.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ MAX_DETECTION_DIM: Final = 1600
 JPEG_QUALITY: Final = 90
 MAX_REPORTED: Final = 200
 """Regions listed in the output; every one found is blurred and counted."""
-EXTRA_MODULES: Final = ("torch", "ultralytics")
+EXTRA_MODULES: Final = ("onnxruntime", "numpy")
 
 
 class AnonymizeParams(BaseModel):
@@ -179,6 +179,6 @@ class AnonymizeStep:
 
 def register_anonymize() -> None:
     """A ``_BUILTIN_LOADERS`` entry: registers ``anonymize`` only when the
-    ``[anonymize]`` extra (torch, ultralytics) is installed."""
+    ``[anonymize]`` extra (onnxruntime, numpy) is installed."""
     if all(importlib.util.find_spec(m) is not None for m in EXTRA_MODULES):
         registry.register_builtin(AnonymizeStep())

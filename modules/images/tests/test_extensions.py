@@ -122,7 +122,9 @@ def test_builtins_are_registered_by_default(monkeypatch):
     from sm_images.ai import ai_available
 
     classify = ["classify"] if ai_available() else []  # the [ai] extra
-    assert sorted(reg.all_steps()) == sorted(["exif", "renditions", *quality, *classify])
+    anonymize = ["anonymize"] if importlib.util.find_spec("onnxruntime") else []
+    expected = ["exif", "renditions", *quality, *classify, *anonymize]
+    assert sorted(reg.all_steps()) == sorted(expected)
 
 
 def test_plugin_package_import_error_is_not_swallowed(monkeypatch):

@@ -128,7 +128,7 @@ async def test_malformed_box_fails_the_run():
 async def test_missing_weights_fail_the_run_with_their_own_code():
     from sm_images.steps.anonymize.weights import WeightsUnavailable
 
-    outcome, _ = await run(FakeDetector(error=WeightsUnavailable("no face.pt")))
+    outcome, _ = await run(FakeDetector(error=WeightsUnavailable("no face.onnx")))
     assert (outcome.status, outcome.code) == ("failed", "weights_unavailable")
 
 
@@ -189,7 +189,7 @@ def _specs(monkeypatch, present: set[str]) -> None:
     import importlib.util
 
     real = importlib.util.find_spec
-    heavy = {"torch", "ultralytics"}
+    heavy = {"onnxruntime", "numpy"}
 
     def fake(name, *a):
         if name in heavy:
@@ -200,16 +200,16 @@ def _specs(monkeypatch, present: set[str]) -> None:
 
 
 def test_registered_when_the_extra_is_installed(clean, monkeypatch):
-    _specs(monkeypatch, {"torch", "ultralytics"})
+    _specs(monkeypatch, {"onnxruntime", "numpy"})
     extensions.load_extensions()
     step = registry.get_step("anonymize")
     assert step is not None
     assert (step.queue, step.mutates_display) == ("images_gpu", True)
 
 
-@pytest.mark.parametrize("missing", ["torch", "ultralytics"])
+@pytest.mark.parametrize("missing", ["onnxruntime", "numpy"])
 def test_absent_without_the_extra(clean, monkeypatch, missing):
-    _specs(monkeypatch, {"torch", "ultralytics"} - {missing})
+    _specs(monkeypatch, {"onnxruntime", "numpy"} - {missing})
     extensions.load_extensions()
     assert registry.get_step("anonymize") is None
     assert registry.get_step("renditions") is not None
@@ -221,7 +221,7 @@ def test_importing_the_step_pulls_no_heavy_module():
 
     code = (
         "import sys, sm_images.steps.anonymize, sm_images.steps.anonymize.step;"
-        "print(sorted(m for m in ('torch','ultralytics','cv2') if m in sys.modules))"
+        "print(sorted(m for m in ('onnxruntime','numpy','cv2','torch') if m in sys.modules))"
     )
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
     assert out.stdout.strip() == "[]"

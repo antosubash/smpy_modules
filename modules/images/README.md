@@ -28,13 +28,13 @@ resolve it from the workspace:
 workspace = true
 ```
 
-A plain install pulls no torch, ultralytics or OpenCV. Heavy processors are
+A plain install pulls no onnxruntime or OpenCV. Heavy processors are
 extras, imported only inside the step that needs them:
 
 | Extra | Adds |
 | --- | --- |
 | `quality` | OpenCV: resolution, blur and exposure metrics |
-| `anonymize` | torch, ultralytics: YOLO face and plate detection, blurred into a display copy (the original is kept); weights from `anonymize_weights_path` or a pinned, checksummed download on first use |
+| `anonymize` | onnxruntime: YuNet face and YOLOv9 plate detection (MIT models), blurred into a display copy (the original is kept); weights from `anonymize_weights_path` or a pinned, checksummed download on first use |
 | `ai` | `simple_module_ai`: prompt-based image analysis |
 | `billing` | `simple_module_billing`: storage and request metering |
 | `pagebuilder` | `simple_module_pagebuilder`: an image gallery block |
@@ -42,12 +42,16 @@ extras, imported only inside the step that needs them:
 The map view needs no extra: its PMTiles archive is built by the `tippecanoe`
 binary (`tippecanoe_path`), which must be on the worker's machine.
 
-**Licence warning.** The `anonymize` extra installs ultralytics, which is
-AGPL-3.0, and the default weights it downloads are AGPL-3.0 community
-checkpoints, while this module is MIT. Whether to use it is the operator's
-decision. Plate-detection recall is unverified, and weights are cached under
-`~/.cache/simple_module_images/models` unless `anonymize_weights_path` points
-at `face.pt` and `plate.pt`. See [docs/index.md](docs/index.md).
+**Models and licences.** The `anonymize` extra installs only onnxruntime
+(MIT). The step downloads two MIT-licensed ONNX models on first use, pinned by
+SHA-256: **YuNet** (faces; Shiqi Yu, via
+[OpenCV Zoo](https://github.com/opencv/opencv_zoo/tree/eb9f4f2d4b79b58e5513b5d25d5f0243a8357bf4/models/face_detection_yunet))
+and **YOLOv9 licence-plate detector** (ankandrew,
+[open-image-models](https://github.com/ankandrew/open-image-models)). Their
+copyright notices are in this module's `NOTICE`. Recall is unverified, and
+weights are cached under `~/.cache/simple_module_images/models` unless
+`anonymize_weights_path` points at `face.onnx` and `plate.onnx`. See
+[docs/index.md](docs/index.md#anonymize-models-and-licences).
 
 The module needs the framework's `settings`, `sharing`, `file_storage` and
 `background_tasks` modules. Migrations live in the consuming host

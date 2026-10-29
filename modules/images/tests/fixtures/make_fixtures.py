@@ -1,6 +1,8 @@
 """Regenerate the small image fixtures (run from the repo root with uv run python).
 
 EXIF is written with Pillow's ``Image.Exif`` API. Every file stays under 50 KB.
+``real_face.jpg`` and ``real_plate.jpg`` are not generated here: they are CC0
+photographs for the ``real_models`` tests (sources in ``test_anonymize_real.py``).
 """
 
 from __future__ import annotations

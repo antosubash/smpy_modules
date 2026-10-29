@@ -1,6 +1,6 @@
 """A fake detector for the ``anonymize`` step, and a registry that runs it.
 
-The real detectors need the ``[anonymize]`` extra (torch, ultralytics) and
+The real detectors need the ``[anonymize]`` extra (onnxruntime) and
 weights, which default CI never installs; every unit test injects this fake.
 """
 

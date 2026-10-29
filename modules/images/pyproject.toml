@@ -49,11 +49,12 @@ dev = [
 ]
 
 # Heavy processors are extras, imported only inside the step that needs them:
-# a plain `pip install simple_module_images` pulls no torch, ultralytics or cv2.
+# a plain `pip install simple_module_images` pulls no onnxruntime or cv2.
 quality = ["opencv-python-headless>=4.9"]
-# facenet-pytorch is deliberately absent: it pins Pillow<10.3 and torch<2.3, which
-# would downgrade Pillow in the one shared uv.lock. Faces and plates are both YOLO.
-anonymize = ["torch>=2.2", "ultralytics>=8.2"]
+# MIT runtime and MIT weights only (no torch, no ultralytics, nothing AGPL):
+# YuNet faces and YOLOv9 plates as ONNX, downloaded and pinned by weights.py.
+# numpy comes with onnxruntime. A GPU worker installs onnxruntime-gpu instead.
+anonymize = ["onnxruntime>=1.18"]
 
 # Sibling modules, all optional. Must stay 0.0.x ranges: the repo publishes at 0.0.x.
 # floor: 0.0.14 - ``sm_ai.contracts.consume_requests`` (``ai.requests`` metered

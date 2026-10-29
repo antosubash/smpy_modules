@@ -6,7 +6,8 @@
 install: install-py install-js sync-module-deps
 
 install-py:
-	# Skips the heavy anonymize extra (torch); `uv sync --extra anonymize` installs the models.
+	# Skips the anonymize extra (onnxruntime; its step downloads model weights on first
+	# use). `uv sync --all-packages --all-extras` installs it.
 	uv sync --all-packages --all-extras --no-extra anonymize
 
 install-js:

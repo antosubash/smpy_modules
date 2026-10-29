@@ -1,11 +1,11 @@
 # Opt-in: the images `anonymize` step against its real detectors.
 #
-# ci.yml syncs with `--no-extra anonymize`: torch and ultralytics are too heavy
-# for every pull request, so the step's default tests run on a fake detector.
-# This job installs the `[anonymize]` extra (CPU torch, see below), downloads
-# the pinned, checksummed YOLO weights (sm_images/steps/anonymize/weights.py)
-# and runs the tests marked `real_models`, which the module's addopts deselect
-# everywhere else.
+# ci.yml syncs with `--no-extra anonymize`, so the step's default tests run on
+# a fake detector and no pull request downloads model weights. This job syncs
+# the `[anonymize]` extra (onnxruntime) from the lock, downloads the pinned,
+# checksummed ONNX models (sm_images/steps/anonymize/weights.py: YuNet faces,
+# YOLOv9 plates, both MIT) and runs the tests marked `real_models`, which the
+# module's addopts deselect everywhere else.
 #
 # Weekly and by hand. Keep `UV_VERSION` equal to ci.yml's (#120).
 
@@ -31,7 +31,7 @@ jobs:
   real-models:
     name: images anonymize (real models)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 
@@ -39,34 +39,14 @@ jobs:
         uses: astral-sh/setup-uv@v10.3.0
         with:
           version: ${{ env.UV_VERSION }}
-          # The torch download dwarfs the cache's worth, and a cache saved by
-          # a schedule on main is restorable by ci.yml.
+          # A cache saved by a schedule on main is restorable by ci.yml.
           enable-cache: false
 
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
 
-      # Everything but the extra, exactly as ci.yml syncs it.
-      - name: Sync workspace (without the anonymize extra)
-        run: uv sync --locked --all-packages --all-extras --no-extra anonymize
+      - name: Sync workspace (with the anonymize extra)
+        run: uv sync --locked --all-packages --all-extras
 
-      # The extra at the lock's own versions, but torch and torchvision from
-      # PyTorch's CPU index. The locked PyPI torch for Linux pulls several GB of
-      # CUDA libraries a GPU-less runner never uses. Installed with `uv pip`
-      # into this job's venv only: uv.lock, and every other job, keep resolving
-      # torch from PyPI. A uv index config would have to live in pyproject.toml
-      # and so change the lock for everyone. `2.15.0` matches `2.15.0+cpu`.
-      - name: Install the anonymize extra (CPU torch)
-        run: |
-          pins="$(uv export --locked --all-packages --all-extras --no-hashes \
-            | grep -E '^(torch|torchvision|ultralytics)==' | sed 's/ *;.*//' | sort -u)"
-          echo "$pins"
-          torch_pins="$(echo "$pins" | grep -E '^torch(vision)?==')"
-          test "$(echo "$torch_pins" | wc -l)" -eq 2
-          uv pip install --index-url https://download.pytorch.org/whl/cpu $torch_pins
-          uv pip install "$(echo "$pins" | grep '^ultralytics==')"
-          uv run --no-sync python -c "import torch, ultralytics; print(torch.__version__, ultralytics.__version__)"
-
-      # `--no-sync`: a sync would not need torch and might touch the venv.
       - name: Run pytest (images, real models)
         run: cd modules/images && uv run --no-sync pytest -q -p no:cacheprovider -m real_models

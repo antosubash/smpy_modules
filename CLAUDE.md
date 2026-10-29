@@ -258,15 +258,19 @@ Redis, and `make worker` / `worker-imports` / `worker-heavy` / `worker-gpu` /
 `make dev` starts none of them. With no worker, set
 `SM_BG_TASKS_TASK_ALWAYS_EAGER=true` (`.env.example`; the e2e server exports it,
 plus `..._TASK_EAGER_PROPAGATES=true`) and tasks run inline. CI installs
-`tippecanoe` with apt in the Python-tests and Postgres jobs. **Torch and
-ultralytics are never installed by default.** `make install`, the Python-tests,
-repo-checks, e2e (`.github/actions/e2e-setup`) and `release` jobs and
-`framework-latest` sync with `--all-extras --no-extra anonymize` (the `quality`,
-`ai`, `billing` and `pagebuilder` extras are installed, `anonymize` is
-not); the Postgres and frontend jobs sync no extras. The anonymize step's default tests use a fake
-detector. Only the weekly/manual `images-models` workflow installs the extra, with
-CPU torch, and runs the `real_models` tests. The extra is AGPL-3.0 (see
-`modules/images/docs/index.md`).
+`tippecanoe` with apt in the Python-tests and Postgres jobs. **The images
+`[anonymize]` extra (onnxruntime) is never installed by default.** `make install`,
+the Python-tests, repo-checks, e2e (`.github/actions/e2e-setup`) and `release`
+jobs and `framework-latest` sync with `--all-extras --no-extra anonymize` (the
+`quality`, `ai`, `billing` and `pagebuilder` extras are installed, `anonymize`
+is not); the Postgres and frontend jobs sync no extras. The anonymize step's
+default tests use a fake detector (and a fake `onnxruntime` for the wiring).
+Only the weekly/manual `images-models` workflow syncs the extra, downloads the
+pinned weights and runs the `real_models` tests. **No AGPL code or weights in
+that extra** (user decision, 2026-10-29): runtime and both models are MIT
+(YuNet faces, open-image-models YOLOv9 plates; `modules/images/NOTICE`,
+`modules/images/docs/index.md`). Do not bring back torch/ultralytics or an
+ultralytics-trained checkpoint, whatever its model card says.
 
 ## Working against an unreleased framework
 

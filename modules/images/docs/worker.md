@@ -86,7 +86,7 @@ tasks. The rest are `background_tasks` settings, read once when a worker starts
 | Setting | Why for images |
 | --- | --- |
 | `visibility_timeout_seconds` | On a Redis broker a message not acknowledged within it (Celery's default is 1 hour) is redelivered, so a longer task runs twice. Set it above your longest import, for instance 12 hours (43 200) to match the import tasks' `stuck_after` |
-| `worker_max_tasks_per_child`, `worker_max_memory_per_child_kb` | Recycle prefork children; torch and OpenCV hold memory. Worth setting on `worker-heavy` and `worker-gpu` |
+| `worker_max_tasks_per_child`, `worker_max_memory_per_child_kb` | Recycle prefork children; onnxruntime and OpenCV hold memory. Worth setting on `worker-heavy` and `worker-gpu` |
 | `task_reject_on_worker_lost` | Redeliver a task whose child was killed (for instance by the memory cap) |
 | `worker_concurrency` | The make targets pass `-c` on the command line |
 
@@ -98,26 +98,32 @@ database engine is rebuilt in every forked child, so no connection crosses a for
 
 ### The anonymize step
 
-The `anonymize` step is registered only when `torch` and `ultralytics` import.
-**Both are AGPL-3.0, and so are the default weights** (see
-[index.md](index.md#licence-warning-anonymize)); the module itself is MIT.
+The `anonymize` step is registered only when `onnxruntime` and `numpy` import
+(the `[anonymize]` extra). Runtime and default weights are MIT (see
+[index.md](index.md#anonymize-models-and-licences)). For a GPU worker, install
+`onnxruntime-gpu` in place of `onnxruntime`: the step uses CUDA when the
+installed build offers it, the CPU otherwise.
 
-- **Weights.** With `anonymize_weights_path` empty, the pinned YOLO weights
-  (a face model and a plate model, commit-pinned from Hugging Face) are downloaded
-  once, on first use, into `~/.cache/simple_module_images/models` of the user the
-  worker runs as. Each load verifies size and SHA-256 and reads from a private
-  snapshot, so a swapped cache file is never loaded. **On a read-only home,
+- **Weights.** With `anonymize_weights_path` empty, the pinned ONNX models
+  (YuNet for faces, from an opencv_zoo commit; YOLOv9 for plates, from the
+  open-image-models release) are downloaded once, on first use, into
+  `~/.cache/simple_module_images/models` of the user the worker runs as. Each
+  load verifies size and SHA-256 and hands onnxruntime the verified bytes
+  themselves, so a swapped cache file is never loaded. **On a read-only home,
   or to keep weights off the network, set `anonymize_weights_path`** to a
-  directory holding `face.pt` and `plate.pt`; those are used as they are, with no
-  checksum, and a missing file fails the run (`weights_unavailable`). The setting
-  needs a restart; workers read it from the same database setting.
-- **Recall.** The plate model's recall has not been verified. It is a best-effort
+  directory holding `face.onnx` (YuNet-compatible: dynamic input, `cls_*`,
+  `obj_*`, `bbox_*` outputs) and `plate.onnx` (an end-to-end YOLOv9 export with a
+  608 px input and `[batch, x1, y1, x2, y2, class, score]` rows); those are used
+  as they are, with no checksum, and a missing file fails the run
+  (`weights_unavailable`). A directory still holding the former `face.pt` and
+  `plate.pt` fails the same way. Workers read the setting per run.
+- **Recall.** Neither model's recall has been verified. It is a best-effort
   blur.
 - **Re-runs.** A re-run starts from the original. If it detects nothing it
   completes without a new display copy, so the **previously blurred copy
   stays**.
-- CI installs the extra only in the weekly `images-models` workflow, with CPU
-  torch.
+- CI installs the extra only in the weekly `images-models` workflow, which
+  runs the `real_models` tests against the pinned weights.
 
 ### Map tiles
 

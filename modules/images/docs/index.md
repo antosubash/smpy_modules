@@ -66,7 +66,7 @@ The console is at `/admin/images`.
 pip install simple_module_images
 ```
 
-A plain install pulls no torch, ultralytics or OpenCV. Heavy processors are
+A plain install pulls no onnxruntime or OpenCV. Heavy processors are
 extras, imported only inside the step that needs them; with an extra missing
 the step is not registered and a collection that enabled it keeps the
 configuration, its runs settling as `not_installed`.
@@ -74,7 +74,7 @@ configuration, its runs settling as `not_installed`.
 | Extra | Adds |
 | --- | --- |
 | `quality` | OpenCV: resolution, blur and exposure metrics |
-| `anonymize` | torch and ultralytics: face and number-plate detection, blurred into a display copy. **See the licence warning below** |
+| `anonymize` | onnxruntime (MIT): face and number-plate detection, blurred into a display copy. Model licences and attribution below |
 | `ai` | `simple_module_ai`: `classify` and prompts |
 | `billing` | `simple_module_billing`: storage and AI-request metering |
 | `pagebuilder` | `simple_module_pagebuilder`: the `ImageGallery` block |
@@ -88,17 +88,31 @@ The module depends on the framework's `settings`, `sharing`, `file_storage` and
 `branch_labels = ("images",)`, which names the revision but does not roll back
 only this module (see the repo `CLAUDE.md`).
 
-### Licence warning: `anonymize`
+### `anonymize`: models and licences
 
-The `anonymize` extra installs **ultralytics, which is AGPL-3.0**, and the
-default weights the step downloads are **AGPL-3.0 community checkpoints** (faces:
-`arnabdhar/YOLOv8-Face-Detection`; number plates:
-`morsetechlab/yolov11-license-plate-detection`), while this module is MIT.
-Installing the extra, or running the step, is a licence decision for the
-operator. Two more things to know:
+The extra installs only **onnxruntime** (MIT; it brings numpy, BSD). No torch,
+no ultralytics and nothing AGPL. The step downloads two ONNX models on first
+use, each pinned by size and SHA-256:
 
-- Recall of the plate model has not been verified against a labelled set. Treat
-  the blur as best effort, not as a guarantee that no plate or face remains.
+| Detects | Model | Licence | Source |
+| --- | --- | --- | --- |
+| Faces | YuNet, `face_detection_yunet_2026may.onnx` (230 KB), by Shiqi Yu, from OpenCV Zoo | [MIT](https://github.com/opencv/opencv_zoo/blob/eb9f4f2d4b79b58e5513b5d25d5f0243a8357bf4/models/face_detection_yunet/LICENSE) | [opencv/opencv_zoo @ eb9f4f2](https://github.com/opencv/opencv_zoo/tree/eb9f4f2d4b79b58e5513b5d25d5f0243a8357bf4/models/face_detection_yunet) |
+| Number plates | `yolo-v9-s-608-license-plates-end2end.onnx` (28.6 MB), by ankandrew | [MIT](https://github.com/ankandrew/open-image-models/blob/main/LICENSE) | [open-image-models release `assets`](https://github.com/ankandrew/open-image-models/releases/tag/assets) |
+
+Both are MIT, so redistributing them, or a product that downloads them, needs
+the copyright notice and licence text kept with them; the repository's
+`NOTICE` file carries both. Three more things to know:
+
+- The plate model was trained with the YOLOv9 reference code (WongKinYiu/yolov9,
+  GPL-3.0), not ultralytics, and its author publishes the weights under the
+  repository's MIT licence. The training data is not documented. If that
+  provenance matters to you, point `anonymize_weights_path` at a model of your
+  own.
+- Recall has not been verified against a labelled set. Treat the blur as best
+  effort, not as a guarantee that no plate or face remains. Plates are searched
+  in the whole frame and, on a large picture, in four overlapping tiles too;
+  faces at full size and at 640 px. A low `min_confidence` blurs more false
+  positives (a wheel, say) rather than fewer faces.
 - A re-run that finds nothing leaves the **previously blurred display copy** in
   place; it does not revert to the original.
 
@@ -154,7 +168,7 @@ tenant. Workers read the same values (cached for about 30 seconds).
 | `step_output_max_bytes` | 65 536 | Largest JSON a step may store |
 | `step_lease_seconds` | 1 800 | How long a running step holds its lease |
 | `tippecanoe_path` | `tippecanoe` | The binary that builds PMTiles. **Restart** |
-| `anonymize_weights_path` | empty | Directory with `face.pt` and `plate.pt`; read per run |
+| `anonymize_weights_path` | empty | Directory with `face.onnx` and `plate.onnx`; read per run |
 | `public_asset_base_url` | empty | Origin that serves public renditions instead of this app; single-tenant hosts only (ignored, with a warning, on a multi-tenant one). **Restart** |
 
 `thumbnail_sizes` and the limits are read per request or per task. The three
