@@ -710,6 +710,6 @@ Record the results in `modules/images/docs/worker.md` and stop everything afterw
 
 **Done-check:** `make lint`.
 
-- [ ] Commit `docs(images): module documentation`
+- [x] Commit `docs(images): module documentation`
 
 Then `/ship`, which updates PR #272.
