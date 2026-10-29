@@ -46,7 +46,6 @@
     "failed": "The collection could not be created."
   },
   "collection": {
-    "images": "Images",
     "delete": "Delete collection",
     "delete_title": "Delete this collection?",
     "delete_body": "The collection and all of its images move to the trash.",
@@ -86,7 +85,6 @@
     "back": "Back to the collection",
     "show_original": "Show original",
     "show_display": "Show display copy",
-    "loading_original": "Loading the original…",
     "original_failed": "The original could not be loaded.",
     "display_not_ready": "Display copy not ready yet",
     "display_pending": "This image is still being anonymised. It is shown once that has finished.",

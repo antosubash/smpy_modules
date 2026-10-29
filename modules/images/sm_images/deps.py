@@ -18,8 +18,6 @@ from sm_images.settings import ImagesSettings
 require_view = Depends(RequiresPermission(constants.PERM_VIEW))
 require_create = Depends(RequiresPermission(constants.PERM_CREATE))
 require_publish = Depends(RequiresPermission(constants.PERM_PUBLISH))
-require_manage = Depends(RequiresPermission(constants.PERM_MANAGE))
-require_originals = Depends(RequiresPermission(constants.PERM_ORIGINALS))
 
 
 def get_settings(request: Request) -> ImagesSettings:
