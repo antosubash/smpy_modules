@@ -18,7 +18,6 @@ from simple_module_hosting.resource_deps import resource_principal
 
 from sm_images import constants, events
 from sm_images.access import CollectionEdit, CollectionOwner, CollectionView
-from sm_images.contracts.schemas import collection_fields
 from sm_images.deps import require_create, require_view
 from sm_images.imports.cleanup import cancel_for_collection
 from sm_images.models import Collection
@@ -31,6 +30,7 @@ from sm_images.schemas.collection import (
     VisibilityUpdate,
 )
 from sm_images.services import collections as service
+from sm_images.services.viewer_stats import collection_outs
 
 router = APIRouter(prefix="/collections", tags=["collections"])
 
@@ -42,8 +42,8 @@ def _bus(request: Request) -> object:
     return getattr(getattr(request.app.state, "sm", None), "event_bus", None)
 
 
-def out(row: Collection, who: ResourcePrincipal) -> CollectionOut:
-    return CollectionOut(**collection_fields(row), is_owner=who.user_id == row.owner_id)
+async def out(db, row: Collection, who: ResourcePrincipal) -> CollectionOut:
+    return (await collection_outs(db, who, [row]))[0]
 
 
 @router.get("", dependencies=[require_view])
@@ -57,7 +57,9 @@ async def list_collections(
     rows, token, total = await service.list_page(
         db, who, filter_=filter, limit=limit, cursor=cursor
     )
-    return CollectionPageOut(items=[out(r, who) for r in rows], next_cursor=token, total=total)
+    return CollectionPageOut(
+        items=await collection_outs(db, who, rows), next_cursor=token, total=total
+    )
 
 
 @router.post("", status_code=201, dependencies=[require_create])
@@ -72,20 +74,22 @@ async def create_collection(
         slug=body.slug,
         visibility=body.visibility,
     )
-    return out(row, who)
+    return await out(db, row, who)
 
 
 @router.get("/{collection_id}", dependencies=[require_view])
-async def get_collection(collection: CollectionView, who: Principal) -> CollectionOut:
-    return out(collection, who)
+async def get_collection(
+    collection: CollectionView, who: Principal, db=Depends(get_db)
+) -> CollectionOut:
+    return await out(db, collection, who)
 
 
 @router.patch("/{collection_id}", dependencies=[require_view])
 async def update_collection(
-    body: CollectionUpdate, collection: CollectionEdit, who: Principal
+    body: CollectionUpdate, collection: CollectionEdit, who: Principal, db=Depends(get_db)
 ) -> CollectionOut:
     service.update(collection, body.model_dump(exclude_unset=True))
-    return out(collection, who)
+    return await out(db, collection, who)
 
 
 @router.put("/{collection_id}/visibility", dependencies=[require_view])
@@ -99,7 +103,7 @@ async def set_visibility(
     before = await service.set_visibility(db, collection, who, body.visibility)
     if before is not collection.visibility:  # the map was withdrawn with it
         events.emit(db, _bus(request), events.visibility_changed(collection, before.value))
-    return out(collection, who)
+    return await out(db, collection, who)
 
 
 @router.delete("/{collection_id}", status_code=204, dependencies=[require_view])

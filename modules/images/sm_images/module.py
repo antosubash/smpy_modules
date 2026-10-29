@@ -192,9 +192,14 @@ class ImagesModule(ModuleBase):
     def mount_public_pages(app: FastAPI) -> None:
         """``/images/c/{slug}`` at the app root, beside the console's prefix
         (``register_routes`` hands out only prefixed routers)."""
+        from fastapi.routing import iter_route_contexts
+
         from sm_images.endpoints.public_views import router
 
-        app.include_router(router)
+        # Once per app: ``on_startup`` runs again on a lifespan restart.
+        page = f"{constants.PUBLIC_COLLECTION_PREFIX.rstrip('/')}/{{slug}}"
+        if not any(r.path == page for r in iter_route_contexts(app.routes)):
+            app.include_router(router)
 
     async def on_shutdown(self, app: FastAPI) -> None:
         """Forget the runtime: a lifespan restart in one process (tests, dev

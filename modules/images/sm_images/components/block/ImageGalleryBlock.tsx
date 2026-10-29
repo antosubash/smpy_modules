@@ -16,6 +16,7 @@ import type { ComponentConfig } from '@puckeditor/core';
 
 import { listCollections } from '../../utils/api';
 import { keys, type Translate, translate } from '../../utils/i18n';
+import type { Collection, Page } from '../../utils/types';
 import { PublicGallery, type TileSize } from '../public/PublicGallery';
 
 export interface ImageGalleryProps {
@@ -28,6 +29,7 @@ export interface ImageGalleryProps {
 export const COUNT_MIN = 1;
 export const COUNT_MAX = 48;
 export const COUNT_DEFAULT = 8;
+const MAX_PICKER_PAGES = 100;
 const SIZES: TileSize[] = ['small', 'medium', 'large'];
 
 /** Stored props may predate the editor's constraints, and a fractional or
@@ -67,14 +69,22 @@ function buildFields(tr: Translate, collections: { label: string; value: string 
  *  a visitor, and offering it would be a trap. Empty when the editor is
  *  offline or signed out, which must not break the editor. */
 async function publicCollections() {
+  const found: { label: string; value: string }[] = [];
   try {
-    const page = await listCollections('public');
-    return page.items
-      .filter((c) => c.visibility === 'public')
-      .map((c) => ({ label: c.name, value: c.slug }));
+    let cursor: string | null = null;
+    // Bounded: a cursor that never ends must not hang the editor.
+    for (let i = 0; i < MAX_PICKER_PAGES; i++) {
+      const page: Page<Collection> = await listCollections('public', cursor);
+      for (const c of page.items) {
+        if (c.visibility === 'public') found.push({ label: c.name, value: c.slug });
+      }
+      cursor = page.next_cursor;
+      if (!cursor) break;
+    }
   } catch {
-    return [];
+    // Keep what loaded: a later page failing must not empty the picker.
   }
+  return found;
 }
 
 export function ImageGalleryRender({ collection, size, count }: ImageGalleryProps) {

@@ -33,6 +33,7 @@ from sm_images.contracts.schemas import CollectionPageRead, CollectionRead
 from sm_images.map import points as map_points
 from sm_images.models import Collection
 from sm_images.services import collections as service
+from sm_images.services.viewer_stats import viewer_fields
 from sm_images.tenancy import tenant_scope
 
 __all__ = ["get_collection", "list_collections", "points", "rendition_url"]
@@ -60,7 +61,11 @@ async def get_collection(
                 principal, ACTION_VIEW, select(Collection).where(Collection.id == collection_id)
             )
             row = (await session.execute(stmt)).scalars().first()
-            return None if row is None else CollectionRead.from_row(row)
+            return (
+                None
+                if row is None
+                else CollectionRead(**(await viewer_fields(session, principal, [row]))[0])
+            )
 
 
 async def list_collections(
@@ -84,7 +89,9 @@ async def list_collections(
                 session, principal, filter_=filter, limit=limit, cursor=cursor
             )
             return CollectionPageRead(
-                items=[CollectionRead.from_row(r) for r in rows], next_cursor=token, total=total
+                items=[CollectionRead(**f) for f in await viewer_fields(session, principal, rows)],
+                next_cursor=token,
+                total=total,
             )
 
 

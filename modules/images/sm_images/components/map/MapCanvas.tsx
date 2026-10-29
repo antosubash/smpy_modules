@@ -4,14 +4,15 @@ import {
   type LngLatBoundsLike,
   Map as MapLibreMap,
   NavigationControl,
-  setWorkerUrl,
 } from 'maplibre-gl';
-import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+import { keys, useT } from '../../utils/i18n';
 
 import { boundsOf, type MapSource } from './mapSource';
+import { installMapWorker } from './mapWorker';
 
 /** The tippecanoe layer name (`-l images`), and the sources and layers we add. */
 const TILE_LAYER = 'images';
@@ -32,9 +33,7 @@ const STYLE = {
 let protocolAdded = false;
 function ensureProtocol() {
   if (protocolAdded) return;
-  // MapLibre looks for its worker next to its own module, which is not where a
-  // bundler (or Vite's dependency pre-bundle) puts it: name the bundled one.
-  setWorkerUrl(workerUrl);
+  installMapWorker();
   addProtocol('pmtiles', new Protocol().tile);
   protocolAdded = true;
 }
@@ -95,6 +94,8 @@ export default function MapCanvas({ source, bbox, label, onSelect }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const select = useRef(onSelect);
   select.current = onSelect;
+  const { t } = useT();
+  const [failed, setFailed] = useState(false);
 
   // The map is built once per source; a re-render with the same source keeps it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: bbox only seeds the first view
@@ -109,6 +110,9 @@ export default function MapCanvas({ source, bbox, label, onSelect }: Props) {
       attributionControl: false,
     });
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+    setFailed(false);
+    // A worker that never starts, a tile or archive that does not load: say so.
+    map.on('error', () => setFailed(true));
     map.on('load', () => {
       addLayers(map, source);
       const bounds = boundsOf(bbox);
@@ -116,6 +120,14 @@ export default function MapCanvas({ source, bbox, label, onSelect }: Props) {
         map.fitBounds(bounds as LngLatBoundsLike, { padding: 40, maxZoom: 14, animate: false });
       }
       host.current?.setAttribute('data-map-ready', source.kind);
+    });
+    // How many of our features are drawn right now: 0 means the worker or the
+    // data did not make it, whatever the canvas shows.
+    map.on('idle', () => {
+      const drawn = map.getLayer(POINTS)
+        ? map.queryRenderedFeatures({ layers: [CLUSTERS, POINTS] })
+        : [];
+      host.current?.setAttribute('data-map-features', String(drawn.length));
     });
     map.on('click', POINTS, (event) => {
       const id = event.features?.[0]?.properties?.id;
@@ -141,12 +153,19 @@ export default function MapCanvas({ source, bbox, label, onSelect }: Props) {
   }, [source]);
 
   return (
-    <div
-      ref={host}
-      role="img"
-      aria-label={label}
-      className="h-[60vh] min-h-80 w-full overflow-hidden rounded-md border"
-      data-testid="images-map"
-    />
+    <>
+      <div
+        ref={host}
+        role="img"
+        aria-label={label}
+        className="h-[60vh] min-h-80 w-full overflow-hidden rounded-md border"
+        data-testid="images-map"
+      />
+      {failed && (
+        <p className="mt-2 text-sm text-destructive" role="alert" data-testid="images-map-error">
+          {t(keys.images.map.failed)}
+        </p>
+      )}
+    </>
   );
 }

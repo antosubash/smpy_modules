@@ -171,3 +171,22 @@ def test_images_object_intents_work_in_the_real_app(booted_host):
         assert "images/default/boot-check" in asyncio.run(write_and_read())
     finally:
         use_session_factory(None)
+
+
+def test_images_public_page_is_not_shadowed_by_another_route(booted_host):
+    """``/images/c/{slug}`` is mounted at the app root during the lifespan. Walk
+    the routes in registration order, as Starlette does: the first that matches
+    must be images' own, not a catch-all (a pagebuilder slug route, a locale
+    prefix) registered before it."""
+    from starlette.routing import compile_path
+
+    app = booted_host
+
+    async def first_match() -> str | None:
+        async with app.router.lifespan_context(app):
+            for route in iter_route_contexts(app.routes):
+                if route.path and compile_path(route.path)[0].match("/images/c/some-slug"):
+                    return route.path
+        return None
+
+    assert asyncio.run(first_match()) == "/images/c/{slug}"

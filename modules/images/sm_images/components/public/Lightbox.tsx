@@ -2,22 +2,53 @@ import { useEffect, useRef } from 'react';
 
 import { keys, useT } from '../../utils/i18n';
 
-/** A full-size picture over the page: Escape or a click outside closes it.
+/** A full-size picture over the page: Escape or a click outside closes it. Focus
+ *  moves in, stays in (Tab wraps) and returns to what opened it.
  *  Plain markup rather than the console's dialog, which needs the admin shell. */
 export function Lightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
   const { t } = useT();
   const close = useRef<HTMLButtonElement>(null);
+  const dialog = useRef<HTMLDivElement>(null);
+
+  // The latest onClose without re-running the effect below: it focuses on mount,
+  // and an inline callback would make every parent render steal focus back.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
     close.current?.focus();
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCloseRef.current();
+      if (event.key !== 'Tab') return;
+      // A modal: Tab cycles inside the dialog, never out to the page behind it.
+      const stops = dialog.current?.querySelectorAll<HTMLElement>('button, [href], [tabindex]');
+      const first = stops?.[0];
+      const last = stops?.[stops.length - 1];
+      if (!first || !last) return;
+      const at = document.activeElement;
+      if (event.shiftKey && at === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && at === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (!dialog.current?.contains(at)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      opener?.focus?.();
+    };
+  }, []);
 
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: Escape is handled on window
     <div
+      ref={dialog}
       role="dialog"
       aria-modal="true"
       aria-label={t(keys.images.public.viewer)}

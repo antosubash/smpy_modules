@@ -7,7 +7,7 @@ import { login, moduleCsrfHeader } from './helpers';
 /**
  * A public collection, end to end: create one with two geotagged images,
  * publish it, open `/images/c/<slug>` as an anonymous visitor (thumbnails load,
- * the map draws) and check the console's map tab draws a canvas too.
+ * the map draws) and check the console's map tab draws the points too.
  *
  * Standalone: it seeds its own collection and relies on no settings beyond the
  * suite's (`start-test-server.sh`). The map falls back to the GeoJSON points
@@ -18,13 +18,15 @@ const fixture = (name: string) =>
   fileURLToPath(new URL(`../../modules/images/tests/fixtures/${name}`, import.meta.url));
 const JPEGS = [fixture('rotated.jpg'), fixture('geotagged.jpg')];
 
-/** Console errors that name the map's worker or library: a map whose worker
- *  failed to start still draws an empty canvas, so the canvas alone proves little.
+/** Console errors that name the map's worker or library. A map whose worker
+ *  failed to start still draws an empty canvas, so the canvas alone proves
+ *  nothing: this is asserted in dev and in bundle mode alike, next to a check
+ *  that the seeded points are actually rendered (`data-map-features`).
  *
- *  Only asserted against the production bundle (`E2E_BUNDLE=1`, what CI runs).
- *  Under `make dev` the page is served from :8000 and the worker from Vite's
- *  :5050, and the dev CSP (`worker-src 'self' blob:`) refuses a cross-origin
- *  worker, so MapLibre reports a worker error there whatever this module does. */
+ *  Under `make dev` the page is on :8000 and Vite on :5050, and the dev CSP's
+ *  `worker-src 'self' blob:` refuses a worker loaded from the Vite origin
+ *  (Chromium: "csp" on `…/maplibre-gl-worker.mjs?worker_file&type=module`), so
+ *  the module hands MapLibre a blob: worker instead. */
 function mapErrors(page: Page): string[] {
   const seen: string[] = [];
   page.on('console', (msg) => {
@@ -37,7 +39,14 @@ function mapErrors(page: Page): string[] {
   return seen;
 }
 
-const BUNDLE = process.env.E2E_BUNDLE === '1';
+/** The map drew our points: its worker ran, parsed the data and the layers rendered. */
+async function drawsPoints(map: ReturnType<Page['locator']>) {
+  await expect(map.locator('canvas')).toBeVisible({ timeout: 20_000 });
+  await expect(map).toHaveAttribute('data-map-ready', /.+/, { timeout: 20_000 });
+  await expect
+    .poll(async () => Number(await map.getAttribute('data-map-features')), { timeout: 20_000 })
+    .toBeGreaterThan(0);
+}
 
 async function loaded(img: ReturnType<Page['locator']>) {
   await expect(img).toBeVisible({ timeout: 20_000 });
@@ -105,13 +114,8 @@ test('a published collection is viewable anonymously, with thumbnails and a map'
     await visitor.keyboard.press('Escape');
     await expect(visitor.getByTestId('images-lightbox')).toHaveCount(0);
     // The map draws.
-    await expect(visitor.getByTestId('images-map').locator('canvas')).toBeVisible({
-      timeout: 20_000,
-    });
-    await expect(visitor.getByTestId('images-map')).toHaveAttribute('data-map-ready', /.+/, {
-      timeout: 20_000,
-    });
-    if (BUNDLE) expect(visitorErrors).toEqual([]);
+    await drawsPoints(visitor.getByTestId('images-map'));
+    expect(visitorErrors).toEqual([]);
   } finally {
     await visitor.context().close();
   }
@@ -120,11 +124,8 @@ test('a published collection is viewable anonymously, with thumbnails and a map'
   const consoleErrors = mapErrors(page);
   await page.goto(collectionUrl);
   await page.getByTestId('images-tab-map').click();
-  await expect(page.getByTestId('images-map').locator('canvas')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId('images-map')).toHaveAttribute('data-map-ready', /.+/, {
-    timeout: 20_000,
-  });
-  if (BUNDLE) expect(consoleErrors).toEqual([]);
+  await drawsPoints(page.getByTestId('images-map'));
+  expect(consoleErrors).toEqual([]);
 
   const hidden = await page.request.put(`/api/images/collections/${collectionId}/visibility`, {
     headers: { ...csrf, 'content-type': 'application/json' },

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { listPublicImages, publicDisplayUrl } from '../../utils/api-public';
 import { keys, useT } from '../../utils/i18n';
@@ -43,10 +43,15 @@ export function PublicGallery({
   const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading');
   const [opened, setOpened] = useState<string | null>(null);
 
+  // Aborts every request of the current slug (the first page and each "load
+  // more") when the slug changes or the gallery unmounts.
+  const controller = useRef<AbortController | null>(null);
+
   const load = useCallback(
     async (cursor: string | null, signal?: AbortSignal) => {
       try {
         const page = await listPublicImages(slug, { limit: count, cursor, signal });
+        if (signal?.aborted) return;
         setItems((rows) => (cursor ? [...rows, ...page.items] : page.items));
         setNext(count ? null : page.next_cursor);
         setState('ready');
@@ -58,10 +63,13 @@ export function PublicGallery({
   );
 
   useEffect(() => {
-    const controller = new AbortController();
+    const own = new AbortController();
+    controller.current = own;
+    setItems([]);
+    setNext(null);
     setState('loading');
-    void load(null, controller.signal);
-    return () => controller.abort();
+    void load(null, own.signal);
+    return () => own.abort();
   }, [load]);
 
   const shown = opened ?? openId;
@@ -112,7 +120,7 @@ export function PublicGallery({
           type="button"
           className="rounded-md border px-4 py-2 text-sm"
           data-testid="images-public-more"
-          onClick={() => void load(next)}
+          onClick={() => void load(next, controller.current?.signal)}
         >
           {t(keys.images.public.load_more)}
         </button>

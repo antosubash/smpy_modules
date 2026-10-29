@@ -84,3 +84,17 @@ async def test_page_is_served_anonymously_with_safe_props(client, g):
 async def test_page_for_private_or_unknown_is_404(client, g, slug):
     got = await client.get(f"/images/c/{g.slugs[slug] if slug else 'nope'}")
     assert got.status_code == 404
+
+
+def test_mount_public_pages_is_idempotent():
+    """A lifespan restart (tests, dev reload) runs ``on_startup`` again on the
+    same app; the page must not be registered twice."""
+    from fastapi import FastAPI
+    from fastapi.routing import iter_route_contexts
+    from sm_images.module import ImagesModule
+
+    app = FastAPI()
+    ImagesModule.mount_public_pages(app)
+    ImagesModule.mount_public_pages(app)
+    paths = [r.path for r in iter_route_contexts(app.routes) if r.path]
+    assert paths.count("/images/c/{slug}") == 1

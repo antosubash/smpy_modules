@@ -57,6 +57,33 @@ describe('ImageGalleryBlock config', () => {
     expect(fields.collection.label).toBe('Collection');
   });
 
+  it('follows next_cursor so collections past the first page are offered', async () => {
+    const calls = stubFetch({
+      'GET /api/images/collections': (call: { url: string }) =>
+        call.url.includes('cursor=p2')
+          ? {
+              items: [{ id: '2', slug: 'late', name: 'Late', visibility: 'public' }],
+              next_cursor: null,
+              total: null,
+            }
+          : {
+              items: [{ id: '1', slug: 'early', name: 'Early', visibility: 'public' }],
+              next_cursor: 'p2',
+              total: 2,
+            },
+    });
+    const fields = await (
+      ImageGalleryBlock.resolveFields as unknown as () => Promise<
+        Record<string, { options?: Opt[] }>
+      >
+    )();
+    expect(fields.collection.options?.map((o) => o.value)).toEqual(['', 'early', 'late']);
+    expect(calls.map((c) => c.url)).toEqual([
+      '/api/images/collections?filter=public',
+      '/api/images/collections?filter=public&cursor=p2',
+    ]);
+  });
+
   it('asks the server for public collections', async () => {
     const calls = stubFetch({
       'GET /api/images/collections': { items: [], next_cursor: null, total: 0 },

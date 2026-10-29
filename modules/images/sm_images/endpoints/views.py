@@ -29,12 +29,12 @@ from sm_images.access import (
     can_edit,
     can_view_original,
 )
-from sm_images.contracts.schemas import collection_fields
 from sm_images.csrf import share_csrf_token
 from sm_images.deps import get_settings, require_view
 from sm_images.schemas.collection import CollectionOut, CollectionPageOut
 from sm_images.services import collections as collection_service
 from sm_images.services import gallery, present
+from sm_images.services.viewer_stats import collection_outs
 from sm_images.tenancy import bind_admin
 
 # ``bind_admin`` first, for the reason ``endpoints.api``'s router gives.
@@ -43,8 +43,8 @@ router = APIRouter(dependencies=[Depends(bind_admin), require_view, Depends(shar
 Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
 
 
-def _out(row: Any, who: ResourcePrincipal) -> CollectionOut:
-    return CollectionOut(**collection_fields(row), is_owner=who.user_id == row.owner_id)
+async def _out(db: Any, row: Any, who: ResourcePrincipal) -> CollectionOut:
+    return (await collection_outs(db, who, [row]))[0]
 
 
 async def _rights(db: Any, who: ResourcePrincipal, collection: Any) -> dict[str, bool]:
@@ -64,7 +64,9 @@ async def collections(
     inertia: InertiaDep, who: Principal, db: Any = Depends(get_db)
 ) -> InertiaResponse:
     rows, token, total = await collection_service.list_page(db, who)
-    page = CollectionPageOut(items=[_out(r, who) for r in rows], next_cursor=token, total=total)
+    page = CollectionPageOut(
+        items=await collection_outs(db, who, rows), next_cursor=token, total=total
+    )
     return await inertia.render(
         constants.PAGE_COLLECTIONS,
         {
@@ -100,7 +102,7 @@ async def image(
             "image": (await present.present_detail(db, collection, row, who)).model_dump(
                 mode="json"
             ),
-            "collection": _out(collection, who).model_dump(mode="json"),
+            "collection": (await _out(db, collection, who)).model_dump(mode="json"),
             "can_view_original": can_view_original(who, row, collection, protected=protected),
             "display_pending": withheld,
             "group_roles": list(collection.group_roles or []),
@@ -121,7 +123,7 @@ async def collection_page(
     return await inertia.render(
         constants.PAGE_COLLECTION,
         {
-            "collection": _out(collection, who).model_dump(mode="json"),
+            "collection": (await _out(db, collection, who)).model_dump(mode="json"),
             **await _rights(db, who, collection),
             # Where the uploader switches from one multipart request to a direct upload.
             "direct_upload_threshold": get_settings(request).direct_upload_threshold,
@@ -131,9 +133,10 @@ async def collection_page(
 
 @router.get("/{collection_id}/review", response_model=None)
 async def review_page(
-    collection: CollectionEdit, inertia: InertiaDep, who: Principal
+    collection: CollectionEdit, inertia: InertiaDep, who: Principal, db: Any = Depends(get_db)
 ) -> InertiaResponse:
     """The review queue; the results themselves are fetched by the page."""
     return await inertia.render(
-        constants.PAGE_REVIEW, {"collection": _out(collection, who).model_dump(mode="json")}
+        constants.PAGE_REVIEW,
+        {"collection": (await _out(db, collection, who)).model_dump(mode="json")},
     )

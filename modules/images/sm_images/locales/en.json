@@ -587,8 +587,7 @@
     "loading": "Loading the map…",
     "failed": "The map could not be loaded.",
     "empty": "No image of this collection has a location yet.",
-    "label": "Map of the collection's located images",
-    "cluster": "{count} images"
+    "label": "Map of the collection's located images"
   },
   "public": {
     "gallery": "Gallery",

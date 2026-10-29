@@ -13,16 +13,17 @@ whichever way the tenant was chosen: the shareable rule is for the byte routes.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Response
+from simple_module_db.deps import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 
 from sm_images import cache, constants
 from sm_images.access import public_collection
-from sm_images.contracts.schemas import collection_fields
 from sm_images.endpoints.public import PublicRoute
 from sm_images.models import Collection
+from sm_images.services.viewer_stats import public_fields
 from sm_images.tenancy import bind_public
 
 router = APIRouter(
@@ -38,8 +39,11 @@ Public = Annotated[Collection, Depends(public_collection)]
 
 
 @router.get("/{slug}", response_model=None)
-async def public_collection_page(collection: Public, inertia: InertiaDep) -> Response:
-    shown = collection_fields(collection)
+async def public_collection_page(
+    collection: Public, inertia: InertiaDep, db: Any = Depends(get_db)
+) -> Response:
+    # Counts and box over the display-safe images only: a withheld one is not shown.
+    shown = await public_fields(db, collection)
     response = await inertia.render(
         constants.PAGE_PUBLIC_COLLECTION,
         {"collection": {name: shown[name] for name in _SHOWN}},
