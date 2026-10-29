@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from simple_module_db import finalize_session
 from sqlalchemy import func, select
 from tenants.models import Tenant
 
@@ -258,6 +259,9 @@ async def save_connection(db: AsyncSession, app: FastAPI, data: ConnectionIn) ->
     await apply_changes_and_reload(
         app, app.state.sm.event_bus, store, package=c.PACKAGE, changes=connection_changes(data)
     )
-    # The reload published ``SettingsReloaded``; ``sm_billing.live`` has rebuilt
-    # the provider (and the reconcile loop) from the new secrets by now.
+    # Framework 0.0.41 reloads and publishes ``SettingsReloaded`` only after the
+    # commit, which the request would run once this response is built. Commit
+    # now so ``sm_billing.live`` has rebuilt the provider (and the reconcile
+    # loop) from the new secrets before the screen reads them back.
+    await finalize_session(db)
     return connection_out(app)
