@@ -127,7 +127,8 @@ Who may share the answer:
   picked by anything request-specific (a multi-tenant host never qualifies).
 - Everything else is `private, no-cache`.
 - A protected original is `private, no-store` for everyone, the owner included.
-- The map surfaces (points, `map.pmtiles`) follow the same split.
+- The map surfaces (points, `map.pmtiles`) follow the same split; the points
+  ETag digests the answer itself, so a gated page never validates a raw one.
 - Error answers on the public routes carry `no-store`.
 
 `public_asset_base_url`, when set, makes public pages link renditions of public
