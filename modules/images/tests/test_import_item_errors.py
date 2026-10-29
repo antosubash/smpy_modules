@@ -49,6 +49,17 @@ async def test_a_403_row_stores_its_status_code_and_place(imp, resolver, inner):
     assert "secret" not in str(rows)
 
 
+async def test_rows_refused_while_parsing_say_why_too(imp, resolver, inner):
+    """Review: a row the parser refuses (no URL) is recorded FAILED in the
+    chunk's own transaction, never through ``fail_item``."""
+    serve_images(resolver, inner)
+    job = await imp.job([feature({"name": "no url"}), feature({"url": "  "})], URL)
+    assert await imp.run(job) == "completed"
+    rows = [e for e in (await imp.reload(job)).errors if "item" in e]
+    assert sorted((e["item"], e["code"]) for e in rows) == [(0, "missing_url"), (1, "missing_url")]
+    assert all(set(e) <= {"code", "item", "where", "at"} for e in rows)
+
+
 async def test_only_the_first_rows_are_kept(imp, resolver, inner, monkeypatch):
     monkeypatch.setattr(item_errors, "ITEM_ERRORS_MAX", 2)
     serve_images(resolver, inner, fail={f"/{n}.jpg": httpx.Response(404) for n in range(4)})

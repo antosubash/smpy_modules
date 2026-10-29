@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from sm_images.models import Collection, Image
 from sm_images.services.neighbors import neighbors
 from sqlalchemy import update
@@ -55,3 +56,39 @@ async def test_a_withheld_image_is_never_a_viewers_neighbour(uploads):
         coll.protect_originals = True  # nothing redacted: every image is withheld
         gated = await neighbors(s, coll, image, gated=True)
         assert gated == {"prev": None, "next": None}
+
+
+async def test_ties_on_created_at_are_ordered_by_id(uploads):
+    cid, ids = await _three(uploads)
+    same = datetime(2026, 2, 1, tzinfo=UTC)
+    async with uploads.db_state.session_factory() as s:
+        await s.execute(
+            update(Image).where(Image.collection_id == uuid.UUID(cid)).values(created_at=same)
+        )
+        await s.commit()
+        coll = await s.get(Collection, uuid.UUID(cid))
+        order = sorted(ids, key=uuid.UUID, reverse=True)  # gallery order on a tie: id desc
+        middle = await s.get(Image, uuid.UUID(order[1]))
+        found = await neighbors(s, coll, middle, gated=False)
+    assert found == {"prev": order[0], "next": order[2]}
+
+
+async def test_each_side_is_one_index_seek(uploads):
+    """Review: an OR of the two halves defeats the (collection_id, created_at,
+    id) index; a row-value comparison seeks it."""
+    from sm_images.services.neighbors import side_statements
+
+    cid, ids = await _three(uploads)
+    async with uploads.db_state.session_factory() as s:
+        if s.bind.dialect.name != "sqlite":
+            pytest.skip("the plan is checked on SQLite")
+        coll = await s.get(Collection, uuid.UUID(cid))
+        image = await s.get(Image, uuid.UUID(ids[1]))
+        conn = await s.connection()
+        for stmt in side_statements(coll, image, gated=False):
+            sql = str(stmt.compile(s.bind, compile_kwargs={"literal_binds": True}))
+            rows = await conn.exec_driver_sql(f"EXPLAIN QUERY PLAN {sql}")
+            plan = " ".join(str(r[-1]) for r in rows.all())
+            assert "ix_images_image_gallery" in plan, plan
+            assert "(created_at,id)" in plan.replace(" ", ""), plan
+            assert "TEMP B-TREE" not in plan, plan

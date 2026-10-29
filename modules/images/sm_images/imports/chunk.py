@@ -28,6 +28,7 @@ from sqlalchemy import case, func, select, update
 
 from sm_images import constants
 from sm_images.db_time import dialect_insert
+from sm_images.imports import item_errors
 from sm_images.imports.features import Parsed
 from sm_images.imports.jobs import COUNTERS, SYNC, JobSnap, now, where
 from sm_images.ingest import dedupe
@@ -177,6 +178,12 @@ async def record_chunk(
         if not await advance_checkpoint(db, tenant, job, parsed[-1].index + 1, deltas):
             await db.rollback()
             raise Stopped()
+        refused = [  # rows the parser refused (no URL, ...): why, on the job's card
+            (row["last_error"] or "failed", row["feature_index"], row["url"])
+            for row in rows
+            if row["feature_index"] in inserted and row["status"] is ItemStatus.FAILED
+        ]
+        await item_errors.append(db, tenant, job.id, refused)
         await finalize_session(db)
 
 

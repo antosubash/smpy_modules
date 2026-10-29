@@ -23,7 +23,7 @@ from sm_images.constants import NO_SYNC
 from sm_images.imports import jobs
 from sm_images.models import ImportItem, ImportJob
 
-__all__ = ["ITEM_ERRORS_MAX", "entry", "record"]
+__all__ = ["ITEM_ERRORS_MAX", "append", "entry", "record"]
 
 ITEM_ERRORS_MAX = 20
 WHERE_MAX = 200
@@ -56,16 +56,32 @@ def entry(code: str, item: int, url: str | None, at: str) -> dict[str, Any]:
     return out
 
 
-async def record(db: Any, tenant: str, job_id: uuid.UUID, item_id: int, code: str) -> None:
-    """Add the failed row ``item_id`` to its job's errors, in ``db``'s transaction
-    (after ``jobs.bump`` took the job's row)."""
+async def append(
+    db: Any, tenant: str, job_id: uuid.UUID, failed: list[tuple[str, int, str | None]]
+) -> None:
+    """Add ``(code, feature index, url)`` rows to the job's errors in ``db``'s
+    transaction (after the job's row was taken: ``jobs.bump`` or the chunk's
+    checkpoint), as far as :data:`ITEM_ERRORS_MAX` allows."""
+    if not failed:
+        return
     errors = (
         await db.execute(select(ImportJob.errors).where(*jobs.where(tenant, job_id)))
-    ).scalar_one_or_none()
-    if errors is None:
-        errors = []
-    if sum(1 for e in errors if "item" in e) >= ITEM_ERRORS_MAX:
+    ).scalar_one_or_none() or []
+    room = ITEM_ERRORS_MAX - sum(1 for e in errors if "item" in e)
+    if room <= 0:
         return
+    at = jobs.now().isoformat()
+    new = [entry(code, index, url, at) for code, index, url in failed[:room]]
+    await db.execute(
+        update(ImportJob)
+        .where(*jobs.where(tenant, job_id))
+        .values(errors=[*errors, *new])
+        .execution_options(**NO_SYNC)
+    )
+
+
+async def record(db: Any, tenant: str, job_id: uuid.UUID, item_id: int, code: str) -> None:
+    """Add the failed row ``item_id`` (a download that failed) to its job's errors."""
     found = (
         await db.execute(
             select(ImportItem.feature_index, ImportItem.url).where(
@@ -73,12 +89,5 @@ async def record(db: Any, tenant: str, job_id: uuid.UUID, item_id: int, code: st
             )
         )
     ).first()
-    if found is None:
-        return
-    new = entry(code, found.feature_index, found.url, jobs.now().isoformat())
-    await db.execute(
-        update(ImportJob)
-        .where(*jobs.where(tenant, job_id))
-        .values(errors=[*errors, new])
-        .execution_options(**NO_SYNC)
-    )
+    if found is not None:
+        await append(db, tenant, job_id, [(code, found.feature_index, found.url)])

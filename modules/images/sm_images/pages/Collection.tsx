@@ -14,6 +14,7 @@ import { GroupsTab } from '../components/groups/GroupsTab';
 import { ImagesLayout } from '../components/ImagesLayout';
 import { ImportsTab } from '../components/imports/ImportsTab';
 import { CollectionMap } from '../components/map/CollectionMap';
+import { mapRevision } from '../components/map/mapRevision';
 import { PipelineTab } from '../components/pipeline/PipelineTab';
 import { PromptsTab } from '../components/prompts/PromptsTab';
 import { RunOnImages } from '../components/prompts/RunOnImages';
@@ -54,9 +55,9 @@ function Collection({
 }: Props) {
   const { t } = useT();
   const gallery = useImages(collection.id);
-  // The gallery re-reads while uploads are processed: a change in what it holds,
-  // or in how many of those have a location, re-reads the map's points.
-  const mapVersion = `${gallery.items.length}:${gallery.items.filter((i) => i.lat !== null).length}`;
+  // The gallery re-reads while uploads are processed: when the located images it
+  // holds change (one added, moved or replaced), the map reads its points again.
+  const mapVersion = mapRevision(gallery.items);
   const [visibility, setVisible] = useState<Visibility>(collection.visibility);
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<Tab>('gallery');
