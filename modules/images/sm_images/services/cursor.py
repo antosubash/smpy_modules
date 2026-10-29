@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import binascii
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -18,7 +19,7 @@ from sqlalchemy import and_, or_
 from sm_images import constants
 from sm_images.errors import Invalid
 
-__all__ = ["decode", "encode", "seek"]
+__all__ = ["cut", "decode", "encode", "seek"]
 
 _SEP = "|"
 
@@ -45,3 +46,17 @@ def seek(created_col: Any, id_col: Any, cursor: str) -> Any:
     ``(created_at DESC, id DESC)`` order."""
     created, ident = decode(cursor)
     return or_(created_col < created, and_(created_col == created, id_col < ident))
+
+
+def cut(
+    rows: list[Any], limit: int, *, last: Callable[[Any], Any] = lambda row: row
+) -> tuple[list[Any], str | None]:
+    """The page of a ``LIMIT limit + 1`` keyset query, and the cursor after it
+    (``None`` on the last page). ``last`` picks the ``created_at``/``id``
+    carrier out of a row."""
+    more = len(rows) > limit
+    rows = rows[:limit]
+    if not more:
+        return rows, None
+    end = last(rows[-1])
+    return rows, encode(end.created_at, end.id)

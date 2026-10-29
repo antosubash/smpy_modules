@@ -165,7 +165,5 @@ async def list_page(
         stmt = stmt.where(cursors.seek(Collection.created_at, Collection.id, cursor))
     stmt = stmt.order_by(Collection.created_at.desc(), Collection.id.desc()).limit(limit + 1)
     rows = list((await db.execute(stmt)).scalars())
-    more = len(rows) > limit
-    rows = rows[:limit]
-    token = cursors.encode(rows[-1].created_at, rows[-1].id) if more else None
+    rows, token = cursors.cut(rows, limit)
     return rows, token, total

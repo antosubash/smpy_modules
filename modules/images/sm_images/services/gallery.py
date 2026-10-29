@@ -88,9 +88,7 @@ async def list_page(
         stmt = stmt.where(cursors.seek(Image.created_at, Image.id, cursor))
     stmt = stmt.order_by(Image.created_at.desc(), Image.id.desc()).limit(limit + 1)
     rows = list((await db.execute(stmt)).scalars())
-    more = len(rows) > limit
-    rows = rows[:limit]
-    token = cursors.encode(rows[-1].created_at, rows[-1].id) if more else None
+    rows, token = cursors.cut(rows, limit)
     return rows, token, total
 
 

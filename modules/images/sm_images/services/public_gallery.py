@@ -46,9 +46,7 @@ async def page(
     if cursor:
         stmt = stmt.where(cursors.seek(Image.created_at, Image.id, cursor))
     stmt = stmt.order_by(Image.created_at.desc(), Image.id.desc()).limit(limit + 1)
-    rows = list((await db.execute(stmt)).all())
-    more = len(rows) > limit
-    rows = rows[:limit]
+    rows, token = cursors.cut(list((await db.execute(stmt)).all()), limit, last=lambda row: row[0])
     return {
         "items": [
             {
@@ -60,5 +58,5 @@ async def page(
             }
             for image, cut in rows
         ],
-        "next_cursor": cursors.encode(rows[-1][0].created_at, rows[-1][0].id) if more else None,
+        "next_cursor": token,
     }
