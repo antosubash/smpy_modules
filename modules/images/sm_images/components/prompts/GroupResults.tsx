@@ -9,9 +9,33 @@ function show(value: unknown): string {
   return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 }
 
-/** `quota_exceeded: the plan's …` → its code. */
-function codeOf(error: string): string {
-  return error.split(':')[0].trim();
+/** `quota_exceeded: the plan's …` → its code and the stored detail (if any). */
+function splitError(error: string): { code: string; detail: string | null } {
+  const at = error.indexOf(':');
+  if (at < 0) return { code: error.trim(), detail: null };
+  return { code: error.slice(0, at).trim(), detail: error.slice(at + 1).trim() || null };
+}
+
+/** A failed run's error: its label (the code as a tooltip) and the stored
+ *  detail, the same two lines the image viewer shows for a failed step. */
+function GroupError({ id, error }: { id: number; error: string }) {
+  const { t } = useT();
+  const { code, detail } = splitError(error);
+  return (
+    <>
+      <p className="text-destructive" title={code} data-testid={`images-group-result-error-${id}`}>
+        {errorCodeLabel(t, code)}
+      </p>
+      {detail && (
+        <p
+          className="break-words text-xs text-destructive"
+          data-testid={`images-group-result-detail-${id}`}
+        >
+          {detail}
+        </p>
+      )}
+    </>
+  );
 }
 
 /**
@@ -60,9 +84,7 @@ export function GroupResults({
                 </span>
               )}
             </div>
-            {failed && row.error && (
-              <p className="text-destructive">{errorCodeLabel(t, codeOf(row.error))}</p>
-            )}
+            {failed && row.error && <GroupError id={row.id} error={row.error} />}
             {data !== null && data !== undefined && failed && (
               <div data-testid={`images-group-result-previous-${row.id}`}>
                 <p className="text-muted-foreground">{t(keys.images.prompts.results.previous)}</p>

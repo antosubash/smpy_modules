@@ -236,4 +236,26 @@ describe('group results panel', () => {
     expect(byId(view, 'images-group-result-2')).not.toBeNull();
     await view.unmount();
   });
+
+  it('shows the stored error label and its detail, like the image viewer', async () => {
+    const failed = {
+      ...result(1, 'failed', null),
+      error: "quota_exceeded: the plan's AI request limit is used up",
+    };
+    const { view } = await open({ [RESULTS]: { items: [failed], next_cursor: null } });
+    const label = byId(view, 'images-group-result-error-1');
+    expect(label?.textContent).toBe("The plan's quota is used up.");
+    expect(label?.getAttribute('title')).toBe('quota_exceeded');
+    expect(byId(view, 'images-group-result-detail-1')?.textContent).toBe(
+      "the plan's AI request limit is used up",
+    );
+    await view.unmount();
+  });
+
+  it('shows no detail for an error that is only a code', async () => {
+    const { view } = await open({ [RESULTS]: { items: [result(1, 'failed', null)], next_cursor: null } });
+    expect(byId(view, 'images-group-result-error-1')).not.toBeNull();
+    expect(byId(view, 'images-group-result-detail-1')).toBeNull();
+    await view.unmount();
+  });
 });
