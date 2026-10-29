@@ -75,7 +75,7 @@ is `POST /pages/{id}/translations`, which creates a sibling sharing a
 `translation_group`. Every slug lookup and redirect takes a locale; adding one
 that does not is how `/de/p/x` starts serving the English page.
 
-**Every pagebuilder, news and records entry point binds a tenant (#38, #112).**
+**Every pagebuilder, news, records and images entry point binds a tenant (#38, #112).**
 Their tables carry `MultiTenantMixin`, and the framework filters them only
 while a tenant is bound — on a host with `multi_tenant` off nothing is bound
 and a read is *unfiltered*. Routers get `tenancy.bind_admin`/`bind_public`,
@@ -90,7 +90,10 @@ tenant is never shareable-cached (records #196; pagebuilder and news #192).
 The scheduler opens one session per tenant under `tenant_context`. News has its
 own copy, `news.tenancy`, and its scheduler ticks per tenant the same way;
 records' is `sm_records.tenancy` (its 403 is the `{"detail","code"}` envelope,
-code `tenant_required`); billing reads the same `request.state.tenant_id`
+code `tenant_required`) and images' `sm_images.tenancy` is a copy of it; images'
+Celery tasks never run unscoped — `images.reconcile` and `images.janitor`
+enumerate tenants in one narrow `all_tenants()` read and do each tenant's work
+under `tenant_context`; billing reads the same `request.state.tenant_id`
 through `context.billing_context`. Another module reads pagebuilder only
 through `pagebuilder.contracts` (news' search calls
 `search_pages`/`search_media`, #130); the caller names the tenant and the
@@ -141,7 +144,7 @@ one place provider state becomes local state), and response models
 (`PlanOut`) must not inherit input bounds — a stored row that predates a bound
 would 500 every screen listing plans. Its docs are in `modules/billing/docs/`.
 
-**`pagebuilder`, `news`, `billing` and `ai` read no environment variables.** Their settings are
+**`pagebuilder`, `news`, `billing`, `ai` and `images` read no environment variables.** Their settings are
 DB-backed through the framework's settings module (`register_module_settings`),
 and each class drops pydantic-settings' env, `.env` and secrets sources — so
 adding a field means adding it to the class, not to `.env.example`, and an
@@ -157,7 +160,20 @@ API key per slot for the whole deployment, shared by every tenant. The one
 thing ai still reads from the environment is `SM_SECRET_KEY`, for its key
 encryption, and only as the framework's `BootstrapSettings` locates `.env`
 (`SM_PROJECT_ROOT`, else the walk up to the project root) — never a
-cwd-relative file (#124).
+cwd-relative file (#124). Images' workers never build the app, so they read
+the same class with `background_tasks.settings_for(ImagesSettings, "sm_images")`
+(DB-backed, cached about 30 s).
+
+**A plugin registers images steps and presets from `images_extensions.py`, never
+from `on_startup`.** Celery workers do not run module hooks, and a dependant's
+`on_startup` runs after images' own. A package with a `simple_module` entry point
+ships `images_extensions.py` with `def register(registry)`;
+`sm_images.pipeline.extensions.load_extensions()` imports it in the web process
+(images' `on_startup`) and in a worker (first registry read), then freezes the
+registry, so a later `register_step` raises `RegistryFrozenError`. The plugin must
+be installed identically in the web image and in **every** worker image: a worker
+without it settles the plugin's steps as `not_installed`. Docs:
+`modules/images/docs/`.
 
 **Host settings come from the environment first, then the database.**
 `host/main.py` builds its settings with the framework's
@@ -239,9 +255,15 @@ Redis, and `make worker` / `worker-imports` / `worker-heavy` / `worker-gpu` /
 `make dev` starts none of them. With no worker, set
 `SM_BG_TASKS_TASK_ALWAYS_EAGER=true` (`.env.example`; the e2e server exports it,
 plus `..._TASK_EAGER_PROPAGATES=true`) and tasks run inline. CI installs
-`tippecanoe` with apt in the Python-tests and Postgres jobs. (Task 2 will
-add `--no-extra anonymize` to the CI syncs together with the `anonymize`
-extra; `uv sync` rejects the flag until some project defines it.)
+`tippecanoe` with apt in the Python-tests and Postgres jobs. **Torch and
+ultralytics are never installed by default.** `make install`, the Python-tests,
+repo-checks, e2e (`.github/actions/e2e-setup`) and `release` jobs and
+`framework-latest` sync with `--all-extras --no-extra anonymize` (the `quality`,
+`map`, `ai`, `billing` and `pagebuilder` extras are installed, `anonymize` is
+not); the Postgres and frontend jobs sync no extras. The anonymize step's default tests use a fake
+detector. Only the weekly/manual `images-models` workflow installs the extra, with
+CPU torch, and runs the `real_models` tests. The extra is AGPL-3.0 (see
+`modules/images/docs/index.md`).
 
 ## Working against an unreleased framework
 
@@ -256,7 +278,7 @@ the target fails without it.
 
 ## Known deferred work
 
-- **UI i18n — done in every module, in English and German.** All five ship
+- **UI i18n — done in every module, in English and German.** All six ship
   `locales/en.json` and `locales/de.json` and route every string through
   `t()`. `scripts/check_locales.py` (in `make lint` and CI) fails when a
   translation's key tree or placeholders drift from `en.json` — add a key to
@@ -273,7 +295,7 @@ the target fails without it.
   redundant. The framework modules' screens (users, settings, …) ship German
   since 0.0.38 as well.
 
-  news, pagebuilder, ai, billing and records call
+  news, pagebuilder, ai, billing, records and images call
   `t(keys.<module>.<section>.<key>)`, with no `defaultValue` — each
   module's `utils/i18n.ts` supplies the English text from `en.json`. A
   family of keys chosen at runtime (`filters.op.<op>`) is a

@@ -7,10 +7,12 @@ is produced by pipeline steps that run as background tasks. Collections are
 private to their owner, shared with chosen users, internal to the organisation
 or public.
 
-This release is the module skeleton: registrations, permissions, settings,
-tenancy and the test harness. Collections, uploads, the pipeline and the
-screens arrive in the following releases. Design:
-`docs/superpowers/specs/2026-10-28-images-module-design.md` in the source repo.
+Imports take single files, batches, large direct uploads, ZIP archives and
+GeoJSON sources of up to a million located images. Groups, AI prompts with a
+review queue, a map (GeoJSON points and PMTiles) and a public gallery are
+included. Design:
+`docs/superpowers/specs/2026-10-28-images-module-design.md` in the source repo;
+the guides are in [`docs/`](docs/index.md).
 
 ## Install
 
@@ -38,9 +40,23 @@ extras, imported only inside the step that needs them:
 | `billing` | `simple_module_billing`: storage and request metering |
 | `pagebuilder` | `simple_module_pagebuilder`: an image gallery block |
 
-The module needs the framework's `settings` module, and from the next release
-`file_storage`, `sharing` and `background_tasks`. Migrations live in the
-consuming host (`make migration`), never in the wheel.
+**Licence warning.** The `anonymize` extra installs ultralytics, which is
+AGPL-3.0, and the default weights it downloads are AGPL-3.0 community
+checkpoints, while this module is MIT. Whether to use it is the operator's
+decision. Plate-detection recall is unverified, and weights are cached under
+`~/.cache/simple_module_images/models` unless `anonymize_weights_path` points
+at `face.pt` and `plate.pt`. See [docs/index.md](docs/index.md).
+
+The module needs the framework's `settings`, `sharing`, `file_storage` and
+`background_tasks` modules. Migrations live in the consuming host
+(`make migration`), never in the wheel.
+
+Image processing runs in Celery workers (`make worker`, `worker-imports`,
+`worker-heavy`, `worker-gpu`, `beat`) or inline with
+`SM_BG_TASKS_TASK_ALWAYS_EAGER=true`. A plugin that adds steps ships an
+`images_extensions.py` and must be installed in the web process and every
+worker. See [docs/worker.md](docs/worker.md) and
+[docs/writing-a-plugin.md](docs/writing-a-plugin.md).
 
 ## Usage
 
@@ -76,8 +92,8 @@ tenant. Fields marked as needing a restart (`tippecanoe_path`,
 | `direct_upload_threshold` | 20 MiB |
 | `zip_max_bytes` / `zip_max_entries` | 2 GiB / 10 000 |
 | `zip_max_entry_bytes` / `zip_max_total_bytes` / `zip_max_ratio` | 200 MiB / 8 GiB / 200 |
-| `geojson_max_features` / `geojson_max_bytes` | 1 000 000 / 2 GiB |
-| `download_concurrency_per_domain` / `download_concurrency_total` / `download_timeout` | 4 / 32 / 60 s |
+| `geojson_max_features` / `geojson_max_bytes` / `geojson_max_feature_bytes` | 1 000 000 / 2 GiB / 60 MiB |
+| `download_concurrency_per_domain` / `download_concurrency_total` (per download task) / `download_timeout` | 4 / 32 / 60 s |
 | `thumbnail_sizes` | marker 64, small 160, medium 400, large 1024 |
 | `dedupe_by_hash` | off |
 | `tippecanoe_path`, `anonymize_weights_path` | `tippecanoe`, empty |
@@ -114,3 +130,15 @@ limit. Public exemptions are `GET`/`HEAD` only, under `/images/c/` and
   example once a mutator plugin is removed) until `images.reconcile` rebuilds it.
 - The `images.tippecanoe` health check is degraded while the binary cannot be
   found. Points keep working.
+
+## Documentation
+
+| Page | For |
+| --- | --- |
+| [docs/index.md](docs/index.md) | Concepts, install, permissions, every setting |
+| [docs/access.md](docs/access.md) | Visibility, shares, originals, withheld images |
+| [docs/imports.md](docs/imports.md) | Uploads, direct upload and bucket CORS, ZIP, GeoJSON, limits |
+| [docs/pipeline.md](docs/pipeline.md) | Steps, leases, AI prompts, groups, presets, review, storage metering |
+| [docs/writing-a-plugin.md](docs/writing-a-plugin.md) | Steps, presets and result views from another module |
+| [docs/worker.md](docs/worker.md) | Workers, beat, timeouts, tuning, recovery times |
+| [docs/migrating-from-portal.md](docs/migrating-from-portal.md) | Moving off the portal's feature |

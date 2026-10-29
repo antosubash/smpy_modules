@@ -28,17 +28,104 @@ The web process and every worker need:
 - `SM_BG_TASKS_TASK_ALWAYS_EAGER` unset or `false`;
 - the same file storage (`file_storage` settings). The local backend only
   works when every process shares one filesystem;
-- **the same installed plugins.** The registry is built from the installed
-  `simple_module` entry points in each process
-  (`sm_images.pipeline.extensions.load_extensions`). If a worker lacks a
-  plugin the web process has, that worker's runs of the plugin's steps settle
-  as `not_installed`.
+- **the same installed plugins, registered the same way.** A worker never builds
+  the app, so a plugin cannot register from `on_startup`. Each process builds the
+  registry from the installed `simple_module` entry points and imports every
+  package's `images_extensions.py`
+  (`sm_images.pipeline.extensions.load_extensions`; see
+  [writing-a-plugin.md](writing-a-plugin.md#registration)). A worker that lacks a
+  plugin the web process has settles that plugin's step runs as `not_installed`;
+  install it identically in the web image and in every worker image.
 
 The real environment takes precedence over `.env` in the workers too
 (`load_dotenv_into_environ` uses `setdefault`), so a one-off override on the
 command line reaches both sides.
 
 Beat writes `celerybeat-schedule.db` in the repo root, which git ignores.
+
+## Production settings
+
+### Database timeouts
+
+The framework's default for both is `0`, which is off. A worker holding a lock
+on a stuck database connection holds a worker slot, and images sets no Celery
+time limit on its import tasks, so **set both on Postgres**:
+
+- `SM_DB_STATEMENT_TIMEOUT_MS` (`statement_timeout`) and
+  `SM_DB_IDLE_IN_TX_TIMEOUT_MS` (`idle_in_transaction_session_timeout`) for the
+  host. Workers inherit them.
+- `SM_BG_TASKS_DB_STATEMENT_TIMEOUT_MS` overrides the statement timeout for the
+  workers alone, where a longer value than the web process's may belong. Restart
+  workers after changing any of them. PgBouncer in transaction mode rejects these startup
+  parameters; see the framework's database tuning guide.
+
+### Why imports have no Celery time limit
+
+A 1M-feature GeoJSON import legitimately runs for hours, so a hard or soft task
+time limit would kill healthy work. Instead an import is **liveness-guarded**:
+
+- the runner writes a **heartbeat** while it works (also during slow downloads);
+- `images.reconcile` reclaims a job whose heartbeat is older than 5 minutes, under
+  a new generation, and resumes it from the checkpoint;
+- a job that is reclaimed again and again with no progress is failed as
+  `stalled` after five relaunches (the **stalled breaker**).
+
+CPU work is bounded by size caps instead of time: `max_image_bytes`, the pixel
+guard, the ZIP limits, `geojson_max_feature_bytes`, `step_output_max_bytes`. The
+task decorators declare `stuck_after` (12 hours for imports, 2 hours for the
+rest), which is what the framework's sweep reads. If you do want a time limit for
+image steps, set `task_soft_time_limit`/`task_time_limit`; a step that hits the
+soft limit then fails with `time_limit`.
+
+### Celery tuning
+
+The framework fixes `acks_late` and a prefetch multiplier of 1, which suit long
+tasks. The rest are `background_tasks` settings, read once when a worker starts
+(Settings screen, or the environment as `SM_BG_TASKS_<FIELD>`):
+
+| Setting | Why for images |
+| --- | --- |
+| `visibility_timeout_seconds` | On a Redis broker a message not acknowledged within it (Celery's default is 1 hour) is redelivered, so a longer task runs twice. Set it above your longest import, for instance 12 hours (43 200) to match the import tasks' `stuck_after` |
+| `worker_max_tasks_per_child`, `worker_max_memory_per_child_kb` | Recycle prefork children; torch and OpenCV hold memory. Worth setting on `worker-heavy` and `worker-gpu` |
+| `task_reject_on_worker_lost` | Redeliver a task whose child was killed (for instance by the memory cap) |
+| `worker_concurrency` | The make targets pass `-c` on the command line |
+
+As general advice, give the heavy workers a thread budget (`OMP_NUM_THREADS=1`, and the same for
+OpenCV/MKL if they are used) so a child does not oversubscribe the cores. The
+database engine is rebuilt in every forked child, so no connection crosses a fork.
+
+`worker-imports` runs with concurrency 1, and `worker-gpu` with one child.
+
+### The anonymize step
+
+The `anonymize` step is registered only when `torch` and `ultralytics` import.
+**Both are AGPL-3.0, and so are the default weights** (see
+[index.md](index.md#licence-warning-anonymize)); the module itself is MIT.
+
+- **Weights.** With `anonymize_weights_path` empty, the pinned YOLO weights
+  (a face model and a plate model, commit-pinned from Hugging Face) are downloaded
+  once, on first use, into `~/.cache/simple_module_images/models` of the user the
+  worker runs as. Each load verifies size and SHA-256 and reads from a private
+  snapshot, so a swapped cache file is never loaded. **On a read-only home,
+  or to keep weights off the network, set `anonymize_weights_path`** to a
+  directory holding `face.pt` and `plate.pt`; those are used as they are, with no
+  checksum, and a missing file fails the run (`weights_unavailable`). The setting
+  needs a restart; workers read it from the same database setting.
+- **Recall.** The plate model's recall has not been verified. It is a best-effort
+  blur.
+- **Re-runs.** A re-run starts from the original. If it detects nothing it
+  completes without a new display copy, so the **previously blurred copy
+  stays**.
+- CI installs the extra only in the weekly `images-models` workflow, with CPU
+  torch.
+
+### Map tiles
+
+`tippecanoe` must be on `PATH` of the workers that run `images.build_map` (queue
+`images`), or at `tippecanoe_path`. Without it the map falls back to GeoJSON
+points and the `images.tippecanoe` health check reports degraded. The map worker
+in the browser (MapLibre) is inlined as a `blob:` URL, so no Content-Security-Policy
+source has to be added.
 
 ## A local run
 
@@ -152,3 +239,7 @@ recovery paths, not bugs:
   that window can refuse an upload that would otherwise fit.
 - Plugins must be installed identically in the web image and every worker
   image (see "Processes").
+- Image download limits (`download_concurrency_*`) are per download task, not
+  fleet-wide ([imports.md](imports.md#downloads-and-the-ssrf-guard)).
+- A change to an images setting reaches workers within about 30 seconds (their
+  settings cache); the three restart settings need a restart.

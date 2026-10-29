@@ -50,7 +50,8 @@ runs:
 
     - name: Sync Python workspace
       shell: bash
-      run: uv sync --locked --all-packages --all-extras
+      # Without the anonymize extra: torch is too heavy for every run (ci.yml).
+      run: uv sync --locked --all-packages --all-extras --no-extra anonymize
 
     - name: Install npm workspace
       shell: bash
