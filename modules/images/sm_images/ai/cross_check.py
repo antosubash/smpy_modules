@@ -46,7 +46,7 @@ CROSS_CHECK_TIMEOUT_S = 30.0
 POOL_SIZE = 4
 _POOL = ThreadPoolExecutor(max_workers=POOL_SIZE, thread_name_prefix="images-cross-check")
 _SLOTS = threading.BoundedSemaphore(POOL_SIZE)
-"""Admission: one slot per submitted hook, freed only when it really returns."""
+"""Admission: one slot per submitted hook, freed when its job is done."""
 
 
 class CrossCheckTimedOut(Exception):  # noqa: N818 - reads as the condition
@@ -80,14 +80,8 @@ def run_cross_check(
     return json.loads(encoded)
 
 
-def _run_and_release(
-    fn: Any, group: GroupRead, results: Sequence[PromptResultRead], max_bytes: int
-) -> dict[str, Any] | None:
-    """In the worker thread: free the slot when the hook finishes, not at timeout."""
-    try:
-        return run_cross_check(fn, group, results, max_bytes)
-    finally:
-        _SLOTS.release()
+def _release_slot(_done: object) -> None:
+    _SLOTS.release()
 
 
 async def check(
@@ -99,14 +93,21 @@ async def check(
     limit = CROSS_CHECK_TIMEOUT_S
     if not _SLOTS.acquire(blocking=False):
         raise CrossCheckTimedOut(f"the cross-check pool is full; no slot within {limit:g} s")
-    call = functools.partial(_run_and_release, fn, group, results, max_bytes)
+    call = functools.partial(run_cross_check, fn, group, results, max_bytes)
     ctx = contextvars.copy_context()  # as ``asyncio.to_thread`` would
     try:
-        work = asyncio.get_running_loop().run_in_executor(_POOL, ctx.run, call)
-    except BaseException:  # never submitted: the wrapper will not release
-        _SLOTS.release()
+        job = _POOL.submit(ctx.run, call)
+    except BaseException:
+        # ``submit`` queues the item before it starts a thread, so a failure
+        # here may leave it queued and still holding its arguments: keep the
+        # slot (fail closed) rather than admit work the pool still holds. Only
+        # a process that cannot start threads gets here.
+        logger.error("images.group.cross_check_submit_failed", exc_info=True)
         raise
+    # Freed when the job is done - returned, raised, or cancelled while still
+    # queued (then its body never runs) - never merely because we stopped waiting.
+    job.add_done_callback(_release_slot)
     try:
-        return await asyncio.wait_for(work, limit)
+        return await asyncio.wait_for(asyncio.wrap_future(job), limit)
     except TimeoutError as exc:
         raise CrossCheckTimedOut(f"the cross-check took longer than {limit:g} s") from exc

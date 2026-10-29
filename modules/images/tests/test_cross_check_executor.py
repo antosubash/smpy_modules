@@ -101,3 +101,24 @@ def test_admission_is_bounded_when_every_pool_thread_hangs(monkeypatch):
         assert asyncio.run(run(lambda g, r: {"ok": 1})) == {"ok": 1}
     finally:
         release.set()
+
+
+def test_a_job_cancelled_while_queued_gives_its_slot_back(monkeypatch):
+    """Its body never runs, so only a done-callback can free the slot."""
+    monkeypatch.setattr(cross_check, "CROSS_CHECK_TIMEOUT_S", 0.1)
+    release = threading.Event()
+    busy = [cross_check._POOL.submit(release.wait, 30) for _ in range(cross_check.POOL_SIZE)]
+    ran: list[int] = []
+    try:
+
+        async def main() -> None:
+            with pytest.raises(cross_check.CrossCheckTimedOut):
+                await cross_check.check(lambda g, r: ran.append(1) or {}, _stand_in(), [], 1000)
+
+        asyncio.run(main())  # queued behind the busy threads, then cancelled
+        assert ran == []
+        assert cross_check._SLOTS._value == cross_check.POOL_SIZE  # type: ignore[attr-defined]
+    finally:
+        release.set()
+        for job in busy:
+            job.result(5)
