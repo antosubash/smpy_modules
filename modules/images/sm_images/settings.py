@@ -45,6 +45,11 @@ class ImagesSettings(BootSettings):
     direct_upload_threshold: int = Field(default=20 * _MIB, ge=1)
     """A file over this size must use a direct (presigned) upload, in bytes."""
 
+    max_open_uploads_per_tenant: int = Field(default=20, ge=1)
+    """Most direct and ZIP uploads one tenant may have open at once. Opening one
+    is also refused when the storage gauge plus the declared sizes of the
+    tenant's open uploads would not fit the plan (with billing installed)."""
+
     zip_max_bytes: int = Field(default=2 * _GIB, ge=1)
     """Largest ZIP archive accepted for import, in bytes."""
 

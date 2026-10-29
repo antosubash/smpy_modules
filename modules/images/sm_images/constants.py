@@ -224,6 +224,7 @@ CODE_REGROUP_ACTIVE: Final = "regroup_active"
 CODE_ROLE_NEEDS_GROUP: Final = "role_needs_group"
 CODE_CONFLICT: Final = "conflict"
 CODE_QUOTA_EXCEEDED: Final = "quota_exceeded"
+CODE_TOO_MANY_OPEN_UPLOADS: Final = "too_many_open_uploads"
 ERROR_CODES: Final = (
     CODE_UNSUPPORTED_TYPE,
     CODE_TOO_MANY_PIXELS,
@@ -247,6 +248,7 @@ ERROR_CODES: Final = (
     CODE_ROLE_NEEDS_GROUP,
     CODE_CONFLICT,
     CODE_QUOTA_EXCEEDED,
+    CODE_TOO_MANY_OPEN_UPLOADS,
 )
 """Every code an upload can answer with; each has a translated sentence."""
 

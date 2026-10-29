@@ -1,6 +1,7 @@
 """Direct uploads: start, relay a part, complete, abort (see ``ingest.direct``).
 
-``POST /collections/{id}/uploads`` is an ``edit`` on the collection. The later
+``POST /collections/{id}/uploads`` is an ``edit`` on the collection, admitted
+against the tenant's open uploads first (``ingest.admission``). The later
 calls carry the signed ``upload_id`` instead of a collection in the path, and
 each of them - part, complete, abort - resolves the ticket's collection through
 the same ``RequiresResource(POLICY, ACTION_EDIT, ...)`` dependency the
@@ -26,6 +27,7 @@ from sm_images.deps import require_view
 from sm_images.endpoints.api.images import Ingest, result
 from sm_images.errors import UploadNotFound, UploadNotOpen
 from sm_images.ingest import direct
+from sm_images.ingest.admission import admit
 from sm_images.models import Collection
 from sm_images.schemas.image import (
     DirectComplete,
@@ -73,6 +75,13 @@ async def start_upload(
 ) -> DirectCreated:
     if who.user_id is None:  # pragma: no cover - require_view admits only signed-in callers
         raise UploadNotFound("Upload not found")
+    await admit(
+        request.app,
+        ingest.db,
+        bound_tenant(),
+        body.size,
+        cap=ingest.settings.max_open_uploads_per_tenant,
+    )
     token, ticket, urls, presigned = await direct.start(
         ingest.db,
         store_for(request.app),

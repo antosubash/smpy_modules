@@ -92,6 +92,7 @@ tenant. Fields marked as needing a restart (`tippecanoe_path`,
 | `batch_max` | 50 |
 | `upload_body_max_bytes` | 100 MiB |
 | `direct_upload_threshold` | 20 MiB |
+| `max_open_uploads_per_tenant` | 20 |
 | `zip_max_bytes` / `zip_max_entries` | 2 GiB / 10 000 |
 | `zip_max_entry_bytes` / `zip_max_total_bytes` / `zip_max_ratio` | 200 MiB / 8 GiB / 200 |
 | `geojson_max_features` / `geojson_max_bytes` / `geojson_max_feature_bytes` | 1 000 000 / 2 GiB / 60 MiB |

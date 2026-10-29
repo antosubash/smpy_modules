@@ -30,18 +30,18 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
 from simple_module_core.resources import ACTION_EDIT, ResourcePrincipal
 from simple_module_db.deps import get_db
-from simple_module_db.listeners import current_tenant_id
 from simple_module_hosting.resource_deps import RequiresResource, resource_principal
 from sqlalchemy import select
 
 from sm_images import billing, constants
 from sm_images.access import POLICY, CollectionEdit
-from sm_images.deps import require_view
+from sm_images.deps import get_settings, require_view
 from sm_images.endpoints.api.uploads import host_secret
 from sm_images.errors import ServiceUnavailable, UploadNotFound
 from sm_images.imports import access, controls, zip_upload
 from sm_images.imports.service import start_import
 from sm_images.imports.zip_import import launch_sealed
+from sm_images.ingest.admission import admit
 from sm_images.models import Collection, ImportJob
 from sm_images.pipeline.runtime import Runtime, current_runtime
 from sm_images.schemas.image import DirectCreated
@@ -53,6 +53,7 @@ from sm_images.schemas.imports import (
     ZipExtract,
     job_out,
 )
+from sm_images.tenancy import bound_tenant
 
 router = APIRouter(tags=["imports"])
 
@@ -65,13 +66,6 @@ def _runtime() -> Runtime:
     if runtime is None:
         raise ServiceUnavailable("the image pipeline is not running in this process")
     return runtime
-
-
-def _tenant() -> str:
-    tenant = current_tenant_id.get()
-    if tenant is None:  # bind_admin ran first; this is the import code's own guard
-        raise ServiceUnavailable("no tenant is bound")
-    return tenant
 
 
 def job_collection_stmt(job_id: uuid.UUID) -> Any:
@@ -107,11 +101,11 @@ async def create_import(
     auto_run_prompts: Annotated[bool, Form()] = True,
     file: Annotated[UploadFile | None, File()] = None,
 ) -> ImportJobOut:
-    await billing.check(request.app, _tenant(), 1)  # a full gauge refuses the job up front
+    await billing.check(request.app, bound_tenant(), 1)  # a full gauge refuses the job up front
     user, basis = await _actor(db, who, collection)
     row = await start_import(
         _runtime(),
-        _tenant(),
+        bound_tenant(),
         collection,
         kind=kind,
         mapping=mapping,
@@ -134,11 +128,12 @@ async def create_zip_import(
     who: Principal,
     db: Annotated[Any, Depends(get_db)],
 ) -> ZipCreated:
-    await billing.check(request.app, _tenant(), 1)
+    cap = get_settings(request).max_open_uploads_per_tenant
+    await admit(request.app, db, bound_tenant(), body.size, cap=cap)
     user, basis = await _actor(db, who, collection)
     job, (token, ticket, urls, presigned) = await zip_upload.start(
         _runtime(),
-        _tenant(),
+        bound_tenant(),
         collection,
         filename=body.filename,
         size=body.size,
@@ -166,7 +161,7 @@ async def extract_zip_import(
     who: Principal,
     db=Depends(get_db),
 ) -> ImportJobOut:
-    runtime, tenant = _runtime(), _tenant()
+    runtime, tenant = _runtime(), bound_tenant()
     actor = await _actor(db, who, collection)  # the extractor takes the job over
     claimed = {p.no: p.etag for p in body.parts}
     generation = await zip_upload.seal(runtime, tenant, job_id, claimed, actor)
@@ -195,7 +190,7 @@ async def get_import(
 
 @router.post("/imports/{job_id}/pause", dependencies=[require_view])
 async def pause_import(job_id: uuid.UUID, collection: JobCollection) -> ImportJobOut:
-    return job_out(await controls.pause(_runtime(), _tenant(), job_id))
+    return job_out(await controls.pause(_runtime(), bound_tenant(), job_id))
 
 
 @router.post("/imports/{job_id}/resume", status_code=202, dependencies=[require_view])
@@ -203,7 +198,7 @@ async def resume_import(
     job_id: uuid.UUID, collection: JobCollection, who: Principal, db=Depends(get_db)
 ) -> ImportJobOut:
     actor = await _actor(db, who, collection)
-    return job_out(await controls.resume(_runtime(), _tenant(), job_id, actor=actor))
+    return job_out(await controls.resume(_runtime(), bound_tenant(), job_id, actor=actor))
 
 
 @router.post("/imports/{job_id}/restart", status_code=202, dependencies=[require_view])
@@ -211,7 +206,7 @@ async def restart_import(
     job_id: uuid.UUID, collection: JobCollection, who: Principal, db=Depends(get_db)
 ) -> ImportJobOut:
     actor = await _actor(db, who, collection)
-    return job_out(await controls.restart(_runtime(), _tenant(), job_id, actor=actor))
+    return job_out(await controls.restart(_runtime(), bound_tenant(), job_id, actor=actor))
 
 
 @router.post("/imports/{job_id}/retry-failed", status_code=202, dependencies=[require_view])
@@ -219,10 +214,10 @@ async def retry_failed_import(
     job_id: uuid.UUID, collection: JobCollection, who: Principal, db=Depends(get_db)
 ) -> ImportJobOut:
     actor = await _actor(db, who, collection)
-    return job_out(await controls.retry_failed(_runtime(), _tenant(), job_id, actor=actor))
+    return job_out(await controls.retry_failed(_runtime(), bound_tenant(), job_id, actor=actor))
 
 
 @router.delete("/imports/{job_id}", status_code=204, dependencies=[require_view])
 async def delete_import(job_id: uuid.UUID, collection: JobCollection) -> Response:
-    await controls.delete_job(_runtime(), _tenant(), job_id)
+    await controls.delete_job(_runtime(), bound_tenant(), job_id)
     return Response(status_code=204)

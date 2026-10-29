@@ -154,6 +154,7 @@
     "upload_failed": "The file could not be stored. Try again.",
     "upload_in_progress": "This upload is being completed. Try again in a moment.",
     "upload_not_open": "This upload no longer accepts parts.",
+    "too_many_open_uploads": "Too many uploads are open. Finish or cancel one and try again.",
     "group_not_found": "That group does not exist in this collection.",
     "group_exists": "This collection already has a group with that key.",
     "invalid_role": "That role is not one of the collection's group roles.",

@@ -71,6 +71,22 @@ it shows up in relay URLs and so in access logs, and grants nothing without the
 owner's session, an edit right and a bound tenant. A replayed `complete` answers
 with the image it created. An abandoned upload is reclaimed by the janitor.
 
+**Admission.** An open upload lets the client write straight to storage, so it is
+admitted before the `upload_id` is issued (here and for a ZIP import's upload):
+
+- at most `max_open_uploads_per_tenant` (default 20) uploads may be open in a
+  tenant at once; one more is `429 too_many_open_uploads`;
+- with billing installed, the storage gauge plus the declared sizes of the
+  tenant's open uploads plus this one must fit the plan, or it is
+  `402 quota_exceeded`.
+
+An upload is open until it is completed, aborted or expires. The declared size is
+binding: every part must be exactly its expected size and `complete` refuses a
+missing, short or extra part. The check is **soft**: uploads opened at the same
+moment each see only the others already committed, so they can overshoot by at
+most the cap's worth of declared sizes. The hold taken at `complete` is still the
+enforcement.
+
 > **Bucket CORS (S3 and MinIO).** The browser talks to the bucket directly, so
 > the bucket's CORS configuration must allow the **`PUT`** method from the
 > console's origin, and must **expose the `ETag` response header**

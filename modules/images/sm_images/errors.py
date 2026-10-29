@@ -109,6 +109,13 @@ class StorageQuotaExceeded(ImagesError):  # noqa: N818 - billing's vocabulary
     code = constants.CODE_QUOTA_EXCEEDED
 
 
+class TooManyOpenUploads(ImagesError):  # noqa: N818 - HTTP vocabulary, deliberately
+    """The tenant already has ``max_open_uploads_per_tenant`` uploads open (429)."""
+
+    status_code = 429
+    code = constants.CODE_TOO_MANY_OPEN_UPLOADS
+
+
 class UploadNotFound(NotFound):
     code = constants.CODE_UPLOAD_NOT_FOUND
 

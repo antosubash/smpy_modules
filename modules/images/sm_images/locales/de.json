@@ -154,6 +154,7 @@
     "upload_failed": "Die Datei konnte nicht gespeichert werden. Versuchen Sie es erneut.",
     "upload_in_progress": "Dieser Upload wird gerade abgeschlossen. Versuchen Sie es gleich noch einmal.",
     "upload_not_open": "Dieser Upload nimmt keine Teile mehr an.",
+    "too_many_open_uploads": "Es sind zu viele Uploads offen. Schließen Sie einen ab oder brechen Sie einen ab und versuchen Sie es dann erneut.",
     "group_not_found": "Diese Gruppe gibt es in dieser Sammlung nicht.",
     "group_exists": "Diese Sammlung hat bereits eine Gruppe mit diesem Schlüssel.",
     "invalid_role": "Diese Rolle gehört nicht zu den Gruppenrollen der Sammlung.",

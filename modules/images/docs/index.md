@@ -131,6 +131,7 @@ tenant. Workers read the same values (cached for about 30 seconds).
 | `batch_max` | 50 | Files per multipart request |
 | `upload_body_max_bytes` | 100 MiB | Body ceiling of the upload routes (read per request) |
 | `direct_upload_threshold` | 20 MiB | Files above this must use a direct (multipart) upload |
+| `max_open_uploads_per_tenant` | 20 | Direct and ZIP uploads a tenant may have open at once ([imports](imports.md#direct-upload)) |
 | `zip_max_bytes` | 2 GiB | Largest ZIP |
 | `zip_max_entries` | 10 000 | Entries per ZIP |
 | `zip_max_entry_bytes` | 200 MiB | One decompressed entry |
