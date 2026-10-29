@@ -38,10 +38,12 @@ class BootSettings(DbBackedSettings):
     """
 
     anonymize_weights_path: str = Field(default="", json_schema_extra=_RESTART)
-    """Where the ``anonymize`` step finds its detector weights.
+    """Directory holding the ``anonymize`` step's detector weights.
 
-    Empty (the default) downloads them once to a cache directory on first use.
-    The weights are not bundled in the wheel. Read once, while booting, because
+    It must contain ``face.pt`` and ``plate.pt`` (ultralytics YOLO weights).
+    Empty (the default) downloads pinned, checksummed weights once, on first
+    use, to ``~/.cache/simple_module_images/models`` on each worker. The
+    weights are not bundled in the wheel. Read once, while booting, because
     whether the step is offered at all depends on the ``[anonymize]`` extra and
     on these files being reachable.
     """

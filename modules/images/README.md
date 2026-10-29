@@ -32,7 +32,7 @@ extras, imported only inside the step that needs them:
 | Extra | Adds |
 | --- | --- |
 | `quality` | OpenCV: resolution, blur and exposure metrics |
-| `anonymize` | torch, facenet-pytorch, ultralytics: face and plate blurring |
+| `anonymize` | torch, ultralytics: YOLO face and plate detection, blurred into a display copy (the original is kept); weights from `anonymize_weights_path` or a pinned, checksummed download on first use |
 | `map` | PMTiles support for the map view (also needs the `tippecanoe` binary) |
 | `ai` | `simple_module_ai`: prompt-based image analysis |
 | `billing` | `simple_module_billing`: storage and request metering |

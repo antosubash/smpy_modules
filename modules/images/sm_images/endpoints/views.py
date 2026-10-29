@@ -85,9 +85,13 @@ async def image(
     """The viewer. ``can_view_original`` is the serving route's own rule, fed the
     same protection state (a display copy, or a display mutator that has not
     settled), so the toggle is offered exactly when ``/original`` would answer
-    200."""
+    200. ``display_pending`` is when ``…/display`` would 404 (redaction has not
+    settled), so the page says so instead of showing a broken picture."""
     row = await gallery.get(db, collection, image_id)
-    protected = row.display_key is not None or await redaction_state.pending(db, collection, row)
+    withheld = not redaction_state.trusts_display(
+        collection, row
+    ) and await redaction_state.pending(db, collection, row)
+    protected = row.display_key is not None or withheld
     rights = await _rights(db, who, collection)
     return await inertia.render(
         constants.PAGE_IMAGE,
@@ -97,6 +101,7 @@ async def image(
             ),
             "collection": _out(collection, who).model_dump(mode="json"),
             "can_view_original": can_view_original(who, row, collection, protected=protected),
+            "display_pending": withheld,
             "can_edit": rights["can_edit"],
             "can_manage": rights["can_manage"],
         },

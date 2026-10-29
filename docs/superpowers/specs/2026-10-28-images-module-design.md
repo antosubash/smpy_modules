@@ -201,7 +201,7 @@ class Step(Protocol):
 | `exif` | core | Pillow (with `pillow-heif` for HEIC) reads GPS, altitude, heading, DateTimeOriginal, make/model and orientation. Writes location only when the image's `location_source` is lower precedence than `exif` |
 | `renditions` | core | Applies EXIF orientation and writes the `thumbnail_sizes` JPEGs from the display copy. Re-runs automatically after a step that changed `display_key` |
 | `quality` | `[quality]` (opencv-headless) | Resolution, Laplacian blur and histogram exposure, with thresholds as step params. Informational; output goes to `step_run.output` |
-| `anonymize` | `[anonymize]` (torch, facenet-pytorch, ultralytics) | Detects faces and plates (toggled per collection), blurs padded regions, writes `display.jpg` and the regions and counts in `output`. **Never touches `storage_key`.** The weights file is a setting path or downloaded on first use; it is not bundled in the wheel |
+| `anonymize` | `[anonymize]` (torch, ultralytics; YOLO for faces and plates, since facenet-pytorch would downgrade Pillow) | Detects faces and plates (toggled per collection), blurs padded regions, writes `display.jpg` and the regions and counts in `output`. **Never touches `storage_key`.** The weights file is a setting path or downloaded on first use; it is not bundled in the wheel |
 | `classify` | `[ai]` (needs the `ai` module) | Structured vision call through `sm_ai.contracts.resolve_model()` and a pydantic-ai `Agent` with `output_type`, on a 1024 px copy. Its vocabulary and prompt are step params with neutral defaults; the portal's land-use prompt moves to its preset |
 | `prompt:<id>` | `[ai]` | One `images_prompt` with image scope, run per image |
 

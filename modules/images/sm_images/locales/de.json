@@ -83,6 +83,7 @@
     "show_display": "Anzeigekopie anzeigen",
     "loading_original": "Das Original wird geladen…",
     "original_failed": "Das Original konnte nicht geladen werden.",
+    "display_pending": "Dieses Bild wird noch anonymisiert. Es wird angezeigt, sobald das abgeschlossen ist.",
     "metadata": "Details",
     "filename": "Dateiname",
     "dimensions": "Abmessungen",

@@ -1,0 +1,56 @@
+# Opt-in: the images `anonymize` step against its real detectors.
+#
+# ci.yml syncs with `--no-extra anonymize`: torch and ultralytics are too heavy
+# for every pull request, so the step's default tests run on a fake detector.
+# This job installs the `[anonymize]` extra, downloads the pinned, checksummed
+# YOLO weights (sm_images/steps/anonymize/weights.py) and runs the tests marked
+# `real_models`, which the module's addopts deselect everywhere else.
+#
+# Weekly and by hand. Keep `UV_VERSION` equal to ci.yml's (#120).
+
+name: images-models
+
+on:
+  schedule:
+    - cron: "41 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: images-models-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  UV_VERSION: "0.13.4"
+
+jobs:
+  real-models:
+    name: images anonymize (real models)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      # torch's Linux wheels bring the CUDA libraries: make room for them.
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          # The torch download dwarfs the cache's worth, and a cache saved by
+          # a schedule on main is restorable by ci.yml.
+          enable-cache: false
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Sync workspace (with the anonymize extra)
+        run: uv sync --locked --all-packages --all-extras
+
+      - name: Run pytest (images, real models)
+        run: cd modules/images && uv run pytest -q -p no:cacheprovider -m real_models

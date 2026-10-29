@@ -39,7 +39,17 @@ def _load_quality_step() -> None:
     register_quality()  # only when the [quality] extra (cv2) is installed
 
 
-_BUILTIN_LOADERS: list[Callable[[], None]] = [_load_builtin_steps, _load_quality_step]
+def _load_anonymize_step() -> None:
+    from sm_images.steps.anonymize import register_anonymize
+
+    register_anonymize()  # only when the [anonymize] extra (torch, ultralytics) is installed
+
+
+_BUILTIN_LOADERS: list[Callable[[], None]] = [
+    _load_builtin_steps,
+    _load_quality_step,
+    _load_anonymize_step,
+]
 """Callables that ``register_builtin`` the reserved-id steps, run before plugins."""
 
 

@@ -11,6 +11,8 @@ the moment one changes - in CI on the framework bump, not in production.
   ``background_tasks.outbox_dispatch.deliver_one`` is the coroutine on the
   stack while a durable handler runs, and ``OutboxTransport.drain`` is what an
   eager submit waits on.
+* ``sm_images/pipeline/runtime.py`` (``worker_multi_tenant``) -
+  ``background_tasks.sync_db._url_override``, set by ``set_database_url``.
 """
 
 from __future__ import annotations
@@ -51,3 +53,26 @@ def test_the_durable_delivery_hooks_still_exist():
     )
     assert inspect.iscoroutinefunction(OutboxTransport.drain), f"{_DRAIN}: drain gone or sync"
     assert eager_drain.deliver_code() is outbox_dispatch.deliver_one.__code__, _DRAIN
+
+
+_TENANCY = "sm_images/pipeline/runtime.py (worker_multi_tenant)"
+
+
+def test_sync_db_url_override_tracks_set_database_url():
+    """``worker_multi_tenant`` reads ``sync_db._url_override`` to tell a configured
+    worker engine from an unconfigured one. Renamed, ``getattr`` answers ``None``
+    and every worker silently runs multi-tenant."""
+    from background_tasks import sync_db
+
+    assert hasattr(sync_db, "_url_override"), f"{_TENANCY}: sync_db._url_override is gone"
+    saved = (sync_db._url_override, sync_db._tenant_strict, sync_db._default_tenant)
+    try:
+        sync_db.set_database_url("sqlite:///pin-check.db", tenant_strict=False)
+        assert sync_db._url_override == "sqlite:///pin-check.db", (
+            f"{_TENANCY}: set_database_url no longer records the URL in _url_override"
+        )
+        assert sync_db.engine_tenancy().tenant_strict is False, f"{_TENANCY}: tenant_strict"
+        sync_db.set_database_url(None)
+        assert sync_db._url_override is None, f"{_TENANCY}: clearing no longer resets it"
+    finally:
+        sync_db.set_database_url(saved[0], tenant_strict=saved[1], default_tenant=saved[2])

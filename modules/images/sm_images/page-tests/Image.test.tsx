@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { click, mount } from '../test-dom';
+import { act, click, mount } from '../test-dom';
 import { collection, image, stubFetch } from './support';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
@@ -33,6 +33,52 @@ describe('Image viewer', () => {
       '/api/images/images/i1/original',
     );
     await click(toggle());
+    expect(view.find('[data-testid="images-viewer-image"]')?.getAttribute('src')).toBe(
+      '/api/images/images/i1/display?v=1',
+    );
+    await view.unmount();
+  });
+
+  it('says the display copy is pending instead of requesting one the gate withholds', async () => {
+    const view = await mount(
+      <Image image={image('i1')} can_view_original={false} display_pending {...props} />,
+    );
+    expect(view.find('[data-testid="images-display-pending"]')).not.toBeNull();
+    expect(view.find('[data-testid="images-viewer-image"]')).toBeNull();
+    expect(view.find('[data-testid="images-original-toggle"]')).toBeNull();
+    expect(view.host.innerHTML).not.toContain('/display');
+    expect(view.host.innerHTML).not.toContain('/original');
+    await view.unmount();
+  });
+
+  it('still lets someone with the right look at the original while pending', async () => {
+    const view = await mount(
+      <Image image={image('i1')} can_view_original={true} display_pending {...props} />,
+    );
+    const toggle = () => view.find('[data-testid="images-original-toggle"]');
+    expect(view.find('[data-testid="images-display-pending"]')).not.toBeNull();
+    await click(toggle());
+    expect(view.find('[data-testid="images-display-pending"]')).toBeNull();
+    expect(view.find('[data-testid="images-viewer-image"]')?.getAttribute('src')).toBe(
+      '/api/images/images/i1/original',
+    );
+    await click(toggle());
+    expect(view.find('[data-testid="images-display-pending"]')).not.toBeNull();
+    expect(view.host.innerHTML).not.toContain('/display');
+    await view.unmount();
+  });
+
+  it('reports an original that fails to load, and recovers on toggling back', async () => {
+    const view = await mount(<Image image={image('i1')} can_view_original={true} {...props} />);
+    const toggle = () => view.find('[data-testid="images-original-toggle"]');
+    await click(toggle());
+    const img = view.find<HTMLImageElement>('[data-testid="images-viewer-image"]');
+    await act(async () => {
+      img?.dispatchEvent(new Event('error'));
+    });
+    expect(view.find('[role="alert"]')).not.toBeNull();
+    await click(toggle());
+    expect(view.find('[role="alert"]')).toBeNull();
     expect(view.find('[data-testid="images-viewer-image"]')?.getAttribute('src')).toBe(
       '/api/images/images/i1/display?v=1',
     );

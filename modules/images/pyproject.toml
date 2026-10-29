@@ -48,8 +48,8 @@ dev = [
 # Heavy processors are extras, imported only inside the step that needs them:
 # a plain `pip install simple_module_images` pulls no torch, ultralytics or cv2.
 quality = ["opencv-python-headless>=4.9"]
-# facenet-pytorch is deliberately absent for now: it pins Pillow<10.3 and torch<2.3,
-# which would downgrade Pillow in the one shared uv.lock. Task 20 picks the detectors.
+# facenet-pytorch is deliberately absent: it pins Pillow<10.3 and torch<2.3, which
+# would downgrade Pillow in the one shared uv.lock. Faces and plates are both YOLO.
 anonymize = ["torch>=2.2", "ultralytics>=8.2"]
 map = ["pmtiles>=3.2"]
 
