@@ -24,7 +24,7 @@ from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import select, update
 
 from tests.jobs.test_janitor import NOW, OLD, _ids, _intents, _purge
-from tests.support.pg import USING_POSTGRES
+from tests.pg_support import USING_POSTGRES
 from tests.support.pipeline import use_steps
 
 T = DEFAULT_TENANT

@@ -15,8 +15,8 @@ from sm_images.models.enums import JobStatus
 from sm_images.pipeline import runtime as runtime_mod
 from sqlalchemy import update
 
+from tests.pg_support import USING_POSTGRES
 from tests.support.imports import b64, feature
-from tests.support.pg import USING_POSTGRES
 from tests.support.stub_auth import user_uuid
 
 pytestmark = pytest.mark.asyncio

@@ -22,7 +22,7 @@ from sm_images.ingest import admission
 from sm_images.models import Collection, UploadSession, UploadStatus
 from sm_images.tenancy import DEFAULT_TENANT, tenant_scope
 
-from tests.support.pg import arm_reset, make_db_state
+from tests.pg_support import arm_reset, make_db_state
 
 CAP = 2
 OPENS = 5

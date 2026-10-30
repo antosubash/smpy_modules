@@ -61,7 +61,7 @@ async def file_pipe(tmp_path):
     """The pipeline harness on a file database: member runs use up to four
     sessions at once, which the in-memory database's one shared connection
     cannot. The AI steps are registered."""
-    from tests.support.pg import make_db_state
+    from tests.pg_support import make_db_state
 
     use_ai_steps()
     state = await make_db_state(file=tmp_path / "group.db")

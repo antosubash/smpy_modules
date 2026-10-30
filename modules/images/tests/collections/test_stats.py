@@ -9,7 +9,7 @@ from sm_images.models import Collection, Image, Visibility
 from sm_images.services import stats
 from sqlalchemy import select
 
-from tests.support.pg import USING_POSTGRES
+from tests.pg_support import USING_POSTGRES
 
 
 async def _seed(db) -> Collection:

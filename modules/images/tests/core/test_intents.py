@@ -48,7 +48,7 @@ async def test_caller_rollback_drops_its_row_but_keeps_the_intent(tmp_path):
     """
     from sm_images.models import Collection
 
-    from tests.support.pg import make_db_state
+    from tests.pg_support import make_db_state
 
     db_state = await make_db_state(file=tmp_path / "intents.db")
     try:

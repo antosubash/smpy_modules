@@ -31,7 +31,7 @@ from sm_images.module import ImagesModule
 from sm_images.settings import ImagesSettings
 from sm_images.tenancy import configure, install_guard
 
-from tests.support.pg import make_db_state
+from tests.pg_support import make_db_state
 from tests.support.stub_auth import (  # noqa: F401 - re-exported: tests import them from here
     ADMIN_PERMS,
     TEST_TENANT_HEADER,

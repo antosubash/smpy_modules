@@ -183,7 +183,7 @@ async def file_imp(tmp_path):
     ``COMMIT``s another's half-finished settlement; a file database gives each
     session its own connection and makes a write wait for SQLite's lock, as on
     a host (see ``tests/pg_support.make_db_state``, #209)."""
-    from tests.support.pg import make_db_state
+    from tests.pg_support import make_db_state
 
     use_steps()
     pipe = await make_pipe(tmp_path, await make_db_state(file=tmp_path / "imports.db"))

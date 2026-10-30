@@ -14,7 +14,7 @@ from sm_images.imports.manage_right import manager_active
 from sm_images.imports.rate_limit import retry_after_seconds
 from sm_images.pipeline import runtime as runtime_mod
 
-from tests.support.pg import USING_POSTGRES
+from tests.pg_support import USING_POSTGRES
 from tests.support.stub_auth import user_uuid
 
 pytestmark = pytest.mark.asyncio

@@ -185,7 +185,7 @@ def use_steps(*steps: Any) -> None:
 
 
 async def make_pipe(tmp_path: Path, db_state: Any = None, **settings: Any) -> Pipe:
-    from tests.support.pg import make_db_state
+    from tests.pg_support import make_db_state
 
     state = db_state or await make_db_state()
     install_guard(state.sync_session_class)

@@ -15,8 +15,8 @@ from file_storage.backends.filesystem import FilesystemBackend
 from httpx import ASGITransport, AsyncClient
 from sm_images.intents import use_session_factory
 
+from tests.pg_support import USING_POSTGRES, make_db_state
 from tests.support.app_harness import build_app
-from tests.support.pg import USING_POSTGRES, make_db_state
 from tests.support.upload import jpeg, make_collection, post_files
 
 

@@ -7,7 +7,7 @@ Two things are load-bearing and easy to drop when extending this file:
 tenant at flush, so a fixture that inserts a row needs one bound.
 
 ``_arm_database_reset``: on Postgres it is what makes the *first* database a
-test asks for a clean one (see :func:`tests.support.pg.arm_reset`).
+test asks for a clean one (see :func:`tests.pg_support.arm_reset`).
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ import pytest_asyncio
 from sm_images.tenancy import DEFAULT_TENANT, tenant_scope
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tests.pg_support import arm_reset, make_db_state
 from tests.support.ai import ai  # noqa: F401 - the AI step tests' fixture
 from tests.support.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
     ADMIN_PERMS,
@@ -38,7 +39,6 @@ from tests.support.groups import file_pipe  # noqa: F401 - the group-run tests' 
 from tests.support.imports import file_imp, imp  # noqa: F401 - the import tests' fixtures
 from tests.support.isolation import two_tenants  # noqa: F401 - the tenancy matrix's fixture
 from tests.support.map import fake_tippecanoe, web_runtime  # noqa: F401 - the map tests' fixtures
-from tests.support.pg import arm_reset, make_db_state
 from tests.support.pipeline import pipe  # noqa: F401 - the pipeline tests' fixture
 from tests.support.pipeline_api import world  # noqa: F401 - the pipeline API tests' fixture
 from tests.support.prompts import prompts_world  # noqa: F401 - the prompt route tests' fixture

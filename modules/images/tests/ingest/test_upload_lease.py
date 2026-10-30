@@ -23,8 +23,8 @@ from sm_images.models import Image, UploadSession, UploadStatus
 
 from tests.ingest.test_upload_reaper import _one_part_in, _parts_exist, _reap
 from tests.ingest.test_upload_session import _uploaded, ticket_of
+from tests.pg_support import USING_POSTGRES
 from tests.support.direct import UPLOADS, complete, send_parts, start
-from tests.support.pg import USING_POSTGRES
 from tests.support.upload import OLGA, all_rows, jpeg, make_collection, stored
 
 

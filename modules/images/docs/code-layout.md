@@ -52,3 +52,8 @@ rest is in `components/<feature>/`, `hooks/` and `utils/`, and page tests are in
 `tests/` mirrors the packages: `tests/<feature>/test_*.py`, with shared helpers
 in `tests/support/` and files in `tests/fixtures/` and `tests/plugin_fixture/`.
 A new test goes in the folder of the feature it exercises.
+
+`tests/pg_support.py` stays at the root: it is the Postgres opt-in every module
+copies, and `scripts/tests/test_helper_parity.py` holds the copies identical,
+path depth included. The tenancy helpers (`tenancy/__init__.py`,
+`tenancy/_mode.py`) are copies of records' in the same way.

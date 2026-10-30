@@ -28,7 +28,7 @@ from sm_images.storage import reset_worker_store
 from sm_images.tenancy import DEFAULT_TENANT, TenantUnbound
 from sqlalchemy import select
 
-from tests.support.pg import USING_POSTGRES, make_db_state
+from tests.pg_support import USING_POSTGRES, make_db_state
 from tests.support.pipeline import make_pipe, use_steps
 
 pytestmark = pytest.mark.skipif(

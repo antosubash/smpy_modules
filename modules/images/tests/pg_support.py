@@ -1,7 +1,7 @@
 """This suite's window onto the repo-level Postgres opt-in.
 
 The decision — in-memory SQLite, or the Postgres database an environment
-variable names — belongs to ``tests/support/pg.py`` at the repo root, which
+variable names — belongs to ``tests/pg_support.py`` at the repo root, which
 ``pagebuilder`` and ``news`` reach the same way. Everything about *why* it
 works the way it does is documented there: one engine per test, why the reset
 is ``TRUNCATE … RESTART IDENTITY CASCADE`` and why it is armed per test rather
@@ -22,16 +22,16 @@ from typing import Any
 
 
 def _shared() -> Any:
-    """Load ``<repo>/tests/support/pg.py`` under a name of its own.
+    """Load ``<repo>/tests/pg_support.py`` under a name of its own.
 
     By path rather than by import: ``modules/images/tests`` is itself a
-    package called ``tests`` and is what ``import tests.support.pg`` would
+    package called ``tests`` and is what ``import tests.pg_support`` would
     find while this suite runs. The repo root is three directories up.
     """
     name = "smpy_tests_pg_support"
     module = sys.modules.get(name)
     if module is None:
-        path = Path(__file__).resolve().parents[4] / "tests" / "pg_support.py"
+        path = Path(__file__).resolve().parents[3] / "tests" / "pg_support.py"
         spec = importlib.util.spec_from_file_location(name, path)
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)

@@ -163,7 +163,7 @@ async def test_progress_renews_the_lease_and_stops_a_lost_run(pipe):
 async def test_concurrent_claim_runs_once(tmp_path):
     """Two real connections (a file database on SQLite): the second planner
     waits on the image lock, then finds nothing left to claim."""
-    from tests.support.pg import make_db_state
+    from tests.pg_support import make_db_state
 
     use_steps(Scripted("acme.a"), Scripted("acme.b"))
     state = await make_db_state(file=tmp_path / "race.db")
