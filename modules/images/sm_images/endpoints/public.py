@@ -10,7 +10,7 @@ included, who has the admin routes.
 The twin answers as the anonymous surface for everyone: the caller's identity
 is never consulted, so a protected original is a 403 here even for its owner,
 and the answer is the same for every reader - which is what lets
-``sm_images.cache`` make a rendition or display copy shareable here (and only
+``sm_images.serving.cache`` make a rendition or display copy shareable here (and only
 here, and only when no request-specific source picked the tenant).
 
 Error answers carry ``Cache-Control: no-store``: the same URL can be a 200 for
@@ -29,7 +29,7 @@ from fastapi.routing import APIRoute
 from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.deps import get_db
 
-from sm_images import cache, constants, serving
+from sm_images import constants, serving
 from sm_images.access import public_collection
 from sm_images.endpoints.map_params import (
     BBox,
@@ -42,6 +42,7 @@ from sm_images.endpoints.map_params import (
 from sm_images.errors import ImagesError, render
 from sm_images.models import Collection
 from sm_images.services import public_gallery
+from sm_images.serving import cache
 from sm_images.tenancy import bind_public
 
 _NO_STORE = "no-store"

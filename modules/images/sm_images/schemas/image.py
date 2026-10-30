@@ -64,7 +64,7 @@ class ImageOut(BaseModel):
     created_at: datetime | None
     created_by: str | None
     thumb_url: str | None = None
-    """The versioned ``small`` rendition (``sm_images.urls``); ``None`` until the
+    """The versioned ``small`` rendition (``sm_images.serving.urls``); ``None`` until the
     pipeline has produced one for the current display copy."""
     display_url: str | None = None
     """The versioned display copy; the original's bytes when there is none."""

@@ -35,7 +35,7 @@ async def launch_runner(runtime: Runtime, tenant: str, job_id: uuid.UUID, genera
     from background_tasks.tenant_context import TENANT_HEADER
 
     from sm_images.imports.tasks import import_geojson
-    from sm_images.task_config import QUEUE_IMPORTS
+    from sm_images.jobs.task_config import QUEUE_IMPORTS
 
     import_geojson.s(str(job_id), generation).apply_async(
         queue=QUEUE_IMPORTS, headers={TENANT_HEADER: tenant}
@@ -51,7 +51,7 @@ async def launch_reset(runtime: Runtime, tenant: str, job_id: uuid.UUID, generat
     from background_tasks.tenant_context import TENANT_HEADER
 
     from sm_images.imports.tasks import reset_import
-    from sm_images.task_config import QUEUE_IMPORTS
+    from sm_images.jobs.task_config import QUEUE_IMPORTS
 
     reset_import.s(str(job_id), generation).apply_async(
         queue=QUEUE_IMPORTS, headers={TENANT_HEADER: tenant}
@@ -71,7 +71,7 @@ async def launch_downloads(
     from background_tasks.tenant_context import TENANT_HEADER
 
     from sm_images.imports.tasks import download_items
-    from sm_images.task_config import QUEUE_DEFAULT
+    from sm_images.jobs.task_config import QUEUE_DEFAULT
 
     for start in range(0, len(ids), DOWNLOAD_BATCH):
         batch = [int(i) for i in ids[start : start + DOWNLOAD_BATCH]]

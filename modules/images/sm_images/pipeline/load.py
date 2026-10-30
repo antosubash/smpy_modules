@@ -54,7 +54,7 @@ class Loaded:
 
 
 async def _display_safe(db: Any, tenant: str, image: Image) -> bool:
-    from sm_images import redaction
+    from sm_images.access import redaction
 
     stmt = select(Collection).where(
         Collection.id == image.collection_id, Collection.tenant_id == tenant

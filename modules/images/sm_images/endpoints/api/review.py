@@ -22,8 +22,8 @@ from sqlalchemy import select
 from sm_images import constants, events
 from sm_images.access import POLICY, CollectionEdit
 from sm_images.ai import review as service
-from sm_images.deps import get_settings, require_view
 from sm_images.endpoints.api._runtime import tenant
+from sm_images.endpoints.deps import get_settings, require_view
 from sm_images.models import Collection, Prompt, PromptResult
 from sm_images.models.enums import ReviewStatus
 from sm_images.schemas.review import ReviewedOut, ReviewIn, ReviewPageOut

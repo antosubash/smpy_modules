@@ -8,7 +8,7 @@ chunk it records and before each download batch fetches anything. Without
 it, an editor whose share is revoked keeps importing into the collection.
 
 What still counts as edit, from a worker, is decided by
-:func:`sm_images.starter_right.holds_right` (shared with regroups,
+:func:`sm_images.access.starter_right.holds_right` (shared with regroups,
 whole-collection restarts and prompt runs): ownership, an active edit share, or
 ``images.manage`` for a user still active in the tenant.
 
@@ -28,6 +28,7 @@ from simple_module_core.resources import ResourcePrincipal
 from simple_module_db import finalize_session
 from sqlalchemy import select
 
+from sm_images.access.starter_right import MANAGE, OWNER, SHARE, holds_right, shared_edit
 from sm_images.imports.chunk import Stopped
 from sm_images.imports.jobs import CLAIMABLE, load, now, where
 from sm_images.imports.manage_right import manager_active
@@ -35,7 +36,6 @@ from sm_images.imports.terminal import ERRORS_MAX, release_staging
 from sm_images.models import Collection, ImportJob
 from sm_images.models.enums import JobStatus
 from sm_images.pipeline.runtime import Runtime, first_row
-from sm_images.starter_right import MANAGE, OWNER, SHARE, holds_right, shared_edit
 
 __all__ = [
     "ACCESS_REVOKED",

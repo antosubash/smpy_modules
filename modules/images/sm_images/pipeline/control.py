@@ -145,7 +145,7 @@ async def launch_restart(
         return
     from background_tasks.tenant_context import TENANT_HEADER
 
-    from sm_images.task_config import QUEUE_IMPORTS
+    from sm_images.jobs.task_config import QUEUE_IMPORTS
     from sm_images.tasks import restart_collection
 
     restart_id = await start_restart(

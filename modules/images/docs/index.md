@@ -21,6 +21,7 @@ differs from the design the page says so.
 | Configuring steps, AI prompts, groups, presets or storage billing | [pipeline.md](pipeline.md) |
 | Adding a step, a preset or a result view from another module | [writing-a-plugin.md](writing-a-plugin.md) |
 | Moving the gis-data-portal `images` feature onto this module | [migrating-from-portal.md](migrating-from-portal.md) |
+| Changing the module's code: where each feature lives | [code-layout.md](code-layout.md) |
 
 ## Concepts
 

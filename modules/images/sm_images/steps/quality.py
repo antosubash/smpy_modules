@@ -55,8 +55,8 @@ def measure(data: bytes, p: QualityParams) -> dict[str, Any]:
     import numpy as np
     from PIL import Image, ImageOps
 
-    from sm_images._heif import register_heif
     from sm_images.ingest.guards import guard_pixels
+    from sm_images.processing.heif import register_heif
 
     register_heif()
     guard_pixels(data)  # the decompression-bomb guard, before any decode

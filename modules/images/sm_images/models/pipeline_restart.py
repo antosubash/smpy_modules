@@ -32,6 +32,6 @@ class PipelineRestart(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ig
     finished_at: datetime | None = dt_col()
     run_as: str | None = Field(default=None, max_length=255)
     """Who started the restart. Owner or ``images.manage`` only; the runner
-    re-checks it before each chunk (``sm_images.starter_right``)."""
+    re-checks it before each chunk (``sm_images.access.starter_right``)."""
     access_basis: str | None = Field(default=None, max_length=10)
     """``owner`` or ``manage``: where ``run_as``'s right came from."""

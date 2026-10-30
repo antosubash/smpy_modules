@@ -13,7 +13,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from sm_images import redaction
+from sm_images.access import redaction
 from sm_images.models import Collection, Image, PromptResult
 from sm_images.pipeline.registry import PROMPT_PREFIX
 

@@ -26,13 +26,14 @@ from typing import Any
 
 from simple_module_core.resources import ACTION_VIEW, ResourcePrincipal
 
-from sm_images import constants, intents, urls
+from sm_images import constants, intents
 from sm_images.access import visible_collections
 from sm_images.contracts.schemas import CollectionPageRead, CollectionRead
 from sm_images.map import points as map_points
 from sm_images.models import Collection
 from sm_images.services import collections as service
 from sm_images.services.viewer_stats import viewer_fields
+from sm_images.serving import urls
 from sm_images.tenancy import tenant_scope
 
 __all__ = ["get_collection", "list_collections", "points", "rendition_url"]
@@ -124,7 +125,7 @@ async def points(
 
 def rendition_url(image: Any, rendition: Any, *, collection: Any = None) -> str:
     """The URL that streams *rendition* (one of *image*'s ``Rendition`` rows);
-    see :func:`sm_images.urls.rendition_url`.
+    see :func:`sm_images.serving.urls.rendition_url`.
 
     Access is checked by the route, not here: a URL for an image the viewer may
     not open is a 404 when followed. ``?v=`` names the rendition's own bytes

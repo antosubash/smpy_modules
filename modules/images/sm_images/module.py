@@ -79,7 +79,7 @@ class ImagesModule(ModuleBase):
         )
 
     def register_resource_types(self, registry: ResourceTypeRegistry) -> None:
-        from sm_images import resource_types
+        from sm_images.access import resource_types
 
         resource_types.register(registry)
 
@@ -91,7 +91,7 @@ class ImagesModule(ModuleBase):
     def register_middleware(self, app: FastAPI) -> None:
         """Remember the current request for the ``images.collection`` sharing
         loader, which the framework calls without one (``request_context``)."""
-        from sm_images.request_context import RequestContextMiddleware
+        from sm_images.tenancy.request_context import RequestContextMiddleware
 
         app.add_middleware(RequestContextMiddleware)
 
@@ -150,7 +150,7 @@ class ImagesModule(ModuleBase):
         A provider, evaluated per response from the hydrated settings: this
         runs before they hydrate, and an edit then applies with no restart.
         """
-        from sm_images.map_style import csp_sources
+        from sm_images.map.style import csp_sources
 
         registry.add_provider(csp_sources)
 
@@ -180,9 +180,10 @@ class ImagesModule(ModuleBase):
         ``images_extensions``, then frozen), the runtime the pipeline's
         after-commit dispatch runs on, and the ``images.storage_bytes`` gauge
         on billing's registry when billing runs."""
-        from sm_images import billing, intents, tenancy, urls
+        from sm_images import billing, intents, tenancy
         from sm_images.imports import log_redact
         from sm_images.pipeline.extensions import load_extensions
+        from sm_images.serving import urls
 
         log_redact.install()
 

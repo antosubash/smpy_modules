@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from simple_module_db.deps import get_db
 
 from sm_images.access import CollectionOwner
-from sm_images.deps import require_view
+from sm_images.endpoints.deps import require_view
 from sm_images.schemas.prompt import PromptOut
 from sm_images.services import presets as service
 

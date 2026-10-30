@@ -2,7 +2,7 @@
  * The share dialog's calls: the framework's `/api/sharing/shares` (list, grant,
  * revoke) and images' own picker. A collection is addressed as
  * `images.collection` with its UUID string as `resource_id`, the encoding the
- * resource type's loader (`sm_images/resource_types.py`) parses.
+ * resource type's loader (`sm_images/access/resource_types.py`) parses.
  */
 
 import { json, send } from './api';

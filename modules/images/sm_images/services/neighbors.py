@@ -13,7 +13,7 @@ from typing import Any
 
 from sqlalchemy import select, tuple_
 
-from sm_images import redaction
+from sm_images.access import redaction
 from sm_images.models import Collection, Image
 
 __all__ = ["neighbors", "side_statements"]

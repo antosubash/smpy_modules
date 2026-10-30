@@ -1,4 +1,4 @@
-"""The durable outbox of storage-gauge settlements (``sm_images.billing_ops``).
+"""The durable outbox of storage-gauge settlements (``sm_images.billing.ops``).
 
 An ``ingest`` op takes a new image's first hold (a swap from no hold); a
 ``swap`` op moves one image's hold to a new quantity through billing's
@@ -60,7 +60,7 @@ class BillingOp(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[u
     """The settler (or executor, or ingest) running this op; only it may finish it."""
     claim_expires_at: datetime | None = dt_col()
     repaired_at: datetime | None = dt_col()
-    """When the repair (``sm_images.billing_repair``) examined this done op."""
+    """When the repair (``sm_images.billing.repair``) examined this done op."""
     not_after: datetime | None = dt_col()
     """The op's deadline: the database's time when the op was written, plus
     :data:`BILLING_OP_MAX_AGE`. Immutable; passed unchanged to billing with

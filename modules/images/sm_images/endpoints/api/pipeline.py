@@ -21,11 +21,11 @@ from simple_module_core.resources import ACTION_DELETE, ResourcePrincipal
 from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal
 
-from sm_images import redaction
-from sm_images.access import POLICY, CollectionEdit, CollectionOwner
-from sm_images.access_write import ImageCollectionEdit
-from sm_images.deps import require_view
+from sm_images.access import POLICY, CollectionEdit, CollectionOwner, redaction
+from sm_images.access.starter_right import owner_or_manage_basis
+from sm_images.access.write import ImageCollectionEdit
 from sm_images.endpoints.api._runtime import runtime, tenant
+from sm_images.endpoints.deps import require_view
 from sm_images.errors import Forbidden, Invalid
 from sm_images.map import revoke as map_revoke
 from sm_images.pipeline import control
@@ -36,7 +36,6 @@ from sm_images.pipeline.config import (
 )
 from sm_images.schemas.pipeline import PipelineConfigIn, ReprocessIn, RestartIn
 from sm_images.services import gallery
-from sm_images.starter_right import owner_or_manage_basis
 
 router = APIRouter(tags=["pipeline"])
 

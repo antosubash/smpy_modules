@@ -67,8 +67,8 @@ def load_upright(data: bytes) -> Any:
     """The picture as displayed: decompression-bomb guard, EXIF transpose, RGB."""
     from PIL import Image, ImageOps
 
-    from sm_images._heif import register_heif
     from sm_images.ingest.guards import guard_pixels
+    from sm_images.processing.heif import register_heif
 
     register_heif()
     guard_pixels(data)

@@ -35,8 +35,8 @@ from sqlalchemy import select
 
 from sm_images import billing, constants
 from sm_images.access import POLICY, CollectionEdit
-from sm_images.deps import get_settings, require_view
 from sm_images.endpoints.api.uploads import host_secret
+from sm_images.endpoints.deps import get_settings, require_view
 from sm_images.errors import ServiceUnavailable, UploadNotFound
 from sm_images.imports import access, controls, zip_upload
 from sm_images.imports.service import start_import

@@ -24,9 +24,9 @@ from sm_images.access import (
     GroupCollectionView,
     RegroupCollectionEdit,
 )
-from sm_images.access_write import GroupCollectionEdit
-from sm_images.deps import require_view
+from sm_images.access.write import GroupCollectionEdit
 from sm_images.endpoints.api._runtime import runtime, tenant
+from sm_images.endpoints.deps import require_view
 from sm_images.imports.access import basis
 from sm_images.models import Collection, Group, RegroupJob
 from sm_images.regroup import jobs

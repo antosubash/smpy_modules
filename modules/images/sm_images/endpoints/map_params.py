@@ -13,8 +13,9 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Path, Query, Request, Response
 from fastapi.encoders import jsonable_encoder
 
-from sm_images import cache, constants
+from sm_images import constants
 from sm_images.map import points
+from sm_images.serving import cache
 
 __all__ = ["BBox", "Cursor", "Limit", "Size", "get_and_head", "points_response"]
 
@@ -50,7 +51,7 @@ async def points_response(
     """Shared by both surfaces: the page, and Task 12's cache split (``no-cache``:
     points change with every processed image).
 
-    Revalidated like the byte routes (``sm_images.cache``): a strong ETag that
+    Revalidated like the byte routes (``sm_images.serving.cache``): a strong ETag that
     digests the answer itself, so it changes with any point and differs
     between a viewer's gated page and an editor's raw one. The caller's
     dependencies have already re-checked access, and the page was built

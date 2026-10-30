@@ -19,7 +19,7 @@ from pydantic import Field, field_validator
 from pydantic_settings import SettingsConfigDict
 
 from sm_images.constants import DOWNLOAD_TIMEOUT_MAX
-from sm_images.map_style import DEFAULT_STYLE_URL, validate_style_url
+from sm_images.map.style import DEFAULT_STYLE_URL, validate_style_url
 from sm_images.settings_boot import BootSettings
 
 __all__ = ["ImagesSettings"]

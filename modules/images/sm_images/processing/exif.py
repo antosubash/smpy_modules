@@ -18,7 +18,7 @@ from typing import Any, Final
 
 from PIL import Image
 
-from sm_images._heif import register_heif
+from sm_images.processing.heif import register_heif
 
 register_heif()
 

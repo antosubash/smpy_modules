@@ -21,12 +21,12 @@ from typing import Any
 from simple_module_db import finalize_session
 from sqlalchemy import select, update
 
+from sm_images.access.starter_right import holds_right
 from sm_images.clock import utcnow as _now
 from sm_images.constants import NO_SYNC
 from sm_images.models import Image, PipelineRestart
 from sm_images.pipeline.orchestrate import Scope, reset_image, submit_dispatch
 from sm_images.pipeline.runtime import Runtime
-from sm_images.starter_right import holds_right
 
 __all__ = ["CHUNK", "restart_collection_async", "resume_restart", "start_restart"]
 

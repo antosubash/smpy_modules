@@ -2,7 +2,7 @@
 
 A point is an image of the (already authorised) collection that is not
 trashed, has a real coordinate, and whose picture may be shown
-(:func:`sm_images.redaction.ready_clause`): an image still waiting for its
+(:func:`sm_images.access.redaction.ready_clause`): an image still waiting for its
 blur is not on the map, the portal's privacy gate. The same statement feeds
 the PMTiles build (:mod:`sm_images.map.build`), so the archive and the points
 never disagree about who is on the map.
@@ -21,7 +21,8 @@ from typing import Any
 
 from sqlalchemy import and_, or_, select
 
-from sm_images import constants, redaction
+from sm_images import constants
+from sm_images.access import redaction
 from sm_images.errors import Invalid
 from sm_images.models import Collection, Image
 from sm_images.services import cursor as cursors

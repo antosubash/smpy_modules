@@ -17,7 +17,7 @@ from simple_module_db.deps import get_db
 
 from sm_images import constants
 from sm_images.access import CollectionOwner
-from sm_images.deps import require_view
+from sm_images.endpoints.deps import require_view
 from sm_images.errors import ServiceUnavailable
 from sm_images.schemas.collection import ShareCandidate
 from sm_images.tenancy import DEFAULT_TENANT, TenancyMode, bound_tenant, mode_of, request_mode

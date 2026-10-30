@@ -30,7 +30,6 @@ from pydantic import ValidationError
 from simple_module_db import finalize_session, tenant_context
 from sqlalchemy import select, update
 
-from sm_images import storage_keys
 from sm_images.errors import FileTooLarge, ImagesError, PartsMismatch
 from sm_images.errors import UploadNotFound as Gone
 from sm_images.imports import jobs, terminal
@@ -47,6 +46,7 @@ from sm_images.intents import clear_intents
 from sm_images.models import Collection, ImportJob, UploadSession, UploadStatus
 from sm_images.models.enums import ImportKind, JobStatus
 from sm_images.pipeline.runtime import Runtime
+from sm_images.storage import keys as storage_keys
 
 __all__ = ["ZIP_CONTENT_TYPE", "fail_upload", "seal", "session_ticket", "start"]
 

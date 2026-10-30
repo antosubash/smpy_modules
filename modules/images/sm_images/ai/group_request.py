@@ -62,7 +62,7 @@ async def request_groups(
 ) -> int:
     """Request and dispatch; returns how many groups got a new run.
 
-    ``allowed``: the starter's right (``sm_images.starter_right``), asked
+    ``allowed``: the starter's right (``sm_images.access.starter_right``), asked
     before each chunk of :data:`CHUNK` groups after the first (the caller
     asked before the first); ``False`` stops the run where it is."""
     lease_s = runtime.settings().step_lease_seconds

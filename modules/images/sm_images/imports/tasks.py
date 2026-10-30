@@ -21,7 +21,7 @@ import uuid
 
 from celery import shared_task
 
-from sm_images.task_config import DOWNLOAD_ITEMS, IMPORT_GEOJSON, RESET_IMPORT
+from sm_images.jobs.task_config import DOWNLOAD_ITEMS, IMPORT_GEOJSON, RESET_IMPORT
 
 __all__ = ["download_items", "import_geojson", "reset_import"]
 

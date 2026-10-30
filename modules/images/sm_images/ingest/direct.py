@@ -49,7 +49,7 @@ from typing import Any
 from file_storage.contracts.service import StorageError
 from sqlalchemy import select
 
-from sm_images import constants, storage_keys
+from sm_images import constants
 from sm_images.errors import (
     FileTooLarge,
     ImageTooLarge,
@@ -73,6 +73,7 @@ from sm_images.ingest.ticket import (
     serializer,
 )
 from sm_images.models import Collection, Image, UploadStatus
+from sm_images.storage import keys as storage_keys
 from sm_images.tenancy import bound_tenant
 
 __all__ = [

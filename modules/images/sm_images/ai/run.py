@@ -30,6 +30,7 @@ from typing import Any, Literal
 from simple_module_db import finalize_session
 from sqlalchemy import select
 
+from sm_images.access.starter_right import holds_right
 from sm_images.ai.prompt_steps import step_id
 from sm_images.models import Image, Prompt, StepRun
 from sm_images.models.enums import PromptScope, StepStatus
@@ -37,7 +38,6 @@ from sm_images.pipeline.claim import insert_missing, load_runs, lock_image
 from sm_images.pipeline.cycle import reset_runs
 from sm_images.pipeline.orchestrate import submit_dispatch
 from sm_images.pipeline.runtime import Runtime, first_row
-from sm_images.starter_right import holds_right
 
 __all__ = ["CHUNK", "IDS_MAX", "RunScope", "launch", "run_prompt", "wanted"]
 
@@ -182,7 +182,7 @@ async def launch(
         return await run_prompt(runtime, tenant, prompt_id, scope, image_ids, group_ids, **starter)
     from background_tasks.tenant_context import TENANT_HEADER
 
-    from sm_images.task_config import QUEUE_IMPORTS
+    from sm_images.jobs.task_config import QUEUE_IMPORTS
     from sm_images.tasks import run_prompt_task
 
     run_prompt_task.s(str(prompt_id), scope, **starter).apply_async(

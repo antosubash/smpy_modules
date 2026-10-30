@@ -14,7 +14,8 @@ from typing import Any
 
 from sqlalchemy import exists, func, select, update
 
-from sm_images import constants, redaction
+from sm_images import constants
+from sm_images.access import redaction
 from sm_images.errors import Conflict, NotFound, absent
 from sm_images.map import revoke as map_revoke
 from sm_images.map import schedule as map_schedule

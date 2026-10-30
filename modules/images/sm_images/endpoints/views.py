@@ -20,7 +20,6 @@ from simple_module_hosting.resource_deps import resource_principal
 from simple_module_inertia import InertiaResponse
 
 from sm_images import constants
-from sm_images import redaction as redaction_state
 from sm_images.access import (
     POLICY,
     CollectionEdit,
@@ -29,8 +28,9 @@ from sm_images.access import (
     can_edit,
     can_view_original,
 )
-from sm_images.csrf import share_csrf_token
-from sm_images.deps import get_settings, require_view
+from sm_images.access import redaction as redaction_state
+from sm_images.endpoints.csrf import share_csrf_token
+from sm_images.endpoints.deps import get_settings, require_view
 from sm_images.schemas.collection import CollectionOut, CollectionPageOut
 from sm_images.services import collections as collection_service
 from sm_images.services import gallery, present

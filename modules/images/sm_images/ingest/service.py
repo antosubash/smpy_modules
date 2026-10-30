@@ -42,7 +42,7 @@ from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 
-from sm_images import billing, events, pipeline, storage_keys
+from sm_images import billing, events, pipeline
 from sm_images.errors import StorageQuotaExceeded
 from sm_images.ingest import dedupe
 from sm_images.ingest import slots as holds
@@ -53,6 +53,7 @@ from sm_images.intents import clear_intents, object_intent
 from sm_images.models import Collection, Image, StepRun
 from sm_images.services import stats
 from sm_images.storage import ImageStore
+from sm_images.storage import keys as storage_keys
 from sm_images.tenancy import bound_tenant
 
 __all__ = ["Duplicate", "IngestService", "Slot", "safe_filename"]

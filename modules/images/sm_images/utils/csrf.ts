@@ -2,7 +2,7 @@
  *
  * The API checks the framework's `RequiresCsrf`: every POST/PUT/PATCH/DELETE
  * needs the token in `X-CSRF-Token`. Every images screen shares it as the
- * `csrf_token` Inertia prop (`sm_images/csrf.py`), but the fetch helpers are
+ * `csrf_token` Inertia prop (`sm_images/endpoints/csrf.py`), but the fetch helpers are
  * module-level and no page threads a prop into them — so this keeps the latest
  * value: the page the server rendered, then every page Inertia navigates to.
  *

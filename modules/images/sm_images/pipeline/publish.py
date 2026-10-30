@@ -103,7 +103,7 @@ async def invalidate_other_mutators(
 ) -> list[str]:
     """``writer`` replaced the display copy: every *other* mutator's result
     described a copy that is gone (a blur that settled before a crop re-read the
-    original), so none may vouch for the new one (``sm_images.redaction``).
+    original), so none may vouch for the new one (``sm_images.access.redaction``).
     Their runs go back to ``pending``: an enabled one runs again, a disabled
     one settles as a ``disabled`` placeholder, reopened when it is enabled."""
     stmt = select(StepRun.step).where(

@@ -18,7 +18,7 @@ from simple_module_hosting.resource_deps import resource_principal
 
 from sm_images import constants, events
 from sm_images.access import CollectionEdit, CollectionOwner, CollectionView
-from sm_images.deps import require_create, require_view
+from sm_images.endpoints.deps import require_create, require_view
 from sm_images.imports.cleanup import cancel_for_collection
 from sm_images.models import Collection
 from sm_images.regroup.control import cancel_for_collection as cancel_regroups

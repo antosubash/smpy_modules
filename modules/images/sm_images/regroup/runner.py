@@ -19,13 +19,13 @@ from simple_module_db import finalize_session
 from sqlalchemy import select
 
 from sm_images import constants
+from sm_images.access.starter_right import holds_right
 from sm_images.imports.access import ACCESS_REVOKED
 from sm_images.models import Collection
 from sm_images.pipeline.runtime import Runtime
 from sm_images.regroup import control, jobs
 from sm_images.services import regroup as plan
 from sm_images.services import regroup_write as write
-from sm_images.starter_right import holds_right
 
 __all__ = ["may_edit", "run_regroup"]
 

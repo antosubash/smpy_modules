@@ -18,7 +18,7 @@ from simple_module_hosting.resource_deps import resource_principal
 
 from sm_images import serving
 from sm_images.access import CollectionView, can_edit
-from sm_images.deps import require_view
+from sm_images.endpoints.deps import require_view
 from sm_images.endpoints.map_params import BBox, Cursor, Limit, get_and_head, points_response
 from sm_images.map.schedule import rebuild_pending
 

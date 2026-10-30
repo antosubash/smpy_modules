@@ -29,10 +29,11 @@ from sqlalchemy import select
 
 from sm_images import ai, constants
 from sm_images.access import POLICY, CollectionEdit, CollectionView
+from sm_images.access.starter_right import owner_or_manage_basis
 from sm_images.ai import codes
 from sm_images.ai import run as runs
-from sm_images.deps import require_view
 from sm_images.endpoints.api._runtime import runtime, tenant
+from sm_images.endpoints.deps import require_view
 from sm_images.errors import Forbidden, Invalid, ServiceUnavailable
 from sm_images.models import Collection, Prompt, PromptResult
 from sm_images.models.enums import PromptScope
@@ -48,7 +49,6 @@ from sm_images.schemas.prompt import (
 )
 from sm_images.services import prompts as service
 from sm_images.services.viewer_stats import viewer_only
-from sm_images.starter_right import owner_or_manage_basis
 
 router = APIRouter(tags=["prompts"])
 Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]

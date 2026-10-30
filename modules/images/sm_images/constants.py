@@ -106,7 +106,7 @@ PUBLIC_API_ROUTER_PREFIX: Final = PUBLIC_API_PREFIX.removeprefix(ROUTE_PREFIX_AP
 RENDITION_SIZE_MAX: Final = 50
 """``Rendition.size``'s column width; a longer path segment is a 422."""
 DISPLAY_CONTENT_TYPE: Final = "image/jpeg"
-"""Display copies and renditions are always JPEG (``storage_keys``)."""
+"""Display copies and renditions are always JPEG (``storage.keys``)."""
 ORIGINAL_FORBIDDEN_DETAIL: Final = "The original of this image is not available to you"
 
 # --- The map: ``…/points`` and ``…/map.pmtiles`` (spec §5, ``sm_images.map``) ---

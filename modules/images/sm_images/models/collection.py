@@ -79,4 +79,4 @@ class Collection(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True
     every step of it installed, clears it (``pipeline.config.protect_originals``)."""
     purge_failed_at: datetime | None = dt_col()
     """When the janitor last failed to purge this (trashed) collection, or one
-    of its images; it then goes to the back of later passes (``sm_images.purge``)."""
+    of its images; it then goes to the back of later passes (``sm_images.jobs.purge``)."""

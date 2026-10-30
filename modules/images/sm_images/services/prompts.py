@@ -28,7 +28,7 @@ from typing import Any
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 
-from sm_images import redaction
+from sm_images.access import redaction
 from sm_images.ai import codes, prompt_steps
 from sm_images.ai.schema_safety import UnsafeSchema, check
 from sm_images.errors import Conflict, Invalid, NotFound

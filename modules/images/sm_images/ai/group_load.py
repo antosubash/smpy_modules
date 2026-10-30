@@ -16,7 +16,7 @@ from typing import Any
 from simple_module_db import finalize_session
 from sqlalchemy import select
 
-from sm_images import redaction
+from sm_images.access import redaction
 from sm_images.ai.reads import GroupMemberRead, GroupRead
 from sm_images.models import Collection, Group, Image, Prompt
 from sm_images.models.enums import PromptScope

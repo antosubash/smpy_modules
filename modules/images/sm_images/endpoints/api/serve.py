@@ -5,7 +5,7 @@ loads the image's collection through the policy, so an image the caller may
 not see is the 404 an absent id gets; everything after that - which object,
 the original's own right, cache headers, 304, ``Range`` - is
 :func:`sm_images.serving.serve`. Never shareable-cached: the answer depends on
-who asks (``sm_images.cache``).
+who asks (``sm_images.serving.cache``).
 """
 
 from __future__ import annotations
@@ -18,10 +18,11 @@ from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal
 
-from sm_images import cache, serving
+from sm_images import serving
 from sm_images.access import ImageCollectionView
-from sm_images.deps import require_view
+from sm_images.endpoints.deps import require_view
 from sm_images.endpoints.map_params import Size, get_and_head
+from sm_images.serving import cache
 
 router = APIRouter(tags=["images"])
 

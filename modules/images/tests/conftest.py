@@ -7,7 +7,7 @@ Two things are load-bearing and easy to drop when extending this file:
 tenant at flush, so a fixture that inserts a row needs one bound.
 
 ``_arm_database_reset``: on Postgres it is what makes the *first* database a
-test asks for a clean one (see :func:`tests.pg_support.arm_reset`).
+test asks for a clean one (see :func:`tests.support.pg.arm_reset`).
 """
 
 from __future__ import annotations
@@ -20,29 +20,29 @@ import pytest_asyncio
 from sm_images.tenancy import DEFAULT_TENANT, tenant_scope
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.ai_support import ai  # noqa: F401 - the AI step tests' fixture
-from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
+from tests.support.ai import ai  # noqa: F401 - the AI step tests' fixture
+from tests.support.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
     ADMIN_PERMS,
     as_user,
     client,
     images_app,
     storage,
 )
-from tests.billing_support import (  # noqa: F401 - billing off unless asked
+from tests.support.billing import (  # noqa: F401 - billing off unless asked
     _billing_off,
     gauge,
 )
-from tests.direct_support import small_parts  # noqa: F401 - two parts per test image
-from tests.fetch_support import inner, resolver  # noqa: F401 - the safe-fetch tests' fixtures
-from tests.group_support import file_pipe  # noqa: F401 - the group-run tests' fixture
-from tests.import_support import file_imp, imp  # noqa: F401 - the import tests' fixtures
-from tests.isolation_support import two_tenants  # noqa: F401 - the tenancy matrix's fixture
-from tests.map_support import fake_tippecanoe, web_runtime  # noqa: F401 - the map tests' fixtures
-from tests.pg_support import arm_reset, make_db_state
-from tests.pipeline_api_support import world  # noqa: F401 - the pipeline API tests' fixture
-from tests.pipeline_support import pipe  # noqa: F401 - the pipeline tests' fixture
-from tests.prompts_support import prompts_world  # noqa: F401 - the prompt route tests' fixture
-from tests.upload_support import uploads  # noqa: F401 - the upload tests' client
+from tests.support.direct import small_parts  # noqa: F401 - two parts per test image
+from tests.support.fetch import inner, resolver  # noqa: F401 - the safe-fetch tests' fixtures
+from tests.support.groups import file_pipe  # noqa: F401 - the group-run tests' fixture
+from tests.support.imports import file_imp, imp  # noqa: F401 - the import tests' fixtures
+from tests.support.isolation import two_tenants  # noqa: F401 - the tenancy matrix's fixture
+from tests.support.map import fake_tippecanoe, web_runtime  # noqa: F401 - the map tests' fixtures
+from tests.support.pg import arm_reset, make_db_state
+from tests.support.pipeline import pipe  # noqa: F401 - the pipeline tests' fixture
+from tests.support.pipeline_api import world  # noqa: F401 - the pipeline API tests' fixture
+from tests.support.prompts import prompts_world  # noqa: F401 - the prompt route tests' fixture
+from tests.support.upload import uploads  # noqa: F401 - the upload tests' client
 
 
 @pytest.fixture(autouse=True)

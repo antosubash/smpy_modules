@@ -19,12 +19,13 @@ from fastapi import APIRouter, Depends, Request, Response
 from simple_module_db.deps import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 
-from sm_images import cache, constants
+from sm_images import constants
 from sm_images.access import public_collection
-from sm_images.deps import get_settings
+from sm_images.endpoints.deps import get_settings
 from sm_images.endpoints.public import PublicRoute
 from sm_images.models import Collection
 from sm_images.services.viewer_stats import public_fields
+from sm_images.serving import cache
 from sm_images.tenancy import bind_public
 
 router = APIRouter(

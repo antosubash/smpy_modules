@@ -30,7 +30,7 @@ from typing import Any
 from simple_module_db.callbacks import register_on_commit
 from sqlalchemy import select, update
 
-from sm_images import redaction
+from sm_images.access import redaction
 from sm_images.constants import NO_SYNC
 from sm_images.intents import add_intents
 from sm_images.map.objects import drop_objects

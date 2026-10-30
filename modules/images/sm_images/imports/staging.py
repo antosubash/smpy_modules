@@ -29,11 +29,11 @@ from typing import IO, Any, Final
 
 from file_storage.contracts.service import StorageNotFoundError
 
-from sm_images import storage_keys
 from sm_images.imports.fetch import safe_stream
 from sm_images.imports.geojson_stream import GeoJSONError, validate_and_count
 from sm_images.intents import object_intent
 from sm_images.pipeline.runtime import Runtime
+from sm_images.storage import keys as storage_keys
 
 __all__ = [
     "SOURCE_PREFIX",

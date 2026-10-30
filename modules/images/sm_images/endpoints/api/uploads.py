@@ -24,8 +24,8 @@ from simple_module_hosting.resource_deps import RequiresResource, resource_princ
 
 from sm_images import billing, constants
 from sm_images.access import POLICY, CollectionEdit, collection_stmt
-from sm_images.deps import require_view
 from sm_images.endpoints.api.images import Ingest, result
+from sm_images.endpoints.deps import require_view
 from sm_images.errors import UploadNotFound, UploadNotOpen
 from sm_images.ingest import direct
 from sm_images.ingest.admission import prepare

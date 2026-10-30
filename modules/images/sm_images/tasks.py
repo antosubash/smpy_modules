@@ -3,7 +3,7 @@
 Imported by every process that builds the Celery app - the web process and
 every worker, including the test runner's eager app - so it stays light:
 Celery here, everything else inside the bodies. Routing and beat are in
-:mod:`sm_images.task_config`.
+:mod:`sm_images.jobs.task_config`.
 
 * ``images.run_step(image_id, step, token)`` - execute one claimed run; its
   completion claims and enqueues whatever became ready.
@@ -22,7 +22,7 @@ Celery here, everything else inside the bodies. Routing and beat are in
 * ``images.reconcile()`` - the five-minute recovery beat, also sent once when a
   worker comes up (``worker_ready``).
 * ``images.janitor(dry_run=False)`` - the daily clean-up beat: abandoned
-  uploads and trashed rows per tenant, then orphaned objects (:mod:`sm_images.janitor`).
+  uploads and trashed rows per tenant, then orphaned objects (:mod:`sm_images.jobs.janitor`).
 * ``images.import_geojson``, ``images.download_items`` and
   ``images.reset_import`` - imports (a GeoJSON stream, its downloads, and the
   reset behind restart and retry-failed), defined in
@@ -45,8 +45,7 @@ from celery import shared_task
 from celery.signals import worker_process_init, worker_ready
 
 from sm_images.imports import tasks as _import_tasks  # noqa: F401 - registers the import tasks
-from sm_images.map import tasks as _map_tasks  # noqa: F401 - registers images.build_map
-from sm_images.task_config import (
+from sm_images.jobs.task_config import (
     JANITOR,
     QUEUE_DEFAULT,
     RECONCILE,
@@ -56,6 +55,7 @@ from sm_images.task_config import (
     RUN_REGROUP,
     RUN_STEP,
 )
+from sm_images.map import tasks as _map_tasks  # noqa: F401 - registers images.build_map
 
 logger = logging.getLogger(__name__)
 
@@ -137,8 +137,8 @@ def run_group_prompt_task(prompt_id: str, group_id: str) -> bool:
 
 @shared_task(name=RECONCILE)
 def reconcile() -> dict[str, int]:
+    from sm_images.jobs.reconcile import reconcile_async
     from sm_images.pipeline.worker_runtime import run_platform
-    from sm_images.reconcile import reconcile_async
 
     summary = run_platform(lambda runtime: reconcile_async(runtime, datetime.now(UTC)))
     if any(summary.values()):
@@ -148,7 +148,7 @@ def reconcile() -> dict[str, int]:
 
 @shared_task(name=JANITOR, stuck_after=STUCK_AFTER_SECONDS)
 def janitor(dry_run: bool = False) -> dict[str, int]:
-    from sm_images.janitor import janitor_async
+    from sm_images.jobs.janitor import janitor_async
     from sm_images.pipeline.worker_runtime import run_platform
 
     summary = run_platform(

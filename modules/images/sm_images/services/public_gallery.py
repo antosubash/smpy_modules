@@ -1,7 +1,7 @@
 """A public collection's gallery for the anonymous page and the pagebuilder block.
 
 Only what a visitor may see: an image that is not trashed, whose picture may be
-shown (:func:`sm_images.redaction.ready_clause`, the map's gate) and that has a
+shown (:func:`sm_images.access.redaction.ready_clause`, the map's gate) and that has a
 ``small`` rendition cut from its current display copy - so every tile this
 returns is a URL the anonymous twin will answer. Items carry the id, the pixel
 size and two URLs; no filename, metadata or location. The caller has already
@@ -14,9 +14,11 @@ from typing import Any
 
 from sqlalchemy import select
 
-from sm_images import constants, redaction, urls
+from sm_images import constants
+from sm_images.access import redaction
 from sm_images.models import Collection, Image, Rendition
 from sm_images.services import cursor as cursors
+from sm_images.serving import urls
 
 __all__ = ["page"]
 

@@ -49,8 +49,8 @@ def prepare_image(data: bytes, max_side: int) -> bytes:
     """A JPEG no larger than ``max_side`` on either side, with no metadata."""
     from PIL import Image, ImageOps
 
-    from sm_images._heif import register_heif
     from sm_images.ingest.guards import guard_pixels
+    from sm_images.processing.heif import register_heif
 
     register_heif()
     guard_pixels(data)  # the decompression-bomb guard, before any decode
@@ -90,8 +90,8 @@ async def run_structured(
 
 def metering_key(ctx: StepContext, version: int, token: Any) -> str:
     """``images:prompt:<digest>`` (``images:step:`` for a built-in AI step) of
-    tenant, image, step, version and lease token: see :mod:`sm_images.metering_keys`."""
-    from sm_images.metering_keys import digest_key
+    tenant, image, step, version and lease token: see :mod:`sm_images.billing.metering_keys`."""
+    from sm_images.billing.metering_keys import digest_key
 
     kind = "images:prompt" if ctx.step.id.startswith("prompt:") else "images:step"
     return digest_key(kind, ctx.tenant_id, ctx.image.id, ctx.step.id, version, token)

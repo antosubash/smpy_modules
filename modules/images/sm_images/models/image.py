@@ -69,7 +69,7 @@ class Image(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  #
     display_step: str | None = Field(default=None, max_length=100)
     """The step that wrote the current display copy, stamped at its fenced
     publication. A display copy is trusted as redacted only while this is the
-    collection's enabled display mutator (``sm_images.redaction``): a crop is a
+    collection's enabled display mutator (``sm_images.access.redaction``): a crop is a
     display mutator too, and redacts nothing."""
     display_step_version: int | None = Field(default=None)
     processing_generation: int = Field(default=1, sa_column_kwargs={"nullable": False})
@@ -80,7 +80,7 @@ class Image(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  #
     Conditional ``UPDATE`` on these two is what makes the event fire once."""
     purge_failed_at: datetime | None = dt_col()
     """When the janitor last failed to delete this (trashed) image's objects;
-    such images go to the back of later purge passes (``sm_images.purge``)."""
+    such images go to the back of later purge passes (``sm_images.jobs.purge``)."""
     storage_hold_id: str | None = Field(default=None, max_length=64)
     storage_bytes: int = Field(default=0, sa_type=BigInteger, sa_column_kwargs={"nullable": False})
     """Sum of this image's objects (original, display copy, renditions), as held

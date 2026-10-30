@@ -16,8 +16,7 @@ from typing import Any
 from simple_module_core.resources import ACTION_EDIT, ResourcePrincipal
 from sqlalchemy import func, select
 
-from sm_images import redaction
-from sm_images.access import POLICY
+from sm_images.access import POLICY, redaction
 from sm_images.contracts.schemas import collection_fields
 from sm_images.models import Collection, Image
 from sm_images.schemas.collection import CollectionOut

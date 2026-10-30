@@ -27,7 +27,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from sm_images import redaction
+from sm_images.access import redaction
 from sm_images.ai import codes
 from sm_images.errors import Invalid, NotFound
 from sm_images.map import revoke
