@@ -33,7 +33,7 @@ export function GroupCard({
       data-group-id={group.id}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+        <div className="min-w-0 [overflow-wrap:anywhere]">
           <p className="font-medium">{group.name ?? group.key}</p>
           <p className="text-xs text-muted-foreground">
             {group.name ? `${group.key} · ` : ''}

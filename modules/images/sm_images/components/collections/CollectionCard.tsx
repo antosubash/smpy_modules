@@ -15,11 +15,13 @@ export function CollectionCard({ collection }: { collection: Collection }) {
       data-collection-id={collection.id}
     >
       <div className="flex items-start justify-between gap-2">
-        <h2 className="font-medium break-words">{collection.name}</h2>
+        <h2 className="min-w-0 font-medium [overflow-wrap:anywhere]">{collection.name}</h2>
         <Badge variant="secondary">{visibilityLabel(t, collection.visibility)}</Badge>
       </div>
       {collection.description && (
-        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{collection.description}</p>
+        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground [overflow-wrap:anywhere]">
+          {collection.description}
+        </p>
       )}
       <p className="mt-3 text-sm text-muted-foreground">
         {t(keys.images.collections.image_count, { count: collection.image_count })}

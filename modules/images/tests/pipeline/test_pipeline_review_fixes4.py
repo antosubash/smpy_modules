@@ -22,6 +22,9 @@ from tests.support.pipeline import Scripted, use_steps
 T = DEFAULT_TENANT
 BOUND = 0.5  # the eager drain bound under test (the module default is 5 s)
 HARD = 15.0  # a regressed deadlock fails here instead of hanging the run
+SLACK = 3.0
+"""Scheduling slack on a loaded CI runner (1.71 s was seen against a 1.5 s limit).
+Below both the 60 s handler timeout and the 5 s default bound, so only BOUND ends the wait."""
 
 
 async def _setup(pipe, monkeypatch):
@@ -63,7 +66,7 @@ async def test_task_spawned_in_a_durable_handler_does_not_deadlock(pipe, monkeyp
     caplog.set_level(logging.WARNING, logger=eager_drain.__name__)
     await _publish(pipe, coll, parent, request=False)
     await _bounded(transport, asyncio.sleep(0), limit=HARD)
-    assert finished and finished[0] < BOUND + 1.0
+    assert finished and finished[0] < BOUND + SLACK
     assert sorted(delivered) == sorted([str(parent), str(child)])
     assert "eager_drain_timeout" in caplog.text
 
@@ -73,7 +76,7 @@ async def test_request_inline_delivery_whose_handler_awaits_a_submitting_task(pi
     holding the dispatcher lock; the child's own delivery queues behind it."""
     transport, coll, parent, child, delivered, finished = await _setup(pipe, monkeypatch)
     await _bounded(transport, _publish(pipe, coll, parent, request=True), limit=HARD)
-    assert finished and finished[0] < BOUND + 1.0
+    assert finished and finished[0] < BOUND + SLACK
     assert sorted(delivered) == sorted([str(parent), str(child)])
 
 

@@ -38,6 +38,9 @@ type Props = {
   public_path?: string;
 };
 
+/** A name without spaces wraps anywhere rather than pushing the page sideways. */
+const WRAP = '[overflow-wrap:anywhere]';
+
 type Tab = 'gallery' | 'map' | 'groups' | 'pipeline' | 'prompts' | 'imports';
 
 /** `Images/Collection` - `/admin/images/{id}`. Tabs: the gallery, the groups,
@@ -105,7 +108,8 @@ function Collection({
   const remove = async () => {
     await deleteCollection(collection.id);
     toast(t(keys.images.collection.deleted));
-    router.visit('/admin/images/');
+    // Replace this entry: Back must not bring the deleted collection's page back.
+    router.visit('/admin/images/', { replace: true });
   };
 
   return (
@@ -113,7 +117,12 @@ function Collection({
       <Head title={collection.name} />
       <PageShell
         title={collection.name}
-        description={collection.description ?? undefined}
+        titleClassName={WRAP}
+        description={
+          collection.description ? (
+            <span className={WRAP}>{collection.description}</span>
+          ) : undefined
+        }
         back="/admin/images/"
         actions={
           <>
@@ -168,31 +177,34 @@ function Collection({
               />
             </div>
           )}
-          <div
-            role="tablist"
-            aria-label={t(keys.images.tabs.label)}
-            className="flex gap-2 border-b"
-          >
-            {tabs.map((name) => (
-              <button
-                key={name}
-                type="button"
-                role="tab"
-                id={`images-tab-${name}`}
-                aria-controls="images-tabpanel"
-                aria-selected={tab === name}
-                tabIndex={tab === name ? 0 : -1}
-                data-testid={`images-tab-${name}`}
-                className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === name ? 'border-primary font-medium' : 'border-transparent text-muted-foreground'}`}
-                onClick={() => {
-                  // Images may have arrived (an import, an upload elsewhere) while away.
-                  if (name === 'gallery' && tab !== 'gallery') void gallery.reload();
-                  setTab(name);
-                }}
-              >
-                {t(keys.images.tabs[name])}
-              </button>
-            ))}
+          {/* On a phone the tabs scroll sideways inside their own row. */}
+          <div className="overflow-x-auto">
+            <div
+              role="tablist"
+              aria-label={t(keys.images.tabs.label)}
+              className="flex w-max min-w-full gap-2 border-b"
+            >
+              {tabs.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  role="tab"
+                  id={`images-tab-${name}`}
+                  aria-controls="images-tabpanel"
+                  aria-selected={tab === name}
+                  tabIndex={tab === name ? 0 : -1}
+                  data-testid={`images-tab-${name}`}
+                  className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm ${tab === name ? 'border-primary font-medium' : 'border-transparent text-muted-foreground'}`}
+                  onClick={() => {
+                    // Images may have arrived (an import, an upload elsewhere) while away.
+                    if (name === 'gallery' && tab !== 'gallery') void gallery.reload();
+                    setTab(name);
+                  }}
+                >
+                  {t(keys.images.tabs[name])}
+                </button>
+              ))}
+            </div>
           </div>
           <div role="tabpanel" id="images-tabpanel" aria-labelledby={`images-tab-${tab}`}>
             {tab === 'gallery' && <Gallery gallery={gallery} pick={pick} />}

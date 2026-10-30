@@ -7,6 +7,7 @@ import { getPipeline, restartPipeline, savePipeline } from '../../utils/api';
 import { errorText } from '../../utils/api-net';
 import { keys, useT } from '../../utils/i18n';
 import type { PipelineOverview, RestartScope } from '../../utils/types';
+import { ConfirmDialog } from '../ConfirmDialog';
 import { StepCard, type StepDraft } from './StepCard';
 
 type Drafts = Record<string, StepDraft>;
@@ -19,6 +20,24 @@ function draftsOf(overview: PipelineOverview): Drafts {
   return Object.fromEntries(
     overview.steps.map((s) => [s.id, { enabled: s.enabled, params: { ...(s.params ?? {}) } }]),
   );
+}
+
+/** `value` as JSON with sorted keys: two drafts compare by content. */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`);
+    return `{${entries.join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/** Whether `drafts` differ from what `overview` has saved. */
+export function changed(overview: PipelineOverview | null, drafts: Drafts): boolean {
+  return overview !== null && canonical(drafts) !== canonical(draftsOf(overview));
 }
 
 /** The `PUT` body: every enabled step, plus any disabled step already in the
@@ -59,7 +78,8 @@ export function PipelineTab({
   const { t } = useT();
   const [overview, setOverview] = useState<PipelineOverview | null>(null);
   const [drafts, setDrafts] = useState<Drafts>({});
-  const [dirty, setDirty] = useState(false);
+  // Edited, and not back to what is saved: undoing a change undoes this too.
+  const dirty = changed(overview, drafts);
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
   // Bumped around every write of ours: a poll read begun before it is stale.
@@ -77,7 +97,6 @@ export function PipelineTab({
       const next = await getPipeline(collectionId);
       setOverview(next);
       setDrafts(draftsOf(next));
-      setDirty(false);
       setError(null);
     } catch (e) {
       setError(errorText(e));
@@ -117,7 +136,6 @@ export function PipelineTab({
       epoch.current += 1;
       setOverview(next);
       setDrafts(draftsOf(next));
-      setDirty(false);
       setError(null);
       setOfferRestart(true);
       toast(t(keys.images.pipeline.saved));
@@ -153,19 +171,41 @@ export function PipelineTab({
     );
   }
 
+  // Re-running everything repeats every step on every image, AI steps
+  // included, so it asks first; the narrower scopes do not.
   const restartButtons = (scopes: RestartScope[]) =>
-    scopes.map((scope) => (
-      <Button
-        key={scope}
-        type="button"
-        variant="outline"
-        disabled={busy}
-        data-testid={`images-pipeline-restart-${scope}`}
-        onClick={() => void restart(scope)}
-      >
-        {t(keys.images.pipeline.restart[scope])}
-      </Button>
-    ));
+    scopes.map((scope) =>
+      scope === 'all' ? (
+        <ConfirmDialog
+          key={scope}
+          trigger={
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              data-testid="images-pipeline-restart-all"
+            >
+              {t(keys.images.pipeline.restart.all)}
+            </Button>
+          }
+          title={t(keys.images.pipeline.restart_all_title)}
+          description={t(keys.images.pipeline.restart_all_body)}
+          confirmLabel={t(keys.images.pipeline.restart.all)}
+          onConfirm={() => restart('all')}
+        />
+      ) : (
+        <Button
+          key={scope}
+          type="button"
+          variant="outline"
+          disabled={busy}
+          data-testid={`images-pipeline-restart-${scope}`}
+          onClick={() => void restart(scope)}
+        >
+          {t(keys.images.pipeline.restart[scope])}
+        </Button>
+      ),
+    );
 
   return (
     <section className="space-y-4" aria-labelledby="images-pipeline-title">
@@ -209,10 +249,7 @@ export function PipelineTab({
             draft={drafts[step.id]}
             canEdit={canManage}
             counts={overview.status[step.id] ?? {}}
-            onChange={(next) => {
-              setDrafts((d) => ({ ...d, [step.id]: next }));
-              setDirty(true);
-            }}
+            onChange={(next) => setDrafts((d) => ({ ...d, [step.id]: next }))}
           />
         ))}
       </ul>

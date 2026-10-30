@@ -361,7 +361,9 @@
       "failed": "Fehlgeschlagene wiederholen",
       "stale": "Veraltete neu berechnen",
       "all": "Alles neu berechnen"
-    }
+    },
+    "restart_all_title": "Alle Schritte für alle Bilder erneut ausführen?",
+    "restart_all_body": "Jeder aktivierte Schritt läuft für jedes Bild dieser Sammlung erneut, KI-Schritte eingeschlossen. Das kann dauern und KI-Guthaben verbrauchen. Ergebnisse werden ersetzt, sobald ein Schritt fertig ist."
   },
   "imports": {
     "description": "Bilder aus einer GeoJSON-Datei, einer GeoJSON-Adresse oder einem ZIP-Archiv übernehmen.",
@@ -456,7 +458,11 @@
       "failures_other": "Warum {count} Zeilen fehlschlugen",
       "failure_row": "Zeile {row}: {why}",
       "failure_http": "HTTP {status} {reason}",
-      "failures_more": "…und {count} weitere"
+      "failures_more": "…und {count} weitere",
+      "paused": "Import angehalten",
+      "resumed": "Import fortgesetzt",
+      "restarted": "Import neu gestartet",
+      "retrying": "Fehlgeschlagene Zeilen werden wiederholt"
     }
   },
   "prompts": {
@@ -549,7 +555,8 @@
       "remove_field": "Entfernen",
       "advanced": "Dieses Schema nutzt mehr, als der Feld-Editor zeigen kann, daher wird es als JSON bearbeitet.",
       "invalid_json": "Das Schema ist kein gültiges JSON.",
-      "reserved_name": "„{name}“ kann kein Feldname sein."
+      "reserved_name": "„{name}“ kann kein Feldname sein.",
+      "duplicate_name": "Ein anderes Feld heißt bereits „{name}“."
     },
     "results": {
       "show": "Ergebnisse",

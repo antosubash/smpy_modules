@@ -108,6 +108,7 @@ RENDITION_SIZE_MAX: Final = 50
 DISPLAY_CONTENT_TYPE: Final = "image/jpeg"
 """Display copies and renditions are always JPEG (``storage.keys``)."""
 ORIGINAL_FORBIDDEN_DETAIL: Final = "The original of this image is not available to you"
+OWNER_ONLY_DETAIL: Final = "Only the collection's owner or an images manager can do this"
 
 # --- The map: ``…/points`` and ``…/map.pmtiles`` (spec §5, ``sm_images.map``) ---
 

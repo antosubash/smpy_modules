@@ -28,8 +28,9 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from sharing.policy import share_exists_for
+from simple_module_core.permission_denied import PermissionDenied
 from simple_module_core.resources import (
     ACTION_DELETE,
     ACTION_EDIT,
@@ -134,8 +135,21 @@ CollectionView = Annotated[
 CollectionEdit = Annotated[
     Collection, Depends(RequiresResource(POLICY, ACTION_EDIT, collection_stmt))
 ]
+
+
+class _RequiresOwner(RequiresResource):
+    """``RequiresResource`` for owner-only actions, whose refusal says who may
+    act instead of naming the internal ``resource:delete`` action."""
+
+    async def __call__(self, *, request: Request, stmt: Any, session: Any) -> Any:
+        try:
+            return await super().__call__(request=request, stmt=stmt, session=session)
+        except PermissionDenied as exc:
+            raise PermissionDenied(exc.permission, constants.OWNER_ONLY_DETAIL) from None
+
+
 CollectionOwner = Annotated[
-    Collection, Depends(RequiresResource(POLICY, ACTION_DELETE, collection_stmt))
+    Collection, Depends(_RequiresOwner(POLICY, ACTION_DELETE, collection_stmt))
 ]
 """Owner or ``images.manage``: delete, visibility, shares, pipeline config,
 deleting images and whole-collection re-runs."""

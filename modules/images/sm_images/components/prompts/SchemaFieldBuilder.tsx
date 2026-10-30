@@ -4,6 +4,7 @@ import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 
 import { keys, useT } from '../../utils/i18n';
 import {
+  duplicateNames,
   emptyField,
   FIELD_TYPES,
   type FieldType,
@@ -34,6 +35,7 @@ export function SchemaFieldBuilder({
   disabled?: boolean;
 }) {
   const { t } = useT();
+  const repeated = duplicateNames(fields);
   const update = (index: number, patch: Partial<SchemaField>) =>
     onChange(fields.map((f, i) => (i === index ? { ...f, ...patch } : f)));
 
@@ -82,6 +84,14 @@ export function SchemaFieldBuilder({
               data-testid={`images-schema-field-error-${index}`}
             >
               {t(fieldNameError(field.name) as string, { name: field.name.trim() })}
+            </p>
+          )}
+          {repeated.has(field.name.trim()) && (
+            <p
+              className="text-sm text-destructive"
+              data-testid={`images-schema-field-duplicate-${index}`}
+            >
+              {t(keys.images.prompts.schema.duplicate_name, { name: field.name.trim() })}
             </p>
           )}
           <Input

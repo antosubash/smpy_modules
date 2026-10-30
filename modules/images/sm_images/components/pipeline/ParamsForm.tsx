@@ -134,6 +134,10 @@ function Field({
   const s = resolve(schema);
   const kind = kindOf(schema);
   const shown = value === undefined ? s.default : value;
+  // A text or number field left empty shows the default as its placeholder, so
+  // clearing it visibly means "use the default" instead of snapping back to it.
+  const typed = value === undefined || value === null ? '' : String(value);
+  const placeholder = s.default === undefined || s.default === null ? undefined : String(s.default);
   switch (kind) {
     case 'boolean':
       return (
@@ -172,7 +176,8 @@ function Field({
           id={id}
           type="number"
           step={kind === 'integer' ? 1 : 'any'}
-          value={shown === undefined || shown === null ? '' : String(shown)}
+          value={typed}
+          placeholder={placeholder}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))}
         />
@@ -181,7 +186,8 @@ function Field({
       return (
         <Input
           id={id}
-          value={shown === undefined || shown === null ? '' : String(shown)}
+          value={typed}
+          placeholder={placeholder}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value)}
         />
@@ -197,7 +203,8 @@ function Field({
  * A form for one step's `params_schema` (a pydantic JSON Schema): string,
  * number, integer, boolean, enum and arrays of strings get a control; anything
  * else (nested objects, arrays of objects, unions) a JSON textarea. A cleared
- * field drops its key, so the server's default applies.
+ * field drops its key, so the server's default applies; a text or number field
+ * shows that default as its placeholder.
  */
 export function ParamsForm({
   stepId,

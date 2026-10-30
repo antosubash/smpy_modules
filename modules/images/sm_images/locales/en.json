@@ -361,7 +361,9 @@
       "failed": "Retry failed",
       "stale": "Re-run stale",
       "all": "Re-run everything"
-    }
+    },
+    "restart_all_title": "Re-run every step on every image?",
+    "restart_all_body": "Every enabled step runs again on every image in this collection, AI steps included, so it can take a while and use AI credits. Results are replaced as each step finishes."
   },
   "imports": {
     "description": "Bring images in from a GeoJSON file, a GeoJSON address or a ZIP archive.",
@@ -456,7 +458,11 @@
       "failures_other": "Why {count} rows failed",
       "failure_row": "Row {row}: {why}",
       "failure_http": "HTTP {status} {reason}",
-      "failures_more": "…and {count} more"
+      "failures_more": "…and {count} more",
+      "paused": "Import paused",
+      "resumed": "Import resumed",
+      "restarted": "Import restarted",
+      "retrying": "Retrying the failed rows"
     }
   },
   "prompts": {
@@ -549,7 +555,8 @@
       "remove_field": "Remove",
       "advanced": "This schema uses more than the field editor can show, so it is edited as JSON.",
       "invalid_json": "The schema is not valid JSON.",
-      "reserved_name": "“{name}” cannot be a field name."
+      "reserved_name": "“{name}” cannot be a field name.",
+      "duplicate_name": "Another field is already called “{name}”."
     },
     "results": {
       "show": "Results",

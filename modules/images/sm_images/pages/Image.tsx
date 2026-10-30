@@ -47,7 +47,8 @@ function Image({
   const remove = async () => {
     await deleteImage(image.id);
     toast(t(keys.images.viewer.deleted));
-    router.visit(back);
+    // Replace this entry: Back must not bring the deleted image's page back.
+    router.visit(back, { replace: true });
   };
 
   return (
@@ -56,7 +57,7 @@ function Image({
       <PageShell
         title={image.filename}
         titleClassName="break-all"
-        description={collection.name}
+        description={<span className="[overflow-wrap:anywhere]">{collection.name}</span>}
         back={back}
         actions={
           <>

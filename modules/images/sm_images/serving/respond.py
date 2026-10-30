@@ -60,6 +60,10 @@ from sm_images.storage import ImageStore, store_for
 
 __all__ = ["Target", "resolve", "serve", "serve_map"]
 
+_BROWSER_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
+"""Originals a browser draws. HEIC/HEIF and TIFF are not: without a display
+copy, ``…/display`` serves their largest current rendition instead (B1)."""
+
 
 @dataclass(frozen=True)
 class Target:
@@ -91,6 +95,20 @@ async def _load(db: Any, collection: Collection, image_id: uuid.UUID, size: str 
     return None if row is None else (row[0], row[1])
 
 
+async def _largest_rendition(db: Any, image: Image) -> str | None:
+    """The key of *image*'s widest rendition cut from its current bytes."""
+    stmt = (
+        select(Rendition.storage_key)
+        .where(
+            Rendition.image_id == image.id,
+            Rendition.source_generation == image.display_generation,
+        )
+        .order_by(Rendition.width.desc())
+        .limit(1)
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
 async def resolve(
     db: Any,
     collection: Collection,
@@ -115,9 +133,13 @@ async def resolve(
     if route == cache.DISPLAY:
         if pending:
             raise _missing(twin)
-        key = image.display_key or image.storage_key
-        kind = constants.DISPLAY_CONTENT_TYPE if image.display_key else image.content_type
-        return image, Target(key, kind, False)
+        if image.display_key:
+            return image, Target(image.display_key, constants.DISPLAY_CONTENT_TYPE, False)
+        if image.content_type not in _BROWSER_TYPES:
+            stand_in = await _largest_rendition(db, image)
+            if stand_in is not None:
+                return image, Target(stand_in, constants.DISPLAY_CONTENT_TYPE, False)
+        return image, Target(image.storage_key, image.content_type, False)
     protected = image.display_key is not None or pending
     return image, Target(image.storage_key, image.content_type, protected, withheld=pending)
 

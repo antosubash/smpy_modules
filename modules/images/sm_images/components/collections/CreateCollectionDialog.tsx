@@ -48,8 +48,20 @@ export function CreateCollectionDialog({ canPublish }: { canPublish: boolean }) 
     }
   };
 
+  const changeOpen = (next: boolean) => {
+    if (pending) return;
+    setOpen(next);
+    // Closing without creating forgets what was typed.
+    if (!next) {
+      setName('');
+      setDescription('');
+      setVisibility('private');
+      setError(null);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(next) => !pending && setOpen(next)}>
+    <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>
         <Button type="button" data-testid="images-new-collection">
           {t(keys.images.collections.new)}
@@ -99,7 +111,7 @@ export function CreateCollectionDialog({ canPublish }: { canPublish: boolean }) 
               type="button"
               variant="outline"
               disabled={pending}
-              onClick={() => setOpen(false)}
+              onClick={() => changeOpen(false)}
             >
               {t(keys.images.common.cancel)}
             </Button>

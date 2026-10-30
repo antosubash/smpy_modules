@@ -34,6 +34,20 @@ export function fieldNameError(name: string): string | null {
   return RESERVED.has(name.trim()) ? keys.images.prompts.schema.reserved_name : null;
 }
 
+/** The trimmed names more than one field uses: a JSON object keeps one of
+ *  each, so saving them would silently drop the others. */
+export function duplicateNames(fields: SchemaField[]): Set<string> {
+  const seen = new Set<string>();
+  const twice = new Set<string>();
+  for (const field of fields) {
+    const name = field.name.trim();
+    if (!name) continue;
+    if (seen.has(name)) twice.add(name);
+    seen.add(name);
+  }
+  return twice;
+}
+
 export function emptyField(): SchemaField {
   return { name: '', type: 'string', description: '', required: false, choices: [] };
 }

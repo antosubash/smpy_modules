@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 import pytest
+from sm_images import constants
 from sm_images.models import Collection, StepRun
 from sm_images.models.enums import StepStatus
 from sqlalchemy import update
@@ -91,6 +92,9 @@ async def test_put_is_owner_or_manage(world, who, expected):
     assert r.status_code == expected, r.text
     if expected == 200:
         assert r.json()["config"] == CONFIG
+    if expected == 403:
+        # Says who may act, not the internal action it was checked as.
+        assert r.json()["detail"] == constants.OWNER_ONLY_DETAIL
 
 
 @pytest.mark.parametrize(

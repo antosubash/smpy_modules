@@ -1,4 +1,5 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { isActive, isStalled } from '../../hooks/useImportJobs';
@@ -30,6 +31,15 @@ const CONTROL_LABEL = {
   'retry-failed': keys.images.imports.job.retry_failed,
 } satisfies Record<ImportControl, string>;
 
+/** What a control did, said once it has been accepted: a restarted job that
+ *  finishes at once would otherwise look as if nothing happened. */
+const CONTROL_DONE = {
+  pause: keys.images.imports.job.paused,
+  resume: keys.images.imports.job.resumed,
+  restart: keys.images.imports.job.restarted,
+  'retry-failed': keys.images.imports.job.retrying,
+} satisfies Record<ImportControl, string>;
+
 export function JobRow({
   job,
   canEdit,
@@ -49,11 +59,16 @@ export function JobRow({
   const jobErrors = job.errors.filter((e) => !isRowError(e));
   const percent = known ? Math.min(100, Math.round((processed / job.total_count) * 100)) : null;
 
+  const [busy, setBusy] = useState(false);
   const run = async (control: ImportControl) => {
+    setBusy(true);
     try {
       await onControl(job, control);
+      toast(t(CONTROL_DONE[control]));
     } catch (e) {
       toast.error(t(text.control_failed, { reason: errorText(e) }));
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -117,6 +132,7 @@ export function JobRow({
               type="button"
               size="sm"
               variant="outline"
+              disabled={busy}
               data-testid={`images-import-${control}`}
               onClick={() => void run(control)}
             >

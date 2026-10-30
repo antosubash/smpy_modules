@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { keys, useT } from '../../utils/i18n';
 import {
   buildJsonSchema,
+  duplicateNames,
   fieldNameError,
   type SchemaField,
   schemaToFields,
@@ -50,8 +51,8 @@ export function SchemaEditor({
 
   const editFields = (next: SchemaField[]) => {
     setFields(next);
-    // A reserved name is refused: nothing to save until it is renamed.
-    const refused = next.some((f) => fieldNameError(f.name));
+    // A reserved or repeated name is refused: nothing to save until it is renamed.
+    const refused = next.some((f) => fieldNameError(f.name)) || duplicateNames(next).size > 0;
     onChange({ schema: refused ? null : buildJsonSchema(next) });
   };
   const editText = (next: string) => {

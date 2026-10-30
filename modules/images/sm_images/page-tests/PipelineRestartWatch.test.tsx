@@ -44,6 +44,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/** "Re-run everything" asks first: press the dialog's confirm button (portalled
+ *  to the body, outside the mounted host). */
+async function confirmDialog() {
+  const dialog = document.querySelector('[role="alertdialog"]');
+  const buttons = Array.from(dialog?.querySelectorAll('button') ?? []);
+  await click(buttons[buttons.length - 1] as HTMLElement);
+}
+
 async function open(reads: () => PipelineOverview) {
   vi.useFakeTimers();
   const calls = stubFetch({
@@ -68,6 +76,7 @@ describe('after a restart request (review of QA round 1)', () => {
       return overview({ 'prompt:646b48c4': { pending: 3 } }, 3); // it began
     });
     await click(view.find('[data-testid="images-pipeline-restart-all"]'));
+    await confirmDialog();
     await act(async () => vi.advanceTimersByTimeAsync(0));
     for (let i = 0; i < 8; i++) await tick();
     expect(reads).toBeGreaterThanOrEqual(9); // polled through the idle reads
