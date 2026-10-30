@@ -67,9 +67,7 @@ def excerpt(blocks: dict | None, q: str) -> str:
         return ""
     start = max(0, at - _SNIPPET_PADDING)
     end = min(len(text), at + len(q) + _SNIPPET_PADDING)
-    return (
-        ("…" if start else "") + text[start:end].strip() + ("…" if end < len(text) else "")
-    )
+    return ("…" if start else "") + text[start:end].strip() + ("…" if end < len(text) else "")
 
 
 async def _article_ids_by_tag(db: AsyncSession, pattern: str) -> set[int]:
@@ -85,7 +83,12 @@ async def _article_ids_by_tag(db: AsyncSession, pattern: str) -> set[int]:
 
 
 async def _search_articles(
-    db: AsyncSession, results: SearchResults, q: str, pattern: str, *, include_drafts: bool,
+    db: AsyncSession,
+    results: SearchResults,
+    q: str,
+    pattern: str,
+    *,
+    include_drafts: bool,
     per_section: int,
 ) -> None:
     tagged = await _article_ids_by_tag(db, pattern)
@@ -173,9 +176,7 @@ async def search(
         )
 
     # ── Media (likewise) ──────────────────────────────────────────────
-    assets, results.media_total = await pagebuilder.search_media(
-        db, pattern, limit=per_section
-    )
+    assets, results.media_total = await pagebuilder.search_media(db, pattern, limit=per_section)
     for asset in assets:
         results.media.append(
             SearchHit(

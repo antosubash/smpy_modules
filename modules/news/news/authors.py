@@ -84,9 +84,7 @@ async def bylines(db: AsyncSession, locale: str) -> list[tuple[str, int]]:
     return [(name, int(count)) for name, count in rows.all()]
 
 
-async def resolve(
-    db: AsyncSession, slug: str, locale: str
-) -> tuple[list[str], str | None]:
+async def resolve(db: AsyncSession, slug: str, locale: str) -> tuple[list[str], str | None]:
     """Which bylines this address means, and what to call the page.
 
     Returns every spelling slugging to ``slug`` — usually one — and the one to

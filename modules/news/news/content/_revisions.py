@@ -67,17 +67,13 @@ class RevisionsMixin(HostBase):
         )
         return list(result.scalars().all())
 
-    async def get_revision(
-        self, article_id: int, revision_id: int
-    ) -> NewsArticleRevision:
+    async def get_revision(self, article_id: int, revision_id: int) -> NewsArticleRevision:
         revision = await self.db.get(NewsArticleRevision, revision_id)
         if revision is None or revision.article_id != article_id:
             raise HTTPException(status_code=404, detail="Revision not found")
         return revision
 
-    async def restore_revision(
-        self, article_id: int, revision_id: int
-    ) -> NewsArticle:
+    async def restore_revision(self, article_id: int, revision_id: int) -> NewsArticle:
         """Copy a revision's payload into the article's draft.
 
         Deliberately does not publish. Restoring is an editing action — the

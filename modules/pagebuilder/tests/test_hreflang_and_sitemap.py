@@ -89,9 +89,7 @@ class TestHreflangOnThePage:
         # One published page in the group, so the list is dropped entirely.
         assert props["alternates"] == []
 
-    async def test_a_monolingual_page_emits_nothing(
-        self, authed_client: AsyncClient
-    ) -> None:
+    async def test_a_monolingual_page_emits_nothing(self, authed_client: AsyncClient) -> None:
         """A lone hreflang pointing at the page itself says nothing, and would
         be noise in the head of every document on every single-language site."""
         page = (
@@ -105,9 +103,7 @@ class TestHreflangOnThePage:
 
         assert props["alternates"] == []
 
-    async def test_the_page_reports_its_own_language(
-        self, bilingual_client: AsyncClient
-    ) -> None:
+    async def test_the_page_reports_its_own_language(self, bilingual_client: AsyncClient) -> None:
         await _published_pair(bilingual_client)
 
         assert (await _props(bilingual_client, "/de/p/about"))["locale"] == "de"
@@ -124,9 +120,7 @@ class TestSitemap:
         assert "<loc>http://test/p/about</loc>" in body
         assert "<loc>http://test/de/p/about</loc>" in body
 
-    async def test_each_entry_carries_its_counterparts(
-        self, bilingual_client: AsyncClient
-    ) -> None:
+    async def test_each_entry_carries_its_counterparts(self, bilingual_client: AsyncClient) -> None:
         """What lets a crawler learn the German page exists without having
         fetched the English one first."""
         await _published_pair(bilingual_client)
@@ -147,9 +141,7 @@ class TestSitemap:
         assert "/de/p/about" not in body
         assert "xhtml:link" not in body
 
-    async def test_a_monolingual_sitemap_is_unchanged(
-        self, authed_client: AsyncClient
-    ) -> None:
+    async def test_a_monolingual_sitemap_is_unchanged(self, authed_client: AsyncClient) -> None:
         page = (
             await authed_client.post(
                 API, json={"title": "Solo", "slug": "solo", "draft_data": {"content": []}}

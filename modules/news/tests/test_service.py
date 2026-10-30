@@ -40,9 +40,7 @@ class TestReadBack:
         assert found.slug == "solo"
         assert found.url == "/news/solo"
 
-    async def test_finds_an_undated_article_behind_a_full_page_of_dated_ones(
-        self, db
-    ) -> None:
+    async def test_finds_an_undated_article_behind_a_full_page_of_dated_ones(self, db) -> None:
         """The bug this replaces: reading back by scanning the first page.
 
         A new article is undated, and the listing sorts `published_at DESC NULLS
@@ -52,7 +50,10 @@ class TestReadBack:
         """
         for i in range(MAX_LIMIT):
             await make_article(
-                db, slug=f"dated-{i}", title=f"Dated {i}", category="Archive",
+                db,
+                slug=f"dated-{i}",
+                title=f"Dated {i}",
+                category="Archive",
                 published_at=DATED,
             )
 
@@ -60,9 +61,7 @@ class TestReadBack:
         await db.commit()
 
         # It is genuinely past the first page — that is the point of the setup.
-        first_page, total = await service.list_articles(
-            db, limit=MAX_LIMIT, include_drafts=True
-        )
+        first_page, total = await service.list_articles(db, limit=MAX_LIMIT, include_drafts=True)
         assert total == MAX_LIMIT + 1
         assert fresh.id not in {item.id for item in first_page}
 
@@ -122,9 +121,7 @@ class TestSkippingTheCount:
 class TestPartialUpdate:
     async def test_omitting_published_at_leaves_the_date_alone(self, db) -> None:
         """`UNSET` is the default, so a caller that says nothing changes nothing."""
-        article = await make_article(
-            db, slug="dated", category="Before", published_at=DATED
-        )
+        article = await make_article(db, slug="dated", category="Before", published_at=DATED)
 
         await service.update(db, article, category="After")
 
@@ -136,9 +133,7 @@ class TestPartialUpdate:
         # An undated article is a real state, not an error — this has to stay
         # reachable, which is why the sentinel exists rather than a truthiness
         # test.
-        article = await make_article(
-            db, slug="undate-me", category="News", published_at=DATED
-        )
+        article = await make_article(db, slug="undate-me", category="News", published_at=DATED)
 
         await service.update(db, article, published_at=None)
 

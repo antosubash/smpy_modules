@@ -55,9 +55,7 @@ async def record(
             NewsArticleRedirect.from_slug.in_([old_slug, new_slug]),
         )
     )
-    db.add(
-        NewsArticleRedirect(from_slug=old_slug, article_id=article_id, locale=locale)
-    )
+    db.add(NewsArticleRedirect(from_slug=old_slug, article_id=article_id, locale=locale))
     await db.flush()
 
 
@@ -108,7 +106,5 @@ async def resolve(db: AsyncSession, slug: str, locale: str) -> str | None:
 async def clear_for_article(db: AsyncSession, article_id: int) -> None:
     """Drop an article's redirects. Used when it is purged."""
     await db.execute(
-        sa_delete(NewsArticleRedirect).where(
-            NewsArticleRedirect.article_id == article_id
-        )
+        sa_delete(NewsArticleRedirect).where(NewsArticleRedirect.article_id == article_id)
     )

@@ -233,11 +233,7 @@ async def render_archive(
     response = _head.inject(
         set_html_lang(rendered, locale),
         _head.listing_head(
-            title=(
-                heading
-                if not settings.site_name
-                else f"{heading} — {settings.site_name}"
-            ),
+            title=(heading if not settings.site_name else f"{heading} — {settings.site_name}"),
             description=description,
             canonical=canonical,
             site_name=settings.site_name or None,
@@ -247,9 +243,7 @@ async def render_archive(
             # document in each language; a set of results for an English phrase
             # is not the German page's content, and pointing a crawler at it as
             # though it were would be a claim about a page that does not exist.
-            alternates=(
-                None if query else _archive_alternates(request, settings, path_for)
-            ),
+            alternates=(None if query else _archive_alternates(request, settings, path_for)),
             robots=SEARCH_ROBOTS if query else None,
         ),
     )

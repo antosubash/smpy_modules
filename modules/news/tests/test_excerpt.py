@@ -21,4 +21,3 @@ class TestExcerpt:
     def test_empty_blocks_give_nothing(self) -> None:
         assert search_service.excerpt(None, "canopy") == ""
         assert search_service.excerpt({}, "canopy") == ""
-

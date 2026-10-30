@@ -140,11 +140,7 @@ async def list_articles(
     # Resolved once here rather than inside the count query: the listing
     # already turned a slug into a name, and counting against the raw slug
     # would report zero for every pill on a slug-filtered view.
-    resolved = (
-        await service.resolve_category_slug(db, category) or category
-        if category
-        else None
-    )
+    resolved = await service.resolve_category_slug(db, category) or category if category else None
     cache(response, request, include_drafts=may_draft)
     return ArticleListResponse(
         items=items,
@@ -177,9 +173,7 @@ async def list_categories(
     status_code=201,
     dependencies=[require_edit],
 )
-async def create_article(
-    body: ArticleCreate, db: AsyncSession = Depends(get_db)
-) -> ArticleRead:
+async def create_article(body: ArticleCreate, db: AsyncSession = Depends(get_db)) -> ArticleRead:
     """Create an article, body and all, in one insert.
 
     This was two requests against two modules while an article was metadata
@@ -206,9 +200,7 @@ async def create_article(
     return await read_one(db, article.id or 0)
 
 
-@router.put(
-    "/articles/{article_id}", response_model=ArticleRead, dependencies=[require_edit]
-)
+@router.put("/articles/{article_id}", response_model=ArticleRead, dependencies=[require_edit])
 async def update_article(
     article_id: int, body: ArticleUpdate, db: AsyncSession = Depends(get_db)
 ) -> ArticleRead:
@@ -268,9 +260,7 @@ async def update_article(
     status_code=204,
     dependencies=[require_edit, require_publish],
 )
-async def delete_article(
-    article_id: int, db: AsyncSession = Depends(get_db)
-) -> None:
+async def delete_article(article_id: int, db: AsyncSession = Depends(get_db)) -> None:
     """Delete the article outright — body, tags and all.
 
     There is no longer a page left standing behind it, which is why this is a

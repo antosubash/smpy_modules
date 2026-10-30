@@ -65,10 +65,7 @@ def _alternate_links(alternates: list[tuple[str, str]]) -> str:
     ]
     default = next((url for locale, url in alternates if locales.is_default(locale)), None)
     if default is not None:
-        links.append(
-            '<xhtml:link rel="alternate" hreflang="x-default" '
-            f'href="{_attr(default)}"/>'
-        )
+        links.append(f'<xhtml:link rel="alternate" hreflang="x-default" href="{_attr(default)}"/>')
     return "".join(links)
 
 
@@ -102,18 +99,14 @@ async def sitemap(
     # address, including ones that sort after it.
     alternates: dict[str, list[tuple[str, str]]] = {}
     for page in pages:
-        alternates.setdefault(page.translation_group, []).append(
-            (page.locale, absolute(page))
-        )
+        alternates.setdefault(page.translation_group, []).append((page.locale, absolute(page)))
 
     entries: list[str] = []
     for page in pages:
         loc = xml_escape(absolute(page))
         links = _alternate_links(alternates[page.translation_group])
         lastmod = page.updated_at.isoformat() if page.updated_at else None
-        modified = (
-            f"<lastmod>{xml_escape(lastmod)}</lastmod>" if lastmod is not None else ""
-        )
+        modified = f"<lastmod>{xml_escape(lastmod)}</lastmod>" if lastmod is not None else ""
         entries.append(f"  <url><loc>{loc}</loc>{modified}{links}</url>")
 
     body = (

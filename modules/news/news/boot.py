@@ -55,9 +55,7 @@ def mount_public_routers(app: FastAPI, prefix: str) -> None:
 
     languages = locales.supported()
     for locale in languages:
-        app.include_router(
-            public_router(locale), prefix=f"{locales.path_prefix(locale)}{prefix}"
-        )
+        app.include_router(public_router(locale), prefix=f"{locales.path_prefix(locale)}{prefix}")
     if len(languages) > 1:
         # ``/en/news/x`` → ``/news/x``. The default language serves unprefixed,
         # but anything that builds URLs by pasting a locale in front will ask
@@ -68,9 +66,7 @@ def mount_public_routers(app: FastAPI, prefix: str) -> None:
         )
 
 
-def exempt_public_routes(
-    app: FastAPI, prefix: str, languages: tuple[str, ...]
-) -> None:
+def exempt_public_routes(app: FastAPI, prefix: str, languages: tuple[str, ...]) -> None:
     """Exempt the public article viewer from auth, one prefix per language.
 
     Without this every article 302s an anonymous reader to the login screen,

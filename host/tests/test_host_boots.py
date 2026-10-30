@@ -190,3 +190,31 @@ def test_images_public_page_is_not_shadowed_by_another_route(booted_host):
         return None
 
     assert asyncio.run(first_match()) == "/images/c/{slug}"
+
+
+def test_no_module_imports_the_deprecated_settings_shim():
+    """``settings.registration`` warns on import and goes away in 0.1.0 (#273).
+
+    Fresh interpreter: an earlier test may already have imported the shim, and
+    a module imports it only once, so the warning would not fire again here.
+    """
+    code = (
+        "import sys; sys.path.insert(0, 'host'); "
+        "import records_collections; "
+        "from simple_module_hosting import Settings, create_app; "
+        "create_app(Settings())"
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-W",
+            "error:settings.registration is deprecated:DeprecationWarning",
+            "-c",
+            code,
+        ],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr[-2000:]

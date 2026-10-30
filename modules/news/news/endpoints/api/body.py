@@ -26,9 +26,7 @@ its own viewer for the published snapshot.
 
 
 @router.get("/articles/{article_id}/detail", response_model=ArticleDetail)
-async def get_article_detail(
-    article_id: int, db: AsyncSession = Depends(get_db)
-) -> ArticleDetail:
+async def get_article_detail(article_id: int, db: AsyncSession = Depends(get_db)) -> ArticleDetail:
     """Everything the editor screens need, in one request.
 
     The listing shape widened rather than replaced — see ``detail_of`` — so the

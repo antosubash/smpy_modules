@@ -41,9 +41,7 @@ async def list_article_tags(
     keeps it in one place: that query is the listing's own, so "visible" means
     the same thing here as it does there, trash included.
     """
-    visible = await service.get_read(
-        db, article_id, include_drafts=may_see_drafts(request)
-    )
+    visible = await service.get_read(db, article_id, include_drafts=may_see_drafts(request))
     # One message for both misses on purpose: a distinguishable "exists but is
     # hidden" would answer the question the 404 is there to refuse.
     if visible is None:

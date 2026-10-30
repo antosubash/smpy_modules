@@ -49,9 +49,7 @@ async def schedule_article(
     response_model=ArticleRead,
     dependencies=[require_edit, require_publish],
 )
-async def publish_article(
-    article_id: int, db: AsyncSession = Depends(get_db)
-) -> ArticleRead:
+async def publish_article(article_id: int, db: AsyncSession = Depends(get_db)) -> ArticleRead:
     """Snapshot the draft and serve it."""
     await ArticlesService(db).publish(article_id)
     return await read_one(db, article_id)
@@ -62,9 +60,7 @@ async def publish_article(
     response_model=ArticleRead,
     dependencies=[require_edit, require_publish],
 )
-async def unpublish_article(
-    article_id: int, db: AsyncSession = Depends(get_db)
-) -> ArticleRead:
+async def unpublish_article(article_id: int, db: AsyncSession = Depends(get_db)) -> ArticleRead:
     """Take the article off the public site, keeping the draft."""
     await ArticlesService(db).unpublish(article_id)
     return await read_one(db, article_id)
@@ -75,9 +71,7 @@ async def unpublish_article(
     response_model=ArticleRead,
     dependencies=[require_edit],
 )
-async def submit_article(
-    article_id: int, db: AsyncSession = Depends(get_db)
-) -> ArticleRead:
+async def submit_article(article_id: int, db: AsyncSession = Depends(get_db)) -> ArticleRead:
     """Hand a draft to a reviewer.
 
     ``news.edit`` alone, deliberately: submitting is what an author does when
@@ -93,9 +87,7 @@ async def submit_article(
     response_model=ArticleRead,
     dependencies=[require_edit, require_publish],
 )
-async def approve_article(
-    article_id: int, db: AsyncSession = Depends(get_db)
-) -> ArticleRead:
+async def approve_article(article_id: int, db: AsyncSession = Depends(get_db)) -> ArticleRead:
     """Approve and publish in one action — see ``WorkflowMixin.approve``."""
     await ArticlesService(db).approve(article_id)
     return await read_one(db, article_id)
@@ -139,9 +131,7 @@ async def trash_article(article_id: int, db: AsyncSession = Depends(get_db)) -> 
     response_model=ArticleRead,
     dependencies=[require_edit],
 )
-async def restore_article(
-    article_id: int, db: AsyncSession = Depends(get_db)
-) -> ArticleRead:
+async def restore_article(article_id: int, db: AsyncSession = Depends(get_db)) -> ArticleRead:
     """Bring an article back out of the trash, status untouched."""
     await ArticlesService(db).restore(article_id)
     return await read_one(db, article_id)

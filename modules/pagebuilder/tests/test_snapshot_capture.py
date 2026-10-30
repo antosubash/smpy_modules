@@ -40,9 +40,7 @@ async def test_capture_skips_trashed_pages_but_keeps_templates(snapshot_db, tmp_
     session = snapshot_db.session
     session.add(Page(slug="live", title="Live"))
     session.add(Page(slug="starter", title="Starter", is_template=True))
-    session.add(
-        Page(slug="binned", title="Binned", deleted_at=datetime.now(UTC))
-    )
+    session.add(Page(slug="binned", title="Binned", deleted_at=datetime.now(UTC)))
     await session.flush()
 
     dest, _ = await _capture(snapshot_db, tmp_path)
@@ -98,9 +96,7 @@ async def test_capture_rewrites_media_urls_to_sentinels(snapshot_db, tmp_path):
             slug="home",
             title="Home",
             status=PageStatus.PUBLISHED,
-            draft_data={
-                "content": [{"props": {"src": "/media/pagebuilder/uuid1.jpg"}}]
-            },
+            draft_data={"content": [{"props": {"src": "/media/pagebuilder/uuid1.jpg"}}]},
         )
     )
     await session.flush()
@@ -128,9 +124,7 @@ async def test_media_row_without_a_file_is_reported_not_fatal(snapshot_db, tmp_p
     assert _read(dest, "manifest.json")["missing_media"] == ["gone.jpg"]
 
 
-async def test_capture_replaces_a_stale_bundle_rather_than_merging(
-    snapshot_db, tmp_path
-):
+async def test_capture_replaces_a_stale_bundle_rather_than_merging(snapshot_db, tmp_path):
     """A directory that already holds a bundle must not contribute to the new one.
 
     Snapshot ids come from the database while these files live on disk, so
@@ -152,9 +146,7 @@ async def test_capture_replaces_a_stale_bundle_rather_than_merging(
     assert {e["slug"] for e in _read(dest, "manifest.json")["pages"]} == {"real"}
 
 
-async def test_two_captures_of_unchanged_content_are_byte_identical(
-    snapshot_db, tmp_path
-):
+async def test_two_captures_of_unchanged_content_are_byte_identical(snapshot_db, tmp_path):
     snapshot_db.session.add(Page(slug="a", title="A"))
     await snapshot_db.session.flush()
 
@@ -165,9 +157,7 @@ async def test_two_captures_of_unchanged_content_are_byte_identical(
         assert (first / name).read_bytes() == (second / name).read_bytes()
 
 
-async def test_missing_media_is_not_rewritten_to_an_unresolvable_sentinel(
-    snapshot_db, tmp_path
-):
+async def test_missing_media_is_not_rewritten_to_an_unresolvable_sentinel(snapshot_db, tmp_path):
     """A row whose file is gone must leave the page's URL alone.
 
     Rewriting it to `asset://` produced a sentinel the bundle could not carry,
@@ -187,9 +177,7 @@ async def test_missing_media_is_not_rewritten_to_an_unresolvable_sentinel(
         Page(
             slug="home",
             title="Home",
-            draft_data={
-                "content": [{"props": {"src": "/media/pagebuilder/gone.jpg"}}]
-            },
+            draft_data={"content": [{"props": {"src": "/media/pagebuilder/gone.jpg"}}]},
         )
     )
     await session.flush()
@@ -218,18 +206,14 @@ async def test_og_image_travels_as_a_sentinel(snapshot_db, tmp_path):
             content_type="image/jpeg",
         )
     )
-    session.add(
-        Page(slug="home", title="Home", og_image="/media/pagebuilder/uuid1.jpg")
-    )
+    session.add(Page(slug="home", title="Home", og_image="/media/pagebuilder/uuid1.jpg"))
     await session.flush()
 
     dest, _ = await _capture(snapshot_db, tmp_path)
     assert _read(dest, "pages", "home.json")["og_image"] == "asset://hero.jpg"
 
 
-async def test_a_failed_capture_leaves_no_directory_behind(
-    snapshot_db, tmp_path, monkeypatch
-):
+async def test_a_failed_capture_leaves_no_directory_behind(snapshot_db, tmp_path, monkeypatch):
     """The row naming the directory rolls back; the files have to go too.
 
     Without the guard the bundle stayed on disk holding a copy of live

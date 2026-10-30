@@ -87,9 +87,7 @@ async def test_a_window_that_passed_unseen_is_retired_not_published(db) -> None:
     stay live forever, which is what publishing it and then clearing the
     elapsed ``unpublish_at`` as a leftover would do."""
     now = datetime.now(UTC)
-    missed = await make_article(
-        db, slug="missed", status=ArticleStatus.DRAFT, publish_body=False
-    )
+    missed = await make_article(db, slug="missed", status=ArticleStatus.DRAFT, publish_body=False)
     still_open = await make_article(
         db, slug="still-open", status=ArticleStatus.DRAFT, publish_body=False
     )

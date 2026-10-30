@@ -37,9 +37,7 @@ class TestNavAndSeoFields:
 
         assert page["meta_title"] is None
 
-    async def test_they_round_trip_through_an_update(
-        self, authed_client: AsyncClient
-    ) -> None:
+    async def test_they_round_trip_through_an_update(self, authed_client: AsyncClient) -> None:
         page = (
             await authed_client.post(
                 API, json={"title": "R", "slug": "round", "draft_data": {"content": []}}

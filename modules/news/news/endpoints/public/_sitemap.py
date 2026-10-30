@@ -143,9 +143,9 @@ async def sitemap_taxonomy_paths(db: AsyncSession) -> list[str]:
         .distinct()
         .order_by(NewsTag.slug, NewsArticle.locale)
     )
-    return [
-        public_category_path(slug, locale) for slug, locale in categories.all()
-    ] + [public_tag_path(slug, locale) for slug, locale in tags.all()]
+    return [public_category_path(slug, locale) for slug, locale in categories.all()] + [
+        public_tag_path(slug, locale) for slug, locale in tags.all()
+    ]
 
 
 async def sitemap_author_paths(db: AsyncSession) -> list[str]:
@@ -192,9 +192,7 @@ def sitemap_router() -> APIRouter:
     router = APIRouter()
 
     @router.api_route("/sitemap.xml", methods=["GET", "HEAD"], response_model=None)
-    async def article_sitemap(
-        request: Request, db: AsyncSession = Depends(get_db)
-    ) -> Response:
+    async def article_sitemap(request: Request, db: AsyncSession = Depends(get_db)) -> Response:
         """Every published article, in every language, for a crawler.
 
         Articles used to reach one through pagebuilder's sitemap, because they
@@ -216,17 +214,11 @@ def sitemap_router() -> APIRouter:
         # ``sitemap_taxonomy_paths``. Before the articles, because that is the
         # order a reader meets them in.
         narrowing = await sitemap_taxonomy_paths(db) + await sitemap_author_paths(db)
-        urls += [
-            f"<url><loc>{escape(base + path)}</loc></url>" for path in narrowing
-        ]
+        urls += [f"<url><loc>{escape(base + path)}</loc></url>" for path in narrowing]
         urls += [
             "<url>"
             f"<loc>{escape(base + public_article_path(slug, locale))}</loc>"
-            + (
-                f"<lastmod>{updated_at.date().isoformat()}</lastmod>"
-                if updated_at
-                else ""
-            )
+            + (f"<lastmod>{updated_at.date().isoformat()}</lastmod>" if updated_at else "")
             + "</url>"
             for slug, locale, updated_at in await sitemap_entries(db)
         ]

@@ -142,9 +142,7 @@ async def search_pages(
     )
 
 
-async def search_media(
-    db: AsyncSession, pattern: str, *, limit: int
-) -> tuple[list[Any], int]:
+async def search_media(db: AsyncSession, pattern: str, *, limit: int) -> tuple[list[Any], int]:
     """Media assets matching ``pattern``. ``([], 0)`` without pagebuilder."""
     contract = _contract()
     if contract is None:

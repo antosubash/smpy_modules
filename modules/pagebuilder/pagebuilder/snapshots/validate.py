@@ -101,8 +101,7 @@ def _width(column: str) -> int:
 
 
 _MEDIA_FIELD_LIMITS = tuple(
-    (field, _width(field))
-    for field in ("original_filename", "content_type", "folder")
+    (field, _width(field)) for field in ("original_filename", "content_type", "folder")
 )
 _GROUP_WIDTH: int = Page.__table__.columns["translation_group"].type.length
 
@@ -118,9 +117,7 @@ def check_media_entry(name: str, entry: dict[str, Any]) -> None:
         if not isinstance(value, str):
             raise BundleError(f"media entry {name!r} has a non-string {field}")
         if len(value) > limit:
-            raise BundleError(
-                f"media entry {name!r} has a {field} longer than {limit} characters"
-            )
+            raise BundleError(f"media entry {name!r} has a {field} longer than {limit} characters")
 
 
 def _check_redirects(dest: Path) -> None:
@@ -179,9 +176,7 @@ def check_documents(dest: Path, index: dict[str, Any]) -> None:
         # change exists to support, not a malformed bundle.
         page_key = (payload_locale(payload), payload["slug"])
         if page_key in seen_pages:
-            raise BundleError(
-                f"{label} repeats slug {payload['slug']!r} in {page_key[0]}"
-            )
+            raise BundleError(f"{label} repeats slug {payload['slug']!r} in {page_key[0]}")
         seen_pages.add(page_key)
         # One page per language per group, as the live index has it: a restore
         # matches by the pair, so two documents claiming it have one row to
@@ -201,6 +196,4 @@ def check_documents(dest: Path, index: dict[str, Any]) -> None:
 
     missing = sorted(referenced - set(index))
     if missing:
-        raise BundleError(
-            "bundle references media it does not contain: " + ", ".join(missing)
-        )
+        raise BundleError("bundle references media it does not contain: " + ", ".join(missing))

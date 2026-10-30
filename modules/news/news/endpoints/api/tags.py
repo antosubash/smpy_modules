@@ -52,9 +52,7 @@ async def create_tag(body: TagCreate, db: AsyncSession = Depends(get_db)) -> Tag
 
 
 @router.put("/tags/{tag_id}", response_model=TagRead)
-async def rename_tag(
-    tag_id: int, body: TagUpdate, db: AsyncSession = Depends(get_db)
-) -> TagRead:
+async def rename_tag(tag_id: int, body: TagUpdate, db: AsyncSession = Depends(get_db)) -> TagRead:
     tag = await _load(db, tag_id)
     try:
         updated = await tag_service.rename(db, tag, body.name)

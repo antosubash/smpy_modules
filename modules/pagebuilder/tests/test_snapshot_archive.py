@@ -35,9 +35,7 @@ def _page(slug: str = "home", **extra) -> bytes:
 
 
 def test_reads_a_minimal_bundle(tmp_path):
-    manifest, index = read_zip(
-        _zip(_minimal()), tmp_path / "out", BlobStore(tmp_path / "blobs")
-    )
+    manifest, index = read_zip(_zip(_minimal()), tmp_path / "out", BlobStore(tmp_path / "blobs"))
     assert manifest["format_version"] == 1
     assert index == {}
     # A bundle without redirects still yields a readable redirects document.
@@ -52,9 +50,7 @@ def test_unknown_format_version_is_refused(tmp_path):
 
 def test_missing_manifest_is_refused(tmp_path):
     with pytest.raises(BundleError, match="manifest"):
-        read_zip(
-            _zip({"pages/a.json": b"{}"}), tmp_path / "out", BlobStore(tmp_path / "b")
-        )
+        read_zip(_zip({"pages/a.json": b"{}"}), tmp_path / "out", BlobStore(tmp_path / "b"))
 
 
 def test_not_a_zip_is_refused(tmp_path):
@@ -121,18 +117,14 @@ def test_index_digest_that_traverses_is_refused(tmp_path):
     """
     (tmp_path / "secret.txt").write_bytes(b"private")
     index = {"hero.jpg": {"sha256": "../secret.txt", "original_filename": "hero.jpg"}}
-    data = _zip(
-        {"manifest.json": _manifest(), "media/index.json": json.dumps(index).encode()}
-    )
+    data = _zip({"manifest.json": _manifest(), "media/index.json": json.dumps(index).encode()})
     with pytest.raises(BundleError, match="no valid sha256"):
         read_zip(data, tmp_path / "out", BlobStore(tmp_path / "blobs"))
 
 
 def test_index_digest_that_is_absolute_is_refused(tmp_path):
     index = {"hero.jpg": {"sha256": "/etc/hosts", "original_filename": "hero.jpg"}}
-    data = _zip(
-        {"manifest.json": _manifest(), "media/index.json": json.dumps(index).encode()}
-    )
+    data = _zip({"manifest.json": _manifest(), "media/index.json": json.dumps(index).encode()})
     with pytest.raises(BundleError, match="no valid sha256"):
         read_zip(data, tmp_path / "out", BlobStore(tmp_path / "blobs"))
 
@@ -158,9 +150,7 @@ def test_round_trip_through_write_zip(tmp_path):
         json.dumps({"hero.jpg": {"sha256": sha, "original_filename": "hero.jpg"}})
     )
     (bundle / "pages").mkdir()
-    (bundle / "pages" / "home.json").write_bytes(
-        _page(draft_data={"src": "asset://hero.jpg"})
-    )
+    (bundle / "pages" / "home.json").write_bytes(_page(draft_data={"src": "asset://hero.jpg"}))
 
     target = tmp_path / "out.zip"
     size = write_zip(bundle, blobs, [{"sha256": sha}], target)

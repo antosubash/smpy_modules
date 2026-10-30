@@ -160,9 +160,7 @@ async def test_unpublish_clears_pending_unpublish_at(
         f"/api/pagebuilder/pages/{page['id']}/schedule",
         json={"unpublish_at": when},
     )
-    response = await authed_client.post(
-        f"/api/pagebuilder/pages/{page['id']}/unpublish"
-    )
+    response = await authed_client.post(f"/api/pagebuilder/pages/{page['id']}/unpublish")
     assert response.status_code == 200
     detail = await authed_client.get(f"/api/pagebuilder/pages/{page['id']}")
     assert detail.json()["unpublish_at"] is None

@@ -88,9 +88,7 @@ def test_one_article_per_language_per_translation_group() -> None:
     # Without it a second "add German" click — a double submit, a stale tab —
     # produces two German siblings and every alternates list starts
     # contradicting itself.
-    assert unique_index(
-        NewsArticle.__table__, "ix_news_articles_tenant_group_locale"
-    ) == (
+    assert unique_index(NewsArticle.__table__, "ix_news_articles_tenant_group_locale") == (
         "tenant_id",
         "translation_group",
         "locale",

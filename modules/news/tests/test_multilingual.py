@@ -48,9 +48,7 @@ class TestPublicAddress:
 
 
 class TestListingFilter:
-    async def test_a_feed_sees_only_its_own_language(
-        self, editor_client, bilingual
-    ) -> None:
+    async def test_a_feed_sees_only_its_own_language(self, editor_client, bilingual) -> None:
         """A feed block on a German page passes ``de``. An English card in a
         German list is worse than no card."""
         async with editor_client.db_state.session_factory() as db:
@@ -61,9 +59,7 @@ class TestListingFilter:
 
         assert [item["slug"] for item in body["items"]] == ["german-one"]
 
-    async def test_the_admin_list_shows_every_language(
-        self, editor_client, bilingual
-    ) -> None:
+    async def test_the_admin_list_shows_every_language(self, editor_client, bilingual) -> None:
         """An editor looking for an article should not have to guess which
         translation they filed the headline under."""
         async with editor_client.db_state.session_factory() as db:
@@ -74,9 +70,7 @@ class TestListingFilter:
 
         assert len(body["items"]) == 2
 
-    async def test_an_unconfigured_language_filters_nothing(
-        self, editor_client, bilingual
-    ) -> None:
+    async def test_an_unconfigured_language_filters_nothing(self, editor_client, bilingual) -> None:
         """The value arrives from a query string; a link to a language the site
         has since dropped should show the list, not an error."""
         async with editor_client.db_state.session_factory() as db:
@@ -115,9 +109,7 @@ class TestABlankFilterMatchesNothing:
         assert response.status_code == 200
         assert response.json()["items"] == []
 
-    async def test_a_whitespace_group_is_blank_too(
-        self, editor_client, bilingual
-    ) -> None:
+    async def test_a_whitespace_group_is_blank_too(self, editor_client, bilingual) -> None:
         async with editor_client.db_state.session_factory() as db:
             await make_article(db, slug="unrelated-one", locale="en")
 
@@ -158,9 +150,7 @@ class TestSlugsAreUniquePerLanguage:
     make the URL a workaround for a schema decision.
     """
 
-    async def test_two_languages_can_hold_the_same_slug(
-        self, editor_client, bilingual
-    ) -> None:
+    async def test_two_languages_can_hold_the_same_slug(self, editor_client, bilingual) -> None:
         async with editor_client.db_state.session_factory() as db:
             await make_article(db, slug="budget", locale="en")
             await make_article(db, slug="budget", locale="de")
@@ -200,9 +190,7 @@ class TestCreatingInALanguage:
         assert created.json()["locale"] == "de"
         assert created.json()["url"] == "/de/news/feldnotizen"
 
-    async def test_no_language_means_the_sites_default(
-        self, editor_client, bilingual
-    ) -> None:
+    async def test_no_language_means_the_sites_default(self, editor_client, bilingual) -> None:
         """What every caller written before there was such a thing as a
         language means, and what keeps a monolingual host from having to say
         ``en`` on every create."""
@@ -210,9 +198,7 @@ class TestCreatingInALanguage:
 
         assert created.json()["locale"] == "en"
 
-    async def test_an_unconfigured_language_is_refused(
-        self, editor_client, bilingual
-    ) -> None:
+    async def test_an_unconfigured_language_is_refused(self, editor_client, bilingual) -> None:
         """A write is refused rather than quietly filed under the default: the
         locale is fixed for the article's lifetime and is part of its address,
         so guessing would put it at a URL nobody can move it off."""
@@ -225,9 +211,7 @@ class TestCreatingInALanguage:
 
 
 class TestTheGroupIsListable:
-    async def test_the_switcher_asks_the_ordinary_listing(
-        self, editor_client, bilingual
-    ) -> None:
+    async def test_the_switcher_asks_the_ordinary_listing(self, editor_client, bilingual) -> None:
         """Through the listing rather than a route of its own, so it inherits
         the visibility rule instead of restating it."""
         async with editor_client.db_state.session_factory() as db:
@@ -278,5 +262,3 @@ class TestMonolingualSitesAreUnaffected:
         body = (await editor_client.get(f"{API}/articles")).json()
 
         assert body["items"][0]["url"] == "/news/field-notes"
-
-

@@ -77,9 +77,5 @@ class NewsArticleTag(Base, MultiTenantMixin, table=True):  # ty: ignore[unsuppor
 
     __tablename__ = "news_article_tags"
 
-    article_id: int = Field(
-        foreign_key=f"{ARTICLE_TABLE}.id", primary_key=True, ondelete="CASCADE"
-    )
-    tag_id: int = Field(
-        foreign_key="news_tags.id", primary_key=True, ondelete="CASCADE"
-    )
+    article_id: int = Field(foreign_key=f"{ARTICLE_TABLE}.id", primary_key=True, ondelete="CASCADE")
+    tag_id: int = Field(foreign_key="news_tags.id", primary_key=True, ondelete="CASCADE")

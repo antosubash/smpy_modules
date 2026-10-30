@@ -74,9 +74,7 @@ async def flag_for(client, slug: str) -> bool:
 
 
 class TestTheListingFlagsADivergedDraft:
-    async def test_a_published_article_whose_draft_moved_on_is_flagged(
-        self, editor_client
-    ) -> None:
+    async def test_a_published_article_whose_draft_moved_on_is_flagged(self, editor_client) -> None:
         article = await seed(editor_client, "moving", draft_data=body_with("v1"))
         await edit_body(editor_client, article.id, body_with("v2"))
 
@@ -87,9 +85,7 @@ class TestTheListingFlagsADivergedDraft:
 
         assert await flag_for(editor_client, "settled") is False
 
-    async def test_an_autosave_that_changed_nothing_is_not(
-        self, editor_client
-    ) -> None:
+    async def test_an_autosave_that_changed_nothing_is_not(self, editor_client) -> None:
         """A content comparison, not a timestamp one. The canvas saves on a
         timer, so a row can be written without the document changing — and an
         editor told there are unpublished edits every time they open an article
@@ -99,9 +95,7 @@ class TestTheListingFlagsADivergedDraft:
 
         assert await flag_for(editor_client, "resaved") is False
 
-    async def test_a_draft_holding_an_old_snapshot_is_not_flagged(
-        self, editor_client
-    ) -> None:
+    async def test_a_draft_holding_an_old_snapshot_is_not_flagged(self, editor_client) -> None:
         """The case the preview screen got right and a naive implementation
         gets wrong. This article was published, edited, and then taken down: it
         still carries the snapshot readers used to get, and its draft still
@@ -113,9 +107,7 @@ class TestTheListingFlagsADivergedDraft:
 
         assert await flag_for(editor_client, "withdrawn") is False
 
-    async def test_a_binned_article_is_not_flagged_in_the_trash(
-        self, editor_client
-    ) -> None:
+    async def test_a_binned_article_is_not_flagged_in_the_trash(self, editor_client) -> None:
         """Trashing keeps the status and the snapshot, and the viewer 404s the
         article regardless — so the one listing that shows binned rows must not
         say readers are still being served something."""
@@ -128,9 +120,7 @@ class TestTheListingFlagsADivergedDraft:
 
         assert rows["binned"][FLAG] is False
 
-    async def test_a_draft_that_was_never_published_is_not_flagged(
-        self, editor_client
-    ) -> None:
+    async def test_a_draft_that_was_never_published_is_not_flagged(self, editor_client) -> None:
         await seed(
             editor_client,
             "unfinished",
@@ -141,9 +131,7 @@ class TestTheListingFlagsADivergedDraft:
 
         assert await flag_for(editor_client, "unfinished") is False
 
-    async def test_the_single_article_read_agrees_with_the_listing(
-        self, editor_client
-    ) -> None:
+    async def test_the_single_article_read_agrees_with_the_listing(self, editor_client) -> None:
         """``get_read`` shares the listing's query so the row a just-saved
         article is read back through cannot describe it differently."""
         article = await seed(editor_client, "written", draft_data=body_with("v1"))
@@ -189,17 +177,13 @@ class TestTheListAndThePreviewAgree:
         assert preview.status_code == 200, preview.text
         return await flag_for(client, slug), self._preview_flag(preview.text)
 
-    async def test_they_agree_that_a_live_article_has_diverged(
-        self, editor_client
-    ) -> None:
+    async def test_they_agree_that_a_live_article_has_diverged(self, editor_client) -> None:
         article = await seed(editor_client, "moving", draft_data=body_with("v1"))
         await edit_body(editor_client, article.id, body_with("v2"))
 
         assert await self._both(editor_client, "moving", article.id) == (True, True)
 
-    async def test_they_agree_that_a_withdrawn_one_has_not(
-        self, editor_client
-    ) -> None:
+    async def test_they_agree_that_a_withdrawn_one_has_not(self, editor_client) -> None:
         article = await seed(editor_client, "withdrawn", draft_data=body_with("v1"))
         await edit_body(editor_client, article.id, body_with("v2"))
         await unpublish(editor_client, article.id)

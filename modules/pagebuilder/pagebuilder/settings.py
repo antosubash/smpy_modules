@@ -87,9 +87,7 @@ class PagebuilderSettings(BaseSettings):
     404ing the entire site at the first request.
     """
 
-    media_root: Path = Field(
-        default=Path("var/pagebuilder/media"), json_schema_extra=_RESTART
-    )
+    media_root: Path = Field(default=Path("var/pagebuilder/media"), json_schema_extra=_RESTART)
     """Filesystem directory where uploaded media is stored.
 
     Relative paths are anchored to the project root (``SM_PROJECT_ROOT``
@@ -99,9 +97,7 @@ class PagebuilderSettings(BaseSettings):
     directories against one database. Created if it doesn't exist.
     """
 
-    media_url_prefix: str = Field(
-        default="/media/pagebuilder", json_schema_extra=_RESTART
-    )
+    media_url_prefix: str = Field(default="/media/pagebuilder", json_schema_extra=_RESTART)
     """URL prefix the media directory is mounted at."""
 
     media_max_bytes: int = 10 * 1024 * 1024

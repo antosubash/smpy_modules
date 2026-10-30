@@ -126,9 +126,7 @@ class MediaService:
     async def list_folders(self) -> list[str]:
         """Return every distinct non-empty folder name, sorted."""
         result = await self.db.execute(
-            select(MediaAsset.folder)
-            .where(MediaAsset.folder.is_not(None))
-            .distinct()
+            select(MediaAsset.folder).where(MediaAsset.folder.is_not(None)).distinct()
         )
         return sorted({row for row in result.scalars().all() if row})
 
@@ -165,8 +163,7 @@ class MediaService:
             raise HTTPException(
                 status_code=415,
                 detail=(
-                    f"Declared content-type {declared!r} does not match "
-                    f"sniffed type {sniffed!r}"
+                    f"Declared content-type {declared!r} does not match sniffed type {sniffed!r}"
                 ),
             )
         content_type = sniffed

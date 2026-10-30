@@ -22,16 +22,12 @@ API = "/api/news"
 
 
 class TestTranslatingAnArticle:
-    async def test_it_creates_a_sibling_in_the_same_group(
-        self, editor_client, bilingual
-    ) -> None:
+    async def test_it_creates_a_sibling_in_the_same_group(self, editor_client, bilingual) -> None:
         """A sibling sharing a ``translation_group``, not a copy pointing back
         at an original: translations have no parent, so deleting the English
         one must not orphan or re-parent the rest."""
         async with editor_client.db_state.session_factory() as db:
-            article = await make_article(
-                db, slug="budget", locale="en", category="Field"
-            )
+            article = await make_article(db, slug="budget", locale="en", category="Field")
 
         response = await editor_client.post(
             f"{API}/articles/{article.id}/translations", json={"locale": "de"}
@@ -81,9 +77,7 @@ class TestTranslatingAnArticle:
 
         assert created["status"] == ArticleStatus.DRAFT.value
 
-    async def test_it_reuses_the_slug_under_the_new_prefix(
-        self, editor_client, bilingual
-    ) -> None:
+    async def test_it_reuses_the_slug_under_the_new_prefix(self, editor_client, bilingual) -> None:
         async with editor_client.db_state.session_factory() as db:
             article = await make_article(db, slug="budget", locale="en")
 
@@ -95,9 +89,7 @@ class TestTranslatingAnArticle:
 
         assert created["url"] == "/de/news/budget"
 
-    async def test_the_headline_carries_over_untranslated(
-        self, editor_client, bilingual
-    ) -> None:
+    async def test_the_headline_carries_over_untranslated(self, editor_client, bilingual) -> None:
         """A more useful starting point for a translator than a blank field,
         and it makes what still needs doing obvious in the list."""
         async with editor_client.db_state.session_factory() as db:
@@ -111,9 +103,7 @@ class TestTranslatingAnArticle:
 
         assert created["title"] == "The budget"
 
-    async def test_an_explicit_slug_and_title_are_honoured(
-        self, editor_client, bilingual
-    ) -> None:
+    async def test_an_explicit_slug_and_title_are_honoured(self, editor_client, bilingual) -> None:
         async with editor_client.db_state.session_factory() as db:
             article = await make_article(db, slug="budget", locale="en")
 
@@ -135,9 +125,7 @@ class TestTranslatingAnArticle:
         itself."""
         async with editor_client.db_state.session_factory() as db:
             article = await make_article(db, slug="budget", locale="en")
-        await editor_client.post(
-            f"{API}/articles/{article.id}/translations", json={"locale": "de"}
-        )
+        await editor_client.post(f"{API}/articles/{article.id}/translations", json={"locale": "de"})
 
         again = await editor_client.post(
             f"{API}/articles/{article.id}/translations", json={"locale": "de"}
@@ -148,9 +136,7 @@ class TestTranslatingAnArticle:
         # surface as "Slug already in use", which is about a slug nobody typed.
         assert "de" in again.json()["detail"]
 
-    async def test_an_unconfigured_language_is_refused(
-        self, editor_client, bilingual
-    ) -> None:
+    async def test_an_unconfigured_language_is_refused(self, editor_client, bilingual) -> None:
         """422 naming what is configured, so the error talks about the field
         the author filled in."""
         async with editor_client.db_state.session_factory() as db:
@@ -182,9 +168,7 @@ class TestTranslatingAnArticle:
 
         assert response.status_code == 404
 
-    async def test_a_trashed_article_is_a_404_too(
-        self, editor_client, bilingual
-    ) -> None:
+    async def test_a_trashed_article_is_a_404_too(self, editor_client, bilingual) -> None:
         """The rule every other write path applies. Translating one would put a
         live sibling behind something the author believes they deleted."""
         async with editor_client.db_state.session_factory() as db:

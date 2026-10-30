@@ -59,9 +59,7 @@ class TestFrontDoor:
 
         assert [i["slug"] for i in response.json()["props"]["items"]] == ["listed"]
 
-    async def test_an_anonymous_reader_is_not_sent_to_the_login_screen(
-        self, anon_client
-    ) -> None:
+    async def test_an_anonymous_reader_is_not_sent_to_the_login_screen(self, anon_client) -> None:
         """The whole point. ``/news/`` used to 404 and ``/news`` used to 302."""
         assert (await anon_client.get(f"{NEWS}/")).status_code == 200
 
@@ -86,9 +84,7 @@ class TestPaging:
             await _seed(anon_client, f"article-{index:02d}")
 
         first = await anon_client.get(f"{NEWS}/", headers={"X-Inertia": "true"})
-        second = await anon_client.get(
-            f"{NEWS}/?page=2", headers={"X-Inertia": "true"}
-        )
+        second = await anon_client.get(f"{NEWS}/?page=2", headers={"X-Inertia": "true"})
 
         assert len(first.json()["props"]["items"]) == 12
         assert len(second.json()["props"]["items"]) == 2
@@ -116,16 +112,12 @@ class TestCategoryArchive:
         assert [item["slug"] for item in props["items"]] == ["in"]
         assert props["heading"] == "Field notes"
 
-    async def test_a_category_nobody_formalised_still_has_a_page(
-        self, anon_client
-    ) -> None:
+    async def test_a_category_nobody_formalised_still_has_a_page(self, anon_client) -> None:
         # A category typed on an article but never given a row on the categories
         # screen has no slug — the raw value has to work as one.
         await _seed(anon_client, "typed", category="Ad hoc")
 
-        response = await anon_client.get(
-            f"{NEWS}/category/Ad hoc", headers={"X-Inertia": "true"}
-        )
+        response = await anon_client.get(f"{NEWS}/category/Ad hoc", headers={"X-Inertia": "true"})
 
         assert [i["slug"] for i in response.json()["props"]["items"]] == ["typed"]
 
@@ -144,9 +136,7 @@ class TestTagArchive:
         await _seed(anon_client, "untagged")
         await self._tag(anon_client, tagged, "Canopy", "canopy")
 
-        response = await anon_client.get(
-            f"{NEWS}/tag/canopy", headers={"X-Inertia": "true"}
-        )
+        response = await anon_client.get(f"{NEWS}/tag/canopy", headers={"X-Inertia": "true"})
 
         assert [i["slug"] for i in response.json()["props"]["items"]] == ["tagged"]
 
@@ -165,16 +155,12 @@ class TestTagArchive:
         assert response.status_code == 200, response.text
         assert [i["slug"] for i in response.json()["props"]["items"]] == ["chinese"]
 
-    async def test_an_unknown_tag_is_an_empty_archive_not_a_404(
-        self, anon_client
-    ) -> None:
+    async def test_an_unknown_tag_is_an_empty_archive_not_a_404(self, anon_client) -> None:
         # A tag can be removed from the last article carrying it. The URL that
         # was published while it existed should say "nothing here now".
         await _seed(anon_client, "something")
 
-        response = await anon_client.get(
-            f"{NEWS}/tag/gone", headers={"X-Inertia": "true"}
-        )
+        response = await anon_client.get(f"{NEWS}/tag/gone", headers={"X-Inertia": "true"})
 
         assert response.status_code == 200
         assert response.json()["props"]["items"] == []
@@ -188,7 +174,7 @@ class TestFeed:
 
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("application/rss+xml")
-        assert "<rss version=\"2.0\"" in response.text
+        assert '<rss version="2.0"' in response.text
         assert f"{NEWS}/in-the-feed" in response.text
         assert "What happened." in response.text
 
@@ -197,9 +183,7 @@ class TestFeed:
         response = await anon_client.get(f"{NEWS}/feed.xml")
         assert "draft-one" not in response.text
 
-    async def test_it_escapes_a_headline_that_would_break_the_xml(
-        self, anon_client
-    ) -> None:
+    async def test_it_escapes_a_headline_that_would_break_the_xml(self, anon_client) -> None:
         async with anon_client.db_state.session_factory() as db:
             await make_article(db, slug="ampersand", title="Fish & chips <b>")
 
@@ -208,9 +192,7 @@ class TestFeed:
         assert "Fish &amp; chips &lt;b&gt;" in response.text
         assert "<b>" not in response.text
 
-    async def test_the_feed_is_not_mistaken_for_an_article_slug(
-        self, anon_client
-    ) -> None:
+    async def test_the_feed_is_not_mistaken_for_an_article_slug(self, anon_client) -> None:
         # `/{slug}` matches any single segment, so registration order is what
         # keeps this from 404ing. It has been a bug once already.
         assert (await anon_client.get(f"{NEWS}/feed.xml")).status_code == 200

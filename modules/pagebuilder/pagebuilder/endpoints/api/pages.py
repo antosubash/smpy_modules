@@ -166,9 +166,7 @@ async def restore_page(page_id: int, db: AsyncSession = Depends(get_db)) -> Page
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[require_edit],
 )
-async def purge_page(
-    page_id: int, request: Request, db: AsyncSession = Depends(get_db)
-) -> None:
+async def purge_page(page_id: int, request: Request, db: AsyncSession = Depends(get_db)) -> None:
     """Remove a trashed page for good. Not reversible.
 
     Carries the bus for the same reason the soft delete no longer does: this is

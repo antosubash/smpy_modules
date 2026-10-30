@@ -60,9 +60,7 @@ async def list_categories(
 
 
 @router.post("/categories", response_model=CategoryRead, status_code=201)
-async def create_category(
-    body: CategoryCreate, db: AsyncSession = Depends(get_db)
-) -> CategoryRead:
+async def create_category(body: CategoryCreate, db: AsyncSession = Depends(get_db)) -> CategoryRead:
     if body.name.strip().lower() == UNCATEGORISED_LABEL.lower():
         # Not a real row anywhere — it is the empty-category bucket. Letting
         # one be created would produce two rows on the screen claiming the same
@@ -115,9 +113,7 @@ async def update_category(
             )
     await _checked_slug(db, body.slug, excluding=category.id)
     try:
-        updated = await category_service.rename(
-            db, category, name=body.name, slug=body.slug
-        )
+        updated = await category_service.rename(db, category, name=body.name, slug=body.slug)
     except IntegrityError:
         raise HTTPException(status_code=409, detail=_SLUG_TAKEN) from None
     counts = {c.name: c.article_count for c in await category_service.list_categories(db)}
@@ -132,9 +128,7 @@ async def update_category(
 
 
 @router.post("/categories/reorder", status_code=204)
-async def reorder_categories(
-    body: CategoryReorder, db: AsyncSession = Depends(get_db)
-) -> None:
+async def reorder_categories(body: CategoryReorder, db: AsyncSession = Depends(get_db)) -> None:
     await category_service.reorder(db, body.ordered_ids)
 
 

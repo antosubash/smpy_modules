@@ -42,9 +42,7 @@ class TestTemplates:
         """2h's "Save as template" — the flag is an ordinary field update."""
         page = await _create(authed_client, slug="promote", title="Promote")
 
-        await authed_client.put(
-            f"/api/pagebuilder/pages/{page['id']}", json={"is_template": True}
-        )
+        await authed_client.put(f"/api/pagebuilder/pages/{page['id']}", json={"is_template": True})
 
         listed = (await authed_client.get("/api/pagebuilder/pages/templates")).json()
         assert [p["slug"] for p in listed["items"]] == ["promote"]
@@ -66,9 +64,7 @@ class TestCopyFrom:
 
         assert copy["draft_data"] == HERO
 
-    async def test_the_copy_is_independent_of_its_source(
-        self, authed_client: AsyncClient
-    ) -> None:
+    async def test_the_copy_is_independent_of_its_source(self, authed_client: AsyncClient) -> None:
         """The bug a shared dict would cause: editing one rewrites the other."""
         source = await _create(authed_client, slug="src2", title="Src", draft_data=HERO)
         copy = await _create(
@@ -83,9 +79,7 @@ class TestCopyFrom:
         back = (await authed_client.get(f"/api/pagebuilder/pages/{source['id']}")).json()
         assert back["draft_data"] == HERO
 
-    async def test_copying_carries_no_published_state(
-        self, authed_client: AsyncClient
-    ) -> None:
+    async def test_copying_carries_no_published_state(self, authed_client: AsyncClient) -> None:
         """A starting point offers work in progress, not a live page."""
         source = await _create(authed_client, slug="src3", title="Src", draft_data=HERO)
         await authed_client.post(f"/api/pagebuilder/pages/{source['id']}/publish", json={})
@@ -114,15 +108,11 @@ class TestParent:
     async def test_parent_is_stored_and_read_back(self, authed_client: AsyncClient) -> None:
         parent = await _create(authed_client, slug="parent", title="Parent")
 
-        child = await _create(
-            authed_client, slug="child", title="Child", parent_id=parent["id"]
-        )
+        child = await _create(authed_client, slug="child", title="Child", parent_id=parent["id"])
 
         assert child["parent_id"] == parent["id"]
 
-    async def test_parent_does_not_change_the_public_url(
-        self, authed_client: AsyncClient
-    ) -> None:
+    async def test_parent_does_not_change_the_public_url(self, authed_client: AsyncClient) -> None:
         """The whole point of it being breadcrumb-only: re-parenting for
         navigation must never break a link that already exists."""
         parent = await _create(authed_client, slug="p2", title="Parent")
@@ -131,9 +121,7 @@ class TestParent:
 
         assert (await authed_client.get("/p/c2")).status_code == 200
 
-    async def test_trashing_a_parent_keeps_the_link(
-        self, authed_client: AsyncClient
-    ) -> None:
+    async def test_trashing_a_parent_keeps_the_link(self, authed_client: AsyncClient) -> None:
         """Deleting is reversible, so the relationship has to be too.
 
         Nulling children on a soft delete would mean a restore brought the page

@@ -34,7 +34,9 @@ async def mt(tmp_path):
 
 async def _upload(client: AsyncClient, headers, name: str = "secret.png") -> dict:
     response = await client.post(
-        API, files={"file": (name, _png(), "image/png")}, data={"folder": "private"},
+        API,
+        files={"file": (name, _png(), "image/png")},
+        data={"folder": "private"},
         headers=headers,
     )
     assert response.status_code == 201, response.text

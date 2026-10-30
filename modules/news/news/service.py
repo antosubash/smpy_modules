@@ -93,9 +93,9 @@ async def list_articles(
         # a mistyped tag URL should be an empty archive, not the whole one.
         stmt = stmt.where(
             NewsArticle.id.in_(
-                select(NewsArticleTag.article_id).join(
-                    NewsTag, NewsTag.id == NewsArticleTag.tag_id
-                ).where(or_(NewsTag.slug == tag, NewsTag.name == tag))
+                select(NewsArticleTag.article_id)
+                .join(NewsTag, NewsTag.id == NewsArticleTag.tag_id)
+                .where(or_(NewsTag.slug == tag, NewsTag.name == tag))
             )
         )
     if in_feed_only:
@@ -119,11 +119,7 @@ async def list_articles(
     # narrows, so the two compose safely in either order.
     stmt = query_filters.status(stmt, status)
 
-    total = (
-        await db.scalar(select(func.count()).select_from(stmt.subquery()))
-        if with_total
-        else 0
-    )
+    total = await db.scalar(select(func.count()).select_from(stmt.subquery())) if with_total else 0
 
     if include_drafts:
         # After the count, and only for a caller who may see drafts. Both
@@ -153,9 +149,7 @@ async def resolve_category_slug(db: AsyncSession, slug: str) -> str | None:
     )
 
 
-async def list_categories(
-    db: AsyncSession, *, include_drafts: bool = False
-) -> list[CategoryCount]:
+async def list_categories(db: AsyncSession, *, include_drafts: bool = False) -> list[CategoryCount]:
     """Counts per category, in the order the categories screen set. Blanks omitted.
 
     The order is the whole point: the categories screen exists to arrange the
@@ -204,9 +198,7 @@ async def get(db: AsyncSession, article_id: int) -> NewsArticle | None:
     this returns ``None`` because its callers turn the miss into their own 404
     with their own wording.
     """
-    return await db.scalar(
-        select(NewsArticle).where(NOT_TRASHED, NewsArticle.id == article_id)
-    )
+    return await db.scalar(select(NewsArticle).where(NOT_TRASHED, NewsArticle.id == article_id))
 
 
 async def update(

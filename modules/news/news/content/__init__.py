@@ -65,9 +65,7 @@ class ArticlesService(WorkflowMixin):
         self.db = db
 
     # ── Queries the write paths need ──────────────────────────────────
-    async def get_article(
-        self, article_id: int, *, include_trashed: bool = False
-    ) -> NewsArticle:
+    async def get_article(self, article_id: int, *, include_trashed: bool = False) -> NewsArticle:
         """One article by id.
 
         A trashed article is a 404 here, not a row with a flag on it: every
@@ -77,15 +75,11 @@ class ArticlesService(WorkflowMixin):
         that is *about* trashed articles.
         """
         article = await self.db.get(NewsArticle, article_id)
-        if article is None or (
-            article.deleted_at is not None and not include_trashed
-        ):
+        if article is None or (article.deleted_at is not None and not include_trashed):
             raise HTTPException(status_code=404, detail="Article not found")
         return article
 
-    async def get_by_slug_published(
-        self, slug: str, locale: str
-    ) -> NewsArticle | None:
+    async def get_by_slug_published(self, slug: str, locale: str) -> NewsArticle | None:
         """One published article by address — slug *and* language.
 
         Both, because a slug identifies an article only within one language:
@@ -155,9 +149,7 @@ class ArticlesService(WorkflowMixin):
             category=category,
             author=author,
             published_at=published_at,
-            draft_data=draft_data
-            if draft_data is not None
-            else empty_article_document(title),
+            draft_data=draft_data if draft_data is not None else empty_article_document(title),
             status=ArticleStatus.DRAFT,
             # Stamped at birth so a first edit from a stale tab is detectable
             # too; otherwise there is nothing to compare until the first save.

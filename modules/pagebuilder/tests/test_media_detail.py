@@ -96,9 +96,7 @@ class TestUsageQuery:
 
 
 class TestDetailEndpoints:
-    async def test_alt_text_caption_and_credit_round_trip(
-        self, authed_client: AsyncClient
-    ) -> None:
+    async def test_alt_text_caption_and_credit_round_trip(self, authed_client: AsyncClient) -> None:
         created = await authed_client.post(
             f"{API}/uploads",
             files={"file": ("shot.png", PNG_BYTES, "image/png")},

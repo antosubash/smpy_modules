@@ -85,9 +85,7 @@ async def free_slug(db: AsyncSession, base: str, locale: str) -> str:
     )
     if base not in taken:
         return base
-    for candidate in suffixed(
-        base, max_length=MAX_SLUG_LEN, limit=MAX_SLUG_ATTEMPTS + 1
-    ):
+    for candidate in suffixed(base, max_length=MAX_SLUG_LEN, limit=MAX_SLUG_ATTEMPTS + 1):
         if candidate not in taken:
             return candidate
     return ""

@@ -89,9 +89,7 @@ async def translate_article(
         author=article.author,
         published_at=article.published_at,
     )
-    await service.update(
-        db, translated, pinned=article.pinned, show_in_feed=article.show_in_feed
-    )
+    await service.update(db, translated, pinned=article.pinned, show_in_feed=article.show_in_feed)
     return await read_one(db, translated.id or 0)
 
 

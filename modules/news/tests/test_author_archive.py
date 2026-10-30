@@ -48,9 +48,7 @@ class TestTheArchive:
 
     async def test_it_omits_drafts(self, anon_client) -> None:
         await _seed(anon_client, "live", author="Anto Subash")
-        await _seed(
-            anon_client, "hidden", author="Anto Subash", status=ArticleStatus.DRAFT
-        )
+        await _seed(anon_client, "hidden", author="Anto Subash", status=ArticleStatus.DRAFT)
 
         props = await _props(anon_client, f"{NEWS}/author/anto-subash")
 
@@ -64,9 +62,7 @@ class TestTheArchive:
 
         assert [i["slug"] for i in props["items"]] == ["listed"]
 
-    async def test_an_unknown_byline_is_an_empty_archive_not_a_404(
-        self, anon_client
-    ) -> None:
+    async def test_an_unknown_byline_is_an_empty_archive_not_a_404(self, anon_client) -> None:
         """Same rule as an unknown tag: a byline can be edited off the last
         article carrying it, and the URL published while it existed should say
         "nothing here now"."""
@@ -77,9 +73,7 @@ class TestTheArchive:
         assert response.status_code == 200
         assert response.json()["props"]["items"] == []
 
-    async def test_an_unknown_byline_does_not_list_the_whole_archive(
-        self, anon_client
-    ) -> None:
+    async def test_an_unknown_byline_does_not_list_the_whole_archive(self, anon_client) -> None:
         """The failure the empty-list filter exists to prevent: an address
         nobody has published under must narrow to nothing, not to everything."""
         await _seed(anon_client, "a", author="Anto Subash")
@@ -127,9 +121,7 @@ class TestCollidingSpellings:
 
         assert {i["slug"] for i in props["items"]} == {"dotted", "undotted"}
 
-    async def test_the_page_is_titled_with_the_majority_spelling(
-        self, anon_client
-    ) -> None:
+    async def test_the_page_is_titled_with_the_majority_spelling(self, anon_client) -> None:
         await _seed(anon_client, "one", author="A Subash")
         await _seed(anon_client, "two", author="A Subash")
         await _seed(anon_client, "three", author="A. Subash")
@@ -140,9 +132,7 @@ class TestCollidingSpellings:
 
 
 class TestOneLanguageOnly:
-    async def test_it_lists_the_language_it_is_mounted_under(
-        self, bilingual_public_client
-    ) -> None:
+    async def test_it_lists_the_language_it_is_mounted_under(self, bilingual_public_client) -> None:
         client = bilingual_public_client
         await _seed(client, "english", author="Anto Subash", locale="en")
         await _seed(client, "german", author="Anto Subash", locale="de")
@@ -213,19 +203,13 @@ class TestTheSitemap:
         assert response.status_code == 200
         return response.text
 
-    async def test_an_author_with_a_published_article_is_listed(
-        self, anon_client
-    ) -> None:
+    async def test_an_author_with_a_published_article_is_listed(self, anon_client) -> None:
         await _seed(anon_client, "piece", author="Anto Subash")
 
-        assert "<loc>http://test/news/author/anto-subash</loc>" in await self._sitemap(
-            anon_client
-        )
+        assert "<loc>http://test/news/author/anto-subash</loc>" in await self._sitemap(anon_client)
 
     async def test_a_draft_only_author_is_not(self, anon_client) -> None:
-        await _seed(
-            anon_client, "piece", author="Anto Subash", status=ArticleStatus.DRAFT
-        )
+        await _seed(anon_client, "piece", author="Anto Subash", status=ArticleStatus.DRAFT)
 
         assert "author/anto-subash" not in await self._sitemap(anon_client)
 
@@ -241,9 +225,7 @@ class TestTheSitemap:
 
         assert "author/anto-subash" not in await self._sitemap(anon_client)
 
-    async def test_a_byline_with_no_address_is_not_advertised(
-        self, anon_client
-    ) -> None:
+    async def test_a_byline_with_no_address_is_not_advertised(self, anon_client) -> None:
         await _seed(anon_client, "piece", author="田中太郎")
 
         assert "/news/author/" not in await self._sitemap(anon_client)
@@ -256,9 +238,7 @@ class TestTheSitemap:
             "<loc>http://test/news/author/a-subash</loc>"
         ) == 1
 
-    async def test_each_language_gets_its_own_entry(
-        self, bilingual_public_client
-    ) -> None:
+    async def test_each_language_gets_its_own_entry(self, bilingual_public_client) -> None:
         client = bilingual_public_client
         await _seed(client, "english", author="Anto Subash", locale="en")
         await _seed(client, "german", author="Anto Subash", locale="de")

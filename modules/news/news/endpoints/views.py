@@ -140,9 +140,7 @@ async def article_editor(article_id: int, inertia: InertiaDep) -> InertiaRespons
             # Served rather than assembled in the browser, for the same reason
             # ``edit_url`` is on the listing DTO: this screen holds no opinion
             # about how the module routes its own screens.
-            "preview_url": constants.ARTICLE_PREVIEW_URL.format(
-                article_id=article_id
-            ),
+            "preview_url": constants.ARTICLE_PREVIEW_URL.format(article_id=article_id),
             **_locale_props(),
         },
     )
@@ -164,9 +162,7 @@ async def article_body(article_id: int, inertia: InertiaDep) -> InertiaResponse:
     rendering it through Inertia would only mean shipping the whole block
     document twice on every load.
     """
-    return await inertia.render(
-        constants._PAGE_ARTICLE_BODY, {"article_id": article_id}
-    )
+    return await inertia.render(constants._PAGE_ARTICLE_BODY, {"article_id": article_id})
 
 
 def _may_preview(request: Request) -> None:
@@ -206,16 +202,11 @@ def _preview_state(article: NewsArticle) -> dict[str, Any]:
     timestamp, too: an autosave that restored the previous text moves
     ``updated_at`` and leaves the document identical.
     """
-    live = (
-        article.status is ArticleStatus.PUBLISHED and article.published_data is not None
-    )
+    live = article.status is ArticleStatus.PUBLISHED and article.published_data is not None
     return {
         "status": article.status.value,
-        "has_unpublished_changes": live
-        and article.draft_data != article.published_data,
-        "live_url": (
-            public_article_path(article.slug, article.locale) if live else None
-        ),
+        "has_unpublished_changes": live and article.draft_data != article.published_data,
+        "live_url": (public_article_path(article.slug, article.locale) if live else None),
         "editor_url": constants.ARTICLE_EDITOR_URL.format(article_id=article.id),
     }
 

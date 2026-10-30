@@ -123,11 +123,7 @@ def block_diff(
                     "id": block_id,
                     "type": after_block.get("type"),
                     "fields": fields,
-                    **(
-                        {"type_before": before_block.get("type")}
-                        if type_changed
-                        else {}
-                    ),
+                    **({"type_before": before_block.get("type")} if type_changed else {}),
                 }
             )
 

@@ -170,9 +170,7 @@ class WorkflowMixin(TrashMixin):
             for article_id, due_at in await due_candidates(
                 self.db, column=column, status=status, now=now
             ):
-                if not await claim(
-                    self.db, article_id, column=column, status=status, now=now
-                ):
+                if not await claim(self.db, article_id, column=column, status=status, now=now):
                     # Another replica got there first, or a person did. Not a
                     # failure and not worth a line in the log: the article is
                     # being flipped, just not by us.
@@ -243,9 +241,7 @@ class WorkflowMixin(TrashMixin):
         gets forgotten."""
         article = await self.get_article(article_id)
         if article.status is not ArticleStatus.SUBMITTED_FOR_REVIEW:
-            raise HTTPException(
-                status_code=409, detail="Only a submitted article can be approved."
-            )
+            raise HTTPException(status_code=409, detail="Only a submitted article can be approved.")
         await claim_status(
             self.db,
             article,
@@ -270,9 +266,7 @@ class WorkflowMixin(TrashMixin):
     async def reject(self, article_id: int, note: str | None = None) -> NewsArticle:
         article = await self.get_article(article_id)
         if article.status is not ArticleStatus.SUBMITTED_FOR_REVIEW:
-            raise HTTPException(
-                status_code=409, detail="Only a submitted article can be rejected."
-            )
+            raise HTTPException(status_code=409, detail="Only a submitted article can be rejected.")
         await claim_status(
             self.db,
             article,

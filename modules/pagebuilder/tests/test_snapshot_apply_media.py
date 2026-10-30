@@ -99,9 +99,7 @@ async def test_two_assets_sharing_a_filename_stay_two_files(snapshot_db, tmp_pat
     restored = {(root / a.filename).read_bytes() for a in assets}
     assert restored == {PNG, PNG_RED_2X2}
 
-    alpha = (
-        await session.execute(select(Page).where(Page.slug == "alpha"))
-    ).scalars().one()
+    alpha = (await session.execute(select(Page).where(Page.slug == "alpha"))).scalars().one()
     blocks = alpha.draft_data["content"]
     assert blocks[0]["props"]["src"] != blocks[1]["props"]["src"]
     assert "asset://" not in json.dumps(alpha.draft_data)

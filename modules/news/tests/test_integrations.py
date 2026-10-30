@@ -143,9 +143,7 @@ class TestNewsImportsWithoutPagebuilder:
             print("ok")
         """)
 
-        done = subprocess.run(
-            [sys.executable, "-c", probe], capture_output=True, text=True
-        )
+        done = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True)
 
         assert done.returncode == 0, done.stderr
         assert done.stdout.strip().endswith("ok")

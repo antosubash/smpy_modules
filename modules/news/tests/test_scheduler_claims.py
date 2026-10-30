@@ -53,18 +53,14 @@ UNPUBLISH_CLAIM = {
 
 
 async def _due_draft(db, slug: str) -> NewsArticle:
-    article = await make_article(
-        db, slug=slug, status=ArticleStatus.DRAFT, publish_body=False
-    )
+    article = await make_article(db, slug=slug, status=ArticleStatus.DRAFT, publish_body=False)
     await ArticlesService(db).schedule(article.id, publish_at=EARLIER)
     return article
 
 
 async def _stored_publish_at(db, article_id: int) -> datetime | None:
     """``publish_at`` as the *row* holds it, not as the session remembers it."""
-    stored = await db.execute(
-        select(NewsArticle.publish_at).where(NewsArticle.id == article_id)
-    )
+    stored = await db.execute(select(NewsArticle.publish_at).where(NewsArticle.id == article_id))
     return stored.scalar_one()
 
 
@@ -122,9 +118,7 @@ class TestTheClaim:
 
         assert await claim(db, article.id, now=NOW, **PUBLISH_CLAIM) is False
 
-    async def test_a_row_published_by_hand_in_the_gap_cannot_be_claimed(
-        self, db
-    ) -> None:
+    async def test_a_row_published_by_hand_in_the_gap_cannot_be_claimed(self, db) -> None:
         article = await _due_draft(db, "beaten-by-a-human")
         await due_candidates(db, now=NOW, **PUBLISH_CLAIM)
 
@@ -164,9 +158,7 @@ class TestTwoReplicas:
         assert await claim(db, article.id, now=NOW, **PUBLISH_CLAIM) is False
         assert await _publish_revisions(db, article.id) == 1
 
-    async def test_the_loser_does_not_take_a_published_article_back_down(
-        self, db
-    ) -> None:
+    async def test_the_loser_does_not_take_a_published_article_back_down(self, db) -> None:
         # The unpublish half is the worse failure of the two: two replicas
         # racing it flip-flop the article rather than merely duplicating a row.
         article = await make_article(db, slug="expiring")
@@ -216,9 +208,7 @@ class TestAnAbandonedClaim:
         assert as_utc(row.publish_at) == EARLIER
         assert row.status is ArticleStatus.DRAFT
         # And the next tick, on any replica, simply finds it due again.
-        assert [r[0] for r in await due_candidates(db, now=NOW, **PUBLISH_CLAIM)] == [
-            article_id
-        ]
+        assert [r[0] for r in await due_candidates(db, now=NOW, **PUBLISH_CLAIM)] == [article_id]
 
 
 class TestAReleasedClaim:
@@ -237,9 +227,7 @@ class TestAReleasedClaim:
 
         assert as_utc(await _stored_publish_at(db, article.id)) == EARLIER
 
-    async def test_a_refused_publish_is_retried_on_the_next_tick(
-        self, db, monkeypatch
-    ) -> None:
+    async def test_a_refused_publish_is_retried_on_the_next_tick(self, db, monkeypatch) -> None:
         """End to end through ``process_due``: fail once, succeed after.
 
         The unclaimed code retried by accident — it never wrote anything for a

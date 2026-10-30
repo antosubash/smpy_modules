@@ -93,8 +93,7 @@ def checked_locale(value: str | None) -> str | None:
         raise HTTPException(
             status_code=422,
             detail=(
-                f"{value!r} is not a content locale. "
-                f"Configured: {', '.join(locales.supported())}."
+                f"{value!r} is not a content locale. Configured: {', '.join(locales.supported())}."
             ),
         )
     return resolved

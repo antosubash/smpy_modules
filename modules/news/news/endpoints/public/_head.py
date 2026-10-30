@@ -119,10 +119,7 @@ def article_head(
     if not index_in_search:
         parts.append('<meta name="robots" content="noindex,nofollow">')
     if json_ld:
-        parts.append(
-            '<script type="application/ld+json">'
-            f"{_safe_json_ld(json_ld)}</script>"
-        )
+        parts.append(f'<script type="application/ld+json">{_safe_json_ld(json_ld)}</script>')
     return "".join(part for part in parts if part)
 
 
@@ -187,11 +184,7 @@ def _safe_json_ld(doc: dict[str, Any]) -> str:
     containing ``</script>`` would close the element early. ``<\\/`` parses
     identically to ``</`` inside JSON, so the document round-trips.
     """
-    return (
-        json.dumps(doc)
-        .replace("</", "<\\/")
-        .replace("<!--", "<\\u0021--")
-    )
+    return json.dumps(doc).replace("</", "<\\/").replace("<!--", "<\\u0021--")
 
 
 _EXISTING_TITLE = re.compile(rb"<title>.*?</title>", re.S)
@@ -219,10 +212,7 @@ def inject(response: Response, head: str) -> Response:
         return response
     shell_head, rest = body.split(_CLOSE_HEAD, 1)
     patched = (
-        _EXISTING_TITLE.sub(b"", shell_head, count=1)
-        + head.encode("utf-8")
-        + _CLOSE_HEAD
-        + rest
+        _EXISTING_TITLE.sub(b"", shell_head, count=1) + head.encode("utf-8") + _CLOSE_HEAD + rest
     )
     response.body = patched
     response.headers["content-length"] = str(len(patched))

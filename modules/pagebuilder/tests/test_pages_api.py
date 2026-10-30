@@ -96,9 +96,7 @@ async def test_delete_page(authed_client: AsyncClient) -> None:
     page = await _create(authed_client)
     response = await authed_client.delete(f"/api/pagebuilder/pages/{page['id']}")
     assert response.status_code == 204
-    assert (
-        await authed_client.get(f"/api/pagebuilder/pages/{page['id']}")
-    ).status_code == 404
+    assert (await authed_client.get(f"/api/pagebuilder/pages/{page['id']}")).status_code == 404
 
 
 async def test_create_keeps_every_page_create_field(authed_client: AsyncClient) -> None:

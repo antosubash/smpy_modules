@@ -155,7 +155,7 @@ class PagebuilderModule(ModuleBase):
         The pre-seeded ``self.settings`` wins when present: that is the hook a
         test uses to pin configuration in a process with no settings rows.
         """
-        from settings.registration import register_module_settings
+        from simple_module_core.module_settings import register_module_settings
 
         from pagebuilder.services import PagebuilderServices
 
