@@ -24,8 +24,8 @@ from sm_images.ingest import upload_session as state
 from sm_images.ingest.admission import Admission
 from sm_images.ingest.service import safe_filename
 from sm_images.ingest.ticket import _BAD_PART, _GONE, Ticket, serializer
-from sm_images.intents import object_intent
 from sm_images.models import Collection
+from sm_images.storage.intents import object_intent
 from sm_images.tenancy import bound_tenant
 
 __all__ = ["assemble", "backend_of", "open_upload", "write_part"]

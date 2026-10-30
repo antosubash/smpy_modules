@@ -13,13 +13,13 @@ from typing import Any
 
 from sqlalchemy import delete, or_, select, update
 
-from sm_images.intents import add_intents
 from sm_images.map.revoke import gate_reopened, may_mutate, withdraw
 from sm_images.models import Image, Rendition, StepRun
 from sm_images.models.enums import LocationSource, StepStatus
 from sm_images.pipeline.runtime import current_runtime
 from sm_images.processing.exif import ExifData
 from sm_images.services import stats
+from sm_images.storage.intents import add_intents
 
 __all__ = [
     "add_intents",

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { act, click, mount, setValue } from '../test-dom';
+import { act, click, mount, setValue } from './test-dom';
 import type { ImportJob } from '../utils/types';
 import { flush, job, stubFetch } from './support';
 

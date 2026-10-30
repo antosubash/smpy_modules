@@ -28,10 +28,10 @@ from sqlalchemy import String, cast, delete, or_, select, update
 from sm_images.imports.jobs import SYNC, TERMINAL, load, now, where
 from sm_images.imports.lookup import get
 from sm_images.imports.terminal import release_staging
-from sm_images.intents import clear_intents, object_intent
 from sm_images.models import ImportItem, ImportJob
 from sm_images.models.enums import JobStatus
 from sm_images.pipeline.runtime import Runtime
+from sm_images.storage.intents import clear_intents, object_intent
 
 __all__ = ["SWEEP_CAP", "cancel_for_collection", "delete_job", "reap_staging"]
 

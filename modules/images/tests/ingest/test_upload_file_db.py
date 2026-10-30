@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 from file_storage.backends.filesystem import FilesystemBackend
 from httpx import ASGITransport, AsyncClient
-from sm_images.intents import use_session_factory
+from sm_images.storage.intents import use_session_factory
 
 from tests.pg_support import USING_POSTGRES, make_db_state
 from tests.support.app_harness import build_app

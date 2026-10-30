@@ -42,11 +42,11 @@ from sm_images.imports.zip_source import parts_fingerprint, sha_fingerprint
 from sm_images.ingest import multipart
 from sm_images.ingest import upload_session as state
 from sm_images.ingest.ticket import Ticket
-from sm_images.intents import clear_intents
 from sm_images.models import Collection, ImportJob, UploadSession, UploadStatus
 from sm_images.models.enums import ImportKind, JobStatus
 from sm_images.pipeline.runtime import Runtime
 from sm_images.storage import keys as storage_keys
+from sm_images.storage.intents import clear_intents
 
 __all__ = ["ZIP_CONTENT_TYPE", "fail_upload", "seal", "session_ticket", "start"]
 

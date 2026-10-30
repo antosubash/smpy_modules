@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { flush } from '../../page-tests/support';
-import { click, mount } from '../../test-dom';
+import { click, mount } from '../../page-tests/test-dom';
 import { PublicGallery } from './PublicGallery';
 
 afterEach(() => vi.unstubAllGlobals());

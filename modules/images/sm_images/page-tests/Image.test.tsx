@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { act, click, mount } from '../test-dom';
+import { act, click, mount } from './test-dom';
 import { collection, image, stubFetch } from './support';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());

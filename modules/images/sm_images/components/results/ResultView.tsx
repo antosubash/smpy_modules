@@ -1,4 +1,4 @@
-import '../../images-steps'; // fills the registry before any result renders
+import './plugins'; // fills the registry before any result renders
 
 import { useT } from '../../utils/i18n';
 import { GenericResultView } from './GenericResultView';

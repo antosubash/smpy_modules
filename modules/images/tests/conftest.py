@@ -65,7 +65,7 @@ def _default_tenant(request):
 def _reset_intent_factory(monkeypatch):
     """``use_session_factory`` sets a process-wide default; a test that sets it
     must not hand its (disposed) factory to the next one."""
-    from sm_images import intents
+    from sm_images.storage import intents
 
     monkeypatch.setattr(intents, "_default_factory", None)
 

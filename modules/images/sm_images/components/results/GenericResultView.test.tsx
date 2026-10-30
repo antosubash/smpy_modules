@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
 
-import { mount } from '../../test-dom';
+import { mount } from '../../page-tests/test-dom';
 import { ResultView } from './ResultView';
 
 const run = {

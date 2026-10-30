@@ -13,8 +13,8 @@ from typing import Any
 
 import pytest_asyncio
 from PIL import Image as PILImage
-from sm_images.intents import use_session_factory
 from sm_images.models import Image, ObjectIntent, StepRun
+from sm_images.storage.intents import use_session_factory
 from sqlalchemy import select
 
 from tests.support.stub_auth import as_user

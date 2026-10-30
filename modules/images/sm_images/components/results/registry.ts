@@ -32,7 +32,7 @@ const slot = (kind: ResultKind, id: string) => `${kind}:${id}`;
 
 /**
  * Register the component that renders one kind of result. A plugin calls this
- * from its `images-steps.ts`, which `sm_images/images-steps.ts` globs in. A
+ * from its `images-steps.ts`, which `components/results/plugins.ts` globs in. A
  * second registration for the same `(kind, id)` throws: two plugins fighting
  * over one view would otherwise be settled by import order.
  */

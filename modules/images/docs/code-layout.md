@@ -1,19 +1,18 @@
 # Code layout
 
-`sm_images` is grouped by feature. Find the feature, then the file. The
-300-line cap keeps files small, so a feature is a package, never one big module.
+`sm_images` follows the repo's [module layout](../../../docs/module-layout.md),
+and is its reference. This page maps that layout onto images: find the
+feature, then the file.
 
 ## Top level
 
-Only what the framework or every feature needs stays at the top of the package:
-
-| Module | What it is |
+| Path | What it is |
 | --- | --- |
 | `module.py` | The `ModuleBase` the host loads (the `simple_module` entry point) |
 | `tasks.py`, `task_config.py` | The Celery tasks, and their queues and beat schedule. **Both must stay here**: `background_tasks` imports `<package>.tasks` and `<package>.task_config` and looks nowhere else (`tests/core/test_task_discovery.py`) |
-| `constants.py`, `errors.py`, `events.py`, `menu.py` | Names, error types, published events, the console menu |
-| `settings.py`, `settings_boot.py` | The DB-backed settings class and what is read at boot |
-| `clock.py`, `db_time.py`, `intents.py` | Wall clock, database clock, write-ahead object intents, used everywhere |
+| `constants.py`, `errors.py`, `events.py` | Names, error types, published events |
+| `index.ts` | The TS surface a plugin imports (`@simple-module-py/images`) |
+| `pagebuilder-blocks.ts` | The ImageGallery block; pagebuilder globs this name |
 
 ## Feature packages
 
@@ -21,8 +20,10 @@ Only what the framework or every feature needs stays at the top of the package:
 | --- | --- |
 | `access/` | The collection policy (`access/__init__.py`), write rules, the redaction state, the sharing resource type, a background run's starter right |
 | `tenancy/` | Binding the tenant per request (`tenancy/__init__.py`), the tenancy mode, the request context |
+| `settings/` | The DB-backed settings class (`settings/__init__.py`) and what is read at boot (`settings/boot.py`) |
+| `clock/` | The wall clock (`clock/__init__.py`) and the database clock (`clock/db.py`) |
 | `billing/` | The storage-gauge facade billing sees (`billing/__init__.py`), the hold swap ops, settle, install, repair, metering keys |
-| `storage/` | The object store (`storage/__init__.py`) and the object-key layout (`storage/keys.py`) |
+| `storage/` | The object store (`storage/__init__.py`), the object-key layout (`storage/keys.py`) and write-ahead object intents (`storage/intents.py`) |
 | `serving/` | Serving image bytes (`serving/respond.py`): cache headers, `Range`, URLs |
 | `jobs/` | The platform beats: janitor, reconcile, purge and their phases |
 | `ingest/` | Uploads: multipart, base64, direct-to-storage, admission, dedupe |
@@ -34,30 +35,29 @@ Only what the framework or every feature needs stays at the top of the package:
 | `map/` | Points, PMTiles builds, the basemap style |
 | `models/`, `schemas/` | Tables and request/response shapes |
 | `services/` | Reads and writes the endpoints share |
-| `endpoints/` | Routers: `api/` (JSON), console and public views, request dependencies, CSRF |
+| `endpoints/` | Routers: `api/` (JSON), console and public views, request dependencies, CSRF, the console menu |
 | `contracts/` | What other modules may import. Anything outside it can move |
 
-`access`, `tenancy`, `billing` and `storage` keep their public face in the
-package's `__init__.py`, so `from sm_images import billing` and
-`billing.check(...)` read as before the package existed. That only works for a
-light module: an `__init__.py` runs whenever any sibling is imported, so
-`serving`'s heavy byte-serving code lives in `serving/respond.py` and its
-`__init__.py` is empty. Every module imports on its own in a fresh interpreter;
-keep it that way when adding imports to an `__init__.py`.
+`serving/__init__.py` holds only a docstring: its byte-serving code is heavy
+and imports half the package, so it lives in `serving/respond.py`. Every module
+imports on its own in a fresh interpreter. Keep it that way when adding
+imports to an `__init__.py`.
 
 ## Frontend
 
-`pages/` holds only real Inertia pages (the page name comes from the path). The
-rest is in `components/<feature>/`, `hooks/` and `utils/`, and page tests are in
-`page-tests/`.
+- `pages/`: the Inertia pages.
+- `components/<feature>/`: everything else, grouped by feature.
+  `components/results/plugins.ts` globs in the plugins' `images-steps.ts`.
+- `hooks/`, `utils/`: hooks and plain TS.
+- `page-tests/`: the page tests, `test-dom.tsx` and shared test support.
 
 ## Tests
 
-`tests/` mirrors the packages: `tests/<feature>/test_*.py`, with shared helpers
-in `tests/support/` and files in `tests/fixtures/` and `tests/plugin_fixture/`.
-A new test goes in the folder of the feature it exercises.
+`tests/<feature>/test_*.py` mirrors the packages; `tests/core/` covers boot,
+contracts, settings and task discovery. Shared helpers are in `tests/support/`;
+files the tests read are in `tests/fixtures/` and `tests/plugin_fixture/`.
 
-`tests/pg_support.py` stays at the root: it is the Postgres opt-in every module
-copies, and `scripts/tests/test_helper_parity.py` holds the copies identical,
-path depth included. The tenancy helpers (`tenancy/__init__.py`,
-`tenancy/_mode.py`) are copies of records' in the same way.
+`tests/pg_support.py` stays at the root, and the tenancy helpers
+(`tenancy/__init__.py`, `tenancy/_mode.py`) are copies of records'. The repo's
+parity checks hold both identical across modules; see
+[module layout](../../../docs/module-layout.md#tests).

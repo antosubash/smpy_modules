@@ -7,8 +7,8 @@ import uuid
 import pytest
 from simple_module_db.listeners import TenantIsolationError
 from sm_images import contracts
-from sm_images.intents import use_session_factory
 from sm_images.models import Image, Visibility
+from sm_images.storage.intents import use_session_factory
 from sm_images.tenancy import tenant_scope
 
 from tests.support.access import (

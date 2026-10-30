@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { registerResultView as publicRegister } from '../../index';
-import { mount } from '../../test-dom';
+import { mount } from '../../page-tests/test-dom';
 import { ResultView } from './ResultView';
 import { clearResultViews, getResultView, registerResultView } from './registry';
 

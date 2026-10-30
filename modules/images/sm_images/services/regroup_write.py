@@ -21,7 +21,7 @@ from typing import Any
 from sqlalchemy import Uuid, case, literal, select, update
 
 from sm_images import constants
-from sm_images.db_time import dialect_insert
+from sm_images.clock.db import dialect_insert
 from sm_images.map import schedule as map_schedule
 from sm_images.models import Group, Image
 

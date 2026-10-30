@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { flush } from '../../page-tests/support';
-import { mount } from '../../test-dom';
+import { mount } from '../../page-tests/test-dom';
 
 type Handler = (event?: unknown) => void;
 const handlers: Record<string, Handler> = {};

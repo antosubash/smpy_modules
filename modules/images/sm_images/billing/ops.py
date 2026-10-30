@@ -32,7 +32,7 @@ from simple_module_db import finalize_session
 from sqlalchemy import delete, select, update
 
 from sm_images import billing
-from sm_images.db_time import db_now
+from sm_images.clock.db import db_now
 from sm_images.models import BillingOp
 from sm_images.models.billing_op import BILLING_OP_MAX_AGE, NO_HOLD, OP_RELEASE, OP_SWAP
 

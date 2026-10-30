@@ -33,10 +33,10 @@ from simple_module_db import finalize_session
 from sqlalchemy import and_, exists, not_, or_, update
 
 from sm_images.imports.jobs import ACTIVE, SYNC, TERMINAL, load, now, returning_one, where
-from sm_images.intents import clear_intents, object_intent
 from sm_images.models import ImportItem, ImportJob
 from sm_images.models.enums import ImportKind, ItemStatus, JobStatus
 from sm_images.pipeline.runtime import Runtime
+from sm_images.storage.intents import clear_intents, object_intent
 
 __all__ = ["ERRORS_MAX", "fail", "finish", "release_staging", "try_complete"]
 

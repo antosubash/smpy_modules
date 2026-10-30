@@ -214,6 +214,14 @@ the app once.
 the root `.env` is the single source of truth for settings regardless of the
 command.
 
+**Module layout: `docs/module-layout.md`, with images as the reference.**
+A package root keeps only what something else looks up by name (`module.py`,
+`models/`, `tasks.py`, `task_config.py`, `pages/`, `locales/`, `index.ts`,
+`pagebuilder-blocks.ts`) plus `constants.py`, `errors.py` and `events.py`.
+Everything else goes in a feature package, and tests go in `tests/<feature>/`.
+New code in any module follows it. Other modules move towards it in PRs that
+contain only moves; the doc's table says how far each one has got.
+
 **300-line cap** on every `.py` / `.ts` / `.tsx`, enforced by
 `scripts/check_file_size.py`. Nothing under `modules/` is exempt. The check
 also lists files at 280+ lines as a WARNING: when you touch one, split it by

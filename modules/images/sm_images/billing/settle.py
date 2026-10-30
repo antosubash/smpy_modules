@@ -29,7 +29,7 @@ from sqlalchemy.orm import aliased
 
 from sm_images import billing
 from sm_images.billing import ops as billing_ops
-from sm_images.db_time import db_now
+from sm_images.clock.db import db_now
 from sm_images.models import BillingOp
 from sm_images.models.billing_op import (  # noqa: F401 - re-exported
     BILLING_OP_MAX_AGE,

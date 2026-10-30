@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { splitList } from '../components/pipeline/ParamsForm';
 import { PipelineTab } from '../components/pipeline/PipelineTab';
 import { PIPELINE_POLL_MS } from '../hooks/usePipelinePoll';
-import { act, click, mount, setValue } from '../test-dom';
+import { act, click, mount, setValue } from './test-dom';
 import type { PipelineOverview } from '../utils/types';
 import { flush, stubFetch } from './support';
 

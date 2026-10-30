@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
 
-import { act, click, mount, press } from '../../test-dom';
+import { act, click, mount, press } from '../../page-tests/test-dom';
 import { Lightbox } from './Lightbox';
 
 function Page({ onClose }: { onClose: () => void }) {

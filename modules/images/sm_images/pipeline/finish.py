@@ -32,7 +32,6 @@ from simple_module_db.callbacks import register_on_commit
 from sqlalchemy import delete
 
 from sm_images.errors import StorageQuotaExceeded
-from sm_images.intents import clear_intents, object_intent
 from sm_images.models import ObjectIntent
 from sm_images.pipeline import publish, registry, storage_hold
 from sm_images.pipeline.advance import advance_locked, conclude
@@ -41,6 +40,7 @@ from sm_images.pipeline.cycle import release
 from sm_images.pipeline.runtime import Runtime
 from sm_images.pipeline.step import StepOutcome
 from sm_images.storage import keys as storage_keys
+from sm_images.storage.intents import clear_intents, object_intent
 
 __all__ = ["Staged", "complete_step", "stage"]
 

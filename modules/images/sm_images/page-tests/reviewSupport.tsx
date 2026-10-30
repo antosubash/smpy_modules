@@ -1,7 +1,7 @@
 /** Shared stand-ins for the review page tests. */
 import { vi } from 'vitest';
 
-import { act, mount } from '../test-dom';
+import { act, mount } from './test-dom';
 import { collection, stubFetch } from './support';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());

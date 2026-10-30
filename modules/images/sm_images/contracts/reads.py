@@ -14,7 +14,7 @@ not exist.
 **A session is optional.** Pass the caller's own (``db=``) to join its unit of
 work, as pagebuilder's contracts do; without one the call opens a short
 read-only session from the factory ``on_startup`` registered
-(:func:`sm_images.intents.current_factory`) and rolls it back on the way out.
+(:func:`sm_images.storage.intents.current_factory`) and rolls it back on the way out.
 """
 
 from __future__ import annotations
@@ -26,13 +26,14 @@ from typing import Any
 
 from simple_module_core.resources import ACTION_VIEW, ResourcePrincipal
 
-from sm_images import constants, intents
+from sm_images import constants
 from sm_images.access import visible_collections
 from sm_images.contracts.schemas import CollectionPageRead, CollectionRead
 from sm_images.map import points as map_points
 from sm_images.models import Collection
 from sm_images.services import collections as service
 from sm_images.serving import urls
+from sm_images.storage import intents
 from sm_images.tenancy import tenant_scope
 
 __all__ = ["get_collection", "list_collections", "points", "rendition_url"]

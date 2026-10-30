@@ -15,10 +15,10 @@ from sqlalchemy import update
 
 from sm_images.imports import chunk, jobs, staging
 from sm_images.imports.beat import beating
-from sm_images.intents import clear_intents
 from sm_images.models import ImportJob
 from sm_images.models.enums import JobStatus
 from sm_images.pipeline.runtime import Runtime
+from sm_images.storage.intents import clear_intents
 
 __all__ = ["stage_source"]
 

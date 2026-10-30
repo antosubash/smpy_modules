@@ -154,8 +154,8 @@ def test_no_module_subscribes_to_record_events(booted_host):
 def test_images_object_intents_work_in_the_real_app(booted_host):
     """``on_startup`` hands images the host's session factory, so a handler's
     bare ``object_intent(keys)`` writes to the host database."""
-    from sm_images.intents import object_intent, use_session_factory
     from sm_images.models import ObjectIntent
+    from sm_images.storage.intents import object_intent, use_session_factory
     from sqlalchemy import select
 
     app = booted_host

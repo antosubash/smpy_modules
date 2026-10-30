@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { flush } from '../../page-tests/support';
-import { mount } from '../../test-dom';
+import { mount } from '../../page-tests/test-dom';
 
 // WebGL does not exist here: the canvas is the e2e's to prove.
 vi.mock('./MapCanvas', () => ({

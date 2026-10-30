@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { job } from '../../page-tests/support';
-import { click, mount } from '../../test-dom';
+import { click, mount } from '../../page-tests/test-dom';
 import { FAILURES_SHOWN, JobRow } from './JobRow';
 
 vi.mock('@inertiajs/react', async () => (await import('../../page-tests/support')).inertiaMock());

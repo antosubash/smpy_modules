@@ -9,7 +9,7 @@ from the DB at lifespan start, and the Settings screen writes it back. SYSTEM
 scope: one configuration for the whole deployment, shared by every tenant.
 
 The two fields read while booting are declared on the base class
-:class:`~sm_images.settings_boot.BootSettings` and carry ``requires_restart``.
+:class:`~sm_images.settings.boot.BootSettings` and carry ``requires_restart``.
 Everything else is read per request, or per task in a worker.
 """
 
@@ -20,7 +20,7 @@ from pydantic_settings import SettingsConfigDict
 
 from sm_images.constants import DOWNLOAD_TIMEOUT_MAX
 from sm_images.map.style import DEFAULT_STYLE_URL, validate_style_url
-from sm_images.settings_boot import BootSettings
+from sm_images.settings.boot import BootSettings
 
 __all__ = ["ImagesSettings"]
 

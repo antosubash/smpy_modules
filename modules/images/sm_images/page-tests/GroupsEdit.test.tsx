@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { act, click, mount, setValue } from '../test-dom';
+import { act, click, mount, setValue } from './test-dom';
 import type { GroupItem } from '../utils/types';
 import { collection, flush, image, stubFetch } from './support';
 

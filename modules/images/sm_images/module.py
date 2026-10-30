@@ -84,7 +84,7 @@ class ImagesModule(ModuleBase):
         resource_types.register(registry)
 
     def register_menu_items(self, registry: MenuRegistry) -> None:
-        from sm_images import menu
+        from sm_images.endpoints import menu
 
         menu.register(registry)
 
@@ -180,10 +180,11 @@ class ImagesModule(ModuleBase):
         ``images_extensions``, then frozen), the runtime the pipeline's
         after-commit dispatch runs on, and the ``images.storage_bytes`` gauge
         on billing's registry when billing runs."""
-        from sm_images import billing, intents, tenancy
+        from sm_images import billing, tenancy
         from sm_images.imports import log_redact
         from sm_images.pipeline.extensions import load_extensions
         from sm_images.serving import urls
+        from sm_images.storage import intents
 
         log_redact.install()
 

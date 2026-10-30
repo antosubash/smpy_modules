@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
 
-import { click, mount } from '../../test-dom';
+import { click, mount } from '../../page-tests/test-dom';
 import { TEXT_SHOWN } from './PromptAnswer';
 import { ResultView } from './ResultView';
 

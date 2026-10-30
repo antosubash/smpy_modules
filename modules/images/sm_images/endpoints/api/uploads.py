@@ -29,7 +29,6 @@ from sm_images.endpoints.deps import require_view
 from sm_images.errors import UploadNotFound, UploadNotOpen
 from sm_images.ingest import direct
 from sm_images.ingest.admission import prepare
-from sm_images.intents import current_factory
 from sm_images.models import Collection
 from sm_images.schemas.image import (
     DirectComplete,
@@ -39,6 +38,7 @@ from sm_images.schemas.image import (
     UploadResult,
 )
 from sm_images.storage import store_for
+from sm_images.storage.intents import current_factory
 from sm_images.tenancy import bound_tenant
 
 router = APIRouter(tags=["uploads"])

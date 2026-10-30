@@ -41,7 +41,6 @@ from sqlalchemy import select, update
 from sm_images import constants
 from sm_images.access import redaction
 from sm_images.constants import NO_SYNC
-from sm_images.intents import add_intents, clear_intents, object_intent
 from sm_images.map import pmtiles_build
 from sm_images.map.objects import drop_objects
 from sm_images.map.points import located
@@ -49,6 +48,7 @@ from sm_images.map.schedule import FAILED_COOLDOWN, request_if_due
 from sm_images.models import Collection, Image
 from sm_images.pipeline.runtime import Runtime
 from sm_images.storage import keys as storage_keys
+from sm_images.storage.intents import add_intents, clear_intents, object_intent
 
 __all__ = ["FAILED", "PUBLISHED", "SUPERSEDED", "UNAVAILABLE", "build_map_async"]
 

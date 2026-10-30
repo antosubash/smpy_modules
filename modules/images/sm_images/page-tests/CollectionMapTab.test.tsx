@@ -2,7 +2,7 @@
 import { router } from '@inertiajs/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { click, mount } from '../test-dom';
+import { click, mount } from './test-dom';
 import { collection, flush, stubFetch } from './support';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());

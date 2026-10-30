@@ -61,7 +61,7 @@ def worker_session_factory() -> Any:
     from simple_module_db.query_filter import bind_engine_policy
     from sqlalchemy.pool import NullPool
 
-    from sm_images import intents
+    from sm_images.storage import intents
     from sm_images.tenancy import install_guard
 
     url, policy, options = _config()

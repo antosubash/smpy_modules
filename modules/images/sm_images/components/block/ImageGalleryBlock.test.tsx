@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { flush, stubFetch } from '../../page-tests/support';
-import { mount } from '../../test-dom';
+import { mount } from '../../page-tests/test-dom';
 import {
   COUNT_DEFAULT,
   COUNT_MAX,

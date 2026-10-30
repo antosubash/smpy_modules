@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { click, mount } from '../test-dom';
+import { click, mount } from './test-dom';
 import { flush, stubFetch } from './support';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
@@ -59,7 +59,7 @@ describe('ShareDialog', () => {
     });
     const role = document.querySelector<HTMLSelectElement>('#images-share-role');
     if (role) {
-      const { setValue } = await import('../test-dom');
+      const { setValue } = await import('./test-dom');
       await setValue(role, 'edit');
     }
     await click(document.querySelector('[data-testid="images-share-candidate"] button'));

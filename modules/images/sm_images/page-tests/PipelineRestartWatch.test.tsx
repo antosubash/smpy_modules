@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PipelineTab, RESTART_WATCH_MS } from '../components/pipeline/PipelineTab';
 import { PIPELINE_POLL_MS } from '../hooks/usePipelinePoll';
-import { act, click, mount } from '../test-dom';
+import { act, click, mount } from './test-dom';
 import type { PipelineOverview } from '../utils/types';
 import { stubFetch } from './support';
 

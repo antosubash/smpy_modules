@@ -17,10 +17,10 @@ from typing import Any
 import pytest_asyncio
 from sm_images.imports import jobs, runner, staging
 from sm_images.imports.mapping import Mapping
-from sm_images.intents import use_session_factory
 from sm_images.models import Collection, Group, Image, ImportItem, ImportJob
 from sm_images.models.enums import ImportKind
 from sm_images.pipeline import registry
+from sm_images.storage.intents import use_session_factory
 from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import select
 

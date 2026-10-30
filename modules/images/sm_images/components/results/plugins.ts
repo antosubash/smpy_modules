@@ -7,7 +7,8 @@
  * a plugin and a host without the plugin builds nothing dangling.
  *
  * Imported for its side effect by the component that renders results
- * (`components/results/ResultView.tsx`), so the registry is filled before the first render. The
- * glob skips this file itself. A glob that matches nothing is not an error.
+ * (`components/results/ResultView.tsx`), so the registry is filled before the first render.
+ * Images ships no `images-steps.ts` of its own. A glob that matches nothing is
+ * not an error.
  */
-import.meta.glob('../../*/*/images-steps.ts', { eager: true });
+import.meta.glob('../../../../*/*/images-steps.ts', { eager: true });

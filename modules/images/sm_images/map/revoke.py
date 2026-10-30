@@ -32,13 +32,13 @@ from sqlalchemy import select, update
 
 from sm_images.access import redaction
 from sm_images.constants import NO_SYNC
-from sm_images.intents import add_intents
 from sm_images.map.objects import drop_objects
 from sm_images.map.schedule import request
 from sm_images.models import Collection, Image, StepRun
 from sm_images.models.enums import StepStatus
 from sm_images.pipeline import registry
 from sm_images.pipeline.runtime import Runtime, current_runtime
+from sm_images.storage.intents import add_intents
 
 __all__ = ["gate_reopened", "gate_saved", "may_mutate", "point_removed", "withdraw"]
 

@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PromptsTab } from '../components/prompts/PromptsTab';
-import { act, click, mount, setValue } from '../test-dom';
+import { act, click, mount, setValue } from './test-dom';
 import type { Prompt } from '../utils/types-prompts';
 import { stubFetch } from './support';
 

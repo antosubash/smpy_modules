@@ -2,7 +2,7 @@
 
 import { vi } from 'vitest';
 
-import { act } from '../test-dom';
+import { act } from './test-dom';
 import type { Collection, ImageItem, ImportJob } from '../utils/types';
 
 export type Call = { url: string; method: string; body: unknown };

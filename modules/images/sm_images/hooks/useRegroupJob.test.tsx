@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { act, mount } from '../test-dom';
+import { act, mount } from '../page-tests/test-dom';
 import { ApiError } from '../utils/api-net';
 import type { RegroupJob } from '../utils/types';
 
