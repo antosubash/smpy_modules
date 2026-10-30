@@ -44,7 +44,7 @@ def test_rebuild_threshold(pending, baseline, urgent, expected):
 def test_a_zero_threshold_is_refused(field):
     """0 would make every change due (``pending >= 0``): the minimum is 1."""
     from pydantic import ValidationError
-    from sm_images.settings import ImagesSettings
+    from sm_images.core.settings import ImagesSettings
 
     with pytest.raises(ValidationError):
         ImagesSettings(**{field: 0})
@@ -193,9 +193,9 @@ async def test_a_trashed_collection_is_not_built(pipe, fake_tippecanoe):
 
 async def test_the_janitor_keeps_the_published_map_and_reaps_a_lost_one(pipe):
     from simple_module_db import all_tenants
+    from sm_images.core.storage import keys as storage_keys
     from sm_images.jobs.janitor import reap_intents
     from sm_images.models import ObjectIntent
-    from sm_images.storage import keys as storage_keys
 
     coll = await pipe.collection({})
     live = storage_keys.map_key(T, str(coll.id), 1, "a")

@@ -6,8 +6,8 @@ from __future__ import annotations
 import asyncio
 
 from sm_images.contracts import ImageProcessed
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.pipeline import eager_drain, orchestrate
-from sm_images.tenancy import DEFAULT_TENANT
 
 from tests.pipeline.test_pipeline_review_fixes2 import _bounded
 from tests.pipeline.test_pipeline_review_fixes3 import _transport

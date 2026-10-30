@@ -2,7 +2,7 @@
 taken before the caller's transaction writes), a :class:`Duplicate` answer,
 and the file name a row keeps.
 
-The storage hold (``sm_images.billing``): an ``ingest`` op is written and
+The storage hold (``sm_images.core.billing``): an ``ingest`` op is written and
 claimed in a short transaction of its own, then billing swaps from no hold -
 a committed hold for the original, or a refusal - under a key of this
 attempt's own (two ``complete`` calls for one image never share one). The
@@ -26,8 +26,8 @@ from typing import Any
 from simple_module_db import finalize_session, mark_written
 from sqlalchemy import event
 
-from sm_images import billing
-from sm_images.billing import ops as billing_ops
+from sm_images.core import billing
+from sm_images.core.billing import ops as billing_ops
 from sm_images.core.errors import StorageQuotaExceeded
 from sm_images.models.billing_op import OP_EXPIRED, OP_INGEST
 

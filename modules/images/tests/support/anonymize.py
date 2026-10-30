@@ -13,7 +13,7 @@ from typing import Any
 from PIL import Image as PILImage
 from sm_images.pipeline import registry
 from sm_images.pipeline.builtin_steps import register_builtins
-from sm_images.steps.anonymize import AnonymizeStep, Detection
+from sm_images.pipeline.steps.anonymize import AnonymizeStep, Detection
 
 Found = list[Detection] | Callable[[PILImage.Image], list[Detection]]
 

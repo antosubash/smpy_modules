@@ -17,7 +17,7 @@ Either way an id with no installed implementation is *kept*, as
 ``not_installed``: removing a plugin must not silently rewrite a collection's
 configuration, and its runs settle as skipped rather than waiting forever.
 ``prompt:<id>`` steps are never registered: the caller resolves them from the
-database per execution (:func:`sm_images.ai.prompt_steps.resolve`) and passes
+database per execution (:func:`sm_images.pipeline.ai.prompt_steps.resolve`) and passes
 them as ``prompts``. A config-named one it did not pass (a deleted prompt, no
 ``ai``) is ``not_installed`` too. :meth:`PipelineConfig.with_requested` adds
 the resolved prompt runs requested for one image (auto-run, the run route)

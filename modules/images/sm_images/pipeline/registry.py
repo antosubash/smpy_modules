@@ -74,7 +74,7 @@ class InvalidPresetError(ValueError):
 
 
 def _check_schemas(preset: Preset) -> None:
-    from sm_images.ai.schema_safety import UnsafeSchema, check
+    from sm_images.pipeline.ai.schema_safety import UnsafeSchema, check
 
     for spec in preset.prompts:
         if spec.output_schema is None:

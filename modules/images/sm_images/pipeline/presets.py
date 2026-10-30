@@ -4,7 +4,7 @@ A :class:`Preset` is checked when it is built, so a malformed plugin fails at
 boot: spec ids unique, names unique, a group prompt's ``member`` names an
 image-scope spec of the same preset. ``register_preset`` also runs every
 ``output_schema`` through ``schema_safety``. Applying a preset to a collection
-(:mod:`sm_images.services.presets`) is idempotent by :attr:`PromptSpec.id`.
+(:mod:`sm_images.web.services.presets`) is idempotent by :attr:`PromptSpec.id`.
 """
 
 from __future__ import annotations
@@ -15,12 +15,12 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from sm_images.ai.reads import GroupRead, PromptResultRead
+from sm_images.pipeline.ai.reads import GroupRead, PromptResultRead
 
 __all__ = ["CrossCheck", "Preset", "PromptSpec"]
 
 CrossCheck = Callable[[GroupRead, list[PromptResultRead]], dict[str, Any]]
-"""Pure: called after a group run with no session; see :mod:`sm_images.ai.reads`."""
+"""Pure: called after a group run with no session; see :mod:`sm_images.pipeline.ai.reads`."""
 
 SPEC_ID = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$")
 Inputs = Literal["images", "results", "both"]

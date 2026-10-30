@@ -9,9 +9,9 @@ enumeration (:func:`sm_images.jobs.reconcile.tenants`). Per tenant, under
 * trashed rows past ``janitor_grace_days`` are purged with their objects
   (:func:`sm_images.jobs.purge.purge_expired`);
 * staged sources that a finished import job failed to delete itself are
-  deleted once past the grace period (:func:`sm_images.imports.cleanup.reap_staging`);
+  deleted once past the grace period (:func:`sm_images.ingest.imports.cleanup.reap_staging`);
 * storage-billing outbox ops done before the grace period are deleted
-  (:func:`sm_images.billing.ops.sweep`).
+  (:func:`sm_images.core.billing.ops.sweep`).
 
 Each is a phase of its own (:func:`sm_images.jobs.phases.run_phases`): one that
 raises is logged and counted as ``failed_phases``, and the rest still run.
@@ -36,8 +36,9 @@ from typing import Any
 from simple_module_db import all_tenants, finalize_session, tenant_context
 from sqlalchemy import delete, select, update
 
-from sm_images.billing import ops as billing_ops
-from sm_images.imports.cleanup import reap_staging
+from sm_images.core.billing import ops as billing_ops
+from sm_images.core.tenancy import all_tenants as tagged
+from sm_images.ingest.imports.cleanup import reap_staging
 from sm_images.ingest.upload_reaper import reap_expired_uploads
 from sm_images.jobs.phases import Phase, run_phases
 from sm_images.jobs.purge import MIN_INTENT_AGE, PurgeReport, purge_expired
@@ -52,7 +53,6 @@ from sm_images.models import (
     UploadStatus,
 )
 from sm_images.pipeline.runtime import Runtime
-from sm_images.tenancy import all_tenants as tagged
 
 __all__ = [
     "CAP",

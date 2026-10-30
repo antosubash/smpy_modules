@@ -7,5 +7,5 @@ export type {
   ResultKind,
   ResultViewProps,
   ResultViewRegistration,
-} from './components/results/registry';
-export { registerResultView } from './components/results/registry';
+} from './ui/components/results/registry';
+export { registerResultView } from './ui/components/results/registry';

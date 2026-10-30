@@ -13,13 +13,13 @@ from typing import Any
 
 from sqlalchemy import delete, or_, select, update
 
+from sm_images.core.storage.intents import add_intents
 from sm_images.map.revoke import gate_reopened, may_mutate, withdraw
 from sm_images.models import Image, Rendition, StepRun
 from sm_images.models.enums import LocationSource, StepStatus
+from sm_images.pipeline.processing.exif import ExifData
 from sm_images.pipeline.runtime import current_runtime
-from sm_images.processing.exif import ExifData
-from sm_images.services import stats
-from sm_images.storage.intents import add_intents
+from sm_images.web.services import stats
 
 __all__ = [
     "add_intents",
@@ -103,7 +103,7 @@ async def invalidate_other_mutators(
 ) -> list[str]:
     """``writer`` replaced the display copy: every *other* mutator's result
     described a copy that is gone (a blur that settled before a crop re-read the
-    original), so none may vouch for the new one (``sm_images.access.redaction``).
+    original), so none may vouch for the new one (``sm_images.core.access.redaction``).
     Their runs go back to ``pending``: an enabled one runs again, a disabled
     one settles as a ``disabled`` placeholder, reopened when it is enabled."""
     stmt = select(StepRun.step).where(

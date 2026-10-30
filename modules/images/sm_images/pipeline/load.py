@@ -54,7 +54,7 @@ class Loaded:
 
 
 async def _display_safe(db: Any, tenant: str, image: Image) -> bool:
-    from sm_images.access import redaction
+    from sm_images.core.access import redaction
 
     stmt = select(Collection).where(
         Collection.id == image.collection_id, Collection.tenant_id == tenant
@@ -94,7 +94,7 @@ async def load_run(
             cfg = await collection_config(db, tenant, image.collection_id, requested)
             impl = cfg.impl(step)
             if requested and impl is not None:
-                from sm_images.ai import prompt_steps
+                from sm_images.pipeline.ai import prompt_steps
 
                 impl = await prompt_steps.full(db, tenant, impl)
             safe = True

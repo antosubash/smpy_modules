@@ -8,7 +8,7 @@ their holds. So :func:`admit` refuses, before the session row is inserted:
   ``completing``, not expired) in the tenant - 429 ``too_many_open_uploads``;
 * when the declared sizes of those sessions plus this one would not fit the
   gauge's headroom - 402 ``quota_exceeded``. The headroom (``limit - level``,
-  :func:`sm_images.billing.headroom`) is read by :func:`prepare` *before* the
+  :func:`sm_images.core.billing.headroom`) is read by :func:`prepare` *before* the
   lock, so admission never opens a billing connection while holding it.
   Without billing this part is skipped.
 
@@ -38,8 +38,8 @@ from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from sm_images import billing
-from sm_images.clock import utcnow
+from sm_images.core import billing
+from sm_images.core.clock import utcnow
 from sm_images.core.errors import StorageQuotaExceeded, TooManyOpenUploads
 from sm_images.models import UploadAdmission, UploadSession, UploadStatus
 

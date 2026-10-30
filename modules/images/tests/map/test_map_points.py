@@ -13,9 +13,9 @@ from datetime import UTC, datetime
 import pytest
 from sm_images.contracts import points as points_contract
 from sm_images.core import constants
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.models import Group, StepRun, Visibility
 from sm_images.models.enums import StepStatus
-from sm_images.tenancy import DEFAULT_TENANT
 
 from tests.support.access import OWNER, STRANGER, collection, headers, image, principal
 from tests.support.pipeline import Blur, use_steps
@@ -155,7 +155,7 @@ async def test_an_internal_collection_has_no_public_points(client):
 
 @pytest.mark.unbound_tenant
 async def test_public_twin_serves_a_public_collection(client):
-    from sm_images.tenancy import tenant_scope
+    from sm_images.core.tenancy import tenant_scope
 
     with tenant_scope(DEFAULT_TENANT):
         coll, ids, _ = await _seed(client, Visibility.PUBLIC)

@@ -11,7 +11,10 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sm_images.billing import ops as billing_ops
+from sm_images.core.billing import ops as billing_ops
+from sm_images.core.storage import ImageStore
+from sm_images.core.storage import keys as storage_keys
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.jobs.janitor import purge_expired
 from sm_images.models import (
     Collection,
@@ -22,9 +25,6 @@ from sm_images.models import (
     StepRun,
 )
 from sm_images.pipeline.orchestrate import rerun_image
-from sm_images.storage import ImageStore
-from sm_images.storage import keys as storage_keys
-from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import select, update
 
 from tests.support.pipeline import Blur, use_steps

@@ -11,7 +11,7 @@ import socket
 
 import httpx
 import pytest
-from sm_images.imports import fetch, url_safety
+from sm_images.ingest.imports import fetch, url_safety
 
 PUBLIC_IP = "93.184.216.34"
 OTHER_PUBLIC_IP = "93.184.216.35"

@@ -9,13 +9,13 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from simple_module_db.callbacks import register_on_commit
 from sm_images.contracts import DisplayWriterMissing, ImageProcessed, StepOutcome
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.models import StepRun
 from sm_images.models.enums import StepStatus
 from sm_images.pipeline import executor, finish
 from sm_images.pipeline.config import PipelineConfigError, validate_pipeline_config
 from sm_images.pipeline.executor import run_step_async
-from sm_images.processing.exif import ExifData
-from sm_images.tenancy import DEFAULT_TENANT
+from sm_images.pipeline.processing.exif import ExifData
 from sqlalchemy import update
 
 from tests.pipeline.test_pipeline_leases import _claim

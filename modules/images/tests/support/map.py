@@ -8,9 +8,9 @@ import uuid
 
 import pytest
 from simple_module_db import finalize_session
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.map import pmtiles_build, schedule
 from sm_images.models import Collection
-from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import select
 
 T = DEFAULT_TENANT

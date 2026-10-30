@@ -12,8 +12,8 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sm_images.core.tenancy import DEFAULT_TENANT, tenant_scope
 from sm_images.models import Collection, Visibility
-from sm_images.tenancy import DEFAULT_TENANT, tenant_scope
 from sqlalchemy import update
 
 from tests.map.test_map_tiles import _public, _seed, _url

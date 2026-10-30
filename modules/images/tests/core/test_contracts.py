@@ -7,9 +7,9 @@ import uuid
 import pytest
 from simple_module_db.listeners import TenantIsolationError
 from sm_images import contracts
+from sm_images.core.storage.intents import use_session_factory
+from sm_images.core.tenancy import tenant_scope
 from sm_images.models import Image, Visibility
-from sm_images.storage.intents import use_session_factory
-from sm_images.tenancy import tenant_scope
 
 from tests.support.access import (
     ANON,
@@ -127,7 +127,7 @@ async def test_the_tenant_is_unbound_again_afterwards(seeded):
 
 def test_rendition_url_versions_by_the_renditions_bytes():
     from sm_images.models import Rendition
-    from sm_images.serving import cache
+    from sm_images.web.serving import cache
 
     img = Image(
         id=uuid.UUID(int=7),

@@ -8,8 +8,8 @@ from simple_module_core.body_limits import BodyLimitRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 from sm_images.core import constants
+from sm_images.core.settings import ImagesSettings
 from sm_images.module import ImagesModule
-from sm_images.settings import ImagesSettings
 
 EXPECTED_PERMISSIONS = {
     "images.view",
@@ -89,8 +89,8 @@ async def test_harness_serves_the_routers(client, storage):
 async def test_on_startup_installs_the_intent_session_factory(images_app):
     """Handlers call ``object_intent(keys)`` with no factory: ``on_startup`` must
     have set the default to the app's own."""
+    from sm_images.core.storage import intents
     from sm_images.models import ObjectIntent
-    from sm_images.storage import intents
     from sqlalchemy import select
 
     app, db_state = images_app

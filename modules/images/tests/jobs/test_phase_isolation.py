@@ -7,8 +7,8 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.jobs import janitor, reconcile, reconcile_dispatch
-from sm_images.tenancy import DEFAULT_TENANT
 
 T = DEFAULT_TENANT
 LATER = datetime.now(UTC) + timedelta(minutes=10)

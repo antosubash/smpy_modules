@@ -19,18 +19,18 @@ isolation applying as in a request:
   ``ImageProcessed`` once;
 * import jobs whose runner went silent are reclaimed (a new generation) and
   ``images.import_geojson`` is launched again; URL items left ``pending`` are
-  handed to ``images.download_items`` again (:mod:`sm_images.imports.recover`);
+  handed to ``images.download_items`` again (:mod:`sm_images.ingest.imports.recover`);
 * unfinished collection restarts whose heartbeat is stale are resumed (on the
   imports queue in broker mode, inline when eager);
 * regroup jobs of big collections whose heartbeat is stale are claimed (a new
-  generation) and relaunched from their cursor (:mod:`sm_images.regroup`);
+  generation) and relaunched from their cursor (:mod:`sm_images.jobs.regroup`);
 * group prompt runs requested longer than :data:`CUTOFF` ago and never
   claimed, or claimed under an expired lease, are dispatched again
-  (:func:`sm_images.ai.group_request.recover_group_runs`);
+  (:func:`sm_images.pipeline.ai.group_request.recover_group_runs`);
 * storage-gauge settlements left pending in the outbox (billing was down, a
   worker died after the commit) are retried in bounded pages, each op after
-  its backoff (:func:`sm_images.billing.ops.settle`), and an image that lost
-  a committed swap is reconciled (:func:`sm_images.billing.repair.repair`);
+  its backoff (:func:`sm_images.core.billing.ops.settle`), and an image that lost
+  a committed swap is reconciled (:func:`sm_images.core.billing.repair.repair`);
 * every live collection's stats are recomputed (the only way a box shrinks
   after deletes; there is no durable "touched" marker yet, so all of them,
   in batches);
@@ -55,12 +55,15 @@ from functools import partial
 from simple_module_db import all_tenants, finalize_session, tenant_context
 from sqlalchemy import or_, select, update
 
-from sm_images.ai.group_request import recover_group_runs
-from sm_images.billing import ops as billing_ops
-from sm_images.billing import repair as billing_repair
-from sm_images.imports.recover import recover_imports
+from sm_images.core.billing import ops as billing_ops
+from sm_images.core.billing import repair as billing_repair
+from sm_images.core.tenancy import all_tenants as tagged
+from sm_images.core.tenancy import valid_tenant
+from sm_images.ingest.imports.recover import recover_imports
 from sm_images.jobs.phases import run_phases
 from sm_images.jobs.reconcile_dispatch import dispatch_images, ids, repair_unleased
+from sm_images.jobs.regroup import control as regroup_control
+from sm_images.jobs.regroup import jobs as regroup_jobs
 from sm_images.map.recover import reconcile_maps
 from sm_images.models import (
     BillingOp,
@@ -72,12 +75,9 @@ from sm_images.models import (
     RegroupJob,
     StepRun,
 )
+from sm_images.pipeline.ai.group_request import recover_group_runs
 from sm_images.pipeline.runtime import Runtime
-from sm_images.regroup import control as regroup_control
-from sm_images.regroup import jobs as regroup_jobs
-from sm_images.services import stats
-from sm_images.tenancy import all_tenants as tagged
-from sm_images.tenancy import valid_tenant
+from sm_images.web.services import stats
 
 __all__ = ["CUTOFF", "reconcile_async", "reconcile_tenant", "tenants"]
 

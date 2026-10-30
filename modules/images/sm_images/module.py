@@ -63,8 +63,8 @@ class ImagesModule(ModuleBase):
         """
         from settings.registration import register_module_settings
 
-        from sm_images.services import ImagesServices
-        from sm_images.settings import ImagesSettings
+        from sm_images.core.settings import ImagesSettings
+        from sm_images.web.services import ImagesServices
 
         register_module_settings(
             app,
@@ -79,19 +79,19 @@ class ImagesModule(ModuleBase):
         )
 
     def register_resource_types(self, registry: ResourceTypeRegistry) -> None:
-        from sm_images.access import resource_types
+        from sm_images.core.access import resource_types
 
         resource_types.register(registry)
 
     def register_menu_items(self, registry: MenuRegistry) -> None:
-        from sm_images.endpoints import menu
+        from sm_images.web.endpoints import menu
 
         menu.register(registry)
 
     def register_middleware(self, app: FastAPI) -> None:
         """Remember the current request for the ``images.collection`` sharing
         loader, which the framework calls without one (``request_context``)."""
-        from sm_images.tenancy.request_context import RequestContextMiddleware
+        from sm_images.core.tenancy.request_context import RequestContextMiddleware
 
         app.add_middleware(RequestContextMiddleware)
 
@@ -162,9 +162,9 @@ class ImagesModule(ModuleBase):
         # Imported here, not at module top: the entry point must resolve for
         # Alembic autogenerate and the doctor even when the routers cannot be
         # built yet.
-        from sm_images.endpoints.api import router as api
-        from sm_images.endpoints.public import router as public
-        from sm_images.endpoints.views import router as views
+        from sm_images.web.endpoints.api import router as api
+        from sm_images.web.endpoints.public import router as public
+        from sm_images.web.endpoints.views import router as views
 
         api_router.include_router(api)
         # Beside the admin router, not in it: anonymous, so without its tenant
@@ -180,11 +180,11 @@ class ImagesModule(ModuleBase):
         ``images_extensions``, then frozen), the runtime the pipeline's
         after-commit dispatch runs on, and the ``images.storage_bytes`` gauge
         on billing's registry when billing runs."""
-        from sm_images import billing, tenancy
-        from sm_images.imports import log_redact
+        from sm_images.core import billing, tenancy
+        from sm_images.core.storage import intents
+        from sm_images.ingest.imports import log_redact
         from sm_images.pipeline.extensions import load_extensions
-        from sm_images.serving import urls
-        from sm_images.storage import intents
+        from sm_images.web.serving import urls
 
         log_redact.install()
 
@@ -210,7 +210,7 @@ class ImagesModule(ModuleBase):
         (``register_routes`` hands out only prefixed routers)."""
         from fastapi.routing import iter_route_contexts
 
-        from sm_images.endpoints.public_views import router
+        from sm_images.web.endpoints.public_views import router
 
         # Once per app: ``on_startup`` runs again on a lifespan restart.
         page = f"{constants.PUBLIC_COLLECTION_PREFIX.rstrip('/')}/{{slug}}"
@@ -228,8 +228,8 @@ class ImagesModule(ModuleBase):
     def _use_runtime(app: FastAPI, factory: object) -> None:
         from simple_module_hosting.tenancy import TenancyMode, tenancy_mode
 
+        from sm_images.core.storage import store_for
         from sm_images.pipeline.runtime import Runtime, use_runtime
-        from sm_images.storage import store_for
 
         use_runtime(
             Runtime(

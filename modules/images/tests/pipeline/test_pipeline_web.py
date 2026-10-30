@@ -5,12 +5,12 @@ from __future__ import annotations
 
 import uuid
 
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.map import pmtiles_build
 from sm_images.models import Collection, Image, StepRun
 from sm_images.module import ImagesModule
 from sm_images.pipeline.cycle import mark_processed
 from sm_images.pipeline.orchestrate import rerun_image
-from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import select, update
 
 from tests.support.pipeline import FIX, use_steps

@@ -14,9 +14,9 @@ from background_tasks.outbox_transport import OutboxTransport
 from background_tasks.settings import BackgroundTasksSettings
 from simple_module_db import all_tenants
 from sm_images.contracts import ImageProcessed
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.models import Collection
 from sm_images.pipeline.orchestrate import rerun_image
-from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import select, update
 
 from tests.support.pipeline import Scripted, use_steps

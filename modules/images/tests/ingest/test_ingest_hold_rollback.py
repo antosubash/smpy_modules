@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 from sm_images import pipeline
-from sm_images.imports import jobs
+from sm_images.ingest.imports import jobs
 from sm_images.models import ItemStatus
 
 from tests.ingest.test_upload_base64 import b64, post

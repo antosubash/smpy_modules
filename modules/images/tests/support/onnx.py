@@ -15,7 +15,7 @@ from typing import Any
 
 import numpy as np
 from sm_images.pipeline.step import StepContext, StepOutcome
-from sm_images.steps.anonymize import AnonymizeParams, AnonymizeStep
+from sm_images.pipeline.steps.anonymize import AnonymizeParams, AnonymizeStep
 
 FACE_OUTPUTS = [f"{part}_{s}" for part in ("cls", "obj", "bbox", "kps") for s in (8, 16, 32)]
 WIDTHS = {"cls": 1, "obj": 1, "bbox": 4, "kps": 10}
@@ -55,7 +55,7 @@ class FakeOrt:
         self.created = 0
 
     def install(self, monkeypatch) -> None:
-        from sm_images.steps.anonymize import detectors
+        from sm_images.pipeline.steps.anonymize import detectors
 
         fake = self
 

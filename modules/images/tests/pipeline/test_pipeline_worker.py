@@ -19,12 +19,12 @@ from simple_module_db import tenant_context
 from simple_module_db.stored_settings import Base as SettingsBase
 from simple_module_db.stored_settings import Setting
 from sm_images import task_config, tasks
+from sm_images.core.storage import intents, reset_worker_store
+from sm_images.core.tenancy import DEFAULT_TENANT, TenantUnbound
 from sm_images.models import Rendition, StepRun
 from sm_images.pipeline import registry
 from sm_images.pipeline import worker_runtime as wr
 from sm_images.pipeline.advance import plan_and_claim
-from sm_images.storage import intents, reset_worker_store
-from sm_images.tenancy import DEFAULT_TENANT, TenantUnbound
 from sqlalchemy import select
 
 from tests.pg_support import USING_POSTGRES, make_db_state

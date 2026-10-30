@@ -12,10 +12,10 @@ import base64
 import uuid
 
 from sm_images.core import constants
+from sm_images.core.settings import ImagesSettings
+from sm_images.core.storage import ImageStore
 from sm_images.ingest import Duplicate, IngestMeta, IngestService, dedupe
 from sm_images.models import Collection, Image
-from sm_images.settings import ImagesSettings
-from sm_images.storage import ImageStore
 from sqlalchemy import select
 
 from tests.support.upload import BASE, OLGA, all_rows, intents, jpeg, make_collection, stored

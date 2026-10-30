@@ -20,8 +20,8 @@ from sm_images.contracts.events import (
     ImageAdded,
     PromptResultReviewed,
 )
+from sm_images.core.tenancy import bound_tenant, tenant_scope
 from sm_images.models import Collection, Image, PromptResult
-from sm_images.tenancy import bound_tenant, tenant_scope
 
 __all__ = ["deleted", "emit", "image_added", "result_reviewed", "visibility_changed"]
 

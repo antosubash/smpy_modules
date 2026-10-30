@@ -37,7 +37,7 @@ from simple_module_db import tenant_context
 from simple_module_db.callbacks import register_on_commit
 from sqlalchemy import or_, select, update
 
-from sm_images.clock import utcnow as now
+from sm_images.core.clock import utcnow as now
 from sm_images.core.constants import NO_SYNC
 from sm_images.models import Collection, Image
 from sm_images.pipeline.runtime import Runtime, current_runtime
@@ -191,7 +191,7 @@ async def changed(
     if row is None or runtime is None or not due_row(row, runtime.settings()):
         return
     if tenant is None:
-        from sm_images.tenancy import bound_tenant
+        from sm_images.core.tenancy import bound_tenant
 
         tenant = bound_tenant()
     await request(db, runtime, tenant, collection_id)

@@ -119,7 +119,7 @@ def test_builtins_are_registered_by_default(monkeypatch):
     monkeypatch.setattr(extensions, "_BUILTIN_LOADERS", REAL_LOADERS)
     extensions.load_extensions()
     quality = ["quality"] if importlib.util.find_spec("cv2") else []  # the [quality] extra
-    from sm_images.ai import ai_available
+    from sm_images.pipeline.ai import ai_available
 
     classify = ["classify"] if ai_available() else []  # the [ai] extra
     anonymize = ["anonymize"] if importlib.util.find_spec("onnxruntime") else []

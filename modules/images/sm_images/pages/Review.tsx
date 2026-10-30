@@ -6,15 +6,15 @@ import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { ImagesLayout } from '../components/ImagesLayout';
-import { ReviewPanel } from '../components/review/ReviewPanel';
-import { useReviewKeys } from '../hooks/useReviewKeys';
-import { useReviewQueue } from '../hooks/useReviewQueue';
-import { listPrompts } from '../utils/api-prompts';
-import type { ReviewAction, ReviewFilter } from '../utils/api-review';
-import { keys, useT } from '../utils/i18n';
-import type { Collection } from '../utils/types';
-import type { Prompt } from '../utils/types-prompts';
+import { ImagesLayout } from '../ui/components/ImagesLayout';
+import { ReviewPanel } from '../ui/components/review/ReviewPanel';
+import { useReviewKeys } from '../ui/hooks/useReviewKeys';
+import { useReviewQueue } from '../ui/hooks/useReviewQueue';
+import { listPrompts } from '../ui/utils/api-prompts';
+import type { ReviewAction, ReviewFilter } from '../ui/utils/api-review';
+import { keys, useT } from '../ui/utils/i18n';
+import type { Collection } from '../ui/utils/types';
+import type { Prompt } from '../ui/utils/types-prompts';
 
 const STATUSES = {
   unreviewed: keys.images.review.filter.unreviewed,

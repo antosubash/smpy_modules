@@ -5,11 +5,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sm_images.contracts import ImageProcessed, StepOutcome
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.models import Collection, LocationSource
 from sm_images.pipeline import registry
 from sm_images.pipeline.orchestrate import rerun_image
 from sm_images.pipeline.plan import is_stale
-from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import select, update
 
 from tests.support.pipeline import FIX, Blur, Scripted, use_steps

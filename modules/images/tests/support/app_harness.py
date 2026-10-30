@@ -27,9 +27,9 @@ from simple_module_core.events import EventBus
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_hosting.middleware import TENANT_HEADER, TenantMiddleware
 from simple_module_inertia import InertiaConfig, inertia_dependency_factory
+from sm_images.core.settings import ImagesSettings
+from sm_images.core.tenancy import configure, install_guard
 from sm_images.module import ImagesModule
-from sm_images.settings import ImagesSettings
-from sm_images.tenancy import configure, install_guard
 
 from tests.pg_support import make_db_state
 from tests.support.stub_auth import (  # noqa: F401 - re-exported: tests import them from here

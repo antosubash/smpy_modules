@@ -11,8 +11,8 @@ from background_tasks.outbox_transport import OutboxTransport
 from background_tasks.settings import BackgroundTasksSettings
 from simple_module_db import finalize_session
 from sm_images.contracts import ImageProcessed
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.pipeline import eager_drain
-from sm_images.tenancy import DEFAULT_TENANT
 
 from tests.pipeline.test_pipeline_review_fixes2 import _bounded
 from tests.support.pipeline import Scripted, use_steps

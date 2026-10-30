@@ -13,8 +13,8 @@ from typing import Any
 
 import pytest_asyncio
 from PIL import Image as PILImage
+from sm_images.core.storage.intents import use_session_factory
 from sm_images.models import Image, ObjectIntent, StepRun
-from sm_images.storage.intents import use_session_factory
 from sqlalchemy import select
 
 from tests.support.stub_auth import as_user
@@ -39,7 +39,7 @@ def png(**kw: Any) -> bytes:
 
 
 def heic(**kw: Any) -> bytes:
-    from sm_images.processing.heif import register_heif
+    from sm_images.pipeline.processing.heif import register_heif
 
     register_heif()
 

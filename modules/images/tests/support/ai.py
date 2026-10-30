@@ -23,7 +23,7 @@ from sm_images.models import Prompt, PromptResult
 from sm_images.models.enums import PromptScope
 from sm_images.pipeline import registry
 from sm_images.pipeline.builtin_steps import register_builtins
-from sm_images.steps.classify import ClassifyStep
+from sm_images.pipeline.steps.classify import ClassifyStep
 from sqlalchemy import select
 
 

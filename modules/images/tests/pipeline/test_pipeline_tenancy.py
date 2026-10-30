@@ -9,12 +9,12 @@ import pytest
 from simple_module_db.listeners import current_tenant_id
 from sm_images import pipeline
 from sm_images.contracts import ImageProcessed
+from sm_images.core.tenancy import tenant_scope
 from sm_images.jobs.reconcile import reconcile_async
 from sm_images.models import Collection, StepRun
 from sm_images.pipeline.advance import plan_and_claim
 from sm_images.pipeline.orchestrate import dispatch_ready
 from sm_images.pipeline.runtime import Runtime, use_runtime
-from sm_images.tenancy import tenant_scope
 from sqlalchemy import select, update
 
 from tests.support.pipeline import Scripted, use_steps

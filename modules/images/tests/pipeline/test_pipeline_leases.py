@@ -7,12 +7,12 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.models import StepRun
 from sm_images.pipeline.advance import plan_and_claim
 from sm_images.pipeline.claim import complete, lock_image, renew
 from sm_images.pipeline.executor import run_step_async
 from sm_images.pipeline.step import StepOutcome
-from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import update
 
 from tests.support.pipeline import Blur, Scripted, make_pipe, use_steps

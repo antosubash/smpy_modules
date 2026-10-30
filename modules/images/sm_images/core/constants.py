@@ -256,7 +256,7 @@ ERROR_CODES: Final = (
 )
 """Every code an upload can answer with; each has a translated sentence."""
 
-# Storage metering (decision 10, ``sm_images.billing``): a billing gauge in
+# Storage metering (decision 10, ``sm_images.core.billing``): a billing gauge in
 # bytes. The key is a ``Plan.limits`` key, so renaming it orphans every limit.
 METER_STORAGE: Final = "images.storage_bytes"
 METER_STORAGE_LABEL_KEY: Final = "images.meters.storage_bytes"

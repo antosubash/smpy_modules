@@ -12,7 +12,7 @@
 * **Object intents** commit through this engine's factory
   (``intents.use_session_factory``).
 * **Settings** - ``settings_for(ImagesSettings, "sm_images")`` (DB-backed, 30 s
-  cache); **storage** - :func:`sm_images.storage.worker_store`; **bus** - the
+  cache); **storage** - :func:`sm_images.core.storage.worker_store`; **bus** - the
   framework's worker bus (durable subscriptions of every installed module).
 * **Registry** - ``load_extensions()`` on first use, the same code path as the
   web process's ``on_startup``.
@@ -61,8 +61,8 @@ def worker_session_factory() -> Any:
     from simple_module_db.query_filter import bind_engine_policy
     from sqlalchemy.pool import NullPool
 
-    from sm_images.storage import intents
-    from sm_images.tenancy import install_guard
+    from sm_images.core.storage import intents
+    from sm_images.core.tenancy import install_guard
 
     url, policy, options = _config()
     key = (url, policy.tenant_strict, policy.default_tenant_id, tuple(sorted(options.items())))
@@ -97,7 +97,7 @@ def _forget() -> None:
 
 def reset_worker_runtime() -> None:
     """Forget the engine and the store (``worker_process_init``, tests)."""
-    from sm_images.storage import reset_worker_store
+    from sm_images.core.storage import reset_worker_store
 
     with _lock:
         _forget()
@@ -108,7 +108,7 @@ def worker_settings() -> Any:
     from background_tasks import settings_for
 
     from sm_images.core.constants import PACKAGE
-    from sm_images.settings import ImagesSettings
+    from sm_images.core.settings import ImagesSettings
 
     return settings_for(ImagesSettings, PACKAGE)
 
@@ -120,9 +120,9 @@ def _bus() -> Any:
 
 
 def worker_runtime() -> Runtime:
-    from sm_images.imports import log_redact
+    from sm_images.core.storage import worker_store
+    from sm_images.ingest.imports import log_redact
     from sm_images.pipeline.extensions import load_extensions
-    from sm_images.storage import worker_store
 
     log_redact.install()
     load_extensions()
@@ -141,7 +141,7 @@ def task_tenant() -> str:
     from background_tasks import sync_db
     from simple_module_db.listeners import current_tenant_id
 
-    from sm_images.tenancy import TenantUnbound
+    from sm_images.core.tenancy import TenantUnbound
 
     tenant = current_tenant_id.get()
     if tenant:

@@ -21,7 +21,7 @@ session, so it must be written before the caller's session first writes:
 on file-backed SQLite the caller then holds the writer lock and the intent
 waits on it. A caller adding several images in one transaction calls
 :meth:`IngestService.reserve` for all of them first and passes each
-:class:`Slot` in. The storage hold (``sm_images.billing``) follows the same
+:class:`Slot` in. The storage hold (``sm_images.core.billing``) follows the same
 rule, so ``reserve(..., sizes=)`` takes it there too (committed at once by
 billing's swap); the insert finishes its op, or hands it back to be released
 when nothing kept it - in the caller's transaction, so a caller that rolls
@@ -42,20 +42,20 @@ from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 
-from sm_images import billing, pipeline
-from sm_images.core import events
+from sm_images import pipeline
+from sm_images.core import billing, events
 from sm_images.core.errors import StorageQuotaExceeded
+from sm_images.core.storage import ImageStore
+from sm_images.core.storage import keys as storage_keys
+from sm_images.core.storage.intents import clear_intents, object_intent
+from sm_images.core.tenancy import bound_tenant
 from sm_images.ingest import dedupe
 from sm_images.ingest import slots as holds
 from sm_images.ingest.guards import Inspected, inspect, read_staged
 from sm_images.ingest.meta import IngestMeta, normalise
 from sm_images.ingest.slots import Duplicate, Slot, safe_filename
 from sm_images.models import Collection, Image, StepRun
-from sm_images.services import stats
-from sm_images.storage import ImageStore
-from sm_images.storage import keys as storage_keys
-from sm_images.storage.intents import clear_intents, object_intent
-from sm_images.tenancy import bound_tenant
+from sm_images.web.services import stats
 
 __all__ = ["Duplicate", "IngestService", "Slot", "safe_filename"]
 
@@ -114,7 +114,7 @@ class IngestService:
         await holds.finalize_or_release(self.db, self._factory(), self.acquired)
 
     def _factory(self) -> Any:
-        """Where billing's own short transactions run (``sm_images.billing``)."""
+        """Where billing's own short transactions run (``sm_images.core.billing``)."""
         return billing.factory_of(self.db, self.intent_factory)
 
     def inspect(self, data: bytes) -> Inspected:

@@ -68,8 +68,8 @@ def host(tmp_path, monkeypatch):
 
 
 async def _seed(app):
+    from sm_images.core.tenancy import DEFAULT_TENANT, tenant_scope
     from sm_images.models import Collection, Group, Image, Visibility
-    from sm_images.tenancy import DEFAULT_TENANT, tenant_scope
     from sqlalchemy import select
     from users.models import User
 
@@ -109,8 +109,8 @@ async def _seed(app):
 
 async def _delete(app, ids, what):
     """Make the id absent: delete the image or the group for real."""
+    from sm_images.core.tenancy import DEFAULT_TENANT, tenant_scope
     from sm_images.models import Group, Image
-    from sm_images.tenancy import DEFAULT_TENANT, tenant_scope
     from sqlalchemy import delete, update
 
     with tenant_scope(DEFAULT_TENANT):

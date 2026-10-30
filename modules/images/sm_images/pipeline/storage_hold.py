@@ -38,9 +38,9 @@ from typing import Any
 from simple_module_db import finalize_session
 from sqlalchemy import func, select, update
 
-from sm_images import billing
-from sm_images.billing import ops as billing_ops
-from sm_images.billing.settle import CLAIM
+from sm_images.core import billing
+from sm_images.core.billing import ops as billing_ops
+from sm_images.core.billing.settle import CLAIM
 from sm_images.core.errors import StorageQuotaExceeded
 from sm_images.models import Image, Rendition
 from sm_images.models.billing_op import OP_EXPIRED, OP_SWAP

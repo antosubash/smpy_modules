@@ -4,15 +4,15 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { ConfirmDialog } from '../components/ConfirmDialog';
-import { ImagesLayout } from '../components/ImagesLayout';
-import { GroupEditor } from '../components/viewer/GroupEditor';
-import { ImageMeta } from '../components/viewer/ImageMeta';
-import { ImageViewer } from '../components/viewer/ImageViewer';
-import { NeighborNav, type Neighbors } from '../components/viewer/NeighborNav';
-import { deleteImage } from '../utils/api';
-import { keys, useT } from '../utils/i18n';
-import type { Collection, ImageItem } from '../utils/types';
+import { ConfirmDialog } from '../ui/components/ConfirmDialog';
+import { ImagesLayout } from '../ui/components/ImagesLayout';
+import { GroupEditor } from '../ui/components/viewer/GroupEditor';
+import { ImageMeta } from '../ui/components/viewer/ImageMeta';
+import { ImageViewer } from '../ui/components/viewer/ImageViewer';
+import { NeighborNav, type Neighbors } from '../ui/components/viewer/NeighborNav';
+import { deleteImage } from '../ui/utils/api';
+import { keys, useT } from '../ui/utils/i18n';
+import type { Collection, ImageItem } from '../ui/utils/types';
 
 type Props = {
   image: ImageItem;

@@ -10,7 +10,7 @@
    of the replaced keys added, then the next planning round - dependants
    claimed, ``ImageProcessed`` decided - all committing together.
    A ``prompt:*`` run also writes its ``images_prompt_result`` row there
-   (:func:`sm_images.ai.results.record_prompt_run`), and records the prompt's
+   (:func:`sm_images.pipeline.ai.results.record_prompt_run`), and records the prompt's
    revision as the run's version. ``storage_bytes`` and the storage hold move
    here too; a growing image's hold is swapped between the two phases
    (``storage_hold``).
@@ -32,6 +32,8 @@ from simple_module_db.callbacks import register_on_commit
 from sqlalchemy import delete
 
 from sm_images.core.errors import StorageQuotaExceeded
+from sm_images.core.storage import keys as storage_keys
+from sm_images.core.storage.intents import clear_intents, object_intent
 from sm_images.models import ObjectIntent
 from sm_images.pipeline import publish, registry, storage_hold
 from sm_images.pipeline.advance import advance_locked, conclude
@@ -39,8 +41,6 @@ from sm_images.pipeline.claim import complete, lock_image
 from sm_images.pipeline.cycle import release
 from sm_images.pipeline.runtime import Runtime
 from sm_images.pipeline.step import StepOutcome
-from sm_images.storage import keys as storage_keys
-from sm_images.storage.intents import clear_intents, object_intent
 
 __all__ = ["Staged", "complete_step", "stage"]
 
@@ -219,7 +219,7 @@ async def complete_step(
             requeue = ok  # still ours: only the display fence failed
         else:
             if prompt:
-                from sm_images.ai.results import record_prompt_run
+                from sm_images.pipeline.ai.results import record_prompt_run
 
                 await record_prompt_run(db, loaded, outcome, writes)
             await clear_intents(db, staged.keys)

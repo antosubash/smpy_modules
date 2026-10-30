@@ -21,8 +21,8 @@ from sm_images.core.errors import (
     UnsupportedType,
     UploadNotFound,
 )
+from sm_images.core.tenancy import bound_tenant
 from sm_images.ingest.sniff import EXTENSIONS
-from sm_images.tenancy import bound_tenant
 
 __all__ = ["Ticket", "declared_type", "load_ticket", "serializer"]
 

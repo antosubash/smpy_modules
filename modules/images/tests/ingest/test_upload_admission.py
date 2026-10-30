@@ -94,7 +94,7 @@ async def test_the_open_session_cap(api, opener):
 
 
 def test_the_cap_defaults_to_twenty():
-    from sm_images.settings import ImagesSettings
+    from sm_images.core.settings import ImagesSettings
 
     assert ImagesSettings.model_fields["max_open_uploads_per_tenant"].default == 20
 

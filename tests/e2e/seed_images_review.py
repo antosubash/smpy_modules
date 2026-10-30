@@ -26,9 +26,9 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from headless_settings import headless_settings  # noqa: E402
 from simple_module_core.environments import NON_PROD_ENVIRONMENTS  # noqa: E402
 from simple_module_hosting.app_builder import create_app  # noqa: E402
+from sm_images.core.tenancy import DEFAULT_TENANT, tenant_scope  # noqa: E402
 from sm_images.models import Image, Prompt, PromptResult  # noqa: E402
 from sm_images.models.enums import StepStatus  # noqa: E402
-from sm_images.tenancy import DEFAULT_TENANT, tenant_scope  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
 E2E_SQLITE = ROOT / "host" / "test.db"

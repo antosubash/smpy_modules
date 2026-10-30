@@ -34,19 +34,19 @@ def _load_builtin_steps() -> None:
 
 
 def _load_quality_step() -> None:
-    from sm_images.steps.quality import register_quality
+    from sm_images.pipeline.steps.quality import register_quality
 
     register_quality()  # only when the [quality] extra (cv2) is installed
 
 
 def _load_anonymize_step() -> None:
-    from sm_images.steps.anonymize import register_anonymize
+    from sm_images.pipeline.steps.anonymize import register_anonymize
 
     register_anonymize()  # only when the [anonymize] extra (onnxruntime) is installed
 
 
 def _load_classify_step() -> None:
-    from sm_images.steps.classify import register_classify
+    from sm_images.pipeline.steps.classify import register_classify
 
     register_classify()  # only when the [ai] extra (the ai module, Pydantic AI) is installed
 

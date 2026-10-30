@@ -139,7 +139,7 @@ so the setting is ignored there and a warning is logged at boot.
 
 ## Tenancy
 
-Every router binds a tenant through `sm_images.tenancy`, a copy of records':
+Every router binds a tenant through `sm_images.core.tenancy`, a copy of records':
 a single-tenant host uses `default`; a multi-tenant host uses the tenant the
 framework resolved (`request.state.tenant_id`); none resolved is a 403
 `tenant_required` for the console and API and a 404 for public routes. A tenant

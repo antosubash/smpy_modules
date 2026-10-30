@@ -13,11 +13,11 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sm_images.core import constants
 from sm_images.core.errors import UploadNotFound
+from sm_images.core.storage import ImageStore
 from sm_images.ingest import direct
 from sm_images.ingest import upload_session as state
 from sm_images.ingest.service import IngestService
 from sm_images.models import UploadStatus
-from sm_images.storage import ImageStore
 
 from tests.ingest.test_upload_lease import _row, _update
 from tests.ingest.test_upload_reaper import _one_part_in, _parts_exist, _reap

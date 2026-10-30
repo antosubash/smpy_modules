@@ -121,7 +121,7 @@ async def test_janitor_purges_past_the_settings_grace(pipe):
 
 def _refusing(monkeypatch, bad: set[str]) -> list[str]:
     """Deletes of ``bad`` keys fail; returns every key a delete was tried on."""
-    from sm_images.storage import ImageStore
+    from sm_images.core.storage import ImageStore
 
     real, tried = ImageStore.delete_keys, []
 
@@ -165,9 +165,9 @@ async def test_an_intent_pass_stops_trying_after_repeated_failures(pipe, monkeyp
 
 
 async def test_purge_dry_run_leaves_intents_and_billing_alone(pipe, monkeypatch):
-    from sm_images.billing import ops as billing_ops
+    from sm_images.core.billing import ops as billing_ops
+    from sm_images.core.storage import keys as storage_keys
     from sm_images.jobs.purge import purge_expired
-    from sm_images.storage import keys as storage_keys
 
     use_steps()
     coll = await pipe.collection({})
@@ -190,7 +190,7 @@ async def test_purge_dry_run_leaves_intents_and_billing_alone(pipe, monkeypatch)
 
 
 async def test_janitor_dry_run_end_to_end_changes_nothing(pipe, monkeypatch):
-    from sm_images.billing import ops as billing_ops
+    from sm_images.core.billing import ops as billing_ops
 
     use_steps()
     coll = await pipe.collection({})

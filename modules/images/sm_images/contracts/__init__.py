@@ -7,7 +7,6 @@ stable surface.
 
 from __future__ import annotations
 
-from sm_images.ai.reads import GroupMemberRead, GroupRead, PromptResultRead
 from sm_images.contracts.events import (
     CollectionDeleted,
     CollectionVisibilityChanged,
@@ -17,6 +16,7 @@ from sm_images.contracts.events import (
 )
 from sm_images.contracts.reads import get_collection, list_collections, points, rendition_url
 from sm_images.contracts.schemas import CollectionPageRead, CollectionRead, ImageRead
+from sm_images.pipeline.ai.reads import GroupMemberRead, GroupRead, PromptResultRead
 from sm_images.pipeline.extensions import load_extensions
 from sm_images.pipeline.presets import Preset, PromptSpec
 from sm_images.pipeline.registry import (

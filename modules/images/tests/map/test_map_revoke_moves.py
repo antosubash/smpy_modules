@@ -15,17 +15,17 @@ from datetime import UTC, datetime
 
 import pytest
 from simple_module_db import finalize_session
-from sm_images.access import redaction
+from sm_images.core.access import redaction
+from sm_images.core.storage import ImageStore
+from sm_images.core.storage import keys as storage_keys
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.map import build
 from sm_images.models import Collection, Image, StepRun, Visibility
 from sm_images.models.enums import LocationSource, StepStatus
 from sm_images.pipeline import cycle, publish
+from sm_images.pipeline.processing.exif import ExifData
 from sm_images.pipeline.runtime import bind_runtime
-from sm_images.processing.exif import ExifData
-from sm_images.services import gallery
-from sm_images.storage import ImageStore
-from sm_images.storage import keys as storage_keys
-from sm_images.tenancy import DEFAULT_TENANT
+from sm_images.web.services import gallery
 from sqlalchemy import select
 
 from tests.support.access import OWNER, collection, headers, image

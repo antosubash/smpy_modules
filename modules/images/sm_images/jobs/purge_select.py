@@ -28,6 +28,7 @@ from typing import Any
 
 from sqlalchemy import func, or_, select
 
+from sm_images.core.storage import keys as storage_keys
 from sm_images.models import (
     Collection,
     Image,
@@ -37,7 +38,6 @@ from sm_images.models import (
     UploadSession,
     UploadStatus,
 )
-from sm_images.storage import keys as storage_keys
 
 __all__ = ["MIN_INTENT_AGE", "Keys", "Selection", "chunks", "collect_keys", "pick"]
 

@@ -1,6 +1,6 @@
 """The core built-in steps: ``exif`` and ``renditions`` (spec §3).
 
-Both wrap the pure processors in :mod:`sm_images.processing`, run the CPU work
+Both wrap the pure processors in :mod:`sm_images.pipeline.processing`, run the CPU work
 in a thread, and hand their typed writes to the executor through the context's
 private staging - never to the database themselves. The executor applies them
 only if the run's lease still holds when it completes:
@@ -22,9 +22,9 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from sm_images.pipeline import registry
+from sm_images.pipeline.processing.exif import ExifData, read_exif
+from sm_images.pipeline.processing.renditions import make_renditions
 from sm_images.pipeline.step import StepContext, StepOutcome
-from sm_images.processing.exif import ExifData, read_exif
-from sm_images.processing.renditions import make_renditions
 
 __all__ = ["ExifStep", "RenditionsStep", "exif_output", "register_builtins"]
 

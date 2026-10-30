@@ -15,7 +15,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from simple_module_hosting import Settings, app_builder, create_app
 from sm_images.core import constants
-from sm_images.settings import ImagesSettings
+from sm_images.core.settings import ImagesSettings
 
 MIB = 1024 * 1024
 UPLOAD = "/api/images/collections/00000000-0000-0000-0000-000000000001/images"

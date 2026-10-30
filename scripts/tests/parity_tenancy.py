@@ -42,7 +42,7 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
                 f"{RECORDS}/_tenancy_mode.py",
                 {"logger": "_log"},
             ),
-            Copy(f"{IMAGES}/tenancy/_mode.py", {"logger": "_log"}),
+            Copy(f"{IMAGES}/core/tenancy/_mode.py", {"logger": "_log"}),
         ),
         shared=(
             "TenancyMode",
@@ -97,7 +97,7 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
         (
             Copy(f"{PB}/tenancy.py"),
             Copy(f"{RECORDS}/tenancy.py", {"_resolved": "upstream_tenant"}),
-            Copy(f"{IMAGES}/tenancy/__init__.py", {"_resolved": "upstream_tenant"}),
+            Copy(f"{IMAGES}/core/tenancy/__init__.py", {"_resolved": "upstream_tenant"}),
         ),
         shared=("resolve_public",),
         differ={

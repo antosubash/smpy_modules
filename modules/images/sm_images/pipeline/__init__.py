@@ -61,7 +61,7 @@ def dispatch(db: Any, image_id: uuid.UUID) -> None:
     """Queue ``image_id`` for the pipeline once ``db`` commits."""
     tenant = current_tenant_id.get()
     if tenant is None:
-        from sm_images.tenancy import TenantUnbound
+        from sm_images.core.tenancy import TenantUnbound
 
         raise TenantUnbound("pipeline.dispatch needs a bound tenant")
     register_on_commit(db, partial(_dispatch_after_commit, image_id, tenant))
@@ -81,7 +81,7 @@ async def queue_auto_run(
     """
     if not enabled:
         return
-    from sm_images.ai import prompt_steps
+    from sm_images.pipeline.ai import prompt_steps
 
     await prompt_steps.request_auto_run(db, collection, image_id)
 

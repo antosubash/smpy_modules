@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
-from sm_images.tenancy import DEFAULT_TENANT, tenant_scope
+from sm_images.core.tenancy import DEFAULT_TENANT, tenant_scope
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.pg_support import arm_reset, make_db_state
@@ -65,7 +65,7 @@ def _default_tenant(request):
 def _reset_intent_factory(monkeypatch):
     """``use_session_factory`` sets a process-wide default; a test that sets it
     must not hand its (disposed) factory to the next one."""
-    from sm_images.storage import intents
+    from sm_images.core.storage import intents
 
     monkeypatch.setattr(intents, "_default_factory", None)
 

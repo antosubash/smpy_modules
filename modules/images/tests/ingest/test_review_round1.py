@@ -11,8 +11,8 @@ import pytest
 from file_storage.contracts.service import NotSupportedError
 from simple_module_db import tenant_context
 from sm_images.core.errors import UnsupportedType
-from sm_images.imports.url_safety import UnsafeURLError, check_url
 from sm_images.ingest import multipart
+from sm_images.ingest.imports.url_safety import UnsafeURLError, check_url
 from sm_images.ingest.ticket import declared_type
 from sm_images.pipeline import keeper as keeper_mod
 

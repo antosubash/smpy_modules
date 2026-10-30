@@ -2,7 +2,7 @@
 
 ``conftest`` turns billing off for every test (no billing tables here): the
 seam then answers as on a host without billing. ``gauge`` installs this fake
-instead - the hold calls (``sm_images.billing.storage_meter``) and the web
+instead - the hold calls (``sm_images.core.billing.storage_meter``) and the web
 pre-flight (``app.state.billing_usage``) - so a test can set a limit, read
 what is held, and make billing fail (``fail_swap``, ``fail_release``).
 
@@ -31,9 +31,9 @@ from sm_billing.contracts.metering import (
     IdempotencyConflict,
     Refused,
 )
-from sm_images import billing
+from sm_images.core import billing
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.models import BillingOp, Image
-from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import select, update
 
 LIVE = ("held", "committed")

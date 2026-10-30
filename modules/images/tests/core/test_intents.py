@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from sm_images.core.storage.intents import clear_intents, object_intent, use_session_factory
 from sm_images.models.object_intent import ObjectIntent
-from sm_images.storage.intents import clear_intents, object_intent, use_session_factory
 from sqlalchemy import select
 
 KEYS = ["images/default/c/i/original.jpg", "images/default/c/i/display.1.jpg"]

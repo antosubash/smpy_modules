@@ -15,7 +15,7 @@ turn); :mod:`sm_images.jobs.purge_select` decides the rows and their keys. One p
    the back of later passes) and its collection is not removed. After
    :data:`FAILURE_LIMIT` failures a pass stops trying (storage is down).
 3. **Rows** of what was cleared, children first; the intents of the deleted
-   keys; the images' storage-hold releases (:mod:`sm_images.billing.ops`). The caller
+   keys; the images' storage-hold releases (:mod:`sm_images.core.billing.ops`). The caller
    commits.
 """
 
@@ -30,7 +30,7 @@ from typing import Any
 from simple_module_db.independent import independent_session
 from sqlalchemy import and_, delete, or_, select, update
 
-from sm_images.billing import ops as billing_ops
+from sm_images.core.billing import ops as billing_ops
 from sm_images.core.constants import NO_SYNC
 from sm_images.ingest.upload_session import mark_cleaned, move
 from sm_images.jobs.purge_delete import FAILURE_LIMIT, delete_keys

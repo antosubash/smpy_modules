@@ -2,11 +2,11 @@ import { Head } from '@inertiajs/react';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { useState } from 'react';
 
-import { CollectionMap } from '../components/map/CollectionMap';
-import { PublicGallery } from '../components/public/PublicGallery';
-import { publicMapUrl, publicPointsUrl } from '../utils/api-public';
-import { keys, useT } from '../utils/i18n';
-import type { PublicCollectionInfo } from '../utils/types-public';
+import { CollectionMap } from '../ui/components/map/CollectionMap';
+import { PublicGallery } from '../ui/components/public/PublicGallery';
+import { publicMapUrl, publicPointsUrl } from '../ui/utils/api-public';
+import { keys, useT } from '../ui/utils/i18n';
+import type { PublicCollectionInfo } from '../ui/utils/types-public';
 
 /** `Images/PublicCollection` - `/images/c/{slug}`, for anyone.
  *

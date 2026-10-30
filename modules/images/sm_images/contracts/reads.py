@@ -6,7 +6,7 @@ beat task) still reads exactly one. A caller already inside a *different*
 tenant is refused rather than re-bound.
 
 **Every call names its principal** and goes through
-:data:`sm_images.access.POLICY` for ``view``: a module asking for "the
+:data:`sm_images.core.access.POLICY` for ``view``: a module asking for "the
 collections of this user" sees what that user would see in the console, and a
 collection they may not open is ``None``, indistinguishable from one that does
 not exist.
@@ -14,7 +14,7 @@ not exist.
 **A session is optional.** Pass the caller's own (``db=``) to join its unit of
 work, as pagebuilder's contracts do; without one the call opens a short
 read-only session from the factory ``on_startup`` registered
-(:func:`sm_images.storage.intents.current_factory`) and rolls it back on the way out.
+(:func:`sm_images.core.storage.intents.current_factory`) and rolls it back on the way out.
 """
 
 from __future__ import annotations
@@ -26,15 +26,15 @@ from typing import Any
 
 from simple_module_core.resources import ACTION_VIEW, ResourcePrincipal
 
-from sm_images.access import visible_collections
 from sm_images.contracts.schemas import CollectionPageRead, CollectionRead
 from sm_images.core import constants
+from sm_images.core.access import visible_collections
+from sm_images.core.storage import intents
+from sm_images.core.tenancy import tenant_scope
 from sm_images.map import points as map_points
 from sm_images.models import Collection
-from sm_images.services import collections as service
-from sm_images.serving import urls
-from sm_images.storage import intents
-from sm_images.tenancy import tenant_scope
+from sm_images.web.services import collections as service
+from sm_images.web.serving import urls
 
 __all__ = ["get_collection", "list_collections", "points", "rendition_url"]
 
@@ -43,7 +43,7 @@ async def _viewer_fields(session: Any, principal: ResourcePrincipal, rows: list[
     # Imported when called: ``services.viewer_stats`` imports
     # ``contracts.schemas``, which runs this package's ``__init__`` and so this
     # module, so a top-level import is a cycle whichever side loads first.
-    from sm_images.services.viewer_stats import viewer_fields
+    from sm_images.web.services.viewer_stats import viewer_fields
 
     return await viewer_fields(session, principal, rows)
 
@@ -134,7 +134,7 @@ async def points(
 
 def rendition_url(image: Any, rendition: Any, *, collection: Any = None) -> str:
     """The URL that streams *rendition* (one of *image*'s ``Rendition`` rows);
-    see :func:`sm_images.serving.urls.rendition_url`.
+    see :func:`sm_images.web.serving.urls.rendition_url`.
 
     Access is checked by the route, not here: a URL for an image the viewer may
     not open is a 404 when followed. ``?v=`` names the rendition's own bytes

@@ -13,11 +13,11 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sm_images.access import redaction
+from sm_images.core.access import redaction
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.jobs.reconcile import reconcile_tenant
 from sm_images.models import Collection, Image
 from sm_images.models.enums import StepStatus
-from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import select, update
 
 from tests.support.pipeline import Blur, Scripted, use_steps

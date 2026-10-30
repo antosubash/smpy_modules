@@ -131,8 +131,8 @@ async def _one(data: bytes):
 async def upload_zip(imp, data: bytes, *, mapping=None, coll=None):
     """Start a ZIP job and write its parts the way the relay route does;
     ``(job_id, ticket)``. Not sealed yet."""
-    from sm_images.imports import zip_upload
-    from sm_images.tenancy import DEFAULT_TENANT
+    from sm_images.core.tenancy import DEFAULT_TENANT
+    from sm_images.ingest.imports import zip_upload
 
     job, (_token, ticket, _urls, _direct) = await zip_upload.start(
         imp.runtime,
@@ -156,8 +156,8 @@ async def sealed_zip(imp, data: bytes, **kw):
     """``(job, generation)``: uploaded and sealed, not yet run."""
     from types import SimpleNamespace
 
-    from sm_images.imports import zip_upload
-    from sm_images.tenancy import DEFAULT_TENANT
+    from sm_images.core.tenancy import DEFAULT_TENANT
+    from sm_images.ingest.imports import zip_upload
 
     job_id, _ = await upload_zip(imp, data, **kw)
     generation = await zip_upload.seal(imp.runtime, DEFAULT_TENANT, job_id, {})
@@ -165,8 +165,8 @@ async def sealed_zip(imp, data: bytes, **kw):
 
 
 async def run_zip(imp, job, generation: int) -> str:
-    from sm_images.imports import zip_import
-    from sm_images.tenancy import DEFAULT_TENANT
+    from sm_images.core.tenancy import DEFAULT_TENANT
+    from sm_images.ingest.imports import zip_import
 
     return await zip_import.import_zip_async(imp.runtime, DEFAULT_TENANT, job.id, generation)
 

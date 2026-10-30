@@ -18,7 +18,7 @@ BASE = "/api/images"
 async def prompts_world(client, storage):
     """olga's private collection with one stored image, an edit share for eddie
     and a view share for vic; the eager web runtime."""
-    from sm_images.storage import ImageStore
+    from sm_images.core.storage import ImageStore
 
     from tests.support.pipeline import jpeg
 

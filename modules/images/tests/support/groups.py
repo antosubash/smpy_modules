@@ -6,10 +6,10 @@ import uuid
 from typing import Any
 
 import pytest_asyncio
-from sm_images.ai.group_request import request_groups
 from sm_images.models import Group, PromptResult
 from sm_images.models.enums import PromptScope
 from sm_images.pipeline import registry
+from sm_images.pipeline.ai.group_request import request_groups
 from sqlalchemy import select
 
 from tests.support.ai import add_prompt, use_ai_steps

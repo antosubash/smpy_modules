@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 import simple_module_db.deps as db_deps
 from simple_module_db.session import RequestSession
-from sm_images.storage import ImageStore
+from sm_images.core.storage import ImageStore
 
 from tests.ingest.test_upload_base64 import b64, post
 from tests.support.billing import ops

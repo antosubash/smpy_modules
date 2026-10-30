@@ -69,7 +69,7 @@ class Image(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  #
     display_step: str | None = Field(default=None, max_length=100)
     """The step that wrote the current display copy, stamped at its fenced
     publication. A display copy is trusted as redacted only while this is the
-    collection's enabled display mutator (``sm_images.access.redaction``): a crop is a
+    collection's enabled display mutator (``sm_images.core.access.redaction``): a crop is a
     display mutator too, and redacts nothing."""
     display_step_version: int | None = Field(default=None)
     processing_generation: int = Field(default=1, sa_column_kwargs={"nullable": False})
@@ -84,7 +84,7 @@ class Image(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  #
     storage_hold_id: str | None = Field(default=None, max_length=64)
     storage_bytes: int = Field(default=0, sa_type=BigInteger, sa_column_kwargs={"nullable": False})
     """Sum of this image's objects (original, display copy, renditions), as held
-    against the storage gauge (``sm_images.billing``)."""
+    against the storage gauge (``sm_images.core.billing``)."""
     display_bytes: int = Field(default=0, sa_type=BigInteger, sa_column_kwargs={"nullable": False})
     """The display copy's size; ``0`` while the original is the display copy."""
 

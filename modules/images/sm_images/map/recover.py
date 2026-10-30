@@ -15,7 +15,7 @@ from datetime import datetime
 from simple_module_db import finalize_session
 from sqlalchemy import or_, select
 
-from sm_images.access import redaction
+from sm_images.core.access import redaction
 from sm_images.map import pmtiles_build
 from sm_images.map.revoke import withdraw
 from sm_images.map.schedule import MAP_STATE, due_row, request

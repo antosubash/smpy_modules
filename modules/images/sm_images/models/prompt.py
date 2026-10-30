@@ -83,7 +83,7 @@ class PromptResult(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignor
     history: list[dict[str, Any]] = json_col(list)
     """The last 5 reviewed values, newest first, kept when a re-run resets the review."""
     lease_token: uuid.UUID | None = Field(default=None, sa_column=Column(Uuid, nullable=True))
-    """A group run's claim (``sm_images.ai.group_lease``); image results leave it null."""
+    """A group run's claim (``sm_images.pipeline.ai.group_lease``); image results leave it null."""
     lease_expires_at: datetime | None = dt_col()
     """A requested (``pending``) or claimed (``running``) group run is in flight until then."""
     ai_started_at: datetime | None = dt_col()

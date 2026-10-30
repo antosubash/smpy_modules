@@ -10,15 +10,15 @@ import re
 from pathlib import Path
 
 import pytest
-from sm_images.ai.codes import AI_CODES
 from sm_images.core import constants
-from sm_images.endpoints.api.pipeline import CODE_INVALID_CONFIG
-from sm_images.imports import access, recover, retrying
-from sm_images.imports.features import PARSE_CODES
-from sm_images.imports.filename_pattern import MAX_PATTERN_LENGTH
-from sm_images.imports.mapping import Mapping, Prop
+from sm_images.ingest.imports import access, recover, retrying
+from sm_images.ingest.imports.features import PARSE_CODES
+from sm_images.ingest.imports.filename_pattern import MAX_PATTERN_LENGTH
+from sm_images.ingest.imports.mapping import Mapping, Prop
 from sm_images.pipeline import plan
+from sm_images.pipeline.ai.codes import AI_CODES
 from sm_images.pipeline.reopen import PLACEHOLDER_CODES
+from sm_images.web.endpoints.api.pipeline import CODE_INVALID_CONFIG
 
 PKG = Path(constants.__file__).parent.parent  # sm_images/, above core/
 CATALOGUES = ("en", "de")
@@ -55,7 +55,7 @@ def _raised_codes() -> set[str]:
     """Codes the import code raises as literals (archive and source refusals)."""
     found: set[str] = set()
     pattern = re.compile(r'(?:GeoJSONError|ZipRejected|FetchError)\("([a-z_]+)"')
-    for path in (PKG / "imports").glob("*.py"):
+    for path in (PKG / "ingest" / "imports").glob("*.py"):
         found.update(pattern.findall(path.read_text()))
     return found
 
@@ -88,6 +88,6 @@ def test_the_wizard_bounds_match_the_mapping():
     (constraint,) = Prop.__metadata__
     props = [f for f in Mapping.model_fields if f.endswith("_prop")]
     assert {Mapping.model_fields[f].annotation for f in props} == {Prop | None}
-    source = (PKG / "components" / "imports" / "MappingFields.tsx").read_text()
+    source = (PKG / "ui" / "components" / "imports" / "MappingFields.tsx").read_text()
     bounds = [int(n) for n in re.findall(r"maxLength=\{(\d+)\}", source)]
     assert bounds == [constraint.max_length, MAX_PATTERN_LENGTH]

@@ -34,7 +34,7 @@ from typing import Any, Literal
 
 from simple_module_db import finalize_session, tenant_context
 
-from sm_images.clock import utcnow
+from sm_images.core.clock import utcnow
 from sm_images.pipeline import advance
 from sm_images.pipeline.claim import load_runs, lock_image
 from sm_images.pipeline.cycle import bump_cycle, reset_runs

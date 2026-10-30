@@ -9,14 +9,14 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sm_images.billing import ops as billing_ops
 from sm_images.core import constants
+from sm_images.core.billing import ops as billing_ops
 from sm_images.core.errors import ImageTooLarge, ServiceUnavailable
+from sm_images.core.tenancy import DEFAULT_TENANT as T
 from sm_images.ingest.service import IngestService
 from sm_images.ingest.slots import INGEST_CLAIM
 from sm_images.models import UploadSession, UploadStatus
-from sm_images.services import stats
-from sm_images.tenancy import DEFAULT_TENANT as T
+from sm_images.web.services import stats
 
 from tests.support.direct import complete, send_parts, start
 from tests.support.upload import all_rows, jpeg, make_collection, stored

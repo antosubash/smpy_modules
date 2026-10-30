@@ -13,11 +13,11 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from sm_images.access import redaction
+from sm_images.core.access import redaction
+from sm_images.core.storage import ImageStore
+from sm_images.core.storage import keys as storage_keys
+from sm_images.core.tenancy import DEFAULT_TENANT, tenant_scope
 from sm_images.models import Collection, Group, ObjectIntent, Visibility
-from sm_images.storage import ImageStore
-from sm_images.storage import keys as storage_keys
-from sm_images.tenancy import DEFAULT_TENANT, tenant_scope
 from sqlalchemy import select, update
 
 from tests.support.access import OWNER, STRANGER, collection, headers

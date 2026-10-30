@@ -29,7 +29,7 @@ from typing import Any
 
 from simple_module_db import finalize_session
 
-from sm_images.clock import utcnow as _now
+from sm_images.core.clock import utcnow as _now
 from sm_images.pipeline.claim import LostLease, renew
 from sm_images.pipeline.finish import complete_step
 from sm_images.pipeline.keeper import stop as stop_keeper
@@ -58,7 +58,7 @@ class Staging:
     renditions: dict[str, tuple[bytes, int, int]] | None = None
     exif: Any = None
     prompt: Any = None
-    """A prompt step's result (``sm_images.ai.results.PromptWrite``)."""
+    """A prompt step's result (``sm_images.pipeline.ai.results.PromptWrite``)."""
     token: uuid.UUID | None = None
     """The run's lease token: part of an AI step's metering idempotency key."""
     session_factory: Any = None

@@ -18,7 +18,7 @@ from sharing.policy import canonical_id
 from simple_module_core.resources import ACTION_VIEW, ResourcePrincipal
 from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal
-from sm_images.access import (
+from sm_images.core.access import (
     COLLECTION_RESOURCE,
     CollectionEdit,
     CollectionOwner,
@@ -26,8 +26,8 @@ from sm_images.access import (
     public_collection,
     visible_collections,
 )
+from sm_images.core.tenancy import bind_admin, bind_public
 from sm_images.models import Collection, Image, Visibility
-from sm_images.tenancy import bind_admin, bind_public
 
 from tests.support.stub_auth import as_user, user_uuid
 

@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.jobs.reconcile import reconcile_async
 from sm_images.models import PipelineRestart
 from sm_images.pipeline import restart
-from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import select, update
 
 from tests.support.pipeline import Scripted, use_steps

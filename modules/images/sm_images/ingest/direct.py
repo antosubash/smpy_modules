@@ -58,6 +58,8 @@ from sm_images.core.errors import (
     UnsupportedType,
     UploadNotFound,
 )
+from sm_images.core.storage import keys as storage_keys
+from sm_images.core.tenancy import bound_tenant
 from sm_images.ingest import upload_session as state
 from sm_images.ingest.meta import IngestMeta
 from sm_images.ingest.multipart import assemble as _assemble
@@ -73,8 +75,6 @@ from sm_images.ingest.ticket import (
     serializer,
 )
 from sm_images.models import Collection, Image, UploadStatus
-from sm_images.storage import keys as storage_keys
-from sm_images.tenancy import bound_tenant
 
 __all__ = [
     "Ticket",

@@ -11,14 +11,14 @@ Celery here, everything else inside the bodies. Routing and beat are in
   and re-dispatch a collection in chunks (``images_imports``), recorded so a
   lost one is resumed (``restart_id``) by reconcile.
 * ``images.run_regroup(job_id, generation)`` - one filename-pattern regroup of a
-  big collection, in fenced chunks (:mod:`sm_images.regroup`); a stale
+  big collection, in fenced chunks (:mod:`sm_images.jobs.regroup`); a stale
   ``generation`` does nothing.
 * ``images.run_prompt(prompt_id, scope, run_as=None, access_basis=None)`` -
   request a prompt's runs (re-checking the starter's right per chunk) over a
   whole collection (its images, or its groups for a group prompt) and
-  dispatch them (:mod:`sm_images.ai.run`).
+  dispatch them (:mod:`sm_images.pipeline.ai.run`).
 * ``images.run_group_prompt(prompt_id, group_id)`` - claim and execute one
-  requested group run (:mod:`sm_images.ai.group_run`).
+  requested group run (:mod:`sm_images.pipeline.ai.group_run`).
 * ``images.reconcile()`` - the five-minute recovery beat, also sent once when a
   worker comes up (``worker_ready``).
 * ``images.janitor(dry_run=False)`` - the daily clean-up beat: abandoned
@@ -26,7 +26,7 @@ Celery here, everything else inside the bodies. Routing and beat are in
 * ``images.import_geojson``, ``images.download_items`` and
   ``images.reset_import`` - imports (a GeoJSON stream, its downloads, and the
   reset behind restart and retry-failed), defined in
-  :mod:`sm_images.imports.tasks` and registered by the import below;
+  :mod:`sm_images.ingest.imports.tasks` and registered by the import below;
   ``images.build_map`` likewise, from :mod:`sm_images.map.tasks`.
 
 Bodies run through :mod:`sm_images.pipeline.worker_runtime`: no app, the
@@ -44,7 +44,7 @@ from typing import Any
 from celery import shared_task
 from celery.signals import worker_process_init, worker_ready
 
-from sm_images.imports import tasks as _import_tasks  # noqa: F401 - registers the import tasks
+from sm_images.ingest.imports import tasks as _import_tasks  # noqa: F401 - registers the import tasks
 from sm_images.map import tasks as _map_tasks  # noqa: F401 - registers images.build_map
 from sm_images.task_config import (
     JANITOR,
@@ -94,8 +94,8 @@ def restart_collection(collection_id: str, scope: str, restart_id: str | None = 
 
 @shared_task(name=RUN_REGROUP, stuck_after=STUCK_AFTER_SECONDS)
 def run_regroup_task(job_id: str, generation: int) -> int:
+    from sm_images.jobs.regroup.runner import run_regroup
     from sm_images.pipeline.worker_runtime import run_task
-    from sm_images.regroup.runner import run_regroup
 
     return run_task(
         lambda runtime, tenant: run_regroup(runtime, tenant, uuid.UUID(job_id), int(generation))
@@ -106,7 +106,7 @@ def run_regroup_task(job_id: str, generation: int) -> int:
 def run_prompt_task(
     prompt_id: str, scope: str, run_as: str | None = None, access_basis: str | None = None
 ) -> int:
-    from sm_images.ai.run import run_prompt
+    from sm_images.pipeline.ai.run import run_prompt
     from sm_images.pipeline.worker_runtime import run_task
 
     if scope not in ("missing", "stale", "all"):
@@ -125,7 +125,7 @@ def run_prompt_task(
 
 @shared_task(name=RUN_GROUP_PROMPT, stuck_after=STUCK_AFTER_SECONDS)
 def run_group_prompt_task(prompt_id: str, group_id: str) -> bool:
-    from sm_images.ai.group_run import run_group
+    from sm_images.pipeline.ai.group_run import run_group
     from sm_images.pipeline.worker_runtime import run_task
 
     return run_task(

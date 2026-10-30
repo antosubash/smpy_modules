@@ -90,7 +90,7 @@ tenant is never shareable-cached (records #196; pagebuilder and news #192).
 The scheduler opens one session per tenant under `tenant_context`. News has its
 own copy, `news.tenancy`, and its scheduler ticks per tenant the same way;
 records' is `sm_records.tenancy` (its 403 is the `{"detail","code"}` envelope,
-code `tenant_required`) and images' `sm_images.tenancy` is a copy of it; images'
+code `tenant_required`) and images' `sm_images.core.tenancy` is a copy of it; images'
 Celery tasks never run unscoped — `images.reconcile` and `images.janitor`
 enumerate tenants in one narrow `all_tenants()` read and do each tenant's work
 under `tenant_context`; billing reads the same `request.state.tenant_id`
@@ -217,9 +217,11 @@ command.
 **Module layout: `docs/module-layout.md`, with images as the reference.**
 A package root keeps only what something else looks up by name (`module.py`,
 `models/`, `tasks.py`, `task_config.py`, `pages/`, `locales/`, `index.ts`,
-`pagebuilder-blocks.ts`). Everything else goes in a feature package, with what
-every feature shares in `core/` (`constants`, `errors`, `events`), and tests go
-in `tests/<feature>/`.
+`pagebuilder-blocks.ts`, plus `contracts/`, the import path other modules use).
+Everything else goes in one of a few areas: `core/` (what every feature
+builds on), `web/` (endpoints, schemas, services, serving), one folder per
+domain (images: `ingest/`, `pipeline/`, `jobs/`, `map/`) and `ui/` for the
+frontend that is not a page. Tests mirror the areas under `tests/`.
 New code in any module follows it. Other modules move towards it in PRs that
 contain only moves; the doc's table says how far each one has got.
 

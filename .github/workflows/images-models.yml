@@ -3,7 +3,7 @@
 # ci.yml syncs with `--no-extra anonymize`, so the step's default tests run on
 # a fake detector and no pull request downloads model weights. This job syncs
 # the `[anonymize]` extra (onnxruntime) from the lock, downloads the pinned,
-# checksummed ONNX models (sm_images/steps/anonymize/weights.py: YuNet faces,
+# checksummed ONNX models (sm_images/pipeline/steps/anonymize/weights.py: YuNet faces,
 # YOLOv9 plates, both MIT) and runs the tests marked `real_models`, which the
 # module's addopts deselect everywhere else.
 #

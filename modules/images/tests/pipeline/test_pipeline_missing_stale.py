@@ -7,10 +7,10 @@ sees why a restart is offered.
 
 from __future__ import annotations
 
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.models import Collection, Image
 from sm_images.pipeline import restart
 from sm_images.pipeline.control import overview
-from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import update
 
 from tests.support.pipeline import Scripted, use_steps

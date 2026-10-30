@@ -2,14 +2,14 @@ import { Head } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 
-import { ChipGroup } from '../components/ChipGroup';
-import { CollectionCard } from '../components/collections/CollectionCard';
-import { CreateCollectionDialog } from '../components/collections/CreateCollectionDialog';
-import { ImagesLayout } from '../components/ImagesLayout';
-import { useCollections } from '../hooks/useCollections';
-import { keys, useT } from '../utils/i18n';
-import { COLLECTION_FILTERS, collectionFilterLabel } from '../utils/labels';
-import type { Collection, Page } from '../utils/types';
+import { ChipGroup } from '../ui/components/ChipGroup';
+import { CollectionCard } from '../ui/components/collections/CollectionCard';
+import { CreateCollectionDialog } from '../ui/components/collections/CreateCollectionDialog';
+import { ImagesLayout } from '../ui/components/ImagesLayout';
+import { useCollections } from '../ui/hooks/useCollections';
+import { keys, useT } from '../ui/utils/i18n';
+import { COLLECTION_FILTERS, collectionFilterLabel } from '../ui/utils/labels';
+import type { Collection, Page } from '../ui/utils/types';
 
 type Props = {
   collections: Page<Collection>;

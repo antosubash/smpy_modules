@@ -17,11 +17,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from simple_module_db.listeners import current_tenant_id
+from sm_images.core.storage import ImageStore
+from sm_images.core.storage import keys as storage_keys
+from sm_images.core.tenancy import DEFAULT_TENANT, tenant_scope
 from sm_images.models import Image, Rendition, Visibility
-from sm_images.serving import cache
-from sm_images.storage import ImageStore
-from sm_images.storage import keys as storage_keys
-from sm_images.tenancy import DEFAULT_TENANT, tenant_scope
+from sm_images.web.serving import cache
 
 from tests.support.access import EDITOR, OWNER, collection, share
 

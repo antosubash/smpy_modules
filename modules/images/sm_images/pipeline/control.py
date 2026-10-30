@@ -25,7 +25,7 @@ from sm_images.pipeline.orchestrate import Scope, rerun_image
 from sm_images.pipeline.plan import is_stale
 from sm_images.pipeline.restart import restart_collection_async, start_restart
 from sm_images.pipeline.runtime import Runtime
-from sm_images.services.present import prompt_names
+from sm_images.web.services.present import prompt_names
 
 __all__ = ["RESTART_SCOPES", "launch_restart", "overview", "reprocess"]
 
@@ -94,7 +94,7 @@ async def _missing(db: Any, collection_id: uuid.UUID, steps: list[str]) -> int:
 async def overview(db: Any, collection: Collection) -> dict[str, Any]:
     """The saved config, every registered step with its JSON schema, and the
     results' status, stale and not-installed counts (trashed images excluded)."""
-    from sm_images.ai import prompt_steps
+    from sm_images.pipeline.ai import prompt_steps
 
     prompts = await prompt_steps.resolve(db, collection.id, tenant=collection.tenant_id)
     cfg = validate_pipeline_config(collection.pipeline_config, strict=False, prompts=prompts)

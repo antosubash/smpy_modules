@@ -16,11 +16,11 @@ import uuid
 from datetime import timedelta
 
 import pytest
+from sm_images.core.storage import ImageStore
+from sm_images.core.storage import keys as storage_keys
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.jobs import purge, purge_select
 from sm_images.models import Collection, Image, ObjectIntent, UploadSession, UploadStatus
-from sm_images.storage import ImageStore
-from sm_images.storage import keys as storage_keys
-from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import select, update
 
 from tests.jobs.test_janitor import NOW, OLD, _ids, _intents, _purge

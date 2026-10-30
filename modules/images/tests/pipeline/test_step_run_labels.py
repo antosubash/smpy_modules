@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import uuid
 
+from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.models import Collection, Prompt, StepRun, StepStatus
-from sm_images.tenancy import DEFAULT_TENANT
 from sqlalchemy import update
 
 from tests.support.upload import OLGA, jpeg, make_collection, post_files

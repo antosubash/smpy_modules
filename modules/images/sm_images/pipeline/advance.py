@@ -74,7 +74,7 @@ async def collection_config(
 ) -> Any:
     """The collection's validated config with its prompt steps resolved, plus
     the ``requested`` prompt runs of one image (:func:`requested_prompts`)."""
-    from sm_images.ai import prompt_steps
+    from sm_images.pipeline.ai import prompt_steps
 
     stmt = select(Collection.pipeline_config).where(
         Collection.id == collection_id, Collection.tenant_id == tenant
@@ -136,7 +136,7 @@ async def plan_and_claim(
 
 async def claim_ready(db: Any, image_id: uuid.UUID, now: datetime, lease_s: int) -> list[Claim]:
     """Claim every ready step of ``image_id`` in the bound tenant (one ``UPDATE``)."""
-    from sm_images.tenancy import bound_tenant
+    from sm_images.core.tenancy import bound_tenant
 
     found = await plan_and_claim(db, bound_tenant(), image_id, now, lease_s)
     return [] if found is None else found.claims

@@ -8,9 +8,9 @@ import pytest
 from pydantic import ValidationError
 from simple_module_core.csp import CspSourceRegistry
 from simple_module_hosting._csp_dynamic import DynamicCsp
+from sm_images.core.settings import ImagesSettings
 from sm_images.map.style import DEFAULT_STYLE_URL, csp_sources, style_origin
 from sm_images.module import ImagesModule
-from sm_images.settings import ImagesSettings
 
 BASE = "default-src 'self'; img-src 'self' data: blob:; connect-src 'self'"
 

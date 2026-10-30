@@ -14,8 +14,8 @@
 
 import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/components/blockRegistry';
 
-import { ImageGalleryBlock } from './components/block/ImageGalleryBlock';
-import { keys } from './utils/i18n';
+import { ImageGalleryBlock } from './ui/components/block/ImageGalleryBlock';
+import { keys } from './ui/utils/i18n';
 
 try {
   registerPuckBlocks({

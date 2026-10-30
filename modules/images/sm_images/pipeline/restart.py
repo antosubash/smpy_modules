@@ -21,8 +21,8 @@ from typing import Any
 from simple_module_db import finalize_session
 from sqlalchemy import select, update
 
-from sm_images.access.starter_right import holds_right
-from sm_images.clock import utcnow as _now
+from sm_images.core.access.starter_right import holds_right
+from sm_images.core.clock import utcnow as _now
 from sm_images.core.constants import NO_SYNC
 from sm_images.models import Image, PipelineRestart
 from sm_images.pipeline.orchestrate import Scope, reset_image, submit_dispatch
