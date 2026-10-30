@@ -114,6 +114,17 @@ describe('FileGallery', () => {
     );
   });
 
+  it('opens a new search on its first page, even after Next during the debounce', async () => {
+    const adapter = libraryAdapter();
+    await open(adapter);
+    await type('photo-08');
+    await act(async () => button('Next')?.click());
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await flush();
+    expect(adapter.list).toHaveBeenLastCalledWith({ skip: 0, take: 12, search: 'photo-08' });
+    expect(picks()).toHaveLength(6);
+  });
+
   it('drops a slower answer to an older search', async () => {
     const adapter = libraryAdapter();
     let releaseOld: (value: { items: FileItem[]; totalCount: number }) => void = () => {};

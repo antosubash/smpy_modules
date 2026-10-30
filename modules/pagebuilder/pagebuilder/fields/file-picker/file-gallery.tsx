@@ -116,11 +116,15 @@ function GalleryBody({
 }) {
 	const { t } = useT();
 	const searchId = useId();
-	const [page, setPage] = useState(0);
 	const [query, setQuery] = useState("");
 	const [attempt, setAttempt] = useState(0);
 	const [list, setList] = useState<ListState>({ status: "loading" });
 	const search = useDebounced(query);
+	// The page belongs to the search it was chosen under: Next clicked while a
+	// new search is still debouncing must not carry over, or the new search
+	// would open on its second page and could look empty.
+	const [paged, setPaged] = useState({ search: "", page: 0 });
+	const page = paged.search === search ? paged.page : 0;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is the Retry button
 	useEffect(() => {
@@ -169,7 +173,6 @@ function GalleryBody({
 					placeholder={t(keys.pagebuilder.gallery.search_placeholder)}
 					onChange={(event) => {
 						setQuery(event.target.value);
-						setPage(0);
 					}}
 				/>
 			</div>
@@ -241,7 +244,7 @@ function GalleryBody({
 						type="button"
 						variant="outline"
 						size="sm"
-						onClick={() => setPage((p) => p - 1)}
+						onClick={() => setPaged({ search, page: page - 1 })}
 						disabled={!hasPrev}
 					>
 						{t(keys.pagebuilder.gallery.prev)}
@@ -250,7 +253,7 @@ function GalleryBody({
 						type="button"
 						variant="outline"
 						size="sm"
-						onClick={() => setPage((p) => p + 1)}
+						onClick={() => setPaged({ search, page: page + 1 })}
 						disabled={!hasMore}
 					>
 						{t(keys.pagebuilder.gallery.next)}
