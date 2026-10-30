@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
 
-from sm_images import constants
+from sm_images.core import constants
 
 
 def register(registry: MenuRegistry) -> None:

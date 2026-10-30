@@ -9,7 +9,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.ingest.meta import UploadMeta
 from sm_images.models import LocationSource
 

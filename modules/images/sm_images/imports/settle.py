@@ -31,8 +31,8 @@ from typing import Any
 from simple_module_db import finalize_session
 from sqlalchemy import update
 
-from sm_images import constants
-from sm_images.errors import ImagesError
+from sm_images.core import constants
+from sm_images.core.errors import ImagesError
 from sm_images.imports import item_errors, jobs
 from sm_images.imports.chunk import pending_items
 from sm_images.imports.features import Parsed

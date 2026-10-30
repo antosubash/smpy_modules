@@ -16,7 +16,7 @@ admin route applies, per request (:func:`~sm_images.tenancy.resolve_admin`):
   resolved: ``request.state.tenant_id`` if something upstream set it; else
   ``default`` only when *this request* is single-tenant (``request_mode``,
   which treats a mounted child app the framework cannot answer for as multi);
-  else :class:`~sm_images.errors.TenantRequired`, the 403 images' admin
+  else :class:`~sm_images.core.errors.TenantRequired`, the 403 images' admin
   surface answers. The statement is pinned to that tenant explicitly and tagged
   past the images guard only - the framework's own scoping is not waived, so a
   strict (multi-tenant) engine still refuses it: fail closed;
@@ -35,7 +35,7 @@ from simple_module_db.listeners import current_tenant_id
 from simple_module_db.resource_policy import select_by_id
 
 from sm_images.access import COLLECTION_RESOURCE, POLICY
-from sm_images.errors import TenantRequired
+from sm_images.core.errors import TenantRequired
 from sm_images.models import Collection
 from sm_images.tenancy import all_tenants, resolve_admin, valid_tenant
 from sm_images.tenancy.request_context import current_request

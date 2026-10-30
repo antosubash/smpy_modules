@@ -49,9 +49,9 @@ from file_storage.contracts.service import StorageNotFoundError
 from simple_module_core.resources import ResourcePrincipal
 from sqlalchemy import and_, select
 
-from sm_images import constants, errors
 from sm_images.access import can_view_original, redaction
-from sm_images.errors import Forbidden, NotFound
+from sm_images.core import constants, errors
+from sm_images.core.errors import Forbidden, NotFound
 from sm_images.models import Collection, Image, Rendition
 from sm_images.services.viewer_stats import viewer_only
 from sm_images.serving import cache

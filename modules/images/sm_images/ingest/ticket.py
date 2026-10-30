@@ -14,8 +14,8 @@ from pathlib import PurePosixPath
 
 from itsdangerous import BadData, URLSafeTimedSerializer
 
-from sm_images import constants
-from sm_images.errors import (
+from sm_images.core import constants
+from sm_images.core.errors import (
     DirectUploadUnsupported,
     InvalidUpload,
     UnsupportedType,

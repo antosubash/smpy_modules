@@ -18,7 +18,7 @@ from __future__ import annotations
 from pydantic import Field, field_validator
 from pydantic_settings import SettingsConfigDict
 
-from sm_images.constants import DOWNLOAD_TIMEOUT_MAX
+from sm_images.core.constants import DOWNLOAD_TIMEOUT_MAX
 from sm_images.map.style import DEFAULT_STYLE_URL, validate_style_url
 from sm_images.settings.boot import BootSettings
 

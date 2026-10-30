@@ -11,8 +11,8 @@ from typing import Any
 from simple_module_db import finalize_session
 from sqlalchemy import case, or_, update
 
-from sm_images import constants
 from sm_images.clock.db import dialect_insert
+from sm_images.core import constants
 from sm_images.models import RegroupJob, RegroupJobGroup
 from sm_images.models.regroup_job import CANCELLED, FAILED, RUNNING
 from sm_images.pipeline.runtime import Runtime

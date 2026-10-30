@@ -12,8 +12,8 @@ import uuid
 
 import pytest
 import pytest_asyncio
-from sm_images import constants
 from sm_images.access import redaction
+from sm_images.core import constants
 from sm_images.models import Group, ImportJob, Prompt, RegroupJob, Rendition, Visibility
 from sm_images.storage import ImageStore
 

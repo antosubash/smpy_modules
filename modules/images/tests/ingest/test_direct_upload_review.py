@@ -14,7 +14,7 @@ import pytest
 from fastapi.routing import iter_route_contexts
 from sharing.models import ResourceShare
 from simple_module_hosting.token_guard import route_admits_tokens
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.ingest import direct
 from sm_images.models import Collection, Image
 from sm_images.storage import ImageStore

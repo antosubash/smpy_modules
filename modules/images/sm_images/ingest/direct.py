@@ -49,8 +49,8 @@ from typing import Any
 from file_storage.contracts.service import StorageError
 from sqlalchemy import select
 
-from sm_images import constants
-from sm_images.errors import (
+from sm_images.core import constants
+from sm_images.core.errors import (
     FileTooLarge,
     ImageTooLarge,
     InvalidUpload,

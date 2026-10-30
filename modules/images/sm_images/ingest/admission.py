@@ -40,7 +40,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from sm_images import billing
 from sm_images.clock import utcnow
-from sm_images.errors import StorageQuotaExceeded, TooManyOpenUploads
+from sm_images.core.errors import StorageQuotaExceeded, TooManyOpenUploads
 from sm_images.models import UploadAdmission, UploadSession, UploadStatus
 
 __all__ = ["Admission", "admit", "open_uploads", "prepare"]

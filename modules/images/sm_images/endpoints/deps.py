@@ -12,7 +12,7 @@ from __future__ import annotations
 from fastapi import Depends, Request
 from simple_module_hosting.permissions import RequiresPermission
 
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.settings import ImagesSettings
 
 require_view = Depends(RequiresPermission(constants.PERM_VIEW))

@@ -10,9 +10,9 @@ from simple_module_core.resources import ACTION_VIEW, ResourcePrincipal
 from sqlalchemy import false, func, select
 from sqlalchemy.exc import IntegrityError
 
-from sm_images import constants
 from sm_images.access import COLLECTION_RESOURCE, visible_collections
-from sm_images.errors import Conflict, Forbidden, Invalid
+from sm_images.core import constants
+from sm_images.core.errors import Conflict, Forbidden, Invalid
 from sm_images.map.revoke import withdraw
 from sm_images.models import Collection, Visibility
 from sm_images.models.collection import COLLECTION_SLUG_INDEX

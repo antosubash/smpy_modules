@@ -107,7 +107,7 @@ def reset_worker_runtime() -> None:
 def worker_settings() -> Any:
     from background_tasks import settings_for
 
-    from sm_images.constants import PACKAGE
+    from sm_images.core.constants import PACKAGE
     from sm_images.settings import ImagesSettings
 
     return settings_for(ImagesSettings, PACKAGE)

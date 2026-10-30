@@ -28,7 +28,7 @@ from sqlalchemy import select, update
 from sm_images import billing
 from sm_images.billing import ops as billing_ops
 from sm_images.billing.settle import OP_EXPIRED, ClaimLost, Op, deadline
-from sm_images.errors import StorageQuotaExceeded
+from sm_images.core.errors import StorageQuotaExceeded
 from sm_images.models import BillingOp, Image
 from sm_images.models.billing_op import NO_HOLD, OP_SWAP
 

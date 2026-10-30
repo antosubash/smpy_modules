@@ -42,9 +42,9 @@ from typing import Any, Final
 from simple_module_db.independent import independent_session
 from sqlalchemy import select, update
 
-from sm_images import constants
 from sm_images.clock import utcnow as _now
-from sm_images.errors import UploadInProgress, UploadNotFound, UploadNotOpen
+from sm_images.core import constants
+from sm_images.core.errors import UploadInProgress, UploadNotFound, UploadNotOpen
 from sm_images.ingest.dedupe import find_id
 from sm_images.models import UploadSession, UploadStatus
 

@@ -11,8 +11,8 @@ from unittest.mock import patch
 
 import pytest
 from file_storage.contracts.service import StorageNotFoundError
-from sm_images import constants
-from sm_images.errors import Conflict, NotFound
+from sm_images.core import constants
+from sm_images.core.errors import Conflict, NotFound
 from sm_images.imports import controls, zip_import, zip_safety, zip_upload
 from sm_images.imports.zip_safety import Limits, ZipRejected, inspect
 from sm_images.imports.zip_source import fetch_verified

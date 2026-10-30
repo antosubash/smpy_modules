@@ -18,8 +18,8 @@ from typing import Any
 from simple_module_db.callbacks import register_on_commit
 from sqlalchemy import select
 
-from sm_images import events
 from sm_images.contracts.events import ImageProcessed
+from sm_images.core import events
 from sm_images.models import Collection, StepRun
 from sm_images.models.enums import StepStatus
 from sm_images.pipeline import registry

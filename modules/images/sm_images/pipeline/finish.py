@@ -31,7 +31,7 @@ from simple_module_db import finalize_session, independent_session
 from simple_module_db.callbacks import register_on_commit
 from sqlalchemy import delete
 
-from sm_images.errors import StorageQuotaExceeded
+from sm_images.core.errors import StorageQuotaExceeded
 from sm_images.models import ObjectIntent
 from sm_images.pipeline import publish, registry, storage_hold
 from sm_images.pipeline.advance import advance_locked, conclude

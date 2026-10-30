@@ -17,7 +17,7 @@ from simple_module_db.types import AwareDateTime
 from sqlalchemy import BigInteger, Column, Index, Uuid
 from sqlmodel import Field
 
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.models._base import Base
 from sm_images.models._cols import enum_col, fk_uuid, pk_uuid
 from sm_images.models.enums import UploadStatus

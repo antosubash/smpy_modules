@@ -32,8 +32,8 @@ from typing import Any, Final
 from simple_module_db import finalize_session, tenant_context
 from sqlalchemy import select, update
 
-from sm_images import constants
-from sm_images.errors import ServiceUnavailable
+from sm_images.core import constants
+from sm_images.core.errors import ServiceUnavailable
 from sm_images.imports import access, chunk, jobs, launch, lookup, settle, terminal, zip_source
 from sm_images.imports.beat import beating
 from sm_images.imports.features import Parsed

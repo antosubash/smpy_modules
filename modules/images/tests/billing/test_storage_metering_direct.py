@@ -7,7 +7,7 @@ from __future__ import annotations
 import uuid
 
 from simple_module_db import finalize_session
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.ingest import Duplicate, IngestMeta, IngestService
 from sm_images.models import Collection, Image
 from sm_images.storage import store_for

@@ -1,6 +1,6 @@
 """Domain events other modules can subscribe to (bus: ``simple_module_core.events``).
 
-Published after the commit (:mod:`sm_images.events`), inside the tenant they
+Published after the commit (:mod:`sm_images.core.events`), inside the tenant they
 describe, and carrying identifiers only. Every event names its ``tenant_id``
 second: a slug and an id are only unique within a tenant.
 """

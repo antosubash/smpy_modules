@@ -22,7 +22,7 @@ from typing import Final
 
 import regex
 
-from sm_images import constants
+from sm_images.core import constants
 
 __all__ = [
     "MATCH_TIMEOUT_SECONDS",

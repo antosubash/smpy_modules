@@ -7,8 +7,8 @@ from typing import Annotated
 from pydantic import StringConstraints, field_validator
 from sqlmodel import SQLModel
 
-from sm_images import constants
 from sm_images.contracts.schemas import CollectionRead
+from sm_images.core import constants
 from sm_images.models import Visibility
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, max_length=constants.NAME_MAX)]

@@ -6,7 +6,7 @@ The image is staged at its final ``original_key`` and ingested in place on
 
 from __future__ import annotations
 
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.models import Image
 
 from tests.support.direct import UPLOADS, complete, send_parts, start

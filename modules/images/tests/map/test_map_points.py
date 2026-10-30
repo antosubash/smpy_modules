@@ -11,8 +11,8 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
-from sm_images import constants
 from sm_images.contracts import points as points_contract
+from sm_images.core import constants
 from sm_images.models import Group, StepRun, Visibility
 from sm_images.models.enums import StepStatus
 from sm_images.tenancy import DEFAULT_TENANT

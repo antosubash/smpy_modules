@@ -42,8 +42,9 @@ from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 
-from sm_images import billing, events, pipeline
-from sm_images.errors import StorageQuotaExceeded
+from sm_images import billing, pipeline
+from sm_images.core import events
+from sm_images.core.errors import StorageQuotaExceeded
 from sm_images.ingest import dedupe
 from sm_images.ingest import slots as holds
 from sm_images.ingest.guards import Inspected, inspect, read_staged

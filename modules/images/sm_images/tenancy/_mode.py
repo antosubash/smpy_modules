@@ -13,7 +13,7 @@ from typing import Any, Final
 
 from simple_module_hosting.tenancy import single_tenant_id, tenancy_mode
 
-from sm_images import constants
+from sm_images.core import constants
 
 __all__ = [
     "DEFAULT_TENANT",

@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
-from sm_images.errors import Conflict
+from sm_images.core.errors import Conflict
 from sm_images.imports import beat, controls, jobs, launch, runner, staging
 from sm_images.imports.geojson_stream import OVERSIZE, iter_features
 from sm_images.imports.mapping import Mapping

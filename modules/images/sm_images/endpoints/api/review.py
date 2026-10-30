@@ -19,9 +19,9 @@ from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import RequiresResource, resource_principal
 from sqlalchemy import select
 
-from sm_images import constants, events
 from sm_images.access import POLICY, CollectionEdit
 from sm_images.ai import review as service
+from sm_images.core import constants, events
 from sm_images.endpoints.api._runtime import tenant
 from sm_images.endpoints.deps import get_settings, require_view
 from sm_images.models import Collection, Prompt, PromptResult

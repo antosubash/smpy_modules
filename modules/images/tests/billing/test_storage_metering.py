@@ -9,7 +9,8 @@ import sys
 import types
 
 import pytest
-from sm_images import billing, constants
+from sm_images import billing
+from sm_images.core import constants
 from sm_images.models import Image
 from sqlalchemy import select
 

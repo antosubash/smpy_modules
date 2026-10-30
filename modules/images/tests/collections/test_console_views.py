@@ -115,7 +115,7 @@ async def test_screens_hide_a_collection_the_caller_may_not_open(uploads):
 async def test_an_images_refusal_on_a_screen_is_the_hosts_error_page(uploads):
     """The framework's own 404 (an id the policy hides) already gets the host's
     page; this is the one images raises itself (``ImagesError``)."""
-    from sm_images.errors import NotFound
+    from sm_images.core.errors import NotFound
 
     @uploads.app.get(f"{VIEWS}/x/boom")
     async def boom():

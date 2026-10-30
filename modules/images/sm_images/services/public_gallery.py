@@ -14,8 +14,8 @@ from typing import Any
 
 from sqlalchemy import select
 
-from sm_images import constants
 from sm_images.access import redaction
+from sm_images.core import constants
 from sm_images.models import Collection, Image, Rendition
 from sm_images.services import cursor as cursors
 from sm_images.serving import urls

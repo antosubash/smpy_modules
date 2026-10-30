@@ -24,9 +24,9 @@ from simple_module_hosting.resource_deps import resource_principal
 from sm_images.access import POLICY, CollectionEdit, CollectionOwner, redaction
 from sm_images.access.starter_right import owner_or_manage_basis
 from sm_images.access.write import ImageCollectionEdit
+from sm_images.core.errors import Forbidden, Invalid
 from sm_images.endpoints.api._runtime import runtime, tenant
 from sm_images.endpoints.deps import require_view
-from sm_images.errors import Forbidden, Invalid
 from sm_images.map import revoke as map_revoke
 from sm_images.pipeline import control
 from sm_images.pipeline.config import (

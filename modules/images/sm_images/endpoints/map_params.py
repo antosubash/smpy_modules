@@ -13,7 +13,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Path, Query, Request, Response
 from fastapi.encoders import jsonable_encoder
 
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.map import points
 from sm_images.serving import cache
 

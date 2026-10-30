@@ -31,7 +31,7 @@ from simple_module_db.independent import independent_session
 from sqlalchemy import and_, delete, or_, select, update
 
 from sm_images.billing import ops as billing_ops
-from sm_images.constants import NO_SYNC
+from sm_images.core.constants import NO_SYNC
 from sm_images.ingest.upload_session import mark_cleaned, move
 from sm_images.jobs.purge_delete import FAILURE_LIMIT, delete_keys
 from sm_images.jobs.purge_select import MIN_INTENT_AGE, Keys, Selection, chunks, collect_keys, pick

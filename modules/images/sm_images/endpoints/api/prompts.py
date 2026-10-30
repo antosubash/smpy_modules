@@ -27,14 +27,15 @@ from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import RequiresResource, resource_principal
 from sqlalchemy import select
 
-from sm_images import ai, constants
+from sm_images import ai
 from sm_images.access import POLICY, CollectionEdit, CollectionView
 from sm_images.access.starter_right import owner_or_manage_basis
 from sm_images.ai import codes
 from sm_images.ai import run as runs
+from sm_images.core import constants
+from sm_images.core.errors import Forbidden, Invalid, ServiceUnavailable
 from sm_images.endpoints.api._runtime import runtime, tenant
 from sm_images.endpoints.deps import require_view
-from sm_images.errors import Forbidden, Invalid, ServiceUnavailable
 from sm_images.models import Collection, Prompt, PromptResult
 from sm_images.models.enums import PromptScope
 from sm_images.schemas.prompt import (

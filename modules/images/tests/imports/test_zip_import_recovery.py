@@ -115,7 +115,7 @@ async def test_an_upload_that_never_arrives_is_failed_by_reconcile_not_relaunche
 
 
 async def test_controls_refuse_an_uploading_job_and_delete_removes_it(imp):
-    from sm_images.errors import Conflict
+    from sm_images.core.errors import Conflict
 
     job_id, _ = await upload_zip(imp, _five())
     for control in (controls.pause, controls.resume, controls.restart, controls.retry_failed):

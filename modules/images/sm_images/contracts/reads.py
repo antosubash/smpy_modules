@@ -26,9 +26,9 @@ from typing import Any
 
 from simple_module_core.resources import ACTION_VIEW, ResourcePrincipal
 
-from sm_images import constants
 from sm_images.access import visible_collections
 from sm_images.contracts.schemas import CollectionPageRead, CollectionRead
+from sm_images.core import constants
 from sm_images.map import points as map_points
 from sm_images.models import Collection
 from sm_images.services import collections as service

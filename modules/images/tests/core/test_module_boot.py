@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from simple_module_core.body_limits import BodyLimitRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.module import ImagesModule
 from sm_images.settings import ImagesSettings
 

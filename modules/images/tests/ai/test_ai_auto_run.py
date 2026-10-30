@@ -9,7 +9,7 @@ step, and a prompt without ``auto_run`` is not requested.
 from __future__ import annotations
 
 from simple_module_db import finalize_session
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.ingest import IngestMeta, IngestService
 from sm_images.models import Collection
 

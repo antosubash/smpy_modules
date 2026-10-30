@@ -36,8 +36,8 @@ from typing import Any
 
 from simple_module_db.callbacks import register_on_commit
 
-from sm_images import constants
-from sm_images.errors import StorageQuotaExceeded
+from sm_images.core import constants
+from sm_images.core.errors import StorageQuotaExceeded
 
 __all__ = [
     "KeyClosed",

@@ -9,9 +9,9 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sm_images import constants
 from sm_images.billing import ops as billing_ops
-from sm_images.errors import ImageTooLarge, ServiceUnavailable
+from sm_images.core import constants
+from sm_images.core.errors import ImageTooLarge, ServiceUnavailable
 from sm_images.ingest.service import IngestService
 from sm_images.ingest.slots import INGEST_CLAIM
 from sm_images.models import UploadSession, UploadStatus

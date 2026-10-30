@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 
-from sm_images import constants
+from sm_images.core import constants
 
 __all__ = ["slugify"]
 

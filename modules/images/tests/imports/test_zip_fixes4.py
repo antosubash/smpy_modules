@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from pydantic import ValidationError
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.imports import beat, chunk, download, launch, recover, reset, retrying
 from sm_images.jobs.reconcile import CUTOFF
 from sm_images.models import ImportJob

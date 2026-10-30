@@ -48,8 +48,8 @@ from fastapi import HTTPException, Request
 from simple_module_db import tenant_context
 from simple_module_db.listeners import TenantIsolationError, current_tenant_id
 
-from sm_images.constants import NOT_FOUND_DETAIL
-from sm_images.errors import TenantRequired
+from sm_images.core.constants import NOT_FOUND_DETAIL
+from sm_images.core.errors import TenantRequired
 from sm_images.tenancy._mode import (
     DEFAULT_TENANT,
     TenancyMode,
@@ -236,7 +236,7 @@ async def bind_public(request: Request) -> AsyncIterator[str]:
     note_tenant_source(request)
     tenant = resolve_public(request)
     if tenant is None:
-        from sm_images.errors import NotFound
+        from sm_images.core.errors import NotFound
 
         raise NotFound(NOT_FOUND_DETAIL)
     with tenant_scope(tenant):

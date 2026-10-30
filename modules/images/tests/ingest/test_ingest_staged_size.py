@@ -11,7 +11,7 @@ import uuid
 from types import SimpleNamespace
 
 import pytest
-from sm_images.errors import FileTooLarge
+from sm_images.core.errors import FileTooLarge
 from sm_images.ingest import IngestMeta, IngestService
 
 

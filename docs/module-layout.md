@@ -23,9 +23,8 @@ Nothing else lives at this level.
 
 ## The package root
 
-Only three kinds of file stay at the top of the package.
-
-**Files something else looks up by name.** Moving one breaks a host, a
+Only files that something else looks up by name stay at the top of the
+package. Moving one breaks a host, a
 worker or a sibling module silently, while the module's own tests keep
 passing (they import by whatever path the file has). Pin each with a test
 that loads it the way its consumer does, like images'
@@ -42,12 +41,12 @@ that loads it the way its consumer does, like images'
 | `pagebuilder-blocks.ts` | pagebuilder's `puck-blocks.ts` glob (`*/*/pagebuilder-blocks.ts`) |
 | `images_extensions.py`, `images-steps.ts` | a plugin's file that another module imports or globs by name |
 
-**What every feature needs:** `constants.py`, `errors.py`, `events.py`.
-Keep this list short. If only two features use something, it belongs to one of
-them.
-
-**Nothing else.** Settings, tenancy, the clock, the menu and helpers all go
-into a package.
+**Nothing else.** In images that leaves four Python files at the root.
+Settings, tenancy, the clock, the menu and helpers all go into a package. So
+does what every feature uses, which goes in `core/`: `core/constants.py`,
+`core/errors.py` and `core/events.py`, under an `__init__.py` that holds only a
+docstring. Keep `core/` short: if only two features use something, it belongs
+to one of them.
 
 ## Feature packages
 
@@ -148,7 +147,7 @@ Do it in small PRs, one module at a time, each containing only moves:
 
 | Module | Root `.py` files | Flat `tests/test_*.py` | State |
 | --- | --- | --- | --- |
-| images | 7 | 0 | follows this layout |
+| images | 4 | 0 | follows this layout |
 | ai | 13 | 14 | not moved yet |
 | billing | 28 | 53 | not moved yet |
 | news | 27 | 78 | not moved yet |

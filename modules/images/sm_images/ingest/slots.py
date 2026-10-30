@@ -28,7 +28,7 @@ from sqlalchemy import event
 
 from sm_images import billing
 from sm_images.billing import ops as billing_ops
-from sm_images.errors import StorageQuotaExceeded
+from sm_images.core.errors import StorageQuotaExceeded
 from sm_images.models.billing_op import OP_EXPIRED, OP_INGEST
 
 __all__ = [

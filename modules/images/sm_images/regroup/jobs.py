@@ -19,9 +19,9 @@ from simple_module_db import finalize_session
 from sqlalchemy import exists, select, update
 from sqlalchemy.exc import IntegrityError
 
-from sm_images import constants
 from sm_images.clock import utcnow as now
-from sm_images.errors import Conflict
+from sm_images.core import constants
+from sm_images.core.errors import Conflict
 from sm_images.models import Collection, RegroupJob
 from sm_images.models.regroup_job import CANCELLED, COMPLETED, RUNNING
 from sm_images.pipeline.runtime import Runtime

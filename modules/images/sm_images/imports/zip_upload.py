@@ -30,8 +30,8 @@ from pydantic import ValidationError
 from simple_module_db import finalize_session, tenant_context
 from sqlalchemy import select, update
 
-from sm_images.errors import FileTooLarge, ImagesError, PartsMismatch
-from sm_images.errors import UploadNotFound as Gone
+from sm_images.core.errors import FileTooLarge, ImagesError, PartsMismatch
+from sm_images.core.errors import UploadNotFound as Gone
 from sm_images.imports import jobs, terminal
 from sm_images.imports.jobs import SYNC, now, where
 from sm_images.imports.lookup import conflict, get

@@ -14,7 +14,7 @@ from typing import Final
 from simple_module_db import finalize_session
 from sqlalchemy import or_, select, update
 
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.imports import jobs, settle
 from sm_images.imports.jobs import SYNC, now
 from sm_images.ingest import dedupe

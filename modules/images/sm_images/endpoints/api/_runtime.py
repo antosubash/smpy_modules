@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from simple_module_db.listeners import current_tenant_id
 
-from sm_images.errors import ServiceUnavailable
+from sm_images.core.errors import ServiceUnavailable
 from sm_images.pipeline.runtime import Runtime, current_runtime
 
 __all__ = ["runtime", "tenant"]

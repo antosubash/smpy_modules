@@ -90,7 +90,7 @@ async def test_an_undecodable_file_fails_the_run_with_a_code():
 async def test_a_pixel_bomb_is_refused_before_decoding(monkeypatch, side):
     """``measure`` runs ``guard_pixels`` first: Pillow alone only *warns* in the
     1x-2x band and would decode the whole bitmap."""
-    from sm_images.errors import ImageTooLarge
+    from sm_images.core.errors import ImageTooLarge
     from sm_images.steps.quality import QualityParams, measure
 
     monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 100)

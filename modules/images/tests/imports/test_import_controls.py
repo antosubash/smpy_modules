@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
-from sm_images.errors import Conflict
+from sm_images.core.errors import Conflict
 from sm_images.imports import controls, jobs, launch, reset, runner, terminal
 from sm_images.models import ImportItem, ImportJob
 from sm_images.tenancy import DEFAULT_TENANT

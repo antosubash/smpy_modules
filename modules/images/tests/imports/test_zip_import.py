@@ -11,7 +11,7 @@ import os
 from datetime import UTC, datetime
 
 import pytest
-from sm_images.errors import FileTooLarge
+from sm_images.core.errors import FileTooLarge
 from sm_images.imports import zip_upload
 from sm_images.models.enums import JobStatus
 from sm_images.tenancy import DEFAULT_TENANT
@@ -198,7 +198,7 @@ async def test_zip_groups_by_pattern(imp):
 
 
 async def test_a_zip_maps_nothing_but_a_filename_pattern(imp):
-    from sm_images.errors import Invalid
+    from sm_images.core.errors import Invalid
 
     for mapping in ({"url_prop": "u"}, {"filename_pattern": "(?P<x>a)"}, {"nope": 1}):
         with pytest.raises(Invalid) as err:

@@ -12,8 +12,8 @@ import base64
 import binascii
 from typing import Final
 
-from sm_images import constants
-from sm_images.errors import FileTooLarge, InvalidUpload
+from sm_images.core import constants
+from sm_images.core.errors import FileTooLarge, InvalidUpload
 
 __all__ = ["decode_base64"]
 

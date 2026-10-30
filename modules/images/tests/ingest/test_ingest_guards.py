@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 from PIL import Image as PILImage
-from sm_images import constants
-from sm_images.errors import ImageTooLarge, UnsupportedType
+from sm_images.core import constants
+from sm_images.core.errors import ImageTooLarge, UnsupportedType
 from sm_images.ingest import guard_pixels, sniff
 
 from tests.support.upload import (

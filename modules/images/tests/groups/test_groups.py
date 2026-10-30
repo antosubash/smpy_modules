@@ -205,7 +205,7 @@ async def test_regroup_keeps_the_role_when_the_pattern_gives_none(uploads):
 
 
 async def test_regroup_more_images_than_one_chunk(uploads, monkeypatch):
-    from sm_images import constants
+    from sm_images.core import constants
 
     monkeypatch.setattr(constants, "REGROUP_CHUNK", 3)
     names = [f"s{i % 4}_{ROLES[i % 3]}_{i}.jpg" for i in range(10)]
@@ -229,7 +229,7 @@ async def test_regroup_refuses_bad_patterns_and_reports_timeouts(uploads, monkey
 
 
 async def test_regroup_over_budget_writes_nothing(uploads, monkeypatch):
-    from sm_images import constants
+    from sm_images.core import constants
 
     monkeypatch.setattr(constants, "REGROUP_BUDGET_SECONDS", -1.0)
     cid, _ = await seed(uploads, ["s1_point.jpg"])

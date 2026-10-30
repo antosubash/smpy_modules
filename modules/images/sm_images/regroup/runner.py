@@ -18,8 +18,8 @@ import uuid
 from simple_module_db import finalize_session
 from sqlalchemy import select
 
-from sm_images import constants
 from sm_images.access.starter_right import holds_right
+from sm_images.core import constants
 from sm_images.imports.access import ACCESS_REVOKED
 from sm_images.models import Collection
 from sm_images.pipeline.runtime import Runtime

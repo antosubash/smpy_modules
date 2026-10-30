@@ -4,7 +4,7 @@ The module range admits any 0.0.x framework, but these call sites read names
 the framework does not promise to keep. Each test fails, naming the call site,
 the moment one changes - in CI on the framework bump, not in production.
 
-* ``sm_images/errors.py`` (``_error_page``) -
+* ``sm_images/core/errors.py`` (``_error_page``) -
   ``simple_module_hosting._error_handlers.render_error_page`` (records pins
   the same name). No public replacement yet: simple_module_python#684.
 * ``sm_images/pipeline/eager_drain.py`` (``deliver_code``/``in_delivery``) -
@@ -22,7 +22,7 @@ import inspect
 
 import pytest
 
-_ERRORS = "sm_images/errors.py (_error_page)"
+_ERRORS = "sm_images/core/errors.py (_error_page)"
 _DRAIN = "sm_images/pipeline/eager_drain.py (deliver_code / in_delivery)"
 
 

@@ -21,8 +21,8 @@ from typing import Any
 from PIL import Image as PILImage
 from PIL import UnidentifiedImageError
 
-from sm_images import constants
-from sm_images.errors import FileTooLarge, ImageTooLarge, UnsupportedType
+from sm_images.core import constants
+from sm_images.core.errors import FileTooLarge, ImageTooLarge, UnsupportedType
 from sm_images.ingest.sniff import EXTENSIONS, sniff
 
 __all__ = ["Inspected", "guard_pixels", "inspect", "read_bounded"]

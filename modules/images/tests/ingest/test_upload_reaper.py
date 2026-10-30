@@ -11,7 +11,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.ingest.upload_reaper import reap_expired_uploads
 from sm_images.models import UploadSession, UploadStatus
 from sm_images.storage import ImageStore

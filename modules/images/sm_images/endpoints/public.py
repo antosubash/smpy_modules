@@ -29,8 +29,9 @@ from fastapi.routing import APIRoute
 from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.deps import get_db
 
-from sm_images import constants
 from sm_images.access import public_collection
+from sm_images.core import constants
+from sm_images.core.errors import ImagesError, render
 from sm_images.endpoints.map_params import (
     BBox,
     Cursor,
@@ -39,7 +40,6 @@ from sm_images.endpoints.map_params import (
     get_and_head,
     points_response,
 )
-from sm_images.errors import ImagesError, render
 from sm_images.models import Collection
 from sm_images.services import public_gallery
 from sm_images.serving import cache, respond

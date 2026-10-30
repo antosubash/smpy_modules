@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sm_images.errors import Conflict
+from sm_images.core.errors import Conflict
 from sm_images.imports import (
     claims,
     controls,

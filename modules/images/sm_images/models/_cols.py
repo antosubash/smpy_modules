@@ -11,7 +11,7 @@ from sqlalchemy import JSON, Column, ForeignKey, Uuid
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field
 
-from sm_images import constants
+from sm_images.core import constants
 
 
 def pk_uuid() -> Any:

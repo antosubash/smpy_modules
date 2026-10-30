@@ -36,7 +36,7 @@ from pydantic import (
     field_validator,
 )
 
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.imports.features import Parsed, base64_external_id
 from sm_images.imports.filename_pattern import canonical_role, group_key, match_group
 from sm_images.imports.mapping import Mapping, MappingError

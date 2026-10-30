@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 import pytest_asyncio
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.models import ImportJob
 from sm_images.module import ImagesModule
 

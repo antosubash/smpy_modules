@@ -10,7 +10,6 @@ feature, then the file.
 | --- | --- |
 | `module.py` | The `ModuleBase` the host loads (the `simple_module` entry point) |
 | `tasks.py`, `task_config.py` | The Celery tasks, and their queues and beat schedule. **Both must stay here**: `background_tasks` imports `<package>.tasks` and `<package>.task_config` and looks nowhere else (`tests/core/test_task_discovery.py`) |
-| `constants.py`, `errors.py`, `events.py` | Names, error types, published events |
 | `index.ts` | The TS surface a plugin imports (`@simple-module-py/images`) |
 | `pagebuilder-blocks.ts` | The ImageGallery block; pagebuilder globs this name |
 
@@ -18,6 +17,7 @@ feature, then the file.
 
 | Package | Holds |
 | --- | --- |
+| `core/` | What every feature uses: names and limits (`core/constants.py`), error types (`core/errors.py`), published events (`core/events.py`) |
 | `access/` | The collection policy (`access/__init__.py`), write rules, the redaction state, the sharing resource type, a background run's starter right |
 | `tenancy/` | Binding the tenant per request (`tenancy/__init__.py`), the tenancy mode, the request context |
 | `settings/` | The DB-backed settings class (`settings/__init__.py`) and what is read at boot (`settings/boot.py`) |

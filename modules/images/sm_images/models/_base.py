@@ -9,6 +9,6 @@ from __future__ import annotations
 
 from simple_module_db.base import create_module_base
 
-from sm_images import constants
+from sm_images.core import constants
 
 Base = create_module_base(constants.BASE_NAME)

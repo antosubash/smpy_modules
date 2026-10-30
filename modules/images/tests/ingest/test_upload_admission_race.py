@@ -17,7 +17,7 @@ from types import SimpleNamespace
 import pytest
 import pytest_asyncio
 from sm_images.clock import utcnow
-from sm_images.errors import StorageQuotaExceeded, TooManyOpenUploads
+from sm_images.core.errors import StorageQuotaExceeded, TooManyOpenUploads
 from sm_images.ingest import admission
 from sm_images.models import Collection, UploadSession, UploadStatus
 from sm_images.tenancy import DEFAULT_TENANT, tenant_scope

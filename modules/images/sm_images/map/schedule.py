@@ -38,7 +38,7 @@ from simple_module_db.callbacks import register_on_commit
 from sqlalchemy import or_, select, update
 
 from sm_images.clock import utcnow as now
-from sm_images.constants import NO_SYNC
+from sm_images.core.constants import NO_SYNC
 from sm_images.models import Collection, Image
 from sm_images.pipeline.runtime import Runtime, current_runtime
 

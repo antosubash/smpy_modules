@@ -8,7 +8,7 @@ import uuid
 from simple_module_db import finalize_session
 from sqlalchemy import func, select
 
-from sm_images.errors import Conflict, NotFound
+from sm_images.core.errors import Conflict, NotFound
 from sm_images.imports.jobs import JobSnap, load
 from sm_images.models import Collection, ImportItem, ImportJob
 from sm_images.models.enums import ImportKind, ItemStatus

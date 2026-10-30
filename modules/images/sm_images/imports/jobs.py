@@ -28,7 +28,7 @@ from simple_module_db import finalize_session
 from sqlalchemy import case, func, select, update
 
 from sm_images.clock import utcnow as now
-from sm_images.constants import NO_SYNC
+from sm_images.core.constants import NO_SYNC
 from sm_images.imports.mapping import Mapping
 from sm_images.models import Collection, ImportItem, ImportJob
 from sm_images.models.enums import ImportKind, ItemStatus, JobStatus

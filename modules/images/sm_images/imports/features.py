@@ -26,7 +26,7 @@ from datetime import datetime
 from typing import Any, Final
 from urllib.parse import unquote, urlsplit
 
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.imports.filename_pattern import canonical_role, group_key, match_group
 from sm_images.imports.mapping import Mapping
 from sm_images.imports.values import coordinates, lookup, parse_datetime

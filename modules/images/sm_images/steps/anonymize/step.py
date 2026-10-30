@@ -34,7 +34,7 @@ from typing import Any, Final
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from sm_images.errors import ImageTooLarge
+from sm_images.core.errors import ImageTooLarge
 from sm_images.pipeline import registry
 from sm_images.pipeline.step import StepContext, StepOutcome
 from sm_images.steps.anonymize.blur import Region, blur_regions, pad_and_clamp

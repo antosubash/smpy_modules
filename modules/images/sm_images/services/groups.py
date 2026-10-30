@@ -16,9 +16,9 @@ from typing import Any
 from sqlalchemy import case, delete, exists, func, literal, select, update
 from sqlalchemy.exc import IntegrityError
 
-from sm_images import constants
 from sm_images.access import redaction
-from sm_images.errors import Conflict, GroupExists, InvalidGroup, NotFound, absent
+from sm_images.core import constants
+from sm_images.core.errors import Conflict, GroupExists, InvalidGroup, NotFound, absent
 from sm_images.imports.filename_pattern import canonical_role
 from sm_images.map import schedule as map_schedule
 from sm_images.models import Collection, Group, Image

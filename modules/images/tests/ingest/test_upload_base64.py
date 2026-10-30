@@ -11,7 +11,7 @@ from __future__ import annotations
 import base64
 import uuid
 
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.ingest import Duplicate, IngestMeta, IngestService, dedupe
 from sm_images.models import Collection, Image
 from sm_images.settings import ImagesSettings

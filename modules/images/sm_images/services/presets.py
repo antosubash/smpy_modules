@@ -29,7 +29,7 @@ from sqlalchemy import select
 
 from sm_images.access import redaction
 from sm_images.ai import codes
-from sm_images.errors import Invalid, NotFound
+from sm_images.core.errors import Invalid, NotFound
 from sm_images.map import revoke
 from sm_images.models import Collection, Prompt
 from sm_images.models.enums import PromptScope

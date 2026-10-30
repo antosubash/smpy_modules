@@ -9,7 +9,8 @@ from typing import Any
 from simple_module_core.resources import ResourcePrincipal
 from sqlalchemy import select
 
-from sm_images import access, constants
+from sm_images import access
+from sm_images.core import constants
 from sm_images.models import Collection, Group, Image, Prompt, Rendition, StepRun
 from sm_images.schemas.image import ImageOut, StepRunOut
 from sm_images.serving import urls

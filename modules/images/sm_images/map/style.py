@@ -16,7 +16,7 @@ from collections.abc import Iterable
 from typing import Any
 from urllib.parse import urlsplit
 
-from sm_images import constants
+from sm_images.core import constants
 
 __all__ = ["DEFAULT_STYLE_URL", "csp_sources", "style_origin", "validate_style_url"]
 

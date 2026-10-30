@@ -32,7 +32,7 @@ from sm_images.ai import codes
 from sm_images.ai.group_lease import lock_group
 from sm_images.ai.results import encoded_size, reset_review
 from sm_images.ai.schema_model import build_model
-from sm_images.errors import Conflict, Invalid, NotFound
+from sm_images.core.errors import Conflict, Invalid, NotFound
 from sm_images.models import Prompt, PromptResult
 from sm_images.models.enums import ReviewStatus, StepStatus
 from sm_images.pipeline.claim import lock_image

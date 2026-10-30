@@ -25,7 +25,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from sm_images.errors import ImageTooLarge
+from sm_images.core.errors import ImageTooLarge
 from sm_images.pipeline import registry
 from sm_images.pipeline.step import StepContext, StepOutcome
 

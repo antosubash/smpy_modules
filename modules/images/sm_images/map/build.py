@@ -38,9 +38,9 @@ from typing import Any, Final
 from simple_module_db import finalize_session
 from sqlalchemy import select, update
 
-from sm_images import constants
 from sm_images.access import redaction
-from sm_images.constants import NO_SYNC
+from sm_images.core import constants
+from sm_images.core.constants import NO_SYNC
 from sm_images.map import pmtiles_build
 from sm_images.map.objects import drop_objects
 from sm_images.map.points import located

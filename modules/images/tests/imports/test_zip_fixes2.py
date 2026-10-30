@@ -11,7 +11,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.imports import values, zip_import, zip_metadata, zip_safety
 from sm_images.imports.zip_safety import Limits, ZipRejected, inspect
 

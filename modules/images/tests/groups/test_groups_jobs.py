@@ -7,7 +7,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.models import Collection, Group, RegroupJob
 from sm_images.module import ImagesModule
 from sm_images.regroup import jobs

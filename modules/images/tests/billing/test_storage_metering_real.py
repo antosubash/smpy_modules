@@ -22,7 +22,7 @@ from simple_module_db.listeners import attach_session_listeners
 from sm_images import billing
 from sm_images.billing import ops as billing_ops
 from sm_images.billing import repair as billing_repair
-from sm_images.errors import StorageQuotaExceeded
+from sm_images.core.errors import StorageQuotaExceeded
 from sm_images.ingest.slots import Slot, hold_slot, keep_hold
 from sm_images.models import BillingOp, Collection, Image
 from sm_images.models.billing_op import OP_SWAP

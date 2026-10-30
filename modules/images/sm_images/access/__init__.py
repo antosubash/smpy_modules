@@ -43,8 +43,8 @@ from simple_module_hosting.resource_deps import RequiresResource
 from sqlalchemy import or_
 from sqlmodel import select
 
-from sm_images import constants
-from sm_images.errors import NotFound
+from sm_images.core import constants
+from sm_images.core.errors import NotFound
 from sm_images.models import Collection, Group, Image, RegroupJob, Visibility
 
 COLLECTION_RESOURCE = "images.collection"

@@ -17,7 +17,6 @@ from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal
 from sqlalchemy import select
 
-from sm_images import constants
 from sm_images.access import (
     CollectionEdit,
     CollectionView,
@@ -25,6 +24,7 @@ from sm_images.access import (
     RegroupCollectionEdit,
 )
 from sm_images.access.write import GroupCollectionEdit
+from sm_images.core import constants
 from sm_images.endpoints.api._runtime import runtime, tenant
 from sm_images.endpoints.deps import require_view
 from sm_images.imports.access import basis

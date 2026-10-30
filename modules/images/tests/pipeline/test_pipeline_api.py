@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.models import Collection, StepRun
 from sm_images.models.enums import StepStatus
 from sqlalchemy import update

@@ -22,7 +22,7 @@ import logging
 from typing import Any
 from urllib.parse import quote
 
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.models import Visibility
 from sm_images.serving import cache
 from sm_images.tenancy._mode import TenancyMode

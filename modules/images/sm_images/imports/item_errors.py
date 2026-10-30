@@ -19,7 +19,7 @@ from urllib.parse import urlsplit
 
 from sqlalchemy import select, update
 
-from sm_images.constants import NO_SYNC
+from sm_images.core.constants import NO_SYNC
 from sm_images.imports import jobs
 from sm_images.models import ImportItem, ImportJob
 

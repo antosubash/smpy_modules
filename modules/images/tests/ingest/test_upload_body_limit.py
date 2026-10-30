@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from httpx import ASGITransport, AsyncClient
 from simple_module_hosting import Settings, app_builder, create_app
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.settings import ImagesSettings
 
 MIB = 1024 * 1024

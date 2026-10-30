@@ -4,7 +4,7 @@ complete, and a part size that splits a test-sized image in two."""
 from __future__ import annotations
 
 import pytest
-from sm_images import constants
+from sm_images.core import constants
 
 from tests.support.upload import BASE, OLGA
 

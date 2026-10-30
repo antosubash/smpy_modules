@@ -26,8 +26,8 @@ from typing import Any
 from simple_module_db import finalize_session
 from sqlalchemy import case, func, select, update
 
-from sm_images import constants
 from sm_images.clock.db import dialect_insert
+from sm_images.core import constants
 from sm_images.imports import item_errors
 from sm_images.imports.features import Parsed
 from sm_images.imports.jobs import COUNTERS, SYNC, JobSnap, now, where

@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.models import ImportJob
 from sm_images.schemas.image import DirectCreated, Filename, PartIn
 

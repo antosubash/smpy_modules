@@ -22,7 +22,7 @@ from typing import IO
 import httpx
 from pydantic import ValidationError
 
-from sm_images.errors import FileTooLarge, Invalid, ServiceUnavailable
+from sm_images.core.errors import FileTooLarge, Invalid, ServiceUnavailable
 from sm_images.imports import jobs, launch, staging, terminal
 from sm_images.imports.dns import resolve_bounded
 from sm_images.imports.errors import FetchError

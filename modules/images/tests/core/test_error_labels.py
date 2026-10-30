@@ -10,8 +10,8 @@ import re
 from pathlib import Path
 
 import pytest
-from sm_images import constants
 from sm_images.ai.codes import AI_CODES
+from sm_images.core import constants
 from sm_images.endpoints.api.pipeline import CODE_INVALID_CONFIG
 from sm_images.imports import access, recover, retrying
 from sm_images.imports.features import PARSE_CODES
@@ -20,7 +20,7 @@ from sm_images.imports.mapping import Mapping, Prop
 from sm_images.pipeline import plan
 from sm_images.pipeline.reopen import PLACEHOLDER_CODES
 
-PKG = Path(constants.__file__).parent
+PKG = Path(constants.__file__).parent.parent  # sm_images/, above core/
 CATALOGUES = ("en", "de")
 
 EXECUTOR_CODES = frozenset(

@@ -47,9 +47,5 @@ def test_every_module_icon_is_one_navicon_renders() -> None:
     assert "search" in known
     module_icons = _module_icons()
     assert module_icons, "found no icon names in any module; the patterns are stale"
-    unknown = {
-        path: sorted(names - known)
-        for path, names in module_icons.items()
-        if names - known
-    }
+    unknown = {path: sorted(names - known) for path, names in module_icons.items() if names - known}
     assert unknown == {}, f"icons NavIcon cannot render (blank in the sidebar): {unknown}"

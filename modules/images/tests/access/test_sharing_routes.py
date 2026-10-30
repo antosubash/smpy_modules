@@ -20,7 +20,7 @@ from simple_module_core.resources import ResourceTypeRegistry
 from simple_module_core.user_directory import DirectoryUser
 from simple_module_db import tenant_context
 from simple_module_db.listeners import TenantIsolationError
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.models import Collection
 from sm_images.tenancy import ALL_TENANTS, tenant_scope
 from sm_images.tenancy import _mode as _tenancy_mode

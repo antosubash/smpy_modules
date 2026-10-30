@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 import uuid
 
-from sm_images import constants
 from sm_images.contracts.events import ImageAdded
+from sm_images.core import constants
 from sm_images.models import Collection, Group, LocationSource
 from sqlalchemy import select
 

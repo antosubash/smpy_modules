@@ -11,7 +11,7 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 
-from sm_images import constants
+from sm_images.core import constants
 
 
 class ImagesError(Exception):

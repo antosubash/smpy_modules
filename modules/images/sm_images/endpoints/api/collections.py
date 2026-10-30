@@ -16,8 +16,8 @@ from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal
 
-from sm_images import constants, events
 from sm_images.access import CollectionEdit, CollectionOwner, CollectionView
+from sm_images.core import constants, events
 from sm_images.endpoints.deps import require_create, require_view
 from sm_images.imports.cleanup import cancel_for_collection
 from sm_images.models import Collection

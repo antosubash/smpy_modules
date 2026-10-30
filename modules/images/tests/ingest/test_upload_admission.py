@@ -16,7 +16,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 import pytest_asyncio
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.models import UploadSession
 from sm_images.module import ImagesModule
 from sqlalchemy import update

@@ -7,7 +7,7 @@ import uuid
 
 from simple_module_db import finalize_session
 
-from sm_images.errors import UploadNotFound as Gone
+from sm_images.core.errors import UploadNotFound as Gone
 from sm_images.imports.zip_upload import session_ticket
 from sm_images.ingest import upload_session as state
 from sm_images.models import ImportJob

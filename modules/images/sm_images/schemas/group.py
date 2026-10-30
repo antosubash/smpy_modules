@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from sm_images import constants
+from sm_images.core import constants
 from sm_images.imports.filename_pattern import MAX_PATTERN_LENGTH
 from sm_images.schemas.image import ImageOut
 

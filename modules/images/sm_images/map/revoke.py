@@ -31,7 +31,7 @@ from simple_module_db.callbacks import register_on_commit
 from sqlalchemy import select, update
 
 from sm_images.access import redaction
-from sm_images.constants import NO_SYNC
+from sm_images.core.constants import NO_SYNC
 from sm_images.map.objects import drop_objects
 from sm_images.map.schedule import request
 from sm_images.models import Collection, Image, StepRun

@@ -22,7 +22,7 @@ from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 from simple_module_core.resources import ResourceTypeRegistry
 
-from sm_images import constants
+from sm_images.core import constants
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -111,7 +111,7 @@ class ImagesModule(ModuleBase):
         )
 
     def register_exception_handlers(self, app: FastAPI) -> None:
-        from sm_images.errors import install_exception_handlers
+        from sm_images.core.errors import install_exception_handlers
 
         install_exception_handlers(app)
 
