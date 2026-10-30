@@ -6,13 +6,14 @@ the moment one changes - in CI on the framework bump, not in production.
 
 * ``sm_images/errors.py`` (``_error_page``) -
   ``simple_module_hosting._error_handlers.render_error_page`` (records pins
-  the same name). No public replacement yet.
+  the same name). No public replacement yet: simple_module_python#684.
 * ``sm_images/pipeline/eager_drain.py`` (``deliver_code``/``in_delivery``) -
   ``background_tasks.outbox_dispatch.deliver_one`` is the coroutine on the
   stack while a durable handler runs, and ``OutboxTransport.drain`` is what an
-  eager submit waits on.
+  eager submit waits on. Public signal requested: simple_module_python#682.
 * ``sm_images/pipeline/runtime.py`` (``worker_multi_tenant``) -
-  ``background_tasks.sync_db._url_override``, set by ``set_database_url``.
+  ``background_tasks.sync_db._url_override``, set by ``set_database_url``
+  (simple_module_python#685).
 """
 
 from __future__ import annotations

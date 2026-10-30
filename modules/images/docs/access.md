@@ -58,7 +58,7 @@ and on a multi-tenant host lists only members of the bound tenant.
 **Purging a collection does not remove its share rows.** The janitor deletes the
 collection's images and objects, but the framework's `sharing` module has no
 per-resource cleanup hook yet, so the rows for a purged collection stay in its
-table until that exists upstream. They grant nothing: the resource they name is
+table until that exists upstream (simple_module_python#683). They grant nothing: the resource they name is
 gone.
 
 ## Originals and display copies
