@@ -3,6 +3,8 @@ export interface FileItem {
 	mimeType: string;
 	fileSize: number;
 	url: string;
+	/** What the picker shows and announces for the file (its original name). */
+	name?: string;
 }
 
 export interface FilePickerAdapter {
@@ -10,6 +12,8 @@ export interface FilePickerAdapter {
 	list(params: {
 		skip?: number;
 		take?: number;
+		/** Filter by file name; an adapter that cannot search ignores it. */
+		search?: string;
 	}): Promise<{ items: FileItem[]; totalCount: number }>;
 	getViewUrl(id: string): string;
 }
