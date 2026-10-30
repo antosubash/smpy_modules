@@ -182,7 +182,7 @@ async def launch(
         return await run_prompt(runtime, tenant, prompt_id, scope, image_ids, group_ids, **starter)
     from background_tasks.tenant_context import TENANT_HEADER
 
-    from sm_images.jobs.task_config import QUEUE_IMPORTS
+    from sm_images.task_config import QUEUE_IMPORTS
     from sm_images.tasks import run_prompt_task
 
     run_prompt_task.s(str(prompt_id), scope, **starter).apply_async(

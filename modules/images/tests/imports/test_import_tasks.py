@@ -11,11 +11,11 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from background_tasks.tenant_context import TENANT_HEADER
+from sm_images import task_config
 from sm_images.errors import ServiceUnavailable
 from sm_images.imports import download, launch, staging
 from sm_images.imports import tasks as import_tasks
 from sm_images.imports.service import start_import
-from sm_images.jobs import task_config
 from sm_images.tenancy import DEFAULT_TENANT
 
 from tests.support.imports import HOST, URL, feature, geojson, serve_images

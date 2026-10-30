@@ -10,7 +10,7 @@ Only what the framework or every feature needs stays at the top of the package:
 | Module | What it is |
 | --- | --- |
 | `module.py` | The `ModuleBase` the host loads (the `simple_module` entry point) |
-| `tasks.py` | The Celery tasks. **Must stay here**: `background_tasks` autodiscovers `<package>.tasks` and imports nothing else (`tests/core/test_task_discovery.py`) |
+| `tasks.py`, `task_config.py` | The Celery tasks, and their queues and beat schedule. **Both must stay here**: `background_tasks` imports `<package>.tasks` and `<package>.task_config` and looks nowhere else (`tests/core/test_task_discovery.py`) |
 | `constants.py`, `errors.py`, `events.py`, `menu.py` | Names, error types, published events, the console menu |
 | `settings.py`, `settings_boot.py` | The DB-backed settings class and what is read at boot |
 | `clock.py`, `db_time.py`, `intents.py` | Wall clock, database clock, write-ahead object intents, used everywhere |
@@ -23,8 +23,8 @@ Only what the framework or every feature needs stays at the top of the package:
 | `tenancy/` | Binding the tenant per request (`tenancy/__init__.py`), the tenancy mode, the request context |
 | `billing/` | The storage-gauge facade billing sees (`billing/__init__.py`), the hold swap ops, settle, install, repair, metering keys |
 | `storage/` | The object store (`storage/__init__.py`) and the object-key layout (`storage/keys.py`) |
-| `serving/` | Serving image bytes (`serving/__init__.py`): cache headers, `Range`, URLs |
-| `jobs/` | The platform beats: janitor, reconcile, purge, their phases, task routing and beat config |
+| `serving/` | Serving image bytes (`serving/respond.py`): cache headers, `Range`, URLs |
+| `jobs/` | The platform beats: janitor, reconcile, purge and their phases |
 | `ingest/` | Uploads: multipart, base64, direct-to-storage, admission, dedupe |
 | `imports/` | GeoJSON and ZIP import jobs, safe fetching |
 | `pipeline/` | The step registry, plugins, planning, claiming and running steps |
@@ -37,9 +37,13 @@ Only what the framework or every feature needs stays at the top of the package:
 | `endpoints/` | Routers: `api/` (JSON), console and public views, request dependencies, CSRF |
 | `contracts/` | What other modules may import. Anything outside it can move |
 
-A feature with a namesake module keeps its public face in the package's
-`__init__.py`, so `from sm_images import billing` and `billing.check(...)`
-read the same as before the package existed.
+`access`, `tenancy`, `billing` and `storage` keep their public face in the
+package's `__init__.py`, so `from sm_images import billing` and
+`billing.check(...)` read as before the package existed. That only works for a
+light module: an `__init__.py` runs whenever any sibling is imported, so
+`serving`'s heavy byte-serving code lives in `serving/respond.py` and its
+`__init__.py` is empty. Every module imports on its own in a fresh interpreter;
+keep it that way when adding imports to an `__init__.py`.
 
 ## Frontend
 

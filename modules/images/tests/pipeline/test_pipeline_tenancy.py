@@ -75,7 +75,7 @@ async def test_task_runs_in_enqueuer_tenant(pipe):
 @pytest.mark.unbound_tenant
 async def test_broker_mode_enqueues_on_the_step_queue_with_the_tenant(pipe, monkeypatch):
     from celery import current_app
-    from sm_images.jobs.task_config import RUN_STEP
+    from sm_images.task_config import RUN_STEP
 
     step = Scripted("acme.gpu", queue="images_gpu")
     use_steps(step)

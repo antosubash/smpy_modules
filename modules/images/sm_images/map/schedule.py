@@ -123,8 +123,8 @@ def hand_off(db: Any, runtime: Runtime, tenant: str, collection_id: uuid.UUID, g
     from background_tasks import enqueue_after_commit
     from background_tasks.tenant_context import TENANT_HEADER
 
-    from sm_images.jobs.task_config import QUEUE_DEFAULT
     from sm_images.map.tasks import build_map
+    from sm_images.task_config import QUEUE_DEFAULT
 
     sig = build_map.s().set(queue=QUEUE_DEFAULT, headers={TENANT_HEADER: tenant})
     enqueue_after_commit(db, sig, str(collection_id), gen)

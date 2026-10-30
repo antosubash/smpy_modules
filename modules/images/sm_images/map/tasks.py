@@ -13,7 +13,7 @@ import uuid
 
 from celery import shared_task
 
-from sm_images.jobs.task_config import BUILD_MAP
+from sm_images.task_config import BUILD_MAP
 
 logger = logging.getLogger(__name__)
 

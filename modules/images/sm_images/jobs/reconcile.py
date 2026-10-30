@@ -133,7 +133,7 @@ async def _restarts(runtime: Runtime, tenant: str, now: datetime, cutoff: dateti
             continue
         from background_tasks.tenant_context import TENANT_HEADER
 
-        from sm_images.jobs.task_config import QUEUE_IMPORTS
+        from sm_images.task_config import QUEUE_IMPORTS
         from sm_images.tasks import restart_collection
 
         restart_collection.s(str(collection_id), scope, str(restart_id)).apply_async(

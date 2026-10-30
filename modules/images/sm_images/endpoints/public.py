@@ -29,7 +29,7 @@ from fastapi.routing import APIRoute
 from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.deps import get_db
 
-from sm_images import constants, serving
+from sm_images import constants
 from sm_images.access import public_collection
 from sm_images.endpoints.map_params import (
     BBox,
@@ -42,7 +42,7 @@ from sm_images.endpoints.map_params import (
 from sm_images.errors import ImagesError, render
 from sm_images.models import Collection
 from sm_images.services import public_gallery
-from sm_images.serving import cache
+from sm_images.serving import cache, respond
 from sm_images.tenancy import bind_public
 
 _NO_STORE = "no-store"
@@ -80,7 +80,7 @@ _BASE = "/c/{slug}/images/{image_id}"
 async def public_rendition(
     request: Request, image_id: uuid.UUID, size: Size, collection: Public, db: Any = Depends(get_db)
 ) -> Response:
-    return await serving.serve(
+    return await respond.serve(
         request, db, collection, image_id, ANONYMOUS, cache.RENDITION, size=size, twin=True
     )
 
@@ -89,7 +89,7 @@ async def public_rendition(
 async def public_display(
     request: Request, image_id: uuid.UUID, collection: Public, db: Any = Depends(get_db)
 ) -> Response:
-    return await serving.serve(
+    return await respond.serve(
         request, db, collection, image_id, ANONYMOUS, cache.DISPLAY, twin=True
     )
 
@@ -98,7 +98,7 @@ async def public_display(
 async def public_original(
     request: Request, image_id: uuid.UUID, collection: Public, db: Any = Depends(get_db)
 ) -> Response:
-    return await serving.serve(
+    return await respond.serve(
         request, db, collection, image_id, ANONYMOUS, cache.ORIGINAL, twin=True
     )
 
@@ -141,4 +141,4 @@ async def public_map(request: Request, collection: Public) -> Response:
     """Re-checked as public on every request, every range of a viewer included:
     a collection made private stops here at once (and its archive was withdrawn
     with the change, ``sm_images.map.revoke.withdraw``)."""
-    return await serving.serve_map(request, collection, twin=True)
+    return await respond.serve_map(request, collection, twin=True)

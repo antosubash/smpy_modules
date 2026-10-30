@@ -16,11 +16,11 @@ from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal
 
-from sm_images import serving
 from sm_images.access import CollectionView, can_edit
 from sm_images.endpoints.deps import require_view
 from sm_images.endpoints.map_params import BBox, Cursor, Limit, get_and_head, points_response
 from sm_images.map.schedule import rebuild_pending
+from sm_images.serving import respond
 
 Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
 router = APIRouter(prefix="/collections", tags=["images-map"])
@@ -51,7 +51,7 @@ async def collection_map(
     async def stale() -> bool:
         return rebuild_pending(collection) and await can_edit(db, who, collection)
 
-    return await serving.serve_map(request, collection, twin=False, stale=stale)
+    return await respond.serve_map(request, collection, twin=False, stale=stale)
 
 
 _MAP = "/{collection_id}/map.pmtiles"

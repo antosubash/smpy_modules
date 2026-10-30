@@ -18,8 +18,7 @@ from background_tasks.worker_settings import clear_settings_cache
 from simple_module_db import tenant_context
 from simple_module_db.stored_settings import Base as SettingsBase
 from simple_module_db.stored_settings import Setting
-from sm_images import intents, tasks
-from sm_images.jobs import task_config
+from sm_images import intents, task_config, tasks
 from sm_images.models import Rendition, StepRun
 from sm_images.pipeline import registry
 from sm_images.pipeline import worker_runtime as wr

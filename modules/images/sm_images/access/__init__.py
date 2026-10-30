@@ -205,7 +205,7 @@ def can_view_original(
 
     ``protected`` overrides "has a display copy" for a caller that knows more:
     the serving route also protects an original whose display mutator has not
-    settled yet (``sm_images.serving``).
+    settled yet (``sm_images.serving.respond``).
     """
     if image.collection_id != collection.id:
         return False

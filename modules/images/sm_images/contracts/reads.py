@@ -32,11 +32,19 @@ from sm_images.contracts.schemas import CollectionPageRead, CollectionRead
 from sm_images.map import points as map_points
 from sm_images.models import Collection
 from sm_images.services import collections as service
-from sm_images.services.viewer_stats import viewer_fields
 from sm_images.serving import urls
 from sm_images.tenancy import tenant_scope
 
 __all__ = ["get_collection", "list_collections", "points", "rendition_url"]
+
+
+async def _viewer_fields(session: Any, principal: ResourcePrincipal, rows: list[Any]) -> Any:
+    # Imported when called: ``services.viewer_stats`` imports
+    # ``contracts.schemas``, which runs this package's ``__init__`` and so this
+    # module, so a top-level import is a cycle whichever side loads first.
+    from sm_images.services.viewer_stats import viewer_fields
+
+    return await viewer_fields(session, principal, rows)
 
 
 @asynccontextmanager
@@ -62,7 +70,7 @@ async def get_collection(
             return (
                 None
                 if row is None
-                else CollectionRead(**(await viewer_fields(session, principal, [row]))[0])
+                else CollectionRead(**(await _viewer_fields(session, principal, [row]))[0])
             )
 
 
@@ -87,7 +95,7 @@ async def list_collections(
                 session, principal, filter_=filter, limit=limit, cursor=cursor
             )
             return CollectionPageRead(
-                items=[CollectionRead(**f) for f in await viewer_fields(session, principal, rows)],
+                items=[CollectionRead(**f) for f in await _viewer_fields(session, principal, rows)],
                 next_cursor=token,
                 total=total,
             )

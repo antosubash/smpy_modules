@@ -3,7 +3,7 @@
 Imported by every process that builds the Celery app - the web process and
 every worker, including the test runner's eager app - so it stays light:
 Celery here, everything else inside the bodies. Routing and beat are in
-:mod:`sm_images.jobs.task_config`.
+:mod:`sm_images.task_config`.
 
 * ``images.run_step(image_id, step, token)`` - execute one claimed run; its
   completion claims and enqueues whatever became ready.
@@ -45,7 +45,8 @@ from celery import shared_task
 from celery.signals import worker_process_init, worker_ready
 
 from sm_images.imports import tasks as _import_tasks  # noqa: F401 - registers the import tasks
-from sm_images.jobs.task_config import (
+from sm_images.map import tasks as _map_tasks  # noqa: F401 - registers images.build_map
+from sm_images.task_config import (
     JANITOR,
     QUEUE_DEFAULT,
     RECONCILE,
@@ -55,7 +56,6 @@ from sm_images.jobs.task_config import (
     RUN_REGROUP,
     RUN_STEP,
 )
-from sm_images.map import tasks as _map_tasks  # noqa: F401 - registers images.build_map
 
 logger = logging.getLogger(__name__)
 

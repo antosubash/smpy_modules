@@ -7,7 +7,8 @@ from datetime import UTC, datetime, timedelta
 
 from simple_module_db import all_tenants
 from simple_module_db.tenancy import current_tenant_id, is_all_tenants
-from sm_images.jobs import janitor, task_config
+from sm_images import task_config
+from sm_images.jobs import janitor
 from sm_images.jobs.janitor import janitor_async, reap_intents
 from sm_images.jobs.purge import PurgeReport
 from sm_images.models import Image, ObjectIntent

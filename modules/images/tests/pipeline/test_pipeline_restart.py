@@ -59,8 +59,8 @@ async def test_interrupted_restart_is_completed_by_reconcile(pipe, monkeypatch):
 
 async def test_broker_mode_reconcile_requeues_a_stale_restart(pipe, monkeypatch):
     from celery import current_app
-    from sm_images.jobs.task_config import RESTART_COLLECTION
     from sm_images.pipeline.runtime import Runtime
+    from sm_images.task_config import RESTART_COLLECTION
 
     use_steps(Scripted("acme.x"))
     coll = await pipe.collection({"acme.x": {}})
@@ -118,9 +118,9 @@ async def test_a_lost_first_restart_delivery_is_resumed_by_reconcile(pipe, monke
     """Broker mode: the restart's record is stored before the message is sent
     and the message names it, so a lost first delivery is still finished."""
     from celery import current_app
-    from sm_images.jobs.task_config import RESTART_COLLECTION
     from sm_images.pipeline.control import launch_restart
     from sm_images.pipeline.runtime import Runtime
+    from sm_images.task_config import RESTART_COLLECTION
 
     x = Scripted("acme.x")
     use_steps(x)

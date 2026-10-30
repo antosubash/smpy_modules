@@ -6,7 +6,7 @@ mutator (anonymization) is enabled, a share is withdrawn. A cache that keeps a
 response without asking would go on serving it, so nothing is ``immutable`` or
 carries a ``max-age``: every response is ``no-cache`` with a strong ETag, each
 reuse is a conditional request, and the route answers 304 only after the full
-access and redaction check (``sm_images.serving``). The cost is one small
+access and redaction check (``sm_images.serving.respond``). The cost is one small
 round trip per reuse.
 
 **Shareable** - ``public, no-cache`` - only when all four hold:
