@@ -38,6 +38,19 @@ class Counted:
     end: datetime | None = field(default=None, kw_only=True)
 
 
+@dataclass(frozen=True)
+class Terminal:
+    """What an ``apply`` returns to keep its writes when they record a key's
+    terminal outcome - a refusal, an expired call, a closed key - rather than
+    a count: ``outcome`` is what the call answers."""
+
+    outcome: Any
+
+
+def _keeps(outcome: Any) -> bool:
+    return isinstance(outcome, (Counted, Terminal))
+
+
 class _Undo(Exception):  # noqa: N818 - control flow, never escapes this module
     """Roll the savepoint back but keep the caller's transaction."""
 
@@ -47,7 +60,7 @@ async def _in_savepoint(db: AsyncSession, apply: Apply) -> Any:
     try:
         async with db.begin_nested():
             outcome = await apply(db)
-            if not isinstance(outcome, Counted):
+            if not _keeps(outcome):
                 raise _Undo
     except _Undo:
         return outcome
@@ -56,9 +69,10 @@ async def _in_savepoint(db: AsyncSession, apply: Apply) -> Any:
 
 
 async def run_write(factory: async_sessionmaker, db: AsyncSession | None, apply: Apply) -> Any:
-    """Run ``apply`` and keep its writes only when it returns ``Counted``.
+    """Run ``apply`` and keep its writes only when it returns ``Counted`` or
+    ``Terminal`` (a key's recorded outcome: hold, refusal, expiry, closure).
 
-    Anything else (a replay, a refusal) is rolled back. SQLite's "database is
+    Anything else (a replay, a refusal that records nothing) is rolled back. SQLite's "database is
     locked" becomes ``UsageBusyError`` (503): the call fails closed.
     """
     try:
@@ -66,7 +80,7 @@ async def run_write(factory: async_sessionmaker, db: AsyncSession | None, apply:
             return await _in_savepoint(db, apply)
         async with factory() as session:
             outcome = await apply(session)
-            if isinstance(outcome, Counted):
+            if _keeps(outcome):
                 # Core DML: flag it, or finalize_session sees nothing to commit.
                 mark_written(session)
                 await finalize_session(session)

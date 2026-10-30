@@ -36,6 +36,8 @@
     "vector_dimension": "Vektordimension",
     "vector_dimension_hint": "Vektorspeicher legen die Breite der Sammlung darauf fest – eine Änderung erfordert eine Neuindizierung.",
     "test_connection": "Verbindung testen",
+    "testing": "Wird getestet…",
+    "testing_hint": "Warten auf die Antwort des Modells…",
     "save_first": "Speichern Sie zuerst Ihre Änderungen – der Test verwendet die gespeicherten Einstellungen.",
     "test_ok": "OK – {model} ({latency} ms)",
     "load_models": "Modelle laden",

@@ -43,6 +43,7 @@ testpaths = [
     "host/tests",
     "modules/ai/tests",
     "modules/billing/tests",
+    "modules/images/tests",
     "modules/news/tests",
     "modules/pagebuilder/tests",
     "modules/records/tests",

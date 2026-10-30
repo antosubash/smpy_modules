@@ -7,19 +7,24 @@ Reads run in a short session of their own, closed before any write starts
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from sqlalchemy import select
+
+from sm_billing.contracts.metering import Allowed, Exceeded, Hold, HoldStatus, MeterKind
 from sm_billing.metering.periods import as_utc, current_period, provider_period
+from sm_billing.models import UsageGauge, UsageHold
 from sm_billing.resolve import effective_plan
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-    from sm_billing.contracts.metering import MeterDefinition, MeterKind
+    from sm_billing.contracts.metering import MeterDefinition
     from sm_billing.metering.registry import MeterRegistry
 
 #: The hold TTL when neither the caller, the meter nor a setting gives one.
@@ -38,7 +43,7 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-class MeteringCore:
+class MeteringCore(ABC):
     def __init__(
         self,
         session_factory: async_sessionmaker,
@@ -65,6 +70,43 @@ class MeteringCore:
     def _require(self, meter: str, kind: MeterKind) -> MeterDefinition | None:
         """``UnknownMeterError`` unless ``meter`` is a registered ``kind`` meter."""
         return None if self._meters is None else self._meters.require(meter, kind)
+
+    async def check(self, tenant_id: str, meter: str, qty: int = 1) -> Allowed | Exceeded:
+        """A registered gauge compares its level held; anything else is a counter."""
+        definition = None if self._meters is None else self._meters.get(meter)
+        if definition is not None and definition.kind is MeterKind.GAUGE:
+            return await self._check_level(tenant_id, meter, qty)
+        return await self._check_counter(tenant_id, meter, qty)
+
+    async def get_hold(self, tenant_id: str, hold_id: str) -> Hold | None:
+        """Read-only; a ``held`` hold past its expiry reads as ``expired``; another
+        tenant's hold reads as unknown (``None``)."""
+        async with self._factory() as session:
+            row = await session.get(UsageHold, hold_id)
+            if row is None or row.tenant_id != tenant_id:
+                return None
+            status, expires = row.status, row.expires_at
+            if expires is not None and status == HoldStatus.HELD.value:
+                expires = as_utc(expires)
+                if expires <= self._clock():
+                    status = HoldStatus.EXPIRED.value
+            return Hold(row.id, row.tenant_id, row.meter, int(row.quantity), status, expires)
+
+    @abstractmethod
+    async def _check_counter(self, tenant_id: str, meter: str, qty: int) -> Allowed | Exceeded:
+        """The period counter's check (``UsageService``)."""
+
+    async def _check_level(self, tenant_id: str, meter: str, qty: int) -> Allowed | Exceeded:
+        """Would holding ``qty`` more fit the gauge's limit right now? Read-only."""
+        async with self._factory() as session:
+            res = await self._resolve(tenant_id, meter, session)
+            stmt = select(UsageGauge.in_use).where(
+                UsageGauge.tenant_id == tenant_id, UsageGauge.meter == meter
+            )
+            level = int((await session.execute(stmt)).scalar_one_or_none() or 0)
+        if res.limit is not None and level + qty > res.limit:
+            return Exceeded(level, res.limit, qty, None)
+        return Allowed(level, res.limit, None)
 
     def _default_ttl(self, definition: MeterDefinition | None) -> int:
         if definition is not None and definition.hold_ttl_seconds is not None:

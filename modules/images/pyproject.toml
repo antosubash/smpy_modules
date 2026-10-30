@@ -1,0 +1,116 @@
+[project]
+name = "simple_module_images"
+version = "0.0.13"
+description = "Image collections with a processing pipeline: EXIF, renditions, quality checks, optional anonymisation, geo-located imports and map tiles"
+requires-python = ">=3.12"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Anto Subash", email = "antosubash@live.com" }]
+keywords = ["simple-module", "images", "gallery", "exif", "geo"]
+# Ranges, never `==`: an exact framework pin makes a published module
+# uninstallable in any host running a newer framework build.
+dependencies = [
+    "simple_module_core>=0.0.41,<0.1",
+    "simple_module_db>=0.0.41,<0.1",
+    "simple_module_hosting>=0.0.41,<0.1",
+    "simple_module_inertia>=0.0.41,<0.1",
+    "simple_module_settings>=0.0.41,<0.1",
+    # depends_on: shares (the access policy), the storage backend, the workers.
+    "simple_module_sharing>=0.0.41,<0.1",
+    "simple_module_file_storage>=0.0.41,<0.1",
+    "simple_module_background_tasks>=0.0.41,<0.1",
+    "pydantic-settings>=2.0",
+    "httpx>=0.27",
+    "Pillow>=10.0",
+    "pillow-heif>=1.4",  # cp314 wheels (the Docker runtime is Python 3.14)
+    "ijson>=3.2",
+    # Time-bounded matching of user filename patterns (a catastrophic pattern
+    # must not pin an import worker); `re` has no timeout.
+    "regex>=2023.0",
+    # Signs direct-upload tickets with the host's secret_key (the library the
+    # framework's session cookie already uses).
+    "itsdangerous>=2.0,<3",
+]
+
+[project.urls]
+Repository = "https://github.com/antosubash/simple_module_python_modules"
+
+[project.entry-points.simple_module]
+images = "sm_images.module:ImagesModule"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "simple_module_test>=0.0.41,<0.1",
+    # Reads built archives back in tests/test_map_tippecanoe.py. The module
+    # itself never imports it: map building shells out to tippecanoe.
+    "pmtiles>=3.2",
+]
+
+# Heavy processors are extras, imported only inside the step that needs them:
+# a plain `pip install simple_module_images` pulls no onnxruntime or cv2.
+quality = ["opencv-python-headless>=4.9"]
+# MIT runtime and MIT weights only (no torch, no ultralytics, nothing AGPL):
+# YuNet faces and YOLOv9 plates as ONNX, downloaded and pinned by weights.py.
+# numpy comes with onnxruntime. A GPU worker installs onnxruntime-gpu instead.
+anonymize = ["onnxruntime>=1.18"]
+
+# Sibling modules, all optional. Must stay 0.0.x ranges: the repo publishes at 0.0.x.
+# floor: 0.0.14 - ``sm_ai.contracts.consume_requests`` (``ai.requests`` metered
+# outside a request, which classify and the prompt steps need in a worker) and
+# ``resolve_model(max_retries=...)`` first ship in 0.0.14, the next lockstep release.
+ai = ["simple_module_ai>=0.0.14,<0.1"]
+# floor: 0.0.14 - ``images.storage_bytes`` is a gauge held through
+# ``usage_meter``'s atomic ``swap``, and its upload pre-flight is ``check`` on a
+# gauge; both first ship in 0.0.14, the next lockstep release.
+billing = ["simple_module_billing>=0.0.14,<0.1"]
+# floor: 0.0.12 - images imports no pagebuilder Python. It only ships
+# ``pagebuilder-blocks.ts`` (the ImageGallery block, registered through
+# ``components/blockRegistry``), which pagebuilder's ``puck-blocks.ts`` globs in
+# from sibling packages; that glob first shipped in 0.0.12 (#77).
+pagebuilder = ["simple_module_pagebuilder>=0.0.12,<0.1"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sm_images"]
+# Frontend test files and their helpers sit beside the source they test, so
+# `packages` would ship them. A host's Vite scans installed module source and
+# skips dependency pre-bundling when it meets an import it cannot resolve
+# (`vitest`), so none of them may reach the wheel (#63).
+exclude = [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/__tests__/**",
+    "**/test-dom.tsx",
+    "**/*-test-support.ts",
+    "**/page-tests/**",
+]
+artifacts = ["sm_images/static/dist/**"]
+
+# package.json lives at the module root so npm workspaces see it; copying it
+# into the package lets the host discover JS deps after a pip install.
+[tool.hatch.build.targets.wheel.force-include]
+"package.json" = "sm_images/package.json"
+
+[tool.hatch.build.targets.sdist]
+artifacts = ["sm_images/static/dist/**"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "perf: performance measurement, excluded from the default run",
+    "real_models: needs the [anonymize] weights; run by the images-models workflow only",
+    "unbound_tenant: run with no images tenant bound (tests/conftest.py binds 'default' otherwise)",
+]
+addopts = "-m 'not perf and not real_models'"
+
+# Resolve the sibling modules from the workspace during development. This is
+# tool config, so the published wheel still carries the ranges above.
+[tool.uv.sources]
+simple_module_ai = { workspace = true }
+simple_module_billing = { workspace = true }
+simple_module_pagebuilder = { workspace = true }

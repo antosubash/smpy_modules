@@ -17,6 +17,7 @@ from sm_ai.contracts import (
     AiKeyUnreadableError,
     AiNotConfiguredError,
     RequiresAiRequest,
+    consume_requests,
     embedding_dim,
     resolve_embedder,
     resolve_model,
@@ -32,7 +33,13 @@ slot and build the object. Provider and authentication failures surface later,
 when you call the provider (`agent.run()`, `embed_documents()` and so on), as
 whatever exception Pydantic AI raises.
 
-### `resolve_model(model_name: str | None = None) -> pydantic_ai.models.Model`
+### `resolve_model(model_name: str | None = None, *, max_retries: int | None = None) -> pydantic_ai.models.Model`
+
+`max_retries` sets the provider SDK's own transport retries on the client it
+builds (OpenAI and OpenAI-compatible, Anthropic: the client's `max_retries`;
+Google: `HttpRetryOptions(attempts=max_retries + 1)`). `None` keeps the SDK
+default. A caller that meters each call with `consume_requests` passes `0`,
+so one charge is at most one provider request.
 
 Builds a chat model from the **chat** slot:
 
@@ -122,9 +129,36 @@ connect should refund, and know that an error mid-stream does not.
 "AI requests limit reached (1/1); resets Nov 1, 2026." in the console's
 language; this module's `api.ts` decodes every failed call through it.
 
-A worker that calls the model outside a request meters through billing's
-`app.state.billing_usage` directly (`consume` / `record` with
-`METER_REQUESTS`), as billing's API reference describes.
+### Usage metering outside a request: `consume_requests`
+
+```python
+async def consume_requests(
+    tenant_id: str, qty: int = 1, *, idempotency_key: str, source: str,
+    session_factory=None,
+) -> bool
+```
+
+For code with no request and no app, such as a Celery task. Call it before
+each model call and skip the call when it answers `False` (the plan's limit
+refused it, or the key was since refunded). With billing installed it is
+billing's `usage_meter(session_factory).consume(..., "ai.requests", ...)`:
+billing's conditional upsert, in its own short transaction finished with
+`finalize_session`. `session_factory` is the caller's (images passes its
+pipeline's); without one, the process opens a `NullPool` engine of its own
+on the host's database URL (`SM_DATABASE_URL`, else the project `.env`, read
+through `BootstrapSettings`). Only when `sm_billing` is not installed at all
+does it return `True` (and import nothing). An installed billing that cannot
+meter fails closed: one older than `usage_meter` raises `RuntimeError`, and an
+import error propagates, so a call is never free because billing failed to
+load. A worker cannot see the
+web host's module list, so an *installed* billing counts as running there.
+
+`idempotency_key` makes a retry of the same call free: a replay answers the
+first outcome and counts nothing (images uses
+`images:{tenant}:{image}:{step}:{version}:{lease token}`). Never put personal
+data in the key or `source`. `qty` outside 1 to 2^53, or an empty key or
+source, raises `ValueError`. Nothing is refunded: a provider error after the
+charge keeps it, since the provider may have billed the call.
 
 ## HTTP API — `/api/ai`
 

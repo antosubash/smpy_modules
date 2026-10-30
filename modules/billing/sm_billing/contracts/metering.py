@@ -23,12 +23,36 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, ClassVar, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+# The exceptions live in ``metering_errors`` (split for size); they are part of
+# this contract, so import them from here.
+from sm_billing.contracts.metering_errors import (
+    HoldExpired,
+    HoldNotFound,
+    IdempotencyConflict,
+    QuotaExceededError,
+    UnknownMeterError,
+)
+
+# The result types live in ``metering_results`` (split for size); they are
+# part of this contract, so import them from here.
+from sm_billing.contracts.metering_results import (
+    LIVE_HOLD_STATUSES,
+    Allowed,
+    Closed,
+    Exceeded,
+    Expired,
+    Hold,
+    HoldStatus,
+    Refunded,
+    Refused,
+)
 
 if TYPE_CHECKING:
     from contextlib import AbstractAsyncContextManager
 
-    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 
 class MeterKind(StrEnum):
@@ -54,126 +78,6 @@ class MeterDefinition:
     hold_ttl_seconds: int | None = None
 
 
-class HoldStatus(StrEnum):
-    HELD = "held"
-    COMMITTED = "committed"
-    RELEASED = "released"
-    EXPIRED = "expired"
-
-
-#: The statuses whose quantity counts toward the gauge.
-LIVE_HOLD_STATUSES = frozenset({HoldStatus.HELD, HoldStatus.COMMITTED})
-
-
-@dataclass(frozen=True)
-class Allowed:
-    """The call counted (or was a replay of one that did).
-
-    ``used`` is the period's total after the call, ``limit`` ``None`` when the
-    plan sets none, and ``period_end`` when the counter resets.
-    """
-
-    used: int
-    limit: int | None
-    period_end: datetime | None
-    replayed: bool = False
-
-    #: ``outcome.ok`` tells the two apart without importing either class.
-    ok: ClassVar[bool] = True
-
-
-@dataclass(frozen=True)
-class Exceeded:
-    """Refused: ``used + requested`` would pass ``limit``. Nothing was written."""
-
-    used: int
-    limit: int
-    requested: int
-    period_end: datetime | None
-
-    ok: ClassVar[bool] = False
-
-
-@dataclass(frozen=True)
-class Refunded:
-    """A replay of a key whose call was since refunded: **not** admitted.
-
-    The key is spent; a retry that should count again needs a new key.
-    """
-
-    used: int
-    limit: int | None
-    period_end: datetime | None
-    replayed: bool = True
-
-    ok: ClassVar[bool] = False
-
-
-@dataclass(frozen=True)
-class Hold:
-    """A reservation against a gauge; ``id`` is the handle for the calls after.
-
-    ``ok`` is whether it still counts (``held`` or ``committed``): a replayed
-    key whose hold was since released or expired comes back not ``ok``.
-    """
-
-    id: str
-    tenant_id: str
-    meter: str
-    quantity: int
-    status: str
-    expires_at: datetime | None
-    replayed: bool = False
-
-    @property
-    def ok(self) -> bool:
-        return self.status in LIVE_HOLD_STATUSES
-
-
-class UnknownMeterError(LookupError):
-    """The meter is not registered (or is the other kind): a programming error."""
-
-
-class HoldNotFound(LookupError):  # noqa: N818 - reads as the condition
-    """No hold has this id. Billing maps it to 404 ``hold_not_found``."""
-
-
-class HoldExpired(Exception):  # noqa: N818 - reads as the condition
-    """The hold no longer counts (``status``: expired or released), so it
-    cannot be committed or extended. Billing maps it to 409 ``hold_expired``."""
-
-    def __init__(self, hold_id: str, status: str) -> None:
-        super().__init__(f"hold {hold_id} is {status}")
-        self.hold_id = hold_id
-        self.status = status
-
-
-class QuotaExceededError(Exception):
-    """Raised where an outcome cannot be returned (``holding``, ``RequiresQuota``).
-
-    Billing maps it to 402 ``quota_exceeded`` with the meter, limit, used,
-    requested and (counters) ``resets_at``.
-    """
-
-    def __init__(self, meter: str, outcome: Exceeded) -> None:
-        super().__init__(f"{meter}: {outcome.used} + {outcome.requested} > {outcome.limit}")
-        self.meter = meter
-        self.outcome = outcome
-
-
-class IdempotencyConflict(Exception):  # noqa: N818 - reads as the condition
-    """The key was first used for a different call (quantity, kind or source).
-
-    A key answers only for the call it was first used with, so a reused key
-    can never buy an admission it did not pay for. Billing maps it to 409
-    ``idempotency_conflict``.
-    """
-
-    def __init__(self, key: str) -> None:
-        super().__init__(f"idempotency key {key!r} was used for a different call")
-        self.key = key
-
-
 @runtime_checkable
 class UsageMeter(Protocol):
     """Race-safe, idempotent per-period counters, keyed by tenant and meter.
@@ -187,7 +91,8 @@ class UsageMeter(Protocol):
 
     async def check(self, tenant_id: str, meter: str, qty: int = 1) -> Allowed | Exceeded:
         """Would ``qty`` fit right now? Advisory and read-only: a UI hint, never
-        enforcement, since another call can consume between this and yours."""
+        enforcement, since another call can consume between this and yours.
+        A registered gauge compares its level held (``period_end`` ``None``)."""
         ...
 
     async def consume(
@@ -262,6 +167,50 @@ class UsageMeter(Protocol):
         """Push a held hold's expiry to ``ttl`` seconds from now (a heartbeat)."""
         ...
 
+    async def swap(
+        self,
+        tenant_id: str,
+        meter: str,
+        old_hold_id: str | None,
+        quantity: int,
+        idempotency_key: str,
+        *,
+        source: str,
+        not_after: datetime,
+    ) -> Hold | Exceeded | Expired | Closed:
+        """Reserve and commit a hold of ``quantity`` and release ``old_hold_id``,
+        in one transaction (its own). The limit is checked on the net delta
+        (``quantity`` less the old hold's): a delta of zero or less is always
+        admitted. An old hold already settled, or unknown, frees nothing - a
+        plain reserve and commit; one of another tenant or meter raises
+        ``HoldNotFound`` and writes nothing. ``Exceeded`` (``requested`` = the
+        delta) leaves the old hold counting. ``not_after`` is the caller's
+        deadline, compared with the database's clock after the key is claimed:
+        a call admitted later is ``Expired`` and writes nothing to the gauge.
+        Exactly one outcome is ever committed under a key, in the transaction
+        that claimed it; a replay of the same call (quantity, ``source``, old
+        hold, ``not_after``) returns it, another call under the key is an
+        ``IdempotencyConflict``, and a key ``close_key`` closed answers
+        ``Closed`` to any call, writing nothing."""
+        ...
+
+    async def close_key(
+        self, tenant_id: str, meter: str, idempotency_key: str
+    ) -> Hold | Refused | Expired | Closed:
+        """The key's terminal outcome, committing ``Closed`` when it has none:
+        its ``Hold`` (in its current state), ``Refused`` (the limit refused
+        it), ``Expired`` (it arrived past its deadline), or ``Closed`` - then
+        no ``swap`` under the key will ever write. A ``swap`` in flight under
+        the key is waited for, and its outcome returned. Idempotent."""
+        ...
+
+    async def get_hold(self, tenant_id: str, hold_id: str) -> Hold | None:
+        """The hold's current state, read-only; ``None`` for an unknown id or
+        one reserved for another tenant than ``tenant_id``. A
+        ``held`` hold past its ``expires_at`` is reported ``expired`` (the
+        sweeper may not have settled it yet; a ``commit`` would refuse it)."""
+        ...
+
     def holding(
         self,
         tenant_id: str,
@@ -277,9 +226,29 @@ class UsageMeter(Protocol):
         ...
 
 
+def usage_meter(session_factory: async_sessionmaker) -> UsageMeter:
+    """Billing's ``UsageMeter`` over ``session_factory``, for code with no app.
+
+    A Celery worker never builds the app, so ``app.state.billing_usage`` is not
+    there to read. This builds the same service over a factory the caller owns
+    (the worker's engine): every write is still its own short transaction,
+    finished with ``finalize_session``. It knows no meter registry: it takes
+    any key (pass only meters registered in the web process, e.g.
+    ``ai.requests``, ``images.storage_bytes``), its ``check`` is a counter's,
+    and a hold without ``ttl`` gets the default TTL. Importing it imports
+    billing; a consumer that treats billing as optional checks ``find_spec``.
+    """
+    from sm_billing.metering.service import UsageService
+
+    return UsageService(session_factory)
+
+
 __all__ = [
+    "LIVE_HOLD_STATUSES",
     "Allowed",
+    "Closed",
     "Exceeded",
+    "Expired",
     "Hold",
     "HoldExpired",
     "HoldNotFound",
@@ -289,6 +258,8 @@ __all__ = [
     "MeterKind",
     "QuotaExceededError",
     "Refunded",
+    "Refused",
     "UnknownMeterError",
     "UsageMeter",
+    "usage_meter",
 ]

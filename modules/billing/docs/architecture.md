@@ -31,7 +31,7 @@ plain dataclasses. No Stripe object crosses it.
 | `billing_usage_event` | `id`, unique `(tenant_id, meter, idempotency_key)` | the append-only metering ledger: consume, record, refund and adjust rows, each with the `period_start` it counted against |
 | `billing_usage_period` | `(tenant_id, meter, period_start)` | the per-period counter (`used`, `period_end`) the conditional upsert enforces on, and `provider_period` (the row counts a provider's period, not a calendar month) |
 | `billing_usage_gauge` | `(tenant_id, meter)` | a gauge's current level (`in_use`), the sum of its live holds |
-| `billing_usage_hold` | `id` (random 128-bit hex), unique `(tenant_id, meter, idempotency_key)` | one reservation against a gauge: `quantity`, `status` (`held`, `committed`, `released`, `expired`), `expires_at`, `settled_at` |
+| `billing_usage_hold` | `id` (random 128-bit hex), unique `(tenant_id, meter, idempotency_key)` | one reservation against a gauge, or a key's terminal outcome: `quantity`, `status` (`held`, `committed`, `released`, `expired`; the outcomes `refused`, `expired_call`, `closed`), `expires_at`, `settled_at`, a `swap`'s `replaces_hold_id` and `not_after` |
 
 One subscription row per organisation. `tenant_id` is a plain column, not a
 foreign key: each module owns its own SQLAlchemy `MetaData`, so a cross-module

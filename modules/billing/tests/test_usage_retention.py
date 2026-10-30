@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sm_billing.constants import USAGE_STATE_ATTR
 from sm_billing.contracts.metering import Allowed
 from sm_billing.metering.retention import purge
 from sm_billing.metering.sweeper import UsageSweeper
+from sm_billing.models import UsageHold
+from sqlalchemy import update
 from usage_helpers import GAUGE, METER, OCT, Clock, events, gauge_service, hold_statuses, used
 from usage_helpers import seed_limits as seed
 
@@ -34,6 +36,10 @@ async def test_old_ledger_rows_and_settled_holds_go(factory, usage, clock):
     old = await usage.reserve(tenant, GAUGE, 1, "old", source="t")
     await usage.release(old.id)
     await usage.reserve(tenant, GAUGE, 1, "live", source="t")
+    async with factory() as s:  # settled 31 days ago by the database's clock
+        settled = datetime.now(UTC) - timedelta(days=31)
+        await s.execute(update(UsageHold).where(UsageHold.id == old.id).values(settled_at=settled))
+        await s.commit()
     clock.now += timedelta(days=31)
     await usage.consume(tenant, METER, 1, "new", source="t")
     first = await purge(usage, retention_days=400)

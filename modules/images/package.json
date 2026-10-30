@@ -1,0 +1,31 @@
+{
+  "name": "@simple-module-py/images",
+  "version": "0.0.13",
+  "private": true,
+  "exports": {
+    ".": "./sm_images/index.ts"
+  },
+  "description": "Frontend assets for the Images module",
+  "dependencies": {
+    "maplibre-gl": "^6.16.0",
+    "pmtiles": "^4.5.0"
+  },
+  "peerDependencies": {
+    "@inertiajs/react": "^3.9.1",
+    "@puckeditor/core": "^0.23.0",
+    "@simple-module-py/i18n": "*",
+    "@simple-module-py/pagebuilder": "*",
+    "@simple-module-py/ui": "*",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "sonner": "^2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@simple-module-py/pagebuilder": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@simple-module-py/tsconfig": "*"
+  }
+}

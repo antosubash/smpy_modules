@@ -50,7 +50,8 @@ runs:
 
     - name: Sync Python workspace
       shell: bash
-      run: uv sync --locked --all-packages --all-extras
+      # Without the anonymize extra: its step would download model weights (ci.yml).
+      run: uv sync --locked --all-packages --all-extras --no-extra anonymize
 
     - name: Install npm workspace
       shell: bash

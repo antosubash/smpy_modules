@@ -48,7 +48,18 @@ Downgrading *through* a merge point is ambiguous with `-1`; name the parent.
 revisions live in its repo's host, not in the wheels, so a framework bump means
 porting each new one into this history unchanged (see the `(framework 0.0.3x)`
 revisions, e.g. `307543b6146a`…`b65e04cf65d7` for 0.0.37/0.0.38) and then
-`alembic check` on SQLite *and* Postgres. SQLModel is unpinned since 0.0.38
+`alembic check` on SQLite *and* Postgres. Framework 0.0.41 added `simple_module_file_storage`,
+`simple_module_sharing` and `simple_module_background_tasks` to the host's
+dependencies. Their tables had never been in this history (the framework keeps
+`background_tasks_task_execution` in its initial schema, which this host never
+had), so `c9e3a5f1b7d2` creates it and `b5d3f08a6e17`, `e878882924e7`,
+`bb906e1a1089` and `1f5985daa10b` (background_tasks), `f733c7938fd1` (sharing)
+and `a625f0b7c912`, `a626b1c8d023` (users) follow, upstream ids unchanged and
+chained linearly. **0.0.40 hashes bearer tokens at rest**: `a626b1c8d023`
+deletes every `users_access_token` and `users_refresh_token` row, so every
+session and API token is invalidated once on upgrade, and anything that stored
+a raw token must keep the plaintext itself (the table holds only a digest).
+SQLModel is unpinned since 0.0.38
 (framework 0.0.37+ imports its `UTCDateTime`): a bare `datetime` field is
 `timestamptz` now, which is why `9d83e789a5b4` retypes the framework's
 `users_refresh_token` columns on Postgres. And since 0.0.37 the soft-delete and
@@ -64,7 +75,7 @@ is `POST /pages/{id}/translations`, which creates a sibling sharing a
 `translation_group`. Every slug lookup and redirect takes a locale; adding one
 that does not is how `/de/p/x` starts serving the English page.
 
-**Every pagebuilder, news and records entry point binds a tenant (#38, #112).**
+**Every pagebuilder, news, records and images entry point binds a tenant (#38, #112).**
 Their tables carry `MultiTenantMixin`, and the framework filters them only
 while a tenant is bound — on a host with `multi_tenant` off nothing is bound
 and a read is *unfiltered*. Routers get `tenancy.bind_admin`/`bind_public`,
@@ -79,7 +90,10 @@ tenant is never shareable-cached (records #196; pagebuilder and news #192).
 The scheduler opens one session per tenant under `tenant_context`. News has its
 own copy, `news.tenancy`, and its scheduler ticks per tenant the same way;
 records' is `sm_records.tenancy` (its 403 is the `{"detail","code"}` envelope,
-code `tenant_required`); billing reads the same `request.state.tenant_id`
+code `tenant_required`) and images' `sm_images.core.tenancy` is a copy of it; images'
+Celery tasks never run unscoped — `images.reconcile` and `images.janitor`
+enumerate tenants in one narrow `all_tenants()` read and do each tenant's work
+under `tenant_context`; billing reads the same `request.state.tenant_id`
 through `context.billing_context`. Another module reads pagebuilder only
 through `pagebuilder.contracts` (news' search calls
 `search_pages`/`search_media`, #130); the caller names the tenant and the
@@ -130,7 +144,7 @@ one place provider state becomes local state), and response models
 (`PlanOut`) must not inherit input bounds — a stored row that predates a bound
 would 500 every screen listing plans. Its docs are in `modules/billing/docs/`.
 
-**`pagebuilder`, `news`, `billing` and `ai` read no environment variables.** Their settings are
+**`pagebuilder`, `news`, `billing`, `ai` and `images` read no environment variables.** Their settings are
 DB-backed through the framework's settings module (`register_module_settings`),
 and each class drops pydantic-settings' env, `.env` and secrets sources — so
 adding a field means adding it to the class, not to `.env.example`, and an
@@ -142,11 +156,27 @@ hydration happens at lifespan start, so a value read earlier is the pydantic
 default no matter what the database says. Mark such fields
 `json_schema_extra=_RESTART` so the Settings screen says a restart is needed.
 These settings are SYSTEM-scope: ai has one provider configuration and one
-API key per slot for the whole deployment, shared by every tenant. The one
-thing ai still reads from the environment is `SM_SECRET_KEY`, for its key
-encryption, and only as the framework's `BootstrapSettings` locates `.env`
-(`SM_PROJECT_ROOT`, else the walk up to the project root) — never a
-cwd-relative file (#124).
+API key per slot for the whole deployment, shared by every tenant. ai reads
+two things from the environment, both only as the framework's
+`BootstrapSettings` locates `.env` (`SM_PROJECT_ROOT`, else the walk up to the
+project root) — never a cwd-relative file (#124): `SM_SECRET_KEY`, for its key
+encryption, and `SM_DATABASE_URL`, only when `sm_ai.contracts.consume_requests`
+is called without a `session_factory` while billing is installed (it then opens
+its own NullPool engine on the host database, `metering._own_factory`). Images
+always passes its factory, so that fallback is for other callers. Images' workers never build the app, so they read
+the same class with `background_tasks.settings_for(ImagesSettings, "sm_images")`
+(DB-backed, cached about 30 s).
+
+**A plugin registers images steps and presets from `images_extensions.py`, never
+from `on_startup`.** Celery workers do not run module hooks, and a dependant's
+`on_startup` runs after images' own. A package with a `simple_module` entry point
+ships `images_extensions.py` with `def register(registry)`;
+`sm_images.pipeline.extensions.load_extensions()` imports it in the web process
+(images' `on_startup`) and in a worker (first registry read), then freezes the
+registry, so a later `register_step` raises `RegistryFrozenError`. The plugin must
+be installed identically in the web image and in **every** worker image: a worker
+without it settles the plugin's steps as `not_installed`. Docs:
+`modules/images/docs/`.
 
 **Host settings come from the environment first, then the database.**
 `host/main.py` builds its settings with the framework's
@@ -183,6 +213,17 @@ the app once.
 `script_location` relative to itself and `dev-api` uses `--app-dir host`, so
 the root `.env` is the single source of truth for settings regardless of the
 command.
+
+**Module layout: `docs/module-layout.md`, with images as the reference.**
+A package root keeps only what something else looks up by name (`module.py`,
+`models/`, `tasks.py`, `task_config.py`, `pages/`, `locales/`, `index.ts`,
+`pagebuilder-blocks.ts`, plus `contracts/`, the import path other modules use).
+Everything else goes in one of a few areas: `core/` (what every feature
+builds on), `web/` (endpoints, schemas, services, serving), one folder per
+domain (images: `ingest/`, `pipeline/`, `jobs/`, `map/`) and `ui/` for the
+frontend that is not a page. Tests mirror the areas under `tests/`.
+New code in any module follows it. Other modules move towards it in PRs that
+contain only moves; the doc's table says how far each one has got.
 
 **300-line cap** on every `.py` / `.ts` / `.tsx`, enforced by
 `scripts/check_file_size.py`. Nothing under `modules/` is exempt. The check
@@ -221,7 +262,26 @@ Without that stack, one container matching CI's image is enough:
 docker run -d --name smpy-postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=smpy_modules postgres:16
 ```
 
-This repo does not use Redis or Celery.
+Redis and Celery are used by the **images** module (framework
+`background_tasks`, host pinned `==0.0.41`): `SM_REDIS_URL` points at dev-services'
+Redis, and `make worker` / `worker-imports` / `worker-heavy` / `worker-gpu` /
+`beat` run `host/worker.py` (`build_runner_celery`) with one queue set each.
+`make dev` starts none of them. With no worker, set
+`SM_BG_TASKS_TASK_ALWAYS_EAGER=true` (`.env.example`; the e2e server exports it,
+plus `..._TASK_EAGER_PROPAGATES=true`) and tasks run inline. CI installs
+`tippecanoe` with apt in the Python-tests and Postgres jobs. **The images
+`[anonymize]` extra (onnxruntime) is never installed by default.** `make install`,
+the Python-tests, repo-checks, e2e (`.github/actions/e2e-setup`) and `release`
+jobs and `framework-latest` sync with `--all-extras --no-extra anonymize` (the
+`quality`, `ai`, `billing` and `pagebuilder` extras are installed, `anonymize`
+is not); the Postgres and frontend jobs sync no extras. The anonymize step's
+default tests use a fake detector (and a fake `onnxruntime` for the wiring).
+Only the weekly/manual `images-models` workflow syncs the extra, downloads the
+pinned weights and runs the `real_models` tests. **No AGPL code or weights in
+that extra** (user decision, 2026-10-29): runtime and both models are MIT
+(YuNet faces, open-image-models YOLOv9 plates; `modules/images/NOTICE`,
+`modules/images/docs/index.md`). Do not bring back torch/ultralytics or an
+ultralytics-trained checkpoint, whatever its model card says.
 
 ## Working against an unreleased framework
 
@@ -236,7 +296,7 @@ the target fails without it.
 
 ## Known deferred work
 
-- **UI i18n — done in every module, in English and German.** All five ship
+- **UI i18n — done in every module, in English and German.** All six ship
   `locales/en.json` and `locales/de.json` and route every string through
   `t()`. `scripts/check_locales.py` (in `make lint` and CI) fails when a
   translation's key tree or placeholders drift from `en.json` — add a key to
@@ -253,7 +313,7 @@ the target fails without it.
   redundant. The framework modules' screens (users, settings, …) ship German
   since 0.0.38 as well.
 
-  news, pagebuilder, ai, billing and records call
+  news, pagebuilder, ai, billing, records and images call
   `t(keys.<module>.<section>.<key>)`, with no `defaultValue` — each
   module's `utils/i18n.ts` supplies the English text from `en.json`. A
   family of keys chosen at runtime (`filters.op.<op>`) is a

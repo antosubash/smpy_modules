@@ -61,12 +61,21 @@ if usage is not None:
         raise HTTPException(402, f"limit {outcome.limit} reached")
 ```
 
+**With no app** (a Celery worker never builds one, so `app.state` is not
+there): `usage_meter(session_factory)` from `sm_billing.contracts.metering`
+builds the same service over a session factory the caller owns. Every write
+is still its own short transaction finished with `finalize_session`. It has no
+meter registry, so it accepts any key: use it only for counters the web
+process registers (`ai.requests`). Importing it imports billing, so a module
+that treats billing as optional checks `find_spec` first, as
+`sm_ai.contracts.consume_requests` does.
+
 | Call | Does |
 |---|---|
 | `consume(tenant, meter, qty, key, *, source, db=None)` | atomic check-and-count against the current period → `Allowed(used, limit, period_end, replayed)`, `Exceeded(used, limit, requested, period_end)` or, for a refunded key, `Refunded`; a refusal writes nothing |
 | `record(tenant, meter, qty, key, *, source, occurred_at=None, db=None)` | count usage reported after the fact, unconditionally (may pass the limit; the next `consume` is then refused) |
 | `refund(tenant, meter, key)` | reverse that call in the period it counted against; idempotent |
-| `check(tenant, meter, qty=1)` | advisory and read-only — a UI hint, never enforcement |
+| `check(tenant, meter, qty=1)` | advisory and read-only — a UI hint, never enforcement. On a registered gauge it compares the level held plus `qty` with the limit (`period_end` `None`); `usage_meter(factory)` knows no registry, so there it checks a counter |
 
 The meter key is a `Plan.limits` key, exactly like an entitlement: absent is
 unlimited, `0` forbids. Quantities are positive integers in the meter's minor
@@ -95,12 +104,15 @@ against:
 
 | Name | What it is |
 |---|---|
-| `UsageMeter` | the `runtime_checkable` protocol: `check`, `consume`, `record`, `refund`, `reserve`, `commit`, `release`, `extend`, `holding` |
+| `UsageMeter` | the `runtime_checkable` protocol: `check`, `consume`, `record`, `refund`, `reserve`, `commit`, `release`, `swap`, `close_key`, `extend`, `get_hold`, `holding` |
 | `Allowed(used, limit, period_end, replayed=False)` | counted (or a replay of a call that was); `used` is the period's total after it, `limit` `None` when the plan sets none, `period_end` when the counter resets. `ok` is true |
 | `Exceeded(used, limit, requested, period_end)` | refused: `used + requested` would pass `limit`; nothing was written. `ok` is false. For a gauge `used` is the level held and `period_end` is `None` |
 | `Refunded(used, limit, period_end, replayed=True)` | a replay of a key whose call was since refunded: not admitted, the key is spent. `ok` is false |
 | `Hold(id, tenant_id, meter, quantity, status, expires_at, replayed=False)` | a reservation; `ok` while it is `held` or `committed` |
-| `MeterKind`, `MeterDefinition`, `HoldStatus` | `counter` / `gauge`; a registered meter (`key`, `kind`, `unit`, `label_key`, `hold_ttl_seconds`); `held` / `committed` / `released` / `expired` |
+| `Expired(idempotency_key, not_after)` | a `swap` admitted after its `not_after` (by the database's clock): nothing written, kept as the key's outcome. `ok` is false |
+| `Refused(idempotency_key, reason="limit")` | `close_key`: the key's `swap` was refused by the limit. `ok` is false |
+| `Closed(idempotency_key)` | `close_key` closed the key before any call landed; every later `swap` under it answers `Closed` and writes nothing. Key-wide: no quantity, source or deadline. `ok` is false |
+| `MeterKind`, `MeterDefinition`, `HoldStatus` | `counter` / `gauge`; a registered meter (`key`, `kind`, `unit`, `label_key`, `hold_ttl_seconds`); `held` / `committed` / `released` / `expired`, and the key outcomes `refused` / `expired_call` / `closed` (counted by nothing) |
 | `UnknownMeterError` | the meter is not registered, or is the other kind: a programming error, so a 500 |
 | `IdempotencyConflict` | 409 `idempotency_conflict` |
 | `QuotaExceededError(meter, outcome)` | raised where an outcome cannot be returned (`RequiresQuota`, `holding()`): 402 `quota_exceeded` |
@@ -179,6 +191,8 @@ For capacity held over time (concurrent jobs, reserved bytes), register a
 | `reserve(tenant, meter, qty, key, *, source, ttl=None)` | atomically hold `qty` within the limit → `Hold` or `Exceeded`; `ttl` (seconds) defaults to the meter's `hold_ttl_seconds`, else `usage_hold_ttl_seconds` |
 | `commit(hold_id)` | keep it with no expiry (stays counted until released); idempotent; `HoldExpired` (409 `hold_expired`) once lapsed or released |
 | `release(hold_id)` | return the capacity; `False` if already settled; `HoldNotFound` (404) for an unknown id |
+| `close_key(tenant, meter, key)` | the key's terminal outcome: its `Hold` (current state), `Refused`, `Expired`, or - when it has none - `Closed`, committed now. A `swap` in flight under the key is waited for (Postgres: on the key's unique index; SQLite: the writer lock) and its outcome returned; idempotent. A closed key is a `closed` row (quantity 0, source `close_key`, no deadline), settled when closed. A consumer calls it before finishing its own record of a call without that call's answer, so the call can never land afterwards |
+| `swap(tenant, meter, old_hold_id, qty, key, *, source, not_after)` | replace a resource's hold in one transaction: a new hold of `qty`, committed at once, and `old_hold_id` released; the limit is checked on the net delta (`qty` less the old hold's), and a delta of zero or less is always admitted. An old hold already settled (or unknown, or `None`) frees nothing; one of another tenant or meter raises `HoldNotFound` and writes nothing. **One outcome per key, committed with the claim:** the call claims the key's row first, then reads the database's clock (`clock_timestamp()` on Postgres, `strftime(…'now')` on SQLite) - never the caller's - and a call past `not_after` becomes `Expired`, writing nothing to the gauge. Otherwise the gauge changes run in a SAVEPOINT; `Exceeded` rolls them back (the old hold still counts) and records `refused` under the key in the same transaction. A later call with the key returns that outcome: a closed key answers `Closed` to any call; otherwise only the same call (quantity, `source`, `old_hold_id` *and* `not_after`) replays, else `IdempotencyConflict`. Retention keeps a key's settled outcome 30 days and at least a day past its `not_after`; after that only the deadline protects the key - a caller that invents a new deadline for an old key cannot be stopped. A lowered plan limit evicts nothing: holds over it stay, and a swap that does not grow is still admitted |
 | `extend(hold_id, ttl)` | heartbeat: push a held hold's expiry to `ttl` seconds from now |
 | `holding(tenant, meter, qty, key, *, source, ttl=None)` | `async with`: reserve (raises `QuotaExceededError` → 402), release on exit. The block runs at most once per key: a replayed key whose hold is still live raises 409 `idempotency_replay`; one whose hold was released or expired raises 409 `hold_expired` (with its `status`) |
 

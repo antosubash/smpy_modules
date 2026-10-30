@@ -6,6 +6,7 @@ from datetime import timedelta
 
 import pytest
 from sm_billing.contracts.metering import (
+    Allowed,
     Exceeded,
     Hold,
     HoldExpired,
@@ -57,6 +58,20 @@ async def test_the_limit_holds_and_a_release_frees_it(factory, usage):
     assert await hold_statuses(factory, tenant) == ["held"]  # a refusal writes nothing
     await usage.release(first.id)
     assert isinstance(await usage.reserve(tenant, GAUGE, 1, "b", source="t"), Hold)
+
+
+async def test_a_refusal_reports_the_level_that_refused_it(factory, usage, monkeypatch):
+    """The payload's level is read in the refusing transaction, not afterwards:
+    a release landing between the two must not report room that refused."""
+    tenant = await seed_limits(factory, {GAUGE: 2})
+    await usage.reserve(tenant, GAUGE, 2, "a", source="t")
+
+    async def later_read(*_args):  # what a separate read sees after a release
+        return 0
+
+    monkeypatch.setattr(usage, "in_use", later_read)
+    refused = await usage.reserve(tenant, GAUGE, 1, "b", source="t")
+    assert refused == Exceeded(used=2, limit=2, requested=1, period_end=None)
 
 
 async def test_more_than_the_limit_and_zero_forbid(factory, usage):
@@ -219,3 +234,40 @@ async def test_recount_repairs_drift(factory, usage):
     assert await in_use(factory, tenant) == 4
     fresh = await seed_limits(factory, {})
     assert await usage.recount(fresh, GAUGE) == 0  # creates the row
+
+
+async def test_check_on_a_gauge_compares_the_level_held(factory, usage):
+    """``check`` on a registered gauge answers from the level held now (a
+    consumer's pre-flight before it reserves), never from a period counter."""
+    tenant = await seed_limits(factory, {GAUGE: 5})
+    assert await usage.check(tenant, GAUGE, 5) == Allowed(0, 5, None)
+    await usage.reserve(tenant, GAUGE, 3, "a", source="t")
+    assert await usage.check(tenant, GAUGE, 2) == Allowed(3, 5, None)
+    assert await usage.check(tenant, GAUGE, 3) == Exceeded(3, 5, 3, None)
+    assert await hold_statuses(factory, tenant) == ["held"]  # read-only
+    unlimited = await seed_limits(factory, {})
+    assert await usage.check(unlimited, GAUGE, 10**9) == Allowed(0, None, None)
+
+
+async def test_get_hold_reads_the_state_without_writing(factory, usage, clock):
+    tenant = await seed_limits(factory, {GAUGE: 10})
+    assert await usage.get_hold(tenant, "0" * 32) is None
+    held = await usage.reserve(tenant, GAUGE, 2, "a", source="t", ttl=60)
+    assert (await usage.get_hold(tenant, held.id)).status == "held"
+    await usage.commit(held.id)
+    assert (await usage.get_hold(tenant, held.id)).status == "committed"
+    lapsing = await usage.reserve(tenant, GAUGE, 1, "b", source="t", ttl=60)
+    clock.now += timedelta(seconds=61)
+    read = await usage.get_hold(tenant, lapsing.id)
+    assert (read.status, read.quantity) == ("expired", 1)
+    assert sorted(await hold_statuses(factory, tenant)) == ["committed", "held"]  # no write
+    await usage.release(held.id)
+    assert (await usage.get_hold(tenant, held.id)).status == "released"
+
+
+async def test_get_hold_never_reads_another_tenants_hold(factory, usage):
+    mine = await seed_limits(factory, {GAUGE: 10})
+    theirs = await seed_limits(factory, {GAUGE: 10})
+    hold = await usage.reserve(theirs, GAUGE, 2, "a", source="t")
+    assert await usage.get_hold(mine, hold.id) is None
+    assert (await usage.get_hold(theirs, hold.id)).status == "held"

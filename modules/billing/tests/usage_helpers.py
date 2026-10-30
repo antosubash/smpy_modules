@@ -18,6 +18,8 @@ METER = "ai.requests"
 GAUGE = "jobs.concurrent"
 OCT = (datetime(2026, 10, 1, tzinfo=UTC), datetime(2026, 11, 1, tzinfo=UTC))
 NOV = (datetime(2026, 11, 1, tzinfo=UTC), datetime(2026, 12, 1, tzinfo=UTC))
+#: A ``swap`` deadline no test reaches.
+FAR = datetime(2100, 1, 1, tzinfo=UTC)
 
 
 @dataclass
