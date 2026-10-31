@@ -1,4 +1,5 @@
 /** One thumbnail in the media picker: a button named by the file. */
+import { formatBytes } from "../../utils/mediaFormat";
 import type { FileItem } from "./types";
 
 export function GalleryItem({
@@ -36,15 +37,9 @@ export function GalleryItem({
 					{name}
 				</div>
 				<div className="text-muted-foreground">
-					{formatFileSize(item.fileSize)}
+					{formatBytes(item.fileSize)}
 				</div>
 			</div>
 		</button>
 	);
-}
-
-function formatFileSize(bytes: number): string {
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

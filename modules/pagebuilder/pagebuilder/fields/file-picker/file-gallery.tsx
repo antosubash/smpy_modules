@@ -11,6 +11,7 @@ import { Label } from "@simple-module-py/ui/components/ui/label";
 import { useEffect, useId, useRef, useState } from "react";
 import { keys, useT } from "../../utils/i18n";
 import { GalleryItem } from "./gallery-item";
+import { useDebounced } from "../../hooks/useDebounced";
 import type { FileItem, FilePickerAdapter } from "./types";
 
 interface FileGalleryProps {
@@ -27,12 +28,15 @@ interface FileGalleryProps {
 }
 
 const PAGE_SIZE = 12;
-const SEARCH_DEBOUNCE_MS = 250;
 
 type ListState =
 	| { status: "loading" }
 	| { status: "error"; message: string }
-	| { status: "ready"; items: FileItem[]; totalCount: number };
+	| { status: "ready"; items: FileItem[]; totalCount: number }
+	// A page change or new search in flight: the last page stays on screen, so
+	// the pager keeps its state (a focused Next must not turn disabled and drop
+	// keyboard focus) and the grid does not flash empty.
+	| { status: "refreshing"; items: FileItem[]; totalCount: number };
 
 /**
  * The library as a modal dialog (#234): every file reachable through paging
@@ -91,19 +95,6 @@ export function FileGallery({
 	);
 }
 
-/** The debounced search that goes to the server. */
-function useDebounced(value: string): string {
-	const [debounced, setDebounced] = useState(value);
-	useEffect(() => {
-		const timer = window.setTimeout(
-			() => setDebounced(value.trim()),
-			SEARCH_DEBOUNCE_MS,
-		);
-		return () => window.clearTimeout(timer);
-	}, [value]);
-	return debounced;
-}
-
 /** The dialog's contents. A component of its own because Radix unmounts it
  *  on close: every open starts on page one with an empty search, and a
  *  response still in flight is dropped rather than landing in a closed box. */
@@ -125,13 +116,22 @@ function GalleryBody({
 	// would open on its second page and could look empty.
 	const [paged, setPaged] = useState({ search: "", page: 0 });
 	const page = paged.search === search ? paged.page : 0;
+	// Forget the page once the search moves on, or returning to an earlier
+	// search ("a" -> "b" -> "a") would resurrect the page it was left on.
+	useEffect(() => {
+		setPaged({ search, page: 0 });
+	}, [search]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is the Retry button
 	useEffect(() => {
 		// Only the latest request may land: typing "he" then "hero" must not
 		// let a slow answer for "he" overwrite the one for "hero".
 		let current = true;
-		setList({ status: "loading" });
+		setList((previous) =>
+			previous.status === "ready" || previous.status === "refreshing"
+				? { ...previous, status: "refreshing" }
+				: { status: "loading" },
+		);
 		adapter
 			.list({ skip: page * PAGE_SIZE, take: PAGE_SIZE, search })
 			.then(
@@ -156,7 +156,9 @@ function GalleryBody({
 		};
 	}, [adapter, page, search, attempt]);
 
-	const totalCount = list.status === "ready" ? list.totalCount : 0;
+	const shown =
+		list.status === "ready" || list.status === "refreshing" ? list : null;
+	const totalCount = shown?.totalCount ?? 0;
 	const hasPrev = page > 0;
 	const hasMore = (page + 1) * PAGE_SIZE < totalCount;
 
@@ -179,6 +181,7 @@ function GalleryBody({
 
 			<div
 				className="min-h-0 flex-1 overflow-y-auto"
+				aria-busy={list.status === "loading" || list.status === "refreshing"}
 				data-testid="pagebuilder-gallery-results"
 			>
 				{list.status === "loading" && (
@@ -209,7 +212,7 @@ function GalleryBody({
 						</Button>
 					</div>
 				)}
-				{list.status === "ready" && list.items.length === 0 && (
+				{shown && shown.items.length === 0 && (
 					<p
 						className="py-8 text-center text-sm text-muted-foreground"
 						data-testid="pagebuilder-gallery-empty"
@@ -219,9 +222,11 @@ function GalleryBody({
 							: t(keys.pagebuilder.gallery.empty)}
 					</p>
 				)}
-				{list.status === "ready" && list.items.length > 0 && (
-					<ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-						{list.items.map((item) => (
+				{shown && shown.items.length > 0 && (
+					<ul
+						className={`grid grid-cols-2 gap-3 sm:grid-cols-4 ${list.status === "refreshing" ? "opacity-60" : ""}`}
+					>
+						{shown.items.map((item) => (
 							<li key={item.id}>
 								<GalleryItem item={item} onPick={onPick} />
 							</li>
@@ -232,7 +237,7 @@ function GalleryBody({
 
 			<div className="flex items-center justify-between gap-2 border-t pt-3">
 				<span className="text-sm text-muted-foreground" aria-live="polite">
-					{list.status === "ready"
+					{shown
 						? t(keys.pagebuilder.gallery.file_count, { count: totalCount })
 						: ""}
 				</span>

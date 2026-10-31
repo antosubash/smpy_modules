@@ -75,5 +75,15 @@ test.describe('Media picker', () => {
     // The URL input of the picker that was opened (the block has more than one).
     const field = browse.locator('xpath=ancestor::div[contains(@class, "space-y-2")][1]');
     await expect(field.getByPlaceholder('Pick from library or paste a URL')).toHaveValue(oldestUrl);
+
+    // Leave the library as it was for the other specs in this shard. The page
+    // still uses the newest upload, so that one delete is refused, and kept.
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
+    const listed = await page.request.get('/api/pagebuilder/uploads', {
+      params: { search: tag, limit: 50 },
+    });
+    for (const asset of ((await listed.json()) as { items: { id: number }[] }).items) {
+      await page.request.delete(`/api/pagebuilder/uploads/${asset.id}`, { headers });
+    }
   });
 });

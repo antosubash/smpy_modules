@@ -18,6 +18,7 @@ import { MediaGrid } from '../components/media/MediaGrid';
 import { MediaHeader } from '../components/media/MediaHeader';
 import { MediaDropzone, MediaUploadQueue } from '../components/media/MediaUploadQueue';
 import type { ListFilters } from '../components/media/types';
+import { useDebounced } from '../hooks/useDebounced';
 import { useMediaUploads } from '../hooks/useMediaUploads';
 import {
   deleteAssetIfUnused,
@@ -59,11 +60,7 @@ export default function MediaLibrary() {
 
   // Debounced search: state holds what the user is typing, `query`
   // holds what we actually send to the server.
-  const [query, setQuery] = useState<string>('');
-  useEffect(() => {
-    const t = window.setTimeout(() => setQuery(filters.search.trim()), 250);
-    return () => window.clearTimeout(t);
-  }, [filters.search]);
+  const query = useDebounced(filters.search);
 
   const refresh = useCallback(
     async (mode: 'replace' | 'append' = 'replace', cursor?: number | null) => {

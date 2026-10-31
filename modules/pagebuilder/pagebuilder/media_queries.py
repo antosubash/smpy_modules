@@ -10,7 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from pagebuilder.media_usage import _like_literal
+from pagebuilder.media_usage import like_literal
 from pagebuilder.models import MediaAsset
 
 DEFAULT_PAGE_SIZE = 60
@@ -31,9 +31,9 @@ def filtered_stmt(
     if search:
         # ILIKE, not LIKE: Postgres' LIKE is case-sensitive, and "hero" should
         # find "Hero.jpg" there too. Wildcards are escaped as in
-        # ``media_usage._like_literal``: filenames are full of ``_``, so
+        # ``media_usage.like_literal``: filenames are full of ``_``, so
         # "hero_1" must not also find "heroX1.png".
-        pattern = f"%{_like_literal(search)}%"
+        pattern = f"%{like_literal(search)}%"
         stmt = stmt.where(MediaAsset.original_filename.ilike(pattern, escape="\\"))
     if content_type:
         if content_type.endswith("/*"):

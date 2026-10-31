@@ -75,7 +75,6 @@ afterEach(() => {
   act(() => root?.unmount());
   root = null;
   document.body.replaceChildren();
-  vi.useRealTimers();
 });
 
 describe('FileGallery', () => {
@@ -98,6 +97,19 @@ describe('FileGallery', () => {
     expect(button('Next')?.disabled).toBe(true);
     await act(async () => dialog().querySelector<HTMLButtonElement>('ul button')?.click());
     expect(onSelect).toHaveBeenCalledWith('/media/85.png', LIBRARY[84]);
+  });
+
+  it('enables Next only when a file lies beyond the page', async () => {
+    const exact = libraryAdapter();
+    exact.list.mockImplementation(async () => ({ items: LIBRARY.slice(0, 12), totalCount: 12 }));
+    await open(exact);
+    expect(button('Next')?.disabled).toBe(true);
+    act(() => root?.unmount());
+    document.body.replaceChildren();
+    const past = libraryAdapter();
+    past.list.mockImplementation(async () => ({ items: LIBRARY.slice(0, 12), totalCount: 13 }));
+    await open(past);
+    expect(button('Next')?.disabled).toBe(false);
   });
 
   it('searches by file name on the server, from page one', async () => {
@@ -123,6 +135,38 @@ describe('FileGallery', () => {
     await flush();
     expect(adapter.list).toHaveBeenLastCalledWith({ skip: 0, take: 12, search: 'photo-08' });
     expect(picks()).toHaveLength(6);
+  });
+
+  it("does not bring back an earlier search's page when the search returns to it", async () => {
+    const adapter = libraryAdapter();
+    await open(adapter);
+    await act(async () => button('Next')?.click());
+    await flush();
+    await type('photo-0');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await flush();
+    await type('');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await flush();
+    expect(adapter.list).toHaveBeenLastCalledWith({ skip: 0, take: 12, search: '' });
+    expect(picks()[0]).toContain('photo-001.png');
+  });
+
+  it('keeps Next enabled while the next page loads, so keyboard focus is not dropped', async () => {
+    const adapter = libraryAdapter();
+    await open(adapter);
+    let release: (value: { items: FileItem[]; totalCount: number }) => void = () => {};
+    adapter.list.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    await act(async () => button('Next')?.click());
+    expect(button('Next')?.disabled).toBe(false);
+    await act(async () => release({ items: LIBRARY.slice(12, 24), totalCount: 85 }));
+    await flush();
+    expect(picks()[0]).toContain('photo-013.png');
   });
 
   it('drops a slower answer to an older search', async () => {
