@@ -76,8 +76,8 @@ test.describe('Media picker', () => {
     const field = browse.locator('xpath=ancestor::div[contains(@class, "space-y-2")][1]');
     await expect(field.getByPlaceholder('Pick from library or paste a URL')).toHaveValue(oldestUrl);
 
-    // Leave the library as it was for the other specs in this shard. The page
-    // still uses the newest upload, so that one delete is refused, and kept.
+    // Leave the library as it was for the other specs in this shard (a plain
+    // DELETE does not check usage, so the page's image goes too).
     const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     const listed = await page.request.get('/api/pagebuilder/uploads', {
       params: { search: tag, limit: 50 },

@@ -212,7 +212,7 @@ function GalleryBody({
 						</Button>
 					</div>
 				)}
-				{shown && shown.items.length === 0 && (
+				{list.status === "ready" && list.items.length === 0 && (
 					<p
 						className="py-8 text-center text-sm text-muted-foreground"
 						data-testid="pagebuilder-gallery-empty"
