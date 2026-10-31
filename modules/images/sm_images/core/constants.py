@@ -50,7 +50,7 @@ MENU_GROUP: Final = "Images"
 MENU_GROUP_KEY: Final = "images.menu.group_images"
 
 #: The framework's settings module, by ``ModuleMeta.name``. Depending on it
-#: guarantees ``app.state.settings.module_registry`` exists by the time
+#: guarantees ``app.state.module_settings_registry`` exists by the time
 #: ``register_settings`` runs - the host topo-sorts modules on this field.
 _MODULE_SETTINGS: Final = "Settings"
 #: The framework modules images builds on, by ``ModuleMeta.name``: shares

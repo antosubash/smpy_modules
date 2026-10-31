@@ -10,7 +10,7 @@ keywords = ["simple-module", "ai", "llm", "pydantic-ai", "embeddings"]
 # Ranges, never `==`: an exact framework pin makes a published module
 # uninstallable in any host running a newer framework build.
 dependencies = [
-    "simple_module_core>=0.0.36,<0.1",
+    "simple_module_core>=0.0.38,<0.1",  # module_settings first shipped in 0.0.38
     "simple_module_db>=0.0.36,<0.1",
     "simple_module_hosting>=0.0.36,<0.1",
     "simple_module_inertia>=0.0.36,<0.1",

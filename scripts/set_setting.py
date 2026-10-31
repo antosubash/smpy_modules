@@ -28,9 +28,9 @@ import json
 import sys
 
 from headless_settings import headless_settings
-from settings.hydrate import value_type_for_field
 from settings.service import SettingService
 from settings.store import SettingsStore
+from simple_module_core.settings_hydrate import value_type_for_field
 from simple_module_hosting.app_builder import create_app
 
 _USAGE = "usage: set_setting.py <package> <field> <value> [<field> <value> ...]"

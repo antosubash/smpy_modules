@@ -61,7 +61,7 @@ class ImagesModule(ModuleBase):
         container this creates, which is why every later read goes through
         ``app.state.sm_images`` rather than a captured local.
         """
-        from settings.registration import register_module_settings
+        from simple_module_core.module_settings import register_module_settings
 
         from sm_images.core.settings import ImagesSettings
         from sm_images.web.services import ImagesServices
