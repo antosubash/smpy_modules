@@ -39,7 +39,7 @@ class AiModule(ModuleBase):
     )
 
     def register_settings(self, app: FastAPI) -> None:
-        from settings.registration import register_module_settings
+        from simple_module_core.module_settings import register_module_settings
 
         from sm_ai import crypto, services
         from sm_ai.settings import AiSettings
