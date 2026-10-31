@@ -120,6 +120,26 @@ async def test_list_uploads_search_filters_filename(authed_client: AsyncClient) 
     assert names == {"banner.png"}
 
 
+async def test_list_uploads_search_ignores_case_and_matches_wildcards_literally(
+    authed_client: AsyncClient,
+) -> None:
+    """The picker's search (#234): "HERO" finds "hero_1.png", and the ``_`` in
+    "hero_1" is a character, not LIKE's any-single-character."""
+    await _upload(authed_client, filename="hero_1.png")
+    await _upload(authed_client, filename="heroX1.png")
+
+    async def names(search: str) -> set[str]:
+        body = (
+            await authed_client.get(
+                "/api/pagebuilder/uploads", params={"search": search, "offset": 0}
+            )
+        ).json()
+        return {item["original_filename"] for item in body["items"]}
+
+    assert await names("HERO_1") == {"hero_1.png"}
+    assert await names("%") == set()
+
+
 async def test_list_uploads_filter_by_content_type(authed_client: AsyncClient) -> None:
     await _upload(authed_client, filename="hero.png")
     body = (

@@ -1,6 +1,17 @@
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { Button } from "@simple-module-py/ui/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@simple-module-py/ui/components/ui/dialog";
+import { Input } from "@simple-module-py/ui/components/ui/input";
+import { Label } from "@simple-module-py/ui/components/ui/label";
+import { useEffect, useId, useRef, useState } from "react";
 import { keys, useT } from "../../utils/i18n";
+import { GalleryItem } from "./gallery-item";
+import { useDebounced } from "../../hooks/useDebounced";
 import type { FileItem, FilePickerAdapter } from "./types";
 
 interface FileGalleryProps {
@@ -17,7 +28,23 @@ interface FileGalleryProps {
 }
 
 const PAGE_SIZE = 12;
+const SEARCH_MAX_LENGTH = 200;
 
+type ListState =
+	| { status: "loading" }
+	| { status: "error"; message: string }
+	| { status: "ready"; items: FileItem[]; totalCount: number }
+	// A page change or new search in flight: the last page stays on screen, so
+	// the pager keeps its state (a focused Next must not turn disabled and drop
+	// keyboard focus) and the grid does not flash empty.
+	| { status: "refreshing"; items: FileItem[]; totalCount: number };
+
+/**
+ * The library as a modal dialog (#234): every file reachable through paging
+ * and a filename search, each thumbnail named, focus held inside while it is
+ * open and handed back to whatever opened it — Radix does both — and Escape
+ * or the close button dismisses it.
+ */
 export function FileGallery({
 	adapter,
 	open,
@@ -25,134 +52,222 @@ export function FileGallery({
 	onSelect,
 }: FileGalleryProps) {
 	const { t } = useT();
-	const [items, setItems] = useState<FileItem[]>([]);
-	const [totalCount, setTotalCount] = useState(0);
-	const [loading, setLoading] = useState(false);
-	const [page, setPage] = useState(0);
-
-	useEffect(() => {
-		if (!open) return;
-		setLoading(true);
-		adapter
-			.list({ skip: page * PAGE_SIZE, take: PAGE_SIZE })
-			.then((result) => {
-				setItems(result.items);
-				setTotalCount(result.totalCount);
-			})
-			.catch((err) => {
-				// Log instead of letting the rejection go unhandled. Keep whatever
-				// items are already displayed — wiping them on a failed page fetch
-				// would misread as "your uploads are gone".
-				console.error("[FileGallery] Failed to list files:", err);
-			})
-			.finally(() => setLoading(false));
-	}, [adapter, open, page]);
-
-	useEffect(() => {
-		if (!open) return;
-		const handleKeyDown = (e: KeyboardEvent) => {
-			if (e.key === "Escape") onClose();
-		};
-		document.addEventListener("keydown", handleKeyDown);
-		return () => document.removeEventListener("keydown", handleKeyDown);
-	}, [open, onClose]);
-
-	if (!open) return null;
-
-	const hasMore = (page + 1) * PAGE_SIZE < totalCount;
-	const hasPrev = page > 0;
-
-	return createPortal(
-		<div
-			className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50"
-			onClick={(e) => {
-				if (e.target === e.currentTarget) onClose();
+	// Radix hands focus back to its own `DialogTrigger` on close, and the
+	// pickers open this from a button of their own, so without this focus fell
+	// to <body>. Recorded before Radix moves focus into the dialog.
+	const opener = useRef<HTMLElement | null>(null);
+	return (
+		<Dialog
+			open={open}
+			onOpenChange={(next) => {
+				if (!next) onClose();
 			}}
 		>
-			<div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[80vh] flex flex-col m-4">
-				<div className="flex items-center justify-between px-4 py-3 border-b">
-					<h2 className="text-lg font-semibold">
-						{t(keys.pagebuilder.gallery.title)}
-					</h2>
-					<button
-						type="button"
-						onClick={onClose}
-						className="text-gray-500 hover:text-gray-700 text-xl leading-none"
-					>
-						&times;
-					</button>
-				</div>
-				<div className="flex-1 overflow-y-auto p-4">
-					{loading ? (
-						<div className="text-center py-8 text-gray-500">
-							{t(keys.pagebuilder.gallery.loading)}
-						</div>
-					) : items.length === 0 ? (
-						<div className="text-center py-8 text-gray-500">
-							{t(keys.pagebuilder.gallery.empty)}
-						</div>
-					) : (
-						<div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-							{items.map((item) => (
-								<button
-									key={item.id}
-									type="button"
-									onClick={() => {
-										onSelect(item.url, item);
-										onClose();
-									}}
-									className="group relative aspect-square rounded-md overflow-hidden border hover:ring-2 hover:ring-blue-500 focus:ring-2 focus:ring-blue-500 outline-none"
-								>
-									{item.mimeType.startsWith("image/") ? (
-										<img
-											src={item.url}
-											alt=""
-											className="w-full h-full object-cover"
-										/>
-									) : (
-										<div className="w-full h-full flex items-center justify-center bg-gray-100 text-xs text-gray-500 p-2 text-center">
-											{item.mimeType}
-										</div>
-									)}
-									<div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-xs px-1 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity truncate">
-										{formatFileSize(item.fileSize)}
-									</div>
-								</button>
-							))}
-						</div>
-					)}
-				</div>
-				<div className="flex items-center justify-between px-4 py-3 border-t">
-					<span className="text-sm text-gray-500">
-						{t(keys.pagebuilder.gallery.file_count, { count: totalCount })}
-					</span>
-					<div className="flex gap-2">
-						<button
-							type="button"
-							onClick={() => setPage((p) => p - 1)}
-							disabled={!hasPrev}
-							className="px-3 py-1 text-sm rounded border disabled:opacity-40 hover:bg-gray-50"
-						>
-							{t(keys.pagebuilder.gallery.prev)}
-						</button>
-						<button
-							type="button"
-							onClick={() => setPage((p) => p + 1)}
-							disabled={!hasMore}
-							className="px-3 py-1 text-sm rounded border disabled:opacity-40 hover:bg-gray-50"
-						>
-							{t(keys.pagebuilder.gallery.next)}
-						</button>
-					</div>
-				</div>
-			</div>
-		</div>,
-		document.body,
+			<DialogContent
+				className="flex max-h-[85dvh] flex-col sm:max-w-3xl"
+				onOpenAutoFocus={() => {
+					opener.current =
+						document.activeElement instanceof HTMLElement
+							? document.activeElement
+							: null;
+				}}
+				onCloseAutoFocus={(event) => {
+					if (opener.current?.isConnected) {
+						event.preventDefault();
+						opener.current.focus();
+					}
+				}}
+			>
+				<DialogHeader>
+					<DialogTitle>{t(keys.pagebuilder.gallery.title)}</DialogTitle>
+					<DialogDescription>
+						{t(keys.pagebuilder.gallery.description)}
+					</DialogDescription>
+				</DialogHeader>
+				<GalleryBody
+					adapter={adapter}
+					onPick={(item) => {
+						onSelect(item.url, item);
+						onClose();
+					}}
+				/>
+			</DialogContent>
+		</Dialog>
 	);
 }
 
-function formatFileSize(bytes: number): string {
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+/** The dialog's contents. A component of its own because Radix unmounts it
+ *  on close: every open starts on page one with an empty search, and a
+ *  response still in flight is dropped rather than landing in a closed box. */
+function GalleryBody({
+	adapter,
+	onPick,
+}: {
+	adapter: FilePickerAdapter;
+	onPick: (item: FileItem) => void;
+}) {
+	const { t } = useT();
+	const searchId = useId();
+	const [query, setQuery] = useState("");
+	const [attempt, setAttempt] = useState(0);
+	const [list, setList] = useState<ListState>({ status: "loading" });
+	const search = useDebounced(query);
+	// The page belongs to the search it was chosen under: Next clicked while a
+	// new search is still debouncing must not carry over, or the new search
+	// would open on its second page and could look empty.
+	const [paged, setPaged] = useState({ search: "", page: 0 });
+	const page = paged.search === search ? paged.page : 0;
+	// Forget the page once the search moves on, or returning to an earlier
+	// search ("a" -> "b" -> "a") would resurrect the page it was left on.
+	useEffect(() => {
+		setPaged({ search, page: 0 });
+	}, [search]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is the Retry button
+	useEffect(() => {
+		// Only the latest request may land: typing "he" then "hero" must not
+		// let a slow answer for "he" overwrite the one for "hero".
+		let current = true;
+		setList((previous) =>
+			previous.status === "ready" || previous.status === "refreshing"
+				? { ...previous, status: "refreshing" }
+				: { status: "loading" },
+		);
+		adapter
+			.list({ skip: page * PAGE_SIZE, take: PAGE_SIZE, search })
+			.then(
+				(result) => {
+					if (current)
+						setList({
+							status: "ready",
+							items: result.items,
+							totalCount: result.totalCount,
+						});
+				},
+				(error: unknown) => {
+					if (current)
+						setList({
+							status: "error",
+							message: error instanceof Error ? error.message : String(error),
+						});
+				},
+			);
+		return () => {
+			current = false;
+		};
+	}, [adapter, page, search, attempt]);
+
+	const shown =
+		list.status === "ready" || list.status === "refreshing" ? list : null;
+	const totalCount = shown?.totalCount ?? 0;
+	const hasPrev = page > 0;
+	const hasMore = (page + 1) * PAGE_SIZE < totalCount;
+
+	return (
+		<>
+			<div className="grid gap-1.5">
+				<Label htmlFor={searchId}>
+					{t(keys.pagebuilder.gallery.search_label)}
+				</Label>
+				<Input
+					id={searchId}
+					type="search"
+					// The uploads endpoint refuses a longer search.
+					maxLength={SEARCH_MAX_LENGTH}
+					value={query}
+					placeholder={t(keys.pagebuilder.gallery.search_placeholder)}
+					onChange={(event) => {
+						setQuery(event.target.value);
+					}}
+				/>
+			</div>
+
+			<div
+				className="min-h-0 flex-1 overflow-y-auto"
+				aria-busy={list.status === "loading" || list.status === "refreshing"}
+				data-testid="pagebuilder-gallery-results"
+			>
+				{list.status === "loading" && (
+					<p
+						role="status"
+						className="py-8 text-center text-sm text-muted-foreground"
+					>
+						{t(keys.pagebuilder.gallery.loading)}
+					</p>
+				)}
+				{list.status === "error" && (
+					<div
+						role="alert"
+						className="grid justify-items-start gap-2 py-4 text-sm"
+					>
+						<p className="text-destructive">
+							{t(keys.pagebuilder.gallery.load_failed, {
+								message: list.message,
+							})}
+						</p>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={() => setAttempt((n) => n + 1)}
+						>
+							{t(keys.pagebuilder.gallery.retry)}
+						</Button>
+					</div>
+				)}
+				{list.status === "ready" && list.items.length === 0 && (
+					<p
+						className="py-8 text-center text-sm text-muted-foreground"
+						data-testid="pagebuilder-gallery-empty"
+					>
+						{search
+							? t(keys.pagebuilder.gallery.no_matches)
+							: t(keys.pagebuilder.gallery.empty)}
+					</p>
+				)}
+				{shown && shown.items.length > 0 && (
+					<ul
+						className={`grid grid-cols-2 gap-3 sm:grid-cols-4 ${list.status === "refreshing" ? "opacity-60" : ""}`}
+					>
+						{shown.items.map((item) => (
+							<li key={item.id}>
+								<GalleryItem item={item} onPick={onPick} />
+							</li>
+						))}
+					</ul>
+				)}
+			</div>
+
+			<div className="flex items-center justify-between gap-2 border-t pt-3">
+				<span className="text-sm text-muted-foreground" aria-live="polite">
+					{shown
+						? t(keys.pagebuilder.gallery.file_count, { count: totalCount })
+						: ""}
+				</span>
+				<nav
+					className="flex gap-2"
+					aria-label={t(keys.pagebuilder.gallery.pagination)}
+				>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={() => setPaged({ search, page: page - 1 })}
+						disabled={!hasPrev}
+					>
+						{t(keys.pagebuilder.gallery.prev)}
+					</Button>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={() => setPaged({ search, page: page + 1 })}
+						disabled={!hasMore}
+					>
+						{t(keys.pagebuilder.gallery.next)}
+					</Button>
+				</nav>
+			</div>
+		</>
+	);
 }
