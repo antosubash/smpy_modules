@@ -83,7 +83,7 @@ MENU_GROUP_KEY_SEARCH: Final = "news.menu.group_find"
 # now exists to allow. What news still borrows from it, it borrows at runtime
 # and only where it is there — see ``news.integrations.pagebuilder``.
 #: The framework's settings module, by ``ModuleMeta.name``. Depended on so the
-#: host has built ``app.state.settings.module_registry`` before this module's
+#: host has built ``app.state.module_settings_registry`` before this module's
 #: ``register_settings`` tries to register against it.
 _MODULE_SETTINGS: Final = "Settings"
 
