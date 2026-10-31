@@ -28,6 +28,7 @@ interface FileGalleryProps {
 }
 
 const PAGE_SIZE = 12;
+const SEARCH_MAX_LENGTH = 200;
 
 type ListState =
 	| { status: "loading" }
@@ -171,6 +172,8 @@ function GalleryBody({
 				<Input
 					id={searchId}
 					type="search"
+					// The uploads endpoint refuses a longer search.
+					maxLength={SEARCH_MAX_LENGTH}
 					value={query}
 					placeholder={t(keys.pagebuilder.gallery.search_placeholder)}
 					onChange={(event) => {

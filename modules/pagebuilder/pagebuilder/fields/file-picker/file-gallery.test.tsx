@@ -126,6 +126,12 @@ describe('FileGallery', () => {
     );
   });
 
+  it('stops the search at the 200 characters the server accepts', async () => {
+    await open(libraryAdapter());
+    const input = dialog().querySelector('input[type="search"]') as HTMLInputElement;
+    expect(input.maxLength).toBe(200);
+  });
+
   it('opens a new search on its first page, even after Next during the debounce', async () => {
     const adapter = libraryAdapter();
     await open(adapter);
