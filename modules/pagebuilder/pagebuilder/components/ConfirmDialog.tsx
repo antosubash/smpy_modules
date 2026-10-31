@@ -100,7 +100,8 @@ export function ConfirmDialog({
       <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
+          {/* A title can carry a filename or page title with nothing to break at. */}
+          <AlertDialogTitle className="[overflow-wrap:anywhere]">{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         {children && <div className="grid gap-2 py-2">{children}</div>}
