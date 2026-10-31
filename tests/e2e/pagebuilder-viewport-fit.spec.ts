@@ -44,6 +44,20 @@ test.describe('Pagebuilder fits its viewport', () => {
       await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
       expect(await overflowX(page)).toBe(0);
     }
+    // The delete confirmation names the file too, and must wrap it as well.
+    await page.setViewportSize({ width: 375, height: 800 });
+    await page.getByRole('button', { name: 'Delete asset' }).click();
+    const confirm = page.getByRole('alertdialog');
+    const title = confirm.getByRole('heading', { name: `Delete “${name}”?` });
+    await expect(title).toBeVisible();
+    // The header is a grid, so an unbreakable title widens its own box past
+    // the dialog's edge rather than overflowing itself.
+    const [dialogBox, titleBox] = [await confirm.boundingBox(), await title.boundingBox()];
+    expect(titleBox && dialogBox && titleBox.x + titleBox.width).toBeLessThanOrEqual(
+      (dialogBox?.x ?? 0) + (dialogBox?.width ?? 0),
+    );
+    await page.keyboard.press('Escape');
+    await page.request.delete(`/api/pagebuilder/uploads/${id}`, { headers });
   });
 
   test('the new-page dialog keeps its actions reachable at 720x450', async ({ page }) => {
@@ -63,6 +77,8 @@ test.describe('Pagebuilder fits its viewport', () => {
     const create = dialog.getByRole('button', { name: 'Create and open editor' });
     await create.scrollIntoViewIfNeeded();
     await expect(create).toBeInViewport();
+    // The close button does not scroll away with the form.
+    await expect(dialog.getByRole('button', { name: 'Close' })).toBeInViewport();
   });
 
   test('the blobs timeline fits a 320px phone', async ({ page }) => {
