@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -218,3 +219,25 @@ def test_no_module_imports_the_deprecated_settings_shim():
         check=False,
     )
     assert result.returncode == 0, result.stderr[-2000:]
+
+
+def test_shipped_code_imports_no_deprecated_settings_shim():
+    """The boot test above misses imports made later, inside a function: the
+    worker's settings load, billing's live check and records' CLI (#273). The
+    framework's ``settings.registration``, ``settings.hydrate`` and
+    ``settings.module_registry`` all warn on import and go away in 0.1.0.
+    Tests may still use them; shipped code and scripts may not.
+    """
+    shim = re.compile(r"^\s*(from|import) settings\.(registration|hydrate|module_registry)\b")
+    shipped = [
+        path
+        for path in [*REPO.glob("modules/*/*/**/*.py"), *REPO.glob("scripts/*.py")]
+        if "tests" not in path.relative_to(REPO).parts
+    ]
+    offenders = [
+        f"{path.relative_to(REPO)}:{number}"
+        for path in shipped
+        for number, line in enumerate(path.read_text().splitlines(), start=1)
+        if shim.match(line)
+    ]
+    assert offenders == []
