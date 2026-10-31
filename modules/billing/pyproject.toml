@@ -12,7 +12,7 @@ keywords = ["simple-module", "billing", "saas", "stripe", "subscriptions", "tena
 # first release carrying ``simple_module_tenants`` and its entitlements seam;
 # the floor is 0.0.36 like every other module here (#211).
 dependencies = [
-    "simple_module_core>=0.0.36,<0.1",
+    "simple_module_core>=0.0.38,<0.1",  # module_settings first shipped in 0.0.38
     "simple_module_db>=0.0.36,<0.1",
     "simple_module_hosting>=0.0.36,<0.1",
     "simple_module_inertia>=0.0.36,<0.1",

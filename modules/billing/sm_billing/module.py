@@ -10,7 +10,6 @@ a deleted tenant's subscription (``sm_billing.teardown``).
 
 from __future__ import annotations
 
-import importlib
 import importlib.metadata
 import importlib.resources
 import logging
@@ -59,13 +58,12 @@ class BillingModule(ModuleBase):
         return {c.LOCALE_NAMESPACE: base}
 
     def register_settings(self, app: FastAPI) -> None:
+        from simple_module_core.module_settings import register_module_settings
+
         from sm_billing import crypto
         from sm_billing.services import BillingServices
         from sm_billing.settings import BillingSettings
 
-        register_module_settings = importlib.import_module(
-            "settings.registration"
-        ).register_module_settings
         register_module_settings(
             app, c.PACKAGE, BillingSettings, lambda s: BillingServices(settings=s)
         )

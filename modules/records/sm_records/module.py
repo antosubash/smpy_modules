@@ -83,7 +83,7 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         every write to them would be a ``no such table`` found at runtime
         rather than a ``RuntimeError`` found at boot.
         """
-        from settings.registration import register_module_settings
+        from simple_module_core.module_settings import register_module_settings
 
         from sm_records.models._tables import seal
 

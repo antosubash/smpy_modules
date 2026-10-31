@@ -89,8 +89,8 @@ async def _stored(app: FastAPI) -> dict[str, Any]:
     """The ``FOLLOWED_FIELDS`` values the database holds now (defaults where unset)."""
     from settings.constants import SYSTEM_SCOPE_ID
     from settings.contracts.schemas import SettingScope
-    from settings.hydrate import build_settings
     from settings.models import Setting
+    from simple_module_core.settings_hydrate import build_settings
     from sqlalchemy import select
 
     keys = {f"{c.PACKAGE}.{field}": field for field in FOLLOWED_FIELDS}
