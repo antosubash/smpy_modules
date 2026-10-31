@@ -103,7 +103,7 @@ export function TranslatePageDialog({ page, locales, defaultLocale, publicPrefix
           close button stays put (#236). */}
       <DialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[minmax(0,1fr)]">
         <form
-          className="-mx-1 min-h-0 overflow-y-auto px-1"
+          className="-m-1 min-h-0 overflow-y-auto p-1"
           onSubmit={(e) => {
             e.preventDefault();
             if (target && !pending) void create();
