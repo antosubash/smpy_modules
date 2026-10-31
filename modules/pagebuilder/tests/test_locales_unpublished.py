@@ -32,7 +32,9 @@ def test_a_later_use_takes_effect_after_an_early_call() -> None:
     assert locales.supported() == PagebuilderSettings().content_locales
     assert locales._active is None, "the fallback must not be cached"
 
-    locales.use(PagebuilderSettings(content_locales=("de", "en"), default_content_locale="de"))
+    locales.use(
+        PagebuilderSettings(content_locales=("de", "en"), default_content_locale="de")
+    )
 
     assert locales.supported() == ("de", "en")
     assert locales.default() == "de"
@@ -84,7 +86,11 @@ def test_news_borrow_follows_a_later_use() -> None:
     news_locales.reset()
     try:
         assert news_locales.supported() == PagebuilderSettings().content_locales
-        locales.use(PagebuilderSettings(content_locales=("en", "fr"), default_content_locale="en"))
+        locales.use(
+            PagebuilderSettings(
+                content_locales=("en", "fr"), default_content_locale="en"
+            )
+        )
         assert news_locales.supported() == ("en", "fr")
     finally:
         news_locales.reset()

@@ -22,7 +22,9 @@ async def _add(snapshot_db, *, filename: str, original: str, data: bytes | None)
     root.mkdir(parents=True, exist_ok=True)
     if data is not None:
         (root / filename).write_bytes(data)
-    asset = MediaAsset(filename=filename, original_filename=original, content_type="image/jpeg")
+    asset = MediaAsset(
+        filename=filename, original_filename=original, content_type="image/jpeg"
+    )
     snapshot_db.session.add(asset)
     await snapshot_db.session.flush()
     return asset
@@ -35,7 +37,9 @@ def _index(sha: str, original: str = "hero.jpg", bundle_name: str = "hero.jpg"):
 async def test_same_name_and_same_bytes_matches(snapshot_db):
     """Re-running a restore must not duplicate an asset it already has."""
     asset = await _add(snapshot_db, filename="u1.jpg", original="hero.jpg", data=_OURS)
-    matched = await match_existing(snapshot_db.session, snapshot_db.settings, _index(_sha(_OURS)))
+    matched = await match_existing(
+        snapshot_db.session, snapshot_db.settings, _index(_sha(_OURS))
+    )
     assert matched["hero.jpg"].id == asset.id
 
 
@@ -47,22 +51,30 @@ async def test_same_name_but_different_bytes_does_not_match(snapshot_db):
     nothing — the restored site would look wrong with no error anywhere.
     """
     await _add(snapshot_db, filename="u1.jpg", original="hero.jpg", data=_OURS)
-    matched = await match_existing(snapshot_db.session, snapshot_db.settings, _index(_sha(_THEIRS)))
+    matched = await match_existing(
+        snapshot_db.session, snapshot_db.settings, _index(_sha(_THEIRS))
+    )
     assert matched == {}
 
 
 async def test_matches_the_right_one_when_a_name_is_ambiguous(snapshot_db):
     """One name, two assets: the digest picks, not the ordering."""
     await _add(snapshot_db, filename="u1.jpg", original="hero.jpg", data=_OURS)
-    wanted = await _add(snapshot_db, filename="u2.jpg", original="hero.jpg", data=_THEIRS)
-    matched = await match_existing(snapshot_db.session, snapshot_db.settings, _index(_sha(_THEIRS)))
+    wanted = await _add(
+        snapshot_db, filename="u2.jpg", original="hero.jpg", data=_THEIRS
+    )
+    matched = await match_existing(
+        snapshot_db.session, snapshot_db.settings, _index(_sha(_THEIRS))
+    )
     assert matched["hero.jpg"].id == wanted.id
 
 
 async def test_a_row_whose_file_is_missing_does_not_match(snapshot_db):
     """Issue #14's divergence reads as 'no match', so the restore repairs it."""
     await _add(snapshot_db, filename="gone.jpg", original="hero.jpg", data=None)
-    matched = await match_existing(snapshot_db.session, snapshot_db.settings, _index(_sha(_OURS)))
+    matched = await match_existing(
+        snapshot_db.session, snapshot_db.settings, _index(_sha(_OURS))
+    )
     assert matched == {}
 
 

@@ -19,7 +19,9 @@ class LayoutService:
         self.db = db
 
     async def get(self) -> Layout:
-        result = await self.db.execute(select(Layout).order_by(Layout.id.asc()).limit(1))
+        result = await self.db.execute(
+            select(Layout).order_by(Layout.id.asc()).limit(1)
+        )
         layout = result.scalars().first()
         if layout is None:
             layout = Layout(header_data={}, footer_data={})
@@ -90,6 +92,10 @@ def public_layout_props(layout: Layout) -> dict[str, dict | None]:
     # Empty slots surface as None so PublicPage can drop the wrapper —
     # an empty <header> is worse than no header.
     return {
-        "layout_header": layout.header_data if _has_content(layout.header_data) else None,
-        "layout_footer": layout.footer_data if _has_content(layout.footer_data) else None,
+        "layout_header": layout.header_data
+        if _has_content(layout.header_data)
+        else None,
+        "layout_footer": layout.footer_data
+        if _has_content(layout.footer_data)
+        else None,
     }

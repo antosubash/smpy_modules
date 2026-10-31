@@ -43,9 +43,9 @@ async def test_publish_without_body_still_works(authed_client: AsyncClient) -> N
     page_id = await _create(authed_client, slug="no-note", blocks=[])
     response = await authed_client.post(f"/api/pagebuilder/pages/{page_id}/publish")
     assert response.status_code == 200
-    revisions = (await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")).json()[
-        "items"
-    ]
+    revisions = (
+        await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")
+    ).json()["items"]
     assert revisions[0]["note"] is None
 
 
@@ -54,9 +54,9 @@ async def test_publish_note_is_persisted_on_revision(
 ) -> None:
     page_id = await _create(authed_client, slug="with-note", blocks=[])
     await _publish(authed_client, page_id, note="Initial launch — homepage v1")
-    revisions = (await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")).json()[
-        "items"
-    ]
+    revisions = (
+        await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")
+    ).json()["items"]
     assert revisions[0]["note"] == "Initial launch — homepage v1"
 
 
@@ -77,9 +77,9 @@ async def test_approve_carries_note(approver_client: AsyncClient) -> None:
         json={"note": "LGTM after copy review"},
     )
     assert response.status_code == 200
-    revisions = (await approver_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")).json()[
-        "items"
-    ]
+    revisions = (
+        await approver_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")
+    ).json()["items"]
     approve_rows = [r for r in revisions if r["event"] == "approve"]
     assert approve_rows[0]["note"] == "LGTM after copy review"
 
@@ -106,9 +106,9 @@ async def test_diff_reports_added_block(authed_client: AsyncClient) -> None:
     )
     await _publish(authed_client, page_id)
 
-    revisions = (await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")).json()[
-        "items"
-    ]
+    revisions = (
+        await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")
+    ).json()["items"]
     new_id, old_id = revisions[0]["id"], revisions[1]["id"]
 
     diff = await authed_client.get(
@@ -134,9 +134,9 @@ async def test_diff_reports_removed_block(authed_client: AsyncClient) -> None:
     )
     await _publish(authed_client, page_id)
 
-    revisions = (await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")).json()[
-        "items"
-    ]
+    revisions = (
+        await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")
+    ).json()["items"]
     diff = (
         await authed_client.get(
             f"/api/pagebuilder/pages/{page_id}"
@@ -159,9 +159,9 @@ async def test_diff_reports_changed_fields(authed_client: AsyncClient) -> None:
     )
     await _publish(authed_client, page_id)
 
-    revisions = (await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")).json()[
-        "items"
-    ]
+    revisions = (
+        await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")
+    ).json()["items"]
     diff = (
         await authed_client.get(
             f"/api/pagebuilder/pages/{page_id}"
@@ -183,9 +183,9 @@ async def test_diff_reports_metadata_changes(authed_client: AsyncClient) -> None
     )
     await _publish(authed_client, page_id)
 
-    revisions = (await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")).json()[
-        "items"
-    ]
+    revisions = (
+        await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")
+    ).json()["items"]
     diff = (
         await authed_client.get(
             f"/api/pagebuilder/pages/{page_id}"
@@ -200,13 +200,15 @@ async def test_diff_reports_metadata_changes(authed_client: AsyncClient) -> None
 
 
 async def test_diff_empty_when_revisions_match(authed_client: AsyncClient) -> None:
-    page_id = await _create(authed_client, slug="diff-noop", blocks=[_block("a", "Heading")])
+    page_id = await _create(
+        authed_client, slug="diff-noop", blocks=[_block("a", "Heading")]
+    )
     await _publish(authed_client, page_id)
     await _publish(authed_client, page_id)  # publish again, same draft
 
-    revisions = (await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")).json()[
-        "items"
-    ]
+    revisions = (
+        await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")
+    ).json()["items"]
     diff = (
         await authed_client.get(
             f"/api/pagebuilder/pages/{page_id}"
@@ -224,12 +226,12 @@ async def test_diff_404_for_revision_from_another_page(
     page_b = await _create(authed_client, slug="bravo", blocks=[])
     await _publish(authed_client, page_a)
     await _publish(authed_client, page_b)
-    a_rev = (await authed_client.get(f"/api/pagebuilder/pages/{page_a}/revisions")).json()["items"][
-        0
-    ]["id"]
-    b_rev = (await authed_client.get(f"/api/pagebuilder/pages/{page_b}/revisions")).json()["items"][
-        0
-    ]["id"]
+    a_rev = (
+        await authed_client.get(f"/api/pagebuilder/pages/{page_a}/revisions")
+    ).json()["items"][0]["id"]
+    b_rev = (
+        await authed_client.get(f"/api/pagebuilder/pages/{page_b}/revisions")
+    ).json()["items"][0]["id"]
     response = await authed_client.get(
         f"/api/pagebuilder/pages/{page_a}/revisions/{a_rev}/diff/{b_rev}"
     )
@@ -248,9 +250,9 @@ async def test_diff_for_type_change(authed_client: AsyncClient) -> None:
     )
     await _publish(authed_client, page_id)
 
-    revisions = (await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")).json()[
-        "items"
-    ]
+    revisions = (
+        await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")
+    ).json()["items"]
     diff = (
         await authed_client.get(
             f"/api/pagebuilder/pages/{page_id}"

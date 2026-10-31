@@ -132,7 +132,9 @@ class TrashMixin(TrashHostBase):
         """
         page = await self._trashed_or_404(page_id)
         slug = page.slug
-        await self.db.execute(sa_delete(PageRevision).where(PageRevision.page_id == page_id))
+        await self.db.execute(
+            sa_delete(PageRevision).where(PageRevision.page_id == page_id)
+        )
         await self.db.execute(
             sa_update(Page).where(Page.parent_id == page_id).values(parent_id=None)
         )

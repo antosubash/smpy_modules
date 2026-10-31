@@ -43,7 +43,9 @@ class TestCategoryListing:
         """The editor's screen: a category of drafts still has real weight."""
         await _article(db, "d", "Research", status=ArticleStatus.DRAFT)
 
-        found = next(c for c in await category_service.list_categories(db) if c.name == "Research")
+        found = next(
+            c for c in await category_service.list_categories(db) if c.name == "Research"
+        )
 
         assert found.article_count == 1
 

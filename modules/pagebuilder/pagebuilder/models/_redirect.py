@@ -47,3 +47,5 @@ class PageRedirect(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupporte
     """
 
     page_id: int = Field(foreign_key="pagebuilder_pages.id", index=True, ondelete="CASCADE")
+
+

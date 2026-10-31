@@ -98,7 +98,9 @@ async def test_put_layout_records_a_revision(authed_client: AsyncClient) -> None
         "/api/pagebuilder/layout",
         json={"header_data": _FOOTER_DATA, "note": "Swap"},
     )
-    revisions = (await authed_client.get("/api/pagebuilder/layout/revisions")).json()["items"]
+    revisions = (await authed_client.get("/api/pagebuilder/layout/revisions")).json()[
+        "items"
+    ]
     assert [r["note"] for r in revisions] == ["Swap", "Initial"]
 
 
@@ -114,7 +116,9 @@ async def test_put_layout_skips_revision_when_unchanged(
         "/api/pagebuilder/layout",
         json={"header_data": _HEADER_DATA, "note": "noop"},
     )
-    revisions = (await authed_client.get("/api/pagebuilder/layout/revisions")).json()["items"]
+    revisions = (await authed_client.get("/api/pagebuilder/layout/revisions")).json()[
+        "items"
+    ]
     assert [r["note"] for r in revisions] == ["v1"]
 
 
@@ -130,7 +134,9 @@ async def test_layout_restore_round_trips_both_slots(
             "note": "v1",
         },
     )
-    revisions = (await authed_client.get("/api/pagebuilder/layout/revisions")).json()["items"]
+    revisions = (await authed_client.get("/api/pagebuilder/layout/revisions")).json()[
+        "items"
+    ]
     target_id = revisions[0]["id"]
 
     await authed_client.put(
@@ -138,7 +144,9 @@ async def test_layout_restore_round_trips_both_slots(
         json={"header_data": {"content": [], "root": {"props": {}}}, "note": "wiped"},
     )
 
-    restore = await authed_client.post(f"/api/pagebuilder/layout/revisions/{target_id}/restore")
+    restore = await authed_client.post(
+        f"/api/pagebuilder/layout/revisions/{target_id}/restore"
+    )
     assert restore.status_code == 200, restore.text
     body = restore.json()
     assert body["header_data"] == _HEADER_DATA
@@ -163,7 +171,9 @@ async def test_public_viewer_renders_layout_props_when_set(
         json={"header_data": _HEADER_DATA, "footer_data": _FOOTER_DATA},
     )
     page = await _publish_page(authed_client)
-    response = await authed_client.get(f"/p/{page['slug']}", headers={"X-Inertia": "true"})
+    response = await authed_client.get(
+        f"/p/{page['slug']}", headers={"X-Inertia": "true"}
+    )
     assert response.status_code == 200
     props = response.json()["props"]
     assert props["layout_header"] == _HEADER_DATA
@@ -182,7 +192,9 @@ async def test_public_viewer_skips_empty_slots(
         },
     )
     page = await _publish_page(authed_client)
-    response = await authed_client.get(f"/p/{page['slug']}", headers={"X-Inertia": "true"})
+    response = await authed_client.get(
+        f"/p/{page['slug']}", headers={"X-Inertia": "true"}
+    )
     props = response.json()["props"]
     assert props["layout_header"] is None
     assert props["layout_footer"] == _FOOTER_DATA
@@ -192,7 +204,9 @@ async def test_public_viewer_renders_pages_when_layout_unset(
     authed_client: AsyncClient,
 ) -> None:
     page = await _publish_page(authed_client, slug="bare")
-    response = await authed_client.get(f"/p/{page['slug']}", headers={"X-Inertia": "true"})
+    response = await authed_client.get(
+        f"/p/{page['slug']}", headers={"X-Inertia": "true"}
+    )
     props = response.json()["props"]
     assert props["layout_header"] is None
     assert props["layout_footer"] is None
@@ -241,8 +255,12 @@ async def test_layout_revision_carries_combined_snapshot(
         "/api/pagebuilder/layout",
         json={"header_data": _HEADER_DATA, "footer_data": _FOOTER_DATA},
     )
-    revisions = (await authed_client.get("/api/pagebuilder/layout/revisions")).json()["items"]
-    detail = await authed_client.get(f"/api/pagebuilder/layout/revisions/{revisions[0]['id']}")
+    revisions = (await authed_client.get("/api/pagebuilder/layout/revisions")).json()[
+        "items"
+    ]
+    detail = await authed_client.get(
+        f"/api/pagebuilder/layout/revisions/{revisions[0]['id']}"
+    )
     body = detail.json()
     assert body["header_data"] == _HEADER_DATA
     assert body["footer_data"] == _FOOTER_DATA

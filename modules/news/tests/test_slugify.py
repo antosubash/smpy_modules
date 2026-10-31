@@ -92,5 +92,7 @@ class TestSuffixed:
 
         assert all(
             c.startswith(stem)
-            for c in suffixed(base, max_length=MAX_SLUG_LEN, limit=MAX_SLUG_ATTEMPTS + 1)
+            for c in suffixed(
+                base, max_length=MAX_SLUG_LEN, limit=MAX_SLUG_ATTEMPTS + 1
+            )
         )

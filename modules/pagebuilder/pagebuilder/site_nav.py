@@ -61,3 +61,4 @@ async def site_nav(db: AsyncSession, prefix: str, locale: str) -> SiteNav:
         if row.show_in_footer:
             nav["footer"].append(link)
     return nav
+

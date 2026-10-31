@@ -57,7 +57,7 @@ _SHELL = (
     # SSR. `endpoints.public._head` writes an article's real metadata into that
     # head, and against a stub with nowhere to write it every test asserting on
     # server-rendered metadata would pass by asserting nothing.
-    '<html lang="en"><head><title>SimpleModule</title>{% inertia_head %}</head>'
+    "<html lang=\"en\"><head><title>SimpleModule</title>{% inertia_head %}</head>"
     "<body>{% inertia_body %}</body></html>"
 )
 
@@ -117,7 +117,9 @@ def bilingual():
     from pagebuilder import locales
     from pagebuilder.settings import PagebuilderSettings
 
-    locales.use(PagebuilderSettings(content_locales=("en", "de"), default_content_locale="en"))
+    locales.use(
+        PagebuilderSettings(content_locales=("en", "de"), default_content_locale="en")
+    )
     return ("en", "de")
 
 
@@ -289,3 +291,5 @@ async def bilingual_public_client(bilingual) -> AsyncIterator[AsyncClient]:
     """
     async for client in _client(None, mount_public=True):
         yield client
+
+

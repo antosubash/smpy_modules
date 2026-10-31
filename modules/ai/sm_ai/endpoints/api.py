@@ -76,7 +76,9 @@ async def test_connection(data: AiTestRequest) -> AiTestResult:
                 await resolve.build_embedder(settings).embed_query(constants.TEST_PROMPT)
     except Exception as exc:  # a failed probe is a result, not a bug
         return AiTestResult(ok=False, model=label, error=_probe_error("test probe", data.slot, exc))
-    return AiTestResult(ok=True, model=label, latency_ms=int((time.monotonic() - started) * 1000))
+    return AiTestResult(
+        ok=True, model=label, latency_ms=int((time.monotonic() - started) * 1000)
+    )
 
 
 @router.post("/models", response_model=AiModelsResult, dependencies=[_MANAGE])

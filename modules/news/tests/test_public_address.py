@@ -86,7 +86,9 @@ class TestTheViewer:
         which is exactly the state a reviewer might assume is already safe to
         link. It is not: the viewer serves ``PUBLISHED`` and nothing else.
         """
-        await _seed(anon_client, "awaiting", status=ArticleStatus.SUBMITTED_FOR_REVIEW)
+        await _seed(
+            anon_client, "awaiting", status=ArticleStatus.SUBMITTED_FOR_REVIEW
+        )
 
         assert (await anon_client.get(f"{NEWS}/awaiting")).status_code == 404
 
@@ -120,7 +122,9 @@ class TestTheViewer:
 
         assert answers == {(404, "Article not found")}
 
-    async def test_an_article_published_without_a_body_snapshot_is_a_404(self, anon_client) -> None:
+    async def test_an_article_published_without_a_body_snapshot_is_a_404(
+        self, anon_client
+    ) -> None:
         """``status`` alone is not enough — the viewer serves ``published_data``.
 
         A row marked published with nothing snapshotted would otherwise render
@@ -130,15 +134,21 @@ class TestTheViewer:
 
         assert (await anon_client.get(f"{NEWS}/no-snapshot")).status_code == 404
 
-    async def test_it_serves_the_snapshot_rather_than_the_draft(self, anon_client) -> None:
-        article = await _seed(anon_client, "two-versions", draft_data={"content": ["live"]})
+    async def test_it_serves_the_snapshot_rather_than_the_draft(
+        self, anon_client
+    ) -> None:
+        article = await _seed(
+            anon_client, "two-versions", draft_data={"content": ["live"]}
+        )
         async with anon_client.db_state.session_factory() as db:
             await ArticlesService(db).save_body(article.id, {"content": ["wip"]})
             await db.commit()
 
         # Asked as Inertia would, so the response is the props rather than the
         # shell template — the body is what this is about.
-        response = await anon_client.get(f"{NEWS}/two-versions", headers={"X-Inertia": "true"})
+        response = await anon_client.get(
+            f"{NEWS}/two-versions", headers={"X-Inertia": "true"}
+        )
 
         assert "live" in response.text
         assert "wip" not in response.text
@@ -153,7 +163,9 @@ class TestTheViewer:
         """
         await _seed(anon_client, "knows-itself")
 
-        response = await anon_client.get(f"{NEWS}/knows-itself", headers={"X-Inertia": "true"})
+        response = await anon_client.get(
+            f"{NEWS}/knows-itself", headers={"X-Inertia": "true"}
+        )
 
         assert response.json()["props"]["slug"] == "knows-itself"
 
@@ -173,7 +185,9 @@ class TestCachingHeaders:
         await _seed(anon_client, "conditional")
         etag = (await anon_client.get(f"{NEWS}/conditional")).headers["ETag"]
 
-        response = await anon_client.get(f"{NEWS}/conditional", headers={"If-None-Match": etag})
+        response = await anon_client.get(
+            f"{NEWS}/conditional", headers={"If-None-Match": etag}
+        )
 
         assert response.status_code == 304
 

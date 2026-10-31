@@ -52,8 +52,12 @@ async def test_sitemap_excludes_drafts(authed_client: AsyncClient) -> None:
 
 
 async def test_sitemap_excludes_noindex_pages(authed_client: AsyncClient) -> None:
-    await _create_and_publish(authed_client, slug="indexed", extra={"index_in_search": True})
-    await _create_and_publish(authed_client, slug="hidden", extra={"index_in_search": False})
+    await _create_and_publish(
+        authed_client, slug="indexed", extra={"index_in_search": True}
+    )
+    await _create_and_publish(
+        authed_client, slug="hidden", extra={"index_in_search": False}
+    )
     response = await authed_client.get("/sitemap.xml")
     assert "/p/indexed" in response.text
     assert "/p/hidden" not in response.text

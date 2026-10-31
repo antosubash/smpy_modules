@@ -34,7 +34,9 @@ async def _count(client) -> int:
 
 class TestCreate:
     async def test_creates_the_article_in_one_request(self, editor_client) -> None:
-        response = await editor_client.post(ARTICLES, json={"title": "Field campaign in Estonia"})
+        response = await editor_client.post(
+            ARTICLES, json={"title": "Field campaign in Estonia"}
+        )
 
         assert response.status_code == 201
         body = response.json()
@@ -55,11 +57,15 @@ class TestCreate:
 
         assert body["edit_url"] == ARTICLE_BODY_URL.format(article_id=body["id"])
 
-    async def test_the_derived_slug_is_readable_rather_than_stamped(self, editor_client) -> None:
+    async def test_the_derived_slug_is_readable_rather_than_stamped(
+        self, editor_client
+    ) -> None:
         """The two-call version put ``Date.now()`` in every slug so a retry
         could not collide, leaving each article at ``/p/my-title-1755561234567``
         for life. Nothing needs that now: the request is atomic."""
-        body = (await editor_client.post(ARTICLES, json={"title": "Sensor rollout"})).json()
+        body = (
+            await editor_client.post(ARTICLES, json={"title": "Sensor rollout"})
+        ).json()
 
         assert body["slug"] == "sensor-rollout"
         assert body["url"] == "/news/sensor-rollout"
@@ -95,7 +101,9 @@ class TestCreate:
 
         assert second.json()["slug"] == "recycled-2"
 
-    async def test_an_author_supplied_slug_is_used_verbatim(self, editor_client) -> None:
+    async def test_an_author_supplied_slug_is_used_verbatim(
+        self, editor_client
+    ) -> None:
         response = await editor_client.post(
             ARTICLES, json={"title": "Sensor rollout", "slug": "north-site"}
         )
@@ -120,16 +128,22 @@ class TestCreate:
         assert response.json()["detail"][0]["loc"] == ["body", "slug"]
         assert await _count(editor_client) == 0
 
-    async def test_an_author_supplied_slug_that_collides_is_reported(self, editor_client) -> None:
+    async def test_an_author_supplied_slug_that_collides_is_reported(
+        self, editor_client
+    ) -> None:
         """Not silently suffixed. The URL is a thing they typed and expect to
         get, so changing it under them is worse than saying it is taken."""
         await editor_client.post(ARTICLES, json={"title": "One", "slug": "taken"})
 
-        response = await editor_client.post(ARTICLES, json={"title": "Two", "slug": "taken"})
+        response = await editor_client.post(
+            ARTICLES, json={"title": "Two", "slug": "taken"}
+        )
 
         assert response.status_code == 409
 
-    async def test_the_category_and_date_are_set_in_the_same_request(self, editor_client) -> None:
+    async def test_the_category_and_date_are_set_in_the_same_request(
+        self, editor_client
+    ) -> None:
         body = (
             await editor_client.post(
                 ARTICLES,
@@ -144,7 +158,9 @@ class TestCreate:
         assert body["category"] == "Field notes"
         assert body["published_at"].startswith("2026-02-01")
 
-    async def test_the_date_is_the_calendar_day_the_author_picked(self, editor_client) -> None:
+    async def test_the_date_is_the_calendar_day_the_author_picked(
+        self, editor_client
+    ) -> None:
         """6pm on the 1st in UTC-6 is the 2nd in UTC. Taking the offset into
         account would list an article on a day nobody chose."""
         body = (
@@ -156,7 +172,9 @@ class TestCreate:
 
         assert body["published_at"].startswith("2026-02-01")
 
-    async def test_a_reader_without_edit_cannot_create_one(self, viewer_client) -> None:
+    async def test_a_reader_without_edit_cannot_create_one(
+        self, viewer_client
+    ) -> None:
         response = await viewer_client.post(ARTICLES, json={"title": "Estonia"})
 
         assert response.status_code in (401, 403)
@@ -170,7 +188,9 @@ class TestCreate:
         assert response.status_code == 422
         assert await _count(editor_client) == 0
 
-    async def test_a_new_article_opens_on_an_empty_document(self, editor_client) -> None:
+    async def test_a_new_article_opens_on_an_empty_document(
+        self, editor_client
+    ) -> None:
         """The canvas has to have something to open.
 
         This was ``empty_puck_document`` in the pagebuilder seam, because the
@@ -198,23 +218,32 @@ class TestRunningOutOfAddresses:
     """
 
     async def test_it_gives_up_after_the_capped_number_of_attempts(self, db) -> None:
-        for slug in ["crowded"] + [f"crowded-{n}" for n in range(2, MAX_SLUG_ATTEMPTS + 2)]:
+        for slug in ["crowded"] + [
+            f"crowded-{n}" for n in range(2, MAX_SLUG_ATTEMPTS + 2)
+        ]:
             await make_article(db, slug=slug)
 
         assert await free_slug(db, "crowded", locales.default()) == ""
 
     async def test_the_last_attempt_is_still_offered(self, db) -> None:
         # One short of exhaustion: the final suffix has to be tried, not skipped.
-        for slug in ["crowded"] + [f"crowded-{n}" for n in range(2, MAX_SLUG_ATTEMPTS + 1)]:
+        for slug in ["crowded"] + [
+            f"crowded-{n}" for n in range(2, MAX_SLUG_ATTEMPTS + 1)
+        ]:
             await make_article(db, slug=slug)
 
         assert (
-            await free_slug(db, "crowded", locales.default()) == f"crowded-{MAX_SLUG_ATTEMPTS + 1}"
+            await free_slug(db, "crowded", locales.default())
+            == f"crowded-{MAX_SLUG_ATTEMPTS + 1}"
         )
 
-    async def test_an_exhausted_title_is_a_409_rather_than_a_guess(self, editor_client) -> None:
+    async def test_an_exhausted_title_is_a_409_rather_than_a_guess(
+        self, editor_client
+    ) -> None:
         async with editor_client.db_state.session_factory() as db:
-            for slug in ["taken-out"] + [f"taken-out-{n}" for n in range(2, MAX_SLUG_ATTEMPTS + 2)]:
+            for slug in ["taken-out"] + [
+                f"taken-out-{n}" for n in range(2, MAX_SLUG_ATTEMPTS + 2)
+            ]:
                 await make_article(db, slug=slug)
             await db.commit()
 

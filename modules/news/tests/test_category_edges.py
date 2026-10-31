@@ -56,7 +56,9 @@ async def test_a_category_cannot_be_renamed_into_the_system_name(
     editor_client,
 ) -> None:
     """Creating it is refused; renaming into it has to be refused too."""
-    created = await editor_client.post("/api/news/taxonomy/categories", json={"name": "Research"})
+    created = await editor_client.post(
+        "/api/news/taxonomy/categories", json={"name": "Research"}
+    )
     assert created.status_code == 201, created.text
     category_id = created.json()["id"]
 

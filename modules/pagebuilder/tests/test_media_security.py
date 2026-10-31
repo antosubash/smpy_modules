@@ -99,6 +99,8 @@ async def test_upload_pins_extension_to_sniffed_type(
     media_service: MediaService,
 ) -> None:
     # PNG bytes uploaded under a .jpg filename should be stored as .png.
-    upload = _make_upload(_PNG_HEADER, filename="real-but-renamed.jpg", content_type="image/png")
+    upload = _make_upload(
+        _PNG_HEADER, filename="real-but-renamed.jpg", content_type="image/png"
+    )
     asset = await media_service.upload(upload)
     assert asset.filename.endswith(".png")

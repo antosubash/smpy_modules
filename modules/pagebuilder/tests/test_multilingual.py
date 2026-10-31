@@ -62,7 +62,9 @@ class TestSlugsAreUniquePerLanguage:
         # that plainly contains no second "about" has nothing to go on.
         assert "de" in clash.json()["detail"]
 
-    async def test_an_unconfigured_language_is_refused(self, bilingual_client: AsyncClient) -> None:
+    async def test_an_unconfigured_language_is_refused(
+        self, bilingual_client: AsyncClient
+    ) -> None:
         """422 naming what *is* configured. A page in a language the site does
         not serve has no address, so accepting it would create something
         unreachable."""

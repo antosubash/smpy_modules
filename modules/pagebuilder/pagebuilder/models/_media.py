@@ -65,3 +65,5 @@ class MediaAsset(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[
         default_factory=dict,
         sa_column=Column(JSON, nullable=False, default=dict),
     )
+
+

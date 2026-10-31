@@ -25,14 +25,13 @@ pytestmark = pytest.mark.asyncio
 TAGS = ["embargoed", "canopy"]
 
 
-async def _seed(client: AsyncClient, *, status: ArticleStatus, trashed: bool = False) -> int:
+async def _seed(
+    client: AsyncClient, *, status: ArticleStatus, trashed: bool = False
+) -> int:
     """A tagged article on the client's own database. Returns its id."""
     async with client.db_state.session_factory() as session:  # type: ignore[attr-defined]
         article = await make_article(
-            session,
-            slug="subject",
-            title="Subject",
-            status=status,
+            session, slug="subject", title="Subject", status=status,
             category="Research",
         )
         await tag_service.set_for_article(session, article.id or 0, TAGS)

@@ -111,3 +111,4 @@ class ArticleTagsUpdate(NoNul):
     """Full replacement set — a tag the writer removed has to disappear."""
 
     tags: list[str] = Field(default_factory=list)
+

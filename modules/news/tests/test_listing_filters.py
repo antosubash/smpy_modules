@@ -38,14 +38,18 @@ class TestCacheHeaders:
     with the wrong one it is an editor's draft list served to a stranger.
     """
 
-    async def test_the_anonymous_listing_may_be_held_by_a_shared_cache(self, anon_client) -> None:
+    async def test_the_anonymous_listing_may_be_held_by_a_shared_cache(
+        self, anon_client
+    ) -> None:
         response = await anon_client.get(ARTICLES)
 
         assert response.headers["cache-control"] == PUBLIC_CACHE_CONTROL
         assert response.headers["cache-control"].startswith("public")
 
     async def test_the_anonymous_category_list_too(self, anon_client) -> None:
-        assert (await anon_client.get(CATEGORIES)).headers["cache-control"] == PUBLIC_CACHE_CONTROL
+        assert (await anon_client.get(CATEGORIES)).headers[
+            "cache-control"
+        ] == PUBLIC_CACHE_CONTROL
 
     async def test_an_editors_listing_is_never_stored(self, editor_client) -> None:
         # It includes drafts, so it differs by permission and must not be
@@ -56,12 +60,18 @@ class TestCacheHeaders:
 
         assert response.headers["cache-control"] == PRIVATE_CACHE_CONTROL
 
-    async def test_an_administrators_listing_is_never_stored_either(self, admin_client) -> None:
+    async def test_an_administrators_listing_is_never_stored_either(
+        self, admin_client
+    ) -> None:
         # An admin resolves to WILDCARD rather than to a literal `news.edit`,
         # which a naive membership test would miss.
-        assert (await admin_client.get(ARTICLES)).headers["cache-control"] == PRIVATE_CACHE_CONTROL
+        assert (await admin_client.get(ARTICLES)).headers[
+            "cache-control"
+        ] == PRIVATE_CACHE_CONTROL
 
-    async def test_the_editors_category_list_is_never_stored_either(self, editor_client) -> None:
+    async def test_the_editors_category_list_is_never_stored_either(
+        self, editor_client
+    ) -> None:
         assert (await editor_client.get(CATEGORIES)).headers[
             "cache-control"
         ] == PRIVATE_CACHE_CONTROL
@@ -71,4 +81,6 @@ class TestCacheHeaders:
     ) -> None:
         # No drafts in it, so nothing about it is specific to this person and
         # a shared cache may serve it to the next visitor.
-        assert (await viewer_client.get(ARTICLES)).headers["cache-control"] == PUBLIC_CACHE_CONTROL
+        assert (await viewer_client.get(ARTICLES)).headers[
+            "cache-control"
+        ] == PUBLIC_CACHE_CONTROL

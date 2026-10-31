@@ -104,7 +104,9 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin, TranslationsMixin)
             # offset guard matters: past-the-end paging returns no rows, and
             # `offset + 0` would under-report.
             return rows, len(rows)
-        total = await self.db.scalar(select(func.count()).select_from(Page).where(*filters))
+        total = await self.db.scalar(
+            select(func.count()).select_from(Page).where(*filters)
+        )
         return rows, int(total or 0)
 
     async def list_templates(self) -> list[Page]:
@@ -245,7 +247,9 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin, TranslationsMixin)
             await self.db.flush()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=409, detail=f"Slug already in use in {locale}") from exc
+            raise HTTPException(
+                status_code=409, detail=f"Slug already in use in {locale}"
+            ) from exc
         await self.db.refresh(page)
         return page
 
@@ -266,7 +270,9 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin, TranslationsMixin)
             await self.db.flush()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=409, detail=f"Slug already in use in {locale}") from exc
+            raise HTTPException(
+                status_code=409, detail=f"Slug already in use in {locale}"
+            ) from exc
         # Recorded after the flush, so a rename the database rejected leaves no
         # redirect pointing at an address the page never took. Scoped to the
         # page's own language: an old German address is not an old French one.
@@ -279,3 +285,4 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin, TranslationsMixin)
         )
         await self.db.refresh(page)
         return page
+

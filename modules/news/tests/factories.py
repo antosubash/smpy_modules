@@ -64,7 +64,9 @@ async def make_article(
         title=title,
         status=status,
         draft_data=body,
-        published_data=(body if publish_body and status is ArticleStatus.PUBLISHED else None),
+        published_data=(
+            body if publish_body and status is ArticleStatus.PUBLISHED else None
+        ),
         meta_description=meta_description,
         og_image=og_image,
         category=category,

@@ -186,7 +186,9 @@ class TestApprovalAndRetraction:
         await db.refresh(article)
         assert article.publish_at is None
 
-    async def test_a_retraction_is_not_undone_by_the_schedule_before_it(self, db) -> None:
+    async def test_a_retraction_is_not_undone_by_the_schedule_before_it(
+        self, db
+    ) -> None:
         """Scheduled, approved early, then deliberately taken down.
 
         Every step is something a person did on purpose, and the last one has to

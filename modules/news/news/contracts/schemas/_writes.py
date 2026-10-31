@@ -43,7 +43,9 @@ class ArticleCreate(NoNul):
     """
 
     title: str = Field(min_length=1, max_length=MAX_TITLE_LEN)
-    slug: str | None = Field(default=None, max_length=MAX_SLUG_LEN, pattern=SLUG_PATTERN)
+    slug: str | None = Field(
+        default=None, max_length=MAX_SLUG_LEN, pattern=SLUG_PATTERN
+    )
     locale: str | None = Field(default=None, max_length=MAX_LOCALE_LEN)
     """Language to write in. ``None`` means the site's default.
 
@@ -74,7 +76,9 @@ class ArticleTranslationCreate(NoNul):
     """
 
     locale: str = Field(min_length=2, max_length=MAX_LOCALE_LEN)
-    slug: str | None = Field(default=None, max_length=MAX_SLUG_LEN, pattern=SLUG_PATTERN)
+    slug: str | None = Field(
+        default=None, max_length=MAX_SLUG_LEN, pattern=SLUG_PATTERN
+    )
     """Address within the new language. Defaults to the source article's own,
     which is free unless an unrelated article already took it — slugs are
     unique per language, so ``/news/x`` and ``/de/news/x`` do not collide."""
@@ -102,7 +106,9 @@ class ArticleUpdate(NoNul):
     """
 
     title: str | None = Field(default=None, min_length=1, max_length=MAX_TITLE_LEN)
-    slug: str | None = Field(default=None, max_length=MAX_SLUG_LEN, pattern=SLUG_PATTERN)
+    slug: str | None = Field(
+        default=None, max_length=MAX_SLUG_LEN, pattern=SLUG_PATTERN
+    )
     category: str | None = Field(default=None, max_length=MAX_CATEGORY_LEN)
     published_at: datetime | None = None
     pinned: bool | None = None
@@ -176,4 +182,6 @@ class ScheduleRequest(NoNul):
     publish_at: datetime | None = None
     unpublish_at: datetime | None = None
 
-    _instants = field_validator("publish_at", "unpublish_at", mode="before")(_guards.aware_instant)
+    _instants = field_validator("publish_at", "unpublish_at", mode="before")(
+        _guards.aware_instant
+    )

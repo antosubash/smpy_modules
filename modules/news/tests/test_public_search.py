@@ -71,7 +71,9 @@ class TestItNarrows:
         added to the filter: a reader searching an archive is matching words
         they read, and most of the words on a card are not in the headline.
         """
-        await _seed(anon_client, "quiet-title", meta_description="A study of canopy loss.")
+        await _seed(
+            anon_client, "quiet-title", meta_description="A study of canopy loss."
+        )
 
         props = await _props(anon_client, f"{NEWS}/?q=canopy loss")
 
@@ -182,7 +184,9 @@ class TestWhatASearchMayNotReach:
 
         assert props["items"] == []
 
-    async def test_an_article_held_out_of_listings_is_not_findable(self, anon_client) -> None:
+    async def test_an_article_held_out_of_listings_is_not_findable(
+        self, anon_client
+    ) -> None:
         await _seed(anon_client, "unlisted", title="Canopy standing page", show_in_feed=False)
 
         props = await _props(anon_client, f"{NEWS}/?q=canopy")
@@ -216,7 +220,9 @@ class TestNoResults:
 
         assert (await anon_client.get(f"{NEWS}/?q=canopy&page=9")).status_code == 404
 
-    async def test_past_the_end_of_an_empty_archive_is_a_404_too(self, anon_client) -> None:
+    async def test_past_the_end_of_an_empty_archive_is_a_404_too(
+        self, anon_client
+    ) -> None:
         """Page 1 of an empty result is a real address. Page 2 is not."""
         assert (await anon_client.get(f"{NEWS}/?q=nothing")).status_code == 200
         assert (await anon_client.get(f"{NEWS}/?q=nothing&page=2")).status_code == 404
@@ -250,7 +256,9 @@ class TestWhatACrawlerIsTold:
         # `q` before `page`, so one page of one search has one spelling.
         assert 'rel="canonical" href="http://test/news/?q=canopy&amp;page=2"' in rendered
 
-    async def test_a_search_advertises_no_translations(self, bilingual_public_client) -> None:
+    async def test_a_search_advertises_no_translations(
+        self, bilingual_public_client
+    ) -> None:
         """The archive pages are the same document per language; a set of
         results for an English phrase is not the German page's content."""
         await _seed(bilingual_public_client, "canopy", title="Canopy", locale="en")
@@ -273,7 +281,9 @@ class TestTheTermItself:
         assert [i["slug"] for i in props["items"]] == ["first"]
         assert props["query"] == ""
 
-    async def test_an_over_long_term_is_truncated_not_rejected(self, anon_client) -> None:
+    async def test_an_over_long_term_is_truncated_not_rejected(
+        self, anon_client
+    ) -> None:
         """A 422 on a reader-facing page has nowhere to be shown."""
         response = await anon_client.get(f"{NEWS}/?q={'a' * 500}", headers=INERTIA)
 

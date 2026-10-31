@@ -262,6 +262,8 @@ class PageRevision(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignor
     note: str | None = Field(default=None, max_length=2000)
 
 
+
+
 NOT_TRASHED = Page.deleted_at.is_(None)
 """Every listing's filter. Named once so a new query cannot quietly omit it.
 

@@ -70,7 +70,9 @@ class TestCreatingATranslation:
         )
 
         created = (
-            await bilingual_client.post(f"{API}/{source['id']}/translations", json={"locale": "de"})
+            await bilingual_client.post(
+                f"{API}/{source['id']}/translations", json={"locale": "de"}
+            )
         ).json()
 
         assert created["title"] == "About us"
@@ -82,18 +84,24 @@ class TestCreatingATranslation:
         source = await _page(bilingual_client, slug="about", locale="en")
 
         created = (
-            await bilingual_client.post(f"{API}/{source['id']}/translations", json={"locale": "de"})
+            await bilingual_client.post(
+                f"{API}/{source['id']}/translations", json={"locale": "de"}
+            )
         ).json()
 
         assert created["slug"] == "about"
 
-    async def test_a_taken_slug_gets_a_free_variant(self, bilingual_client: AsyncClient) -> None:
+    async def test_a_taken_slug_gets_a_free_variant(
+        self, bilingual_client: AsyncClient
+    ) -> None:
         """Only when an *unrelated* German page already holds the word."""
         await _page(bilingual_client, slug="about", locale="de", title="Unrelated")
         source = await _page(bilingual_client, slug="about", locale="en")
 
         created = (
-            await bilingual_client.post(f"{API}/{source['id']}/translations", json={"locale": "de"})
+            await bilingual_client.post(
+                f"{API}/{source['id']}/translations", json={"locale": "de"}
+            )
         ).json()
 
         assert created["slug"] == "about-2"
@@ -141,16 +149,22 @@ class TestCreatingATranslation:
         parent = await _page(bilingual_client, slug="handbook", locale="en")
         child = await _page(bilingual_client, slug="chapter", locale="en", parent_id=parent["id"])
         german_parent = (
-            await bilingual_client.post(f"{API}/{parent['id']}/translations", json={"locale": "de"})
+            await bilingual_client.post(
+                f"{API}/{parent['id']}/translations", json={"locale": "de"}
+            )
         ).json()
 
         german_child = (
-            await bilingual_client.post(f"{API}/{child['id']}/translations", json={"locale": "de"})
+            await bilingual_client.post(
+                f"{API}/{child['id']}/translations", json={"locale": "de"}
+            )
         ).json()
 
         assert german_child["parent_id"] == german_parent["id"]
 
-    async def test_a_canonical_url_is_never_inherited(self, bilingual_client: AsyncClient) -> None:
+    async def test_a_canonical_url_is_never_inherited(
+        self, bilingual_client: AsyncClient
+    ) -> None:
         """Copying it would make every translation declare the source as its
         canonical — telling search engines the translations are duplicates."""
         source = await _page(
@@ -158,7 +172,9 @@ class TestCreatingATranslation:
         )
 
         created = (
-            await bilingual_client.post(f"{API}/{source['id']}/translations", json={"locale": "de"})
+            await bilingual_client.post(
+                f"{API}/{source['id']}/translations", json={"locale": "de"}
+            )
         ).json()
 
         assert created["canonical_url"] is None
@@ -173,10 +189,14 @@ class TestATrashedCounterpart:
     possible outcome is the 409 below.
     """
 
-    async def test_it_still_occupies_the_language(self, bilingual_client: AsyncClient) -> None:
+    async def test_it_still_occupies_the_language(
+        self, bilingual_client: AsyncClient
+    ) -> None:
         source = await _page(bilingual_client, slug="about", locale="en")
         german = (
-            await bilingual_client.post(f"{API}/{source['id']}/translations", json={"locale": "de"})
+            await bilingual_client.post(
+                f"{API}/{source['id']}/translations", json={"locale": "de"}
+            )
         ).json()
 
         assert (await bilingual_client.delete(f"{API}/{german['id']}")).status_code == 204
@@ -190,7 +210,9 @@ class TestATrashedCounterpart:
         german_row = next(t for t in detail["translations"] if t["locale"] == "de")
         assert german_row["trashed"] is True
 
-    async def test_a_live_counterpart_is_not_flagged(self, bilingual_client: AsyncClient) -> None:
+    async def test_a_live_counterpart_is_not_flagged(
+        self, bilingual_client: AsyncClient
+    ) -> None:
         """The flag has to distinguish, or the panel labels every sibling
         "In trash" and no language is ever openable."""
         source = await _page(bilingual_client, slug="about", locale="en")

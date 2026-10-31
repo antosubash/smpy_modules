@@ -85,7 +85,9 @@ def exempt_public_routes(app: FastAPI, settings: PagebuilderSettings) -> None:
         # address (see ``default_locale_alias_router``). Exempt too, or the
         # redirect that exists to be forgiving answers with a login page.
         registry.add_prefix(
-            dir_prefix(f"/{settings.default_content_locale}{settings.public_route_prefix}"),
+            dir_prefix(
+                f"/{settings.default_content_locale}{settings.public_route_prefix}"
+            ),
             methods=methods,
         )
     # Published pages reference uploaded images; without this the page renders
@@ -121,7 +123,9 @@ def mount_public_routers(app: FastAPI, settings: PagebuilderSettings) -> None:
         # URL nobody types.
         app.include_router(
             default_locale_alias_router(settings),
-            prefix=(f"/{settings.default_content_locale}{settings.public_route_prefix}"),
+            prefix=(
+                f"/{settings.default_content_locale}{settings.public_route_prefix}"
+            ),
         )
     if settings.sitemap_enabled or settings.robots_enabled:
         # Mounted at the root so crawlers find them where they look.

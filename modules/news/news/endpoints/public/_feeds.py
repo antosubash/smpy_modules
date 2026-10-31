@@ -41,7 +41,9 @@ def feed_router(locale: str) -> APIRouter:
     router = APIRouter()
 
     @router.api_route("/feed.xml", methods=["GET", "HEAD"], response_model=None)
-    async def article_feed(request: Request, db: AsyncSession = Depends(get_db)) -> Response:
+    async def article_feed(
+        request: Request, db: AsyncSession = Depends(get_db)
+    ) -> Response:
         """The recent archive, as RSS 2.0.
 
         RSS rather than Atom because it is what every reader and aggregator
@@ -71,7 +73,9 @@ def feed_router(locale: str) -> APIRouter:
             # misdate the item for any reader whose host isn't running in UTC.
             pub_dt = as_utc(item.published_at)
             published = (
-                f"<pubDate>{format_datetime(pub_dt)}</pubDate>" if pub_dt is not None else ""
+                f"<pubDate>{format_datetime(pub_dt)}</pubDate>"
+                if pub_dt is not None
+                else ""
             )
             entries.append(
                 "<item>"
@@ -81,8 +85,16 @@ def feed_router(locale: str) -> APIRouter:
                 # the title, and already what a redirect keeps working after a
                 # rename.
                 f'<guid isPermaLink="true">{escape(url)}</guid>'
-                + (f"<description>{escape(item.excerpt)}</description>" if item.excerpt else "")
-                + (f"<category>{escape(item.category)}</category>" if item.category else "")
+                + (
+                    f"<description>{escape(item.excerpt)}</description>"
+                    if item.excerpt
+                    else ""
+                )
+                + (
+                    f"<category>{escape(item.category)}</category>"
+                    if item.category
+                    else ""
+                )
                 + published
                 + "</item>"
             )

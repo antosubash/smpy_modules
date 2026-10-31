@@ -67,7 +67,9 @@ class TestItNeverForwardsToA404:
     published, and carrying a snapshot.
     """
 
-    async def test_it_does_not_forward_to_an_unpublished_article(self, anon_client) -> None:
+    async def test_it_does_not_forward_to_an_unpublished_article(
+        self, anon_client
+    ) -> None:
         """Published at A, renamed to B, then taken off the site."""
         article = await _seed(anon_client, "was-here")
         async with anon_client.db_state.session_factory() as db:
@@ -94,7 +96,9 @@ class TestItNeverForwardsToA404:
 
         assert await redirects.resolve(db, "was-binned", locales.default()) is None
 
-    async def test_it_does_not_forward_to_an_article_with_no_snapshot(self, db) -> None:
+    async def test_it_does_not_forward_to_an_article_with_no_snapshot(
+        self, db
+    ) -> None:
         """The check that has to stay in Python.
 
         ``published_data`` is a JSON column, and a Python ``None`` is stored in
@@ -108,7 +112,9 @@ class TestItNeverForwardsToA404:
 
         assert await redirects.resolve(db, "no-body", locales.default()) is None
 
-    async def test_it_forwards_again_once_the_article_is_back(self, anon_client) -> None:
+    async def test_it_forwards_again_once_the_article_is_back(
+        self, anon_client
+    ) -> None:
         # Refusing while the article is down must not be permanent either: the
         # redirect row is still there, and republishing makes it good again.
         article = await _seed(anon_client, "returning")

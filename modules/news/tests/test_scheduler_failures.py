@@ -47,7 +47,9 @@ def _fail_on(monkeypatch, method: str, article_id: int, *, detail: str) -> None:
 
 
 def _only_warning(caplog) -> logging.LogRecord:
-    warnings = [r for r in caplog.records if r.name == LOGGER and r.levelno == logging.WARNING]
+    warnings = [
+        r for r in caplog.records if r.name == LOGGER and r.levelno == logging.WARNING
+    ]
     assert len(warnings) == 1, [r.getMessage() for r in warnings]
     return warnings[0]
 
@@ -56,7 +58,9 @@ class TestABadRow:
     async def test_a_failing_publish_is_logged_and_the_tick_continues(
         self, db, caplog, monkeypatch
     ) -> None:
-        bad = await make_article(db, slug="wont-go", status=ArticleStatus.DRAFT, publish_body=False)
+        bad = await make_article(
+            db, slug="wont-go", status=ArticleStatus.DRAFT, publish_body=False
+        )
         good = await make_article(
             db, slug="will-go", status=ArticleStatus.DRAFT, publish_body=False
         )
@@ -95,7 +99,9 @@ class TestABadRow:
         assert str(bad.id) in record.getMessage()
         assert record.article_id == bad.id
 
-    async def test_a_tick_with_nothing_wrong_stays_quiet(self, db, caplog) -> None:
+    async def test_a_tick_with_nothing_wrong_stays_quiet(
+        self, db, caplog
+    ) -> None:
         """Otherwise the warning is noise and gets filtered out again."""
         article = await make_article(
             db, slug="fine", status=ArticleStatus.DRAFT, publish_body=False

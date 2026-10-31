@@ -112,7 +112,9 @@ async def test_a_missing_variant_counts_as_missing(
     root = tmp_path / "media"
     (root / "default").mkdir(parents=True)
     (root / "default" / "photo.jpg").write_bytes(b"ok")
-    db_session.add(_asset("photo.jpg", variants={"w320": {"filename": "photo_w320.webp"}}))
+    db_session.add(
+        _asset("photo.jpg", variants={"w320": {"filename": "photo_w320.webp"}})
+    )
     await db_session.commit()
 
     assert await count_missing_media_files(db_session, root) == 1
@@ -123,7 +125,9 @@ async def test_intact_library_counts_zero(db_session: AsyncSession, tmp_path: Pa
     (root / "default").mkdir(parents=True)
     (root / "default" / "photo.jpg").write_bytes(b"ok")
     (root / "default" / "photo_w320.webp").write_bytes(b"ok")
-    db_session.add(_asset("photo.jpg", variants={"w320": {"filename": "photo_w320.webp"}}))
+    db_session.add(
+        _asset("photo.jpg", variants={"w320": {"filename": "photo_w320.webp"}})
+    )
     await db_session.commit()
 
     assert await count_missing_media_files(db_session, root) == 0

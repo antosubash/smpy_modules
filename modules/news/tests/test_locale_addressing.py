@@ -46,13 +46,17 @@ class TestRoutesAreMountedPerLanguage:
     no longer describes what is public.
     """
 
-    async def test_each_language_gets_its_own_viewer(self, bilingual_public_client) -> None:
+    async def test_each_language_gets_its_own_viewer(
+        self, bilingual_public_client
+    ) -> None:
         paths = _route_paths(bilingual_public_client.app)
 
         assert "/news/{slug}" in paths
         assert "/de/news/{slug}" in paths
 
-    async def test_the_archive_is_mounted_per_language_too(self, bilingual_public_client) -> None:
+    async def test_the_archive_is_mounted_per_language_too(
+        self, bilingual_public_client
+    ) -> None:
         """The reading surface, not just the leaf. An archive that existed only
         in the default language would leave every German article reachable but
         unbrowsable."""
@@ -80,12 +84,16 @@ class TestRoutesAreMountedPerLanguage:
         404 would be correct and useless."""
         assert "/en/news/{slug}" in _route_paths(bilingual_public_client.app)
 
-        response = await bilingual_public_client.get("/en/news/budget", follow_redirects=False)
+        response = await bilingual_public_client.get(
+            "/en/news/budget", follow_redirects=False
+        )
 
         assert response.status_code == 301
         assert response.headers["location"] == "/news/budget"
 
-    async def test_only_the_default_language_has_an_alias(self, bilingual_public_client) -> None:
+    async def test_only_the_default_language_has_an_alias(
+        self, bilingual_public_client
+    ) -> None:
         """The alias exists because the default language serves *unprefixed*,
         so ``/en/news/x`` is a second spelling of one address. ``/de/news/x`` is
         the German article's only address — bouncing it anywhere would send a
@@ -94,7 +102,9 @@ class TestRoutesAreMountedPerLanguage:
         async with bilingual_public_client.db_state.session_factory() as db:
             await make_article(db, slug="haushalt", locale="de")
 
-        response = await bilingual_public_client.get("/de/news/haushalt", follow_redirects=False)
+        response = await bilingual_public_client.get(
+            "/de/news/haushalt", follow_redirects=False
+        )
 
         assert response.status_code == 200, response.text
 
@@ -112,7 +122,9 @@ class TestRoutesAreMountedPerLanguage:
         async with bilingual_public_client.db_state.session_factory() as db:
             await make_article(db, slug="budget", title="Budget", locale="en")
 
-        response = await bilingual_public_client.get("/fr/news/budget", follow_redirects=False)
+        response = await bilingual_public_client.get(
+            "/fr/news/budget", follow_redirects=False
+        )
 
         assert response.status_code == 404
         assert "Budget" not in response.text
@@ -131,12 +143,16 @@ class TestRoutesAreMountedPerLanguage:
         async with bilingual_public_client.db_state.session_factory() as db:
             await make_article(db, slug="budget", title="Budget", locale="en")
 
-        response = await bilingual_public_client.get("/de/news/budget", follow_redirects=False)
+        response = await bilingual_public_client.get(
+            "/de/news/budget", follow_redirects=False
+        )
 
         assert response.status_code == 404
         assert "Budget" not in response.text
 
-    async def test_a_monolingual_site_gets_no_alias_at_all(self, anon_client) -> None:
+    async def test_a_monolingual_site_gets_no_alias_at_all(
+        self, anon_client
+    ) -> None:
         """One language means the bare prefix is the only address there is, so
         there is no second spelling for an alias to collapse."""
         paths = _route_paths(anon_client.app)
@@ -164,7 +180,9 @@ class TestTheSitemapCarriesEveryLanguage:
     ) -> None:
         client = bilingual_public_client
         await self._seed(client, slug="budget", locale="en", name="Budget", cat="budget")
-        await self._seed(client, slug="haushalt", locale="de", name="Haushalt", cat="haushalt")
+        await self._seed(
+            client, slug="haushalt", locale="de", name="Haushalt", cat="haushalt"
+        )
 
         text = (await client.get("/news/sitemap.xml")).text
 
@@ -177,7 +195,9 @@ class TestTheSitemapCarriesEveryLanguage:
         """The German article carries the category, so only the German page has
         anything on it. The English one answers 200 and lists nothing."""
         client = bilingual_public_client
-        await self._seed(client, slug="haushalt", locale="de", name="Haushalt", cat="haushalt")
+        await self._seed(
+            client, slug="haushalt", locale="de", name="Haushalt", cat="haushalt"
+        )
 
         text = (await client.get("/news/sitemap.xml")).text
 
@@ -193,7 +213,9 @@ class TestTheViewerResolvesWithinOneLanguage:
         assert await service.get_by_slug_published("budget", "en") is not None
         assert await service.get_by_slug_published("budget", "de") is None
 
-    async def test_two_languages_serve_their_own_article_at_one_slug(self, db, bilingual) -> None:
+    async def test_two_languages_serve_their_own_article_at_one_slug(
+        self, db, bilingual
+    ) -> None:
         """The point of ``(locale, slug)`` being the unique key rather than
         ``slug``: these are two documents, not a collision."""
         await make_article(db, slug="budget", title="Budget", locale="en")
@@ -210,7 +232,9 @@ class TestRedirectsAreScopedToOneLanguage:
     """An old German address forwarding to the English article would answer
     "where did my page go" with someone else's article."""
 
-    async def test_the_same_old_slug_forwards_differently_per_language(self, db, bilingual) -> None:
+    async def test_the_same_old_slug_forwards_differently_per_language(
+        self, db, bilingual
+    ) -> None:
         english = await make_article(db, slug="new-en", locale="en")
         german = await make_article(db, slug="new-de", locale="de")
         await redirects.record(
@@ -223,7 +247,9 @@ class TestRedirectsAreScopedToOneLanguage:
         assert await redirects.resolve(db, "retired", "en") == "new-en"
         assert await redirects.resolve(db, "retired", "de") == "new-de"
 
-    async def test_a_redirect_does_not_leak_into_another_language(self, db, bilingual) -> None:
+    async def test_a_redirect_does_not_leak_into_another_language(
+        self, db, bilingual
+    ) -> None:
         """Two languages can legitimately have retired the same word, and only
         one of them recorded a redirect for it."""
         english = await make_article(db, slug="new-en", locale="en")
@@ -233,7 +259,9 @@ class TestRedirectsAreScopedToOneLanguage:
 
         assert await redirects.resolve(db, "retired", "de") is None
 
-    async def test_renaming_in_one_language_leaves_the_other_alone(self, db, bilingual) -> None:
+    async def test_renaming_in_one_language_leaves_the_other_alone(
+        self, db, bilingual
+    ) -> None:
         """The deletes ``record`` performs first are locale-scoped too, so
         clearing the German article's path never drops the English redirect from
         the same word."""

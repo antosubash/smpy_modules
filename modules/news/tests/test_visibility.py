@@ -67,7 +67,9 @@ class TestDraftVisibility:
 
         assert (await viewer_client.get(ARTICLES)).json()["total"] == 0
 
-    async def test_a_published_article_is_visible_to_everyone(self, anon_client) -> None:
+    async def test_a_published_article_is_visible_to_everyone(
+        self, anon_client
+    ) -> None:
         await _seed(anon_client, slug="live", title="Live", category="News")
 
         body = (await anon_client.get(ARTICLES)).json()
@@ -79,7 +81,9 @@ class TestDraftVisibility:
 
         assert (await anon_client.get(CATEGORIES)).json()["items"] == []
 
-    async def test_a_trashed_article_is_hidden_from_the_editor_too(self, editor_client) -> None:
+    async def test_a_trashed_article_is_hidden_from_the_editor_too(
+        self, editor_client
+    ) -> None:
         article = await _seed(editor_client, slug="binned", title="Binned")
 
         await editor_client.post(f"{ARTICLES}/{article.id}/trash")

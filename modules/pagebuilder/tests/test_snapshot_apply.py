@@ -64,7 +64,9 @@ async def _seed_rich_site(session, settings):
             title="Alpha",
             parent_id=zeta.id,
             status=PageStatus.PUBLISHED,
-            draft_data={"content": [{"props": {"id": "a", "src": "/media/pagebuilder/uuid1.png"}}]},
+            draft_data={
+                "content": [{"props": {"id": "a", "src": "/media/pagebuilder/uuid1.png"}}]
+            },
             published_data={"content": [{"props": {"id": "a"}}]},
         )
     )
@@ -110,7 +112,9 @@ async def test_round_trip_is_identical(snapshot_db, tmp_path):
     assert _tree(first) == _tree(second)
 
 
-async def test_parent_resolves_even_when_it_sorts_after_the_child(snapshot_db, tmp_path):
+async def test_parent_resolves_even_when_it_sorts_after_the_child(
+    snapshot_db, tmp_path
+):
     session, settings = snapshot_db.session, snapshot_db.settings
     blobs = BlobStore(tmp_path / "blobs")
     await _seed_rich_site(session, settings)
@@ -126,7 +130,9 @@ async def test_parent_resolves_even_when_it_sorts_after_the_child(snapshot_db, t
     assert alpha.parent_id == zeta.id
 
 
-async def test_unresolvable_parent_becomes_none_rather_than_failing(snapshot_db, tmp_path):
+async def test_unresolvable_parent_becomes_none_rather_than_failing(
+    snapshot_db, tmp_path
+):
     session, settings = snapshot_db.session, snapshot_db.settings
     bundle = tmp_path / "b"
     (bundle / "pages").mkdir(parents=True)
@@ -147,7 +153,9 @@ async def test_unresolvable_parent_becomes_none_rather_than_failing(snapshot_db,
 
     await apply_bundle(session, settings, bundle, BlobStore(tmp_path / "blobs"), {})
 
-    page = (await session.execute(select(Page).where(Page.slug == "orphan"))).scalars().one()
+    page = (
+        await session.execute(select(Page).where(Page.slug == "orphan"))
+    ).scalars().one()
     assert page.parent_id is None
 
 
@@ -155,10 +163,14 @@ async def test_redirect_with_an_unresolvable_target_is_dropped(snapshot_db, tmp_
     session, settings = snapshot_db.session, snapshot_db.settings
     bundle = tmp_path / "b"
     (bundle / "pages").mkdir(parents=True)
-    (bundle / "redirects.json").write_text(json.dumps([{"from_slug": "old", "to_slug": "nowhere"}]))
+    (bundle / "redirects.json").write_text(
+        json.dumps([{"from_slug": "old", "to_slug": "nowhere"}])
+    )
     (bundle / "layout.json").write_text("{}")
 
-    result = await apply_bundle(session, settings, bundle, BlobStore(tmp_path / "blobs"), {})
+    result = await apply_bundle(
+        session, settings, bundle, BlobStore(tmp_path / "blobs"), {}
+    )
     assert result["redirects_dropped"] == ["old"]
     assert (await session.execute(select(PageRedirect))).scalars().all() == []
 
@@ -197,7 +209,9 @@ async def test_restoring_over_a_trashed_slug_revives_the_page(snapshot_db, tmp_p
     assert pages[0].deleted_at is None
 
 
-async def test_media_is_matched_by_original_filename_not_duplicated(snapshot_db, tmp_path):
+async def test_media_is_matched_by_original_filename_not_duplicated(
+    snapshot_db, tmp_path
+):
     session, settings = snapshot_db.session, snapshot_db.settings
     blobs = BlobStore(tmp_path / "blobs")
     await _seed_rich_site(session, settings)
@@ -223,7 +237,9 @@ async def test_restoring_onto_an_empty_host_reuploads_the_media(snapshot_db, tmp
     result = await apply_bundle(session, settings, bundle, blobs, _index(bundle))
     assert result["media_added"] == 1
 
-    alpha = (await session.execute(select(Page).where(Page.slug == "alpha"))).scalars().one()
+    alpha = (
+        await session.execute(select(Page).where(Page.slug == "alpha"))
+    ).scalars().one()
     src = alpha.draft_data["content"][0]["props"]["src"]
     # Resolved to a real, host-local URL rather than left as a sentinel.
     assert src.startswith("/media/pagebuilder/")

@@ -97,7 +97,9 @@ async def test_delete_of_a_missing_tag_is_404(editor_client) -> None:
     assert response.status_code == 404
 
 
-async def test_rename_and_delete_need_the_create_permission(editor_client, viewer_client) -> None:
+async def test_rename_and_delete_need_the_create_permission(
+    editor_client, viewer_client
+) -> None:
     """Same gate as creating a tag: ``news.edit`` on the whole router."""
     created = await editor_client.post(TAGS, json={"name": "Guarded"})
     tag_id = created.json()["id"]

@@ -96,7 +96,9 @@ class TestABadRow:
         assert [r for r in caplog.records if r.name == LOGGER] == []
 
     async def test_a_retired_window_is_logged(self, db, caplog) -> None:
-        await make_page(db, "missed", publish_at=EARLIER - timedelta(hours=1), unpublish_at=EARLIER)
+        await make_page(
+            db, "missed", publish_at=EARLIER - timedelta(hours=1), unpublish_at=EARLIER
+        )
 
         with caplog.at_level(logging.WARNING, logger=LOGGER):
             assert await PagesService(db).process_due(NOW) == []

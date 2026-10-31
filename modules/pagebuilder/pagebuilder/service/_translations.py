@@ -110,7 +110,9 @@ class TranslationsMixin(HostBase):
                 ),
             )
         if locale == source.locale:
-            raise HTTPException(status_code=409, detail=f"This page is already in {locale}.")
+            raise HTTPException(
+                status_code=409, detail=f"This page is already in {locale}."
+            )
         existing = await self._sibling(source.translation_group, locale)
         if existing is not None:
             raise HTTPException(
@@ -186,9 +188,7 @@ class TranslationsMixin(HostBase):
         already written in the same transaction.
         """
         rows = await self.db.execute(
-            select(Page.slug).where(
-                Page.locale == locale, Page.slug.startswith(base[: _stem(base)])
-            )
+            select(Page.slug).where(Page.locale == locale, Page.slug.startswith(base[:_stem(base)]))
         )
         taken = set(rows.scalars())
         if base not in taken:

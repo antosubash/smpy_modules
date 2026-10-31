@@ -99,7 +99,11 @@ class WorkflowMixin(RevisionsMixin):
             if not isinstance(unpublish_at, _Unset)
             else _normalize_to_utc(page.unpublish_at)
         )
-        if new_publish is not None and new_unpublish is not None and new_publish >= new_unpublish:
+        if (
+            new_publish is not None
+            and new_unpublish is not None
+            and new_publish >= new_unpublish
+        ):
             raise HTTPException(
                 status_code=422,
                 detail="publish_at must be strictly before unpublish_at",

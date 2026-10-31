@@ -54,7 +54,9 @@ async def test_a_blank_title_on_update_is_a_422(editor_client) -> None:
 
 async def test_update_trims_the_title(editor_client) -> None:
     article_id = await _article(editor_client, "trim-update")
-    response = await editor_client.put(f"{ARTICLES}/{article_id}", json={"title": "  padded  "})
+    response = await editor_client.put(
+        f"{ARTICLES}/{article_id}", json={"title": "  padded  "}
+    )
     assert response.status_code == 200, response.text
     assert response.json()["title"] == "padded"
 
@@ -158,7 +160,9 @@ async def test_republishing_an_unchanged_article_is_a_no_op(editor_client) -> No
 async def test_republishing_a_changed_draft_is_recorded(editor_client) -> None:
     article_id = await _article(editor_client, "changed")
     await editor_client.post(f"{ARTICLES}/{article_id}/publish")
-    await editor_client.put(f"{ARTICLES}/{article_id}/body", json={"draft_data": {"content": [1]}})
+    await editor_client.put(
+        f"{ARTICLES}/{article_id}/body", json={"draft_data": {"content": [1]}}
+    )
     before = await _revisions(editor_client, article_id)
     await editor_client.post(f"{ARTICLES}/{article_id}/publish")
     assert len(await _revisions(editor_client, article_id)) == len(before) + 1
@@ -180,20 +184,14 @@ async def test_a_transition_claim_loses_to_an_earlier_one(racing_client) -> None
         a = await ArticlesService(one).get_article(article_id)
         b = await ArticlesService(two).get_article(article_id)
         await claim_status(
-            one,
-            a,
-            expected=(ArticleStatus.SUBMITTED_FOR_REVIEW,),
-            to=ArticleStatus.PUBLISHED,
-            conflict="lost",
+            one, a, expected=(ArticleStatus.SUBMITTED_FOR_REVIEW,),
+            to=ArticleStatus.PUBLISHED, conflict="lost",
         )
         await one.commit()
         with pytest.raises(HTTPException) as lost:
             await claim_status(
-                two,
-                b,
-                expected=(ArticleStatus.SUBMITTED_FOR_REVIEW,),
-                to=ArticleStatus.PUBLISHED,
-                conflict="lost",
+                two, b, expected=(ArticleStatus.SUBMITTED_FOR_REVIEW,),
+                to=ArticleStatus.PUBLISHED, conflict="lost",
             )
         assert lost.value.status_code == 409
 

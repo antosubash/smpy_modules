@@ -57,7 +57,9 @@ async def _about_in_both(session) -> None:
     await session.flush()
 
 
-async def test_one_slug_in_two_languages_survives_capture(bilingual_snapshot_db, tmp_path):
+async def test_one_slug_in_two_languages_survives_capture(
+    bilingual_snapshot_db, tmp_path
+):
     await _about_in_both(bilingual_snapshot_db.session)
     dest, result = await _capture(bilingual_snapshot_db, tmp_path)
 
@@ -89,7 +91,9 @@ async def test_read_pages_keeps_both_languages(bilingual_snapshot_db, tmp_path):
     assert pages[("de", "about")]["title"] == "Über uns"
 
 
-async def test_capture_carries_locale_and_translation_group(bilingual_snapshot_db, tmp_path):
+async def test_capture_carries_locale_and_translation_group(
+    bilingual_snapshot_db, tmp_path
+):
     """Dropped, a restored site holds translations it can no longer link up."""
     await _about_in_both(bilingual_snapshot_db.session)
     dest, _ = await _capture(bilingual_snapshot_db, tmp_path)
@@ -126,8 +130,12 @@ async def test_redirects_are_captured_per_language(bilingual_snapshot_db, tmp_pa
     different pages — ``(locale, from_slug)`` is what is unique."""
     session = bilingual_snapshot_db.session
     await _about_in_both(session)
-    english = (await session.execute(select(Page).where(Page.locale == "en"))).scalars().first()
-    german = (await session.execute(select(Page).where(Page.locale == "de"))).scalars().first()
+    english = (
+        await session.execute(select(Page).where(Page.locale == "en"))
+    ).scalars().first()
+    german = (
+        await session.execute(select(Page).where(Page.locale == "de"))
+    ).scalars().first()
     session.add(PageRedirect(from_slug="info", locale="en", page_id=english.id))
     session.add(PageRedirect(from_slug="info", locale="de", page_id=german.id))
     await session.flush()
@@ -190,19 +198,29 @@ async def test_restoring_does_not_overwrite_one_language_with_another(
 
     # Both matched existing rows; nothing was created, nothing crossed over.
     assert (summary["pages_created"], summary["pages_updated"]) == (0, 2)
-    english = (await session.execute(select(Page).where(Page.locale == "en"))).scalars().one()
-    german = (await session.execute(select(Page).where(Page.locale == "de"))).scalars().one()
+    english = (
+        await session.execute(select(Page).where(Page.locale == "en"))
+    ).scalars().one()
+    german = (
+        await session.execute(select(Page).where(Page.locale == "de"))
+    ).scalars().one()
     assert english.title == "About us"
     assert german.title == "Über uns"
 
 
-async def test_a_redirect_resolves_within_its_own_language(bilingual_snapshot_db, tmp_path):
+async def test_a_redirect_resolves_within_its_own_language(
+    bilingual_snapshot_db, tmp_path
+):
     """A retired English address must not start serving the German page that
     happens to use the slug it pointed at."""
     session = bilingual_snapshot_db.session
     await _about_in_both(session)
-    english = (await session.execute(select(Page).where(Page.locale == "en"))).scalars().one()
-    german = (await session.execute(select(Page).where(Page.locale == "de"))).scalars().one()
+    english = (
+        await session.execute(select(Page).where(Page.locale == "en"))
+    ).scalars().one()
+    german = (
+        await session.execute(select(Page).where(Page.locale == "de"))
+    ).scalars().one()
     session.add(PageRedirect(from_slug="info", locale="en", page_id=english.id))
     session.add(PageRedirect(from_slug="info", locale="de", page_id=german.id))
     await session.flush()
@@ -212,7 +230,9 @@ async def test_a_redirect_resolves_within_its_own_language(bilingual_snapshot_db
     rows = (await session.execute(select(PageRedirect))).scalars().all()
     by_locale = {r.locale: r for r in rows}
     assert set(by_locale) == {"en", "de"}
-    pages = {p.id: p.locale for p in (await session.execute(select(Page))).scalars().all()}
+    pages = {
+        p.id: p.locale for p in (await session.execute(select(Page))).scalars().all()
+    }
     # Each redirect points at the page in its own language.
     assert pages[by_locale["en"].page_id] == "en"
     assert pages[by_locale["de"].page_id] == "de"

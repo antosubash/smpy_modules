@@ -46,7 +46,6 @@ A media URL embeds a host-local UUID filename, so serialising one verbatim
 would produce a bundle whose images 404 everywhere but the host that wrote it.
 """
 
-
 def is_readable(version: object) -> bool:
     """Whether this build can restore a bundle written at *version*.
 

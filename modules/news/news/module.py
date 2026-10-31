@@ -252,7 +252,9 @@ class NewsModule(ModuleBase):
         for prefix in constants.PUBLIC_READ_PREFIXES:
             registry.add_prefix(prefix, methods={"GET"})
 
-    def _exempt_public_routes(self, app: FastAPI, prefix: str, languages: tuple[str, ...]) -> None:
+    def _exempt_public_routes(
+        self, app: FastAPI, prefix: str, languages: tuple[str, ...]
+    ) -> None:
         """Exempt the public article viewer from auth, one prefix per language.
 
         A method rather than a straight call to :mod:`news.boot` because it is

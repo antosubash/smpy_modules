@@ -113,7 +113,9 @@ async def test_upload_empty_folder_is_unfiled(authed_client: AsyncClient) -> Non
 async def test_list_uploads_search_filters_filename(authed_client: AsyncClient) -> None:
     await _upload(authed_client, filename="banner.png")
     await _upload(authed_client, filename="hero.png")
-    body = (await authed_client.get("/api/pagebuilder/uploads", params={"search": "ban"})).json()
+    body = (
+        await authed_client.get("/api/pagebuilder/uploads", params={"search": "ban"})
+    ).json()
     names = {item["original_filename"] for item in body["items"]}
     assert names == {"banner.png"}
 
@@ -121,11 +123,15 @@ async def test_list_uploads_search_filters_filename(authed_client: AsyncClient) 
 async def test_list_uploads_filter_by_content_type(authed_client: AsyncClient) -> None:
     await _upload(authed_client, filename="hero.png")
     body = (
-        await authed_client.get("/api/pagebuilder/uploads", params={"content_type": "image/jpeg"})
+        await authed_client.get(
+            "/api/pagebuilder/uploads", params={"content_type": "image/jpeg"}
+        )
     ).json()
     assert body["items"] == []
     body = (
-        await authed_client.get("/api/pagebuilder/uploads", params={"content_type": "image/*"})
+        await authed_client.get(
+            "/api/pagebuilder/uploads", params={"content_type": "image/*"}
+        )
     ).json()
     assert len(body["items"]) == 1
 
@@ -135,10 +141,14 @@ async def test_list_uploads_filter_by_folder(authed_client: AsyncClient) -> None
     await _upload(authed_client, filename="b.png", folder="news")
     await _upload(authed_client, filename="c.png")  # unfiled
 
-    body = (await authed_client.get("/api/pagebuilder/uploads", params={"folder": "ads"})).json()
+    body = (
+        await authed_client.get("/api/pagebuilder/uploads", params={"folder": "ads"})
+    ).json()
     assert {item["original_filename"] for item in body["items"]} == {"a.png"}
 
-    body = (await authed_client.get("/api/pagebuilder/uploads", params={"folder": ""})).json()
+    body = (
+        await authed_client.get("/api/pagebuilder/uploads", params={"folder": ""})
+    ).json()
     assert {item["original_filename"] for item in body["items"]} == {"c.png"}
 
     body = (await authed_client.get("/api/pagebuilder/uploads")).json()
@@ -151,7 +161,9 @@ async def test_list_uploads_cursor_pagination(authed_client: AsyncClient) -> Non
     for i in range(5):
         ids.append((await _upload(authed_client, filename=f"f{i}.png"))["id"])
 
-    first = (await authed_client.get("/api/pagebuilder/uploads", params={"limit": 2})).json()
+    first = (
+        await authed_client.get("/api/pagebuilder/uploads", params={"limit": 2})
+    ).json()
     assert [item["id"] for item in first["items"]] == [ids[4], ids[3]]
     assert first["next_cursor"] == ids[3]
 

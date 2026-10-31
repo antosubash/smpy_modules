@@ -50,7 +50,9 @@ class TestCreate:
         # against an already-published page published it immediately.
         assert body["status"] == ArticleStatus.DRAFT.value
 
-    async def test_derives_a_free_slug_when_the_title_collides(self, editor_client) -> None:
+    async def test_derives_a_free_slug_when_the_title_collides(
+        self, editor_client
+    ) -> None:
         await editor_client.post(ARTICLES, json={"title": "Same title"})
 
         response = await editor_client.post(ARTICLES, json={"title": "Same title"})
@@ -58,11 +60,15 @@ class TestCreate:
         assert response.status_code == 201, response.text
         assert response.json()["slug"] == "same-title-2"
 
-    async def test_an_author_supplied_slug_that_collides_is_a_409(self, editor_client) -> None:
+    async def test_an_author_supplied_slug_that_collides_is_a_409(
+        self, editor_client
+    ) -> None:
         """Reported rather than silently altered: the URL is a thing they typed."""
         await editor_client.post(ARTICLES, json={"title": "First", "slug": "mine"})
 
-        response = await editor_client.post(ARTICLES, json={"title": "Second", "slug": "mine"})
+        response = await editor_client.post(
+            ARTICLES, json={"title": "Second", "slug": "mine"}
+        )
 
         assert response.status_code == 409
 
@@ -74,7 +80,9 @@ class TestCreate:
         )
         assert response.status_code == 422
 
-    async def test_succeeds_behind_a_full_page_of_dated_articles(self, editor_client) -> None:
+    async def test_succeeds_behind_a_full_page_of_dated_articles(
+        self, editor_client
+    ) -> None:
         """Regression: this returned 404 for a row it had just written.
 
         The new article is undated and the listing sorts undated last, so the
@@ -110,13 +118,17 @@ class TestCreate:
 
 
 class TestPartialUpdate:
-    async def test_updating_only_the_category_keeps_the_date(self, editor_client) -> None:
+    async def test_updating_only_the_category_keeps_the_date(
+        self, editor_client
+    ) -> None:
         """Regression: any partial PUT silently cleared the publication date."""
         article = await _seed(
             editor_client, slug="keep-date", category="Before", published_at=DATED
         )
 
-        response = await editor_client.put(f"{ARTICLES}/{article.id}", json={"category": "After"})
+        response = await editor_client.put(
+            f"{ARTICLES}/{article.id}", json={"category": "After"}
+        )
 
         assert response.status_code == 200, response.text
         body = response.json()
@@ -124,14 +136,20 @@ class TestPartialUpdate:
         assert body["published_at"] is not None, "an omitted field must not clear it"
 
     async def test_explicit_null_undates_the_article(self, editor_client) -> None:
-        article = await _seed(editor_client, slug="undate", category="News", published_at=DATED)
+        article = await _seed(
+            editor_client, slug="undate", category="News", published_at=DATED
+        )
 
-        response = await editor_client.put(f"{ARTICLES}/{article.id}", json={"published_at": None})
+        response = await editor_client.put(
+            f"{ARTICLES}/{article.id}", json={"published_at": None}
+        )
 
         assert response.status_code == 200, response.text
         assert response.json()["published_at"] is None
 
-    async def test_renaming_the_slug_keeps_the_old_address_working(self, editor_client) -> None:
+    async def test_renaming_the_slug_keeps_the_old_address_working(
+        self, editor_client
+    ) -> None:
         """A rename is not a private edit — the old URL is already in the wild.
 
         News used to get this from pagebuilder's redirect table, because the
@@ -140,7 +158,9 @@ class TestPartialUpdate:
         """
         article = await _seed(editor_client, slug="old-name")
 
-        response = await editor_client.put(f"{ARTICLES}/{article.id}", json={"slug": "new-name"})
+        response = await editor_client.put(
+            f"{ARTICLES}/{article.id}", json={"slug": "new-name"}
+        )
 
         assert response.status_code == 200, response.text
         assert response.json()["slug"] == "new-name"
@@ -162,9 +182,7 @@ class TestListing:
     async def _three(self, client) -> None:
         async with client.db_state.session_factory() as db:
             await make_article(
-                db,
-                slug="old",
-                title="Old",
+                db, slug="old", title="Old",
                 published_at=datetime(2025, 1, 1, tzinfo=UTC),
             )
             await make_article(db, slug="new", title="New", published_at=DATED)
@@ -173,11 +191,15 @@ class TestListing:
     async def test_orders_newest_first_with_undated_last(self, editor_client) -> None:
         await self._three(editor_client)
 
-        titles = [item["title"] for item in (await editor_client.get(ARTICLES)).json()["items"]]
+        titles = [
+            item["title"] for item in (await editor_client.get(ARTICLES)).json()["items"]
+        ]
 
         assert titles == ["New", "Old", "Undated"]
 
-    async def test_undated_first_puts_work_in_progress_up_front(self, editor_client) -> None:
+    async def test_undated_first_puts_work_in_progress_up_front(
+        self, editor_client
+    ) -> None:
         # The admin list's ordering: an undated article is work in progress,
         # and with pagination the default would bury it on the last page.
         await self._three(editor_client)

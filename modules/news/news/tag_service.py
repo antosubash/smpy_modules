@@ -91,21 +91,19 @@ async def get_or_create(db: AsyncSession, name: str) -> NewsTag:
 async def list_for_article(db: AsyncSession, article_id: int) -> list[str]:
     """Tag names on one article, in display order."""
     rows = (
-        (
-            await db.execute(
-                select(NewsTag.name)
-                .join(NewsArticleTag, NewsArticleTag.tag_id == NewsTag.id)
-                .where(NewsArticleTag.article_id == article_id)
-                .order_by(NewsTag.name)
-            )
+        await db.execute(
+            select(NewsTag.name)
+            .join(NewsArticleTag, NewsArticleTag.tag_id == NewsTag.id)
+            .where(NewsArticleTag.article_id == article_id)
+            .order_by(NewsTag.name)
         )
-        .scalars()
-        .all()
-    )
+    ).scalars().all()
     return list(rows)
 
 
-async def names_for_articles(db: AsyncSession, article_ids: list[int]) -> dict[int, list[str]]:
+async def names_for_articles(
+    db: AsyncSession, article_ids: list[int]
+) -> dict[int, list[str]]:
     """Tags for many articles in one query.
 
     The list view needs tags per row; doing it per row is the classic N+1 that
@@ -144,7 +142,9 @@ async def set_for_article(db: AsyncSession, article_id: int, names: list[str]) -
         seen.add(tag.id or 0)
         tags.append(tag)
 
-    await db.execute(sa_delete(NewsArticleTag).where(NewsArticleTag.article_id == article_id))
+    await db.execute(
+        sa_delete(NewsArticleTag).where(NewsArticleTag.article_id == article_id)
+    )
     for tag in tags:
         db.add(NewsArticleTag(article_id=article_id, tag_id=tag.id or 0))
     await db.flush()
@@ -179,7 +179,9 @@ async def rename(db: AsyncSession, tag: NewsTag, name: str) -> NewsTag:
             db.add(tag)
             await db.flush()
             # Inside the savepoint too, so a refused rename leaves no redirect.
-            await tag_redirects.record(db, tag_id=tag.id or 0, old_slug=old_slug, new_slug=slug)
+            await tag_redirects.record(
+                db, tag_id=tag.id or 0, old_slug=old_slug, new_slug=slug
+            )
     except IntegrityError as exc:
         raise TagCollisionError(f"A tag named {name!r} already exists.") from exc
     await db.refresh(tag)
@@ -209,7 +211,9 @@ async def unlink_article(db: AsyncSession, article_id: int) -> None:
 
     Same reasoning as :func:`delete`, from the other side of the join.
     """
-    await db.execute(sa_delete(NewsArticleTag).where(NewsArticleTag.article_id == article_id))
+    await db.execute(
+        sa_delete(NewsArticleTag).where(NewsArticleTag.article_id == article_id)
+    )
 
 
 async def merge(db: AsyncSession, *, source: NewsTag, target: NewsTag) -> int:
@@ -226,7 +230,9 @@ async def merge(db: AsyncSession, *, source: NewsTag, target: NewsTag) -> int:
     source_articles = set(
         (
             await db.execute(
-                select(NewsArticleTag.article_id).where(NewsArticleTag.tag_id == source.id)
+                select(NewsArticleTag.article_id).where(
+                    NewsArticleTag.tag_id == source.id
+                )
             )
         )
         .scalars()
@@ -235,7 +241,9 @@ async def merge(db: AsyncSession, *, source: NewsTag, target: NewsTag) -> int:
     target_articles = set(
         (
             await db.execute(
-                select(NewsArticleTag.article_id).where(NewsArticleTag.tag_id == target.id)
+                select(NewsArticleTag.article_id).where(
+                    NewsArticleTag.tag_id == target.id
+                )
             )
         )
         .scalars()

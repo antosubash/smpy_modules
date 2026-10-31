@@ -31,22 +31,15 @@ requires_pagebuilder = pytest.mark.skipif(
 )
 
 
-async def _article(
-    db, slug: str, *, category: str = "", title: str | None = None, draft_data: dict | None = None
-):
+async def _article(db, slug: str, *, category: str = "", title: str | None = None,
+                   draft_data: dict | None = None):
     return await make_article(
         db, slug=slug, title=title or slug, category=category, draft_data=draft_data
     )
 
 
-async def _page(
-    db,
-    slug: str,
-    *,
-    title: str | None = None,
-    draft_data: dict | None = None,
-    tenant: str = "default",
-):
+async def _page(db, slug: str, *, title: str | None = None, draft_data: dict | None = None,
+                tenant: str = "default"):
     from pagebuilder.models import Page, PageStatus
 
     page = Page(
@@ -128,7 +121,9 @@ class TestArticles:
     async def test_a_draft_is_hidden_when_drafts_are_not_asked_for(self, db) -> None:
         from news.models import ArticleStatus
 
-        await make_article(db, slug="wip", title="Draft article", status=ArticleStatus.DRAFT)
+        await make_article(
+            db, slug="wip", title="Draft article", status=ArticleStatus.DRAFT
+        )
 
         results = await search_service.search(db, "Draft", include_drafts=False)
 
@@ -260,7 +255,9 @@ class TestItAgreesWithTheArticleList:
     async def test_it_finds_an_article_by_its_excerpt(self, db) -> None:
         # The field the list's `q` gained when the public archive grew a search
         # box. Without it here, one box finds the row and the other does not.
-        await make_article(db, slug="quiet", title="Quiet", meta_description="On canopy loss.")
+        await make_article(
+            db, slug="quiet", title="Quiet", meta_description="On canopy loss."
+        )
 
         results = await search_service.search(db, "canopy loss")
 

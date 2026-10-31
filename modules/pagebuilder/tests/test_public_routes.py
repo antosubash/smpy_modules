@@ -38,7 +38,9 @@ def _registry(**overrides) -> PublicRouteRegistry:
 
 def test_no_registry_is_survivable():
     """A host with no auth middleware publishes no registry to add to."""
-    boot.exempt_public_routes(SimpleNamespace(state=SimpleNamespace()), PagebuilderSettings())
+    boot.exempt_public_routes(
+        SimpleNamespace(state=SimpleNamespace()), PagebuilderSettings()
+    )
 
 
 @pytest.mark.parametrize(

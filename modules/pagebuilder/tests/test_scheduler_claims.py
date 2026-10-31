@@ -136,7 +136,9 @@ class TestTwoReplicas:
         assert await claim(db, second.id, now=NOW, **PUBLISH_CLAIM) is True
         assert await claim(db, first.id, now=NOW, **PUBLISH_CLAIM) is False
 
-    async def test_a_second_tick_at_the_same_instant_writes_no_second_revision(self, db) -> None:
+    async def test_a_second_tick_at_the_same_instant_writes_no_second_revision(
+        self, db
+    ) -> None:
         """End to end through ``process_due``: the second tick flips nothing."""
         page = await _due_draft(db, "end-to-end")
 
@@ -174,7 +176,9 @@ class TestAReleasedClaim:
 
         assert await _stored_publish_at(db, page.id) == EARLIER
 
-    async def test_a_refused_publish_is_retried_on_the_next_tick(self, db, monkeypatch) -> None:
+    async def test_a_refused_publish_is_retried_on_the_next_tick(
+        self, db, monkeypatch
+    ) -> None:
         page = await _due_draft(db, "flaky")
         service = PagesService(db)
         real = PagesService.publish

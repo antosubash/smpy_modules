@@ -60,7 +60,9 @@ async def render_article(
     for the same reason — the preview forces it False regardless of what the
     article says, which is what puts ``noindex`` in both heads.
     """
-    published_at = article.published_at.isoformat() if article.published_at is not None else None
+    published_at = (
+        article.published_at.isoformat() if article.published_at is not None else None
+    )
     # The byline's archive, where it has one. It was a dead end before: rendered
     # on the page and emitted as ``article:author``, with nowhere for a reader
     # who liked the writer to go, while a category and a tag each had a page.

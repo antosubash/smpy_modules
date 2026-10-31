@@ -55,7 +55,9 @@ class TestRename:
         # `mover` still serves its own page rather than redirecting anywhere.
         assert (await authed_client.get("/p/mover")).status_code == 200
 
-    async def test_renaming_twice_collapses_to_one_hop(self, authed_client: AsyncClient) -> None:
+    async def test_renaming_twice_collapses_to_one_hop(
+        self, authed_client: AsyncClient
+    ) -> None:
         """Every old address points at the page, and the page knows where it
         lives now — so no chain of redirects can build up."""
         page = await _published(authed_client, "first")
@@ -68,7 +70,9 @@ class TestRename:
             assert moved.status_code == 301, old
             assert moved.headers["location"] == "/p/third"
 
-    async def test_reclaiming_an_old_slug_does_not_loop(self, authed_client: AsyncClient) -> None:
+    async def test_reclaiming_an_old_slug_does_not_loop(
+        self, authed_client: AsyncClient
+    ) -> None:
         """Renaming back would otherwise leave `a -> a`, which redirects the
         page off itself forever."""
         page = await _published(authed_client, "there")
@@ -83,7 +87,9 @@ class TestRename:
     ) -> None:
         assert (await authed_client.get("/p/never-existed")).status_code == 404
 
-    async def test_a_trashed_page_does_not_redirect(self, authed_client: AsyncClient) -> None:
+    async def test_a_trashed_page_does_not_redirect(
+        self, authed_client: AsyncClient
+    ) -> None:
         """A trashed page is offline; sending its old address to it would put
         the visitor on a 404 by a slower route."""
         page = await _published(authed_client, "binned-old")
@@ -112,7 +118,9 @@ class TestRedirectTargetMustBeLive:
         assert (await authed_client.get("/p/draft-new")).status_code == 404
         assert (await authed_client.get("/p/draft-old")).status_code == 404
 
-    async def test_republishing_brings_the_redirect_back(self, authed_client: AsyncClient) -> None:
+    async def test_republishing_brings_the_redirect_back(
+        self, authed_client: AsyncClient
+    ) -> None:
         page = await _published(authed_client, "back-old")
         await authed_client.put(f"{API}/{page['id']}", json={"slug": "back-new"})
         await authed_client.post(f"{API}/{page['id']}/unpublish", json={})
@@ -122,7 +130,9 @@ class TestRedirectTargetMustBeLive:
         assert moved.status_code == 301
         assert moved.headers["location"] == "/p/back-new"
 
-    async def test_a_published_page_without_a_snapshot_does_not_redirect(self, db) -> None:
+    async def test_a_published_page_without_a_snapshot_does_not_redirect(
+        self, db
+    ) -> None:
         """The viewer 404s a published row with nothing to render, so its old
         address must not forward to it either. Not reachable through the API,
         hence built directly — and why the snapshot is checked in Python: a

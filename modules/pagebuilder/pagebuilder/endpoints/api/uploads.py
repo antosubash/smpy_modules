@@ -25,9 +25,9 @@ async def list_uploads(
         default=None,
         ge=0,
         description=(
-            "Offset paging, for callers that jump to an arbitrary page (the "
-            "image-picker gallery). Takes precedence over `cursor` and makes "
-            "the response carry `total`."
+            'Offset paging, for callers that jump to an arbitrary page (the '
+            'image-picker gallery). Takes precedence over `cursor` and makes '
+            'the response carry `total`.'
         ),
     ),
     limit: int = Query(default=60, ge=1, le=200),

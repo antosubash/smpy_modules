@@ -33,7 +33,9 @@ async def create_draft(
         json={
             "title": title,
             "slug": slug,
-            "draft_data": draft_data if draft_data is not None else {"content": ["hello"]},
+            "draft_data": draft_data
+            if draft_data is not None
+            else {"content": ["hello"]},
         },
     )
     assert response.status_code == 201, response.text

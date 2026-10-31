@@ -47,7 +47,9 @@ class NewsArticleRedirect(Base, MultiTenantMixin, table=True):  # ty: ignore[uns
     unique index the two rows have no reason to share.
     """
 
-    article_id: int = Field(foreign_key=f"{ARTICLE_TABLE}.id", index=True, ondelete="CASCADE")
+    article_id: int = Field(
+        foreign_key=f"{ARTICLE_TABLE}.id", index=True, ondelete="CASCADE"
+    )
 
 
 class NewsTagRedirect(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]

@@ -59,7 +59,9 @@ class TestSitemapTaxonomy:
             db.add(NewsArticleTag(article_id=article.id, tag_id=tag.id))
             await db.commit()
 
-    async def test_a_category_with_a_published_article_is_listed(self, anon_client) -> None:
+    async def test_a_category_with_a_published_article_is_listed(
+        self, anon_client
+    ) -> None:
         await self._category(anon_client, "Field notes", "field-notes")
         await _seed(anon_client, "in-it", category="Field notes")
 
@@ -67,7 +69,9 @@ class TestSitemapTaxonomy:
 
         assert f"{NEWS}/category/field-notes</loc>" in response.text
 
-    async def test_a_category_with_nothing_published_in_it_is_not(self, anon_client) -> None:
+    async def test_a_category_with_nothing_published_in_it_is_not(
+        self, anon_client
+    ) -> None:
         # The category exists on the categories screen and its page answers
         # 200 — with nothing on it. That is a thin page, and asking a crawler
         # to come and index one is worse than saying nothing.
@@ -82,7 +86,9 @@ class TestSitemapTaxonomy:
         await self._category(anon_client, "Pending", "pending")
         await _seed(anon_client, "unfinished", category="Pending", status=ArticleStatus.DRAFT)
 
-        assert "/category/pending" not in (await anon_client.get(f"{NEWS}/sitemap.xml")).text
+        assert "/category/pending" not in (
+            await anon_client.get(f"{NEWS}/sitemap.xml")
+        ).text
 
     async def test_nor_does_an_article_held_out_of_listings(self, anon_client) -> None:
         # `show_in_feed=False` keeps the article off the archive pages, so the
@@ -90,7 +96,9 @@ class TestSitemapTaxonomy:
         await self._category(anon_client, "Standing", "standing")
         await _seed(anon_client, "standing-piece", category="Standing", show_in_feed=False)
 
-        assert "/category/standing" not in (await anon_client.get(f"{NEWS}/sitemap.xml")).text
+        assert "/category/standing" not in (
+            await anon_client.get(f"{NEWS}/sitemap.xml")
+        ).text
 
     async def test_nor_does_one_that_asked_not_to_be_indexed(self, anon_client) -> None:
         # The same rule the article entries follow. A category page whose only
@@ -98,13 +106,19 @@ class TestSitemapTaxonomy:
         await self._category(anon_client, "Quiet", "quiet")
         await _seed(anon_client, "private-piece", category="Quiet", index_in_search=False)
 
-        assert "/category/quiet" not in (await anon_client.get(f"{NEWS}/sitemap.xml")).text
+        assert "/category/quiet" not in (
+            await anon_client.get(f"{NEWS}/sitemap.xml")
+        ).text
 
-    async def test_a_tag_carried_by_a_published_article_is_listed(self, anon_client) -> None:
+    async def test_a_tag_carried_by_a_published_article_is_listed(
+        self, anon_client
+    ) -> None:
         tagged = await _seed(anon_client, "tagged")
         await self._tag(anon_client, tagged, "Canopy", "canopy")
 
-        assert f"{NEWS}/tag/canopy</loc>" in (await anon_client.get(f"{NEWS}/sitemap.xml")).text
+        assert f"{NEWS}/tag/canopy</loc>" in (
+            await anon_client.get(f"{NEWS}/sitemap.xml")
+        ).text
 
     async def test_a_tag_nothing_published_carries_is_not(self, anon_client) -> None:
         draft = await _seed(anon_client, "unfinished", status=ArticleStatus.DRAFT)
@@ -112,7 +126,9 @@ class TestSitemapTaxonomy:
 
         assert "/tag/later" not in (await anon_client.get(f"{NEWS}/sitemap.xml")).text
 
-    async def test_a_category_appears_once_however_many_articles_fill_it(self, anon_client) -> None:
+    async def test_a_category_appears_once_however_many_articles_fill_it(
+        self, anon_client
+    ) -> None:
         # One page, one entry. Selecting it per article would list the same
         # URL as many times as the archive has stories in that category.
         await self._category(anon_client, "Field notes", "field-notes")

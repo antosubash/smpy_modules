@@ -73,7 +73,9 @@ class SnapshotMedia(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupport
     __tablename__ = "pagebuilder_snapshot_media"
 
     id: int | None = Field(default=None, primary_key=True)
-    snapshot_id: int = Field(foreign_key=f"{SNAPSHOT_TABLE}.id", index=True, ondelete="CASCADE")
+    snapshot_id: int = Field(
+        foreign_key=f"{SNAPSHOT_TABLE}.id", index=True, ondelete="CASCADE"
+    )
     sha256: str = Field(max_length=64, index=True)
     bundle_name: str = Field(max_length=300)
     original_filename: str = Field(max_length=300)
@@ -107,7 +109,9 @@ class PendingImport(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: igno
     )
 
     id: int | None = Field(default=None, primary_key=True)
-    snapshot_id: int = Field(foreign_key=f"{SNAPSHOT_TABLE}.id", index=True, ondelete="CASCADE")
+    snapshot_id: int = Field(
+        foreign_key=f"{SNAPSHOT_TABLE}.id", index=True, ondelete="CASCADE"
+    )
     plan: dict[str, Any] = Field(
         default_factory=dict,
         sa_column=Column(JSON, nullable=False, default=dict),

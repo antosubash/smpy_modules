@@ -21,6 +21,7 @@ from sqlalchemy import select
 pytestmark = pytest.mark.asyncio
 
 
+
 class TestChangedInTheGap:
     async def test_a_row_submitted_for_review_cannot_be_claimed(self, db) -> None:
         """Only a DRAFT auto-publishes; a submission belongs to the reviewer."""

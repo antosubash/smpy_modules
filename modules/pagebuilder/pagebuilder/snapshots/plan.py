@@ -96,7 +96,9 @@ def redirect_locale(row: dict[str, str]) -> str:
     return normalise_locale(row.get("locale"))
 
 
-def _fields_differ(payload: dict[str, Any], page: Page, name_to_url: dict[str, str]) -> bool:
+def _fields_differ(
+    payload: dict[str, Any], page: Page, name_to_url: dict[str, str]
+) -> bool:
     """Compare only the fields the bundle actually carries.
 
     ``apply_payload`` sets a field only when the payload has it, so comparing
@@ -154,7 +156,10 @@ async def build_plan(
         incoming_published = from_sentinels(payload.get("published_data"), name_to_url)
         content_differs = (
             ("draft_data" in payload and incoming_draft != page.draft_data)
-            or ("published_data" in payload and incoming_published != page.published_data)
+            or (
+                "published_data" in payload
+                and incoming_published != page.published_data
+            )
             or ("status" in payload and payload["status"] != page.status.value)
         )
         # Neither a trashed nor a renamed page is ever "unchanged": apply

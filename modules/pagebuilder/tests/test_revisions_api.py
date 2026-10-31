@@ -56,7 +56,9 @@ async def test_get_revision_detail(authed_client: AsyncClient) -> None:
     page_id = await _create_and_publish(authed_client)
     revisions = (await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions")).json()
     revision_id = revisions["items"][0]["id"]
-    response = await authed_client.get(f"/api/pagebuilder/pages/{page_id}/revisions/{revision_id}")
+    response = await authed_client.get(
+        f"/api/pagebuilder/pages/{page_id}/revisions/{revision_id}"
+    )
     assert response.status_code == 200
     body = response.json()
     assert body["data"] == {"content": ["one"]}
@@ -70,7 +72,9 @@ async def test_get_revision_404_when_belongs_to_another_page(
     b_revs = (await authed_client.get(f"/api/pagebuilder/pages/{b}/revisions")).json()
     b_revision_id = b_revs["items"][0]["id"]
     # Cross-reference: page A asking for B's revision should 404.
-    response = await authed_client.get(f"/api/pagebuilder/pages/{a}/revisions/{b_revision_id}")
+    response = await authed_client.get(
+        f"/api/pagebuilder/pages/{a}/revisions/{b_revision_id}"
+    )
     assert response.status_code == 404
 
 

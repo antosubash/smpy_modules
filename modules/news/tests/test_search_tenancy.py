@@ -30,9 +30,7 @@ async def _asset(db, name: str, *, tenant: str = "default"):
     from pagebuilder.models import MediaAsset
 
     asset = MediaAsset(
-        tenant_id=tenant,
-        filename=f"{tenant}-{name}",
-        original_filename=name,
+        tenant_id=tenant, filename=f"{tenant}-{name}", original_filename=name,
         content_type="image/png",
     )
     db.add(asset)
@@ -45,11 +43,8 @@ async def _page(db, slug: str, *, tenant: str = "default", published: bool = Tru
     from pagebuilder.models import Page, PageStatus
 
     page = Page(
-        tenant_id=tenant,
-        slug=slug,
-        title=slug,
-        status=PageStatus.PUBLISHED if published else PageStatus.DRAFT,
-        draft_data={},
+        tenant_id=tenant, slug=slug, title=slug,
+        status=PageStatus.PUBLISHED if published else PageStatus.DRAFT, draft_data={},
     )
     db.add(page)
     await db.commit()

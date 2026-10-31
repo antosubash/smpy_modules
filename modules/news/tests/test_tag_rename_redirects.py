@@ -96,7 +96,9 @@ class TestOldAddress:
             assert (await db.execute(select(NewsTagRedirect))).all() == []
 
 
-async def test_a_rename_that_loses_the_race_is_409_not_500(editor_client, monkeypatch) -> None:
+async def test_a_rename_that_loses_the_race_is_409_not_500(
+    editor_client, monkeypatch
+) -> None:
     """Both requests pass the check; the unique index stops the second.
 
     Simulated by switching the check off, which is exactly the state the loser

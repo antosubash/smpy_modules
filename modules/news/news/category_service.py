@@ -67,10 +67,8 @@ async def list_categories(db: AsyncSession) -> list[CategoryRead]:
     """
     counts = await _counts(db)
     rows = (
-        (await db.execute(select(NewsCategory).order_by(NewsCategory.position, NewsCategory.name)))
-        .scalars()
-        .all()
-    )
+        await db.execute(select(NewsCategory).order_by(NewsCategory.position, NewsCategory.name))
+    ).scalars().all()
 
     items = [
         CategoryRead(
@@ -151,7 +149,9 @@ async def create(db: AsyncSession, *, name: str, slug: str | None = None) -> New
         if slug
         else unique_slug(name, await _taken_slugs(db), max_length=MAX_CATEGORY_LEN)
     )
-    category = NewsCategory(name=name, slug=resolved, position=(last or 0) + 1)
+    category = NewsCategory(
+        name=name, slug=resolved, position=(last or 0) + 1
+    )
     db.add(category)
     await db.flush()
     await db.refresh(category)
@@ -196,12 +196,16 @@ async def reorder(db: AsyncSession, ordered_ids: list[int]) -> None:
     """
     for position, category_id in enumerate(ordered_ids):
         await db.execute(
-            sa_update(NewsCategory).where(NewsCategory.id == category_id).values(position=position)
+            sa_update(NewsCategory)
+            .where(NewsCategory.id == category_id)
+            .values(position=position)
         )
     await db.flush()
 
 
-async def delete(db: AsyncSession, category: NewsCategory, *, reassign_to: str = "") -> int:
+async def delete(
+    db: AsyncSession, category: NewsCategory, *, reassign_to: str = ""
+) -> int:
     """Remove the category, moving its articles rather than deleting them.
 
     ``reassign_to`` is a category *name*; the empty string means Uncategorised,

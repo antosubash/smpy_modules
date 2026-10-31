@@ -74,7 +74,9 @@ async def test_publish_alone_cannot_approve(publisher_client):
     staged = await publisher_client.post(f"{_SNAPSHOTS}/{snapshot['id']}/restore")
     assert staged.status_code == 201, staged.text
 
-    refused = await publisher_client.post(f"/api/pagebuilder/imports/{staged.json()['id']}/approve")
+    refused = await publisher_client.post(
+        f"/api/pagebuilder/imports/{staged.json()['id']}/approve"
+    )
     assert refused.status_code == 403
     # And rejecting is gated the same way.
     assert (
@@ -89,7 +91,9 @@ async def test_approving_takes_a_pre_restore_snapshot_first(approver_client):
     snapshot = await _take(approver_client)
     staged = await approver_client.post(f"{_SNAPSHOTS}/{snapshot['id']}/restore")
 
-    applied = await approver_client.post(f"/api/pagebuilder/imports/{staged.json()['id']}/approve")
+    applied = await approver_client.post(
+        f"/api/pagebuilder/imports/{staged.json()['id']}/approve"
+    )
     assert applied.status_code == 200, applied.text
     assert applied.json()["pages_updated"] == 1
 
@@ -109,7 +113,9 @@ async def test_restoring_brings_back_a_page_deleted_after_the_snapshot(approver_
     assert listing.json()["items"] == []
 
     staged = await approver_client.post(f"{_SNAPSHOTS}/{snapshot['id']}/restore")
-    await approver_client.post(f"/api/pagebuilder/imports/{staged.json()['id']}/approve")
+    await approver_client.post(
+        f"/api/pagebuilder/imports/{staged.json()['id']}/approve"
+    )
 
     listing = await approver_client.get("/api/pagebuilder/pages")
     assert [p["slug"] for p in listing.json()["items"]] == ["home"]
@@ -134,7 +140,9 @@ async def test_deciding_twice_is_refused(approver_client):
     staged = await approver_client.post(f"{_SNAPSHOTS}/{snapshot['id']}/restore")
     import_id = staged.json()["id"]
     await approver_client.post(f"/api/pagebuilder/imports/{import_id}/reject", json={})
-    again = await approver_client.post(f"/api/pagebuilder/imports/{import_id}/reject", json={})
+    again = await approver_client.post(
+        f"/api/pagebuilder/imports/{import_id}/reject", json={}
+    )
     assert again.status_code == 409
 
 
@@ -166,7 +174,9 @@ async def test_uploading_something_that_is_not_a_bundle_is_refused(authed_client
 
 async def test_deleting_a_snapshot_removes_it(authed_client):
     snapshot = await _take(authed_client)
-    assert (await authed_client.delete(f"{_SNAPSHOTS}/{snapshot['id']}")).status_code == 204
+    assert (
+        await authed_client.delete(f"{_SNAPSHOTS}/{snapshot['id']}")
+    ).status_code == 204
     assert (await authed_client.get(_SNAPSHOTS)).json()["items"] == []
 
 

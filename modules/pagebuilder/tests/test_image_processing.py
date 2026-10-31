@@ -66,14 +66,18 @@ def media_service(db: AsyncSession, tmp_path) -> MediaService:  # type: ignore[n
 
 
 async def test_upload_records_dimensions(media_service: MediaService) -> None:
-    upload = _make_upload(_png_bytes(800, 600), filename="hero.png", content_type="image/png")
+    upload = _make_upload(
+        _png_bytes(800, 600), filename="hero.png", content_type="image/png"
+    )
     asset = await media_service.upload(upload)
     assert asset.width == 800
     assert asset.height == 600
 
 
 async def test_upload_generates_webp_thumbnails(media_service: MediaService) -> None:
-    upload = _make_upload(_png_bytes(1500, 1000), filename="hero.png", content_type="image/png")
+    upload = _make_upload(
+        _png_bytes(1500, 1000), filename="hero.png", content_type="image/png"
+    )
     asset = await media_service.upload(upload)
     # 1500px source → widths 320, 640, 1280 qualify; 1920 is skipped
     # because we never upscale.
@@ -93,14 +97,18 @@ async def test_upload_skips_thumbnails_smaller_than_smallest_width(
     media_service: MediaService,
 ) -> None:
     # 200px source: every configured width >= source, so no variants.
-    upload = _make_upload(_png_bytes(200, 100), filename="tiny.png", content_type="image/png")
+    upload = _make_upload(
+        _png_bytes(200, 100), filename="tiny.png", content_type="image/png"
+    )
     asset = await media_service.upload(upload)
     assert asset.width == 200
     assert asset.variants == {}
 
 
 async def test_animated_gif_skips_thumbnails(media_service: MediaService) -> None:
-    upload = _make_upload(_animated_gif_bytes(), filename="loop.gif", content_type="image/gif")
+    upload = _make_upload(
+        _animated_gif_bytes(), filename="loop.gif", content_type="image/gif"
+    )
     asset = await media_service.upload(upload)
     # Animated GIFs land in storage as-is; we capture dimensions so the
     # Image block can still emit width/height, but skip transcoding so
@@ -113,7 +121,9 @@ async def test_animated_gif_skips_thumbnails(media_service: MediaService) -> Non
 
 
 async def test_to_read_exposes_variant_urls(media_service: MediaService) -> None:
-    upload = _make_upload(_png_bytes(1024, 768), filename="hero.png", content_type="image/png")
+    upload = _make_upload(
+        _png_bytes(1024, 768), filename="hero.png", content_type="image/png"
+    )
     asset = await media_service.upload(upload)
     read = media_service.to_read(asset)
     assert read.width == 1024
@@ -125,10 +135,13 @@ async def test_to_read_exposes_variant_urls(media_service: MediaService) -> None
 
 
 async def test_delete_removes_variant_files(media_service: MediaService) -> None:
-    upload = _make_upload(_png_bytes(1024, 768), filename="hero.png", content_type="image/png")
+    upload = _make_upload(
+        _png_bytes(1024, 768), filename="hero.png", content_type="image/png"
+    )
     asset = await media_service.upload(upload)
     variant_paths = [
-        media_service.tenant_dir() / meta["filename"] for meta in asset.variants.values()
+        media_service.tenant_dir() / meta["filename"]
+        for meta in asset.variants.values()
     ]
     original_path = media_service.tenant_dir() / asset.filename
     assert variant_paths and all(p.is_file() for p in variant_paths)
@@ -139,13 +152,17 @@ async def test_delete_removes_variant_files(media_service: MediaService) -> None
         assert not p.exists(), f"variant {p.name} leaked after delete"
 
 
-async def test_disabling_thumbnail_widths_skips_generation(db: AsyncSession, tmp_path) -> None:
+async def test_disabling_thumbnail_widths_skips_generation(
+    db: AsyncSession, tmp_path
+) -> None:
     settings = PagebuilderSettings(
         media_root=tmp_path / "media",
         media_thumbnail_widths=(),
     )
     service = MediaService(db, settings)
-    upload = _make_upload(_png_bytes(1024, 768), filename="hero.png", content_type="image/png")
+    upload = _make_upload(
+        _png_bytes(1024, 768), filename="hero.png", content_type="image/png"
+    )
     asset = await service.upload(upload)
     # Dimensions still captured — that's a separate concern from
     # generating derivatives.

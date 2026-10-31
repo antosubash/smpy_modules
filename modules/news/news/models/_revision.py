@@ -53,7 +53,9 @@ class NewsArticleRevision(Base, AuditMixin, MultiTenantMixin, table=True):  # ty
     __tablename__ = "news_article_revisions"
 
     id: int | None = Field(default=None, primary_key=True)
-    article_id: int = Field(foreign_key=f"{ARTICLE_TABLE}.id", index=True, ondelete="CASCADE")
+    article_id: int = Field(
+        foreign_key=f"{ARTICLE_TABLE}.id", index=True, ondelete="CASCADE"
+    )
     title: str = Field(max_length=MAX_TITLE_LEN)
     meta_description: str | None = Field(default=None, max_length=MAX_URL_LEN)
     og_image: str | None = Field(default=None, max_length=MAX_URL_LEN)

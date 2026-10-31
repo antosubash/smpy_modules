@@ -45,7 +45,9 @@ async def test_same_locale_and_slug_in_both_tenants(mt: AsyncClient) -> None:
     b = await create_page(mt, B, slug="about", title="B about")
     assert a["id"] != b["id"]
     # ...but not twice in one tenant.
-    again = await mt.post(API, json={"title": "x", "slug": "about", "draft_data": {}}, headers=A)
+    again = await mt.post(
+        API, json={"title": "x", "slug": "about", "draft_data": {}}, headers=A
+    )
     assert again.status_code == 409
 
 

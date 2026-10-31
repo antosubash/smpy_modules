@@ -74,7 +74,9 @@ async def test_an_offset_past_the_end_steps_back_to_the_last_page(
     """Deleting the last row of the last page leaves the offset stranded."""
     await _create(authed_client, "Only page", "only-page")
 
-    response = await authed_client.get(VIEW, params={"offset": 100}, headers={"X-Inertia": "true"})
+    response = await authed_client.get(
+        VIEW, params={"offset": 100}, headers={"X-Inertia": "true"}
+    )
     props = response.json()["props"]
     assert props["filters"]["offset"] == 0
     assert [p["slug"] for p in props["pages"]["items"]] == ["only-page"]
@@ -99,8 +101,13 @@ async def test_the_language_filter_narrows_the_board_too(
         assert response.status_code == 201, response.text
 
     props = (
-        await bilingual_client.get(VIEW, params={"locale": "de"}, headers={"X-Inertia": "true"})
+        await bilingual_client.get(
+            VIEW, params={"locale": "de"}, headers={"X-Inertia": "true"}
+        )
     ).json()["props"]
 
-    board_slugs = {item["slug"] for stage in props["board"] for item in stage["items"]}
+    board_slugs = {
+        item["slug"] for stage in props["board"] for item in stage["items"]
+    }
     assert board_slugs == {"ueber"}
+

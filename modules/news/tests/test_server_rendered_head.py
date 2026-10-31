@@ -29,7 +29,9 @@ NEWS = "/news"
 
 
 class TestArticleHead:
-    async def test_the_title_is_the_headline_not_the_app_name(self, anon_client) -> None:
+    async def test_the_title_is_the_headline_not_the_app_name(
+        self, anon_client
+    ) -> None:
         async with anon_client.db_state.session_factory() as db:
             await make_article(db, slug="titled", title="Sensor rollout completes")
 
@@ -40,7 +42,9 @@ class TestArticleHead:
         # titles let the consumer pick, which in practice means the wrong one.
         assert body.count("<title>") == 1
 
-    async def test_it_carries_the_open_graph_tags_a_preview_needs(self, anon_client) -> None:
+    async def test_it_carries_the_open_graph_tags_a_preview_needs(
+        self, anon_client
+    ) -> None:
         async with anon_client.db_state.session_factory() as db:
             await make_article(
                 db,
@@ -75,7 +79,9 @@ class TestArticleHead:
         assert 'rel="canonical"' in body
         assert f"{NEWS}/canonical" in body
 
-    async def test_noindex_reaches_a_crawler_that_runs_no_script(self, anon_client) -> None:
+    async def test_noindex_reaches_a_crawler_that_runs_no_script(
+        self, anon_client
+    ) -> None:
         # The one tag where client-side rendering was not merely unhelpful but
         # actively wrong: a crawler that does not execute the bundle would have
         # indexed an article explicitly marked not to be.
@@ -89,7 +95,9 @@ class TestArticleHead:
 
         assert '<meta name="robots" content="noindex,nofollow">' in body
 
-    async def test_a_headline_with_a_quote_does_not_break_the_attribute(self, anon_client) -> None:
+    async def test_a_headline_with_a_quote_does_not_break_the_attribute(
+        self, anon_client
+    ) -> None:
         async with anon_client.db_state.session_factory() as db:
             await make_article(db, slug="quoted", title='He said "no"')
 
@@ -109,8 +117,12 @@ class TestArticleHead:
         assert "<\\/script>" in body
         assert "<script>alert(1)</script>" not in body
 
-    async def test_the_site_name_and_handle_appear_when_configured(self, anon_client) -> None:
-        news_settings.use(NewsSettings(site_name="The Archive", twitter_handle="@archive"))
+    async def test_the_site_name_and_handle_appear_when_configured(
+        self, anon_client
+    ) -> None:
+        news_settings.use(
+            NewsSettings(site_name="The Archive", twitter_handle="@archive")
+        )
         try:
             async with anon_client.db_state.session_factory() as db:
                 await make_article(db, slug="branded", title="Branded")
@@ -133,7 +145,9 @@ class TestListingHead:
         assert 'type="application/rss+xml"' in body
         assert f"{NEWS}/feed.xml" in body
 
-    async def test_an_archive_page_is_a_website_not_an_article(self, anon_client) -> None:
+    async def test_an_archive_page_is_a_website_not_an_article(
+        self, anon_client
+    ) -> None:
         body = (await anon_client.get(f"{NEWS}/")).text
         assert '<meta property="og:type" content="website">' in body
 
@@ -148,7 +162,9 @@ class TestTheViewerAdvertisesItsTranslations:
 
     async def _pair(self, client) -> None:
         async with client.db_state.session_factory() as db:
-            english = await make_article(db, slug="budget", title="Budget", locale="en")
+            english = await make_article(
+                db, slug="budget", title="Budget", locale="en"
+            )
             await make_article(
                 db,
                 slug="haushalt",
@@ -157,7 +173,9 @@ class TestTheViewerAdvertisesItsTranslations:
                 translation_group=english.translation_group,
             )
 
-    async def test_each_language_is_linked_from_the_other(self, bilingual_public_client) -> None:
+    async def test_each_language_is_linked_from_the_other(
+        self, bilingual_public_client
+    ) -> None:
         await self._pair(bilingual_public_client)
 
         body = (await bilingual_public_client.get("/news/budget")).text
@@ -166,7 +184,9 @@ class TestTheViewerAdvertisesItsTranslations:
         assert 'hreflang="de"' in body
         assert "/de/news/haushalt" in body
 
-    async def test_x_default_names_the_sites_own_language(self, bilingual_public_client) -> None:
+    async def test_x_default_names_the_sites_own_language(
+        self, bilingual_public_client
+    ) -> None:
         """The version to serve someone whose language nobody matched. The
         site's default is the only defensible answer."""
         await self._pair(bilingual_public_client)
@@ -187,7 +207,9 @@ class TestTheViewerAdvertisesItsTranslations:
 
         assert "hreflang" not in body
 
-    async def test_a_draft_translation_is_not_advertised(self, bilingual_public_client) -> None:
+    async def test_a_draft_translation_is_not_advertised(
+        self, bilingual_public_client
+    ) -> None:
         """Pointing a crawler at a 404 and offering a reader a language switch
         that dead-ends."""
         async with bilingual_public_client.db_state.session_factory() as db:
@@ -204,7 +226,9 @@ class TestTheViewerAdvertisesItsTranslations:
 
         assert "haushalt" not in body
 
-    async def test_the_response_says_which_language_it_is(self, bilingual_public_client) -> None:
+    async def test_the_response_says_which_language_it_is(
+        self, bilingual_public_client
+    ) -> None:
         """For caches, and for anything reading the response without parsing
         the body."""
         await self._pair(bilingual_public_client)
@@ -212,3 +236,5 @@ class TestTheViewerAdvertisesItsTranslations:
         response = await bilingual_public_client.get("/de/news/haushalt")
 
         assert response.headers["Content-Language"] == "de"
+
+

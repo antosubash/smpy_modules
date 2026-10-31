@@ -117,7 +117,9 @@ class TestWhoMaySee:
 
         assert (await viewer_client.get(preview_of(article.id))).status_code == 404
 
-    async def test_an_article_that_never_existed_answers_the_same(self, editor_client) -> None:
+    async def test_an_article_that_never_existed_answers_the_same(
+        self, editor_client
+    ) -> None:
         assert (await editor_client.get(preview_of(9999))).status_code == 404
 
     async def test_a_trashed_article_is_a_404(self, editor_client) -> None:
@@ -137,7 +139,9 @@ class TestWhatItShows:
     ) -> None:
         """The second gap: an author keeps working after publishing, and until
         now there was no way to see the pending version at all."""
-        article = await seed(editor_public_client, "revised", draft_data=body_with("as-published"))
+        article = await seed(
+            editor_public_client, "revised", draft_data=body_with("as-published")
+        )
         await edit_body(editor_public_client, article.id, body_with("rewritten-since"))
 
         preview = await editor_public_client.get(preview_of(article.id))
@@ -147,21 +151,29 @@ class TestWhatItShows:
         assert "as-published" in live.text
         assert "rewritten-since" not in live.text
 
-    async def test_it_says_there_are_unpublished_changes(self, editor_public_client) -> None:
-        article = await seed(editor_public_client, "diverged", draft_data=body_with("as-published"))
+    async def test_it_says_there_are_unpublished_changes(
+        self, editor_public_client
+    ) -> None:
+        article = await seed(
+            editor_public_client, "diverged", draft_data=body_with("as-published")
+        )
         await edit_body(editor_public_client, article.id, body_with("newer"))
 
-        preview = page_props((await editor_public_client.get(preview_of(article.id))).text)[
-            "preview"
-        ]
+        preview = page_props(
+            (await editor_public_client.get(preview_of(article.id))).text
+        )["preview"]
 
         assert preview["has_unpublished_changes"] is True
         assert preview["live_url"] == f"{NEWS}/diverged"
 
-    async def test_an_untouched_published_article_reports_no_changes(self, editor_client) -> None:
+    async def test_an_untouched_published_article_reports_no_changes(
+        self, editor_client
+    ) -> None:
         article = await seed(editor_client, "unchanged")
 
-        preview = page_props((await editor_client.get(preview_of(article.id))).text)["preview"]
+        preview = page_props((await editor_client.get(preview_of(article.id))).text)[
+            "preview"
+        ]
 
         assert preview["has_unpublished_changes"] is False
         assert preview["status"] == "published"
@@ -173,7 +185,9 @@ class TestWhatItShows:
             editor_client, "never-live", status=ArticleStatus.DRAFT, publish_body=False
         )
 
-        preview = page_props((await editor_client.get(preview_of(article.id))).text)["preview"]
+        preview = page_props((await editor_client.get(preview_of(article.id))).text)[
+            "preview"
+        ]
 
         assert preview["live_url"] is None
         assert preview["status"] == "draft"
@@ -228,13 +242,19 @@ class TestItIsNotForReaders:
 
         assert (await anon_client.get(f"{NEWS}/unfinished")).status_code == 404
 
-    async def test_the_public_viewer_still_serves_the_snapshot(self, editor_public_client) -> None:
+    async def test_the_public_viewer_still_serves_the_snapshot(
+        self, editor_public_client
+    ) -> None:
         """And the other half of it: the viewer reads ``published_data``, so an
         edited draft changes nothing about what readers get."""
-        article = await seed(editor_public_client, "steady", draft_data=body_with("as-published"))
+        article = await seed(
+            editor_public_client, "steady", draft_data=body_with("as-published")
+        )
         await edit_body(editor_public_client, article.id, body_with("draft-only"))
 
-        assert "draft-only" not in (await editor_public_client.get(f"{NEWS}/steady")).text
+        assert "draft-only" not in (
+            await editor_public_client.get(f"{NEWS}/steady")
+        ).text
 
 
 class TestLanguage:
@@ -258,6 +278,8 @@ class TestLanguage:
     ) -> None:
         article = await seed(editor_client, "haushalt", locale="de")
 
-        preview = page_props((await editor_client.get(preview_of(article.id))).text)["preview"]
+        preview = page_props((await editor_client.get(preview_of(article.id))).text)[
+            "preview"
+        ]
 
         assert preview["live_url"] == "/de/news/haushalt"

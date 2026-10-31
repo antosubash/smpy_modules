@@ -36,7 +36,9 @@ async def client(monkeypatch):
     from sm_ai.endpoints.api import router as api_router
 
     services.install(
-        services.AiServices(settings=AiSettings(chat_api_key=crypto.encrypt_value("sk-stored")))
+        services.AiServices(
+            settings=AiSettings(chat_api_key=crypto.encrypt_value("sk-stored"))
+        )
     )
     applied: list[dict] = []
 
@@ -117,7 +119,9 @@ class TestBuildChanges:
 
 class TestPutSettings:
     async def test_put_applies_changes(self, client):
-        res = await client.put("/api/ai/settings", json={"chat_model": "claude-sonnet-5"})
+        res = await client.put(
+            "/api/ai/settings", json={"chat_model": "claude-sonnet-5"}
+        )
         assert res.status_code == 200
         assert client.applied == [{"chat_model": "claude-sonnet-5"}]
 
@@ -159,7 +163,9 @@ class TestSlotRequiresBaseUrl:
         assert client.applied == []
 
     async def test_provider_alone_rejected_when_stored_url_blank(self, client):
-        res = await client.put("/api/ai/settings", json={"embedding_provider": "openai_compatible"})
+        res = await client.put(
+            "/api/ai/settings", json={"embedding_provider": "openai_compatible"}
+        )
         assert res.status_code == 422
 
     async def test_with_url_accepted(self, client):

@@ -27,7 +27,9 @@ ARTICLES = f"{ROUTE_PREFIX_API}/articles"
 
 async def _draft(client, slug="a-draft"):
     async with client.db_state.session_factory() as db:
-        return await make_article(db, slug=slug, title="A draft", status=ArticleStatus.DRAFT)
+        return await make_article(
+            db, slug=slug, title="A draft", status=ArticleStatus.DRAFT
+        )
 
 
 class TestPublishSeparation:
@@ -87,7 +89,9 @@ class TestPublishSeparation:
 
         assert response.status_code == 201
 
-    async def test_submitting_for_review_still_needs_only_news_edit(self, author_client) -> None:
+    async def test_submitting_for_review_still_needs_only_news_edit(
+        self, author_client
+    ) -> None:
         """Gating this on ``news.publish`` would close the only door the
         separation leaves an author."""
         article = await _draft(author_client)
@@ -112,10 +116,7 @@ class TestPublishSeparation:
 class TestDraftAndPublishedAreSeparate:
     async def test_publishing_snapshots_the_draft(self, db) -> None:
         article = await make_article(
-            db,
-            slug="snap",
-            status=ArticleStatus.DRAFT,
-            publish_body=False,
+            db, slug="snap", status=ArticleStatus.DRAFT, publish_body=False,
             draft_data={"content": [{"type": "Text", "props": {"text": "v1"}}]},
         )
 
@@ -129,10 +130,7 @@ class TestDraftAndPublishedAreSeparate:
         An author fixing a typo on a live article is not republishing it.
         """
         article = await make_article(
-            db,
-            slug="live",
-            status=ArticleStatus.DRAFT,
-            publish_body=False,
+            db, slug="live", status=ArticleStatus.DRAFT, publish_body=False,
             draft_data={"content": [{"type": "Text", "props": {"text": "v1"}}]},
         )
         service = ArticlesService(db)
@@ -148,9 +146,8 @@ class TestDraftAndPublishedAreSeparate:
     async def test_unpublishing_keeps_what_readers_last_saw(self, db) -> None:
         """Discarding it would make "what was live before I pulled it?"
         unanswerable."""
-        article = await make_article(
-            db, slug="pulled", status=ArticleStatus.DRAFT, publish_body=False
-        )
+        article = await make_article(db, slug="pulled", status=ArticleStatus.DRAFT,
+                                     publish_body=False)
         service = ArticlesService(db)
         await service.publish(article.id)
 
@@ -164,9 +161,8 @@ class TestReview:
     async def test_approving_publishes(self, db) -> None:
         """One action, because approving a submission the reviewer then has to
         publish separately is a step that only ever gets forgotten."""
-        article = await make_article(
-            db, slug="queued", status=ArticleStatus.DRAFT, publish_body=False
-        )
+        article = await make_article(db, slug="queued", status=ArticleStatus.DRAFT,
+                                     publish_body=False)
         service = ArticlesService(db)
         await service.submit_for_review(article.id)
 
@@ -176,9 +172,8 @@ class TestReview:
         assert article.published_data is not None
 
     async def test_rejecting_returns_it_to_draft_with_a_reason(self, db) -> None:
-        article = await make_article(
-            db, slug="sent-back", status=ArticleStatus.DRAFT, publish_body=False
-        )
+        article = await make_article(db, slug="sent-back", status=ArticleStatus.DRAFT,
+                                     publish_body=False)
         service = ArticlesService(db)
         await service.submit_for_review(article.id)
 
@@ -189,9 +184,8 @@ class TestReview:
 
     async def test_resubmitting_clears_the_stale_rejection_note(self, db) -> None:
         """Otherwise the banner from the last round shadows the new one."""
-        article = await make_article(
-            db, slug="round-two", status=ArticleStatus.DRAFT, publish_body=False
-        )
+        article = await make_article(db, slug="round-two", status=ArticleStatus.DRAFT,
+                                     publish_body=False)
         service = ArticlesService(db)
         await service.submit_for_review(article.id)
         await service.reject(article.id, "First pass")
@@ -201,9 +195,8 @@ class TestReview:
         assert article.rejection_note is None
 
     async def test_only_a_submitted_article_can_be_approved(self, db) -> None:
-        article = await make_article(
-            db, slug="not-queued", status=ArticleStatus.DRAFT, publish_body=False
-        )
+        article = await make_article(db, slug="not-queued", status=ArticleStatus.DRAFT,
+                                     publish_body=False)
 
         with pytest.raises(Exception) as exc:
             await ArticlesService(db).approve(article.id)
@@ -214,9 +207,8 @@ class TestReview:
 class TestRevisions:
     async def test_every_transition_records_one(self, db) -> None:
         """The history is the audit log rather than something kept beside it."""
-        article = await make_article(
-            db, slug="tracked", status=ArticleStatus.DRAFT, publish_body=False
-        )
+        article = await make_article(db, slug="tracked", status=ArticleStatus.DRAFT,
+                                     publish_body=False)
         service = ArticlesService(db)
 
         await service.publish(article.id)
@@ -228,13 +220,9 @@ class TestRevisions:
     async def test_restoring_a_revision_does_not_publish_it(self, db) -> None:
         """Restoring is an editing action — the author looks at what came back
         before deciding it should be live."""
-        article = await make_article(
-            db,
-            slug="restored",
-            status=ArticleStatus.DRAFT,
-            publish_body=False,
-            draft_data={"content": ["v1"]},
-        )
+        article = await make_article(db, slug="restored", status=ArticleStatus.DRAFT,
+                                     publish_body=False,
+                                     draft_data={"content": ["v1"]})
         service = ArticlesService(db)
         await service.publish(article.id)
         await service.save_body(article.id, {"content": ["v2"]})
@@ -249,10 +237,10 @@ class TestRevisions:
         assert article.status is ArticleStatus.PUBLISHED
 
     async def test_a_revision_of_another_article_is_a_404(self, db) -> None:
-        mine = await make_article(db, slug="mine", status=ArticleStatus.DRAFT, publish_body=False)
-        theirs = await make_article(
-            db, slug="theirs", status=ArticleStatus.DRAFT, publish_body=False
-        )
+        mine = await make_article(db, slug="mine", status=ArticleStatus.DRAFT,
+                                  publish_body=False)
+        theirs = await make_article(db, slug="theirs", status=ArticleStatus.DRAFT,
+                                    publish_body=False)
         service = ArticlesService(db)
         await service.publish(theirs.id)
         stolen = (await service.list_revisions(theirs.id))[0]
@@ -264,7 +252,9 @@ class TestRevisions:
 
 
 class TestTrash:
-    async def test_trashing_hides_it_and_restoring_brings_it_back(self, editor_client) -> None:
+    async def test_trashing_hides_it_and_restoring_brings_it_back(
+        self, editor_client
+    ) -> None:
         article = await _draft(editor_client, slug="temp")
 
         assert (await editor_client.post(f"{ARTICLES}/{article.id}/trash")).status_code == 204

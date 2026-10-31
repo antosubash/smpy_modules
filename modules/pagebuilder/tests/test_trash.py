@@ -52,7 +52,9 @@ class TestSoftDelete:
 
         assert (await authed_client.get(f"{API}/{page['id']}")).status_code == 404
 
-    async def test_a_published_page_goes_offline_at_once(self, authed_client: AsyncClient) -> None:
+    async def test_a_published_page_goes_offline_at_once(
+        self, authed_client: AsyncClient
+    ) -> None:
         """The 30-day window is for recovery, not for staying live."""
         page = await _create(authed_client, "live-then-binned", publish=True)
         assert (await authed_client.get("/p/live-then-binned")).status_code == 200
@@ -69,7 +71,9 @@ class TestSoftDelete:
 
         assert "mapped" not in body
 
-    async def test_it_is_recoverable_rather_than_removed(self, authed_client: AsyncClient) -> None:
+    async def test_it_is_recoverable_rather_than_removed(
+        self, authed_client: AsyncClient
+    ) -> None:
         page = await _create(authed_client, "still-there")
 
         await authed_client.delete(f"{API}/{page['id']}")
@@ -89,7 +93,9 @@ class TestTrashListing:
         assert [p["slug"] for p in listed["items"]] == ["binned"]
         assert kept["slug"] not in [p["slug"] for p in listed["items"]]
 
-    async def test_trash_route_is_not_read_as_a_page_id(self, authed_client: AsyncClient) -> None:
+    async def test_trash_route_is_not_read_as_a_page_id(
+        self, authed_client: AsyncClient
+    ) -> None:
         assert (await authed_client.get(f"{API}/trash")).status_code == 200
 
 
@@ -114,7 +120,9 @@ class TestRestore:
         assert (await authed_client.get(f"{API}/{page['id']}")).json()["status"] == "draft"
         assert (await authed_client.get("/p/was-live")).status_code == 404
 
-    async def test_the_slug_is_still_held_while_trashed(self, authed_client: AsyncClient) -> None:
+    async def test_the_slug_is_still_held_while_trashed(
+        self, authed_client: AsyncClient
+    ) -> None:
         """Releasing it would let a new page take the URL, and restoring the old
         one would then collide or silently steal the address back."""
         page = await _create(authed_client, "claimed")
@@ -152,12 +160,8 @@ class TestPurge:
 class TestRetentionSweep:
     async def test_it_removes_only_what_is_past_the_window(self, db) -> None:
         service = PagesService(db)
-        old = Page(
-            slug="old",
-            title="Old",
-            draft_data={},
-            deleted_at=datetime.now(UTC) - timedelta(days=RETENTION_DAYS + 1),
-        )
+        old = Page(slug="old", title="Old", draft_data={}, deleted_at=datetime.now(UTC)
+                   - timedelta(days=RETENTION_DAYS + 1))
         recent = Page(slug="recent", title="Recent", draft_data={}, deleted_at=datetime.now(UTC))
         live = Page(slug="live", title="Live", draft_data={})
         db.add_all([old, recent, live])

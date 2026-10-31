@@ -30,7 +30,9 @@ async def record(db: AsyncSession, *, tag_id: int, old_slug: str, new_slug: str)
     if old_slug == new_slug:
         return
     await db.execute(
-        sa_delete(NewsTagRedirect).where(NewsTagRedirect.from_slug.in_([old_slug, new_slug]))
+        sa_delete(NewsTagRedirect).where(
+            NewsTagRedirect.from_slug.in_([old_slug, new_slug])
+        )
     )
     db.add(NewsTagRedirect(from_slug=old_slug, tag_id=tag_id))
     await db.flush()
@@ -48,7 +50,9 @@ async def release(db: AsyncSession, slug: str) -> None:
 async def repoint(db: AsyncSession, *, source: NewsTag, target: NewsTag) -> None:
     """A merge folds ``source`` into ``target``: its addresses go with it."""
     await db.execute(
-        update(NewsTagRedirect).where(NewsTagRedirect.tag_id == source.id).values(tag_id=target.id)
+        update(NewsTagRedirect)
+        .where(NewsTagRedirect.tag_id == source.id)
+        .values(tag_id=target.id)
     )
     await record(db, tag_id=target.id or 0, old_slug=source.slug, new_slug=target.slug)
 
