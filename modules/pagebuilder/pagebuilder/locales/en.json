@@ -957,12 +957,19 @@
     "upload_to": "Upload to folder"
   },
   "gallery": {
+    "description": "Pick an uploaded file. Search by file name, or page through the library.",
     "empty": "No files uploaded yet.",
     "file_count_one": "{count} file",
     "file_count_other": "{count} files",
+    "load_failed": "Could not load the library: {message}",
     "loading": "Loading...",
     "next": "Next",
+    "no_matches": "No file name matches that search.",
+    "pagination": "Library pages",
     "prev": "Prev",
+    "retry": "Try again",
+    "search_label": "Search by file name",
+    "search_placeholder": "e.g. hero",
     "title": "Select a file"
   },
   "grid": {
@@ -1078,12 +1085,7 @@
   "media_picker": {
     "browse": "Browse media…",
     "clear": "Clear",
-    "close": "Close picker",
-    "dialog": "Media library picker",
-    "empty": "No uploads yet. Upload images from the Media library page.",
-    "loading": "Loading…",
-    "placeholder": "Pick from library or paste a URL",
-    "title": "Pick an image"
+    "placeholder": "Pick from library or paste a URL"
   },
   "narrow": {
     "description": "Drag-and-drop layout needs width, so the canvas is read-only at this size. You can still preview the draft, reorder blocks below, schedule and publish.",

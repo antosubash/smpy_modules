@@ -957,12 +957,19 @@
     "upload_to": "In Ordner hochladen"
   },
   "gallery": {
+    "description": "Wählen Sie eine hochgeladene Datei. Suchen Sie nach dem Dateinamen oder blättern Sie durch die Mediathek.",
     "empty": "Noch keine Dateien hochgeladen.",
     "file_count_one": "{count} Datei",
     "file_count_other": "{count} Dateien",
+    "load_failed": "Die Mediathek konnte nicht geladen werden: {message}",
     "loading": "Wird geladen …",
     "next": "Weiter",
+    "no_matches": "Kein Dateiname passt zu dieser Suche.",
+    "pagination": "Seiten der Mediathek",
     "prev": "Zurück",
+    "retry": "Erneut versuchen",
+    "search_label": "Nach Dateiname suchen",
+    "search_placeholder": "z. B. hero",
     "title": "Datei auswählen"
   },
   "grid": {
@@ -1078,12 +1085,7 @@
   "media_picker": {
     "browse": "Medien durchsuchen …",
     "clear": "Leeren",
-    "close": "Auswahl schließen",
-    "dialog": "Mediathek-Auswahl",
-    "empty": "Noch keine Uploads. Laden Sie Bilder auf der Mediathek-Seite hoch.",
-    "loading": "Wird geladen …",
-    "placeholder": "Aus der Mediathek wählen oder URL einfügen",
-    "title": "Bild auswählen"
+    "placeholder": "Aus der Mediathek wählen oder URL einfügen"
   },
   "narrow": {
     "description": "Das Layout per Drag-and-drop braucht Platz, daher ist die Arbeitsfläche bei dieser Größe schreibgeschützt. Sie können den Entwurf weiterhin in der Vorschau ansehen, Blöcke unten umsortieren, planen und veröffentlichen.",

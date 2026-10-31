@@ -142,7 +142,7 @@ test.describe('Image block + media picker', () => {
 
     // 4) Open picker and click the asset.
     await page.getByRole('button', { name: /browse media/i }).click();
-    const dialog = page.getByRole('dialog', { name: /media library picker/i });
+    const dialog = page.getByRole('dialog', { name: /select a file/i });
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: /hero-1024x768\.png/ }).click();
 
