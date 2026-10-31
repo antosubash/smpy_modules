@@ -917,8 +917,10 @@
     "before": "Bilddateien hier ablegen, um sie hochzuladen nach"
   },
   "editor": {
+    "add_item": "Eintrag hinzufügen",
     "rejected": "Abgelehnt:",
-    "untitled": "Seite ohne Titel"
+    "untitled": "Seite ohne Titel",
+    "zoom": "Zoom"
   },
   "errors": {
     "csrf_failed": "Das Sicherheitstoken dieser Seite ist veraltet. Laden Sie die Seite neu und versuchen Sie es erneut – Ihre Änderungen bleiben auf dieser Seite erhalten, bis Sie sie verlassen.",

@@ -11,6 +11,7 @@ import { NO_HEADER_ACTIONS } from '../components/editor/noHeaderActions';
 import { emptyLayoutData, getLayoutPuckConfig } from '../components/layoutPuckConfig';
 import { localizeConfig } from '../components/localizeConfig';
 import { useIsNarrow } from '../hooks/useIsNarrow';
+import { usePuckA11y } from '../hooks/usePuckA11y';
 import {
   type LayoutDetail,
   type LayoutRevisionRead,
@@ -28,6 +29,7 @@ interface Props {
 
 export default function LayoutEditor() {
   const { t, locale } = useT();
+  usePuckA11y();
   const props = usePage<{ props: Props }>().props as unknown as Props;
   const { layout } = props;
   const revisions = props.revisions ?? [];
