@@ -18,6 +18,7 @@ import { useIsNarrow } from '../hooks/useIsNarrow';
 import { usePageRevisions } from '../hooks/usePageRevisions';
 import { usePageSchedule } from '../hooks/usePageSchedule';
 import { usePageWorkflow } from '../hooks/usePageWorkflow';
+import { usePuckA11y } from '../hooks/usePuckA11y';
 import type { PageDetail, PageRestoreMarker, PageRevisionRead } from '../utils/api';
 import type { EditorSnapshot } from '../utils/editorSnapshot';
 import { keys, useT } from '../utils/i18n';
@@ -73,6 +74,10 @@ function initialSnapshotFor(page: PageDetail | null): EditorSnapshot {
 
 export default function PageEditor() {
   const { t } = useT();
+  usePuckA11y({
+    zoom: t(keys.pagebuilder.editor.zoom),
+    addItem: t(keys.pagebuilder.editor.add_item),
+  });
   const props = usePage<{ props: Props }>().props as unknown as Props;
   const { page } = props;
   const revisions = props.revisions ?? [];
