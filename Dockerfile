@@ -25,7 +25,7 @@ ARG UV_VERSION=0.13.4
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
 
 # ---------------------------------------------------------------------------
-FROM node:26.11.1-bookworm-slim@sha256:86f07bc9c5dce4578cf37e5a418b7bfc7f817cda25cde66e2b66e95ed86c4567 AS ui
+FROM node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe AS ui
 ARG PYTHON_VERSION
 COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_LINK_MODE=copy \
@@ -50,7 +50,7 @@ RUN uv run --no-sync --project host python -m simple_module_hosting sync-js-deps
  && npm run build
 
 # ---------------------------------------------------------------------------
-FROM python:3.14.7-slim-bookworm@sha256:82bc3c539b8813ada9d68c63b40158fa002f7f33de9bf3312a3dfdc0620dff56 AS runtime
+FROM python:3.15.0-slim-bookworm@sha256:0e019bbdfb5d9874cb2389f1c2884b64aa2ac97c99960b5bc521cef978c0617d AS runtime
 COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
