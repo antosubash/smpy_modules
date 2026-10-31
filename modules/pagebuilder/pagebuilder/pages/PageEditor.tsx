@@ -74,10 +74,7 @@ function initialSnapshotFor(page: PageDetail | null): EditorSnapshot {
 
 export default function PageEditor() {
   const { t } = useT();
-  usePuckA11y({
-    zoom: t(keys.pagebuilder.editor.zoom),
-    addItem: t(keys.pagebuilder.editor.add_item),
-  });
+  usePuckA11y();
   const props = usePage<{ props: Props }>().props as unknown as Props;
   const { page } = props;
   const revisions = props.revisions ?? [];

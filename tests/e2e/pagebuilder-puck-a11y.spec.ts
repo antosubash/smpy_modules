@@ -44,9 +44,8 @@ test.describe('Puck editor accessibility', () => {
     await outline.focus();
     await expect(outline).toBeFocused();
     await page.keyboard.press('Enter');
-    await expect(
-      page.getByRole('button', { name: /Keyboard heading|Heading/ }).first(),
-    ).toBeVisible();
+    // The Outline's rows are buttons; the Blocks drawer's are not.
+    await expect(page.locator('button[class*="_Layer-clickable_"]').first()).toBeVisible();
   });
 
   test('both layout editors reach their plugin rail from the keyboard', async ({ page }) => {
@@ -56,6 +55,9 @@ test.describe('Puck editor accessibility', () => {
     for (const slot of ['layout-header-slot', 'layout-footer-slot']) {
       const blocks = page.getByTestId(slot).getByRole('button', { name: 'Blocks', exact: true });
       await expect(blocks).toHaveAttribute('tabindex', '0');
+      await blocks.focus();
+      await page.keyboard.press('Enter');
+      await expect(blocks).toBeFocused();
     }
   });
 });

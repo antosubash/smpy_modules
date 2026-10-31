@@ -17,18 +17,21 @@
 
 import { useEffect } from 'react';
 
+import { keys, useT } from '../utils/i18n';
+
 const ZOOM = 'select[class*="_ViewportControls-zoomSelect_"]';
 const ARRAY_ADD = 'button[class*="_ArrayField-addButton_"]';
 const NAV_ITEM = '[class*="_NavItem-link_"]';
 
-interface Labels {
-  zoom: string;
-  addItem: string;
-}
+const OWN_LABEL = 'data-a11y-label';
 
+/** Names unnamed controls; a name set here is renamed when the locale changes. */
 function label(doc: Document, selector: string, name: string): void {
   for (const el of doc.querySelectorAll(selector)) {
-    if (!el.getAttribute('aria-label')) el.setAttribute('aria-label', name);
+    if (!el.getAttribute('aria-label') || el.hasAttribute(OWN_LABEL)) {
+      el.setAttribute('aria-label', name);
+      el.setAttribute(OWN_LABEL, '');
+    }
   }
 }
 
@@ -58,23 +61,31 @@ function onCanvasKey(event: KeyboardEvent): void {
   const target = event.target as HTMLElement | null;
   if (typeof target?.hasAttribute !== 'function') return;
   if (!target.hasAttribute('data-puck-component')) return;
+  // A block whose root is itself a form control or editable keeps its Enter.
+  if (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
   event.preventDefault();
   target.click();
 }
 
-export function usePuckA11y(labels: Labels): void {
-  const { zoom, addItem } = labels;
+export function usePuckA11y(): void {
+  const { t } = useT();
+  const zoom = t(keys.pagebuilder.editor.zoom);
+  const addItem = t(keys.pagebuilder.editor.add_item);
   useEffect(() => {
     // The canvas is a same-origin iframe in the page editor and part of the
     // document in the layout editor; listen in both.
-    const docs = new Set<Document>();
-    const frames = new WeakSet<HTMLIFrameElement>();
-    const listen = (doc: Document) => {
-      if (docs.has(doc)) return;
-      docs.add(doc);
-      doc.addEventListener('keydown', onCanvasKey);
+    // Each frame's current document, so a swapped one is unhooked rather than kept.
+    const frameDocs = new Map<HTMLIFrameElement, Document | null>();
+    const loadHandlers = new Map<HTMLIFrameElement, () => void>();
+    document.addEventListener('keydown', onCanvasKey);
+    const hook = (iframe: HTMLIFrameElement) => {
+      const doc = iframe.contentDocument;
+      const prev = frameDocs.get(iframe);
+      if (prev === doc) return;
+      prev?.removeEventListener('keydown', onCanvasKey);
+      doc?.addEventListener('keydown', onCanvasKey);
+      frameDocs.set(iframe, doc);
     };
-    listen(document);
 
     let frame = 0;
     const patch = () => {
@@ -83,27 +94,32 @@ export function usePuckA11y(labels: Labels): void {
       label(document, ARRAY_ADD, addItem);
       navItems(document);
       for (const iframe of document.querySelectorAll('iframe')) {
-        if (!frames.has(iframe)) {
-          frames.add(iframe);
+        if (!loadHandlers.has(iframe)) {
           // A load can swap the frame's document without touching ours.
-          iframe.addEventListener('load', () => {
-            if (iframe.contentDocument) listen(iframe.contentDocument);
-          });
+          const onLoad = () => hook(iframe);
+          loadHandlers.set(iframe, onLoad);
+          iframe.addEventListener('load', onLoad);
         }
-        if (iframe.contentDocument) listen(iframe.contentDocument);
+        hook(iframe);
       }
     };
     patch();
     // Puck renders these lazily (a field's add button appears when its block
     // is selected), so patch again after each change, once per frame.
-    const observer = new MutationObserver(() => {
-      if (!frame) frame = requestAnimationFrame(patch);
+    const observer = new MutationObserver((records) => {
+      // Only new nodes can need patching; removals (and a drag's churn of
+      // them) do not.
+      if (!frame && records.some((r) => r.addedNodes.length > 0)) {
+        frame = requestAnimationFrame(patch);
+      }
     });
     observer.observe(document.body, { childList: true, subtree: true });
     return () => {
       observer.disconnect();
       if (frame) cancelAnimationFrame(frame);
-      for (const doc of docs) doc.removeEventListener('keydown', onCanvasKey);
+      document.removeEventListener('keydown', onCanvasKey);
+      for (const doc of frameDocs.values()) doc?.removeEventListener('keydown', onCanvasKey);
+      for (const [iframe, onLoad] of loadHandlers) iframe.removeEventListener('load', onLoad);
     };
   }, [zoom, addItem]);
 }
