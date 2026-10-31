@@ -28,9 +28,11 @@ const OWN_LABEL = 'data-a11y-label';
 /** Names unnamed controls; a name set here is renamed when the locale changes. */
 function label(doc: Document, selector: string, name: string): void {
   for (const el of doc.querySelectorAll(selector)) {
-    if (!el.getAttribute('aria-label') || el.hasAttribute(OWN_LABEL)) {
+    // The marker holds the name we set, so a name Puck sets later is not ours to replace.
+    const current = el.getAttribute('aria-label');
+    if (!current || current === el.getAttribute(OWN_LABEL)) {
       el.setAttribute('aria-label', name);
-      el.setAttribute(OWN_LABEL, '');
+      el.setAttribute(OWN_LABEL, name);
     }
   }
 }
@@ -93,6 +95,12 @@ export function usePuckA11y(): void {
       label(document, ZOOM, zoom);
       label(document, ARRAY_ADD, addItem);
       navItems(document);
+      // Forget frames Puck removed, so their entries do not outlive them.
+      for (const iframe of [...loadHandlers.keys()]) {
+        if (iframe.isConnected) continue;
+        loadHandlers.delete(iframe);
+        frameDocs.delete(iframe);
+      }
       for (const iframe of document.querySelectorAll('iframe')) {
         if (!loadHandlers.has(iframe)) {
           // A load can swap the frame's document without touching ours.
