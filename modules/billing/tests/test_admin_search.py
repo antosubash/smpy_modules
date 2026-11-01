@@ -28,9 +28,9 @@ async def test_user_mode_searches_by_email(user_mode_app, admin):
     assert await _ids(admin, "%") == []  # a wildcard is matched literally
     assert await _ids(admin, "_lice") == []
     props = await page_props(admin, "/admin/billing/subscriptions?q=alice")
-    assert [r["tenant_id"] for r in props["rows"]] == [alice]
+    assert [r["tenant_id"] for r in props["subscriptions"]["items"]] == [alice]
     assert props["search"] == "alice"
-    assert props["row_limit"] == 200
+    assert props["subscriptions"]["total"] == 1
 
 
 async def test_user_mode_matches_a_subject_or_uuid_exactly(user_mode_app, admin):

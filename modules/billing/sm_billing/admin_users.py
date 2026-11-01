@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from tenants.models import Tenant
 from users.models import User
 
@@ -80,6 +80,25 @@ def row(
     )
 
 
+def _user_base(*columns):
+    """The user list's FROM clause, shared by the rows and their count."""
+    return (
+        select(*columns)
+        .select_from(User)
+        .outerjoin(Subscription, Subscription.tenant_id == subjects.user_key())
+        .outerjoin(Plan, Plan.id == Subscription.plan_id)
+    )
+
+
+def _user_filters(status: str | None, q: str | None) -> list[ColumnElement[bool]]:
+    filters: list[ColumnElement[bool]] = []
+    if status:
+        filters.append(Subscription.status == status)
+    if q:
+        filters.append(_user_search(q))
+    return filters
+
+
 async def user_rows(
     db: AsyncSession,
     default: Plan,
@@ -91,19 +110,13 @@ async def user_rows(
     q: str | None = None,
 ) -> list[SubscriptionRow]:
     # Built in SQL so paging and the status filter stay one query.
-    key = subjects.user_key()
     stmt = (
-        select(User.id, User.email, User.is_active, User.disabled_at, Subscription, Plan)
-        .outerjoin(Subscription, Subscription.tenant_id == key)
-        .outerjoin(Plan, Plan.id == Subscription.plan_id)
+        _user_base(User.id, User.email, User.is_active, User.disabled_at, Subscription, Plan)
+        .where(*_user_filters(status, q))
         .order_by(User.email, User.id)
         .limit(limit)
         .offset(offset)
     )
-    if status:
-        stmt = stmt.where(Subscription.status == status)
-    if q:
-        stmt = stmt.where(_user_search(q))
     if subject is not None:
         user_id = subjects.user_uuid(subject)
         if user_id is None:
@@ -121,6 +134,12 @@ async def user_rows(
         )
         for user_id, email, is_active, disabled_at, sub, plan in (await db.execute(stmt)).all()
     ]
+
+
+async def user_count(db: AsyncSession, *, status: str | None, q: str | None) -> int:
+    """How many rows ``user_rows`` lists for the same ``status`` and ``q``."""
+    stmt = _user_base(func.count(User.id)).where(*_user_filters(status, q))
+    return (await db.execute(stmt)).scalar_one()
 
 
 async def require_subject(db: AsyncSession, app: FastAPI, subject: str) -> None:

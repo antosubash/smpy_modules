@@ -30,6 +30,7 @@ from sm_billing.sync import resync as resync_subscription
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
+    from sqlalchemy import ColumnElement
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from sm_billing.schemas import AssignIn
@@ -93,6 +94,36 @@ async def save_plan(db: AsyncSession, app: FastAPI, data: PlanIn, plan_id: int |
 # ── subscriptions ───────────────────────────────────────────────────
 
 
+def _tenant_base(*columns):
+    """The tenant list's FROM clause, shared by the rows and their count."""
+    return (
+        select(*columns)
+        .select_from(Tenant)
+        .outerjoin(Subscription, Subscription.tenant_id == Tenant.id)
+        .outerjoin(Plan, Plan.id == Subscription.plan_id)
+    )
+
+
+def _tenant_filters(status: str | None, q: str | None) -> list[ColumnElement[bool]]:
+    filters: list[ColumnElement[bool]] = []
+    if status:
+        filters.append(Subscription.status == status)
+    if q:
+        filters.append(admin_users.tenant_search(q))
+    return filters
+
+
+async def subscription_count(
+    db: AsyncSession, app: FastAPI, *, status: str | None = None, q: str | None = None
+) -> int:
+    """How many rows ``subscription_rows`` lists for the same ``status`` and ``q``."""
+    q = (q or "").strip() or None
+    if subjects.subject_mode(app) == c.SUBJECT_MODE_USER:
+        return await admin_users.user_count(db, status=status, q=q)
+    stmt = _tenant_base(func.count(Tenant.id)).where(*_tenant_filters(status, q))
+    return (await db.execute(stmt)).scalar_one()
+
+
 async def subscription_rows(
     db: AsyncSession,
     app: FastAPI,
@@ -111,19 +142,14 @@ async def subscription_rows(
             db, default, status=status, subject=tenant_id, limit=limit, offset=offset, q=q
         )
     stmt = (
-        select(Tenant, Subscription, Plan)
-        .outerjoin(Subscription, Subscription.tenant_id == Tenant.id)
-        .outerjoin(Plan, Plan.id == Subscription.plan_id)
+        _tenant_base(Tenant, Subscription, Plan)
+        .where(*_tenant_filters(status, q))
         .order_by(Tenant.name, Tenant.id)
         .limit(limit)
         .offset(offset)
     )
-    if status:
-        stmt = stmt.where(Subscription.status == status)
     if tenant_id:
         stmt = stmt.where(Tenant.id == tenant_id)
-    if q:
-        stmt = stmt.where(admin_users.tenant_search(q))
     found = (await db.execute(stmt)).all()
     counts = await tenant_service(db, app).member_counts([t.id for t, _, _ in found])
     return [
