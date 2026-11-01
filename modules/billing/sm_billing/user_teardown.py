@@ -4,7 +4,9 @@ Only in ``subject_mode = "user"``. The teardown is the one a deleted tenant
 gets: :func:`sm_billing.sweep.run_teardown` (claim, backoff) over
 :func:`sm_billing.teardown.cancel_for_deleted_tenant`, keyed by the user's
 ``user:<id>`` subject. A user with no billing is a no-op; a failure is logged
-and retried by the sweep/reconcile like a tenant's.
+and retried like a tenant's: ``reconcile_one`` (``lifecycle.tenant_gone`` reads
+a user subject whose user row is gone as deleted) for a mirrored subscription,
+and the user-mode sweep (:mod:`sm_billing.user_sweep`) for the rest.
 """
 
 from __future__ import annotations

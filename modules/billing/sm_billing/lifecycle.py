@@ -16,6 +16,7 @@ subscription only drops it to the default plan (``resolve.effective_plan``).
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -24,7 +25,9 @@ from tenants.constants import TenantStatus
 from tenants.models import Tenant
 from tenants.resolver import make_invalidator
 from tenants.service import TenantService
+from users.models import User
 
+from sm_billing import constants as c
 from sm_billing.constants import USER_SUBJECT_PREFIX, SubscriptionStatus
 
 if TYPE_CHECKING:
@@ -62,13 +65,21 @@ async def tenant_gone(db: AsyncSession, app: FastAPI, tenant_id: str) -> bool:
     no row exists for it — a missing row there is normal, not a deletion, and
     reading it as one would cancel the host's own subscription. Never for
     ``"default"`` either, for a host that switched multi-tenancy on later, nor
-    for a user subject, which has no tenant row at all.
+    for a tenant check of a user subject, which has no tenant row at all.
+
+    A user subject (#274) is "gone" in user mode once its ``users_user`` row is
+    (users are hard-deleted): reconcile then routes it to the teardown, which
+    is the retry for a ``UserDeleted`` cancel that failed.
     """
-    if (
-        not is_multi_tenant(app)
-        or tenant_id == DEFAULT_TENANT_ID
-        or tenant_id.startswith(USER_SUBJECT_PREFIX)
-    ):
+    if tenant_id.startswith(USER_SUBJECT_PREFIX):
+        if getattr(app.state, c.SUBJECTS_STATE_ATTR, None) != c.SUBJECT_MODE_USER:
+            return False
+        try:
+            user_id = uuid.UUID(tenant_id[len(USER_SUBJECT_PREFIX) :])
+        except ValueError:
+            return False
+        return await db.get(User, user_id) is None
+    if not is_multi_tenant(app) or tenant_id == DEFAULT_TENANT_ID:
         return False
     return await db.get(Tenant, tenant_id) is None
 
