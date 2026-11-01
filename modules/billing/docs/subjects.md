@@ -70,6 +70,27 @@ it. At 41 characters it fits the key columns, which migration `a7c2e4d81b35`
 widens from 32 to 64 (`host/migrations/versions/`). A tenant id is a 32-character
 hex string, so the two kinds cannot collide.
 
+## Entitlements in user mode
+
+`app.state.tenants.entitlements` (`limit`, `has_feature`) answers for
+whichever subject it is given. In `user` mode, `request.state.tenant_id` is
+`default` for every caller, so passing it checks the host's plan, not the
+user's. Take the subject from the request instead:
+
+```python
+from sm_billing.contracts import subject_for_request
+
+entitlements = request.app.state.tenants.entitlements
+subject = subject_for_request(request)  # tenant id in tenant mode, user:<uuid> in user mode
+if not await entitlements.has_feature(subject, "sso"):
+    ...
+limit = await entitlements.limit(subject, "exports.per_month")
+```
+
+`subject_for_request` raises billing's `401 subject_required` for a signed-out
+caller in `user` mode, and the tenant rules (`default`, or `403
+tenant_required`) in `tenant` mode, exactly as `RequiresQuota` does.
+
 ## For callers that run outside a request
 
 A worker or a job has no request to ask, so it must not build the key by hand.
@@ -77,24 +98,36 @@ Import the helpers from the contracts package:
 
 ```python
 from sm_billing.contracts import (
-    current_subject_mode,   # (app) -> "tenant" | "user"
+    worker_subject_mode,    # () -> "tenant" | "user", read from the database
     subject_for_tenant,     # (tenant_id) -> the tenant's subject
-    subject_for_user,       # (user_id) -> "user:<uuid>"
+    subject_for_user,       # (user_id) -> "user:<uuid>", canonical whatever the spelling
 )
 
 usage = getattr(app.state, "billing_usage", None)
 if usage is not None:
     subject = (
         subject_for_user(owner_id)
-        if current_subject_mode(app) == "user"
+        if worker_subject_mode() == "user"
         else subject_for_tenant(tenant_id)
     )
     await usage.consume(subject, "ai.requests", 1, job_id, source="ai")
 ```
 
+- **`worker_subject_mode()`** reads the stored setting through
+  `background_tasks.settings_for(BillingSettings, "sm_billing")` (cached about
+  30 s), so it needs the framework's `simple_module_background_tasks`, as every
+  Celery worker has; billing does not depend on it and imports it only when
+  called. It returns the stored value, which after a change can differ from
+  the mode the web process booted with until that restarts.
+- **`current_subject_mode(app)`** is for web-process code only: it reads what
+  billing's `on_startup` stored on the app. A worker has no such app and would
+  always get `"tenant"`.
+- **`subject_for_user`** accepts a `UUID` or any spelling of one (hex,
+  uppercase) and returns the canonical key; anything else raises `ValueError`.
+
 The first argument of every `UsageMeter` method is the billing subject (the
-parameter is still called `tenant_id`; renaming it is deferred). The helpers
-import nothing heavy, so a Celery worker can load them without the app.
+parameter is still called `tenant_id`; renaming it is deferred). The key
+helpers import nothing heavy, so a Celery worker can load them without the app.
 
 ## images and ai keep billing the tenant
 

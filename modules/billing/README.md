@@ -159,8 +159,9 @@ By default each organisation holds a subscription and a usage counter. Set
 single-tenant host and each signed-in user holds their own instead; boot
 refuses it when `multi_tenant` is on. A user is downgraded to the default plan,
 never suspended, and cannot take a per-seat plan. Workers build the subject key
-with `subject_for_user`, `subject_for_tenant` and `current_subject_mode` from
-`sm_billing.contracts`. See `docs/subjects.md`.
+with `subject_for_user`, `subject_for_tenant` and `worker_subject_mode` from
+`sm_billing.contracts`; request code, entitlement checks included, takes it from
+`subject_for_request(request)`. See `docs/subjects.md`.
 
 ### Providers
 

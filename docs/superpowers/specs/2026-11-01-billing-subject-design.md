@@ -47,7 +47,7 @@ A host can bill **each user** instead of the tenant. gis-data-portal needs this:
   - `user` mode: `user:<id>` for the signed-in user. With no user, a 401 `subject_required`.
 - `exists(db, subject)`: a tenant row exists, or `default`; for a user subject, a user row exists.
 - `names(db, subjects)`: tenant name and slug, or the user's email, for admin lists.
-- Exported from `sm_billing.contracts`: `subject_for_user`, `subject_for_tenant` and `current_subject_mode(app)`. Worker code never builds keys by hand.
+- Exported from `sm_billing.contracts`: `subject_for_user`, `subject_for_tenant`, `current_subject_mode(app)` (web process only), `worker_subject_mode()` (a worker, via `background_tasks.settings_for`) and `subject_for_request(request)` (for entitlement checks). Worker code never builds keys by hand.
 
 **Entry points switched to `subjects`.**
 - `RequiresQuota._tenant` (`metering/deps.py`), which also covers ai's `RequiresAiRequest`.
