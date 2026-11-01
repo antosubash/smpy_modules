@@ -158,7 +158,7 @@ test('the Subscriptions list pages past 50 users, keeping the search', async ({ 
 
   // A search goes back to page 1 and keeps the pager out of a short result.
   await page.locator('#subscriptions-search').fill(target);
-  await page.getByRole('button', { name: 'Search' }).click();
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page).not.toHaveURL(/page=/);
   await expect(page.locator('tbody tr')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Next' })).toHaveCount(0);
