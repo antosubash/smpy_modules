@@ -367,3 +367,6 @@ the target fails without it.
   `E2E_MULTI_TENANT=1` and run in their own CI job, `E2E (multi-tenant)`;
   `start-test-server.sh` sets `tenants.subdomain_base=localhost` for that run,
   so `<org-slug>.localhost` addresses an organisation's public site.
+  Billing's `subject_mode = "user"` (#274) has its own opt-in spec,
+  `billing-user`, run with `E2E_BILLING_USER=1` in the CI job
+  `E2E (billing per user)`; `start-test-server.sh` sets the mode before boot.

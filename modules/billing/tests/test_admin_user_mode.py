@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from api_helpers import arm_csrf, page_props
+from api_helpers import page_props
 from conftest import make_user
 from helpers import make_plan
 from sm_billing.constants import PricingModel
@@ -15,12 +15,6 @@ from usage_api_helpers import ADMIN as USAGE
 from usage_api_helpers import COUNTER, consume, define_meters, put_on_plan
 
 ADMIN = "/api/billing/admin"
-
-
-@pytest.fixture
-async def admin(authenticated_client):
-    await arm_csrf(authenticated_client, "/admin/billing/subscriptions")
-    return authenticated_client
 
 
 async def _plan(app, key: str = "team", **kw) -> int:
@@ -62,6 +56,24 @@ async def test_admin_lists_users_in_user_mode(user_mode_app, admin):
     props = await page_props(admin, "/admin/billing/subscriptions")
     assert props["subject_mode"] == "user"
     assert a in {r["tenant_id"] for r in props["rows"]}
+
+
+async def test_a_user_disabled_with_disabled_at_is_inactive(user_mode_app, admin):
+    """A user the framework treats as disabled (``disabled_at`` set) is listed inactive."""
+    from datetime import UTC, datetime
+
+    from sqlalchemy import update
+    from users.models import User
+
+    app = user_mode_app
+    uid = await make_user(app, "gone@x.io")
+    async with app.state.sm.db.session_factory() as session:
+        await session.execute(
+            update(User).where(User.id == uuid.UUID(uid)).values(disabled_at=datetime.now(UTC))
+        )
+        await session.commit()
+    rows = _by_subject((await admin.get(f"{ADMIN}/subscriptions")).json())
+    assert rows[subject_for_user(uid)]["tenant_status"] == "inactive"
 
 
 async def test_tenant_mode_lists_say_tenant(app, admin):

@@ -27,7 +27,8 @@ from tenants.service import TenantService
 from users.models import User
 
 from sm_billing import constants as c
-from sm_billing.constants import USER_SUBJECT_PREFIX, SubscriptionStatus
+from sm_billing.constants import SubscriptionStatus
+from sm_billing.subject_keys import kind, subject_mode, user_uuid
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -63,18 +64,16 @@ async def tenant_gone(db: AsyncSession, app: FastAPI, tenant_id: str) -> bool:
     Never on a single-tenant host, where everything runs as ``"default"`` and
     no row exists for it — a missing row there is normal, not a deletion, and
     reading it as one would cancel the host's own subscription. Never for
-    ``"default"`` either, for a host that switched multi-tenancy on later, nor
-    for a tenant check of a user subject, which has no tenant row at all.
+    ``"default"`` either, for a host that switched multi-tenancy on later.
 
-    A user subject (#274) is "gone" in user mode once its ``users_user`` row is
-    (users are hard-deleted): reconcile then routes it to the teardown, which
-    is the retry for a ``UserDeleted`` cancel that failed.
+    A user subject (#274) has no tenant row. In user mode it is "gone" once its
+    ``users_user`` row is (users are hard-deleted): reconcile then routes it to
+    the teardown, which is the retry for a ``UserDeleted`` cancel that failed.
+    In tenant mode a left-over ``user:<id>`` is never gone.
     """
-    if tenant_id.startswith(USER_SUBJECT_PREFIX):
-        if getattr(app.state, c.SUBJECTS_STATE_ATTR, None) != c.SUBJECT_MODE_USER:
+    if kind(tenant_id) == c.SUBJECT_MODE_USER:
+        if subject_mode(app) != c.SUBJECT_MODE_USER:
             return False
-        from sm_billing.subjects import user_uuid  # subjects imports this module
-
         user_id = user_uuid(tenant_id)  # a non-canonical spelling names no user
         return user_id is not None and await db.get(User, user_id) is None
     if not is_multi_tenant(app) or tenant_id == DEFAULT_TENANT_ID:
@@ -99,8 +98,8 @@ async def apply_lifecycle(db: AsyncSession, app: FastAPI, sub: Subscription) -> 
     is a ``RequestSession``), so a caller outside a request must commit with
     ``simple_module_db.finalize_session`` — a bare ``commit()`` drops it.
     """
-    if sub.tenant_id.startswith(USER_SUBJECT_PREFIX):
-        # Never suspended: a user is not a tenant (``subjects`` imports this module).
+    if kind(sub.tenant_id) == c.SUBJECT_MODE_USER:
+        # Never suspended: a user is not a tenant.
         sub.suspended_by_billing = False
         await db.flush()
         return

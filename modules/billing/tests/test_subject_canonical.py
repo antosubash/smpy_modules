@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
-from api_helpers import arm_csrf
 from conftest import make_user
 from helpers import make_plan
 from sm_billing import subjects
@@ -27,12 +25,6 @@ def _spellings(user_id: str) -> list[str]:
     return [f"user:{user_id.upper()}", f"user:{uuid.UUID(user_id).hex}"]
 
 
-@pytest.fixture
-async def admin(authenticated_client):
-    await arm_csrf(authenticated_client, "/admin/billing/subscriptions")
-    return authenticated_client
-
-
 async def test_only_the_canonical_spelling_names_a_user(user_mode_app):
     app = user_mode_app
     user_id = await make_user(app, "a@x.io")
@@ -42,7 +34,6 @@ async def test_only_the_canonical_spelling_names_a_user(user_mode_app):
         assert await subjects.exists(db, canonical)
         for spelling in _spellings(user_id):
             assert subjects.user_uuid(spelling) is None
-            assert subjects.user_id_of(spelling) is None
             assert not await subjects.exists(db, spelling)
             assert (await subjects.names(db, [spelling]))[spelling] == (spelling, "")
         # A missing user under another spelling is not "gone" either: it never

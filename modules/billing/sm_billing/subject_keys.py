@@ -1,13 +1,16 @@
-"""The subject-key builders with no dependencies, so ``contracts`` can export them.
+"""The subject-key builders and parsers with no heavy dependencies.
 
-``sm_billing.subjects`` re-exports these; it imports the error and model
-layers, which import ``contracts`` themselves.
+``contracts`` exports them, and ``lifecycle`` reads them, so they cannot live in
+``sm_billing.subjects``: that imports the error and model layers, which import
+``contracts`` and ``lifecycle`` themselves. ``subjects`` re-exports them.
 """
 
 from __future__ import annotations
 
 import uuid
 from typing import Any, Literal
+
+from simple_module_db.tenancy import DEFAULT_TENANT_ID
 
 from sm_billing import constants as c
 
@@ -25,6 +28,33 @@ def subject_for_user(user_id: str | uuid.UUID) -> str:
     ``ValueError`` rather than naming a subject no user can own.
     """
     return f"{c.USER_SUBJECT_PREFIX}{uuid.UUID(str(user_id))}"
+
+
+def kind(subject: str) -> SubjectKind:
+    return (
+        c.SUBJECT_MODE_USER if subject.startswith(c.USER_SUBJECT_PREFIX) else c.SUBJECT_MODE_TENANT
+    )
+
+
+def user_uuid(subject: str) -> uuid.UUID | None:
+    """The user a subject names — only in the canonical ``subject_for_user`` form.
+
+    An uppercase or dashless spelling parses as the same UUID, but every
+    request, list and checkout keys on the canonical string, so a row stored
+    under another spelling would bill nobody. Such a subject names no user.
+    """
+    if kind(subject) != c.SUBJECT_MODE_USER:
+        return None
+    try:
+        parsed = uuid.UUID(subject[len(c.USER_SUBJECT_PREFIX) :])
+    except ValueError:
+        return None
+    return parsed if subject_for_user(parsed) == subject else None
+
+
+def tenant_of(subject: str) -> str:
+    """The tenant a subject lives under: a user subject has none, so ``"default"``."""
+    return DEFAULT_TENANT_ID if kind(subject) == c.SUBJECT_MODE_USER else subject
 
 
 def subject_mode(app: Any) -> SubjectKind:

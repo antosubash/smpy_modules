@@ -37,7 +37,7 @@ A host can bill **each user** instead of the tenant. gis-data-portal needs this:
 
 **Setting.**
 - `BillingSettings.subject_mode: Literal["tenant","user"] = "tenant"`, marked restart-only (`_RESTART`). It is read in `on_startup` from `app.state.sm_billing.settings`.
-- Boot **refuses** `user` mode when `multi_tenant` is on. Otherwise the deleted-tenant sweep would see every user customer as a deleted tenant and cancel it.
+- Boot **refuses** `user` mode when `multi_tenant` is on. User mode replaces the active-organisation checks with the signed-in user, which only makes sense where there are no organisations; the same boot check also keeps the deleted-tenant sweep from seeing user customers as deleted tenants.
 - Boot **warns** when `user` mode finds `default` subscriptions or usage rows. They stay stranded and inert, and nothing moves them.
 
 **Subject helpers, `sm_billing/subjects.py`.**

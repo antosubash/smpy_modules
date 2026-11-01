@@ -3,7 +3,7 @@ import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { Plan, SubscriptionRow } from '../utils/types';
-import { offeredPlan } from './AssignDialog';
+import { AssignDialog, offeredPlan } from './AssignDialog';
 import { PlansTable } from './PlansTable';
 import { SubscriptionsTable } from './SubscriptionsTable';
 
@@ -140,5 +140,32 @@ describe('assign dialog preselection', () => {
     expect(offeredPlan(choices, 9)).toBe(1);
     expect(offeredPlan(choices, undefined)).toBe(1);
     expect(offeredPlan([], 9)).toBe(0);
+  });
+});
+
+describe('AssignDialog', () => {
+  it('says why Assign is unavailable when no plan can be assigned', () => {
+    const seatsOnly: Plan[] = [{ ...plan, id: 2, pricing_model: 'per_seat' }];
+    const { createRoot } = require('react-dom/client') as typeof import('react-dom/client');
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const { act } = React as unknown as { act: (fn: () => void) => void };
+    act(() => {
+      createRoot(host).render(
+        <AssignDialog
+          row={row}
+          plans={seatsOnly}
+          busy={false}
+          onClose={() => {}}
+          onAssign={() => {}}
+          subjectMode="user"
+        />,
+      );
+    });
+    const assign = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Assign');
+    expect(assign?.hasAttribute('disabled')).toBe(true);
+    expect(document.querySelector('[role="status"]')?.textContent).toMatch(
+      /No plan can be assigned/,
+    );
   });
 });

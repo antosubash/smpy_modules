@@ -15,8 +15,9 @@ Set `subject_mode` on the Settings screen or with
 `scripts/set_setting.py sm_billing subject_mode user`, then **restart**: the
 mode is read once at startup. At boot, in `user` mode, billing:
 
-- **refuses to start** when `multi_tenant` is on. A user has no tenant, so the
-  deleted-tenant sweep would see every user customer as a deleted tenant
+- **refuses to start** when `multi_tenant` is on: user mode replaces the
+  active-organisation checks (`deps.require_active`) with the signed-in user,
+  which only makes sense where there are no organisations
   (`sm_billing/subject_boot.py`);
 - maps `billing.view` and `billing.manage` onto the framework's `user` role,
   so every signed-in user can open their own Billing page;

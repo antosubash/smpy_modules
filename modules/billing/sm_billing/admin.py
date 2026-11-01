@@ -187,11 +187,8 @@ async def assign(db: AsyncSession, app: FastAPI, tenant_id: str, data: AssignIn)
     plan = await PlanService(db).get(data.plan_id)
     if plan is None:
         raise BillingError("plan_not_found", 404)
-    if (
-        plan.pricing_model == c.PricingModel.PER_SEAT
-        and subjects.kind(tenant_id) == c.SUBJECT_MODE_USER
-    ):
-        raise BillingError("per_seat_requires_tenant", 422)  # a user has no seats
+    if not subjects.can_hold(tenant_id, plan):
+        raise BillingError("per_seat_requires_tenant", 422)
     sub = await subscription_for(db, tenant_id)
     if sub is None:
         sub = Subscription(tenant_id=tenant_id, plan_id=plan.id)

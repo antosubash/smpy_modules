@@ -70,6 +70,15 @@ async def user_mode_app(single_tenant, app):
     return app
 
 
+@pytest.fixture
+async def admin(authenticated_client):
+    """The platform admin's client, armed for the unsafe verbs on the admin API."""
+    from api_helpers import arm_csrf
+
+    await arm_csrf(authenticated_client, "/admin/billing/subscriptions")
+    return authenticated_client
+
+
 @pytest.fixture(autouse=True)
 def _fresh_membership_cache():
     from tenants.resolver import forget

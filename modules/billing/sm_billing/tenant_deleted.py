@@ -12,7 +12,9 @@ import logging
 from typing import TYPE_CHECKING
 
 from sm_billing import constants as c
+from sm_billing.live import ensure_current
 from sm_billing.subjects import kind
+from sm_billing.sweep import run_teardown
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -34,9 +36,6 @@ def subscribe(bus: EventBus, app: FastAPI) -> None:
         return
 
     async def _on_deleted(event: TenantDeleted) -> None:
-        from sm_billing.live import ensure_current
-        from sm_billing.sweep import run_teardown
-
         if kind(event.tenant_id) == c.SUBJECT_MODE_USER:
             logger.warning("billing: TenantDeleted for user subject %s ignored", event.tenant_id)
             return

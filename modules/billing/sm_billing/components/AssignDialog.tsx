@@ -97,11 +97,19 @@ export function AssignDialog({
             </NativeSelect>
           </div>
         </div>
+        {choices.length === 0 && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {t(keys.billing.assign.no_plans)}
+          </p>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             {t(keys.billing.assign.cancel)}
           </Button>
-          <Button disabled={busy || !planId} onClick={() => onAssign(planId, status)}>
+          <Button
+            disabled={busy || choices.length === 0 || !planId}
+            onClick={() => onAssign(planId, status)}
+          >
             {t(keys.billing.assign.assign)}
           </Button>
         </DialogFooter>

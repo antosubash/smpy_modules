@@ -342,7 +342,8 @@
     "plan": "Plan",
     "status": "Status",
     "cancel": "Cancel",
-    "assign": "Assign"
+    "assign": "Assign",
+    "no_plans": "No plan can be assigned to this subject: every plan is archived or needs seats."
   },
   "connection": {
     "head_title": "Stripe connection",

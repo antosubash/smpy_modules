@@ -48,6 +48,20 @@ def _id(value: Any) -> str | None:
     return value or None
 
 
+def _reference(subject: str) -> str:
+    """A subject as a Checkout ``client_reference_id``: Stripe takes only letters,
+    digits, dashes and underscores, so ``user:<uuid>`` is sent as ``user_<uuid>``
+    (tenant ids are hex and never start with ``user_``)."""
+    return subject.replace(":", "_")
+
+
+def _subject(reference: str | None) -> str | None:
+    """Inverse of :func:`_reference`."""
+    if reference and reference.startswith("user_"):
+        return "user:" + reference[len("user_") :]
+    return reference
+
+
 def _first_item(sub: dict) -> dict:
     items = (sub.get("items") or {}).get("data") or []
     if not items:
@@ -127,7 +141,7 @@ class StripeProvider:
         params: dict[str, Any] = {
             "mode": "subscription",
             "line_items": [{"price": price_id, "quantity": quantity}],
-            "client_reference_id": tenant_id,
+            "client_reference_id": _reference(tenant_id),
             "subscription_data": subscription_data,
             "success_url": success_url,
             "cancel_url": cancel_url,
@@ -224,7 +238,7 @@ class StripeProvider:
         return CheckoutSnapshot(
             id=session["id"],
             subscription_id=_id(session.get("subscription")),
-            tenant_id=session.get("client_reference_id"),
+            tenant_id=_subject(session.get("client_reference_id")),
             customer_id=_id(session.get("customer")),
             status=session.get("status"),
         )

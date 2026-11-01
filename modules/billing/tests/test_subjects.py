@@ -26,13 +26,13 @@ def test_round_trip():
     assert len(user) == 41
     assert subjects.subject_for_user(str(uid)) == user
     assert subjects.kind(user) == "user"
-    assert subjects.user_id_of(user) == str(uid)
+    assert subjects.user_uuid(user) == uid
     assert subjects.tenant_of(user) == "default"
 
     for tenant in ("default", uuid.uuid4().hex):
         assert subjects.subject_for_tenant(tenant) == tenant
         assert subjects.kind(tenant) == "tenant"
-        assert subjects.user_id_of(tenant) is None
+        assert subjects.user_uuid(tenant) is None
         assert subjects.tenant_of(tenant) == tenant
 
 

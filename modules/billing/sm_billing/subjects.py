@@ -12,7 +12,7 @@ import uuid
 from typing import Any
 
 from simple_module_db.tenancy import DEFAULT_TENANT_ID
-from sqlalchemy import select
+from sqlalchemy import String, cast, literal, select
 from tenants.models import Tenant
 from users.models import User
 
@@ -21,45 +21,23 @@ from sm_billing.errors import BillingError
 from sm_billing.lifecycle import is_multi_tenant
 from sm_billing.subject_keys import (
     SubjectKind,
+    kind,
     subject_for_tenant,
     subject_for_user,
     subject_mode,
+    tenant_of,
+    user_uuid,
 )
 
-__all__ = ["SubjectKind", "subject_for_tenant", "subject_for_user", "subject_mode"]
-
-
-def kind(subject: str) -> SubjectKind:
-    return (
-        c.SUBJECT_MODE_USER if subject.startswith(c.USER_SUBJECT_PREFIX) else c.SUBJECT_MODE_TENANT
-    )
-
-
-def user_uuid(subject: str) -> uuid.UUID | None:
-    """The user a subject names — only in the canonical ``subject_for_user`` form.
-
-    An uppercase or dashless spelling parses as the same UUID, but every
-    request, list and checkout keys on the canonical string, so a row stored
-    under another spelling would bill nobody. Such a subject names no user.
-    """
-    if kind(subject) != c.SUBJECT_MODE_USER:
-        return None
-    try:
-        parsed = uuid.UUID(subject[len(c.USER_SUBJECT_PREFIX) :])
-    except ValueError:
-        return None
-    return parsed if subject_for_user(parsed) == subject else None
-
-
-def user_id_of(subject: str) -> str | None:
-    """The user id of a canonical user subject; ``None`` for anything else."""
-    parsed = user_uuid(subject)
-    return None if parsed is None else str(parsed)
-
-
-def tenant_of(subject: str) -> str:
-    """The tenant a subject lives under: a user subject has none, so ``"default"``."""
-    return DEFAULT_TENANT_ID if kind(subject) == c.SUBJECT_MODE_USER else subject
+__all__ = [
+    "SubjectKind",
+    "kind",
+    "subject_for_tenant",
+    "subject_for_user",
+    "subject_mode",
+    "tenant_of",
+    "user_uuid",
+]
 
 
 def for_request(request: Any) -> str:
@@ -81,6 +59,21 @@ def for_request(request: Any) -> str:
     if not is_multi_tenant(request.app):
         return DEFAULT_TENANT_ID
     raise BillingError("tenant_required", 403)
+
+
+def user_key() -> Any:
+    """SQL for ``subject_for_user(users_user.id)``: the join key to a subject column.
+
+    The GUID column is the dashed string on SQLite and a native uuid on
+    Postgres; both cast to the dashed text ``subject_for_user`` writes.
+    """
+    return literal(c.USER_SUBJECT_PREFIX, String).concat(cast(User.id, String))
+
+
+def can_hold(subject: str, plan: Any) -> bool:
+    """Whether ``subject`` may subscribe to ``plan``: a user has no seats to price."""
+    per_seat = plan.pricing_model == c.PricingModel.PER_SEAT
+    return not (per_seat and kind(subject) == c.SUBJECT_MODE_USER)
 
 
 async def exists(db: Any, subject: str) -> bool:

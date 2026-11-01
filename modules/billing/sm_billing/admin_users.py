@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String, cast, literal, or_, select
+from sqlalchemy import or_, select
 from tenants.models import Tenant
 from users.models import User
 
@@ -90,12 +90,10 @@ async def user_rows(
     offset: int,
     q: str | None = None,
 ) -> list[SubscriptionRow]:
-    # Built in SQL so paging and the status filter stay one query: the GUID
-    # column is the dashed string on SQLite and a native uuid on Postgres, and
-    # both cast to the dashed text ``subject_for_user`` writes.
-    key = literal(c.USER_SUBJECT_PREFIX, String).concat(cast(User.id, String))
+    # Built in SQL so paging and the status filter stay one query.
+    key = subjects.user_key()
     stmt = (
-        select(User.id, User.email, User.is_active, Subscription, Plan)
+        select(User.id, User.email, User.is_active, User.disabled_at, Subscription, Plan)
         .outerjoin(Subscription, Subscription.tenant_id == key)
         .outerjoin(Plan, Plan.id == Subscription.plan_id)
         .order_by(User.email, User.id)
@@ -116,12 +114,12 @@ async def user_rows(
             subjects.subject_for_user(user_id),
             email,
             "",
-            "active" if is_active else "inactive",
+            "active" if is_active and disabled_at is None else "inactive",
             1,
             sub,
             plan if plan is not None else default,
         )
-        for user_id, email, is_active, sub, plan in (await db.execute(stmt)).all()
+        for user_id, email, is_active, disabled_at, sub, plan in (await db.execute(stmt)).all()
     ]
 
 

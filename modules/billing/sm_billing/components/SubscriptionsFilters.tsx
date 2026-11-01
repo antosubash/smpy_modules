@@ -55,7 +55,7 @@ export function SubscriptionsFilters({
           <NativeSelect
             id="status-filter"
             value={status}
-            onChange={(e) => onChange({ status: e.target.value, q: search })}
+            onChange={(e) => onChange({ status: e.target.value, q: draft.trim() })}
           >
             <NativeSelectOption value="">{t(c.all)}</NativeSelectOption>
             {STATUSES.map((s) => (

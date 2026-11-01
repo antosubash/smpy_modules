@@ -11,7 +11,6 @@ from dataclasses import replace
 import pytest
 from api_helpers import arm_csrf
 from conftest import make_user
-from fake_provider import FakeProvider
 from helpers import make_plan, make_tenant
 from simple_module_db import finalize_session
 from simple_module_db import tenant_context as real_tenant_context
@@ -25,24 +24,7 @@ from sm_billing.seats import push_quantity
 from sm_billing.subjects import subject_for_user
 from sm_billing.sync import SyncError, apply_snapshot, resync
 from sqlalchemy import select
-from subscription_helpers import _snap
-
-
-def _fake(app) -> FakeProvider:
-    provider = FakeProvider()
-    app.state.sm_billing.provider = provider
-    return provider
-
-
-async def _subscribed(app, subject: str, *, pricing_model="flat", **kw) -> int:
-    """``subject`` on a ``team`` plan mirrored as ``sub_1`` (customer ``cus_1``)."""
-    async with app.state.sm.db.session_factory() as session:
-        plan = await make_plan(session, "team", pricing_model=pricing_model)
-        fields = {"provider_subscription_id": "sub_1", **kw}
-        session.add(Subscription(tenant_id=subject, plan_id=plan.id, **fields))
-        session.add(Customer(tenant_id=subject, provider="stripe", provider_customer_id="cus_1"))
-        await session.commit()
-        return plan.id
+from subscription_helpers import _fake, _snap, _subscribed
 
 
 @contextmanager

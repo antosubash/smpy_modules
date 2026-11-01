@@ -400,8 +400,9 @@ Pages are `{"items", "total", "page", "per_page", "pages"}`.
 
 Adjust takes counters only and recount gauges only: anything else, or an
 unregistered meter, is 400 `unknown_meter` (`{"meter", "kind"}`). Both answer
-404 `tenant_not_found` for an organisation with no row; on a single-tenant
-host `default` is allowed. An unknown hold is 404 `hold_not_found`. Every
+404 `tenant_not_found` for an organisation with no row (in `user` mode, for a
+user that does not exist, or a `user:<uuid>` not in canonical spelling); on a
+single-tenant host `default` is allowed. An unknown hold is 404 `hold_not_found`. Every
 write goes through `UsageService` in its own short transaction.
 
 ## Webhook — `POST /billing/webhooks/stripe`

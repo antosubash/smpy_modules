@@ -82,12 +82,7 @@ class BillingService:
     async def public_plans(self) -> list[PlanOut]:
         """The plans this subject may buy: a user has no seats (see ``_target``)."""
         plans = await self.plans.list(include_archived=False)
-        user = subjects.kind(self.tenant_id) == c.SUBJECT_MODE_USER
-        return [
-            plan_out(p)
-            for p in plans
-            if p.is_public and not (user and p.pricing_model == c.PricingModel.PER_SEAT)
-        ]
+        return [plan_out(p) for p in plans if p.is_public and subjects.can_hold(self.tenant_id, p)]
 
     # ── guards ──────────────────────────────────────────────────
 
@@ -99,11 +94,8 @@ class BillingService:
         plan = await self.plans.get(plan_id)
         if plan is None or plan.archived_at is not None or not plan.is_public:
             raise BillingError("plan_not_found", 404)
-        if (
-            plan.pricing_model == c.PricingModel.PER_SEAT
-            and subjects.kind(self.tenant_id) == c.SUBJECT_MODE_USER
-        ):
-            raise BillingError("per_seat_requires_tenant", 422)  # a user has no seats
+        if not subjects.can_hold(self.tenant_id, plan):
+            raise BillingError("per_seat_requires_tenant", 422)
         return plan
 
     @staticmethod

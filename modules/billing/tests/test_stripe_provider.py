@@ -200,6 +200,26 @@ async def test_checkout_params(provider):
     assert params["subscription_data"] == {"metadata": {"tenant_id": "t1"}, "trial_period_days": 14}
 
 
+async def test_checkout_reference_of_a_user_subject_is_a_valid_stripe_reference(provider):
+    subject = "user:0b8f6a52-5b0a-4c0e-9f43-2f5f9a3c7d10"
+    await provider.create_checkout(
+        customer_id=None,
+        price_id="price_p",
+        quantity=1,
+        trial_days=0,
+        tenant_id=subject,
+        success_url="https://a/ok",
+        cancel_url="https://a/no",
+    )
+    params = provider.calls[-1][2]
+    assert ":" not in params["client_reference_id"]
+    assert params["subscription_data"]["metadata"] == {"tenant_id": subject}
+    ref = params["client_reference_id"]
+    session = {"id": "cs_1", "subscription": "sub_9", "client_reference_id": ref, "customer": "c9"}
+    provider._v1.checkout = SimpleNamespace(sessions=_Recorder(provider.calls, "checkout", session))
+    assert (await provider.fetch_checkout("cs_1")).tenant_id == subject
+
+
 async def test_checkout_without_trial_omits_trial(provider):
     await provider.create_checkout(
         customer_id="cus_1",

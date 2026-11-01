@@ -13,12 +13,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String, cast, literal, or_, select
+from sqlalchemy import or_, select
 from users.models import User
 
 from sm_billing.constants import USER_SUBJECT_PREFIX
 from sm_billing.models import Customer
-from sm_billing.subjects import user_uuid
+from sm_billing.subjects import user_key, user_uuid
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 async def orphan_users(app: FastAPI, subject: str | None, now: datetime) -> list[str]:
     """Due, un-torn-down user customers whose user is gone."""
-    key = literal(USER_SUBJECT_PREFIX, String).concat(cast(User.id, String))
+    key = user_key()
     stmt = (
         select(Customer.tenant_id)
         .outerjoin(User, key == Customer.tenant_id)

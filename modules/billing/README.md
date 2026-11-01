@@ -282,7 +282,7 @@ the `csrf_token` prop.
   failing backs off (from 15 minutes up to a day), whichever path tried it,
   and one atomic claim per organisation means only one worker at a time calls Stripe.
   Stripe's "no such customer" is retried too, because a key from another
-  account or mode gives the same answer. A single-tenant host never sweeps. The Checkout session id
+  account or mode gives the same answer. A single-tenant host never sweeps organisations (in `user` mode it sweeps deleted users). The Checkout session id
   is forgotten only once Stripe says the session is no longer open. Everything
   that has not ended is canceled, `incomplete` and `paused` included, across
   every page of the customer's subscriptions.

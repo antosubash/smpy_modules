@@ -342,7 +342,8 @@
     "plan": "Tarif",
     "status": "Status",
     "cancel": "Abbrechen",
-    "assign": "Zuweisen"
+    "assign": "Zuweisen",
+    "no_plans": "Diesem Konto kann kein Tarif zugewiesen werden: Alle Tarife sind archiviert oder benötigen Plätze."
   },
   "connection": {
     "head_title": "Stripe-Verbindung",

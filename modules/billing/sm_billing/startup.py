@@ -20,6 +20,7 @@ from sm_billing import constants as c
 from sm_billing import live
 from sm_billing.entitlements import PlanEntitlements
 from sm_billing.plans import seed_default_plan
+from sm_billing.subject_boot import apply_subject_mode
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -28,8 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 async def run(app: FastAPI) -> None:
-    from sm_billing.subject_boot import apply_subject_mode
-
     await apply_subject_mode(app)
     session_factory = app.state.sm.db.session_factory
     await seed_default_plan(session_factory)

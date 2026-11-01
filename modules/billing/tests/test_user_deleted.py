@@ -6,19 +6,11 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from conftest import make_user
-from fake_provider import FakeProvider
 from simple_module_core.user_events import UserDeleted
 from sm_billing.models import Customer
 from sm_billing.reconcile import reconcile
 from sm_billing.subjects import subject_for_user
-from subscription_helpers import _snap
-from test_subject_kinds import _subscribed
-
-
-def _fake(app) -> FakeProvider:
-    provider = FakeProvider()
-    app.state.sm_billing.provider = provider
-    return provider
+from subscription_helpers import _fake, _snap, _subscribed
 
 
 async def _publish(app, user_id: str) -> None:
@@ -170,3 +162,12 @@ async def test_the_user_sweep_is_one_query_however_many_customers(user_mode_app)
 
     assert sorted(found) == sorted(gone)
     assert len([s for s in statements if s.lstrip().upper().startswith("SELECT")]) == 1
+
+
+async def test_a_malformed_user_id_is_logged_not_raised(user_mode_app, caplog):
+    """The handler must never raise into the publisher, even on a bad id."""
+    event = UserDeleted(user_id=uuid.uuid4())
+    object.__setattr__(event, "user_id", "not-a-uuid")
+    with caplog.at_level("WARNING"):
+        await user_mode_app.state.sm.event_bus.publish(event)
+    assert any("could not cancel" in r.getMessage() for r in caplog.records)
