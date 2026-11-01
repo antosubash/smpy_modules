@@ -143,6 +143,7 @@ Metering writes run in their own short transaction finished with
 `finalize_session`. Pass `db=` to `consume`/`record` only when the rest of the
 caller's transaction is short, because the rollup row lock is held until it
 commits.
+`subject_mode = user` (restart-only, refused at boot on a multi-tenant host) makes a signed-in user the billing subject instead of a tenant; see `modules/billing/docs/subjects.md`.
 Two more billing invariants: webhook payloads are never trusted for state (every
 event re-fetches the subscription through `sync.resync`/`apply_snapshot`, the
 one place provider state becomes local state), and response models
@@ -366,3 +367,6 @@ the target fails without it.
   `E2E_MULTI_TENANT=1` and run in their own CI job, `E2E (multi-tenant)`;
   `start-test-server.sh` sets `tenants.subdomain_base=localhost` for that run,
   so `<org-slug>.localhost` addresses an organisation's public site.
+  Billing's `subject_mode = "user"` (#274) has its own opt-in spec,
+  `billing-user`, run with `E2E_BILLING_USER=1` in the CI job
+  `E2E (billing per user)`; `start-test-server.sh` sets the mode before boot.

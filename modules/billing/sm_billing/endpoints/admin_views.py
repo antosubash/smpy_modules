@@ -11,7 +11,7 @@ from simple_module_hosting.permissions import RequiresPermission, resolved_permi
 from simple_module_inertia import InertiaResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_billing import admin
+from sm_billing import admin, subjects
 from sm_billing import constants as c
 from sm_billing.checkout import plan_out
 from sm_billing.metering import admin as usage_admin
@@ -37,6 +37,8 @@ def _common(request: Request) -> dict:
         "checkout_available": bool(services.provider and services.provider.supports_checkout),
         # Why a chosen ``stripe`` fell back to ``manual``; "" when it did not (#200).
         "provider_error": services.provider_error,
+        # "user": the lists name users (by email) instead of organisations (#274).
+        "subject_mode": subjects.subject_mode(request.app),
     }
 
 
@@ -56,7 +58,8 @@ async def subscriptions_page(
     request: Request, inertia: InertiaDep, db: AsyncSession = Depends(get_db)
 ) -> InertiaResponse:
     status = request.query_params.get("status") or None
-    rows = await admin.subscription_rows(db, request.app, status=status)
+    search = (request.query_params.get("q") or "").strip()
+    rows = await admin.subscription_rows(db, request.app, status=status, q=search)
     plans = [plan_out(p).model_dump(mode="json") for p in await PlanService(db).list()]
     return await inertia.render(
         c._PAGE_SUBSCRIPTIONS,
@@ -65,6 +68,9 @@ async def subscriptions_page(
             "rows": [r.model_dump(mode="json") for r in rows],
             "plans": plans,
             "status_filter": status or "",
+            "search": search,
+            # The list stops here; the page says so and points at the search.
+            "row_limit": c.ADMIN_ROW_LIMIT,
             "sync_health": (await admin.sync_health(db, request.app)).model_dump(mode="json"),
         },
     )

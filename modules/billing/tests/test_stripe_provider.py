@@ -3,17 +3,13 @@
 No network: payloads are signed locally with the scheme Stripe documents
 (``t=<ts>,v1=HMAC-SHA256(secret, "<ts>.<body>")``) and verified by the real
 ``stripe`` SDK; API calls go to a recording stand-in for ``client.v1``.
+Checkout tests are in ``test_stripe_checkout.py``.
 """
 
 from __future__ import annotations
 
-import hashlib
-import hmac
-import json
-import time
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from typing import Any
 
 import pytest
 import stripe
@@ -22,84 +18,7 @@ from sm_billing.contracts.provider import InvalidWebhookSignature, ProviderError
 from sm_billing.providers.factory import build_provider
 from sm_billing.providers.stripe import StripeProvider
 from sm_billing.settings import BillingSettings
-
-SECRET = "whsec_test"
-PERIOD_END = 1793491200  # 2026-11-01T00:00:00Z
-
-SUBSCRIPTION = {
-    "id": "sub_1",
-    "object": "subscription",
-    "customer": "cus_1",
-    "status": "trialing",
-    "cancel_at_period_end": False,
-    "trial_end": 1792281600,
-    "metadata": {"tenant_id": "t1"},
-    "items": {
-        "object": "list",
-        "data": [
-            {
-                "id": "si_1",
-                "object": "subscription_item",
-                "quantity": 4,
-                "current_period_end": PERIOD_END,
-                "price": {"id": "price_team_m", "object": "price"},
-            }
-        ],
-    },
-}
-
-
-def _signed(payload: dict, secret: str = SECRET) -> tuple[bytes, dict[str, str]]:
-    body = json.dumps(payload).encode()
-    ts = int(time.time())
-    sig = hmac.new(secret.encode(), f"{ts}.{body.decode()}".encode(), hashlib.sha256).hexdigest()
-    return body, {"stripe-signature": f"t={ts},v1={sig}"}
-
-
-def _event(etype: str, obj: dict) -> dict:
-    return {"id": "evt_1", "object": "event", "type": etype, "data": {"object": obj}}
-
-
-class _Recorder:
-    """Stands in for one ``client.v1.<resource>`` service."""
-
-    def __init__(self, calls: list, name: str, result: dict) -> None:
-        self._calls, self._name, self._result = calls, name, result
-
-    def __getattr__(self, method: str):
-        async def call(*args: Any, **kwargs: Any):
-            self._calls.append((f"{self._name}.{method}", args, kwargs.get("params")))
-            self.options = kwargs.get("options")
-            return stripe.StripeObject.construct_from(self._result, "sk_test")
-
-        return call
-
-
-@pytest.fixture
-def provider():
-    p = StripeProvider(secret_key="sk_test_x", webhook_secret=SECRET)
-    p.calls = []
-    p._v1 = SimpleNamespace(
-        subscriptions=_Recorder(p.calls, "subscriptions", SUBSCRIPTION),
-        customers=_Recorder(p.calls, "customers", {"id": "cus_new", "object": "customer"}),
-        checkout=SimpleNamespace(
-            sessions=_Recorder(p.calls, "checkout", {"id": "cs_1", "url": "https://co/1"})
-        ),
-        billing_portal=SimpleNamespace(
-            sessions=_Recorder(p.calls, "portal", {"id": "bps_1", "url": "https://bp/1"})
-        ),
-        prices=_Recorder(
-            p.calls,
-            "prices",
-            {
-                "id": "price_team_m",
-                "currency": "eur",
-                "active": True,
-                "recurring": {"interval": "month"},
-            },
-        ),
-    )
-    return p
+from stripe_helpers import SECRET, SUBSCRIPTION, _event, _signed
 
 
 def test_parse_subscription_event(provider):
@@ -133,24 +52,6 @@ def test_parse_checkout_completed(provider):
     assert not hasattr(event, "tenant_id")
 
 
-async def test_fetch_checkout_reads_the_retrieved_session(provider):
-    session = {
-        "id": "cs_1",
-        "object": "checkout.session",
-        "subscription": {"id": "sub_9", "object": "subscription"},
-        "client_reference_id": "t9",
-        "customer": "cus_9",
-    }
-    provider._v1.checkout = SimpleNamespace(sessions=_Recorder(provider.calls, "checkout", session))
-    checkout = await provider.fetch_checkout("cs_1")
-    assert provider.calls[-1][:2] == ("checkout.retrieve_async", ("cs_1",))
-    assert (checkout.subscription_id, checkout.tenant_id, checkout.customer_id) == (
-        "sub_9",
-        "t9",
-        "cus_9",
-    )
-
-
 def test_parse_other_event_has_no_subscription(provider):
     body, headers = _signed(_event("invoice.created", {"id": "in_1", "object": "invoice"}))
     assert provider.parse_webhook(body, headers).subscription_id is None
@@ -179,38 +80,6 @@ async def test_fetch_subscription_maps_snapshot(provider):
     assert (snap.status, snap.price_id, snap.quantity) == ("trialing", "price_team_m", 4)
     assert snap.current_period_end == datetime(2026, 11, 1, tzinfo=UTC)
     assert snap.trial_end == datetime.fromtimestamp(1792281600, UTC)
-
-
-async def test_checkout_params(provider):
-    session = await provider.create_checkout(
-        customer_id="cus_1",
-        price_id="price_team_m",
-        quantity=3,
-        trial_days=14,
-        tenant_id="t1",
-        success_url="https://a/ok",
-        cancel_url="https://a/no",
-    )
-    assert (session.id, session.url) == ("cs_1", "https://co/1")
-    name, _, params = provider.calls[-1]
-    assert name == "checkout.create_async"
-    assert params["mode"] == "subscription"
-    assert params["client_reference_id"] == "t1"
-    assert params["line_items"] == [{"price": "price_team_m", "quantity": 3}]
-    assert params["subscription_data"] == {"metadata": {"tenant_id": "t1"}, "trial_period_days": 14}
-
-
-async def test_checkout_without_trial_omits_trial(provider):
-    await provider.create_checkout(
-        customer_id="cus_1",
-        price_id="p",
-        quantity=1,
-        trial_days=0,
-        tenant_id="t1",
-        success_url="s",
-        cancel_url="c",
-    )
-    assert "trial_period_days" not in provider.calls[-1][2]["subscription_data"]
 
 
 async def test_change_plan_updates_the_item_with_proration(provider):
@@ -272,8 +141,3 @@ def test_factory_builds_stripe_with_encrypted_secrets():
         crypto.set_secret_provider(lambda: "")
     assert isinstance(provider, StripeProvider)
     assert error == ""
-
-
-async def test_expire_checkout(provider):
-    await provider.expire_checkout("cs_1")
-    assert provider.calls[-1][:2] == ("checkout.expire_async", ("cs_1",))

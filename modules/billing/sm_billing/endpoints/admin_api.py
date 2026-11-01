@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query, Request
 from simple_module_db.deps import get_db
 from simple_module_hosting.csrf import RequiresCsrf
 from simple_module_hosting.permissions import RequiresPermission
@@ -56,9 +58,10 @@ async def list_subscriptions(
     request: Request,
     status: str | None = None,
     offset: int = 0,
+    q: Annotated[str | None, Query(max_length=120)] = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[SubscriptionRow]:
-    return await admin.subscription_rows(db, request.app, status=status, offset=max(0, offset))
+    return await admin.subscription_rows(db, request.app, status=status, offset=max(0, offset), q=q)
 
 
 @router.post(

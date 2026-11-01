@@ -9,11 +9,13 @@
   "page": {
     "title": "Abrechnung",
     "description": "Tarif, Plätze und Zahlung Ihrer Organisation.",
+    "description_user": "Ihr Tarif und Ihre Zahlung.",
     "plans_heading": "Tarife",
     "period_label": "Abrechnungszeitraum",
     "monthly": "Monatlich",
     "yearly": "Jährlich",
     "owner_only": "Nur der Inhaber der Organisation kann den Tarif ändern.",
+    "owner_only_user": "Sie können Ihren Tarif hier nicht ändern – wenden Sie sich an den Website-Administrator.",
     "no_checkout": "Online-Zahlung ist hier nicht eingerichtet – wenden Sie sich an den Website-Administrator, um den Tarif zu ändern.",
     "activating_title": "Ihr Abonnement wird aktiviert …",
     "activating_description": "Stripe hat die Zahlung bestätigt; diese Seite wird aktualisiert, sobald die Bestätigung bei uns eintrifft.",
@@ -48,6 +50,7 @@
   "usage": {
     "title": "Verbrauch",
     "description": "Was Ihre Organisation verbraucht hat, gemessen an den Grenzen Ihres Tarifs.",
+    "description_user": "Was Sie verbraucht haben, gemessen an den Grenzen Ihres Tarifs.",
     "unlimited": "Unbegrenzt",
     "of_limit": "{used} von {limit}",
     "used_no_limit": "{used} verbraucht",
@@ -181,12 +184,21 @@
   "subscriptions": {
     "head_title": "Abrechnungsabonnements",
     "description_stripe": "Jede Organisation und ihr Stripe-Abonnement.",
+    "description_stripe_users": "Jeder Benutzer und sein Stripe-Abonnement.",
     "description_manual": "Anbieter: {provider}. Tarife werden manuell zugewiesen; niemandem wird etwas berechnet.",
     "fallback_title": "Stripe ist konfiguriert, wird aber nicht verwendet",
     "fallback_description": "{error}. Tarife werden manuell zugewiesen und niemandem wird etwas berechnet, bis dies im Reiter „Stripe-Verbindung“ behoben ist.",
     "status": "Status",
     "all": "Alle",
+    "search": "Organisation",
+    "search_user": "Benutzer",
+    "search_placeholder": "Name, Kürzel oder ID",
+    "search_placeholder_user": "E-Mail oder ID",
+    "search_submit": "Suchen",
+    "limit_notice": "Die ersten {count} werden angezeigt – suchen Sie, um die Liste einzugrenzen.",
+    "empty_search": "Nichts entspricht dieser Suche.",
     "empty_title": "Keine Organisationen",
+    "empty_title_users": "Keine Benutzer",
     "empty_filtered": "Keine Organisation hat diesen Status.",
     "empty_none": "Noch hat sich niemand registriert.",
     "resynced": "{name} wurde mit Stripe neu synchronisiert",
@@ -204,6 +216,7 @@
   },
   "subscriptions_table": {
     "col_organisation": "Organisation",
+    "col_user": "Benutzer",
     "col_plan": "Tarif",
     "col_status": "Status",
     "col_members": "Mitglieder",
@@ -221,11 +234,14 @@
   "admin_usage": {
     "head_title": "Abrechnung – Verbrauch",
     "description": "Was jede Organisation verbraucht hat, gemessen an den Grenzen ihres Tarifs.",
+    "description_user": "Was jeder Benutzer verbraucht hat, gemessen an den Grenzen seines Tarifs.",
     "filters": {
       "meter": "Zähler",
       "all_meters": "Alle Zähler",
       "search": "Organisation",
+      "search_user": "Benutzer",
       "search_placeholder": "Name, Kürzel oder ID",
+      "search_placeholder_user": "E-Mail oder ID",
       "submit": "Suchen",
       "over": "Über 80 %",
       "period": "Zeitraum",
@@ -234,6 +250,7 @@
     },
     "columns": {
       "organisation": "Organisation",
+      "user": "Benutzer",
       "meter": "Zähler",
       "used": "Verbraucht",
       "limit": "Grenze",
@@ -250,7 +267,9 @@
     "details": "Details",
     "empty_title": "Kein Verbrauch",
     "empty_filtered": "Keine Organisation entspricht diesen Filtern.",
+    "empty_filtered_user": "Kein Benutzer entspricht diesen Filtern.",
     "empty_none": "Noch keine Organisation hat eine gemessene Funktion genutzt.",
+    "empty_none_user": "Noch kein Benutzer hat eine gemessene Funktion genutzt.",
     "detail": {
       "title": "Verbrauch von {name}",
       "description": "Das Journal erklärt jede Änderung an den Zählern; Reservierungen bilden die Pegel."
@@ -319,10 +338,12 @@
   "assign": {
     "title": "{name} einen Tarif zuweisen",
     "description": "„Unbezahlt“ sperrt die Organisation; jeder andere Status hebt eine von der Abrechnung verhängte Sperre auf.",
+    "description_user": "„Unbezahlt“ stuft den Benutzer bis zur Zahlung auf den Standardtarif zurück; ein Benutzer wird nie gesperrt.",
     "plan": "Tarif",
     "status": "Status",
     "cancel": "Abbrechen",
-    "assign": "Zuweisen"
+    "assign": "Zuweisen",
+    "no_plans": "Diesem Konto kann kein Tarif zugewiesen werden: Alle Tarife sind archiviert oder benötigen Plätze."
   },
   "connection": {
     "head_title": "Stripe-Verbindung",
@@ -366,6 +387,7 @@
     "no_customer": "Es gibt noch kein Abrechnungskonto – abonnieren Sie zuerst einen Tarif.",
     "tenant_owner_required": "Nur der Inhaber der Organisation kann die Abrechnung ändern.",
     "tenant_required": "Wählen Sie zuerst eine Organisation aus.",
+    "per_seat_requires_tenant": "Pläne pro Platz gibt es nur für Organisationen — wählen Sie einen anderen Plan.",
     "provider_error": "Der Zahlungsanbieter hat die Anfrage abgelehnt.",
     "provider_managed": "Abonnements werden von Stripe verwaltet; verwenden Sie stattdessen „Neu synchronisieren“.",
     "no_provider_subscription": "Dieser Mandant hat kein Stripe-Abonnement, das synchronisiert werden könnte.",

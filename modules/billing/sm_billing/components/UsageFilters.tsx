@@ -6,7 +6,7 @@ import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/component
 import { Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { keys, useT } from '../utils/i18n';
-import type { MeterInfo } from '../utils/types';
+import type { MeterInfo, SubjectMode } from '../utils/types';
 import { meterLabel } from '../utils/usage';
 
 export interface UsageFilterValues {
@@ -20,6 +20,8 @@ interface Props {
   value: UsageFilterValues;
   meters: MeterInfo[];
   onChange: (next: UsageFilterValues) => void;
+  /** "user": the search names users (by email) instead of organisations. */
+  subjectMode?: SubjectMode;
 }
 
 /**
@@ -27,9 +29,10 @@ interface Props {
  * in the URL, so a control shows its new value at once rather than flipping
  * back until the filtered page arrives.
  */
-export function UsageFilters({ value, meters, onChange }: Props) {
+export function UsageFilters({ value, meters, onChange, subjectMode = 'tenant' }: Props) {
   const { t } = useT();
   const c = keys.billing.admin_usage.filters;
+  const byUser = subjectMode === 'user';
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
 
@@ -74,13 +77,13 @@ export function UsageFilters({ value, meters, onChange }: Props) {
         </NativeSelect>
       </div>
       <div className="min-w-48 flex-1 space-y-1.5 sm:max-w-xs">
-        <Label htmlFor="usage-search">{t(c.search)}</Label>
+        <Label htmlFor="usage-search">{t(byUser ? c.search_user : c.search)}</Label>
         <div className="flex gap-2">
           <Input
             id="usage-search"
             type="search"
             maxLength={120}
-            placeholder={t(c.search_placeholder)}
+            placeholder={t(byUser ? c.search_placeholder_user : c.search_placeholder)}
             value={draft.q}
             onChange={(e) => setDraft({ ...draft, q: e.target.value })}
           />

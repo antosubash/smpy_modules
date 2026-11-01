@@ -145,6 +145,14 @@ if [[ "${SM_MULTI_TENANT:-}" == "true" ]]; then
   uv run python scripts/set_setting.py tenants subdomain_base localhost
 fi
 
+# Billing-per-user runs only (E2E_BILLING_USER=1, playwright.config.ts):
+# billing bills each signed-in user instead of the tenant (#274). The mode is
+# read once at boot, so it is written here, before the host starts. It refuses
+# to boot with multi-tenancy on, so the two opt-in runs never combine.
+if [[ "${E2E_BILLING_USER:-}" == "1" ]]; then
+  uv run python scripts/set_setting.py sm_billing subject_mode user
+fi
+
 # E2E_BUNDLE=1: the build users get (#119). No Vite dev server and no
 # --reload — playwright.config.ts sets SM_ENVIRONMENT=production for this
 # mode, which is what makes the host read host/static/dist's manifest instead

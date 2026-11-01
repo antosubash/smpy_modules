@@ -23,8 +23,14 @@ has not completed (``teardown_done_at``) and whose retry is due
 - **Live settings.** Before each tenant it re-reads the stored provider
   (``live.ensure_current``) and stops when it changed — a switch to ``manual``
   on another worker stops the cancels here too.
-- **Single-tenant hosts never sweep.** There everything is ``"default"`` with
-  no tenant row, which would read as deleted; ``"default"`` is never swept.
+- **Single-tenant hosts in tenant mode never sweep.** There everything is
+  ``"default"`` with no tenant row, which would read as deleted; ``"default"``
+  is never swept.
+- **User mode sweeps users instead (#274).** There the sweep selects the
+  ``user:<id>`` customers whose user is gone (the retry for a ``UserDeleted``
+  cancel that failed, :mod:`sm_billing.user_teardown`) and nothing else. In
+  tenant mode a ``user:<id>`` customer (one left over from switching
+  ``subject_mode``) is no deleted tenant and is never swept.
 
 Two instances sweeping one customer at once only cost calls: the teardown is
 idempotent.
@@ -43,11 +49,15 @@ from sqlalchemy import or_, select
 from tenants.models import Tenant
 
 from sm_billing import live
+from sm_billing.constants import SUBJECT_MODE_USER as USER_MODE
+from sm_billing.constants import USER_SUBJECT_PREFIX
 from sm_billing.contracts.provider import ProviderError, ProviderNotFound
 from sm_billing.lifecycle import is_multi_tenant
 from sm_billing.models import Customer
+from sm_billing.subjects import subject_mode
 from sm_billing.teardown import cancel_for_deleted_tenant
 from sm_billing.teardown_claim import claim, failed, succeeded
+from sm_billing.user_sweep import orphan_users
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -88,6 +98,7 @@ async def _orphans(app: FastAPI, tenant_id: str | None, now: datetime) -> list[s
         .where(
             Tenant.id.is_(None),
             Customer.tenant_id != DEFAULT_TENANT_ID,
+            Customer.tenant_id.not_like(f"{USER_SUBJECT_PREFIX}%"),
             Customer.provider_customer_id.is_not(None),
             Customer.teardown_done_at.is_(None),
             or_(
@@ -145,9 +156,15 @@ async def sweep_deleted_tenants(
     budget: Budget | None = None,
 ) -> None:
     """Retry every due teardown; ``attempted`` were tried by this run already."""
-    if not is_multi_tenant(app):
+    user_mode = subject_mode(app) == USER_MODE
+    if not user_mode and not is_multi_tenant(app):
         return
-    for orphan in await _orphans(app, tenant_id, datetime.now(UTC)):
+    now = datetime.now(UTC)
+    if user_mode:
+        orphans = await orphan_users(app, tenant_id, now)
+    else:
+        orphans = await _orphans(app, tenant_id, now)
+    for orphan in orphans:
         if orphan in attempted:
             continue
         if await live.ensure_current(app):

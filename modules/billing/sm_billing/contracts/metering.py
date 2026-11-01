@@ -80,7 +80,10 @@ class MeterDefinition:
 
 @runtime_checkable
 class UsageMeter(Protocol):
-    """Race-safe, idempotent per-period counters, keyed by tenant and meter.
+    """Race-safe, idempotent per-period counters, keyed by subject and meter.
+
+    The ``tenant_id`` parameter is the billing subject: a tenant id,
+    ``default``, or ``user:<id>`` (``sm_billing.contracts.subject_for_user``).
 
     Every write runs in its own short transaction unless ``db=`` is passed
     (see ``consume``). A replayed ``idempotency_key`` is never counted twice:

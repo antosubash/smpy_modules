@@ -7,7 +7,7 @@ should be sent to pick an organisation, not shown a 403.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from simple_module_core.permissions import grants
 from simple_module_db.deps import get_db
@@ -18,8 +18,9 @@ from simple_module_inertia import InertiaResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_billing import constants as c
+from sm_billing import subjects
 from sm_billing.checkout import BillingService
-from sm_billing.context import billing_context
+from sm_billing.context import billing_context, is_user_mode
 from sm_billing.metering.admin import tenant_usage
 
 router = APIRouter()
@@ -37,6 +38,9 @@ async def billing_page(
 ) -> InertiaResponse | RedirectResponse:
     ctx = await billing_context(request, db)
     if ctx is None or (not ctx.restore and not _perm(request, c.PERM_VIEW)):
+        if is_user_mode(request):
+            # No organisation to pick in user mode: the chooser is never the answer.
+            raise HTTPException(status_code=403, detail="Forbidden")
         return RedirectResponse(NO_TENANT_REDIRECT, status_code=303)
     service = BillingService(db, request.app, ctx.tenant_id)
     # Restore mode is pay-only: no plan changes from a suspended organisation.
@@ -55,5 +59,6 @@ async def billing_page(
             "restore": ctx.restore,
             "csrf_token": get_csrf_token(request),
             "checkout": request.query_params.get("checkout", ""),
+            "subject_mode": subjects.subject_mode(request.app),
         },
     )

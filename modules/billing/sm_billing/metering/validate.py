@@ -15,7 +15,7 @@ ADMIN_SOURCE = "admin"
 # Leaves room for the derived refund key inside the 128-character column.
 KEY_MAX = 128 - len(REFUND_SUFFIX)
 METER_MAX = SOURCE_MAX = 64
-TENANT_MAX = 32
+TENANT_MAX = 64  # a subject: tenant id or "user:<uuid>"
 ACTOR_MAX = 255
 # Far past any plan limit (int4), well inside the BIGINT counter: a larger
 # quantity is a bug in the caller, not a reason for a database error.

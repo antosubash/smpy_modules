@@ -10,24 +10,28 @@ import {
 } from '@simple-module-py/ui/components/ui/table';
 import { formatDate } from '../utils/format';
 import { keys, useT } from '../utils/i18n';
-import type { UsageRow } from '../utils/types';
+import type { SubjectMode, UsageRow } from '../utils/types';
 import { formatQuantity, meterLabel, usageTone } from '../utils/usage';
 import { UsageBar } from './UsageBar';
 
 interface Props {
   rows: UsageRow[];
   onOpen: (row: UsageRow) => void;
+  /** "user": each row is a user, named by email. */
+  subjectMode?: SubjectMode;
 }
 
-/** Organisation x meter for the period, fullest first (the server's order). */
-export function UsageTable({ rows, onOpen }: Props) {
+/** Organisation (or user) x meter for the period, fullest first (the server's order). */
+export function UsageTable({ rows, onOpen, subjectMode = 'tenant' }: Props) {
   const { t, locale } = useT();
   const c = keys.billing.admin_usage;
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>{t(c.columns.organisation)}</TableHead>
+          <TableHead>
+            {t(subjectMode === 'user' ? c.columns.user : c.columns.organisation)}
+          </TableHead>
           <TableHead>{t(c.columns.meter)}</TableHead>
           <TableHead className="text-right">{t(c.columns.used)}</TableHead>
           <TableHead className="text-right">{t(c.columns.limit)}</TableHead>

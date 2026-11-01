@@ -62,10 +62,20 @@ PROVIDERS: Final = (PROVIDER_MANUAL, PROVIDER_STRIPE)
 ENTITLEMENT_SEATS: Final = "tenants.seats"
 KNOWN_LIMIT_KEYS: Final = (ENTITLEMENT_SEATS,)
 
+# The admin Subscriptions list shows at most this many rows; search narrows it.
+ADMIN_ROW_LIMIT: Final = 200
+
 # Where the ``UsageMeter`` implementation lives (``sm_billing.contracts.metering``).
 USAGE_STATE_ATTR: Final = "billing_usage"
 # Where the ``MeterRegistry`` lives (``sm_billing.metering.registry``).
 METERS_STATE_ATTR: Final = "billing_meters"
+
+# ── Billing subject (who a plan and a counter belong to) ─────────────
+USER_SUBJECT_PREFIX: Final = "user:"
+SUBJECT_MODE_TENANT: Final = "tenant"
+SUBJECT_MODE_USER: Final = "user"
+# Where ``on_startup`` stores the mode (``sm_billing.subjects.subject_mode``).
+SUBJECTS_STATE_ATTR: Final = "billing_subject_mode"
 
 DEFAULT_PLAN_KEY: Final = "free"
 DEFAULT_PLAN_NAME: Final = "Free"

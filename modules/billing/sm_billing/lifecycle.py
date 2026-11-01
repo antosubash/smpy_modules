@@ -9,6 +9,9 @@ suspension would.
   *only if billing suspended it*. An admin's suspension is never lifted here.
 - unpaid: suspend an active tenant and remember that billing did it. A tenant
   an admin already suspended stays theirs.
+
+A user subject (``user:<id>``, #274) has no tenant to suspend: an unpaid
+subscription only drops it to the default plan (``resolve.effective_plan``).
 """
 
 from __future__ import annotations
@@ -21,8 +24,11 @@ from tenants.constants import TenantStatus
 from tenants.models import Tenant
 from tenants.resolver import make_invalidator
 from tenants.service import TenantService
+from users.models import User
 
+from sm_billing import constants as c
 from sm_billing.constants import SubscriptionStatus
+from sm_billing.subject_keys import kind, subject_mode, user_uuid
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -59,7 +65,17 @@ async def tenant_gone(db: AsyncSession, app: FastAPI, tenant_id: str) -> bool:
     no row exists for it — a missing row there is normal, not a deletion, and
     reading it as one would cancel the host's own subscription. Never for
     ``"default"`` either, for a host that switched multi-tenancy on later.
+
+    A user subject (#274) has no tenant row. In user mode it is "gone" once its
+    ``users_user`` row is (users are hard-deleted): reconcile then routes it to
+    the teardown, which is the retry for a ``UserDeleted`` cancel that failed.
+    In tenant mode a left-over ``user:<id>`` is never gone.
     """
+    if kind(tenant_id) == c.SUBJECT_MODE_USER:
+        if subject_mode(app) != c.SUBJECT_MODE_USER:
+            return False
+        user_id = user_uuid(tenant_id)  # a non-canonical spelling names no user
+        return user_id is not None and await db.get(User, user_id) is None
     if not is_multi_tenant(app) or tenant_id == DEFAULT_TENANT_ID:
         return False
     return await db.get(Tenant, tenant_id) is None
@@ -82,6 +98,11 @@ async def apply_lifecycle(db: AsyncSession, app: FastAPI, sub: Subscription) -> 
     is a ``RequestSession``), so a caller outside a request must commit with
     ``simple_module_db.finalize_session`` — a bare ``commit()`` drops it.
     """
+    if kind(sub.tenant_id) == c.SUBJECT_MODE_USER:
+        # Never suspended: a user is not a tenant.
+        sub.suspended_by_billing = False
+        await db.flush()
+        return
     service = tenant_service(db, app)
     tenant = await db.get(Tenant, sub.tenant_id)
     if tenant is None:

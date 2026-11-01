@@ -2,19 +2,20 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { EmptyState } from '@simple-module-py/ui/components/EmptyState';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Card } from '@simple-module-py/ui/components/ui/card';
-import { Label } from '@simple-module-py/ui/components/ui/label';
-import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
-import { Building2 } from 'lucide-react';
+import { Building2, User } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { AdminNav } from '../components/AdminNav';
 import { AssignDialog } from '../components/AssignDialog';
 import { ProviderFallbackBanner } from '../components/ProviderFallbackBanner';
+import {
+  SubscriptionsFilters,
+  type SubscriptionsFilterValues,
+} from '../components/SubscriptionsFilters';
 import { SubscriptionsTable } from '../components/SubscriptionsTable';
 import { SyncHealthBar } from '../components/SyncHealthBar';
 import { ADMIN_API, api } from '../utils/api';
-import { STATUSES, statusLabel } from '../utils/format';
 import { keys, useT } from '../utils/i18n';
 import type {
   AdminCommon,
@@ -28,6 +29,10 @@ interface Props extends AdminCommon {
   rows: SubscriptionRow[];
   plans: Plan[];
   status_filter: string;
+  /** The search the rows were filtered by ("" for none). */
+  search: string;
+  /** The most rows the server sends; a full page means the list was cut. */
+  row_limit: number;
   sync_health: SyncHealth;
 }
 
@@ -40,13 +45,17 @@ function Subscriptions() {
     rows,
     plans,
     status_filter,
+    search,
+    row_limit,
     sync_health,
     csrf_token,
     can_manage,
     checkout_available,
     provider,
     provider_error,
+    subject_mode,
   } = usePage<{ props: Props }>().props as unknown as Props;
+  const byUser = subject_mode === 'user';
   const [assigning, setAssigning] = useState<SubscriptionRow | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -78,8 +87,12 @@ function Subscriptions() {
       setAssigning(null);
     });
 
-  const filter = (value: string) =>
-    router.get(VIEW_URL, value ? { status: value } : {}, { preserveScroll: true });
+  const filter = ({ status, q }: SubscriptionsFilterValues) => {
+    const query: Record<string, string> = {};
+    if (status) query.status = status;
+    if (q) query.q = q;
+    router.get(VIEW_URL, query, { preserveScroll: true });
+  };
 
   return (
     <>
@@ -87,7 +100,9 @@ function Subscriptions() {
       <PageShell
         title={t(keys.billing.page.title)}
         description={
-          checkout_available ? t(c.description_stripe) : t(c.description_manual, { provider })
+          checkout_available
+            ? t(byUser ? c.description_stripe_users : c.description_stripe)
+            : t(c.description_manual, { provider })
         }
       >
         <AdminNav active="subscriptions" />
@@ -97,29 +112,22 @@ function Subscriptions() {
           </div>
         )}
         {checkout_available && <SyncHealthBar health={sync_health} />}
-        <div className="mb-4 flex max-w-xs items-center gap-2">
-          <Label htmlFor="status-filter" className="shrink-0">
-            {t(c.status)}
-          </Label>
-          <NativeSelect
-            id="status-filter"
-            value={status_filter}
-            onChange={(e) => filter(e.target.value)}
-          >
-            <NativeSelectOption value="">{t(c.all)}</NativeSelectOption>
-            {STATUSES.map((s) => (
-              <NativeSelectOption key={s} value={s}>
-                {statusLabel(s)}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </div>
+        <SubscriptionsFilters
+          status={status_filter}
+          search={search ?? ''}
+          rowCount={rows.length}
+          rowLimit={row_limit ?? Number.POSITIVE_INFINITY}
+          subjectMode={subject_mode}
+          onChange={filter}
+        />
         <Card className="overflow-hidden p-0">
           {rows.length === 0 ? (
             <EmptyState
-              icon={Building2}
-              title={t(c.empty_title)}
-              description={status_filter ? t(c.empty_filtered) : t(c.empty_none)}
+              icon={byUser ? User : Building2}
+              title={t(byUser ? c.empty_title_users : c.empty_title)}
+              description={
+                search ? t(c.empty_search) : status_filter ? t(c.empty_filtered) : t(c.empty_none)
+              }
             />
           ) : (
             <SubscriptionsTable
@@ -129,6 +137,7 @@ function Subscriptions() {
               busy={busy}
               onResync={resync}
               onAssign={setAssigning}
+              subjectMode={subject_mode}
             />
           )}
         </Card>
@@ -139,6 +148,7 @@ function Subscriptions() {
         busy={busy}
         onClose={() => setAssigning(null)}
         onAssign={assign}
+        subjectMode={subject_mode}
       />
     </>
   );

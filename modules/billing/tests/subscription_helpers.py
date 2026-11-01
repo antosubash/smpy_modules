@@ -4,7 +4,7 @@ subscription, a suspension, and a signed webhook delivery."""
 from __future__ import annotations
 
 import httpx
-from fake_provider import GOOD_SIGNATURE, SIGNATURE_HEADER
+from fake_provider import GOOD_SIGNATURE, SIGNATURE_HEADER, FakeProvider
 from helpers import make_plan
 from sm_billing import constants as c
 from sm_billing.contracts.provider import SubscriptionSnapshot, WebhookEvent
@@ -28,6 +28,23 @@ def _snap(tenant_id, *, status="active", price="price_team_m", sid="sub_1", quan
         current_period_end=None,
         cancel_at_period_end=False,
     )
+
+
+def _fake(app) -> FakeProvider:
+    provider = FakeProvider()
+    app.state.sm_billing.provider = provider
+    return provider
+
+
+async def _subscribed(app, subject: str, *, pricing_model="flat", **kw) -> int:
+    """``subject`` on a ``team`` plan mirrored as ``sub_1`` (customer ``cus_1``)."""
+    async with app.state.sm.db.session_factory() as session:
+        plan = await make_plan(session, "team", pricing_model=pricing_model)
+        fields = {"provider_subscription_id": "sub_1", **kw}
+        session.add(Subscription(tenant_id=subject, plan_id=plan.id, **fields))
+        session.add(Customer(tenant_id=subject, provider="stripe", provider_customer_id="cus_1"))
+        await session.commit()
+        return plan.id
 
 
 async def _team(app, **kw) -> int:

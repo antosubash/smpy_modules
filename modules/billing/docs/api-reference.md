@@ -313,7 +313,7 @@ Platform admins (role `admin`) hold both.
 | `POST /plans` | plan (below) | the plan, 201 |
 | `PUT /plans/{id}` | plan (same `key`) | the plan |
 | `POST /plans/{id}/archive` | — | the plan |
-| `GET /subscriptions?status=&offset=` | — | one row per organisation (200 per page) |
+| `GET /subscriptions?status=&offset=&q=` | — | one row per organisation, or per user in `user` mode (200 per page); `q` searches name/slug/id, or email/subject/UUID |
 | `POST /subscriptions/{tenant_id}/assign` | `{"plan_id", "status", "interval"?}` | the row — manual provider only |
 | `POST /subscriptions/{tenant_id}/resync` | — | the row — Stripe only |
 | `GET /connection` | — | connection status (never the secrets) |
@@ -400,8 +400,9 @@ Pages are `{"items", "total", "page", "per_page", "pages"}`.
 
 Adjust takes counters only and recount gauges only: anything else, or an
 unregistered meter, is 400 `unknown_meter` (`{"meter", "kind"}`). Both answer
-404 `tenant_not_found` for an organisation with no row; on a single-tenant
-host `default` is allowed. An unknown hold is 404 `hold_not_found`. Every
+404 `tenant_not_found` for an organisation with no row (in `user` mode, for a
+user that does not exist, or a `user:<uuid>` not in canonical spelling); on a
+single-tenant host `default` is allowed. An unknown hold is 404 `hold_not_found`. Every
 write goes through `UsageService` in its own short transaction.
 
 ## Webhook — `POST /billing/webhooks/stripe`

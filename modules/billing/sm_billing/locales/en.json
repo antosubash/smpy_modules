@@ -9,11 +9,13 @@
   "page": {
     "title": "Billing",
     "description": "Your organisation's plan, seats and payment.",
+    "description_user": "Your plan and payment.",
     "plans_heading": "Plans",
     "period_label": "Billing period",
     "monthly": "Monthly",
     "yearly": "Yearly",
     "owner_only": "Only the organisation owner can change the plan.",
+    "owner_only_user": "You cannot change your plan here — contact the site administrator.",
     "no_checkout": "Online payment is not set up here — contact the site administrator to change plan.",
     "activating_title": "Activating your subscription…",
     "activating_description": "Stripe confirmed the payment; this page updates once it reaches us.",
@@ -48,6 +50,7 @@
   "usage": {
     "title": "Usage",
     "description": "What your organisation has used, against your plan's limits.",
+    "description_user": "What you have used, against your plan's limits.",
     "unlimited": "Unlimited",
     "of_limit": "{used} of {limit}",
     "used_no_limit": "{used} used",
@@ -181,12 +184,21 @@
   "subscriptions": {
     "head_title": "Billing subscriptions",
     "description_stripe": "Every organisation and its Stripe subscription.",
+    "description_stripe_users": "Every user and their Stripe subscription.",
     "description_manual": "Provider: {provider}. Assign plans by hand; nobody is charged.",
     "fallback_title": "Stripe is configured but not in use",
     "fallback_description": "{error}. Plans are assigned by hand, and nobody is charged, until this is fixed on the Stripe connection tab.",
     "status": "Status",
     "all": "All",
+    "search": "Organisation",
+    "search_user": "User",
+    "search_placeholder": "Name, slug or ID",
+    "search_placeholder_user": "Email or ID",
+    "search_submit": "Search",
+    "limit_notice": "Showing the first {count} — search to narrow.",
+    "empty_search": "Nothing matches this search.",
     "empty_title": "No organisations",
+    "empty_title_users": "No users",
     "empty_filtered": "None match this status.",
     "empty_none": "Nobody has signed up yet.",
     "resynced": "{name} resynced from Stripe",
@@ -204,6 +216,7 @@
   },
   "subscriptions_table": {
     "col_organisation": "Organisation",
+    "col_user": "User",
     "col_plan": "Plan",
     "col_status": "Status",
     "col_members": "Members",
@@ -221,11 +234,14 @@
   "admin_usage": {
     "head_title": "Billing usage",
     "description": "What each organisation used, against its plan's limits.",
+    "description_user": "What each user used, against their plan's limits.",
     "filters": {
       "meter": "Meter",
       "all_meters": "All meters",
       "search": "Organisation",
+      "search_user": "User",
       "search_placeholder": "Name, slug or ID",
+      "search_placeholder_user": "Email or ID",
       "submit": "Search",
       "over": "Over 80%",
       "period": "Period",
@@ -234,6 +250,7 @@
     },
     "columns": {
       "organisation": "Organisation",
+      "user": "User",
       "meter": "Meter",
       "used": "Used",
       "limit": "Limit",
@@ -250,7 +267,9 @@
     "details": "Details",
     "empty_title": "No usage",
     "empty_filtered": "No organisation matches these filters.",
+    "empty_filtered_user": "No user matches these filters.",
     "empty_none": "No organisation has used a metered feature yet.",
+    "empty_none_user": "No user has used a metered feature yet.",
     "detail": {
       "title": "Usage of {name}",
       "description": "The ledger explains every change to the counters; holds make up the gauges."
@@ -319,10 +338,12 @@
   "assign": {
     "title": "Assign a plan to {name}",
     "description": "“Unpaid” suspends the organisation; any other status lifts a suspension billing made.",
+    "description_user": "“Unpaid” drops the user to the default plan until it is paid; a user is never suspended.",
     "plan": "Plan",
     "status": "Status",
     "cancel": "Cancel",
-    "assign": "Assign"
+    "assign": "Assign",
+    "no_plans": "No plan can be assigned to this subject: every plan is archived or needs seats."
   },
   "connection": {
     "head_title": "Stripe connection",
@@ -366,6 +387,7 @@
     "no_customer": "There is no billing account yet — subscribe to a plan first.",
     "tenant_owner_required": "Only the organisation owner can change billing.",
     "tenant_required": "Pick an organisation first.",
+    "per_seat_requires_tenant": "Per-seat plans are for organisations — pick another plan.",
     "provider_error": "The payment provider refused the request.",
     "provider_managed": "Subscriptions are managed by Stripe; use Resync instead.",
     "no_provider_subscription": "This tenant has no Stripe subscription to resync.",

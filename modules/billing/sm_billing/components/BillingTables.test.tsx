@@ -3,6 +3,7 @@ import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { Plan, SubscriptionRow } from '../utils/types';
+import { AssignDialog, offeredPlan } from './AssignDialog';
 import { PlansTable } from './PlansTable';
 import { SubscriptionsTable } from './SubscriptionsTable';
 
@@ -90,6 +91,81 @@ describe('billing table long names', () => {
         />,
       ),
       2,
+    );
+  });
+});
+
+describe('subscriptions table subject mode', () => {
+  function headers(subjectMode?: 'tenant' | 'user'): string[] {
+    const host = document.createElement('div');
+    host.innerHTML = renderToStaticMarkup(
+      <SubscriptionsTable
+        rows={[{ ...row, tenant_id: 'user:1', tenant_name: 'a@x.io', tenant_slug: '' }]}
+        canManage
+        mode="assign"
+        busy={false}
+        onResync={() => {}}
+        onAssign={() => {}}
+        subjectMode={subjectMode}
+      />,
+    );
+    return [...host.querySelectorAll('thead th')].map((th) => th.textContent ?? '');
+  }
+
+  it('names organisations and members in tenant mode', () => {
+    const cols = headers();
+    expect(cols[0]).toBe('Organisation');
+    expect(cols).toContain('Members');
+  });
+
+  it('names users and drops members in user mode', () => {
+    const cols = headers('user');
+    expect(cols[0]).toBe('User');
+    expect(cols).not.toContain('Members');
+    expect(cols).toHaveLength(headers().length - 1);
+  });
+});
+
+describe('assign dialog preselection', () => {
+  const choices = [
+    { ...plan, id: 1 },
+    { ...plan, id: 2 },
+  ];
+
+  it('keeps the row plan when the picker offers it', () => {
+    expect(offeredPlan(choices, 2)).toBe(2);
+  });
+
+  it('falls back to the first choice when the row plan is not offered', () => {
+    expect(offeredPlan(choices, 9)).toBe(1);
+    expect(offeredPlan(choices, undefined)).toBe(1);
+    expect(offeredPlan([], 9)).toBe(0);
+  });
+});
+
+describe('AssignDialog', () => {
+  it('says why Assign is unavailable when no plan can be assigned', () => {
+    const seatsOnly: Plan[] = [{ ...plan, id: 2, pricing_model: 'per_seat' }];
+    const { createRoot } = require('react-dom/client') as typeof import('react-dom/client');
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const { act } = React as unknown as { act: (fn: () => void) => void };
+    act(() => {
+      createRoot(host).render(
+        <AssignDialog
+          row={row}
+          plans={seatsOnly}
+          busy={false}
+          onClose={() => {}}
+          onAssign={() => {}}
+          subjectMode="user"
+        />,
+      );
+    });
+    const assign = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Assign');
+    expect(assign?.hasAttribute('disabled')).toBe(true);
+    expect(document.querySelector('[role="status"]')?.textContent).toMatch(
+      /No plan can be assigned/,
     );
   });
 });

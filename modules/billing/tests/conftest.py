@@ -13,13 +13,16 @@ import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 import pytest
 from simple_module_hosting.settings import Settings
 from simple_module_test.database import database_url_for_tests
 from simple_module_test.session_cookie import forge_session_cookie
+from sm_billing.providers.stripe import StripeProvider
 from sqlalchemy import select
+from stripe_helpers import SECRET, SUBSCRIPTION, _Recorder
 
 MODULES = ["Auth", "Users", "Permissions", "Settings", "Tenants", "Billing"]
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -46,6 +49,37 @@ def settings() -> Settings:
         auth_provider="users",
         modules_enabled=MODULES,
     )
+
+
+@pytest.fixture
+def single_tenant(settings) -> Settings:
+    """A single-tenant host: what ``subject_mode = "user"`` requires."""
+    settings.multi_tenant = False
+    return settings
+
+
+@pytest.fixture
+async def user_mode_app(single_tenant, app):
+    """The app in ``subject_mode = "user"``: billing bills the signed-in user.
+
+    The mode is applied the way ``on_startup`` applies it, after the setting is
+    in place (the app fixture has already run startup in tenant mode).
+    """
+    from sm_billing import constants as c
+    from sm_billing.subject_boot import apply_subject_mode
+
+    getattr(app.state, c.PACKAGE).settings.subject_mode = c.SUBJECT_MODE_USER
+    await apply_subject_mode(app)
+    return app
+
+
+@pytest.fixture
+async def admin(authenticated_client):
+    """The platform admin's client, armed for the unsafe verbs on the admin API."""
+    from api_helpers import arm_csrf
+
+    await arm_csrf(authenticated_client, "/admin/billing/subscriptions")
+    return authenticated_client
 
 
 @pytest.fixture(autouse=True)
@@ -139,3 +173,30 @@ async def owner(quota_app, user_client):
         await limit_plan(quota_app, tenant["id"], 2)
         client.tenant_id = tenant["id"]
         yield client
+
+
+@pytest.fixture
+def provider():
+    p = StripeProvider(secret_key="sk_test_x", webhook_secret=SECRET)
+    p.calls = []
+    p._v1 = SimpleNamespace(
+        subscriptions=_Recorder(p.calls, "subscriptions", SUBSCRIPTION),
+        customers=_Recorder(p.calls, "customers", {"id": "cus_new", "object": "customer"}),
+        checkout=SimpleNamespace(
+            sessions=_Recorder(p.calls, "checkout", {"id": "cs_1", "url": "https://co/1"})
+        ),
+        billing_portal=SimpleNamespace(
+            sessions=_Recorder(p.calls, "portal", {"id": "bps_1", "url": "https://bp/1"})
+        ),
+        prices=_Recorder(
+            p.calls,
+            "prices",
+            {
+                "id": "price_team_m",
+                "currency": "eur",
+                "active": True,
+                "recurring": {"interval": "month"},
+            },
+        ),
+    )
+    return p

@@ -5,7 +5,8 @@
     @router.post("/chat", dependencies=[RequiresQuota("ai.requests")])
     async def chat(...): ...
 
-The request's tenant is charged ``qty`` before the handler runs, in the
+The request's billing subject (``subjects.for_request``: its tenant, or the
+signed-in user in ``user`` mode) is charged ``qty`` before the handler runs, in the
 service's own short transaction. Refused → 402 ``quota_exceeded`` with
 ``meter``, ``limit``, ``used``, ``requested`` and ``resets_at``.
 
@@ -44,13 +45,11 @@ from uuid import uuid4
 
 from fastapi import Depends, Request
 from simple_module_db.deps import get_db
-from simple_module_db.tenancy import DEFAULT_TENANT_ID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_billing import constants as c
 from sm_billing.contracts.metering import Allowed, Exceeded, QuotaExceededError
 from sm_billing.errors import BillingError
-from sm_billing.lifecycle import is_multi_tenant
 from sm_billing.metering.errors import IdempotencyReplay
 from sm_billing.metering.validate import (
     ADJUST_PREFIX,
@@ -60,20 +59,11 @@ from sm_billing.metering.validate import (
     SOURCE_MAX,
     check_text,
 )
+from sm_billing.subjects import for_request
 
 logger = logging.getLogger(__name__)
 
 IDEMPOTENCY_HEADER = "Idempotency-Key"
-
-
-def _tenant(request: Request) -> str:
-    """The request's tenant; a single-tenant host meters everything as ``default``."""
-    tenant_id = getattr(request.state, "tenant_id", None)
-    if tenant_id:
-        return tenant_id
-    if not is_multi_tenant(request.app):
-        return DEFAULT_TENANT_ID
-    raise BillingError("tenant_required", 403)
 
 
 def _key(request: Request, header: str) -> str:
@@ -95,7 +85,7 @@ def _source(request: Request) -> str:
 def RequiresQuota(  # noqa: N802 - reads like the framework's RequiresPermission
     meter: str, qty: int = 1, *, key_header: str = IDEMPOTENCY_HEADER
 ):
-    """A dependency that charges ``qty`` of ``meter`` to the request's tenant."""
+    """A dependency that charges ``qty`` of ``meter`` to the request's subject."""
     check_text("meter", meter, 64)
     if isinstance(qty, bool) or not isinstance(qty, int) or not 1 <= qty <= QTY_MAX:
         raise ValueError(f"qty must be an integer from 1 to {QTY_MAX}")
@@ -107,7 +97,7 @@ def RequiresQuota(  # noqa: N802 - reads like the framework's RequiresPermission
         if usage is None:
             yield None
             return
-        tenant_id = _tenant(request)
+        tenant_id = for_request(request)
         key = _key(request, key_header)
         outcome = await usage.consume(tenant_id, meter, qty, key, source=_source(request))
         if isinstance(outcome, Exceeded):
