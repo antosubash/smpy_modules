@@ -34,7 +34,8 @@ from sm_billing.constants import SubscriptionStatus
 
 Base = create_module_base("billing")
 
-_TENANT_ID_LEN = 32  # tenants: uuid4().hex
+# A subject: a tenant's uuid4().hex (32), "default", or "user:<uuid>" (41).
+_TENANT_ID_LEN = 64
 
 
 def _utcnow() -> datetime:

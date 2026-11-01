@@ -12,7 +12,7 @@ from sm_billing.contracts.metering import MeterKind
 from sm_billing.metering import hold_sql
 from sm_billing.metering.core import MeteringCore
 from sm_billing.metering.tx import Counted, run_write
-from sm_billing.metering.validate import check_text
+from sm_billing.metering.validate import TENANT_MAX, check_text
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +26,7 @@ class HoldRepairMixin(MeteringCore):
         holds the sweeper has not expired yet still count, as they do in the
         gauge until it does.
         """
-        check_text("tenant_id", tenant_id, 32)
+        check_text("tenant_id", tenant_id, TENANT_MAX)
         self._require(meter, MeterKind.GAUGE)
         now = self._clock()
         fields = {"tenant_id": tenant_id, "meter": meter, "now": now}
