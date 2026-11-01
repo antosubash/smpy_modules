@@ -9,16 +9,15 @@ import { toast } from 'sonner';
 import { AdminNav } from '../components/AdminNav';
 import { AssignDialog } from '../components/AssignDialog';
 import { ProviderFallbackBanner } from '../components/ProviderFallbackBanner';
-import {
-  SubscriptionsFilters,
-  type SubscriptionsFilterValues,
-} from '../components/SubscriptionsFilters';
+import { SubscriptionsFilters } from '../components/SubscriptionsFilters';
+import { SubscriptionsPager, visitSubscriptions } from '../components/SubscriptionsPager';
 import { SubscriptionsTable } from '../components/SubscriptionsTable';
 import { SyncHealthBar } from '../components/SyncHealthBar';
 import { ADMIN_API, api } from '../utils/api';
 import { keys, useT } from '../utils/i18n';
 import type {
   AdminCommon,
+  Paged,
   Plan,
   SubscriptionRow,
   SubscriptionStatus,
@@ -26,27 +25,22 @@ import type {
 } from '../utils/types';
 
 interface Props extends AdminCommon {
-  rows: SubscriptionRow[];
+  subscriptions: Paged<SubscriptionRow>;
   plans: Plan[];
   status_filter: string;
   /** The search the rows were filtered by ("" for none). */
   search: string;
-  /** The most rows the server sends; a full page means the list was cut. */
-  row_limit: number;
   sync_health: SyncHealth;
 }
-
-const VIEW_URL = '/admin/billing/subscriptions';
 
 function Subscriptions() {
   const { t } = useT();
   const c = keys.billing.subscriptions;
   const {
-    rows,
+    subscriptions,
     plans,
     status_filter,
     search,
-    row_limit,
     sync_health,
     csrf_token,
     can_manage,
@@ -87,12 +81,8 @@ function Subscriptions() {
       setAssigning(null);
     });
 
-  const filter = ({ status, q }: SubscriptionsFilterValues) => {
-    const query: Record<string, string> = {};
-    if (status) query.status = status;
-    if (q) query.q = q;
-    router.get(VIEW_URL, query, { preserveScroll: true });
-  };
+  const { items: rows } = subscriptions;
+  const filters = { status: status_filter, q: search ?? '' };
 
   return (
     <>
@@ -115,10 +105,8 @@ function Subscriptions() {
         <SubscriptionsFilters
           status={status_filter}
           search={search ?? ''}
-          rowCount={rows.length}
-          rowLimit={row_limit ?? Number.POSITIVE_INFINITY}
           subjectMode={subject_mode}
-          onChange={filter}
+          onChange={(next) => visitSubscriptions(next)}
         />
         <Card className="overflow-hidden p-0">
           {rows.length === 0 ? (
@@ -140,6 +128,12 @@ function Subscriptions() {
               subjectMode={subject_mode}
             />
           )}
+          <SubscriptionsPager
+            filters={filters}
+            page={subscriptions.page}
+            perPage={subscriptions.per_page}
+            total={subscriptions.total}
+          />
         </Card>
       </PageShell>
       <AssignDialog

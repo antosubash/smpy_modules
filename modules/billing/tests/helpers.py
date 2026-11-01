@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from sm_billing.constants import PricingModel
 from sm_billing.models import Plan, Subscription
 from tenants.models import Membership, Tenant
+from users.models import User
+
+
+async def make_users(app, n: int) -> None:
+    """``n`` plain users, ``u000@x.io`` onward, in their own committed session."""
+    async with app.state.sm.db.session_factory() as session:
+        for i in range(n):
+            session.add(User(id=uuid.uuid4(), email=f"u{i:03}@x.io", hashed_password="x"))
+        await session.commit()
 
 
 async def make_tenant(session, slug: str = "acme", *, members: int = 0) -> Tenant:

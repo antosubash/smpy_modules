@@ -24,7 +24,7 @@ describe('SubscriptionsFilters', () => {
     host?.remove();
   });
 
-  async function mount(opts: { rows?: number; search?: string; mode?: SubjectMode } = {}) {
+  async function mount(opts: { search?: string; mode?: SubjectMode } = {}) {
     const onChange = vi.fn();
     host = document.createElement('div');
     document.body.append(host);
@@ -34,8 +34,6 @@ describe('SubscriptionsFilters', () => {
         <SubscriptionsFilters
           status=""
           search={opts.search ?? ''}
-          rowCount={opts.rows ?? 3}
-          rowLimit={200}
           subjectMode={opts.mode ?? 'tenant'}
           onChange={onChange}
         />,
@@ -63,14 +61,5 @@ describe('SubscriptionsFilters', () => {
     host?.remove();
     const user = await mount({ mode: 'user' });
     expect(user.input.placeholder).toBe('Email or ID');
-  });
-
-  it('says the list is cut at the limit only when it is', async () => {
-    await mount({ rows: 3 });
-    expect(document.body.textContent).not.toContain('Showing the first 200');
-    act(() => root?.unmount());
-    host?.remove();
-    await mount({ rows: 200 });
-    expect(document.body.textContent).toContain('Showing the first 200 — search to narrow.');
   });
 });
