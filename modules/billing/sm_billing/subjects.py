@@ -9,7 +9,7 @@ holds their own subscription and usage.
 from __future__ import annotations
 
 import uuid
-from typing import Any, Literal
+from typing import Any
 
 from simple_module_db.tenancy import DEFAULT_TENANT_ID
 from sqlalchemy import select
@@ -19,16 +19,14 @@ from users.models import User
 from sm_billing import constants as c
 from sm_billing.errors import BillingError
 from sm_billing.lifecycle import is_multi_tenant
+from sm_billing.subject_keys import (
+    SubjectKind,
+    subject_for_tenant,
+    subject_for_user,
+    subject_mode,
+)
 
-SubjectKind = Literal["tenant", "user"]
-
-
-def subject_for_tenant(tenant_id: str) -> str:
-    return tenant_id
-
-
-def subject_for_user(user_id: str | uuid.UUID) -> str:
-    return f"{c.USER_SUBJECT_PREFIX}{user_id}"
+__all__ = ["SubjectKind", "subject_for_tenant", "subject_for_user", "subject_mode"]
 
 
 def kind(subject: str) -> SubjectKind:
@@ -62,11 +60,6 @@ def user_id_of(subject: str) -> str | None:
 def tenant_of(subject: str) -> str:
     """The tenant a subject lives under: a user subject has none, so ``"default"``."""
     return "default" if kind(subject) == c.SUBJECT_MODE_USER else subject
-
-
-def subject_mode(app: Any) -> SubjectKind:
-    """The mode ``on_startup`` stored on ``app.state`` (tenant when unset)."""
-    return getattr(app.state, c.SUBJECTS_STATE_ATTR, c.SUBJECT_MODE_TENANT)
 
 
 def for_request(request: Any) -> str:

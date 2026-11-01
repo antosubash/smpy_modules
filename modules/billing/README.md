@@ -151,6 +151,17 @@ required reason). The protocol is `sm_billing.contracts.metering`; upstream
 issue antosubash/simple_module_python#616 tracks moving it into the
 framework.
 
+### Billing subject
+
+By default each organisation holds a subscription and a usage counter. Set
+`subject_mode` to `user` (Settings screen or
+`scripts/set_setting.py sm_billing subject_mode user`, then restart) on a
+single-tenant host and each signed-in user holds their own instead; boot
+refuses it when `multi_tenant` is on. A user is downgraded to the default plan,
+never suspended, and cannot take a per-seat plan. Workers build the subject key
+with `subject_for_user`, `subject_for_tenant` and `current_subject_mode` from
+`sm_billing.contracts`. See `docs/subjects.md`.
+
 ### Providers
 
 Billing settings are stored in the database. They are registered with
