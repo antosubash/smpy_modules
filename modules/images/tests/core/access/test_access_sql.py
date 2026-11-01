@@ -8,6 +8,7 @@ builds, and ``can`` is checked never to say yes where ``filter`` says no.
 from __future__ import annotations
 
 import pytest
+from sharing.policy import resolve_roles
 from simple_module_core.resources import (
     ACTION_DELETE,
     ACTION_EDIT,
@@ -167,7 +168,8 @@ def test_the_resource_type_is_registered_with_the_same_policy():
     assert registered is not None
     assert registered.policy is POLICY
     assert isinstance(POLICY, ResourcePolicy)
-    assert set(registered.shareable_actions) == {ACTION_VIEW, ACTION_EDIT}
+    # None: sharing's default roles, view and edit.
+    assert set(resolve_roles(registered.share_roles)) == {ACTION_VIEW, ACTION_EDIT}
 
 
 def test_depends_on_names_the_real_modules():

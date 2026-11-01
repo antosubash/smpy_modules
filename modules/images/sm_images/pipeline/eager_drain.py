@@ -3,66 +3,32 @@
 An eager :func:`~sm_images.pipeline.orchestrate.submit` waits for the durable
 deliveries its work published (``ImageProcessed`` subscribers), unless it runs
 inside a delivery itself - waiting there would wait on that very delivery.
+
+"Inside a delivery" is the framework's
+:func:`simple_module_core.durable_events.in_delivery`: every delivery path
+(the outbox dispatcher on a worker or on a request's task, and inline
+delivery without a transport) sets it around the handler call, and tasks the
+handler spawns inherit it with the context. Code that merely runs while some
+*unrelated* delivery is in flight is not inside one, and waits.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-import sys
-from contextvars import ContextVar
 from typing import Any
+
+from simple_module_core.durable_events import in_delivery
 
 from sm_images.pipeline.runtime import Runtime
 
-__all__ = ["EAGER_DRAIN_TIMEOUT", "IN_DELIVERY", "deliver_code", "drain_durable", "in_delivery"]
+__all__ = ["EAGER_DRAIN_TIMEOUT", "drain_durable"]
 
 logger = logging.getLogger(__name__)
-
-# Set while an outermost drain runs inside a durable delivery, so the tasks it
-# (or anything it calls) spawns inherit "inside a delivery" with the context.
-IN_DELIVERY: ContextVar[bool] = ContextVar("sm_images_in_delivery", default=False)
 
 #: Longest an eager drain waits for durable deliveries (see :func:`drain_durable`).
 EAGER_DRAIN_TIMEOUT = 5.0
 _orphans: set[asyncio.Future[Any]] = set()  # shielded drains outliving their wait
-
-
-def deliver_code() -> Any:
-    """The code object of the framework coroutine that runs a durable handler."""
-    try:
-        from background_tasks.outbox_dispatch import deliver_one
-    except ImportError:  # pragma: no cover - background_tasks is a dependency
-        return None
-    return deliver_one.__code__
-
-
-def in_delivery() -> bool:
-    """Is this code running inside a durable delivery (an outbox handler)?
-
-    Decided by the **call path**, not by the transport's global state: while a
-    coroutine runs, its awaiting callers' frames are on the stack, so a
-    handler - delivered on its own task or inline on a request's - finds
-    ``deliver_one`` below it. Waiting for the transport from there would wait
-    on that very delivery (or the dispatcher lock it holds), so the caller
-    leaves delivery to the dispatcher already running. Code that merely runs
-    while some *unrelated* delivery is in flight is not inside one, and waits.
-
-    A task does not inherit its creator's frames, so a task spawned inside a
-    handler is invisible to the walk. ``IN_DELIVERY`` covers the ones spawned
-    while images code runs inside a delivery; the rest (a handler that spawns
-    a submitting task before calling into images) are caught only by the
-    ``EAGER_DRAIN_TIMEOUT`` bound in :func:`drain_durable`.
-    """
-    if IN_DELIVERY.get():
-        return True
-    target = deliver_code()
-    frame = sys._getframe(1)
-    while frame is not None:
-        if frame.f_code is target:
-            return True
-        frame = frame.f_back
-    return False
 
 
 async def drain_durable(runtime: Runtime) -> bool:
@@ -74,10 +40,12 @@ async def drain_durable(runtime: Runtime) -> bool:
     for, it must not wait, or the wait timed out - the caller then runs what
     is already queued and stops waiting.
 
-    The wait is bounded and shielded: a submit from a task spawned inside a
-    durable handler cannot tell it is in one, and its ``drain()`` gathers the
-    parent delivery that is awaiting it. After ``EAGER_DRAIN_TIMEOUT`` it gives
-    up (the deliveries carry on uncancelled), turning a deadlock into a delay.
+    The wait is bounded and shielded as a safety net: code that runs on behalf
+    of a delivery in a context that lost the framework's flag (a task started
+    with a fresh ``Context``, say) would have its ``drain()`` gather the parent
+    delivery that is awaiting it. After ``EAGER_DRAIN_TIMEOUT`` it gives up
+    (the deliveries carry on uncancelled), turning that deadlock into a delay;
+    a handler that simply outlives the bound is cut off the same way.
     """
     transport = getattr(runtime.bus(), "durable_transport", None)
     drain = getattr(transport, "drain", None)
@@ -91,8 +59,8 @@ async def drain_durable(runtime: Runtime) -> bool:
         waiting.add_done_callback(_orphans.discard)
         logger.warning(
             "images.pipeline.eager_drain_timeout after %ss: durable deliveries are "
-            "still running, most likely because this submit runs in a task spawned "
-            "inside a durable handler and is waiting on its own parent delivery; "
+            "still running (a slow handler, or this submit runs on behalf of a durable "
+            "delivery in a context without the framework's in_delivery flag); "
             "running the work already queued and returning without them",
             EAGER_DRAIN_TIMEOUT,
         )
