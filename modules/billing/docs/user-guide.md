@@ -57,7 +57,9 @@ it. The default plan can't be archived.
 One row per organisation: its plan (with the interval), subscription status,
 member count (and the billed quantity if it differs), and the period end.
 **Suspended (unpaid)** marks an organisation billing suspended;
-**Suspended** alone means an administrator did. Filter by **Status**.
+**Suspended** alone means an administrator did. Filter by **Status** or search;
+the list shows 50 rows a page, with **Previous** / **Next** under the table when
+there is more than one page.
 
 - With the **manual** provider each row has **Assign plan**: pick a plan and a
   status. Choosing **Unpaid** suspends the organisation; any other status

@@ -16,25 +16,15 @@ export interface SubscriptionsFilterValues {
 interface Props {
   status: string;
   search: string;
-  /** Rows on this page, and the most the server sends: equal means the list was cut. */
-  rowCount: number;
-  rowLimit: number;
   subjectMode?: SubjectMode;
   onChange: (next: SubscriptionsFilterValues) => void;
 }
 
 /**
  * The status filter and the search (organisation name or slug; a user's email
- * or id in user mode), plus a notice when the list stops at the row limit.
+ * or id in user mode).
  */
-export function SubscriptionsFilters({
-  status,
-  search,
-  rowCount,
-  rowLimit,
-  subjectMode = 'tenant',
-  onChange,
-}: Props) {
+export function SubscriptionsFilters({ status, search, subjectMode = 'tenant', onChange }: Props) {
   const { t } = useT();
   const c = keys.billing.subscriptions;
   const byUser = subjectMode === 'user';
@@ -42,7 +32,7 @@ export function SubscriptionsFilters({
   useEffect(() => setDraft(search), [search]);
 
   return (
-    <div className="mb-4 space-y-2">
+    <div className="mb-4">
       <form
         className="flex flex-wrap items-end gap-3"
         onSubmit={(event) => {
@@ -82,11 +72,6 @@ export function SubscriptionsFilters({
           </div>
         </div>
       </form>
-      {rowCount >= rowLimit && (
-        <p className="text-sm text-muted-foreground" data-testid="subscriptions-limit">
-          {t(c.limit_notice, { count: rowLimit })}
-        </p>
-      )}
     </div>
   );
 }
