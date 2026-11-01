@@ -48,6 +48,28 @@ def settings() -> Settings:
     )
 
 
+@pytest.fixture
+def single_tenant(settings) -> Settings:
+    """A single-tenant host: what ``subject_mode = "user"`` requires."""
+    settings.multi_tenant = False
+    return settings
+
+
+@pytest.fixture
+async def user_mode_app(single_tenant, app):
+    """The app in ``subject_mode = "user"``: billing bills the signed-in user.
+
+    The mode is applied the way ``on_startup`` applies it, after the setting is
+    in place (the app fixture has already run startup in tenant mode).
+    """
+    from sm_billing import constants as c
+    from sm_billing.subject_boot import apply_subject_mode
+
+    getattr(app.state, c.PACKAGE).settings.subject_mode = c.SUBJECT_MODE_USER
+    await apply_subject_mode(app)
+    return app
+
+
 @pytest.fixture(autouse=True)
 def _fresh_membership_cache():
     from tenants.resolver import forget

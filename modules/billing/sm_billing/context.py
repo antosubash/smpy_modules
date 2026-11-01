@@ -7,6 +7,9 @@ suspension can never be lifted from inside the app. So when the session's
 chosen organisation is suspended *by billing* and the user owns it, billing
 opens it in **restore** mode — status and portal only, never checkout or plan
 changes. An organisation an admin suspended stays closed.
+
+In ``subject_mode = "user"`` there is no organisation: the signed-in user is
+the subject and owns it, and nothing is ever billing-suspended (#274).
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ from tenants.models import Membership, Tenant
 
 from sm_billing import constants as c
 from sm_billing.resolve import subscription_for
+from sm_billing.subjects import for_request, subject_mode
 
 
 @dataclass(frozen=True)
@@ -52,12 +56,26 @@ async def _restorable(request: Request, db: AsyncSession) -> BillingContext | No
     return BillingContext(tenant_id=chosen, role=c.TENANT_ROLE_OWNER, restore=True)
 
 
+def user_context(request: Request) -> BillingContext:
+    """User mode: the signed-in user's own subject, owned by them. No restore
+    mode — a user subject is never suspended. 401 ``subject_required`` signed out."""
+    return BillingContext(tenant_id=for_request(request), role=c.TENANT_ROLE_OWNER)
+
+
+def is_user_mode(request: Request) -> bool:
+    return subject_mode(request.app) == c.SUBJECT_MODE_USER
+
+
 async def billing_context(request: Request, db: AsyncSession) -> BillingContext | None:
     """The organisation this request bills, or ``None`` (pick one first).
 
     The chosen-but-suspended organisation wins over the resolver's fallback:
     it is the one the user asked for, and the one that needs paying.
+    In user mode: the signed-in user's subject, or ``None`` signed out.
     """
+    if is_user_mode(request):
+        signed_in = getattr(request.state, "user", None) is not None
+        return user_context(request) if signed_in else None
     restore = await _restorable(request, db)
     if restore is not None:
         return restore

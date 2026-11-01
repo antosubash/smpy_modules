@@ -11,10 +11,13 @@ from __future__ import annotations
 import uuid
 from typing import Any, Literal
 
+from simple_module_db.tenancy import DEFAULT_TENANT_ID
 from tenants.models import Tenant
 from users.models import User
 
 from sm_billing import constants as c
+from sm_billing.errors import BillingError
+from sm_billing.lifecycle import is_multi_tenant
 
 SubjectKind = Literal["tenant", "user"]
 
@@ -47,6 +50,27 @@ def tenant_of(subject: str) -> str:
 def subject_mode(app: Any) -> SubjectKind:
     """The mode ``on_startup`` stored on ``app.state`` (tenant when unset)."""
     return getattr(app.state, c.SUBJECTS_STATE_ATTR, c.SUBJECT_MODE_TENANT)
+
+
+def for_request(request: Any) -> str:
+    """The subject a request bills.
+
+    Tenant mode: the request's tenant, else ``"default"`` on a single-tenant
+    host, else 403 ``tenant_required``. User mode: the signed-in user, else
+    401 ``subject_required`` — never ``"default"``, which would bill every
+    anonymous caller to one shared counter.
+    """
+    if subject_mode(request.app) == c.SUBJECT_MODE_USER:
+        user = getattr(request.state, "user", None)
+        if user is None:
+            raise BillingError("subject_required", 401)
+        return subject_for_user(user.id)
+    tenant_id = getattr(request.state, "tenant_id", None)
+    if tenant_id:
+        return subject_for_tenant(tenant_id)
+    if not is_multi_tenant(request.app):
+        return DEFAULT_TENANT_ID
+    raise BillingError("tenant_required", 403)
 
 
 def _as_uuid(raw: str | None) -> uuid.UUID | None:

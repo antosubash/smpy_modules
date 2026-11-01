@@ -15,12 +15,6 @@ STRANDED = "billing.subject_mode.stranded_default_rows"
 CALLERS = "billing.subject_mode.tenant_billed_callers"
 
 
-@pytest.fixture
-def single_tenant(settings):
-    settings.multi_tenant = False
-    return settings
-
-
 def _set_mode(app, mode: str) -> None:
     getattr(app.state, c.PACKAGE).settings.subject_mode = mode
 
