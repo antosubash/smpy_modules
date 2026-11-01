@@ -10,12 +10,13 @@ import logging
 from typing import TYPE_CHECKING
 
 from simple_module_core import get_module_package_name
+from simple_module_db.tenancy import DEFAULT_TENANT_ID
 from sqlalchemy import select
 from users.constants import USER_ROLE_NAME
 
 from sm_billing import constants as c
 from sm_billing.lifecycle import is_multi_tenant
-from sm_billing.models import Subscription, UsagePeriod
+from sm_billing.models import Customer, Subscription, UsageGauge, UsageHold, UsagePeriod
 from sm_billing.user_teardown import subscribe_user_teardown
 
 if TYPE_CHECKING:
@@ -23,7 +24,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Modules whose workers meter on the tenant, whatever the mode.
+# Modules whose workers meter on the tenant, whatever the mode. ai's
+# request-time ``RequiresAiRequest`` is billing's ``RequiresQuota`` and bills the
+# user; only its worker-side ``consume_requests`` (images' AI steps) bills the
+# tenant, so ``ai.requests`` is split across the two subjects.
 _TENANT_BILLED = {"sm_images": "images", "sm_ai": "ai"}
 
 
@@ -35,9 +39,9 @@ def installed_callers(app: FastAPI) -> list[str]:
 
 async def _has_default_rows(app: FastAPI) -> bool:
     async with app.state.sm.db.session_factory() as session:
-        for model in (Subscription, UsagePeriod):
+        for model in (Subscription, UsagePeriod, UsageGauge, UsageHold, Customer):
             row = await session.execute(
-                select(model.tenant_id).where(model.tenant_id == "default").limit(1)
+                select(model.tenant_id).where(model.tenant_id == DEFAULT_TENANT_ID).limit(1)
             )
             if row.first() is not None:
                 return True
@@ -60,13 +64,15 @@ async def apply_subject_mode(app: FastAPI) -> None:
     subscribe_user_teardown(app)  # a deleted user's subscription is canceled
     if await _has_default_rows(app):
         logger.warning(
-            "billing.subject_mode.stranded_default_rows: subscriptions or usage "
-            'recorded under the "default" subject are not visible in user mode'
+            "billing.subject_mode.stranded_default_rows: subscriptions, usage, holds "
+            'or a customer recorded under the "default" subject are not visible in '
+            "user mode"
         )
     callers = installed_callers(app)
     if callers:
         logger.warning(
-            "billing.subject_mode.tenant_billed_callers: %s keep metering on "
-            'the tenant ("default"), not on a user',
+            "billing.subject_mode.tenant_billed_callers: %s meter on the tenant "
+            '("default") from workers, not on a user; ai.requests charged in a '
+            "request bills the user, so that meter is split across both subjects",
             ", ".join(callers),
         )

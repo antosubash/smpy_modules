@@ -94,7 +94,7 @@ The contract docstrings say "billing subject (a tenant id or `user:<id>`)".
 
 1. **The key format is `user:<uuid>`.** A bare `uuid.hex` would collide with tenant ids.
 2. **The column keeps the name `tenant_id`.** The rename is deferred.
-3. **images and ai keep billing the tenant in `user` mode.** Their worker paths pass the row's tenant (`default`). Boot logs one warning naming them. Making them bill per user (through the collection owner) is a follow-up issue. Refusing to boot instead would lock any host with images out of `user` mode.
+3. **images and ai keep billing the tenant in `user` mode.** Their worker paths pass the row's tenant (`default`); ai's request-time `RequiresAiRequest` bills the user, so `ai.requests` is split across the two subjects. Boot logs one warning naming them. Making them bill per user (through the collection owner) is a follow-up issue. Refusing to boot instead would lock any host with images out of `user` mode.
 4. **No `period_policy`.** Stripe subscribers follow Stripe's period, everyone else calendar months, as today.
 5. **One owner page.** The same `/billing` page, fed a synthesised owner context, not a second page.
 6. **User subjects are never suspended.** An unpaid subscription falls back to the default plan.

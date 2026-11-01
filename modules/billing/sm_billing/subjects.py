@@ -59,7 +59,7 @@ def user_id_of(subject: str) -> str | None:
 
 def tenant_of(subject: str) -> str:
     """The tenant a subject lives under: a user subject has none, so ``"default"``."""
-    return "default" if kind(subject) == c.SUBJECT_MODE_USER else subject
+    return DEFAULT_TENANT_ID if kind(subject) == c.SUBJECT_MODE_USER else subject
 
 
 def for_request(request: Any) -> str:
@@ -84,7 +84,7 @@ def for_request(request: Any) -> str:
 
 
 async def exists(db: Any, subject: str) -> bool:
-    if subject == "default":
+    if subject == DEFAULT_TENANT_ID:
         return True
     if kind(subject) == c.SUBJECT_MODE_USER:
         user_id = user_uuid(subject)
@@ -102,7 +102,7 @@ async def names(db: Any, subjects: list[str]) -> dict[str, tuple[str, str]]:
             user_id = user_uuid(subject)
             if user_id is not None:
                 users[user_id] = subject
-        elif subject != "default":
+        elif subject != DEFAULT_TENANT_ID:
             tenant_ids.append(subject)
     # Two queries however long the list (the usage overview names every row).
     if users:

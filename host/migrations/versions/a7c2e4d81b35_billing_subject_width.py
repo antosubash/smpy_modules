@@ -4,6 +4,10 @@ A billing subject is a tenant id (32 characters), ``"default"`` or, in user
 mode, ``"user:<uuid>"`` (41). Widens the six ``tenant_id`` columns of
 sm_billing to 64 (#274).
 
+The downgrade narrows them back to 32, which fails on Postgres once any row
+holds a subject longer than 32 characters (every ``user:<uuid>`` does):
+delete or rewrite those rows first. SQLite does not enforce the length.
+
 Revision ID: a7c2e4d81b35
 Revises: f5b1c3e8a207
 Create Date: 2026-11-01 12:00:00.000000

@@ -72,3 +72,45 @@ async def test_installed_images_or_ai_warn(single_tenant, app, caplog, monkeypat
         await apply_subject_mode(app)
     [rec] = [r for r in caplog.records if CALLERS in r.message]
     assert "images" in rec.getMessage() and "ai" in rec.getMessage()
+
+
+def _stranded_row(kind: str):
+    from sm_billing.models import Customer, UsageGauge, UsageHold
+
+    if kind == "gauge":
+        return UsageGauge(tenant_id="default", meter="files.storage", in_use=1)
+    if kind == "hold":
+        return UsageHold(
+            id="h1",
+            tenant_id="default",
+            meter="files.storage",
+            quantity=1,
+            status="held",
+            idempotency_key="k",
+            source="test",
+        )
+    return Customer(tenant_id="default", provider="stripe", provider_customer_id="cus_1")
+
+
+@pytest.mark.parametrize("kind", ["gauge", "hold", "customer"])
+async def test_every_stranded_default_row_warns(single_tenant, app, caplog, kind):
+    async with app.state.sm.db.session_factory() as session:
+        session.add(_stranded_row(kind))
+        await session.commit()
+    _set_mode(app, "user")
+    with caplog.at_level("WARNING"):
+        await apply_subject_mode(app)
+    assert [r for r in caplog.records if STRANDED in r.message]
+
+
+async def test_ai_warning_says_requests_are_split(single_tenant, app, caplog, monkeypatch):
+    """Request-time ``RequiresAiRequest`` bills the user; only worker metering bills default."""
+    from sm_billing import subject_boot
+
+    monkeypatch.setattr(subject_boot, "installed_callers", lambda _app: ["ai"])
+    _set_mode(app, "user")
+    with caplog.at_level("WARNING"):
+        await apply_subject_mode(app)
+    [rec] = [r for r in caplog.records if CALLERS in r.message]
+    message = rec.getMessage()
+    assert "worker" in message and "ai.requests" in message

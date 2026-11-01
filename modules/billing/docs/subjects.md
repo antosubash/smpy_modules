@@ -23,7 +23,7 @@ mode is read once at startup. At boot, in `user` mode, billing:
 - subscribes the `UserDeleted` teardown (below);
 - logs two warnings when they apply (see
   [Rows do not move](#rows-do-not-move) and
-  [images and ai](#images-and-ai-keep-billing-the-tenant)).
+  [Worker metering stays on the tenant](#worker-metering-stays-on-the-tenant)).
 
 In `tenant` mode nothing changes.
 
@@ -135,11 +135,25 @@ The first argument of every `UsageMeter` method is the billing subject (the
 parameter is still called `tenant_id`; renaming it is deferred). The key
 helpers import nothing heavy, so a Celery worker can load them without the app.
 
-## images and ai keep billing the tenant
+## Worker metering stays on the tenant
 
-The `images` and `ai` worker paths pass the row's tenant, which is `default` on
-a single-tenant host, so in `user` mode their usage is metered against
-`default`, not a user. Boot logs
-`billing.subject_mode.tenant_billed_callers` naming whichever is installed
-(`subject_boot.py`). Billing them per user is follow-up work; until then a
-plan limit on one of their meters applies to the whole host in `user` mode.
+Request-time metering follows the mode: ai's `RequiresAiRequest` *is*
+billing's `RequiresQuota("ai.requests")`, so an AI request made from a route
+bills the signed-in user. The worker paths do not: images' steps, and ai's
+`consume_requests` that images' AI steps call, pass the row's tenant, which is
+`default` on a single-tenant host. In `user` mode, then, images' meters are
+counted against `default`, and `ai.requests` is **split across two subjects**:
+each user's own counter for requests made in a request, and `default` for
+requests made by workers. Boot logs `billing.subject_mode.tenant_billed_callers`
+naming whichever of the two is installed (`subject_boot.py`). Billing the
+worker paths per user is follow-up work (they would use `worker_subject_mode`
+above); until then a plan limit on one of their meters applies to the whole
+host for worker usage in `user` mode.
+
+## Stripe Customer Portal in user mode
+
+A user cannot hold a per-seat plan, and billing only blocks that on its own
+routes. In `user` mode, keep every per-seat product and price out of the
+Customer Portal's plan-switching configuration (Stripe → Settings → Billing →
+Customer portal → Subscriptions), or a user could switch themselves onto one
+there; the webhook would then mirror a per-seat subscription onto a user.

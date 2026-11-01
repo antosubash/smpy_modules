@@ -89,7 +89,9 @@ environment variables — an `SM_BILLING_*` line does nothing.
 6. Enable the Customer Portal (Stripe → Settings → Billing → Customer portal).
    **Do not let the portal switch customers to prices that belong to no plan**
    here: billing maps every subscription to a plan by its price, and an unknown
-   price on a live subscription fails until a plan carries it.
+   price on a live subscription fails until a plan carries it. With
+   `subject_mode = user`, also keep per-seat prices out of the portal's plan
+   switching (`docs/subjects.md`).
 7. Set `provider = stripe` on the Settings screen. It takes effect on save.
 
 ## Switching provider
