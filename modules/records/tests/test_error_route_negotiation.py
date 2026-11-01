@@ -45,7 +45,7 @@ async def test_a_view_route_renders_the_frameworks_error_page(client, path):
     assert resp.headers["content-type"].startswith("text/html"), resp.headers["content-type"]
 
 
-async def test_a_view_route_keeps_recordss_json_body_for_a_json_client(client, monkeypatch):
+async def test_a_view_route_keeps_its_json_body_for_a_json_client(client, monkeypatch):
     """The framework's ``render_error_page`` negotiates to a bare ``{"detail"}``;
     records answers an explicit JSON client with its own body instead, so a
     refusal's extra keys (``code`` here) survive."""

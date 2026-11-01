@@ -139,12 +139,13 @@ async def _error_page(request: Request, exc: Exception) -> Response:
     """The host's Inertia error document for a view route's refusal.
 
     The framework's public ``render_error_page`` (0.0.42) negotiates: an
-    Inertia visit or a browser navigation gets the page, an explicit
-    ``Accept: application/json`` gets records' own JSON body. A harness that mounted
-    these routers without ``app.state.sm.inertia_config``, or a host whose
-    error page itself fails, still gets an answer rather than an error on top
-    of the original refusal: the JSON body, which is exactly what this route
-    class used to send unconditionally.
+    Inertia visit or a browser navigation gets the page; an explicit
+    ``Accept: application/json`` gets records' own JSON body, not the
+    framework's bare ``{"detail"}``. A harness that mounted these routers
+    without ``app.state.sm.inertia_config``, or a host whose error page itself
+    fails, still gets an answer rather than an error on top of the original
+    refusal: the JSON body, which is exactly what this route class used to
+    send unconditionally.
     """
     config = getattr(getattr(request.app.state, "sm", None), "inertia_config", None)
     if config is None:
