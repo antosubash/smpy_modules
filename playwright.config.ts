@@ -43,8 +43,18 @@ const BUNDLE = process.env.E2E_BUNDLE === '1';
 // scripts/e2e_report_summary.mjs lists both in the job summary (#119).
 const CI = !!process.env.CI;
 
+// E2E_BILLING_USER=1 runs billing with `subject_mode=user` (#274), a boot-time
+// setting start-test-server.sh writes before the host starts. Only
+// billing-user.spec.ts belongs to that host; every other spec assumes the
+// default (tenant) mode, and that spec needs the user mode, so each run
+// ignores the other's files (CI's `E2E (billing per user)` job).
+const BILLING_USER = process.env.E2E_BILLING_USER === '1';
+
 export default defineConfig({
   testDir: './tests/e2e',
+  ...(BILLING_USER
+    ? { testMatch: /billing-user\.spec\.ts$/ }
+    : { testIgnore: /billing-user\.spec\.ts$/ }),
   // One worker against one host and one database: a second worker would be a
   // second writer to the same SQLite file. Parallelism comes from CI-level
   // `--shard=i/n` instead, each shard a separate job with its own host (#119).
@@ -133,6 +143,8 @@ export default defineConfig({
       // Opt-in: the billing tenant flow needs an active organisation, which
       // only exists with multi-tenancy on. The default suite runs without it.
       ...(process.env.E2E_MULTI_TENANT ? { SM_MULTI_TENANT: 'true' } : {}),
+      // Opt-in: billing per user (see BILLING_USER above).
+      ...(BILLING_USER ? { E2E_BILLING_USER: '1' } : {}),
       // Consumed by Makefile dev-api and vite.config.ts respectively.
       API_PORT,
       SM_UI_PORT: UI_PORT,

@@ -504,6 +504,45 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  e2e-billing-user:
+    name: E2E (billing per user)
+    runs-on: ubuntu-latest
+    # billing-user.spec.ts against a host with billing's subject_mode=user
+    # (#274), which start-test-server.sh sets before boot. Same budget, and the
+    # same reason, as `e2e-multi-tenant`.
+    timeout-minutes: 30
+    env:
+      E2E_BILLING_USER: "1"
+      E2E_BUNDLE: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/e2e-setup
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          node-version: ${{ env.NODE_VERSION }}
+          uv-version: ${{ env.UV_VERSION }}
+
+      # With E2E_BILLING_USER=1, playwright.config.ts matches billing-user.spec.ts
+      # only; the `e2e-shard` jobs ignore it. Not sharded: one spec.
+      - name: Run billing-per-user Playwright tests
+        run: npm run test:e2e
+
+      - name: Flaky and failed tests
+        if: ${{ !cancelled() }}
+        run: node scripts/e2e_report_summary.mjs
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-billing-user
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
   lint-js:
     name: Lint (biome)
     runs-on: ubuntu-latest
