@@ -15,7 +15,7 @@ import { useCheckoutPolling } from '../hooks/useCheckoutPolling';
 import { api, BILLING_API } from '../utils/api';
 import { type PlanCta, planCta, priceLabel } from '../utils/format';
 import { keys, useT } from '../utils/i18n';
-import type { Interval, MeterUsage, Plan, Status } from '../utils/types';
+import type { Interval, MeterUsage, Plan, Status, SubjectMode } from '../utils/types';
 
 interface Props {
   status: Status;
@@ -27,14 +27,16 @@ interface Props {
   restore: boolean;
   csrf_token: string;
   checkout: string;
+  /** "user": billing bills the signed-in user — no organisation, no seats (#274). */
+  subject_mode?: SubjectMode;
 }
 
 function Billing() {
   const { t, locale } = useT();
   const c = keys.billing.page;
-  const { status, plans, usage, can_manage, restore, csrf_token, checkout } = usePage<{
-    props: Props;
-  }>().props as unknown as Props;
+  const { status, plans, usage, can_manage, restore, csrf_token, checkout, subject_mode } =
+    usePage<{ props: Props }>().props as unknown as Props;
+  const byUser = subject_mode === 'user';
   const [interval, setBillingInterval] = useState<Interval>(
     status.subscription?.interval ?? 'month',
   );
@@ -94,7 +96,7 @@ function Billing() {
   return (
     <>
       <Head title={t(c.title)} />
-      <PageShell title={t(c.title)} description={t(c.description)}>
+      <PageShell title={t(c.title)} description={t(byUser ? c.description_user : c.description)}>
         <div className="space-y-8">
           {polling === 'waiting' && (
             <InlineBanner
@@ -134,8 +136,9 @@ function Billing() {
             canManage={can_manage || restore}
             busy={busy}
             onPortal={openPortal}
+            showSeats={!byUser}
           />
-          <UsageCard usage={usage ?? []} />
+          <UsageCard usage={usage ?? []} byUser={byUser} />
 
           <section className="space-y-4" hidden={restore}>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -152,7 +155,11 @@ function Billing() {
                 />
               )}
             </div>
-            {!can_manage && <p className="text-sm text-muted-foreground">{t(c.owner_only)}</p>}
+            {!can_manage && (
+              <p className="text-sm text-muted-foreground">
+                {t(byUser ? c.owner_only_user : c.owner_only)}
+              </p>
+            )}
             {!status.checkout_available && can_manage && (
               <p className="text-sm text-muted-foreground">{t(c.no_checkout)}</p>
             )}
@@ -166,6 +173,7 @@ function Billing() {
                   canManage={can_manage}
                   busy={busy}
                   onChoose={choose}
+                  showSeats={!byUser}
                 />
               ))}
             </div>

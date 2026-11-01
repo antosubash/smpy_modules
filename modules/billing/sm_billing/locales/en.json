@@ -9,11 +9,13 @@
   "page": {
     "title": "Billing",
     "description": "Your organisation's plan, seats and payment.",
+    "description_user": "Your plan and payment.",
     "plans_heading": "Plans",
     "period_label": "Billing period",
     "monthly": "Monthly",
     "yearly": "Yearly",
     "owner_only": "Only the organisation owner can change the plan.",
+    "owner_only_user": "You cannot change your plan here — contact the site administrator.",
     "no_checkout": "Online payment is not set up here — contact the site administrator to change plan.",
     "activating_title": "Activating your subscription…",
     "activating_description": "Stripe confirmed the payment; this page updates once it reaches us.",
@@ -48,6 +50,7 @@
   "usage": {
     "title": "Usage",
     "description": "What your organisation has used, against your plan's limits.",
+    "description_user": "What you have used, against your plan's limits.",
     "unlimited": "Unlimited",
     "of_limit": "{used} of {limit}",
     "used_no_limit": "{used} used",

@@ -47,7 +47,9 @@ or reassign plans by hand (**Subscriptions** screen) after switching.
   A `canceled`, `unpaid` or otherwise lapsed subscription *downgrades* the user
   to the default plan; nothing is written to `tenants`.
 - **No seats.** A per-seat plan cannot go to a user: checkout, plan change and
-  the admin **Assign** all answer `422 per_seat_requires_tenant`.
+  the admin **Assign** all answer `422 per_seat_requires_tenant`, and the
+  Billing page does not offer one (`BillingService.public_plans`). The page
+  speaks to the user, not an organisation, and shows no seat counts.
 - **Reconcile** runs bound to tenant `default`, never to a user id.
 - **Admin screens.** **Subscriptions** lists users by email (not
   organisations) and assigns a plan per user; **Usage** works per user. Assigning

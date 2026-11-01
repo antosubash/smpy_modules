@@ -21,6 +21,8 @@ interface Props {
   canManage: boolean;
   busy: boolean;
   onChoose: (plan: Plan, cta: PlanCta) => void;
+  /** False in user mode: a user has no seats, so no seat line. */
+  showSeats?: boolean;
 }
 
 const LABEL: Record<PlanCta, string> = {
@@ -31,20 +33,31 @@ const LABEL: Record<PlanCta, string> = {
   unavailable: keys.billing.plan_card.unavailable,
 };
 
-function limitLines(plan: Plan, t: Translate): string[] {
+function limitLines(plan: Plan, t: Translate, showSeats: boolean): string[] {
   const seats = plan.limits['tenants.seats'];
-  const lines = [
-    seats === undefined
-      ? t(keys.billing.plan_card.unlimited_seats)
-      : t(keys.billing.plan_card.up_to_seats, { count: seats }),
-  ];
+  const lines: string[] = [];
+  if (showSeats) {
+    lines.push(
+      seats === undefined
+        ? t(keys.billing.plan_card.unlimited_seats)
+        : t(keys.billing.plan_card.up_to_seats, { count: seats }),
+    );
+  }
   for (const [key, value] of Object.entries(plan.limits)) {
     if (key !== 'tenants.seats') lines.push(t(keys.billing.plan_card.limit_line, { key, value }));
   }
   return lines;
 }
 
-export function PlanCard({ plan, interval, cta, canManage, busy, onChoose }: Props) {
+export function PlanCard({
+  plan,
+  interval,
+  cta,
+  canManage,
+  busy,
+  onChoose,
+  showSeats = true,
+}: Props) {
   const { t, locale } = useT();
   const actionable = canManage && cta !== 'current' && cta !== 'unavailable';
   return (
@@ -67,7 +80,7 @@ export function PlanCard({ plan, interval, cta, canManage, busy, onChoose }: Pro
       <CardContent className="flex-1 space-y-3 text-sm">
         {plan.description && <p className="text-muted-foreground">{plan.description}</p>}
         <ul className="space-y-1.5">
-          {[...limitLines(plan, t), ...plan.features].map((line) => (
+          {[...limitLines(plan, t, showSeats), ...plan.features].map((line) => (
             <li key={line} className="flex items-start gap-2">
               <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
               <span>{line}</span>

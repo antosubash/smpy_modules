@@ -18,6 +18,7 @@ from simple_module_inertia import InertiaResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_billing import constants as c
+from sm_billing import subjects
 from sm_billing.checkout import BillingService
 from sm_billing.context import billing_context
 from sm_billing.metering.admin import tenant_usage
@@ -55,5 +56,6 @@ async def billing_page(
             "restore": ctx.restore,
             "csrf_token": get_csrf_token(request),
             "checkout": request.query_params.get("checkout", ""),
+            "subject_mode": subjects.subject_mode(request.app),
         },
     )

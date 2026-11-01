@@ -9,11 +9,13 @@
   "page": {
     "title": "Abrechnung",
     "description": "Tarif, Plätze und Zahlung Ihrer Organisation.",
+    "description_user": "Ihr Tarif und Ihre Zahlung.",
     "plans_heading": "Tarife",
     "period_label": "Abrechnungszeitraum",
     "monthly": "Monatlich",
     "yearly": "Jährlich",
     "owner_only": "Nur der Inhaber der Organisation kann den Tarif ändern.",
+    "owner_only_user": "Sie können Ihren Tarif hier nicht ändern – wenden Sie sich an den Website-Administrator.",
     "no_checkout": "Online-Zahlung ist hier nicht eingerichtet – wenden Sie sich an den Website-Administrator, um den Tarif zu ändern.",
     "activating_title": "Ihr Abonnement wird aktiviert …",
     "activating_description": "Stripe hat die Zahlung bestätigt; diese Seite wird aktualisiert, sobald die Bestätigung bei uns eintrifft.",
@@ -48,6 +50,7 @@
   "usage": {
     "title": "Verbrauch",
     "description": "Was Ihre Organisation verbraucht hat, gemessen an den Grenzen Ihres Tarifs.",
+    "description_user": "Was Sie verbraucht haben, gemessen an den Grenzen Ihres Tarifs.",
     "unlimited": "Unbegrenzt",
     "of_limit": "{used} von {limit}",
     "used_no_limit": "{used} verbraucht",

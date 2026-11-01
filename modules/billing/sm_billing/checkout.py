@@ -80,8 +80,14 @@ class BillingService:
         )
 
     async def public_plans(self) -> list[PlanOut]:
+        """The plans this subject may buy: a user has no seats (see ``_target``)."""
         plans = await self.plans.list(include_archived=False)
-        return [plan_out(p) for p in plans if p.is_public]
+        user = subjects.kind(self.tenant_id) == c.SUBJECT_MODE_USER
+        return [
+            plan_out(p)
+            for p in plans
+            if p.is_public and not (user and p.pricing_model == c.PricingModel.PER_SEAT)
+        ]
 
     # ── guards ──────────────────────────────────────────────────
 
