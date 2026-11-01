@@ -139,3 +139,34 @@ async def test_tenant_mode_never_sweeps_user_customers(app):
     fake.snapshots["sub_1"] = _snap(subject, status="active", sid="sub_1")
     await reconcile(app)
     assert fake.called("cancel_now") == []
+
+
+async def test_the_user_sweep_is_one_query_however_many_customers(user_mode_app):
+    """An anti-join on ``users_user``, not a lookup per paying user."""
+    from sm_billing.user_sweep import orphan_users
+    from sqlalchemy import event
+
+    app = user_mode_app
+    live = [subject_for_user(await make_user(app, f"u{i}@x.io")) for i in range(3)]
+    gone = [subject_for_user(uuid.uuid4()) for _ in range(2)]
+    odd = "user:" + uuid.uuid4().hex  # non-canonical: names no user, never torn down
+    async with app.state.sm.db.session_factory() as session:
+        for i, subject in enumerate([*live, *gone, odd]):
+            customer = Customer(tenant_id=subject, provider="stripe", provider_customer_id=f"c{i}")
+            session.add(customer)
+        await session.commit()
+
+    statements: list[str] = []
+
+    def spy(conn, cursor, statement, *args) -> None:
+        statements.append(statement)
+
+    engine = app.state.sm.db.engine.sync_engine
+    event.listen(engine, "before_cursor_execute", spy)
+    try:
+        found = await orphan_users(app, None, datetime.now(UTC))
+    finally:
+        event.remove(engine, "before_cursor_execute", spy)
+
+    assert sorted(found) == sorted(gone)
+    assert len([s for s in statements if s.lstrip().upper().startswith("SELECT")]) == 1
