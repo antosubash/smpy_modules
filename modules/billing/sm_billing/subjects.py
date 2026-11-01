@@ -12,6 +12,7 @@ import uuid
 from typing import Any, Literal
 
 from simple_module_db.tenancy import DEFAULT_TENANT_ID
+from sqlalchemy import select
 from tenants.models import Tenant
 from users.models import User
 
@@ -91,18 +92,23 @@ async def exists(db: Any, subject: str) -> bool:
 
 async def names(db: Any, subjects: list[str]) -> dict[str, tuple[str, str]]:
     """Subject -> (display name, slug). A user gives ``(email, "")``; an unknown one itself."""
-    out: dict[str, tuple[str, str]] = {}
+    out: dict[str, tuple[str, str]] = {subject: (subject, "") for subject in subjects}
+    users: dict[uuid.UUID, str] = {}
+    tenant_ids: list[str] = []
     for subject in subjects:
-        out[subject] = (subject, "")
-        if subject == "default":
-            continue
         if kind(subject) == c.SUBJECT_MODE_USER:
             user_id = _as_uuid(user_id_of(subject))
-            user = await db.get(User, user_id) if user_id else None
-            if user is not None:
-                out[subject] = (user.email, "")
-        else:
-            tenant = await db.get(Tenant, subject)
-            if tenant is not None:
-                out[subject] = (tenant.name, tenant.slug)
+            if user_id is not None:
+                users[user_id] = subject
+        elif subject != "default":
+            tenant_ids.append(subject)
+    # Two queries however long the list (the usage overview names every row).
+    if users:
+        stmt = select(User.id, User.email).where(User.id.in_(list(users)))
+        for user_id, email in (await db.execute(stmt)).all():
+            out[users[uuid.UUID(str(user_id))]] = (email, "")
+    if tenant_ids:
+        stmt = select(Tenant.id, Tenant.name, Tenant.slug).where(Tenant.id.in_(tenant_ids))
+        for tenant_id, name, slug in (await db.execute(stmt)).all():
+            out[tenant_id] = (name, slug)
     return out

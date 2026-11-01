@@ -93,3 +93,34 @@ describe('billing table long names', () => {
     );
   });
 });
+
+describe('subscriptions table subject mode', () => {
+  function headers(subjectMode?: 'tenant' | 'user'): string[] {
+    const host = document.createElement('div');
+    host.innerHTML = renderToStaticMarkup(
+      <SubscriptionsTable
+        rows={[{ ...row, tenant_id: 'user:1', tenant_name: 'a@x.io', tenant_slug: '' }]}
+        canManage
+        mode="assign"
+        busy={false}
+        onResync={() => {}}
+        onAssign={() => {}}
+        subjectMode={subjectMode}
+      />,
+    );
+    return [...host.querySelectorAll('thead th')].map((th) => th.textContent ?? '');
+  }
+
+  it('names organisations and members in tenant mode', () => {
+    const cols = headers();
+    expect(cols[0]).toBe('Organisation');
+    expect(cols).toContain('Members');
+  });
+
+  it('names users and drops members in user mode', () => {
+    const cols = headers('user');
+    expect(cols[0]).toBe('User');
+    expect(cols).not.toContain('Members');
+    expect(cols).toHaveLength(headers().length - 1);
+  });
+});

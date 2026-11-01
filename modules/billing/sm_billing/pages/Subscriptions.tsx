@@ -5,7 +5,7 @@ import { Card } from '@simple-module-py/ui/components/ui/card';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
-import { Building2 } from 'lucide-react';
+import { Building2, User } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { AdminNav } from '../components/AdminNav';
@@ -46,7 +46,9 @@ function Subscriptions() {
     checkout_available,
     provider,
     provider_error,
+    subject_mode,
   } = usePage<{ props: Props }>().props as unknown as Props;
+  const byUser = subject_mode === 'user';
   const [assigning, setAssigning] = useState<SubscriptionRow | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -87,7 +89,9 @@ function Subscriptions() {
       <PageShell
         title={t(keys.billing.page.title)}
         description={
-          checkout_available ? t(c.description_stripe) : t(c.description_manual, { provider })
+          checkout_available
+            ? t(byUser ? c.description_stripe_users : c.description_stripe)
+            : t(c.description_manual, { provider })
         }
       >
         <AdminNav active="subscriptions" />
@@ -117,8 +121,8 @@ function Subscriptions() {
         <Card className="overflow-hidden p-0">
           {rows.length === 0 ? (
             <EmptyState
-              icon={Building2}
-              title={t(c.empty_title)}
+              icon={byUser ? User : Building2}
+              title={t(byUser ? c.empty_title_users : c.empty_title)}
               description={status_filter ? t(c.empty_filtered) : t(c.empty_none)}
             />
           ) : (
@@ -129,6 +133,7 @@ function Subscriptions() {
               busy={busy}
               onResync={resync}
               onAssign={setAssigning}
+              subjectMode={subject_mode}
             />
           )}
         </Card>
@@ -139,6 +144,7 @@ function Subscriptions() {
         busy={busy}
         onClose={() => setAssigning(null)}
         onAssign={assign}
+        subjectMode={subject_mode}
       />
     </>
   );

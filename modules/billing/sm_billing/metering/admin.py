@@ -13,9 +13,9 @@ from typing import TYPE_CHECKING
 
 from simple_module_db.tenancy import DEFAULT_TENANT_ID
 from sqlalchemy import func, select
-from tenants.models import Tenant
 
 from sm_billing import constants as c
+from sm_billing import subjects
 from sm_billing.contracts.metering import LIVE_HOLD_STATUSES, MeterKind
 from sm_billing.errors import BillingError
 from sm_billing.lifecycle import is_multi_tenant
@@ -83,11 +83,14 @@ def require_meter(app: FastAPI, meter: str, kind: MeterKind) -> None:
 
 
 async def require_tenant(db: AsyncSession, app: FastAPI, tenant_id: str) -> None:
-    """An adjustment names a real organisation — or, on a single-tenant host,
-    the one tenant everything is metered as (``RequiresQuota``'s ``default``)."""
-    if tenant_id == DEFAULT_TENANT_ID and not is_multi_tenant(app):
-        return
-    if await db.get(Tenant, tenant_id) is None:
+    """An adjustment names a real subject: an organisation, a user (user mode),
+    or, on a single-tenant host only, the one tenant everything is metered as
+    (``RequiresQuota``'s ``default``) — on a multi-tenant host it is none."""
+    if tenant_id == DEFAULT_TENANT_ID:
+        if not is_multi_tenant(app):
+            return
+        raise BillingError("tenant_not_found", 404)
+    if not await subjects.exists(db, tenant_id):
         raise BillingError("tenant_not_found", 404)
 
 

@@ -88,6 +88,9 @@ export interface Connection {
 }
 
 /** Props every admin page receives. */
+/** Who billing bills: organisations, or each signed-in user (#274). */
+export type SubjectMode = 'tenant' | 'user';
+
 export interface AdminCommon {
   csrf_token: string;
   can_manage: boolean;
@@ -95,6 +98,8 @@ export interface AdminCommon {
   checkout_available: boolean;
   /** Why a chosen ``stripe`` fell back to ``manual``; "" when it did not. */
   provider_error: string;
+  /** "user": the admin lists name users (by email) instead of organisations. */
+  subject_mode: SubjectMode;
 }
 
 // ── usage metering (sm_billing/metering/schemas.py) ─────────────────

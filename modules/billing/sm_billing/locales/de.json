@@ -181,12 +181,14 @@
   "subscriptions": {
     "head_title": "Abrechnungsabonnements",
     "description_stripe": "Jede Organisation und ihr Stripe-Abonnement.",
+    "description_stripe_users": "Jeder Benutzer und sein Stripe-Abonnement.",
     "description_manual": "Anbieter: {provider}. Tarife werden manuell zugewiesen; niemandem wird etwas berechnet.",
     "fallback_title": "Stripe ist konfiguriert, wird aber nicht verwendet",
     "fallback_description": "{error}. Tarife werden manuell zugewiesen und niemandem wird etwas berechnet, bis dies im Reiter „Stripe-Verbindung“ behoben ist.",
     "status": "Status",
     "all": "Alle",
     "empty_title": "Keine Organisationen",
+    "empty_title_users": "Keine Benutzer",
     "empty_filtered": "Keine Organisation hat diesen Status.",
     "empty_none": "Noch hat sich niemand registriert.",
     "resynced": "{name} wurde mit Stripe neu synchronisiert",
@@ -204,6 +206,7 @@
   },
   "subscriptions_table": {
     "col_organisation": "Organisation",
+    "col_user": "Benutzer",
     "col_plan": "Tarif",
     "col_status": "Status",
     "col_members": "Mitglieder",
@@ -225,7 +228,9 @@
       "meter": "Zähler",
       "all_meters": "Alle Zähler",
       "search": "Organisation",
+      "search_user": "Benutzer",
       "search_placeholder": "Name, Kürzel oder ID",
+      "search_placeholder_user": "E-Mail oder ID",
       "submit": "Suchen",
       "over": "Über 80 %",
       "period": "Zeitraum",
@@ -234,6 +239,7 @@
     },
     "columns": {
       "organisation": "Organisation",
+      "user": "Benutzer",
       "meter": "Zähler",
       "used": "Verbraucht",
       "limit": "Grenze",
@@ -319,6 +325,7 @@
   "assign": {
     "title": "{name} einen Tarif zuweisen",
     "description": "„Unbezahlt“ sperrt die Organisation; jeder andere Status hebt eine von der Abrechnung verhängte Sperre auf.",
+    "description_user": "„Unbezahlt“ stuft den Benutzer bis zur Zahlung auf den Standardtarif zurück; ein Benutzer wird nie gesperrt.",
     "plan": "Tarif",
     "status": "Status",
     "cancel": "Abbrechen",

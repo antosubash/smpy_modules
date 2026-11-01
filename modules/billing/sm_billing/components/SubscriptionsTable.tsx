@@ -10,7 +10,7 @@ import {
 } from '@simple-module-py/ui/components/ui/table';
 import { formatDate } from '../utils/format';
 import { keys, useT } from '../utils/i18n';
-import type { SubscriptionRow } from '../utils/types';
+import type { SubjectMode, SubscriptionRow } from '../utils/types';
 import { StatusBadge } from './StatusBadge';
 
 interface Props {
@@ -21,19 +21,30 @@ interface Props {
   busy: boolean;
   onResync: (row: SubscriptionRow) => void;
   onAssign: (row: SubscriptionRow) => void;
+  /** "user": each row is a user (named by email), and there are no members. */
+  subjectMode?: SubjectMode;
 }
 
-export function SubscriptionsTable({ rows, canManage, mode, busy, onResync, onAssign }: Props) {
+export function SubscriptionsTable({
+  rows,
+  canManage,
+  mode,
+  busy,
+  onResync,
+  onAssign,
+  subjectMode = 'tenant',
+}: Props) {
   const { t, locale } = useT();
   const c = keys.billing.subscriptions_table;
+  const byUser = subjectMode === 'user';
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>{t(c.col_organisation)}</TableHead>
+          <TableHead>{byUser ? t(c.col_user) : t(c.col_organisation)}</TableHead>
           <TableHead>{t(c.col_plan)}</TableHead>
           <TableHead>{t(c.col_status)}</TableHead>
-          <TableHead>{t(c.col_members)}</TableHead>
+          {!byUser && <TableHead>{t(c.col_members)}</TableHead>}
           <TableHead>{t(c.col_period_end)}</TableHead>
           <TableHead className="sticky right-0 bg-background text-right">
             {t(c.col_actions)}
@@ -54,7 +65,9 @@ export function SubscriptionsTable({ rows, canManage, mode, busy, onResync, onAs
                   </Badge>
                 )}
               </div>
-              <div className="font-mono text-xs text-muted-foreground">{row.tenant_slug}</div>
+              {row.tenant_slug && (
+                <div className="font-mono text-xs text-muted-foreground">{row.tenant_slug}</div>
+              )}
             </TableCell>
             <TableCell>
               <span className="block max-w-32 truncate sm:max-w-64" title={row.plan_name}>
@@ -72,14 +85,16 @@ export function SubscriptionsTable({ rows, canManage, mode, busy, onResync, onAs
                 <div className="mt-1 text-xs text-muted-foreground">{t(c.ends_at_period_end)}</div>
               )}
             </TableCell>
-            <TableCell>
-              {row.members}
-              {row.quantity !== null && row.quantity !== row.members && (
-                <span className="text-xs text-muted-foreground">
-                  {` ${t(c.billed, { quantity: row.quantity })}`}
-                </span>
-              )}
-            </TableCell>
+            {!byUser && (
+              <TableCell>
+                {row.members}
+                {row.quantity !== null && row.quantity !== row.members && (
+                  <span className="text-xs text-muted-foreground">
+                    {` ${t(c.billed, { quantity: row.quantity })}`}
+                  </span>
+                )}
+              </TableCell>
+            )}
             <TableCell>{formatDate(row.current_period_end, locale) || '—'}</TableCell>
             <TableCell className="sticky right-0 bg-background text-right">
               {canManage && mode === 'assign' && (

@@ -11,7 +11,7 @@ from simple_module_hosting.permissions import RequiresPermission, resolved_permi
 from simple_module_inertia import InertiaResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_billing import admin
+from sm_billing import admin, subjects
 from sm_billing import constants as c
 from sm_billing.checkout import plan_out
 from sm_billing.metering import admin as usage_admin
@@ -37,6 +37,8 @@ def _common(request: Request) -> dict:
         "checkout_available": bool(services.provider and services.provider.supports_checkout),
         # Why a chosen ``stripe`` fell back to ``manual``; "" when it did not (#200).
         "provider_error": services.provider_error,
+        # "user": the lists name users (by email) instead of organisations (#274).
+        "subject_mode": subjects.subject_mode(request.app),
     }
 
 

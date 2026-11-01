@@ -12,7 +12,7 @@ import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/component
 import { useEffect, useState } from 'react';
 import { clipName, STATUSES, statusLabel } from '../utils/format';
 import { keys, useT } from '../utils/i18n';
-import type { Plan, SubscriptionRow, SubscriptionStatus } from '../utils/types';
+import type { Plan, SubjectMode, SubscriptionRow, SubscriptionStatus } from '../utils/types';
 
 interface Props {
   row: SubscriptionRow | null;
@@ -20,12 +20,24 @@ interface Props {
   busy: boolean;
   onClose: () => void;
   onAssign: (planId: number, status: SubscriptionStatus) => void;
+  /** "user": per-seat plans are left out — a user has no seats (#274). */
+  subjectMode?: SubjectMode;
 }
 
-/** Manual provider: set an organisation's plan and status by hand. */
-export function AssignDialog({ row, plans, busy, onClose, onAssign }: Props) {
+/** Manual provider: set an organisation's (or a user's) plan and status by hand. */
+export function AssignDialog({
+  row,
+  plans,
+  busy,
+  onClose,
+  onAssign,
+  subjectMode = 'tenant',
+}: Props) {
   const { t } = useT();
-  const choices = plans.filter((p) => !p.archived_at);
+  const byUser = subjectMode === 'user';
+  const choices = plans.filter(
+    (p) => !p.archived_at && !(byUser && p.pricing_model === 'per_seat'),
+  );
   const [planId, setPlanId] = useState<number>(row?.plan_id ?? choices[0]?.id ?? 0);
   const [status, setStatus] = useState<SubscriptionStatus>(row?.status ?? 'active');
   useEffect(() => {
@@ -42,7 +54,9 @@ export function AssignDialog({ row, plans, busy, onClose, onAssign }: Props) {
           <DialogTitle>
             {t(keys.billing.assign.title, { name: clipName(row?.tenant_name ?? '') })}
           </DialogTitle>
-          <DialogDescription>{t(keys.billing.assign.description)}</DialogDescription>
+          <DialogDescription>
+            {t(byUser ? keys.billing.assign.description_user : keys.billing.assign.description)}
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">

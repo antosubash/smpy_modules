@@ -37,7 +37,7 @@ function query(filters: UsageFilterValues, page: number): Record<string, string>
 function Usage() {
   const { t } = useT();
   const c = keys.billing.admin_usage;
-  const { usage, meters, filters, csrf_token, can_manage, provider_error } = usePage<{
+  const { usage, meters, filters, csrf_token, can_manage, provider_error, subject_mode } = usePage<{
     props: Props;
   }>().props as unknown as Props;
   const [open, setOpen] = useState<UsageRow | null>(null);
@@ -58,7 +58,12 @@ function Usage() {
             <ProviderFallbackBanner error={provider_error} />
           </div>
         )}
-        <UsageFilters value={filters} meters={meters} onChange={(next) => visit(next)} />
+        <UsageFilters
+          value={filters}
+          meters={meters}
+          onChange={(next) => visit(next)}
+          subjectMode={subject_mode}
+        />
         <Card className="overflow-hidden p-0">
           {usage.items.length === 0 ? (
             <EmptyState
@@ -69,6 +74,7 @@ function Usage() {
           ) : (
             <UsageTable
               rows={usage.items}
+              subjectMode={subject_mode}
               onOpen={(row) => {
                 drawerFocus.remember();
                 setOpen(row);

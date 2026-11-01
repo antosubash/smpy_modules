@@ -1,4 +1,4 @@
-"""Platform-admin operations: plan writes with price checks, the tenant list,
+"""Platform-admin operations: plan writes with price checks, the tenant (or user) list,
 manual assignment, resync, and the Stripe connection settings."""
 
 from __future__ import annotations
@@ -9,8 +9,8 @@ from simple_module_db import finalize_session
 from sqlalchemy import func, select
 from tenants.models import Tenant
 
+from sm_billing import admin_users, crypto, subjects
 from sm_billing import constants as c
-from sm_billing import crypto
 from sm_billing.contracts.provider import ProviderError
 from sm_billing.errors import BillingError
 from sm_billing.lifecycle import apply_lifecycle, tenant_service
@@ -103,6 +103,10 @@ async def subscription_rows(
     offset: int = 0,
 ) -> list[SubscriptionRow]:
     default = await PlanService(db).default()
+    if subjects.subject_mode(app) == c.SUBJECT_MODE_USER:
+        return await admin_users.user_rows(
+            db, default, status=status, subject=tenant_id, limit=limit, offset=offset
+        )
     stmt = (
         select(Tenant, Subscription, Plan)
         .outerjoin(Subscription, Subscription.tenant_id == Tenant.id)
@@ -117,31 +121,19 @@ async def subscription_rows(
         stmt = stmt.where(Tenant.id == tenant_id)
     found = (await db.execute(stmt)).all()
     counts = await tenant_service(db, app).member_counts([t.id for t, _, _ in found])
-    rows = []
-    for tenant, sub, plan in found:
-        # The subscribed plan even when lapsed — the status column says so.
-        shown = plan if plan is not None else default
-        rows.append(
-            SubscriptionRow(
-                tenant_id=tenant.id,
-                tenant_name=tenant.name,
-                tenant_slug=tenant.slug,
-                tenant_status=tenant.status,
-                members=counts.get(tenant.id, 0),
-                plan_id=shown.id,
-                plan_key=shown.key,
-                plan_name=shown.name,
-                status=sub.status if sub else None,
-                interval=sub.interval if sub else None,
-                quantity=sub.quantity if sub else None,
-                current_period_end=sub.current_period_end if sub else None,
-                cancel_at_period_end=bool(sub and sub.cancel_at_period_end),
-                suspended_by_billing=bool(sub and sub.suspended_by_billing),
-                provider_subscription_id=sub.provider_subscription_id if sub else None,
-                synced_at=sub.synced_at if sub else None,
-            )
+    return [
+        admin_users.row(
+            tenant.id,
+            tenant.name,
+            tenant.slug,
+            tenant.status,
+            counts.get(tenant.id, 0),
+            sub,
+            # The subscribed plan even when lapsed — the status column says so.
+            plan if plan is not None else default,
         )
-    return rows
+        for tenant, sub, plan in found
+    ]
 
 
 async def sync_health(db: AsyncSession, app: FastAPI) -> SyncHealth:
@@ -186,11 +178,15 @@ async def assign(db: AsyncSession, app: FastAPI, tenant_id: str, data: AssignIn)
     """
     if current_provider(app).supports_checkout:
         raise BillingError("provider_managed", 409)
-    if await db.get(Tenant, tenant_id) is None:
-        raise BillingError("tenant_not_found", 404)
+    await admin_users.require_subject(db, app, tenant_id)
     plan = await PlanService(db).get(data.plan_id)
     if plan is None:
         raise BillingError("plan_not_found", 404)
+    if (
+        plan.pricing_model == c.PricingModel.PER_SEAT
+        and subjects.kind(tenant_id) == c.SUBJECT_MODE_USER
+    ):
+        raise BillingError("per_seat_requires_tenant", 422)  # a user has no seats
     sub = await subscription_for(db, tenant_id)
     if sub is None:
         sub = Subscription(tenant_id=tenant_id, plan_id=plan.id)

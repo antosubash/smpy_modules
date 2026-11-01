@@ -181,12 +181,14 @@
   "subscriptions": {
     "head_title": "Billing subscriptions",
     "description_stripe": "Every organisation and its Stripe subscription.",
+    "description_stripe_users": "Every user and their Stripe subscription.",
     "description_manual": "Provider: {provider}. Assign plans by hand; nobody is charged.",
     "fallback_title": "Stripe is configured but not in use",
     "fallback_description": "{error}. Plans are assigned by hand, and nobody is charged, until this is fixed on the Stripe connection tab.",
     "status": "Status",
     "all": "All",
     "empty_title": "No organisations",
+    "empty_title_users": "No users",
     "empty_filtered": "None match this status.",
     "empty_none": "Nobody has signed up yet.",
     "resynced": "{name} resynced from Stripe",
@@ -204,6 +206,7 @@
   },
   "subscriptions_table": {
     "col_organisation": "Organisation",
+    "col_user": "User",
     "col_plan": "Plan",
     "col_status": "Status",
     "col_members": "Members",
@@ -225,7 +228,9 @@
       "meter": "Meter",
       "all_meters": "All meters",
       "search": "Organisation",
+      "search_user": "User",
       "search_placeholder": "Name, slug or ID",
+      "search_placeholder_user": "Email or ID",
       "submit": "Search",
       "over": "Over 80%",
       "period": "Period",
@@ -234,6 +239,7 @@
     },
     "columns": {
       "organisation": "Organisation",
+      "user": "User",
       "meter": "Meter",
       "used": "Used",
       "limit": "Limit",
@@ -319,6 +325,7 @@
   "assign": {
     "title": "Assign a plan to {name}",
     "description": "“Unpaid” suspends the organisation; any other status lifts a suspension billing made.",
+    "description_user": "“Unpaid” drops the user to the default plan until it is paid; a user is never suspended.",
     "plan": "Plan",
     "status": "Status",
     "cancel": "Cancel",
