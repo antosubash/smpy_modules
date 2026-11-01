@@ -61,3 +61,10 @@ async def test_user_list_stops_at_the_row_limit_and_pages_on(user_mode_app, admi
     rest = await admin.get(ADMIN, params={"offset": c.ADMIN_ROW_LIMIT})
     after = [r["tenant_id"] for r in rest.json()]
     assert after and not set(first) & set(after)  # ... and the next page has them
+
+
+async def test_api_rejects_a_search_past_the_bound(app, admin):
+    ok = await admin.get(ADMIN, params={"q": "x" * c.ADMIN_SEARCH_MAX})
+    assert ok.status_code == 200, ok.text
+    too_long = await admin.get(ADMIN, params={"q": "x" * (c.ADMIN_SEARCH_MAX + 1)})
+    assert too_long.status_code == 422

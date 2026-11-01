@@ -61,7 +61,7 @@ async def subscriptions_page(
     status = request.query_params.get("status") or None
     # The API rejects a longer search; the screen truncates it instead of failing.
     search = (request.query_params.get("q") or "").strip()[: c.ADMIN_SEARCH_MAX]
-    total =await subscription_list.subscription_count(db, request.app, status=status, q=search)
+    total = await subscription_list.subscription_count(db, request.app, status=status, q=search)
     served, pages = page_numbers(total, _page(request.query_params.get("page")), c.ADMIN_PAGE_SIZE)
     rows = await subscription_list.subscription_rows(
         db,
