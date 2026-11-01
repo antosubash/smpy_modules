@@ -16,6 +16,7 @@ from users.constants import USER_ROLE_NAME
 from sm_billing import constants as c
 from sm_billing.lifecycle import is_multi_tenant
 from sm_billing.models import Subscription, UsagePeriod
+from sm_billing.user_teardown import subscribe_user_teardown
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -56,6 +57,7 @@ async def apply_subject_mode(app: FastAPI) -> None:
     # Ordinary users hold the "user" role; with no tenant roles in play it is
     # the only one that reaches them.
     app.state.sm.permissions.map_role(USER_ROLE_NAME, [c.PERM_VIEW, c.PERM_MANAGE])
+    subscribe_user_teardown(app)  # a deleted user's subscription is canceled
     if await _has_default_rows(app):
         logger.warning(
             "billing.subject_mode.stranded_default_rows: subscriptions or usage "
