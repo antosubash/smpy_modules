@@ -224,6 +224,7 @@
   "admin_usage": {
     "head_title": "Billing usage",
     "description": "What each organisation used, against its plan's limits.",
+    "description_user": "What each user used, against their plan's limits.",
     "filters": {
       "meter": "Meter",
       "all_meters": "All meters",
@@ -256,7 +257,9 @@
     "details": "Details",
     "empty_title": "No usage",
     "empty_filtered": "No organisation matches these filters.",
+    "empty_filtered_user": "No user matches these filters.",
     "empty_none": "No organisation has used a metered feature yet.",
+    "empty_none_user": "No user has used a metered feature yet.",
     "detail": {
       "title": "Usage of {name}",
       "description": "The ledger explains every change to the counters; holds make up the gauges."

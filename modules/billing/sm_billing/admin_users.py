@@ -7,7 +7,6 @@ driven from ``tenants_tenant``: every user, outer-joined to their subscription
 
 from __future__ import annotations
 
-import uuid
 from typing import TYPE_CHECKING
 
 from sqlalchemy import String, cast, literal, select
@@ -55,13 +54,6 @@ def row(
     )
 
 
-def _user_uuid(subject: str) -> uuid.UUID | None:
-    try:
-        return uuid.UUID(subjects.user_id_of(subject) or "")
-    except ValueError:
-        return None
-
-
 async def user_rows(
     db: AsyncSession,
     default: Plan,
@@ -86,7 +78,7 @@ async def user_rows(
     if status:
         stmt = stmt.where(Subscription.status == status)
     if subject is not None:
-        user_id = _user_uuid(subject)
+        user_id = subjects.user_uuid(subject)
         if user_id is None:
             return []
         stmt = stmt.where(User.id == user_id)
@@ -108,7 +100,9 @@ async def require_subject(db: AsyncSession, app: FastAPI, subject: str) -> None:
     """404 ``tenant_not_found`` unless ``subject`` is a row of this mode's list.
 
     Tenant mode keeps its organisation check as it was (``"default"`` is no
-    organisation); user mode takes an existing user's subject only.
+    organisation); user mode takes an existing user's canonical subject only.
+    Mode-strict on purpose: rows left from the other mode are repaired through
+    the usage admin (``metering.admin.require_tenant``), not assigned here.
     """
     if subjects.subject_mode(app) == c.SUBJECT_MODE_USER:
         found = subjects.kind(subject) == c.SUBJECT_MODE_USER and await subjects.exists(db, subject)

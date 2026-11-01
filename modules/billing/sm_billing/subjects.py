@@ -37,10 +37,26 @@ def kind(subject: str) -> SubjectKind:
     )
 
 
-def user_id_of(subject: str) -> str | None:
+def user_uuid(subject: str) -> uuid.UUID | None:
+    """The user a subject names — only in the canonical ``subject_for_user`` form.
+
+    An uppercase or dashless spelling parses as the same UUID, but every
+    request, list and checkout keys on the canonical string, so a row stored
+    under another spelling would bill nobody. Such a subject names no user.
+    """
     if kind(subject) != c.SUBJECT_MODE_USER:
         return None
-    return subject[len(c.USER_SUBJECT_PREFIX) :]
+    try:
+        parsed = uuid.UUID(subject[len(c.USER_SUBJECT_PREFIX) :])
+    except ValueError:
+        return None
+    return parsed if subject_for_user(parsed) == subject else None
+
+
+def user_id_of(subject: str) -> str | None:
+    """The user id of a canonical user subject; ``None`` for anything else."""
+    parsed = user_uuid(subject)
+    return None if parsed is None else str(parsed)
 
 
 def tenant_of(subject: str) -> str:
@@ -74,18 +90,11 @@ def for_request(request: Any) -> str:
     raise BillingError("tenant_required", 403)
 
 
-def _as_uuid(raw: str | None) -> uuid.UUID | None:
-    try:
-        return uuid.UUID(raw) if raw else None
-    except ValueError:
-        return None
-
-
 async def exists(db: Any, subject: str) -> bool:
     if subject == "default":
         return True
     if kind(subject) == c.SUBJECT_MODE_USER:
-        user_id = _as_uuid(user_id_of(subject))
+        user_id = user_uuid(subject)
         return user_id is not None and await db.get(User, user_id) is not None
     return await db.get(Tenant, subject) is not None
 
@@ -97,7 +106,7 @@ async def names(db: Any, subjects: list[str]) -> dict[str, tuple[str, str]]:
     tenant_ids: list[str] = []
     for subject in subjects:
         if kind(subject) == c.SUBJECT_MODE_USER:
-            user_id = _as_uuid(user_id_of(subject))
+            user_id = user_uuid(subject)
             if user_id is not None:
                 users[user_id] = subject
         elif subject != "default":

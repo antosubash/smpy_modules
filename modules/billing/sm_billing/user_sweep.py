@@ -8,7 +8,6 @@ hard-deleted), whose teardown has not completed and whose retry is due.
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -17,6 +16,7 @@ from users.models import User
 
 from sm_billing.constants import USER_SUBJECT_PREFIX
 from sm_billing.models import Customer
+from sm_billing.subjects import user_uuid
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -42,10 +42,7 @@ async def orphan_users(app: FastAPI, subject: str | None, now: datetime) -> list
     gone: list[str] = []
     async with app.state.sm.db.session_factory() as session:
         for candidate in (await session.scalars(stmt)).all():
-            try:
-                user_id = uuid.UUID(candidate[len(USER_SUBJECT_PREFIX) :])
-            except ValueError:
-                continue
-            if await session.get(User, user_id) is None:
+            user_id = user_uuid(candidate)  # a non-canonical spelling names no user
+            if user_id is not None and await session.get(User, user_id) is None:
                 gone.append(candidate)
     return gone

@@ -224,6 +224,7 @@
   "admin_usage": {
     "head_title": "Abrechnung – Verbrauch",
     "description": "Was jede Organisation verbraucht hat, gemessen an den Grenzen ihres Tarifs.",
+    "description_user": "Was jeder Benutzer verbraucht hat, gemessen an den Grenzen seines Tarifs.",
     "filters": {
       "meter": "Zähler",
       "all_meters": "Alle Zähler",
@@ -256,7 +257,9 @@
     "details": "Details",
     "empty_title": "Kein Verbrauch",
     "empty_filtered": "Keine Organisation entspricht diesen Filtern.",
+    "empty_filtered_user": "Kein Benutzer entspricht diesen Filtern.",
     "empty_none": "Noch keine Organisation hat eine gemessene Funktion genutzt.",
+    "empty_none_user": "Noch kein Benutzer hat eine gemessene Funktion genutzt.",
     "detail": {
       "title": "Verbrauch von {name}",
       "description": "Das Journal erklärt jede Änderung an den Zählern; Reservierungen bilden die Pegel."

@@ -3,6 +3,7 @@ import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { Plan, SubscriptionRow } from '../utils/types';
+import { offeredPlan } from './AssignDialog';
 import { PlansTable } from './PlansTable';
 import { SubscriptionsTable } from './SubscriptionsTable';
 
@@ -122,5 +123,22 @@ describe('subscriptions table subject mode', () => {
     expect(cols[0]).toBe('User');
     expect(cols).not.toContain('Members');
     expect(cols).toHaveLength(headers().length - 1);
+  });
+});
+
+describe('assign dialog preselection', () => {
+  const choices = [
+    { ...plan, id: 1 },
+    { ...plan, id: 2 },
+  ];
+
+  it('keeps the row plan when the picker offers it', () => {
+    expect(offeredPlan(choices, 2)).toBe(2);
+  });
+
+  it('falls back to the first choice when the row plan is not offered', () => {
+    expect(offeredPlan(choices, 9)).toBe(1);
+    expect(offeredPlan(choices, undefined)).toBe(1);
+    expect(offeredPlan([], 9)).toBe(0);
   });
 });

@@ -16,7 +16,6 @@ subscription only drops it to the default plan (``resolve.effective_plan``).
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -74,11 +73,10 @@ async def tenant_gone(db: AsyncSession, app: FastAPI, tenant_id: str) -> bool:
     if tenant_id.startswith(USER_SUBJECT_PREFIX):
         if getattr(app.state, c.SUBJECTS_STATE_ATTR, None) != c.SUBJECT_MODE_USER:
             return False
-        try:
-            user_id = uuid.UUID(tenant_id[len(USER_SUBJECT_PREFIX) :])
-        except ValueError:
-            return False
-        return await db.get(User, user_id) is None
+        from sm_billing.subjects import user_uuid  # subjects imports this module
+
+        user_id = user_uuid(tenant_id)  # a non-canonical spelling names no user
+        return user_id is not None and await db.get(User, user_id) is None
     if not is_multi_tenant(app) or tenant_id == DEFAULT_TENANT_ID:
         return False
     return await db.get(Tenant, tenant_id) is None

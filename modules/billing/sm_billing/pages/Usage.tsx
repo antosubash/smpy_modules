@@ -47,11 +47,15 @@ function Usage() {
     router.get(VIEW_URL, query(next, page), { preserveScroll: true, preserveState: true });
   const reload = useCallback(() => router.reload({ only: ['usage'] }), []);
   const filtered = Boolean(filters.meter || filters.q || filters.over);
+  const byUser = subject_mode === 'user';
 
   return (
     <>
       <Head title={t(c.head_title)} />
-      <PageShell title={t(keys.billing.page.title)} description={t(c.description)}>
+      <PageShell
+        title={t(keys.billing.page.title)}
+        description={t(byUser ? c.description_user : c.description)}
+      >
         <AdminNav active="usage" />
         {provider_error && (
           <div className="mb-4">
@@ -69,7 +73,11 @@ function Usage() {
             <EmptyState
               icon={Gauge}
               title={t(c.empty_title)}
-              description={filtered ? t(c.empty_filtered) : t(c.empty_none)}
+              description={
+                filtered
+                  ? t(byUser ? c.empty_filtered_user : c.empty_filtered)
+                  : t(byUser ? c.empty_none_user : c.empty_none)
+              }
             />
           ) : (
             <UsageTable

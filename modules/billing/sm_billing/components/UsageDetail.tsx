@@ -35,7 +35,7 @@ interface Props {
 }
 
 /**
- * One organisation's usage: the ledger, its open holds (with Release), a
+ * One subject's (organisation's or user's) usage: the ledger, its open holds (with Release), a
  * Recount for each gauge and the Adjust dialog for counters — the writes
  * only with ``billing.platform.manage``.
  */

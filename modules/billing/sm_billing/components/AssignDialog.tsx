@@ -9,7 +9,7 @@ import {
 } from '@simple-module-py/ui/components/ui/dialog';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@simple-module-py/ui/components/ui/native-select';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { clipName, STATUSES, statusLabel } from '../utils/format';
 import { keys, useT } from '../utils/i18n';
 import type { Plan, SubjectMode, SubscriptionRow, SubscriptionStatus } from '../utils/types';
@@ -24,6 +24,14 @@ interface Props {
   subjectMode?: SubjectMode;
 }
 
+/**
+ * The row's plan when the picker offers it, else the first choice: an archived
+ * plan, or a per-seat one for a user, is not in the list to be preselected.
+ */
+export function offeredPlan(choices: Plan[], current: number | undefined): number {
+  return choices.some((p) => p.id === current) ? (current as number) : (choices[0]?.id ?? 0);
+}
+
 /** Manual provider: set an organisation's (or a user's) plan and status by hand. */
 export function AssignDialog({
   row,
@@ -35,17 +43,18 @@ export function AssignDialog({
 }: Props) {
   const { t } = useT();
   const byUser = subjectMode === 'user';
-  const choices = plans.filter(
-    (p) => !p.archived_at && !(byUser && p.pricing_model === 'per_seat'),
+  const choices = useMemo(
+    () => plans.filter((p) => !p.archived_at && !(byUser && p.pricing_model === 'per_seat')),
+    [plans, byUser],
   );
-  const [planId, setPlanId] = useState<number>(row?.plan_id ?? choices[0]?.id ?? 0);
+  const [planId, setPlanId] = useState<number>(() => offeredPlan(choices, row?.plan_id));
   const [status, setStatus] = useState<SubscriptionStatus>(row?.status ?? 'active');
   useEffect(() => {
     if (row) {
-      setPlanId(row.plan_id);
+      setPlanId(offeredPlan(choices, row.plan_id));
       setStatus(row.status ?? 'active');
     }
-  }, [row]);
+  }, [row, choices]);
 
   return (
     <Dialog open={row !== null} onOpenChange={(open) => !open && onClose()}>

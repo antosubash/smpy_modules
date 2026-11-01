@@ -87,10 +87,10 @@ export interface Connection {
   webhook_path: string;
 }
 
-/** Props every admin page receives. */
 /** Who billing bills: organisations, or each signed-in user (#274). */
 export type SubjectMode = 'tenant' | 'user';
 
+/** Props every admin page receives. */
 export interface AdminCommon {
   csrf_token: string;
   can_manage: boolean;
