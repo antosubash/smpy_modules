@@ -22,6 +22,7 @@ from sm_billing.constants import (
     CHECKOUT_COMPLETED,
     PROVIDER_CHECKOUT_BLOCKING_STATUSES,
     PROVIDER_STRIPE,
+    USER_SUBJECT_PREFIX,
 )
 from sm_billing.contracts.provider import (
     CheckoutSession,
@@ -48,17 +49,22 @@ def _id(value: Any) -> str | None:
     return value or None
 
 
+_USER_REFERENCE_PREFIX = USER_SUBJECT_PREFIX.replace(":", "_")
+
+
 def _reference(subject: str) -> str:
     """A subject as a Checkout ``client_reference_id``: Stripe takes only letters,
     digits, dashes and underscores, so ``user:<uuid>`` is sent as ``user_<uuid>``
     (tenant ids are hex and never start with ``user_``)."""
-    return subject.replace(":", "_")
+    if subject.startswith(USER_SUBJECT_PREFIX):
+        return _USER_REFERENCE_PREFIX + subject[len(USER_SUBJECT_PREFIX) :]
+    return subject
 
 
 def _subject(reference: str | None) -> str | None:
     """Inverse of :func:`_reference`."""
-    if reference and reference.startswith("user_"):
-        return "user:" + reference[len("user_") :]
+    if reference and reference.startswith(_USER_REFERENCE_PREFIX):
+        return USER_SUBJECT_PREFIX + reference[len(_USER_REFERENCE_PREFIX) :]
     return reference
 
 

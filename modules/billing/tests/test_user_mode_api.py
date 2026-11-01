@@ -15,14 +15,13 @@ from sm_billing.errors import BillingError
 from sm_billing.models import Customer, Subscription, UsageEvent
 from sm_billing.subjects import subject_for_user
 from sqlalchemy import select
+from subscription_helpers import _fake
 from usage_helpers import METER, events
 
 
 @pytest.fixture
 def fake(user_mode_app) -> FakeProvider:
-    provider = FakeProvider()
-    user_mode_app.state.sm_billing.provider = provider
-    return provider
+    return _fake(user_mode_app)
 
 
 async def limit_plan(app, subject: str, limit: int) -> None:
