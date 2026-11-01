@@ -62,7 +62,7 @@ describe('SubscriptionsPager', () => {
     expect(get).toHaveBeenCalledWith(
       '/admin/billing/subscriptions',
       { status: 'active', q: 'acme', page: '2' },
-      { preserveScroll: true },
+      { preserveScroll: true, preserveState: true },
     );
   });
 

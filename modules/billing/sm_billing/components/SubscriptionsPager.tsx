@@ -17,7 +17,10 @@ export function subscriptionsQuery(
 }
 
 export function visitSubscriptions(filters: SubscriptionsFilterValues, page = 1) {
-  router.get(SUBSCRIPTIONS_URL, subscriptionsQuery(filters, page), { preserveScroll: true });
+  router.get(SUBSCRIPTIONS_URL, subscriptionsQuery(filters, page), {
+    preserveScroll: true,
+    preserveState: true,
+  });
 }
 
 interface Props {

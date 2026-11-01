@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from tenants.models import Tenant
 from users.models import User
 
@@ -32,11 +32,6 @@ def contains(column: ColumnElement[str], q: str) -> ColumnElement[bool]:
     """Case-insensitive substring match where ``%`` and ``_`` in ``q`` are literal."""
     escaped = q.replace(LIKE_ESCAPE, LIKE_ESCAPE * 2).replace("%", "\\%").replace("_", "\\_")
     return column.ilike(f"%{escaped}%", escape=LIKE_ESCAPE)
-
-
-def tenant_search(q: str) -> ColumnElement[bool]:
-    """The tenant list's search: the id exactly, or the name or slug containing ``q``."""
-    return or_(Tenant.id == q, contains(Tenant.name, q), contains(Tenant.slug, q))
 
 
 def _user_search(q: str) -> ColumnElement[bool]:

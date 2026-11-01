@@ -6,10 +6,9 @@ import uuid
 
 from api_helpers import page_props
 from conftest import make_user
-from helpers import make_tenant
+from helpers import make_tenant, make_users
 from sm_billing import constants as c
 from sm_billing.subjects import subject_for_user
-from users.models import User
 
 ADMIN = "/api/billing/admin/subscriptions"
 
@@ -56,10 +55,7 @@ async def test_tenant_mode_searches_by_name_or_slug(app, admin):
 
 
 async def test_user_list_stops_at_the_row_limit_and_pages_on(user_mode_app, admin):
-    async with user_mode_app.state.sm.db.session_factory() as session:
-        for i in range(c.ADMIN_ROW_LIMIT + 1):
-            session.add(User(id=uuid.uuid4(), email=f"u{i:03}@x.io", hashed_password="x"))
-        await session.commit()
+    await make_users(user_mode_app, c.ADMIN_ROW_LIMIT + 1)
     first = [r["tenant_id"] for r in (await admin.get(ADMIN)).json()]
     assert len(first) == c.ADMIN_ROW_LIMIT  # users past the limit are cut ...
     rest = await admin.get(ADMIN, params={"offset": c.ADMIN_ROW_LIMIT})

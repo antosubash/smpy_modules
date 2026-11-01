@@ -58,7 +58,7 @@ async def list_subscriptions(
     request: Request,
     status: str | None = None,
     offset: int = 0,
-    q: Annotated[str | None, Query(max_length=120)] = None,
+    q: Annotated[str | None, Query(max_length=c.ADMIN_SEARCH_MAX)] = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[SubscriptionRow]:
     return await subscription_list.subscription_rows(

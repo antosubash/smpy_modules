@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from tenants.models import Tenant
 
 from sm_billing import admin_users, subjects
@@ -37,12 +37,21 @@ def _tenant_base(*columns):
     )
 
 
+def _tenant_search(q: str) -> ColumnElement[bool]:
+    """The tenant list's search: the id exactly, or the name or slug containing ``q``."""
+    return or_(
+        Tenant.id == q,
+        admin_users.contains(Tenant.name, q),
+        admin_users.contains(Tenant.slug, q),
+    )
+
+
 def _tenant_filters(status: str | None, q: str | None) -> list[ColumnElement[bool]]:
     filters: list[ColumnElement[bool]] = []
     if status:
         filters.append(Subscription.status == status)
     if q:
-        filters.append(admin_users.tenant_search(q))
+        filters.append(_tenant_search(q))
     return filters
 
 
