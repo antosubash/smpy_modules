@@ -54,8 +54,8 @@ from sm_billing.constants import USER_SUBJECT_PREFIX
 from sm_billing.contracts.provider import ProviderError, ProviderNotFound
 from sm_billing.lifecycle import is_multi_tenant
 from sm_billing.models import Customer
-from sm_billing.teardown import cancel_for_deleted_tenant
 from sm_billing.subjects import subject_mode
+from sm_billing.teardown import cancel_for_deleted_tenant
 from sm_billing.teardown_claim import claim, failed, succeeded
 from sm_billing.user_sweep import orphan_users
 
