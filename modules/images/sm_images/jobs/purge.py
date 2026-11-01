@@ -14,9 +14,10 @@ turn); :mod:`sm_images.jobs.purge_select` decides the rows and their keys. One p
    that group: an image is recorded (``purge_failed_at``, which sends it to
    the back of later passes) and its collection is not removed. After
    :data:`FAILURE_LIMIT` failures a pass stops trying (storage is down).
-3. **Rows** of what was cleared, children first; the intents of the deleted
-   keys; the images' storage-hold releases (:mod:`sm_images.core.billing.ops`). The caller
-   commits.
+3. **Rows** of what was cleared, children first, and a whole collection's
+   share rows (``sharing.contracts.forget_resource``, in this session and
+   tenant); the intents of the deleted keys; the images' storage-hold
+   releases (:mod:`sm_images.core.billing.ops`). The caller commits.
 """
 
 from __future__ import annotations
@@ -27,9 +28,12 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
+from sharing.contracts import forget_resource
+from sharing.policy import canonical_id
 from simple_module_db.independent import independent_session
 from sqlalchemy import and_, delete, or_, select, update
 
+from sm_images.core.access import COLLECTION_RESOURCE
 from sm_images.core.billing import ops as billing_ops
 from sm_images.core.constants import NO_SYNC
 from sm_images.ingest.upload_session import mark_cleaned, move
@@ -151,6 +155,8 @@ async def _delete_rows(
         for model in (Prompt, Group, ImportJob, PipelineRestart, UploadSession):
             await run(delete(model).where(model.collection_id.in_(whole_ids)))
         await run(delete(Collection).where(Collection.id.in_(whole_ids)))
+        for chunk in chunks([canonical_id(cid) for cid in whole_ids]):
+            await forget_resource(db, COLLECTION_RESOURCE, chunk)
     for chunk in chunks(keys):
         await run(delete(ObjectIntent).where(ObjectIntent.key.in_(chunk)))
 

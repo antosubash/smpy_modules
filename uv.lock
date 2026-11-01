@@ -2301,7 +2301,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "simple-module-auth"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "itsdangerous" },
@@ -2309,14 +2309,14 @@ dependencies = [
     { name = "simple-module-db" },
     { name = "simple-module-hosting" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/de/14/c05d471821b11b6f694847c377f11c65b30767d072f8ef078fcfc007c753/simple_module_auth-0.0.41.tar.gz", hash = "sha256:267949d6ca171c0ddd86505cc31a531e7f3ec923dedb2561732b9527f0f3bdf8", size = 20806, upload-time = "2026-10-25T09:35:03.745Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/30/72/d92d78d17c0804446e33581469918efcf809da6a57beb414337f166decf7/simple_module_auth-0.0.42.tar.gz", hash = "sha256:440bb2fddb64c65806ae731d66a36a72468e6c3523157d0e40070eb7ce0efd0f", size = 21259, upload-time = "2026-10-31T17:48:33.231Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ab/89/9b575b851f4f118ee7e8ec32a4436850b88cb98bffb1df285458121214e2/simple_module_auth-0.0.41-py3-none-any.whl", hash = "sha256:b1aeb61e03d86ff9f41414aea6b16d3e54280b93de2b222fabe6591d8b4b84b6", size = 17828, upload-time = "2026-10-25T09:35:02.587Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/4b/8f5654d2b90101438a7470138c071217c25830939bd0893361b38e17a191/simple_module_auth-0.0.42-py3-none-any.whl", hash = "sha256:166862616b499e5323d69ffe6e44f0d18afbc4740c28facb77436aae172b4f71", size = 18107, upload-time = "2026-10-31T17:48:31.897Z" },
 ]
 
 [[package]]
 name = "simple-module-background-tasks"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "celery", extra = ["redis"] },
@@ -2326,9 +2326,9 @@ dependencies = [
     { name = "simple-module-hosting" },
     { name = "simple-module-settings" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2f/c8/4602187660a7d744fcb917ccf7e5472376b2073172a9e7d9c35b1f7cab72/simple_module_background_tasks-0.0.41.tar.gz", hash = "sha256:867b542ef15339cf65ec9a7dff5ff51e668b9ff0849162c0b13266ce7440f55a", size = 211618, upload-time = "2026-10-25T09:35:08.349Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ef/b7/69ebaaf75578091ea266a4b6c8e239338ed4debc91fb79ef827361d07309/simple_module_background_tasks-0.0.42.tar.gz", hash = "sha256:53b9a0ac7fc4402092ab58965b056f58f44b5bef2a3dda08c15e04151c48955f", size = 219330, upload-time = "2026-10-31T17:48:38.379Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cf/ab/82c69f68afbaa56be22898e0e809c3ea5914bf59ba59da8d9f4700127bf8/simple_module_background_tasks-0.0.41-py3-none-any.whl", hash = "sha256:bd33ed510c78df0c20c0a4b7bf041f316bc75d68291efed90758448e5ebebdfb", size = 177919, upload-time = "2026-10-25T09:35:06.345Z" },
+    { url = "https://files.pythonhosted.org/packages/a8/ce/e117608db5e20a6443339f69b36163b456f20167c0f2c4d0bac65197f254/simple_module_background_tasks-0.0.42-py3-none-any.whl", hash = "sha256:55f613bcfff092d894074efcd97cd777e8e043438b0262e4ad5f23820f7ffed7", size = 181555, upload-time = "2026-10-31T17:48:36.504Z" },
 ]
 
 [[package]]
@@ -2379,7 +2379,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "simple-module-branding"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "simple-module-core" },
@@ -2388,27 +2388,27 @@ dependencies = [
     { name = "simple-module-hosting" },
     { name = "simple-module-settings" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d8/f3/ff2e67c9fb57a58724581e2667586d90c4c3ebb39852476450f7158b702a/simple_module_branding-0.0.41.tar.gz", hash = "sha256:b59c777420db33a0e09e1502588ce0716cc0b78b9b4e8b39435fa575b22d4ad2", size = 72288, upload-time = "2026-10-25T09:35:14.367Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fd/39/38c0057cffa723de41b124fd9096fefeae481186301477b43bec23f854a8/simple_module_branding-0.0.42.tar.gz", hash = "sha256:15fa03ebcbc71540be36158f5108e3a02c8ef09998d8e75286f790a76e692c64", size = 72593, upload-time = "2026-10-31T17:48:37.914Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1c/ef/fc34e8ab2d19141f21ca262a4366a1e722ff978dedf6cd17e4ea825bdaa4/simple_module_branding-0.0.41-py3-none-any.whl", hash = "sha256:3aebfbe370b7f769eaf78498d17c44263eb3440dfc119a0505682e515c8cf47f", size = 62609, upload-time = "2026-10-25T09:35:12.99Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/74/26e80e3b57059f1fc485bc2edddee1261fe3493d891df5962874506ee3bd/simple_module_branding-0.0.42-py3-none-any.whl", hash = "sha256:694da02af0361735024d62783b244ac9e6613ca732ea0eb13a0409b09b509aad", size = 62610, upload-time = "2026-10-31T17:48:36.554Z" },
 ]
 
 [[package]]
 name = "simple-module-cli"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "tomlkit" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4b/a1/82a2cdb65e34aa7f30f17d85cae4137c71964b8b636e73635db484eff77b/simple_module_cli-0.0.41.tar.gz", hash = "sha256:b93a97b140043a96b1e513fe9c20a2f34d9ef013b8c9115b09cc4b6cd26e891a", size = 181464, upload-time = "2026-10-25T09:35:05.394Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e5/13/f695968bc1ba3c4b6fefe98af7a759769b7ec16031caec4480b79dcbf17f/simple_module_cli-0.0.42.tar.gz", hash = "sha256:78422154939dc87e4a0ed21c03f7195a939d7b54b510f33bd4d5653e83032a98", size = 193054, upload-time = "2026-10-31T17:48:37.344Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/ae/cb32347ecab0bd001d5a3b32baef0a17cb9449bec56e80dcc792cb2c5d4a/simple_module_cli-0.0.41-py3-none-any.whl", hash = "sha256:c157a354b4113ab2ffba91fcfffdeaaa440de153feb1c6aaf07771e3af0b3e68", size = 257929, upload-time = "2026-10-25T09:35:03.864Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/ac/f06956736f6240713a9bfce4ff6cbad3f03cb3efc964edbf8552c2d81b31/simple_module_cli-0.0.42-py3-none-any.whl", hash = "sha256:f4331d9e4d70ef6ca90200dfc0f0a6b14cd549a3f4ce2168f07294d0f567eb05", size = 266537, upload-time = "2026-10-31T17:48:35.75Z" },
 ]
 
 [[package]]
 name = "simple-module-core"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "babel" },
@@ -2418,28 +2418,28 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyee" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/87/4b/3549aa88910f3ca05555f60749fc012bb4e5044e22b72fae77dc515cfb91/simple_module_core-0.0.41.tar.gz", hash = "sha256:77164634b586288f92caa2de463618f1ae9eb133e10f3eb8a7d0a199444a4ec0", size = 156920, upload-time = "2026-10-25T09:35:24.715Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e9/34/565046e18e93200df52603dac9e1b2c65966f1c4c8471c7ba2a37ee22638/simple_module_core-0.0.42.tar.gz", hash = "sha256:b53c3dc5a55923c8c0149753875cf7d5a336f9db03d29b5ae2b54957f67dcb25", size = 159584, upload-time = "2026-10-31T17:48:47.553Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/78/0b/4008710b35749df742b7eae2a7fa182250cc9ae94c8aea456d05cf286eec/simple_module_core-0.0.41-py3-none-any.whl", hash = "sha256:0a4919cc107a663f93e12ec717877097b7a757aa69273c3173de6f404d7e95e1", size = 141206, upload-time = "2026-10-25T09:35:23.014Z" },
+    { url = "https://files.pythonhosted.org/packages/17/8a/539504baed049ad6b96540db57686f5ea6d2561a7b60bec27222d90fe4b7/simple_module_core-0.0.42-py3-none-any.whl", hash = "sha256:bfa7cb8d457b55870942eaa75af367c7c7bd140de988909e7d04c5ba19ae5537", size = 143747, upload-time = "2026-10-31T17:48:46.033Z" },
 ]
 
 [[package]]
 name = "simple-module-dashboard"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "simple-module-core" },
     { name = "simple-module-db" },
     { name = "simple-module-hosting" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/02/66/ce985512571b8119293355a3eb881727cbe7841c91e97e7d50c3b9e7c117/simple_module_dashboard-0.0.41.tar.gz", hash = "sha256:215a3c84164eb9f94b978812eb21878123233b9cd9db79694cec1d5c08ea3852", size = 36696, upload-time = "2026-10-25T09:35:05.588Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c9/5d/38c96db89356387ed93f540c77527cf8c40ef29453c3666d64e0e79bde47/simple_module_dashboard-0.0.42.tar.gz", hash = "sha256:e4e953663d404566b7005267d15b20d9dfafd8e5520735e369a4376b41d5a668", size = 36704, upload-time = "2026-10-31T17:48:32.915Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/43/b8/0f103ed6a0ed8a8537a9528f07005fa6f58df7b3ddacdf8d4f317107861d/simple_module_dashboard-0.0.41-py3-none-any.whl", hash = "sha256:8e708dd2d6353d3af6a0d03cf987d489033a5a8d7d7ea36bd7d48fe9cc210d26", size = 37532, upload-time = "2026-10-25T09:35:04.372Z" },
+    { url = "https://files.pythonhosted.org/packages/05/a6/5f28b96fbf0b7cb60bbb16553956f53da13738b90030f4234fa47c9388a3/simple_module_dashboard-0.0.42-py3-none-any.whl", hash = "sha256:25b771f5bc53b81e86af995538807030960fc1840164200abcb63b128d3ba755", size = 37540, upload-time = "2026-10-31T17:48:31.714Z" },
 ]
 
 [[package]]
 name = "simple-module-db"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiosqlite" },
@@ -2450,14 +2450,14 @@ dependencies = [
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "sqlmodel" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1d/97/b82ec8d8cdedbf19ed0c922944ba1cfab18fbfe5ebe9c45dce6743112f50/simple_module_db-0.0.41.tar.gz", hash = "sha256:d8f4748945e2a11b80c90ba3f4e2ba7995122083b184a89745077a17f8b39efd", size = 112638, upload-time = "2026-10-25T09:35:09.786Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9f/f9/fef376349e95d6a96d8c222caf7fd5db73d6000881f8f2f4ef6590b66b6b/simple_module_db-0.0.42.tar.gz", hash = "sha256:c036ac1b9175e05eea63781e0f4756fb659d5225d46c3e1f1170e7be69733794", size = 118044, upload-time = "2026-10-31T17:48:47.166Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5a/ea/38ec0cac7dcf5d99cac10b4fc910f696b51013e5f4fd450b44aa3d958854/simple_module_db-0.0.41-py3-none-any.whl", hash = "sha256:8a06160e72f14c6cc4911d98c2ecdc4395d890fb892ac9152262e4cc0c22ff84", size = 81192, upload-time = "2026-10-25T09:35:08.542Z" },
+    { url = "https://files.pythonhosted.org/packages/56/91/64877cf19fda7c0e2d0a740ca1b8114b0d865d69afc0d501d40a6f26cfcd/simple_module_db-0.0.42-py3-none-any.whl", hash = "sha256:cb9bdb0602a3d8e43b94aeade626a632045e4525aa81828ddd88016584a4c7c9", size = 83931, upload-time = "2026-10-31T17:48:45.883Z" },
 ]
 
 [[package]]
 name = "simple-module-file-storage"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -2467,14 +2467,14 @@ dependencies = [
     { name = "simple-module-hosting" },
     { name = "simple-module-settings" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ff/28/b5337c513776b14b8f8117abae1ca799896ebb449c5c7a09a6d92cedb01d/simple_module_file_storage-0.0.41.tar.gz", hash = "sha256:03a173f2dadc07c1c56c33864d314645055f4ccbde45402511ea0b29a4a9aeaf", size = 163481, upload-time = "2026-10-25T09:35:13.043Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8b/f4/3d49399add8832555f8c2813c8735fefa7cc679b154104e661acb703c641/simple_module_file_storage-0.0.42.tar.gz", hash = "sha256:2f238799ab8049aeb99c0fc20b5708bd182ee1f6b5a0c258e9b64c8c01ed56b8", size = 175270, upload-time = "2026-10-31T17:48:52.018Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e6/86/0a26966903d56a0c1e1cc7dd55cfc0cc22ccafd7cf4f44185612872d1816/simple_module_file_storage-0.0.41-py3-none-any.whl", hash = "sha256:2b0f821573d8dad29ec63ec1211341d68ab709c1a3f3b7aca7e85aef49cd57cd", size = 132633, upload-time = "2026-10-25T09:35:11.616Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/ce/b4959af9c7e1f566aa96a2f7560706ca538d7c6ca97206f07ad658dc9ba2/simple_module_file_storage-0.0.42-py3-none-any.whl", hash = "sha256:edafa12d895c3274e2a6da5478b57b685598a3f5dc31370a2e2523052cf74877", size = 138278, upload-time = "2026-10-31T17:48:50.521Z" },
 ]
 
 [[package]]
 name = "simple-module-hosting"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -2489,9 +2489,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "uvicorn", extra = ["standard"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d9/59/7a5ef6a1933c9cf78500b2f3f71cac1752afb724c49186b5fb8783fc6446/simple_module_hosting-0.0.41.tar.gz", hash = "sha256:b17cb55340784eed718ca83aed9a0e3557a9b9e3ec5f1ab7bfb36a16e1acca0d", size = 287759, upload-time = "2026-10-25T09:35:25.419Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/98/07/bbc17174be4c7a469edd6230f2a91f1ab0f91b4a559d801b11a8e83b2ee5/simple_module_hosting-0.0.42.tar.gz", hash = "sha256:636bd7fa267e31ab0b967001d8f586df80488de1442b0a1ddf1aa265cc693843", size = 290569, upload-time = "2026-10-31T17:48:33.964Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2f/56/379851ed1fadc32c75109867645adbdc523855b61c5bb62a6740faba4253/simple_module_hosting-0.0.41-py3-none-any.whl", hash = "sha256:c77e4269335e29b6cc62767dc05a0612f25075f783c97cd608cd02a4c67114f5", size = 199841, upload-time = "2026-10-25T09:35:24.011Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/2b/781ac4db2dd1069082a458fccf43713b379e0eaf638d37104df814e45a21/simple_module_hosting-0.0.42-py3-none-any.whl", hash = "sha256:80736b1f6dc784d5f8a6dfc02f5f52c045ac4ba2fec416e82599ff5a92db2a9b", size = 201917, upload-time = "2026-10-31T17:48:32.495Z" },
 ]
 
 [[package]]
@@ -2554,46 +2554,46 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
     { name = "regex", specifier = ">=2023.0" },
     { name = "simple-module-ai", marker = "extra == 'ai'", editable = "modules/ai" },
-    { name = "simple-module-background-tasks", specifier = ">=0.0.41,<0.1" },
+    { name = "simple-module-background-tasks", specifier = ">=0.0.42,<0.1" },
     { name = "simple-module-billing", marker = "extra == 'billing'", editable = "modules/billing" },
-    { name = "simple-module-core", specifier = ">=0.0.41,<0.1" },
-    { name = "simple-module-db", specifier = ">=0.0.41,<0.1" },
-    { name = "simple-module-file-storage", specifier = ">=0.0.41,<0.1" },
-    { name = "simple-module-hosting", specifier = ">=0.0.41,<0.1" },
-    { name = "simple-module-inertia", specifier = ">=0.0.41,<0.1" },
+    { name = "simple-module-core", specifier = ">=0.0.42,<0.1" },
+    { name = "simple-module-db", specifier = ">=0.0.42,<0.1" },
+    { name = "simple-module-file-storage", specifier = ">=0.0.42,<0.1" },
+    { name = "simple-module-hosting", specifier = ">=0.0.42,<0.1" },
+    { name = "simple-module-inertia", specifier = ">=0.0.42,<0.1" },
     { name = "simple-module-pagebuilder", marker = "extra == 'pagebuilder'", editable = "modules/pagebuilder" },
-    { name = "simple-module-settings", specifier = ">=0.0.41,<0.1" },
-    { name = "simple-module-sharing", specifier = ">=0.0.41,<0.1" },
-    { name = "simple-module-test", marker = "extra == 'dev'", specifier = ">=0.0.41,<0.1" },
+    { name = "simple-module-settings", specifier = ">=0.0.42,<0.1" },
+    { name = "simple-module-sharing", specifier = ">=0.0.42,<0.1" },
+    { name = "simple-module-test", marker = "extra == 'dev'", specifier = ">=0.0.42,<0.1" },
 ]
 provides-extras = ["dev", "quality", "anonymize", "ai", "billing", "pagebuilder"]
 
 [[package]]
 name = "simple-module-inertia"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastapi" },
     { name = "jinja2" },
     { name = "starlette" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4e/c4/4e57e0f199a7be591bdf07d59f1820702797b4fa0d9dc720ba4680d94bca/simple_module_inertia-0.0.41.tar.gz", hash = "sha256:e302abcaad0a5409bff052af01251db23704d7b99b20cf26e22f4eecbbf8a4db", size = 24724, upload-time = "2026-10-25T09:35:07.607Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/48/73/e54ac22f3071206ba796d2a0e05d1d7c06709e736c05c49f1c8a47d1dbe2/simple_module_inertia-0.0.42.tar.gz", hash = "sha256:12298d012342298350e3d44967bff419f260ed8afa7b690c5f00113a72ed4e24", size = 25016, upload-time = "2026-10-31T17:48:34.799Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5d/26/a01045c47b031ddd5d0e12441db27fb6e66b6aae137b8c3260fb9d5707d2/simple_module_inertia-0.0.41-py3-none-any.whl", hash = "sha256:96384fc292c0a08e676f46b60e8d2c4d67d084fd0f368cba8d9e1d7d14558465", size = 21557, upload-time = "2026-10-25T09:35:06.312Z" },
+    { url = "https://files.pythonhosted.org/packages/71/2f/fc83a446233a21633bf884f2838b006a1041cae50bbbb21d15a117d6ca02/simple_module_inertia-0.0.42-py3-none-any.whl", hash = "sha256:60645a890cc769431384344cc8d4cfc0ba2d13b595bbbf8d225d7bde394271a3", size = 21563, upload-time = "2026-10-31T17:48:33.428Z" },
 ]
 
 [[package]]
 name = "simple-module-mail"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiosmtplib" },
     { name = "simple-module-core" },
     { name = "simple-module-settings" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3a/32/a2e9f3101ccc72424e3d190ecbea45aa5843d1d7a779bdf9156b9715c138/simple_module_mail-0.0.41.tar.gz", hash = "sha256:eb5ac26d9b58123293aef8a111b00b4a320d1499362d34d94c9f3e30d3efba9c", size = 9414, upload-time = "2026-10-25T09:35:22.825Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/dd/27/900838f745bf66955d1a28f494366bb07da7acde59c4849e656b686261fc/simple_module_mail-0.0.42.tar.gz", hash = "sha256:3c64f9b00601f127d5cd3a6ff4aa423ee618defcf53e1c8f69111cf4bd624bb7", size = 10256, upload-time = "2026-10-31T17:48:51.345Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f1/e7/16168b03c8efa45f96da1a96809b21702e575f1ee3d9acb4b3a7dfd0a953/simple_module_mail-0.0.41-py3-none-any.whl", hash = "sha256:a1f3fbdb401144ece06b9a1d3abf267b6a649f8506b6664ab6f8c0e3d0884b81", size = 8506, upload-time = "2026-10-25T09:35:21.474Z" },
+    { url = "https://files.pythonhosted.org/packages/28/ef/0677fed07ca0114c800953e55c0f5bc6189bd3931915797b34cddfb0be62/simple_module_mail-0.0.42-py3-none-any.whl", hash = "sha256:8b2df805808fcdc5b24f5ba036e74a5e8f1c289c02fcfc5c7f3697bea26fc73b", size = 9374, upload-time = "2026-10-31T17:48:50.08Z" },
 ]
 
 [[package]]
@@ -2678,7 +2678,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "simple-module-permissions"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachetools" },
@@ -2687,9 +2687,9 @@ dependencies = [
     { name = "simple-module-hosting" },
     { name = "simple-module-users" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/04/3e/8ffcdc8fd0b016b87dfb0aa9cce813e1a2b3359cfc6f68225de67f3f1d19/simple_module_permissions-0.0.41.tar.gz", hash = "sha256:ebf570ed3aa438416db16970350070e2b7523627fbf1d06a3324f1c8d2f7c6dd", size = 34997, upload-time = "2026-10-25T09:35:07.154Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/75/6b/711332c6a0a7aed702e3539295a3ea1e945a042a188fa5dc96b536904d01/simple_module_permissions-0.0.42.tar.gz", hash = "sha256:7ccb265720d2272a6468f9465f2ae3026a65f869bd839943b553ef10ffd44bca", size = 38245, upload-time = "2026-10-31T17:48:39.016Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2c/8a/6e250518c3ade847719eabca1a1cc43466dc24308765add665544da706d1/simple_module_permissions-0.0.41-py3-none-any.whl", hash = "sha256:4e3e3f72fef077b5d5ecf3d4813601b972984643c81825d75bfe1729767a7ffe", size = 36007, upload-time = "2026-10-25T09:35:05.855Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/c5/15ba0abfcdb823ffd903ad3fe0237a7743697f3ecb06f4b7f88f7095c8f4/simple_module_permissions-0.0.42-py3-none-any.whl", hash = "sha256:52516a6e2f501a4e10ee949cf455cf6502468ff9ea14c42c764f40cb0cf3691c", size = 37511, upload-time = "2026-10-31T17:48:37.464Z" },
 ]
 
 [[package]]
@@ -2753,7 +2753,7 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
     { name = "simple-module-core", specifier = ">=0.0.38,<0.1" },
     { name = "simple-module-db", specifier = ">=0.0.38,<0.1" },
-    { name = "simple-module-hosting", specifier = ">=0.0.38,<0.1" },
+    { name = "simple-module-hosting", specifier = ">=0.0.42,<0.1" },
     { name = "simple-module-inertia", specifier = ">=0.0.38,<0.1" },
     { name = "simple-module-pagebuilder", marker = "extra == 'pagebuilder'", editable = "modules/pagebuilder" },
     { name = "simple-module-settings", specifier = ">=0.0.38,<0.1" },
@@ -2763,7 +2763,7 @@ provides-extras = ["dev", "pagebuilder"]
 
 [[package]]
 name = "simple-module-settings"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "simple-module-core" },
@@ -2771,14 +2771,14 @@ dependencies = [
     { name = "simple-module-hosting" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/10/7e/0b5d0149566f08976eb213564ffa269e39914896689d064e4056e1f3f070/simple_module_settings-0.0.41.tar.gz", hash = "sha256:99a3f819f16b1fd828e21446c7685e81002580fb2ce21c71c20c8967bfc9f8bc", size = 118175, upload-time = "2026-10-25T09:35:12.837Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e8/51/99a4f8511c604c62ccf63c963705f67f2244c99f52f47bab40a95b028b4f/simple_module_settings-0.0.42.tar.gz", hash = "sha256:74ab2c7fb9b2fe919e47f5595948c90c08d7b4483823de430bfd1253fe5475dc", size = 119818, upload-time = "2026-10-31T17:48:39.682Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/66/5c/b4b6c87a1daf6dff29abe6c10a9a4c7e187f6732b8ad6aba92ef8d271300/simple_module_settings-0.0.41-py3-none-any.whl", hash = "sha256:683406eb6885f9be31968f9bbf3fcbacce65ab08481629b5ebe434bd4622c791", size = 102899, upload-time = "2026-10-25T09:35:11.365Z" },
+    { url = "https://files.pythonhosted.org/packages/a4/9c/ba785b900bf88ea67aa6b990f9cbba54cc0ff41591046508ad06ea7c75ea/simple_module_settings-0.0.42-py3-none-any.whl", hash = "sha256:8631d9d5737c192c0cba453b6d2471c5fdb5f3400854c77d287514d474906f0a", size = 103341, upload-time = "2026-10-31T17:48:38.08Z" },
 ]
 
 [[package]]
 name = "simple-module-sharing"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "simple-module-core" },
@@ -2786,14 +2786,14 @@ dependencies = [
     { name = "simple-module-hosting" },
     { name = "simple-module-inertia" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3c/48/7b1d1f9acdd937d4e0e03955e71e2c6325aae2661a1d3ad1b998e4248cbb/simple_module_sharing-0.0.41.tar.gz", hash = "sha256:c672011cc51c2dd9d4bf240b1d5af024759a8731928610faf7be1f08b8eee6da", size = 20440, upload-time = "2026-10-25T09:35:14.838Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/24/78/744496765cee48410ab9b71f81c1096ecea345a73f43008be601bd33077f/simple_module_sharing-0.0.42.tar.gz", hash = "sha256:26f21e2c1b97f15c8b6d753a5bff83e8a53045b584fe6bc9771cd6d8703a12fa", size = 23782, upload-time = "2026-10-31T17:48:50.149Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b7/93/9980c70e4124550434605f3f95b699ee4498074907db9be12cb7e191dfe9/simple_module_sharing-0.0.41-py3-none-any.whl", hash = "sha256:06d58cadf163bf188148ab849e2595d9a835c60572d3574aa9cffbe2f262e115", size = 22001, upload-time = "2026-10-25T09:35:13.68Z" },
+    { url = "https://files.pythonhosted.org/packages/cc/24/f012eae3c62546641b4870973d4c301a24da0c269e054b9ed06d4dbf1c2a/simple_module_sharing-0.0.42-py3-none-any.whl", hash = "sha256:65b4d99dfbbcc6bfc5e757707da8a91cf01a7346fbb72b0817ece99b9bef5cea", size = 22832, upload-time = "2026-10-31T17:48:49.017Z" },
 ]
 
 [[package]]
 name = "simple-module-tenants"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachetools" },
@@ -2805,14 +2805,14 @@ dependencies = [
     { name = "simple-module-inertia" },
     { name = "simple-module-settings" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b2/00/148831070f6928064ad29f5123eb7d8e045dd965d80d4d282aa72e3eb4d6/simple_module_tenants-0.0.41.tar.gz", hash = "sha256:3f36f40ea0de7381ed50934149273c8400ec99aeb22776897c9d95f56bdbe526", size = 70069, upload-time = "2026-10-25T09:35:29.551Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1d/53/77fce5849849861e87450be035635a020796fb5c0b5b85b187187fe7af16/simple_module_tenants-0.0.42.tar.gz", hash = "sha256:26ba9242d2c286e5031c0e804ba49883f10de98346db09250eead4478fbc5eb9", size = 70072, upload-time = "2026-10-31T17:48:33.783Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e4/14/52095c86db96d255b7894c6d108781cb494c08cebb4de46eb788990ecdfd/simple_module_tenants-0.0.41-py3-none-any.whl", hash = "sha256:16332e6365fbd3b36363223b1b89340a7edd16b028dde33d2bf87398069ff836", size = 70070, upload-time = "2026-10-25T09:35:28.304Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/00/6a74542460bad160268da660a9fd2c7162da85237aef78dd4a395c6fc4c2/simple_module_tenants-0.0.42-py3-none-any.whl", hash = "sha256:bc72b4593e0cad3fdb5060978f0f14ac31425463227dff308a6d49b32ee554e5", size = 70079, upload-time = "2026-10-31T17:48:32.561Z" },
 ]
 
 [[package]]
 name = "simple-module-test"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastapi" },
@@ -2824,14 +2824,14 @@ dependencies = [
     { name = "simple-module-hosting" },
     { name = "sqlalchemy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4d/e3/22144620af88b8cd492b42cbccd677c72262e70895ca11aa5660fd1f77af/simple_module_test-0.0.41.tar.gz", hash = "sha256:915229838986e5a38b437520519c3b205965919edd120fe0a0e04ed489cb82ce", size = 26199, upload-time = "2026-10-25T09:35:03.654Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e8/b4/2383325f8f6a6bc247874450e936fa97b8bd4f6cd5f20d2161d69fdc6983/simple_module_test-0.0.42.tar.gz", hash = "sha256:700ef4105b58e82a8314ff0730bf99288a2b12dab9728c31f277cfba1433b83b", size = 26200, upload-time = "2026-10-31T17:48:37.769Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ca/e5/f726f2175519cdda7ac7654e4afe475eafc11a3b83c13bce993cd5a11dd8/simple_module_test-0.0.41-py3-none-any.whl", hash = "sha256:a7a1b70cd28723abe9916b2eb5a154be677db992d4973bf5e2a445b82504834e", size = 27768, upload-time = "2026-10-25T09:35:01.896Z" },
+    { url = "https://files.pythonhosted.org/packages/97/21/f20946368915afd506853adea426bee6cfb97fcfe74449aff2f934f63b66/simple_module_test-0.0.42-py3-none-any.whl", hash = "sha256:c1210e7a88858883209b66876aef7ac49a928ddb933fd4d92947a47275a55d2c", size = 27768, upload-time = "2026-10-31T17:48:36.108Z" },
 ]
 
 [[package]]
 name = "simple-module-users"
-version = "0.0.41"
+version = "0.0.42"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachetools" },
@@ -2844,9 +2844,9 @@ dependencies = [
     { name = "simple-module-settings" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/54/5a/56446e03f1d894749fb0f67e687d19b302aae76704b309802f113103fc83/simple_module_users-0.0.41.tar.gz", hash = "sha256:666a46514fd1ba1cd4875cbc26f24bd8c2eb06ab8e60977585353d6fe1c16a4a", size = 298336, upload-time = "2026-10-25T09:35:06.355Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c9/fa/5a98b1d7a4cc2734591b7b5ee089e39ba04ea94307efc039bb9602adef04/simple_module_users-0.0.42.tar.gz", hash = "sha256:0ec341b4f98deb8acec896b06d83f9acc799066811a0c5bab0e3fd449157e39f", size = 305591, upload-time = "2026-10-31T17:48:35.722Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d3/44/bc8c31a09393558b2ade169c255f8cea41e67553275ebc2c9d6cef18c01b/simple_module_users-0.0.41-py3-none-any.whl", hash = "sha256:ddb30ca21044afccdad36c6f7f6a797c45e514a5a056b1f4cc2edd478ea349d5", size = 242590, upload-time = "2026-10-25T09:35:04.839Z" },
+    { url = "https://files.pythonhosted.org/packages/99/74/4ef912500d854167bd88d3ee9314089a6b8f3505e9dfa710db51d6f84515/simple_module_users-0.0.42-py3-none-any.whl", hash = "sha256:069c274f4634028af2f6296853fbf8b490a564055d391d29a95803e279d8badc", size = 246424, upload-time = "2026-10-31T17:48:34.152Z" },
 ]
 
 [[package]]
@@ -2896,21 +2896,21 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "simple-module-ai", editable = "modules/ai" },
-    { name = "simple-module-auth", specifier = "==0.0.41" },
-    { name = "simple-module-background-tasks", specifier = "==0.0.41" },
+    { name = "simple-module-auth", specifier = "==0.0.42" },
+    { name = "simple-module-background-tasks", specifier = "==0.0.42" },
     { name = "simple-module-billing", editable = "modules/billing" },
-    { name = "simple-module-branding", specifier = "==0.0.41" },
-    { name = "simple-module-dashboard", specifier = "==0.0.41" },
-    { name = "simple-module-file-storage", specifier = "==0.0.41" },
-    { name = "simple-module-hosting", specifier = "==0.0.41" },
+    { name = "simple-module-branding", specifier = "==0.0.42" },
+    { name = "simple-module-dashboard", specifier = "==0.0.42" },
+    { name = "simple-module-file-storage", specifier = "==0.0.42" },
+    { name = "simple-module-hosting", specifier = "==0.0.42" },
     { name = "simple-module-images", editable = "modules/images" },
     { name = "simple-module-news", editable = "modules/news" },
     { name = "simple-module-pagebuilder", editable = "modules/pagebuilder" },
-    { name = "simple-module-permissions", specifier = "==0.0.41" },
+    { name = "simple-module-permissions", specifier = "==0.0.42" },
     { name = "simple-module-records", editable = "modules/records" },
-    { name = "simple-module-sharing", specifier = "==0.0.41" },
-    { name = "simple-module-tenants", specifier = "==0.0.41" },
-    { name = "simple-module-users", specifier = "==0.0.41" },
+    { name = "simple-module-sharing", specifier = "==0.0.42" },
+    { name = "simple-module-tenants", specifier = "==0.0.42" },
+    { name = "simple-module-users", specifier = "==0.0.42" },
 ]
 
 [package.metadata.requires-dev]
@@ -2921,8 +2921,8 @@ dev = [
     { name = "psycopg2-binary", specifier = ">=2.9" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
-    { name = "simple-module-cli", specifier = "==0.0.41" },
-    { name = "simple-module-test", specifier = "==0.0.41" },
+    { name = "simple-module-cli", specifier = "==0.0.42" },
+    { name = "simple-module-test", specifier = "==0.0.42" },
 ]
 
 [[package]]

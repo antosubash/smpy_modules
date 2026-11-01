@@ -38,7 +38,7 @@ from sm_images.core.clock import utcnow
 from sm_images.pipeline import advance
 from sm_images.pipeline.claim import load_runs, lock_image
 from sm_images.pipeline.cycle import bump_cycle, reset_runs
-from sm_images.pipeline.eager_drain import IN_DELIVERY, drain_durable, in_delivery
+from sm_images.pipeline.eager_drain import drain_durable
 from sm_images.pipeline.plan import FINAL, is_blocked, is_stale
 from sm_images.pipeline.runtime import Runtime
 
@@ -96,9 +96,6 @@ async def submit(runtime: Runtime, items: Iterable[Any]) -> None:
         return
     queue = _Queue(items)
     reset = _drain.set(queue)
-    # Reset on exit: an inline delivery runs on a request's task, and the
-    # request's own later submits must still wait for their deliveries.
-    mark = IN_DELIVERY.set(in_delivery())
     first: BaseException | None = None
     wait = True
     try:
@@ -122,7 +119,6 @@ async def submit(runtime: Runtime, items: Iterable[Any]) -> None:
                 break
     finally:
         queue.closed = True  # a later submit from a copied context starts afresh
-        IN_DELIVERY.reset(mark)
         _drain.reset(reset)
     if first is not None:
         raise first

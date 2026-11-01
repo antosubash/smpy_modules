@@ -126,6 +126,20 @@ async def test_an_images_refusal_on_a_screen_is_the_hosts_error_page(uploads):
     assert screen.json().get("component") and "detail" not in screen.json()
 
 
+async def test_an_images_refusal_on_a_screen_keeps_its_code_for_a_json_client(uploads):
+    """The framework's ``render_error_page`` negotiates; an explicit JSON client
+    gets images' own body, ``code`` included, not a bare ``{"detail"}``."""
+    from sm_images.core.errors import UploadNotFound
+
+    @uploads.app.get(f"{VIEWS}/x/gone")
+    async def gone():
+        raise UploadNotFound("no such upload")
+
+    got = await uploads.get(f"{VIEWS}/x/gone", headers={**OLGA, "Accept": "application/json"})
+    assert got.status_code == 404
+    assert got.json() == {"detail": "no such upload", "code": UploadNotFound.code}
+
+
 async def _seed_run(client, iid: str) -> None:
     from sm_images.models import StepRun, StepStatus
     from sqlalchemy import delete

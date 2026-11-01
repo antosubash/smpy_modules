@@ -32,10 +32,9 @@ def configured(monkeypatch):
     """Pin the worker engine's policy as a configured worker would have it."""
     from background_tasks import sync_db
 
-    def pin(strict):
-        monkeypatch.setattr(sync_db, "_url_override", "sqlite:///x.db")
-        policy = SimpleNamespace(tenant_strict=strict, default_tenant_id=None)
-        monkeypatch.setattr(sync_db, "engine_tenancy", lambda: policy)
+    def pin(multi):
+        tenancy = sync_db.WorkerTenancy(multi_tenant=multi, default_tenant=None)
+        monkeypatch.setattr(sync_db, "worker_tenancy", lambda: tenancy)
 
     return pin
 
@@ -43,7 +42,7 @@ def configured(monkeypatch):
 async def test_an_unconfigured_worker_policy_is_multi_tenant(monkeypatch):
     from background_tasks import sync_db
 
-    monkeypatch.setattr(sync_db, "_url_override", None)
+    monkeypatch.setattr(sync_db, "worker_tenancy", lambda: None)  # nothing pinned
     assert _bare().is_multi_tenant() is True
 
 
@@ -55,9 +54,9 @@ async def test_an_unreadable_worker_policy_is_multi_tenant(configured, monkeypat
     def broken():
         raise RuntimeError("no policy")
 
-    monkeypatch.setattr(sync_db, "engine_tenancy", broken)
+    monkeypatch.setattr(sync_db, "worker_tenancy", broken)
     assert _bare().is_multi_tenant() is True
-    monkeypatch.setattr(sync_db, "engine_tenancy", lambda: SimpleNamespace())
+    monkeypatch.setattr(sync_db, "worker_tenancy", lambda: SimpleNamespace())
     assert _bare().is_multi_tenant() is True  # a policy that does not say
 
 
@@ -102,7 +101,7 @@ async def test_an_unknown_mode_cancels_a_non_member(imp, monkeypatch):
     from background_tasks import sync_db
 
     await _users(imp)
-    monkeypatch.setattr(sync_db, "_url_override", None)
+    monkeypatch.setattr(sync_db, "worker_tenancy", lambda: None)
     unknown = dataclasses.replace(imp.runtime, multi_tenant=None)
     assert await manager_active(unknown, "default", MAX) is False
     imp.pipe.runtime = unknown

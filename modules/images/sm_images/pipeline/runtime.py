@@ -74,20 +74,18 @@ class Runtime:
 
 
 def worker_multi_tenant() -> bool:
-    """The worker engine's ``tenant_strict`` (it mirrors the host's
-    ``multi_tenant``) - or ``True`` when there is no policy to read: the engine
-    was never configured (``set_database_url`` not called; read from the
-    framework's ``_url_override``, so its disappearance also fails closed), the
-    policy cannot be built, or it does not say."""
+    """The worker's host tenancy, from the framework's
+    ``background_tasks.sync_db.worker_tenancy()`` (it mirrors the host's
+    ``multi_tenant``) - or ``True`` when there is nothing to read: the engine
+    was never configured (``set_database_url`` not called, so it answers
+    ``None``), reading it fails, or it does not say."""
     try:
-        from background_tasks import sync_db
+        from background_tasks.sync_db import worker_tenancy
 
-        if getattr(sync_db, "_url_override", None) is None:
-            return True
-        strict = getattr(sync_db.engine_tenancy(), "tenant_strict", None)
+        multi = getattr(worker_tenancy(), "multi_tenant", None)
     except Exception:
         return True
-    return True if strict is None else bool(strict)
+    return True if multi is None else bool(multi)
 
 
 _runtime: Runtime | None = None

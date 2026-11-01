@@ -1,5 +1,6 @@
-"""Review round 3: "inside a delivery" is a property of the call path, not of
-the transport's global lock."""
+"""Review round 3: "inside a delivery" is the framework's per-context flag
+(``simple_module_core.durable_events.in_delivery``), not the transport's global
+lock."""
 
 from __future__ import annotations
 
@@ -9,10 +10,10 @@ from types import SimpleNamespace
 from background_tasks.models import Base as BackgroundBase
 from background_tasks.outbox_transport import OutboxTransport
 from background_tasks.settings import BackgroundTasksSettings
+from simple_module_core.durable_events import in_delivery
 from simple_module_db import finalize_session
 from sm_images.contracts import ImageProcessed
 from sm_images.core.tenancy import DEFAULT_TENANT
-from sm_images.pipeline import eager_drain
 
 from tests.pipeline.test_pipeline_review_fixes2 import _bounded
 from tests.support.pipeline import Scripted, use_steps
@@ -38,13 +39,13 @@ async def test_a_durable_handler_sees_itself_inside_a_delivery(pipe):
     seen: list[bool] = []
 
     async def handler(event, ctx):
-        seen.append(eager_drain.in_delivery())
+        seen.append(in_delivery())
 
     pipe.bus.subscribe_durable(ImageProcessed, handler, name="test.where_am_i")
     coll = await pipe.collection({})
     img = await pipe.image(coll)
     await _bounded(transport, pipe.run(img))
-    assert seen == [True] and eager_drain.in_delivery() is False
+    assert seen == [True] and in_delivery() is False
 
 
 async def test_submit_waits_for_its_own_delivery_behind_an_unrelated_one(pipe):

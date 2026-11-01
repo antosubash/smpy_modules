@@ -1,6 +1,6 @@
 """Pins on the framework internals records reads (#125).
 
-The module range admits any 0.0.x framework, but two call sites read names
+The module range admits any 0.0.x framework, but these call sites read names
 the framework does not promise to keep. Each test here fails, with a message
 naming the call site, the moment one of them changes — in CI on the
 framework bump, not in production.
@@ -15,9 +15,6 @@ framework bump, not in production.
   ``MenuRegistry.add_provider`` and ``PermissionRegistry.add_source`` /
   ``invalidate_source`` (0.0.36, upstream #340 / #334). Public, but the
   sidebar and the role editor rest on how they behave, so that is pinned.
-* ``sm_records/endpoints/api/_errors.py`` —
-  ``simple_module_hosting._error_handlers.render_error_page``. No public
-  replacement yet.
 """
 
 from __future__ import annotations
@@ -38,7 +35,6 @@ pytestmark = pytest.mark.unbound_tenant
 _TENANCY = "sm_records/_tenancy_mode.py (_tenant_middleware / _kwargs)"
 _MENU = "sm_records/menu.py (type_menu_provider)"
 _PERMS = "sm_records/type_permissions.py (TypePermissions)"
-_ERRORS = "sm_records/endpoints/api/_errors.py (_error_page)"
 
 
 # --- tenancy mode -------------------------------------------------------------
@@ -190,24 +186,6 @@ def test_a_permission_source_reaches_the_role_editor():
     assert "records.type.b" not in registry.all_permissions, f"{_PERMS}: source no longer cached"
     registry.invalidate_source(constants.PERM_GROUP)
     assert "records.type.b" in registry.all_permissions, f"{_PERMS}: invalidate_source is inert"
-
-
-# --- error page ---------------------------------------------------------------
-
-
-def test_render_error_page_keeps_its_name_and_signature():
-    try:
-        from simple_module_hosting._error_handlers import render_error_page
-    except ImportError as exc:
-        pytest.fail(
-            f"{_ERRORS}: simple_module_hosting._error_handlers.render_error_page is gone "
-            f"({exc}); view routes would fall back to JSON instead of the error page"
-        )
-    assert inspect.iscoroutinefunction(render_error_page), f"{_ERRORS}: no longer async"
-    params = list(inspect.signature(render_error_page).parameters)
-    assert params[:3] == ["request", "status_code", "message"], (
-        f"{_ERRORS}: render_error_page(request, status, detail) no longer fits: {params}"
-    )
 
 
 # --- no shared or premature cache ---------------------------------------------

@@ -59,6 +59,11 @@ chained linearly. **0.0.40 hashes bearer tokens at rest**: `a626b1c8d023`
 deletes every `users_access_token` and `users_refresh_token` row, so every
 session and API token is invalidated once on upgrade, and anything that stored
 a raw token must keep the plaintext itself (the table holds only a digest).
+0.0.42's `b31a70971001` (background_tasks resource columns) and `f5b1c3e8a207`
+(`file_storage_stored_file.size_bytes` to `BIGINT`) follow the images head;
+`f5b1c3e8a207` is ported **without** its upstream `("file_storage",)` branch
+label, because `ca297bbf33bf` already carries it here and Alembic refuses a
+label used twice — keep dropping a duplicate label when porting.
 SQLModel is unpinned since 0.0.38
 (framework 0.0.37+ imports its `UTCDateTime`): a bare `datetime` field is
 `timestamptz` now, which is why `9d83e789a5b4` retypes the framework's
@@ -263,7 +268,7 @@ docker run -d --name smpy-postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e
 ```
 
 Redis and Celery are used by the **images** module (framework
-`background_tasks`, host pinned `==0.0.41`): `SM_REDIS_URL` points at dev-services'
+`background_tasks`, host pinned `==0.0.42`): `SM_REDIS_URL` points at dev-services'
 Redis, and `make worker` / `worker-imports` / `worker-heavy` / `worker-gpu` /
 `beat` run `host/worker.py` (`build_runner_celery`) with one queue set each.
 `make dev` starts none of them. With no worker, set

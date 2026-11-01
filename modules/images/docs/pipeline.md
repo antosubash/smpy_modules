@@ -84,11 +84,12 @@ waits for the durable deliveries the work published, so `ImageProcessed`
 subscribers have finished before the caller returns.
 
 That wait is **bounded** by `sm_images.pipeline.eager_drain.EAGER_DRAIN_TIMEOUT`
-(5 s). The bound exists for one case the module cannot detect: a durable
-handler that spawns a task (`asyncio.create_task`) which submits images work
-and is then awaited by the handler. The new task does not carry the handler's
-call stack, so its submit waits on the transport's deliveries, including the
-parent delivery that is waiting on it. When the bound expires, images logs an
+(5 s). It is a safety net. A submit made inside a durable delivery does not
+wait at all (see below); the bound covers what that cannot see: a handler
+whose delivery simply outlives it, or work done on a delivery's behalf in a
+context without the framework's delivery flag (a task started with a fresh
+`contextvars.Context`), whose submit would wait on the parent delivery that is
+waiting on it. When the bound expires, images logs an
 `images.pipeline.eager_drain_timeout` warning and stops waiting. The
 deliveries are not cancelled and finish on their own. A deadlock becomes a
 delay of at most 5 s.
@@ -105,12 +106,10 @@ because eager mode is for tests and dev hosts only. In broker mode a step that h
 (`task_soft_time_limit`, `task_time_limit`; see [worker.md](worker.md)); an
 abandoned run's lease expires and is reclaimed by `images.reconcile`.
 
-Two cases need no bound and return at once:
-
-- submits made directly from a durable handler, which images detects from the
-  call path;
-- submits from tasks spawned while images code runs inside a delivery, which
-  inherit a context variable.
+A submit inside a durable delivery returns at once, without waiting: the
+framework sets `simple_module_core.durable_events.in_delivery()` around every
+durable handler call (outbox delivery on a worker or a request's task, and
+inline delivery), and tasks the handler spawns inherit it with the context.
 
 Broker mode (a real Celery worker) never waits on the transport, and the bound
 does not apply there.

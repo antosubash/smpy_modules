@@ -55,11 +55,13 @@ owner and `images.manage`, uses the host's user directory (503
 `user_directory_unavailable` without one), skips inactive users and the owner,
 and on a multi-tenant host lists only members of the bound tenant.
 
-**Purging a collection does not remove its share rows.** The janitor deletes the
-collection's images and objects, but the framework's `sharing` module has no
-per-resource cleanup hook yet, so the rows for a purged collection stay in its
-table until that exists upstream (simple_module_python#683). They grant nothing: the resource they name is
-gone.
+**Purging a collection removes its share rows.** When the janitor deletes a
+whole collection it also calls the framework's
+`sharing.contracts.forget_resource` for it (`images.collection`, the id's
+canonical hex form), in the same session and under the tenant it bound, so the
+rows go in the purge's transaction or not at all. Shares of other collections,
+another tenant's rows and other resource types are untouched. Trashing alone
+keeps the shares: a restored collection is shared as before.
 
 ## Originals and display copies
 

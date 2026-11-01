@@ -52,6 +52,7 @@ from fastapi import Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
+from simple_module_hosting import render_error_page
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from sm_records import events
@@ -137,21 +138,18 @@ async def _discard_writes(request: Request) -> None:
 async def _error_page(request: Request, exc: Exception) -> Response:
     """The host's Inertia error document for a view route's refusal.
 
-    ``render_error_page`` is imported at call time and behind a guard, because
-    it is the host's and this module is published on its own: a harness that
-    mounted these routers without ``app.state.sm.inertia_config`` — and an
-    older framework that does not export the function — must still get an
-    answer rather than an ``AttributeError`` on top of the original refusal.
-    The JSON body is that fallback, which is exactly what this route class
-    used to send unconditionally. ``tests/test_framework_pins.py`` pins the
-    private name and its signature (#125).
+    The framework's public ``render_error_page`` (0.0.42) negotiates: an
+    Inertia visit or a browser navigation gets the page, an explicit
+    ``Accept: application/json`` gets ``{"detail"}``. A harness that mounted
+    these routers without ``app.state.sm.inertia_config``, or a host whose
+    error page itself fails, still gets an answer rather than an error on top
+    of the original refusal: the JSON body, which is exactly what this route
+    class used to send unconditionally.
     """
     config = getattr(getattr(request.app.state, "sm", None), "inertia_config", None)
     if config is None:
         return await response_for(request, exc)
     try:
-        from simple_module_hosting._error_handlers import render_error_page
-
         status = getattr(exc, "status_code", 400)
         detail = getattr(exc, "detail", None) or str(exc)
         return await render_error_page(request, status, detail)

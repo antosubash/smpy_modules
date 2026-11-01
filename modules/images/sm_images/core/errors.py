@@ -8,10 +8,15 @@ another with the same status.
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
+from simple_module_hosting import render_error_page
 
 from sm_images.core import constants
+
+logger = logging.getLogger(__name__)
 
 
 class ImagesError(Exception):
@@ -158,17 +163,24 @@ def absent() -> HTTPException:
 
 async def _error_page(request: Request, exc: ImagesError) -> Response | None:
     """The host's Inertia error page, for a console screen (records does the
-    same). ``None`` when the host cannot render one, so the caller answers JSON
-    rather than stacking an error on the refusal."""
+    same), through the framework's public ``render_error_page``.
+
+    ``None`` - the caller then answers images' own JSON, ``code`` included -
+    when the host cannot render a page (no Inertia config), when the
+    framework's negotiation picks JSON (an explicit ``Accept:
+    application/json``; its body would carry no ``code``), or when the host's
+    error page itself fails, rather than stacking an error on the refusal."""
     config = getattr(getattr(request.app.state, "sm", None), "inertia_config", None)
     if config is None:
         return None
     try:
-        from simple_module_hosting._error_handlers import render_error_page
-
-        return await render_error_page(request, exc.status_code, exc.detail)
-    except Exception:  # pragma: no cover - a framework without the function
+        page = await render_error_page(request, exc.status_code, exc.detail)
+    except Exception:  # pragma: no cover - a host whose error page is itself broken
+        logger.exception("images: rendering the error page failed; answering JSON")
         return None
+    if isinstance(page, JSONResponse) and "x-inertia" not in page.headers:
+        return None  # the framework chose JSON for this client
+    return page
 
 
 async def render(request: Request, exc: ImagesError) -> Response:
