@@ -18,6 +18,9 @@ dependencies = [
     "simple_module_inertia>=0.0.36,<0.1",
     "simple_module_settings>=0.0.36,<0.1",
     "simple_module_tenants>=0.0.36,<0.1",
+    # floor: users.models.User / USER_ROLE_NAME for subject_mode=user (#274);
+    # users pins its own core exactly, so 0.0.40 matches the core floor above.
+    "simple_module_users>=0.0.40,<0.1",
     "stripe>=16,<17",
     "cryptography>=42",
     "typer>=0.12",
