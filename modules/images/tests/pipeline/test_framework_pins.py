@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import inspect
 
+import pytest
+
 _DRAIN = "sm_images/pipeline/eager_drain.py (drain_durable)"
 
 
@@ -25,6 +27,7 @@ def test_the_outbox_transport_still_offers_drain():
     from background_tasks.outbox_transport import OutboxTransport
 
     assert inspect.iscoroutinefunction(OutboxTransport.drain), f"{_DRAIN}: drain gone or sync"
-    assert list(inspect.signature(OutboxTransport.drain).parameters) == ["self"], (
-        f"{_DRAIN}: drain() now takes arguments"
-    )
+    try:
+        inspect.signature(OutboxTransport.drain).bind(None)
+    except TypeError as exc:
+        pytest.fail(f"{_DRAIN}: drain() now needs arguments ({exc})")

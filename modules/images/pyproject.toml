@@ -10,15 +10,15 @@ keywords = ["simple-module", "images", "gallery", "exif", "geo"]
 # Ranges, never `==`: an exact framework pin makes a published module
 # uninstallable in any host running a newer framework build.
 dependencies = [
-    "simple_module_core>=0.0.42,<0.1",  # floor: public in_delivery, render_error_page, worker_tenancy, forget_resource first shipped in 0.0.42
-    "simple_module_db>=0.0.42,<0.1",
-    "simple_module_hosting>=0.0.42,<0.1",
-    "simple_module_inertia>=0.0.42,<0.1",
-    "simple_module_settings>=0.0.42,<0.1",
+    "simple_module_core>=0.0.42,<0.1",  # floor: public durable_events.in_delivery first shipped in 0.0.42
+    "simple_module_db>=0.0.41,<0.1",
+    "simple_module_hosting>=0.0.42,<0.1",  # floor: public render_error_page first shipped in 0.0.42
+    "simple_module_inertia>=0.0.41,<0.1",
+    "simple_module_settings>=0.0.41,<0.1",
     # depends_on: shares (the access policy), the storage backend, the workers.
-    "simple_module_sharing>=0.0.42,<0.1",
-    "simple_module_file_storage>=0.0.42,<0.1",
-    "simple_module_background_tasks>=0.0.42,<0.1",
+    "simple_module_sharing>=0.0.42,<0.1",  # floor: contracts.forget_resource first shipped in 0.0.42
+    "simple_module_file_storage>=0.0.41,<0.1",
+    "simple_module_background_tasks>=0.0.42,<0.1",  # floor: sync_db.worker_tenancy first shipped in 0.0.42
     "pydantic-settings>=2.0",
     "httpx>=0.27",
     "Pillow>=10.0",
@@ -42,7 +42,7 @@ images = "sm_images.module:ImagesModule"
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
-    "simple_module_test>=0.0.42,<0.1",
+    "simple_module_test>=0.0.41,<0.1",
     # Reads built archives back in tests/test_map_tippecanoe.py. The module
     # itself never imports it: map building shells out to tippecanoe.
     "pmtiles>=3.2",

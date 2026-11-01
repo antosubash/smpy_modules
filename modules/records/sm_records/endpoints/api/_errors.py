@@ -140,7 +140,7 @@ async def _error_page(request: Request, exc: Exception) -> Response:
 
     The framework's public ``render_error_page`` (0.0.42) negotiates: an
     Inertia visit or a browser navigation gets the page, an explicit
-    ``Accept: application/json`` gets ``{"detail"}``. A harness that mounted
+    ``Accept: application/json`` gets records' own JSON body. A harness that mounted
     these routers without ``app.state.sm.inertia_config``, or a host whose
     error page itself fails, still gets an answer rather than an error on top
     of the original refusal: the JSON body, which is exactly what this route
@@ -152,10 +152,16 @@ async def _error_page(request: Request, exc: Exception) -> Response:
     try:
         status = getattr(exc, "status_code", 400)
         detail = getattr(exc, "detail", None) or str(exc)
-        return await render_error_page(request, status, detail)
+        page = await render_error_page(request, status, detail)
     except Exception:  # pragma: no cover - a host whose error page is itself broken
         logger.exception("records: rendering the error page failed; answering JSON")
         return await response_for(request, exc)
+    if isinstance(page, JSONResponse) and "x-inertia" not in page.headers:
+        # The framework chose JSON for this client (an explicit ``Accept:
+        # application/json``): its body is a bare ``{"detail"}``, so answer with
+        # records' own, which carries ``code`` / ``errors`` / ``report``.
+        return await response_for(request, exc)
+    return page
 
 
 class RecordsErrorRoute(APIRoute):

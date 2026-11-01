@@ -15,6 +15,7 @@ Two halves of one route class, and each was wrong for the other's caller:
 from __future__ import annotations
 
 import pytest
+from sm_records.services.errors import NotFound
 
 from tests.app_harness import ADMIN, api_type, roles
 
@@ -42,6 +43,19 @@ async def test_a_view_route_renders_the_frameworks_error_page(client, path):
     resp = await client.get(f"{_ADMIN}{path}", headers={**roles(ADMIN), "Accept": "text/html"})
     assert resp.status_code == 404, resp.text
     assert resp.headers["content-type"].startswith("text/html"), resp.headers["content-type"]
+
+
+async def test_a_view_route_keeps_recordss_json_body_for_a_json_client(client, monkeypatch):
+    """The framework's ``render_error_page`` negotiates to a bare ``{"detail"}``;
+    records answers an explicit JSON client with its own body instead, so a
+    refusal's extra keys (``code`` here) survive."""
+    monkeypatch.setattr(NotFound, "code", "probe", raising=False)
+    resp = await client.get(
+        f"{_ADMIN}/types/nosuchtype", headers={**roles(ADMIN), "Accept": "application/json"}
+    )
+    assert resp.status_code == 404, resp.text
+    assert resp.headers["content-type"].startswith("application/json")
+    assert resp.json() == {"detail": "no record type with key 'nosuchtype'", "code": "probe"}
 
 
 async def test_a_missing_record_on_a_real_type_is_an_error_page_too(client):
