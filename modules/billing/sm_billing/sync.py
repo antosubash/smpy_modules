@@ -12,11 +12,12 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from simple_module_db import mark_written
+from simple_module_db.tenancy import DEFAULT_TENANT_ID
 from sqlalchemy import select
 
 from sm_billing import subjects
 from sm_billing.constants import ENTITLED_STATUSES, STRIPE_STATUS_MAP, SubscriptionStatus
-from sm_billing.lifecycle import apply_lifecycle
+from sm_billing.lifecycle import apply_lifecycle, is_multi_tenant
 from sm_billing.metering.sql import extend_rollups
 from sm_billing.models import Customer, Subscription
 from sm_billing.plans import PlanService
@@ -36,10 +37,16 @@ class SyncError(Exception):
         self.code = code
 
 
-async def _tenant_for(db: AsyncSession, snap: SubscriptionSnapshot) -> str:
+async def _tenant_for(db: AsyncSession, app: FastAPI, snap: SubscriptionSnapshot) -> str:
     """The billing subject (a tenant id or ``user:<id>``) the snapshot belongs to:
-    its metadata when that subject still exists, else its customer's row."""
-    if snap.tenant_id and await subjects.exists(db, snap.tenant_id):
+    its metadata when that subject still exists, else its customer's row.
+
+    ``"default"`` is a subject only on a single-tenant host. On a multi-tenant
+    one it is no tenant, so metadata naming it is not trusted: the customer
+    row decides, or the snapshot is refused.
+    """
+    trusted = snap.tenant_id and (snap.tenant_id != DEFAULT_TENANT_ID or not is_multi_tenant(app))
+    if trusted and await subjects.exists(db, snap.tenant_id):
         return snap.tenant_id
     if snap.customer_id:
         stmt = select(Customer).where(Customer.provider_customer_id == snap.customer_id)
@@ -89,7 +96,7 @@ async def apply_snapshot(
     status = STRIPE_STATUS_MAP.get(snap.status)
     if status is None:
         raise SyncError("unknown_status", snap.status)
-    tenant_id = await _tenant_for(db, snap)
+    tenant_id = await _tenant_for(db, app, snap)
     stmt = select(Subscription).where(Subscription.tenant_id == tenant_id)
     sub = (await db.execute(stmt)).scalar_one_or_none()
 

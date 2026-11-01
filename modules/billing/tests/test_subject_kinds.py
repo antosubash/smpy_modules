@@ -12,7 +12,7 @@ import pytest
 from api_helpers import arm_csrf
 from conftest import make_user
 from fake_provider import FakeProvider
-from helpers import make_plan
+from helpers import make_plan, make_tenant
 from simple_module_db import finalize_session
 from simple_module_db import tenant_context as real_tenant_context
 from sm_billing import reconcile as reconcile_mod
@@ -203,3 +203,23 @@ async def test_seat_push_skips_user_subjects(user_mode_app):
     async with app.state.sm.db.session_factory() as session:
         stmt = select(Subscription.quantity).where(Subscription.tenant_id == subject)
         assert (await session.execute(stmt)).scalar_one() == 3
+
+
+async def test_sync_never_trusts_default_metadata_on_a_multi_tenant_host(app):
+    """``"default"`` is no tenant there: the customer row decides, or nothing does."""
+    async with app.state.sm.db.session_factory() as session:
+        tenant = await make_tenant(session, "acme")
+        await make_plan(session, "team")
+        session.add(Customer(tenant_id=tenant.id, provider="stripe", provider_customer_id="cus_1"))
+        await session.commit()
+        tenant_id = tenant.id
+    async with app.state.sm.db.session_factory() as session:
+        sub = await apply_snapshot(session, app, _snap("default"), provider="stripe")
+        assert sub.tenant_id == tenant_id
+        assert await session.get(Customer, "default") is None
+        await session.rollback()
+    orphan = replace(_snap("default"), customer_id="cus_none")
+    async with app.state.sm.db.session_factory() as session:
+        with pytest.raises(SyncError) as exc:
+            await apply_snapshot(session, app, orphan, provider="stripe")
+    assert exc.value.code == "unknown_tenant"
