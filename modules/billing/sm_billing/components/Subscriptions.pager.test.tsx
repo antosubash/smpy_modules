@@ -85,6 +85,5 @@ describe('subscriptionsQuery', () => {
   it('a filter change visits without a page', () => {
     visitSubscriptions({ status: 'trialing', q: 'x' });
     expect(get.mock.calls.at(-1)?.[1]).toEqual({ status: 'trialing', q: 'x' });
-    get.mockClear();
   });
 });

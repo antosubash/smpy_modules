@@ -11,7 +11,7 @@ from simple_module_hosting.permissions import RequiresPermission, resolved_permi
 from simple_module_inertia import InertiaResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_billing import admin, subjects
+from sm_billing import admin, subjects, subscription_list
 from sm_billing import constants as c
 from sm_billing.checkout import plan_out
 from sm_billing.metering import admin as usage_admin
@@ -60,9 +60,9 @@ async def subscriptions_page(
 ) -> InertiaResponse:
     status = request.query_params.get("status") or None
     search = (request.query_params.get("q") or "").strip()
-    total = await admin.subscription_count(db, request.app, status=status, q=search)
+    total = await subscription_list.subscription_count(db, request.app, status=status, q=search)
     served, pages = page_numbers(total, _page(request.query_params.get("page")), c.ADMIN_PAGE_SIZE)
-    rows = await admin.subscription_rows(
+    rows = await subscription_list.subscription_rows(
         db,
         request.app,
         status=status,

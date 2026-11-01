@@ -5,9 +5,12 @@ from __future__ import annotations
 import uuid
 
 from api_helpers import page_props
-from helpers import make_tenant
-from sm_billing import admin
+from conftest import make_user
+from helpers import make_plan, make_sub, make_tenant
 from sm_billing import constants as c
+from sm_billing import subscription_list
+from sm_billing.models import Subscription
+from sm_billing.subjects import subject_for_user
 from users.models import User
 
 SCREEN = "/admin/billing/subscriptions"
@@ -29,8 +32,8 @@ async def _seed_tenants(app, n: int) -> None:
 
 async def _counts(app, **filters) -> tuple[int, int]:
     async with app.state.sm.db.session_factory() as session:
-        total = await admin.subscription_count(session, app, **filters)
-        rows = await admin.subscription_rows(session, app, limit=10_000, **filters)
+        total = await subscription_list.subscription_count(session, app, **filters)
+        rows = await subscription_list.subscription_rows(session, app, limit=10_000, **filters)
     return total, len(rows)
 
 
@@ -89,3 +92,28 @@ async def test_filters_apply_across_pages(user_mode_app, admin):
     page = props["subscriptions"]
     assert page["total"] == 53 and page["page"] == 2 and len(page["items"]) == 3
     assert props["search"] == "u0"
+
+
+async def test_status_filter_counts_a_real_subscription_in_tenant_mode(app):
+    await _seed_tenants(app, 3)
+    async with app.state.sm.db.session_factory() as session:
+        plan = await make_plan(session, "team")
+        await make_sub(session, await make_tenant(session, "paying"), plan, status="active")
+        await session.commit()
+    assert await _counts(app, status="active") == (1, 1)
+    assert await _counts(app, status="canceled") == (0, 0)
+    assert (await _counts(app))[0] == 4
+
+
+async def test_status_filter_counts_a_real_subscription_in_user_mode(user_mode_app):
+    app = user_mode_app
+    await _seed_users(app, 3)
+    user_id = await make_user(app, "paying@x.io")
+    async with app.state.sm.db.session_factory() as session:
+        plan = await make_plan(session, "team")
+        subject = subject_for_user(user_id)
+        session.add(Subscription(tenant_id=subject, plan_id=plan.id, status="active"))
+        await session.commit()
+    assert await _counts(app, status="active") == (1, 1)
+    assert await _counts(app, status="active", q="paying") == (1, 1)
+    assert await _counts(app, status="active", q="u00") == (0, 0)

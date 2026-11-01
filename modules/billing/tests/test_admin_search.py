@@ -1,4 +1,4 @@
-"""The admin Subscriptions list can be searched, so a list past 200 rows stays reachable (#274)."""
+"""The admin Subscriptions list can be searched, so a long list stays reachable (#274)."""
 
 from __future__ import annotations
 

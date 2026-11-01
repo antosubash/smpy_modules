@@ -57,10 +57,11 @@ or reassign plans by hand (**Subscriptions** screen) after switching.
   is mode-strict: only an existing user in `user` mode, only an organisation in
   `tenant` mode (`admin_users.require_subject`); rows left from the other mode
   are repaired through the Usage admin.
-- **Finding a row.** The Subscriptions list pages 50 rows at a time (Previous / Next
-  under the table, keeping the search and status); the search narrows it. In
-  `user` mode it matches part of an email (case-insensitive), or a `user:<uuid>` subject or bare UUID exactly; in
-  `tenant` mode, part of an organisation's name or slug, or its id. The API
+- **Finding a row.** The Subscriptions list pages 50 rows at a time (Previous /
+  Next under the table, keeping the search and status); the search narrows it.
+  In `user` mode it matches part of an email (case-insensitive), or a
+  `user:<uuid>` subject or bare UUID exactly; in `tenant` mode, part of an
+  organisation's name or slug, or its id. The API
   (`GET /api/billing/admin/subscriptions?q=&offset=`) returns 200 rows a page.
 - **Deleting a user** cancels their provider subscription at once (the same
   teardown a deleted tenant gets). A failed attempt is retried with backoff by

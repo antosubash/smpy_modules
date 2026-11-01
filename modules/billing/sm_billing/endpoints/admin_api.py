@@ -10,7 +10,7 @@ from simple_module_hosting.csrf import RequiresCsrf
 from simple_module_hosting.permissions import RequiresPermission
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_billing import admin
+from sm_billing import admin, subscription_list
 from sm_billing import constants as c
 from sm_billing.checkout import plan_out
 from sm_billing.plans import PlanService
@@ -61,7 +61,9 @@ async def list_subscriptions(
     q: Annotated[str | None, Query(max_length=120)] = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[SubscriptionRow]:
-    return await admin.subscription_rows(db, request.app, status=status, offset=max(0, offset), q=q)
+    return await subscription_list.subscription_rows(
+        db, request.app, status=status, offset=max(0, offset), q=q
+    )
 
 
 @router.post(
@@ -71,7 +73,7 @@ async def assign(
     tenant_id: str, body: AssignIn, request: Request, db: AsyncSession = Depends(get_db)
 ) -> SubscriptionRow:
     await admin.assign(db, request.app, tenant_id, body)
-    return await admin.one_row(db, request.app, tenant_id)
+    return await subscription_list.one_row(db, request.app, tenant_id)
 
 
 @router.post(
@@ -81,7 +83,7 @@ async def resync(
     tenant_id: str, request: Request, db: AsyncSession = Depends(get_db)
 ) -> SubscriptionRow:
     await admin.resync(db, request.app, tenant_id)
-    return await admin.one_row(db, request.app, tenant_id)
+    return await subscription_list.one_row(db, request.app, tenant_id)
 
 
 @router.get("/connection", response_model=ConnectionOut, dependencies=_VIEW)

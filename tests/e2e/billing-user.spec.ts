@@ -130,34 +130,36 @@ test('a user is billed as themselves, and an admin assigns them a plan', async (
 test('the Subscriptions list pages past 50 users, keeping the search', async ({ page }) => {
   await login(page);
   const stamp = Date.now();
-  // Enough users that the list cannot fit one page, whatever other specs left.
+  const post = async (email: string) => {
+    const created = await page.request.post('/api/users/admin', {
+      headers: { 'content-type': 'application/json' },
+      data: { email, password: 'changeme1', role_names: ['user'] },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+  };
+  // The search target always exists; top up so the list cannot fit one page,
+  // whatever other specs left.
+  const target = `pager-${stamp}-00`;
+  await post(`${target}@example.com`);
   const listed = await page.request.get('/api/users/admin?per_page=100');
   expect(listed.status(), await listed.text()).toBe(200);
   const missing = Math.max(0, 52 - ((await listed.json()) as unknown[]).length);
-  for (let i = 0; i < missing; i++) {
-    const created = await page.request.post('/api/users/admin', {
-      headers: { 'content-type': 'application/json' },
-      data: {
-        email: `pager-${stamp}-${String(i).padStart(2, '0')}@example.com`,
-        password: 'changeme1',
-        role_names: ['user'],
-      },
-    });
-    expect(created.status(), await created.text()).toBe(201);
+  for (let i = 1; i <= missing; i++) {
+    await post(`pager-${stamp}-${String(i).padStart(2, '0')}@example.com`);
   }
 
   await page.goto('/admin/billing/subscriptions');
   await expect(page.getByText(/^Showing 1–50 of \d+/)).toBeVisible();
-  await expect(page.getByRole('row')).toHaveCount(51); // the header and 50 users
+  await expect(page.locator('tbody tr')).toHaveCount(50);
   await page.getByRole('button', { name: 'Next' }).click();
   await expect(page).toHaveURL(/page=2/);
   await expect(page.getByText(/^Showing 51–/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Previous' })).toBeEnabled();
 
   // A search goes back to page 1 and keeps the pager out of a short result.
-  await page.locator('#subscriptions-search').fill(`pager-${stamp}-00`);
+  await page.locator('#subscriptions-search').fill(target);
   await page.getByRole('button', { name: 'Search' }).click();
   await expect(page).not.toHaveURL(/page=/);
-  await expect(page.getByRole('row')).toHaveCount(2);
+  await expect(page.locator('tbody tr')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Next' })).toHaveCount(0);
 });
