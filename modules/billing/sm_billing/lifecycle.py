@@ -9,6 +9,9 @@ suspension would.
   *only if billing suspended it*. An admin's suspension is never lifted here.
 - unpaid: suspend an active tenant and remember that billing did it. A tenant
   an admin already suspended stays theirs.
+
+A user subject (``user:<id>``, #274) has no tenant to suspend: an unpaid
+subscription only drops it to the default plan (``resolve.effective_plan``).
 """
 
 from __future__ import annotations
@@ -22,7 +25,7 @@ from tenants.models import Tenant
 from tenants.resolver import make_invalidator
 from tenants.service import TenantService
 
-from sm_billing.constants import SubscriptionStatus
+from sm_billing.constants import USER_SUBJECT_PREFIX, SubscriptionStatus
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -58,9 +61,14 @@ async def tenant_gone(db: AsyncSession, app: FastAPI, tenant_id: str) -> bool:
     Never on a single-tenant host, where everything runs as ``"default"`` and
     no row exists for it — a missing row there is normal, not a deletion, and
     reading it as one would cancel the host's own subscription. Never for
-    ``"default"`` either, for a host that switched multi-tenancy on later.
+    ``"default"`` either, for a host that switched multi-tenancy on later, nor
+    for a user subject, which has no tenant row at all.
     """
-    if not is_multi_tenant(app) or tenant_id == DEFAULT_TENANT_ID:
+    if (
+        not is_multi_tenant(app)
+        or tenant_id == DEFAULT_TENANT_ID
+        or tenant_id.startswith(USER_SUBJECT_PREFIX)
+    ):
         return False
     return await db.get(Tenant, tenant_id) is None
 
@@ -82,6 +90,11 @@ async def apply_lifecycle(db: AsyncSession, app: FastAPI, sub: Subscription) -> 
     is a ``RequestSession``), so a caller outside a request must commit with
     ``simple_module_db.finalize_session`` — a bare ``commit()`` drops it.
     """
+    if sub.tenant_id.startswith(USER_SUBJECT_PREFIX):
+        # Never suspended: a user is not a tenant (``subjects`` imports this module).
+        sub.suspended_by_billing = False
+        await db.flush()
+        return
     service = tenant_service(db, app)
     tenant = await db.get(Tenant, sub.tenant_id)
     if tenant is None:

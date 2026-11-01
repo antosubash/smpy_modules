@@ -366,6 +366,7 @@
     "no_customer": "There is no billing account yet — subscribe to a plan first.",
     "tenant_owner_required": "Only the organisation owner can change billing.",
     "tenant_required": "Pick an organisation first.",
+    "per_seat_requires_tenant": "Per-seat plans are for organisations — pick another plan.",
     "provider_error": "The payment provider refused the request.",
     "provider_managed": "Subscriptions are managed by Stripe; use Resync instead.",
     "no_provider_subscription": "This tenant has no Stripe subscription to resync.",

@@ -366,6 +366,7 @@
     "no_customer": "Es gibt noch kein Abrechnungskonto – abonnieren Sie zuerst einen Tarif.",
     "tenant_owner_required": "Nur der Inhaber der Organisation kann die Abrechnung ändern.",
     "tenant_required": "Wählen Sie zuerst eine Organisation aus.",
+    "per_seat_requires_tenant": "Pläne pro Platz gibt es nur für Organisationen — wählen Sie einen anderen Plan.",
     "provider_error": "Der Zahlungsanbieter hat die Anfrage abgelehnt.",
     "provider_managed": "Abonnements werden von Stripe verwaltet; verwenden Sie stattdessen „Neu synchronisieren“.",
     "no_provider_subscription": "Dieser Mandant hat kein Stripe-Abonnement, das synchronisiert werden könnte.",

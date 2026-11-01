@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING
 
 from simple_module_db import mark_written
 from sqlalchemy import select
-from tenants.models import Tenant
 
+from sm_billing import subjects
 from sm_billing.constants import ENTITLED_STATUSES, STRIPE_STATUS_MAP, SubscriptionStatus
 from sm_billing.lifecycle import apply_lifecycle
 from sm_billing.metering.sql import extend_rollups
@@ -37,7 +37,9 @@ class SyncError(Exception):
 
 
 async def _tenant_for(db: AsyncSession, snap: SubscriptionSnapshot) -> str:
-    if snap.tenant_id and await db.get(Tenant, snap.tenant_id) is not None:
+    """The billing subject (a tenant id or ``user:<id>``) the snapshot belongs to:
+    its metadata when that subject still exists, else its customer's row."""
+    if snap.tenant_id and await subjects.exists(db, snap.tenant_id):
         return snap.tenant_id
     if snap.customer_id:
         stmt = select(Customer).where(Customer.provider_customer_id == snap.customer_id)

@@ -14,7 +14,7 @@ imports billing.
 | `app.state.tenants.entitlements` (`EntitlementProvider`) | answer `limit` / `has_feature` from the plan in force (`entitlements.PlanEntitlements`, installed in `startup.run`) |
 | `TenantService.set_status` | suspend on `unpaid`, reactivate on recovery (`lifecycle.apply_lifecycle`) |
 | `MembershipAdded` / `MembershipRemoved` | push the member count to Stripe for per-seat plans (`seats.subscribe`); skipped once the tenant is gone |
-| `TenantDeleted` (0.0.38+) | cancel the tenant's subscriptions at Stripe immediately, then resync the local row (`teardown.subscribe`); reconcile sweeps deleted tenants whose teardown is unfinished (`sweep.sweep_deleted_tenants`: backoff, the tick's error budget, never on a single-tenant host) |
+| `TenantDeleted` (0.0.38+) | cancel the tenant's subscriptions at Stripe immediately, then resync the local row (`tenant_deleted.subscribe`); reconcile sweeps deleted tenants whose teardown is unfinished (`sweep.sweep_deleted_tenants`: backoff, the tick's error budget, never on a single-tenant host) |
 | `require_active_tenant`, `tenant:<role>` roles | scope every tenant route to the session's organisation |
 
 Stripe is behind `contracts/provider.py` (`BillingProvider`), which speaks

@@ -142,11 +142,11 @@ class BillingModule(ModuleBase):
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
         if app is None:
             return
-        from sm_billing import live, seats, teardown
+        from sm_billing import live, seats, tenant_deleted
 
         seats.subscribe(bus, app)
         live.subscribe(bus, app)
-        teardown.subscribe(bus, app)
+        tenant_deleted.subscribe(bus, app)
 
     async def on_startup(self, app: FastAPI) -> None:
         from sm_billing import startup

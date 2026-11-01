@@ -25,6 +25,9 @@ has not completed (``teardown_done_at``) and whose retry is due
   on another worker stops the cancels here too.
 - **Single-tenant hosts never sweep.** There everything is ``"default"`` with
   no tenant row, which would read as deleted; ``"default"`` is never swept.
+- **Tenant subjects only.** A ``user:<id>`` customer (#274; one left over from
+  switching ``subject_mode`` on a multi-tenant host) has no tenant row either,
+  and is not a deleted tenant: a user's teardown runs on ``UserDeleted``.
 
 Two instances sweeping one customer at once only cost calls: the teardown is
 idempotent.
@@ -43,6 +46,7 @@ from sqlalchemy import or_, select
 from tenants.models import Tenant
 
 from sm_billing import live
+from sm_billing.constants import USER_SUBJECT_PREFIX
 from sm_billing.contracts.provider import ProviderError, ProviderNotFound
 from sm_billing.lifecycle import is_multi_tenant
 from sm_billing.models import Customer
@@ -88,6 +92,7 @@ async def _orphans(app: FastAPI, tenant_id: str | None, now: datetime) -> list[s
         .where(
             Tenant.id.is_(None),
             Customer.tenant_id != DEFAULT_TENANT_ID,
+            Customer.tenant_id.not_like(f"{USER_SUBJECT_PREFIX}%"),
             Customer.provider_customer_id.is_not(None),
             Customer.teardown_done_at.is_(None),
             or_(
