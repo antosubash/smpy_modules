@@ -99,13 +99,16 @@ async def subscription_rows(
     *,
     status: str | None = None,
     tenant_id: str | None = None,
-    limit: int = 200,
+    limit: int = c.ADMIN_ROW_LIMIT,
     offset: int = 0,
+    q: str | None = None,
 ) -> list[SubscriptionRow]:
+    """One page of the list; ``q`` searches it (``admin_users`` says how, per mode)."""
     default = await PlanService(db).default()
+    q = (q or "").strip() or None
     if subjects.subject_mode(app) == c.SUBJECT_MODE_USER:
         return await admin_users.user_rows(
-            db, default, status=status, subject=tenant_id, limit=limit, offset=offset
+            db, default, status=status, subject=tenant_id, limit=limit, offset=offset, q=q
         )
     stmt = (
         select(Tenant, Subscription, Plan)
@@ -119,6 +122,8 @@ async def subscription_rows(
         stmt = stmt.where(Subscription.status == status)
     if tenant_id:
         stmt = stmt.where(Tenant.id == tenant_id)
+    if q:
+        stmt = stmt.where(admin_users.tenant_search(q))
     found = (await db.execute(stmt)).all()
     counts = await tenant_service(db, app).member_counts([t.id for t, _, _ in found])
     return [

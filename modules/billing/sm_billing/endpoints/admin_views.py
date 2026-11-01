@@ -58,7 +58,8 @@ async def subscriptions_page(
     request: Request, inertia: InertiaDep, db: AsyncSession = Depends(get_db)
 ) -> InertiaResponse:
     status = request.query_params.get("status") or None
-    rows = await admin.subscription_rows(db, request.app, status=status)
+    search = (request.query_params.get("q") or "").strip()
+    rows = await admin.subscription_rows(db, request.app, status=status, q=search)
     plans = [plan_out(p).model_dump(mode="json") for p in await PlanService(db).list()]
     return await inertia.render(
         c._PAGE_SUBSCRIPTIONS,
@@ -67,6 +68,9 @@ async def subscriptions_page(
             "rows": [r.model_dump(mode="json") for r in rows],
             "plans": plans,
             "status_filter": status or "",
+            "search": search,
+            # The list stops here; the page says so and points at the search.
+            "row_limit": c.ADMIN_ROW_LIMIT,
             "sync_health": (await admin.sync_health(db, request.app)).model_dump(mode="json"),
         },
     )

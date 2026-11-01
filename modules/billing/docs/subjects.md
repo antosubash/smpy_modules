@@ -55,8 +55,12 @@ or reassign plans by hand (**Subscriptions** screen) after switching.
   organisations) and assigns a plan per user; **Usage** works per user. Assigning
   is mode-strict: only an existing user in `user` mode, only an organisation in
   `tenant` mode (`admin_users.require_subject`); rows left from the other mode
-  are repaired through the Usage admin. *Limit:* the Subscriptions list shows at most 200 rows, with no
-  pager or search (the tenant list is the same).
+  are repaired through the Usage admin.
+- **Finding a row.** The Subscriptions list shows at most 200 rows and has no
+  pager; past that, use its search. In `user` mode it matches part of an email
+  (case-insensitive), or a `user:<uuid>` subject or bare UUID exactly; in
+  `tenant` mode, part of an organisation's name or slug, or its id. The page
+  says when the list was cut (`GET /api/billing/admin/subscriptions?q=`).
 - **Deleting a user** cancels their provider subscription at once (the same
   teardown a deleted tenant gets). A failed attempt is retried with backoff by
   `smpy billing reconcile` and the scheduled reconcile, whose sweep finds

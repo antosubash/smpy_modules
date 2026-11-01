@@ -313,7 +313,7 @@ Platform admins (role `admin`) hold both.
 | `POST /plans` | plan (below) | the plan, 201 |
 | `PUT /plans/{id}` | plan (same `key`) | the plan |
 | `POST /plans/{id}/archive` | — | the plan |
-| `GET /subscriptions?status=&offset=` | — | one row per organisation (200 per page) |
+| `GET /subscriptions?status=&offset=&q=` | — | one row per organisation, or per user in `user` mode (200 per page); `q` searches name/slug/id, or email/subject/UUID |
 | `POST /subscriptions/{tenant_id}/assign` | `{"plan_id", "status", "interval"?}` | the row — manual provider only |
 | `POST /subscriptions/{tenant_id}/resync` | — | the row — Stripe only |
 | `GET /connection` | — | connection status (never the secrets) |

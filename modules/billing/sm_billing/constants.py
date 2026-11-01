@@ -62,6 +62,9 @@ PROVIDERS: Final = (PROVIDER_MANUAL, PROVIDER_STRIPE)
 ENTITLEMENT_SEATS: Final = "tenants.seats"
 KNOWN_LIMIT_KEYS: Final = (ENTITLEMENT_SEATS,)
 
+# The admin Subscriptions list shows at most this many rows; search narrows it.
+ADMIN_ROW_LIMIT: Final = 200
+
 # Where the ``UsageMeter`` implementation lives (``sm_billing.contracts.metering``).
 USAGE_STATE_ATTR: Final = "billing_usage"
 # Where the ``MeterRegistry`` lives (``sm_billing.metering.registry``).

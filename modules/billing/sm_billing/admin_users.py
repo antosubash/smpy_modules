@@ -7,9 +7,10 @@ driven from ``tenants_tenant``: every user, outer-joined to their subscription
 
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String, cast, literal, select
+from sqlalchemy import String, cast, literal, or_, select
 from tenants.models import Tenant
 from users.models import User
 
@@ -21,7 +22,32 @@ from sm_billing.schemas import SubscriptionRow
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
+    from sqlalchemy import ColumnElement
     from sqlalchemy.ext.asyncio import AsyncSession
+
+LIKE_ESCAPE = "\\"
+
+
+def contains(column: ColumnElement[str], q: str) -> ColumnElement[bool]:
+    """Case-insensitive substring match where ``%`` and ``_`` in ``q`` are literal."""
+    escaped = q.replace(LIKE_ESCAPE, LIKE_ESCAPE * 2).replace("%", "\\%").replace("_", "\\_")
+    return column.ilike(f"%{escaped}%", escape=LIKE_ESCAPE)
+
+
+def tenant_search(q: str) -> ColumnElement[bool]:
+    """The tenant list's search: the id exactly, or the name or slug containing ``q``."""
+    return or_(Tenant.id == q, contains(Tenant.name, q), contains(Tenant.slug, q))
+
+
+def _user_search(q: str) -> ColumnElement[bool]:
+    """A subject or a UUID names one user exactly; anything else searches emails."""
+    user_id = subjects.user_uuid(q)
+    if user_id is None:
+        try:
+            user_id = uuid.UUID(q)
+        except ValueError:
+            return contains(User.email, q)
+    return User.id == user_id
 
 
 def row(
@@ -62,6 +88,7 @@ async def user_rows(
     subject: str | None,
     limit: int,
     offset: int,
+    q: str | None = None,
 ) -> list[SubscriptionRow]:
     # Built in SQL so paging and the status filter stay one query: the GUID
     # column is the dashed string on SQLite and a native uuid on Postgres, and
@@ -77,6 +104,8 @@ async def user_rows(
     )
     if status:
         stmt = stmt.where(Subscription.status == status)
+    if q:
+        stmt = stmt.where(_user_search(q))
     if subject is not None:
         user_id = subjects.user_uuid(subject)
         if user_id is None:

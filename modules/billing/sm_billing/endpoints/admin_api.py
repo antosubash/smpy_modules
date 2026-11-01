@@ -56,9 +56,10 @@ async def list_subscriptions(
     request: Request,
     status: str | None = None,
     offset: int = 0,
+    q: str | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[SubscriptionRow]:
-    return await admin.subscription_rows(db, request.app, status=status, offset=max(0, offset))
+    return await admin.subscription_rows(db, request.app, status=status, offset=max(0, offset), q=q)
 
 
 @router.post(
