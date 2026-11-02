@@ -41,7 +41,7 @@ from sm_records.index._predicates import SORT_ATTR, QueryError
 from sm_records.models import TableSet, tables_for
 from sm_records.schema.types import IndexKind
 
-__all__ = ["Metric", "aggregate_query", "parse_metric"]
+__all__ = ["Metric", "aggregate_query", "parse_metric", "total_query"]
 
 FIXED_KIND: dict[str, IndexKind] = {
     "status": IndexKind.TEXT,
@@ -208,3 +208,34 @@ def aggregate_query(
     stmt = filtered(stmt, rtype, fields, filters)
     stmt = stmt.group_by(group_expr).order_by(desc(counted), group_expr).limit(cap + 1)
     return stmt, group_kind
+
+
+def total_query(rtype, fields: list[dict[str, Any]], filters, *, metric: Metric) -> Select:
+    """:func:`aggregate_query` with no ``GROUP BY``: one row, one number.
+
+    ``count`` is ``count(distinct record.id)`` and ``sum:<field>`` the sum of
+    that field's index values, read through the same :func:`_column`,
+    :func:`_check_metric`, :func:`_on` and :func:`filtered` the grouped query
+    uses — so the public stats block (#88) and the admin dashboard cannot
+    disagree about which rows a filter keeps or which fields can be summed.
+    ``min``/``max`` are the caller's to refuse or allow; this answers any
+    metric the grouped query would.
+
+    No ``LIMIT``: a single aggregate row has no ceiling to detect.
+    """
+    tables = tables_for(rtype)
+    record = tables.record
+    if metric.field is None:
+        stmt = select(func.count(distinct(record.id))).select_from(record)
+    else:
+        indexed, declared = indexed_map(fields), declared_keys(fields)
+        expr, kind, join, many = _column(tables, rtype, indexed, declared, metric.field)
+        _check_metric(metric, kind, many)
+        stmt = select(getattr(func, metric.op)(expr)).select_from(record)
+        if join is not None:
+            # Inner, not outer: a record with no value adds nothing to a sum,
+            # and ``_check_metric`` has already refused a multi-valued field,
+            # so the join cannot repeat a record.
+            stmt = stmt.join(join[0], _on(record, join[0], rtype.id, join[1]))
+    stmt = stmt.where(record.type_id == rtype.id)
+    return filtered(stmt, rtype, fields, filters)

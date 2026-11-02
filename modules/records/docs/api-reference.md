@@ -1232,6 +1232,7 @@ published records anonymously under `public_route_prefix`
 | Method | Path | Answers |
 |---|---|---|
 | `GET`, `HEAD` | `{prefix}/{type_key}` | `PublicRecordPage` |
+| `GET`, `HEAD` | `{prefix}/{type_key}/stats` | `PublicStatRead` — see [Live counts](#live-counts--type_keystats) |
 | `GET`, `HEAD` | `{prefix}/{type_key}/{uuid}` | `PublicRecordRead` |
 
 `PublicRecordRead` carries `uuid`, `slug`, `locale`, `display_title`,
@@ -1337,7 +1338,7 @@ either way.
 `?after=`, `?total=false` and the `max_count` bound all apply, and a client
 walking a large public type is exactly the caller that should use them.
 
-**Both anonymous reads are cacheable.** They carry a weak `ETag` over the
+**All three anonymous reads are cacheable.** They carry a weak `ETag` over the
 content they are about to return and `Cache-Control: public, max-age=N`, where
 `N` is the `public_cache_seconds` setting (60 by default). A conditional GET
 whose `If-None-Match` matches is a `304` with no body, carrying the same
@@ -1374,6 +1375,37 @@ page of the same query — and not merely when some row somewhere was touched.
 > `simple_module_hosting/_inertia_shared.py:54`. This module writes nothing to
 > the session and does not work around it; until it is fixed upstream, these
 > headers help a browser and a private cache rather than a CDN.
+
+### Live counts — `{type_key}/stats`
+
+What the `RecordStats` page block shows (#88): one number about what the
+listing would return, without the page.
+
+```bash
+curl -s 'http://localhost:8000/api/records/public/product/stats?metric=sum:price&filter=in_stock:eq:true'
+```
+```json
+{"value": 112874.36}
+```
+
+- `metric=count` (the default) is the listing's `total` for the same
+  `?filter=` and `?locale=` — published, out of the trash, in the bound
+  tenant — except that it is never capped at `max_count`: one aggregate row
+  has no page to bound.
+- `metric=sum:<field>` is the **exact** sum of an indexed, single-valued
+  `number` field the public shape carries — an `int` when it is whole, a
+  `float` otherwise, `0` over no rows. A block rounds it for display; the API
+  does not.
+- `?locale=` is resolved by the listing's own rule (absent → the default
+  content locale, case-insensitive, an unconfigured or dropped language a
+  `400`) and **always applied**, so a translated record counts once.
+- Every field named — filtered on *or* summed — goes through the listing's
+  allow-list. `sum:position`, `sum:<virtual field>`, `sum:<text field>` and
+  `filter=created_at:…` are the same `400` naming the field a refused filter
+  gets: a sum under a filter that keeps one row is that row's value. `min` and
+  `max` are refused too (`400` naming `metric`); there is no `group_by`.
+- Registered before `{type_key}/{uuid}`, so `stats` is never read as a uuid; a
+  record whose *slug* is `stats` is still served by its uuid.
 
 ---
 
