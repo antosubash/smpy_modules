@@ -278,6 +278,14 @@ organisation may store). Without it nothing is limited, and
 `images_image.storage_bytes` (original + display copy + renditions) is kept
 all the same.
 
+- **Who is billed.** In billing's `tenant` mode the tenant. In `user` mode
+  `user:<collection owner>`, falling back to the tenant (logged once as
+  `images.billing.owner_unbillable`) when the owner has no user row. The
+  subject is recorded when a hold is taken (`images_billing_op.subject`,
+  `images_image.storage_subject`; `NULL` means the row's tenant) and settle,
+  repair and growth replay it. Only a first hold or a one-shot charge derives
+  it, through `sm_images.core.billing.subject`. See billing's
+  `docs/subjects.md`.
 - **One committed hold per image**, sized to `storage_bytes` and named by
   `storage_hold_id`. Every hold comes from billing's atomic `swap`: the new
   hold is committed and the image's old hold released in one billing

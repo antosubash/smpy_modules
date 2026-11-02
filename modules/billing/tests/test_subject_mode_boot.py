@@ -12,7 +12,7 @@ from sm_billing.plans import PlanService
 from sm_billing.subject_boot import apply_subject_mode
 
 STRANDED = "billing.subject_mode.stranded_default_rows"
-CALLERS = "billing.subject_mode.tenant_billed_callers"
+CALLERS = "tenant_billed_callers"
 
 
 def _set_mode(app, mode: str) -> None:
@@ -63,15 +63,12 @@ async def test_stranded_default_rows_warn(single_tenant, app, caplog):
     assert [r for r in caplog.records if CALLERS in r.message] == []
 
 
-async def test_installed_images_or_ai_warn(single_tenant, app, caplog, monkeypatch):
-    from sm_billing import subject_boot
-
-    monkeypatch.setattr(subject_boot, "installed_callers", lambda _app: ["images", "ai"])
+async def test_user_mode_logs_no_tenant_billed_warning(single_tenant, app, caplog):
+    """Images and ai bill the user now (#284), so boot warns about nothing of the kind."""
     _set_mode(app, "user")
     with caplog.at_level("WARNING"):
         await apply_subject_mode(app)
-    [rec] = [r for r in caplog.records if CALLERS in r.message]
-    assert "images" in rec.getMessage() and "ai" in rec.getMessage()
+    assert [r for r in caplog.records if CALLERS in r.getMessage()] == []
 
 
 def _stranded_row(kind: str):
@@ -101,16 +98,3 @@ async def test_every_stranded_default_row_warns(single_tenant, app, caplog, kind
     with caplog.at_level("WARNING"):
         await apply_subject_mode(app)
     assert [r for r in caplog.records if STRANDED in r.message]
-
-
-async def test_ai_warning_says_requests_are_split(single_tenant, app, caplog, monkeypatch):
-    """Request-time ``RequiresAiRequest`` bills the user; only worker metering bills default."""
-    from sm_billing import subject_boot
-
-    monkeypatch.setattr(subject_boot, "installed_callers", lambda _app: ["ai"])
-    _set_mode(app, "user")
-    with caplog.at_level("WARNING"):
-        await apply_subject_mode(app)
-    [rec] = [r for r in caplog.records if CALLERS in r.message]
-    message = rec.getMessage()
-    assert "worker" in message and "ai.requests" in message

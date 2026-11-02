@@ -144,6 +144,11 @@ Metering writes run in their own short transaction finished with
 caller's transaction is short, because the rollup row lock is held until it
 commits.
 `subject_mode = user` (restart-only, refused at boot on a multi-tenant host) makes a signed-in user the billing subject instead of a tenant; see `modules/billing/docs/subjects.md`.
+In `user` mode images bills `user:<collection owner>` (#284). The subject is
+recorded per hold (`images_billing_op.subject`, `images_image.storage_subject`;
+`NULL` = the row's tenant), and settle, repair and growth replay it and never
+re-derive it. A new images billing call takes its subject from the op or image,
+or from `sm_images.core.billing.subject`.
 Two more billing invariants: webhook payloads are never trusted for state (every
 event re-fetches the subscription through `sync.resync`/`apply_snapshot`, the
 one place provider state becomes local state), and response models
