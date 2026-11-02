@@ -57,11 +57,17 @@ updates:
         update-types: [minor, patch]
 
   # The demo host's Dockerfile pins its python and node base images to an
-  # exact tag and digest (#91); this keeps those current.
+  # exact tag and digest (#91); this keeps those current. Python stays on its
+  # minor line: a new minor (3.14 -> 3.15) lands before its wheels do, so the
+  # runtime stage would build packages from source with no compiler (#268).
+  # Moving to one is a deliberate change, together with CI's interpreter.
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     groups:
       docker:
         patterns: ["*"]
