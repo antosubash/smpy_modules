@@ -27,12 +27,14 @@ T = DEFAULT_TENANT
 # 1 -- two deliveries of one message never share object keys
 async def test_duplicate_delivery_cannot_delete_the_winners_objects(pipe):
     blur = Blur()
+    stalled = asyncio.Event()
     gate = asyncio.Event()
     real = blur.run
 
     async def first_stalls(ctx):
         if blur.calls == 0:
             blur.calls += 1
+            stalled.set()
             await gate.wait()
         return await real(ctx)
 
@@ -42,7 +44,7 @@ async def test_duplicate_delivery_cannot_delete_the_winners_objects(pipe):
     img = await pipe.image(coll)
     token = (await _claim(pipe, img))["acme.blur"]
     loser = asyncio.ensure_future(run_step_async(pipe.runtime, T, img, "acme.blur", token))
-    await asyncio.sleep(0.05)
+    await asyncio.wait_for(stalled.wait(), timeout=10)  # the loser is in its step (#285)
     assert await run_step_async(pipe.runtime, T, img, "acme.blur", token) is True  # the winner
     won = await pipe.row(img)
     gate.set()

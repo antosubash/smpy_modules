@@ -62,12 +62,14 @@ async def test_stale_lease_cannot_complete_or_publish_display(pipe):
     reclaims, publishes and finishes. A's late result, display copy and
     renditions are all discarded and A's staged object is deleted."""
     blur = Blur()
+    stalled = asyncio.Event()
     gate = asyncio.Event()
     real = blur.run
 
     async def stalls_once(ctx):
         if blur.calls == 0:
             blur.calls += 1
+            stalled.set()
             await gate.wait()
             await ctx.write_display(b"stale bytes", "image/jpeg")
             return StepOutcome.completed({"stale": True})
@@ -79,7 +81,7 @@ async def test_stale_lease_cannot_complete_or_publish_display(pipe):
     img = await pipe.image(coll)
     token_a = (await _claim(pipe, img))["acme.blur"]
     worker_a = asyncio.ensure_future(run_step_async(pipe.runtime, T, img, "acme.blur", token_a))
-    await asyncio.sleep(0.05)
+    await asyncio.wait_for(stalled.wait(), timeout=10)  # A is in its step, not worker B (#285)
     assert not worker_a.done()
 
     await _expire(pipe, img, "acme.blur")
