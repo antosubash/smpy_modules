@@ -152,11 +152,11 @@ Who may share the answer:
 - A protected original is `private, no-store` for everyone, the owner included.
 - The map surfaces (points, `map.pmtiles`) follow the same split; the points
   ETag digests the answer itself, so a gated page never validates a raw one.
-- The counts follow the same tenant condition but are the one exception to
-  "every response revalidates": no ETag, and `public, max-age=60` when shareable
-  (otherwise `private, no-cache`), so a page full of `ImageStats` blocks does
-  not run the bounded queries on every view. A count shows nothing a revoked
-  image could leak.
+- The counts follow the same split, `public, no-cache` when shareable and
+  `private, no-cache` otherwise, with no ETag. They revalidate like everything
+  else rather than carrying a `max-age`: the fallback tenant's answer has no
+  `Vary` that a request choosing another tenant would miss, so a fresh shared
+  copy could reach that request. Each count is bounded, so this is affordable.
 - Error answers on the public routes carry `no-store`.
 
 `public_asset_base_url`, when set, makes public pages link renditions of public

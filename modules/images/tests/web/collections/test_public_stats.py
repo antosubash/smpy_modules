@@ -22,7 +22,7 @@ from tests.support.public_stats import (
 )
 from tests.support.public_stats import seed as _seed
 
-SHARED = "public, max-age=60"
+SHARED = "public, no-cache"
 PRIVATE = "private, no-cache"
 
 

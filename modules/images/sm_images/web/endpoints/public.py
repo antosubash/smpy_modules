@@ -133,8 +133,8 @@ async def public_stat(
     """One count for the ``ImageStats`` block: ``{"value": int | null, "capped":
     bool}`` (bounded - see :mod:`~sm_images.web.services.public_stats`). ``metric`` is
     checked here, not by FastAPI, so a bad one is an ``ImagesError`` 400 and
-    carries ``no-store`` like every other refusal. No ETag: a few bytes, cached
-    for a minute instead (``cache.STATS_SHARED``)."""
+    carries ``no-store`` like every other refusal. No ETag: a few bytes, and
+    each count is bounded (``cache.stats_headers`` says why it revalidates)."""
     if metric not in public_stats.METRICS:
         raise ImagesError("Unknown metric")
     coll = None
