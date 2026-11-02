@@ -55,7 +55,7 @@ async def test_admin_lists_users_in_user_mode(user_mode_app, admin):
 
     props = await page_props(admin, "/admin/billing/subscriptions")
     assert props["subject_mode"] == "user"
-    assert a in {r["tenant_id"] for r in props["rows"]}
+    assert a in {r["tenant_id"] for r in props["subscriptions"]["items"]}
 
 
 async def test_a_user_disabled_with_disabled_at_is_inactive(user_mode_app, admin):

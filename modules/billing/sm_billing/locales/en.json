@@ -195,7 +195,6 @@
     "search_placeholder": "Name, slug or ID",
     "search_placeholder_user": "Email or ID",
     "search_submit": "Search",
-    "limit_notice": "Showing the first {count} — search to narrow.",
     "empty_search": "Nothing matches this search.",
     "empty_title": "No organisations",
     "empty_title_users": "No users",

@@ -1,4 +1,4 @@
-"""The admin Subscriptions list can be searched, so a list past 200 rows stays reachable (#274)."""
+"""The admin Subscriptions list can be searched, so a long list stays reachable (#274)."""
 
 from __future__ import annotations
 
@@ -6,10 +6,9 @@ import uuid
 
 from api_helpers import page_props
 from conftest import make_user
-from helpers import make_tenant
+from helpers import make_tenant, make_users
 from sm_billing import constants as c
 from sm_billing.subjects import subject_for_user
-from users.models import User
 
 ADMIN = "/api/billing/admin/subscriptions"
 
@@ -28,9 +27,9 @@ async def test_user_mode_searches_by_email(user_mode_app, admin):
     assert await _ids(admin, "%") == []  # a wildcard is matched literally
     assert await _ids(admin, "_lice") == []
     props = await page_props(admin, "/admin/billing/subscriptions?q=alice")
-    assert [r["tenant_id"] for r in props["rows"]] == [alice]
+    assert [r["tenant_id"] for r in props["subscriptions"]["items"]] == [alice]
     assert props["search"] == "alice"
-    assert props["row_limit"] == 200
+    assert props["subscriptions"]["total"] == 1
 
 
 async def test_user_mode_matches_a_subject_or_uuid_exactly(user_mode_app, admin):
@@ -56,12 +55,16 @@ async def test_tenant_mode_searches_by_name_or_slug(app, admin):
 
 
 async def test_user_list_stops_at_the_row_limit_and_pages_on(user_mode_app, admin):
-    async with user_mode_app.state.sm.db.session_factory() as session:
-        for i in range(c.ADMIN_ROW_LIMIT + 1):
-            session.add(User(id=uuid.uuid4(), email=f"u{i:03}@x.io", hashed_password="x"))
-        await session.commit()
+    await make_users(user_mode_app, c.ADMIN_ROW_LIMIT + 1)
     first = [r["tenant_id"] for r in (await admin.get(ADMIN)).json()]
     assert len(first) == c.ADMIN_ROW_LIMIT  # users past the limit are cut ...
     rest = await admin.get(ADMIN, params={"offset": c.ADMIN_ROW_LIMIT})
     after = [r["tenant_id"] for r in rest.json()]
     assert after and not set(first) & set(after)  # ... and the next page has them
+
+
+async def test_api_rejects_a_search_past_the_bound(app, admin):
+    ok = await admin.get(ADMIN, params={"q": "x" * c.ADMIN_SEARCH_MAX})
+    assert ok.status_code == 200, ok.text
+    too_long = await admin.get(ADMIN, params={"q": "x" * (c.ADMIN_SEARCH_MAX + 1)})
+    assert too_long.status_code == 422
