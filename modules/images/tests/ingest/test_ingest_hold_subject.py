@@ -20,7 +20,7 @@ from tests.support.billing import ops
 from tests.support.imports import b64 as import_b64
 from tests.support.imports import feature
 from tests.support.stub_auth import user_uuid
-from tests.support.upload import all_rows, jpeg, make_collection
+from tests.support.upload import all_rows, jpeg, make_collection, post_files
 
 OLGA = f"user:{user_uuid('olga')}"
 
@@ -95,3 +95,23 @@ async def test_import_item_in_user_mode_holds_under_owner(imp, gauge, user_mode)
     (hold,) = gauge.live()
     assert hold.tenant_id == f"user:{owner}"
     assert (image.storage_hold_id, image.storage_subject) == (hold.id, f"user:{owner}")
+
+
+async def test_multi_file_reserve_looks_the_owner_up_once(
+    uploads, gauge, web_user_mode, monkeypatch
+):
+    seen: list[str] = []
+
+    async def exists(db, who):
+        seen.append(who)
+        return True
+
+    monkeypatch.setattr(subject, "user_exists", exists)
+    cid = await make_collection(uploads)
+    files = [(f"{n}.jpg", jpeg(size=(64 + n, 48)), "image/jpeg") for n in range(3)]
+    done = await post_files(uploads, cid, files)
+    assert done.status_code == 200, done.text
+    assert seen == [OLGA]  # one lookup for the three slots
+    holds = gauge.live()
+    assert [h.tenant_id for h in holds] == [OLGA] * 3
+    assert {r.storage_subject for r in await all_rows(uploads)} == {OLGA}

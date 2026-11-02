@@ -44,6 +44,7 @@ __all__ = [
     "release_after_rollback",
     "release_dropped",
     "safe_filename",
+    "slot_subject",
 ]
 
 logger = logging.getLogger(__name__)
@@ -85,13 +86,22 @@ def safe_filename(name: str | None, fallback: str = "upload") -> str:
     return base[:255] or fallback
 
 
-async def hold_slot(factory: Any, tenant: str, slot: Slot, size: int, collection: Any) -> Slot:
+async def slot_subject(factory: Any, tenant: str, collection: Any) -> str:
+    """Who holds for ``collection``'s originals bill (#284): looked up once for
+    all of a reserve's slots, which share the collection."""
+    return await subject.owner_subject_in(factory, tenant, collection, subject.runtime_mode())
+
+
+async def hold_slot(
+    factory: Any, tenant: str, slot: Slot, size: int, collection: Any, who: str | None = None
+) -> Slot:
     """Hold ``size`` bytes for the slot's original (committed), keyed by this
-    attempt, under the subject ``collection``'s owner is billed as (#284)."""
+    attempt, under ``who`` - the subject ``collection``'s owner is billed as
+    (#284), looked up here unless the caller already has it (:func:`slot_subject`)."""
     meter = billing.storage_meter(factory)
     if meter is None or size < 1:
         return slot
-    who = await subject.owner_subject_in(factory, tenant, collection, subject.runtime_mode())
+    who = who or await slot_subject(factory, tenant, collection)
     key = billing.hold_key(slot.image_id, f"0-{uuid.uuid4().hex}")
     async with factory() as db:
         op = await billing_ops.open_op(
