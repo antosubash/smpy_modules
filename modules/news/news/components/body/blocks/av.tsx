@@ -75,7 +75,7 @@ export const AudioBlock: ComponentConfig<AudioProps> = {
 
 function AudioRender({ url, title, caption }: AudioProps) {
   const { t } = useT();
-  if (!url) return <></>;
+  if (!url) return null;
   return (
     <figure className="my-8 rounded-lg border bg-muted/40 p-4">
       {title && <p className="mb-2 text-sm font-semibold">{title}</p>}

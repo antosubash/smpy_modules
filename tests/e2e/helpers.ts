@@ -36,7 +36,9 @@ export async function clickAndConfirm(
   // would never unlock anything.
   const phrase = dialog.locator('label[for="confirm-dialog-phrase"] code');
   if (await phrase.count()) {
-    await dialog.locator('#confirm-dialog-phrase').fill((await phrase.innerText()).trim());
+    await dialog
+      .locator('#confirm-dialog-phrase')
+      .fill(((await phrase.textContent()) ?? '').trim());
   }
 
   await dialog.getByRole('button', { name: label }).click();
@@ -65,9 +67,10 @@ export async function moduleCsrfHeader(
   const html = await (await page.request.get(view)).text();
   const json = html.match(/<script data-page="app" type="application\/json">([^<]*)<\/script>/);
   expect(json, `expected the Inertia page JSON on ${view}`).toBeTruthy();
-  const token = (JSON.parse(json![1]) as { props?: { csrf_token?: string } }).props?.csrf_token;
+  const token = (JSON.parse(json?.[1] ?? '{}') as { props?: { csrf_token?: string } }).props
+    ?.csrf_token;
   expect(token, `expected a csrf_token prop on ${view}`).toBeTruthy();
-  return { 'X-CSRF-Token': token! };
+  return { 'X-CSRF-Token': token ?? '' };
 }
 
 /**
