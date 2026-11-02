@@ -36,7 +36,8 @@ after the commit - so no other decision can install the hold meanwhile.
 under the op's recorded ``subject``, the image's named hold under its
 ``storage_subject`` (``NULL``: the tenant). Billing scopes both to a subject
 and, asked under another, answers ``Closed``/``None`` instead of failing. An
-installed orphan records the op's subject on the image.
+installed orphan records the op's subject on the image, and an image naming
+no hold is corrected under the op's subject too.
 
 The scan walks bounded laps (``billing.repair_cursor``). A decided op is
 stamped ``repaired_at``; the sweep keeps an unexamined one.
@@ -183,7 +184,9 @@ async def _decide(
     async with factory() as db:
         row = await lock(db, tenant, image_id)
         now_seen = None if row is None else (row[0], int(row[1]), row[2])
-        under = None if row is None else held_under(tenant, row[2])
+        # the subject of the hold the image names; one naming none gets its new
+        # hold under the op's own subject (the owner's), never the tenant's
+        under = None if row is None else own if row[0] is None else held_under(tenant, row[2])
         if await billing_ops.unfinished(db, tenant, image_id) or now_seen != seen:
             await db.rollback()
             return None
@@ -198,7 +201,7 @@ async def _decide(
             )
             right, counted, under = orphan.quantity == int(row[1]), True, own
         if row is not None and not right and (counted or orphan is None):
-            assert under is not None  # the subject of the hold the image names now
+            assert under is not None
             await billing_ops.add_swap(db, image_id, int(row[1]), subject=under, factory=factory)
         await _stamp(db, op_id, now)
         await finalize_session(db)

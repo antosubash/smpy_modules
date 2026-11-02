@@ -18,7 +18,7 @@ from sm_images.core.billing import repair as billing_repair
 from sm_images.core.billing.settle import BILLING_OP_MAX_AGE, CLAIM, OP_EXPIRED
 from sm_images.core.tenancy import DEFAULT_TENANT as T
 from sm_images.models import BillingOp, Collection, Image
-from sm_images.models.billing_op import OP_SWAP
+from sm_images.models.billing_op import OP_INGEST, OP_SWAP
 from sqlalchemy import update
 
 from tests.support.billing import assert_counted_once, held_image, ops
@@ -51,12 +51,12 @@ async def _no_settle(*args, **kwargs) -> int:
     return 0
 
 
-async def _done(pipe, img, hold_id, qty, key, subject, **kw) -> None:
-    """A done ``swap`` op the repair has yet to examine."""
+async def _done(pipe, img, hold_id, qty, key, subject, op=OP_SWAP, **kw) -> None:
+    """A done op (``swap`` by default) the repair has yet to examine."""
     async with pipe.db_state.session_factory() as s:
         s.add(
             BillingOp(
-                op=OP_SWAP,
+                op=op,
                 image_id=img,
                 hold_id=hold_id,
                 quantity=qty,
@@ -221,4 +221,26 @@ async def test_user_hold_survives_owner_change(pipe, gauge):
     await _settle(pipe)
     assert _new_hold(gauge, seed).tenant_id == f"user:{a}"
     assert gauge.level_of(f"user:{b}") == 0
+    await assert_counted_once(pipe.db_state, gauge)
+
+
+async def test_repair_bills_a_hold_less_image_to_the_ops_subject(pipe, gauge, monkeypatch):
+    """A lost ingest under the user: the image stores bytes but names no hold
+    and records no subject. The correction must bill the op's subject (the
+    owner), not fall back to the tenant."""
+    who = _user()
+    coll = await pipe.collection({})
+    img = await pipe.image(coll)
+    async with pipe.db_state.session_factory() as s:
+        await s.execute(update(Image).where(Image.id == img).values(storage_bytes=5000))
+        await s.commit()
+    await _done(pipe, img, None, 5000, "lost-ingest", who, op=OP_INGEST, last_error="refused")
+    with monkeypatch.context() as later:  # the correction waits: read it as written
+        later.setattr(billing_ops, "settle", _no_settle)
+        assert await billing_repair.repair(pipe.db_state.session_factory, T) == 1
+    (fix,) = [o for o in await ops(pipe.db_state) if o.done_at is None]
+    assert (fix.quantity, fix.subject) == (5000, who)
+    await _settle(pipe)
+    row = await pipe.row(img)
+    assert (gauge.holds[row.storage_hold_id].tenant_id, row.storage_subject) == (who, who)
     await assert_counted_once(pipe.db_state, gauge)
