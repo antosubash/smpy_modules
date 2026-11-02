@@ -15,9 +15,11 @@ same hold, a closed key (``close_key``) answering ``Closed`` to any call.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -47,6 +49,8 @@ class FakeGauge:
     """Each key's outcome: its hold id, or the ``Exceeded``/``Expired``/``Closed``."""
     calls_by_key: dict[str, tuple] = field(default_factory=dict)
     calls: list[tuple[str, ...]] = field(default_factory=list)
+    limits: dict[str, int] = field(default_factory=dict)
+    """Per-subject limits overriding ``limit`` (the gauge counts per subject)."""
     fail_swap: int = 0
     """The next N swaps raise (billing unreachable)."""
     fail_release: int = 0
@@ -65,6 +69,15 @@ class FakeGauge:
     def level(self) -> int:
         return sum(h.quantity for h in self.holds.values() if h.status in LIVE)
 
+    def level_of(self, subject: str) -> int:
+        """Bytes live holds count for ``subject``."""
+        return sum(
+            h.quantity for h in self.holds.values() if h.status in LIVE and h.tenant_id == subject
+        )
+
+    def limit_of(self, subject: str) -> int | None:
+        return self.limits.get(subject, self.limit)
+
     def live(self, status: str | None = None) -> list[Hold]:
         want = (status,) if status else LIVE
         return [h for h in self.holds.values() if h.status in want]
@@ -75,10 +88,11 @@ class FakeGauge:
         return new
 
     async def check(self, tenant_id: str, meter: str, qty: int = 1):
-        self.calls.append(("check", meter, str(qty)))
-        if self.limit is not None and self.level + qty > self.limit:
-            return Exceeded(self.level, self.limit, qty, None)
-        return Allowed(self.level, self.limit, None)
+        self.calls.append(("check", tenant_id, meter, str(qty)))
+        level, limit = self.level_of(tenant_id), self.limit_of(tenant_id)
+        if limit is not None and level + qty > limit:
+            return Exceeded(level, limit, qty, None)
+        return Allowed(level, limit, None)
 
     async def swap(
         self, tenant_id, meter, old_hold_id, quantity, idempotency_key, *, source, not_after=None
@@ -106,9 +120,10 @@ class FakeGauge:
             self.keys[idempotency_key] = Expired(idempotency_key, not_after)
             return self.keys[idempotency_key]
         freed = old.quantity if old is not None and old.status in LIVE else 0
-        grows = quantity > freed and self.limit is not None
-        if grows and self.level - freed + quantity > self.limit:
-            refused = Exceeded(self.level, self.limit, quantity - freed, None)
+        level, limit = self.level_of(tenant_id), self.limit_of(tenant_id)
+        grows = quantity > freed and limit is not None
+        if grows and level - freed + quantity > limit:
+            refused = Exceeded(level, limit, quantity - freed, None)
             self.keys[idempotency_key] = refused  # the refusal is the key's outcome
             return refused
         if freed:
@@ -163,6 +178,28 @@ def gauge(monkeypatch) -> FakeGauge:
     monkeypatch.setattr(billing, "storage_meter", lambda factory: fake)
     monkeypatch.setattr(billing, "billing_installed", lambda: True)
     return fake
+
+
+@pytest.fixture
+def user_mode(monkeypatch):
+    """Billing's ``user`` subject mode: every owner exists. Returns a setter that
+    puts a ``Runtime`` (``user_mode.runtime(rt)``) or an app
+    (``user_mode.app(app)``) in the mode."""
+    from sm_images.core.billing import subject
+
+    async def exists(db, who):
+        return True
+
+    monkeypatch.setattr(subject, "user_exists", exists)
+
+    def runtime(rt):
+        return dataclasses.replace(rt, subject_mode=lambda: "user")
+
+    def app(app):
+        app.state.billing_subject_mode = "user"
+        return app
+
+    return SimpleNamespace(runtime=runtime, app=app)
 
 
 async def ops(db_state) -> list:

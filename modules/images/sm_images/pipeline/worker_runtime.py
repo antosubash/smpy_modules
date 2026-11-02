@@ -120,6 +120,7 @@ def _bus() -> Any:
 
 
 def worker_runtime() -> Runtime:
+    from sm_images.core.billing.subject import worker_mode
     from sm_images.core.storage import worker_store
     from sm_images.ingest.imports import log_redact
     from sm_images.pipeline.extensions import load_extensions
@@ -132,6 +133,7 @@ def worker_runtime() -> Runtime:
         settings=worker_settings,
         bus=_bus,
         multi_tenant=worker_multi_tenant,
+        subject_mode=worker_mode,
     )
 
 
