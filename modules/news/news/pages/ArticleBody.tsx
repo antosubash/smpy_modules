@@ -13,6 +13,7 @@ import {
 import { localizeConfig, localizeViewports } from '../components/body/localizeConfig';
 import { useArticleBody } from '../hooks/useArticleBody';
 import { useArticleOutline } from '../hooks/useArticleOutline';
+import { usePuckA11y } from '../hooks/usePuckA11y';
 import { keys, useT } from '../utils/i18n';
 
 /** The canvas an article's body is written in.
@@ -29,6 +30,7 @@ import { keys, useT } from '../utils/i18n';
 export default function ArticleBody() {
   const { t } = useT();
   const copy = keys.news.body;
+  usePuckA11y();
   const { article_id } = usePage<{ props: { article_id: number } }>().props as unknown as {
     article_id: number;
   };
