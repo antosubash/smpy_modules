@@ -18,6 +18,7 @@ from parity_support import Copy, Family
 PB = "modules/pagebuilder/pagebuilder"
 NEWS = "modules/news/news"
 RECORDS = "modules/records/sm_records"
+IMAGES = "modules/images/sm_images"
 
 _RECORDS_ADMIN = (
     "Records' admin rule (#112): on a multi-tenant host an anonymous request is "
@@ -41,6 +42,7 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
                 f"{RECORDS}/_tenancy_mode.py",
                 {"logger": "_log"},
             ),
+            Copy(f"{IMAGES}/core/tenancy/_mode.py", {"logger": "_log"}),
         ),
         shared=(
             "TenancyMode",
@@ -95,14 +97,15 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
         (
             Copy(f"{PB}/tenancy.py"),
             Copy(f"{RECORDS}/tenancy.py", {"_resolved": "upstream_tenant"}),
+            Copy(f"{IMAGES}/core/tenancy/__init__.py", {"_resolved": "upstream_tenant"}),
         ),
         shared=("resolve_public",),
         differ={
             "resolve_admin": _RECORDS_ADMIN,
             "bind_admin": "Records binds through its own tenant_scope, which refuses to "
             "rebind a different tenant inside a bound scope (TenantIsolationError).",
-            "bind_public": "Records' public 404 is its NotFound error, rendered by its "
-            "own error pages.",
+            "bind_public": "Records' and images' public 404 is their NotFound error, "
+            "rendered by their own error handlers.",
         },
     ),
 )

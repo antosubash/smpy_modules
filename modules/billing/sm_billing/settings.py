@@ -14,12 +14,15 @@ per use (the sweep interval on every tick), so they need none either.
 
 from __future__ import annotations
 
+from typing import Any, Final, Literal
+
 from pydantic import Field
 from simple_module_core.settings_base import DbBackedSettings
 
 from sm_billing import constants as c
 
 _GROUP = {"group": "Billing"}
+_RESTART: Final[dict[str, Any]] = {**_GROUP, "requires_restart": True}
 _PROVIDER = {**_GROUP, "choices": list(c.PROVIDERS)}
 
 
@@ -88,4 +91,14 @@ class BillingSettings(DbBackedSettings):
             "0 keeps the ledger forever."
         ),
         json_schema_extra=_GROUP,
+    )
+    subject_mode: Literal["tenant", "user"] = Field(
+        default="tenant",
+        description=(
+            "Who holds a subscription and a usage counter. 'tenant': each organisation "
+            "(or the single default tenant). 'user': each signed-in user, for a "
+            "single-tenant host where people subscribe as themselves; refuses to start "
+            "with multi_tenant on."
+        ),
+        json_schema_extra=_RESTART,
     )

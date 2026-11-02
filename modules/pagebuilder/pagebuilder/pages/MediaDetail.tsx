@@ -79,6 +79,8 @@ export default function MediaDetail() {
   return (
     <PageShell
       title={asset.original_filename}
+      // A long filename has no spaces to break at; let it wrap anywhere (#236).
+      titleClassName="[overflow-wrap:anywhere]"
       description={`${dimensions}${asset.content_type} · ${formatBytes(asset.size_bytes)}`}
       actions={
         <>

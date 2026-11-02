@@ -11,7 +11,7 @@ from datetime import timedelta
 
 import pytest
 from fake_provider import FakeProvider
-from sm_billing import teardown
+from sm_billing import teardown, tenant_deleted
 from sm_billing.constants import PROVIDER_CANCELABLE_STATUSES, SubscriptionStatus
 from sm_billing.contracts.provider import CheckoutSnapshot
 from sm_billing.reconcile import reconcile
@@ -167,5 +167,5 @@ def test_an_older_tenants_without_the_event_subscribes_nothing(app, monkeypatch)
             self.subscribed.append(event_type)
 
     bus = Bus()
-    teardown.subscribe(bus, app)
+    tenant_deleted.subscribe(bus, app)
     assert bus.subscribed == []

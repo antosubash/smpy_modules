@@ -147,7 +147,7 @@ async def test_admin_reads_need_platform_view(app, user_client):
 
 
 async def test_admin_rejects_bad_query(admin):
-    assert (await admin.get(f"{ADMIN}/{'x' * 33}/events")).status_code == 422
+    assert (await admin.get(f"{ADMIN}/{'x' * 65}/events")).status_code == 422
     assert (await admin.get(f"{ADMIN}/t/events", params={"kind": "nope"})).status_code == 422
     assert (await admin.get(ADMIN, params={"period": "last"})).status_code == 422
 

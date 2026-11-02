@@ -93,7 +93,7 @@ class NewsModule(ModuleBase):
         creates, which is why every later read goes through ``app.state.news``
         rather than a captured local.
         """
-        from settings.registration import register_module_settings
+        from simple_module_core.module_settings import register_module_settings
 
         register_module_settings(
             app,

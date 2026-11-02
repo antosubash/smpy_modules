@@ -6,7 +6,13 @@
  * picking a different upload, not editing a path by hand.
  */
 
-import { deleteMedia, listMedia, type MediaAssetRead, uploadMedia } from '../utils/api';
+import {
+  deleteMedia,
+  listMedia,
+  type MediaAssetRead,
+  rememberPickedAsset,
+  uploadMedia,
+} from '../utils/api';
 import type { FileItem, FilePickerAdapter } from './file-picker/types';
 
 function toFileItem(asset: MediaAssetRead): FileItem {
@@ -15,6 +21,7 @@ function toFileItem(asset: MediaAssetRead): FileItem {
     mimeType: asset.content_type,
     fileSize: asset.size_bytes,
     url: asset.url,
+    name: asset.original_filename,
   };
 }
 
@@ -23,10 +30,13 @@ export const mediaLibraryAdapter: FilePickerAdapter = {
     return toFileItem(await uploadMedia(file));
   },
 
-  async list({ skip = 0, take = 24 } = {}) {
+  async list({ skip = 0, take = 24, search } = {}) {
     // The gallery jumps to arbitrary pages, so it uses the uploads endpoint's
     // offset mode; that mode is also what makes the response carry `total`.
-    const response = await listMedia({ offset: skip, limit: take });
+    const response = await listMedia({ offset: skip, limit: take, search });
+    // The Image block's `resolveData` back-fills alt text and size from the
+    // picked asset; remembering what the picker showed spares it a refetch.
+    for (const asset of response.items) rememberPickedAsset(asset);
     return {
       items: response.items.map(toFileItem),
       totalCount: response.total ?? response.items.length,

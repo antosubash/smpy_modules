@@ -58,6 +58,7 @@ environment variables — an `SM_BILLING_*` line does nothing.
 | `stripe_webhook_secret` | — | `whsec_…`, same storage. |
 | `return_base_url` | — | `https://app.example.com`. Origin for Checkout/portal return links. Blank uses the request's host — set it behind a proxy. |
 | `reconcile_interval_minutes` | `0` | Run [reconcile](#reconcile) inside the app every N minutes over subscriptions not synced for N minutes. `0` is off. Takes effect on save: the loop starts, stops or re-times itself. `60` suits most deployments. |
+| `subject_mode` | `tenant` | `tenant` bills organisations; `user` bills each signed-in user (single-tenant hosts only; boot refuses it with `multi_tenant` on). Restart required. See [subjects.md](subjects.md). |
 | `usage_hold_ttl_seconds` | `900` | Default TTL of a usage hold when neither its meter nor the caller sets one (at least 30). A holder that crashes gives its slot back once the hold lapses. Read per call. |
 | `usage_sweep_interval_seconds` | `60` | Seconds between sweeps that expire lapsed holds (every instance sweeps; the guarded transition releases each hold once). `0` turns it off. Re-read from the database before every tick, so a value saved on one worker reaches all of them. |
 | `usage_event_retention_days` | `400` | The daily purge drops ledger charges older than this together with their refunds (by the charge's age, so a key is never left with only its refund; a refund goes only while its selected charge row is still there, so a stale batch on another instance never takes a newer call's refund), and settled holds older than 30 days. Each transaction deletes up to 1,000 charges plus their refunds (so up to about 2,000 ledger rows), or up to 1,000 settled holds, with at most 20 purge write transactions per table per tick, and carries a backlog over to the next ticks, so SQLite's write lock is never held for long. `0` keeps the ledger. Counters and gauges are never purged. A purged key is forgotten whole and can be used again. |
@@ -88,7 +89,9 @@ environment variables — an `SM_BILLING_*` line does nothing.
 6. Enable the Customer Portal (Stripe → Settings → Billing → Customer portal).
    **Do not let the portal switch customers to prices that belong to no plan**
    here: billing maps every subscription to a plan by its price, and an unknown
-   price on a live subscription fails until a plan carries it.
+   price on a live subscription fails until a plan carries it. With
+   `subject_mode = user`, also keep per-seat prices out of the portal's plan
+   switching (`docs/subjects.md`).
 7. Set `provider = stripe` on the Settings screen. It takes effect on save.
 
 ## Switching provider
@@ -315,7 +318,7 @@ not taken as done. Stripe also gives that answer for a key from another
 account, or a test key reading live objects, so a briefly wrong key must not
 end a live customer's teardown for good. The log names that likely cause. If
 the customer really was deleted in Stripe, the retry costs one call a day;
-set `billing_customer.teardown_done_at` to stop it. A single-tenant host never sweeps, and the `default` organisation is
+set `billing_customer.teardown_done_at` to stop it. A single-tenant host never sweeps organisations (in `subject_mode = user` it sweeps deleted users instead, see [subjects.md](subjects.md)), and the `default` organisation is
 never torn down, because it has no organisation row by design. Organisations
 deleted before this release are swept too, on the first reconcile after the
 upgrade. "Still

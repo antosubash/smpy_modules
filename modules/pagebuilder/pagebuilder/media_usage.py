@@ -34,7 +34,7 @@ class Usage:
     draft_only: bool
 
 
-def _like_literal(value: str) -> str:
+def like_literal(value: str) -> str:
     """Escape LIKE's wildcards so ``value`` is matched literally.
 
     Same rule as ``list_pages`` and ``board._search_filter``. It matters more
@@ -57,7 +57,7 @@ def _references(column, needle: str):
     The cast is explicit because SQLAlchemy compiles an untyped ``func.cast`` to
     NullType and the whole statement fails at compile time.
     """
-    return cast(column, Text).like(f"%{_like_literal(needle)}%", escape="\\")
+    return cast(column, Text).like(f"%{like_literal(needle)}%", escape="\\")
 
 
 async def find(

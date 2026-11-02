@@ -34,7 +34,7 @@ so the public API stops serving them (``services.public``) and this is what
 says how many there are and in which language. It is counted at
 :meth:`~sm_records.module.RecordsModule.on_startup` and **only there**: the
 framework's settings registry has no post-hydration hook to re-run it from
-(``settings.registration`` records a class and nothing else), so an operator
+(``register_module_settings`` records a class and nothing else), so an operator
 who drops a locale sees the count at the next restart. The README says so, and
 says how to list them meanwhile.
 

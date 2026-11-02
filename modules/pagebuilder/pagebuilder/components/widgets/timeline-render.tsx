@@ -84,11 +84,12 @@ export function TimelineWidgetRender({
 					    each shape ~13% oversize and made neighbours collide. */}
         <div className="flex flex-wrap justify-center gap-6 lg:flex-nowrap lg:justify-between">
           {items.map((it, idx) => (
+            // A row of its own below `sm`: 360px is wider than a small phone (#236).
             // The marker tag is a SIBLING of the masked blob, never a child:
             // the blob's mask clips its own descendants, and the tag
             // deliberately straddles the blob's edge.
             // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; content repeats, so a content key collides
-            <div key={idx} className="relative flex min-w-[360px] flex-1">
+            <div key={idx} className="relative flex min-w-0 basis-full sm:min-w-[360px] sm:flex-1">
               <div
                 className={cn(
                   // Text is left-aligned and vertically centred, inset far

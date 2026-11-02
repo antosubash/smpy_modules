@@ -19,10 +19,12 @@ interface Props {
   canManage: boolean;
   busy: boolean;
   onPortal: () => void;
+  /** False in user mode: a user has no seats. */
+  showSeats?: boolean;
 }
 
 /** The plan in force, its renewal or end date, seats, and the payment-trouble banner. */
-export function CurrentPlanCard({ status, canManage, busy, onPortal }: Props) {
+export function CurrentPlanCard({ status, canManage, busy, onPortal, showSeats = true }: Props) {
   const { t, locale } = useT();
   const sub = status.subscription;
   const { used, limit } = status.seats;
@@ -58,10 +60,12 @@ export function CurrentPlanCard({ status, canManage, busy, onPortal }: Props) {
         </CardHeader>
         <CardContent className="flex flex-wrap items-end justify-between gap-4">
           <dl className="grid gap-1 text-sm">
-            <div className="flex gap-2">
-              <dt className="text-muted-foreground">{t(keys.billing.current_plan.seats)}</dt>
-              <dd>{seats}</dd>
-            </div>
+            {showSeats && (
+              <div className="flex gap-2">
+                <dt className="text-muted-foreground">{t(keys.billing.current_plan.seats)}</dt>
+                <dd>{seats}</dd>
+              </div>
+            )}
             {sub?.status === 'trialing' && sub.trial_end && (
               <div className="flex gap-2">
                 <dt className="text-muted-foreground">{t(keys.billing.current_plan.trial_ends)}</dt>

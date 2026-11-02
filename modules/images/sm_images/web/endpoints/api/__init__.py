@@ -1,0 +1,50 @@
+"""JSON API for the Images module, mounted under ``ROUTE_PREFIX_API``.
+
+``router`` is what :meth:`ImagesModule.register_routes` includes; the
+per-resource routers are added to it here as they land.
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends
+from simple_module_hosting.csrf import RequiresCsrf
+
+from sm_images.core.tenancy import bind_admin
+from sm_images.web.endpoints.api import (
+    collections,
+    groups,
+    images,
+    imports,
+    pipeline,
+    presets,
+    prompts,
+    review,
+    serve,
+    shares,
+    uploads,
+)
+from sm_images.web.endpoints.api import map as map_api
+
+# The tenant binding is the router's **first** dependency, and FastAPI puts a
+# parent router's dependencies ahead of every included route's, so it is first
+# for every route below. Not cosmetic: yield dependencies exit in reverse, and
+# ``get_db`` - opened by the permission check - commits on its way out, which
+# has to happen while the tenant is still bound.
+#
+# Then the framework's CSRF check on every write: the session cookie's
+# SameSite=Lax does not separate the console from an organisation's public
+# site, which is same-site with it. Reads pass. Anonymous routes are mounted on
+# their own router and never carry either.
+router = APIRouter(dependencies=[Depends(bind_admin), Depends(RequiresCsrf())])
+router.include_router(collections.router)
+router.include_router(shares.router)
+router.include_router(images.router)
+router.include_router(groups.router)
+router.include_router(uploads.router)
+router.include_router(pipeline.router)
+router.include_router(prompts.router)
+router.include_router(presets.router)
+router.include_router(review.router)
+router.include_router(serve.router)
+router.include_router(imports.router)
+router.include_router(map_api.router)

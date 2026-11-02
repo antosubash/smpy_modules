@@ -222,6 +222,16 @@ class SubscriptionRow(BaseModel):
     synced_at: datetime | None
 
 
+class SubscriptionPageOut(BaseModel):
+    """One page of the Subscriptions screen, shaped like ``UsageEventPageOut``."""
+
+    items: list[SubscriptionRow]
+    total: int
+    page: int
+    per_page: int
+    pages: int
+
+
 class SyncHealth(BaseModel):
     """How far the local mirror may lag the provider (admin subscriptions screen)."""
 

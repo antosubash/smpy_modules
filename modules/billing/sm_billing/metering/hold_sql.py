@@ -63,7 +63,7 @@ def upsert_gauge(
     ).returning(GAUGE.c.in_use)
 
 
-def _gauge(tenant_id: str, meter: str) -> tuple:
+def gauge_of(tenant_id: str, meter: str) -> tuple:
     return GAUGE.c.tenant_id == tenant_id, GAUGE.c.meter == meter
 
 
@@ -71,7 +71,7 @@ def raise_within_limit(*, tenant_id: str, meter: str, qty: int, limit: int, now:
     total = GAUGE.c.in_use + qty
     return (
         update(GAUGE)
-        .where(*_gauge(tenant_id, meter), total <= limit)
+        .where(*gauge_of(tenant_id, meter), total <= limit)
         .values(in_use=total, updated_at=now)
         .returning(GAUGE.c.in_use)
     )
@@ -80,7 +80,7 @@ def raise_within_limit(*, tenant_id: str, meter: str, qty: int, limit: int, now:
 def lower_gauge(*, tenant_id: str, meter: str, qty: int, now: datetime) -> Any:
     return (
         update(GAUGE)
-        .where(*_gauge(tenant_id, meter))
+        .where(*gauge_of(tenant_id, meter))
         .values(in_use=GAUGE.c.in_use - qty, updated_at=now)
     )
 
@@ -116,7 +116,7 @@ def recount(*, tenant_id: str, meter: str, now: datetime) -> Any:
     )
     return (
         update(GAUGE)
-        .where(*_gauge(tenant_id, meter))
+        .where(*gauge_of(tenant_id, meter))
         .values(in_use=live, updated_at=now)
         .returning(GAUGE.c.in_use)
     )

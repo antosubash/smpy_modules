@@ -1771,7 +1771,10 @@ message on an API is an information leak with no caller who can act on it.
 The `/admin/records/*` **view** routes are the mirror of that rule: a refusal
 there renders the host's error page, so a stale bookmark or a renamed type
 shows the same 404 screen every other part of the app shows rather than a JSON
-blob in the browser window.
+blob in the browser window. A client that sends an explicit
+`Accept: application/json` to one still gets JSON, with the same body as the
+API routes (`detail`, plus `code`, `errors` or `report` where the refusal has
+them).
 
 **A NUL byte is refused wherever a string enters.** Postgres cannot store
 `\x00` in `text`, `varchar` or `jsonb`, and its driver refuses to bind such a

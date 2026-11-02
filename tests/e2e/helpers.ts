@@ -57,6 +57,7 @@ export async function moduleCsrfHeader(
   view:
     | '/admin/news/'
     | '/admin/records/'
+    | '/admin/images/'
     | '/pagebuilder/'
     | '/ai/'
     | '/admin/billing/usage' = '/admin/news/',

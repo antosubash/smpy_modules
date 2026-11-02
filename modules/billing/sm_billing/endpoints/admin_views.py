@@ -11,12 +11,13 @@ from simple_module_hosting.permissions import RequiresPermission, resolved_permi
 from simple_module_inertia import InertiaResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_billing import admin
+from sm_billing import admin, subjects, subscription_list
 from sm_billing import constants as c
 from sm_billing.checkout import plan_out
 from sm_billing.metering import admin as usage_admin
-from sm_billing.metering.report import overview
+from sm_billing.metering.report import overview, page_numbers
 from sm_billing.plans import PlanService
+from sm_billing.schemas import SubscriptionPageOut
 
 router = APIRouter(dependencies=[Depends(RequiresPermission(c.PERM_PLATFORM_VIEW))])
 
@@ -37,6 +38,8 @@ def _common(request: Request) -> dict:
         "checkout_available": bool(services.provider and services.provider.supports_checkout),
         # Why a chosen ``stripe`` fell back to ``manual``; "" when it did not (#200).
         "provider_error": services.provider_error,
+        # "user": the lists name users (by email) instead of organisations (#274).
+        "subject_mode": subjects.subject_mode(request.app),
     }
 
 
@@ -56,15 +59,30 @@ async def subscriptions_page(
     request: Request, inertia: InertiaDep, db: AsyncSession = Depends(get_db)
 ) -> InertiaResponse:
     status = request.query_params.get("status") or None
-    rows = await admin.subscription_rows(db, request.app, status=status)
+    # The API rejects a longer search; the screen truncates it instead of failing.
+    search = (request.query_params.get("q") or "").strip()[: c.ADMIN_SEARCH_MAX]
+    total = await subscription_list.subscription_count(db, request.app, status=status, q=search)
+    served, pages = page_numbers(total, _page(request.query_params.get("page")), c.ADMIN_PAGE_SIZE)
+    rows = await subscription_list.subscription_rows(
+        db,
+        request.app,
+        status=status,
+        q=search,
+        limit=c.ADMIN_PAGE_SIZE,
+        offset=(served - 1) * c.ADMIN_PAGE_SIZE,
+    )
+    page = SubscriptionPageOut(
+        items=rows, total=total, page=served, per_page=c.ADMIN_PAGE_SIZE, pages=pages
+    )
     plans = [plan_out(p).model_dump(mode="json") for p in await PlanService(db).list()]
     return await inertia.render(
         c._PAGE_SUBSCRIPTIONS,
         {
             **_common(request),
-            "rows": [r.model_dump(mode="json") for r in rows],
+            "subscriptions": page.model_dump(mode="json"),
             "plans": plans,
             "status_filter": status or "",
+            "search": search,
             "sync_health": (await admin.sync_health(db, request.app)).model_dump(mode="json"),
         },
     )

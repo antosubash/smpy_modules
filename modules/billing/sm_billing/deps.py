@@ -11,10 +11,25 @@ from tenants.deps import ActiveTenantContext, require_active_tenant, require_use
 
 from sm_billing import constants as c
 from sm_billing.checkout import BillingService
-from sm_billing.context import BillingContext, billing_context
+from sm_billing.context import BillingContext, billing_context, is_user_mode, user_context
 from sm_billing.errors import BillingError
 
-ActiveTenant = Annotated[ActiveTenantContext, Depends(require_active_tenant)]
+
+async def require_active(request: Request) -> ActiveTenantContext:
+    """The active tenant; in user mode the signed-in user's own subject.
+
+    A single-tenant host never sets ``tenant_role``, so user mode cannot go
+    through ``require_active_tenant``.
+    """
+    if not is_user_mode(request):
+        return await require_active_tenant(request)
+    ctx = user_context(request)
+    return ActiveTenantContext(
+        tenant_id=ctx.tenant_id, role=ctx.role, user_id=str(request.state.user.id)
+    )
+
+
+ActiveTenant = Annotated[ActiveTenantContext, Depends(require_active)]
 
 
 def require_owner(ctx: ActiveTenant) -> ActiveTenantContext:
@@ -47,7 +62,11 @@ def user_email(request: Request) -> str | None:
 
 
 async def get_context(request: Request, db: AsyncSession = Depends(get_db)) -> BillingContext:
-    """Active tenant, or a billing-suspended one its owner is restoring."""
+    """Active tenant, or a billing-suspended one its owner is restoring.
+
+    User mode: the signed-in user, else 401 ``subject_required``."""
+    if is_user_mode(request):
+        return user_context(request)
     await require_user_id(request)
     ctx = await billing_context(request, db)
     if ctx is None:

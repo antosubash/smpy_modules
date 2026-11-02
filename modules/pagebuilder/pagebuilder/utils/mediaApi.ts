@@ -99,7 +99,7 @@ export function buildSrcset(asset: MediaAssetRead): string {
     .join(', ');
 }
 
-// Cache of MediaAssetRead objects emitted by the MediaPicker, keyed by
+// Cache of MediaAssetRead objects the media picker has shown, keyed by
 // asset URL. The Image block's `resolveData` reads from this so the
 // auto-fill round-trip doesn't have to refetch the full list that the
 // picker just loaded. Falls back to a fresh `listMedia()` for URLs not

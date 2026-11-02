@@ -40,6 +40,14 @@ services:
       SM_DATABASE_URL: ${SMPY_DATABASE_URL:-sqlite+aiosqlite:////app/var/app.db}
       SMPY_MIGRATE_ON_START: ${SMPY_MIGRATE_ON_START:-1}
       PORT: "8000"
+      # No Redis or worker in this stack: background tasks run inline. In
+      # production background_tasks rejects its default localhost broker even
+      # then, so name in-process transports. Override all three (and add a
+      # redis service plus `make worker`-style processes) for a real deployment.
+      SM_BG_TASKS_TASK_ALWAYS_EAGER: ${SM_BG_TASKS_TASK_ALWAYS_EAGER:-true}
+      SM_BG_TASKS_BROKER_URL: ${SM_BG_TASKS_BROKER_URL:-memory://}
+      SM_BG_TASKS_RESULT_BACKEND: ${SM_BG_TASKS_RESULT_BACKEND:-cache+memory://}
+      SM_BG_TASKS_BROADCAST_INVALIDATIONS: ${SM_BG_TASKS_BROADCAST_INVALIDATIONS:-false}
     ports:
       - "${SMPY_BIND_ADDRESS:-127.0.0.1}:${SMPY_PORT:-8090}:8000"
     volumes:

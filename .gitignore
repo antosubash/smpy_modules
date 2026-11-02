@@ -28,6 +28,8 @@ app.db*
 # SQLite runs in WAL mode since framework 0.0.35 (#339): its sidecar files.
 host/*.db-wal
 host/*.db-shm
+# `make beat` keeps Celery beat's schedule state in the repo root.
+celerybeat-schedule*
 
 # Runtime upload storage (PagebuilderSettings.media_root)
 var/

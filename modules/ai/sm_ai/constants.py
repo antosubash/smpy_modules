@@ -96,3 +96,6 @@ METER_UNIT_COUNT: Final = "count"
 # app.state.
 BILLING_QUOTA_MODULE: Final = "sm_billing.metering.deps"
 BILLING_METERS_ATTR: Final = "billing_meters"
+BILLING_PACKAGE: Final = "sm_billing"
+BILLING_USAGE_MODULE: Final = "sm_billing.contracts.metering"
+"""Where billing's ``usage_meter`` lives: its entry for code with no app (workers)."""
