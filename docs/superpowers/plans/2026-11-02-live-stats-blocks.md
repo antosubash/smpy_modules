@@ -14,10 +14,10 @@
 
 - No file under `modules/pagebuilder/` changes. Blocks import `StatsView` and `StatsWidgetProps['surface']` from `@simple-module-py/pagebuilder/pagebuilder/components/widgets/stats-widget`, and only from the block's own component files (`pagebuilder-blocks.ts` and the files it imports).
 - Block names: `NewsStats`, `RecordStats`, `ImageStats`. Palette categories: news `feeds`, records `data`, images `images`. Never `layout: true`.
-- `items`: Puck array, `min: 1`, `max: 6`. The `resolveData` clamp runs only on `trigger === 'load'` (the `NewsFeed` precedent).
+- `items`: Puck array, `min: 1`, `max: 6`. `clampStatItems` runs in `resolveData` on `trigger === 'load'` only (the `NewsFeed` precedent) **and** at the top of every renderer, because `resolveData` never runs on an anonymous public page.
 - Each item has `label: string`, `prefix: string`, `suffix: string`, `iconUrl?: string` plus its metric fields. Block-level props are `title`, `subtitle`, `surface: 'default'|'lime'|'cards'`.
 - Value text is `prefix + new Intl.NumberFormat(pageLocale).format(value) + suffix`. While loading and on failure the value is `–` (U+2013).
-- Endpoint body: `{"value": <int>}`; a records `sum` is rounded to the nearest int server-side.
+- Endpoint body: `{"value": <number>}`. Counts are ints; a records `sum` is the exact sum. Display formatting uses `Intl.NumberFormat(pageLocale, { maximumFractionDigits: 2 })`.
 - Every new UI string is a catalogue key, added to the module's `locales/en.json` **and** `locales/de.json`.
 - 300-line cap per file; split by responsibility.
 - Python test runs cap xdist at `PYTEST_WORKERS=8` / `-n 8`; never run two suites at once.
@@ -38,7 +38,7 @@
 
 **Files:**
 - Create: `modules/news/news/stats.py` (query), `modules/news/news/endpoints/api/stats.py` (route)
-- Modify: `modules/news/news/endpoints/api/__init__.py` (include router), `modules/news/news/constants.py` (`PUBLIC_READ_PREFIXES` gains `f"{ROUTE_PREFIX_API}/stats"`)
+- Modify: `modules/news/news/endpoints/api/__init__.py` (include router), `modules/news/news/constants.py` (new `PUBLIC_STATS_PREFIX: Final = f"{ROUTE_PREFIX_API}/stats"`), `modules/news/news/module.py` (`register_public_routes` also adds `PUBLIC_STATS_PREFIX` with `methods={"GET", "HEAD"}`; `register_public_routes` hardcodes GET for the others, so a HEAD would otherwise still need a session)
 - Test: `modules/news/tests/test_stats_api.py`
 
 **Interfaces:**
@@ -50,10 +50,10 @@
   - `test_counts_only_published_live_articles`: seed 2 published, 1 draft, 1 published+trashed, 1 published with `unpublish_at` in the past, and 1 with it in the future. Anonymous GET → `{"value": 3}`.
   - `test_category_and_locale_narrow`: published `en`/`a`, `en`/`b`, `de`/`a`. `?category=a` → 2; `?locale=de` → 1; both → 1.
   - `test_anonymous_cache_headers`: `Cache-Control == "public, max-age=60"`, `"Cookie" in Vary`.
-  - `test_head_answers`: HEAD → 200, empty body.
+  - `test_head_answers`: an anonymous HEAD through the real auth middleware (not a dependency override) → 200, empty body.
   - `test_unknown_metric_is_422`: `?metric=drafts` → 422.
   - `test_other_tenant_not_counted`: in multi-tenant mode, as in `test_tenancy_public.py`, an article in tenant B is not counted for tenant A.
-  - `test_stats_prefix_is_public`: extend the assertion in `test_module.py:149` so `/api/news/stats` is registered GET-only.
+  - `test_stats_prefix_is_public`: extend the assertion in `test_module.py:149` so `/api/news/stats` is registered for GET and HEAD, and the existing prefixes stay GET-only.
 - [ ] **Step 2: Run** `uv run pytest modules/news/tests/test_stats_api.py -n 8 -q`. Expected: fails (404).
 - [ ] **Step 3: Implement** `count_published` and the route. HEAD is explicit with `@router.api_route(..., methods=["GET", "HEAD"])`.
 - [ ] **Step 4: Run** the same command, then `uv run pytest modules/news/tests/test_module.py -q`. Expected: pass.
@@ -93,10 +93,10 @@
 
 **Interfaces:**
 - Produces: `GET|HEAD {public_route_prefix}/{type_key}/stats?metric=count|sum:<field>&filter=…&locale=<tag>` → `{"value": int}`. Filters are parsed with the existing `parse_filters` dependency.
-- `async def public_stat(db: AsyncSession, key: str, *, metric: Metric, filters: Sequence[Filter], locale: str | None) -> int` in `services/public_stats.py`:
+- `async def public_stat(db: AsyncSession, key: str, *, settings: RecordsSettings, metric: Metric, filters: Sequence[Filter], locale: str | None) -> int | float` in `services/public_stats.py`:
   - `get_public_type(db, key)` (shared 404 for a private or missing type);
   - `_check_columns(rtype, [*filters, Filter(field=metric.field)…], [])`, which refuses a summed field outside the public shape;
-  - the narrowing is `_narrow_for(record, locale)` when `locale` is given, else `_published_only(record, …)`;
+  - the locale is resolved exactly as `list_public_records` resolves it (an omitted locale → the configured default, case-normalised, an unsupported or removed language refused/empty the same way), and the narrowing is **always** `_narrow_for(record, resolved_locale)`, so a translated record counts once and a language no longer configured never counts;
   - the statement is `count(distinct record.id)`, or `sum` of the metric's index column, built with the same filter-joining helpers `aggregate_query` uses (`tables_for`, `_column`, `_check_metric`, the filter grammar). There is no `group_by` and no cap.
   - `min`/`max` metrics are refused with a `QueryError("metric", "bad_value", …)` → 400.
 - Response headers through `_public_cache.apply` (ETag + `public_cache_seconds`); refusals through the existing `_refused` → 400 naming the field.
@@ -104,10 +104,12 @@
 - [ ] **Step 1: Failing tests** in `test_public_stats.py`, with the fixtures of `test_public_records*.py`:
   - `test_count_published_only`: on a public type, 3 published, 1 draft, 1 trashed → 3.
   - `test_private_type_is_404`: same body as an unknown type.
-  - `test_sum_public_number_field`: published `area` values 1.5, 2.5, plus a draft at 100 → 4.
+  - `test_sum_public_number_field`: published indexed `area` values 1.25 and 2.5, plus a draft at 100 → `3.75`.
   - `test_sum_refuses_hidden_or_non_number`: a virtual or undeclared field → 400 naming it; a text field → 400.
   - `test_filter_narrows`: `filter=<a public field>:eq:x` counts only matches.
-  - `test_locale_narrows`: on a translatable type, `en` and `de` rows of one record give `?locale=de` → 1.
+  - `test_hidden_filter_refused`: for both `count` and `sum`, a filter on a hidden fixed column (`created_at`, `position`) and on a provider-only virtual field → 400 naming the field.
+  - `test_locale_narrows`: on a translatable type, `en` and `de` rows of one record give `?locale=de` → 1 and no locale → 1 (the default language), never 2.
+  - `test_locale_resolution_matches_listing`: an unsupported locale, a removed one and an upper-case one answer exactly as `GET /{key}?locale=…` does (same status; same count as that listing's `total`).
   - `test_min_metric_refused`: `metric=min:area` → 400.
   - `test_stats_route_not_shadowed`: `/{key}/stats` returns the stats body, and a record with slug `stats` is still served by its uuid route.
   - `test_cache_and_head`: ETag present, `Cache-Control` per `test_public_cache.py`, HEAD 200.
@@ -128,11 +130,11 @@
 - Consumes: Task 3's endpoint.
 - `fetchPublicStat(prefix: string, typeKey: string, opts: { metric: string; filter: string; locale: string; tenant: string; signal: AbortSignal }): Promise<number>` follows `fetchPublicRecords`: same prefix default, tenant header, `credentials: 'omit'`.
 - Block-level props, copied from `RecordsListBlock` with the same semantics: `locale`, `tenant`, `apiPrefix`.
-- Item: `{ typeKey; metric: 'count' | 'sum'; field: string; filter: string; label; prefix; suffix; iconUrl? }`. `resolveFields` fills the `typeKey` options from the admin `listTypes()` as `RecordsList` does, and the `field` options from the chosen type's declared number fields. `field` is ignored for `count`.
+- Item: `{ typeKey; metric: 'count' | 'sum'; field: string; filter: string; label; prefix; suffix; iconUrl? }`. `resolveFields` fills the `typeKey` options from the admin `listTypes()` as `RecordsList` does, and the `field` options from the chosen type's declared number fields **that are indexed** (an unindexed one is refused `not_indexed` by the endpoint). `field` is ignored for `count`.
 - Exports `RecordStatsBlock`, `RecordStatsRender`, `clampStatItems`. The hidden-field helper is the existing local `hiddenField` pattern only if needed; prefer no hidden fields.
 - Keys under `records.stats`: the same set as news plus `item_type`, `item_metric`, `item_metric_count`, `item_metric_sum`, `item_field`, `item_filter`, `locale`, `tenant`, `api_prefix`.
 
-- [ ] **Step 1: Failing vitest**, the same cases as Task 2 adapted, plus: a `sum` item sends `metric=sum:<field>`; a `count` item ignores `field`; an item without `typeKey` shows `–` and makes no request.
+- [ ] **Step 1: Failing vitest**, the same cases as Task 2 adapted, plus: a `sum` item sends `metric=sum:<field>` and `3.75` renders as `3,75` under `de`; a `count` item ignores `field`; an item without `typeKey` shows `–` and makes no request; the field options list indexed number fields only (an unindexed number field and a text field are absent).
 - [ ] **Step 2–4:** Run vitest (FAIL), implement, run vitest and `make lint` (PASS).
 - [ ] **Step 5: Commit** `feat(records): RecordStats block (#88)`.
 
@@ -148,16 +150,16 @@
 - `async def public_stat(db, *, metric: Literal["images","located","collections"], collection: Collection | None) -> int` in `web/services/public_stats.py`:
   - `collections`: count of `Collection` with `visibility == PUBLIC` (soft-delete and tenant filtered by the mixins). The `collection` argument is ignored.
   - `images`/`located`: `count(Image.id)` / `count(Image.lat)` with `Image.is_deleted.is_(False)` and `redaction.ready_clause(c)`, for the one collection, or summed over every public collection.
-  - Shares `_gated`'s predicate. Move that predicate into one helper in `viewer_stats.py` (e.g. `gated_counts(db, collection) -> tuple[int, int]`) and use it from both places, instead of copying it.
-- `collection` resolves through `public_collection` semantics (a private, internal, trashed or unknown slug → the usual 404), raised as the module's `ImagesError` so `PublicRoute` adds `no-store`.
+  - Counts exactly the images `public_gallery.page` would list: not trashed, `redaction.ready_clause(c)`, **and** a current `small` rendition (`source_generation == Image.display_generation`). Extract the gallery's visibility predicate into one helper in `web/services/public_gallery.py` (e.g. `visible_clause(collection)`) used by both the gallery and the stats; do not copy it.
+- `collection` resolves through `public_collection` semantics (a private, internal, trashed or unknown slug → the usual 404), raised as the module's `ImagesError` so `PublicRoute` adds `no-store`. `metric` is a plain `str` query param validated in the handler and refused with an `ImagesError` (400), not a `Literal` (FastAPI's 422 would bypass `PublicRoute` and its `no-store`). No ETag: the body is a few bytes.
 - Headers: with a collection, `cache.cache_headers(request, collection, cache.DISPLAY, twin=True)`; without, `cache.listing_headers(request)`, which is `PUBLIC_NO_CACHE` when `_shared_tenant(request)` and otherwise `PRIVATE`.
 
 - [ ] **Step 1: Failing tests**, with the fixtures of `test_gallery_api.py`:
-  - `test_counts_public_ready_images`: a public collection with 3 ready images, 1 trashed, and 1 held back by redaction (set up as the gallery tests do) → `images` 3. With 2 of them located → `located` 2.
+  - `test_counts_public_ready_images`: a public collection with 3 ready images, 1 trashed, 1 held back by redaction, 1 with no `small` rendition and 1 whose rendition is stale (set up as the gallery tests do) → `images` 3, for the collection and in the all-collections total. With 2 of them located → `located` 2.
   - `test_all_collections_total_excludes_private`: two public and one private collection → the sum covers only the public two. `collections` → 2, and a trashed public collection is not counted.
   - `test_private_slug_is_404_no_store`.
-  - `test_unknown_metric_is_422`.
-  - `test_cache_headers`: a single collection → `public, no-cache` in single-tenant mode; the total → the same.
+  - `test_unknown_metric_is_400_no_store`.
+  - `test_cache_headers`: a single collection and the total → `public, no-cache` only in single-tenant mode with no request-chosen tenant. Both are `private, no-cache` when the tenant came from upstream (`request.state.tenant_id`), from an explicitly selected `"default"`, from a bound `tenant_context`, or in multi-tenant mode. Multi-tenant with no tenant resolved → 404 `no-store`.
   - `test_head_answers`.
   - `test_other_tenant_not_counted`.
   - `test_viewer_fields_unchanged`: the existing viewer_stats tests still pass after the helper move.

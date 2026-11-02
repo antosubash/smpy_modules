@@ -93,8 +93,10 @@ is the module's usual public 404/400, with `no-store`.
 - Goes through the existing public gates: `get_public_type` (a private type is
   the shared 404), `_published_only`, and `_check_columns` for the filter and
   the summed field. It reuses `aggregate_query` with those clauses added.
-- A sum over a non-integer field is rounded for display only; the API returns
-  the exact number.
+- A sum over a non-integer field is rounded for display only (two decimals);
+  the API returns the exact number. Only indexed number fields can be summed.
+- The locale is resolved as the public listing resolves it and always applied,
+  so a translated record counts once.
 - The item picks a type from the admin type list (`resolveFields`, as
   `RecordsList` does) and offers only that type's public number fields for
   `sum`.
@@ -104,7 +106,7 @@ is the module's usual public 404/400, with `no-store`.
 
 | metric | counts |
 |---|---|
-| `images` | images the public gallery would show: not trashed, and passing `redaction.ready_clause` |
+| `images` | images the public gallery would show: not trashed, passing `redaction.ready_clause`, with a current `small` rendition (the gallery's own predicate, shared) |
 | `located` | the same, with a location |
 | `collections` | public, non-trashed collections (no `collection` argument) |
 
@@ -113,8 +115,8 @@ is the module's usual public 404/400, with `no-store`.
   the usual 404.
 - It never reads the stored `Collection.image_count`, which includes images the
   public must not see.
-- Cached with `cache.cache_headers` semantics (`PUBLIC_NO_CACHE` plus an ETag
-  for a shared tenant source, else `PRIVATE`).
+- Cached with `cache.cache_headers` semantics (`PUBLIC_NO_CACHE` for a shared
+  tenant source, else `PRIVATE`); no ETag, the body is a few bytes.
 
 ### Permissions
 
