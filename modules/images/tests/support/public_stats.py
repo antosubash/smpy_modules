@@ -9,13 +9,24 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
 from sm_images.core.tenancy import DEFAULT_TENANT, tenant_scope
 from sm_images.models import Rendition, StepRun
 from sm_images.models.enums import StepStatus
 
 from tests.support.access import OWNER, collection, image
+from tests.support.pipeline import Blur, use_steps
 
 URL = "/api/images/public/stats"
+
+
+@pytest.fixture(autouse=True)
+def blur_installed():
+    """Autouse in every module that imports it: the ``extra`` images need the
+    blur step registered."""
+    use_steps(Blur())
+    yield
+    use_steps()
 
 
 async def seed(session_factory, specs, tenant=DEFAULT_TENANT):

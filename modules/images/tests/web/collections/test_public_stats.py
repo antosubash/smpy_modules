@@ -15,19 +15,15 @@ from sm_images.models import Visibility
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from tests.support.isolation import ACME
-from tests.support.pipeline import Blur, use_steps
-from tests.support.public_stats import URL, stat
+from tests.support.public_stats import (
+    URL,
+    blur_installed,  # noqa: F401 - autouse
+    stat,
+)
 from tests.support.public_stats import seed as _seed
 
 SHARED = "public, no-cache"
 PRIVATE = "private, no-cache"
-
-
-@pytest.fixture(autouse=True)
-def _blur_installed():
-    use_steps(Blur())
-    yield
-    use_steps()
 
 
 async def _value(client, metric, slug=None, **kw):

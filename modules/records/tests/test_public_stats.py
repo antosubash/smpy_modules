@@ -49,6 +49,13 @@ async def _parcel(client, name: str, area=None, *, status: str = "published", ki
     return await api_record(client, _KEY, data, status=status)
 
 
+async def _trash(client, record: dict) -> None:
+    gone = await client.delete(
+        f"/api/records/types/{_KEY}/records/{record['uuid']}", headers=roles(ADMIN)
+    )
+    assert gone.status_code == 204
+
+
 async def _value(client, query: str = "", *, url: str = _STATS, **kwargs):
     resp = await client.get(f"{url}?{query}", **kwargs)
     assert resp.status_code == 200, resp.text
@@ -60,11 +67,7 @@ async def test_count_published_only(parcels):
     for name in ("one", "two", "three"):
         await _parcel(parcels, name)
     await _parcel(parcels, "draft", status="draft")
-    binned = await _parcel(parcels, "binned")
-    gone = await parcels.delete(
-        f"/api/records/types/{_KEY}/records/{binned['uuid']}", headers=roles(ADMIN)
-    )
-    assert gone.status_code == 204
+    await _trash(parcels, await _parcel(parcels, "binned"))
     assert await _value(parcels, "metric=count") == 3
     assert await _value(parcels) == 3, "count is the default metric"
 
@@ -83,11 +86,7 @@ async def test_sum_public_number_field(parcels):
     await _parcel(parcels, "b", 2.5)
     await _parcel(parcels, "c")
     await _parcel(parcels, "draft", 100, status="draft")
-    binned = await _parcel(parcels, "binned", 1000)
-    gone = await parcels.delete(
-        f"/api/records/types/{_KEY}/records/{binned['uuid']}", headers=roles(ADMIN)
-    )
-    assert gone.status_code == 204
+    await _trash(parcels, await _parcel(parcels, "binned", 1000))
     assert await _value(parcels, "metric=sum:area") == 3.75
     await _parcel(parcels, "d", 0.25)
     whole = await _value(parcels, "metric=sum:area")

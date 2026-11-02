@@ -38,7 +38,7 @@ from sm_records.index._fields import declared_keys, indexed_map
 from sm_records.index._filters import filtered, resolve
 from sm_records.index._fixed import FIXED_COLUMNS, fixed_expression
 from sm_records.index._predicates import SORT_ATTR, QueryError
-from sm_records.index.query import count_columns
+from sm_records.index.query import _bounded_inner
 from sm_records.models import TableSet, tables_for
 from sm_records.schema.types import IndexKind
 
@@ -218,10 +218,11 @@ def bounded_sum_query(
 
     The anonymous stats sum (#88) is bounded the way the listing's ``total``
     is, and by the same machinery: the inner query is
-    :func:`~sm_records.index.query.bounded_count_query`'s — the mapped
-    :func:`~sm_records.index.query.count_columns` (so the soft-delete filter
-    still reaches the ``LIMIT``), ``narrow`` and :func:`filtered` applied,
-    ``LIMIT cap + 1`` — and the outer sums the field over an alias of it.
+    :func:`~sm_records.index.query.bounded_count_query`'s own
+    (:func:`~sm_records.index.query._bounded_inner` — the mapped
+    :func:`~sm_records.index.query.count_columns`, so the soft-delete filter
+    still reaches the ``LIMIT``, ``narrow`` and :func:`filtered` applied,
+    ``LIMIT cap + 1``) and the outer sums the field over an alias of it.
     ``matched`` past ``cap`` means the sum covers only some of the matches,
     which the caller reports as "not available" rather than a wrong number.
 
@@ -242,11 +243,7 @@ def bounded_sum_query(
     indexed, declared = indexed_map(fields), declared_keys(fields)
     _, kind, join, many = _column(tables, rtype, indexed, declared, metric.field)
     _check_metric(metric, kind, many)
-    inner = narrow(
-        filtered(
-            select(*count_columns(record)).where(record.type_id == rtype.id), rtype, fields, filters
-        )
-    ).limit(cap + 1)
+    inner = _bounded_inner(rtype, fields, filters, cap=cap, narrow=narrow)
     counted = aliased(record, inner.subquery())
     if join is None:
         value = fixed_expression(counted, metric.field)

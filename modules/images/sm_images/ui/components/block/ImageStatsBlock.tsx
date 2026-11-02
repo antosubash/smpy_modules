@@ -27,6 +27,15 @@ export { clampStatItems, ImageStatsRender };
 type Option = { label: string; value: string };
 type BlockFields = NonNullable<ComponentConfig<ImageStatsProps>['fields']>;
 
+/** A new block's first item, and every item added to it. */
+const DEFAULT_ITEM: ImageStatItem = {
+  metric: 'images',
+  collection: '',
+  label: 'Images',
+  prefix: '',
+  suffix: '',
+};
+
 function buildFields(tr: Translate, collections: Option[]): BlockFields {
   const k = keys.images.stats;
   return {
@@ -55,13 +64,7 @@ function buildFields(tr: Translate, collections: Option[]): BlockFields {
         suffix: { type: 'text', label: tr(k.item_suffix) },
         iconUrl: createImageField(mediaLibraryAdapter, tr(k.item_icon)),
       },
-      defaultItemProps: {
-        metric: 'images',
-        collection: '',
-        label: 'Images',
-        prefix: '',
-        suffix: '',
-      },
+      defaultItemProps: DEFAULT_ITEM,
       min: 1,
       max: STAT_ITEMS_MAX,
     },
@@ -89,7 +92,7 @@ export const ImageStatsBlock: ComponentConfig<ImageStatsProps> = {
     title: '',
     subtitle: '',
     surface: 'default',
-    items: [{ metric: 'images', collection: '', label: 'Images', prefix: '', suffix: '' }],
+    items: [{ ...DEFAULT_ITEM }],
   },
   resolveFields: async () => {
     picker?.abort();

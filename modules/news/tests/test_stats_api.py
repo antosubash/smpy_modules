@@ -39,6 +39,12 @@ async def _alter(client: AsyncClient, article, **columns) -> None:
         await db.commit()
 
 
+async def _stat(client: AsyncClient, **params: str) -> dict:
+    response = await client.get(STATS, params={"metric": "published", **params})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
 async def test_counts_only_published_live_articles(anon_client: AsyncClient) -> None:
     now = datetime.now(UTC)
     await _seed(anon_client, slug="p1")
@@ -63,15 +69,10 @@ async def test_category_and_locale_narrow(anon_client: AsyncClient) -> None:
     await _seed(anon_client, slug="en-b", locale="en", category="b")
     await _seed(anon_client, slug="de-a", locale="de", category="a")
 
-    async def count(**params: str) -> int:
-        response = await anon_client.get(STATS, params={"metric": "published", **params})
-        assert response.status_code == 200, response.text
-        return response.json()["value"]
-
-    assert await count() == 3
-    assert await count(category="a") == 2
-    assert await count(locale="de") == 1
-    assert await count(category="a", locale="de") == 1
+    assert (await _stat(anon_client))["value"] == 3
+    assert (await _stat(anon_client, category="a"))["value"] == 2
+    assert (await _stat(anon_client, locale="de"))["value"] == 1
+    assert (await _stat(anon_client, category="a", locale="de"))["value"] == 1
 
 
 @pytest.mark.usefixtures("bilingual")
@@ -88,15 +89,10 @@ async def test_language_removed_after_publishing_is_not_counted(
     await _seed(anon_client, slug="de-1", locale="de")
     await _seed(anon_client, slug="fr-1", locale="fr")  # French was dropped since
 
-    async def count(**params: str) -> int:
-        response = await anon_client.get(STATS, params={"metric": "published", **params})
-        assert response.status_code == 200, response.text
-        return response.json()["value"]
-
-    assert await count() == 2
-    assert await count(locale="fr") == 0
+    assert (await _stat(anon_client))["value"] == 2
+    assert (await _stat(anon_client, locale="fr"))["value"] == 0
     # Resolved like the public routes resolve it: the tag's case is not a language.
-    assert await count(locale="DE") == 1
+    assert (await _stat(anon_client, locale="DE"))["value"] == 1
 
 
 async def test_count_stops_at_the_cap(
@@ -105,16 +101,11 @@ async def test_count_stops_at_the_cap(
     """Past the bound the answer is the bound and ``capped``, never a full scan."""
     monkeypatch.setattr("news.endpoints.api.stats.PUBLIC_STATS_MAX_COUNT", 2)
 
-    async def stat() -> dict:
-        response = await anon_client.get(STATS, params={"metric": "published"})
-        assert response.status_code == 200, response.text
-        return response.json()
-
     await _seed(anon_client, slug="c1")
     await _seed(anon_client, slug="c2")
-    assert await stat() == {"value": 2, "capped": False}
+    assert await _stat(anon_client) == {"value": 2, "capped": False}
     await _seed(anon_client, slug="c3")
-    assert await stat() == {"value": 2, "capped": True}
+    assert await _stat(anon_client) == {"value": 2, "capped": True}
 
 
 async def test_anonymous_cache_headers(anon_client: AsyncClient) -> None:

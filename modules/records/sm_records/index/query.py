@@ -211,6 +211,19 @@ def count_columns(record: Any) -> tuple[Any, ...]:
     )
 
 
+def _bounded_inner(rtype: RecordType, fields, filters, *, cap: int, narrow: Any = None) -> Select:
+    """The bounded aggregates' inner query: the :func:`count_columns` of the
+    records ``filters`` and ``narrow`` match, ``LIMIT cap + 1``. Shared by
+    :func:`bounded_count_query` and
+    :func:`~sm_records.index.aggregate.bounded_sum_query`, so the two bound the
+    same rows; each lifts its execution options to the outer statement."""
+    record = tables_for(rtype).record
+    stmt = filtered(
+        select(*count_columns(record)).where(record.type_id == rtype.id), rtype, fields, filters
+    )
+    return (narrow(stmt) if narrow is not None else stmt).limit(cap + 1)
+
+
 def bounded_count_query(
     rtype: RecordType,
     fields: list[dict[str, Any]],
@@ -250,17 +263,8 @@ def bounded_count_query(
     statement, because ``include_deleted`` is read off the statement being
     executed and a nested one is never that.
     """
-    record = tables_for(rtype).record
-    apply = narrow if narrow is not None else (lambda stmt: stmt)
-    inner = apply(
-        filtered(
-            select(*count_columns(record)).where(record.type_id == rtype.id),
-            rtype,
-            fields,
-            filters,
-        )
-    ).limit(cap + 1)
-    counted = aliased(record, inner.subquery())
+    inner = _bounded_inner(rtype, fields, filters, cap=cap, narrow=narrow)
+    counted = aliased(tables_for(rtype).record, inner.subquery())
     stmt = select(func.count(counted.id)).select_from(counted)
     options = inner.get_execution_options()
     return stmt.execution_options(**options) if options else stmt

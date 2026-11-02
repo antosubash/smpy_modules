@@ -141,11 +141,9 @@ async def public_stat(
         coll = await public_collection(collection, db)
     chosen = cast("public_stats.Metric", metric)
     value, capped = await public_stats.public_stat(db, metric=chosen, collection=coll)
-    headers = {
-        "Cache-Control": cache.listing_headers(request)
-        if coll is None
-        else cache.cache_headers(request, coll, cache.DISPLAY, twin=True)
-    }
+    # A named collection is public (``public_collection``), so it caches like
+    # the count over all of them.
+    headers = {"Cache-Control": cache.listing_headers(request)}
     if request.method == "HEAD":
         return Response(headers=headers, media_type="application/json")
     return JSONResponse({"value": value, "capped": capped}, headers=headers)

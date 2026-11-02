@@ -102,6 +102,15 @@ export function NewsStatsRender({ title, subtitle, surface, items }: NewsStatsPr
   return <StatsView title={title} subtitle={subtitle} surface={surface} items={shown} />;
 }
 
+/** A new block's first item, and every item added to it. */
+const DEFAULT_ITEM: NewsStatItem = {
+  language: 'page',
+  category: '',
+  label: 'Articles published',
+  prefix: '',
+  suffix: '',
+};
+
 /**
  * The palette entry. Labels are catalogue keys, resolved by pagebuilder's
  * `localizeConfig` (see `NewsFeedBlock`).
@@ -129,13 +138,7 @@ export const NewsStatsBlock: ComponentConfig<NewsStatsProps> = {
         suffix: { type: 'text', label: keys.news.stats.item_suffix },
         iconUrl: createImageField(mediaLibraryAdapter, keys.news.stats.item_icon),
       },
-      defaultItemProps: {
-        language: 'page',
-        category: '',
-        label: 'Articles published',
-        prefix: '',
-        suffix: '',
-      },
+      defaultItemProps: DEFAULT_ITEM,
       min: 1,
       max: STAT_ITEMS_MAX,
     },
@@ -153,9 +156,7 @@ export const NewsStatsBlock: ComponentConfig<NewsStatsProps> = {
     title: '',
     subtitle: '',
     surface: 'default',
-    items: [
-      { language: 'page', category: '', label: 'Articles published', prefix: '', suffix: '' },
-    ],
+    items: [{ ...DEFAULT_ITEM }],
   },
   // Once on load, never per keystroke (the `NewsFeedBlock` precedent).
   resolveData: ({ props }, { trigger }) =>

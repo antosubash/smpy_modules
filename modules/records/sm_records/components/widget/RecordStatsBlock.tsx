@@ -11,7 +11,6 @@ import {
   mediaLibraryAdapter,
 } from '@simple-module-py/pagebuilder/pagebuilder/fields';
 
-import { listTypes } from '../../utils/api';
 import { keys, type Translate, translate } from '../../utils/i18n';
 import { DEFAULT_PUBLIC_PREFIX } from '../../utils/public-api';
 import type { TypeRead } from '../../utils/types';
@@ -22,6 +21,7 @@ import {
   RecordStatsRender,
   STAT_ITEMS_MAX,
 } from './RecordStatsRender';
+import { loadTypes } from './RecordsListBlock';
 
 export type { RecordStatItem };
 export { clampStatItems, RecordStatsRender };
@@ -30,6 +30,17 @@ const NUMBER_TYPES = new Set(['number', 'integer']);
 
 type Option = { label: string; value: string };
 type BlockFields = NonNullable<ComponentConfig<RecordStatsProps>['fields']>;
+
+/** A new block's first item, and every item added to it. */
+const DEFAULT_ITEM: RecordStatItem = {
+  typeKey: '',
+  metric: 'count',
+  field: '',
+  filter: '',
+  label: 'Records',
+  prefix: '',
+  suffix: '',
+};
 
 /** An unindexed field is refused `not_indexed` by the endpoint, so it is not
  *  offered; a text field cannot be summed. */
@@ -73,15 +84,7 @@ function buildFields(tr: Translate, typeOptions: Option[], fieldOptions: Option[
         suffix: { type: 'text', label: tr(k.item_suffix) },
         iconUrl: createImageField(mediaLibraryAdapter, tr(k.item_icon)),
       },
-      defaultItemProps: {
-        typeKey: '',
-        metric: 'count',
-        field: '',
-        filter: '',
-        label: 'Records',
-        prefix: '',
-        suffix: '',
-      },
+      defaultItemProps: DEFAULT_ITEM,
       min: 1,
       max: STAT_ITEMS_MAX,
     },
@@ -100,15 +103,6 @@ function buildFields(tr: Translate, typeOptions: Option[], fieldOptions: Option[
   };
 }
 
-async function loadTypes(): Promise<TypeRead[]> {
-  try {
-    return (await listTypes()).items;
-  } catch {
-    // Not signed in, or a blip mid-edit: the editor must keep working.
-    return [];
-  }
-}
-
 export const RecordStatsBlock: ComponentConfig<RecordStatsProps> = {
   label: keys.records.stats.label,
   // Labels are catalogue keys here (pagebuilder's `localizeConfig` resolves
@@ -118,17 +112,7 @@ export const RecordStatsBlock: ComponentConfig<RecordStatsProps> = {
     title: '',
     subtitle: '',
     surface: 'default',
-    items: [
-      {
-        typeKey: '',
-        metric: 'count',
-        field: '',
-        filter: '',
-        label: 'Records',
-        prefix: '',
-        suffix: '',
-      },
-    ],
+    items: [{ ...DEFAULT_ITEM }],
     locale: '',
     tenant: '',
     apiPrefix: DEFAULT_PUBLIC_PREFIX,

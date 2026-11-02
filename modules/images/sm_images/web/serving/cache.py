@@ -114,9 +114,10 @@ def cache_headers(
 
 
 def listing_headers(request: Any) -> str:
-    """The ``Cache-Control`` of an anonymous answer about no one collection (the
-    public counts over every public collection): shareable under the same
-    tenant rule as :func:`cache_headers`, and only through the public twin."""
+    """The ``Cache-Control`` of an anonymous answer that is not an image's bytes
+    (the public counts, over one public collection or all of them): shareable
+    under the same tenant rule as :func:`cache_headers`, and only through the
+    public twin."""
     return PUBLIC_NO_CACHE if _shared_tenant(request) else PRIVATE
 
 

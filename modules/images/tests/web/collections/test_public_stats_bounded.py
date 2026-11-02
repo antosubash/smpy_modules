@@ -11,22 +11,17 @@ many collections it spans, not one per collection.
 
 from __future__ import annotations
 
-import pytest
 from sm_images.models import Visibility
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
-from tests.support.pipeline import Blur, use_steps
-from tests.support.public_stats import seed, stat
+from tests.support.public_stats import (
+    blur_installed,  # noqa: F401 - autouse
+    seed,
+    stat,
+)
 
 _SERVICE = "sm_images.web.services.public_stats"
-
-
-@pytest.fixture(autouse=True)
-def _blur_installed():
-    use_steps(Blur())
-    yield
-    use_steps()
 
 
 async def test_image_count_stops_at_the_cap(client, monkeypatch):
