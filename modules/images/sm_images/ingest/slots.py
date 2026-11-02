@@ -28,6 +28,7 @@ from sqlalchemy import event
 
 from sm_images.core import billing
 from sm_images.core.billing import ops as billing_ops
+from sm_images.core.billing import subject
 from sm_images.core.errors import StorageQuotaExceeded
 from sm_images.models.billing_op import OP_EXPIRED, OP_INGEST
 
@@ -61,14 +62,16 @@ class Duplicate:
 @dataclass(frozen=True)
 class Slot:
     """An image id and its original's key, with the intent already recorded,
-    and - once sized (:func:`hold_slot`) - its storage hold and the op that
-    took it, or ``refused`` when the plan's storage had no room for it."""
+    and - once sized (:func:`hold_slot`) - its storage hold, the op that took
+    it and the billing subject it bills, or ``refused`` when the plan's storage
+    had no room for it."""
 
     image_id: uuid.UUID
     key: str
     hold: str | None = None
     refused: bool = False
     op: billing_ops.Claimed | None = None
+    subject: str | None = None
 
 
 class HoldTakenOver(Exception):  # noqa: N818 - reads as the condition
@@ -82,19 +85,21 @@ def safe_filename(name: str | None, fallback: str = "upload") -> str:
     return base[:255] or fallback
 
 
-async def hold_slot(factory: Any, tenant: str, slot: Slot, size: int) -> Slot:
-    """Hold ``size`` bytes for the slot's original (committed), keyed by this attempt."""
+async def hold_slot(factory: Any, tenant: str, slot: Slot, size: int, collection: Any) -> Slot:
+    """Hold ``size`` bytes for the slot's original (committed), keyed by this
+    attempt, under the subject ``collection``'s owner is billed as (#284)."""
     meter = billing.storage_meter(factory)
     if meter is None or size < 1:
         return slot
+    who = await subject.owner_subject_in(factory, tenant, collection, subject.runtime_mode())
     key = billing.hold_key(slot.image_id, f"0-{uuid.uuid4().hex}")
     async with factory() as db:
         op = await billing_ops.open_op(
-            db, OP_INGEST, slot.image_id, size, key, claim=INGEST_CLAIM, old=None, subject=tenant
+            db, OP_INGEST, slot.image_id, size, key, claim=INGEST_CLAIM, old=None, subject=who
         )
         await finalize_session(db)
     try:
-        hold = await billing.swap(factory, tenant, None, size, key, meter, not_after=op.not_after)
+        hold = await billing.swap(factory, who, None, size, key, meter, not_after=op.not_after)
     except StorageQuotaExceeded as exc:
         async with factory() as db:
             await billing_ops.finish(db, op, None, f"{type(exc).__name__}: {exc}")
@@ -110,7 +115,7 @@ async def hold_slot(factory: Any, tenant: str, slot: Slot, size: int) -> Slot:
             await billing_ops.hand_back(db, op, factory)
             await finalize_session(db)
         raise
-    return replace(slot, hold=hold.id, op=op)
+    return replace(slot, hold=hold.id, op=op, subject=who)
 
 
 async def keep_hold(db: Any, slot_op: billing_ops.Claimed | None, hold: str | None) -> None:

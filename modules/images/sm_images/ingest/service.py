@@ -97,10 +97,10 @@ class IngestService:
             pass
         if sizes is None:
             return slots
-        return [await self._hold(s, n) for s, n in zip(slots, sizes, strict=True)]
+        return [await self._hold(collection, s, n) for s, n in zip(slots, sizes, strict=True)]
 
-    async def _hold(self, slot: Slot, size: int) -> Slot:
-        held = await holds.hold_slot(self._factory(), bound_tenant(), slot, size)
+    async def _hold(self, collection: Collection, slot: Slot, size: int) -> Slot:
+        held = await holds.hold_slot(self._factory(), bound_tenant(), slot, size, collection)
         self.acquired += [held.op] if held.op is not None else []
         return held
 
@@ -168,7 +168,7 @@ class IngestService:
             if staged_key is not None:
                 assert image_id is not None
                 key, new_id = staged_key, image_id
-                slot = await self._hold(Slot(new_id, key), len(data))
+                slot = await self._hold(collection, Slot(new_id, key), len(data))
                 if slot.refused:  # the caller removes its staged object
                     raise StorageQuotaExceeded(billing.FULL)
             else:
@@ -188,6 +188,7 @@ class IngestService:
             storage_key=key,
             storage_bytes=len(data),
             storage_hold_id=slot.hold,
+            storage_subject=slot.subject if slot.hold else None,
             filename=safe_filename(filename),
             content_type=info.content_type,
             size_bytes=len(data),

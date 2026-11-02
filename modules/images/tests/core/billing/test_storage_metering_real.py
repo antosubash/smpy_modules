@@ -76,7 +76,7 @@ async def _level(factory) -> int:
 
 
 async def _ingest(factory, size: int) -> uuid.UUID:
-    slot = await hold_slot(factory, T, Slot(uuid.uuid4(), "k"), size)
+    slot = await hold_slot(factory, T, Slot(uuid.uuid4(), "k"), size, None)
     async with factory() as db:
         coll = Collection(slug=f"c-{uuid.uuid4().hex[:6]}", name="C", owner_id="olga")
         db.add(coll)
@@ -129,8 +129,8 @@ async def test_codex_v_trace_no_images_hold_can_lapse(real):
     assert await expire_due(UsageService(factory, clock=lambda: clock)) == 0
     assert await _level(factory) == row[1] == 300
     # The room left is exactly the limit less what the image stores.
-    assert (await hold_slot(factory, T, Slot(uuid.uuid4(), "k"), LIMIT - 300 + 1)).refused
-    assert not (await hold_slot(factory, T, Slot(uuid.uuid4(), "k"), LIMIT - 300)).refused
+    assert (await hold_slot(factory, T, Slot(uuid.uuid4(), "k"), LIMIT - 300 + 1, None)).refused
+    assert not (await hold_slot(factory, T, Slot(uuid.uuid4(), "k"), LIMIT - 300, None)).refused
 
 
 async def test_codex_trace_t_against_real_billing(real):

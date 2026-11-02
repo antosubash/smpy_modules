@@ -222,7 +222,7 @@ async def test_a_purge_with_a_swap_pending_releases_the_swapped_hold(
 
 async def test_an_ingest_that_never_inserts_is_released(pipe, gauge):
     factory = pipe.db_state.session_factory
-    slot = await hold_slot(factory, T, Slot(uuid.uuid4(), "k"), 100)
+    slot = await hold_slot(factory, T, Slot(uuid.uuid4(), "k"), 100, None)
     assert [h.id for h in gauge.live()] == [slot.hold]
     assert await _settle(pipe) == 0  # the ingest still owns it
     await _settle(pipe, INGEST_CLAIM + timedelta(seconds=1))
@@ -235,7 +235,7 @@ async def test_concurrent_uploads_take_exactly_the_room(pipe, gauge):
     factory = pipe.db_state.session_factory
     gauge.limit, gauge.delay = 250, 0.05
     slots = await asyncio.gather(
-        *(hold_slot(factory, T, Slot(uuid.uuid4(), "k"), 100) for _ in range(4))
+        *(hold_slot(factory, T, Slot(uuid.uuid4(), "k"), 100, None) for _ in range(4))
     )
     assert sorted(s.refused for s in slots) == [False, False, True, True]
     assert gauge.level == 200 <= gauge.limit
