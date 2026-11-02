@@ -127,7 +127,6 @@ def test_app_mode_reads_app_state(monkeypatch):
 
 def test_runtime_billing_mode_defaults_to_tenant(pipe):
     assert pipe.runtime.billing_mode() == "tenant"
-    assert subject.runtime_mode() in ("tenant", "user")
 
 
 def test_runtime_mode_reads_the_bound_runtime(pipe):

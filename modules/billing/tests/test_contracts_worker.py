@@ -73,4 +73,6 @@ async def test_subject_exists_knows_users_and_default(user_mode_app) -> None:
         assert await contracts.subject_exists(db, contracts.subject_for_user(user.id)) is True
         assert await contracts.subject_exists(db, contracts.subject_for_user(uuid.uuid4())) is False
         assert await contracts.subject_exists(db, "default") is True
+        # A non-canonical spelling names no user, as everywhere else in billing.
+        assert await contracts.subject_exists(db, f"user:{str(user.id).upper()}") is False
         assert "subject_exists" in contracts.__all__
