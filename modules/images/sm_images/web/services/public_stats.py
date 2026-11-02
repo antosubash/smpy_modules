@@ -28,7 +28,7 @@ cause. Every answer is ``(value, capped)``:
 
 from __future__ import annotations
 
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, get_args
 
 from sqlalchemy import JSON, Select, func, or_, select
 from sqlalchemy.orm import aliased
@@ -40,7 +40,7 @@ from sm_images.web.services.public_gallery import gate, visible, visible_where
 __all__ = ["MAX_COLLECTIONS", "MAX_COUNT", "METRICS", "Metric", "public_stat"]
 
 Metric = Literal["images", "located", "collections"]
-METRICS: Final[frozenset[str]] = frozenset({"images", "located", "collections"})
+METRICS: Final[frozenset[str]] = frozenset(get_args(Metric))
 
 MAX_COUNT: Final = 10_000
 """Where a count stops: the block shows "10,000+" past it. A stats band has

@@ -74,7 +74,7 @@ is the module's usual public 404/400, with `no-store`.
 |---|---|
 | `published` | articles with `status = published`, not trashed, and `unpublish_at` null or in the future |
 
-- `category`: optional, one category name.
+- `category`: optional, one category, by name or slug (the listing's rule).
 - `locale`: an item field, either "this page's language" (the default) or "all
   languages".
 - Served from news's API router like the `NewsFeed` reads it sits beside: the

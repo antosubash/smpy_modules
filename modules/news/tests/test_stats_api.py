@@ -15,7 +15,7 @@ from conftest import ROLE_EDITOR
 from factories import make_article
 from httpx import AsyncClient
 from news.constants import ROUTE_PREFIX_API
-from news.models import ArticleStatus
+from news.models import ArticleStatus, NewsCategory
 from simple_module_db import tenant_context
 from stub_auth import stub_user
 from tenant_app import as_tenant, multi_client
@@ -73,6 +73,18 @@ async def test_category_and_locale_narrow(anon_client: AsyncClient) -> None:
     assert (await _stat(anon_client, category="a"))["value"] == 2
     assert (await _stat(anon_client, locale="de"))["value"] == 1
     assert (await _stat(anon_client, category="a", locale="de"))["value"] == 1
+
+
+async def test_category_matches_by_slug_as_the_listing_does(anon_client: AsyncClient) -> None:
+    async with anon_client.db_state.session_factory() as db:
+        db.add(NewsCategory(name="Field notes", slug="field-notes"))
+        await db.commit()
+    await _seed(anon_client, slug="fn", category="Field notes")
+    await _seed(anon_client, slug="other", category="Other")
+
+    assert (await _stat(anon_client, category="field-notes"))["value"] == 1
+    assert (await _stat(anon_client, category="Field notes"))["value"] == 1
+    assert (await _stat(anon_client, category="missing"))["value"] == 0
 
 
 @pytest.mark.usefixtures("bilingual")

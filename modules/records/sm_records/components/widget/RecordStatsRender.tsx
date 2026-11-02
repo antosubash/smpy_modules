@@ -12,6 +12,7 @@ import {
 } from '@simple-module-py/pagebuilder/pagebuilder/components/widgets/stats-widget';
 import { useEffect, useMemo, useState } from 'react';
 
+import { formatNumber } from '../../utils/locale';
 import { fetchPublicStat, type PublicStat } from '../../utils/public-api';
 import { useDateLocale } from './FieldValues';
 
@@ -70,12 +71,7 @@ function metricOf(item: RecordStatItem): string | null {
 
 function formatValue(item: RecordStatItem, stat: PublicStat | null, locale: string | undefined) {
   if (stat === null || stat.value === null) return PLACEHOLDER;
-  let text: string;
-  try {
-    text = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(stat.value);
-  } catch {
-    text = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(stat.value);
-  }
+  const text = formatNumber(stat.value, locale, { maximumFractionDigits: 2 });
   // The `+` belongs to the number, so it sits inside the author's affixes.
   const more = stat.capped ? '+' : '';
   return `${item.prefix ?? ''}${text}${more}${item.suffix ?? ''}`;

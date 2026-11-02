@@ -305,7 +305,7 @@ and through the same tenant binding and `Cache-Control: public, max-age=60` as
 the feed reads. `metric` is `published` only; anything else is a 422. It counts
 what a reader could open right now: status `published`, not in the trash, and
 no `unpublish_at` that has already passed (the listing and viewer keep serving
-those until the scheduler's next tick; the count stops sooner). Without `category` it counts
+those until the scheduler's next tick; the count stops sooner). `category` is a name or a slug, as the listing takes it. Without `category` it counts
 every category, without `locale` every language the site publishes in
 (`content_locales`). An article whose language was taken off the site is never
 counted, and a `locale` the site does not publish in counts `0`. The count is

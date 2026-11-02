@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from news import stats
+from news import service, stats
 from news.constants import PUBLIC_STATS_MAX_COUNT
 from news.endpoints.api._deps import cache
 
@@ -33,7 +33,9 @@ async def published_count(
     metric: Literal["published"] = Query(
         description="What to count. Only `published`: articles a reader can open."
     ),
-    category: str | None = Query(None, description="Only articles in this category (by name)."),
+    category: str | None = Query(
+        None, description="Only articles in this category, by name or by slug."
+    ),
     locale: str | None = Query(
         None,
         description=(
@@ -47,6 +49,10 @@ async def published_count(
     # Never ``include_drafts``: the count is public whoever asks, so an editor's
     # session must not change it either.
     cache(response, request, include_drafts=False)
+    # A slug is what a public link carries and a name what the editor typed;
+    # the listing accepts both, so the figure beside it has to as well.
+    if category:
+        category = await service.resolve_category_slug(db, category) or category
     value, capped = await stats.count_published(
         db,
         category=category,
