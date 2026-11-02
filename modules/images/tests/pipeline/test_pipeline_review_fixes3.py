@@ -56,11 +56,13 @@ async def test_submit_waits_for_its_own_delivery_behind_an_unrelated_one(pipe):
     coll = await pipe.collection({"acme.x": {}})
     other = await pipe.image(coll)
     mine = await pipe.image(coll)
+    started = asyncio.Event()
     gate = asyncio.Event()
     delivered: list[str] = []
 
     async def handler(event, ctx):
         if event.image_id == str(other):
+            started.set()
             await gate.wait()  # the unrelated delivery, in flight
         delivered.append(event.image_id)
 
@@ -68,7 +70,9 @@ async def test_submit_waits_for_its_own_delivery_behind_an_unrelated_one(pipe):
     async with pipe.db_state.session_factory() as s:
         await pipe.bus.publish_durable(ImageProcessed(T, str(coll.id), str(other), 0), s)
         await finalize_session(s)
-    await asyncio.sleep(0.05)
+    # The delivery is a task started after commit that claims its row first;
+    # wait for its handler rather than a fixed sleep (#285).
+    await asyncio.wait_for(started.wait(), timeout=10)
     assert transport._dispatch_lock.locked()  # the unrelated delivery holds it
 
     asyncio.get_running_loop().call_later(0.2, gate.set)
