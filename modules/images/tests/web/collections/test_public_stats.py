@@ -8,60 +8,19 @@ trashed or unknown slug is the public 404, and every refusal is ``no-store``.
 
 from __future__ import annotations
 
-import uuid
-
 import pytest
 import pytest_asyncio
-from sm_images.core.tenancy import DEFAULT_TENANT, tenant_scope
-from sm_images.models import Rendition, StepRun, Visibility
-from sm_images.models.enums import StepStatus
+from sm_images.core.tenancy import DEFAULT_TENANT
+from sm_images.models import Visibility
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from tests.support.access import OWNER, collection, image
 from tests.support.isolation import ACME
 from tests.support.pipeline import Blur, use_steps
+from tests.support.public_stats import URL, stat
+from tests.support.public_stats import seed as _seed
 
-URL = "/api/images/public/stats"
 SHARED = "public, no-cache"
 PRIVATE = "private, no-cache"
-
-
-async def _seed(session_factory, specs, tenant=DEFAULT_TENANT):
-    """``specs``: ``(visibility, trashed, n_ready, n_located, extra)`` per collection;
-    ``extra`` adds the images the gallery skips. Returns the collections."""
-    made = []
-    with tenant_scope(tenant):
-        async with session_factory() as s:
-            for visibility, trashed, ready, located, extra in specs:
-                coll = collection(f"s-{uuid.uuid4().hex[:8]}", visibility, OWNER)
-                if extra:
-                    coll.pipeline_config = {"steps": {"acme.blur": {}}}
-                s.add(coll)
-                await s.flush()
-                for i in range(ready):
-                    at = {"lat": 1.0, "lng": 2.0} if i < located else {}
-                    await _image(s, coll, f"r{i}.jpg", settled=bool(extra), **at)
-                if extra:
-                    await _image(s, coll, "trashed.jpg", settled=True, is_deleted=True)
-                    await _image(s, coll, "held.jpg", settled=False, lat=1.0, lng=2.0)
-                    await _image(s, coll, "bare.jpg", settled=True, small=None)
-                    await _image(s, coll, "stale.jpg", settled=True, display_generation=1)
-                coll.is_deleted = trashed
-                made.append(coll)
-            await s.commit()
-    return made
-
-
-async def _image(s, coll, name, *, settled, small=0, **kw):
-    pic = image(coll, name, **kw)
-    s.add(pic)
-    await s.flush()
-    if small is not None:
-        s.add(Rendition(image_id=pic.id, size="small", storage_key=f"k/{name}.s", width=1,
-                        height=1, source_generation=small))  # fmt: skip
-    if settled:
-        s.add(StepRun(image_id=pic.id, step="acme.blur", status=StepStatus.COMPLETED,
-                      step_version=1))  # fmt: skip
 
 
 @pytest.fixture(autouse=True)
@@ -72,10 +31,9 @@ def _blur_installed():
 
 
 async def _value(client, metric, slug=None, **kw):
-    params = {"metric": metric} | ({"collection": slug} if slug else {})
-    got = await client.get(URL, params=params, **kw)
-    assert got.status_code == 200, got.text
-    return got.json()["value"]
+    answer = await stat(client, metric, slug, **kw)
+    assert answer["capped"] is False
+    return answer["value"]
 
 
 async def test_counts_public_ready_images(client):
@@ -98,6 +56,16 @@ async def test_all_collections_total_excludes_private(client):
     assert await _value(client, "images") == 5
     assert await _value(client, "located") == 4
     assert await _value(client, "collections") == 2
+
+
+async def test_each_collection_keeps_its_own_gate(client):
+    """One total over collections with different redaction gates: the blurred
+    one holds back its unsettled image, the plain one (no mutator) shows its
+    images without any step run - neither gate leaks onto the other."""
+    specs = [(Visibility.PUBLIC, False, 3, 2, 1), (Visibility.PUBLIC, False, 2, 1, 0)]
+    await _seed(client.db_state.session_factory, specs)
+    assert await _value(client, "images") == 5
+    assert await _value(client, "located") == 3
 
 
 @pytest.mark.parametrize(("visibility", "trashed"), [
@@ -197,7 +165,7 @@ async def test_multi_tenant_answers_are_private(two_tenants, acme_public):
     assert await _cache_controls(client, acme_public.slug, headers=tenant) == (PRIVATE, PRIVATE)
     assert await _value(client, "images", headers=tenant) == 2
     other = await client.get(URL, params={"metric": "images"}, headers={"X-Tenant-ID": "globex"})
-    assert other.json() == {"value": 0}
+    assert other.json() == {"value": 0, "capped": False}
     for params in ({"metric": "images"}, {"metric": "images", "collection": acme_public.slug}):
         got = await client.get(URL, params=params)
         assert (got.status_code, got.headers["cache-control"]) == (404, "no-store")

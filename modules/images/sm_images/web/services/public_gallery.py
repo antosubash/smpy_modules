@@ -10,9 +10,10 @@ established that the collection is public (``access.public_collection``).
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import Select, select
+from sqlalchemy import ColumnElement, Select, and_, select
 
 from sm_images.core import constants
 from sm_images.core.access import redaction
@@ -20,7 +21,7 @@ from sm_images.models import Collection, Image, Rendition
 from sm_images.web.services import cursor as cursors
 from sm_images.web.serving import urls
 
-__all__ = ["page", "visible"]
+__all__ = ["gate", "page", "visible", "visible_where"]
 
 
 def visible(stmt: Select[Any], collection: Collection) -> Select[Any]:
@@ -29,16 +30,27 @@ def visible(stmt: Select[Any], collection: Collection) -> Select[Any]:
     gate, and cut from the current display copy. One row per image (a rendition
     is unique per image and size). The gallery and the public counts
     (:mod:`~sm_images.web.services.public_stats`) both go through here."""
+    return visible_where(
+        stmt, and_(Image.collection_id == collection.id, redaction.ready_clause(collection))
+    )
+
+
+def gate(ids: Sequence[Any], collection: Collection) -> ColumnElement[bool]:
+    """The images of the collections *ids* that pass *collection*'s redaction
+    gate - for collections sharing one ``redaction.gate_key``, whose clauses
+    are the same. The public total ORs one of these per distinct gate."""
+    return and_(Image.collection_id.in_(list(ids)), redaction.ready_clause(collection))
+
+
+def visible_where(stmt: Select[Any], where: ColumnElement[bool]) -> Select[Any]:
+    """:func:`visible`'s rendition and trash rule, over the images *where*
+    picks: *where* must hold each collection to its own gate (:func:`gate`)."""
     return stmt.join(
         Rendition,
         (Rendition.image_id == Image.id)
         & (Rendition.size == constants.THUMB_SIZE)
         & (Rendition.source_generation == Image.display_generation),
-    ).where(
-        Image.collection_id == collection.id,
-        Image.is_deleted.is_(False),
-        redaction.ready_clause(collection),
-    )
+    ).where(Image.is_deleted.is_(False), where)
 
 
 async def page(

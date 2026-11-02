@@ -1,7 +1,9 @@
 /**
  * `ImageStats` block: the render side. One effect fetches every item's number
  * from the anonymous public stats route; a number that is loading or failed
- * shows a dash, never an error on a public page.
+ * shows a dash, never an error on a public page. The route is bounded: a
+ * capped count shows as the bound and a `+`, an unavailable total (`null`) as
+ * the dash.
  */
 
 import { usePage } from '@inertiajs/react';
@@ -11,7 +13,7 @@ import {
 } from '@simple-module-py/pagebuilder/pagebuilder/components/widgets/stats-widget';
 import { useEffect, useMemo, useState } from 'react';
 
-import { fetchPublicStat, type StatMetric } from '../../utils/api-public';
+import { fetchPublicStat, type PublicStat, type StatMetric } from '../../utils/api-public';
 import { useT } from '../../utils/i18n';
 
 export interface ImageStatItem {
@@ -46,15 +48,17 @@ export function clampStatItems(items: readonly ImageStatItem[] | undefined): Ima
     .slice(0, STAT_ITEMS_MAX);
 }
 
-function formatValue(item: ImageStatItem, value: number | null, locale: string | undefined) {
-  if (value === null) return PLACEHOLDER;
+function formatValue(item: ImageStatItem, stat: PublicStat | null, locale: string | undefined) {
+  if (stat === null || stat.value === null) return PLACEHOLDER;
   let text: string;
   try {
-    text = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
+    text = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(stat.value);
   } catch {
-    text = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+    text = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(stat.value);
   }
-  return `${item.prefix ?? ''}${text}${item.suffix ?? ''}`;
+  // The `+` belongs to the number, so it sits inside the author's affixes.
+  const more = stat.capped ? '+' : '';
+  return `${item.prefix ?? ''}${text}${more}${item.suffix ?? ''}`;
 }
 
 /** The page's language when there is one (public viewer or editor preview),
@@ -72,7 +76,7 @@ export function ImageStatsRender({ title, subtitle, surface, items }: ImageStats
   const numberLocale = useNumberLocale();
   // `resolveData` never runs on an anonymous public page, so clamp here too.
   const safe = useMemo(() => clampStatItems(items), [items]);
-  const [values, setValues] = useState<(number | null)[]>([]);
+  const [values, setValues] = useState<(PublicStat | null)[]>([]);
 
   // Only what changes the requests: editing a label must not refetch.
   const fetchKey = JSON.stringify(

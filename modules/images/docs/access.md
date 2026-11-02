@@ -114,13 +114,24 @@ Public routes are `GET` and `HEAD` only: the collection page, the gallery
 tenant and an unbound tenant all get the one 404 body.
 
 `/api/images/public/stats?metric=…&collection={slug}` answers one number,
-`{"value": n}`, for the pagebuilder `ImageStats` block. `images` and `located`
+for the pagebuilder `ImageStats` block. `images` and `located`
 count exactly what the gallery lists (not trashed, past the redaction gate, with
 a current `small` rendition), for one public collection or summed over every
 public collection when `collection` is left out. `collections` counts the public
 collections. It never reads the stored `image_count`, which includes images the
 public must not see. A private, internal, trashed or unknown slug is the same
 404, and an unknown or missing `metric` is a 400.
+
+The answer is `{"value": n, "capped": bool}` and every count is bounded, since
+the route is anonymous: a count reads at most `MAX_COUNT + 1` (10,000) rows and
+past that answers `{"value": 10000, "capped": true}`, which the block shows as
+`10,000+`. The total over every public collection is one count, however many
+collections it spans: the collections are grouped by redaction gate
+(`redaction.gate_key`, decided in Python against the installed steps) and the
+statement holds each group to its own gate. Deciding the gates reads the
+collections, so at most `MAX_COLLECTIONS` (200) public ones are considered;
+past that the total is `{"value": null, "capped": true}` (the block shows a
+dash) rather than a partial sum. A named collection always answers.
 
 Every byte response can be revoked later (the collection goes private,
 `protect_originals` is switched on, anonymization is enabled, a share is

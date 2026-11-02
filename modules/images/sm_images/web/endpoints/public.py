@@ -130,7 +130,8 @@ async def public_stat(
     metric: str | None = Query(None),
     collection: str | None = Query(None),
 ) -> Response:
-    """One count for the ``ImageStats`` block: ``{"value": int}``. ``metric`` is
+    """One count for the ``ImageStats`` block: ``{"value": int | null, "capped":
+    bool}`` (bounded - see :mod:`~sm_images.web.services.public_stats`). ``metric`` is
     checked here, not by FastAPI, so a bad one is an ``ImagesError`` 400 and
     carries ``no-store`` like every other refusal. No ETag: a few bytes."""
     if metric not in public_stats.METRICS:
@@ -139,7 +140,7 @@ async def public_stat(
     if collection is not None and metric != "collections":
         coll = await public_collection(collection, db)
     chosen = cast("public_stats.Metric", metric)
-    value = await public_stats.public_stat(db, metric=chosen, collection=coll)
+    value, capped = await public_stats.public_stat(db, metric=chosen, collection=coll)
     headers = {
         "Cache-Control": cache.listing_headers(request)
         if coll is None
@@ -147,7 +148,7 @@ async def public_stat(
     }
     if request.method == "HEAD":
         return Response(headers=headers, media_type="application/json")
-    return JSONResponse({"value": value}, headers=headers)
+    return JSONResponse({"value": value, "capped": capped}, headers=headers)
 
 
 @router.get("/c/{slug}/points")

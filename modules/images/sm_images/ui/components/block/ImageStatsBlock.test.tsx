@@ -112,6 +112,17 @@ describe('ImageStatsRender', () => {
     await view.unmount();
   });
 
+  it('marks a capped count with a + inside the affixes, and an unavailable total with a dash', async () => {
+    respond = async () => new Response(JSON.stringify({ value: 10000, capped: true }));
+    const a = await render([item({ prefix: '~', suffix: ' Bilder' })]);
+    expect(values(a)).toEqual(['~10.000+ Bilder']);
+    await a.unmount();
+    respond = async () => new Response(JSON.stringify({ value: null, capped: true }));
+    const b = await render([item()]);
+    expect(values(b)).toEqual(['–']);
+    await b.unmount();
+  });
+
   it('shows a dash when the request fails or is refused', async () => {
     respond = async () => {
       throw new Error('offline');
