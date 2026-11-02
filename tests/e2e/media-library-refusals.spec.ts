@@ -80,10 +80,12 @@ test.describe('a missing asset is a clean not-found', () => {
     await expect(page.getByRole('heading', { name: /asset not found/i })).toBeVisible();
     // The old error path rendered the whole Inertia HTML shell as the message,
     // putting the permissions list and menu JSON on screen.
-    // Rendered text only: the shell's own JSON <script> legitimately holds both.
-    const body = page.locator('body');
-    for (const raw of [/data-page/i, /"permissions"/i, /<!doctype/i]) {
-      await expect(body).not.toContainText(raw, { useInnerText: true });
-    }
+    // One snapshot of the rendered text: the shell's own JSON <script> holds both.
+    const texts = await page.locator('body').allInnerTexts();
+    expect(texts).toHaveLength(1);
+    const body = texts[0].toLowerCase();
+    expect(body).not.toContain('data-page');
+    expect(body).not.toContain('"permissions"');
+    expect(body).not.toContain('<!doctype');
   });
 });
