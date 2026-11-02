@@ -27,8 +27,20 @@ def subject_for_request(request: Any) -> str:
     return for_request(request)
 
 
+async def subject_exists(db: Any, subject: str) -> bool:
+    """Whether ``subject`` names something billable: :func:`sm_billing.subjects.exists`.
+
+    ``"default"`` and an existing user's ``user:<uuid>`` are true; an unknown
+    user or a non-canonical spelling is false. Imported lazily, as above.
+    """
+    from sm_billing.subjects import exists
+
+    return await exists(db, subject)
+
+
 __all__ = [
     "current_subject_mode",
+    "subject_exists",
     "subject_for_request",
     "subject_for_tenant",
     "subject_for_user",
