@@ -68,7 +68,7 @@ auth-exempt for `GET`, answers `{"value": <int>}`, and uses the module's existin
 public cache helper. Every refusal (unknown type, private collection, bad metric)
 is the module's usual public 404/400, with `no-store`.
 
-**news** — `GET /api/news/public/stats?metric=published&category=&locale=`
+**news** — `GET /api/news/stats?metric=published&category=&locale=`
 
 | metric | counts |
 |---|---|
@@ -77,8 +77,11 @@ is the module's usual public 404/400, with `no-store`.
 - `category`: optional, one category name.
 - `locale`: an item field, either "this page's language" (the default) or "all
   languages".
-- Bound with `news.tenancy.bind_public`, cached with `PUBLIC_CACHE_CONTROL`
-  (60 s) plus `vary_on_tenant`.
+- Served from news's API router like the `NewsFeed` reads it sits beside: the
+  router's `bind_admin` (a multi-tenant host with no tenant gives 403
+  `tenant_required`), opened to anonymous `GET` through `PUBLIC_READ_PREFIXES`,
+  and cached with `_deps.cache` (`PUBLIC_CACHE_CONTROL`, 60 s, `Vary: Cookie`
+  plus `vary_on_tenant`).
 
 **records** — `GET {public_route_prefix}/{type_key}/stats?metric=count|sum:<field>&filter=`
 
