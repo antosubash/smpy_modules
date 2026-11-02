@@ -90,7 +90,7 @@ async def hold_slot(factory: Any, tenant: str, slot: Slot, size: int) -> Slot:
     key = billing.hold_key(slot.image_id, f"0-{uuid.uuid4().hex}")
     async with factory() as db:
         op = await billing_ops.open_op(
-            db, OP_INGEST, slot.image_id, size, key, claim=INGEST_CLAIM, old=None
+            db, OP_INGEST, slot.image_id, size, key, claim=INGEST_CLAIM, old=None, subject=tenant
         )
         await finalize_session(db)
     try:

@@ -94,27 +94,28 @@ def hold_key(image_id: uuid.UUID | str, attempt: str | int) -> str:
     return f"images:{image_id}:storage:{attempt}"
 
 
-async def check(app: Any, tenant: str, qty: int) -> None:
-    """Refuse up front (402) what would not fit the gauge now. Advisory: the
+async def check(app: Any, subject: str, qty: int) -> None:
+    """Refuse up front (402) what would not fit ``subject``'s gauge now
+    (the billing subject: the tenant, or ``user:<id>``). Advisory: the
     swap taken afterwards is the enforcement. Billing not running in this
     process (as ``RequiresQuota`` answers then), or nothing to store → no-op."""
     usage = getattr(app.state, constants.BILLING_USAGE_ATTR, None)
     if usage is None or qty < 1:
         return
-    outcome = await usage.check(tenant, METER, int(qty))
+    outcome = await usage.check(subject, METER, int(qty))
     if not outcome.ok:
         raise StorageQuotaExceeded(FULL)
 
 
-async def headroom(app: Any, tenant: str, qty: int) -> int | None:
-    """Bytes the gauge has left (``limit - level``), after refusing (402) a
+async def headroom(app: Any, subject: str, qty: int) -> int | None:
+    """Bytes ``subject``'s gauge has left (``limit - level``), after refusing (402) a
     *qty* that does not fit even now; ``None`` without billing or without a
     limit. Read once, before upload admission takes its lock, so no billing
     connection is ever opened while that lock is held."""
     usage = getattr(app.state, constants.BILLING_USAGE_ATTR, None)
     if usage is None:
         return None
-    outcome = await usage.check(tenant, METER, max(1, int(qty)))
+    outcome = await usage.check(subject, METER, max(1, int(qty)))
     if not outcome.ok:
         raise StorageQuotaExceeded(FULL)
     return None if outcome.limit is None else int(outcome.limit) - int(outcome.used)
@@ -131,7 +132,7 @@ class KeyClosed(SwapExpired):
 
 async def swap(
     session_factory: Any,
-    tenant: str,
+    subject: str,
     old: str | None,
     qty: int,
     key: str,
@@ -141,7 +142,9 @@ async def swap(
 ) -> Any:
     """Billing's atomic swap: a committed hold of ``qty`` bytes in place of
     ``old`` (billing's ``Hold``), or ``None`` without billing (or nothing to
-    hold). :class:`StorageQuotaExceeded` when the net delta does not fit -
+    hold). ``subject`` is the one ``old`` was taken under (billing refuses
+    another subject's hold) and the new hold's.
+    :class:`StorageQuotaExceeded` when the net delta does not fit -
     ``old`` then still counts; :class:`SwapExpired` when the call reached
     billing after ``not_after``, :class:`KeyClosed` when its key was closed
     (nothing changed). A replayed ``key`` returns the same outcome; every
@@ -150,7 +153,7 @@ async def swap(
     if meter is None or qty < 1:
         return None
     outcome = await meter.swap(
-        tenant, METER, old, int(qty), key, source=SOURCE, not_after=not_after
+        subject, METER, old, int(qty), key, source=SOURCE, not_after=not_after
     )
     kind = type(outcome).__name__
     if kind == "Closed":
@@ -162,16 +165,18 @@ async def swap(
     return outcome
 
 
-async def close_key(session_factory: Any, tenant: str, key: str, meter: Any = None) -> Any:
-    """The terminal outcome of the swap under ``key`` (billing's ``close_key``):
-    its ``Hold``, ``Refused``, ``Expired``, or ``Closed`` - committed now, so no
+async def close_key(session_factory: Any, subject: str, key: str, meter: Any = None) -> Any:
+    """The terminal outcome of the swap under ``key`` (billing's ``close_key``),
+    asked under the ``subject`` the key was used under: billing scopes keys to
+    their subject, and under another answers ``Closed`` for a key it never saw.
+    Its ``Hold``, ``Refused``, ``Expired``, or ``Closed`` - committed now, so no
     call under the key will ever write. Waits for a swap in flight. ``None``
     without billing. Raises when billing cannot answer: the caller's op must
     then stay unfinished, to be retried."""
     meter = meter or storage_meter(session_factory)
     if meter is None:
         return None
-    return await meter.close_key(tenant, METER, key)
+    return await meter.close_key(subject, METER, key)
 
 
 def held_by(outcome: Any) -> str | None:

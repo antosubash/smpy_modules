@@ -144,7 +144,7 @@ async def _open(
             if not waiting:
                 key = billing.hold_key(image_id, attempt)
                 op = await billing_ops.open_op(
-                    db, OP_SWAP, image_id, planned, key, claim=CLAIM, old=found[3]
+                    db, OP_SWAP, image_id, planned, key, claim=CLAIM, old=found[3], subject=tenant
                 )
                 await finalize_session(db)
                 return op, found[3]
@@ -172,7 +172,9 @@ async def record(db: Any, runtime: Runtime, loaded: Any, planned: Planned | None
             return False
         values["storage_hold_id"] = planned.hold
     elif planned.queue and total != stored:
-        await billing_ops.add_swap(db, loaded.image_id, total, factory=runtime.session_factory)
+        await billing_ops.add_swap(
+            db, loaded.image_id, total, subject=loaded.tenant, factory=runtime.session_factory
+        )
     await db.execute(
         update(Image)
         .where(Image.id == loaded.image_id, Image.tenant_id == loaded.tenant)

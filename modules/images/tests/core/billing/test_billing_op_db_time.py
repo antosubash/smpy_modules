@@ -38,7 +38,7 @@ async def _open(pipe) -> billing_ops.Claimed:
     async with pipe.db_state.session_factory() as s:
         key = f"k-{uuid.uuid4().hex}"
         claimed = await billing_ops.open_op(
-            s, OP_INGEST, uuid.uuid4(), 10, key, claim=INGEST_CLAIM, old=None
+            s, OP_INGEST, uuid.uuid4(), 10, key, claim=INGEST_CLAIM, old=None, subject="default"
         )
         await s.commit()
     return claimed

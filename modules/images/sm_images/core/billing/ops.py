@@ -77,9 +77,11 @@ async def open_op(
     *,
     claim: timedelta,
     old: str | None,
+    subject: str,
 ) -> Claimed:
     """Write an op claimed by the caller for ``claim``, in ``db``'s transaction,
-    replacing ``old`` (``None``: no hold)."""
+    replacing ``old`` (``None``: no hold), billed to ``subject`` - the one
+    ``old`` was taken under: its key and its hold live there."""
     token = uuid.uuid4().hex
     row = BillingOp(
         op=op,
@@ -88,6 +90,7 @@ async def open_op(
         idempotency_key=key,
         old_hold_id=old or NO_HOLD,
         claim_token=token,
+        subject=subject,
     )
     not_after = await _deadline(db, row, claim)
     assert row.id is not None
@@ -152,14 +155,19 @@ async def hand_back(db: Any, claimed: Claimed | None, factory: Any = None) -> No
     _settle_after(db, [claimed.op_id], factory)
 
 
-async def add_swap(db: Any, image_id: uuid.UUID, qty: int, *, factory: Any = None) -> BillingOp:
+async def add_swap(
+    db: Any, image_id: uuid.UUID, qty: int, *, subject: str, factory: Any = None
+) -> BillingOp:
     """Move the image's hold to ``qty`` once ``db`` commits (a shrink or a
-    correction: never refused). Runs after the image's earlier swaps."""
+    correction: never refused), under ``subject`` - the image's hold's, as
+    the caller sees it; settling fixes it with the old hold (``install``).
+    Runs after the image's earlier swaps."""
     row = BillingOp(
         op=OP_SWAP,
         image_id=image_id,
         quantity=qty,
         idempotency_key=billing.hold_key(image_id, f"swap-{uuid.uuid4().hex}"),
+        subject=subject,
     )
     await _deadline(db, row)
     assert row.id is not None
