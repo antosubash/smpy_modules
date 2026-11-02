@@ -1,9 +1,9 @@
 /**
- * Registers the news feed block into pagebuilder's palette — where pagebuilder
- * is there to have one.
+ * Registers the news blocks (`NewsFeed`, `NewsStats`) into pagebuilder's
+ * palette — where pagebuilder is there to have one.
  *
- * This file, and the `NewsFeed` component it pulls in, are the *only* two
- * places in this module's frontend allowed to import `@simple-module-py/
+ * This file, and the `NewsFeed` and `NewsStats` components it pulls in, are the
+ * *only* three places in this module's frontend allowed to import `@simple-module-py/
  * pagebuilder`. Everything else — the admin list, the editors, the public
  * article viewer — has to work on a host that never installed it, which is what
  * the split was for. `test_module.py` guards the equivalent rule on the Python
@@ -29,6 +29,7 @@
 import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/components/blockRegistry';
 
 import { NewsFeedBlock } from './components/NewsFeed';
+import { NewsStatsBlock } from './components/NewsStats';
 import { keys } from './utils/i18n';
 
 try {
@@ -44,4 +45,16 @@ try {
   // other's saved data. In a hot-reloading dev server that is a re-run of this
   // module rather than a real collision, and it must not blank the editor.
   console.warn('[news] NewsFeed block not registered:', error);
+}
+
+// Its own guard: a clash on one name must not leave the other unregistered.
+try {
+  registerPuckBlocks({
+    blocks: { NewsStats: NewsStatsBlock },
+    category: { key: 'feeds', title: keys.news.feed.palette_group },
+    // Page-only, like the feed: the number is about this site's content, not
+    // chrome to repeat on every page.
+  });
+} catch (error) {
+  console.warn('[news] NewsStats block not registered:', error);
 }
