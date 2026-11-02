@@ -1356,13 +1356,15 @@ is **signed in** is resolved to their own account's tenant, which no request
 header names, so their answer is `Cache-Control: private, max-age=N` instead.
 A single-tenant host sends neither: every read there is `default`.
 
-**Errors, on a multi-tenant host, are never storable.** The same URL can be a
-`200` for one tenant and a `404` for another, and HTTP lets a cache keep a
-`404` heuristically when nothing forbids it — so every public error response
-(the `404`, the `400` for a refused filter, sort or cursor, the `422` for a bad
-parameter, the `500`) carries the tenant header in `Vary` and
-`Cache-Control: no-store`. The bodies are unchanged. A single-tenant host
-sends errors as before.
+**Errors are never storable.** HTTP lets a cache keep a `404` heuristically
+when nothing forbids it, so a cache holding one would go on answering it after
+the type is made public or the record published — and on a multi-tenant host
+the same URL can be a `200` for one tenant and a `404` for another. So every
+public error response (the `404`, the `400` for a refused filter, sort, cursor,
+metric or locale, the `422` for a bad parameter, the `500`), on the listing,
+the record read and the stats route alike, carries `Cache-Control: no-store`,
+on a single-tenant host too; a multi-tenant host also names the tenant header
+in `Vary`. The bodies are unchanged.
 
 The validator covers the *content*, so it changes when the answer does — a row
 edited, a row unpublished out of the page, a different `?filter=`, a different
