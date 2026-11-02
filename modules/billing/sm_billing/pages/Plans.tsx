@@ -7,14 +7,14 @@ import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import { Archive, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { AdminNav } from '../components/AdminNav';
-import { PlanEditor } from '../components/PlanEditor';
-import { PlansTable } from '../components/PlansTable';
-import { ADMIN_API, api } from '../utils/api';
-import { clipName } from '../utils/format';
-import { keys, useT } from '../utils/i18n';
-import { type PlanForm, planPayload } from '../utils/plan-form';
-import type { AdminCommon, Plan } from '../utils/types';
+import { AdminNav } from '../ui/components/AdminNav';
+import { PlanEditor } from '../ui/components/PlanEditor';
+import { PlansTable } from '../ui/components/PlansTable';
+import { ADMIN_API, api } from '../ui/utils/api';
+import { clipName } from '../ui/utils/format';
+import { keys, useT } from '../ui/utils/i18n';
+import { type PlanForm, planPayload } from '../ui/utils/plan-form';
+import type { AdminCommon, Plan } from '../ui/utils/types';
 
 interface Props extends AdminCommon {
   plans: Plan[];

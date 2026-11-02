@@ -19,10 +19,10 @@ import { AlertTriangle, Info } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { AdminNav } from '../components/AdminNav';
-import { ADMIN_API, ApiError, api } from '../utils/api';
-import { keys, translate, useT } from '../utils/i18n';
-import type { AdminCommon, Connection as ConnectionInfo } from '../utils/types';
+import { AdminNav } from '../ui/components/AdminNav';
+import { ADMIN_API, ApiError, api } from '../ui/utils/api';
+import { keys, translate, useT } from '../ui/utils/i18n';
+import type { AdminCommon, Connection as ConnectionInfo } from '../ui/utils/types';
 
 interface Props extends AdminCommon {
   connection: ConnectionInfo;

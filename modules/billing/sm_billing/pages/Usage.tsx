@@ -6,14 +6,14 @@ import { Card } from '@simple-module-py/ui/components/ui/card';
 import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import { Gauge } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { AdminNav } from '../components/AdminNav';
-import { ProviderFallbackBanner } from '../components/ProviderFallbackBanner';
-import { UsageDetail } from '../components/UsageDetail';
-import { UsageFilters, type UsageFilterValues } from '../components/UsageFilters';
-import { UsageTable } from '../components/UsageTable';
-import { useReturnFocus } from '../hooks/useReturnFocus';
-import { keys, useT } from '../utils/i18n';
-import type { AdminCommon, MeterInfo, Paged, UsageRow } from '../utils/types';
+import { AdminNav } from '../ui/components/AdminNav';
+import { ProviderFallbackBanner } from '../ui/components/ProviderFallbackBanner';
+import { UsageDetail } from '../ui/components/UsageDetail';
+import { UsageFilters, type UsageFilterValues } from '../ui/components/UsageFilters';
+import { UsageTable } from '../ui/components/UsageTable';
+import { useReturnFocus } from '../ui/hooks/useReturnFocus';
+import { keys, useT } from '../ui/utils/i18n';
+import type { AdminCommon, MeterInfo, Paged, UsageRow } from '../ui/utils/types';
 
 interface Props extends AdminCommon {
   usage: Paged<UsageRow>;

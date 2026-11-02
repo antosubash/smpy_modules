@@ -164,7 +164,7 @@ FAMILIES: tuple[Family, ...] = (
                 ),
             ),
             Copy(
-                f"{BILLING}/crypto.py",
+                f"{BILLING}/core/crypto.py",
                 {"BillingKeyUnreadableError": "KeyUnreadableError"},
                 own={
                     "BillingKeyUnreadableError": "AI keeps its error in sm_ai.contracts.errors, "

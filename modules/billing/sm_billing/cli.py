@@ -26,7 +26,7 @@ def reconcile_command(
     from simple_module_hosting.app_builder import create_app
     from simple_module_hosting.settings import Settings
 
-    from sm_billing.reconcile import reconcile
+    from sm_billing.subscriptions.reconcile import reconcile
 
     fastapi_app = create_app(Settings())
 

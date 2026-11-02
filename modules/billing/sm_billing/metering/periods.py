@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
-from sm_billing.constants import ENTITLED_STATUSES
+from sm_billing.core.constants import ENTITLED_STATUSES
 
 if TYPE_CHECKING:
     from sm_billing.models import Subscription

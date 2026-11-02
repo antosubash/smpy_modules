@@ -56,7 +56,7 @@ def _route(app, path: str, endpoint) -> None:
 @pytest.fixture
 async def metered(app):
     """The app with metered test routes, and a plan allowing one AI request."""
-    from sm_billing.constants import PricingModel
+    from sm_billing.core.constants import PricingModel
     from sm_billing.models import Plan, Subscription
 
     async def chat(outcome=RequiresAiRequest()):

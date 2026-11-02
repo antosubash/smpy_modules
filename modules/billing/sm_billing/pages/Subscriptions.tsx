@@ -6,15 +6,15 @@ import { AdminLayout } from '@simple-module-py/ui/layouts/AdminLayout';
 import { Building2, User } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { AdminNav } from '../components/AdminNav';
-import { AssignDialog } from '../components/AssignDialog';
-import { ProviderFallbackBanner } from '../components/ProviderFallbackBanner';
-import { SubscriptionsFilters } from '../components/SubscriptionsFilters';
-import { SubscriptionsPager, visitSubscriptions } from '../components/SubscriptionsPager';
-import { SubscriptionsTable } from '../components/SubscriptionsTable';
-import { SyncHealthBar } from '../components/SyncHealthBar';
-import { ADMIN_API, api } from '../utils/api';
-import { keys, useT } from '../utils/i18n';
+import { AdminNav } from '../ui/components/AdminNav';
+import { AssignDialog } from '../ui/components/AssignDialog';
+import { ProviderFallbackBanner } from '../ui/components/ProviderFallbackBanner';
+import { SubscriptionsFilters } from '../ui/components/SubscriptionsFilters';
+import { SubscriptionsPager, visitSubscriptions } from '../ui/components/SubscriptionsPager';
+import { SubscriptionsTable } from '../ui/components/SubscriptionsTable';
+import { SyncHealthBar } from '../ui/components/SyncHealthBar';
+import { ADMIN_API, api } from '../ui/utils/api';
+import { keys, useT } from '../ui/utils/i18n';
 import type {
   AdminCommon,
   Paged,
@@ -22,7 +22,7 @@ import type {
   SubscriptionRow,
   SubscriptionStatus,
   SyncHealth,
-} from '../utils/types';
+} from '../ui/utils/types';
 
 interface Props extends AdminCommon {
   subscriptions: Paged<SubscriptionRow>;

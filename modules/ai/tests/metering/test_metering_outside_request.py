@@ -23,9 +23,9 @@ def _needs_billing() -> None:
 
 
 async def _seed(factory, limit: int) -> str:
-    from sm_billing.constants import PricingModel
+    from sm_billing.core.constants import PricingModel
     from sm_billing.models import Plan, Subscription
-    from sm_billing.plans import seed_default_plan
+    from sm_billing.plans.service import seed_default_plan
 
     await seed_default_plan(factory)
     tenant = uuid.uuid4().hex

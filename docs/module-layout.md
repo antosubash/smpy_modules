@@ -31,6 +31,7 @@ file has).
 | Path | Who looks it up |
 | --- | --- |
 | `__init__.py`, `module.py` | Python; the `simple_module` entry point |
+| `cli.py` | The `simple_module_cli.cli_plugins` entry point, where declared |
 | `models/` | `simple_module_db` imports `<package>.models` for migrations |
 | `tasks.py`, `task_config.py` | `background_tasks`: Celery autodiscovery and the routes/beat loader |
 | `pages/` | the host's page glob; real Inertia pages only (`scripts/check_rules.py`) |
@@ -157,7 +158,7 @@ Do it in small PRs, one module at a time, each containing only moves:
 | --- | --- | --- | --- | --- |
 | images | 4 | 11 | 0 | follows this layout |
 | ai | 2 | 8 | 0 | follows this layout |
-| billing | 28 | 9 | 53 | not moved yet |
+| billing | 3 | 11 | 0 | follows this layout |
 | news | 27 | 10 | 78 | not moved yet |
 | pagebuilder | 30 | 14 | 99 | not moved yet |
 | records | 37 | 14 | 181 | not moved yet |

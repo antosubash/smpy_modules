@@ -18,12 +18,6 @@ from typing import Any
 
 import stripe
 
-from sm_billing.constants import (
-    CHECKOUT_COMPLETED,
-    PROVIDER_CHECKOUT_BLOCKING_STATUSES,
-    PROVIDER_STRIPE,
-    USER_SUBJECT_PREFIX,
-)
 from sm_billing.contracts.provider import (
     CheckoutSession,
     CheckoutSnapshot,
@@ -33,6 +27,12 @@ from sm_billing.contracts.provider import (
     ProviderNotFound,
     SubscriptionSnapshot,
     WebhookEvent,
+)
+from sm_billing.core.constants import (
+    CHECKOUT_COMPLETED,
+    PROVIDER_CHECKOUT_BLOCKING_STATUSES,
+    PROVIDER_STRIPE,
+    USER_SUBJECT_PREFIX,
 )
 
 _SUBSCRIPTION_EVENTS = ("customer.subscription.",)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy.exc import OperationalError
 
-from sm_billing.errors import BillingError
+from sm_billing.core.errors import BillingError
 
 _SQLITE_BUSY = 5  # the primary code; BUSY_SNAPSHOT (517) and the rest share it
 

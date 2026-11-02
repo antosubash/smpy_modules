@@ -34,9 +34,9 @@ LIMIT = 1000
 
 @pytest.fixture
 async def real(tmp_path, monkeypatch):
-    from sm_billing.constants import PricingModel
+    from sm_billing.core.constants import PricingModel
     from sm_billing.models import Base, Plan, Subscription
-    from sm_billing.plans import seed_default_plan
+    from sm_billing.plans.service import seed_default_plan
     from sm_images.models import Base as ImagesBase
 
     monkeypatch.setattr(billing, "billing_installed", lambda: True)

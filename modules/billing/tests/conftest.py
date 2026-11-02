@@ -22,7 +22,8 @@ from simple_module_test.database import database_url_for_tests
 from simple_module_test.session_cookie import forge_session_cookie
 from sm_billing.providers.stripe import StripeProvider
 from sqlalchemy import select
-from stripe_helpers import SECRET, SUBSCRIPTION, _Recorder
+
+from tests.support.stripe_helpers import SECRET, SUBSCRIPTION, _Recorder
 
 MODULES = ["Auth", "Users", "Permissions", "Settings", "Tenants", "Billing"]
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -65,8 +66,8 @@ async def user_mode_app(single_tenant, app):
     The mode is applied the way ``on_startup`` applies it, after the setting is
     in place (the app fixture has already run startup in tenant mode).
     """
-    from sm_billing import constants as c
-    from sm_billing.subject_boot import apply_subject_mode
+    from sm_billing.core import constants as c
+    from sm_billing.core.subject_boot import apply_subject_mode
 
     getattr(app.state, c.PACKAGE).settings.subject_mode = c.SUBJECT_MODE_USER
     await apply_subject_mode(app)
@@ -76,7 +77,7 @@ async def user_mode_app(single_tenant, app):
 @pytest.fixture
 async def admin(authenticated_client):
     """The platform admin's client, armed for the unsafe verbs on the admin API."""
-    from api_helpers import arm_csrf
+    from tests.support.api_helpers import arm_csrf
 
     await arm_csrf(authenticated_client, "/admin/billing/subscriptions")
     return authenticated_client
@@ -151,7 +152,7 @@ def user_client(app) -> Callable:
 @pytest.fixture
 def quota_app(app):
     """The app with ``quota_helpers``' ``RequiresQuota`` test routes."""
-    from quota_helpers import install_quota_routes
+    from tests.support.quota_helpers import install_quota_routes
 
     return install_quota_routes(app)
 
@@ -165,8 +166,8 @@ def runs(quota_app) -> list[int]:
 @pytest.fixture
 async def owner(quota_app, user_client):
     """A tenant owner's client whose plan allows 2 of the test meter."""
-    from api_helpers import create_tenant
-    from quota_helpers import limit_plan
+    from tests.support.api_helpers import create_tenant
+    from tests.support.quota_helpers import limit_plan
 
     async with user_client("owner@x.io") as (client, _):
         tenant = await create_tenant(client)

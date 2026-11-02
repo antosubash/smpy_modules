@@ -18,7 +18,7 @@ mode is read once at startup. At boot, in `user` mode, billing:
 - **refuses to start** when `multi_tenant` is on: user mode replaces the
   active-organisation checks (`deps.require_active`) with the signed-in user,
   which only makes sense where there are no organisations
-  (`sm_billing/subject_boot.py`);
+  (`sm_billing/core/subject_boot.py`);
 - maps `billing.view` and `billing.manage` onto the framework's `user` role,
   so every signed-in user can open their own Billing page;
 - subscribes the `UserDeleted` teardown (below);
@@ -70,7 +70,7 @@ or reassign plans by hand (**Subscriptions** screen) after switching.
 ## The subject format
 
 A user subject is exactly `user:` plus the user's id in canonical form
-(lowercase, hyphenated; `user_uuid` in `sm_billing/subject_keys.py`). An uppercase or
+(lowercase, hyphenated; `user_uuid` in `sm_billing/core/subject_keys.py`). An uppercase or
 dashless spelling parses as the same UUID but names no user, so billing rejects
 it. At 41 characters it fits the key columns, which migration `a7c2e4d81b35`
 widens from 32 to 64 (`host/migrations/versions/`). A tenant id is a 32-character

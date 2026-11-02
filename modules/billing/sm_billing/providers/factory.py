@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import logging
 
-from sm_billing import constants as c
-from sm_billing import crypto
 from sm_billing.contracts.provider import BillingProvider
+from sm_billing.core import constants as c
+from sm_billing.core import crypto
+from sm_billing.core.services import BillingServices
+from sm_billing.core.settings import BillingSettings
 from sm_billing.providers.manual import ManualProvider
-from sm_billing.services import BillingServices
-from sm_billing.settings import BillingSettings
 
 logger = logging.getLogger(__name__)
 
