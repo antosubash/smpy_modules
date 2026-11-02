@@ -23,8 +23,8 @@ import {
   STAT_ITEMS_MAX,
 } from './RecordStatsRender';
 
-export type { RecordStatItem, RecordStatsProps };
-export { clampStatItems, RecordStatsRender, STAT_ITEMS_MAX };
+export type { RecordStatItem };
+export { clampStatItems, RecordStatsRender };
 
 const NUMBER_TYPES = new Set(['number', 'integer']);
 

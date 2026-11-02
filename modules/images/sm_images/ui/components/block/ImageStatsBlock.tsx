@@ -21,8 +21,8 @@ import {
   STAT_ITEMS_MAX,
 } from './ImageStatsRender';
 
-export type { ImageStatItem, ImageStatsProps };
-export { clampStatItems, ImageStatsRender, STAT_ITEMS_MAX };
+export type { ImageStatItem };
+export { clampStatItems, ImageStatsRender };
 
 type Option = { label: string; value: string };
 type BlockFields = NonNullable<ComponentConfig<ImageStatsProps>['fields']>;
