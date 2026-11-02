@@ -78,7 +78,8 @@ admitted before the `upload_id` is issued (here and for a ZIP import's upload):
   tenant at once; one more is `429 too_many_open_uploads`;
 - with billing installed, the storage gauge plus the declared sizes of the
   tenant's open uploads plus this one must fit the plan, or it is
-  `402 quota_exceeded`.
+  `402 quota_exceeded`. In billing's `user` mode the gauge is the collection
+  owner's, and only the open uploads into that owner's collections count.
 
 An upload is open until it is completed, aborted or expires. The declared size is
 binding: every part must be exactly its expected size and `complete` refuses a

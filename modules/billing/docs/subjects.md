@@ -157,9 +157,12 @@ owner pays for what others upload into it.
   and keep settling and releasing as before.
 - **No hold yet.** An image that names no hold bills the owner. Repair
   corrects such an image under the subject of the op it examines.
-- **Upload pre-checks.** The advisory check reads the owner's headroom. The
-  open-upload count and its lock stay per tenant, which can only be stricter,
-  never looser, because `user` mode is single-tenant only.
+- **Upload pre-checks.** The advisory check reads the owner's headroom, and
+  opening a direct or ZIP upload compares it with the declared sizes of the
+  open uploads into collections of the same owner only: another user's open
+  upload is held against that user's gauge, not this one's room. The
+  open-upload cap (`max_open_uploads_per_tenant`) and the admission lock stay
+  per tenant; the cap bounds concurrency, it is not a quota.
 - **Unbillable owner.** An owner with no valid user row (deleted, or not a
   UUID) falls back to the tenant. Images logs
   `images.billing.owner_unbillable collection=<id>` once per collection.

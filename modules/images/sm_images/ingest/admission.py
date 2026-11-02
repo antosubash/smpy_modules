@@ -24,9 +24,14 @@ which its own hold then refuses or counts. Run :func:`admit` as the transaction'
 (SQLite: a transaction that read first can fail to take the write lock with
 ``SQLITE_BUSY_SNAPSHOT`` instead of waiting).
 
-The open-session count, the cap and the lock stay per tenant even when the
-headroom is a user's (billing's ``user`` mode): other users' open uploads still
-count against that user's room.
+**Billing's ``user`` mode.** The headroom is the collection owner's
+(``user:<owner>``), so the pending bytes compared with it are only those of
+open sessions whose collection's owner maps to the same subject: another
+owner's open upload is held against that owner's gauge, not this one's room.
+When the subject fell back to the tenant (an owner billing cannot bill), every
+open session of the tenant counts, as in ``tenant`` mode. The open-session
+count, the cap and the lock stay per tenant: the cap bounds concurrency, it is
+not a quota.
 
 The declared size is held to at part and complete time: every part must be
 exactly its expected size, and ``multipart.assemble`` refuses a missing, short
@@ -45,9 +50,9 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sm_images.core import billing
 from sm_images.core.clock import utcnow
 from sm_images.core.errors import StorageQuotaExceeded, TooManyOpenUploads
-from sm_images.models import UploadAdmission, UploadSession, UploadStatus
+from sm_images.models import Collection, UploadAdmission, UploadSession, UploadStatus
 
-__all__ = ["Admission", "admit", "open_uploads", "prepare"]
+__all__ = ["Admission", "admit", "open_uploads", "pending_for", "prepare"]
 
 Admission = Callable[[Any], Awaitable[None]]
 """Called with the session that will insert the upload's row (``open_upload``).
@@ -85,14 +90,52 @@ async def open_uploads(db: Any, tenant: str) -> tuple[int, int]:
     return int(count), int(total)
 
 
-async def admit(db: Any, tenant: str, size: int, *, cap: int, room: int | None) -> None:
+async def pending_for(db: Any, tenant: str, subject: str) -> int:
+    """Declared bytes of *tenant*'s unexpired open sessions whose collection's
+    owner bills as the user *subject*. Grouped by owner and mapped in Python, so
+    any spelling of an owner's id maps as billing maps it; a trashed collection's
+    open session still counts."""
+    stmt = (
+        select(Collection.owner_id, func.coalesce(func.sum(UploadSession.size), 0))
+        .join(Collection, Collection.id == UploadSession.collection_id)
+        .where(
+            UploadSession.tenant_id == tenant,
+            UploadSession.status.in_(_OPEN),
+            UploadSession.expires_at > utcnow(),
+        )
+        .group_by(Collection.owner_id)
+        .execution_options(include_deleted=True)
+    )
+    rows = (await db.execute(stmt)).all()
+    return sum(int(n) for owner, n in rows if _bills_as(owner) == subject)
+
+
+def _bills_as(owner_id: str | None) -> str | None:
+    """``user:<owner>`` as billing spells it; ``None`` for an owner no user can be."""
+    from sm_billing.contracts import subject_for_user
+
+    try:
+        return subject_for_user(owner_id)
+    except ValueError:
+        return None
+
+
+async def admit(
+    db: Any, tenant: str, size: int, *, cap: int, room: int | None, subject: str | None = None
+) -> None:
     """Lock, count and refuse opening an upload of *size* bytes (see module).
-    ``room``: the gauge's headroom read before the lock (``None``: unlimited)."""
+    ``room``: the gauge's headroom read before the lock (``None``: unlimited).
+    ``subject``: whose gauge ``room`` is; a user's counts only that user's
+    open sessions, ``None`` or the tenant every open session of the tenant."""
     await _lock(db, tenant)
     count, pending = await open_uploads(db, tenant)
     if count >= cap:
         raise TooManyOpenUploads(_TOO_MANY)
-    if room is not None and pending + int(size) > room:
+    if room is None:
+        return
+    if subject is not None and subject != tenant:
+        pending = await pending_for(db, tenant, subject)
+    if pending + int(size) > room:
         raise StorageQuotaExceeded(billing.FULL)
 
 
@@ -106,6 +149,6 @@ async def prepare(
     room = await billing.headroom(app, subject or tenant, size)
 
     async def run(db: Any) -> None:
-        await admit(db, tenant, size, cap=cap, room=room)
+        await admit(db, tenant, size, cap=cap, room=room, subject=subject)
 
     return run

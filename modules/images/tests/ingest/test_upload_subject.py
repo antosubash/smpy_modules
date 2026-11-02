@@ -115,3 +115,20 @@ async def test_admission_cap_stays_per_tenant(web_user, gauge):
     assert first.status_code == 201, first.text
     second = await web_user.post(url, json={"filename": "b.jpg", "size": 50}, headers=EDDIE)
     assert second.status_code == 429
+
+
+async def test_admission_counts_only_the_owners_open_uploads(web_user, gauge):
+    """Another owner's open upload is held against that owner's gauge, not this
+    one's room; the owner's own open upload still is."""
+    eddie_cid = await make_collection(web_user, headers=EDDIE)
+    gauge.limits = {OWNER: 1000, f"user:{user_uuid('eddie')}": 1000}
+    url = f"{BASE}/{{}}/uploads"
+    theirs = await web_user.post(
+        url.format(eddie_cid), json={"filename": "e.jpg", "size": 900}, headers=EDDIE
+    )
+    assert theirs.status_code == 201, theirs.text
+    mine = url.format(web_user.cid)
+    first = await web_user.post(mine, json={"filename": "a.jpg", "size": 200}, headers=OLGA)
+    assert first.status_code == 201, first.text
+    second = await web_user.post(mine, json={"filename": "b.jpg", "size": 900}, headers=OLGA)
+    assert (second.status_code, second.json()["code"]) == (402, QUOTA)
