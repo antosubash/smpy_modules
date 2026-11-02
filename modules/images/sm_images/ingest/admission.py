@@ -12,7 +12,10 @@ their holds. So :func:`admit` refuses, before the session row is inserted:
   lock, so admission never opens a billing connection while holding it.
   Without billing this part is skipped.
 
-**Serialised per tenant.** :func:`admit` first *writes* the tenant's
+**Serialised per tenant.** The open-session count, the cap and the lock stay per
+tenant even when the headroom is a user's (billing's ``user`` mode): other
+users' open uploads still count against the room, which is conservative.
+ :func:`admit` first *writes* the tenant's
 ``images_upload_admission`` row (an upsert, then an ``UPDATE``): the row lock on
 Postgres, the database write lock on SQLite. The caller inserts the session row
 in the same transaction and commits, which releases the lock, so the next
@@ -92,10 +95,14 @@ async def admit(db: Any, tenant: str, size: int, *, cap: int, room: int | None) 
         raise StorageQuotaExceeded(billing.FULL)
 
 
-async def prepare(app: Any, tenant: str, size: int, *, cap: int) -> Admission:
+async def prepare(
+    app: Any, tenant: str, size: int, *, cap: int, subject: str | None = None
+) -> Admission:
     """Read the gauge's headroom now (402 if *size* alone does not fit), and
-    return :func:`admit` bound to everything but the session, for ``open_upload``."""
-    room = await billing.headroom(app, tenant, size)
+    return :func:`admit` bound to everything but the session, for ``open_upload``.
+    ``subject`` is whose gauge is read (the collection owner's in billing's
+    ``user`` mode); ``None``: the tenant's."""
+    room = await billing.headroom(app, subject or tenant, size)
 
     async def run(db: Any) -> None:
         await admit(db, tenant, size, cap=cap, room=room)
