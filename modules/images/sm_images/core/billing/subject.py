@@ -39,6 +39,7 @@ __all__ = [
     "reset_unbillable_log",
     "runtime_mode",
     "user_exists",
+    "user_subject",
     "worker_mode",
 ]
 
@@ -96,6 +97,17 @@ def _unbillable(collection_id: uuid.UUID | None) -> None:
     logger.warning("images.billing.owner_unbillable collection=%s", collection_id)
 
 
+def user_subject(owner_id: str | None) -> str | None:
+    """``user:<owner>`` as billing spells it; ``None`` for an owner no user can be
+    (missing, or not a UUID). Pure: no lookup, no log."""
+    from sm_billing.contracts import subject_for_user
+
+    try:
+        return subject_for_user(owner_id)
+    except ValueError:
+        return None
+
+
 def image_subject(
     tenant: str, owner_id: str | None, mode: str, *, collection_id: uuid.UUID | None = None
 ) -> str:
@@ -103,13 +115,11 @@ def image_subject(
     A missing or non-UUID owner bills the tenant, logged once per collection."""
     if mode != USER:
         return tenant
-    from sm_billing.contracts import subject_for_user
-
-    try:
-        return subject_for_user(owner_id)
-    except ValueError:
+    who = user_subject(owner_id)
+    if who is None:
         _unbillable(collection_id)
         return tenant
+    return who
 
 
 async def user_exists(db: Any, subject: str) -> bool:

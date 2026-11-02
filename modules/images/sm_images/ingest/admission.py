@@ -48,6 +48,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from sm_images.core import billing
+from sm_images.core.billing.subject import user_subject
 from sm_images.core.clock import utcnow
 from sm_images.core.errors import StorageQuotaExceeded, TooManyOpenUploads
 from sm_images.models import Collection, UploadAdmission, UploadSession, UploadStatus
@@ -79,12 +80,19 @@ async def _lock(db: Any, tenant: str) -> None:
     )
 
 
-async def open_uploads(db: Any, tenant: str) -> tuple[int, int]:
-    """``(count, declared bytes)`` of *tenant*'s unexpired open sessions."""
-    stmt = select(func.count(), func.coalesce(func.sum(UploadSession.size), 0)).where(
+def _is_open(tenant: str) -> tuple[Any, ...]:
+    """The criteria of an open session: *tenant*'s, not expired, not settled."""
+    return (
         UploadSession.tenant_id == tenant,
         UploadSession.status.in_(_OPEN),
         UploadSession.expires_at > utcnow(),
+    )
+
+
+async def open_uploads(db: Any, tenant: str) -> tuple[int, int]:
+    """``(count, declared bytes)`` of *tenant*'s unexpired open sessions."""
+    stmt = select(func.count(), func.coalesce(func.sum(UploadSession.size), 0)).where(
+        *_is_open(tenant)
     )
     count, total = (await db.execute(stmt)).one()
     return int(count), int(total)
@@ -98,26 +106,12 @@ async def pending_for(db: Any, tenant: str, subject: str) -> int:
     stmt = (
         select(Collection.owner_id, func.coalesce(func.sum(UploadSession.size), 0))
         .join(Collection, Collection.id == UploadSession.collection_id)
-        .where(
-            UploadSession.tenant_id == tenant,
-            UploadSession.status.in_(_OPEN),
-            UploadSession.expires_at > utcnow(),
-        )
+        .where(*_is_open(tenant))
         .group_by(Collection.owner_id)
         .execution_options(include_deleted=True)
     )
     rows = (await db.execute(stmt)).all()
-    return sum(int(n) for owner, n in rows if _bills_as(owner) == subject)
-
-
-def _bills_as(owner_id: str | None) -> str | None:
-    """``user:<owner>`` as billing spells it; ``None`` for an owner no user can be."""
-    from sm_billing.contracts import subject_for_user
-
-    try:
-        return subject_for_user(owner_id)
-    except ValueError:
-        return None
+    return sum(int(n) for owner, n in rows if user_subject(owner) == subject)
 
 
 async def admit(

@@ -23,8 +23,8 @@ Out:
 
 ## Who pays: the collection's owner
 
-In user mode an image's work bills **`user:<collection.owner_id>`**. This
-needs a decision (question 1).
+In user mode an image's work bills **`user:<collection.owner_id>`** (approved: the owner
+pays).
 
 - **Why the owner.** `Collection.owner_id` exists for every image and every
   job, including code-started ones. One image always has one payer, so its
@@ -54,8 +54,8 @@ needs a decision (question 1).
      30 s of the restart.
    - **A malformed or missing owner** (an owner deleted while the collection
      stays): the image falls back to the tenant subject, `default`, and logs
-     `images.billing.owner_unbillable` once per collection. This needs a
-     decision (question 3).
+     `images.billing.owner_unbillable` once per collection (approved: an
+     unbillable owner falls back to the tenant).
 2. **The subject is recorded on the hold, not re-derived.** New nullable
    `subject` column (max 64) on `images_billing_op` and on `images_image`
    (`storage_subject`):
@@ -83,7 +83,10 @@ needs a decision (question 1).
 4. **Web advisory checks** (`api/images.py`, `api/uploads.py`,
    `ingest/admission.py`) check the collection owner's headroom, the same
    subject the hold will use. The uploader's own counter is irrelevant
-   because they are not the one billed.
+   because they are not the one billed. Admission compares that headroom
+   with the declared sizes of the open uploads into collections of the same
+   owner only (`admission.pending_for`); the open-upload cap and the lock stay
+   per tenant.
 5. **Jobs with no originating user.**
    - `reconcile`, `janitor` and the purge only settle, repair, release or
      expire existing ops. They take no new quota, and they use each op's
@@ -101,6 +104,8 @@ needs a decision (question 1).
 
 ## Decisions made (override any at approval)
 
+- Old holds stay on `default`: their recorded subject (or `NULL`) is replayed,
+  and a mode switch moves nothing (approved).
 - The owner's subject is decided when the hold is taken and kept for that
   hold's life. A later ownership change affects only new holds.
 - AI step charges follow the same payer as storage, so the AI cost of a
@@ -141,4 +146,4 @@ needs a decision (question 1).
   hold makes the lag harmless to continuity. Only which payer a brand-new
   hold gets can lag.
 - **The owner's quota blocks other uploaders** to a shared collection. This
-  follows from question 1.
+  follows from the owner paying.
