@@ -54,9 +54,9 @@ class FakeGauge:
     calls_by_key: dict[str, tuple] = field(default_factory=dict)
     calls: list[tuple[str, ...]] = field(default_factory=list)
     limits: dict[str, int] = field(default_factory=dict)
+    """Per-subject limits overriding ``limit`` (the gauge counts per subject)."""
     key_subject: dict[str, str] = field(default_factory=dict)
     """The subject each key was first used under (its namespace)."""
-    """Per-subject limits overriding ``limit`` (the gauge counts per subject)."""
     fail_swap: int = 0
     """The next N swaps raise (billing unreachable)."""
     fail_release: int = 0
