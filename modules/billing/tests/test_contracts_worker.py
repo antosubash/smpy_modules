@@ -61,3 +61,18 @@ def test_subject_for_request_needs_a_user_in_user_mode() -> None:
 def test_subject_for_request_bills_the_tenant_in_tenant_mode(app) -> None:
     request = SimpleNamespace(app=app, state=SimpleNamespace(user=None, tenant_id="acme"))
     assert contracts.subject_for_request(request) == "acme"
+
+
+async def test_subject_exists_knows_users_and_default(user_mode_app) -> None:
+    from users.models import User
+
+    async with user_mode_app.state.sm.db.session_factory() as db:
+        user = User(id=uuid.uuid4(), email="owner@x.io", hashed_password="x")
+        db.add(user)
+        await db.flush()
+        assert await contracts.subject_exists(db, contracts.subject_for_user(user.id)) is True
+        assert await contracts.subject_exists(db, contracts.subject_for_user(uuid.uuid4())) is False
+        assert await contracts.subject_exists(db, "default") is True
+        # A non-canonical spelling names no user, as everywhere else in billing.
+        assert await contracts.subject_exists(db, f"user:{str(user.id).upper()}") is False
+        assert "subject_exists" in contracts.__all__

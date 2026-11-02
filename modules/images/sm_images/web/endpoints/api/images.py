@@ -27,6 +27,7 @@ from simple_module_hosting.resource_deps import resource_principal
 from sm_images.core import billing, constants
 from sm_images.core.access import CollectionEdit, CollectionView, ImageCollectionView
 from sm_images.core.access.write import ImageCollectionEdit, ImageCollectionOwner
+from sm_images.core.billing import subject
 from sm_images.core.errors import ImagesError, InvalidUpload, UploadFailed, UseDirectUpload
 from sm_images.core.storage import store_for
 from sm_images.core.tenancy import bound_tenant
@@ -115,7 +116,10 @@ async def upload_images(
         except ImagesError as exc:
             read.append(exc)
     good = [r[1] for r in read if isinstance(r, tuple)]
-    await billing.check(request.app, bound_tenant(), sum(len(data) for data, _ in good))
+    payer = await subject.for_app(
+        request.app, billing.factory_of(ingest.db), bound_tenant(), collection
+    )
+    await billing.check(request.app, payer, sum(len(data) for data, _ in good))
     # Every intent and storage hold before the first insert (IngestService.reserve).
     slots = iter(
         await ingest.reserve(collection, [i.ext for _, i in good], [len(d) for d, _ in good])
@@ -157,7 +161,10 @@ async def upload_base64(
     request: Request, body: Base64Upload, collection: CollectionEdit, ingest: Ingest
 ) -> UploadResult:
     data = decode_base64(body.data, ingest.settings.max_image_bytes)
-    await billing.check(request.app, bound_tenant(), len(data))
+    payer = await subject.for_app(
+        request.app, billing.factory_of(ingest.db), bound_tenant(), collection
+    )
+    await billing.check(request.app, payer, len(data))
     outcome = await ingest.add_image(
         collection,
         data=data,

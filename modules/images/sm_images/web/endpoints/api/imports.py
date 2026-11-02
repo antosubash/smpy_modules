@@ -35,6 +35,7 @@ from sqlalchemy import select
 
 from sm_images.core import billing, constants
 from sm_images.core.access import POLICY, CollectionEdit
+from sm_images.core.billing import subject
 from sm_images.core.errors import ServiceUnavailable, UploadNotFound
 from sm_images.core.tenancy import bound_tenant
 from sm_images.ingest.admission import prepare
@@ -101,7 +102,8 @@ async def create_import(
     auto_run_prompts: Annotated[bool, Form()] = True,
     file: Annotated[UploadFile | None, File()] = None,
 ) -> ImportJobOut:
-    await billing.check(request.app, bound_tenant(), 1)  # a full gauge refuses the job up front
+    payer = await subject.for_app(request.app, billing.factory_of(db), bound_tenant(), collection)
+    await billing.check(request.app, payer, 1)  # a full gauge refuses the job up front
     user, basis = await _actor(db, who, collection)
     row = await start_import(
         _runtime(),
@@ -129,7 +131,8 @@ async def create_zip_import(
     db: Annotated[Any, Depends(get_db)],
 ) -> ZipCreated:
     cap = get_settings(request).max_open_uploads_per_tenant
-    admission = await prepare(request.app, bound_tenant(), body.size, cap=cap)
+    owner = await subject.for_app(request.app, billing.factory_of(db), bound_tenant(), collection)
+    admission = await prepare(request.app, bound_tenant(), body.size, cap=cap, subject=owner)
     user, basis = await _actor(db, who, collection)
     job, (token, ticket, urls, presigned) = await zip_upload.start(
         _runtime(),

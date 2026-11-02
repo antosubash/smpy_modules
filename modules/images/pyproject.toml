@@ -63,7 +63,10 @@ anonymize = ["onnxruntime>=1.18"]
 ai = ["simple_module_ai>=0.0.14,<0.1"]
 # floor: 0.0.14 - ``images.storage_bytes`` is a gauge held through
 # ``usage_meter``'s atomic ``swap``, and its upload pre-flight is ``check`` on a
-# gauge; both first ship in 0.0.14, the next lockstep release.
+# gauge; both first ship in 0.0.14, the next lockstep release. So do
+# ``sm_billing.contracts.subject_for_user``, ``worker_subject_mode``,
+# ``current_subject_mode`` and ``subject_exists`` (#274/#284), which user-mode
+# billing of the collection owner calls.
 billing = ["simple_module_billing>=0.0.14,<0.1"]
 # floor: 0.0.12 - images imports no pagebuilder Python. It only ships
 # ``pagebuilder-blocks.ts`` (the ImageGallery block, registered through

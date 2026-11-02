@@ -15,7 +15,7 @@ A host can bill **each user** instead of the tenant. gis-data-portal needs this:
 **Out of scope:**
 - Per-user billing **inside** a multi-tenant host. `user` mode is refused there.
 - Renaming the `tenant_id` columns and contract parameters to `subject_id`. That can be a follow-up PR that only moves code.
-- Teaching images and ai worker paths to bill users. They keep billing the tenant (`default`); see Decisions.
+- Teaching images and ai worker paths to bill users. Done in #284 (the collection owner pays); see [the 2026-11-02 spec](2026-11-02-worker-billing-subject-design.md).
 - A `period_policy` setting. The issue says the calendar-month fallback in `metering/periods.py` covers the period policy: users without a provider period get calendar months, and Stripe subscribers get Stripe's period.
 
 ## Approach
@@ -94,7 +94,7 @@ The contract docstrings say "billing subject (a tenant id or `user:<id>`)".
 
 1. **The key format is `user:<uuid>`.** A bare `uuid.hex` would collide with tenant ids.
 2. **The column keeps the name `tenant_id`.** The rename is deferred.
-3. **images and ai keep billing the tenant in `user` mode.** Their worker paths pass the row's tenant (`default`); ai's request-time `RequiresAiRequest` bills the user, so `ai.requests` is split across the two subjects. Boot logs one warning naming them. Making them bill per user (through the collection owner) is a follow-up issue. Refusing to boot instead would lock any host with images out of `user` mode.
+3. **Superseded by #284: images and ai now bill the collection owner in `user` mode** (see [the 2026-11-02 spec](2026-11-02-worker-billing-subject-design.md)), and the boot warning is gone. Originally: **images and ai keep billing the tenant in `user` mode.** Their worker paths pass the row's tenant (`default`); ai's request-time `RequiresAiRequest` bills the user, so `ai.requests` is split across the two subjects. Boot logs one warning naming them. Making them bill per user (through the collection owner) is a follow-up issue. Refusing to boot instead would lock any host with images out of `user` mode.
 4. **No `period_policy`.** Stripe subscribers follow Stripe's period, everyone else calendar months, as today.
 5. **One owner page.** The same `/billing` page, fed a synthesised owner context, not a second page.
 6. **User subjects are never suspended.** An unpaid subscription falls back to the default plan.

@@ -76,7 +76,7 @@ async def _level(factory) -> int:
 
 
 async def _ingest(factory, size: int) -> uuid.UUID:
-    slot = await hold_slot(factory, T, Slot(uuid.uuid4(), "k"), size)
+    slot = await hold_slot(factory, T, Slot(uuid.uuid4(), "k"), size, None)
     async with factory() as db:
         coll = Collection(slug=f"c-{uuid.uuid4().hex[:6]}", name="C", owner_id="olga")
         db.add(coll)
@@ -109,7 +109,9 @@ async def test_codex_v_trace_no_images_hold_can_lapse(real):
     async with factory() as db:
         old = (await db.execute(select(Image.storage_hold_id))).scalar_one()
         key, claim = billing.hold_key(image, "grow"), timedelta(minutes=5)
-        op = await billing_ops.open_op(db, OP_SWAP, image, 700, key, claim=claim, old=old)
+        op = await billing_ops.open_op(
+            db, OP_SWAP, image, 700, key, claim=claim, old=old, subject=T
+        )
         await finalize_session(db)
     grown = await billing.swap(factory, T, old, 700, op.key, not_after=op.not_after)
     assert await _level(factory) == 700  # counted once, by the swapped hold
@@ -127,8 +129,8 @@ async def test_codex_v_trace_no_images_hold_can_lapse(real):
     assert await expire_due(UsageService(factory, clock=lambda: clock)) == 0
     assert await _level(factory) == row[1] == 300
     # The room left is exactly the limit less what the image stores.
-    assert (await hold_slot(factory, T, Slot(uuid.uuid4(), "k"), LIMIT - 300 + 1)).refused
-    assert not (await hold_slot(factory, T, Slot(uuid.uuid4(), "k"), LIMIT - 300)).refused
+    assert (await hold_slot(factory, T, Slot(uuid.uuid4(), "k"), LIMIT - 300 + 1, None)).refused
+    assert not (await hold_slot(factory, T, Slot(uuid.uuid4(), "k"), LIMIT - 300, None)).refused
 
 
 async def test_codex_trace_t_against_real_billing(real):
@@ -142,7 +144,9 @@ async def test_codex_trace_t_against_real_billing(real):
     async with factory() as db:
         old = (await db.execute(select(Image.storage_hold_id))).scalar_one()
         key, claim = billing.hold_key(image, "grow"), timedelta(minutes=5)
-        op = await billing_ops.open_op(db, OP_SWAP, image, 1200, key, claim=claim, old=old)
+        op = await billing_ops.open_op(
+            db, OP_SWAP, image, 1200, key, claim=claim, old=old, subject=T
+        )
         await finalize_session(db)
     later = datetime.now(UTC) + timedelta(minutes=6)
     assert await billing_ops.settle(factory, T, now=later) == 1  # the takeover: refused
@@ -168,7 +172,9 @@ async def test_codex_p1_2_an_early_expiry_closes_the_key(real):
     async with factory() as db:
         old = (await db.execute(select(Image.storage_hold_id))).scalar_one()
         key, claim = billing.hold_key(image, "grow"), timedelta(minutes=5)
-        op = await billing_ops.open_op(db, OP_SWAP, image, 700, key, claim=claim, old=old)
+        op = await billing_ops.open_op(
+            db, OP_SWAP, image, 700, key, claim=claim, old=old, subject=T
+        )
         await finalize_session(db)
     soon, lapsed = datetime.now(UTC) + timedelta(seconds=30), datetime.now(UTC)
     async with factory() as db:  # its deadline is near, and the executor's claim lapsed

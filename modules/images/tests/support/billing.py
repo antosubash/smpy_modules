@@ -9,18 +9,25 @@ what is held, and make billing fail (``fail_swap``, ``fail_release``).
 Its ``swap`` is billing's: one atomic step (no ``await`` between the check
 and the write), the limit on the net delta, a replayed key returning the
 same hold, a closed key (``close_key``) answering ``Closed`` to any call.
+Keys and holds are scoped to their subject, as billing's: a key used under
+another subject is another key (``close_key`` there answers ``Closed`` and
+leaves the real one open), and ``get_hold`` answers ``None`` for another
+subject's hold - so a call under the wrong subject shows in the outcome.
 :func:`assert_counted_once` is the invariant every test ends on.
 """
 
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from sm_billing import contracts as billing_contracts
 from sm_billing.contracts.metering import (
     Allowed,
     Closed,
@@ -47,6 +54,10 @@ class FakeGauge:
     """Each key's outcome: its hold id, or the ``Exceeded``/``Expired``/``Closed``."""
     calls_by_key: dict[str, tuple] = field(default_factory=dict)
     calls: list[tuple[str, ...]] = field(default_factory=list)
+    limits: dict[str, int] = field(default_factory=dict)
+    """Per-subject limits overriding ``limit`` (the gauge counts per subject)."""
+    key_subject: dict[str, str] = field(default_factory=dict)
+    """The subject each key was first used under (its namespace)."""
     fail_swap: int = 0
     """The next N swaps raise (billing unreachable)."""
     fail_release: int = 0
@@ -60,10 +71,26 @@ class FakeGauge:
         """Billing's retention purged the key's settled outcome."""
         self.keys.pop(key, None)
         self.calls_by_key.pop(key, None)
+        self.key_subject.pop(key, None)
+
+    def _ns(self, subject: str, key: str) -> str:
+        """The key's slot in ``keys``: billing keys a key by ``(subject, key)``,
+        so one used under another subject than its first is a different key."""
+        owner = self.key_subject.setdefault(key, subject)
+        return key if owner == subject else f"{subject}|{key}"
 
     @property
     def level(self) -> int:
         return sum(h.quantity for h in self.holds.values() if h.status in LIVE)
+
+    def level_of(self, subject: str) -> int:
+        """Bytes live holds count for ``subject``."""
+        return sum(
+            h.quantity for h in self.holds.values() if h.status in LIVE and h.tenant_id == subject
+        )
+
+    def limit_of(self, subject: str) -> int | None:
+        return self.limits.get(subject, self.limit)
 
     def live(self, status: str | None = None) -> list[Hold]:
         want = (status,) if status else LIVE
@@ -75,15 +102,17 @@ class FakeGauge:
         return new
 
     async def check(self, tenant_id: str, meter: str, qty: int = 1):
-        self.calls.append(("check", meter, str(qty)))
-        if self.limit is not None and self.level + qty > self.limit:
-            return Exceeded(self.level, self.limit, qty, None)
-        return Allowed(self.level, self.limit, None)
+        self.calls.append(("check", tenant_id, meter, str(qty)))
+        level, limit = self.level_of(tenant_id), self.limit_of(tenant_id)
+        if limit is not None and level + qty > limit:
+            return Exceeded(level, limit, qty, None)
+        return Allowed(level, limit, None)
 
     async def swap(
         self, tenant_id, meter, old_hold_id, quantity, idempotency_key, *, source, not_after=None
     ):
-        self.calls.append(("swap", str(old_hold_id), str(quantity), idempotency_key))
+        self.calls.append(("swap", str(old_hold_id), str(quantity), idempotency_key, tenant_id))
+        idempotency_key = self._ns(tenant_id, idempotency_key)
         if self.delay:
             await asyncio.sleep(self.delay)
         if self.fail_swap:
@@ -106,9 +135,10 @@ class FakeGauge:
             self.keys[idempotency_key] = Expired(idempotency_key, not_after)
             return self.keys[idempotency_key]
         freed = old.quantity if old is not None and old.status in LIVE else 0
-        grows = quantity > freed and self.limit is not None
-        if grows and self.level - freed + quantity > self.limit:
-            refused = Exceeded(self.level, self.limit, quantity - freed, None)
+        level, limit = self.level_of(tenant_id), self.limit_of(tenant_id)
+        grows = quantity > freed and limit is not None
+        if grows and level - freed + quantity > limit:
+            refused = Exceeded(level, limit, quantity - freed, None)
             self.keys[idempotency_key] = refused  # the refusal is the key's outcome
             return refused
         if freed:
@@ -120,17 +150,18 @@ class FakeGauge:
 
     async def close_key(self, tenant_id: str, meter: str, key: str):
         """The key's outcome, or ``Closed`` committed now (billing's ``close_key``)."""
-        self.calls.append(("close_key", key))
+        self.calls.append(("close_key", tenant_id, key))
         if self.fail_close:
             self.fail_close -= 1
             raise RuntimeError("billing is down")
+        key = self._ns(tenant_id, key)
         outcome = self.keys.setdefault(key, Closed(key))
         if isinstance(outcome, str):
             return self.holds[outcome]
         return Refused(key) if isinstance(outcome, Exceeded) else outcome
 
     async def get_hold(self, tenant_id: str, hold_id: str) -> Hold | None:
-        self.calls.append(("get_hold", hold_id))
+        self.calls.append(("get_hold", tenant_id, hold_id))
         hold = self.holds.get(hold_id)
         return None if hold is None or hold.tenant_id != tenant_id else hold
 
@@ -151,9 +182,11 @@ class FakeGauge:
 @pytest.fixture(autouse=True)
 def _billing_off():
     """Every test runs as on a host without billing unless it asks for ``gauge``.
-    Its own patcher: a test's ``monkeypatch.undo()`` must not turn billing on."""
+    Its own patcher: a test's ``monkeypatch.undo()`` must not turn billing on.
+    The stored ``subject_mode`` is billing's default (no settings table here)."""
     with pytest.MonkeyPatch.context() as patcher:
         patcher.setattr(billing, "billing_installed", lambda: False)
+        patcher.setattr(billing_contracts, "worker_subject_mode", lambda: "tenant")
         yield
 
 
@@ -165,22 +198,57 @@ def gauge(monkeypatch) -> FakeGauge:
     return fake
 
 
+@pytest.fixture
+def user_mode(monkeypatch):
+    """Billing's ``user`` subject mode: every owner exists. Returns a setter that
+    puts a ``Runtime`` (``user_mode.runtime(rt)``) or an app
+    (``user_mode.app(app)``) in the mode."""
+    from sm_images.core.billing import subject
+
+    async def exists(db, who):
+        return True
+
+    monkeypatch.setattr(subject, "user_exists", exists)
+
+    def runtime(rt):
+        return dataclasses.replace(rt, subject_mode=lambda: "user")
+
+    def app(app):
+        app.state.billing_subject_mode = "user"
+        return app
+
+    def web(app_=None):
+        """The web path: ``subject.runtime_mode()`` (ingest, ``slots``) reads user."""
+        monkeypatch.setattr(subject, "runtime_mode", lambda: subject.USER)
+        return user_mode_ns if app_ is None else app(app_)
+
+    user_mode_ns = SimpleNamespace(runtime=runtime, app=app, web=web)
+    return user_mode_ns
+
+
+async def no_settle(*args, **kwargs) -> int:
+    """Stands in for ``billing_ops.settle``: the test settles when it chooses."""
+    return 0
+
+
 async def ops(db_state) -> list:
     """Every outbox row, oldest first."""
     async with db_state.session_factory() as s:
         return list((await s.execute(select(BillingOp).order_by(BillingOp.id))).scalars())
 
 
-async def held_image(pipe, gauge, coll):
-    """An ingested image: its original under a committed hold, as ingest leaves it."""
+async def held_image(pipe, gauge, coll, subject: str = DEFAULT_TENANT):
+    """An ingested image: its original under a committed hold, as ingest leaves
+    it - under ``subject``, recorded on the image when it is not the tenant."""
     img = await pipe.image(coll)
     row = await pipe.row(img)
-    hold = await gauge.swap(DEFAULT_TENANT, billing.METER, None, row.size_bytes, "seed", source="t")
+    hold = await gauge.swap(subject, billing.METER, None, row.size_bytes, "seed", source="t")
+    recorded = None if subject == DEFAULT_TENANT else subject
     async with pipe.db_state.session_factory() as s:
         await s.execute(
             update(Image)
             .where(Image.id == img)
-            .values(storage_hold_id=hold.id, storage_bytes=row.size_bytes)
+            .values(storage_hold_id=hold.id, storage_bytes=row.size_bytes, storage_subject=recorded)
         )
         await s.commit()
     return img, hold.id

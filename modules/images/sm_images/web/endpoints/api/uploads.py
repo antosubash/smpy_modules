@@ -24,6 +24,7 @@ from simple_module_hosting.resource_deps import RequiresResource, resource_princ
 
 from sm_images.core import billing, constants
 from sm_images.core.access import POLICY, CollectionEdit, collection_stmt
+from sm_images.core.billing import subject
 from sm_images.core.errors import UploadNotFound, UploadNotOpen
 from sm_images.core.storage import store_for
 from sm_images.core.storage.intents import current_factory
@@ -78,7 +79,11 @@ async def start_upload(
     if who.user_id is None:  # pragma: no cover - require_view admits only signed-in callers
         raise UploadNotFound("Upload not found")
     admission = await prepare(
-        request.app, bound_tenant(), body.size, cap=ingest.settings.max_open_uploads_per_tenant
+        request.app,
+        bound_tenant(),
+        body.size,
+        cap=ingest.settings.max_open_uploads_per_tenant,
+        subject=await subject.for_app(request.app, current_factory(), bound_tenant(), collection),
     )
     # A session of its own: the admission lock must be its first statement
     # (SQLite), and is released as soon as the session row is committed.
@@ -132,7 +137,10 @@ async def complete_upload(
     done = await direct.existing(ingest.db, ticket)
     if done is not None:  # a replay is answered before any capacity check
         return result(done, body.filename or ticket.filename)
-    await billing.check(request.app, bound_tenant(), ticket.size)
+    payer = await subject.for_app(
+        request.app, billing.factory_of(ingest.db), bound_tenant(), collection
+    )
+    await billing.check(request.app, payer, ticket.size)
     meta = body.metadata.to_ingest() if body.metadata else direct.IngestMeta()
     outcome = await direct.complete(
         ingest,

@@ -228,6 +228,7 @@ class ImagesModule(ModuleBase):
     def _use_runtime(app: FastAPI, factory: object) -> None:
         from simple_module_hosting.tenancy import TenancyMode, tenancy_mode
 
+        from sm_images.core.billing.subject import app_mode
         from sm_images.core.storage import store_for
         from sm_images.pipeline.runtime import Runtime, use_runtime
 
@@ -239,5 +240,6 @@ class ImagesModule(ModuleBase):
                 bus=lambda: getattr(getattr(app.state, "sm", None), "event_bus", None),
                 # Anything not clearly single-tenant is multi: fail closed.
                 multi_tenant=lambda: tenancy_mode(app) is not TenancyMode.SINGLE,
+                subject_mode=lambda: app_mode(app),
             )
         )

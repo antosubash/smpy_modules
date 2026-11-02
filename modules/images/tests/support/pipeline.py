@@ -107,7 +107,7 @@ class Pipe:
             row = Collection(
                 slug=kw.pop("slug", f"c-{uuid.uuid4().hex[:8]}"),
                 name="C",
-                owner_id="olga",
+                owner_id=kw.pop("owner_id", "olga"),
                 pipeline_config={"steps": steps},
                 **kw,
             )

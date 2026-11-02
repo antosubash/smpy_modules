@@ -29,6 +29,7 @@ from sqlalchemy.orm import aliased
 
 from sm_images.core import billing
 from sm_images.core.billing import ops as billing_ops
+from sm_images.core.billing.subject import held_under
 from sm_images.core.clock.db import db_now
 from sm_images.models import BillingOp
 from sm_images.models.billing_op import (  # noqa: F401 - re-exported
@@ -59,6 +60,7 @@ _COLUMNS = (
     BillingOp.attempts,
     BillingOp.created_at,
     BillingOp.not_after,
+    BillingOp.subject,
 )
 
 
@@ -76,6 +78,8 @@ class Op:
     attempts: int
     created_at: datetime
     not_after: datetime | None
+    subject: str | None
+    """The subject its key and hold live under; ``None``: the tenant (#284)."""
 
 
 class ClaimLost(Exception):  # noqa: N818 - reads as the condition
@@ -160,7 +164,8 @@ async def _attempt(factory: Any, tenant: str, op_id: int, now: datetime) -> bool
         if meter is None:
             await run.finish_op(factory, mine, None)
         elif op.op != OP_RELEASE and now > deadline(op):
-            await run.expire(factory, tenant, mine, meter)  # the repair takes over
+            # the repair takes over; the key lives under the op's subject
+            await run.expire(factory, held_under(tenant, op.subject), mine, meter)
         elif op.op == OP_RELEASE:
             await run.release_hold(meter, op.hold_id)
             await run.finish_op(factory, mine, op.hold_id)

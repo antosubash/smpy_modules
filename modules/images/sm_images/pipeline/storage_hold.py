@@ -26,6 +26,12 @@ claim) commit together. **A completion that keeps nothing** hands its op to
 the settler (:func:`abandon`), which installs the swapped hold and queues the
 correcting shrink back to what the image stores.
 
+**Who pays** (#284): the subject the image's hold was taken under
+(``Image.storage_subject``, ``NULL`` meaning the tenant), so a mode switch or an
+ownership change never moves an existing hold; an image with no hold bills
+:attr:`~sm_images.pipeline.load.Loaded.subject` (the owner, in billing's
+``user`` mode). The new hold's subject is recorded with ``storage_hold_id``.
+
 Without billing only ``storage_bytes`` is written.
 """
 
@@ -41,6 +47,7 @@ from sqlalchemy import func, select, update
 from sm_images.core import billing
 from sm_images.core.billing import ops as billing_ops
 from sm_images.core.billing.settle import CLAIM
+from sm_images.core.billing.subject import held_under
 from sm_images.core.errors import StorageQuotaExceeded
 from sm_images.models import Image, Rendition
 from sm_images.models.billing_op import OP_EXPIRED, OP_SWAP
@@ -64,15 +71,21 @@ class Planned:
     op: billing_ops.Claimed | None = None
     queue: bool = False
     """Shrinking (or same size) with billing: the completion queues the swap."""
+    subject: str | None = None
+    """Who ``hold`` bills: recorded on the image with it."""
 
 
 async def parts(
     db: Any, tenant: str, image_id: uuid.UUID
-) -> tuple[int, int, int, str | None, int] | None:
-    """``(original, display copy, renditions, hold, storage_bytes)`` of the
-    image's stored bytes; ``None`` when there is no such image."""
+) -> tuple[int, int, int, str | None, int, str | None] | None:
+    """``(original, display copy, renditions, hold, storage_bytes, the hold's
+    subject)`` of the image's stored bytes; ``None`` when there is no such image."""
     stmt = select(
-        Image.size_bytes, Image.display_bytes, Image.storage_hold_id, Image.storage_bytes
+        Image.size_bytes,
+        Image.display_bytes,
+        Image.storage_hold_id,
+        Image.storage_bytes,
+        Image.storage_subject,
     ).where(Image.id == image_id, Image.tenant_id == tenant)
     image = (await db.execute(stmt)).first()
     if image is None:
@@ -82,7 +95,16 @@ async def parts(
             Rendition.image_id == image_id, Rendition.tenant_id == tenant
         )
     )
-    return int(image[0]), int(image[1]), int(rendered.scalar_one()), image[2], int(image[3])
+    total = int(rendered.scalar_one())
+    return int(image[0]), int(image[1]), total, image[2], int(image[3]), image[4]
+
+
+def bills(loaded: Any, hold: str | None, recorded: str | None) -> str:
+    """Who a swap of the image bills: the subject its hold ``hold`` was taken
+    under, or - for a first hold - the one the run loaded (the owner)."""
+    if hold is not None:
+        return held_under(loaded.tenant, recorded)
+    return loaded.subject or loaded.tenant
 
 
 async def reserve(runtime: Runtime, loaded: Any, staged: Any) -> Planned | None:
@@ -95,7 +117,7 @@ async def reserve(runtime: Runtime, loaded: Any, staged: Any) -> Planned | None:
         found = await parts(db, loaded.tenant, loaded.image_id)
     if found is None:
         raise LookupError("the image is gone")
-    original, display, renditions, _, _ = found
+    original, display, renditions, *_ = found
     if staged.display_key is not None:
         display = staged.display_bytes
     if staged.renditions:
@@ -107,11 +129,9 @@ async def reserve(runtime: Runtime, loaded: Any, staged: Any) -> Planned | None:
     opened = await _open(factory, loaded, planned, staged.attempt)
     if opened is None:
         return Planned(planned, queue=True)
-    op, old = opened
+    op, old, who = opened
     try:
-        hold = await billing.swap(
-            factory, loaded.tenant, old, planned, op.key, meter, not_after=op.not_after
-        )
+        hold = await billing.swap(factory, who, old, planned, op.key, meter, not_after=op.not_after)
     except StorageQuotaExceeded as exc:  # nothing changed: the old hold still counts
         await _finish(factory, op, f"{type(exc).__name__}: {exc}")
         raise
@@ -121,15 +141,16 @@ async def reserve(runtime: Runtime, loaded: Any, staged: Any) -> Planned | None:
     except Exception:  # outcome unknown: the settler obtains it
         await _hand_back(factory, op)
         raise
-    return Planned(planned, hold.id, old, op)
+    return Planned(planned, hold.id, old, op, subject=who)
 
 
 async def _open(
     factory: Any, loaded: Any, planned: int, attempt: str
-) -> tuple[billing_ops.Claimed, str | None] | None:
-    """Write our claimed ``swap`` op when ``planned`` grows the image; ``None``
-    when it does not. Settles a pending swap of the image once first;
-    :class:`HoldBusy` when one is still pending."""
+) -> tuple[billing_ops.Claimed, str | None, str] | None:
+    """Write our claimed ``swap`` op when ``planned`` grows the image, with the
+    old hold and the subject it bills; ``None`` when it does not. Settles a
+    pending swap of the image once first; :class:`HoldBusy` when one is still
+    pending."""
     tenant, image_id = loaded.tenant, loaded.image_id
     for first in (True, False):
         async with factory() as db:
@@ -142,12 +163,12 @@ async def _open(
                 return None
             waiting = await billing_ops.pending_swaps(db, tenant, image_id)
             if not waiting:
-                key = billing.hold_key(image_id, attempt)
+                key, who = billing.hold_key(image_id, attempt), bills(loaded, found[3], found[5])
                 op = await billing_ops.open_op(
-                    db, OP_SWAP, image_id, planned, key, claim=CLAIM, old=found[3]
+                    db, OP_SWAP, image_id, planned, key, claim=CLAIM, old=found[3], subject=who
                 )
                 await finalize_session(db)
-                return op, found[3]
+                return op, found[3], who
             await db.rollback()
         if first:
             await billing_ops.settle(factory, tenant, waiting)
@@ -162,7 +183,7 @@ async def record(db: Any, runtime: Runtime, loaded: Any, planned: Planned | None
         return True
     found = await parts(db, loaded.tenant, loaded.image_id)
     assert found is not None  # the caller holds its lock
-    original, display, renditions, hold, stored = found
+    original, display, renditions, hold, stored, held = found
     total = original + display + renditions
     if total != planned.total:
         return False
@@ -171,8 +192,12 @@ async def record(db: Any, runtime: Runtime, loaded: Any, planned: Planned | None
         if hold != planned.old or not await billing_ops.finish(db, planned.op, planned.hold):
             return False
         values["storage_hold_id"] = planned.hold
+        values["storage_subject"] = planned.subject  # with the hold, always
     elif planned.queue and total != stored:
-        await billing_ops.add_swap(db, loaded.image_id, total, factory=runtime.session_factory)
+        who = bills(loaded, hold, held)
+        await billing_ops.add_swap(
+            db, loaded.image_id, total, subject=who, factory=runtime.session_factory
+        )
     await db.execute(
         update(Image)
         .where(Image.id == loaded.image_id, Image.tenant_id == loaded.tenant)

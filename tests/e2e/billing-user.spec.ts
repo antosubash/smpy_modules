@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { login, moduleCsrfHeader } from './helpers';
@@ -15,6 +17,9 @@ import { login, moduleCsrfHeader } from './helpers';
  *
  *   E2E_BILLING_USER=1 npx playwright test billing-user
  *
+ * A second case (#284) uploads an image as a plain user and checks that the
+ * stored bytes land on that user's own Billing page, not the admin's.
+ *
  * The default suite ignores this file (playwright.config.ts). Stands alone: it
  * creates its own user and plan.
  */
@@ -22,6 +27,9 @@ import { login, moduleCsrfHeader } from './helpers';
 test.skip(!process.env.E2E_BILLING_USER, 'needs E2E_BILLING_USER=1 (billing subject_mode=user)');
 
 const COUNTER = 'demo.exports';
+const ROTATED = fileURLToPath(
+  new URL('../../modules/images/tests/fixtures/rotated.jpg', import.meta.url),
+);
 const ADMIN_API = '/api/billing/admin';
 
 async function createPlainUser(admin: Page, stamp: number) {
@@ -125,6 +133,48 @@ test('a user is billed as themselves, and an admin assigns them a plan', async (
   await expect(currentPlan(page)).toContainText('Free');
   expect(await planName(page)).toBe('Free');
   await expect(page.locator(`[data-meter="${COUNTER}"]`)).toHaveCount(0);
+});
+
+test('images a user uploads count on their own Billing page', async ({ page, browser }) => {
+  await login(page);
+  const user = await createPlainUser(page, Date.now());
+  const granted = await page.request.put(`/api/permissions/users/${user.id}`, {
+    headers: { 'content-type': 'application/json' },
+    data: { permissions: ['images.view', 'images.create'] },
+  });
+  expect(granted.status(), await granted.text()).toBe(200);
+
+  const STORAGE = '[data-meter="images.storage_bytes"]';
+  const adminMeter = async () => {
+    await page.goto('/billing/');
+    await expect(page.getByRole('heading', { name: 'Billing' })).toBeVisible();
+    const row = page.locator(STORAGE);
+    return (await row.count()) === 0 ? null : await row.innerText();
+  };
+  const before = await adminMeter();
+
+  const member = await signedIn(browser, user);
+  try {
+    await member.goto('/admin/images/');
+    await member.getByTestId('images-new-collection').click();
+    await member.getByLabel('Name').fill(`Mine ${Date.now().toString(36)}`);
+    await member.getByRole('button', { name: 'Create collection' }).click();
+    await member.waitForURL(/\/admin\/images\/[0-9a-f-]{36}$/);
+    await member.getByTestId('images-upload-input').setInputFiles(ROTATED);
+    await expect(member.getByTestId('images-gallery-tile')).toHaveCount(1);
+
+    // The stored bytes are the user's own usage, in the usage card.
+    await member.goto('/billing/');
+    const meter = member.getByTestId('usage-card').locator(STORAGE);
+    await expect(meter).toBeVisible();
+    await expect(meter).not.toContainText(/(^|\s)0 (B|bytes)\b/);
+    await expect(meter).toContainText(/[1-9]/);
+  } finally {
+    await member.context().close();
+  }
+
+  // The admin's subject is untouched.
+  expect(await adminMeter()).toBe(before);
 });
 
 test('the Subscriptions list pages past 50 users, keeping the search', async ({ page }) => {

@@ -16,7 +16,8 @@ from the prompt's JSON Schema after ``schema_safety.check``) or ``str``.
    of the same lease (a redelivered message) loses it and stops as if its
    lease were lost: no provider call, no result; the first one's stands;
 4. **metering** - one ``ai.requests`` per call through
-   ``sm_ai.contracts.consume_requests``, keyed by a digest of
+   ``sm_ai.contracts.consume_requests`` (billed to the collection owner in
+   billing's ``user`` mode, ``Staging.subject``), keyed by a digest of
    ``(tenant, image, step, version, lease token)`` so a retry of
    the same claim is never charged twice; a refusal fails ``quota_exceeded``
    (final until someone retries it: nothing re-queues a failed run);
@@ -141,7 +142,7 @@ async def ai_call(
         return failure("ai_not_configured", exc)
     await _start_once(ctx, staging)
     admitted = await contracts.consume_requests(
-        ctx.tenant_id,
+        staging.subject or ctx.tenant_id,
         idempotency_key=metering_key(ctx, version, staging.token),
         source=source,
         session_factory=staging.session_factory,

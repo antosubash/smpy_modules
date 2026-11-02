@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from simple_module_core import get_module_package_name
 from simple_module_db.tenancy import DEFAULT_TENANT_ID
 from sqlalchemy import select
 from users.constants import USER_ROLE_NAME
@@ -23,18 +22,6 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
-
-# Modules whose workers meter on the tenant, whatever the mode. ai's
-# request-time ``RequiresAiRequest`` is billing's ``RequiresQuota`` and bills the
-# user; only its worker-side ``consume_requests`` (images' AI steps) bills the
-# tenant, so ``ai.requests`` is split across the two subjects.
-_TENANT_BILLED = {"sm_images": "images", "sm_ai": "ai"}
-
-
-def installed_callers(app: FastAPI) -> list[str]:
-    """The loaded modules that keep metering on the tenant."""
-    loaded = {get_module_package_name(m) for m in app.state.sm.modules}
-    return [name for pkg, name in _TENANT_BILLED.items() if pkg in loaded]
 
 
 async def _has_default_rows(app: FastAPI) -> bool:
@@ -67,12 +54,4 @@ async def apply_subject_mode(app: FastAPI) -> None:
             "billing.subject_mode.stranded_default_rows: subscriptions, usage, holds "
             'or a customer recorded under the "default" subject are not visible in '
             "user mode"
-        )
-    callers = installed_callers(app)
-    if callers:
-        logger.warning(
-            "billing.subject_mode.tenant_billed_callers: %s meter on the tenant "
-            '("default") from workers, not on a user; ai.requests charged in a '
-            "request bills the user, so that meter is split across both subjects",
-            ", ".join(callers),
         )

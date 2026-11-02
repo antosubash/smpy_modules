@@ -37,7 +37,6 @@ import contextlib
 import hashlib
 import logging
 import uuid
-from collections.abc import Iterable
 from typing import Any
 
 from sqlalchemy.exc import IntegrityError
@@ -46,13 +45,12 @@ from sm_images import pipeline
 from sm_images.core import billing, events
 from sm_images.core.errors import StorageQuotaExceeded
 from sm_images.core.storage import ImageStore
-from sm_images.core.storage import keys as storage_keys
-from sm_images.core.storage.intents import clear_intents, object_intent
-from sm_images.core.tenancy import bound_tenant
+from sm_images.core.storage.intents import clear_intents
 from sm_images.ingest import dedupe
 from sm_images.ingest import slots as holds
 from sm_images.ingest.guards import Inspected, inspect, read_staged
 from sm_images.ingest.meta import IngestMeta, normalise
+from sm_images.ingest.service_holds import HoldsMixin
 from sm_images.ingest.slots import Duplicate, Slot, safe_filename
 from sm_images.models import Collection, Image, StepRun
 from sm_images.web.services import stats
@@ -62,7 +60,7 @@ __all__ = ["Duplicate", "IngestService", "Slot", "safe_filename"]
 logger = logging.getLogger(__name__)
 
 
-class IngestService:
+class IngestService(HoldsMixin):
     def __init__(
         self,
         db: Any,
@@ -79,43 +77,6 @@ class IngestService:
         self.intent_factory = intent_factory
         self._seen = dedupe.Seen()
         self.acquired: list[Any] = []  # every op held in ``db`` (:meth:`release_holds`)
-
-    # -- intents ---------------------------------------------------------
-
-    async def reserve(
-        self, collection: Collection, exts: Iterable[str], sizes: Iterable[int] | None = None
-    ) -> list[Slot]:
-        """Mint ids and keys for originals and record their intents in one go;
-        with ``sizes``, also reserve each original's storage hold (``slots``)."""
-        tenant = bound_tenant()
-        slots = []
-        for ext in exts:
-            image_id = uuid.uuid4()
-            key = storage_keys.original_key(tenant, str(collection.id), str(image_id), ext)
-            slots.append(Slot(image_id, key))
-        async with object_intent([s.key for s in slots], session_factory=self.intent_factory):
-            pass
-        if sizes is None:
-            return slots
-        return [await self._hold(s, n) for s, n in zip(slots, sizes, strict=True)]
-
-    async def _hold(self, slot: Slot, size: int) -> Slot:
-        held = await holds.hold_slot(self._factory(), bound_tenant(), slot, size)
-        self.acquired += [held.op] if held.op is not None else []
-        return held
-
-    async def release_holds(self) -> None:
-        """After a rollback (no write lock held): hand every op taken back on its own."""
-        await holds.release_after_rollback(self._factory(), self.acquired)
-
-    async def finalize(self) -> None:
-        """Finalize the caller's transaction; its holds follow the outcome
-        (:func:`~sm_images.ingest.slots.finalize_or_release`)."""
-        await holds.finalize_or_release(self.db, self._factory(), self.acquired)
-
-    def _factory(self) -> Any:
-        """Where billing's own short transactions run (``sm_images.core.billing``)."""
-        return billing.factory_of(self.db, self.intent_factory)
 
     def inspect(self, data: bytes) -> Inspected:
         return inspect(data, max_bytes=self.settings.max_image_bytes)
@@ -168,7 +129,7 @@ class IngestService:
             if staged_key is not None:
                 assert image_id is not None
                 key, new_id = staged_key, image_id
-                slot = await self._hold(Slot(new_id, key), len(data))
+                slot = await self._hold(collection, Slot(new_id, key), len(data))
                 if slot.refused:  # the caller removes its staged object
                     raise StorageQuotaExceeded(billing.FULL)
             else:
@@ -188,6 +149,7 @@ class IngestService:
             storage_key=key,
             storage_bytes=len(data),
             storage_hold_id=slot.hold,
+            storage_subject=slot.subject,
             filename=safe_filename(filename),
             content_type=info.content_type,
             size_bytes=len(data),

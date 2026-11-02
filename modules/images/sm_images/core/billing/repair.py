@@ -32,6 +32,13 @@ op, and one that moved since the reads is looked at again next lap. A
 release is only recorded there - a ``release`` op in that transaction, run
 after the commit - so no other decision can install the hold meanwhile.
 
+**Each hold is read under its own subject** (#284): the op's key and hold
+under the op's recorded ``subject``, the image's named hold under its
+``storage_subject`` (``NULL``: the tenant). Billing scopes both to a subject
+and, asked under another, answers ``Closed``/``None`` instead of failing. An
+installed orphan records the op's subject on the image, and an image naming
+no hold is corrected under the op's subject too.
+
 The scan walks bounded laps (``billing.repair_cursor``). A decided op is
 stamped ``repaired_at``; the sweep keeps an unexamined one.
 """
@@ -51,6 +58,7 @@ from sm_images.core.billing import ops as billing_ops
 from sm_images.core.billing import repair_cursor as cursor
 from sm_images.core.billing.install import lock
 from sm_images.core.billing.settle import OP_EXPIRED
+from sm_images.core.billing.subject import held_under
 from sm_images.models import BillingOp, Image
 from sm_images.models.billing_op import OP_INGEST, OP_SWAP
 
@@ -66,9 +74,11 @@ _COLUMNS = (
     BillingOp.quantity,
     BillingOp.idempotency_key,
     BillingOp.last_error,
+    BillingOp.subject,
     Image.id,
     Image.storage_hold_id,
     Image.storage_bytes,
+    Image.storage_subject,
 )
 
 
@@ -121,23 +131,26 @@ async def repair(factory: Any, tenant: str, now: datetime | None = None) -> int:
 
 
 async def _examine(factory: Any, tenant: str, meter: Any, row: Any, now: datetime) -> int | None:
-    op_id, image_id, hold_id, _qty, key, error, present, named, stored = row
+    op_id, image_id, hold_id, _qty, key, error, recorded, present, named, stored, named_under = row
+    own = held_under(tenant, recorded)  # the op's key and hold live there
     if hold_id is None and error == OP_EXPIRED and key:  # outcome unknown: get a final one
-        hold_id = billing.held_by(await billing.close_key(factory, tenant, key, meter))
+        hold_id = billing.held_by(await billing.close_key(factory, own, key, meter))
         if hold_id is not None:
             await _record_hold(factory, op_id, hold_id)
     orphan = None
     if hold_id is not None and hold_id != named:
-        found = await meter.get_hold(tenant, hold_id)
+        found = await meter.get_hold(own, hold_id)
         orphan = found if found is not None and found.status == _COMMITTED else None
-    current = None if named is None else await meter.get_hold(tenant, named)
+    current = None
+    if named is not None:
+        current = await meter.get_hold(held_under(tenant, named_under), named)
     counted = current is not None and current.status == _COMMITTED
     right = present is None or (counted and current.quantity == int(stored)) or int(stored) < 1
     if orphan is None and right:
         await _decided(factory, op_id, now)  # nothing lost, counted right
         return 0
-    seen = None if present is None else (named, int(stored))
-    return await _decide(factory, tenant, op_id, image_id, seen, orphan, counted, right, now)
+    seen = None if present is None else (named, int(stored), named_under)
+    return await _decide(factory, tenant, op_id, image_id, seen, (orphan, own), counted, right, now)
 
 
 async def _record_hold(factory: Any, op_id: int, hold_id: str) -> None:
@@ -156,18 +169,24 @@ async def _decide(
     tenant: str,
     op_id: int,
     image_id: uuid.UUID,
-    seen: tuple[str | None, int] | None,
-    orphan: Any,
+    seen: tuple[str | None, int, str | None] | None,
+    lost: tuple[Any, str],
     counted: bool,
     right: bool,
     now: datetime,
 ) -> int | None:
     """Act under the image's row lock; 1 if something was repaired, ``None``
-    when the image moved since the reads (``seen``: what it named and stored,
-    ``None`` if gone), or has an op unfinished (left for the next lap)."""
+    when the image moved since the reads (``seen``: what it named, stored and
+    the named hold's subject, ``None`` if gone), or has an op unfinished (left
+    for the next lap). ``lost``: the op's orphan hold (or ``None``) and the
+    subject it lives under."""
+    orphan, own = lost
     async with factory() as db:
         row = await lock(db, tenant, image_id)
-        now_seen = None if row is None else (row[0], int(row[1]))
+        now_seen = None if row is None else (row[0], int(row[1]), row[2])
+        # the subject of the hold the image names; one naming none gets its new
+        # hold under the op's own subject (the owner's), never the tenant's
+        under = None if row is None else own if row[0] is None else held_under(tenant, row[2])
         if await billing_ops.unfinished(db, tenant, image_id) or now_seen != seen:
             await db.rollback()
             return None
@@ -177,13 +196,13 @@ async def _decide(
             await db.execute(
                 update(Image)
                 .where(Image.id == image_id, Image.tenant_id == tenant)
-                .values(storage_hold_id=orphan.id)
+                .values(storage_hold_id=orphan.id, storage_subject=own)
                 .execution_options(include_deleted=True, synchronize_session=False)
             )
-            right = orphan.quantity == int(row[1])
-            counted = True
+            right, counted, under = orphan.quantity == int(row[1]), True, own
         if row is not None and not right and (counted or orphan is None):
-            await billing_ops.add_swap(db, image_id, int(row[1]), factory=factory)
+            assert under is not None
+            await billing_ops.add_swap(db, image_id, int(row[1]), subject=under, factory=factory)
         await _stamp(db, op_id, now)
         await finalize_session(db)
     logger.warning("images.billing_repair image=%s op=%s", image_id, op_id)

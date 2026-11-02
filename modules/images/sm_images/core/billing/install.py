@@ -13,6 +13,11 @@ that could have installed it. An ``ingest`` op reaching a settler means its
 image was never inserted (that insert finishes the op itself, and cannot
 while we hold the claim), so its release is recorded the same way. A
 ``release`` op is billing's ``release``, after the commit that decided it.
+
+**Every call names the op's recorded subject** (``BillingOp.subject``, #284),
+never one derived now: billing scopes keys and holds to a subject. A queued
+swap fixes its subject together with its old hold (:func:`_fix_old`), and an
+installed hold records it on the image (``Image.storage_subject``).
 """
 
 from __future__ import annotations
@@ -28,6 +33,7 @@ from sqlalchemy import select, update
 from sm_images.core import billing
 from sm_images.core.billing import ops as billing_ops
 from sm_images.core.billing.settle import OP_EXPIRED, ClaimLost, Op, deadline
+from sm_images.core.billing.subject import held_under
 from sm_images.core.errors import StorageQuotaExceeded
 from sm_images.models import BillingOp, Image
 from sm_images.models.billing_op import NO_HOLD, OP_SWAP
@@ -38,33 +44,39 @@ logger = logging.getLogger(__name__)
 
 
 async def swap(factory: Any, tenant: str, op: Op, mine: Any, meter: Any) -> None:
-    present, named = False, None
+    """Run a claimed ``swap``/``ingest`` op of ``tenant`` under its subject."""
+    present, named, named_under = False, None, None
     if op.op == OP_SWAP and op.image_id is not None:
-        present, named = await _names(factory, tenant, op.image_id)
-    fixed = op.old_hold_id
+        present, named, named_under = await _names(factory, tenant, op.image_id)
+    fixed, subject = op.old_hold_id, held_under(tenant, op.subject)
     if fixed is None:  # a queued swap: fix its old hold before billing hears of it
         fixed = named or NO_HOLD
-        await _fix_old(factory, mine, fixed)
+        if named is not None:  # with the subject that hold lives under
+            subject = held_under(tenant, named_under)
+        await _fix_old(factory, mine, fixed, subject)
     old = None if fixed == NO_HOLD else fixed
     try:
         hold = await billing.swap(
-            factory, tenant, old, op.quantity, mine.key, meter, not_after=deadline(op)
+            factory, subject, old, op.quantity, mine.key, meter, not_after=deadline(op)
         )
     except StorageQuotaExceeded as exc:  # nothing changed: the old hold still counts
         await finish_op(factory, mine, None, f"{type(exc).__name__}: {exc}")
         return
     except billing.SwapExpired:  # past the deadline, or closed: billing changed nothing
-        await expire(factory, tenant, mine, meter)
+        await expire(factory, subject, mine, meter)
         return
     if hold is None:
         await finish_op(factory, mine, None)
     elif not present:  # never inserted (fenced by our claim), or gone
         await _spare(factory, op, mine, hold.id)
     else:
-        await _install(factory, tenant, op, mine, old, hold)
+        await _install(factory, tenant, op, mine, old, hold, subject)
 
 
-async def _fix_old(factory: Any, mine: Any, old: str) -> None:
+async def _fix_old(factory: Any, mine: Any, old: str, subject: str) -> None:
+    """Fix a queued op's old hold and, with it, the subject that hold lives
+    under (the image's, or the op's own when it names none). Billing has not
+    heard of the key yet, so moving it to another subject is safe."""
     async with factory() as db:
         got = await db.execute(
             update(BillingOp)
@@ -73,7 +85,7 @@ async def _fix_old(factory: Any, mine: Any, old: str) -> None:
                 BillingOp.claim_token == mine.token,
                 BillingOp.done_at.is_(None),
             )
-            .values(old_hold_id=old)
+            .values(old_hold_id=old, subject=subject)
             .returning(BillingOp.id)
             .execution_options(synchronize_session=False)
         )
@@ -83,23 +95,26 @@ async def _fix_old(factory: Any, mine: Any, old: str) -> None:
         await finalize_session(db)
 
 
-async def _names(factory: Any, tenant: str, image_id: uuid.UUID) -> tuple[bool, str | None]:
-    """Whether the image exists (trashed included), and the hold it names."""
+async def _names(
+    factory: Any, tenant: str, image_id: uuid.UUID
+) -> tuple[bool, str | None, str | None]:
+    """Whether the image exists (trashed included), the hold it names and the
+    subject recorded for it (``None``: the tenant)."""
     async with factory() as db:
         row = (
             await db.execute(
-                select(Image.storage_hold_id)
+                select(Image.storage_hold_id, Image.storage_subject)
                 .where(Image.id == image_id, Image.tenant_id == tenant)
                 .execution_options(include_deleted=True)
             )
         ).first()
         await finalize_session(db)
-    return (False, None) if row is None else (True, row[0])
+    return (False, None, None) if row is None else (True, row[0], row[1])
 
 
 async def lock(db: Any, tenant: str, image_id: uuid.UUID) -> Any:
     """Take the image's row lock (trashed included: the same lock the executor's
-    completion takes); ``(storage_hold_id, storage_bytes)``, or ``None`` when it
+    completion takes); ``(storage_hold_id, storage_bytes, storage_subject)``, or ``None`` when it
     is gone. Every decision to install or release an image's hold is taken
     under it."""
     return (
@@ -107,7 +122,7 @@ async def lock(db: Any, tenant: str, image_id: uuid.UUID) -> Any:
             update(Image)
             .where(Image.id == image_id, Image.tenant_id == tenant)
             .values(updated_at=Image.updated_at)
-            .returning(Image.storage_hold_id, Image.storage_bytes)
+            .returning(Image.storage_hold_id, Image.storage_bytes, Image.storage_subject)
             .execution_options(include_deleted=True, synchronize_session=False)
         )
     ).first()
@@ -125,11 +140,12 @@ async def _spare(factory: Any, op: Op, mine: Any, hold_id: str) -> None:
 
 
 async def _install(
-    factory: Any, tenant: str, op: Op, mine: Any, old: str | None, hold: Any
+    factory: Any, tenant: str, op: Op, mine: Any, old: str | None, hold: Any, subject: str
 ) -> None:
-    """Under the image's row lock: write ``hold`` onto the image while it still
-    names ``old``; else (gone, or moved on) record ``hold``'s release - this op,
-    finished in the same transaction, is the only one that could install it.
+    """Under the image's row lock: write ``hold`` (taken under ``subject``)
+    onto the image while it still names ``old``; else (gone, or moved on)
+    record ``hold``'s release - this op, finished in the same transaction, is
+    the only one that could install it.
     :class:`ClaimLost` when the op is no longer ours."""
     assert op.image_id is not None
     async with factory() as db:
@@ -142,21 +158,23 @@ async def _install(
             await db.execute(
                 update(Image)
                 .where(Image.id == op.image_id, Image.tenant_id == tenant)
-                .values(storage_hold_id=hold.id)
+                .values(storage_hold_id=hold.id, storage_subject=subject)
                 .execution_options(include_deleted=True, synchronize_session=False)
             )
             later = [
                 i for i in await billing_ops.pending_swaps(db, tenant, op.image_id) if i > op.id
             ]
             if int(row[1]) != op.quantity and not later:
-                await billing_ops.add_swap(db, op.image_id, int(row[1]), factory=factory)
+                await billing_ops.add_swap(
+                    db, op.image_id, int(row[1]), subject=subject, factory=factory
+                )
         if not await billing_ops.finish(db, mine, hold.id):
             await db.rollback()
             raise ClaimLost(op.id)
         await finalize_session(db)
 
 
-async def expire(factory: Any, tenant: str, mine: Any, meter: Any) -> None:
+async def expire(factory: Any, subject: str, mine: Any, meter: Any) -> None:
     """Finish an op at its deadline (or once billing answered its key is
     expired or closed), without a hold of its own - only after billing gave
     the key a terminal outcome: ``close_key`` returns the hold a swap made
@@ -165,8 +183,10 @@ async def expire(factory: Any, tenant: str, mine: Any, meter: Any) -> None:
     returns is kept on the op (``hold_id``) for the repair to install or
     release. If billing cannot answer, this raises and the op stays
     unfinished, to be retried. The decision may come from our clock: closing
-    early only refuses a late call, and the repair then looks at the image."""
-    found = await billing.close_key(factory, tenant, mine.key, meter)
+    early only refuses a late call, and the repair then looks at the image.
+    ``subject`` is the op's: the key lives there, and under another billing
+    would answer ``Closed`` while a swap under the real one still writes."""
+    found = await billing.close_key(factory, subject, mine.key, meter)
     await finish_op(factory, mine, billing.held_by(found), OP_EXPIRED)
 
 

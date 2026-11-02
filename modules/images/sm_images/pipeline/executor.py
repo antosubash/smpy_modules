@@ -65,6 +65,8 @@ class Staging:
     """The runtime's sessions, for metering outside a request."""
     display_safe: bool = True
     """Whether the display copy may leave the system (``Loaded.display_safe``)."""
+    subject: str | None = None
+    """Who an AI charge bills (``Loaded.subject``; ``None``: the tenant)."""
 
 
 def bounded(outcome: StepOutcome, max_bytes: int) -> StepOutcome:
@@ -139,6 +141,7 @@ async def _run(runtime: Runtime, loaded: Loaded, impl: Any, staging: Staging) ->
         on_progress=lease.renew,
     )
     staging.token = loaded.token
+    staging.subject = loaded.subject
     staging.session_factory = runtime.session_factory
     staging.display_safe = loaded.display_safe
     ctx._staging = staging

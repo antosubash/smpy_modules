@@ -64,6 +64,13 @@ class Runtime:
     Changes are counted either way; a test pipeline turns hand-offs off so a
     test that is not about the map never runs tippecanoe."""
 
+    subject_mode: Callable[[], str] | None = None
+    """Billing's subject mode (``"tenant"``/``"user"``): the app's in the web
+    process, the DB-backed setting in a worker. ``None`` is ``"tenant"``."""
+
+    def billing_mode(self) -> str:
+        return "tenant" if self.subject_mode is None else self.subject_mode()
+
     def is_eager(self) -> bool:
         return celery_eager() if self.eager is None else self.eager
 

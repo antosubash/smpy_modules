@@ -22,9 +22,7 @@ mode is read once at startup. At boot, in `user` mode, billing:
 - maps `billing.view` and `billing.manage` onto the framework's `user` role,
   so every signed-in user can open their own Billing page;
 - subscribes the `UserDeleted` teardown (below);
-- logs two warnings when they apply (see
-  [Rows do not move](#rows-do-not-move) and
-  [Worker metering stays on the tenant](#worker-metering-stays-on-the-tenant)).
+- logs a warning when it applies (see [Rows do not move](#rows-do-not-move)).
 
 In `tenant` mode nothing changes.
 
@@ -137,20 +135,45 @@ The first argument of every `UsageMeter` method is the billing subject (the
 parameter is still called `tenant_id`; renaming it is deferred). The key
 helpers import nothing heavy, so a Celery worker can load them without the app.
 
-## Worker metering stays on the tenant
+## Images bills the collection's owner
 
-Request-time metering follows the mode: ai's `RequiresAiRequest` *is*
-billing's `RequiresQuota("ai.requests")`, so an AI request made from a route
-bills the signed-in user. The worker paths do not: images' steps, and ai's
-`consume_requests` that images' AI steps call, pass the row's tenant, which is
-`default` on a single-tenant host. In `user` mode, then, images' meters are
-counted against `default`, and `ai.requests` is **split across two subjects**:
-each user's own counter for requests made in a request, and `default` for
-requests made by workers. Boot logs `billing.subject_mode.tenant_billed_callers`
-naming whichever of the two is installed (`subject_boot.py`). Billing the
-worker paths per user is follow-up work (they would use `worker_subject_mode`
-above); until then a plan limit on one of their meters applies to the whole
-host for worker usage in `user` mode.
+In `user` mode images bills `user:<collection.owner_id>`, in the web process
+and in the workers alike (`sm_images/core/billing/subject.py`). One image has
+one payer, so its storage hold is swapped, grown and released under one
+subject for its whole life. Sharing a collection does not move the bill: the
+owner pays for what others upload into it.
+
+- **Covered.** The storage hold taken at upload or import, pipeline growth,
+  settle, repair and release, and the AI steps' `ai.requests`
+  (`consume_requests`). `ai.requests` is no longer split: a request made in a
+  route and a request made by a worker both bill the user. An AI charge uses
+  the owner as of now.
+- **Recorded, not re-derived.** The subject a hold was taken under is written
+  to `images_billing_op.subject` and `images_image.storage_subject`. Settle,
+  repair and growth replay it, so a mode switch or a change of owner never
+  sends a swap to a subject that does not hold the key. It is always written
+  explicitly, `default` included in `tenant` mode. `NULL` (rows from before
+  #284, or billing off) means the row's tenant, so old holds stay on `default`
+  and keep settling and releasing as before.
+- **No hold yet.** An image that names no hold bills the owner. Repair
+  corrects such an image under the subject of the op it examines.
+- **Upload pre-checks.** The advisory check reads the owner's headroom, and
+  opening a direct or ZIP upload compares it with the declared sizes of the
+  open uploads into collections of the same owner only: another user's open
+  upload is held against that user's gauge, not this one's room. The
+  open-upload cap (`max_open_uploads_per_tenant`) and the admission lock stay
+  per tenant; the cap bounds concurrency, it is not a quota.
+- **Unbillable owner.** An owner with no valid user row (deleted, or not a
+  UUID) falls back to the tenant. Images logs
+  `images.billing.owner_unbillable collection=<id>` once per collection.
+- **Worker lag.** A worker reads the mode through `worker_subject_mode()`,
+  cached about 30 s, so a new hold follows a mode switch about 30 s after the
+  restart. Holds already taken keep their recorded subject.
+- **Rows do not move.** Holds taken under `default` before the switch stay
+  there, as in [Rows do not move](#rows-do-not-move).
+
+A new images billing call takes its subject from the op or the image, or from
+`sm_images.core.billing.subject`; it never builds one by hand.
 
 ## Stripe Customer Portal in user mode
 
