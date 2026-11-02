@@ -113,6 +113,15 @@ Public routes are `GET` and `HEAD` only: the collection page, the gallery
 `r/{size}`, `display` and `original` byte routes. An unknown slug, a foreign
 tenant and an unbound tenant all get the one 404 body.
 
+`/api/images/public/stats?metric=…&collection={slug}` answers one number,
+`{"value": n}`, for the pagebuilder `ImageStats` block. `images` and `located`
+count exactly what the gallery lists (not trashed, past the redaction gate, with
+a current `small` rendition), for one public collection or summed over every
+public collection when `collection` is left out. `collections` counts the public
+collections. It never reads the stored `image_count`, which includes images the
+public must not see. A private, internal, trashed or unknown slug is the same
+404, and an unknown or missing `metric` is a 400.
+
 Every byte response can be revoked later (the collection goes private,
 `protect_originals` is switched on, anonymization is enabled, a share is
 withdrawn), so **every response revalidates**: nothing is `immutable` or carries
@@ -131,6 +140,9 @@ Who may share the answer:
 - A protected original is `private, no-store` for everyone, the owner included.
 - The map surfaces (points, `map.pmtiles`) follow the same split; the points
   ETag digests the answer itself, so a gated page never validates a raw one.
+- The counts follow it too, without an ETag: for one collection, the rule
+  of its display copy; over every public collection, `public, no-cache` under
+  the same tenant condition.
 - Error answers on the public routes carry `no-store`.
 
 `public_asset_base_url`, when set, makes public pages link renditions of public

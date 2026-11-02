@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import Select, select
 
 from sm_images.core import constants
 from sm_images.core.access import redaction
@@ -20,7 +20,25 @@ from sm_images.models import Collection, Image, Rendition
 from sm_images.web.services import cursor as cursors
 from sm_images.web.serving import urls
 
-__all__ = ["page"]
+__all__ = ["page", "visible"]
+
+
+def visible(stmt: Select[Any], collection: Collection) -> Select[Any]:
+    """*stmt* narrowed to the images of *collection* the gallery lists, joined to
+    each one's current ``small`` rendition: not trashed, passing the redaction
+    gate, and cut from the current display copy. One row per image (a rendition
+    is unique per image and size). The gallery and the public counts
+    (:mod:`~sm_images.web.services.public_stats`) both go through here."""
+    return stmt.join(
+        Rendition,
+        (Rendition.image_id == Image.id)
+        & (Rendition.size == constants.THUMB_SIZE)
+        & (Rendition.source_generation == Image.display_generation),
+    ).where(
+        Image.collection_id == collection.id,
+        Image.is_deleted.is_(False),
+        redaction.ready_clause(collection),
+    )
 
 
 async def page(
@@ -31,20 +49,7 @@ async def page(
     cursor: str | None = None,
 ) -> dict[str, Any]:
     limit = max(1, min(int(limit), constants.PAGE_MAX))
-    stmt = (
-        select(Image, Rendition)
-        .join(
-            Rendition,
-            (Rendition.image_id == Image.id)
-            & (Rendition.size == constants.THUMB_SIZE)
-            & (Rendition.source_generation == Image.display_generation),
-        )
-        .where(
-            Image.collection_id == collection.id,
-            Image.is_deleted.is_(False),
-            redaction.ready_clause(collection),
-        )
-    )
+    stmt = visible(select(Image, Rendition), collection)
     if cursor:
         stmt = stmt.where(cursors.seek(Image.created_at, Image.id, cursor))
     stmt = stmt.order_by(Image.created_at.desc(), Image.id.desc()).limit(limit + 1)

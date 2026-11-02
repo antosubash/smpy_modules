@@ -67,6 +67,7 @@ __all__ = [
     "cache_headers",
     "etag",
     "if_range_ok",
+    "listing_headers",
     "not_modified",
     "version",
 ]
@@ -110,6 +111,13 @@ def cache_headers(
         return NO_STORE if protected else PRIVATE
     shared = twin and collection.visibility == Visibility.PUBLIC and _shared_tenant(request)
     return PUBLIC_NO_CACHE if shared else PRIVATE
+
+
+def listing_headers(request: Any) -> str:
+    """The ``Cache-Control`` of an anonymous answer about no one collection (the
+    public counts over every public collection): shareable under the same
+    tenant rule as :func:`cache_headers`, and only through the public twin."""
+    return PUBLIC_NO_CACHE if _shared_tenant(request) else PRIVATE
 
 
 def version(generation: int, key: str) -> str:

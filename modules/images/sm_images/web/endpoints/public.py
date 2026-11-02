@@ -5,7 +5,8 @@
 and ``HEAD`` only): a **public** collection's images and map for anyone, through
 ``bind_public`` and :func:`~sm_images.core.access.public_collection`. A private or
 internal collection is the 404 an unknown slug gets, whoever asks - the owner
-included, who has the admin routes.
+included, who has the admin routes. ``/public/stats`` counts what those
+galleries show, for the ``ImageStats`` block (#88).
 
 The twin answers as the anonymous surface for everyone: the caller's identity
 is never consulted, so a protected original is a 403 here even for its owner,
@@ -22,9 +23,10 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Coroutine
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.deps import get_db
@@ -42,7 +44,7 @@ from sm_images.web.endpoints.map_params import (
     get_and_head,
     points_response,
 )
-from sm_images.web.services import public_gallery
+from sm_images.web.services import public_gallery, public_stats
 from sm_images.web.serving import cache, respond
 
 _NO_STORE = "no-store"
@@ -119,6 +121,33 @@ async def public_images(
         request, collection, cache.DISPLAY, twin=True
     )
     return body
+
+
+@get_and_head(router, "/stats")
+async def public_stat(
+    request: Request,
+    db: Any = Depends(get_db),
+    metric: str | None = Query(None),
+    collection: str | None = Query(None),
+) -> Response:
+    """One count for the ``ImageStats`` block: ``{"value": int}``. ``metric`` is
+    checked here, not by FastAPI, so a bad one is an ``ImagesError`` 400 and
+    carries ``no-store`` like every other refusal. No ETag: a few bytes."""
+    if metric not in public_stats.METRICS:
+        raise ImagesError("Unknown metric")
+    coll = None
+    if collection is not None and metric != "collections":
+        coll = await public_collection(collection, db)
+    chosen = cast("public_stats.Metric", metric)
+    value = await public_stats.public_stat(db, metric=chosen, collection=coll)
+    headers = {
+        "Cache-Control": cache.listing_headers(request)
+        if coll is None
+        else cache.cache_headers(request, coll, cache.DISPLAY, twin=True)
+    }
+    if request.method == "HEAD":
+        return Response(headers=headers, media_type="application/json")
+    return JSONResponse({"value": value}, headers=headers)
 
 
 @router.get("/c/{slug}/points")
