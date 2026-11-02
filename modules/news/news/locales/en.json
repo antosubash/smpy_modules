@@ -235,7 +235,8 @@
     "reload": "Reload",
     "publish": "Publish",
     "sent_back": "Sent back:",
-    "select_a_block": "Select a block to edit it. The headline, URL and publish date belong to the article — edit them on the article screen."
+    "select_a_block": "Select a block to edit it. The headline, URL and publish date belong to the article — edit them on the article screen.",
+    "zoom": "Zoom"
   },
   "categories": {
     "title": "Categories",
