@@ -26,9 +26,8 @@ OLGA = f"user:{user_uuid('olga')}"
 
 
 @pytest.fixture
-def web_user_mode(monkeypatch, user_mode):
-    monkeypatch.setattr(subject, "runtime_mode", lambda: subject.USER)
-    return user_mode
+def web_user_mode(user_mode):
+    return user_mode.web()
 
 
 async def _upload(uploads) -> None:

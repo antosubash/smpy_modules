@@ -54,7 +54,7 @@ from sm_images.models.billing_op import OP_EXPIRED, OP_SWAP
 from sm_images.pipeline.claim import lock_image
 from sm_images.pipeline.runtime import Runtime
 
-__all__ = ["HoldBusy", "Planned", "abandon", "bills", "parts", "record", "reserve"]
+__all__ = ["HoldBusy", "Planned", "abandon", "parts", "record", "reserve"]
 
 
 class HoldBusy(Exception):  # noqa: N818 - reads as the condition

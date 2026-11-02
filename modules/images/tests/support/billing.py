@@ -214,7 +214,18 @@ def user_mode(monkeypatch):
         app.state.billing_subject_mode = "user"
         return app
 
-    return SimpleNamespace(runtime=runtime, app=app)
+    def web(app_=None):
+        """The web path: ``subject.runtime_mode()`` (ingest, ``slots``) reads user."""
+        monkeypatch.setattr(subject, "runtime_mode", lambda: subject.USER)
+        return user_mode_ns if app_ is None else app(app_)
+
+    user_mode_ns = SimpleNamespace(runtime=runtime, app=app, web=web)
+    return user_mode_ns
+
+
+async def no_settle(*args, **kwargs) -> int:
+    """Stands in for ``billing_ops.settle``: the test settles when it chooses."""
+    return 0
 
 
 async def ops(db_state) -> list:

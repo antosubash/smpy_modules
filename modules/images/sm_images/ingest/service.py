@@ -149,7 +149,7 @@ class IngestService(HoldsMixin):
             storage_key=key,
             storage_bytes=len(data),
             storage_hold_id=slot.hold,
-            storage_subject=slot.subject if slot.hold else None,
+            storage_subject=slot.subject,
             filename=safe_filename(filename),
             content_type=info.content_type,
             size_bytes=len(data),

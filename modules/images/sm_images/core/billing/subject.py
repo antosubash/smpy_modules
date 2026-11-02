@@ -103,7 +103,7 @@ def image_subject(
 
     try:
         return subject_for_user(owner_id)
-    except (ValueError, TypeError):
+    except ValueError:
         _unbillable(collection_id)
         return tenant
 
@@ -138,4 +138,5 @@ async def owner_subject_in(factory: Any, tenant: str, collection: Any, mode: str
 
 
 async def for_app(app: Any, factory: Any, tenant: str, collection: Any) -> str:
+    """:func:`owner_subject_in` in the web process's mode (``app.state``)."""
     return await owner_subject_in(factory, tenant, collection, app_mode(app))

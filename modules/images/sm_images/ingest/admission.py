@@ -12,10 +12,7 @@ their holds. So :func:`admit` refuses, before the session row is inserted:
   lock, so admission never opens a billing connection while holding it.
   Without billing this part is skipped.
 
-**Serialised per tenant.** The open-session count, the cap and the lock stay per
-tenant even when the headroom is a user's (billing's ``user`` mode): other
-users' open uploads still count against the room, which is conservative.
- :func:`admit` first *writes* the tenant's
+**Serialised per tenant.** :func:`admit` first *writes* the tenant's
 ``images_upload_admission`` row (an upsert, then an ``UPDATE``): the row lock on
 Postgres, the database write lock on SQLite. The caller inserts the session row
 in the same transaction and commits, which releases the lock, so the next
@@ -26,6 +23,10 @@ seen - an overshoot of at most the sum of those concurrent increases, each of
 which its own hold then refuses or counts. Run :func:`admit` as the transaction's first statement
 (SQLite: a transaction that read first can fail to take the write lock with
 ``SQLITE_BUSY_SNAPSHOT`` instead of waiting).
+
+The open-session count, the cap and the lock stay per tenant even when the
+headroom is a user's (billing's ``user`` mode): other users' open uploads still
+count against that user's room.
 
 The declared size is held to at part and complete time: every part must be
 exactly its expected size, and ``multipart.assemble`` refuses a missing, short

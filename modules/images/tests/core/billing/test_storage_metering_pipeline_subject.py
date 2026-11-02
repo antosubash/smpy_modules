@@ -19,7 +19,7 @@ from sm_images.core.tenancy import DEFAULT_TENANT as T
 from sm_images.pipeline.orchestrate import rerun_image
 
 from tests.core.billing.test_storage_metering_swap import Sized
-from tests.support.billing import assert_counted_once, held_image, ops
+from tests.support.billing import assert_counted_once, held_image, no_settle, ops
 from tests.support.pipeline import Blur, use_steps
 
 
@@ -39,10 +39,6 @@ def owner(pipe, user_mode) -> str:
 
 async def _owned(pipe, owner: str, steps=None):
     return await pipe.collection(steps or {"acme.blur": {}, "renditions": {}}, owner_id=owner)
-
-
-async def _no_settle(*args, **kwargs) -> int:
-    return 0
 
 
 async def test_growth_first_hold_in_user_mode_bills_owner(pipe, blur, gauge, owner):
@@ -90,7 +86,7 @@ async def test_shrink_queues_swap_under_held_subject(pipe, gauge, owner, monkeyp
     await pipe.run(img)
     step.dims = (8, 6)
     with monkeypatch.context() as later:  # the shrink waits: read it as queued
-        later.setattr(billing_ops, "settle", _no_settle)
+        later.setattr(billing_ops, "settle", no_settle)
         await rerun_image(pipe.runtime, T, img, "force")
     (shrink,) = [o for o in await ops(pipe.db_state) if o.done_at is None]
     assert shrink.subject == a == (await pipe.row(img)).storage_subject

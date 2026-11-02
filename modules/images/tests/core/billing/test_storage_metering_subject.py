@@ -21,7 +21,7 @@ from sm_images.models import BillingOp, Collection, Image
 from sm_images.models.billing_op import OP_INGEST, OP_SWAP
 from sqlalchemy import update
 
-from tests.support.billing import assert_counted_once, held_image, ops
+from tests.support.billing import assert_counted_once, held_image, no_settle, ops
 
 
 def _user() -> str:
@@ -45,10 +45,6 @@ async def _queue(pipe, img, qty: int, subject: str | None) -> BillingOp:
             row = await billing_ops.add_swap(s, img, qty, subject=subject)
         await s.commit()  # not finalize_session: the test settles when it chooses
     return row
-
-
-async def _no_settle(*args, **kwargs) -> int:
-    return 0
 
 
 async def _done(pipe, img, hold_id, qty, key, subject, op=OP_SWAP, **kw) -> None:
@@ -197,7 +193,7 @@ async def test_repair_installs_orphan_with_its_subject(pipe, gauge, monkeypatch)
     await _done(pipe, img, orphan.id, size - 1, "lost", who)
     factory = pipe.db_state.session_factory
     with monkeypatch.context() as later:  # the correction waits: read it as written
-        later.setattr(billing_ops, "settle", _no_settle)
+        later.setattr(billing_ops, "settle", no_settle)
         assert await billing_repair.repair(factory, T) == 1
     (fix,) = [o for o in await ops(pipe.db_state) if o.done_at is None]
     assert (fix.quantity, fix.subject) == (size, who)
@@ -236,7 +232,7 @@ async def test_repair_bills_a_hold_less_image_to_the_ops_subject(pipe, gauge, mo
         await s.commit()
     await _done(pipe, img, None, 5000, "lost-ingest", who, op=OP_INGEST, last_error="refused")
     with monkeypatch.context() as later:  # the correction waits: read it as written
-        later.setattr(billing_ops, "settle", _no_settle)
+        later.setattr(billing_ops, "settle", no_settle)
         assert await billing_repair.repair(pipe.db_state.session_factory, T) == 1
     (fix,) = [o for o in await ops(pipe.db_state) if o.done_at is None]
     assert (fix.quantity, fix.subject) == (5000, who)

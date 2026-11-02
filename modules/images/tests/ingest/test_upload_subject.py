@@ -10,7 +10,6 @@ from __future__ import annotations
 import pytest
 import pytest_asyncio
 from sm_images.core import constants
-from sm_images.core.billing import subject
 from sm_images.models import Collection
 from sm_images.module import ImagesModule
 
@@ -33,9 +32,8 @@ async def api(uploads, gauge):
 
 
 @pytest.fixture
-def web_user(api, user_mode, monkeypatch):
-    user_mode.app(api.app)
-    monkeypatch.setattr(subject, "runtime_mode", lambda: subject.USER)
+def web_user(api, user_mode):
+    user_mode.web(api.app)
     return api
 
 
