@@ -10,9 +10,9 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 
 import { useContentLocale } from '../hooks/useContentLocale';
-import { fetchPublishedCount } from '../utils/api';
 import { keys } from '../utils/i18n';
 import { intlLocale } from '../utils/locale';
+import { fetchPublishedCount } from '../utils/stats-api';
 
 export interface NewsStatItem {
   /** `page` counts the page's own language; `all` counts every language. */
