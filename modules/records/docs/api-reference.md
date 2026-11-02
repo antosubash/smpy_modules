@@ -1395,10 +1395,11 @@ curl -s 'http://localhost:8000/api/records/public/product/stats?metric=sum:price
   tenant — and bounded the same way: past `max_count` (10,000) `value` is
   `max_count` and `capped` is `true`, the listing's `total_capped`. The block
   shows that as `10,000+`.
-- `metric=sum:<field>` is the **exact** sum of an indexed, single-valued
+- `metric=sum:<field>` is the sum of an indexed, single-valued
   `number` field the public shape carries — an `int` when it is whole, a
-  `float` otherwise, `0` over no rows. A block rounds it for display; the API
-  does not. It reads at most `max_count + 1` matching records: when more
+  `float` otherwise, `0` over no rows. The database's sum is returned as-is
+  (SQLite adds floats, so `0.1 + 0.2` is `0.30000000000000004`; Postgres
+  `numeric` gives `0.3`); the block rounds it to two decimals for display. It reads at most `max_count + 1` matching records: when more
   match, the answer is `{"value": null, "capped": true}` — not available,
   rather than the sum of some of them — and the block shows a dash. Narrow it
   with `?filter=` to get a number.
@@ -1407,9 +1408,10 @@ curl -s 'http://localhost:8000/api/records/public/product/stats?metric=sum:price
   content locale, case-insensitive, an unconfigured or dropped language a
   `400`) and **always applied**, so a translated record counts once.
 - Every field named — filtered on *or* summed — goes through the listing's
-  allow-list. `sum:position`, `sum:<virtual field>`, `sum:<text field>` and
+  allow-list. `sum:position`, `sum:<virtual field>` and
   `filter=created_at:…` are the same `400` naming the field a refused filter
-  gets: a sum under a filter that keeps one row is that row's value. Any
+  gets (`sum:<text field>` or a multi-valued field is a `400` saying it is not
+  a number field that can be summed): a sum under a filter that keeps one row is that row's value. Any
   metric other than `count` and `sum:<field>` — `min` and `max` included — is
   a `400` saying it is not a supported metric; there is no `group_by`.
 - Registered before `{type_key}/{uuid}`, so `stats` is never read as a uuid; a

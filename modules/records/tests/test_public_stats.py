@@ -1,6 +1,6 @@
 """``GET {public_route_prefix}/{type_key}/stats`` — the live stats block's number (#88).
 
-One count or one exact sum over what the public listing would show, and not a
+One count or one sum over what the public listing would show, and not a
 row more: published, out of the trash, in the bound tenant, in one language
 resolved exactly as the listing resolves it. Everything the listing refuses to
 filter or sort by, this refuses to sum or filter by, with the same 400 naming
@@ -99,10 +99,18 @@ async def test_sum_over_nothing_is_zero(parcels):
 
 async def test_sum_refuses_hidden_or_non_number(parcels):
     await _parcel(parcels, "a", 1)
-    for name in ("risk", "nope", "position", "created_at", "name", "notes", "published_at"):
+    for name in ("risk", "nope", "position", "created_at"):
         resp = await parcels.get(f"{_STATS}?metric=sum:{name}")
         assert resp.status_code == 400, (name, resp.text)
-        assert repr(name) in resp.json()["detail"], name
+        assert resp.json()["detail"] == f"cannot filter or sort by {name!r}", name
+
+
+async def test_sum_of_non_number_says_it_cannot_be_summed(parcels):
+    await _parcel(parcels, "a", 1)
+    for name in ("name", "kind", "notes", "published_at"):
+        resp = await parcels.get(f"{_STATS}?metric=sum:{name}")
+        assert resp.status_code == 400, (name, resp.text)
+        assert resp.json()["detail"] == f"{name!r} is not a number field that can be summed"
 
 
 async def test_filter_narrows(parcels):
@@ -120,7 +128,13 @@ async def test_hidden_filter_refused(parcels):
         for name in ("created_at", "position", "risk", "status", "locale"):
             resp = await parcels.get(f"{_STATS}?metric={metric}&filter={name}:gte:0")
             assert resp.status_code == 400, (metric, name, resp.text)
-            assert repr(name) in resp.json()["detail"], (metric, name)
+            assert resp.json()["detail"] == f"cannot filter or sort by {name!r}", (metric, name)
+
+
+async def test_bad_filter_op_keeps_filter_message(parcels):
+    resp = await parcels.get(f"{_STATS}?metric=sum:area&filter=name:gte:0")
+    assert resp.status_code == 400, resp.text
+    assert "summed" not in resp.json()["detail"]
 
 
 async def test_min_metric_refused(parcels):

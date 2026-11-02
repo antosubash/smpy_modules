@@ -94,7 +94,7 @@ is the module's usual public 404/400, with `no-store`.
   the shared 404), `_published_only`, and `_check_columns` for the filter and
   the summed field. It reuses `aggregate_query` with those clauses added.
 - A sum over a non-integer field is rounded for display only (two decimals);
-  the API returns the exact number. Only indexed number fields can be summed.
+  the API returns the database's sum as-is (SQLite float noise included). Only indexed number fields can be summed.
 - The locale is resolved as the public listing resolves it and always applied,
   so a translated record counts once.
 - The item picks a type from the admin type list (`resolveFields`, as

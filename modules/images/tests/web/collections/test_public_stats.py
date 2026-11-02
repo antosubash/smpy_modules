@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import pytest
 import pytest_asyncio
-from sm_images.core.tenancy import DEFAULT_TENANT
+from sm_images.core.tenancy import DEFAULT_TENANT, tenant_scope
 from sm_images.models import Visibility
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from tests.support.isolation import ACME
 from tests.support.public_stats import (
     URL,
+    _image,
     blur_installed,  # noqa: F401 - autouse
     stat,
 )
@@ -38,6 +39,22 @@ async def test_counts_public_ready_images(client):
     assert await _value(client, "images") == 3
     assert await _value(client, "located", coll.slug) == 2
     assert await _value(client, "located") == 2
+
+
+async def test_located_needs_both_coordinates_in_range(client):
+    """The map's rule: a coordinate out of range is an image but not a located
+    one. (A lat without a lng cannot be stored: ``ck_images_image_coords_paired``.)"""
+    (coll,) = await _seed(client.db_state.session_factory, [(Visibility.PUBLIC, False, 1, 1, 0)])
+    odd = [("bad-lat", {"lat": 91.0, "lng": 2.0}),
+           ("bad-lng", {"lat": 1.0, "lng": 181.0})]  # fmt: skip
+    with tenant_scope(DEFAULT_TENANT):
+        async with client.db_state.session_factory() as s:
+            for name, at in odd:
+                await _image(s, coll, name, settled=False, **at)
+            await s.commit()
+    for slug in (coll.slug, None):
+        assert await _value(client, "images", slug) == 3
+        assert await _value(client, "located", slug) == 1
 
 
 async def test_all_collections_total_excludes_private(client):

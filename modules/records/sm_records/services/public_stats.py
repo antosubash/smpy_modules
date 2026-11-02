@@ -59,13 +59,14 @@ PUBLIC_METRICS = frozenset({"count", "sum"})
 
 
 def _number(value: Decimal | float | int | None) -> int | float:
-    """The exact sum as JSON can carry it: an int when it is whole.
+    """The database's sum as JSON can carry it: an int when it is whole.
 
     ``SUM`` over the ``NUMERIC`` index column is a ``Decimal`` (and ``NULL``
     over no rows, which is a sum of nothing: ``0``). A whole value becomes an
     ``int`` so ``1284`` is not served as ``1284.0``; anything else is a
-    ``float``, which is exact for every value the index's scale can hold at
-    the sizes a stats band shows.
+    ``float``. The sum is returned as the database computed it, not rounded:
+    SQLite adds floats (``0.1 + 0.2`` is ``0.30000000000000004``), Postgres
+    ``numeric`` is exact (``0.3``). The block rounds for display.
     """
     if value is None:
         return 0
@@ -76,7 +77,8 @@ def _number(value: Decimal | float | int | None) -> int | float:
 
 
 class UnsupportedMetricError(ValueError):
-    """``?metric=`` is not ``count`` or ``sum:<field>``.
+    """``?metric=`` is not ``count`` or ``sum:<field>``, or the summed field is
+    not a single-valued number.
 
     Not a ``QueryError``: the endpoint flattens those into "cannot filter or
     sort by <field>", which is the wrong sentence about a metric — and telling
@@ -128,6 +130,12 @@ async def public_stat(
         stmt = bounded_count_query(rtype, fields, filters, cap=cap, narrow=narrow)
         counted = int((await db.execute(stmt)).scalar_one())
         return (cap, True) if counted > cap else (counted, False)
+    try:  # the summed field alone: a filter's refusal below must stay a filter's
+        bounded_sum_query(rtype, fields, [], metric=asked, cap=cap, narrow=narrow)
+    except QueryError as exc:
+        raise UnsupportedMetricError(
+            f"{asked.field!r} is not a number field that can be summed"
+        ) from exc
     stmt = bounded_sum_query(rtype, fields, filters, metric=asked, cap=cap, narrow=narrow)
     matched, total = (await db.execute(stmt)).one()
     return (None, True) if matched > cap else (_number(total), False)
