@@ -11,6 +11,10 @@ a plugin's) it also decides :attr:`Loaded.display_safe` the way serving
 does: a trusted (redacted) display copy, or nothing pending redaction. The
 planner already orders these steps after the display mutator; this catches
 the cases it cannot see, such as a mutator whose plugin was uninstalled.
+
+:attr:`Loaded.subject` is who a first storage hold or an AI charge bills
+(``sm_images.core.billing.subject``): the tenant, or in billing's ``user``
+mode the collection's owner. Tenant mode reads no collection for it.
 """
 
 from __future__ import annotations
@@ -24,6 +28,7 @@ from simple_module_db import finalize_session
 from sqlalchemy import select
 
 from sm_images.contracts.schemas import ImageRead
+from sm_images.core.billing import subject
 from sm_images.models import Collection, Image, StepRun
 from sm_images.models.enums import StepStatus
 from sm_images.pipeline import registry
@@ -51,15 +56,20 @@ class Loaded:
     impl: Any = None
     """The registered step, or the prompt step resolved for this execution."""
     display_safe: bool = True
+    subject: str | None = None
+    """Who a first hold or a charge bills (``None``: the tenant)."""
 
 
-async def _display_safe(db: Any, tenant: str, image: Image) -> bool:
-    from sm_images.core.access import redaction
-
+async def _collection(db: Any, tenant: str, image: Image) -> Collection | None:
     stmt = select(Collection).where(
         Collection.id == image.collection_id, Collection.tenant_id == tenant
     )
-    collection = (await db.execute(stmt)).scalar_one_or_none()
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def _display_safe(db: Any, collection: Collection | None, image: Image) -> bool:
+    from sm_images.core.access import redaction
+
     if collection is None:
         return False
     if redaction.trusts_display(collection, image):
@@ -97,9 +107,14 @@ async def load_run(
                 from sm_images.pipeline.ai import prompt_steps
 
                 impl = await prompt_steps.full(db, tenant, impl)
-            safe = True
-            if sends_display_out(impl):
-                safe = await _display_safe(db, tenant, image)
+            mode, sends = runtime.billing_mode(), sends_display_out(impl)
+            collection = None
+            if sends or mode == subject.USER:
+                collection = await _collection(db, tenant, image)
+            safe = await _display_safe(db, collection, image) if sends else True
+            who = tenant
+            if collection is not None:
+                who = await subject.owner_subject(db, tenant, collection, mode)
             loaded = Loaded(
                 tenant=tenant,
                 image_id=image_id,
@@ -114,6 +129,7 @@ async def load_run(
                 mutates_display=bool(getattr(impl, "mutates_display", False)),
                 impl=impl,
                 display_safe=safe,
+                subject=who,
             )
         await finalize_session(db)  # read-only: closes the transaction before any work
     return loaded
