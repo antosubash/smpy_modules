@@ -75,8 +75,20 @@ async def test_submit_waits_for_its_own_delivery_behind_an_unrelated_one(pipe):
     await asyncio.wait_for(started.wait(), timeout=10)
     assert transport._dispatch_lock.locked()  # the unrelated delivery holds it
 
-    asyncio.get_running_loop().call_later(0.2, gate.set)
+    # Release the unrelated delivery only once submit's own delivery is queued
+    # behind it, so the test always exercises the contention it describes.
+    queued = asyncio.Event()
+    dispatch = transport._dispatch
+
+    async def dispatch_and_signal(ids):
+        queued.set()
+        return await dispatch(ids)
+
+    transport._dispatch = dispatch_and_signal
     submit = asyncio.ensure_future(pipe.run(mine))
+    await asyncio.wait_for(queued.wait(), timeout=10)
+    assert not submit.done()  # it waits for its own delivery
+    gate.set()
     done, _ = await asyncio.wait({submit}, timeout=10)
     returned_with = list(delivered)  # what was delivered when submit returned
     await _bounded(transport, asyncio.sleep(0))  # cleanup; fails on a hang
