@@ -76,30 +76,40 @@ export function ImageStatsRender({ title, subtitle, surface, items }: ImageStats
   const numberLocale = useNumberLocale();
   // `resolveData` never runs on an anonymous public page, so clamp here too.
   const safe = useMemo(() => clampStatItems(items), [items]);
-  const [values, setValues] = useState<(PublicStat | null)[]>([]);
+  // Values by the key of the request that produced them, never by position: a
+  // reorder or a delete must not show one frame of another item's number.
+  const [values, setValues] = useState<Record<string, PublicStat | null>>({});
 
   // Only what changes the requests: editing a label must not refetch.
-  const fetchKey = JSON.stringify(
-    safe.map((item) => [item.metric, item.metric === 'collections' ? '' : (item.collection ?? '')]),
+  const itemKeys = safe.map((item) =>
+    JSON.stringify([item.metric, item.metric === 'collections' ? '' : (item.collection ?? '')]),
   );
+  const fetchKey = JSON.stringify(itemKeys);
 
   useEffect(() => {
-    const specs = JSON.parse(fetchKey) as [StatMetric, string][];
+    const keys = JSON.parse(fetchKey) as string[];
     const controller = new AbortController();
-    setValues([]);
     Promise.allSettled(
-      specs.map(([metric, collection]) =>
-        fetchPublicStat({ metric, collection, signal: controller.signal }),
-      ),
+      keys.map((key) => {
+        const [metric, collection] = JSON.parse(key) as [StatMetric, string];
+        return fetchPublicStat({ metric, collection, signal: controller.signal });
+      }),
     ).then((results) => {
       if (controller.signal.aborted) return;
-      setValues(results.map((r) => (r.status === 'fulfilled' ? r.value : null)));
+      setValues(
+        Object.fromEntries(
+          keys.map((key, i) => {
+            const r = results[i];
+            return [key, r.status === 'fulfilled' ? r.value : null];
+          }),
+        ),
+      );
     });
     return () => controller.abort();
   }, [fetchKey]);
 
   const shown = safe.map((item, index) => ({
-    value: formatValue(item, values[index] ?? null, numberLocale),
+    value: formatValue(item, values[itemKeys[index]] ?? null, numberLocale),
     label: item.label,
     iconUrl: item.iconUrl || undefined,
   }));

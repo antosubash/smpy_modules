@@ -20,7 +20,7 @@ import { keys } from './ui/utils/i18n';
 
 try {
   registerPuckBlocks({
-    blocks: { ImageGallery: ImageGalleryBlock, ImageStats: ImageStatsBlock },
+    blocks: { ImageGallery: ImageGalleryBlock },
     // A catalogue key, resolved by pagebuilder's localizeConfig at render.
     category: { key: 'images', title: keys.images.block.palette_group },
     // Page-only: a gallery in the site header or footer would repeat on every page.
@@ -29,5 +29,15 @@ try {
   // Registering twice throws by design (a name already taken); in a
   // hot-reloading dev server that is a re-run of this module, and it must not
   // blank the editor.
-  console.warn('[images] blocks not registered:', error);
+  console.warn('[images] ImageGallery block not registered:', error);
+}
+
+// Its own guard: a clash on one name must not leave the other unregistered.
+try {
+  registerPuckBlocks({
+    blocks: { ImageStats: ImageStatsBlock },
+    category: { key: 'images', title: keys.images.block.palette_group },
+  });
+} catch (error) {
+  console.warn('[images] ImageStats block not registered:', error);
 }

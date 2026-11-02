@@ -119,8 +119,9 @@ count exactly what the gallery lists (not trashed, past the redaction gate, with
 a current `small` rendition), for one public collection or summed over every
 public collection when `collection` is left out. `collections` counts the public
 collections. It never reads the stored `image_count`, which includes images the
-public must not see. A private, internal, trashed or unknown slug is the same
-404, and an unknown or missing `metric` is a 400.
+public must not see. For `images` and `located` a private, internal, trashed or unknown slug is the
+same 404; `collections` ignores `collection` (the block sends none), so it
+answers 200 whatever the slug. An unknown or missing `metric` is a 400.
 
 The answer is `{"value": n, "capped": bool}` and every count is bounded, since
 the route is anonymous: a count reads at most `MAX_COUNT + 1` (10,000) rows and
@@ -151,9 +152,11 @@ Who may share the answer:
 - A protected original is `private, no-store` for everyone, the owner included.
 - The map surfaces (points, `map.pmtiles`) follow the same split; the points
   ETag digests the answer itself, so a gated page never validates a raw one.
-- The counts follow it too, without an ETag: for one collection, the rule
-  of its display copy; over every public collection, `public, no-cache` under
-  the same tenant condition.
+- The counts follow the same tenant condition but are the one exception to
+  "every response revalidates": no ETag, and `public, max-age=60` when shareable
+  (otherwise `private, no-cache`), so a page full of `ImageStats` blocks does
+  not run the bounded queries on every view. A count shows nothing a revoked
+  image could leak.
 - Error answers on the public routes carry `no-store`.
 
 `public_asset_base_url`, when set, makes public pages link renditions of public

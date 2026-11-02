@@ -64,11 +64,12 @@ __all__ = [
     "PRIVATE_NO_CACHE",
     "PUBLIC_NO_CACHE",
     "RENDITION",
+    "STATS_SHARED",
     "cache_headers",
     "etag",
     "if_range_ok",
-    "listing_headers",
     "not_modified",
+    "stats_headers",
     "version",
 ]
 
@@ -79,6 +80,10 @@ ORIGINAL: Final = "original"
 PUBLIC_NO_CACHE: Final = "public, no-cache"
 PRIVATE_NO_CACHE: Final = "private, no-cache"
 NO_STORE: Final = "private, no-store"
+STATS_SHARED: Final = "public, max-age=60"
+"""The public counts: a minute of freshness, because a page view of an
+``ImageStats`` block would otherwise run the bounded queries every time. A
+count reveals nothing a revoked image could leak, so staleness is harmless."""
 PRIVATE: Final = PRIVATE_NO_CACHE
 """Everything not shareable and not a protected original."""
 
@@ -113,12 +118,12 @@ def cache_headers(
     return PUBLIC_NO_CACHE if shared else PRIVATE
 
 
-def listing_headers(request: Any) -> str:
-    """The ``Cache-Control`` of an anonymous answer that is not an image's bytes
-    (the public counts, over one public collection or all of them): shareable
-    under the same tenant rule as :func:`cache_headers`, and only through the
-    public twin."""
-    return PUBLIC_NO_CACHE if _shared_tenant(request) else PRIVATE
+def stats_headers(request: Any) -> str:
+    """The ``Cache-Control`` of the anonymous public counts (over one public
+    collection or all of them): a short shared ``max-age`` under the same tenant
+    rule as :func:`cache_headers`, otherwise :data:`PRIVATE`. Unlike the byte
+    routes it is not revalidated: a count has no ETag and is only a number."""
+    return STATS_SHARED if _shared_tenant(request) else PRIVATE
 
 
 def version(generation: int, key: str) -> str:

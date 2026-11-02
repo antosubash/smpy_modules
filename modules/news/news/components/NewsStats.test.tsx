@@ -141,6 +141,21 @@ describe('NewsStatsRender', () => {
     expect(all.has('locale')).toBe(false);
   });
 
+  it("never shows another item's number on the render after a reorder", async () => {
+    respond = async (url) =>
+      new Response(JSON.stringify({ value: url.includes('category=News') ? 111 : 222 }));
+    const a = item({ category: 'News', label: 'A' });
+    const b = item({ category: 'Blog', label: 'B' });
+    await mount([a, b]);
+    expect(values()).toEqual(['111', '222']);
+    // Freeze the refetch: only the first render after the prop change counts.
+    respond = () => new Promise(() => {});
+    await mount([b, a]);
+    expect(values()).toEqual(['222', '111']);
+    await mount([item({ category: 'Events' })]);
+    expect(values()).toEqual(['–']);
+  });
+
   it('renders at most six of a stored list, skipping an unknown language', async () => {
     const stored = [
       ...Array.from({ length: 8 }, () => item()),

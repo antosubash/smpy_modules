@@ -89,28 +89,39 @@ export function RecordStatsRender({
   const numberLocale = useDateLocale({ locale });
   // `resolveData` never runs on an anonymous public page, so clamp here too.
   const safe = useMemo(() => clampStatItems(items), [items]);
-  const [values, setValues] = useState<(PublicStat | null)[]>([]);
+  // Values by the key of the request that produced them, never by position: a
+  // reorder, a delete or a locale change must not show one frame of another
+  // item's number while the effect catches up. The key carries the block-wide
+  // parts (prefix, locale, tenant) too.
+  const [values, setValues] = useState<Record<string, PublicStat | null>>({});
 
   // Only what changes the requests: editing a label must not refetch.
-  const fetchKey = JSON.stringify([
-    apiPrefix ?? '',
-    locale ?? '',
-    tenant ?? '',
-    safe.map((item) => [item.typeKey ?? '', metricOf(item), item.filter ?? '']),
-  ]);
+  const itemKeys = safe.map((item) =>
+    JSON.stringify([
+      apiPrefix ?? '',
+      locale ?? '',
+      tenant ?? '',
+      item.typeKey ?? '',
+      metricOf(item),
+      item.filter ?? '',
+    ]),
+  );
+  const fetchKey = JSON.stringify(itemKeys);
 
   useEffect(() => {
-    const [prefix, itemLocale, itemTenant, specs] = JSON.parse(fetchKey) as [
-      string,
-      string,
-      string,
-      [string, string | null, string][],
-    ];
+    const keys = JSON.parse(fetchKey) as string[];
     const controller = new AbortController();
-    setValues([]);
     Promise.allSettled(
-      specs.map(([typeKey, metric, filter]) =>
-        metric === null
+      keys.map((key) => {
+        const [prefix, itemLocale, itemTenant, typeKey, metric, filter] = JSON.parse(key) as [
+          string,
+          string,
+          string,
+          string,
+          string | null,
+          string,
+        ];
+        return metric === null
           ? Promise.reject(new Error('incomplete stat'))
           : fetchPublicStat(prefix, typeKey, {
               metric,
@@ -118,17 +129,24 @@ export function RecordStatsRender({
               locale: itemLocale,
               tenant: itemTenant,
               signal: controller.signal,
-            }),
-      ),
+            });
+      }),
     ).then((results) => {
       if (controller.signal.aborted) return;
-      setValues(results.map((r) => (r.status === 'fulfilled' ? r.value : null)));
+      setValues(
+        Object.fromEntries(
+          keys.map((key, i) => {
+            const r = results[i];
+            return [key, r.status === 'fulfilled' ? r.value : null];
+          }),
+        ),
+      );
     });
     return () => controller.abort();
   }, [fetchKey]);
 
   const shown = safe.map((item, index) => ({
-    value: formatValue(item, values[index] ?? null, numberLocale),
+    value: formatValue(item, values[itemKeys[index]] ?? null, numberLocale),
     label: item.label,
     iconUrl: item.iconUrl || undefined,
   }));

@@ -163,6 +163,29 @@ describe('ImageStatsRender', () => {
     await view.unmount();
   });
 
+  it("never shows another item's number on the render after a reorder", async () => {
+    respond = async (url) =>
+      new Response(JSON.stringify({ value: url.includes('metric=images') ? 111 : 222 }));
+    const a = item({ metric: 'images', label: 'A' });
+    const b = item({ metric: 'located', label: 'B' });
+    const view = await render([a, b]);
+    expect(values(view)).toEqual(['111', '222']);
+    // Freeze the refetch: only the first render after the prop change counts.
+    respond = () => new Promise(() => {});
+    await view.render(<ImageStatsRender title="" subtitle="" surface="default" items={[b, a]} />);
+    expect(values(view)).toEqual(['222', '111']);
+    await view.render(
+      <ImageStatsRender
+        title=""
+        subtitle=""
+        surface="default"
+        items={[item({ metric: 'located', collection: 'trees' })]}
+      />,
+    );
+    expect(values(view)).toEqual(['–']);
+    await view.unmount();
+  });
+
   it('does not refetch when only a label changes', async () => {
     const view = await render([item()]);
     await view.render(

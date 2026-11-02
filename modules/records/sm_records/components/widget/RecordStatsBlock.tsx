@@ -122,7 +122,14 @@ export const RecordStatsBlock: ComponentConfig<RecordStatsProps> = {
     const chosen = new Set((data.props.items ?? []).map((item) => item?.typeKey ?? ''));
     return buildFields(
       translate,
-      types.map((rtype) => ({ label: rtype.label, value: rtype.key })),
+      // Like the list block: a type that is not public renders nothing on the
+      // site (its stats route is a 404), so the author is told in the picker.
+      types.map((rtype) => ({
+        label: rtype.is_public
+          ? rtype.label
+          : translate(keys.records.widget.type_not_public, { label: rtype.label }),
+        value: rtype.key,
+      })),
       sumFieldOptions(types, chosen),
     );
   },

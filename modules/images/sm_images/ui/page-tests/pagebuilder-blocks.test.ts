@@ -6,9 +6,13 @@ describe('pagebuilder-blocks', () => {
       '@simple-module-py/pagebuilder/pagebuilder/components/blockRegistry'
     );
     await import('../../pagebuilder-blocks');
-    const mine = registeredBlocks().find((r) => 'ImageGallery' in r.blocks);
-    expect(mine?.blocks).toHaveProperty('ImageStats');
-    expect(mine?.category).toEqual({ key: 'images', title: 'images.block.palette_group' });
-    expect(mine?.layout).toBeFalsy();
+    // Each block has its own guarded registration, so a clash on one name
+    // cannot leave the other unregistered.
+    for (const name of ['ImageGallery', 'ImageStats']) {
+      const mine = registeredBlocks().find((r) => name in r.blocks);
+      expect(mine, name).toBeDefined();
+      expect(mine?.category).toEqual({ key: 'images', title: 'images.block.palette_group' });
+      expect(mine?.layout).toBeFalsy();
+    }
   });
 });
