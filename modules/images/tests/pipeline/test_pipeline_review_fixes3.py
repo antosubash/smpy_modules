@@ -52,6 +52,9 @@ async def test_submit_waits_for_its_own_delivery_behind_an_unrelated_one(pipe):
     """An unrelated delivery holds the dispatcher lock; an independent eager
     submit must still return only once its own durable delivery is done."""
     transport = await _transport(pipe)
+    # The held delivery must outlast every bounded wait below, or its handler
+    # timeout would release the lock and the contention would vanish.
+    transport._services.settings.outbox_handler_timeout_seconds = 60
     use_steps(Scripted("acme.x"))
     coll = await pipe.collection({"acme.x": {}})
     other = await pipe.image(coll)
@@ -88,6 +91,7 @@ async def test_submit_waits_for_its_own_delivery_behind_an_unrelated_one(pipe):
     submit = asyncio.ensure_future(pipe.run(mine))
     await asyncio.wait_for(queued.wait(), timeout=10)
     assert not submit.done()  # it waits for its own delivery
+    assert transport._dispatch_lock.locked() and str(other) not in delivered
     gate.set()
     done, _ = await asyncio.wait({submit}, timeout=10)
     returned_with = list(delivered)  # what was delivered when submit returned
