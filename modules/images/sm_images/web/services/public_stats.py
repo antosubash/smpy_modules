@@ -34,6 +34,7 @@ from sqlalchemy import JSON, Select, func, or_, select
 from sqlalchemy.orm import aliased
 
 from sm_images.core.access import redaction
+from sm_images.map.points import in_range
 from sm_images.models import Collection, Image, Visibility
 from sm_images.web.services.public_gallery import gate, visible, visible_where
 
@@ -79,8 +80,7 @@ def _images(metric: Metric) -> Select[Any]:
     stmt = select(*_columns(Image))
     if metric != "located":
         return stmt
-    # The map's own rule (``map.points.located``): both coordinates, in range.
-    return stmt.where(Image.lat.between(-90, 90), Image.lng.between(-180, 180))
+    return stmt.where(in_range())  # the map's own rule
 
 
 def _public() -> Select[Any]:

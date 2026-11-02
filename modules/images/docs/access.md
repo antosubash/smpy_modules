@@ -116,7 +116,8 @@ tenant and an unbound tenant all get the one 404 body.
 `/api/images/public/stats?metric=…&collection={slug}` answers one number,
 for the pagebuilder `ImageStats` block. `images` and `located`
 count exactly what the gallery lists (not trashed, past the redaction gate, with
-a current `small` rendition), for one public collection or summed over every
+a current `small` rendition; `located` also needs both coordinates in
+range, the map's rule), for one public collection or summed over every
 public collection when `collection` is left out. `collections` counts the public
 collections. It never reads the stored `image_count`, which includes images the
 public must not see. For `images` and `located` a private, internal, trashed or unknown slug is the

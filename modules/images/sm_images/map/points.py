@@ -27,7 +27,7 @@ from sm_images.core.errors import Invalid
 from sm_images.models import Collection, Image
 from sm_images.web.services import cursor as cursors
 
-__all__ = ["BBox", "check_bbox", "feature", "located", "page", "parse_bbox"]
+__all__ = ["BBox", "check_bbox", "feature", "in_range", "located", "page", "parse_bbox"]
 
 BBox = tuple[float, float, float, float]
 """``(minx, miny, maxx, maxy)`` in degrees; ``minx > maxx`` crosses the antimeridian."""
@@ -67,6 +67,11 @@ def _in_box(box: BBox) -> Any:
     return and_(lat, or_(Image.lng >= minx, Image.lng <= maxx))
 
 
+def in_range() -> Any:
+    """Both coordinates present and real: the map's (and the stats') "located"."""
+    return and_(Image.lat.between(-90, 90), Image.lng.between(-180, 180))
+
+
 def located(collection: Collection, *columns: Any) -> Any:
     """``SELECT columns`` (default: the point's) over the images of *collection*
     that may be placed. ``ready_clause`` reads the collection's config now."""
@@ -74,8 +79,7 @@ def located(collection: Collection, *columns: Any) -> Any:
     return select(*cols).where(
         Image.collection_id == collection.id,
         Image.is_deleted.is_(False),
-        Image.lat.between(-90, 90),
-        Image.lng.between(-180, 180),
+        in_range(),
         redaction.ready_clause(collection),
     )
 
