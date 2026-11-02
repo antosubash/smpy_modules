@@ -82,6 +82,9 @@ class Image(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  #
     """When the janitor last failed to delete this (trashed) image's objects;
     such images go to the back of later purge passes (``sm_images.jobs.purge``)."""
     storage_hold_id: str | None = Field(default=None, max_length=64)
+    storage_subject: str | None = Field(default=None, max_length=64)
+    """The billing subject ``storage_hold_id`` was taken under (#284); ``NULL``
+    is ``tenant_id`` (holds before #284)."""
     storage_bytes: int = Field(default=0, sa_type=BigInteger, sa_column_kwargs={"nullable": False})
     """Sum of this image's objects (original, display copy, renditions), as held
     against the storage gauge (``sm_images.core.billing``)."""

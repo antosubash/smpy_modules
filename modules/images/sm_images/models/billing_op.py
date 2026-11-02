@@ -50,6 +50,9 @@ class BillingOp(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[u
     """The hold a ``swap`` replaces, fixed before billing first hears of it (every
     retry names the same one: billing refuses a replay naming another);
     :data:`NO_HOLD` for none."""
+    subject: str | None = Field(default=None, max_length=64)
+    """The billing subject this op bills (#284): its key and its hold live there.
+    ``NULL`` is the row's ``tenant_id`` (rows before #284)."""
     quantity: int = Field(default=0, sa_type=BigInteger, sa_column_kwargs={"nullable": False})
     idempotency_key: str | None = Field(default=None, max_length=128)
     attempts: int = Field(default=0, sa_column_kwargs={"nullable": False})
