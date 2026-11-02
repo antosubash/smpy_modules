@@ -34,3 +34,21 @@ export const publicMapUrl = (slug: string) => `${publicBase(slug)}/map.pmtiles`;
 /** The display copy the anonymous twin serves (no `?v=`: a point names only an id). */
 export const publicDisplayUrl = (slug: string, imageId: string) =>
   `${publicBase(slug)}/images/${imageId}/display`;
+
+export type StatMetric = 'images' | 'located' | 'collections';
+
+/** One count from `/api/images/public/stats` (the `ImageStats` block). A blank
+ *  `collection`, or any collection for `collections`, is sent as no param. */
+export async function fetchPublicStat(opts: {
+  metric: StatMetric;
+  collection: string;
+  signal: AbortSignal;
+}): Promise<number> {
+  const qs = new URLSearchParams({ metric: opts.metric });
+  if (opts.metric !== 'collections' && opts.collection) qs.set('collection', opts.collection);
+  const body = await read<{ value?: unknown }>(`/api/images/public/stats?${qs}`, opts.signal);
+  if (typeof body.value !== 'number' || !Number.isFinite(body.value)) {
+    throw new Error('bad stat');
+  }
+  return body.value;
+}
