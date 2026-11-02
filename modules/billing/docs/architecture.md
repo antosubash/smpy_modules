@@ -365,7 +365,7 @@ reconcile tenant re-read `provider`, the two secrets (as ciphertext) and the
 interval from the settings table and rebuild the same way when they differ. A
 loop that finds itself stale ends its tick; one told to stop mid-claim hands
 the claim back (`scheduler._claim_safely`) before the cancel propagates. Secrets are `enc:v1:<fernet>` under a key derived from the app's
-`secret_key` (`crypto.py`, a copy of `sm_ai.crypto`'s scheme — a published
+`secret_key` (`crypto.py`, a copy of `sm_ai.core.crypto`'s scheme — a published
 module must not import a sibling optional module).
 
 ## Adding a payment provider

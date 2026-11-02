@@ -97,7 +97,7 @@ FAMILIES: tuple[Family, ...] = (
                     "verify_csrf_if_configured": "See `_check`.",
                 },
             ),
-            Copy(f"{AI}/csrf.py"),
+            Copy(f"{AI}/web/csrf.py"),
             Copy(f"{RECORDS}/csrf.py"),
         ),
     ),
@@ -112,7 +112,7 @@ FAMILIES: tuple[Family, ...] = (
                     "body rather than a Response.",
                 },
             ),
-            Copy(f"{AI}/utils/csrf.ts"),
+            Copy(f"{AI}/ui/utils/csrf.ts"),
             Copy(f"{RECORDS}/utils/csrf.ts"),
         ),
     ),
@@ -151,7 +151,7 @@ FAMILIES: tuple[Family, ...] = (
         "secret encryption",
         (
             Copy(
-                f"{AI}/crypto.py",
+                f"{AI}/core/crypto.py",
                 {"AiKeyUnreadableError": "KeyUnreadableError"},
                 own={
                     "_dotenv_secret": "The AI module also runs in a Celery worker with no app, "

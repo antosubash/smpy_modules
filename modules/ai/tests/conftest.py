@@ -15,10 +15,11 @@ from __future__ import annotations
 import os
 
 import pytest
-from ai_worker_support import put
 from settings.models import Setting
-from sm_ai import crypto, services
+from sm_ai.core import crypto, services
 from sqlmodel import create_engine
+
+from tests.support.ai_worker_support import put
 
 
 @pytest.fixture(autouse=True)

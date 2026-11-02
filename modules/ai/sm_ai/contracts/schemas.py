@@ -7,7 +7,7 @@ from __future__ import annotations
 from pydantic import field_validator
 from sqlmodel import SQLModel
 
-from sm_ai import constants
+from sm_ai.core import constants
 
 
 class AiSettingsOut(SQLModel):

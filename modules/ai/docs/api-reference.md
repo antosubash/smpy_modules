@@ -125,7 +125,7 @@ connect should refund, and know that an error mid-stream does not.
 
 **The 402 in the browser.** The body is
 `{"detail": "quota_exceeded", "meter", "limit", "used", "requested", "resets_at"}`.
-`sm_ai/utils/quotaError.ts` (`isQuotaExceeded`, `quotaMessage`) renders it as
+`sm_ai/ui/utils/quotaError.ts` (`isQuotaExceeded`, `quotaMessage`) renders it as
 "AI requests limit reached (1/1); resets Nov 1, 2026." in the console's
 language; this module's `api.ts` decodes every failed call through it.
 

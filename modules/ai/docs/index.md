@@ -62,3 +62,5 @@ network request; a wrong key or URL fails in the consumer's own call. The only
 times the module itself calls a provider are the **Test connection** and
 **Load models** buttons.
 Every route requires the `ai.manage` permission.
+
+See [Code layout](code-layout.md) for the package and test areas.

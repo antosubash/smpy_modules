@@ -1,6 +1,6 @@
 """Fernet encryption for the stored Stripe secrets.
 
-The pattern of ``sm_ai.crypto``, copied rather than imported: a published
+The pattern of ``sm_ai.core.crypto``, copied rather than imported: a published
 module must not depend on a sibling optional module. The key derives from the
 running app's ``secret_key`` (SHA-256 → urlsafe base64), installed by
 ``BillingModule.register_settings``. Unlike the AI module there is no

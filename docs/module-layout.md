@@ -151,12 +151,12 @@ Do it in small PRs, one module at a time, each containing only moves:
 5. **No logic changes in the same PR**, so the review is just "is every move
    right".
 
-### Where each module stands (2026-10-30)
+### Where each module stands (2026-11-02)
 
 | Module | Root `.py` files | Root folders | Flat `tests/test_*.py` | State |
 | --- | --- | --- | --- | --- |
 | images | 4 | 11 | 0 | follows this layout |
-| ai | 13 | 6 | 14 | not moved yet |
+| ai | 2 | 8 | 0 | follows this layout |
 | billing | 28 | 9 | 53 | not moved yet |
 | news | 27 | 10 | 78 | not moved yet |
 | pagebuilder | 30 | 14 | 99 | not moved yet |

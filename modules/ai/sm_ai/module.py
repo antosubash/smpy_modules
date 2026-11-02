@@ -20,7 +20,7 @@ from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
 
-from sm_ai import constants
+from sm_ai.core import constants
 
 _VERSION = importlib.metadata.version("simple_module_ai")
 logger = logging.getLogger(__name__)
@@ -41,8 +41,8 @@ class AiModule(ModuleBase):
     def register_settings(self, app: FastAPI) -> None:
         from simple_module_core.module_settings import register_module_settings
 
-        from sm_ai import crypto, services
-        from sm_ai.settings import AiSettings
+        from sm_ai.core import crypto, services
+        from sm_ai.core.settings import AiSettings
 
         # Before #124 these seeded unset fields; now they are dead, and a
         # deployment that relied on them silently runs on the defaults.
@@ -91,7 +91,7 @@ class AiModule(ModuleBase):
 
         Billing is optional: without it nothing is metered (see ``metering``).
         """
-        from sm_ai import metering
+        from sm_ai.metering import requests as metering
 
         metering.register_meter(app)
 
@@ -121,9 +121,9 @@ class AiModule(ModuleBase):
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
         from simple_module_hosting.csrf import RequiresCsrf
 
-        from sm_ai.csrf import share_csrf_token
-        from sm_ai.endpoints.api import router as api
-        from sm_ai.endpoints.views import router as views
+        from sm_ai.web.csrf import share_csrf_token
+        from sm_ai.web.endpoints.api import router as api
+        from sm_ai.web.endpoints.views import router as views
 
         # The write surface can redirect chat_base_url and thereby point the
         # stored provider key at an attacker's server. So the framework's CSRF
