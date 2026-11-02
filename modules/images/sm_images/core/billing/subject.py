@@ -12,8 +12,9 @@ call to a subject that does not hold the key.
 
 The mode is ``app.state`` in the web process (:func:`app_mode`) and billing's
 DB-backed setting in a worker (:func:`worker_mode`); a ``Runtime`` carries
-whichever applies. Billing stays optional: without it the mode is ``tenant``
-and ``sm_billing`` is never imported.
+whichever applies, and with no runtime bound :func:`runtime_mode` falls back to
+the stored setting, never to ``tenant``. Billing stays optional: without it the
+mode is ``tenant`` and ``sm_billing`` is never imported.
 """
 
 from __future__ import annotations
@@ -68,11 +69,14 @@ def worker_mode() -> str:
 
 
 def runtime_mode() -> str:
-    """The current runtime's mode; ``tenant`` when none is bound."""
+    """The current runtime's mode. With none bound (a CLI, a worker that never
+    called ``use_runtime``) billing's stored setting (:func:`worker_mode`), so
+    such a caller never bills the tenant in ``user`` mode; ``tenant`` without
+    billing."""
     from sm_images.pipeline.runtime import current_runtime
 
     runtime = current_runtime()
-    return TENANT if runtime is None else runtime.billing_mode()
+    return worker_mode() if runtime is None else runtime.billing_mode()
 
 
 def held_under(tenant: str, recorded: str | None) -> str:

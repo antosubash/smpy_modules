@@ -27,6 +27,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from sm_billing import contracts as billing_contracts
 from sm_billing.contracts.metering import (
     Allowed,
     Closed,
@@ -181,9 +182,11 @@ class FakeGauge:
 @pytest.fixture(autouse=True)
 def _billing_off():
     """Every test runs as on a host without billing unless it asks for ``gauge``.
-    Its own patcher: a test's ``monkeypatch.undo()`` must not turn billing on."""
+    Its own patcher: a test's ``monkeypatch.undo()`` must not turn billing on.
+    The stored ``subject_mode`` is billing's default (no settings table here)."""
     with pytest.MonkeyPatch.context() as patcher:
         patcher.setattr(billing, "billing_installed", lambda: False)
+        patcher.setattr(billing_contracts, "worker_subject_mode", lambda: "tenant")
         yield
 
 

@@ -138,6 +138,34 @@ def test_runtime_mode_reads_the_bound_runtime(pipe):
         assert subject.runtime_mode() == "user"
 
 
+def _unbound(monkeypatch):
+    from sm_images.pipeline import runtime
+
+    monkeypatch.setattr(runtime, "current_runtime", lambda: None)
+
+
+def test_runtime_mode_unbound_reads_the_stored_mode(monkeypatch):
+    """Ingest outside a bound runtime (a CLI, a bare worker) must not bill the
+    tenant in ``user`` mode: it reads billing's stored setting."""
+    from sm_billing import contracts
+
+    _unbound(monkeypatch)
+    monkeypatch.setattr(billing, "billing_installed", lambda: True)
+    monkeypatch.setattr(contracts, "worker_subject_mode", lambda: "user")
+    assert subject.runtime_mode() == "user"
+
+
+def test_runtime_mode_unbound_without_billing_is_tenant(monkeypatch):
+    from sm_billing import contracts
+
+    def boom():
+        raise AssertionError("billing is not installed")
+
+    _unbound(monkeypatch)
+    monkeypatch.setattr(contracts, "worker_subject_mode", boom)
+    assert subject.runtime_mode() == "tenant"
+
+
 def test_worker_runtime_wires_worker_mode(monkeypatch):
     from sm_images.ingest.imports import log_redact
     from sm_images.pipeline import extensions
