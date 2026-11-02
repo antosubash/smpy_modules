@@ -65,11 +65,15 @@ async function uploadBatch(page: Page, files: ReturnType<typeof good>[]) {
 
 /** Nothing a person reads should be the wire format or the server's English. */
 async function expectNoRawServerText(page: Page) {
-  const body = await page.locator('main').innerText();
-  expect(body).not.toContain('"detail"');
-  expect(body).not.toContain('File contents do not match');
-  expect(body).not.toContain('Image dimensions exceed');
-  expect(body).not.toMatch(/errors\.upload_|media\.uploaded/);
+  const main = page.locator('main');
+  for (const raw of [
+    '"detail"',
+    'File contents do not match',
+    'Image dimensions exceed',
+    /errors\.upload_|media\.uploaded/,
+  ]) {
+    await expect(main).not.toContainText(raw, { useInnerText: true });
+  }
 }
 
 test.describe('Media library upload errors', () => {
