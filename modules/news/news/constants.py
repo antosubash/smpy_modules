@@ -115,6 +115,10 @@ PUBLIC_READ_PREFIXES: Final = (
     f"{ROUTE_PREFIX_API}/articles",
     f"{ROUTE_PREFIX_API}/categories",
 )
+# The stats block's count. Its own constant, not a member of the tuple above,
+# because it is the one anonymous path that also answers HEAD: the registry
+# takes a method set per prefix, and the others stay GET-only.
+PUBLIC_STATS_PREFIX: Final = f"{ROUTE_PREFIX_API}/stats"
 
 # Routes owned by pagebuilder, where a host happens to run it. Spelled here and
 # resolved in ``news.integrations.pagebuilder``, which returns "" when the

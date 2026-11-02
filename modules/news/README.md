@@ -299,6 +299,16 @@ anyone else. It is compared, not inferred from a timestamp, and it is false for
 a *draft* holding an old snapshot — there is nothing live there to diverge
 from.
 
+**Live stats block.** `GET /api/news/stats?metric=published[&category][&locale]`
+(and `HEAD`) answers `{"value": <int>}` for the `NewsStats` block, anonymously
+and through the same tenant binding and `Cache-Control: public, max-age=60` as
+the feed reads. `metric` is `published` only; anything else is a 422. It counts
+what a reader could open right now: status `published`, not in the trash, and
+no `unpublish_at` that has already passed (the listing and viewer keep serving
+those until the scheduler's next tick; the count stops sooner). Without `category` it counts
+every category, without `locale` every language. HEAD is registered for this
+path alone; the other public prefixes stay GET-only.
+
 `POST /articles` creates the article in one insert. Omit `slug` and the server
 derives one from the title and takes the first free variant — `my-title`, then
 `my-title-2`; send one and it is used verbatim, with a collision reported as a
