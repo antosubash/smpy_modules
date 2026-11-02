@@ -115,7 +115,7 @@ is the module's usual public 404/400, with `no-store`.
   the usual 404.
 - It never reads the stored `Collection.image_count`, which includes images the
   public must not see.
-- Cached with `cache.cache_headers` semantics (`PUBLIC_NO_CACHE` for a shared
+- Cached with `cache.stats_headers` (`cache.cache_headers`'s tenant rule: `PUBLIC_NO_CACHE` for a shared
   tenant source, else `PRIVATE`); no ETag, the body is a few bytes.
 
 ### Permissions

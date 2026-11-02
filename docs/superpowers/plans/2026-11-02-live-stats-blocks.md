@@ -42,7 +42,7 @@
 - Test: `modules/news/tests/test_stats_api.py`
 
 **Interfaces:**
-- Produces: `GET /api/news/stats?metric=published&category=<name>&locale=<tag>` and `HEAD` on the same path → `{"value": int}`. Without `locale` it counts all languages; without `category`, all categories.
+- Produces: `GET /api/news/stats?metric=published&category=<name or slug>&locale=<tag>` and `HEAD` on the same path → `{"value": int}`. Without `locale` it counts all languages; without `category`, all categories.
 - `async def count_published(db: AsyncSession, *, category: str | None, locale: str | None, now: datetime) -> int` in `news/stats.py`: `status == PUBLISHED`, `NOT_TRASHED`, `unpublish_at IS NULL OR unpublish_at > now`, plus `query_filters.locale` and the category equality.
 - The route lives on news's existing API router (router-level `bind_admin`; anonymous GET via `PUBLIC_READ_PREFIXES`, the same path the `NewsFeed` reads take). Headers come from `_deps.cache(response, request, include_drafts=False)`. `metric` is a `Literal["published"]` query param, so anything else is a 422.
 
@@ -142,7 +142,7 @@
 
 **Files:**
 - Create: `modules/images/sm_images/web/services/public_stats.py`
-- Modify: `modules/images/sm_images/web/endpoints/public.py` (add the route), `modules/images/sm_images/web/serving/cache.py` (add `listing_headers(request) -> str`)
+- Modify: `modules/images/sm_images/web/endpoints/public.py` (add the route), `modules/images/sm_images/web/serving/cache.py` (add `stats_headers(request) -> str`)
 - Test: `modules/images/tests/web/collections/test_public_stats.py`
 
 **Interfaces:**
@@ -152,7 +152,7 @@
   - `images`/`located`: `count(Image.id)` / `count(Image.lat)` with `Image.is_deleted.is_(False)` and `redaction.ready_clause(c)`, for the one collection, or summed over every public collection.
   - Counts exactly the images `public_gallery.page` would list: not trashed, `redaction.ready_clause(c)`, **and** a current `small` rendition (`source_generation == Image.display_generation`). Extract the gallery's visibility predicate into one helper in `web/services/public_gallery.py` (e.g. `visible_clause(collection)`) used by both the gallery and the stats; do not copy it.
 - `collection` resolves through `public_collection` semantics (a private, internal, trashed or unknown slug → the usual 404), raised as the module's `ImagesError` so `PublicRoute` adds `no-store`. `metric` is a plain `str` query param validated in the handler and refused with an `ImagesError` (400), not a `Literal` (FastAPI's 422 would bypass `PublicRoute` and its `no-store`). No ETag: the body is a few bytes.
-- Headers: with a collection, `cache.cache_headers(request, collection, cache.DISPLAY, twin=True)`; without, `cache.listing_headers(request)`, which is `PUBLIC_NO_CACHE` when `_shared_tenant(request)` and otherwise `PRIVATE`.
+- Headers: with a collection, `cache.cache_headers(request, collection, cache.DISPLAY, twin=True)`; without, `cache.stats_headers(request)`, which is `PUBLIC_NO_CACHE` when `_shared_tenant(request)` and otherwise `PRIVATE`.
 
 - [ ] **Step 1: Failing tests**, with the fixtures of `test_gallery_api.py`:
   - `test_counts_public_ready_images`: a public collection with 3 ready images, 1 trashed, 1 held back by redaction, 1 with no `small` rendition and 1 whose rendition is stale (set up as the gallery tests do) → `images` 3, for the collection and in the all-collections total. With 2 of them located → `located` 2.

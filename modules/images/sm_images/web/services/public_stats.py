@@ -77,7 +77,10 @@ async def _bounded(db: Any, model: Any, inner: Select[Any]) -> Answer:
 
 def _images(metric: Metric) -> Select[Any]:
     stmt = select(*_columns(Image))
-    return stmt.where(Image.lat.is_not(None)) if metric == "located" else stmt
+    if metric != "located":
+        return stmt
+    # The map's own rule (``map.points.located``): both coordinates, in range.
+    return stmt.where(Image.lat.between(-90, 90), Image.lng.between(-180, 180))
 
 
 def _public() -> Select[Any]:
