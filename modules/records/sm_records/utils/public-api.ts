@@ -139,3 +139,31 @@ export async function fetchPublicRecords(
   }
   return (await response.json()) as PublicRecordPage;
 }
+
+/** One number about a public type — the `RecordStats` block's read.
+ *  `metric` is `count` or `sum:<field>`; `filter` is one term, as in the
+ *  list. Same anonymous request as {@link fetchPublicRecords}: the prefix
+ *  default, the tenant header, no cookie. Throws on a non-2xx answer or a
+ *  body without a finite `value`. */
+export async function fetchPublicStat(
+  prefix: string,
+  typeKey: string,
+  opts: { metric: string; filter: string; locale: string; tenant: string; signal: AbortSignal },
+): Promise<number> {
+  const params = new URLSearchParams({ metric: opts.metric });
+  const filter = opts.filter.trim();
+  if (filter) params.set('filter', filter);
+  const locale = opts.locale.trim();
+  if (locale) params.set('locale', locale);
+  const url = `${normalizePublicPrefix(prefix)}/${encodeURIComponent(typeKey.trim())}/stats?${params}`;
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  const tenant = opts.tenant.trim();
+  if (tenant) headers[TENANT_HEADER] = tenant;
+  const response = await fetch(url, { credentials: 'omit', headers, signal: opts.signal });
+  if (!response.ok) throw new Error(`records public API: ${response.status}`);
+  const body = (await response.json()) as { value?: unknown };
+  if (typeof body.value !== 'number' || !Number.isFinite(body.value)) {
+    throw new Error('records stats response has no value');
+  }
+  return body.value;
+}
