@@ -17,6 +17,7 @@ from simple_module_db import finalize_session
 from sqlalchemy import select
 
 from sm_images.core.access import redaction
+from sm_images.core.billing import subject
 from sm_images.models import Collection, Group, Image, Prompt
 from sm_images.models.enums import PromptScope
 from sm_images.pipeline.ai.reads import GroupMemberRead, GroupRead
@@ -50,6 +51,9 @@ class GroupJob:
     """Each member's display copy (the original when it is its own display copy)."""
     unsafe: tuple[uuid.UUID, ...] = ()
     """Members whose display copy may not leave the system yet."""
+    subject: str | None = None
+    """Who the consolidation's AI charge bills (the collection owner in billing's
+    ``user`` mode); ``None``: the tenant."""
 
 
 async def _safe(db: Any, collection: Collection, image: Image) -> bool:
@@ -144,6 +148,7 @@ async def load(
                 too_many=len(images) > MAX_MEMBERS,
                 display_keys={i.id: i.display_key or i.storage_key for i in kept},
                 unsafe=unsafe,
+                subject=await subject.owner_subject(db, tenant, collection, runtime.billing_mode()),
             )
         await finalize_session(db)  # read-only: closes the transaction before any work
     return job

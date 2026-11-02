@@ -135,7 +135,7 @@ async def _work(runtime: Any, job: Any, lease: _Lease) -> GroupOutcome:
         return GroupOutcome.failed("no_usable_inputs", f"missing: {', '.join(missing)}")
     await lease.start_call()
     admitted = await contracts.consume_requests(
-        job.tenant,
+        job.subject or job.tenant,
         idempotency_key=metering_key(job.tenant, job, job.group.id, lease.token),
         source=SOURCE,
         session_factory=runtime.session_factory,
