@@ -13,6 +13,21 @@ if [[ -z "${SM_DATABASE_URL:-}" ]]; then
   exit 1
 fi
 
+# No Celery worker or Redis in e2e: background tasks run inline in the request
+# process, and a task error propagates to the caller instead of being swallowed
+# into a result nobody reads. Exported here, before the first command that builds the app (the
+# set_setting.py calls below do, and fail on the broker check otherwise).
+export SM_BG_TASKS_TASK_ALWAYS_EAGER=true
+# background_tasks refuses to boot outside development/testing (the bundle run
+# is production) while its broker or result backend points at localhost, which
+# the default does, eager or not. In-process transports satisfy that check and
+# need no Redis.
+export SM_BG_TASKS_BROKER_URL=memory://
+export SM_BG_TASKS_RESULT_BACKEND=cache+memory://
+# The invalidation transport would otherwise connect to the broker as Redis.
+export SM_BG_TASKS_BROADCAST_INVALIDATIONS=false
+export SM_BG_TASKS_TASK_EAGER_PROPAGATES=true
+
 # Start from an empty database. How that is done depends on the backend, and
 # the parameter expansion below is only meaningful for one of them: on a
 # Postgres URL `${SM_DATABASE_URL#sqlite+aiosqlite:///}` matches nothing, so
@@ -128,6 +143,14 @@ export SM_RATE_LIMIT_PUBLIC=100000/minute
 # other request resolves exactly as it did before.
 if [[ "${SM_MULTI_TENANT:-}" == "true" ]]; then
   uv run python scripts/set_setting.py tenants subdomain_base localhost
+fi
+
+# Billing-per-user runs only (E2E_BILLING_USER=1, playwright.config.ts):
+# billing bills each signed-in user instead of the tenant (#274). The mode is
+# read once at boot, so it is written here, before the host starts. It refuses
+# to boot with multi-tenancy on, so the two opt-in runs never combine.
+if [[ "${E2E_BILLING_USER:-}" == "1" ]]; then
+  uv run python scripts/set_setting.py sm_billing subject_mode user
 fi
 
 # E2E_BUNDLE=1: the build users get (#119). No Vite dev server and no

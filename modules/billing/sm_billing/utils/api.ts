@@ -26,6 +26,7 @@ const MESSAGES: Record<string, string> = {
   no_customer: keys.billing.errors.no_customer,
   tenant_owner_required: keys.billing.errors.tenant_owner_required,
   tenant_required: keys.billing.errors.tenant_required,
+  per_seat_requires_tenant: keys.billing.errors.per_seat_requires_tenant,
   provider_error: keys.billing.errors.provider_error,
   provider_managed: keys.billing.errors.provider_managed,
   no_provider_subscription: keys.billing.errors.no_provider_subscription,

@@ -132,8 +132,11 @@ export function NewPageDialog({
       <DialogTrigger asChild>
         <Button type="button">{t(keys.pagebuilder.new_page.trigger)}</Button>
       </DialogTrigger>
-      <DialogContent>
+      {/* Fits a short viewport: the form scrolls inside the dialog while the
+          close button, a sibling of the form, stays put (#236). */}
+      <DialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[minmax(0,1fr)]">
         <form
+          className="-m-1 min-h-0 overflow-y-auto p-1"
           onSubmit={(e) => {
             e.preventDefault();
             if (title.trim() && slugValid && !pending) void create();

@@ -47,7 +47,13 @@ async def test_admin_views_render(admin):
     assert [p["key"] for p in plans["plans"]] == ["free"]
     assert plans["known_limit_keys"] == ["tenants.seats"]
     subs = await page_props(admin, "/admin/billing/subscriptions")
-    assert subs["rows"] == []
+    assert subs["subscriptions"] == {
+        "items": [],
+        "total": 0,
+        "page": 1,
+        "per_page": 50,
+        "pages": 1,
+    }
     assert subs["provider_error"] == ""
     conn = await page_props(admin, "/admin/billing/connection")
     assert conn["connection"]["webhook_path"] == "/billing/webhooks/stripe"

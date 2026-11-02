@@ -10,12 +10,12 @@ requires-python = ">=3.12"
 dependencies = [
     # Ranges, not exact pins: an `==` here would make this module
     # uninstallable in any host running a newer framework build.
-    "simple_module_core>=0.0.36,<0.1",
+    "simple_module_core>=0.0.38,<0.1",  # module_settings first shipped in 0.0.38
     "simple_module_db>=0.0.36,<0.1",
     "simple_module_hosting>=0.0.36,<0.1",
     "simple_module_inertia>=0.0.36,<0.1",
-    # This module's settings live in the DB-backed settings store, so
-    # ``register_settings`` imports ``settings.registration``.
+    # This module's settings live in the DB-backed settings store, which
+    # the settings plugin hydrates and edits.
     "simple_module_settings>=0.0.36,<0.1",
     "pydantic-settings>=2.0",
     "sqlalchemy>=2.0",

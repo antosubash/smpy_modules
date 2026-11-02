@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -87,7 +88,7 @@ def test_ai_routes_mounted(app):
 
 # Every distributable module in this repo. The subscriber check below is only
 # evidence if each of them is booted, so it asserts that first.
-REPO_MODULES = {"Ai", "Billing", "News", "PageBuilder", "Records"}
+REPO_MODULES = {"Ai", "Billing", "Images", "News", "PageBuilder", "Records"}
 
 
 def _migrate(url: str) -> None:
@@ -149,3 +150,94 @@ def test_no_module_subscribes_to_record_events(booted_host):
             }
 
     assert asyncio.run(listening_inside_lifespan()) == set()
+
+
+def test_images_object_intents_work_in_the_real_app(booted_host):
+    """``on_startup`` hands images the host's session factory, so a handler's
+    bare ``object_intent(keys)`` writes to the host database."""
+    from sm_images.core.storage.intents import object_intent, use_session_factory
+    from sm_images.models import ObjectIntent
+    from sqlalchemy import select
+
+    app = booted_host
+
+    async def write_and_read() -> list[str]:
+        async with app.router.lifespan_context(app):
+            async with object_intent(["images/default/boot-check"]):
+                pass
+            async with app.state.sm.db.session_factory() as session:
+                return list((await session.execute(select(ObjectIntent.key))).scalars())
+
+    try:
+        assert "images/default/boot-check" in asyncio.run(write_and_read())
+    finally:
+        use_session_factory(None)
+
+
+def test_images_public_page_is_not_shadowed_by_another_route(booted_host):
+    """``/images/c/{slug}`` is mounted at the app root during the lifespan. Walk
+    the routes in registration order, as Starlette does: the first that matches
+    must be images' own, not a catch-all (a pagebuilder slug route, a locale
+    prefix) registered before it."""
+    from starlette.routing import compile_path
+
+    app = booted_host
+
+    async def first_match() -> str | None:
+        async with app.router.lifespan_context(app):
+            for route in iter_route_contexts(app.routes):
+                if route.path and compile_path(route.path)[0].match("/images/c/some-slug"):
+                    return route.path
+        return None
+
+    assert asyncio.run(first_match()) == "/images/c/{slug}"
+
+
+def test_no_module_imports_the_deprecated_settings_shim():
+    """``settings.registration`` warns on import and goes away in 0.1.0 (#273).
+
+    Fresh interpreter: an earlier test may already have imported the shim, and
+    a module imports it only once, so the warning would not fire again here.
+    """
+    code = (
+        "import sys; sys.path.insert(0, 'host'); "
+        "import records_collections; "
+        "from simple_module_hosting import Settings, create_app; "
+        "create_app(Settings())"
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-W",
+            "error:settings.registration is deprecated:DeprecationWarning",
+            "-c",
+            code,
+        ],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+
+
+def test_shipped_code_imports_no_deprecated_settings_shim():
+    """The boot test above misses imports made later, inside a function: the
+    worker's settings load, billing's live check and records' CLI (#273). The
+    framework's ``settings.registration``, ``settings.hydrate`` and
+    ``settings.module_registry`` all warn on import and go away in 0.1.0.
+    Tests may still use them; shipped code and scripts may not.
+    """
+    shim = re.compile(r"^\s*(from|import) settings\.(registration|hydrate|module_registry)\b")
+    shipped = [
+        path
+        for path in [*REPO.glob("modules/*/*/**/*.py"), *REPO.glob("scripts/*.py")]
+        if "tests" not in path.relative_to(REPO).parts
+    ]
+    offenders = [
+        f"{path.relative_to(REPO)}:{number}"
+        for path in shipped
+        for number, line in enumerate(path.read_text().splitlines(), start=1)
+        if shim.match(line)
+    ]
+    assert offenders == []

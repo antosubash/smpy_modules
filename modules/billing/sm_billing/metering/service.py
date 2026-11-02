@@ -14,7 +14,7 @@ Every call reads first and writes second, in **separate** transactions:
 
 How the write is wrapped (own transaction or the caller's savepoint) is
 ``metering.tx``; the shared read side is ``metering.core``, and the gauge
-holds are ``metering.holds``.
+holds are ``metering.holds`` (``swap`` in ``metering.swap``).
 """
 
 from __future__ import annotations
@@ -35,8 +35,8 @@ from sm_billing.contracts.metering import (
 )
 from sm_billing.metering import sql
 from sm_billing.metering.core import Resolved as _Resolved
-from sm_billing.metering.holds import HoldsMixin
 from sm_billing.metering.periods import as_utc
+from sm_billing.metering.swap import SwapMixin
 from sm_billing.metering.tx import Apply, Counted, find_event, period_row, run_write
 from sm_billing.metering.validate import (
     ADJUST,
@@ -61,8 +61,8 @@ Outcome = Allowed | Exceeded | Refunded
 _COUNTER = MeterKind.COUNTER
 
 
-class UsageService(HoldsMixin):
-    """Per-period counters (here) and gauge holds (``HoldsMixin``)."""
+class UsageService(SwapMixin):
+    """Per-period counters (here), gauge holds (``HoldsMixin``) and ``swap``."""
 
     # ── reads ────────────────────────────────────────────────────────
     async def _used(self, tenant_id: str, meter: str, start: datetime, db=None) -> int:
@@ -107,7 +107,7 @@ class UsageService(HoldsMixin):
         )
         return Exceeded(used, res.limit or 0, qty, res.period[1])
 
-    async def check(self, tenant_id: str, meter: str, qty: int = 1) -> Allowed | Exceeded:
+    async def _check_counter(self, tenant_id: str, meter: str, qty: int) -> Allowed | Exceeded:
         self._require(meter, _COUNTER)
         async with self._factory() as session:  # one connection for both reads
             res = await self._resolve(tenant_id, meter, session)

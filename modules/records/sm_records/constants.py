@@ -77,7 +77,7 @@ the module's own runtime state — today only to mark the sidebar stale after a
 type write (:func:`sm_records.menu.mark_dirty`)."""
 
 #: The framework's settings module, by ``ModuleMeta.name``. Depending on it
-#: guarantees ``app.state.settings.module_registry`` exists by the time
+#: guarantees ``app.state.module_settings_registry`` exists by the time
 #: ``register_settings`` runs — the host topo-sorts modules on this field.
 _MODULE_SETTINGS: Final = "Settings"
 

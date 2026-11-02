@@ -151,6 +151,18 @@ required reason). The protocol is `sm_billing.contracts.metering`; upstream
 issue antosubash/simple_module_python#616 tracks moving it into the
 framework.
 
+### Billing subject
+
+By default each organisation holds a subscription and a usage counter. Set
+`subject_mode` to `user` (Settings screen or
+`scripts/set_setting.py sm_billing subject_mode user`, then restart) on a
+single-tenant host and each signed-in user holds their own instead; boot
+refuses it when `multi_tenant` is on. A user is downgraded to the default plan,
+never suspended, and cannot take a per-seat plan. Workers build the subject key
+with `subject_for_user`, `subject_for_tenant` and `worker_subject_mode` from
+`sm_billing.contracts`; request code, entitlement checks included, takes it from
+`subject_for_request(request)`. See `docs/subjects.md`.
+
 ### Providers
 
 Billing settings are stored in the database. They are registered with
@@ -270,7 +282,7 @@ the `csrf_token` prop.
   failing backs off (from 15 minutes up to a day), whichever path tried it,
   and one atomic claim per organisation means only one worker at a time calls Stripe.
   Stripe's "no such customer" is retried too, because a key from another
-  account or mode gives the same answer. A single-tenant host never sweeps. The Checkout session id
+  account or mode gives the same answer. A single-tenant host never sweeps organisations (in `user` mode it sweeps deleted users). The Checkout session id
   is forgotten only once Stripe says the session is no longer open. Everything
   that has not ended is canceled, `incomplete` and `paused` included, across
   every page of the customer's subscriptions.

@@ -14,6 +14,11 @@ omits `--standalone`: GitHub only runs workflows from the repository-root
 `.github/workflows/`, so a nested per-module workflow would never fire, and a
 nested `publish.yml` is a publish footgun.
 
+The scaffold is flat. Organise the package and its tests from the start as
+[module layout](module-layout.md) describes: feature packages,
+`tests/<feature>/`, and nothing at the package root that its consumers don't
+look up by name.
+
 ## 2. Wire it into the host
 
 In `host/pyproject.toml`, add the dependency and a workspace source:

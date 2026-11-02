@@ -106,10 +106,15 @@ class AiService:
         from settings.reload import apply_changes_and_reload
         from settings.service import SettingService
         from settings.store import SettingsStore
+        from simple_module_db import finalize_session
 
         store = SettingsStore(SettingService(self.db))
         bus = self.app.state.sm.event_bus
         await apply_changes_and_reload(
             self.app, bus, store, package=constants.PACKAGE, changes=changes
         )
+        # Framework 0.0.41 reloads only after the commit, which the request
+        # would run once the response is built; commit now so ``current()``
+        # reads the saved values back.
+        await finalize_session(self.db)
         return self.current()

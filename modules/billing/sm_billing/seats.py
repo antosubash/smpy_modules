@@ -14,6 +14,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from sm_billing import constants as c
+from sm_billing import subjects
 from sm_billing.lifecycle import tenant_gone, tenant_service
 from sm_billing.resolve import effective_plan
 
@@ -25,7 +26,13 @@ logger = logging.getLogger(__name__)
 
 
 async def push_quantity(app: FastAPI, tenant_id: str) -> bool:
-    """Make the provider's quantity equal the member count. ``True`` if pushed."""
+    """Make the provider's quantity equal the member count. ``True`` if pushed.
+
+    Never for a user subject (#274): a user has no members, and checkout and
+    plan changes refuse it a per-seat plan.
+    """
+    if subjects.kind(tenant_id) == c.SUBJECT_MODE_USER:
+        return False
     provider = getattr(app.state, c.PACKAGE).provider
     if provider is None or not provider.supports_checkout:
         return False

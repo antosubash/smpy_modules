@@ -235,7 +235,8 @@
     "reload": "Neu laden",
     "publish": "Veröffentlichen",
     "sent_back": "Zurückgeschickt:",
-    "select_a_block": "Wählen Sie einen Block aus, um ihn zu bearbeiten. Überschrift, URL und Veröffentlichungsdatum gehören zum Artikel – bearbeiten Sie sie in der Artikelansicht."
+    "select_a_block": "Wählen Sie einen Block aus, um ihn zu bearbeiten. Überschrift, URL und Veröffentlichungsdatum gehören zum Artikel – bearbeiten Sie sie in der Artikelansicht.",
+    "zoom": "Zoom"
   },
   "categories": {
     "title": "Kategorien",

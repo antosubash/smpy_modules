@@ -17,6 +17,7 @@ Start with the document that matches what you are trying to do.
 | A developer calling the billing API, gating a feature on a plan, or metering usage | [api-reference.md](api-reference.md) |
 | An operator installing it, connecting Stripe, or answering "why is this organisation suspended?" | [operations.md](operations.md) |
 | A developer changing the module or adding a payment provider | [architecture.md](architecture.md) |
+| Running a single-tenant host where each user subscribes as themselves, or metering from a worker | [subjects.md](subjects.md) |
 
 ### [user-guide.md](user-guide.md) — for administrators and owners
 
@@ -46,6 +47,13 @@ The tables, how a webhook becomes local state, the lifecycle rules as a
 table, why plans resolve the way they do, the transaction rules every
 out-of-request write must follow, why usage metering is race-safe, and how to
 add a second payment provider.
+
+### [subjects.md](subjects.md) — organisations or users
+
+The `subject_mode` setting: bill each organisation (default) or each signed-in
+user. How to switch, what stays stranded, why users are downgraded and never
+suspended, the helpers a worker uses to build subject keys, and the images/ai
+caveat.
 
 ## The module in one paragraph
 

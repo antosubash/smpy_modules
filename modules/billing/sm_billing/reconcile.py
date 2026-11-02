@@ -23,6 +23,7 @@ from sm_billing.lifecycle import tenant_gone
 from sm_billing.models import Subscription
 from sm_billing.seats import push_quantity
 from sm_billing.services import current_provider
+from sm_billing.subjects import tenant_of
 from sm_billing.sweep import run_teardown, sweep_deleted_tenants
 from sm_billing.sync import resync
 
@@ -55,12 +56,13 @@ async def _targets(app: FastAPI, tenant_id: str | None) -> list[tuple[str, str]]
 async def reconcile_one(app: FastAPI, tenant_id: str, subscription_id: str) -> bool:
     """Sync one tenant from the provider; returns whether a quantity was pushed.
 
-    Runs bound to ``tenant_id``: nothing outside a request binds one, and the
-    ``TenantStatusChanged`` handlers ``finalize_session`` runs may read
+    Runs bound to the subject's tenant: nothing outside a request binds one,
+    and the ``TenantStatusChanged`` handlers ``finalize_session`` runs may read
     tenant-scoped tables of other modules, which are unfiltered while unbound.
+    A user subject (``user:<id>``) lives under ``"default"``, never its own id.
     """
     provider = current_provider(app)
-    with tenant_context(tenant_id):
+    with tenant_context(tenant_of(tenant_id)):
         async with app.state.sm.db.session_factory() as session:
             deleted = await tenant_gone(session, app, tenant_id)
             if not deleted:

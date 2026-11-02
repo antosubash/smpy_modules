@@ -11,6 +11,7 @@ import contextlib
 from typing import TYPE_CHECKING
 
 from sm_billing import constants as c
+from sm_billing import subjects
 from sm_billing.contracts.provider import ProviderError
 from sm_billing.errors import BillingError
 from sm_billing.lifecycle import tenant_service
@@ -79,8 +80,9 @@ class BillingService:
         )
 
     async def public_plans(self) -> list[PlanOut]:
+        """The plans this subject may buy: a user has no seats (see ``_target``)."""
         plans = await self.plans.list(include_archived=False)
-        return [plan_out(p) for p in plans if p.is_public]
+        return [plan_out(p) for p in plans if p.is_public and subjects.can_hold(self.tenant_id, p)]
 
     # ── guards ──────────────────────────────────────────────────
 
@@ -92,6 +94,8 @@ class BillingService:
         plan = await self.plans.get(plan_id)
         if plan is None or plan.archived_at is not None or not plan.is_public:
             raise BillingError("plan_not_found", 404)
+        if not subjects.can_hold(self.tenant_id, plan):
+            raise BillingError("per_seat_requires_tenant", 422)
         return plan
 
     @staticmethod
@@ -155,10 +159,8 @@ class BillingService:
         customer = await self.db.get(Customer, self.tenant_id)
         if customer is not None and customer.provider_customer_id is not None:
             return customer
-        tenant = await self.tenants.get(self.tenant_id)
-        customer_id = await self.provider.ensure_customer(
-            self.tenant_id, tenant.name if tenant else self.tenant_id, email
-        )
+        name, _ = (await subjects.names(self.db, [self.tenant_id]))[self.tenant_id]
+        customer_id = await self.provider.ensure_customer(self.tenant_id, name, email)
         if customer is None:
             customer = Customer(tenant_id=self.tenant_id, provider=self.provider.name)
             self.db.add(customer)

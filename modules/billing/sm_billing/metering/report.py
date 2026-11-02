@@ -16,8 +16,8 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
-from tenants.models import Tenant
 
+from sm_billing import subjects
 from sm_billing.constants import ENTITLED_STATUSES
 from sm_billing.contracts.metering import LIVE_HOLD_STATUSES, MeterKind
 from sm_billing.metering.periods import as_utc, current_period, previous_period
@@ -182,13 +182,6 @@ def _pick_counters(rows, ctx: dict[str, TenantPlan], period: Period) -> dict[tup
     return picked
 
 
-async def _tenant_names(session, ids: list[str]) -> dict[str, tuple[str, str]]:
-    if not ids:
-        return {}
-    stmt = select(Tenant.id, Tenant.name, Tenant.slug).where(Tenant.id.in_(ids))
-    return {tid: (name, slug) for tid, name, slug in (await session.execute(stmt)).all()}
-
-
 def _matches(row: UsageRowOut, query: str) -> bool:
     haystack = (row.tenant_id.lower(), row.tenant_name.lower(), row.tenant_slug.lower())
     return any(query in value for value in haystack)
@@ -217,7 +210,7 @@ async def overview(
     gauges = await _gauge_levels(session, None, meter) if period == "current" else []
     ids = sorted({r.tenant_id for r in counters} | {r.tenant_id for r in gauges})
     ctx = await plan_contexts(session, ids, now)
-    names = await _tenant_names(session, ids)
+    names = await subjects.names(session, ids)  # a user subject shows its email
     picked = _pick_counters(counters, ctx, period)
     raw = [
         (tenant_id, key, MeterKind.COUNTER, used, start, end)

@@ -1,7 +1,8 @@
 """What deleting a tenant does to its billing (#92, upstream #491).
 
 ``tenants`` publishes ``TenantDeleted`` after the commit that removed the
-tenant (framework 0.0.38, ``TenantService.delete_tenant``). Billing then:
+tenant (framework 0.0.38, ``TenantService.delete_tenant``), and
+:mod:`sm_billing.tenant_deleted` hands it here. Billing then:
 
 1. expires the tenant's open Checkout session, so it can no longer be paid;
 2. cancels at the provider, *immediately* (not at period end), every
@@ -43,8 +44,10 @@ organisation whose Stripe customer really was deleted is therefore retried
 once a day, logged each time, until an operator stamps
 ``billing_customer.teardown_done_at``.
 
-**Single-tenant hosts never tear down.** Everything there is ``"default"``
-with no tenant row; ``"default"`` is refused everywhere.
+**Single-tenant hosts never tear down a tenant.** Everything there is
+``"default"`` with no tenant row; ``"default"`` is refused everywhere. A user
+subject (``user:<id>``, #274) is torn down on ``UserDeleted`` through the same
+claim and cancel path, bound to ``"default"``; ``TenantDeleted`` refuses one.
 """
 
 from __future__ import annotations
@@ -63,11 +66,11 @@ from sm_billing import constants as c
 from sm_billing.contracts.provider import ProviderError
 from sm_billing.lifecycle import is_multi_tenant
 from sm_billing.models import Customer, Subscription
+from sm_billing.subjects import kind, tenant_of
 from sm_billing.sync import SyncError, resync
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
-    from simple_module_core.events import EventBus
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from sm_billing.contracts.provider import BillingProvider
@@ -213,11 +216,12 @@ async def cancel_for_deleted_tenant(app: FastAPI, tenant_id: str) -> list[str]:
     retry. Each step is bound to the tenant and ended with
     ``finalize_session``, never ``commit()``.
     """
-    if not is_multi_tenant(app) or tenant_id == DEFAULT_TENANT_ID:
+    is_user = kind(tenant_id) == c.SUBJECT_MODE_USER
+    if tenant_id == DEFAULT_TENANT_ID or not (is_user or is_multi_tenant(app)):
         # No tenant is ever deleted here; "default" missing a row is normal.
         logger.warning("billing: refusing to tear down %s on a single-tenant host", tenant_id)
         return []
-    with tenant_context(tenant_id):
+    with tenant_context(tenant_of(tenant_id)):
         state = await _step(app, lambda s: _mark_local(s, tenant_id))
         if not state.at_provider:
             return []
@@ -247,33 +251,3 @@ async def cancel_for_deleted_tenant(app: FastAPI, tenant_id: str) -> list[str]:
     if expire_error is not None:
         raise expire_error
     return canceled
-
-
-def subscribe(bus: EventBus, app: FastAPI) -> None:
-    """Subscribe to ``TenantDeleted`` where the installed ``tenants`` has it.
-
-    Imported defensively rather than raising billing's floor: the event and
-    ``delete_tenant`` arrived together in ``simple_module_tenants`` 0.0.38, so
-    an older host cannot delete a tenant and has nothing to subscribe to.
-    """
-    try:
-        from tenants.contracts.events import TenantDeleted
-    except ImportError:
-        return
-
-    async def _on_deleted(event: TenantDeleted) -> None:
-        from sm_billing.live import ensure_current
-        from sm_billing.sweep import run_teardown  # it imports this module
-
-        try:
-            await ensure_current(app)  # not through a provider another worker replaced
-            await run_teardown(app, event.tenant_id)  # a failure is recorded for backoff
-        except Exception:
-            logger.warning(
-                "billing: could not cancel the subscription of deleted tenant %s; the next "
-                "reconcile retries it (scheduled only if reconcile_interval_minutes is set)",
-                event.tenant_id,
-                exc_info=True,
-            )
-
-    bus.subscribe(TenantDeleted, _on_deleted)

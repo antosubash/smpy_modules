@@ -1,18 +1,18 @@
-"""Platform-admin operations: plan writes with price checks, the tenant list,
+"""Platform-admin operations: plan writes with price checks, the tenant (or user) list,
 manual assignment, resync, and the Stripe connection settings."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from simple_module_db import finalize_session
 from sqlalchemy import func, select
-from tenants.models import Tenant
 
+from sm_billing import admin_users, crypto, subjects
 from sm_billing import constants as c
-from sm_billing import crypto
 from sm_billing.contracts.provider import ProviderError
 from sm_billing.errors import BillingError
-from sm_billing.lifecycle import apply_lifecycle, tenant_service
+from sm_billing.lifecycle import apply_lifecycle
 from sm_billing.models import Plan, Subscription, WebhookEvent
 from sm_billing.plans import PlanService
 from sm_billing.resolve import subscription_for
@@ -20,7 +20,6 @@ from sm_billing.schemas import (
     ConnectionIn,
     ConnectionOut,
     PlanIn,
-    SubscriptionRow,
     SyncHealth,
     normalise_return_url,
 )
@@ -92,57 +91,6 @@ async def save_plan(db: AsyncSession, app: FastAPI, data: PlanIn, plan_id: int |
 # ── subscriptions ───────────────────────────────────────────────────
 
 
-async def subscription_rows(
-    db: AsyncSession,
-    app: FastAPI,
-    *,
-    status: str | None = None,
-    tenant_id: str | None = None,
-    limit: int = 200,
-    offset: int = 0,
-) -> list[SubscriptionRow]:
-    default = await PlanService(db).default()
-    stmt = (
-        select(Tenant, Subscription, Plan)
-        .outerjoin(Subscription, Subscription.tenant_id == Tenant.id)
-        .outerjoin(Plan, Plan.id == Subscription.plan_id)
-        .order_by(Tenant.name, Tenant.id)
-        .limit(limit)
-        .offset(offset)
-    )
-    if status:
-        stmt = stmt.where(Subscription.status == status)
-    if tenant_id:
-        stmt = stmt.where(Tenant.id == tenant_id)
-    found = (await db.execute(stmt)).all()
-    counts = await tenant_service(db, app).member_counts([t.id for t, _, _ in found])
-    rows = []
-    for tenant, sub, plan in found:
-        # The subscribed plan even when lapsed — the status column says so.
-        shown = plan if plan is not None else default
-        rows.append(
-            SubscriptionRow(
-                tenant_id=tenant.id,
-                tenant_name=tenant.name,
-                tenant_slug=tenant.slug,
-                tenant_status=tenant.status,
-                members=counts.get(tenant.id, 0),
-                plan_id=shown.id,
-                plan_key=shown.key,
-                plan_name=shown.name,
-                status=sub.status if sub else None,
-                interval=sub.interval if sub else None,
-                quantity=sub.quantity if sub else None,
-                current_period_end=sub.current_period_end if sub else None,
-                cancel_at_period_end=bool(sub and sub.cancel_at_period_end),
-                suspended_by_billing=bool(sub and sub.suspended_by_billing),
-                provider_subscription_id=sub.provider_subscription_id if sub else None,
-                synced_at=sub.synced_at if sub else None,
-            )
-        )
-    return rows
-
-
 async def sync_health(db: AsyncSession, app: FastAPI) -> SyncHealth:
     """The numbers that show a missed webhook before a customer does (#122)."""
     held = Subscription.provider_subscription_id.is_not(None)
@@ -166,13 +114,6 @@ async def sync_health(db: AsyncSession, app: FastAPI) -> SyncHealth:
     )
 
 
-async def one_row(db: AsyncSession, app: FastAPI, tenant_id: str) -> SubscriptionRow:
-    rows = await subscription_rows(db, app, tenant_id=tenant_id, limit=1)
-    if not rows:
-        raise BillingError("tenant_not_found", 404)
-    return rows[0]
-
-
 async def assign(db: AsyncSession, app: FastAPI, tenant_id: str, data: AssignIn) -> None:
     """Manual provider only: set the tenant's plan and status directly.
 
@@ -185,11 +126,12 @@ async def assign(db: AsyncSession, app: FastAPI, tenant_id: str, data: AssignIn)
     """
     if current_provider(app).supports_checkout:
         raise BillingError("provider_managed", 409)
-    if await db.get(Tenant, tenant_id) is None:
-        raise BillingError("tenant_not_found", 404)
+    await admin_users.require_subject(db, app, tenant_id)
     plan = await PlanService(db).get(data.plan_id)
     if plan is None:
         raise BillingError("plan_not_found", 404)
+    if not subjects.can_hold(tenant_id, plan):
+        raise BillingError("per_seat_requires_tenant", 422)
     sub = await subscription_for(db, tenant_id)
     if sub is None:
         sub = Subscription(tenant_id=tenant_id, plan_id=plan.id)
@@ -258,6 +200,9 @@ async def save_connection(db: AsyncSession, app: FastAPI, data: ConnectionIn) ->
     await apply_changes_and_reload(
         app, app.state.sm.event_bus, store, package=c.PACKAGE, changes=connection_changes(data)
     )
-    # The reload published ``SettingsReloaded``; ``sm_billing.live`` has rebuilt
-    # the provider (and the reconcile loop) from the new secrets by now.
+    # Framework 0.0.41 reloads and publishes ``SettingsReloaded`` only after the
+    # commit, which the request would run once this response is built. Commit
+    # now so ``sm_billing.live`` has rebuilt the provider (and the reconcile
+    # loop) from the new secrets before the screen reads them back.
+    await finalize_session(db)
     return connection_out(app)

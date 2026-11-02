@@ -23,8 +23,9 @@ const TONE_TEXT = {
  * used: `used / limit` in the meter's unit (or "Unlimited"), a bar, and when
  * a counter resets — a gauge is a level held right now and never resets.
  * Renders nothing when there is no row (a host that meters nothing).
+ * `byUser`: billing bills the signed-in user, so the copy speaks to them.
  */
-export function UsageCard({ usage }: { usage: MeterUsage[] }) {
+export function UsageCard({ usage, byUser = false }: { usage: MeterUsage[]; byUser?: boolean }) {
   const { t, locale } = useT();
   const c = keys.billing.usage;
   if (usage.length === 0) return null;
@@ -32,7 +33,7 @@ export function UsageCard({ usage }: { usage: MeterUsage[] }) {
     <Card data-testid="usage-card">
       <CardHeader>
         <CardTitle>{t(c.title)}</CardTitle>
-        <CardDescription>{t(c.description)}</CardDescription>
+        <CardDescription>{t(byUser ? c.description_user : c.description)}</CardDescription>
       </CardHeader>
       <CardContent>
         <ul className="grid gap-5 sm:grid-cols-2">

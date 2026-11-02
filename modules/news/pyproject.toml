@@ -10,12 +10,12 @@ keywords = ["simple-module", "news", "articles", "cms"]
 # Ranges, never `==`: an exact framework pin makes a published module
 # uninstallable in any host running a newer framework build.
 dependencies = [
-    "simple_module_core>=0.0.36,<0.1",
+    "simple_module_core>=0.0.38,<0.1",  # module_settings first shipped in 0.0.38
     "simple_module_db>=0.0.36,<0.1",
     "simple_module_hosting>=0.0.36,<0.1",
     "simple_module_inertia>=0.0.36,<0.1",
-    # ``register_settings`` imports ``settings.registration``: this module's
-    # settings are DB-backed rather than read from the environment.
+    # This module's settings are DB-backed rather than read from the
+    # environment: the settings plugin hydrates and edits them.
     "simple_module_settings>=0.0.36,<0.1",
     # simple_module_pagebuilder is deliberately NOT here — it is an optional
     # extra below. main carried it as a hard dependency because an article's

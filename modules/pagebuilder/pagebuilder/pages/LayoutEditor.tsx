@@ -11,6 +11,7 @@ import { NO_HEADER_ACTIONS } from '../components/editor/noHeaderActions';
 import { emptyLayoutData, getLayoutPuckConfig } from '../components/layoutPuckConfig';
 import { localizeConfig } from '../components/localizeConfig';
 import { useIsNarrow } from '../hooks/useIsNarrow';
+import { usePuckA11y } from '../hooks/usePuckA11y';
 import {
   type LayoutDetail,
   type LayoutRevisionRead,
@@ -28,6 +29,7 @@ interface Props {
 
 export default function LayoutEditor() {
   const { t, locale } = useT();
+  usePuckA11y();
   const props = usePage<{ props: Props }>().props as unknown as Props;
   const { layout } = props;
   const revisions = props.revisions ?? [];
@@ -199,8 +201,14 @@ export default function LayoutEditor() {
           </div>
         </div>
       ) : (
-        <div className="flex-1 min-h-0 grid grid-rows-2 divide-y">
-          <section className="min-h-0 flex flex-col" data-testid="layout-header-slot">
+        // Each editor fills its half and no more: Puck defaults to 100dvh, so the
+        // header's editor ran under the footer's, whose toolbar then took the
+        // clicks meant for the header's inspector (#237).
+        <div className="flex-1 min-h-0 grid grid-rows-2 divide-y overflow-hidden">
+          <section
+            className="min-h-0 flex flex-col overflow-hidden"
+            data-testid="layout-header-slot"
+          >
             <div className="border-b bg-muted px-4 py-1 text-xs uppercase tracking-wide text-muted-foreground">
               {t(keys.pagebuilder.layout.header)}
             </div>
@@ -208,13 +216,17 @@ export default function LayoutEditor() {
               <Puck
                 config={config}
                 data={headerData}
+                height="100%"
                 iframe={{ enabled: false }}
                 onChange={setHeaderData}
                 overrides={NO_HEADER_ACTIONS}
               />
             </div>
           </section>
-          <section className="min-h-0 flex flex-col" data-testid="layout-footer-slot">
+          <section
+            className="min-h-0 flex flex-col overflow-hidden"
+            data-testid="layout-footer-slot"
+          >
             <div className="border-b bg-muted px-4 py-1 text-xs uppercase tracking-wide text-muted-foreground">
               {t(keys.pagebuilder.layout.footer)}
             </div>
@@ -222,6 +234,7 @@ export default function LayoutEditor() {
               <Puck
                 config={config}
                 data={footerData}
+                height="100%"
                 iframe={{ enabled: false }}
                 onChange={setFooterData}
                 overrides={NO_HEADER_ACTIONS}

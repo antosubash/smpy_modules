@@ -10,7 +10,6 @@ a deleted tenant's subscription (``sm_billing.teardown``).
 
 from __future__ import annotations
 
-import importlib
 import importlib.metadata
 import importlib.resources
 import logging
@@ -59,13 +58,12 @@ class BillingModule(ModuleBase):
         return {c.LOCALE_NAMESPACE: base}
 
     def register_settings(self, app: FastAPI) -> None:
+        from simple_module_core.module_settings import register_module_settings
+
         from sm_billing import crypto
         from sm_billing.services import BillingServices
         from sm_billing.settings import BillingSettings
 
-        register_module_settings = importlib.import_module(
-            "settings.registration"
-        ).register_module_settings
         register_module_settings(
             app, c.PACKAGE, BillingSettings, lambda s: BillingServices(settings=s)
         )
@@ -144,11 +142,11 @@ class BillingModule(ModuleBase):
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
         if app is None:
             return
-        from sm_billing import live, seats, teardown
+        from sm_billing import live, seats, tenant_deleted
 
         seats.subscribe(bus, app)
         live.subscribe(bus, app)
-        teardown.subscribe(bus, app)
+        tenant_deleted.subscribe(bus, app)
 
     async def on_startup(self, app: FastAPI) -> None:
         from sm_billing import startup
