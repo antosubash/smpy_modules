@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useContentLocale } from '../hooks/useContentLocale';
 import { keys } from '../utils/i18n';
 import { intlLocale } from '../utils/locale';
-import { fetchPublishedCount } from '../utils/stats-api';
+import { fetchPublishedCount, type PublishedCount } from '../utils/stats-api';
 
 export interface NewsStatItem {
   /** `page` counts the page's own language; `all` counts every language. */
@@ -53,12 +53,15 @@ export function clampStatItems(items: readonly NewsStatItem[] | undefined): News
     .slice(0, STAT_ITEMS_MAX);
 }
 
-function formatValue(item: NewsStatItem, value: number | null, locale: string | undefined) {
-  if (value === null) return PLACEHOLDER;
+function formatValue(item: NewsStatItem, stat: PublishedCount | null, locale: string | undefined) {
+  if (stat === null) return PLACEHOLDER;
   const text = new Intl.NumberFormat(intlLocale(locale), { maximumFractionDigits: 2 }).format(
-    value,
+    stat.value,
   );
-  return `${item.prefix ?? ''}${text}${item.suffix ?? ''}`;
+  // A capped count is the server's bound, not the total: "10.000+". The `+`
+  // belongs to the number, so it sits inside the author's affixes.
+  const more = stat.capped ? '+' : '';
+  return `${item.prefix ?? ''}${text}${more}${item.suffix ?? ''}`;
 }
 
 export function NewsStatsRender({ title, subtitle, surface, items }: NewsStatsProps) {
@@ -66,7 +69,7 @@ export function NewsStatsRender({ title, subtitle, surface, items }: NewsStatsPr
   const locale = useContentLocale();
   // `resolveData` never runs on an anonymous public page, so clamp here too.
   const safe = useMemo(() => clampStatItems(items), [items]);
-  const [values, setValues] = useState<(number | null)[]>([]);
+  const [values, setValues] = useState<(PublishedCount | null)[]>([]);
 
   // Only what changes the requests: editing a label must not refetch.
   const fetchKey = JSON.stringify(

@@ -18,6 +18,7 @@ from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news import stats
+from news.constants import PUBLIC_STATS_MAX_COUNT
 from news.endpoints.api._deps import cache
 
 router = APIRouter()
@@ -35,13 +36,22 @@ async def published_count(
     category: str | None = Query(None, description="Only articles in this category (by name)."),
     locale: str | None = Query(
         None,
-        description="Only articles written in this language. Omitted counts every language.",
+        description=(
+            "Only articles written in this language. Omitted counts every language "
+            "the site publishes in; one it does not publish in counts nothing."
+        ),
     ),
     db: AsyncSession = Depends(get_db),
-) -> dict[str, int]:
+) -> dict[str, int | bool]:
     del metric  # validated by the type; there is one answer
     # Never ``include_drafts``: the count is public whoever asks, so an editor's
     # session must not change it either.
     cache(response, request, include_drafts=False)
-    value = await stats.count_published(db, category=category, locale=locale, now=datetime.now(UTC))
-    return {"value": value}
+    value, capped = await stats.count_published(
+        db,
+        category=category,
+        locale=locale,
+        now=datetime.now(UTC),
+        cap=PUBLIC_STATS_MAX_COUNT,
+    )
+    return {"value": value, "capped": capped}

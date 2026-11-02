@@ -119,6 +119,11 @@ PUBLIC_READ_PREFIXES: Final = (
 # because it is the one anonymous path that also answers HEAD: the registry
 # takes a method set per prefix, and the others stay GET-only.
 PUBLIC_STATS_PREFIX: Final = f"{ROUTE_PREFIX_API}/stats"
+# Where the anonymous count stops: past it the route answers this number and
+# ``capped``, and the block shows "10,000+". A cache miss is anyone's to cause,
+# so a count must not read every published article of a large archive; a stats
+# band has no use for the exact figure past five digits anyway.
+PUBLIC_STATS_MAX_COUNT: Final = 10_000
 
 # Routes owned by pagebuilder, where a host happens to run it. Spelled here and
 # resolved in ``news.integrations.pagebuilder``, which returns "" when the

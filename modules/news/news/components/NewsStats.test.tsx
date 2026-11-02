@@ -65,7 +65,7 @@ describe('NewsStatsRender', () => {
   beforeEach(() => {
     pageLocale = 'de';
     urls = [];
-    respond = async () => new Response(JSON.stringify({ value: 1284 }));
+    respond = async () => new Response(JSON.stringify({ value: 1284, capped: false }));
     vi.stubGlobal(
       'fetch',
       vi.fn((url: string) => {
@@ -96,13 +96,25 @@ describe('NewsStatsRender', () => {
     respond = () => new Promise((resolveFetch) => (release = resolveFetch));
     await mount([item()]);
     expect(values()).toEqual(['–']);
-    await act(async () => release(new Response(JSON.stringify({ value: 1284 }))));
+    await act(async () => release(new Response(JSON.stringify({ value: 1284, capped: false }))));
     expect(values()).toEqual(['1.284']);
   });
 
   it('wraps the number in the prefix and suffix', async () => {
     await mount([item({ prefix: '~', suffix: '+' })]);
     expect(values()).toEqual(['~1.284+']);
+  });
+
+  it('marks a capped count with a + inside the prefix and suffix', async () => {
+    respond = async () => new Response(JSON.stringify({ value: 10000, capped: true }));
+    await mount([item({ prefix: '~', suffix: ' Artikel' })]);
+    expect(values()).toEqual(['~10.000+ Artikel']);
+  });
+
+  it('shows a dash for an answer without a number', async () => {
+    respond = async () => new Response(JSON.stringify({ capped: false }));
+    await mount([item()]);
+    expect(values()).toEqual(['–']);
   });
 
   it('shows a dash when the request fails', async () => {

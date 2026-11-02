@@ -300,14 +300,19 @@ a *draft* holding an old snapshot — there is nothing live there to diverge
 from.
 
 **Live stats block.** `GET /api/news/stats?metric=published[&category][&locale]`
-(and `HEAD`) answers `{"value": <int>}` for the `NewsStats` block, anonymously
+(and `HEAD`) answers `{"value": <int>, "capped": <bool>}` for the `NewsStats` block, anonymously
 and through the same tenant binding and `Cache-Control: public, max-age=60` as
 the feed reads. `metric` is `published` only; anything else is a 422. It counts
 what a reader could open right now: status `published`, not in the trash, and
 no `unpublish_at` that has already passed (the listing and viewer keep serving
 those until the scheduler's next tick; the count stops sooner). Without `category` it counts
-every category, without `locale` every language. HEAD is registered for this
-path alone; the other public prefixes stay GET-only.
+every category, without `locale` every language the site publishes in
+(`content_locales`). An article whose language was taken off the site is never
+counted, and a `locale` the site does not publish in counts `0`. The count is
+bounded: it reads at most `PUBLIC_STATS_MAX_COUNT + 1` (10,000) rows, and past
+that answers `{"value": 10000, "capped": true}`, which the block shows as
+`10,000+`. HEAD is registered for this path alone; the other public prefixes
+stay GET-only.
 
 `POST /articles` creates the article in one insert. Omit `slug` and the server
 derives one from the title and takes the first free variant — `my-title`, then
