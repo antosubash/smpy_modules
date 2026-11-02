@@ -25,7 +25,7 @@ ARG UV_VERSION=0.13.4
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
 
 # ---------------------------------------------------------------------------
-FROM node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe AS ui
+FROM node:26.13.0-bookworm-slim@sha256:bc0a2afd3b74ce12222fc8bab99271e66257f021078f5f4a5d687a77d280c1d9 AS ui
 ARG PYTHON_VERSION
 COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_LINK_MODE=copy \
