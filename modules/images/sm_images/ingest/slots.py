@@ -93,23 +93,23 @@ async def slot_subject(factory: Any, tenant: str, collection: Any) -> str:
 
 
 async def hold_slot(
-    factory: Any, tenant: str, slot: Slot, size: int, collection: Any, who: str | None = None
+    factory: Any, tenant: str, slot: Slot, size: int, collection: Any, payer: str | None = None
 ) -> Slot:
     """Hold ``size`` bytes for the slot's original (committed), keyed by this
-    attempt, under ``who`` - the subject ``collection``'s owner is billed as
+    attempt, under ``payer`` - the subject ``collection``'s owner is billed as
     (#284), looked up here unless the caller already has it (:func:`slot_subject`)."""
     meter = billing.storage_meter(factory)
     if meter is None or size < 1:
         return slot
-    who = who or await slot_subject(factory, tenant, collection)
+    payer = payer or await slot_subject(factory, tenant, collection)
     key = billing.hold_key(slot.image_id, f"0-{uuid.uuid4().hex}")
     async with factory() as db:
         op = await billing_ops.open_op(
-            db, OP_INGEST, slot.image_id, size, key, claim=INGEST_CLAIM, old=None, subject=who
+            db, OP_INGEST, slot.image_id, size, key, claim=INGEST_CLAIM, old=None, subject=payer
         )
         await finalize_session(db)
     try:
-        hold = await billing.swap(factory, who, None, size, key, meter, not_after=op.not_after)
+        hold = await billing.swap(factory, payer, None, size, key, meter, not_after=op.not_after)
     except StorageQuotaExceeded as exc:
         async with factory() as db:
             await billing_ops.finish(db, op, None, f"{type(exc).__name__}: {exc}")
@@ -125,7 +125,7 @@ async def hold_slot(
             await billing_ops.hand_back(db, op, factory)
             await finalize_session(db)
         raise
-    return replace(slot, hold=hold.id, op=op, subject=who)
+    return replace(slot, hold=hold.id, op=op, subject=payer)
 
 
 async def keep_hold(db: Any, slot_op: billing_ops.Claimed | None, hold: str | None) -> None:

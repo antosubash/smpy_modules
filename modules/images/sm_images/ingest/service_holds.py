@@ -16,18 +16,15 @@ from sm_images.core.storage import keys as storage_keys
 from sm_images.core.storage.intents import object_intent
 from sm_images.core.tenancy import bound_tenant
 from sm_images.ingest import slots as holds
+from sm_images.ingest._holds_host import HostBase
 from sm_images.ingest.slots import Slot
 from sm_images.models import Collection
 
 __all__ = ["HoldsMixin"]
 
 
-class HoldsMixin:
-    """The members below are the composing class's; nothing else is read."""
-
-    db: Any
-    intent_factory: Any
-    acquired: list[Any]  # every op held in ``db`` (:meth:`release_holds`)
+class HoldsMixin(HostBase):
+    """Reads only what :class:`~sm_images.ingest._holds_host.HoldsHost` declares."""
 
     async def reserve(
         self, collection: Collection, exts: Iterable[str], sizes: Iterable[int] | None = None
@@ -44,13 +41,15 @@ class HoldsMixin:
             pass
         if sizes is None:
             return slots
-        who = await holds.slot_subject(self._factory(), tenant, collection)  # once, not per slot
-        return [await self._hold(collection, s, n, who) for s, n in zip(slots, sizes, strict=True)]
+        payer = await holds.slot_subject(self._factory(), tenant, collection)  # once, not per slot
+        return [
+            await self._hold(collection, s, n, payer) for s, n in zip(slots, sizes, strict=True)
+        ]
 
     async def _hold(
-        self, collection: Collection, slot: Slot, size: int, who: str | None = None
+        self, collection: Collection, slot: Slot, size: int, payer: str | None = None
     ) -> Slot:
-        held = await holds.hold_slot(self._factory(), bound_tenant(), slot, size, collection, who)
+        held = await holds.hold_slot(self._factory(), bound_tenant(), slot, size, collection, payer)
         self.acquired += [held.op] if held.op is not None else []
         return held
 
