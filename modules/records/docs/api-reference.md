@@ -1385,25 +1385,31 @@ listing would return, without the page.
 curl -s 'http://localhost:8000/api/records/public/product/stats?metric=sum:price&filter=in_stock:eq:true'
 ```
 ```json
-{"value": 112874.36}
+{"value": 112874.36, "capped": false}
 ```
 
 - `metric=count` (the default) is the listing's `total` for the same
   `?filter=` and `?locale=` — published, out of the trash, in the bound
-  tenant — except that it is never capped at `max_count`: one aggregate row
-  has no page to bound.
+  tenant — and bounded the same way: past `max_count` (10,000) `value` is
+  `max_count` and `capped` is `true`, the listing's `total_capped`. The block
+  shows that as `10,000+`.
 - `metric=sum:<field>` is the **exact** sum of an indexed, single-valued
   `number` field the public shape carries — an `int` when it is whole, a
   `float` otherwise, `0` over no rows. A block rounds it for display; the API
-  does not.
+  does not. It reads at most `max_count + 1` matching records: when more
+  match, the answer is `{"value": null, "capped": true}` — not available,
+  rather than the sum of some of them — and the block shows a dash. Narrow it
+  with `?filter=` to get a number.
+- `?filter=` is bounded by `max_filter_terms` (20) exactly as on the listing.
 - `?locale=` is resolved by the listing's own rule (absent → the default
   content locale, case-insensitive, an unconfigured or dropped language a
   `400`) and **always applied**, so a translated record counts once.
 - Every field named — filtered on *or* summed — goes through the listing's
   allow-list. `sum:position`, `sum:<virtual field>`, `sum:<text field>` and
   `filter=created_at:…` are the same `400` naming the field a refused filter
-  gets: a sum under a filter that keeps one row is that row's value. `min` and
-  `max` are refused too (`400` naming `metric`); there is no `group_by`.
+  gets: a sum under a filter that keeps one row is that row's value. Any
+  metric other than `count` and `sum:<field>` — `min` and `max` included — is
+  a `400` saying it is not a supported metric; there is no `group_by`.
 - Registered before `{type_key}/{uuid}`, so `stats` is never read as a uuid; a
   record whose *slug* is `stats` is still served by its uuid.
 

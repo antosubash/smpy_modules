@@ -64,11 +64,10 @@ from sm_records.deps import (
 from sm_records.endpoints.api import _public_cache
 from sm_records.endpoints.api._errors import PublicErrorRoute
 from sm_records.endpoints.api._responses import PUBLIC_READ, responses
-from sm_records.index.aggregate import parse_metric
 from sm_records.index.query import CursorError, Filter, QueryError, Sort
 from sm_records.media import public_file_url_template
 from sm_records.services import public as public_service
-from sm_records.services.public_stats import public_stat
+from sm_records.services.public_stats import UnsupportedMetricError, public_stat
 from sm_records.settings import RecordsSettings
 from sm_records.tenancy import bind_public
 
@@ -227,20 +226,22 @@ async def public_record_stats(
 ) -> Any:
     """``count`` (the default) or ``sum:<field>`` over what the listing shows.
 
-    The listing's gates, unchanged (``services.public_stats``): the type is
-    public, the rows published and in one language, and every field named —
-    filtered on or summed — is one the public shape carries. Refusals are the
-    listing's 400 naming the field, ``min``/``max`` included.
+    The listing's gates and bound (``services.public_stats``): a public type,
+    published rows in one language, fields the public shape carries, and
+    ``max_count`` (``capped``). Refusals are the listing's 400 naming the
+    field, and a metric other than those two says it is not supported.
     """
     rtype = await public_service.get_public_type(db, type_key)
     chosen = _locale(settings, locale)
     try:
-        value = await public_stat(
-            db, rtype, metric=parse_metric(metric), filters=filters, locale=chosen
+        value, capped = await public_stat(
+            db, rtype, metric=metric, filters=filters, locale=chosen, cap=settings.max_count
         )
+    except UnsupportedMetricError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except QueryError as exc:
         raise _refused(exc) from exc
-    payload = PublicStatRead(value=value)
+    payload = PublicStatRead(value=value, capped=capped)
     return _public_cache.apply(request, response, payload, settings) or payload
 
 

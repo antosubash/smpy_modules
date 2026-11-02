@@ -1,7 +1,9 @@
 /**
  * `RecordStats` block: the render side. One effect fetches every item's
  * number from the anonymous public stats route; a number that is loading or
- * failed shows a dash, never an error on a public page.
+ * failed shows a dash, never an error on a public page. The route stops at
+ * `max_count` like the listing's total: a capped count shows as the ceiling
+ * and a `+`, and a capped sum (no value) as the dash.
  */
 
 import {
@@ -10,7 +12,7 @@ import {
 } from '@simple-module-py/pagebuilder/pagebuilder/components/widgets/stats-widget';
 import { useEffect, useMemo, useState } from 'react';
 
-import { fetchPublicStat } from '../../utils/public-api';
+import { fetchPublicStat, type PublicStat } from '../../utils/public-api';
 import { useDateLocale } from './FieldValues';
 
 export interface RecordStatItem {
@@ -66,15 +68,17 @@ function metricOf(item: RecordStatItem): string | null {
   return item.field?.trim() ? `sum:${item.field.trim()}` : null;
 }
 
-function formatValue(item: RecordStatItem, value: number | null, locale: string | undefined) {
-  if (value === null) return PLACEHOLDER;
+function formatValue(item: RecordStatItem, stat: PublicStat | null, locale: string | undefined) {
+  if (stat === null || stat.value === null) return PLACEHOLDER;
   let text: string;
   try {
-    text = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
+    text = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(stat.value);
   } catch {
-    text = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+    text = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(stat.value);
   }
-  return `${item.prefix ?? ''}${text}${item.suffix ?? ''}`;
+  // The `+` belongs to the number, so it sits inside the author's affixes.
+  const more = stat.capped ? '+' : '';
+  return `${item.prefix ?? ''}${text}${more}${item.suffix ?? ''}`;
 }
 
 export function RecordStatsRender({
@@ -89,7 +93,7 @@ export function RecordStatsRender({
   const numberLocale = useDateLocale({ locale });
   // `resolveData` never runs on an anonymous public page, so clamp here too.
   const safe = useMemo(() => clampStatItems(items), [items]);
-  const [values, setValues] = useState<(number | null)[]>([]);
+  const [values, setValues] = useState<(PublicStat | null)[]>([]);
 
   // Only what changes the requests: editing a label must not refetch.
   const fetchKey = JSON.stringify([

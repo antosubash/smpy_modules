@@ -61,9 +61,14 @@ class PublicStatRead(SQLModel):
     """``GET …/{type_key}/stats`` — one number (#88).
 
     ``int`` for a count and for a whole sum, ``float`` otherwise: the exact
-    sum, which the block rounds for display and the API does not."""
+    sum, which the block rounds for display and the API does not.
 
-    value: int | float
+    ``capped`` is the listing's ``total_capped``: a count past ``max_count``
+    is ``max_count``, and a sum that would read more than ``max_count``
+    records is ``None`` — "not available" rather than a partial sum."""
+
+    value: int | float | None
+    capped: bool = False
 
 
 class PublicRecordPage(SQLModel):

@@ -38,10 +38,11 @@ from sm_records.index._fields import declared_keys, indexed_map
 from sm_records.index._filters import filtered, resolve
 from sm_records.index._fixed import FIXED_COLUMNS, fixed_expression
 from sm_records.index._predicates import SORT_ATTR, QueryError
+from sm_records.index.query import count_columns
 from sm_records.models import TableSet, tables_for
 from sm_records.schema.types import IndexKind
 
-__all__ = ["Metric", "aggregate_query", "parse_metric", "total_query"]
+__all__ = ["Metric", "aggregate_query", "bounded_sum_query", "parse_metric"]
 
 FIXED_KIND: dict[str, IndexKind] = {
     "status": IndexKind.TEXT,
@@ -210,32 +211,49 @@ def aggregate_query(
     return stmt, group_kind
 
 
-def total_query(rtype, fields: list[dict[str, Any]], filters, *, metric: Metric) -> Select:
-    """:func:`aggregate_query` with no ``GROUP BY``: one row, one number.
+def bounded_sum_query(
+    rtype, fields: list[dict[str, Any]], filters, *, metric: Metric, cap: int, narrow: Any
+) -> Select:
+    """``(matched, sum)`` over at most ``cap + 1`` matching records — one row.
 
-    ``count`` is ``count(distinct record.id)`` and ``sum:<field>`` the sum of
-    that field's index values, read through the same :func:`_column`,
-    :func:`_check_metric`, :func:`_on` and :func:`filtered` the grouped query
-    uses — so the public stats block (#88) and the admin dashboard cannot
-    disagree about which rows a filter keeps or which fields can be summed.
-    ``min``/``max`` are the caller's to refuse or allow; this answers any
-    metric the grouped query would.
+    The anonymous stats sum (#88) is bounded the way the listing's ``total``
+    is, and by the same machinery: the inner query is
+    :func:`~sm_records.index.query.bounded_count_query`'s — the mapped
+    :func:`~sm_records.index.query.count_columns` (so the soft-delete filter
+    still reaches the ``LIMIT``), ``narrow`` and :func:`filtered` applied,
+    ``LIMIT cap + 1`` — and the outer sums the field over an alias of it.
+    ``matched`` past ``cap`` means the sum covers only some of the matches,
+    which the caller reports as "not available" rather than a wrong number.
 
-    No ``LIMIT``: a single aggregate row has no ceiling to detect.
+    Chosen over a bounded count followed by an unbounded sum (which is the
+    full scan the bound exists to stop) and over ``SUM ... WHERE id IN
+    (limited)`` (which reads the matching rows twice, F4's measured trap): one
+    statement, the matching rows read once and at most ``cap + 1`` of them,
+    and the index table probed only for those. A **left** join, so a record
+    without a value still counts towards ``matched`` — the bound is on the
+    records scanned, not on the values found — and adds nothing to the sum.
+    ``_check_metric`` has refused a multi-valued field, so the join cannot
+    repeat a record.
     """
+    if metric.field is None:
+        raise ValueError(f"{metric} names no field; count is bounded_count_query")
     tables = tables_for(rtype)
     record = tables.record
-    if metric.field is None:
-        stmt = select(func.count(distinct(record.id))).select_from(record)
+    indexed, declared = indexed_map(fields), declared_keys(fields)
+    _, kind, join, many = _column(tables, rtype, indexed, declared, metric.field)
+    _check_metric(metric, kind, many)
+    inner = narrow(
+        filtered(
+            select(*count_columns(record)).where(record.type_id == rtype.id), rtype, fields, filters
+        )
+    ).limit(cap + 1)
+    counted = aliased(record, inner.subquery())
+    if join is None:
+        value = fixed_expression(counted, metric.field)
     else:
-        indexed, declared = indexed_map(fields), declared_keys(fields)
-        expr, kind, join, many = _column(tables, rtype, indexed, declared, metric.field)
-        _check_metric(metric, kind, many)
-        stmt = select(getattr(func, metric.op)(expr)).select_from(record)
-        if join is not None:
-            # Inner, not outer: a record with no value adds nothing to a sum,
-            # and ``_check_metric`` has already refused a multi-valued field,
-            # so the join cannot repeat a record.
-            stmt = stmt.join(join[0], _on(record, join[0], rtype.id, join[1]))
-    stmt = stmt.where(record.type_id == rtype.id)
-    return filtered(stmt, rtype, fields, filters)
+        value = getattr(join[0], SORT_ATTR[kind])
+    stmt = select(func.count(counted.id), getattr(func, metric.op)(value)).select_from(counted)
+    if join is not None:
+        stmt = stmt.outerjoin(join[0], _on(counted, join[0], rtype.id, join[1]))
+    options = inner.get_execution_options()
+    return stmt.execution_options(**options) if options else stmt

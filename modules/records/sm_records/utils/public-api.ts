@@ -140,16 +140,24 @@ export async function fetchPublicRecords(
   return (await response.json()) as PublicRecordPage;
 }
 
+/** What the stats route answers. `capped` is the listing's `total_capped`:
+ *  a count past `max_count` is `max_count`, and a sum that would read more
+ *  records than that is `null` — not available, rather than a partial sum. */
+export interface PublicStat {
+  value: number | null;
+  capped: boolean;
+}
+
 /** One number about a public type — the `RecordStats` block's read.
  *  `metric` is `count` or `sum:<field>`; `filter` is one term, as in the
  *  list. Same anonymous request as {@link fetchPublicRecords}: the prefix
  *  default, the tenant header, no cookie. Throws on a non-2xx answer or a
- *  body without a finite `value`. */
+ *  body whose `value` is neither a finite number nor a capped `null`. */
 export async function fetchPublicStat(
   prefix: string,
   typeKey: string,
   opts: { metric: string; filter: string; locale: string; tenant: string; signal: AbortSignal },
-): Promise<number> {
+): Promise<PublicStat> {
   const params = new URLSearchParams({ metric: opts.metric });
   const filter = opts.filter.trim();
   if (filter) params.set('filter', filter);
@@ -161,9 +169,11 @@ export async function fetchPublicStat(
   if (tenant) headers[TENANT_HEADER] = tenant;
   const response = await fetch(url, { credentials: 'omit', headers, signal: opts.signal });
   if (!response.ok) throw new Error(`records public API: ${response.status}`);
-  const body = (await response.json()) as { value?: unknown };
+  const body = (await response.json()) as { value?: unknown; capped?: unknown };
+  const capped = body.capped === true;
+  if (body.value === null && capped) return { value: null, capped };
   if (typeof body.value !== 'number' || !Number.isFinite(body.value)) {
     throw new Error('records stats response has no value');
   }
-  return body.value;
+  return { value: body.value, capped };
 }

@@ -52,7 +52,7 @@ async def _parcel(client, name: str, area=None, *, status: str = "published", ki
 async def _value(client, query: str = "", *, url: str = _STATS, **kwargs):
     resp = await client.get(f"{url}?{query}", **kwargs)
     assert resp.status_code == 200, resp.text
-    assert set(resp.json()) == {"value"}
+    assert resp.json()["capped"] is False, "nothing here is near max_count"
     return resp.json()["value"]
 
 

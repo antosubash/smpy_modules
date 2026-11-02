@@ -216,6 +216,24 @@ describe('RecordStatsRender', () => {
     expect(values()).toEqual(['3,75']);
   });
 
+  it('shows a capped count as the ceiling and a plus, inside the prefix and suffix', async () => {
+    respond = async () => new Response(JSON.stringify({ value: 10000, capped: true }));
+    await mount([item(), item({ prefix: '~', suffix: ' Spenden' })]);
+    expect(values()).toEqual(['10.000+', '~10.000+ Spenden']);
+  });
+
+  it('shows a dash for a capped sum, which has no value', async () => {
+    respond = async () => new Response(JSON.stringify({ value: null, capped: true }));
+    await mount([item({ metric: 'sum', field: 'amount', prefix: '€' })]);
+    expect(values()).toEqual(['–']);
+  });
+
+  it('shows a dash for a null value that does not say it is capped', async () => {
+    respond = async () => new Response(JSON.stringify({ value: null, capped: false }));
+    await mount([item()]);
+    expect(values()).toEqual(['–']);
+  });
+
   it('ignores field for a count', async () => {
     await mount([item({ metric: 'count', field: 'amount' })]);
     expect(params(0).get('metric')).toBe('count');
