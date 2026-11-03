@@ -521,12 +521,13 @@ and `hidden` counts the blockers whose type narrows `allowed_roles` past them
 ## Public read API
 
 Off by default and per type. Setting `is_public` on a Record Type serves its
-published records anonymously at two routes, under `public_route_prefix`
+published records anonymously at three routes, under `public_route_prefix`
 (default `/api/records/public`):
 
 | route | answers |
 |---|---|
 | `GET`/`HEAD` `{prefix}/{type_key}` | `{items, total, total_capped, page, page_size, next_cursor, media_url_template}` |
+| `GET`/`HEAD` `{prefix}/{type_key}/stats` | `{value}` — `metric=count` (the listing's `total`) or `sum:<public number field>`, for the `RecordStats` block; see [docs/api-reference.md](docs/api-reference.md#live-counts--type_keystats) |
 | `GET`/`HEAD` `{prefix}/{type_key}/{uuid}` | one record |
 
 A record reads back as `uuid`, `slug`, `locale`, `translations`,

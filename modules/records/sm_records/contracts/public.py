@@ -25,7 +25,13 @@ from sm_records.models import Record, RecordType
 from sm_records.schema.fields import FieldDefinition
 from sm_records.services._payload import field_defs, read_view
 
-__all__ = ["PublicRecordPage", "PublicRecordRead", "public_record_read", "public_records_read"]
+__all__ = [
+    "PublicRecordPage",
+    "PublicRecordRead",
+    "PublicStatRead",
+    "public_record_read",
+    "public_records_read",
+]
 
 
 class PublicRecordRead(SQLModel):
@@ -49,6 +55,20 @@ class PublicRecordRead(SQLModel):
 
     ``translation_group`` itself is *not* published: it is an internal
     grouping key, and a reader needs the addresses, not the join column."""
+
+
+class PublicStatRead(SQLModel):
+    """``GET …/{type_key}/stats`` — one number (#88).
+
+    ``int`` for a count and for a whole sum, ``float`` otherwise: the exact
+    sum, which the block rounds for display and the API does not.
+
+    ``capped`` is the listing's ``total_capped``: a count past ``max_count``
+    is ``max_count``, and a sum that would read more than ``max_count``
+    records is ``None`` — "not available" rather than a partial sum."""
+
+    value: int | float | None
+    capped: bool = False
 
 
 class PublicRecordPage(SQLModel):
