@@ -15,7 +15,7 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
-from simple_module_db import tenant_context
+from sm_newsletter.core.tenancy import tenant_scope
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.pg_support import arm_reset, make_db_state
@@ -30,13 +30,13 @@ def _default_tenant(request):
     pytest-asyncio runs each async fixture and test in a *copy* of this context,
     so the binding reaches all of them.
 
-    ``@pytest.mark.unbound_tenant`` opts a test out. Task 3 swaps this for
-    ``sm_newsletter.core.tenancy.tenant_scope``.
+    ``@pytest.mark.unbound_tenant`` opts a test out. Bound with the module's own
+    ``tenant_scope``, as its entry points do.
     """
     if request.node.get_closest_marker("unbound_tenant") is not None:
         yield None
         return
-    with tenant_context(DEFAULT_TENANT):
+    with tenant_scope(DEFAULT_TENANT):
         yield DEFAULT_TENANT
 
 

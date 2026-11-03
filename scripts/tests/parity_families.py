@@ -224,6 +224,7 @@ FAMILIES: tuple[Family, ...] = (
             Copy("modules/news/tests/pg_support.py"),
             Copy("modules/records/tests/pg_support.py"),
             Copy("modules/images/tests/pg_support.py"),
+            Copy("modules/newsletter/tests/pg_support.py"),
         ),
         shared=("_shared", "_pg", "arm_reset", "USING_POSTGRES"),
     ),
