@@ -2,11 +2,11 @@ import type { ComponentConfig } from '@puckeditor/core';
 import {
   StatsView,
   type StatsWidgetProps,
-} from '@simple-module-py/pagebuilder/pagebuilder/components/widgets/stats-widget';
+} from '@simple-module-py/pagebuilder/pagebuilder/ui/components/widgets/stats-widget';
 import {
   createImageField,
   mediaLibraryAdapter,
-} from '@simple-module-py/pagebuilder/pagebuilder/fields';
+} from '@simple-module-py/pagebuilder/pagebuilder/ui/fields';
 import { useEffect, useMemo, useState } from 'react';
 
 import { useContentLocale } from '../hooks/useContentLocale';

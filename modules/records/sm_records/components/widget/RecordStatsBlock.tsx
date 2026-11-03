@@ -9,7 +9,7 @@ import type { ComponentConfig } from '@puckeditor/core';
 import {
   createImageField,
   mediaLibraryAdapter,
-} from '@simple-module-py/pagebuilder/pagebuilder/fields';
+} from '@simple-module-py/pagebuilder/pagebuilder/ui/fields';
 
 import { keys, type Translate, translate } from '../../utils/i18n';
 import { DEFAULT_PUBLIC_PREFIX } from '../../utils/public-api';

@@ -209,7 +209,7 @@ describe('RecordStatsRender', () => {
 describe('registration', () => {
   it('offers RecordStats in data, page-only', async () => {
     const { registeredBlocks } = await import(
-      '@simple-module-py/pagebuilder/pagebuilder/components/blockRegistry'
+      '@simple-module-py/pagebuilder/pagebuilder/ui/components/blockRegistry'
     );
     await import('../../pagebuilder-blocks');
     const mine = registeredBlocks().find((r) => 'RecordStats' in r.blocks);
