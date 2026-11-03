@@ -4,7 +4,7 @@
   "private": true,
   "description": "Frontend assets for the News module",
   "peerDependencies": {
-    "@inertiajs/react": "^3.9.1",
+    "@inertiajs/react": "^3.10.0",
     "@puckeditor/core": "^0.24.0",
     "@simple-module-py/pagebuilder": "*",
     "@simple-module-py/ui": "*",
