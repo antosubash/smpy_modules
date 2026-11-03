@@ -34,10 +34,10 @@ from decimal import Decimal
 from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.models import IndexReduce, RecordType
 from sm_records.records.index._drift import clear_drift, record_drift
 from sm_records.records.index._reduce_write import drop_type_rows, stored_rows
 from sm_records.records.index.reduce import ReduceSpec, contribution, reduce_specs
-from sm_records.models import IndexReduce, RecordType
 from sm_records.records.services._common import utcnow, walk_type
 
 __all__ = ["Drift", "rebuild_type", "recompute", "verify_type"]

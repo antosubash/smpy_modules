@@ -25,9 +25,9 @@ import tracemalloc
 import pytest
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import Base, Record, RecordType
 from sm_records.records.services import export as export_service
-from sm_records.core.settings import RecordsSettings
 from sqlalchemy import event, insert
 from sqlalchemy.pool import StaticPool
 

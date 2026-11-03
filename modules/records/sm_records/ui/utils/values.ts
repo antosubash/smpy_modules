@@ -19,7 +19,14 @@
  */
 
 import { isoToLocalInput, localInputToIso } from './value-dates';
-export { isoToLocalInput, localInputToIso, formatDateTime, formatCalendarDate } from './value-dates';
+
+export {
+  formatCalendarDate,
+  formatDateTime,
+  isoToLocalInput,
+  localInputToIso,
+} from './value-dates';
+
 import type { FieldDef } from './types';
 
 export type FormValues = Record<string, unknown>;

@@ -12,7 +12,7 @@ Find a file by its responsibility:
 | `public_submissions/` | Website submissions, consent, newsletter links, mail templates, delivery claims and retention |
 | `ui/` | Components, hooks, utilities and page tests |
 
-`module.py`, `models/`, `contracts/`, `pages/`, `locales/`, `index.ts` and
+`module.py`, `models/`, `contracts/`, `pages/`, `locales/` and
 `pagebuilder-blocks.ts` retain the names their consumers discover. JSON catalogues
 remain in `locales/`; Python content-language policy lives in `core/locales.py`.
 The documented `python -m sm_records.cli` command still parses and dispatches at

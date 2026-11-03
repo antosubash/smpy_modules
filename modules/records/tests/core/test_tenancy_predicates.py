@@ -16,8 +16,8 @@ statement's effect cannot be observed, reads the SQL it sent.
 from __future__ import annotations
 
 import pytest
+from sm_records.core.tenancy import all_tenants
 from sm_records.models import RecordType, RevisionEvent, tables_for
-from sm_records.schema.types import IndexKind
 from sm_records.records.services import _invalid, _lock, _referrer_page
 from sm_records.records.services import records as record_service
 from sm_records.records.services import types as type_service
@@ -26,7 +26,7 @@ from sm_records.records.services._empty_trash import _purge_ids
 from sm_records.records.services._lifecycle import hard_delete_record, purge_type_records
 from sm_records.records.services.errors import Conflict
 from sm_records.records.services.revisions import write_revision
-from sm_records.core.tenancy import all_tenants
+from sm_records.schema.types import IndexKind
 from sqlalchemy import insert, select
 
 from tests.support.tenancy_support import (

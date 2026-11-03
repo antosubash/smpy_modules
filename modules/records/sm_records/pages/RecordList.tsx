@@ -1,4 +1,3 @@
-import type { Props } from '../ui/components/record-list-types';
 import { Head, usePage } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import type { SharedProps } from '@simple-module-py/ui/types';
@@ -13,6 +12,7 @@ import { RecordListFooter } from '../ui/components/RecordListFooter';
 import { RecordListPublicUrl } from '../ui/components/RecordListPublicUrl';
 import { RecordsLayout } from '../ui/components/RecordsLayout';
 import { RecordTable } from '../ui/components/RecordTable';
+import type { Props } from '../ui/components/record-list-types';
 import { useListColumns } from '../ui/hooks/useListColumns';
 import { useRecordListMutations } from '../ui/hooks/useRecordListMutations';
 import { useRecordListNav } from '../ui/hooks/useRecordListNav';
@@ -26,8 +26,6 @@ import {
   parseSort,
   parseTrashedParam,
 } from '../ui/utils/listing';
-import type { MediaApi } from '../ui/utils/media-api';
-import type { RecordListPage, TenancyMode, TypeRead } from '../ui/utils/types';
 
 /** The permission the "Trash" toggle costs — see `deps.py::parse_trashed`. */
 const EDIT_PERMISSION = 'records.edit';

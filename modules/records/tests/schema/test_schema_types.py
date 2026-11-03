@@ -12,7 +12,7 @@ from decimal import Decimal
 
 import pytest
 
-from .schema_helpers import CHOICES, UUID_A, UUID_B, check, field, refuses
+from tests.support.schema_helpers import CHOICES, UUID_A, UUID_B, check, field, refuses
 
 
 class TestTextLike:

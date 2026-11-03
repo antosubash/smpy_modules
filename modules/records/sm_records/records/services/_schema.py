@@ -13,14 +13,14 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.core._text import NUL_PROBLEM, has_nul
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordType, RecordTypeRevision
 from sm_records.public_submissions.config import FIELD, settle
 from sm_records.public_submissions.spec import INTERNAL, inject
-from sm_records.schema.fields import FieldDefinition, FieldSchemaError, validate_fields
-from sm_records.schema.types import FieldType
 from sm_records.records.services._common import type_id_map, utcnow
 from sm_records.records.services.errors import ValidationFailed
-from sm_records.core.settings import RecordsSettings
+from sm_records.schema.fields import FieldDefinition, FieldSchemaError, validate_fields
+from sm_records.schema.types import FieldType
 
 _TEXT_COLUMNS = ("label", "label_plural", "description", "icon")
 """The type row's free-text columns. ``key`` is absent because it is matched

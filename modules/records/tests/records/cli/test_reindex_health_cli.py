@@ -15,11 +15,11 @@ from types import SimpleNamespace
 from simple_module_core.health import HealthStatus
 from sm_records.core.constants import REINDEX_ALL
 from sm_records.core.health import stale_reindex_check
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import IndexNumber, RecordType
 from sm_records.records.services import records as record_service
 from sm_records.records.services import schema_change
 from sm_records.records.services import types as type_service
-from sm_records.core.settings import RecordsSettings
 from sqlalchemy import select
 
 # --- the alarm (§8.9) -------------------------------------------------------

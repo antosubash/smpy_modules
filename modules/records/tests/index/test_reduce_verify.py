@@ -21,11 +21,11 @@ import pytest
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
 from sm_records.core.health import stale_reindex_check
+from sm_records.models import Base, IndexReduce
 from sm_records.records.index._drift import clear_drift, current_drift
 from sm_records.records.index.reduce import register_reduce_provider
 from sm_records.records.index.reduce_rebuild import rebuild_type, verify_type
 from sm_records.records.index.reindex import reindex_type
-from sm_records.models import Base, IndexReduce
 from sm_records.records.services._common import utcnow
 from sqlalchemy import delete, select, update
 

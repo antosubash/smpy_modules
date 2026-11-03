@@ -29,5 +29,4 @@ export function useSaveShortcut(save: () => Promise<void>, pending: boolean) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-
 }

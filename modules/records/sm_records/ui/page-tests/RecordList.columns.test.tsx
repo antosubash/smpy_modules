@@ -1,9 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { click, mount } from './test-dom';
 import { columnStorageKey } from '../utils/column-storage';
 import type { FieldDef, RecordPage, RecordRead, TypeRead } from '../utils/types';
+import { click, mount } from './test-dom';
 
 let pageUrl = '/admin/records/book';
 let ioSearch: string | undefined;

@@ -1,12 +1,13 @@
 """records services _translation_slugs helpers."""
 
 from __future__ import annotations
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from sm_records.core.constants import MAX_SLUG_LEN
 from sm_records.models import RecordType, tables_for
 from sm_records.records.services.errors import Conflict
-
 
 _MAX_SLUG_ATTEMPTS = 20
 

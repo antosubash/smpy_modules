@@ -10,10 +10,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from sm_records.schema.fields import FieldDefinition
+from sm_records.core.settings import RecordsSettings
 from sm_records.records.services._patterns import check_defaults
 from sm_records.records.services._schema import normalise
-from sm_records.core.settings import RecordsSettings
+from sm_records.schema.fields import FieldDefinition
 
 __all__ = ["normalise_checked"]
 

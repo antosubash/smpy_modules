@@ -13,10 +13,15 @@ half of the contract and is checked in
 
 from __future__ import annotations
 
-from sm_records.core.settings import RecordsSettings
-
-from tests.support.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, roles
-from tests.support.i18n_helpers import API, TYPE_KEY, make_record, make_type, publish, set_type, translate
+from tests.support.app_harness import ADMIN, roles
+from tests.support.i18n_helpers import (
+    API,
+    TYPE_KEY,
+    make_record,
+    make_type,
+    publish,
+    translate,
+)
 
 
 async def test_a_new_record_is_in_the_default_locale_and_alone_in_its_group(bilingual):

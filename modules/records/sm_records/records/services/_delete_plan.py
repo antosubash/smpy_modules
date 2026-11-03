@@ -22,14 +22,14 @@ from typing import Final
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.core.settings import RecordsSettings
+from sm_records.models import Record, RecordType, RevisionEvent, tables_for
 from sm_records.records.index.reduce import snapshot
 from sm_records.records.index.writer import write_index
-from sm_records.models import Record, RecordType, RevisionEvent, tables_for
 from sm_records.records.services import _payload, _relations
 from sm_records.records.services._access import role_blocked
 from sm_records.records.services._common import bump_or_conflict, type_resolver
 from sm_records.records.services.revisions import write_revision
-from sm_records.core.settings import RecordsSettings
 
 __all__ = ["BLOCKER_CAP", "Blockers", "apply_set_null", "plan_delete"]
 

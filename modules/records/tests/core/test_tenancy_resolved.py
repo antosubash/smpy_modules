@@ -26,9 +26,7 @@ from fastapi import APIRouter, Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
 from simple_module_db.listeners import current_tenant_id
 from simple_module_hosting.middleware import TenantMiddleware, TenantResolution
-from sm_records.core import boot
-from sm_records.core import constants
-from sm_records.models import RecordStatus
+from sm_records.core import boot, constants
 from sm_records.core.tenancy import (
     TenancyMode,
     bind_admin,
@@ -37,8 +35,16 @@ from sm_records.core.tenancy import (
     detect_mode,
     tenant_scope,
 )
+from sm_records.models import RecordStatus
 
-from tests.support.app_harness import ADMIN, TEST_TENANT_HEADER, build_app, roles, seed_record, seed_type
+from tests.support.app_harness import (
+    ADMIN,
+    TEST_TENANT_HEADER,
+    build_app,
+    roles,
+    seed_record,
+    seed_type,
+)
 
 pytestmark = pytest.mark.unbound_tenant
 

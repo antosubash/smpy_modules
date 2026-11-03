@@ -16,10 +16,10 @@ from typing import Any, Final, NamedTuple
 
 from fastapi import Depends, HTTPException, Query
 
-from sm_records.records._expand_grammar import _settings, parse_expand
 from sm_records.core._text import has_nul
-from sm_records.records.index.query import Filter, FilterOp, Sort
 from sm_records.core.settings import RecordsSettings
+from sm_records.records._expand_grammar import _settings, parse_expand
+from sm_records.records.index.query import Filter, FilterOp, Sort
 
 __all__ = [
     "MALFORMED_FILTER",

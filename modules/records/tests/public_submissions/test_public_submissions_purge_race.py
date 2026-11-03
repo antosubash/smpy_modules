@@ -15,17 +15,17 @@ import asyncio
 
 import pytest
 from sm_records.core import events
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import tenant_scope
 from sm_records.models import RecordType, SubmissionDelivery, tables_for
 from sm_records.public_submissions import delivery, sending
 from sm_records.records.services._forget_deliveries import forget_deliveries
 from sm_records.records.services.records import get_record
-from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import tenant_scope
 from sqlalchemy import delete, select, text
 
+from tests.pg_support import USING_POSTGRES
 from tests.support.app_harness import ADMIN, roles
 from tests.support.newsletter_http import LIST, signup, subscriber
-from tests.pg_support import USING_POSTGRES
 
 pytestmark = pytest.mark.unbound_tenant
 

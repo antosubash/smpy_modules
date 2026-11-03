@@ -4,10 +4,10 @@ compare-and-set: an admin's repair saved meanwhile is never overwritten."""
 from __future__ import annotations
 
 from sm_records.core import events
+from sm_records.core.settings import RecordsSettings
 from sm_records.public_submissions import system
 from sm_records.records.services.records import get_record
 from sm_records.records.services.types import get_type
-from sm_records.core.settings import RecordsSettings
 
 from tests.support.app_harness import ADMIN, roles, seed_record
 from tests.support.public_submissions_support import API

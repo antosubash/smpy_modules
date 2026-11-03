@@ -19,16 +19,16 @@ from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.core import events
+from sm_records.core.settings import RecordsSettings
+from sm_records.models import Record, RecordType
 from sm_records.records.index.providers import TypeIndex
 from sm_records.records.index.reduce import snapshot
 from sm_records.records.index.writer import write_index
-from sm_records.models import Record, RecordType
-from sm_records.schema.compile import to_jsonable
 from sm_records.records.services import records as record_service
 from sm_records.records.services._common import mark_written, type_id_map
 from sm_records.records.services._payload import field_defs
 from sm_records.records.services.errors import Conflict, ValidationFailed
-from sm_records.core.settings import RecordsSettings
+from sm_records.schema.compile import to_jsonable
 
 __all__ = ["system_update", "try_system_update"]
 

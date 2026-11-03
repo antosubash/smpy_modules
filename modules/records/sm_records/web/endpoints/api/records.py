@@ -13,7 +13,6 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.core import constants
 from sm_records.contracts.schemas import (
     RecordCreate,
     RecordPage,
@@ -22,6 +21,14 @@ from sm_records.contracts.schemas import (
     record_list_read,
     record_read,
 )
+from sm_records.core import constants
+from sm_records.core.settings import RecordsSettings
+from sm_records.models import RecordStatus, RecordType
+from sm_records.records.index.query import CursorError, Filter, Sort
+from sm_records.records.services import _duplicates
+from sm_records.records.services import expand as expand_service
+from sm_records.records.services import records as record_service
+from sm_records.records.services.errors import ValidationFailed
 from sm_records.web.deps import (
     MAX_PAGE,
     PageCursor,
@@ -43,13 +50,6 @@ from sm_records.web.deps import (
 from sm_records.web.endpoints.api._errors import RecordsErrorRoute
 from sm_records.web.endpoints.api._responses import WRITE, responses
 from sm_records.web.endpoints.api.translations import translations_of
-from sm_records.records.index.query import CursorError, Filter, Sort
-from sm_records.models import RecordStatus, RecordType
-from sm_records.records.services import _duplicates
-from sm_records.records.services import expand as expand_service
-from sm_records.records.services import records as record_service
-from sm_records.records.services.errors import ValidationFailed
-from sm_records.core.settings import RecordsSettings
 
 router = APIRouter(
     prefix="/types/{key}",

@@ -1,11 +1,11 @@
 """Shared setup for test_collections_crud."""
 
 from __future__ import annotations
+
 import pytest
-from sm_records.models import GLOBAL, RecordStatus, tables_for
 from sqlalchemy import func, select
-from tests.support.app_harness import ADMIN, roles, seed_type
-from tests.support.collections_harness import EVENTS
+
+from tests.support.app_harness import seed_type
 
 API = "/api/records/types/gig/records"
 

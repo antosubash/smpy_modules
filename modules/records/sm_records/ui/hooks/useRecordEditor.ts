@@ -1,4 +1,3 @@
-import { useSaveShortcut } from './useSaveShortcut';
 import { router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -12,6 +11,7 @@ import { keys, useT } from '../utils/i18n';
 import type { RecordRead, RecordStatus, TypeRead } from '../utils/types';
 import { parsePosition } from '../utils/values';
 import { useRecordForm } from './useRecordForm';
+import { useSaveShortcut } from './useSaveShortcut';
 import { useUnsavedGuard } from './useUnsavedGuard';
 
 /**

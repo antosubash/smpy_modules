@@ -22,14 +22,14 @@ from collections.abc import Sequence
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.records.index.query import Filter, FilterOp, build_query
+from sm_records.core.tenancy import bound_tenant
 from sm_records.models import Record, RecordType, tables_for
-from sm_records.schema.fields import FieldDefinition
+from sm_records.records.index.query import Filter, FilterOp, build_query
 from sm_records.records.services._import_parse import ImportRow
 from sm_records.records.services._import_rows import envelope_for
 from sm_records.records.services._payload import slugify
 from sm_records.records.services.errors import ValidationFailed
-from sm_records.core.tenancy import bound_tenant
+from sm_records.schema.fields import FieldDefinition
 
 __all__ = ["MATCH_SLUG", "MATCH_UUID", "match_field", "resolve_matches"]
 

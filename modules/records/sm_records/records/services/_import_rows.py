@@ -24,20 +24,19 @@ row and its counterpart in the database:
 
 from __future__ import annotations
 
-from sm_records.records.services._import_envelope import Envelope, envelope_for
-
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.core.constants import ORPHANED_KEY
 from sm_records.contracts.io import ImportMode
+from sm_records.core.constants import ORPHANED_KEY
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordStatus, RecordType, tables_for
+from sm_records.records.services._import_envelope import Envelope, envelope_for
 from sm_records.records.services._import_parse import ImportRow
 from sm_records.records.services._payload import slug_for
 from sm_records.records.services._uuids import uuid_taken
 from sm_records.records.services.errors import Conflict, ValidationFailed
 from sm_records.records.services.records import create_record, update_record
-from sm_records.core.settings import RecordsSettings
 
 __all__ = ["Envelope", "envelope_for", "unchanged", "version_required", "write_row"]
 

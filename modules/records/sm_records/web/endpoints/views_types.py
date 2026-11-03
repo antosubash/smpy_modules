@@ -19,11 +19,12 @@ from simple_module_hosting.inertia_deps import InertiaDep
 from simple_module_inertia import InertiaResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.core import constants
-from sm_records.core import locales
-from sm_records.core import tenancy
-from sm_records.records.collections import collections
 from sm_records.contracts.schemas import type_read
+from sm_records.core import constants, locales, tenancy
+from sm_records.core.settings import RecordsSettings
+from sm_records.models import RecordType
+from sm_records.records.collections import collections
+from sm_records.records.services import types as type_service
 from sm_records.web.deps import (
     get_settings,
     load_type,
@@ -32,9 +33,6 @@ from sm_records.web.deps import (
 )
 from sm_records.web.endpoints.api._errors import RecordsViewErrorRoute
 from sm_records.web.endpoints.api.types import visible_types
-from sm_records.models import RecordType
-from sm_records.records.services import types as type_service
-from sm_records.core.settings import RecordsSettings
 
 router = APIRouter(route_class=RecordsViewErrorRoute)
 

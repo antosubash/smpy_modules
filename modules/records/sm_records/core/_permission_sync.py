@@ -23,8 +23,7 @@ from typing import TYPE_CHECKING
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from sm_records.core import constants
-from sm_records.core import type_permissions
+from sm_records.core import constants, type_permissions
 from sm_records.core.tenancy._mode import TenancyMode, scope_mode
 
 if TYPE_CHECKING:  # pragma: no cover - imports for typing only

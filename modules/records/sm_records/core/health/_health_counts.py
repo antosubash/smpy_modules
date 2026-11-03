@@ -12,10 +12,10 @@ from __future__ import annotations
 from sqlalchemy import func, select
 
 from sm_records.core import locales
-from sm_records.core.tenancy._cross_tenant import read_all, tenant_counts
-from sm_records.models import table_sets
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import DEFAULT_TENANT
+from sm_records.core.tenancy._cross_tenant import read_all, tenant_counts
+from sm_records.models import table_sets
 
 __all__ = [
     "count_invalid_records",

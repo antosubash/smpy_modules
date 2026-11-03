@@ -22,11 +22,11 @@ import asyncio
 
 from sqlalchemy import select
 
-from sm_records.core.tenancy._cross_tenant import read_all
-from sm_records.records.cli.cli_common import connected, load_settings
-from sm_records.models import RecordType
-from sm_records.records.services.reindex_runner import run_pending
 from sm_records.core.tenancy import DEFAULT_TENANT, tenant_scope
+from sm_records.core.tenancy._cross_tenant import read_all
+from sm_records.models import RecordType
+from sm_records.records.cli.cli_common import connected, load_settings
+from sm_records.records.services.reindex_runner import run_pending
 
 __all__ = ["force_pending", "reindex", "run_verify"]
 

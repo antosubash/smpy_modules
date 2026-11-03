@@ -55,8 +55,9 @@ from collections.abc import Sequence
 from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.core import events
 from sm_records.contracts.bulk import BulkAction, BulkFailure, BulkReport, BulkResult
+from sm_records.core import events
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordType
 
 # Re-exported: one record's turn is the same single-record call the endpoint
@@ -71,7 +72,6 @@ from sm_records.records.services._delete_locks import lock_delete_graph
 # one module.
 from sm_records.records.services._empty_trash import Identity, empty_trash
 from sm_records.records.services.errors import BulkRefused, RecordsError, ReferencedByOthers
-from sm_records.core.settings import RecordsSettings
 
 __all__ = ["Change", "Identity", "apply_bulk", "empty_trash"]
 

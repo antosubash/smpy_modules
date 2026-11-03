@@ -17,9 +17,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.core import events
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import bound_tenant
+from sm_records.models import Record, RecordType, RevisionEvent, tables_for
 from sm_records.records.index._reduce_write import apply_delta, drop_type_rows
 from sm_records.records.index.reindex import reindex_record
-from sm_records.models import Record, RecordType, RevisionEvent, tables_for
 from sm_records.records.services._common import (
     PurgedRecord,
     mark_written,
@@ -30,15 +32,17 @@ from sm_records.records.services._common import (
 # Split out for the file cap: everything about the referrer graph — walking
 # it, and rewriting the records that point at the one being deleted — lives
 # there, and everything about a record's own existence lives here.
-from sm_records.records.services._delete_locks import check_delete_plan, lock_delete_graph, still_there
+from sm_records.records.services._delete_locks import (
+    check_delete_plan,
+    lock_delete_graph,
+    still_there,
+)
 from sm_records.records.services._delete_plan import apply_set_null, plan_delete
 from sm_records.records.services._empty_trash import _purge_ids
 from sm_records.records.services._forget_deliveries import forget_deliveries
 from sm_records.records.services._lock import lock_type
 from sm_records.records.services.errors import ReferencedByOthers
 from sm_records.records.services.revisions import write_revision
-from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import bound_tenant
 
 
 async def _trash(

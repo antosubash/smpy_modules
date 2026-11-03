@@ -30,10 +30,9 @@ from typing import Any
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient, Response
 from simple_module_db import all_tenants
-from sm_records.core import boot
-from sm_records.core import constants
-from sm_records.models import RecordType, table_sets
+from sm_records.core import boot, constants
 from sm_records.core.settings import RecordsSettings
+from sm_records.models import RecordType, table_sets
 from sqlalchemy import select
 
 from tests.support.app_harness import ADMIN, TEST_TENANT_HEADER, build_app, roles

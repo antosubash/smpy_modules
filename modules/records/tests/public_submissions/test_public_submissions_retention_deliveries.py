@@ -8,12 +8,12 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
+from sm_records.core.tenancy import tenant_scope
 from sm_records.public_submissions import retention
 from sm_records.public_submissions.attempts import COMPLETE
 from sm_records.public_submissions.retention_deliveries import prune_deliveries
 from sm_records.records.services import records as record_service
 from sm_records.records.services import types as type_service
-from sm_records.core.tenancy import tenant_scope
 
 from tests.support.retention_support import (
     NOW,

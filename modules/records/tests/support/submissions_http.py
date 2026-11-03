@@ -16,10 +16,10 @@ from typing import Any
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from simple_module_core.mail import MailMessage, install_mail_sender
-from sm_records.records import _pattern_worker
 from sm_records.core import constants
-from sm_records.public_submissions import mail_runner
 from sm_records.core.settings import RecordsSettings
+from sm_records.public_submissions import mail_runner
+from sm_records.records import _pattern_worker
 
 from tests.support.app_harness import ADMIN, build_app, roles
 from tests.support.public_submissions_support import create, form_config

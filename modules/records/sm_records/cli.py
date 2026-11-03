@@ -30,13 +30,12 @@ import sys
 from collections.abc import Sequence
 from typing import Any
 
-from sm_records.records.cli import cli_host
-from sm_records.records.cli import cli_io
+from sm_records.core.tenancy import DEFAULT_TENANT, tenant_scope
 from sm_records.core.tenancy._cross_tenant import TenantCounts, tenant_counts
+from sm_records.records.cli import cli_host, cli_io
 from sm_records.records.cli.cli_common import add_tenant_argument, connected, load_settings
 from sm_records.records.cli.cli_reindex import force_pending, reindex, run_verify
 from sm_records.records.seed.runner import SeedSummary
-from sm_records.core.tenancy import DEFAULT_TENANT, tenant_scope
 
 __all__ = ["main", "reindex", "run_verify", "seed", "tenants"]
 

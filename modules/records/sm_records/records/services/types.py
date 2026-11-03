@@ -29,6 +29,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.core import events
 from sm_records.core._text import has_nul
 from sm_records.core.constants import MAX_KEY_LEN, RESERVED_TYPE_KEYS, TYPE_KEY_PATTERN
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import bound_tenant
 from sm_records.models import RecordType, RecordTypeRevision
 from sm_records.public_submissions import config as submissions
 from sm_records.records.services._common import (
@@ -55,8 +57,6 @@ from sm_records.records.services.errors import (
     ValidationFailed,
 )
 from sm_records.records.services.records import purge_type_records
-from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import bound_tenant
 
 __all__ = [
     "create_type",

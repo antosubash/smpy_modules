@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
-
-import { mount } from './test-dom';
 import type { RecordRead, TypeRead } from '../utils/types';
+import { mount } from './test-dom';
 
 // Split out of RecordEditor.test.tsx for the 300-line cap, the same way
 // RecordEditor.duplicate.test.tsx and RecordEditor.invalid.test.tsx already

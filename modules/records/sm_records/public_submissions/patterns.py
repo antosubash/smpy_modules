@@ -13,12 +13,12 @@ from __future__ import annotations
 
 from typing import Any, Final
 
-from sm_records.records import _pattern_worker
 from sm_records.models import RecordType
 from sm_records.public_submissions.errors import SubmissionRefused
-from sm_records.schema._text_checks import Verdicts
+from sm_records.records import _pattern_worker
 from sm_records.records.services._patterns import NOT_CHECKED, TOO_SLOW, pairs_of
 from sm_records.records.services._payload import field_defs
+from sm_records.schema._text_checks import Verdicts
 
 __all__ = ["BUDGET_SECONDS", "WAIT_SECONDS", "check_patterns"]
 

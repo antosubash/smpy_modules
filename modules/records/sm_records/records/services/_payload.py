@@ -24,6 +24,7 @@ from sm_records.core.constants import (
     ORPHANED_KEY,
 )
 from sm_records.models import Record, RecordType
+from sm_records.records.services.errors import ValidationFailed
 from sm_records.schema._text_checks import reading
 from sm_records.schema.compile import (
     PayloadValidationError,
@@ -33,7 +34,6 @@ from sm_records.schema.compile import (
 )
 from sm_records.schema.compile import validate_payload as _validate_payload
 from sm_records.schema.fields import FieldDefinition, FieldSchemaError, validate_fields
-from sm_records.records.services.errors import ValidationFailed
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 

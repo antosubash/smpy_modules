@@ -8,16 +8,9 @@ implementation plan exactly.
 
 from __future__ import annotations
 
-from sm_records.web.endpoints.api._type_writes import _defer_reindex, _schedule_reindex_if_pending, _check_roles_for_discard, create_from, type_written, apply_update
-
-from functools import partial
-from typing import Any
-
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.core import events
-from sm_records.contracts.io import TypeImportRequest
 from sm_records.contracts.schemas import (
     TypeCreate,
     TypeListResponse,
@@ -25,7 +18,11 @@ from sm_records.contracts.schemas import (
     TypeUpdate,
     type_read,
 )
-from sm_records.records.deferred import defer
+from sm_records.core.settings import RecordsSettings
+from sm_records.models import RecordType
+from sm_records.records.services import types as type_service
+from sm_records.records.services._access import role_blocked
+from sm_records.records.services.errors import ValidationFailed
 from sm_records.web.deps import (
     actor,
     caller_roles,
@@ -39,13 +36,13 @@ from sm_records.web.deps import (
 )
 from sm_records.web.endpoints.api._errors import RecordsErrorRoute
 from sm_records.web.endpoints.api._responses import TYPE_WRITE, responses
-from sm_records.web.menu import affects_menu, mark_dirty
-from sm_records.models import RecordType
-from sm_records.records.services import _orphaned, reindex_runner
-from sm_records.records.services import types as type_service
-from sm_records.records.services._access import role_blocked
-from sm_records.records.services.errors import ValidationFailed
-from sm_records.core.settings import RecordsSettings
+from sm_records.web.endpoints.api._type_writes import (
+    _check_roles_for_discard,
+    _defer_reindex,
+    apply_update,
+    create_from,
+)
+from sm_records.web.menu import mark_dirty
 
 router = APIRouter(route_class=RecordsErrorRoute, responses=responses(*TYPE_WRITE))
 

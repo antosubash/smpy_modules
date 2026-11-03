@@ -25,16 +25,16 @@ below are the behaviour that depends on it.
 from __future__ import annotations
 
 import pytest
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType
 from sm_records.records.services._common import guarded_bump
 from sm_records.records.services.records import create_record
-from sm_records.core.settings import RecordsSettings
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import select
 
+from tests.pg_support import USING_POSTGRES
 from tests.support.app_harness import ADMIN, roles
 from tests.support.app_harness import field as _field
-from tests.pg_support import USING_POSTGRES
 
 pytestmark = pytest.mark.skipif(
     not USING_POSTGRES,

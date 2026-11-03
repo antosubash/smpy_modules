@@ -8,8 +8,8 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
-from sm_records.public_submissions import retention_loop
 from sm_records.core.settings import RecordsSettings
+from sm_records.public_submissions import retention_loop
 
 
 def _app(settings: RecordsSettings) -> SimpleNamespace:

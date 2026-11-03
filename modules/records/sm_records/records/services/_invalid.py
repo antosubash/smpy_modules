@@ -59,10 +59,10 @@ from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import attributes
 
+from sm_records.core.tenancy import bound_tenant
 from sm_records.models import Record, RecordType, tables_for
 from sm_records.records.services._common import mark_written, utcnow
 from sm_records.records.services._lock import lock_type
-from sm_records.core.tenancy import bound_tenant
 
 __all__ = ["Marker", "clear_on_write", "count_for_type", "write_marks"]
 

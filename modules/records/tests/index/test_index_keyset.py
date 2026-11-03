@@ -9,6 +9,7 @@ is a property of the two functions, not of the endpoint.
 from __future__ import annotations
 
 import pytest
+from sm_records.models import Record
 from sm_records.records.index._cursor import (
     _FIXED_DECODE,
     CursorError,
@@ -19,7 +20,6 @@ from sm_records.records.index._cursor import (
 from sm_records.records.index._fixed import FIXED_COLUMNS
 from sm_records.records.index.query import Sort, page_query, sort_plan
 from sm_records.records.index.writer import write_index
-from sm_records.models import Record
 
 
 async def _walk(db, rtype, fields, sorts, *, size: int) -> list[str]:

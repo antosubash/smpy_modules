@@ -9,21 +9,23 @@ would be swallowed by the generic editor route with ``uuid == "new"``.
 
 from __future__ import annotations
 
-from sm_records.web.endpoints._locale_props import _locale_props
-
 from fastapi import APIRouter, Depends, Query, Request
 from simple_module_hosting.inertia_deps import InertiaDep
 from simple_module_inertia import InertiaResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.core import constants
-from sm_records.core import locales
-from sm_records.core import tenancy
 from sm_records.contracts.schemas import (
     record_list_read,
     record_read,
     type_read,
 )
+from sm_records.core import constants, locales, tenancy
+from sm_records.core.settings import RecordsSettings
+from sm_records.models import RecordType
+from sm_records.records.index.query import Filter, Sort
+from sm_records.records.services import _relations
+from sm_records.records.services import expand as expand_service
+from sm_records.records.services import types as type_service
 from sm_records.web.csrf import share_csrf_token
 from sm_records.web.deps import (
     MAX_PAGE,
@@ -37,16 +39,11 @@ from sm_records.web.deps import (
     require_view,
 )
 from sm_records.web.endpoints import _list_view, views_types
+from sm_records.web.endpoints._locale_props import _locale_props
 from sm_records.web.endpoints.api._errors import RecordsViewErrorRoute
 from sm_records.web.endpoints.api.referrers import record_or_trash
 from sm_records.web.endpoints.api.translations import translations_of
-from sm_records.records.index.query import Filter, Sort
 from sm_records.web.media import media_props
-from sm_records.models import RecordType
-from sm_records.records.services import _relations
-from sm_records.records.services import expand as expand_service
-from sm_records.records.services import types as type_service
-from sm_records.core.settings import RecordsSettings
 
 # ``bind_admin`` first, for the reason ``endpoints.api``'s router gives; it
 # covers ``views_types`` too, which is included below. ``share_csrf_token``

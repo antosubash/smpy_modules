@@ -22,12 +22,12 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
+from sm_records.models import RecordStatus
 from sm_records.records.index.reduce import (
     ReduceSpec,
     clear_reduce_providers,
     register_reduce_provider,
 )
-from sm_records.models import RecordStatus
 from sm_records.records.services import records as record_service
 
 from tests.perf._bench import Results, capture, repeat

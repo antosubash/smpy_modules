@@ -20,8 +20,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.records.index.providers import virtual_fields
 from sm_records.models import RecordType, TableSet, table_sets
+from sm_records.records.index.providers import virtual_fields
 from sm_records.schema.types import FieldType, IndexKind
 
 __all__ = ["referring_sets"]

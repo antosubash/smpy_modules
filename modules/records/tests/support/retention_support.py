@@ -7,12 +7,12 @@ import secrets
 from contextlib import asynccontextmanager
 from datetime import timedelta
 
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import SubmissionDelivery, tables_for
 from sm_records.public_submissions import retention
 from sm_records.records.services import records as record_service
 from sm_records.records.services import types as type_service
 from sm_records.records.services._common import utcnow
-from sm_records.core.settings import RecordsSettings
 from sqlalchemy import select, update
 
 from tests.support.app_harness import build_app

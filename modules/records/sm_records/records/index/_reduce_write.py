@@ -26,8 +26,8 @@ from sqlalchemy import update as sa_update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.records.index.reduce import contribution, reduce_specs
 from sm_records.models import IndexReduce, Record, RecordType
+from sm_records.records.index.reduce import contribution, reduce_specs
 
 logger = logging.getLogger(__name__)
 

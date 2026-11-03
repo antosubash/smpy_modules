@@ -14,12 +14,8 @@ relates to ``store``, which is global.
 
 from __future__ import annotations
 
-from sm_records.records.seed._fields import _choices, _self_choices, _f, _relation, TypeDef
-
-from dataclasses import dataclass, field
-from typing import Any
-
 from sm_records.records.collections import collections
+from sm_records.records.seed._fields import TypeDef, _choices, _f, _relation, _self_choices
 from sm_records.records.seed.data import (
     EVENT_KINDS,
     ORDER_STATUSES,
@@ -27,7 +23,6 @@ from sm_records.records.seed.data import (
     TAG_POOL,
     US_STATES,
 )
-
 
 _STATE_CHOICES = _choices(US_STATES)
 

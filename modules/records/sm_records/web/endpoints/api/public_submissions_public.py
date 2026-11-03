@@ -33,15 +33,15 @@ from sm_records.contracts.public_submissions_api import (
     SubmissionDefinition,
     SubmitBody,
 )
-from sm_records.web.deps import get_settings, request_db
-from sm_records.web.endpoints.api._errors import PublicErrorRoute
-from sm_records.web.endpoints.api._responses import SUBMISSION, responses
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import bind_public, bound_tenant
 from sm_records.public_submissions import abuse
 from sm_records.public_submissions.definition import accepting_type, definition
 from sm_records.public_submissions.submit import submit
 from sm_records.public_submissions.tokens import host_secret
-from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import bind_public, bound_tenant
+from sm_records.web.deps import get_settings, request_db
+from sm_records.web.endpoints.api._errors import PublicErrorRoute
+from sm_records.web.endpoints.api._responses import SUBMISSION, responses
 
 __all__ = ["router"]
 

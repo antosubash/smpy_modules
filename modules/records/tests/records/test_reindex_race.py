@@ -27,12 +27,12 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
-from sm_records.records.index.reindex import reindex_batch
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordType, tables_for
-from sm_records.schema.types import IndexKind
+from sm_records.records.index.reindex import reindex_batch
 from sm_records.records.services._common import mark_written, type_resolver
 from sm_records.records.services.records import create_record, update_record
-from sm_records.core.settings import RecordsSettings
+from sm_records.schema.types import IndexKind
 from sqlalchemy import select
 
 from tests.pg_support import USING_POSTGRES

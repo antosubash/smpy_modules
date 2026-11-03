@@ -16,10 +16,9 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from simple_module_core.mail import install_mail_sender
-from sm_records.core import boot
-from sm_records.core import constants
-from sm_records.public_submissions import mail_runner
+from sm_records.core import boot, constants
 from sm_records.core.settings import RecordsSettings
+from sm_records.public_submissions import mail_runner
 
 from tests.support.app_harness import build_app
 from tests.support.isolation_support import (

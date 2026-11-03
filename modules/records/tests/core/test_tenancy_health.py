@@ -20,13 +20,13 @@ from typing import Any
 
 import pytest
 from simple_module_core.health import HealthStatus
-from sm_records.web import menu
 from sm_records.core.health import count_orphaned_locales, stale_reindex_check
-from sm_records.records.index._drift import clear_drift, record_drift
-from sm_records.module import RecordsModule
-from sm_records.records.services._common import utcnow
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import TenancyMode, install_guard, tenant_scope
+from sm_records.module import RecordsModule
+from sm_records.records.index._drift import clear_drift, record_drift
+from sm_records.records.services._common import utcnow
+from sm_records.web import menu
 
 from tests.support.app_harness import seed_record, seed_type
 from tests.support.menu_requests import _request, _user

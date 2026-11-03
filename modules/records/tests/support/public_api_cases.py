@@ -1,6 +1,7 @@
 """Shared setup for test_public_api."""
 
 from __future__ import annotations
+
 from tests.support.app_harness import ADMIN, roles
 
 _PREFIX = "/api/records/public"

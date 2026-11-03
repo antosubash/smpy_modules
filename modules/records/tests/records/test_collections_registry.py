@@ -10,10 +10,10 @@ inert-when-unused property is ``test_collections_inert.py``'s.
 from __future__ import annotations
 
 import pytest
-from sm_records.records.collections import collections, declare_collection
 from sm_records.core.constants import MAX_COLLECTION_NAME_LEN, RESERVED_COLLECTION_NAMES
 from sm_records.models import GLOBAL, RecordType, table_set, table_sets, tables_for, tables_of
 from sm_records.models import _tables as registry
+from sm_records.records.collections import collections, declare_collection
 
 from tests.support.collections_harness import COLLECTION_NAMES, EVENTS
 

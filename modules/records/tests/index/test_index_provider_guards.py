@@ -14,8 +14,8 @@ import logging
 
 import pytest
 from sm_records.index import IndexKind, VirtualField, register_index_provider
-from sm_records.records.index import providers as registry
 from sm_records.models import IndexRef, IndexText
+from sm_records.records.index import providers as registry
 from sqlalchemy import func, select
 
 from tests.support.app_harness import ADMIN, roles

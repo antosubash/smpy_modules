@@ -31,8 +31,8 @@ from simple_module_db.mixins import MultiTenantMixin
 from sqlalchemy import event
 from sqlalchemy.orm import ORMExecuteState, Session
 
-from sm_records.models._base import Base
 from sm_records.core.tenancy import ALL_TENANTS, TenantUnbound
+from sm_records.models._base import Base
 
 __all__ = ["install", "is_guarded", "owned"]
 

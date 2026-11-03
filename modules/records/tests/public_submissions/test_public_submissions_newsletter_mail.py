@@ -139,10 +139,10 @@ async def test_the_fallback_clears_optional_values_and_a_unique_one_never_blocks
 async def test_an_unchanged_unique_value_does_not_block_the_direct_merge(site):
     """A change that names the subscriber's own ``sm_email`` again (a
     re-subscribe's system values) still lands on a misfit record."""
-    from sm_records.public_submissions.transition import transition
-    from sm_records.records.services.records import get_record
     from sm_records.core.settings import RecordsSettings
     from sm_records.core.tenancy import tenant_scope
+    from sm_records.public_submissions.transition import transition
+    from sm_records.records.services.records import get_record
 
     first = field("first_name", required=True, indexed=False)
     first["constraints"] = {"max_length": 100}

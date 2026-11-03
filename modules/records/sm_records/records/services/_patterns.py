@@ -19,10 +19,10 @@ from collections.abc import Iterable, Mapping
 from typing import Any, Final
 
 from sm_records.records import _pattern_worker
+from sm_records.records.services.errors import ValidationFailed
 from sm_records.schema._text_checks import Verdicts, verdicts
 from sm_records.schema.fields import FieldDefinition
 from sm_records.schema.types import FieldType
-from sm_records.records.services.errors import ValidationFailed
 
 __all__ = ["WRITE_BUDGET", "batch_budget", "check_defaults", "pairs_of", "precheck"]
 

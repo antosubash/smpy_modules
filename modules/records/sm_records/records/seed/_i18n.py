@@ -13,11 +13,11 @@ from __future__ import annotations
 from typing import Any
 
 from sm_records.core import locales
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType
 from sm_records.records.seed.log import log
 from sm_records.records.services.errors import RecordsError
 from sm_records.records.services.records import create_translation
-from sm_records.core.settings import RecordsSettings
 
 __all__ = ["seed_translations"]
 

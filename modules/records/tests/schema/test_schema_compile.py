@@ -22,7 +22,7 @@ from sm_records.schema.compile import (
 )
 from sm_records.schema.fields import validate_fields
 
-from .schema_helpers import field, model_for, refuses
+from tests.support.schema_helpers import field, model_for, refuses
 
 
 class TestRequiredAndDefaults:

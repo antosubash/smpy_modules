@@ -21,11 +21,11 @@ from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from typing import Any
 
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import tenant_scope
 from sm_records.models import Record, RecordType
 from sm_records.records.services import records as record_service
 from sm_records.records.services import types as type_service
-from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import tenant_scope
 from sqlalchemy import event
 
 SETTINGS = RecordsSettings()

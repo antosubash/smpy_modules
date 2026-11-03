@@ -24,8 +24,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from sm_records.records.collections import declare_collection
 from sm_records.models import tables_for
+from sm_records.records.collections import declare_collection
 
 EVENTS = declare_collection("events")
 ARCHIVE = declare_collection("archive")

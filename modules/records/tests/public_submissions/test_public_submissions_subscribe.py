@@ -9,6 +9,7 @@ import pytest
 from sm_records.contracts.events import RecordCreated, SubscriptionChanged
 from sm_records.public_submissions import mail_runner
 
+from tests.pg_support import USING_POSTGRES
 from tests.support.app_harness import ADMIN, roles
 from tests.support.newsletter_http import (
     ADDRESS,
@@ -22,7 +23,6 @@ from tests.support.newsletter_http import (
     signup,
     subscriber,
 )
-from tests.pg_support import USING_POSTGRES
 from tests.support.submissions_http import SUBMISSIONS, configure
 
 

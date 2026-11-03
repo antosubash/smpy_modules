@@ -8,7 +8,14 @@ from sm_records.public_submissions.abuse import origin_of
 
 from tests.support.app_harness import field, seed_type
 from tests.support.public_submissions_support import contact_fields, form_config
-from tests.support.submissions_http import SUBMISSIONS, configure, contact_type, host_parts, load, send
+from tests.support.submissions_http import (
+    SUBMISSIONS,
+    configure,
+    contact_type,
+    host_parts,
+    load,
+    send,
+)
 
 
 @pytest.mark.parametrize(

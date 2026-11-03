@@ -10,7 +10,14 @@ be a way to make a destructive schema change that §8 never saw.
 from __future__ import annotations
 
 from tests.support.app_harness import ADMIN, ROLE_MANAGER, ROLE_VIEWER, roles
-from tests.support.io_helpers import PRODUCT, catalogue, field, make_record, make_type, product_fields
+from tests.support.io_helpers import (
+    PRODUCT,
+    catalogue,
+    field,
+    make_record,
+    make_type,
+    product_fields,
+)
 
 
 async def _export_type(client, key: str = PRODUCT, actor: str = ADMIN):

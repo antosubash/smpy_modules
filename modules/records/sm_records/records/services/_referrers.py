@@ -31,11 +31,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.models import Record, RecordType, tables_of
-from sm_records.schema.fields import ON_DELETE_DEFAULT
-from sm_records.schema.types import IndexKind
 from sm_records.records.services import _referrer_page
 from sm_records.records.services._access import role_blocked
 from sm_records.records.services._referrer_sets import referring_sets
+from sm_records.schema.fields import ON_DELETE_DEFAULT
+from sm_records.schema.types import IndexKind
 
 __all__ = ["Referrer", "field_label", "paged_referrers", "referrer_count", "referrers"]
 

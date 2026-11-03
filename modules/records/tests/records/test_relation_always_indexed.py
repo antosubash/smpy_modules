@@ -13,11 +13,11 @@ to be backfilled.
 from __future__ import annotations
 
 import pytest
+from sm_records.core.settings import RecordsSettings
 from sm_records.records.index._fields import read_field
+from sm_records.records.services._schema import normalise
 from sm_records.schema.fields import validate_fields
 from sm_records.schema.types import FieldType
-from sm_records.records.services._schema import normalise
-from sm_records.core.settings import RecordsSettings
 
 from tests.support.app_harness import ADMIN, roles
 

@@ -90,12 +90,12 @@ async def main(path: Path, records: int, collections: int, reps: int) -> None:
 
     from simple_module_db.listeners import register_listeners
     from simple_module_db.session import init_db
-    from sm_records.records.index.query import build_query
+    from sm_records.core.settings import RecordsSettings
     from sm_records.models import Base
+    from sm_records.records.index.query import build_query
     from sm_records.records.services._relations import referrers
     from sm_records.records.services.records import create_record
     from sm_records.records.services.types import create_type
-    from sm_records.core.settings import RecordsSettings
 
     if path.exists():
         path.unlink()

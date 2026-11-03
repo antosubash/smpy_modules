@@ -17,24 +17,21 @@ having in front of you while reading it:
 
 from __future__ import annotations
 
-from sm_records.records.services._record_reads import _by_uuid, get_record, get_deleted_record
-
 from functools import partial
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.core import events
-from sm_records.core._text import has_nul
-from sm_records.records.index.providers import TypeIndex
-from sm_records.records.index.reduce import snapshot
-from sm_records.records.index.writer import write_index
 
 # Re-exported: which language a create writes in is locale policy, and lives
 # with the rest of it in :mod:`sm_records.core.locales`.
 from sm_records.core.locales import resolve_locale
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordStatus, RecordType, RevisionEvent, new_uuid, tables_for
+from sm_records.records.index.providers import TypeIndex
+from sm_records.records.index.reduce import snapshot
+from sm_records.records.index.writer import write_index
 from sm_records.records.services import _claims, _invalid, _payload
 from sm_records.records.services._common import bump_or_conflict, utcnow
 
@@ -57,15 +54,13 @@ from sm_records.records.services._payload import read_view
 # Re-exported for the same reason: the shared front half of both write paths
 # (validate, lock, check) lives in ``_prepare`` for the file cap.
 from sm_records.records.services._prepare import prepare as _prepare
+from sm_records.records.services._record_reads import get_deleted_record, get_record
 
 # Re-exported: a translation is an ordinary record, so the two functions that
 # make one and list one live beside the lifecycle they are part of — in
 # ``_translations`` only for the file cap.
 from sm_records.records.services._translations import create_translation, list_translations
-from sm_records.records.services.errors import NotFound
 from sm_records.records.services.revisions import write_revision
-from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import bound_tenant
 
 __all__ = [
     "RecordListPage",

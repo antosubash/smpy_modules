@@ -17,12 +17,11 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from permissions.group_labels import localized_groups
 from simple_module_core.permissions import PermissionRegistry
-from sm_records.core import constants
-from sm_records.core import type_permissions
+from sm_records.core import constants, type_permissions
 from sm_records.core._permission_sync import PermissionSyncMiddleware
-from sm_records.module import RecordsModule
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import TenancyMode, tenant_scope
+from sm_records.module import RecordsModule
 
 from tests.support.app_harness import (
     ADMIN,

@@ -23,11 +23,9 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordType
 from sm_records.public_submissions.config import kind_of
-from sm_records.schema.changes import DryRunReport, SchemaDiff
-from sm_records.schema.diff import diff_fields
-from sm_records.schema.types import ChangeClass
 from sm_records.records.services import _orphaned
 from sm_records.records.services._claims import lock_type
 from sm_records.records.services._common import bump_or_conflict, reload
@@ -53,7 +51,9 @@ from sm_records.records.services.errors import (
     SchemaChangeRefused,
     ValidationFailed,
 )
-from sm_records.core.settings import RecordsSettings
+from sm_records.schema.changes import DryRunReport, SchemaDiff
+from sm_records.schema.diff import diff_fields
+from sm_records.schema.types import ChangeClass
 
 __all__ = ["MISSING", "apply", "preview", "rollback"]
 

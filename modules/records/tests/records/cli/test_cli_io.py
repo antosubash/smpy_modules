@@ -16,10 +16,10 @@ import json
 import pytest
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
-from sm_records.records.cli.cli_io import export_command, import_command
-from sm_records.models import Base, Record, RecordType
-from sm_records.records.services.records import create_record
 from sm_records.core.settings import RecordsSettings
+from sm_records.models import Base, Record, RecordType
+from sm_records.records.cli.cli_io import export_command, import_command
+from sm_records.records.services.records import create_record
 from sqlalchemy import select
 
 FIELDS = [

@@ -7,8 +7,8 @@ import asyncio
 import time
 
 import pytest
-from sm_records.records import _pattern_worker
 from sm_records.public_submissions import patterns
+from sm_records.records import _pattern_worker
 
 from tests.support.app_harness import ADMIN, field, roles
 from tests.support.public_submissions_support import API, create, form_config

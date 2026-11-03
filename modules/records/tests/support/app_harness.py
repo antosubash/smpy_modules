@@ -33,13 +33,14 @@ from simple_module_hosting.middleware import (
     TenantMiddleware,
 )
 from simple_module_inertia import InertiaConfig, inertia_dependency_factory
-from sm_records.records import _pattern_worker
-from sm_records.models import Record, RecordType
-from sm_records.module import RecordsModule
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import configure, install_guard
+from sm_records.models import Record, RecordType
+from sm_records.module import RecordsModule
+from sm_records.records import _pattern_worker
 from sqlmodel import select
 
+from tests.pg_support import make_db_state
 from tests.support.harness_auth import (  # noqa: F401 - re-exported: tests import them from here
     ADMIN,
     ROLE_EDITOR,
@@ -53,7 +54,6 @@ from tests.support.harness_auth import (  # noqa: F401 - re-exported: tests impo
     _register_roles,
     roles,
 )
-from tests.pg_support import make_db_state
 
 
 async def build_app(

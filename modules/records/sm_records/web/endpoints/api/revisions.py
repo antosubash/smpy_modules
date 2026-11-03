@@ -35,6 +35,12 @@ from sm_records.contracts.schemas import (
     record_revision_detail_read,
     revision_read,
 )
+from sm_records.core.settings import RecordsSettings
+from sm_records.models import RecordType, tables_of
+from sm_records.records.services import records as record_service
+from sm_records.records.services import revisions as revision_service
+from sm_records.records.services import schema_change
+from sm_records.records.services.errors import NotFound
 from sm_records.web.deps import (
     MAX_PAGE,
     actor,
@@ -55,13 +61,7 @@ from sm_records.web.endpoints.api._responses import WRITE, responses
 # ``orphaned="discard"`` role check and the post-write tail (event, deferred
 # reindex, fresh read). Imported rather than copied, because a second opinion
 # about either is a permission hole or a stuck rebuild.
-from sm_records.web.endpoints.api.types import _check_roles_for_discard, type_written
-from sm_records.models import RecordType, tables_of
-from sm_records.records.services import records as record_service
-from sm_records.records.services import revisions as revision_service
-from sm_records.records.services import schema_change
-from sm_records.records.services.errors import NotFound
-from sm_records.core.settings import RecordsSettings
+from sm_records.web.endpoints.api._type_writes import _check_roles_for_discard, type_written
 
 router = APIRouter(
     prefix="/types/{key}",

@@ -21,19 +21,19 @@ import pytest
 from simple_module_core.events import EventBus
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
-from sm_records.core import events
-from sm_records.records.cli.cli_io import import_command
 from sm_records.contracts.events import (
     RecordCreated,
     RecordPurged,
     RecordTypeDeleted,
     RecordUpdated,
 )
+from sm_records.core import events
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import Base, Record, RecordType
+from sm_records.records.cli.cli_io import import_command
 from sm_records.records.seed import seed_database
 from sm_records.records.services.errors import Conflict
 from sm_records.records.services.records import create_record
-from sm_records.core.settings import RecordsSettings
 from sqlalchemy import select
 
 FIELDS = [

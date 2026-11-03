@@ -42,8 +42,8 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from sm_records.core.constants import REDUCE_GROUP_LEN
-from sm_records.records.index import _registry
 from sm_records.models import Record, RecordType
+from sm_records.records.index import _registry
 
 logger = logging.getLogger(__name__)
 

@@ -18,22 +18,17 @@ payload", and this one is "what the write claims about the rest of the type".
 
 from __future__ import annotations
 
-from sm_records.records.services._unique_claims import ensure_unique, taken_by
-
-from typing import Any
-
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.core._text import NUL_PROBLEM, has_nul
-from sm_records.records.index.query import Filter, FilterOp, QueryError, exists_query
+from sm_records.core.tenancy import bound_tenant
 from sm_records.models import RecordType, tables_for
-from sm_records.schema.fields import FieldDefinition
 from sm_records.records.services._lock import lock_type
+from sm_records.records.services._unique_claims import ensure_unique, taken_by
 from sm_records.records.services._uuids import uuid_taken
 from sm_records.records.services.errors import Conflict, ValidationFailed
-from sm_records.core.tenancy import bound_tenant
 
 __all__ = ["ensure_slug_free", "ensure_unique", "flush_write", "lock_type", "taken_by"]
 

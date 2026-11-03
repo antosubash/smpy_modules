@@ -16,12 +16,13 @@ import asyncio
 
 import pytest
 from sm_records.contracts.events import SubscriptionChanged
+from sm_records.core.tenancy import tenant_scope
 from sm_records.models import SubmissionDelivery, tables_for
 from sm_records.public_submissions import transition as transition_module
 from sm_records.public_submissions.attempts import MARKERS
-from sm_records.core.tenancy import tenant_scope
 from sqlalchemy import select, update
 
+from tests.pg_support import USING_POSTGRES
 from tests.support.app_harness import ADMIN, roles
 from tests.support.newsletter_http import (
     LIST,
@@ -32,7 +33,6 @@ from tests.support.newsletter_http import (
     signup,
     subscriber,
 )
-from tests.pg_support import USING_POSTGRES
 
 
 def _events(site) -> list:

@@ -1,9 +1,8 @@
-import { useTypeUpdate } from '../ui/hooks/useTypeUpdate';
 import { Head, router } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { RecordsLayout } from '../ui/components/RecordsLayout';
 import { TenantBadge } from '../ui/components/TenantBadge';
@@ -27,13 +26,12 @@ import { TypeIoMenu } from '../ui/components/typeeditor/TypeIoMenu';
 import { TypeMetadataForm } from '../ui/components/typeeditor/TypeMetadataForm';
 import { TypeRevisions } from '../ui/components/typeeditor/TypeRevisions';
 import type { EditableField, TypeEditorProps } from '../ui/components/typeeditor/types';
-import type { SchemaApplyBody } from '../ui/hooks/useSchemaApply';
 import { useSchemaApply } from '../ui/hooks/useSchemaApply';
 import { useTypeEditorSave } from '../ui/hooks/useTypeEditorSave';
 import { useTypeImport } from '../ui/hooks/useTypeImport';
 import { useTypeSync } from '../ui/hooks/useTypeSync';
+import { useTypeUpdate } from '../ui/hooks/useTypeUpdate';
 import { useUnsavedGuard } from '../ui/hooks/useUnsavedGuard';
-import { updateType } from '../ui/utils/api';
 import { keys, useT } from '../ui/utils/i18n';
 import type { DryRunReport, TypeRead } from '../ui/utils/types';
 

@@ -27,8 +27,8 @@ from typing import Any
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
-from sm_records.models import IndexText
 from sm_records.core.settings import RecordsSettings
+from sm_records.models import IndexText
 from sqlalchemy import select
 
 from tests.support.app_harness import seed_record, seed_type

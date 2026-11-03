@@ -1,18 +1,11 @@
 """Shared setup for test_services_types."""
 
 from __future__ import annotations
+
 import pytest
-from sm_records.models import Record, RecordType, RecordTypeRevision
-from sm_records.records.services import records as record_service
-from sm_records.records.services import types as service
-from sm_records.records.services.errors import (
-    Conflict,
-    NotFound,
-    ReferencedByOthers,
-    ValidationFailed,
-)
-from sm_records.core.settings import RecordsSettings
+from sm_records.models import RecordTypeRevision
 from sqlalchemy import select
+
 
 @pytest.fixture
 def product_fields(field_def):

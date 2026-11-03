@@ -17,6 +17,9 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.schemas import RecordRead, record_read
+from sm_records.core.settings import RecordsSettings
+from sm_records.models import RecordType
+from sm_records.records.services import records as record_service
 from sm_records.web.deps import (
     actor,
     caller_roles,
@@ -28,9 +31,6 @@ from sm_records.web.deps import (
 )
 from sm_records.web.endpoints.api._errors import RecordsErrorRoute
 from sm_records.web.endpoints.api._responses import WRITE, responses
-from sm_records.models import RecordType
-from sm_records.records.services import records as record_service
-from sm_records.core.settings import RecordsSettings
 
 router = APIRouter(
     prefix="/types/{key}",

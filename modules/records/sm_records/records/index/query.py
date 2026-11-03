@@ -24,23 +24,29 @@ a rule that already has one owner, and the one place it is *lifted*
 
 from __future__ import annotations
 
-from sm_records.records.index._query_sort import Sort, sort_terms, sort_plan
-
-from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from collections.abc import Sequence
 from functools import cache
 from typing import Any
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import aliased
 
-from sm_records.records.index._cursor import CursorError, decode_cursor, encode_cursor, sort_signature
-from sm_records.records.index._fields import declared_keys, indexed_map
-from sm_records.records.index._filters import Filter, filtered, resolve
+from sm_records.models import RecordType, tables_for
+from sm_records.records.index._cursor import (
+    CursorError,
+    decode_cursor,
+    encode_cursor,
+    sort_signature,
+)
+from sm_records.records.index._filters import Filter, filtered
 from sm_records.records.index._fixed import FIXED_COLUMNS
 from sm_records.records.index._predicates import FilterOp, QueryError
-from sm_records.records.index._sorting import SortTerm, fixed_term, indexed_term, keyset_clause, ordered
-from sm_records.models import RecordType, tables_for
+from sm_records.records.index._query_sort import Sort, sort_plan, sort_terms
+from sm_records.records.index._sorting import (
+    SortTerm,
+    keyset_clause,
+    ordered,
+)
 
 __all__ = [
     "FIXED_COLUMNS",

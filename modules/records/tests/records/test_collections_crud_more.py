@@ -1,12 +1,14 @@
 """test_collections_crud cases."""
 
 from __future__ import annotations
-import pytest
+
 from sm_records.models import GLOBAL, RecordStatus, tables_for
-from sqlalchemy import func, select
-from tests.support.app_harness import ADMIN, roles, seed_type
-from tests.support.collections_harness import EVENTS
-from tests.support.collections_crud_cases import gig, _count, note, API
+from sqlalchemy import select
+
+from tests.support.app_harness import ADMIN, roles
+from tests.support.collections_crud_cases import API, _count
+from tests.support.collections_crud_cases import gig as gig
+from tests.support.collections_crud_cases import note as note
 
 
 async def test_a_slug_is_claimed_per_type_and_locale_inside_the_collection(client, gig):

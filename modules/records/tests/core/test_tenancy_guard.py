@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import pytest
 from simple_module_db.listeners import TenantIsolationError
+from sm_records.core.tenancy import TenantUnbound, all_tenants, install_guard, tenant_scope
 from sm_records.core.tenancy._tenant_guard import is_guarded, owned
 from sm_records.models import IndexText, Record, RecordRevision, RecordType, RecordTypeRevision
-from sm_records.core.tenancy import TenantUnbound, all_tenants, install_guard, tenant_scope
 from sqlalchemy import func, select
 
 pytestmark = pytest.mark.unbound_tenant

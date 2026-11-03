@@ -12,9 +12,9 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
+from sm_records.core.settings import RecordsSettings
 from sm_records.records.services import types as type_service
 from sm_records.records.services.errors import Conflict, ValidationFailed
-from sm_records.core.settings import RecordsSettings
 
 from tests.support.app_harness import ADMIN, roles
 

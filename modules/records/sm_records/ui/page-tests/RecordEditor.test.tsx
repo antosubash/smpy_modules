@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
-import { type, record } from './editor-test-support';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, mount, press, settle, setValue } from './test-dom';
 import { ApiError } from '../utils/api';
 import type { RecordRead, TypeRead } from '../utils/types';
+import { record, type } from './editor-test-support';
+import { act, mount, press, settle, setValue } from './test-dom';
 
 const updated = vi.fn();
 /** U5 tests override this to reject like the server would; every other test

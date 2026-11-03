@@ -28,12 +28,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.aggregate import AggregateGroup, AggregateResponse
+from sm_records.core.settings import RecordsSettings
+from sm_records.models import IndexReduce, RecordType
 from sm_records.records.index._predicates import QueryError
 from sm_records.records.index.aggregate import Metric, aggregate_query
 from sm_records.records.index.query import Filter
 from sm_records.records.index.reduce import group_text, spec_for
-from sm_records.models import IndexReduce, RecordType
-from sm_records.core.settings import RecordsSettings
 
 __all__ = ["aggregate", "stored_aggregate"]
 

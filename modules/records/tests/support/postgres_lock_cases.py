@@ -1,19 +1,19 @@
 """Shared setup for test_postgres_lock."""
 
 from __future__ import annotations
+
 import asyncio
 from collections import Counter
 from typing import Any
-import pytest
+
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType
-from sm_records.schema.types import FieldType
 from sm_records.records.services._type_update import update_type
 from sm_records.records.services.errors import Conflict, RecordsError
 from sm_records.records.services.records import create_record
-from sm_records.core.settings import RecordsSettings
+from sm_records.schema.types import FieldType
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-from tests.pg_support import USING_POSTGRES
 
 WRITERS = 20
 

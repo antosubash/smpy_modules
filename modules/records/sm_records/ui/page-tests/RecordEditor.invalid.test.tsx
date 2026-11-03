@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
-
-import { mount } from './test-dom';
 import type { RecordRead, TypeRead } from '../utils/types';
+import { mount } from './test-dom';
 
 // Split out of RecordEditor.test.tsx for the 300-line cap, the same way
 // RecordEditor.duplicate.test.tsx already is — each of these mounts the
@@ -89,23 +88,20 @@ function record(): RecordRead {
   } as unknown as RecordRead;
 }
 
-describe(
-  "RecordEditor — U9: a stored invalid mark reads the same as the type editor's own report",
-  () => {
-    it('humanizes "Field required" under the affected field, not just in the top notice', async () => {
-      const view = await mount(<RecordEditor type={type()} record={record()} />);
+describe("RecordEditor — U9: a stored invalid mark reads the same as the type editor's own report", () => {
+  it('humanizes "Field required" under the affected field, not just in the top notice', async () => {
+    const view = await mount(<RecordEditor type={type()} record={record()} />);
 
-      // The top-of-page notice (InvalidNotice) and the field's own error
-      // slot are two different renderings of the same `record.invalid`
-      // entry — both have to read the humanized text, not pydantic's raw
-      // wording.
-      const notice = view.find('[data-testid="records-invalid-notice"]');
-      expect(notice?.textContent).toContain('no value for it');
-      expect(notice?.textContent).not.toContain('Field required');
+    // The top-of-page notice (InvalidNotice) and the field's own error
+    // slot are two different renderings of the same `record.invalid`
+    // entry — both have to read the humanized text, not pydantic's raw
+    // wording.
+    const notice = view.find('[data-testid="records-invalid-notice"]');
+    expect(notice?.textContent).toContain('no value for it');
+    expect(notice?.textContent).not.toContain('Field required');
 
-      const fieldError = view.find('[data-testid="records-field-error-title"]');
-      expect(fieldError?.textContent).toBe('required, but this record has no value for it');
-      await view.unmount();
-    });
-  },
-);
+    const fieldError = view.find('[data-testid="records-field-error-title"]');
+    expect(fieldError?.textContent).toBe('required, but this record has no value for it');
+    await view.unmount();
+  });
+});

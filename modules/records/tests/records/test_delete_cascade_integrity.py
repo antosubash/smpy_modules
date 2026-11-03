@@ -8,7 +8,14 @@ declares. Type keys are unique across the whole suite on purpose —
 
 from __future__ import annotations
 
-from tests.support.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, api_record, api_type, roles
+from tests.support.app_harness import (
+    ADMIN,
+    ROLE_EDITOR,
+    ROLE_EDITOR_TWO,
+    api_record,
+    api_type,
+    roles,
+)
 from tests.support.app_harness import field as _field
 
 API = "/api/records"

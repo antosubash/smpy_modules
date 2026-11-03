@@ -196,9 +196,9 @@ async def test_stored_against_live_for_the_same_key(perf_db_copy, one_reduce_spe
 
 async def test_aggregate_is_one_statement_over_the_index(perf_db, perf_session):
     """The ``GROUP BY`` itself, without the request around it."""
+    from sm_records.core.settings import RecordsSettings
     from sm_records.records.index.query import Filter, FilterOp
     from sm_records.records.services import aggregate as aggregate_service
-    from sm_records.core.settings import RecordsSettings
 
     counts = await type_counts(perf_session)
     rtype = await load_type(perf_session, "order")

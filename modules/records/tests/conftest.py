@@ -24,9 +24,11 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
-from sm_records.models import Record, RecordType
 from sm_records.core.tenancy import DEFAULT_TENANT, tenant_scope
+from sm_records.models import Record, RecordType
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from tests.pg_support import arm_reset, make_db_state
 
 # ``app_harness`` is the HTTP test harness — app + client fixtures,
 # header-driven roles, and DB seeding helpers for API/view tests. Split into
@@ -56,7 +58,6 @@ from tests.support.csrf_support import session_client  # noqa: F401 - test_csrf*
 from tests.support.events_harness import bus, note  # noqa: F401
 from tests.support.isolation_support import two_tenants  # noqa: F401 - the tenancy matrix's fixture
 from tests.support.newsletter_http import newsletter  # noqa: F401 - a newsletter list on that fixture
-from tests.pg_support import arm_reset, make_db_state
 from tests.support.shared_fixtures import (  # noqa: F401
     bilingual,
     file_client,

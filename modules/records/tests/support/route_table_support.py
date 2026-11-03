@@ -9,10 +9,9 @@ from types import SimpleNamespace
 from fastapi import APIRouter, FastAPI
 from fastapi.routing import iter_route_contexts
 from settings.module_registry import ModuleSettingsRegistry
-from sm_records.core import boot
-from sm_records.core import constants
-from sm_records.module import RecordsModule
+from sm_records.core import boot, constants
 from sm_records.core.settings import RecordsSettings
+from sm_records.module import RecordsModule
 
 
 def route_table() -> list[tuple[str, str]]:

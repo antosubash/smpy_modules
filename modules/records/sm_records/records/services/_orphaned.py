@@ -24,8 +24,8 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.core.constants import ORPHANED_KEY
-from sm_records.records.index.reduce_rebuild import rebuild_type
 from sm_records.models import RecordType
+from sm_records.records.index.reduce_rebuild import rebuild_type
 from sm_records.records.services._common import mark_written, walk_type
 
 RESTORE = "restore"

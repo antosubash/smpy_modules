@@ -17,12 +17,12 @@ import time
 import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
-from sm_records.records._expand_grammar import parse_expand
 from sm_records.core.constants import EXPAND_DEPTH_CAP, MAX_KEY_LEN
 from sm_records.core.settings import RecordsSettings
+from sm_records.records._expand_grammar import parse_expand
 
-from tests.support.app_harness import ADMIN, ROLE_EDITOR, ROLE_VIEWER, roles
 from tests.perf._bench import capture
+from tests.support.app_harness import ADMIN, ROLE_EDITOR, ROLE_VIEWER, roles
 from tests.support.relation_helpers import field, make_record, make_type
 
 _BOOKS = "/api/records/types/book/records"

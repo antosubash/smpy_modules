@@ -19,11 +19,11 @@ from typing import Any
 from sqlmodel import Field as SQLField
 from sqlmodel import SQLModel
 
-from sm_records.core.constants import ORPHANED_KEY
 from sm_records.contracts.i18n import PublicTranslationRead, public_translation_read
+from sm_records.core.constants import ORPHANED_KEY
 from sm_records.models import Record, RecordType
-from sm_records.schema.fields import FieldDefinition
 from sm_records.records.services._payload import field_defs, read_view
+from sm_records.schema.fields import FieldDefinition
 
 __all__ = ["PublicRecordPage", "PublicRecordRead", "public_record_read", "public_records_read"]
 

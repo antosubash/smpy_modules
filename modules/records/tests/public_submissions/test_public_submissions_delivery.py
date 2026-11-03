@@ -10,15 +10,15 @@ from datetime import timedelta
 import pytest
 from simple_module_core.durable_events import DurableContext
 from sm_records.core import events
+from sm_records.core.tenancy import tenant_scope
 from sm_records.models import SubmissionDelivery
 from sm_records.public_submissions import attempts, delivery
 from sm_records.public_submissions.mail_runner import HANDLER_NAME, NotificationDue
 from sm_records.records.services._common import utcnow
-from sm_records.core.tenancy import tenant_scope
 from sqlalchemy import select, update
 
-from tests.support.app_harness import ADMIN, roles
 from tests.pg_support import USING_POSTGRES
+from tests.support.app_harness import ADMIN, roles
 from tests.support.public_submissions_support import update as update_type
 from tests.support.submissions_http import contact_type, records_of, send
 

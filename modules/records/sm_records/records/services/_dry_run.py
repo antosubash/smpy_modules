@@ -26,7 +26,12 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.core.constants import ORPHANED_KEY
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType
+from sm_records.records.services import _duplicates, _invalid
+from sm_records.records.services._common import record_count, walk_type
+from sm_records.records.services._patterns import batch_budget, precheck
+from sm_records.records.services._payload import field_defs
 from sm_records.schema._text_checks import checked as patterns_checked
 from sm_records.schema.changes import DRY_RUN_SAMPLE, DryRunReport, FailingRecord, SchemaDiff
 from sm_records.schema.compile import (
@@ -37,11 +42,6 @@ from sm_records.schema.compile import (
 )
 from sm_records.schema.fields import FieldDefinition
 from sm_records.schema.types import ChangeClass
-from sm_records.records.services import _duplicates, _invalid
-from sm_records.records.services._common import record_count, walk_type
-from sm_records.records.services._patterns import batch_budget, precheck
-from sm_records.records.services._payload import field_defs
-from sm_records.core.settings import RecordsSettings
 
 
 def _errors_for(model: type, view: dict[str, Any]) -> list[dict[str, str]]:

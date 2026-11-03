@@ -14,7 +14,15 @@ from sm_records.models import IndexText, Record, RecordRevision
 from sqlalchemy import func, select
 
 from tests.support.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, ROLE_VIEWER, roles
-from tests.support.bulk_helpers import API, EMPTY, bulk, make_product, make_records, read, trash_listing
+from tests.support.bulk_helpers import (
+    API,
+    EMPTY,
+    bulk,
+    make_product,
+    make_records,
+    read,
+    trash_listing,
+)
 
 
 async def _empty(client, *, actor: str = ADMIN, params: str = ""):

@@ -10,6 +10,7 @@ each test that writes checks both.
 from __future__ import annotations
 
 import pytest
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import (
     IndexText,
     Record,
@@ -25,7 +26,6 @@ from sm_records.records.services.errors import (
     ValidationFailed,
 )
 from sm_records.records.services.revisions import list_revisions
-from sm_records.core.settings import RecordsSettings
 from sqlalchemy import select
 
 

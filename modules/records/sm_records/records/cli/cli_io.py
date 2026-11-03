@@ -34,15 +34,15 @@ from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
-from sm_records.records.cli import cli_host
-from sm_records.core import events
-from sm_records.records.cli.cli_common import add_tenant_argument, connected, load_settings
 from sm_records.contracts.io import ImportFormat, ImportMode, ImportReport, OnError
+from sm_records.core import events
+from sm_records.core.tenancy import DEFAULT_TENANT, tenant_scope
+from sm_records.records.cli import cli_host
+from sm_records.records.cli.cli_common import add_tenant_argument, connected, load_settings
 from sm_records.records.services import export as export_service
 from sm_records.records.services import import_ as import_service
 from sm_records.records.services.errors import ImportRefused, RecordsError
 from sm_records.records.services.types import get_type
-from sm_records.core.tenancy import DEFAULT_TENANT, tenant_scope
 
 __all__ = ["add_parsers", "export_command", "import_command"]
 

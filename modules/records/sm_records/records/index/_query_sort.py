@@ -1,14 +1,16 @@
 """index _query_sort helpers."""
 
 from __future__ import annotations
+
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
+
+from sm_records.models import RecordType, tables_for
 from sm_records.records.index._fields import declared_keys, indexed_map
 from sm_records.records.index._filters import resolve
 from sm_records.records.index._fixed import FIXED_COLUMNS
 from sm_records.records.index._sorting import SortTerm, fixed_term, indexed_term
-from sm_records.models import RecordType, tables_for
 
 
 @dataclass(frozen=True, slots=True)

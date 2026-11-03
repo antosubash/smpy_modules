@@ -23,11 +23,11 @@ from urllib.parse import urlsplit
 from fastapi import Request
 from simple_module_core.rate_limit import InProcessWindowStore, WindowStore, parse_rate
 
-from sm_records.web.deps import get_settings
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.tokens import public_base_url
 from sm_records.records.services.errors import NotFound
 from sm_records.records.services.public import NOT_FOUND
+from sm_records.web.deps import get_settings
 
 __all__ = [
     "client_ip",

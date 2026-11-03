@@ -22,12 +22,6 @@ import pytest
 from fastapi import APIRouter, Depends
 from simple_module_db.listeners import current_tenant_id
 from sm_records.core import boot
-from sm_records.core.tenancy._tenant_guard import is_guarded
-from sm_records.web.deps import request_db, require_view
-from sm_records.web.endpoints.api import router as api_router
-from sm_records.web.endpoints.api.public import router as public_router
-from sm_records.web.endpoints.views import router as views_router
-from sm_records.models import RecordType
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import (
     DEFAULT_TENANT,
@@ -37,11 +31,17 @@ from sm_records.core.tenancy import (
     bind_public,
     tenant_scope,
 )
+from sm_records.core.tenancy._tenant_guard import is_guarded
+from sm_records.models import RecordType
+from sm_records.web.deps import request_db, require_view
+from sm_records.web.endpoints.api import router as api_router
+from sm_records.web.endpoints.api.public import router as public_router
+from sm_records.web.endpoints.views import router as views_router
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.support.app_harness import ADMIN, TEST_TENANT_HEADER, roles, seed_record, seed_type
 from tests.pg_support import make_db_state
+from tests.support.app_harness import ADMIN, TEST_TENANT_HEADER, roles, seed_record, seed_type
 
 pytestmark = pytest.mark.unbound_tenant
 

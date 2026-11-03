@@ -33,14 +33,14 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.public_submissions_api import LinkResult
-from sm_records.web.deps import get_settings, request_db
-from sm_records.web.endpoints.api._responses import SUBMISSION_LINK, responses
-from sm_records.web.endpoints.api.public_submissions_public import SubmissionRoute
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import _resolved, tenant_scope
 from sm_records.public_submissions import abuse, links, opt_in
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.tokens import host_secret
-from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import _resolved, tenant_scope
+from sm_records.web.deps import get_settings, request_db
+from sm_records.web.endpoints.api._responses import SUBMISSION_LINK, responses
+from sm_records.web.endpoints.api.public_submissions_public import SubmissionRoute
 
 __all__ = ["router"]
 

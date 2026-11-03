@@ -17,8 +17,8 @@ from __future__ import annotations
 
 import json
 
-from sm_records.web._body_limit import ENVELOPE_HEADROOM, body_ceiling
 from sm_records.core.settings import RecordsSettings
+from sm_records.web._body_limit import ENVELOPE_HEADROOM, body_ceiling
 
 from tests.support.app_harness import ADMIN, api_type, roles
 

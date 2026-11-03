@@ -30,11 +30,16 @@ from dataclasses import dataclass
 from typing import Any
 
 from sm_records.core.constants import ORPHANED_KEY
+from sm_records.models import Record, RecordType
 from sm_records.records.index import _registry
 from sm_records.records.index._coerce import COERCE, coerce_ref
 from sm_records.records.index._fields import read_field, relation_target
-from sm_records.records.index._registry import VirtualField, note_dropped, note_shadowed, virtual_fields
-from sm_records.models import Record, RecordType
+from sm_records.records.index._registry import (
+    VirtualField,
+    note_dropped,
+    note_shadowed,
+    virtual_fields,
+)
 from sm_records.schema.types import IndexKind
 
 __all__ = [

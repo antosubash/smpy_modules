@@ -34,8 +34,8 @@ from typing import Any
 from simple_module_db import all_tenants as framework_all_tenants
 from sqlalchemy import func, select
 
-from sm_records.models import RecordType, table_sets
 from sm_records.core.tenancy import all_tenants
+from sm_records.models import RecordType, table_sets
 
 __all__ = ["TenantCounts", "read_all", "tenant_counts"]
 

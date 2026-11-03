@@ -1,5 +1,6 @@
 """Content language view props."""
 
+from sm_records.core import locales
 from sm_records.core.settings import RecordsSettings
 
 

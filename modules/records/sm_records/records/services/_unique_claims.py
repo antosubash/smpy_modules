@@ -1,13 +1,16 @@
 """records services _unique_claims helpers."""
 
 from __future__ import annotations
+
 from typing import Any
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from sm_records.core._text import NUL_PROBLEM, has_nul
-from sm_records.records.index.query import Filter, FilterOp, QueryError, exists_query
 from sm_records.models import RecordType, tables_for
-from sm_records.schema.fields import FieldDefinition
+from sm_records.records.index.query import Filter, FilterOp, QueryError, exists_query
 from sm_records.records.services.errors import Conflict, ValidationFailed
+from sm_records.schema.fields import FieldDefinition
 
 
 async def ensure_unique(

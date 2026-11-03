@@ -34,11 +34,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.models import Record, RecordType, tables_for
-from sm_records.schema.fields import ON_DELETE_DEFAULT
-from sm_records.schema.types import FieldType
 from sm_records.records.services._common import reload
 from sm_records.records.services._lock import lock_types
 from sm_records.records.services.errors import Conflict, NotFound
+from sm_records.schema.fields import ON_DELETE_DEFAULT
+from sm_records.schema.types import FieldType
 
 __all__ = ["DeleteGraph", "check_delete_plan", "lock_delete_graph", "still_there"]
 

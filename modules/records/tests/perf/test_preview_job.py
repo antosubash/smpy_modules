@@ -22,10 +22,10 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sm_records.core.settings import RecordsSettings
 
-from tests.support.app_harness import build_app
 from tests.perf._bench import Results, Timing
 from tests.perf._http import HEADERS
 from tests.perf.conftest import load_type, type_counts
+from tests.support.app_harness import build_app
 
 pytestmark = pytest.mark.perf
 

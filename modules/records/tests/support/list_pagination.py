@@ -1,7 +1,7 @@
 """Shared record test builders."""
 
 from __future__ import annotations
-from sm_records.core.settings import RecordsSettings
+
 from tests.support.app_harness import ADMIN, roles
 from tests.support.app_harness import field as _field
 

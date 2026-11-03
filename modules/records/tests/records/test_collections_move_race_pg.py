@@ -29,9 +29,9 @@ from sm_records.records.services.errors import Conflict
 from sm_records.records.services.records import create_record, get_deleted_record, get_record
 from sqlalchemy import text
 
+from tests.pg_support import USING_POSTGRES
 from tests.support.collections_harness import EVENTS  # noqa: F401 - declares the collections
 from tests.support.move_race_support import SETTINGS, count, move, seed
-from tests.pg_support import USING_POSTGRES
 
 pytestmark = pytest.mark.skipif(
     not USING_POSTGRES, reason="two blocking transactions need Postgres; set RECORDS_TEST_URL"

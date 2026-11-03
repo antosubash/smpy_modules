@@ -22,7 +22,15 @@ import pytest_asyncio
 from sm_records.index import IndexEntry, IndexKind, VirtualField, register_index_provider
 
 from tests.support.app_harness import ADMIN, roles
-from tests.support.i18n_helpers import API, TYPE_KEY, field, make_record, make_type, publish, translate
+from tests.support.i18n_helpers import (
+    API,
+    TYPE_KEY,
+    field,
+    make_record,
+    make_type,
+    publish,
+    translate,
+)
 from tests.support.i18n_helpers import use_locales as _use_locales
 
 PREFIX = "/api/records/public"

@@ -24,8 +24,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.models import table_sets
-from sm_records.schema.fields import FieldDefinition
-from sm_records.schema.types import FieldType
 
 # Re-exported: the referrer half of §9 lives in its own module for the file
 # cap, and every caller still imports ``_relations``.
@@ -37,6 +35,8 @@ from sm_records.records.services._referrers import (
     referrers,
 )
 from sm_records.records.services.errors import ValidationFailed
+from sm_records.schema.fields import FieldDefinition
+from sm_records.schema.types import FieldType
 
 __all__ = [
     "Referrer",

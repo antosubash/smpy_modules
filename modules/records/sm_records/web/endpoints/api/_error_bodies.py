@@ -27,8 +27,8 @@ from fastapi.responses import JSONResponse
 
 from sm_records.contracts.schema_change import dry_run_report_read
 from sm_records.contracts.schemas import record_read, type_read
-from sm_records.records.index.query import QueryError
 from sm_records.models import RecordType, table_sets
+from sm_records.records.index.query import QueryError
 from sm_records.records.services.errors import (
     BulkRefused,
     Conflict,

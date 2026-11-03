@@ -18,8 +18,15 @@ here at all.
 from __future__ import annotations
 
 from tests.support.app_harness import ADMIN, roles
-
-from tests.support.public_api_cases import _field, _make_type, _make_record, _article, _PREFIX, _PUBLIC_SHAPE, _UNKNOWN_UUID
+from tests.support.public_api_cases import (
+    _PREFIX,
+    _PUBLIC_SHAPE,
+    _UNKNOWN_UUID,
+    _article,
+    _field,
+    _make_record,
+    _make_type,
+)
 
 
 async def test_an_anonymous_caller_reads_a_public_type(public_client):

@@ -26,6 +26,8 @@ from typing import Any, NamedTuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.core.settings import RecordsSettings
+from sm_records.models import Record, RecordType, tables_for
 from sm_records.records.index.query import (
     Filter,
     Sort,
@@ -37,8 +39,6 @@ from sm_records.records.index.query import (
     sort_plan,
     sort_signature,
 )
-from sm_records.models import Record, RecordType, tables_for
-from sm_records.core.settings import RecordsSettings
 
 __all__ = ["RecordListPage", "list_records", "page_of"]
 

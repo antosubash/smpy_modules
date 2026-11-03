@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING
 from sm_records.core.settings import RecordsSettings
 
 if TYPE_CHECKING:
-    from sm_records.web.media import MediaApi
     from sm_records.core.tenancy import TenancyMode
+    from sm_records.web.media import MediaApi
 
 
 @dataclass

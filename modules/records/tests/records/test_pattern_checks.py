@@ -9,8 +9,8 @@ import time
 
 import pytest
 from sm_records.records import _pattern_worker
-from sm_records.schema._text_checks import checked, text_check
 from sm_records.records.services import _patterns
+from sm_records.schema._text_checks import checked, text_check
 
 from tests.support.app_harness import ADMIN, field, roles, seed_type
 

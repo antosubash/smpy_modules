@@ -5,9 +5,9 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
+from sm_records.models import INDEX_TABLES, IndexNumber, IndexText, tables_for
 from sm_records.records.index.reindex import clear_pending, reindex_record, reindex_type
 from sm_records.records.index.writer import delete_index, write_index
-from sm_records.models import INDEX_TABLES, IndexNumber, IndexText, tables_for
 from sqlalchemy import delete, select
 
 NOTHING = staticmethod(lambda _key: None)

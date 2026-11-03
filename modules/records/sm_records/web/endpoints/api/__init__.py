@@ -18,6 +18,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from simple_module_hosting.csrf import RequiresCsrf
 
+from sm_records.core.tenancy import bind_admin
 from sm_records.web.endpoints.api import (
     aggregate,
     bulk,
@@ -32,7 +33,6 @@ from sm_records.web.endpoints.api import (
     translations,
     types,
 )
-from sm_records.core.tenancy import bind_admin
 
 # The tenant binding is the router's **first** dependency, and FastAPI puts a
 # parent router's dependencies ahead of every included route's, so it is first

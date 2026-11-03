@@ -39,8 +39,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sm_records.schema.changes import DryRunReport, SchemaDiff
 from sm_records.records.services._common import utcnow
+from sm_records.schema.changes import DryRunReport, SchemaDiff
 
 __all__ = [
     "MAX_JOBS",

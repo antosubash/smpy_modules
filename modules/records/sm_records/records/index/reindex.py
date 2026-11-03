@@ -23,11 +23,11 @@ from typing import Any
 from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.models import RecordType, tables_for
 from sm_records.records.index._batch import current_batch
 from sm_records.records.index.providers import TypeResolver
 from sm_records.records.index.reduce_rebuild import rebuild_type
 from sm_records.records.index.writer import project, row_values, write_index
-from sm_records.models import RecordType, tables_for
 from sm_records.records.services._common import walk_type
 
 

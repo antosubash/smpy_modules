@@ -47,10 +47,10 @@ from typing import Any
 from sqlalchemy import Select, and_, delete, func, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.core import events
-from sm_records.records.collections import collections
 from sm_records.contracts.events import RecordTypeMoved
+from sm_records.core import events
 from sm_records.models import RecordType, table_set, tables_for
+from sm_records.records.collections import collections
 from sm_records.records.services._claims import lock_type
 from sm_records.records.services._common import mark_written
 from sm_records.records.services.errors import Conflict, ValidationFailed

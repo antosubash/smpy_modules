@@ -1,37 +1,22 @@
 """Shared setup for test_tenancy_primitives."""
 
 from __future__ import annotations
-import logging
+
 from pathlib import Path
 from types import SimpleNamespace
+
 import pytest
-from fastapi import APIRouter, Depends, FastAPI, HTTPException
+from fastapi import APIRouter, Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
-from simple_module_db.listeners import TenantIsolationError, current_tenant_id
+from simple_module_db.listeners import current_tenant_id
 from simple_module_hosting.middleware import TenantMiddleware
 from sm_records.core import constants
-from sm_records.web.endpoints.api._errors import RecordsErrorRoute
-from sm_records.records.services.errors import Forbidden
 from sm_records.core.tenancy import (
-    ALL_TENANTS,
-    DEFAULT_TENANT,
-    TENANT_RE,
     TenancyMode,
-    TenantRequired,
-    TenantUnbound,
-    all_tenants,
     bind_admin,
     bind_public,
-    bound_tenant,
-    configure,
-    detect_mode,
-    mode_of,
-    resolve_admin,
-    resolve_public,
-    tenant_header,
-    tenant_scope,
 )
-from sqlalchemy import select
+from sm_records.web.endpoints.api._errors import RecordsErrorRoute
 from starlette.middleware.base import BaseHTTPMiddleware
 
 _REPO = Path(__file__).resolve().parents[4]

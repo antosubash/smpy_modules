@@ -18,21 +18,20 @@ document, this one is the relationship between several.
 
 from __future__ import annotations
 
-from sm_records.records.services._translation_slugs import _free_slug, _stem
-
 from copy import deepcopy
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.core import locales
-from sm_records.core.constants import MAX_SLUG_LEN, ORPHANED_KEY
 from sm_records.contracts.public_submissions import KIND_SUBSCRIPTION
-from sm_records.models import Record, RecordStatus, RecordType, tables_for
-from sm_records.records.services import _claims
-from sm_records.records.services.errors import Conflict
+from sm_records.core import locales
+from sm_records.core.constants import ORPHANED_KEY
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import bound_tenant
+from sm_records.models import Record, RecordStatus, RecordType, tables_for
+from sm_records.records.services import _claims
+from sm_records.records.services._translation_slugs import _free_slug
+from sm_records.records.services.errors import Conflict
 
 __all__ = ["create_translation", "list_translations", "published_siblings"]
 

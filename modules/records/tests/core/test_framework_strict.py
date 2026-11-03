@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import pytest
 from simple_module_db import MissingTenantError
+from sm_records.core.tenancy import tenant_scope
 from sm_records.core.tenancy._cross_tenant import read_all, tenant_counts
 from sm_records.models import RecordType
-from sm_records.core.tenancy import tenant_scope
 from sqlalchemy import select
 
 from tests.conftest import create_record, create_type

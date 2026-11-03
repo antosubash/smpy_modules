@@ -14,28 +14,23 @@ import time
 import tracemalloc
 
 import pytest
-from sm_records.schema.diff import diff_fields
 from sm_records.records.services import _orphaned, schema_change
 from sm_records.records.services._dry_run import dry_run
 from sm_records.records.services._payload import field_defs
 from sm_records.records.services._schema import normalise
 from sm_records.records.services.reindex_runner import run_pending
 from sm_records.records.services.revisions import list_type_revisions
+from sm_records.schema.diff import diff_fields
 
-from tests.perf._bench import Results, Timing, capture, repeat
+from tests.perf._bench import Results, capture, repeat
+from tests.perf._schema_ops import _fields, _one, _set_indexed, _settings
 from tests.perf.conftest import REPS, load_type
 
 pytestmark = pytest.mark.perf
 
 
-def _fields(rtype) -> list[dict]:
-    return [dict(raw) for raw in (rtype.fields or [])]
 
 
-def _one(timing_ms: float) -> Timing:
-    """A single-shot measurement as a :class:`Timing` — these operations run
-    for seconds and are not repeated twenty times."""
-    return Timing(samples=[timing_ms])
 
 
 async def test_dry_run_restrictive(perf_db_copy):
@@ -74,10 +69,6 @@ async def test_dry_run_restrictive(perf_db_copy):
     )
 
 
-def _settings():
-    from sm_records.core.settings import RecordsSettings
-
-    return RecordsSettings()
 
 
 async def test_apply_restrictive_with_force(perf_db_copy):
@@ -105,30 +96,6 @@ async def test_apply_restrictive_with_force(perf_db_copy):
     assert diff.changes
 
 
-async def _set_indexed(db_state, settings, key: str, value: bool) -> int:
-    """Set ``store.<key>``'s ``indexed`` flag and return the type id.
-
-    A no-op when the flag already has that value — ``apply`` would refuse a
-    change that changes nothing, and the caller only wants the state.
-    """
-    async with db_state.session_factory() as session:
-        rtype = await load_type(session, "store")
-        raw = _fields(rtype)
-        changed = False
-        for field in raw:
-            if field["key"] == key and bool(field.get("indexed", False)) != value:
-                field["indexed"] = value
-                changed = True
-        if changed:
-            await schema_change.apply(
-                session,
-                rtype,
-                fields_raw=raw,
-                expected_version=rtype.version,
-                settings=settings,
-            )
-            await session.commit()
-        return rtype.id
 
 
 async def test_toggle_indexed_and_reindex_batches(perf_db_copy):

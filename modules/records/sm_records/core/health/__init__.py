@@ -84,7 +84,7 @@ from typing import TYPE_CHECKING, Any
 from simple_module_core.health import HealthCheck, HealthCheckResult, HealthStatus
 from sqlalchemy import select
 
-from sm_records.core.tenancy._cross_tenant import read_all
+from sm_records.core.constants import REINDEX_ALL
 from sm_records.core.health._health_counts import (
     count_invalid_records,
     count_orphaned_locales,
@@ -92,12 +92,12 @@ from sm_records.core.health._health_counts import (
     orphaned_detail,
     outside_default,
 )
-from sm_records.core.constants import REINDEX_ALL
-from sm_records.records.index._drift import drift_detail
-from sm_records.models import RecordType
-from sm_records.records.services._common import utcnow
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import TenancyMode
+from sm_records.core.tenancy._cross_tenant import read_all
+from sm_records.models import RecordType
+from sm_records.records.index._drift import drift_detail
+from sm_records.records.services._common import utcnow
 
 if TYPE_CHECKING:
     from sm_records.module import RecordsModule

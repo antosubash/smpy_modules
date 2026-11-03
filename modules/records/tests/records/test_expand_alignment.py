@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import pytest
 from sm_records.models import Record
-from sm_records.schema.compile import PayloadValidationError
 from sm_records.records.services import records as record_service
 from sm_records.records.services import types as type_service
 from sm_records.records.services.expand import expand
+from sm_records.schema.compile import PayloadValidationError
 from sqlalchemy import select
 
 from tests.support.app_harness import ADMIN, ROLE_EDITOR, ROLE_VIEWER, roles

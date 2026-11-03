@@ -12,10 +12,10 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.models import RecordType, RecordTypeRevision
-from sm_records.schema.changes import SchemaDiff
-from sm_records.records.services.errors import NotFound
 from sm_records.core.settings import RecordsSettings
+from sm_records.models import RecordType, RecordTypeRevision
+from sm_records.records.services.errors import NotFound
+from sm_records.schema.changes import SchemaDiff
 
 __all__ = ["rollback"]
 

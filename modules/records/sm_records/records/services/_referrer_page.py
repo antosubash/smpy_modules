@@ -40,9 +40,9 @@ from sqlalchemy import case, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Subquery
 
+from sm_records.core.tenancy import bound_tenant
 from sm_records.models import Record, RecordType, TableSet, tables_of
 from sm_records.schema.types import IndexKind
-from sm_records.core.tenancy import bound_tenant
 
 __all__ = ["pair_page", "pair_rows", "set_counts", "types_by_id"]
 

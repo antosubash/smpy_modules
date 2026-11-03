@@ -21,6 +21,7 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.core.constants import TEXT_INDEX_LEN
+from sm_records.models import Record, RecordType, TableSet, tables_for
 from sm_records.records.index._reduce_write import apply_delta
 from sm_records.records.index._registry import provider_name
 from sm_records.records.index.providers import (
@@ -32,9 +33,8 @@ from sm_records.records.index.providers import (
     use_type_resolver,
     virtual_fields,
 )
-from sm_records.models import Record, RecordType, TableSet, tables_for
-from sm_records.schema.types import IndexKind
 from sm_records.records.services._common import utcnow
+from sm_records.schema.types import IndexKind
 
 logger = logging.getLogger(__name__)
 

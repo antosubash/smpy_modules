@@ -15,10 +15,9 @@ from types import SimpleNamespace
 
 import pytest
 from simple_module_core.public_routes import PublicRouteRegistry
-from sm_records.core import boot
-from sm_records.core import constants
-from sm_records.module import RecordsModule
+from sm_records.core import boot, constants
 from sm_records.core.settings import RecordsSettings
+from sm_records.module import RecordsModule
 
 
 def _registry(**overrides) -> PublicRouteRegistry:

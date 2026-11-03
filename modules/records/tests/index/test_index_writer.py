@@ -7,9 +7,6 @@ from decimal import Decimal
 
 import pytest
 from sm_records.core.constants import TEXT_INDEX_LEN
-from sm_records.records.index import providers as provider_registry
-from sm_records.records.index.providers import IndexEntry
-from sm_records.records.index.writer import delete_index, write_index
 from sm_records.models import (
     INDEX_TABLES,
     IndexBool,
@@ -20,6 +17,9 @@ from sm_records.models import (
     IndexText,
     tables_for,
 )
+from sm_records.records.index import providers as provider_registry
+from sm_records.records.index.providers import IndexEntry
+from sm_records.records.index.writer import delete_index, write_index
 from sm_records.schema.types import IndexKind
 from sqlalchemy import select
 

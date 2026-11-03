@@ -6,7 +6,14 @@ from simple_module_hosting.csrf import CSRF_HEADER
 from sm_records.models import RecordType
 from sqlalchemy import select
 
-from tests.support.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, ROLE_VIEWER, roles, seed_record
+from tests.support.app_harness import (
+    ADMIN,
+    ROLE_EDITOR,
+    ROLE_EDITOR_TWO,
+    ROLE_VIEWER,
+    roles,
+    seed_record,
+)
 from tests.support.csrf_support import _token
 from tests.support.public_submissions_support import API, update
 from tests.support.public_submissions_support import create as create_type

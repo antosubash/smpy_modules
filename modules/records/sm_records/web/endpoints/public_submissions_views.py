@@ -28,8 +28,8 @@ from fastapi import APIRouter, Query, Request, Response
 from simple_module_hosting.inertia_deps import InertiaDep
 
 from sm_records.core import constants
-from sm_records.web._html_lang import set_html_lang
 from sm_records.public_submissions import links, strings
+from sm_records.web._html_lang import set_html_lang
 
 __all__ = ["router"]
 

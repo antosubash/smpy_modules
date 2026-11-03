@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { click, mount } from './test-dom';
 import type { RecordListPage, RecordRead, TypeRead } from '../utils/types';
+import { click, mount } from './test-dom';
 
 // The page reads its URL and `list_errors` from `usePage()`; both change between
 // renders here, the way a cursor step changes them.

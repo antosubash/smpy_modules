@@ -23,9 +23,9 @@ from dataclasses import dataclass
 from dataclasses import field as dc_field
 from typing import Any
 
+from sm_records.contracts.io import ImportRowError
 from sm_records.core._text import NUL_PROBLEM, has_nul
 from sm_records.core.constants import ORPHANED_KEY
-from sm_records.contracts.io import ImportRowError
 from sm_records.records.services._export_cells import ENVELOPE_COLUMNS
 from sm_records.records.services.errors import ImportParseFailed, PayloadTooLarge
 

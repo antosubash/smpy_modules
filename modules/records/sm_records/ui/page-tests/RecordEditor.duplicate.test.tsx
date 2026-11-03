@@ -1,11 +1,10 @@
 // @vitest-environment happy-dom
 import { act } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { click, mount, settle } from './test-dom';
 import { ApiError } from '../utils/api';
 import { takeDuplicate } from '../utils/duplicate';
 import type { RecordRead, TypeRead } from '../utils/types';
+import { click, mount, settle } from './test-dom';
 
 vi.mock('@inertiajs/react', () => ({
   Head: () => null,

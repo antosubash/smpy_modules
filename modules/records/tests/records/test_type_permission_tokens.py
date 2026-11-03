@@ -20,7 +20,14 @@ from simple_module_hosting.permissions import apply_scope_cap
 from sm_records.core import constants
 from sm_records.records.services._access import caller_access
 
-from tests.support.app_harness import ADMIN, ROLE_VIEWER, TEST_SCOPES_HEADER, build_app, roles, seed_type
+from tests.support.app_harness import (
+    ADMIN,
+    ROLE_VIEWER,
+    TEST_SCOPES_HEADER,
+    build_app,
+    roles,
+    seed_type,
+)
 
 _LIST = "/api/records/types/payroll/records"
 _SCOPES = f"{constants.PERM_VIEW},records.type.payroll"

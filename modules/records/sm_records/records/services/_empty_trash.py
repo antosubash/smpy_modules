@@ -24,13 +24,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.core import events
-from sm_records.records.index.query import Filter, filtered, only_trashed
+from sm_records.core.tenancy import bound_tenant
 from sm_records.models import RecordType, tables_for
+from sm_records.records.index.query import Filter, filtered, only_trashed
 from sm_records.records.services._common import mark_written
 from sm_records.records.services._forget_deliveries import forget_deliveries
 from sm_records.records.services._lock import lock_type
 from sm_records.records.services.errors import Conflict
-from sm_records.core.tenancy import bound_tenant
 
 __all__ = ["Identity", "empty_trash"]
 

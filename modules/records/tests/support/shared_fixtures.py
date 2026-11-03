@@ -17,13 +17,13 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
-from sm_records.web.deps import require_edit, require_manage_types, require_view
-from sm_records.models import Base
 from sm_records.core.settings import RecordsSettings
+from sm_records.models import Base
+from sm_records.web.deps import require_edit, require_manage_types, require_view
 
+from tests.pg_support import USING_POSTGRES
 from tests.support.app_harness import build_app
 from tests.support.i18n_helpers import use_locales
-from tests.pg_support import USING_POSTGRES
 
 
 @pytest.fixture

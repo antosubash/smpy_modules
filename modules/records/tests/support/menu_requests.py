@@ -1,19 +1,15 @@
 """Shared record test builders."""
 
 from __future__ import annotations
+
 from types import SimpleNamespace
 from typing import Any
-import pytest
+
 from fastapi import FastAPI
-from simple_module_core.menu import MenuRegistry, MenuSection
 from sm_records.core import constants
-from sm_records.web import menu
-from sm_records.web.menu import MenuType
-from sm_records.module import RecordsModule
-from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import TenancyMode, tenant_scope
+from sm_records.core.tenancy import TenancyMode
 from starlette.requests import Request
-from tests.support.app_harness import seed_type
+
 
 def _user(*roles: str) -> SimpleNamespace:
     return SimpleNamespace(id="u", roles=list(roles))

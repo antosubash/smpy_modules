@@ -10,8 +10,8 @@ assertion on a response body would ever notice it breaking.
 
 from __future__ import annotations
 
-from tests.support.app_harness import ADMIN, roles
 from tests.perf._bench import capture
+from tests.support.app_harness import ADMIN, roles
 from tests.support.relation_helpers import INERTIA, field, library, make_record, make_type
 
 

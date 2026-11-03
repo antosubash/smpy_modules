@@ -11,7 +11,9 @@ from sm_records.module import RecordsModule
 
 def test_root_contains_only_discovery_paths():
     root = Path(sm_records.__file__).parent
-    assert {p.name for p in root.glob('*.py')} == {'__init__.py', 'module.py', 'cli.py', 'index.py', 'collections.py', 'seed.py'}
+    assert {p.name for p in root.glob('*.py')} == {
+        '__init__.py', 'module.py', 'cli.py', 'index.py', 'collections.py', 'seed.py',
+    }
     for area in ('core', 'web', 'records'):
         tree = ast.parse((root / area / '__init__.py').read_text())
         assert len(tree.body) == 1 and isinstance(tree.body[0], ast.Expr)

@@ -32,9 +32,17 @@ import type { ApiErrorBody } from './types';
 export { formatBytes } from './format-bytes';
 
 import type { MediaApi, MediaFile, MediaPage } from './media-values';
-import { MEDIA_PAGE_SIZE, fillId } from './media-values';
+import { fillId, MEDIA_PAGE_SIZE } from './media-values';
+
 export type { MediaApi, MediaFile, MediaPage, MediaValueKind } from './media-values';
-export { MEDIA_PAGE_SIZE, fillId, fileUrl, isUrlValue, mediaValueKind, isImage } from './media-values';
+export {
+  fileUrl,
+  fillId,
+  isImage,
+  isUrlValue,
+  MEDIA_PAGE_SIZE,
+  mediaValueKind,
+} from './media-values';
 
 function toMediaFile(raw: Record<string, unknown>): MediaFile {
   return {

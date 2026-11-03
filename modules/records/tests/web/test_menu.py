@@ -12,22 +12,18 @@ page with it. Per-tenant behaviour over HTTP is ``test_menu_tenancy.py``.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
 from simple_module_core.menu import MenuRegistry, MenuSection
 from sm_records.core import constants
-from sm_records.web import menu
-from sm_records.web.menu import MenuType
-from sm_records.module import RecordsModule
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import TenancyMode, tenant_scope
-from starlette.requests import Request
+from sm_records.module import RecordsModule
+from sm_records.web import menu
+from sm_records.web.menu import MenuType
 
 from tests.support.app_harness import seed_type
-
 from tests.support.menu_requests import _request, _user
 
 _VIEW = {constants.PERM_VIEW}

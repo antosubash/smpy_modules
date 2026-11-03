@@ -16,8 +16,7 @@ from __future__ import annotations
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sm_records.core import boot
-from sm_records.core import constants
+from sm_records.core import boot, constants
 
 from tests.support.app_harness import ADMIN, build_app, roles
 from tests.support.isolation_support import (

@@ -22,10 +22,8 @@ import io
 import json
 from typing import Any
 
-from sm_records.core._text import has_nul
 from sm_records.contracts.io import ImportRowError
-from sm_records.schema.fields import FieldDefinition
-from sm_records.schema.types import FieldType
+from sm_records.core._text import has_nul
 from sm_records.records.services._export_cells import _JSON_CELL_TYPES, APOSTROPHE, ENVELOPE_COLUMNS
 from sm_records.records.services._import_parse import (
     ImportRow,
@@ -34,6 +32,8 @@ from sm_records.records.services._import_parse import (
     too_many_rows,
 )
 from sm_records.records.services.errors import ImportParseFailed
+from sm_records.schema.fields import FieldDefinition
+from sm_records.schema.types import FieldType
 
 __all__ = ["parse_csv"]
 

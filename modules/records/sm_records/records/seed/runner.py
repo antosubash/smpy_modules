@@ -15,8 +15,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from sm_records.core import events
-from sm_records.records.index._analyze import analyze_tables, owned_table_names
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordStatus, RecordType
+from sm_records.records.index._analyze import analyze_tables, owned_table_names
 from sm_records.records.seed import generate
 from sm_records.records.seed._i18n import seed_translations
 from sm_records.records.seed.log import log
@@ -28,7 +29,6 @@ from sm_records.records.seed.types import active_type_defs
 from sm_records.records.services.errors import NotFound
 from sm_records.records.services.records import create_record
 from sm_records.records.services.types import create_type, delete_type, get_type, record_count
-from sm_records.core.settings import RecordsSettings
 
 _BATCH_SIZE = 200
 

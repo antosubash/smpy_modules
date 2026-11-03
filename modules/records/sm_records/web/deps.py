@@ -21,8 +21,9 @@ from simple_module_db import get_db
 from simple_module_hosting.permissions import RequiresPermission, resolved_permissions_for
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.core import constants
-from sm_records.core import events
+from sm_records.core import constants, events
+from sm_records.core.settings import RecordsSettings
+from sm_records.models import RecordType
 from sm_records.records._grammar import (
     MAX_PAGE,
     PageCursor,
@@ -32,7 +33,6 @@ from sm_records.records._grammar import (
     parse_sorts,
     parse_view_filters,
 )
-from sm_records.models import RecordType
 from sm_records.records.services._access import (
     CallerRoles,
     caller_access,
@@ -41,7 +41,6 @@ from sm_records.records.services._access import (
 )
 from sm_records.records.services.errors import Forbidden
 from sm_records.records.services.types import get_type
-from sm_records.core.settings import RecordsSettings
 
 # Since framework 0.0.36 (#337) the hosting checker honours roles *and* every
 # registered grant source, so a direct per-user ``records.view`` grant from the

@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { mount } from './test-dom';
 import type { TypeRead } from '../utils/types';
+import { mount } from './test-dom';
 
 vi.mock('@inertiajs/react', () => ({
   Head: () => null,

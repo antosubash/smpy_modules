@@ -8,9 +8,9 @@ with the wrong rows. The refusal happens on the screen that proposes the key.
 from __future__ import annotations
 
 import pytest
+from sm_records.models import Record
 from sm_records.records.index._fixed import RESERVED_FIELD_KEYS
 from sm_records.records.index.query import FIXED_COLUMNS
-from sm_records.models import Record
 from sm_records.schema.fields import FieldSchemaError, validate_fields
 
 from tests.support.app_harness import ADMIN, roles

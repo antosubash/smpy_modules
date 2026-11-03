@@ -17,9 +17,9 @@ import pytest
 from fastapi import APIRouter, FastAPI, File, UploadFile
 from pydantic import ValidationError
 from simple_module_core.public_routes import PublicRouteRegistry
-from sm_records.web import media
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.settings.settings_boot import BootSettings
+from sm_records.web import media
 
 from tests.support.app_harness import ADMIN, roles, seed_type
 

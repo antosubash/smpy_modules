@@ -20,11 +20,11 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.bulk import BulkAction
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordStatus, RecordType
 from sm_records.records.services import records as record_service
 from sm_records.records.services._empty_trash import Identity
 from sm_records.records.services.errors import Conflict
-from sm_records.core.settings import RecordsSettings
 
 __all__ = ["Change", "apply_one", "check_version"]
 

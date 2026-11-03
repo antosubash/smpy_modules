@@ -34,11 +34,11 @@ import logging
 from functools import partial
 from typing import Any
 
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import tenant_scope
 from sm_records.models import RecordType
 from sm_records.records.services import preview_jobs, schema_change
 from sm_records.records.services.schema_change import MISSING
-from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import tenant_scope
 
 __all__ = ["run_preview_job"]
 

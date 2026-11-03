@@ -15,6 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.core import locales
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordType, tables_for
 from sm_records.public_submissions import config as submissions
 from sm_records.records.services._common import bump_or_conflict, record_count
@@ -30,7 +31,6 @@ from sm_records.records.services._schema_checked import normalise_checked
 from sm_records.records.services._type_move import check_target, move_type
 from sm_records.records.services.errors import Conflict, ValidationFailed
 from sm_records.records.services.schema_change import apply as apply_schema_change
-from sm_records.core.settings import RecordsSettings
 
 __all__ = ["update_type"]
 

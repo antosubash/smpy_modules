@@ -12,11 +12,11 @@ from collections.abc import Awaitable, Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.records.index._batch import current_batch
 from sm_records.models import RecordType
-from sm_records.schema.compile import from_stored
+from sm_records.records.index._batch import current_batch
 from sm_records.records.services._common import walk_type
 from sm_records.records.services._payload import display_title, field_defs
+from sm_records.schema.compile import from_stored
 
 __all__ = ["recompute_titles"]
 

@@ -33,11 +33,11 @@ from typing import Any
 from sqlalchemy import Select, select
 from sqlalchemy.sql import ColumnElement
 
+from sm_records.models import RecordType, TableSet, tables_for
 from sm_records.records.index import providers
 from sm_records.records.index._fields import IndexedField, declared_keys, indexed_map, virtual_field
 from sm_records.records.index._fixed import FIXED_COLUMNS, fixed_clause
 from sm_records.records.index._predicates import FilterOp, QueryError, value_clause
-from sm_records.models import RecordType, TableSet, tables_for
 
 logger = logging.getLogger(__name__)
 

@@ -6,8 +6,8 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.core.constants import REINDEX_ALL
-from sm_records.records.index.reindex import pending_map
 from sm_records.models import RecordType
+from sm_records.records.index.reindex import pending_map
 from sm_records.records.services._common import utcnow
 
 __all__ = ["mark_pending"]

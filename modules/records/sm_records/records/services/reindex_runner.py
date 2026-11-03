@@ -33,8 +33,6 @@ arrives unbound and gets the binding here.
 
 from __future__ import annotations
 
-from sm_records.records.services._reindex_markers import pending_type_ids, _clear_rebuilt
-
 import asyncio
 import logging
 
@@ -42,23 +40,23 @@ from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.core.tenancy._cross_tenant import read_all
 from sm_records.core.constants import REINDEX_ALL
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import tenant_scope
+from sm_records.core.tenancy._cross_tenant import read_all
+from sm_records.models import RecordType, tables_for
 from sm_records.records.index._analyze import analyze_tables, index_table_names
 from sm_records.records.index.reduce_rebuild import rebuild_type
 from sm_records.records.index.reindex import (
-    clear_pending,
     delete_field_rows,
     pending_map,
     reindex_type,
 )
-from sm_records.models import RecordType, tables_for
 from sm_records.records.services._claims import lock_type
 from sm_records.records.services._common import mark_written, reload, type_resolver
+from sm_records.records.services._reindex_markers import _clear_rebuilt, pending_type_ids
 from sm_records.records.services._titles import recompute_titles
 from sm_records.records.services.errors import Conflict
-from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import tenant_scope
 
 __all__ = ["pending_type_ids", "run_pending", "schedule"]
 

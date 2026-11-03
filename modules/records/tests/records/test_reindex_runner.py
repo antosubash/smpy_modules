@@ -14,14 +14,14 @@ from __future__ import annotations
 
 import pytest
 from sm_records.core.constants import REINDEX_ALL
+from sm_records.core.settings import RecordsSettings
+from sm_records.models import IndexNumber, IndexText, Record, RecordType
 from sm_records.records.index import reindex as reindex_module
 from sm_records.records.index.query import Filter, FilterOp, build_query
-from sm_records.models import IndexNumber, IndexText, Record, RecordType
 from sm_records.records.services import records as record_service
 from sm_records.records.services import schema_change
 from sm_records.records.services import types as type_service
 from sm_records.records.services.reindex_runner import run_pending, schedule
-from sm_records.core.settings import RecordsSettings
 from sqlalchemy import select
 
 

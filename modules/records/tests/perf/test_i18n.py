@@ -22,16 +22,15 @@ import time
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sm_records.core.settings import settings_checks
+from sm_records.core.settings import RecordsSettings, settings_checks
 from sm_records.models import RecordStatus
 from sm_records.records.services import _claims
 from sm_records.records.services._translations import create_translation, published_siblings
-from sm_records.core.settings import RecordsSettings
 
-from tests.support.app_harness import build_app
 from tests.perf._bench import Results, Timing, capture, explain, repeat
 from tests.perf._http import API, get_ok, measure, plan_label
 from tests.perf.conftest import REPS, load_type, type_counts
+from tests.support.app_harness import build_app
 
 pytestmark = pytest.mark.perf
 

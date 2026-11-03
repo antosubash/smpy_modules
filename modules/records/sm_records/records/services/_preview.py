@@ -12,11 +12,11 @@ from __future__ import annotations
 from typing import Any
 
 from sm_records.core.constants import REINDEX_ALL
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordType
+from sm_records.records.services import preview_jobs
 from sm_records.schema.changes import DryRunReport, SchemaChange
 from sm_records.schema.types import ChangeClass
-from sm_records.records.services import preview_jobs
-from sm_records.core.settings import RecordsSettings
 
 __all__ = ["MISSING", "pointer_preview_changes", "reused_report"]
 

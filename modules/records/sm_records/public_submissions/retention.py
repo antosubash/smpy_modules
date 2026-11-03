@@ -55,20 +55,20 @@ from typing import Any, Final
 from simple_module_core.leases import lease
 from sqlalchemy import select
 
-from sm_records.core import events
-from sm_records.core.tenancy._cross_tenant import read_all
 from sm_records.contracts.public_submissions import KIND_FORM, KIND_SUBSCRIPTION
-from sm_records.records.index.query import Filter, FilterOp, filtered
+from sm_records.core import events
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import bound_tenant, tenant_scope
+from sm_records.core.tenancy._cross_tenant import read_all
 from sm_records.models import RecordType, tables_for
 from sm_records.public_submissions.retention_deliveries import prune_deliveries
 from sm_records.public_submissions.retention_rules import PENDING, days_for, still_due
+from sm_records.records.index.query import Filter, FilterOp, filtered
 from sm_records.records.services._common import utcnow
 from sm_records.records.services._lock import lock_type
 from sm_records.records.services.errors import Conflict, NotFound
 from sm_records.records.services.records import hard_delete_record, soft_delete_record
 from sm_records.records.services.types import get_type, list_types
-from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import bound_tenant, tenant_scope
 
 __all__ = ["LEASE_NAME", "LEASE_TTL", "LeaseLost", "Swept", "sweep"]
 

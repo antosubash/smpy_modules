@@ -30,12 +30,12 @@ from collections import defaultdict
 
 from sqlalchemy import select
 
-from sm_records.core.tenancy._cross_tenant import read_all
-from sm_records.records.index.reduce import reduce_specs
-from sm_records.records.index.reduce_rebuild import verify_type
-from sm_records.models import RecordType
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import DEFAULT_TENANT, tenant_scope
+from sm_records.core.tenancy._cross_tenant import read_all
+from sm_records.models import RecordType
+from sm_records.records.index.reduce import reduce_specs
+from sm_records.records.index.reduce_rebuild import verify_type
 
 
 async def _types_by_tenant(db_state, type_key: str | None, tenant: str | None) -> dict[str, list]:

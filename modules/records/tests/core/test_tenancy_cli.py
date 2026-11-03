@@ -23,18 +23,18 @@ import pytest
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
 from sm_records.cli import main, reindex, run_verify, seed, tenants
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import install_guard, tenant_scope
+from sm_records.models import Base, IndexReduce, Record, RecordType
 from sm_records.records.cli.cli_io import export_command, import_command
 from sm_records.records.cli.cli_reindex import force_pending
 from sm_records.records.index._drift import clear_drift
 from sm_records.records.index.reduce import register_reduce_provider
-from sm_records.models import Base, IndexReduce, Record, RecordType
 from sm_records.records.services import types as type_service
-from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import install_guard, tenant_scope
 from sqlalchemy import select, update
 
-from tests.support.app_harness import seed_record, seed_type
 from tests.pg_support import TEST_URL, USING_POSTGRES, make_db_state
+from tests.support.app_harness import seed_record, seed_type
 from tests.support.reduce import make, state_spec
 
 pytestmark = pytest.mark.unbound_tenant

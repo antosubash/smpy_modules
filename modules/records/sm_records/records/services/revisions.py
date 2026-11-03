@@ -18,6 +18,8 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.core.constants import ORPHANED_KEY
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import bound_tenant
 from sm_records.models import (
     Record,
     RecordRevision,
@@ -29,8 +31,6 @@ from sm_records.models import (
 from sm_records.records.services._common import utcnow
 from sm_records.records.services._payload import field_defs
 from sm_records.records.services.errors import NotFound
-from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import bound_tenant
 
 
 async def list_revisions(db: AsyncSession, record: Record) -> list[RecordRevision]:

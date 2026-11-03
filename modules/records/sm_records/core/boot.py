@@ -30,7 +30,10 @@ from fastapi import FastAPI
 
 from sm_records.core import constants
 from sm_records.core.settings import RecordsSettings
-from sm_records.core.settings.settings_checks import DEFAULT_PUBLIC_ROUTE_PREFIX, check_public_route_prefix
+from sm_records.core.settings.settings_checks import (
+    DEFAULT_PUBLIC_ROUTE_PREFIX,
+    check_public_route_prefix,
+)
 
 logger = logging.getLogger(__name__)
 

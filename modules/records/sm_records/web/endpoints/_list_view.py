@@ -26,10 +26,10 @@ from typing import Final, NamedTuple
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.schemas import RecordPage
-from sm_records.records.index.query import CursorError, Filter, QueryError, Sort
-from sm_records.models import RecordType
-from sm_records.records.services import records as record_service
 from sm_records.core.settings import RecordsSettings
+from sm_records.models import RecordType
+from sm_records.records.index.query import CursorError, Filter, QueryError, Sort
+from sm_records.records.services import records as record_service
 
 __all__ = [
     "BAD_CURSOR",

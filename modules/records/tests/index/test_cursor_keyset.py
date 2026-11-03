@@ -93,8 +93,8 @@ def test_the_keyset_clause_is_a_row_value_only_where_it_means_the_same_thing():
     not a row value either; and two terms may run two ways. Each of those must
     fall back to the ``OR`` expansion, and the one case left must not.
     """
-    from sm_records.records.index._sorting import SortTerm, keyset_clause
     from sm_records.models import Record
+    from sm_records.records.index._sorting import SortTerm, keyset_clause
 
     def term(*, desc: bool, nullable: bool, index_served: bool) -> SortTerm:
         return SortTerm(

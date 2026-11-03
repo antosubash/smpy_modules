@@ -1,19 +1,20 @@
 """test_services_types cases."""
 
 from __future__ import annotations
+
 import pytest
 from sm_records.models import Record, RecordType, RecordTypeRevision
 from sm_records.records.services import records as record_service
 from sm_records.records.services import types as service
 from sm_records.records.services.errors import (
     Conflict,
-    NotFound,
     ReferencedByOthers,
     ValidationFailed,
 )
-from sm_records.core.settings import RecordsSettings
 from sqlalchemy import select
-from tests.support.services_types_cases import product_fields, revisions
+
+from tests.support.services_types_cases import product_fields as product_fields
+from tests.support.services_types_cases import revisions
 
 
 async def test_record_count_ignores_the_trash(db, settings, make_record, product_fields):

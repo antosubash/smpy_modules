@@ -39,11 +39,11 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import select
 
 from sm_records.core import constants
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import TenancyMode
 from sm_records.core.tenancy._cross_tenant import read_all
 from sm_records.models import RecordType
 from sm_records.records.services._access import type_permission
-from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import TenancyMode
 
 if TYPE_CHECKING:  # pragma: no cover - imports for typing only
     from simple_module_core.permissions import PermissionRegistry

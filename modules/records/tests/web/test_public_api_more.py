@@ -1,8 +1,14 @@
 """test_public_api cases."""
 
 from __future__ import annotations
+
 from tests.support.app_harness import ADMIN, roles
-from tests.support.public_api_cases import _field, _make_type, _make_record, _article, _PREFIX, _PUBLIC_SHAPE, _UNKNOWN_UUID
+from tests.support.public_api_cases import (
+    _PREFIX,
+    _article,
+    _make_record,
+    _make_type,
+)
 
 
 async def test_an_unindexed_field_is_a_400_naming_it(public_client):

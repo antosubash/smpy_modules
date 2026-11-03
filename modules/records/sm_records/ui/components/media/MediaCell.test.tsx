@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
-import { IMAGE, flush, cell } from './media-cell-test-support';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { act, mount, settle } from '../../page-tests/test-dom';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, mount } from '../../page-tests/test-dom';
 import {
   availableColumns,
   defaultColumnKeys,
@@ -17,9 +16,9 @@ import {
   PHOTO,
   stubLibrary,
 } from '../../utils/media-test-support';
-import type { FieldDef, RecordRead, TypeRead } from '../../utils/types';
-import { RecordCell } from '../RecordCell';
+import type { RecordRead, TypeRead } from '../../utils/types';
 import { MediaApiProvider } from './MediaApiContext';
+import { cell, flush, IMAGE } from './media-cell-test-support';
 
 vi.mock('@inertiajs/react', () => ({
   Link: ({ children, href }: { children?: unknown; href: string }) => (

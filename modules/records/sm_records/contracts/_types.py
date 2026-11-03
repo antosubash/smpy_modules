@@ -16,8 +16,8 @@ from typing import Any
 from sqlmodel import Field as SQLField
 from sqlmodel import SQLModel
 
-from sm_records.records.index.reindex import pending_map
 from sm_records.models import RecordType
+from sm_records.records.index.reindex import pending_map
 
 __all__ = ["TypeCreate", "TypeListResponse", "TypeRead", "TypeUpdate", "type_read"]
 

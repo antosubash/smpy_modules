@@ -26,8 +26,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.core import constants
 from sm_records.contracts.aggregate import AggregateResponse
+from sm_records.core import constants
+from sm_records.core.settings import RecordsSettings
+from sm_records.models import RecordType
+from sm_records.records.index.aggregate import parse_metric
+from sm_records.records.index.query import Filter, FilterOp, QueryError
+from sm_records.records.services import aggregate as aggregate_service
 from sm_records.web.deps import (
     get_settings,
     load_allowed_type,
@@ -37,11 +42,6 @@ from sm_records.web.deps import (
 )
 from sm_records.web.endpoints.api._errors import RecordsErrorRoute
 from sm_records.web.endpoints.api._responses import LISTING, responses
-from sm_records.records.index.aggregate import parse_metric
-from sm_records.records.index.query import Filter, FilterOp, QueryError
-from sm_records.models import RecordType
-from sm_records.records.services import aggregate as aggregate_service
-from sm_records.core.settings import RecordsSettings
 
 router = APIRouter(
     prefix="/types/{key}",

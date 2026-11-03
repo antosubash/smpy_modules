@@ -5,11 +5,11 @@ index-affecting — the rebuild is what rewrites ``records_index_ref``.
 from __future__ import annotations
 
 from sm_records.models import RecordType, tables_for
-from sm_records.schema.types import IndexKind
 from sm_records.records.services import records as record_service
 from sm_records.records.services import schema_change
 from sm_records.records.services import types as type_service
 from sm_records.records.services.reindex_runner import run_pending
+from sm_records.schema.types import IndexKind
 from sqlalchemy import select
 
 from tests.support.field_builders import rel, text

@@ -15,13 +15,11 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from sm_records.records.index.reduce import ReduceSpec, register_reduce_provider
-from sm_records.records.index.reduce_rebuild import recompute, verify_type
-from sm_records.models import IndexReduce, RecordStatus
+from sm_records.records.index.reduce import register_reduce_provider
+from sm_records.records.index.reduce_rebuild import verify_type
 from sm_records.records.services import records as record_service
-from sqlalchemy import select
 
-from tests.support.reduce import state_spec, stored, assert_matches_recompute, make, STATE
+from tests.support.reduce import assert_matches_recompute, make, state_spec, stored
 
 
 async def test_create_inserts_the_group_then_increments_it(db, order_type, settings):

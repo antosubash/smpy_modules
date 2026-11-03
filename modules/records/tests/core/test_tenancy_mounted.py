@@ -18,10 +18,7 @@ from fastapi import FastAPI, Request
 from httpx import ASGITransport, AsyncClient
 from simple_module_core.permissions import PermissionRegistry
 from sm_records.core import constants
-from sm_records.web import menu
 from sm_records.core._permission_sync import PermissionSyncMiddleware
-from sm_records.module import RecordsModule
-from sm_records.records.services.errors import TenantRequired
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import (
     TenancyMode,
@@ -30,6 +27,9 @@ from sm_records.core.tenancy import (
     resolve_public,
     tenant_scope,
 )
+from sm_records.module import RecordsModule
+from sm_records.records.services.errors import TenantRequired
+from sm_records.web import menu
 from starlette.applications import Starlette
 from starlette.routing import Mount
 

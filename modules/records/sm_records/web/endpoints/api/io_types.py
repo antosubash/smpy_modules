@@ -19,6 +19,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.io import TypeExport, TypeImportRequest, type_export
 from sm_records.contracts.schemas import TypeRead
+from sm_records.core.settings import RecordsSettings
+from sm_records.models import RecordType
+from sm_records.records.services import types as type_service
+from sm_records.records.services.errors import Conflict, ValidationFailed
 from sm_records.web.deps import (
     actor,
     check_type_roles,
@@ -31,10 +35,6 @@ from sm_records.web.deps import (
 from sm_records.web.endpoints.api._errors import RecordsErrorRoute
 from sm_records.web.endpoints.api._responses import IMPORT, responses
 from sm_records.web.endpoints.api.types import _check_roles_for_discard, apply_update, create_from
-from sm_records.models import RecordType
-from sm_records.records.services import types as type_service
-from sm_records.records.services.errors import Conflict, ValidationFailed
-from sm_records.core.settings import RecordsSettings
 
 router = APIRouter(route_class=RecordsErrorRoute, responses=responses(*IMPORT))
 

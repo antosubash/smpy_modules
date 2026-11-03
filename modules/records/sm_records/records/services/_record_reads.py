@@ -1,12 +1,14 @@
 """records services _record_reads helpers."""
 
 from __future__ import annotations
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from sm_records.core._text import has_nul
+from sm_records.core.tenancy import bound_tenant
 from sm_records.models import Record, RecordType, tables_for
 from sm_records.records.services.errors import NotFound
-from sm_records.core.tenancy import bound_tenant
 
 
 async def _by_uuid(db: AsyncSession, rtype: RecordType, uuid: str, *, trashed: bool) -> Record:

@@ -134,8 +134,8 @@ async def test_a_request_that_fails_after_the_write_publishes_nothing(
 ):
     """The service has already queued its ``RecordCreated`` when the endpoint
     refuses; the error route's rollback has to take the event with it."""
-    from sm_records.web.endpoints.api import records as records_endpoint
     from sm_records.records.services.errors import Conflict
+    from sm_records.web.endpoints.api import records as records_endpoint
 
     def refuse(*_args, **_kwargs):
         raise Conflict("refused after the write")

@@ -33,10 +33,10 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.records.index.query import QueryError
 from sm_records.models import RecordType
-from sm_records.schema.types import FieldType
+from sm_records.records.index.query import QueryError
 from sm_records.records.services._access import role_blocked
+from sm_records.schema.types import FieldType
 
 __all__ = ["Hop", "plan", "relation_defs"]
 

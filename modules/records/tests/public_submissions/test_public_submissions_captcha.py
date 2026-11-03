@@ -12,8 +12,8 @@ from urllib.parse import parse_qs
 
 import httpx
 import pytest
-from sm_records.public_submissions import captcha
 from sm_records.core.settings import RecordsSettings
+from sm_records.public_submissions import captcha
 
 from tests.support.submissions_http import configure, contact_type, load, records_of, send
 

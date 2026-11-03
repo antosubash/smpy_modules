@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import pytest
 from sm_records.core import locales
-from sm_records.models import Record, RecordType
 from sm_records.core.settings import RecordsSettings
+from sm_records.models import Record, RecordType
 from sqlalchemy.exc import IntegrityError
 
 

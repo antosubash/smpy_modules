@@ -1,7 +1,9 @@
-import { CONSENT_KEY, form, errors, BY_CODE, wait } from './submission-form-state';
-import type { Phase, Problem, FocusTarget, SubmissionForm, Options } from './submission-form-state';
+import type { FocusTarget, Options, Phase, Problem, SubmissionForm } from './submission-form-state';
+import { BY_CODE, CONSENT_KEY, errors, form, wait } from './submission-form-state';
+
+export type { FocusTarget, Phase, Problem, SubmissionForm } from './submission-form-state';
 export { CONSENT_KEY } from './submission-form-state';
-export type { Phase, Problem, FocusTarget, SubmissionForm } from './submission-form-state';
+
 /**
  * The `RecordForm` block's state machine (#101, design §8):
  * `loading → ready → submitting → success`, with `unavailable` for a form
@@ -19,7 +21,6 @@ export type { Phase, Problem, FocusTarget, SubmissionForm } from './submission-f
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { keys } from '../utils/i18n';
 import {
   type FormValue,
   type FormValues,

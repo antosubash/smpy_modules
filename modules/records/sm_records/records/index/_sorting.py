@@ -29,25 +29,13 @@ drop it and the index serves the order directly.
 
 from __future__ import annotations
 
-from sm_records.records.index._sort_terms import SortTerm, fixed_term, indexed_term
-
 from collections.abc import Sequence
-from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import Select, and_, false, func, nulls_last, or_, select, tuple_
-from sqlalchemy.orm import aliased
+from sqlalchemy import Select, and_, false, nulls_last, or_, tuple_
 from sqlalchemy.sql import ColumnElement
 
-from sm_records.records.index._fields import IndexedField
-from sm_records.records.index._fixed import (
-    NOT_NULL_FIXED_COLUMNS,
-    SORT_INDEXED_FIXED_COLUMNS,
-    fixed_column,
-)
-from sm_records.records.index._predicates import SORT_ATTR
-from sm_records.models import TableSet
-from sm_records.schema.types import IndexKind
+from sm_records.records.index._sort_terms import SortTerm, fixed_term, indexed_term
 
 __all__ = [
     "SortTerm",

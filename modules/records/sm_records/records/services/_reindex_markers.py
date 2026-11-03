@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import logging
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from sm_records.core.tenancy._cross_tenant import read_all
-from sm_records.records.index.reindex import clear_pending, pending_map
 from sm_records.models import RecordType
+from sm_records.records.index.reindex import clear_pending, pending_map
 from sm_records.records.services._claims import lock_type
 from sm_records.records.services._common import reload
 from sm_records.records.services.errors import Conflict
-
 
 logger = logging.getLogger("sm_records.records.services.reindex_runner")
 

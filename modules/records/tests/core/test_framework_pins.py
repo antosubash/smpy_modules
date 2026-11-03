@@ -26,10 +26,10 @@ from types import SimpleNamespace
 import pytest
 from fastapi import FastAPI
 from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
-from sm_records.core.tenancy import _mode as tenancy
 from sm_records.core import constants
-from sm_records.web import menu
 from sm_records.core.tenancy import TenancyMode
+from sm_records.core.tenancy import _mode as tenancy
+from sm_records.web import menu
 
 pytestmark = pytest.mark.unbound_tenant
 

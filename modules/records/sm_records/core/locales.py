@@ -26,9 +26,9 @@ refused would be a puzzle rather than a policy. What comes back is always the
 
 from __future__ import annotations
 
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordType
 from sm_records.records.services.errors import ValidationFailed
-from sm_records.core.settings import RecordsSettings
 
 __all__ = ["default", "require", "resolve", "resolve_locale", "supported"]
 

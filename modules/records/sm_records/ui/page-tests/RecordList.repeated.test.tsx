@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { click, mount, setValue, settle } from './test-dom';
 import type { FieldDef, RecordListPage, RecordRead, TypeRead } from '../utils/types';
+import { click, mount, settle, setValue } from './test-dom';
 
 /**
  * A link carrying several `filter=` / `sort=` terms — the grammar repeats
@@ -22,7 +21,10 @@ vi.mock('@inertiajs/react', () => ({
   Link: ({ children, href }: { children?: unknown; href: string }) => (
     <a href={href}>{children as React.ReactNode}</a>
   ),
-  usePage: () => ({ url: pageUrl, props: { list_errors: {}, auth: { permissions: ['records.edit'] } } }),
+  usePage: () => ({
+    url: pageUrl,
+    props: { list_errors: {}, auth: { permissions: ['records.edit'] } },
+  }),
   router: { get, replace, reload: vi.fn(), visit: vi.fn() },
 }));
 vi.mock('../components/RecordIoMenu', () => ({ RecordIoMenu: () => null }));
@@ -102,7 +104,8 @@ afterEach(() => {
 
 describe('RecordList — a link with repeated filter/sort terms', () => {
   it('a column change keeps both filters, and "Empty trash" then sends both', async () => {
-    pageUrl = '/admin/records/book?trashed=true&filter=author:eq:A&filter=price:gte:5&columns=price';
+    pageUrl =
+      '/admin/records/book?trashed=true&filter=author:eq:A&filter=price:gte:5&columns=price';
     const view = await mount(<RecordList type={type} records={records()} />);
     const url = await toggleBlurb(view);
     expect(url.searchParams.getAll('filter')).toEqual(TERMS);
@@ -146,7 +149,8 @@ describe('RecordList — a link with repeated filter/sort terms', () => {
   });
 
   it('a cursor step carries every filter and sort term', async () => {
-    pageUrl = '/admin/records/book?after=CUR&filter=author:eq:A&filter=price:gte:5&sort=author&sort=-price';
+    pageUrl =
+      '/admin/records/book?after=CUR&filter=author:eq:A&filter=price:gte:5&sort=author&sort=-price';
     const cursor = records({ page: null, total_capped: true, next_cursor: 'N' });
     const view = await mount(<RecordList type={type} records={cursor} />);
     await click(view.button('Next page'));

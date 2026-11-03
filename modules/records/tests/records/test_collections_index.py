@@ -17,14 +17,14 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
+from sm_records.models import GLOBAL, IndexReduce, tables_for
 from sm_records.records.index.reduce import ReduceSpec, register_reduce_provider
 from sm_records.records.index.reduce_rebuild import recompute, verify_type
 from sm_records.records.index.reindex import reindex_type
-from sm_records.models import GLOBAL, IndexReduce, tables_for
-from sm_records.schema.types import IndexKind
 from sm_records.records.services import records as record_service
 from sm_records.records.services import reindex_runner
 from sm_records.records.services._titles import recompute_titles
+from sm_records.schema.types import IndexKind
 from sqlalchemy import func, select
 
 from tests.support.app_harness import ADMIN, roles, seed_type

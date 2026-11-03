@@ -28,9 +28,9 @@ from httpx import ASGITransport, AsyncClient
 from sm_records.models import Record, RecordRevision
 from sqlalchemy import func, select
 
+from tests.pg_support import make_sqlite_db_state
 from tests.support.app_harness import ADMIN, build_app, roles
 from tests.support.bulk_helpers import API, BULK, make_product, make_records
-from tests.pg_support import make_sqlite_db_state
 
 
 @pytest_asyncio.fixture

@@ -58,10 +58,10 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sm_records.records.index._sorting import SortTerm
-from sm_records.models import RecordStatus
-from sm_records.schema.types import IndexKind
 from sm_records.core.tenancy import bound_tenant
+from sm_records.models import RecordStatus
+from sm_records.records.index._sorting import SortTerm
+from sm_records.schema.types import IndexKind
 
 __all__ = ["CursorError", "decode_cursor", "encode_cursor", "sort_signature"]
 

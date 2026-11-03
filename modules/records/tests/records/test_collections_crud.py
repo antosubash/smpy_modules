@@ -13,18 +13,17 @@ the same wrong table as the write and agree with itself.
 
 from __future__ import annotations
 
-import pytest
-from sm_records.models import GLOBAL, RecordStatus, tables_for
-from sqlalchemy import func, select
+from sm_records.models import GLOBAL, tables_for
 
-from tests.support.app_harness import ADMIN, roles, seed_type
+from tests.support.app_harness import ADMIN, roles
+from tests.support.collections_crud_cases import API, _count
+from tests.support.collections_crud_cases import gig as gig
+from tests.support.collections_crud_cases import note as note
 
 # Imported for the declaration it makes at import time, not only for the name:
 # ``declare_collection`` has to run before any app is built (§6.1), and a
 # fixture would race the first test in the session.
 from tests.support.collections_harness import EVENTS
-
-from tests.support.collections_crud_cases import gig, _count, note, API
 
 
 async def test_a_create_writes_the_row_and_its_index_into_the_collections_tables(client, gig):

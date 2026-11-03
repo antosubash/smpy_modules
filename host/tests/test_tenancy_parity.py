@@ -15,8 +15,8 @@ from __future__ import annotations
 import news.core.tenancy
 import pagebuilder.core.tenancy
 import pytest
-import sm_records.core.tenancy._mode
 import sm_records.core.tenancy
+import sm_records.core.tenancy._mode
 from fastapi import Request
 from httpx import ASGITransport, AsyncClient
 from simple_module_hosting import Settings, create_app

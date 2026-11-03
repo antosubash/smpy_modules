@@ -11,9 +11,9 @@ records it leaves behind.
 from __future__ import annotations
 
 import pytest
-from sm_records.records.services import preview_jobs
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import DEFAULT_TENANT
+from sm_records.records.services import preview_jobs
 
 from tests.support.app_harness import ADMIN, roles
 from tests.support.app_harness import field as _field

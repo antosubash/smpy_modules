@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import re
 
-from tests.support.app_harness import ADMIN, roles
 from tests.perf._bench import (
     Results,
     capture,
@@ -19,6 +18,7 @@ from tests.perf._bench import (
     repeat,
 )
 from tests.perf.conftest import REPS
+from tests.support.app_harness import ADMIN, roles
 
 API = "/api/records/types"
 HEADERS = roles(ADMIN)

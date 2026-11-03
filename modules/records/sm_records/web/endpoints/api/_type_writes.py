@@ -1,20 +1,23 @@
 """web endpoints api _type_writes helpers."""
 
 from __future__ import annotations
+
 from functools import partial
 from typing import Any
+
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sm_records.core import events
+
 from sm_records.contracts.io import TypeImportRequest
 from sm_records.contracts.schemas import TypeCreate, TypeRead, TypeUpdate, type_read
-from sm_records.records.deferred import defer
-from sm_records.web.deps import check_type_roles
-from sm_records.web.menu import affects_menu, mark_dirty
+from sm_records.core import events
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordType
+from sm_records.records.deferred import defer
 from sm_records.records.services import _orphaned, reindex_runner
 from sm_records.records.services import types as type_service
-from sm_records.core.settings import RecordsSettings
+from sm_records.web.deps import check_type_roles
+from sm_records.web.menu import affects_menu, mark_dirty
 
 
 def _defer_reindex(request: Request, rtype: RecordType, settings: RecordsSettings) -> None:

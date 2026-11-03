@@ -61,8 +61,8 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         # (:mod:`sm_records.web.menu`) and the role editor's per-type permissions
         # (:mod:`sm_records.core.type_permissions`). The module instance is the one
         # thing that outlives both the registries and the requests.
-        from sm_records.web.menu import TypeMenuCache
         from sm_records.core.type_permissions import TypePermissions
+        from sm_records.web.menu import TypeMenuCache
 
         self.menu_cache = TypeMenuCache()
         self.type_permissions = TypePermissions()
@@ -208,9 +208,9 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         the body for the endpoint's model — which is the cost it exists to
         avoid. The framework offers nothing shared to hook into here.
         """
-        from sm_records.web._body_limit import BodyLimitMiddleware
         from sm_records.core._permission_sync import PermissionSyncMiddleware
         from sm_records.records.deferred import DeferredJobsMiddleware
+        from sm_records.web._body_limit import BodyLimitMiddleware
 
         app.add_middleware(DeferredJobsMiddleware)
         # Added before the two below so it ends up *outside* them
@@ -245,9 +245,9 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         import asyncio
         import contextlib
 
-        from sm_records.records import _pattern_worker
         from sm_records.public_submissions import retention_loop
         from sm_records.public_submissions.mail_runner import drain
+        from sm_records.records import _pattern_worker
 
         await retention_loop.stop(self)
 

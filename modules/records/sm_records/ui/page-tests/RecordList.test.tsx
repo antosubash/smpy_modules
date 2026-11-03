@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { act, click, mount } from './test-dom';
 import type { RecordPage, RecordRead, TypeRead } from '../utils/types';
+import { act, click, mount } from './test-dom';
 
 let getOptions: { onStart?: () => void; onFinish?: () => void } | undefined;
 const get = vi.fn((_url: string, _params: unknown, options: typeof getOptions) => {

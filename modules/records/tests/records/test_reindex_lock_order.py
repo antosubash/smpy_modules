@@ -20,18 +20,18 @@ import asyncio
 from typing import Any
 
 import pytest
-from sm_records.records.index.reduce import ReduceSpec, register_reduce_provider
 from sm_records.models import IndexReduce, RecordType, tables_for
-from sm_records.schema.types import IndexKind
+from sm_records.records.index.reduce import ReduceSpec, register_reduce_provider
 from sm_records.records.services import types as type_service
 from sm_records.records.services.errors import Conflict
 from sm_records.records.services.records import get_record, update_record
 from sm_records.records.services.reindex_runner import _rebuild, run_pending
+from sm_records.schema.types import IndexKind
 from sqlalchemy import select, text
 
+from tests.pg_support import USING_POSTGRES
 from tests.support.collections_harness import EVENTS  # noqa: F401 - declares the collections
 from tests.support.move_race_support import SETTINGS, move, seed
-from tests.pg_support import USING_POSTGRES
 
 on_postgres = pytest.mark.skipif(
     not USING_POSTGRES, reason="observing a blocked backend needs Postgres"

@@ -17,9 +17,9 @@ from __future__ import annotations
 
 import pytest
 import sqlalchemy as sa
-from sm_records.records.index._fixed import NOT_NULL_FIXED_COLUMNS, SORT_INDEXED_FIXED_COLUMNS
 from sm_records.models import table_sets
 from sm_records.models._record_args import DESCENDING_SORT_COLUMNS, descending_index_names
+from sm_records.records.index._fixed import NOT_NULL_FIXED_COLUMNS, SORT_INDEXED_FIXED_COLUMNS
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.schema import CreateIndex
 

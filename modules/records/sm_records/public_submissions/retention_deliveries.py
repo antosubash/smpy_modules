@@ -35,12 +35,12 @@ from typing import Any
 from sqlalchemy import and_, case, func, select, tuple_, union_all
 from sqlalchemy import delete as sa_delete
 
-from sm_records.core import events
 from sm_records.contracts.public_submissions import KIND_SUBSCRIPTION
+from sm_records.core import events
+from sm_records.core.tenancy import bound_tenant
 from sm_records.models import RecordType, SubmissionDelivery, table_sets
 from sm_records.public_submissions.attempts import COMPLETE, MARKERS
 from sm_records.public_submissions.retention_rules import PENDING
-from sm_records.core.tenancy import bound_tenant
 
 __all__ = ["prune_deliveries"]
 

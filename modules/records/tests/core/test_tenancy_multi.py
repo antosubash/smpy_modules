@@ -27,10 +27,9 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from simple_module_db.listeners import current_tenant_id
-from sm_records.core import boot
-from sm_records.core import constants
-from sm_records.models import RecordStatus
+from sm_records.core import boot, constants
 from sm_records.core.tenancy import tenant_scope
+from sm_records.models import RecordStatus
 
 from tests.support.app_harness import (
     ADMIN,

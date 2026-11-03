@@ -6,10 +6,10 @@ from __future__ import annotations
 import json
 
 import pytest
+from sm_records.core.tenancy import tenant_scope
 from sm_records.records.services import records as service
 from sm_records.records.services import types as type_service
 from sm_records.records.services.errors import ValidationFailed
-from sm_records.core.tenancy import tenant_scope
 
 from tests.support.app_harness import ADMIN, roles
 from tests.support.io_helpers import post_import

@@ -23,6 +23,7 @@ from sqlalchemy import or_
 from sqlalchemy.sql import ColumnElement
 
 from sm_records.core.constants import ORPHANED_KEY
+from sm_records.models import Record, RecordStatus
 from sm_records.records.index._coerce import coerce_bool, coerce_datetime, coerce_text
 from sm_records.records.index._predicates import (
     COMPARE,
@@ -33,7 +34,6 @@ from sm_records.records.index._predicates import (
     like_contains_pattern,
     starts_with_clause,
 )
-from sm_records.models import Record, RecordStatus
 
 __all__ = [
     "FIXED_COLUMNS",

@@ -1,11 +1,15 @@
 """index _sort_terms helpers."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any
+
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql import ColumnElement
+
+from sm_records.models import TableSet
 from sm_records.records.index._fields import IndexedField
 from sm_records.records.index._fixed import (
     NOT_NULL_FIXED_COLUMNS,
@@ -13,7 +17,6 @@ from sm_records.records.index._fixed import (
     fixed_column,
 )
 from sm_records.records.index._predicates import SORT_ATTR
-from sm_records.models import TableSet
 from sm_records.schema.types import IndexKind
 
 

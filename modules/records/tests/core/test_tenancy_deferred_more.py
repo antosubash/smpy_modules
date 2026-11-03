@@ -1,29 +1,31 @@
 """test_tenancy_deferred cases."""
 
 from __future__ import annotations
+
 from functools import partial
-from types import SimpleNamespace
 from typing import Any
+
 import pytest
 from simple_module_core.events import EventBus
 from simple_module_db.listeners import TenantIsolationError, current_tenant_id
-from sm_records.records import deferred
-from sm_records.core import events
 from sm_records.contracts.events import RecordCreated, RecordTypeDeleted
-from sm_records.web.endpoints.api.preview import read_preview_job
-from sm_records.web.endpoints.api.types import _schedule_reindex_if_pending
-from sm_records.models import IndexNumber, Record, RecordType
-from sm_records.records.services import preview_jobs, schema_change
-from sm_records.records.services import records as record_service
-from sm_records.records.services import types as type_service
+from sm_records.core import events
+from sm_records.core.tenancy import tenant_scope
+from sm_records.models import Record, RecordType
 from sm_records.records.services.errors import NotFound
 from sm_records.records.services.preview_runner import run_preview_job
 from sm_records.records.services.reindex_runner import pending_type_ids, run_pending
-from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import TenantUnbound, install_guard, tenant_scope
+from sm_records.web.endpoints.api.preview import read_preview_job
 from sqlalchemy import select
-from starlette.requests import Request
-from tests.support.tenancy_deferred_cases import guarded, _app, _serve, _product, _state, _call, _types, _job, SETTINGS
+
+from tests.support.tenancy_deferred_cases import (
+    SETTINGS,
+    _job,
+    _product,
+    _state,
+    _types,
+)
+from tests.support.tenancy_deferred_cases import guarded as guarded
 
 pytestmark = pytest.mark.unbound_tenant
 

@@ -56,12 +56,12 @@ from simple_module_hosting import render_error_page
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from sm_records.core import events
-from sm_records.web.deps import request_session
-from sm_records.web.endpoints.api._error_bodies import response_for
-from sm_records.web.endpoints.api._public_cache import error_headers
 from sm_records.records.index.query import QueryError
 from sm_records.records.services._common import SESSION_HAS_WRITES_KEY
 from sm_records.records.services.errors import RecordsError
+from sm_records.web.deps import request_session
+from sm_records.web.endpoints.api._error_bodies import response_for
+from sm_records.web.endpoints.api._public_cache import error_headers
 
 __all__ = ["PublicErrorRoute", "RecordsErrorRoute", "RecordsViewErrorRoute"]
 

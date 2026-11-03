@@ -12,8 +12,8 @@ string in both tenants), its referrers, its trash.
 from __future__ import annotations
 
 import pytest
-from sm_records.models import Record
 from sm_records.core.tenancy import tenant_scope
+from sm_records.models import Record
 from sqlalchemy import update
 
 from tests.support.isolation_support import (

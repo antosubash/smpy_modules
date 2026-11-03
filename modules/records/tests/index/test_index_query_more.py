@@ -1,22 +1,20 @@
 """test_index_query cases."""
 
 from __future__ import annotations
-from datetime import UTC, datetime
+
 import pytest
-from sm_records.core.constants import TEXT_INDEX_LEN
 from sm_records.records.index.query import (
-    FIXED_COLUMNS,
-    Filter,
-    FilterOp,
     QueryError,
     Sort,
     build_query,
     count_query,
 )
 from sm_records.records.index.writer import write_index
-from sm_records.models import RecordStatus
 from sqlalchemy import select
-from tests.support.index_query_cases import fields, world, found, flt
+
+from tests.support.index_query_cases import fields as fields
+from tests.support.index_query_cases import flt, found
+from tests.support.index_query_cases import world as world
 
 
 async def test_sort_by_multi_valued_field_returns_each_record_once(db, world):

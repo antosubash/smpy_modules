@@ -9,10 +9,9 @@ import pytest
 from pydantic import ValidationError
 from simple_module_core.public_routes import PublicRouteRegistry
 from simple_module_core.rate_limit import RateLimitRegistry
-from sm_records.core import boot
-from sm_records.core import constants
-from sm_records.module import RecordsModule
+from sm_records.core import boot, constants
 from sm_records.core.settings import RecordsSettings
+from sm_records.module import RecordsModule
 
 SUBMIT = "/api/records/submissions/contact/submit"
 DEFINITION = "/api/records/submissions/contact"

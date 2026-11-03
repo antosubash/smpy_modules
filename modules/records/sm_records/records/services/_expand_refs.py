@@ -1,6 +1,7 @@
 """records services _expand_refs helpers."""
 
 from __future__ import annotations
+
 from sm_records.core.constants import MAX_DISPLAY_TITLE_LEN
 from sm_records.models import Record, RecordType
 from sm_records.records.services._expand_plan import relation_defs

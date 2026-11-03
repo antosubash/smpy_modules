@@ -34,11 +34,11 @@ from typing import Any
 from sqlalchemy import Select, and_, desc, distinct, func, select
 from sqlalchemy.orm import aliased
 
+from sm_records.models import TableSet, tables_for
 from sm_records.records.index._fields import declared_keys, indexed_map
 from sm_records.records.index._filters import filtered, resolve
 from sm_records.records.index._fixed import FIXED_COLUMNS, fixed_expression
 from sm_records.records.index._predicates import SORT_ATTR, QueryError
-from sm_records.models import TableSet, tables_for
 from sm_records.schema.types import IndexKind
 
 __all__ = ["Metric", "aggregate_query", "parse_metric"]

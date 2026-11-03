@@ -21,6 +21,11 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.relations import ReferrersResponse, referrer_read
+from sm_records.core.settings import RecordsSettings
+from sm_records.models import RecordType
+from sm_records.records.services import _relations
+from sm_records.records.services import records as record_service
+from sm_records.records.services.errors import NotFound
 from sm_records.web.deps import (
     MAX_PAGE,
     caller_roles,
@@ -32,11 +37,6 @@ from sm_records.web.deps import (
 )
 from sm_records.web.endpoints.api._errors import RecordsErrorRoute
 from sm_records.web.endpoints.api._responses import LISTING, responses
-from sm_records.models import RecordType
-from sm_records.records.services import _relations
-from sm_records.records.services import records as record_service
-from sm_records.records.services.errors import NotFound
-from sm_records.core.settings import RecordsSettings
 
 router = APIRouter(
     prefix="/types/{key}",

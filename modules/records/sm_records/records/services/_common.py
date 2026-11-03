@@ -24,10 +24,10 @@ from sqlalchemy import func, select
 from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.records.index.providers import TypeIndex
-from sm_records.models import RecordType, tables_for
-from sm_records.records.services.errors import Conflict
 from sm_records.core.tenancy import bound_tenant
+from sm_records.models import RecordType, tables_for
+from sm_records.records.index.providers import TypeIndex
+from sm_records.records.services.errors import Conflict
 
 try:  # pragma: no cover - the constant is the framework's, the fallback is ours
     from simple_module_db.listeners import SESSION_HAS_WRITES_KEY

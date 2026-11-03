@@ -11,11 +11,11 @@ from types import SimpleNamespace
 
 from simple_module_core.health import HealthStatus
 from sm_records.core.health import stale_reindex_check
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import IndexText, RecordType
 from sm_records.records.services import reindex_runner as runner_mod
 from sm_records.records.services import types as type_service
 from sm_records.records.services.reindex_runner import run_pending
-from sm_records.core.settings import RecordsSettings
 from sqlalchemy import select
 
 from tests.support.app_harness import ADMIN, roles, seed_record, seed_type

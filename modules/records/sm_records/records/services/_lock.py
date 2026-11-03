@@ -21,9 +21,9 @@ from sqlalchemy import update as sa_update
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.core.tenancy import bound_tenant
 from sm_records.models import RecordType
 from sm_records.records.services.errors import Conflict
-from sm_records.core.tenancy import bound_tenant
 
 __all__ = ["lock_type", "lock_types"]
 

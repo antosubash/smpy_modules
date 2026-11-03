@@ -21,8 +21,8 @@ from sm_records.records.services.errors import Conflict
 from sm_records.records.services.records import create_record
 from sqlalchemy import text
 
-from tests.support.move_race_support import FIELDS, SETTINGS, count
 from tests.pg_support import USING_POSTGRES
+from tests.support.move_race_support import FIELDS, SETTINGS, count
 
 CHANGED = "schema of record type 'list' changed"
 

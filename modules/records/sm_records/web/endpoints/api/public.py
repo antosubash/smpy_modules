@@ -44,14 +44,17 @@ from typing import Any, TypeVar
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.core import constants
-from sm_records.core import locales
 from sm_records.contracts.public import (
     PublicRecordPage,
     PublicRecordRead,
     public_record_read,
     public_records_read,
 )
+from sm_records.core import constants, locales
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import bind_public
+from sm_records.records.index.query import CursorError, Filter, QueryError, Sort
+from sm_records.records.services import public as public_service
 from sm_records.web.deps import (
     MAX_PAGE,
     PageCursor,
@@ -64,11 +67,7 @@ from sm_records.web.deps import (
 from sm_records.web.endpoints.api import _public_cache
 from sm_records.web.endpoints.api._errors import PublicErrorRoute
 from sm_records.web.endpoints.api._responses import PUBLIC_READ, responses
-from sm_records.records.index.query import CursorError, Filter, QueryError, Sort
 from sm_records.web.media import public_file_url_template
-from sm_records.records.services import public as public_service
-from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import bind_public
 
 # ``bind_public`` first, for the reason ``endpoints.api``'s router gives. In
 # multi mode a request whose tenant the framework could not resolve is the

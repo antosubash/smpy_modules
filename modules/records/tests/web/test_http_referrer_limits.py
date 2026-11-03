@@ -13,7 +13,14 @@ import json
 
 from sqlalchemy import event
 
-from tests.support.app_harness import ADMIN, ROLE_EDITOR, ROLE_EDITOR_TWO, api_record, api_type, roles
+from tests.support.app_harness import (
+    ADMIN,
+    ROLE_EDITOR,
+    ROLE_EDITOR_TWO,
+    api_record,
+    api_type,
+    roles,
+)
 from tests.support.relation_helpers import rel_field, text_field
 
 _API = "/api/records/types"

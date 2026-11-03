@@ -1,10 +1,12 @@
 """Shared record test builders."""
 
 from __future__ import annotations
+
 from decimal import Decimal
-from sm_records.records.index.reduce import ReduceSpec, register_reduce_provider
-from sm_records.records.index.reduce_rebuild import recompute, verify_type
+
 from sm_records.models import IndexReduce, RecordStatus
+from sm_records.records.index.reduce import ReduceSpec
+from sm_records.records.index.reduce_rebuild import recompute
 from sm_records.records.services import records as record_service
 from sqlalchemy import select
 

@@ -40,14 +40,14 @@ from typing import Any, NamedTuple
 from sqlalchemy import and_, distinct, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.core.tenancy import bound_tenant
 from sm_records.models import RecordType, tables_for
+from sm_records.records.services import _claims
+from sm_records.records.services._payload import field_defs
 from sm_records.schema.changes import DRY_RUN_SAMPLE, FailingRecord, SchemaDiff
 from sm_records.schema.compile import from_stored
 from sm_records.schema.fields import FieldDefinition
 from sm_records.schema.types import INDEX_KIND
-from sm_records.records.services import _claims
-from sm_records.records.services._payload import field_defs
-from sm_records.core.tenancy import bound_tenant
 
 __all__ = ["Collector", "DuplicateReport", "conflicts_for", "newly_unique", "scan"]
 

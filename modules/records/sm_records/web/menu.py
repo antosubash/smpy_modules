@@ -42,10 +42,10 @@ from simple_module_hosting.permissions import ensure_resolved_permissions
 from sqlalchemy import select
 
 from sm_records.core import constants
-from sm_records.models import RecordType
-from sm_records.records.services._access import caller_access, request_role_map, role_blocked
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import resolve_public, tenant_scope
+from sm_records.models import RecordType
+from sm_records.records.services._access import caller_access, request_role_map, role_blocked
 
 if TYPE_CHECKING:  # pragma: no cover - imports for typing only
     from fastapi import FastAPI

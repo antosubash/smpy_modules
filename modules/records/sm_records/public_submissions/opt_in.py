@@ -34,8 +34,9 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.core import events
 from sm_records.contracts.public_submissions import KIND_SUBSCRIPTION
+from sm_records.core import events
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType
 from sm_records.public_submissions import links
 from sm_records.public_submissions.errors import SubmissionRefused
@@ -46,7 +47,6 @@ from sm_records.records.services._common import utcnow
 from sm_records.records.services._payload import field_defs
 from sm_records.records.services.errors import NotFound
 from sm_records.records.services.types import get_type
-from sm_records.core.settings import RecordsSettings
 
 __all__ = ["confirm", "leave", "unsubscribe"]
 

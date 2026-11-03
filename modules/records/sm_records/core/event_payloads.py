@@ -1,8 +1,10 @@
 """core event_payloads helpers."""
 
 from __future__ import annotations
+
 from collections.abc import Iterable, Sequence
 from typing import Any
+
 from sm_records.contracts.events import (
     RecordCreated,
     RecordPurged,
@@ -12,10 +14,10 @@ from sm_records.contracts.events import (
     RecordTypeDeleted,
     RecordUpdated,
 )
+from sm_records.core.tenancy import bound_tenant
 from sm_records.schema.diff import diff_fields
 from sm_records.schema.fields import validate_fields
 from sm_records.schema.types import ChangeClass
-from sm_records.core.tenancy import bound_tenant
 
 
 def _tenant(rtype: Any) -> str:

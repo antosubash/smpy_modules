@@ -45,9 +45,7 @@ listening. That is what makes one event per record of a bulk path affordable.
 
 from __future__ import annotations
 
-from sm_records.core.event_payloads import _tenant, created, updated, trashed, restored, purged, _purged, type_changed, type_deleted
-
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager, nullcontext
 from functools import partial
 from typing import Any, Final
@@ -56,20 +54,17 @@ from simple_module_db import finalize_session
 from simple_module_db.callbacks import discard_on_commit_callbacks, register_on_commit
 from simple_module_db.listeners import current_tenant_id
 
-from sm_records.contracts.events import (
-    RecordCreated,
-    RecordPurged,
-    RecordRestored,
-    RecordTrashed,
-    RecordTypeChanged,
-    RecordTypeDeleted,
-    RecordUpdated,
+from sm_records.core.event_payloads import (
+    created,
+    purged,
+    restored,
+    trashed,
+    type_changed,
+    type_deleted,
+    updated,
 )
-from sm_records.schema.diff import diff_fields
-from sm_records.schema.fields import validate_fields
-from sm_records.schema.types import ChangeClass
+from sm_records.core.tenancy import tenant_scope
 from sm_records.records.services._common import mark_written
-from sm_records.core.tenancy import bound_tenant, tenant_scope
 
 __all__ = [
     "attach",

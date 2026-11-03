@@ -29,14 +29,14 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
-from sm_records.models import Base, Record, RecordType
 from sm_records.core.settings import RecordsSettings
+from sm_records.models import Base, Record, RecordType
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from tests.support.app_harness import build_app
 from tests.perf._bench import Results
 from tests.perf._schema import create_missing_columns, create_missing_indexes
+from tests.support.app_harness import build_app
 
 DATABASE_URL = os.environ.get("RECORDS_PERF_URL", "")
 """Run the suite against this database instead of a SQLite file.
