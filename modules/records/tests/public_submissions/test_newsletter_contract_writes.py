@@ -1,0 +1,189 @@
+"""The newsletter contract's writes: ``unsubscribe``, ``set_tags`` and
+``can_read_list`` (newsletter PR 1, Task 2; spec amendments 6-9).
+
+A write is the caller's transaction: nothing is visible, and no event is
+published, until the caller finishes the session (records' ``events.commit``,
+which is ``finalize_session``).
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
+import pytest
+from simple_module_db.listeners import TenantIsolationError
+from sm_records.contracts.newsletter import (
+    SubscriberNotFound,
+    can_read_list,
+    iter_subscribers,
+    set_tags,
+    subscribers_by_uuid,
+    unsubscribe,
+)
+from sm_records.core import events
+from sm_records.core.settings import RecordsSettings
+from sm_records.records.services.errors import ValidationFailed
+
+from tests.support.app_harness import ADMIN, roles
+from tests.support.newsletter_contract import (
+    TENANT,
+    join,
+    session,
+    subscription_events,
+    transitions,
+    unbound,
+)
+from tests.support.newsletter_http import LIST, follow, signup
+from tests.support.public_submissions_support import create, update
+
+SETTINGS = RecordsSettings()
+
+
+async def _uuid(client, email: str) -> str:
+    async with session(client) as db:
+        for status in ("confirmed", "unsubscribed"):
+            hits, _ = await iter_subscribers(db, tenant_id=TENANT, type_key=LIST, status=status)
+            for hit in hits:
+                if hit.email == email:
+                    return hit.uuid
+    raise AssertionError(f"no subscriber {email}")
+
+
+async def _hit(client, uuid: str, tenant: str = TENANT):
+    async with session(client) as db:
+        found = await subscribers_by_uuid(db, tenant_id=tenant, type_key=LIST, uuids=[uuid])
+    return found.get(uuid)
+
+
+async def _unsubscribe(client, uuid: str, *, tenant: str = TENANT, cutoff=None) -> bool:
+    async with session(client) as db:
+        wrote = await unsubscribe(
+            db,
+            tenant_id=tenant,
+            type_key=LIST,
+            uuid=uuid,
+            unless_confirmed_after=cutoff,
+            settings=SETTINGS,
+            bus=client.app.state.sm.event_bus,
+        )
+        await events.commit(db)
+    return wrote
+
+
+async def _set_tags(client, uuid: str, **kw):
+    async with session(client) as db:
+        hit = await set_tags(
+            db, tenant_id=TENANT, type_key=LIST, uuid=uuid, settings=SETTINGS, **kw
+        )
+        await events.commit(db)
+    return hit
+
+
+async def test_unsubscribe_suppresses_and_emits_once(audience):
+    uuid = await _uuid(audience, "ada@example.org")
+    seen = subscription_events(audience)
+    assert await _unsubscribe(audience, uuid) is True
+    assert (await _hit(audience, uuid)).status == "unsubscribed"
+    assert list(transitions(seen)) == [("confirmed", "unsubscribed")]
+    assert await _unsubscribe(audience, uuid) is False
+    assert len(seen) == 1, "the second call wrote nothing and announced nothing"
+
+
+async def test_resignup_after_cutoff_is_kept(audience):
+    tokens = await join(audience, "dee@example.org", ["a"], confirm=True)
+    cutoff = datetime.now(UTC)
+    assert (await follow(audience, "unsubscribe", tokens["unsubscribe"])).status_code == 200
+    await join(audience, "dee@example.org", ["a"], confirm=True)
+    uuid = await _uuid(audience, "dee@example.org")
+    assert await _unsubscribe(audience, uuid, cutoff=cutoff) is False
+    assert (await _hit(audience, uuid)).status == "confirmed"
+
+
+async def test_an_old_link_while_pending_again_does_nothing(audience):
+    tokens = await join(audience, "eve@example.org", ["a"], confirm=True)
+    uuid = await _uuid(audience, "eve@example.org")
+    assert (await follow(audience, "unsubscribe", tokens["unsubscribe"])).status_code == 200
+    assert (await signup(audience, "eve@example.org")).status_code == 202
+    assert (await _hit(audience, uuid)).status == "pending"
+    seen = subscription_events(audience)
+    assert await _unsubscribe(audience, uuid, cutoff=datetime.now(UTC)) is False
+    assert await _unsubscribe(audience, uuid) is False, "pending is a no-op even unconditionally"
+    assert (await _hit(audience, uuid)).status == "pending" and seen == []
+
+
+async def test_unsubscribe_unknown_and_trashed_are_false(audience):
+    assert await _unsubscribe(audience, "f" * 32) is False
+    uuid = await _uuid(audience, "ada@example.org")
+    gone = await audience.delete(f"/api/records/types/{LIST}/records/{uuid}", headers=roles(ADMIN))
+    assert gone.status_code < 300, gone.text
+    assert await _unsubscribe(audience, uuid) is False
+    assert (await _hit(audience, uuid)).status == "confirmed"
+
+
+async def test_unsubscribe_wrong_tenant_is_false(audience):
+    uuid = await _uuid(audience, "ada@example.org")
+    with unbound():
+        assert await _unsubscribe(audience, uuid, tenant="other") is False
+    assert (await _hit(audience, uuid)).status == "confirmed"
+
+
+async def test_writes_naming_another_bound_tenant_are_refused(audience):
+    uuid = await _uuid(audience, "ada@example.org")
+    with pytest.raises(TenantIsolationError):
+        await _unsubscribe(audience, uuid, tenant="other")
+    async with session(audience) as db:
+        with pytest.raises(TenantIsolationError):
+            await set_tags(
+                db, tenant_id="other", type_key=LIST, uuid=uuid, add=["b"], settings=SETTINGS
+            )
+        with pytest.raises(TenantIsolationError):
+            await can_read_list(db, tenant_id="other", type_key=LIST, roles=None)
+
+
+async def test_unsubscribe_refuses_a_naive_cutoff(audience):
+    uuid = await _uuid(audience, "ada@example.org")
+    with pytest.raises(ValueError):
+        await _unsubscribe(audience, uuid, cutoff=datetime(2026, 1, 1))
+
+
+async def test_set_tags_adds_and_removes(audience):
+    uuid = await _uuid(audience, "ada@example.org")
+    assert (await _set_tags(audience, uuid, add=["b", "a"], remove=[])).tags == ["a", "b"]
+    assert (await _hit(audience, uuid)).tags == ["a", "b"]
+    assert (await _set_tags(audience, uuid, remove=["a"])).tags == ["b"]
+    hit = await _hit(audience, uuid)
+    assert hit.tags == ["b"] and hit.status == "confirmed", "system values carried over"
+
+
+async def test_set_tags_unknown_choice_refused(audience):
+    uuid = await _uuid(audience, "ada@example.org")
+    async with session(audience) as db:
+        with pytest.raises(ValidationFailed):
+            await set_tags(
+                db, tenant_id=TENANT, type_key=LIST, uuid=uuid, add=["zzz"], settings=SETTINGS
+            )
+        await events.commit(db)  # whatever the refusal left in the session
+    assert (await _hit(audience, uuid)).tags == ["a"]
+
+
+async def test_set_tags_missing_raises(audience):
+    with pytest.raises(SubscriberNotFound):
+        await _set_tags(audience, "f" * 32, add=["a"])
+    with pytest.raises(ValueError):
+        await _set_tags(audience, await _uuid(audience, "ada@example.org"), add="a")
+
+
+async def test_can_read_list(audience):
+    assert (await create(audience, "contact")).status_code == 201
+    narrowed = await update(audience, LIST, allowed_roles=["editor"])
+    assert narrowed.status_code == 200, narrowed.text
+    async with session(audience) as db:
+
+        async def ok(key: str, roles) -> bool:
+            return await can_read_list(db, tenant_id=TENANT, type_key=key, roles=roles)
+
+        assert await ok(LIST, ["viewer"]) is False
+        assert await ok(LIST, ["editor"]) is True
+        assert await ok(LIST, None) is True
+        assert await ok("contact", None) is False, "not a list"
+        assert await ok("nosuch", None) is False

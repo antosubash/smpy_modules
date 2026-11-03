@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-import pytest_asyncio
 from sm_records.contracts.newsletter import (
     MAX_SUBSCRIBER_BATCH,
     SubscriberFilterError,
@@ -11,47 +10,11 @@ from sm_records.contracts.newsletter import (
     iter_subscribers,
     subscribers_by_uuid,
 )
-from sm_records.core import boot
 
-from tests.support.app_harness import ADMIN, field, roles
-from tests.support.newsletter_http import (
-    LIST,
-    follow,
-    links_in,
-    list_config,
-    list_fields,
-    records_of,
-    signup,
-)
+from tests.support.app_harness import ADMIN, roles
+from tests.support.newsletter_contract import TENANT, unbound
+from tests.support.newsletter_http import LIST, records_of
 from tests.support.public_submissions_support import create
-
-TENANT = "default"
-TAGS = field(
-    "tags",
-    "multiselect",
-    choices=[{"value": "a", "label": "A"}, {"value": "b", "label": "B"}],
-)
-
-
-async def _join(client, address: str, tags: list[str], *, confirm: bool) -> None:
-    sent = len(client.outbox.sent)
-    assert (await signup(client, address, data={"tags": tags})).status_code == 202
-    if confirm:
-        tokens = links_in(client.outbox.sent[sent])
-        assert (await follow(client, "confirm", tokens["confirm"]["t"])).status_code == 200
-
-
-@pytest_asyncio.fixture
-async def audience(site):
-    """``news``: ada (confirmed, tag a), bob (confirmed, tag b), cy (pending)."""
-    boot.mount_submission_views(site.app)
-    config = list_config(public_fields=["first_name", "tags"])
-    resp = await create(site, LIST, fields=[*list_fields(), TAGS], config=config)
-    assert resp.status_code == 201, resp.text
-    await _join(site, "ada@example.org", ["a"], confirm=True)
-    await _join(site, "bob@example.org", ["b"], confirm=True)
-    await _join(site, "cy@example.org", ["a", "b"], confirm=False)
-    return site
 
 
 async def _iter(client, **kw):
@@ -113,16 +76,19 @@ async def test_bad_filter_raises_reason(audience):
 
 
 async def test_wrong_tenant_sees_nothing(audience):
-    async with audience.db_state.session_factory() as db:
-        assert await iter_subscribers(db, tenant_id="other", type_key=LIST) == ([], None)
-        assert await count_subscribers(db, tenant_id="other", type_key=LIST) == 0
-        with pytest.raises(ValueError):
-            await iter_subscribers(db, tenant_id="bad tenant!", type_key=LIST)
-        with pytest.raises(ValueError):
-            await count_subscribers(db, tenant_id="bad tenant!", type_key=LIST)
-        with pytest.raises(ValueError):
-            await subscribers_by_uuid(db, tenant_id="bad tenant!", type_key=LIST, uuids=["x"])
-        assert await subscribers_by_uuid(db, tenant_id="other", type_key=LIST, uuids=["x"]) == {}
+    # Nothing bound upstream: only the tenant the call names is read.
+    with unbound():
+        async with audience.db_state.session_factory() as db:
+            assert await iter_subscribers(db, tenant_id="other", type_key=LIST) == ([], None)
+            assert await count_subscribers(db, tenant_id="other", type_key=LIST) == 0
+            with pytest.raises(ValueError):
+                await iter_subscribers(db, tenant_id="bad tenant!", type_key=LIST)
+            with pytest.raises(ValueError):
+                await count_subscribers(db, tenant_id="bad tenant!", type_key=LIST)
+            with pytest.raises(ValueError):
+                await subscribers_by_uuid(db, tenant_id="bad tenant!", type_key=LIST, uuids=["x"])
+            found = await subscribers_by_uuid(db, tenant_id="other", type_key=LIST, uuids=["x"])
+            assert found == {}
 
 
 async def test_by_uuid_any_status(audience):

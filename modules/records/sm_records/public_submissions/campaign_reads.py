@@ -11,7 +11,8 @@ none, so an unpinned read would list every tenant's subscribers.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Final
+from datetime import UTC, datetime
+from typing import Any, Final
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,15 +25,18 @@ from sm_records.records.index._predicates import QueryError
 from sm_records.records.index.query import Filter, FilterOp, build_query, count_query
 
 __all__ = [
-    "CONFIRMED_ONLY",
+    "WALKABLE",
     "SubscriberFilterError",
     "count",
     "list_type",
     "lookup",
+    "moment",
     "page",
 ]
 
-CONFIRMED_ONLY: Final = Filter("sm_status", FilterOp.EQ, "confirmed")
+WALKABLE: Final = ("confirmed", "unsubscribed")
+"""The statuses a walk may ask for: who is mailed, and who left (the
+newsletter's reconcile). ``pending`` is nobody's audience."""
 
 
 class SubscriberFilterError(ValueError):
@@ -61,7 +65,22 @@ async def list_type(db: AsyncSession, tenant_id: str, type_key: str) -> RecordTy
     return rtype
 
 
-def _filters(raw: Sequence[str]) -> list[Filter]:
+def moment(value: Any) -> datetime | None:
+    """A stored ``sm_*_at`` value as an aware datetime, ``None`` if it is none.
+
+    The payload is JSON, so it is normally an ISO string; a naive one is UTC,
+    which is what records writes (``utcnow``)."""
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+    if not isinstance(value, datetime):
+        return None
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
+def _filters(raw: Sequence[str], status: str) -> list[Filter]:
     settings = RecordsSettings()
     if isinstance(raw, str) or len(raw) > settings.max_filter_terms:
         raise SubscriberFilterError("malformed", "too many filter terms")
@@ -69,7 +88,7 @@ def _filters(raw: Sequence[str]) -> list[Filter]:
         parsed = [parse_term(term, settings) for term in raw]
     except FilterTermError as exc:
         raise SubscriberFilterError("malformed", str(exc)) from exc
-    return [CONFIRMED_ONLY, *parsed]
+    return [Filter("sm_status", FilterOp.EQ, status), *parsed]
 
 
 def _live(stmt, record, tenant_id: str):
@@ -84,12 +103,13 @@ async def page(
     filters: Sequence[str],
     after: int,
     limit: int,
+    status: str,
 ) -> tuple[list[Record], int | None]:
-    """Confirmed, untrashed records matching every term, ``Record.id`` order.
+    """Untrashed records in ``status`` matching every term, ``Record.id`` order.
 
     One row more than ``limit`` is read to know whether anything follows, so
     ``next_after`` is ``None`` exactly when the walk is over."""
-    terms = _filters(filters)
+    terms = _filters(filters, status)
     record = tables_for(rtype).record
     try:
         stmt = build_query(rtype, list(rtype.fields or []), terms)
@@ -103,8 +123,10 @@ async def page(
     return rows, rows[-1].id
 
 
-async def count(db: AsyncSession, rtype: RecordType, tenant_id: str, filters: Sequence[str]) -> int:
-    terms = _filters(filters)
+async def count(
+    db: AsyncSession, rtype: RecordType, tenant_id: str, filters: Sequence[str], status: str
+) -> int:
+    terms = _filters(filters, status)
     record = tables_for(rtype).record
     try:
         stmt = count_query(rtype, list(rtype.fields or []), terms)
