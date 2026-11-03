@@ -1,4 +1,4 @@
-"""The skeleton's registrations: permissions and the locale directory."""
+"""The skeleton's registrations: permissions, the locale directory, startup."""
 
 from __future__ import annotations
 
@@ -30,3 +30,26 @@ def test_locale_dir_is_the_namespace():
     assert "newsletter" in dirs
     names = {p.name for p in dirs["newsletter"].iterdir()}
     assert {"en.json", "de.json"} <= names
+
+
+async def test_on_startup_configures_tenancy_and_installs_the_guard(monkeypatch):
+    from types import SimpleNamespace
+
+    from sm_newsletter.core import tenancy
+
+    calls: list[tuple[str, object]] = []
+    monkeypatch.setattr(tenancy, "configure", lambda app: calls.append(("configure", app)))
+    monkeypatch.setattr(tenancy, "install_guard", lambda cls: calls.append(("guard", cls)))
+    session_class = object()
+    app = SimpleNamespace(
+        state=SimpleNamespace(
+            sm=SimpleNamespace(db=SimpleNamespace(sync_session_class=session_class))
+        )
+    )
+    await NewsletterModule().on_startup(app)
+    assert calls == [("configure", app), ("guard", session_class)]
+
+    calls.clear()
+    bare = SimpleNamespace(state=SimpleNamespace())
+    await NewsletterModule().on_startup(bare)
+    assert calls == [("configure", bare)]

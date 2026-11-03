@@ -8,6 +8,7 @@ import weakref
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
+from simple_module_core.events import EventBus
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
 
@@ -82,6 +83,27 @@ class NewsletterModule(ModuleBase):
         # The framework's CSRF check on every write; reads pass. No view routes
         # until PR 3.
         api_router.include_router(api, dependencies=[Depends(RequiresCsrf())])
+
+    def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
+        """Mirror records' ``SubscriptionChanged`` into the suppression store.
+
+        Nothing without ``app``: the outbox worker builds modules with none,
+        and the mirror writes through the web app's session factory."""
+        if app is None:
+            return
+        from sm_newsletter.core.suppression import mirror
+
+        mirror.subscribe(bus, app)
+
+    async def on_startup(self, app: FastAPI) -> None:
+        """The tenancy mode, read off the built middleware stack, and the
+        fail-closed guard on the framework's session class - as images does."""
+        from sm_newsletter.core import tenancy
+
+        tenancy.configure(app)
+        db = getattr(getattr(app.state, "sm", None), "db", None)
+        if (session_class := getattr(db, "sync_session_class", None)) is not None:
+            tenancy.install_guard(session_class)
 
     def register_permissions(self, registry: PermissionRegistry) -> None:
         registry.add_group(
