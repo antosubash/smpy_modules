@@ -24,7 +24,7 @@ transaction and never commit; the caller finishes it with
 ``simple_module_db.finalize_session`` (or records' ``events.commit``), and only
 then are ``SubscriptionChanged``/``RecordUpdated`` published, to ``bus`` when
 one is given. With ``bus=None`` nothing is published: a caller in a web process
-must pass ``app.state.sm.event_bus``. :func:`can_read_list` is records' own per-type narrowing.
+must pass ``app.state.sm.event_bus``.
 """
 
 from __future__ import annotations
@@ -123,7 +123,7 @@ def _text(value: Any) -> str | None:
 def _hit(rtype: RecordType, record: Record) -> SubscriberHit:
     declared = {f.get("key") for f in rtype.fields or []}
     data = record.data or {}
-    tags = data.get("tags") if "tags" in declared else None
+    tags = data.get(campaign_writes.TAGS) if campaign_writes.TAGS in declared else None
     return SubscriberHit(
         uuid=record.uuid,
         email=str(data.get("sm_email") or ""),

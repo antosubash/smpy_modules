@@ -103,10 +103,6 @@ def _filters(raw: Sequence[str], status: str) -> list[Filter]:
     return [Filter("sm_status", FilterOp.EQ, status), *parsed]
 
 
-def _in_tenant(stmt, record, tenant_id: str):
-    return stmt.where(record.tenant_id == tenant_id)
-
-
 def _query(rtype: RecordType, tenant_id: str, filters: Sequence[str], status: str, builder):
     """``builder``'s statement (``build_query``/``count_query``) for the terms,
     pinned to the tenant (the framework's soft-delete filter keeps the trash
@@ -117,7 +113,7 @@ def _query(rtype: RecordType, tenant_id: str, filters: Sequence[str], status: st
         stmt = builder(rtype, list(rtype.fields or []), terms)
     except QueryError as exc:
         raise SubscriberFilterError(exc.reason, str(exc)) from exc
-    return _in_tenant(stmt, record, tenant_id), record
+    return stmt.where(record.tenant_id == tenant_id), record
 
 
 async def page(
