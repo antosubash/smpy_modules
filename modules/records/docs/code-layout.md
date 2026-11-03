@@ -9,7 +9,7 @@ Find a file by its responsibility:
 | `web/` | API/view endpoints, request dependencies, CSRF, body limit, document language, menus and media-backend discovery |
 | `records/` | Collections, record services, schema-change jobs, deferred jobs, index/query/rebuild, demo seeding, CLI implementation and isolated pattern workers |
 | `schema/` | Field definitions, payload model compilation and schema diffs |
-| `public_submissions/` | Website submissions, consent, newsletter links, mail templates, delivery claims and retention |
+| `public_submissions/` | Website submissions, consent, newsletter links, mail templates, delivery claims and retention; `campaign_reads` and `campaign_writes` back the newsletter contract (`contracts/newsletter.py`) |
 | `ui/` | Components, hooks, utilities and page tests |
 
 `module.py`, `models/`, `contracts/`, `pages/`, `locales/` and

@@ -53,11 +53,13 @@ from news.core.tenancy._mode import (  # noqa: F401 - tests read the private nam
     stray_pins,
     upstream_tenant,
 )
+from news.core.tenancy._scope import TenantIsolationError, tenant_scope
 
 __all__ = [
     "DEFAULT_TENANT",
     "TENANT_REQUIRED",
     "TenancyMode",
+    "TenantIsolationError",
     "bind_admin",
     "bind_public",
     "bind_public_viewer",
@@ -68,6 +70,7 @@ __all__ = [
     "resolve_admin",
     "resolve_public",
     "search_tenant",
+    "tenant_scope",
     "tenant_vary",
     "vary_on_tenant",
 ]
