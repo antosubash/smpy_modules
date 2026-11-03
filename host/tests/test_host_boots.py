@@ -125,7 +125,11 @@ def test_no_module_subscribes_to_record_events(booted_host):
     """The evidence behind GH #157's "leave publishing inline" call.
 
     Record events publish at commit, inside the request, so whatever subscribes
-    adds its time to every record write's response. Today nothing does, and a
+    adds its time to every record write's response. Today only ``SubscriptionChanged`` has a
+    listener: the newsletter suppression mirror, which hears subscriber status
+    transitions (signup, confirm, unsubscribe), not every record write. It does
+    one indexed read and one upsert in its own session after records' commit
+    and swallows its own failures, which is the "cheap" this asks for. A
     publish with no listener returns before gathering anything. When this
     fails, a module started listening: check that its handler is cheap, or
     hands its work off, before updating the expectation.
@@ -149,7 +153,7 @@ def test_no_module_subscribes_to_record_events(booted_host):
                 if bus._emitter.listeners(bus._event_key(getattr(events, name)))
             }
 
-    assert asyncio.run(listening_inside_lifespan()) == set()
+    assert asyncio.run(listening_inside_lifespan()) == {"SubscriptionChanged"}
 
 
 def test_images_object_intents_work_in_the_real_app(booted_host):
