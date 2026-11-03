@@ -37,7 +37,7 @@ describe('media values', () => {
     expect(mediaValueKind(PHOTO.id)).toBe('id');
     expect(mediaValueKind(PHOTO.id.replaceAll('-', ''))).toBe('id');
     expect(mediaValueKind(PHOTO.id.toUpperCase())).toBe('id');
-    expect(mediaValueKind('  ' + PHOTO.id + '  ')).toBe('id');
+    expect(mediaValueKind(`  ${PHOTO.id}  `)).toBe('id');
     expect(mediaValueKind('https://cdn.example.com/a.png')).toBe('url');
     expect(mediaValueKind('/static/x.png')).toBe('path');
     expect(mediaValueKind('media/products/sku-000001.jpg')).toBe('text');

@@ -4,12 +4,9 @@
 /** MediaObjectWidget types, helpers and render — split from media-object-widget.tsx,
  *  which keeps the field definitions, so both stay under the 300-line cap. */
 
-import type { CSSProperties } from 'react';
 import { cn } from '../../utils/widgetUtils';
-import { AccentText } from './_internal/accent-text';
-import { LinkArrow } from './_internal/link-arrow';
-import { RichTextBlock, renderRichText } from './_internal/rich-text';
-import { CTAButton, eyebrowTextStyle, maskStyle, SIZES_HALF, srcsetAttrs } from './_shared';
+import { renderRichText } from './_internal/rich-text';
+import { eyebrowTextStyle, maskStyle, SIZES_HALF, srcsetAttrs } from './_shared';
 
 import { GRID_IMAGE, GRID_TEXT, type MediaObjectWidgetProps } from './media-object-layout';
 import { MediaObjectText } from './media-object-text';
@@ -75,8 +72,6 @@ export const MediaObjectWidgetRender = ({
         layout,
       } as MediaObjectWidgetProps)}
       isDark={isDark}
-      grid={grid}
-      textMax={textMax}
     />
   );
 

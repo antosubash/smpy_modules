@@ -74,7 +74,7 @@ export function RelatedRender({
 
   // Nothing until the first response, and nothing when the archive has nothing
   // else to offer — a heading over an empty list reads as broken.
-  if (items === null || items.length === 0) return <></>;
+  if (items === null || items.length === 0) return null;
 
   return (
     <section className="my-10 border-t pt-5">

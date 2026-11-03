@@ -2,19 +2,15 @@
  *  bullets, footnote and link. Split out so the render file stays under
  *  the 300-line cap. */
 
-import type { CSSProperties } from 'react';
-
 import { cn } from '../../utils/widgetUtils';
 import { AccentText } from './_internal/accent-text';
 import { LinkArrow } from './_internal/link-arrow';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
-import { CTAButton, eyebrowTextStyle, maskStyle } from './_shared';
-import { GRID_TEXT, headingStyle, type MediaObjectWidgetProps } from './media-object-layout';
+import { CTAButton, eyebrowTextStyle } from './_shared';
+import { headingStyle, type MediaObjectWidgetProps } from './media-object-layout';
 
 type TextBlockProps = MediaObjectWidgetProps & {
   isDark: boolean;
-  grid: boolean;
-  textMax: string;
 };
 
 export function MediaObjectText({
@@ -35,8 +31,6 @@ export function MediaObjectText({
   headingWidth = 'auto',
   layout = 'half',
   isDark,
-  grid,
-  textMax,
 }: TextBlockProps) {
   return (
     <>
