@@ -34,7 +34,8 @@ __all__ = ["MAX_ARTICLE_SEARCH_LIMIT", "ArticleCard", "get_article_card", "searc
 MAX_ARTICLE_SEARCH_LIMIT = 50
 """The most cards one search returns."""
 
-_MAX_ID = 2**63 - 1
+# `news_article.id` is a 32-bit INTEGER, so a larger id would overflow asyncpg, not miss.
+_MAX_ID = 2**31 - 1
 
 
 def _checked_limit(limit: object) -> int:
@@ -112,7 +113,7 @@ async def get_article_card(
 ) -> ArticleCard | None:
     """The card for one article, or ``None`` for an unknown, draft, trashed or
     other-tenant id."""
-    # `bool` is an `int`; and an id past BIGINT would overflow the driver, not miss.
+    # `bool` is an `int`; and an id past INTEGER would overflow the driver, not miss.
     if not isinstance(article_id, int) or isinstance(article_id, bool):
         raise ValueError(f"article_id must be an int, got {type(article_id).__name__}")
     with tenant_scope(tenant_id):

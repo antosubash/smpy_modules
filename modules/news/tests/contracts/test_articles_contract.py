@@ -62,6 +62,11 @@ async def test_card_none_for_draft_and_unknown(db, seeded):
     assert card is not None and card.title == "Spring update"
 
 
+@pytest.mark.parametrize("article_id", [2**31 - 1, 2**31, 2**63])
+async def test_card_none_at_and_past_the_id_column_range(db, seeded, article_id):
+    assert await get_article_card(db, tenant_id="default", article_id=article_id) is None
+
+
 async def test_limit_accepted_at_the_cap(db, seeded):
     hits = await search_articles(
         db, tenant_id="default", pattern="%Spring%", limit=MAX_ARTICLE_SEARCH_LIMIT
