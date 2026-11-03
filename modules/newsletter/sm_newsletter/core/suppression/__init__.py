@@ -23,9 +23,10 @@ confirmation. They return what they *inserted*. ``refresh=False`` is a pure
 insert-ignore, for the reconcile: idempotent counts, and it never makes a row
 look newer than it is.
 
-**Cutoff on clear.** :func:`clear_for_confirmation` takes the confirmation's
-(aware) time and deletes that list's ``unsubscribed`` row and the
-``hard_bounce`` / ``imported_cleaned`` rows only where ``created_at <=
+**Cutoff on clear.** :func:`clear_for_confirmation` - called only for a
+double-opt-in confirmation (records' confirm link, see ``mirror``) - takes the
+confirmation's (aware) time and deletes that list's ``unsubscribed`` row and
+the ``hard_bounce`` / ``imported_cleaned`` rows only where ``created_at <=
 confirmed_at``: a bounce recorded after the confirmation survives a delayed
 confirm handler. A complaint is never cleared, nor another list's opt-out.
 

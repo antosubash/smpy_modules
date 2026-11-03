@@ -38,9 +38,12 @@ A suppression says "never mail this address". Suppressions are **tenant-wide**:
   list.
 - `hard_bounce`, `complaint` and `imported_cleaned` rows are **address-wide**.
 - The address is stored as `email_hash = sha256(email.strip().lower())`, unkeyed.
-- A confirmation on list L clears L's `unsubscribed` row and any `hard_bounce` or
+- A double-opt-in confirmation on list L (the subscriber following records'
+  confirm link) clears L's `unsubscribed` row and any `hard_bounce` or
   `imported_cleaned` row created at or before the confirmation. It never clears
-  a `complaint`, and never another list's opt-out.
+  a `complaint`, and never another list's opt-out. Nothing else clears a
+  suppression: a signup on a single-opt-in list is confirmed at once but proves
+  nothing about the mailbox (anyone can type the address), so it clears nothing.
 - An hourly reconcile re-adds the opt-outs records holds, trashed subscribers
   included. It only adds; it never removes a suppression. It is the Celery task
   `newsletter.reconcile_suppressions` on the `newsletter` queue (`make worker`

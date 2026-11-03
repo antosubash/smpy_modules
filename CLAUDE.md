@@ -125,10 +125,11 @@ trashes with `soft_delete_record` and then calls `hard_delete_record`.
 **Newsletter mirrors records' unsubscribes into `newsletter_suppression`.** The
 `SubscriptionChanged` handler writes them, and an hourly reconcile walks records'
 unsubscribed subscribers, trash included, and only adds rows. Suppressions are
-tenant-wide: an opt-out on any list suppresses every list in the tenant. A
-confirmation clears that list's opt-out and the bounce/import rows created at or
-before it, never `complaint`. A confirmation clears only that list's opt-out
-row; opt-outs from other lists stay.
+tenant-wide: an opt-out on any list suppresses every list in the tenant. Only a
+double-opt-in confirmation (records' confirm link, the one `pending → confirmed`
+event) clears anything: that list's opt-out and the bounce/import rows created at
+or before it, never `complaint`, never another list's opt-out. A single-opt-in
+signup (`None → confirmed`, anyone can type the address) clears nothing.
 
 **Never add a file under `modules/*/*/pages/` unless it is a real Inertia
 page.** The page name is derived from that path by `import.meta.glob`, so a

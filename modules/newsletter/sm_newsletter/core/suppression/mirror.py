@@ -15,11 +15,23 @@ nothing:
 
 * ``unsubscribed`` (trashed or not: a trashed opt-out is still an opt-out) -
   the list's ``unsubscribed`` row, refreshed on repeat, ``"suppressed"``.
-* ``confirmed`` and not trashed, with a ``confirmed_at`` - the clear a
-  confirmation lifts, cut off at that time so a bounce recorded after it
-  survives a delayed handler; ``"cleared"`` whenever the clear ran, even if it
-  deleted nothing. Without a ``confirmed_at`` nothing is cleared.
-* anything else (pending, unknown uuid, not a list) - ``"ignored"``.
+* ``pending -> confirmed`` - a double-opt-in confirmation (records' confirm
+  link) - and not trashed, with a ``confirmed_at``: the clear a confirmation
+  lifts, cut off at that time so a bounce recorded after it survives a delayed
+  handler; ``"cleared"`` whenever the clear ran, even if it deleted nothing.
+  Without a ``confirmed_at`` nothing is cleared.
+* anything else (pending, unknown uuid, not a list, and every other way to
+  ``confirmed``) - ``"ignored"``.
+
+**Only the confirm link clears.** It is the one change that proves the address
+reached its owner: the link is mailed to it, and records' ``opt_in.confirm`` is
+the only ``pending -> confirmed`` transition it announces. A new address on a
+single-opt-in list is ``None -> confirmed`` at once - anyone can type a
+victim's address into the form, so it must not erase that address's bounces or
+opt-outs. Records sends a known address back to ``pending``, never straight to
+``confirmed``, and its admin screens and imports cannot write ``sm_status``. A
+future records path that confirms without the link must not announce
+``pending -> confirmed``, or must carry a signal this handler can tell apart.
 """
 
 from __future__ import annotations
@@ -86,7 +98,7 @@ async def _act(session: AsyncSession, event: SubscriptionChanged, hit: Any) -> O
             list_type_key=event.type_key,
         )
         return "suppressed"
-    if hit.status == "confirmed" and not hit.trashed and hit.confirmed_at is not None:
+    if _link_confirmation(event) and not hit.trashed and hit.confirmed_at is not None:
         await clear_for_confirmation(
             session,
             tenant_id=event.tenant_id,
@@ -96,6 +108,11 @@ async def _act(session: AsyncSession, event: SubscriptionChanged, hit: Any) -> O
         )
         return "cleared"
     return "ignored"
+
+
+def _link_confirmation(event: SubscriptionChanged) -> bool:
+    """Whether the event is records' confirm link: ``pending -> confirmed``."""
+    return event.status_before == "pending" and event.status_after == "confirmed"
 
 
 def subscribe(bus: EventBus, app: Any) -> None:
