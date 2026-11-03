@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import pytest
+from simple_module_core.diagnostics._tenancy import check_tenant_unique_keys, module_tables
 from sm_newsletter import models
 from sm_newsletter.core.tenancy import TenantUnbound, all_tenants, install_guard
 from sm_newsletter.core.tenancy._guard import owned
 from sm_newsletter.models import Base, Campaign, Send, Suppression
+from sm_newsletter.module import NewsletterModule
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -79,6 +81,13 @@ def test_only_the_lock_is_global():
     for name, table in Base.metadata.tables.items():
         assert name.startswith("newsletter_")
         assert ("tenant_id" in table.c) is (name != LOCK_TABLE), name
+
+
+def test_sm024_reports_nothing():
+    """Every unique key on a tenant-scoped table leads with ``tenant_id``, so
+    the framework's boot diagnostic has nothing to warn about."""
+    tables = module_tables(NewsletterModule())
+    assert check_tenant_unique_keys(tables, "Newsletter") == []
 
 
 def test_every_table_but_the_lock_is_guarded():

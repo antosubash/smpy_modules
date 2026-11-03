@@ -18,7 +18,9 @@ class Send(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     __tablename__ = "newsletter_send"
     __table_args__ = (
         # The no-duplicate guarantee: a subscriber gets a campaign at most once.
-        UniqueConstraint("campaign_id", "record_uuid", name="uq_newsletter_send_campaign_record"),
+        UniqueConstraint(
+            "tenant_id", "campaign_id", "record_uuid", name="uq_newsletter_send_campaign_record"
+        ),
         Index("ix_newsletter_send_campaign_status", "campaign_id", "status", "id"),
     )
 

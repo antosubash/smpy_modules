@@ -15,7 +15,9 @@ from sm_newsletter.models._cols import big_pk, dt_col, fk
 class Link(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     __tablename__ = "newsletter_link"
     __table_args__ = (
-        UniqueConstraint("campaign_id", "position", name="uq_newsletter_link_position"),
+        UniqueConstraint(
+            "tenant_id", "campaign_id", "position", name="uq_newsletter_link_position"
+        ),
     )
 
     id: int | None = Field(default=None, primary_key=True)

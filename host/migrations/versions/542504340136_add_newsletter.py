@@ -2,7 +2,7 @@
 
 Creates the newsletter module's eight tables and their indexes:
 ``newsletter_campaign``, ``newsletter_segment``, ``newsletter_send`` (one row per
-recipient per campaign, unique on ``(campaign_id, record_uuid)``),
+recipient per campaign, unique on ``(tenant_id, campaign_id, record_uuid)``),
 ``newsletter_send_attempt`` (one row per SMTP attempt), ``newsletter_link``,
 ``newsletter_click``, ``newsletter_suppression`` (unique on
 ``(tenant_id, email_hash, reason, list_type_key)``, looked up tenant-wide) and
@@ -163,7 +163,9 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_newsletter_link")),
-        sa.UniqueConstraint("campaign_id", "position", name="uq_newsletter_link_position"),
+        sa.UniqueConstraint(
+            "tenant_id", "campaign_id", "position", name="uq_newsletter_link_position"
+        ),
     )
     op.create_index(
         op.f("ix_newsletter_link_campaign_id"), "newsletter_link", ["campaign_id"], unique=False
@@ -200,7 +202,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_newsletter_send")),
         sa.UniqueConstraint(
-            "campaign_id", "record_uuid", name="uq_newsletter_send_campaign_record"
+            "tenant_id", "campaign_id", "record_uuid", name="uq_newsletter_send_campaign_record"
         ),
     )
     op.create_index(
