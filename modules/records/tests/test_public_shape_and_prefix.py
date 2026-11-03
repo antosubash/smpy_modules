@@ -131,6 +131,7 @@ async def test_the_public_get_and_head_are_distinct_operations(records_app):
         if "/public/" in path
         for operation in item.values()
     ]
-    assert len(ids) == 4
-    assert len(set(ids)) == 4
+    # The listing, the stats count (#88) and the record, each under GET and HEAD.
+    assert len(ids) == 6
+    assert len(set(ids)) == 6
     assert not [w for w in caught if "Duplicate Operation ID" in str(w.message)]

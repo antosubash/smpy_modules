@@ -158,6 +158,17 @@ class TestPublicRoutes:
         for route in registry.routes:
             assert route.methods <= {"GET", "HEAD"}
 
+    def test_stats_prefix_is_public_for_get_and_head(self):
+        # A HEAD is a different method to the registry, and the other prefixes
+        # are registered for GET alone, so the stats count (which a prober may
+        # HEAD) has to name both — and the older prefixes must stay GET-only.
+        registry = PublicRouteRegistry()
+        NewsModule().register_public_routes(registry)
+        methods = {route.pattern: route.methods for route in registry.routes}
+        assert methods[constants.PUBLIC_STATS_PREFIX] == {"GET", "HEAD"}
+        for prefix in constants.PUBLIC_READ_PREFIXES:
+            assert methods[prefix] == {"GET"}
+
     def test_the_public_prefix_does_not_swallow_the_admin_console(self):
         """The reason the console lives at /admin/news rather than /news.
 

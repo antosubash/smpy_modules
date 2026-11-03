@@ -543,6 +543,24 @@
     "view_all_label": "View-all link label",
     "view_all_href": "View-all link URL"
   },
+  "stats": {
+    "label": "Live article count",
+    "title": "Heading",
+    "subtitle": "Subheading",
+    "surface": "Surface",
+    "surface_default": "Default",
+    "surface_lime": "Lime",
+    "surface_cards": "Cards",
+    "items": "Numbers (up to 6)",
+    "item_label": "Label",
+    "item_prefix": "Prefix (e.g. ~)",
+    "item_suffix": "Suffix (e.g. +)",
+    "item_icon": "Icon (optional)",
+    "item_category": "Category (blank = all)",
+    "item_language": "Languages counted",
+    "item_language_page": "This page's language",
+    "item_language_all": "All languages"
+  },
   "errors": {
     "request_failed": "Request failed ({status} {statusText})",
     "request_failed_snippet": "{message}: {snippet}",
