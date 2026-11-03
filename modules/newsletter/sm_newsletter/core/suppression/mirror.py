@@ -3,8 +3,9 @@
 Records publishes the event after its commit, in the tenant it describes
 (``sm_records.core.events``), through the in-process bus, which awaits every
 handler and logs - never propagates - a failure. This handler is a fast path
-only: the reconcile re-reads records' opt-outs anyway, so a lost or failed
-event costs latency, not correctness. That is why the handler never raises.
+only: the hourly reconcile re-reads records' opt-outs anyway, so a lost or
+failed opt-out costs latency, not correctness; a lost confirmation leaves the
+address suppressed (fail-safe). That is why the handler never raises.
 
 **The event is a hint, records is the truth.** It carries identifiers only;
 :func:`apply` reads the subscriber back (``subscribers_by_uuid``, any status,
@@ -44,6 +45,14 @@ logger = logging.getLogger(__name__)
 Outcome = Literal["suppressed", "cleared", "ignored"]
 
 SOURCE = "records_event"
+
+# What a failed mirror costs, per ``status_after``: the reconcile only re-adds
+# opt-outs, so a lost confirmation's clear stays undone (fail-safe: the address
+# remains suppressed).
+_AFTER_FAILURE = {
+    "unsubscribed": "the hourly reconcile picks it up",
+    "confirmed": "the address stays suppressed: the reconcile never clears",
+}
 
 
 async def apply(event: SubscriptionChanged, session_factory: Callable[[], AsyncSession]) -> Outcome:
@@ -98,12 +107,12 @@ def subscribe(bus: EventBus, app: Any) -> None:
             await apply(event, app.state.sm.db.session_factory)
         except Exception:
             logger.warning(
-                "newsletter: could not mirror %s -> %s for list %r in tenant %s; "
-                "the reconcile picks it up",
+                "newsletter: could not mirror %s -> %s for list %r in tenant %s; %s",
                 event.status_before,
                 event.status_after,
                 event.type_key,
                 event.tenant_id,
+                _AFTER_FAILURE.get(event.status_after, "nothing else retries it"),
                 exc_info=True,
             )
 

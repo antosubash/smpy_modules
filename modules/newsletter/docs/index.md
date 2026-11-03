@@ -12,9 +12,9 @@ source repository, and the delivery order is
 | PR | Delivers | State |
 | --- | --- | --- |
 | 1 | records `contracts.newsletter`, news `contracts.articles` | merged |
-| 2 | this package: scaffold, tenancy, settings, models, suppressions | in progress |
+| 2 | this package: scaffold, tenancy, settings, models, suppressions, hourly reconcile | in progress |
 | 3 | campaigns, content blocks, renderer, test send | planned |
-| 4 | sending, throttling, retries, unsubscribe page, hourly reconcile | planned |
+| 4 | sending, throttling, retries, unsubscribe page | planned |
 | 5 | open and click tracking, reports | planned |
 | 6 | segments and the subscriber screen | planned |
 | 7 | Mailchimp import, docs, e2e | planned |
@@ -39,7 +39,9 @@ A suppression says "never mail this address". Suppressions are **tenant-wide**:
 - A confirmation on list L clears L's `unsubscribed` row and any `hard_bounce` or
   `imported_cleaned` row created at or before the confirmation. It never clears
   a `complaint`, and never another list's opt-out.
-- An hourly reconcile re-adds the opt-outs records holds. It only adds; it never
-  removes a suppression.
+- An hourly reconcile re-adds the opt-outs records holds, trashed subscribers
+  included. It only adds; it never removes a suppression. It is the Celery task
+  `newsletter.reconcile_suppressions` on the `newsletter` queue (`make worker`
+  serves it; beat schedules it).
 
 Suppression wins over every other rule at send time.
