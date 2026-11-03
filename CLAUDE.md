@@ -177,7 +177,8 @@ hydration happens at lifespan start, so a value read earlier is the pydantic
 default no matter what the database says. Mark such fields
 `json_schema_extra=_RESTART` so the Settings screen says a restart is needed.
 Newsletter's `smtp_password` is stored `enc:v1:` under `SM_SECRET_KEY` and written only
-through `PUT /api/newsletter/settings/smtp-password` (`scripts/set_setting.py`
+through `PUT /api/newsletter/settings/smtp-password` (needs `newsletter.manage` and
+`settings.edit`; `scripts/set_setting.py`
 would store it in plaintext, accepted with a warning; use the endpoint); the generic Settings screen
 refuses newsletter writes (`manage_url`).
 These settings are SYSTEM-scope: ai has one provider configuration and one

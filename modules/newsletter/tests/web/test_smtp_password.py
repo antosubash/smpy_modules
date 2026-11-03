@@ -44,7 +44,7 @@ class _Auth(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-MANAGE = {"x-perms": constants.PERM_MANAGE}
+MANAGE = {"x-perms": f"{constants.PERM_MANAGE},{constants.PERM_SETTINGS_EDIT}"}
 
 
 async def _build(*, session: bool = False, multi: bool = False):
@@ -122,6 +122,30 @@ async def test_put_requires_manage(client, built):
     res = await client.put(URL, json={"password": "s3cret"}, headers={"x-perms": "newsletter.view"})
     assert res.status_code == 403
     assert await _stored(state) is None
+
+
+async def test_manage_without_settings_edit_is_403(client, built):
+    _, state = built
+    res = await client.put(
+        URL, json={"password": "s3cret"}, headers={"x-perms": constants.PERM_MANAGE}
+    )
+    assert res.status_code == 403
+    assert await _stored(state) is None
+
+
+async def test_settings_edit_without_manage_is_403(client, built):
+    _, state = built
+    res = await client.put(
+        URL, json={"password": "s3cret"}, headers={"x-perms": constants.PERM_SETTINGS_EDIT}
+    )
+    assert res.status_code == 403
+    assert await _stored(state) is None
+
+
+def test_settings_edit_constant_matches_the_framework():
+    from settings.constants import PERM_EDIT
+
+    assert constants.PERM_SETTINGS_EDIT == PERM_EDIT
 
 
 @pytest.mark.parametrize(

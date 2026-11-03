@@ -19,7 +19,12 @@ MAX_PASSWORD_LEN = 1024
 # commit (opened by the handler) has to happen while the tenant is still bound.
 router = APIRouter(
     prefix="/settings",
-    dependencies=[Depends(bind_admin), Depends(RequiresPermission(constants.PERM_MANAGE))],
+    dependencies=[
+        Depends(bind_admin),
+        Depends(RequiresPermission(constants.PERM_MANAGE)),
+        # As strict as the generic Settings write this endpoint replaces.
+        Depends(RequiresPermission(constants.PERM_SETTINGS_EDIT)),
+    ],
 )
 
 

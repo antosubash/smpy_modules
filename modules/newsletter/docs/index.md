@@ -23,7 +23,8 @@ source repository, and the delivery order is
 
 DB-backed through the framework's settings module; no environment variables.
 `smtp_password` is stored encrypted and written only through
-`PUT /api/newsletter/settings/smtp-password` (`scripts/set_setting.py` would
+`PUT /api/newsletter/settings/smtp-password` (needs `newsletter.manage`
+and `settings.edit`; `scripts/set_setting.py` would
 store it in plaintext, accepted with a warning; use the endpoint). The
 generic Settings screen refuses newsletter writes: a dedicated settings page
 arrives in PR 3.

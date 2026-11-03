@@ -42,7 +42,8 @@ Settings are DB-backed (the framework's settings module), never environment
 variables. Configure them on the Settings screen or with
 `scripts/set_setting.py`. The SMTP password is the exception: it is stored
 encrypted under the host's secret key and written only through
-`PUT /api/newsletter/settings/smtp-password` (`scripts/set_setting.py` would
+`PUT /api/newsletter/settings/smtp-password` (needs `newsletter.manage`
+and `settings.edit`; `scripts/set_setting.py` would
 store it in plaintext, accepted with a warning; use the endpoint). The generic Settings screen
 refuses newsletter writes; a dedicated settings page arrives in a later PR.
 
@@ -53,7 +54,7 @@ refuses newsletter writes; a dedicated settings page arrives in a later PR.
 | `newsletter.view` | See campaigns, reports and suppressions |
 | `newsletter.edit` | Create and edit campaigns |
 | `newsletter.send` | Start, pause, resume and cancel a send |
-| `newsletter.manage` | Settings and the SMTP password |
+| `newsletter.manage` | Settings; the SMTP password too, together with `settings.edit` |
 
 Every entry point binds a tenant: a single-tenant host uses `default`, a
 multi-tenant host the organisation the framework resolved (403

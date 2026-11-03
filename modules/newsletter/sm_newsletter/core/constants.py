@@ -18,6 +18,10 @@ PERM_VIEW = "newsletter.view"
 PERM_EDIT = "newsletter.edit"
 PERM_SEND = "newsletter.send"
 PERM_MANAGE = "newsletter.manage"
+# The framework settings module's system-scope write permission
+# (`settings.constants.PERM_EDIT`; a test keeps the two equal). Writing the SMTP
+# password needs it as well as PERM_MANAGE.
+PERM_SETTINGS_EDIT = "settings.edit"
 PERMISSIONS = (PERM_VIEW, PERM_EDIT, PERM_SEND, PERM_MANAGE)
 
 _MODULE_SETTINGS = "Settings"
