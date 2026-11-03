@@ -9,8 +9,9 @@ An invalid ``tenant_id`` raises ``ValueError`` before any SQL runs. A strict
 session with nothing bound (``MissingTenantError``) answers "nothing found".
 
 Only *published, not trashed* articles are ever found or carded: a draft never
-reaches a newsletter. ``path`` is site-relative and locale-prefixed; the caller
-prefixes the public base URL.
+reaches a newsletter. ``path`` is site-relative and locale-prefixed except for the
+default language, and ``image_url`` may be site-relative too; the caller makes
+both absolute (prefixing the public base URL) before they go into an email.
 
 ``pattern`` is a SQL ``LIKE`` pattern with ``\\`` as the escape character; the
 caller owns escaping, as in ``pagebuilder.contracts.search``.
@@ -52,9 +53,11 @@ class ArticleCard(BaseModel):
     title: str
     excerpt: str
     image_url: str
-    """The cover image, or ``""`` when there is none."""
+    """The cover image, or ``""`` when there is none. May be site-relative; the
+    caller makes it absolute for email."""
     path: str
-    """Site-relative and locale-prefixed; the caller prefixes ``public_base_url``."""
+    """Site-relative, locale-prefixed except for the default language; the caller
+    prefixes ``public_base_url``."""
     locale: str
     published_at: datetime | None
 
@@ -82,7 +85,7 @@ async def search_articles(
 ) -> list[ArticleCard]:
     """Published articles in ``tenant_id`` whose title matches ``pattern``.
 
-    Newest ``published_at`` first. Every language unless ``locale`` names one.
+    Newest ``published_at`` first, undated last. Every language unless ``locale`` names one.
     ``limit`` must be 1..:data:`MAX_ARTICLE_SEARCH_LIMIT`.
     """
     limit = _checked_limit(limit)
@@ -93,7 +96,9 @@ async def search_articles(
         )
         if locale:
             stmt = stmt.where(NewsArticle.locale == locale)
-        stmt = stmt.order_by(NewsArticle.published_at.desc(), NewsArticle.id.desc()).limit(limit)
+        stmt = stmt.order_by(
+            NewsArticle.published_at.desc().nullslast(), NewsArticle.id.desc()
+        ).limit(limit)
         try:
             rows = (await session.execute(stmt)).all()
         except MissingTenantError:

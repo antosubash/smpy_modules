@@ -117,7 +117,9 @@ async def set_tags(
     for attempt in range(2):
         stored = (record.data or {}).get(TAGS)
         tags = _merged(stored, add, remove)
-        if isinstance(stored, list) and tags == stored:
+        # No stored tags is the empty list: removing a tag from such a
+        # subscriber changes nothing and must not write.
+        if tags == (stored if isinstance(stored, list) else [] if stored is None else None):
             return rtype, record  # nothing to change: no version bump, no event
         try:
             written = await record_service.update_record(

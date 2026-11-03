@@ -23,7 +23,8 @@ non-negative ``int`` the same way.
 transaction and never commit; the caller finishes it with
 ``simple_module_db.finalize_session`` (or records' ``events.commit``), and only
 then are ``SubscriptionChanged``/``RecordUpdated`` published, to ``bus`` when
-one is given. :func:`can_read_list` is records' own per-type narrowing.
+one is given. With ``bus=None`` nothing is published: a caller in a web process
+must pass ``app.state.sm.event_bus``. :func:`can_read_list` is records' own per-type narrowing.
 """
 
 from __future__ import annotations

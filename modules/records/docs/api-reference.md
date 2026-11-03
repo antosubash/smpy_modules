@@ -1692,8 +1692,9 @@ reads as empty (`[]`, `0`, `{}`) and as `False` for `unsubscribe` and
 **Writes run in the caller's transaction and never commit.** The caller
 finishes the session with `simple_module_db.finalize_session` (records'
 `events.commit`); `SubscriptionChanged` and `RecordUpdated` are published only
-after that, to `bus` when one is given (`events.attach`). A rolled-back
-session publishes nothing.
+after that, to `bus` when one is given (`events.attach`). With `bus=None`
+**nothing is published**: a caller in a web process must pass
+`app.state.sm.event_bus`. A rolled-back session publishes nothing.
 
 - **`unsubscribe`** is the subscriber's own link: it writes the same
   suppression record (see *Unsubscribe* above), for a live subscriber who is

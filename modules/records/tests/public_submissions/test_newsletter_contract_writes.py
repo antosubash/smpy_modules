@@ -232,3 +232,23 @@ async def test_writes_on_a_form_type_raise_not_a_list(audience):
                 db, tenant_id=TENANT, type_key="contact", uuid="x", add=["a"], settings=SETTINGS
             )
         assert err.value.reason == "not_a_list"
+
+
+async def test_set_tags_removing_from_a_subscriber_without_tags_writes_nothing(audience):
+    await join(audience, "eve@example.org", [], confirm=True)
+    uuid = await _uuid(audience, "eve@example.org")
+    async with session(audience) as db:  # a row whose data has no `tags` key at all
+        row = (await db.execute(select(Record).where(Record.uuid == uuid))).scalars().one()
+        row.data = {k: v for k, v in row.data.items() if k != "tags"}
+        await events.commit(db)
+    before = await _version(audience, uuid)
+    seen = []
+
+    async def note(event):
+        seen.append(event)
+
+    audience.app.state.sm.event_bus.subscribe(RecordUpdated, note)
+    hit = await _set_tags(audience, uuid, remove=["x"])
+    assert hit.tags == []
+    assert await _version(audience, uuid) == before
+    assert not seen

@@ -82,3 +82,13 @@ async def test_other_tenant_while_default_bound_raises(db, seeded):
 def test_tenant_scope_reenter_is_noop():
     with tenant_scope("default") as t:
         assert t == "default"
+
+
+async def test_search_orders_undated_last(db):
+    await make_article(db, slug="undated-1", title="Spring one")
+    await make_article(db, slug="undated-2", title="Spring two")
+    dated = await make_article(
+        db, slug="dated", title="Spring dated", published_at=datetime(2026, 4, 1, tzinfo=UTC)
+    )
+    hits = await search_articles(db, tenant_id="default", pattern="%Spring%", limit=1)
+    assert [h.id for h in hits] == [dated.id]
