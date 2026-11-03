@@ -113,7 +113,7 @@ export const CalloutBlock: ComponentConfig<CalloutProps> = {
 
 function CalloutRender({ tone, title, text }: CalloutProps) {
   const { t } = useT();
-  if (!text.trim()) return <></>;
+  if (!text.trim()) return null;
   // A document written before a tone was added, or with one edited by hand,
   // still has to render as something.
   const style = TONES[tone] ?? TONES.note;

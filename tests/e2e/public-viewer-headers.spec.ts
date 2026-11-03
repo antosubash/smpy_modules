@@ -32,7 +32,7 @@ test.describe('Public viewer headers', () => {
 
     // Signed in: the page carries this user, so it is kept nowhere (#94).
     expect(headers['cache-control']).toBe('private, no-store');
-    expect(headers['etag']).toBeUndefined();
+    expect(headers.etag).toBeUndefined();
 
     // Anonymous: shared-cacheable, keyed on what picks the language and the session.
     const anon = await browser.newContext();
@@ -81,13 +81,13 @@ test.describe('Public viewer headers', () => {
     const url = new URL(`/p/${slug}`, page.url()).toString();
     const first = await anon.request.get(url);
     expect(first.status()).toBe(200);
-    const etag = first.headers()['etag'];
+    const etag = first.headers().etag;
     expect(etag).toBeTruthy();
 
     const second = await anon.request.get(url, { headers: { 'if-none-match': etag } });
     expect(second.status()).toBe(304);
     // ETag must round-trip on the 304 so caches can keep their entry.
-    expect(second.headers()['etag']).toBe(etag);
+    expect(second.headers().etag).toBe(etag);
     await anon.close();
 
     // Cleanup.
@@ -119,7 +119,7 @@ test.describe('Public viewer headers', () => {
     expect(get.status()).toBe(200);
     expect(head.status()).toBe(200);
     expect((await head.body()).length).toBe(0);
-    expect(head.headers()['etag']).toBe(get.headers()['etag']);
+    expect(head.headers().etag).toBe(get.headers().etag);
     expect(head.headers()['cache-control']).toBe(get.headers()['cache-control']);
 
     expect((await request.head(`/p/${slug}-missing`, { maxRedirects: 0 })).status()).toBe(404);

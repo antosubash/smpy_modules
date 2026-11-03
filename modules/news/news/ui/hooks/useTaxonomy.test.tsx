@@ -16,20 +16,22 @@ function json(body: unknown, status = 200) {
   });
 }
 
+let api: Api;
+
+/** Renders the hook and exposes what it returns as `api`. */
+function Harness() {
+  api = useTaxonomy();
+  return null;
+}
+
 /** #174: how a refused tag rename or delete reaches the screen. The server's
  *  `detail` is what the banner shows, a refused rename resolves `false` so the
  *  inline editor stays open, and a refused delete rejects so the confirmation
  *  stays open — for a clash (409), a tag someone else removed (404) and a
  *  missing permission (403) alike. */
 describe('useTaxonomy — tag rename and delete failures', () => {
-  let api: Api;
   let calls: { url: string; method: string }[];
   let write: () => Response;
-
-  function Harness() {
-    api = useTaxonomy();
-    return null;
-  }
 
   beforeEach(() => {
     calls = [];

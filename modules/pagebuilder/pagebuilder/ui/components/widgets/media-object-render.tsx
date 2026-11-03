@@ -74,8 +74,6 @@ export const MediaObjectWidgetRender = ({
         layout,
       } as MediaObjectWidgetProps)}
       isDark={isDark}
-      grid={grid}
-      textMax={textMax}
     />
   );
 
