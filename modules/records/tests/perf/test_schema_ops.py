@@ -15,12 +15,12 @@ import tracemalloc
 
 import pytest
 from sm_records.schema.diff import diff_fields
-from sm_records.services import _orphaned, schema_change
-from sm_records.services._dry_run import dry_run
-from sm_records.services._payload import field_defs
-from sm_records.services._schema import normalise
-from sm_records.services.reindex_runner import run_pending
-from sm_records.services.revisions import list_type_revisions
+from sm_records.records.services import _orphaned, schema_change
+from sm_records.records.services._dry_run import dry_run
+from sm_records.records.services._payload import field_defs
+from sm_records.records.services._schema import normalise
+from sm_records.records.services.reindex_runner import run_pending
+from sm_records.records.services.revisions import list_type_revisions
 
 from tests.perf._bench import Results, Timing, capture, repeat
 from tests.perf.conftest import REPS, load_type
@@ -75,7 +75,7 @@ async def test_dry_run_restrictive(perf_db_copy):
 
 
 def _settings():
-    from sm_records.settings import RecordsSettings
+    from sm_records.core.settings import RecordsSettings
 
     return RecordsSettings()
 

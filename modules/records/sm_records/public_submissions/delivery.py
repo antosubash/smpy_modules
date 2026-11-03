@@ -54,12 +54,12 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import events
+from sm_records.core import events
 from sm_records.models import Record, RecordType, SubmissionDelivery
-from sm_records.services._common import utcnow
-from sm_records.services.errors import NotFound
-from sm_records.services.records import get_record
-from sm_records.services.types import get_type
+from sm_records.records.services._common import utcnow
+from sm_records.records.services.errors import NotFound
+from sm_records.records.services.records import get_record
+from sm_records.records.services.types import get_type
 
 __all__ = [
     "LEASE",

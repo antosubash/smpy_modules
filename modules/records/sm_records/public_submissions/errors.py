@@ -2,17 +2,17 @@
 
 One exception rather than one per status: a form branches on ``code``, a
 stable snake_case word, and the status follows from it. It is a
-:class:`~sm_records.services.errors.RecordsError`, so the route class rolls
+:class:`~sm_records.records.services.errors.RecordsError`, so the route class rolls
 the request's session back like any other refusal, and the endpoint layer
 renders ``extra`` and ``headers`` beside ``detail`` and ``code``
-(:mod:`sm_records.endpoints.api.public_submissions_public`).
+(:mod:`sm_records.web.endpoints.api.public_submissions_public`).
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from sm_records.services.errors import RecordsError
+from sm_records.records.services.errors import RecordsError
 
 __all__ = ["CODES", "SubmissionRefused"]
 

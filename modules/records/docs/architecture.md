@@ -58,7 +58,7 @@ constraint and index row per-tenant without a column of its own. Type keys are
 unique per tenant, and so are record uuids.
 
 **Which tenant a request runs in is bound by the routers, not the framework**
-(`sm_records/tenancy.py`). The admin API, the views and the public API each
+(`sm_records/core/tenancy/__init__.py`). The admin API, the views and the public API each
 carry a yield dependency — `bind_admin` or `bind_public` — as their *first*
 dependency, so it is entered before `get_db` and still bound when `get_db`
 commits on the way out. A single-tenant host (no `TenantMiddleware`) binds
@@ -277,7 +277,7 @@ broken by `database is locked`).
 
 ## Extension points
 
-Everything a host can plug in is `sm_records.index.__all__`: `IndexEntry`,
+Everything a host can plug in is `sm_records.records.index.__all__`: `IndexEntry`,
 `IndexKind`, `IndexProvider`, `ReduceSpec`, `VirtualField`,
 `register_index_provider`, `register_reduce_provider`, `virtual_fields`. The
 writer, the query builder and the rebuild are internals.
@@ -378,7 +378,7 @@ need one: the browser calls the library's JSON API itself, with the session
 cookie, under that module's own permissions. Records only has to tell the
 browser *where* the API is.
 
-`sm_records/media.py` decides that once, from `on_startup`:
+`sm_records/web/media.py` decides that once, from `on_startup`:
 
 1. `media_api_prefix` (a `BootSettings` field, so `requires_restart`) is read
    as hydrated. `""` means no picker; a path is used as given (a warning if

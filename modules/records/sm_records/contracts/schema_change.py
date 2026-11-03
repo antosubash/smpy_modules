@@ -185,7 +185,7 @@ def schema_preview_read(diff: SchemaDiff, report: DryRunReport) -> SchemaPreview
 
 
 def schema_preview_job_read(job: Any) -> SchemaPreviewJobRead:
-    """A :class:`~sm_records.services.preview_jobs.PreviewJob` on the wire.
+    """A :class:`~sm_records.records.services.preview_jobs.PreviewJob` on the wire.
 
     ``Any`` rather than the dataclass: the contracts layer is the module's
     public surface and an in-process registry entry is not part of it —

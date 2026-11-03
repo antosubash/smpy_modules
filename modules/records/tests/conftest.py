@@ -25,7 +25,7 @@ from typing import Any
 import pytest
 import pytest_asyncio
 from sm_records.models import Record, RecordType
-from sm_records.tenancy import DEFAULT_TENANT, tenant_scope
+from sm_records.core.tenancy import DEFAULT_TENANT, tenant_scope
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # ``app_harness`` is the HTTP test harness — app + client fixtures,
@@ -35,7 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 #
 # ``pg_support`` owns the one decision both database fixtures make: in-memory
 # SQLite, or the Postgres database ``RECORDS_TEST_URL`` names.
-from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
+from tests.support.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
     ADMIN,
     ROLE_EDITOR,
     ROLE_EDITOR_TWO,
@@ -50,14 +50,14 @@ from tests.app_harness import (  # noqa: F401 - re-exported as fixtures/helpers
 )
 
 # Fixtures several suites share, each defined once beside what it builds on.
-from tests.bulk_helpers import product  # noqa: F401
-from tests.census import Census, census_enabled
-from tests.csrf_support import session_client  # noqa: F401 - test_csrf*'s fixture
-from tests.events_harness import bus, note  # noqa: F401
-from tests.isolation_support import two_tenants  # noqa: F401 - the tenancy matrix's fixture
-from tests.newsletter_http import newsletter  # noqa: F401 - a newsletter list on that fixture
+from tests.support.bulk_helpers import product  # noqa: F401
+from tests.support.census import Census, census_enabled
+from tests.support.csrf_support import session_client  # noqa: F401 - test_csrf*'s fixture
+from tests.support.events_harness import bus, note  # noqa: F401
+from tests.support.isolation_support import two_tenants  # noqa: F401 - the tenancy matrix's fixture
+from tests.support.newsletter_http import newsletter  # noqa: F401 - a newsletter list on that fixture
 from tests.pg_support import arm_reset, make_db_state
-from tests.shared_fixtures import (  # noqa: F401
+from tests.support.shared_fixtures import (  # noqa: F401
     bilingual,
     file_client,
     file_db,
@@ -67,7 +67,7 @@ from tests.shared_fixtures import (  # noqa: F401
     racing_db,
     settings,
 )
-from tests.submissions_http import site  # noqa: F401 - website submissions' fixture
+from tests.support.submissions_http import site  # noqa: F401 - website submissions' fixture
 
 
 @pytest.fixture(autouse=True)
@@ -184,8 +184,8 @@ def _clean_providers():
     reduce spec left registered writes a delta on every later test's record
     write, and its key stays reserved against a declared field of that name.
     """
-    from sm_records.index import providers
-    from sm_records.index.reduce import clear_reduce_providers
+    from sm_records.records.index import providers
+    from sm_records.records.index.reduce import clear_reduce_providers
 
     providers.clear()
     clear_reduce_providers()

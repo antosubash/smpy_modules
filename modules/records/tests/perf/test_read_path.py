@@ -15,7 +15,7 @@ skipped with a note — the suite is an instrument, not a schema test.
 from __future__ import annotations
 
 import pytest
-from sm_records.index.query import Filter, FilterOp, build_query
+from sm_records.records.index.query import Filter, FilterOp, build_query
 
 from tests.perf._bench import Results, capture, explain, plan_scans_records, plan_uses, repeat
 from tests.perf._http import API, HEADERS, measure, plan_label
@@ -223,7 +223,7 @@ async def test_sorted_by_each_kind(perf_client, perf_db, perf_session):
 
 async def test_count_query_alone(perf_db, perf_session):
     """The ``total`` half of a list page, measured without the page read."""
-    from sm_records.index.query import count_query
+    from sm_records.records.index.query import count_query
 
     counts = await type_counts(perf_session)
     rtype = await load_type(perf_session, "order")

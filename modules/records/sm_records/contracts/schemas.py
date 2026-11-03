@@ -42,8 +42,8 @@ from sm_records.contracts.revisions import (
 )
 from sm_records.models import Record, RecordType
 from sm_records.schema.fields import FieldDefinition
-from sm_records.services._payload import field_defs
-from sm_records.services.records import read_view
+from sm_records.records.services._payload import field_defs
+from sm_records.records.services.records import read_view
 
 __all__ = [
     "RecordCreate",

@@ -21,7 +21,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from sm_records import constants
+from sm_records.core import constants
 from sm_records.models._base import GLOBAL_PREFIX, collection_prefix
 from sm_records.models._index import make_index_tables
 from sm_records.models._record import make_record_tables

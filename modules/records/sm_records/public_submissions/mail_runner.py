@@ -14,7 +14,7 @@ perfectly good. Two paths, chosen per write:
   does).
 * **Otherwise after the commit.** An ``on_commit`` callback spawns a task
   (held by a strong reference) that opens its own session, binds the tenant,
-  sends, writes the mark and finishes through :func:`sm_records.events.commit`
+  sends, writes the mark and finishes through :func:`sm_records.core.events.commit`
   — never a bare ``commit()``. That makes this module the **fourth documented
   committer**, beside ``cli_io``, ``reindex_runner`` and ``preview_runner``:
   it runs after the request's session is gone, so there is nobody else to
@@ -49,14 +49,15 @@ from simple_module_db import RequestSession
 from simple_module_db.callbacks import register_on_commit
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from sm_records import constants, events
+from sm_records.core import constants
+from sm_records.core import events
 from sm_records.models import Record, RecordType
 from sm_records.public_submissions.delivery import SessionFactory, load
 from sm_records.public_submissions.mail import deliver
 from sm_records.public_submissions.tokens import public_base_url
-from sm_records.services._common import mark_written
-from sm_records.settings import RecordsSettings
-from sm_records.tenancy import tenant_scope
+from sm_records.records.services._common import mark_written
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import tenant_scope
 
 __all__ = [
     "HANDLER_NAME",

@@ -32,7 +32,7 @@ from decimal import Decimal
 from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Index, Numeric, Text
 from sqlmodel import Field, SQLModel
 
-from sm_records.constants import MAX_KEY_LEN, NUMBER_PRECISION, NUMBER_SCALE, TEXT_INDEX_LEN
+from sm_records.core.constants import MAX_KEY_LEN, NUMBER_PRECISION, NUMBER_SCALE, TEXT_INDEX_LEN
 from sm_records.models._base import (
     INDEX_BOOL_SUFFIX,
     INDEX_DATE_SUFFIX,

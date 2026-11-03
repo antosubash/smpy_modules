@@ -19,9 +19,9 @@ import logging
 from contextlib import suppress
 from typing import Any
 
-from sm_records import constants
+from sm_records.core import constants
 from sm_records.public_submissions.retention import sweep
-from sm_records.settings import RecordsSettings
+from sm_records.core.settings import RecordsSettings
 
 __all__ = ["TASK_ATTR", "start", "stop"]
 

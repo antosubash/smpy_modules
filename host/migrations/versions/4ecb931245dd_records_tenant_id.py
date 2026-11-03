@@ -30,7 +30,7 @@ through ``type_id``/``record_id``.
   long enough for the convention to hash-truncate it is dropped by the spelling
   the database actually holds (``models/_index.py``).
 
-``DEFAULT`` repeats ``sm_records.tenancy.DEFAULT_TENANT`` on purpose: a revision
+``DEFAULT`` repeats ``sm_records.core.tenancy.DEFAULT_TENANT`` on purpose: a revision
 must not change meaning if the constant ever moves.
 
 **Which table sets** comes from the database, by the rule ``fe3ea2dfe0fb`` sets

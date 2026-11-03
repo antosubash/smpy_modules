@@ -23,14 +23,14 @@ from urllib.parse import urlsplit
 from simple_module_core.mail import MailMessage, MailSender
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import constants
+from sm_records.core import constants
 from sm_records.models import Record, RecordType
 from sm_records.public_submissions import strings
 from sm_records.public_submissions.delivery import SessionFactory
 from sm_records.public_submissions.sending import send_all
-from sm_records.services._common import utcnow
-from sm_records.services._payload import field_defs
-from sm_records.settings import RecordsSettings
+from sm_records.records.services._common import utcnow
+from sm_records.records.services._payload import field_defs
+from sm_records.core.settings import RecordsSettings
 
 __all__ = ["deliver", "notification", "template", "text"]
 

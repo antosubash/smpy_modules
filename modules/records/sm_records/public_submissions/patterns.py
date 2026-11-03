@@ -1,7 +1,7 @@
 """Constraint patterns on a website visitor's input (#101).
 
-The same worker check every write path uses (:mod:`sm_records.services.
-_patterns`, :mod:`sm_records._pattern_worker`), with the public path's
+The same worker check every write path uses (:mod:`sm_records.core.services.
+_patterns`, :mod:`sm_records.records._pattern_worker`), with the public path's
 tighter terms: one :data:`BUDGET_SECONDS` for the whole submission, at most
 :data:`WAIT_SECONDS` to get a worker (else ``429``), and a value that misses
 its pattern refused here with the field named — before ``create_record``
@@ -13,12 +13,12 @@ from __future__ import annotations
 
 from typing import Any, Final
 
-from sm_records import _pattern_worker
+from sm_records.records import _pattern_worker
 from sm_records.models import RecordType
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.schema._text_checks import Verdicts
-from sm_records.services._patterns import NOT_CHECKED, TOO_SLOW, pairs_of
-from sm_records.services._payload import field_defs
+from sm_records.records.services._patterns import NOT_CHECKED, TOO_SLOW, pairs_of
+from sm_records.records.services._payload import field_defs
 
 __all__ = ["BUDGET_SECONDS", "WAIT_SECONDS", "check_patterns"]
 

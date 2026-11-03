@@ -1,40 +1,41 @@
+import { useTypeUpdate } from '../ui/hooks/useTypeUpdate';
 import { Head, router } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-import { RecordsLayout } from '../components/RecordsLayout';
-import { TenantBadge } from '../components/TenantBadge';
-import { DeleteTypeSection } from '../components/typeeditor/DeleteTypeSection';
-import { groupErrors } from '../components/typeeditor/errors';
-import { FieldsCard } from '../components/typeeditor/FieldsCard';
+import { RecordsLayout } from '../ui/components/RecordsLayout';
+import { TenantBadge } from '../ui/components/TenantBadge';
+import { DeleteTypeSection } from '../ui/components/typeeditor/DeleteTypeSection';
+import { groupErrors } from '../ui/components/typeeditor/errors';
+import { FieldsCard } from '../ui/components/typeeditor/FieldsCard';
 import {
   metadataFrom,
   presetDraft,
   schemaIsDirty,
   typeIsDirty,
   withUids,
-} from '../components/typeeditor/formHelpers';
-import { PointerFields } from '../components/typeeditor/PointerFields';
-import { PublicSubmissionsCard } from '../components/typeeditor/PublicSubmissionsCard';
-import { ReindexStatus } from '../components/typeeditor/ReindexStatus';
-import { SaveBar } from '../components/typeeditor/SaveBar';
-import { SchemaConflictPanel } from '../components/typeeditor/SchemaConflictPanel';
-import { TypeConflictNotice } from '../components/typeeditor/TypeConflictNotice';
-import { TypeIoMenu } from '../components/typeeditor/TypeIoMenu';
-import { TypeMetadataForm } from '../components/typeeditor/TypeMetadataForm';
-import { TypeRevisions } from '../components/typeeditor/TypeRevisions';
-import type { EditableField, TypeEditorProps } from '../components/typeeditor/types';
-import type { SchemaApplyBody } from '../hooks/useSchemaApply';
-import { useSchemaApply } from '../hooks/useSchemaApply';
-import { useTypeEditorSave } from '../hooks/useTypeEditorSave';
-import { useTypeImport } from '../hooks/useTypeImport';
-import { useTypeSync } from '../hooks/useTypeSync';
-import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
-import { updateType } from '../utils/api';
-import { keys, useT } from '../utils/i18n';
-import type { DryRunReport, TypeRead } from '../utils/types';
+} from '../ui/components/typeeditor/formHelpers';
+import { PointerFields } from '../ui/components/typeeditor/PointerFields';
+import { PublicSubmissionsCard } from '../ui/components/typeeditor/PublicSubmissionsCard';
+import { ReindexStatus } from '../ui/components/typeeditor/ReindexStatus';
+import { SaveBar } from '../ui/components/typeeditor/SaveBar';
+import { SchemaConflictPanel } from '../ui/components/typeeditor/SchemaConflictPanel';
+import { TypeConflictNotice } from '../ui/components/typeeditor/TypeConflictNotice';
+import { TypeIoMenu } from '../ui/components/typeeditor/TypeIoMenu';
+import { TypeMetadataForm } from '../ui/components/typeeditor/TypeMetadataForm';
+import { TypeRevisions } from '../ui/components/typeeditor/TypeRevisions';
+import type { EditableField, TypeEditorProps } from '../ui/components/typeeditor/types';
+import type { SchemaApplyBody } from '../ui/hooks/useSchemaApply';
+import { useSchemaApply } from '../ui/hooks/useSchemaApply';
+import { useTypeEditorSave } from '../ui/hooks/useTypeEditorSave';
+import { useTypeImport } from '../ui/hooks/useTypeImport';
+import { useTypeSync } from '../ui/hooks/useTypeSync';
+import { useUnsavedGuard } from '../ui/hooks/useUnsavedGuard';
+import { updateType } from '../ui/utils/api';
+import { keys, useT } from '../ui/utils/i18n';
+import type { DryRunReport, TypeRead } from '../ui/utils/types';
 
 const TYPES_LIST_HREF = '/admin/records/';
 
@@ -79,14 +80,7 @@ function TypeEditor({
     toast.success(t(keys.records.editor.saved));
   });
 
-  const attemptUpdate = useCallback(
-    (body: SchemaApplyBody) => {
-      if (!current) return Promise.reject(new Error('No type loaded to update'));
-      const { expected_version, ...rest } = body;
-      return updateType(current.key, expected_version, rest);
-    },
-    [current],
-  );
+  const attemptUpdate = useTypeUpdate(current);
 
   const schemaDirty = !isNew && schemaIsDirty(current, values, fields);
   const dirty = typeIsDirty(current, values, fields);

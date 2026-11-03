@@ -11,12 +11,12 @@ import {
   TableRow,
 } from '@simple-module-py/ui/components/ui/table';
 import { useMemo, useState } from 'react';
-import { RecordsLayout } from '../components/RecordsLayout';
-import { TenantBadge } from '../components/TenantBadge';
-import { TypeCounts, TypeIdentity, TypeKey, TypesCardList } from '../components/TypesCardList';
-import { useIsNarrow } from '../hooks/useIsNarrow';
-import { keys, useT } from '../utils/i18n';
-import type { TenancyMode, TypeRead } from '../utils/types';
+import { RecordsLayout } from '../ui/components/RecordsLayout';
+import { TenantBadge } from '../ui/components/TenantBadge';
+import { TypeCounts, TypeIdentity, TypeKey, TypesCardList } from '../ui/components/TypesCardList';
+import { useIsNarrow } from '../ui/hooks/useIsNarrow';
+import { keys, useT } from '../ui/utils/i18n';
+import type { TenancyMode, TypeRead } from '../ui/utils/types';
 
 type Props = {
   types: TypeRead[];

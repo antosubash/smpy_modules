@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 
-from tests.app_harness import ADMIN, roles
+from tests.support.app_harness import ADMIN, roles
 from tests.perf._bench import (
     Results,
     capture,

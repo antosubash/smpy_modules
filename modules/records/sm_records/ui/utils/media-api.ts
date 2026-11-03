@@ -1,0 +1,225 @@
+/**
+ * The browser half of the `media` field picker: a small client for the host's
+ * media library API, wherever `sm_records.media` found it at startup.
+ *
+ * Deliberately not `utils/api.ts`: that client is `/api/records/*` and knows
+ * this module's error bodies. This one talks to *another module's* API —
+ * `file_storage` on a stock host — directly, with the session cookie, and that
+ * module's own permissions decide what the caller may list, upload or read.
+ * Records never proxies a byte of it. What the two share is the connection
+ * handling in `api-net.ts`: an expired session is the same redirect, a
+ * dropped connection the same `ApiError`, wherever the request was going.
+ *
+ * **The stored value is the file's id** (`file_storage`'s UUID), never a URL:
+ * the download URL is derived from `file_url_template` at render time, so a
+ * library moved behind a new prefix does not strand every stored value. A
+ * value saved before the picker existed may still be a plain `https://` URL,
+ * and stays valid — it renders as a link (`isUrlValue`).
+ *
+ * **Only a value shaped like that id is ever looked up.** A `media` field
+ * accepts any string up to 500 characters (`_check_media` — "an opaque id or
+ * URL"), and older or seeded data (`cli.py`'s `seed`) can hold path-like
+ * values, neither an id nor a URL. Asking the library about one of those is a
+ * guaranteed 404/422 — "File missing" for a whole column of legitimate
+ * legacy data. `mediaValueKind` decides what a value is, so the cell, the
+ * editor's chip and the pagebuilder widget agree: only `'id'` is looked up.
+ */
+
+import { ApiError, handleUnauthorized, messageFor, offlineError, parseBody } from './api-net';
+import type { ApiErrorBody } from './types';
+
+// Split out for the 300-line cap; every `media-api` import keeps working.
+export { formatBytes } from './format-bytes';
+
+import type { MediaApi, MediaFile, MediaPage } from './media-values';
+import { MEDIA_PAGE_SIZE, fillId } from './media-values';
+export type { MediaApi, MediaFile, MediaPage, MediaValueKind } from './media-values';
+export { MEDIA_PAGE_SIZE, fillId, fileUrl, isUrlValue, mediaValueKind, isImage } from './media-values';
+
+function toMediaFile(raw: Record<string, unknown>): MediaFile {
+  return {
+    id: String(raw.id ?? ''),
+    filename: String(raw.filename ?? raw.id ?? ''),
+    content_type: String(raw.content_type ?? 'application/octet-stream'),
+    size_bytes: typeof raw.size_bytes === 'number' ? raw.size_bytes : 0,
+    created_at: typeof raw.created_at === 'string' ? raw.created_at : null,
+  };
+}
+
+/** `file_storage` answers a refusal with `detail: {code, message}` rather
+ *  than this module's `detail: "…"`; its `message` is already translated
+ *  server-side, so it is the one to show. */
+function errorFor(status: number, statusText: string, body: unknown): ApiError {
+  const detail = (body as { detail?: unknown } | null)?.detail;
+  const nested =
+    detail && typeof detail === 'object' && 'message' in detail
+      ? String((detail as { message: unknown }).message)
+      : null;
+  const normalised = (nested ? { detail: nested } : body) as ApiErrorBody | null;
+  if (status === 401) handleUnauthorized();
+  return new ApiError(status, normalised, messageFor(status, statusText, normalised));
+}
+
+async function getJson(url: string, signal?: AbortSignal): Promise<Response> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+      signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw offlineError();
+  }
+  return response;
+}
+
+export async function listMediaFiles(
+  api: MediaApi,
+  options: { page: number; query?: string },
+  signal?: AbortSignal,
+): Promise<MediaPage> {
+  const params = new URLSearchParams({
+    page: String(options.page),
+    per_page: String(MEDIA_PAGE_SIZE),
+  });
+  const query = (options.query ?? '').trim();
+  if (api.search_param && query) params.set(api.search_param, query);
+  const response = await getJson(`${api.list_path}?${params.toString()}`, signal);
+  if (!response.ok) {
+    throw errorFor(response.status, response.statusText, await parseBody(response));
+  }
+  const body = (await response.json()) as {
+    items?: Record<string, unknown>[];
+    total?: number;
+    page?: number;
+    per_page?: number;
+  };
+  const items = (body.items ?? []).map(toMediaFile);
+  for (const file of items) rememberMediaFile(api, file);
+  return {
+    items,
+    total: typeof body.total === 'number' ? body.total : items.length,
+    page: body.page ?? options.page,
+    perPage: body.per_page ?? MEDIA_PAGE_SIZE,
+  };
+}
+
+/** One file's metadata, or `null` when the library does not have it — a
+ *  `404` (deleted since it was picked) and a `422` (a stored value that is not
+ *  an id at all) are the same answer to the person looking at the field. */
+async function fetchMediaFile(
+  api: MediaApi,
+  id: string,
+  signal?: AbortSignal,
+): Promise<MediaFile | null> {
+  const response = await getJson(fillId(api.meta_url_template, id), signal);
+  if (response.status === 404 || response.status === 422) return null;
+  if (!response.ok) {
+    throw errorFor(response.status, response.statusText, await parseBody(response));
+  }
+  return toMediaFile((await response.json()) as Record<string, unknown>);
+}
+
+// ---- Metadata cache -------------------------------------------------------
+//
+// A list page of 25 records with an image column asks for up to 25 files,
+// and the editor asks again for the one it opens. One promise per id, shared
+// — but only for one Inertia page visit. A file's metadata never changes
+// under its id, but the file can be *deleted*, and in an Inertia app this
+// module outlives every client-side visit: a file deleted on the media
+// library's own page went on showing as present here until a hard reload
+// (review 4, code F3). So every `inertia:navigate` (the DOM event behind
+// `router.on('navigate')`, heard here rather than through a component that
+// the library's page would unmount) forgets everything. Failures are dropped
+// at once, so a retry after a transient error re-fetches, and so is a file
+// whose thumbnail fails to load (`forgetMediaFile`).
+
+const cache = new Map<string, Promise<MediaFile | null>>();
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('inertia:navigate', () => cache.clear());
+}
+
+function cacheKey(api: MediaApi, id: string): string {
+  return `${api.meta_url_template}\u0000${id}`;
+}
+
+export function rememberMediaFile(api: MediaApi, file: MediaFile): void {
+  cache.set(cacheKey(api, file.id), Promise.resolve(file));
+}
+
+export function getMediaFile(api: MediaApi, id: string): Promise<MediaFile | null> {
+  const key = cacheKey(api, id);
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const pending = fetchMediaFile(api, id).catch((error: unknown) => {
+    cache.delete(key);
+    throw error;
+  });
+  cache.set(key, pending);
+  return pending;
+}
+
+/** Drop one file, so the next lookup asks the library again — a thumbnail
+ *  that failed to load is most often a file deleted since it was cached. */
+export function forgetMediaFile(api: MediaApi, id: string): void {
+  cache.delete(cacheKey(api, id));
+}
+
+/** For tests: every test starts from an empty cache. */
+export function clearMediaCache(): void {
+  cache.clear();
+}
+
+// ---- Upload -----------------------------------------------------------------
+
+export type UploadHandle = { promise: Promise<MediaFile>; abort: () => void };
+
+/**
+ * `POST {upload_path}` as multipart, through `XMLHttpRequest` rather than
+ * `fetch` for the one thing `fetch` still cannot do: report upload progress.
+ * `onProgress` gets 0–100. The failure paths end in the same `ApiError`s the
+ * `fetch` clients raise, so a 401 redirects and a dropped connection says
+ * nothing was lost, exactly as they do everywhere else in the module.
+ */
+export function uploadMediaFile(
+  api: MediaApi,
+  file: File,
+  onProgress: (percent: number) => void,
+): UploadHandle {
+  const xhr = new XMLHttpRequest();
+  const promise = new Promise<MediaFile>((resolve, reject) => {
+    xhr.open('POST', api.upload_path);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader('Accept', 'application/json');
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+      }
+    };
+    xhr.onerror = () => reject(offlineError());
+    xhr.onabort = () => reject(new DOMException('Upload aborted', 'AbortError'));
+    xhr.onload = () => {
+      let body: unknown = null;
+      try {
+        body = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+      } catch {
+        body = null;
+      }
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(errorFor(xhr.status, xhr.statusText, body));
+        return;
+      }
+      const uploaded = toMediaFile((body ?? {}) as Record<string, unknown>);
+      rememberMediaFile(api, uploaded);
+      onProgress(100);
+      resolve(uploaded);
+    };
+    const form = new FormData();
+    form.append('file', file, file.name);
+    xhr.send(form);
+  });
+  return { promise, abort: () => xhr.abort() };
+}

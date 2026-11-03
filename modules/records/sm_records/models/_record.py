@@ -20,7 +20,7 @@ from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, Integer
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field
 
-from sm_records.constants import (
+from sm_records.core.constants import (
     DEFAULT_CONTENT_LOCALE,
     MAX_DISPLAY_TITLE_LEN,
     MAX_LOCALE_LEN,

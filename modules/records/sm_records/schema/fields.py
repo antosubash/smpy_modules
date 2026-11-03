@@ -23,8 +23,8 @@ from typing import Any, Literal
 from sqlmodel import Field as SQLField
 from sqlmodel import SQLModel
 
-from sm_records._text import NUL_PROBLEM, has_nul
-from sm_records.constants import MAX_LABEL_LEN
+from sm_records.core._text import NUL_PROBLEM, has_nul
+from sm_records.core.constants import MAX_LABEL_LEN
 
 # ``ON_DELETE_*`` are re-exported: callers import them from here, as before
 # the rules moved to ``_field_rules`` for the line cap.

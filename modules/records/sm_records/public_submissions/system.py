@@ -4,7 +4,7 @@ A delivery mark (``sm_notified_at``) or a spam verdict (``sm_spam``) is an
 ordinary ``update_record`` — validated, versioned, one revision — with the
 record's own ordinary values sent back unchanged and the new system values
 passed through the internal ``system=`` argument, the one way they are
-written. It runs inside :func:`sm_records.events.muted`: a mark is
+written. It runs inside :func:`sm_records.core.events.muted`: a mark is
 bookkeeping, not a content edit, and announcing it as a ``RecordUpdated``
 would tell every subscriber the visitor's message changed.
 """
@@ -18,17 +18,17 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import events
-from sm_records.index.providers import TypeIndex
-from sm_records.index.reduce import snapshot
-from sm_records.index.writer import write_index
+from sm_records.core import events
+from sm_records.records.index.providers import TypeIndex
+from sm_records.records.index.reduce import snapshot
+from sm_records.records.index.writer import write_index
 from sm_records.models import Record, RecordType
 from sm_records.schema.compile import to_jsonable
-from sm_records.services import records as record_service
-from sm_records.services._common import mark_written, type_id_map
-from sm_records.services._payload import field_defs
-from sm_records.services.errors import Conflict, ValidationFailed
-from sm_records.settings import RecordsSettings
+from sm_records.records.services import records as record_service
+from sm_records.records.services._common import mark_written, type_id_map
+from sm_records.records.services._payload import field_defs
+from sm_records.records.services.errors import Conflict, ValidationFailed
+from sm_records.core.settings import RecordsSettings
 
 __all__ = ["system_update", "try_system_update"]
 

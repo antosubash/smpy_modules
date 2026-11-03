@@ -9,10 +9,10 @@ safe to run twice — the rebuild deletes and rewrites each record's rows from
 ``data``, which is the source of truth (§7.7).
 
 This file parses and dispatches. The work lives next to it:
-:mod:`sm_records.cli_reindex` (``reindex``), :mod:`sm_records.cli_verify`
+:mod:`sm_records.records.cli.cli_reindex` (``reindex``), :mod:`sm_records.records.cli.cli_verify`
 (``reindex --verify``, which writes nothing and exits ``1`` on drift),
-:mod:`sm_records.cli_io` (``export``/``import``), and
-:mod:`sm_records.cli_common` for the connection and ``--tenant``, which every
+:mod:`sm_records.records.cli.cli_io` (``export``/``import``), and
+:mod:`sm_records.records.cli.cli_common` for the connection and ``--tenant``, which every
 subcommand takes. ``tenants`` is read-only and lives here, because it is only
 a query and a table.
 
@@ -30,12 +30,13 @@ import sys
 from collections.abc import Sequence
 from typing import Any
 
-from sm_records import cli_host, cli_io
-from sm_records._cross_tenant import TenantCounts, tenant_counts
-from sm_records.cli_common import add_tenant_argument, connected, load_settings
-from sm_records.cli_reindex import force_pending, reindex, run_verify
-from sm_records.seed.runner import SeedSummary
-from sm_records.tenancy import DEFAULT_TENANT, tenant_scope
+from sm_records.records.cli import cli_host
+from sm_records.records.cli import cli_io
+from sm_records.core.tenancy._cross_tenant import TenantCounts, tenant_counts
+from sm_records.records.cli.cli_common import add_tenant_argument, connected, load_settings
+from sm_records.records.cli.cli_reindex import force_pending, reindex, run_verify
+from sm_records.records.seed.runner import SeedSummary
+from sm_records.core.tenancy import DEFAULT_TENANT, tenant_scope
 
 __all__ = ["main", "reindex", "run_verify", "seed", "tenants"]
 
@@ -54,7 +55,7 @@ async def seed(
 
     Delegates entirely to :mod:`sm_records.seed` — this wrapper only owns the
     database connection and the tenant, the same division of labour as
-    :func:`reindex`, so :func:`sm_records.seed.seed_database` stays callable
+    :func:`reindex`, so :func:`sm_records.records.seed.seed_database` stays callable
     in-process (a test, a perf harness) without a subprocess or a
     settings-from-env detour.
 
@@ -65,7 +66,7 @@ async def seed(
     ``app`` is the host ``--app`` named, already inside its lifespan: the
     write then goes through its database state (:func:`connected`).
     """
-    from sm_records.seed import seed_database
+    from sm_records.records.seed import seed_database
 
     async with connected(database_url, app) as db_state:
         settings = await load_settings(db_state)
@@ -86,7 +87,7 @@ async def tenants(database_url: str) -> dict[str, TenantCounts]:
     """``records tenants``: every tenant that holds a type, with its counts.
 
     Read-only, and across tenants by construction
-    (:mod:`sm_records._cross_tenant`). Records never creates a tenant. A
+    (:mod:`sm_records.core.tenancy._cross_tenant`). Records never creates a tenant. A
     tenant exists when a user, a header or ``--tenant`` names it and something
     is written, so this is the only list of tenants there is (§J).
     """

@@ -15,8 +15,8 @@ from __future__ import annotations
 import news.core.tenancy
 import pagebuilder.core.tenancy
 import pytest
-import sm_records._tenancy_mode
-import sm_records.tenancy
+import sm_records.core.tenancy._mode
+import sm_records.core.tenancy
 from fastapi import Request
 from httpx import ASGITransport, AsyncClient
 from simple_module_hosting import Settings, create_app
@@ -24,12 +24,12 @@ from simple_module_hosting import Settings, create_app
 _DETECTORS = {
     "pagebuilder": pagebuilder.core.tenancy,
     "news": news.core.tenancy,
-    "records": sm_records._tenancy_mode,
+    "records": sm_records.core.tenancy._mode,
 }
 _RESOLVERS = {
     "pagebuilder": pagebuilder.core.tenancy,
     "news": news.core.tenancy,
-    "records": sm_records.tenancy,
+    "records": sm_records.core.tenancy,
 }
 
 # Every row spells out all three settings, so a developer's .env cannot move it.
@@ -74,7 +74,7 @@ def test_the_detectors_agree_with_each_other_and_the_framework(host):
 
 def test_the_header_readers_agree(host):
     app, mode, header = host
-    assert sm_records._tenancy_mode.tenant_header(app) == header
+    assert sm_records.core.tenancy._mode.tenant_header(app) == header
     expected = () if mode == "single" else ("Cookie", header) if header else ("Cookie",)
     # tenant_vary reads the stored mode, which needs on_startup; detect on the fly.
     for detector in (pagebuilder.core.tenancy, news.core.tenancy):

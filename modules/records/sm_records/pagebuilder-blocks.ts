@@ -13,9 +13,9 @@
 
 import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/ui/components/blockRegistry';
 
-import { RecordFormBlock } from './components/public_submissions/form/RecordFormBlock';
-import { RecordsListBlock } from './components/widget/RecordsListBlock';
-import { keys } from './utils/i18n';
+import { RecordFormBlock } from './ui/components/public_submissions/form/RecordFormBlock';
+import { RecordsListBlock } from './ui/components/widget/RecordsListBlock';
+import { keys } from './ui/utils/i18n';
 
 registerPuckBlocks({
   blocks: { RecordsList: RecordsListBlock },

@@ -19,12 +19,12 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
-from sm_records.index.reduce import (
+from sm_records.records.index.reduce import (
     ReduceSpec,
     clear_reduce_providers,
     register_reduce_provider,
 )
-from sm_records.index.reduce_rebuild import rebuild_type
+from sm_records.records.index.reduce_rebuild import rebuild_type
 
 from tests.perf._bench import Results, capture, explain, plan_scans_records, repeat
 from tests.perf._http import API, get_ok, measure, plan_label
@@ -121,7 +121,7 @@ async def test_stored_against_live_for_the_same_key(perf_db_copy, one_reduce_spe
     """
     from httpx import ASGITransport, AsyncClient
 
-    from tests.app_harness import build_app
+    from tests.support.app_harness import build_app
 
     async with perf_db_copy.session_factory() as session:
         rtype = await load_type(session, "order")
@@ -196,14 +196,14 @@ async def test_stored_against_live_for_the_same_key(perf_db_copy, one_reduce_spe
 
 async def test_aggregate_is_one_statement_over_the_index(perf_db, perf_session):
     """The ``GROUP BY`` itself, without the request around it."""
-    from sm_records.index.query import Filter, FilterOp
-    from sm_records.services import aggregate as aggregate_service
-    from sm_records.settings import RecordsSettings
+    from sm_records.records.index.query import Filter, FilterOp
+    from sm_records.records.services import aggregate as aggregate_service
+    from sm_records.core.settings import RecordsSettings
 
     counts = await type_counts(perf_session)
     rtype = await load_type(perf_session, "order")
     settings = RecordsSettings()
-    from sm_records.index.aggregate import parse_metric
+    from sm_records.records.index.aggregate import parse_metric
 
     for label, metric, filters in (
         ("count", "count", []),

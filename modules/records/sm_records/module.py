@@ -19,8 +19,8 @@ from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 
-from sm_records import constants
-from sm_records._module_submissions import SubmissionHooks
+from sm_records.core import constants
+from sm_records.public_submissions._module_submissions import SubmissionHooks
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -54,15 +54,15 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         # while it is ``None`` (there is nothing to be stale during boot).
         self.db = None
         # ``{locale: records}`` for languages this install no longer publishes,
-        # counted once at startup — see :mod:`sm_records.health`.
+        # counted once at startup — see :mod:`sm_records.core.health`.
         self.orphaned_locales: dict[str, int] = {}
         # Runtime state for the two framework hooks that describe types,
         # which are created after boot: each tenant's sidebar types
-        # (:mod:`sm_records.menu`) and the role editor's per-type permissions
-        # (:mod:`sm_records.type_permissions`). The module instance is the one
+        # (:mod:`sm_records.web.menu`) and the role editor's per-type permissions
+        # (:mod:`sm_records.core.type_permissions`). The module instance is the one
         # thing that outlives both the registries and the requests.
-        from sm_records.menu import TypeMenuCache
-        from sm_records.type_permissions import TypePermissions
+        from sm_records.web.menu import TypeMenuCache
+        from sm_records.core.type_permissions import TypePermissions
 
         self.menu_cache = TypeMenuCache()
         self.type_permissions = TypePermissions()
@@ -89,8 +89,8 @@ class RecordsModule(SubmissionHooks, ModuleBase):
 
         seal()
 
-        from sm_records.services import RecordsServices
-        from sm_records.settings import RecordsSettings
+        from sm_records.core.services import RecordsServices
+        from sm_records.core.settings import RecordsSettings
 
         register_module_settings(
             app,
@@ -105,7 +105,7 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         Types are created at runtime, after this hook, so their
         ``records.type.<key>`` permissions come from
         ``PermissionRegistry.add_source`` (framework 0.0.36, upstream #334) over
-        a cache :mod:`sm_records.type_permissions` keeps. Design doc §10.
+        a cache :mod:`sm_records.core.type_permissions` keeps. Design doc §10.
         """
         registry.add_group(
             constants.PERM_GROUP,
@@ -143,7 +143,7 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         # A type opting into its own entry (``show_in_menu``) is a runtime
         # fact, and each tenant has its own: a per-request provider (framework
         # 0.0.36, upstream #340) reads the request's tenant's types.
-        from sm_records.menu import type_menu_provider
+        from sm_records.web.menu import type_menu_provider
 
         registry.add_provider(lambda request: type_menu_provider(self, request))
 
@@ -151,7 +151,7 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         """Re-read the sidebar types and the per-type permissions on the next
         request that needs them.
 
-        Called through :func:`sm_records.menu.mark_dirty` by the endpoints
+        Called through :func:`sm_records.web.menu.mark_dirty` by the endpoints
         that write a type. It drops and flags rather than reads: the write has
         not committed yet when they call it (the framework commits after the
         response starts), so reading now would read the row as it was.
@@ -164,7 +164,7 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         the field just refuses filters until someone runs the CLI. This
         degrades /health/ready when a ``reindex_pending`` entry is older
         than ``reindex_stale_after_seconds``. Design doc §8.9."""
-        from sm_records.health import stale_reindex_check
+        from sm_records.core.health import stale_reindex_check
 
         registry.add(stale_reindex_check(self))
 
@@ -177,7 +177,7 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         operator may have moved, and leave the one they chose gated.
 
         ``AuthMiddleware`` reads the registry live, so
-        :func:`sm_records.boot.exempt_public_routes` can fill it from
+        :func:`sm_records.core.boot.exempt_public_routes` can fill it from
         ``on_startup`` — after hydration, before the first request. Design §10.
 
         The website-submission routes (#101) are the exception: their prefix
@@ -193,24 +193,24 @@ class RecordsModule(SubmissionHooks, ModuleBase):
     def register_middleware(self, app: FastAPI) -> None:
         """Install the deferred-job drain and the per-type permission sync.
 
-        The drain is :mod:`sm_records.deferred`: the reindex of §8.9 must not
+        The drain is :mod:`sm_records.records.deferred`: the reindex of §8.9 must not
         start until the request that scheduled it has committed and released
         its session, and middleware is the first hook that runs after a
         route's dependency teardown. A ``BackgroundTasks`` entry runs *inside*
         it, which on SQLite deadlocks the schema write against its own
         rebuild.
 
-        The sync is :mod:`sm_records.type_permissions`, and middleware for a
+        The sync is :mod:`sm_records.core.type_permissions`, and middleware for a
         different reason — see below.
 
-        The body guard is :mod:`sm_records._body_limit`, and middleware
+        The body guard is :mod:`sm_records.web._body_limit`, and middleware
         because a router dependency runs *after* FastAPI has read and parsed
         the body for the endpoint's model — which is the cost it exists to
         avoid. The framework offers nothing shared to hook into here.
         """
-        from sm_records._body_limit import BodyLimitMiddleware
-        from sm_records._permission_sync import PermissionSyncMiddleware
-        from sm_records.deferred import DeferredJobsMiddleware
+        from sm_records.web._body_limit import BodyLimitMiddleware
+        from sm_records.core._permission_sync import PermissionSyncMiddleware
+        from sm_records.records.deferred import DeferredJobsMiddleware
 
         app.add_middleware(DeferredJobsMiddleware)
         # Added before the two below so it ends up *outside* them
@@ -220,32 +220,32 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         # Parked before the middleware that reads it so a handler can reach
         # this instance through ``request.app`` — today only to mark the
         # sidebar and the per-type permissions stale after a type write
-        # (:func:`sm_records.menu.mark_dirty`).
+        # (:func:`sm_records.web.menu.mark_dirty`).
         setattr(app.state, constants.MODULE_ATTR, self)
         # Keeps the role editor's per-type permissions current in *this*
         # worker: the framework's source is sync and cannot read, so the read
-        # happens here, before the route — see :mod:`sm_records._permission_sync`.
+        # happens here, before the route — see :mod:`sm_records.core._permission_sync`.
         app.add_middleware(PermissionSyncMiddleware, module=self)
 
     async def on_startup(self, app: FastAPI) -> None:
         """Everything that needs the hydrated settings and an open database —
         the tenancy guard, the anonymous read API, the media picker, the
         orphaned-locale count and the first sidebar read. The body is
-        :func:`sm_records.boot.startup`, which says why each runs here."""
-        from sm_records import boot
+        :func:`sm_records.core.boot.startup`, which says why each runs here."""
+        from sm_records.core import boot
 
         await boot.startup(self, app)
 
     async def on_shutdown(self, app: FastAPI) -> None:
         """Stop the retention loop, let in-flight submission mail finish
         (bounded), then stop the pattern-check workers
-        (``sm_records._pattern_worker``). Without the drain a send cancelled
+        (``sm_records.records._pattern_worker``). Without the drain a send cancelled
         at shutdown leaves its claim to expire and the record "not sent"
         until someone presses *Resend*."""
         import asyncio
         import contextlib
 
-        from sm_records import _pattern_worker
+        from sm_records.records import _pattern_worker
         from sm_records.public_submissions import retention_loop
         from sm_records.public_submissions.mail_runner import drain
 
@@ -264,10 +264,10 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         # Alembic autogenerate and the doctor even when the routers cannot be
         # built yet, and a top-level import would make one missing dependency
         # take the whole module — and its tables — out of discovery.
-        from sm_records.endpoints.api import router as api
-        from sm_records.endpoints.api.public_submissions_links import router as links
-        from sm_records.endpoints.api.public_submissions_public import router as submissions
-        from sm_records.endpoints.views import router as views
+        from sm_records.web.endpoints.api import router as api
+        from sm_records.web.endpoints.api.public_submissions_links import router as links
+        from sm_records.web.endpoints.api.public_submissions_public import router as submissions
+        from sm_records.web.endpoints.views import router as views
 
         api_router.include_router(api)
         # Beside the admin router, not in it: anonymous, so without its tenant

@@ -45,8 +45,8 @@ from sm_records.public_submissions.mail import template
 from sm_records.public_submissions.mail_runner import queue, ui_locale
 from sm_records.public_submissions.sending import send_all
 from sm_records.public_submissions.tokens import host_secret, public_base_url
-from sm_records.services._common import utcnow
-from sm_records.settings import RecordsSettings
+from sm_records.records.services._common import utcnow
+from sm_records.core.settings import RecordsSettings
 
 __all__ = [
     "PENDING",

@@ -9,7 +9,7 @@ from simple_module_db.mixins import AuditMixin, MultiTenantMixin
 from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, UniqueConstraint, false
 from sqlmodel import Field
 
-from sm_records.constants import MAX_COLLECTION_COLUMN_LEN, MAX_KEY_LEN, MAX_LABEL_LEN
+from sm_records.core.constants import MAX_COLLECTION_COLUMN_LEN, MAX_KEY_LEN, MAX_LABEL_LEN
 from sm_records.models._base import TYPE_REVISION_TABLE, TYPE_TABLE, Base
 
 TYPE_KEY_INDEX = "uq_records_type_tenant_key"

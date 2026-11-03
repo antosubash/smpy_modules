@@ -18,7 +18,7 @@ from sm_records.models import Record, RecordType, tables_for
 from sm_records.public_submissions import attempts, delivery
 from sm_records.public_submissions.delivery import SessionFactory
 from sm_records.public_submissions.system import try_system_update
-from sm_records.settings import RecordsSettings
+from sm_records.core.settings import RecordsSettings
 
 __all__ = ["send_all"]
 

@@ -98,7 +98,7 @@ FAMILIES: tuple[Family, ...] = (
                 },
             ),
             Copy(f"{AI}/web/csrf.py"),
-            Copy(f"{RECORDS}/csrf.py"),
+            Copy(f"{RECORDS}/web/csrf.py"),
         ),
     ),
     Family(
@@ -113,7 +113,7 @@ FAMILIES: tuple[Family, ...] = (
                 },
             ),
             Copy(f"{AI}/ui/utils/csrf.ts"),
-            Copy(f"{RECORDS}/utils/csrf.ts"),
+            Copy(f"{RECORDS}/ui/utils/csrf.ts"),
         ),
     ),
     Family(

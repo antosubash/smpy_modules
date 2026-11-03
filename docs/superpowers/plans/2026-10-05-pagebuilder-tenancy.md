@@ -13,7 +13,7 @@ every `APIRouter` in `pagebuilder/endpoints/**` and the public routers, `module.
 `pyproject.toml` addopts), `host/migrations/versions/<new>_pagebuilder_tenant_id.py`.
 
 - `DEFAULT_TENANT = "default"`; `detect_mode(app)` / `configure(app)` copied in
-  spirit from `modules/records/sm_records/_tenancy_mode.py` (refuse `fixed != "default"`).
+  spirit from `modules/records/sm_records/core/tenancy/_mode.py` (refuse `fixed != "default"`).
 - `resolve_admin` (SINGLE → default; MULTI → `request.state.tenant_id`, else 403),
   `resolve_public` (SINGLE → default; MULTI → `request.state.tenant_id` or None).
 - `bind_admin` / `bind_public` yield deps using `simple_module_db.tenant_context`;

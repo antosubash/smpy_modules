@@ -28,9 +28,9 @@ import sys
 from pathlib import Path
 
 import pytest
-from sm_records.collections import collections
-from sm_records.index.query import build_query
-from sm_records.services._relations import referrers
+from sm_records.records.collections import collections
+from sm_records.records.index.query import build_query
+from sm_records.records.services._relations import referrers
 
 from tests.perf._bench import Results, Timing, capture, repeat
 from tests.perf._http import plan_label

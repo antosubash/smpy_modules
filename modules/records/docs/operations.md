@@ -834,7 +834,7 @@ with one `ANALYZE` pass over the module's own tables — a bulk load is exactly
 the state SQLite has no planner statistics for.
 
 For an in-process caller, call
-`sm_records.seed.seed_database(db_state, settings, records=…, seed=…,
+`sm_records.records.seed.seed_database(db_state, settings, records=…, seed=…,
 reset=…)` directly instead of shelling out.
 
 ### Event subscribers: `--app`
@@ -1435,7 +1435,7 @@ this module.
 | [#356](https://github.com/antosubash/simple_module_python/issues/356) | `MultiTenantMixin`: unbound flush skips the tenant-change check, letting a row move silently | The same guard's `before_flush` refuses an unbound create, update or delete of an owned row |
 | [#357](https://github.com/antosubash/simple_module_python/issues/357) | `MultiTenantMixin`: bulk `insert()` is not stamped with `tenant_id` | Records never bulk-inserts an owned (mixin) table — only the derived index/reduce tables, which carry no `tenant_id` column at all (design §B) |
 | [#358](https://github.com/antosubash/simple_module_python/issues/358) | `TenantMiddleware`: the header chooses the tenant for *any* authenticated user with no tenant of their own | Fixed upstream in 0.0.35. `resolve_admin` binds the framework-resolved tenant (#112), which for a signed-in user is never one picked by header outside their memberships; with none resolved it answers `403 tenant_required` |
-| [#359](https://github.com/antosubash/simple_module_python/issues/359) | No default-tenant setting or `tenant_scope` helper for `MultiTenantMixin` | `sm_records.tenancy.DEFAULT_TENANT` (a constant, not a setting — see design §A.3) and `tenant_scope()` (always resets, refuses re-binding to a different tenant) are the module's own |
+| [#359](https://github.com/antosubash/simple_module_python/issues/359) | No default-tenant setting or `tenant_scope` helper for `MultiTenantMixin` | `sm_records.core.tenancy.DEFAULT_TENANT` (a constant, not a setting — see design §A.3) and `tenant_scope()` (always resets, refuses re-binding to a different tenant) are the module's own |
 | [#360](https://github.com/antosubash/simple_module_python/issues/360) | `users`: no tenant management — `UserCreate`/`UserUpdate` and `create_admin` have no `tenant_id` | Closed upstream as not planned (the premise predates the tenants module). 0.0.36 retires `users_user.tenant_id` (#381); membership is managed by the `tenants` module, so there is nothing to assign by SQL — see [Assigning tenants to users](#assigning-tenants-to-users) |
 | [#361](https://github.com/antosubash/simple_module_python/issues/361) | `file_storage`: `StoredFile` is not tenant-scoped | Closed upstream as not planned, but 0.0.36 does scope `StoredFile` (PR #393: `MultiTenantMixin`, ids from another tenant `404`, listings count the active tenant only). Records stores a `media` value as a string of at most 500 characters and never looks the file up, so it still accepts another tenant's id; the picker and the download URL go through `file_storage`, which now answers `404` for it |
 | [#362](https://github.com/antosubash/simple_module_python/issues/362) | `users`: a tenant change is invisible until re-login, because `UserContext` is cached in the session | Gone in 0.0.36: `UserContext` no longer carries a tenant of its own, the active tenant is resolved per request from `tenants_membership`, and a membership change applies on the next request (upstream test `test_membership_changes.py`) — see [Assigning tenants to users](#assigning-tenants-to-users) |

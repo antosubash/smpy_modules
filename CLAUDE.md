@@ -94,7 +94,7 @@ so a mis-detected child app fails closed — and a public answer for another
 tenant is never shareable-cached (records #196; pagebuilder and news #192).
 The scheduler opens one session per tenant under `tenant_context`. News has its
 own copy, `news.core.tenancy`, and its scheduler ticks per tenant the same way;
-records' is `sm_records.tenancy` (its 403 is the `{"detail","code"}` envelope,
+records' is `sm_records.core.tenancy` (its 403 is the `{"detail","code"}` envelope,
 code `tenant_required`) and images' `sm_images.core.tenancy` is a copy of it; images'
 Celery tasks never run unscoped — `images.reconcile` and `images.janitor`
 enumerate tenants in one narrow `all_tenants()` read and do each tenant's work
@@ -233,8 +233,8 @@ Everything else goes in one of a few areas: `core/` (what every feature
 builds on), `web/` (endpoints, schemas, services, serving), one folder per
 domain (images: `ingest/`, `pipeline/`, `jobs/`, `map/`) and `ui/` for the
 frontend that is not a page. Tests mirror the areas under `tests/`.
-New code in any module follows it. Other modules move towards it in PRs that
-contain only moves; the doc's table says how far each one has got.
+New code in any module follows it. All six modules follow it; structural changes keep the same moves-only
+review boundary.
 
 **300-line cap** on every `.py` / `.ts` / `.tsx`, enforced by
 `scripts/check_file_size.py`. Nothing under `modules/` is exempt. The check

@@ -16,7 +16,7 @@ from typing import Any
 from sqlmodel import Field as SQLField
 from sqlmodel import SQLModel
 
-from sm_records.index.reindex import pending_map
+from sm_records.records.index.reindex import pending_map
 from sm_records.models import RecordType
 
 __all__ = ["TypeCreate", "TypeListResponse", "TypeRead", "TypeUpdate", "type_read"]
@@ -40,7 +40,7 @@ class TypeRead(SQLModel):
     is_public: bool
     show_in_menu: bool
     """Whether this type has its own entry in the admin sidebar
-    (:mod:`sm_records.menu`). The type editor renders it as a switch; nothing
+    (:mod:`sm_records.web.menu`). The type editor renders it as a switch; nothing
     else reads it, and it is not part of the schema."""
     translatable: bool
     """Whether this type's records may be authored in more than one content
@@ -107,7 +107,7 @@ class TypeUpdate(SQLModel):
     ``endpoints/api/types.py``'s ``model_dump(exclude_unset=True)``.
 
     ``force``/``orphaned`` are not columns and never reach ``**changes`` — they
-    are the two retries a 409 from :mod:`sm_records.services.schema_change`
+    are the two retries a 409 from :mod:`sm_records.records.services.schema_change`
     asks for (§8.2, §8.8), read separately by the endpoint and passed to
     ``update_type`` as their own keyword arguments.
     """

@@ -18,10 +18,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from sm_records.constants import MAX_KEY_LEN, SYSTEM_KEY_PREFIX, TYPE_KEY_PATTERN
-from sm_records.index._fixed import RESERVED_FIELD_KEYS
-from sm_records.index._registry import reduce_keys
-from sm_records.index.providers import virtual_fields
+from sm_records.core.constants import MAX_KEY_LEN, SYSTEM_KEY_PREFIX, TYPE_KEY_PATTERN
+from sm_records.records.index._fixed import RESERVED_FIELD_KEYS
+from sm_records.records.index._registry import reduce_keys
+from sm_records.records.index.providers import virtual_fields
 
 KEY_RE = re.compile(TYPE_KEY_PATTERN)
 """A key: lowercase identifier. Shared with ``fields``, which matches a

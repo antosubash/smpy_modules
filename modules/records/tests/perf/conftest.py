@@ -30,11 +30,11 @@ from httpx import ASGITransport, AsyncClient
 from simple_module_db.listeners import register_listeners
 from simple_module_db.session import init_db
 from sm_records.models import Base, Record, RecordType
-from sm_records.settings import RecordsSettings
+from sm_records.core.settings import RecordsSettings
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from tests.app_harness import build_app
+from tests.support.app_harness import build_app
 from tests.perf._bench import Results
 from tests.perf._schema import create_missing_columns, create_missing_indexes
 
@@ -104,7 +104,7 @@ async def perf_db() -> AsyncIterator[Any]:
     if marker not in _seeded:
         have = await _record_total(state)
         if have < DATASET_SIZE:
-            from sm_records.seed import seed_database
+            from sm_records.records.seed import seed_database
 
             await seed_database(
                 state, RecordsSettings(), records=DATASET_SIZE - have, seed=42, reset=False
@@ -264,7 +264,7 @@ def _empty_preview_jobs():
     copy of the same database, the apply reuses its report (as it is designed
     to) and the number recorded is not the one the row claims.
     """
-    from sm_records.services import preview_jobs
+    from sm_records.records.services import preview_jobs
 
     preview_jobs._jobs.clear()
     yield

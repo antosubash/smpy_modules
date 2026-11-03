@@ -20,9 +20,9 @@ import time
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sm_records.settings import RecordsSettings
+from sm_records.core.settings import RecordsSettings
 
-from tests.app_harness import build_app
+from tests.support.app_harness import build_app
 from tests.perf._bench import Results, Timing
 from tests.perf._http import HEADERS
 from tests.perf.conftest import load_type, type_counts
@@ -121,7 +121,7 @@ async def test_apply_reuses_a_completed_preview(perf_db_copy, tmp_path):
     """
     import time as _time
 
-    from sm_records.services import preview_jobs, schema_change
+    from sm_records.records.services import preview_jobs, schema_change
 
     from tests.perf.conftest import load_type
 

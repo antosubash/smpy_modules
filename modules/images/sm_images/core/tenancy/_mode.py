@@ -1,7 +1,7 @@
 """Whether images runs single- or multi-tenant, read off the built stack.
 
 Split out of :mod:`sm_images.core.tenancy`, which re-exports every name here.
-A copy of ``sm_records._tenancy_mode``; the design is records' tenancy plan, §A.3.
+A copy of ``sm_records.core.tenancy._mode``; the design is records' tenancy plan, §A.3.
 """
 
 from __future__ import annotations

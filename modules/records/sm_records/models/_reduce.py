@@ -26,7 +26,7 @@ from decimal import Decimal
 from sqlalchemy import DateTime, Index, Numeric
 from sqlmodel import Field
 
-from sm_records.constants import (
+from sm_records.core.constants import (
     MAX_KEY_LEN,
     NUMBER_PRECISION,
     NUMBER_SCALE,

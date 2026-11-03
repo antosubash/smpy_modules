@@ -48,7 +48,7 @@ made every unsorted list page and every ``ORDER BY position`` page drive from
 a list page went from 1.1 ms to 26.5 ms, and page 200 from 2.4 ms to 45.3 ms,
 on a database whose *other* indexes were analysed. One ``ANALYZE`` per document
 table puts every plan back. It is the same claim
-:mod:`sm_records.index._analyze` already makes for the end of a reindex and the
+:mod:`sm_records.records.index._analyze` already makes for the end of a reindex and the
 end of a seeding run — a moment that has just rewritten the module's own
 indexes and is out of any request by construction — made once more for the
 moment that adds one.

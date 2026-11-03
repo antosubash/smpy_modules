@@ -1,6 +1,6 @@
 """Which tenant an images statement runs in, and the refusal when there is none.
 
-A copy of ``sm_records.tenancy`` (records' tenancy plan, §A), with images' own
+A copy of ``sm_records.core.tenancy`` (records' tenancy plan, §A), with images' own
 errors. Every tenant-owned images table carries the framework's
 ``MultiTenantMixin``, and the framework's answer to "queried with no tenant
 set" is *every tenant's rows* (FACT 1b) while a write with none is a ``NOT NULL``

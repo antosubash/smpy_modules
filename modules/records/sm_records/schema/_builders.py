@@ -26,8 +26,8 @@ from urllib.parse import urlparse
 
 from pydantic import AfterValidator, BeforeValidator
 
-from sm_records._text import check_no_nul
-from sm_records.constants import TYPE_KEY_PATTERN
+from sm_records.core._text import check_no_nul
+from sm_records.core.constants import TYPE_KEY_PATTERN
 from sm_records.schema._scalars import (
     check_decimal,
     check_json_shape,

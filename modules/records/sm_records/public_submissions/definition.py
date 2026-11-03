@@ -17,8 +17,8 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import locales
-from sm_records.constants import LOCALE_PATTERN
+from sm_records.core import locales
+from sm_records.core.constants import LOCALE_PATTERN
 from sm_records.contracts.public_submissions import KIND_FORM, KIND_SUBSCRIPTION
 from sm_records.contracts.public_submissions_api import (
     SubmissionConsent,
@@ -29,11 +29,11 @@ from sm_records.models import RecordType
 from sm_records.public_submissions.captcha import public_config
 from sm_records.public_submissions.spec import SUBMITTABLE_TYPES
 from sm_records.public_submissions.tokens import sign_form
-from sm_records.services._payload import field_defs
-from sm_records.services.errors import NotFound
-from sm_records.services.public import NOT_FOUND
-from sm_records.services.types import get_type
-from sm_records.settings import RecordsSettings
+from sm_records.records.services._payload import field_defs
+from sm_records.records.services.errors import NotFound
+from sm_records.records.services.public import NOT_FOUND
+from sm_records.records.services.types import get_type
+from sm_records.core.settings import RecordsSettings
 
 __all__ = [
     "EMAIL_KEY",
