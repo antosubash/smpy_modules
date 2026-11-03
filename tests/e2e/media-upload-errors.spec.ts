@@ -65,7 +65,9 @@ async function uploadBatch(page: Page, files: ReturnType<typeof good>[]) {
 
 /** Nothing a person reads should be the wire format or the server's English. */
 async function expectNoRawServerText(page: Page) {
-  const body = await page.locator('main').innerText();
+  const texts = await page.locator('main').allInnerTexts();
+  expect(texts).toHaveLength(1);
+  const body = texts[0];
   expect(body).not.toContain('"detail"');
   expect(body).not.toContain('File contents do not match');
   expect(body).not.toContain('Image dimensions exceed');
