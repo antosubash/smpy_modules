@@ -1,5 +1,5 @@
 /**
- * Registers RecordsList and RecordForm in pagebuilder's palette when
+ * Registers RecordsList, RecordStats and RecordForm in pagebuilder's palette when
  * pagebuilder is installed.
  * Records knows about pagebuilder; pagebuilder knows nothing about records.
  *
@@ -14,11 +14,12 @@
 import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/ui/components/blockRegistry';
 
 import { RecordFormBlock } from './components/public_submissions/form/RecordFormBlock';
+import { RecordStatsBlock } from './components/widget/RecordStatsBlock';
 import { RecordsListBlock } from './components/widget/RecordsListBlock';
 import { keys } from './utils/i18n';
 
 registerPuckBlocks({
-  blocks: { RecordsList: RecordsListBlock },
+  blocks: { RecordsList: RecordsListBlock, RecordStats: RecordStatsBlock },
   // A catalogue key, resolved by pagebuilder's localizeConfig at render.
   category: { key: 'data', title: keys.records.widget.palette_group },
   // Page-only: a live records table in the site header or footer would

@@ -71,6 +71,7 @@ READ_ROUTES: list[ReadRoute] = [
     ReadRoute("GET", "/api/images/public/c/{slug}/points", PUBLIC),
     ReadRoute("GET", "/api/images/public/c/{slug}/map.pmtiles", PUBLIC),
     ReadRoute("GET", "/api/images/public/c/{slug}/images", PUBLIC),
+    ReadRoute("GET", "/api/images/public/stats?metric=images&collection={slug}", PUBLIC),
     ReadRoute("GET", "/images/c/{slug}", PUBLIC),
 ]
 
