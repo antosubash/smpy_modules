@@ -25,9 +25,9 @@ from httpx import ASGITransport, AsyncClient
 from news.core.constants import PERM_EDIT, PERM_PUBLISH, PERM_VIEW
 from news.integrations.pagebuilder import register_bundle_section
 from news.models import NewsArticle
-from pagebuilder.module import PagebuilderModule
 from pagebuilder.core.permissions import ALL_PERMISSIONS as PB_PERMISSIONS
 from pagebuilder.core.settings import PagebuilderSettings
+from pagebuilder.module import PagebuilderModule
 from pg_support import make_db_state
 from settings.module_registry import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry

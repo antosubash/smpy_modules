@@ -19,8 +19,8 @@ from httpx import ASGITransport, AsyncClient
 from news.core import locales as news_locales
 from news.module import NewsModule
 from pagebuilder.content.layout_service import LayoutService
-from pagebuilder.module import PagebuilderModule
 from pagebuilder.core.settings import PagebuilderSettings
+from pagebuilder.module import PagebuilderModule
 from simple_module_db import tenant_context
 from simple_module_hosting.middleware import TenantMiddleware
 
