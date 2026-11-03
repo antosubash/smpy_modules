@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import gc
+from types import SimpleNamespace
+
 from fastapi import FastAPI
 from simple_module_core.module_settings import ModuleSettingsRegistry, module_settings_registry
-from sm_newsletter.core import constants
+from sm_newsletter.core import constants, crypto
 from sm_newsletter.core.services import NewsletterServices
 from sm_newsletter.core.settings import NewsletterSettings
 from sm_newsletter.module import NewsletterModule
@@ -77,3 +80,15 @@ def test_registry_reports_the_settings_url():
         == constants.SETTINGS_URL
         == "/admin/newsletter/settings"
     )
+
+
+def test_secret_provider_reads_the_live_apps_secret_then_yields_nothing():
+    app = _app()
+    app.state.sm = SimpleNamespace(settings=SimpleNamespace(secret_key="live-secret"))
+    NewsletterModule().register_settings(app)
+    provider = crypto._secret_provider
+    assert provider is not None
+    assert provider() == "live-secret"
+    del app
+    gc.collect()
+    assert provider() == ""

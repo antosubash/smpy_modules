@@ -7,7 +7,7 @@ import importlib.resources
 import weakref
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
 
@@ -73,6 +73,15 @@ class NewsletterModule(ModuleBase):
         from sm_newsletter.core.errors import install_exception_handlers
 
         install_exception_handlers(app)
+
+    def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
+        from simple_module_hosting.csrf import RequiresCsrf
+
+        from sm_newsletter.web.endpoints.api import router as api
+
+        # The framework's CSRF check on every write; reads pass. No view routes
+        # until PR 3.
+        api_router.include_router(api, dependencies=[Depends(RequiresCsrf())])
 
     def register_permissions(self, registry: PermissionRegistry) -> None:
         registry.add_group(

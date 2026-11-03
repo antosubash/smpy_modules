@@ -4,15 +4,14 @@ The key derives from ``SM_SECRET_KEY`` (SHA-256 → urlsafe base64). The
 running app's secret wins when the module is registered normally — hosts may
 inject ``secret_key`` programmatically via ``create_app(settings=...)``, see
 ``set_secret_provider`` (a worker installs its own). The fallback is
-``SM_SECRET_KEY`` from the process environment, then from the project ``.env`` *as
-the framework's own
-``BootstrapSettings`` locates it* — ``$SM_PROJECT_ROOT/.env``, else a bounded
-walk up to the project root — never a ``.env`` resolved against whatever
-directory the process happens to run in (#124). The provider and process env
-are re-consulted on every call (only the ``.env`` read is cached — it cannot
-change without a restart) and the derived Fernet cached per secret, so an
-early call (before the app's live secret is available) can never pin the
-fallback secret for the process.
+``SM_SECRET_KEY`` from the process environment, then from the project ``.env``
+*as the framework's own ``BootstrapSettings`` locates it* —
+``$SM_PROJECT_ROOT/.env``, else a bounded walk up to the project root — never a
+``.env`` resolved against whatever directory the process happens to run in
+(#124). The provider and process env are re-consulted on every call (only the
+``.env`` read is cached — it cannot change without a restart) and the derived
+Fernet cached per secret, so an early call (before the app's live secret is
+available) can never pin the fallback secret for the process.
 Stored format is ``enc:v1:<fernet token>``:
 
 - prefix present and decrypts        → plaintext key

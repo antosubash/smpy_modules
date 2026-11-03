@@ -23,7 +23,7 @@ source repository, and the delivery order is
 
 DB-backed through the framework's settings module; no environment variables.
 `smtp_password` is stored encrypted and written only through
-`PUT /api/newsletter/settings/smtp-password` (it arrives later in this PR). The
+`PUT /api/newsletter/settings/smtp-password`. The
 generic Settings screen refuses newsletter writes: a dedicated settings page
 arrives in PR 3.
 

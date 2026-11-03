@@ -41,6 +41,15 @@ def _default_tenant(request):
 
 
 @pytest.fixture(autouse=True)
+def _restore_secret_provider(monkeypatch):
+    """``register_settings`` installs a process-global secret provider; put the
+    previous one back so it cannot leak into the next test."""
+    from sm_newsletter.core import crypto
+
+    monkeypatch.setattr(crypto, "_secret_provider", crypto._secret_provider)
+
+
+@pytest.fixture(autouse=True)
 def _arm_database_reset():
     """Every test starts from an empty database (a no-op on SQLite)."""
     arm_reset()
