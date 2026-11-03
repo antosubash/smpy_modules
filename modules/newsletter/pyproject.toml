@@ -15,10 +15,12 @@ dependencies = [
     "simple_module_hosting>=0.0.42,<0.1",
     "simple_module_settings>=0.0.42,<0.1",
     "simple_module_background_tasks>=0.0.42,<0.1",
-    # floor: 0.0.13 — raise to the records release that first ships contracts.newsletter's subscription_lists / subscription_list_tenants / include_trashed (newsletter PR 2; contracts.newsletter itself is #306)
+    # floor: 0.0.13 — raise to the records release that first ships contracts.newsletter's subscription_lists / subscription_list_tenants / include_trashed (newsletter PR 2; contracts.newsletter itself is #306) and contracts.newsletter.caller_roles (newsletter PR 3)
     "simple_module_records>=0.0.13,<0.1",
     "cryptography>=42",
     "pydantic-settings>=2.0",
+    "aiosmtplib>=3.0,<6",
+    "email-validator>=2.1",
 ]
 
 [project.urls]
@@ -28,7 +30,17 @@ Repository = "https://github.com/antosubash/simple_module_python_modules"
 newsletter = "sm_newsletter.module:NewsletterModule"
 
 [project.optional-dependencies]
+# Optional content sources for campaigns; the module works without either.
+news = [
+    # floor: 0.0.13 — contracts.articles (newsletter PR 1, #306); raise to the release that first ships it
+    "simple_module_news>=0.0.13,<0.1",
+]
+pagebuilder = [
+    # floor: 0.0.13 — contracts.cards (newsletter PR 3); raise to the release that first ships it
+    "simple_module_pagebuilder>=0.0.13,<0.1",
+]
 dev = [
+    "aiosmtpd>=1.4.6",
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
     "simple_module_test>=0.0.42,<0.1",
@@ -73,3 +85,5 @@ markers = [
 # tool config, so the published wheel still carries the ranges above.
 [tool.uv.sources]
 simple_module_records = { workspace = true }
+simple_module_news = { workspace = true }
+simple_module_pagebuilder = { workspace = true }
