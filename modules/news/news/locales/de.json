@@ -543,6 +543,24 @@
     "view_all_label": "Beschriftung des „Alle anzeigen“-Links",
     "view_all_href": "URL des „Alle anzeigen“-Links"
   },
+  "stats": {
+    "label": "Live-Artikelzahl",
+    "title": "Überschrift",
+    "subtitle": "Unterüberschrift",
+    "surface": "Fläche",
+    "surface_default": "Standard",
+    "surface_lime": "Limette",
+    "surface_cards": "Karten",
+    "items": "Zahlen (bis zu 6)",
+    "item_label": "Beschriftung",
+    "item_prefix": "Präfix (z. B. ~)",
+    "item_suffix": "Suffix (z. B. +)",
+    "item_icon": "Symbolbild (optional)",
+    "item_category": "Kategorie (leer = alle)",
+    "item_language": "Gezählte Sprachen",
+    "item_language_page": "Sprache dieser Seite",
+    "item_language_all": "Alle Sprachen"
+  },
   "errors": {
     "request_failed": "Anfrage fehlgeschlagen ({status} {statusText})",
     "request_failed_snippet": "{message}: {snippet}",

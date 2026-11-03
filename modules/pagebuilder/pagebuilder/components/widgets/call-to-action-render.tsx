@@ -1,7 +1,6 @@
 /** CallToActionWidget types, helpers and render — split from call-to-action-widget.tsx,
  *  which keeps the field definitions, so both stay under the 300-line cap. */
 
-import type { CSSProperties } from 'react';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 import { CTAButton, Heading, Section } from './_shared';
 import {

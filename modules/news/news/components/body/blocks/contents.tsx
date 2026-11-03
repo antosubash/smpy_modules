@@ -50,7 +50,7 @@ export function ContentsRender({
     // On the canvas, rendering nothing is indistinguishable from a block that
     // failed to load — and a writer who has just dropped this in has, by
     // definition, not written the headings yet. A reader gets the silence.
-    if (!isEditing) return <></>;
+    if (!isEditing) return null;
     return (
       <p className="my-8 rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
         {t(keys.news.blocks.contents.hint, { min: MIN_SECTIONS })}

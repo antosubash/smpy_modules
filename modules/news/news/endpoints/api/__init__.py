@@ -15,6 +15,7 @@ from news.endpoints.api.articles import router as articles_router
 from news.endpoints.api.body import router as body_router
 from news.endpoints.api.categories import router as categories_router
 from news.endpoints.api.search import router as search_router
+from news.endpoints.api.stats import router as stats_router
 from news.endpoints.api.tags import router as tags_router
 from news.endpoints.api.translations import router as translations_router
 from news.endpoints.api.workflow import router as workflow_router
@@ -37,6 +38,7 @@ router.include_router(article_tags_router)
 router.include_router(body_router)
 router.include_router(categories_router)
 router.include_router(search_router)
+router.include_router(stats_router)
 router.include_router(tags_router)
 router.include_router(translations_router)
 router.include_router(workflow_router)
