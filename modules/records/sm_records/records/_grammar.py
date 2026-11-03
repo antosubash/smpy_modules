@@ -67,7 +67,12 @@ def _too_many(parameter: str, sent: int, cap: int) -> HTTPException:
     )
 
 
-def _parse_filter(raw: str, settings: RecordsSettings) -> Filter:
+class FilterTermError(ValueError):
+    """A ``field:op:value`` term that does not parse. The message is the
+    client-facing detail; the web layer turns it into a 400."""
+
+
+def parse_term(raw: str, settings: RecordsSettings) -> Filter:
     """``field:op:value``, split on the first two colons — a value carrying
     its own colon (a URL, a timestamp) must not be truncated by it.
 
@@ -82,22 +87,17 @@ def _parse_filter(raw: str, settings: RecordsSettings) -> Filter:
     different refusals depending on which third of the term it landed in.
     """
     if has_nul(raw):
-        raise HTTPException(
-            status_code=400,
-            detail=f"invalid filter {raw!r}: a filter term must not contain a NUL character",
+        raise FilterTermError(
+            f"invalid filter {raw!r}: a filter term must not contain a NUL character",
         )
     parts = raw.split(":", 2)
     if len(parts) != 3:
-        raise HTTPException(
-            status_code=400, detail=f"invalid filter {raw!r}: expected 'field:op:value'"
-        )
+        raise FilterTermError(f"invalid filter {raw!r}: expected 'field:op:value'")
     field, op_raw, value = parts
     try:
         op = FilterOp(op_raw)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"invalid filter {raw!r}: unknown operator {op_raw!r}"
-        ) from exc
+        raise FilterTermError(f"invalid filter {raw!r}: unknown operator {op_raw!r}") from exc
     parsed_value: Any
     if op is FilterOp.IN:
         parsed_value = value.split(",")
@@ -108,9 +108,8 @@ def _parse_filter(raw: str, settings: RecordsSettings) -> Filter:
         # importer bounds the same clause for the same reason
         # (``services._import_match``).
         if len(parsed_value) > settings.max_in_values:
-            raise HTTPException(
-                status_code=400,
-                detail=(
+            raise FilterTermError(
+                (
                     f"invalid filter {raw!r}: 'in' takes at most "
                     f"{settings.max_in_values} values, {len(parsed_value)} sent"
                 ),
@@ -118,14 +117,21 @@ def _parse_filter(raw: str, settings: RecordsSettings) -> Filter:
     elif op is FilterOp.IS_NULL:
         low = value.strip().lower()
         if low not in ("true", "false"):
-            raise HTTPException(
-                status_code=400,
-                detail=f"invalid filter {raw!r}: is_null takes 'true' or 'false'",
+            raise FilterTermError(
+                f"invalid filter {raw!r}: is_null takes 'true' or 'false'",
             )
         parsed_value = low == "true"
     else:
         parsed_value = value
     return Filter(field=field, op=op, value=parsed_value)
+
+
+def _parse_filter(raw: str, settings: RecordsSettings) -> Filter:
+    """:func:`parse_term`, as the 400 the HTTP surface answers."""
+    try:
+        return parse_term(raw, settings)
+    except FilterTermError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 def parse_filters(
