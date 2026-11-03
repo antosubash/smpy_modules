@@ -45,6 +45,7 @@ testpaths = [
     "modules/billing/tests",
     "modules/images/tests",
     "modules/news/tests",
+    "modules/newsletter/tests",
     "modules/pagebuilder/tests",
     "modules/records/tests",
     "scripts/tests",

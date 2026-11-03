@@ -1,0 +1,10 @@
+{
+  "extends": "@simple-module-py/tsconfig/base.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./sm_newsletter/*"],
+      "@simple-module-py/ui/*": ["../../packages/ui/src/*"]
+    }
+  },
+  "include": ["sm_newsletter/**/*.ts", "sm_newsletter/**/*.tsx"]
+}
