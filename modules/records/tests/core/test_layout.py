@@ -3,6 +3,8 @@
 import ast
 import importlib
 import importlib.metadata
+import subprocess
+import sys
 from pathlib import Path
 
 import sm_records
@@ -44,3 +46,15 @@ def test_public_extension_lookups_keep_the_same_objects():
         internal = importlib.import_module(f"sm_records.records.{name}")
         assert public.__all__ == internal.__all__
         assert all(getattr(public, key) is getattr(internal, key) for key in public.__all__)
+
+
+def test_newsletter_contract_imports_cleanly_first():
+    """In a fresh interpreter, with nothing imported before it, the contract
+    and the modules behind it load without an import cycle."""
+    code = (
+        "import sm_records.contracts.newsletter as n, "
+        "sm_records.public_submissions.campaign_reads, "
+        "sm_records.public_submissions.campaign_writes; "
+        "assert n.MAX_SUBSCRIBER_BATCH == 1000"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)

@@ -140,5 +140,5 @@ async def test_set_tags_retries_once_when_the_row_moved(audience, monkeypatch):
     async with session(audience) as db:
         with pytest.raises(Conflict):
             await set_tags(
-                db, tenant_id=TENANT, type_key=LIST, uuid=uuid, add=["a"], settings=SETTINGS
+                db, tenant_id=TENANT, type_key=LIST, uuid=uuid, remove=["a"], settings=SETTINGS
             )

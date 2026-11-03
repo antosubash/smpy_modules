@@ -84,3 +84,13 @@ async def test_by_uuid_not_a_list(audience):
         with pytest.raises(SubscriberFilterError) as err:
             await subscribers_by_uuid(db, tenant_id=TENANT, type_key="contact", uuids=["x"])
     assert err.value.reason == "not_a_list"
+
+
+def test_a_naive_stored_timestamp_is_utc():
+    from datetime import UTC, datetime
+
+    from sm_records.public_submissions.campaign_reads import moment
+
+    assert moment("2026-01-02T03:04:05") == datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
+    assert moment("2026-01-02T03:04:05+02:00").utcoffset().total_seconds() == 7200
+    assert moment("not a date") is None and moment(None) is None

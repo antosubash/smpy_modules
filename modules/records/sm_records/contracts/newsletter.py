@@ -209,7 +209,10 @@ async def unsubscribe(
     ``True`` only if *this* call wrote. ``False``, and nothing written, for an
     unknown or trashed subscriber, one ``pending`` or already ``unsubscribed``,
     or one confirmed after ``unless_confirmed_after`` (a re-signup since the
-    mail; ``None`` means unconditionally). The cutoff must be aware."""
+    mail; ``None`` means unconditionally). The cutoff must be aware.
+
+    Raises ``SubscriberFilterError("not_a_list")`` when ``type_key`` is an
+    existing type that is not a newsletter list."""
     tenant = _checked_tenant(tenant_id)
     cutoff = unless_confirmed_after
     if cutoff is not None and (not isinstance(cutoff, datetime) or cutoff.tzinfo is None):
@@ -235,7 +238,12 @@ async def set_tags(
     The stored order is kept, new tags appended, duplicates dropped, and a tag
     in both ``add`` and ``remove`` removed. :class:`SubscriberNotFound` for an
     unknown or trashed one; a tag outside the field's choices raises records'
-    ``ValidationFailed`` unchanged, with nothing written."""
+    ``ValidationFailed`` unchanged, with nothing written. A merge that leaves the
+    stored tags as they are writes nothing (no version bump, no event).
+
+    Raises ``SubscriberFilterError("not_a_list")`` for an existing type that is
+    not a newsletter list. The write is one ``update_record`` at the version
+    read, retried once if the row moved; a second ``Conflict`` is re-raised."""
     tenant = _checked_tenant(tenant_id)
     add, remove = _checked_tags(add, "add"), _checked_tags(remove, "remove")
     with tenant_scope(tenant):

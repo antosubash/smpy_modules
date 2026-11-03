@@ -12,7 +12,9 @@ from datetime import UTC, datetime
 
 import pytest
 from simple_module_db.listeners import TenantIsolationError
+from sm_records.contracts.events import RecordUpdated
 from sm_records.contracts.newsletter import (
+    SubscriberFilterError,
     SubscriberNotFound,
     can_read_list,
     iter_subscribers,
@@ -22,7 +24,9 @@ from sm_records.contracts.newsletter import (
 )
 from sm_records.core import events
 from sm_records.core.settings import RecordsSettings
+from sm_records.models import Record
 from sm_records.records.services.errors import ValidationFailed
+from sqlalchemy import select
 
 from tests.support.app_harness import ADMIN, roles
 from tests.support.newsletter_contract import (
@@ -187,3 +191,44 @@ async def test_can_read_list(audience):
         assert await ok(LIST, None) is True
         assert await ok("contact", None) is False, "not a list"
         assert await ok("nosuch", None) is False
+
+
+async def _version(client, uuid: str) -> int:
+    async with session(client) as db:
+        row = (await db.execute(select(Record).where(Record.uuid == uuid))).scalars().one()
+        return row.version
+
+
+async def test_set_tags_that_changes_nothing_writes_nothing(audience):
+    uuid = await _uuid(audience, "ada@example.org")  # ada has ["a"]
+    before = await _version(audience, uuid)
+    seen = []
+
+    async def note(event):
+        seen.append(event)
+
+    audience.app.state.sm.event_bus.subscribe(RecordUpdated, note)
+    hit = await _set_tags(audience, uuid, add=["a"], remove=["b"])
+    assert hit.tags == ["a"]
+    assert await _version(audience, uuid) == before
+    assert not seen, "no RecordUpdated for a no-op"
+
+
+async def test_writes_on_a_form_type_raise_not_a_list(audience):
+    assert (await create(audience, "contact")).status_code == 201
+    async with session(audience) as db:
+        with pytest.raises(SubscriberFilterError) as err:
+            await unsubscribe(
+                db,
+                tenant_id=TENANT,
+                type_key="contact",
+                uuid="x",
+                unless_confirmed_after=None,
+                settings=SETTINGS,
+            )
+        assert err.value.reason == "not_a_list"
+        with pytest.raises(SubscriberFilterError) as err:
+            await set_tags(
+                db, tenant_id=TENANT, type_key="contact", uuid="x", add=["a"], settings=SETTINGS
+            )
+        assert err.value.reason == "not_a_list"

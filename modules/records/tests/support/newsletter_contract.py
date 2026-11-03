@@ -14,7 +14,7 @@ from typing import Any
 import pytest_asyncio
 from simple_module_db.listeners import current_tenant_id
 from sm_records.contracts.events import SubscriptionChanged
-from sm_records.core import boot
+from sm_records.core import boot, events
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope
 from sm_records.records.services import records as record_service
@@ -101,7 +101,7 @@ async def seed_list(db_state: Any, tenant: str, email: str) -> str:
                     "sm_nonce": "0" * 32,
                 },
             )
-            await db.commit()
+            await events.commit(db)
             return record.uuid
 
 
