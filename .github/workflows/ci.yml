@@ -158,7 +158,7 @@ jobs:
       # perf smoke stays serial: it measures.
       - name: Create test databases
         run: |
-          for db in ci_records ci_records_perf ci_pagebuilder ci_news ci_billing ci_images; do
+          for db in ci_records ci_records_perf ci_pagebuilder ci_news ci_billing ci_images ci_newsletter; do
             PGPASSWORD=postgres createdb -h localhost -U postgres "$db"
           done
 
@@ -227,6 +227,12 @@ jobs:
         env:
           SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_images
         run: scripts/pytest_modules.sh images
+
+      - name: Run pytest (newsletter, Postgres)
+        if: ${{ !cancelled() }}
+        env:
+          SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_newsletter
+        run: scripts/pytest_modules.sh newsletter
 
       # A short smoke, not the full study (which runs at N=20000): enough to
       # exercise the write, read, aggregate and i18n statement-count
