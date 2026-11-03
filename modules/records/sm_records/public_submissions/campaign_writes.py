@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType, tables_for
 from sm_records.public_submissions import opt_in
-from sm_records.public_submissions.campaign_reads import list_type, moment
+from sm_records.public_submissions.campaign_reads import list_type, moment, stored_tags
 from sm_records.public_submissions.subscribe import CONFIRMED
 from sm_records.public_submissions.system import ordinary, reload
 from sm_records.records.services import records as record_service
@@ -88,7 +88,7 @@ async def unsubscribe(
 
 def _merged(stored: object, add: Sequence[str], remove: Sequence[str]) -> list[str]:
     """Stored order kept, new tags appended, duplicates dropped; removal wins."""
-    current = [t for t in stored if isinstance(t, str)] if isinstance(stored, list) else []
+    current = stored_tags(stored)
     gone = set(remove)
     out: list[str] = []
     for tag in [*current, *add]:

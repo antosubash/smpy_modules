@@ -32,6 +32,7 @@ __all__ = [
     "lookup",
     "moment",
     "page",
+    "stored_tags",
 ]
 
 WALKABLE: Final = ("confirmed", "unsubscribed")
@@ -80,6 +81,11 @@ def moment(value: Any) -> datetime | None:
     return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
 
 
+def stored_tags(value: Any) -> list[str]:
+    """The string tags of a stored ``tags`` value; ``[]`` when it is not a list."""
+    return [t for t in value if isinstance(t, str)] if isinstance(value, list) else []
+
+
 def _filters(raw: Sequence[str], status: str) -> list[Filter]:
     settings = RecordsSettings()
     if isinstance(raw, str) or len(raw) > settings.max_filter_terms:
@@ -93,6 +99,18 @@ def _filters(raw: Sequence[str], status: str) -> list[Filter]:
 
 def _live(stmt, record, tenant_id: str):
     return stmt.where(record.tenant_id == tenant_id, record.is_deleted.is_(False))
+
+
+def _query(rtype: RecordType, tenant_id: str, filters: Sequence[str], status: str, builder):
+    """``builder``'s statement (``build_query``/``count_query``) for the terms,
+    pinned to the tenant's untrashed rows; with the type's record table."""
+    terms = _filters(filters, status)
+    record = tables_for(rtype).record
+    try:
+        stmt = builder(rtype, list(rtype.fields or []), terms)
+    except QueryError as exc:
+        raise SubscriberFilterError(exc.reason, str(exc)) from exc
+    return _live(stmt, record, tenant_id), record
 
 
 async def page(
@@ -109,13 +127,8 @@ async def page(
 
     One row more than ``limit`` is read to know whether anything follows, so
     ``next_after`` is ``None`` exactly when the walk is over."""
-    terms = _filters(filters, status)
-    record = tables_for(rtype).record
-    try:
-        stmt = build_query(rtype, list(rtype.fields or []), terms)
-    except QueryError as exc:
-        raise SubscriberFilterError(exc.reason, str(exc)) from exc
-    stmt = _live(stmt, record, tenant_id).where(record.id > after).limit(limit + 1)
+    stmt, record = _query(rtype, tenant_id, filters, status, build_query)
+    stmt = stmt.where(record.id > after).limit(limit + 1)
     rows = list((await db.execute(stmt)).scalars().all())
     if len(rows) <= limit:
         return rows, None
@@ -126,13 +139,8 @@ async def page(
 async def count(
     db: AsyncSession, rtype: RecordType, tenant_id: str, filters: Sequence[str], status: str
 ) -> int:
-    terms = _filters(filters, status)
-    record = tables_for(rtype).record
-    try:
-        stmt = count_query(rtype, list(rtype.fields or []), terms)
-    except QueryError as exc:
-        raise SubscriberFilterError(exc.reason, str(exc)) from exc
-    return int((await db.execute(_live(stmt, record, tenant_id))).scalar_one())
+    stmt, _ = _query(rtype, tenant_id, filters, status, count_query)
+    return int((await db.execute(stmt)).scalar_one())
 
 
 async def lookup(

@@ -29,6 +29,7 @@ from tests.support.newsletter_contract import (
     session,
     subscription_events,
     transitions,
+    unsubscribe_committed,
 )
 from tests.support.newsletter_http import LIST, records_of
 
@@ -52,11 +53,16 @@ async def _call(client, db, uuid: str) -> bool:
     )
 
 
-async def _committed(client, uuid: str) -> bool:
-    async with session(client) as db:
-        wrote = await _call(client, db, uuid)
-        await events.commit(db)
-    return wrote
+async def _force(db, rtype, record, **values) -> None:
+    """Write ``values`` onto the row behind the service's back, as a competing
+    transaction would."""
+    cls = tables_for(rtype).record
+    await db.execute(
+        update(cls)
+        .where(cls.id == record.id, cls.tenant_id == record.tenant_id)
+        .values(**values)
+        .execution_options(synchronize_session=False)
+    )
 
 
 async def test_two_sessions_one_after_the_other(audience):
@@ -82,18 +88,12 @@ async def test_a_competitor_that_wrote_first_makes_this_call_false(audience, mon
     async def racing(db, rtype, record, **kw):
         if not moved:
             moved.append(True)
-            cls = tables_for(rtype).record
             data = {**record.data, "sm_status": "unsubscribed"}
-            await db.execute(
-                update(cls)
-                .where(cls.id == record.id, cls.tenant_id == record.tenant_id)
-                .values(data=data, version=record.version + 1)
-                .execution_options(synchronize_session=False)
-            )
+            await _force(db, rtype, record, data=data, version=record.version + 1)
         return await real(db, rtype, record, **kw)
 
     monkeypatch.setattr(transition_module.record_service, "update_record", racing)
-    assert await _committed(audience, uuid) is False
+    assert await unsubscribe_committed(audience, uuid) is False
     assert moved and seen == []
 
 
@@ -101,7 +101,9 @@ async def test_a_competitor_that_wrote_first_makes_this_call_false(audience, mon
 async def test_two_unsubscribes_at_once_attribute_it_once(audience):
     uuid = await _ada(audience)
     seen = subscription_events(audience)
-    answers = await asyncio.gather(_committed(audience, uuid), _committed(audience, uuid))
+    answers = await asyncio.gather(
+        unsubscribe_committed(audience, uuid), unsubscribe_committed(audience, uuid)
+    )
     assert sorted(answers) == [False, True]
     assert list(transitions(seen)) == [("confirmed", "unsubscribed")]
 
@@ -116,13 +118,7 @@ async def test_set_tags_retries_once_when_the_row_moved(audience, monkeypatch):
     async def bumped(db, rtype, record, **kw):
         calls.append(kw["expected_version"])
         if len(calls) == 1:
-            cls = tables_for(rtype).record
-            await db.execute(
-                update(cls)
-                .where(cls.id == record.id, cls.tenant_id == record.tenant_id)
-                .values(version=record.version + 1)
-                .execution_options(synchronize_session=False)
-            )
+            await _force(db, rtype, record, version=record.version + 1)
         return await real(db, rtype, record, **kw)
 
     monkeypatch.setattr(campaign_writes.record_service, "update_record", bumped)

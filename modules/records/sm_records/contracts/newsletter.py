@@ -42,7 +42,11 @@ from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope
 from sm_records.models import Record, RecordType
 from sm_records.public_submissions import campaign_reads, campaign_writes
-from sm_records.public_submissions.campaign_reads import SubscriberFilterError, moment
+from sm_records.public_submissions.campaign_reads import (
+    SubscriberFilterError,
+    moment,
+    stored_tags,
+)
 from sm_records.public_submissions.campaign_writes import SubscriberNotFound
 from sm_records.records.services._access import CallerRoles, role_blocked
 
@@ -107,7 +111,7 @@ def _checked_tags(tags: Sequence[str], name: str) -> list[str]:
 
 
 def _checked_tenant(tenant_id: object) -> str:
-    if not isinstance(tenant_id, str) or not is_valid_tenant_id(tenant_id):
+    if not is_valid_tenant_id(tenant_id):
         raise ValueError(f"not a valid tenant id: {tenant_id!r}")
     return tenant_id
 
@@ -128,7 +132,7 @@ def _hit(rtype: RecordType, record: Record) -> SubscriberHit:
         confirmed_at=moment(data.get("sm_confirmed_at")),
         first_name=_text(data.get("first_name")) if "first_name" in declared else None,
         last_name=_text(data.get("last_name")) if "last_name" in declared else None,
-        tags=[t for t in tags if isinstance(t, str)] if isinstance(tags, list) else [],
+        tags=stored_tags(tags),
         trashed=bool(record.is_deleted),
     )
 

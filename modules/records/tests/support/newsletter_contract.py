@@ -9,11 +9,13 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, contextmanager
+from datetime import datetime
 from typing import Any
 
 import pytest_asyncio
 from simple_module_db.listeners import current_tenant_id
 from sm_records.contracts.events import SubscriptionChanged
+from sm_records.contracts.newsletter import unsubscribe
 from sm_records.core import boot, events
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope
@@ -105,15 +107,38 @@ async def seed_list(db_state: Any, tenant: str, email: str) -> str:
             return record.uuid
 
 
-def subscription_events(client) -> list:
-    """Every ``SubscriptionChanged`` the app's bus publishes from now on."""
+def published(client, event_type: type) -> list:
+    """Every ``event_type`` the app's bus publishes from now on."""
     seen: list = []
 
     async def note(event):
         seen.append(event)
 
-    client.app.state.sm.event_bus.subscribe(SubscriptionChanged, note)
+    client.app.state.sm.event_bus.subscribe(event_type, note)
     return seen
+
+
+def subscription_events(client) -> list:
+    """Every ``SubscriptionChanged`` the app's bus publishes from now on."""
+    return published(client, SubscriptionChanged)
+
+
+async def unsubscribe_committed(
+    client, uuid: str, *, tenant: str = TENANT, cutoff: datetime | None = None
+) -> bool:
+    """``unsubscribe`` in a session of its own, committed; whether it wrote."""
+    async with session(client) as db:
+        wrote = await unsubscribe(
+            db,
+            tenant_id=tenant,
+            type_key=LIST,
+            uuid=uuid,
+            unless_confirmed_after=cutoff,
+            settings=RecordsSettings(),
+            bus=client.app.state.sm.event_bus,
+        )
+        await events.commit(db)
+    return wrote
 
 
 def transitions(seen: list) -> Iterator[tuple[str | None, str]]:

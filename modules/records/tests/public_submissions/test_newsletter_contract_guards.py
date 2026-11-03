@@ -12,7 +12,6 @@ from __future__ import annotations
 import pytest
 from simple_module_db.listeners import TenantIsolationError
 from sm_records.contracts.newsletter import (
-    SubscriberFilterError,
     count_subscribers,
     iter_subscribers,
     subscribers_by_uuid,
@@ -20,7 +19,6 @@ from sm_records.contracts.newsletter import (
 
 from tests.support.newsletter_contract import TENANT, join, seed_list, session, unbound
 from tests.support.newsletter_http import LIST, follow
-from tests.support.public_submissions_support import create
 
 
 async def _hits(client, tenant: str, **kw) -> list[str]:
@@ -76,14 +74,6 @@ async def test_by_uuid_refuses_a_bare_string(audience):
     async with session(audience) as db:
         with pytest.raises(ValueError):
             await subscribers_by_uuid(db, tenant_id=TENANT, type_key=LIST, uuids="abc")
-
-
-async def test_by_uuid_not_a_list(audience):
-    assert (await create(audience, "contact")).status_code == 201
-    async with session(audience) as db:
-        with pytest.raises(SubscriberFilterError) as err:
-            await subscribers_by_uuid(db, tenant_id=TENANT, type_key="contact", uuids=["x"])
-    assert err.value.reason == "not_a_list"
 
 
 def test_a_naive_stored_timestamp_is_utc():

@@ -12,18 +12,18 @@ from sm_records.contracts.newsletter import (
 )
 
 from tests.support.app_harness import ADMIN, roles
-from tests.support.newsletter_contract import TENANT, unbound
+from tests.support.newsletter_contract import TENANT, session, unbound
 from tests.support.newsletter_http import LIST, records_of
 from tests.support.public_submissions_support import create
 
 
 async def _iter(client, **kw):
-    async with client.db_state.session_factory() as db:
+    async with session(client) as db:
         return await iter_subscribers(db, tenant_id=TENANT, type_key=LIST, **kw)
 
 
 async def _count(client, **kw):
-    async with client.db_state.session_factory() as db:
+    async with session(client) as db:
         return await count_subscribers(db, tenant_id=TENANT, type_key=LIST, **kw)
 
 
@@ -78,7 +78,7 @@ async def test_bad_filter_raises_reason(audience):
 async def test_wrong_tenant_sees_nothing(audience):
     # Nothing bound upstream: only the tenant the call names is read.
     with unbound():
-        async with audience.db_state.session_factory() as db:
+        async with session(audience) as db:
             assert await iter_subscribers(db, tenant_id="other", type_key=LIST) == ([], None)
             assert await count_subscribers(db, tenant_id="other", type_key=LIST) == 0
             with pytest.raises(ValueError):
@@ -95,7 +95,7 @@ async def test_by_uuid_any_status(audience):
     rows = await records_of(audience)
     uuids = [r["uuid"] for r in rows]
     pending = next(r["uuid"] for r in rows if r["data"]["sm_status"] == "pending")
-    async with audience.db_state.session_factory() as db:
+    async with session(audience) as db:
         found = await subscribers_by_uuid(
             db, tenant_id=TENANT, type_key=LIST, uuids=[*uuids, "nope"]
         )
@@ -108,7 +108,7 @@ async def test_by_uuid_any_status(audience):
 async def test_by_uuid_includes_trash(audience):
     uuid = await _uuid_of(audience, "ada@example.org")
     await audience.delete(f"/api/records/types/{LIST}/records/{uuid}", headers=roles(ADMIN))
-    async with audience.db_state.session_factory() as db:
+    async with session(audience) as db:
         found = await subscribers_by_uuid(db, tenant_id=TENANT, type_key=LIST, uuids=[uuid])
     assert found[uuid].trashed is True
 
@@ -120,7 +120,7 @@ async def test_limit_checked(audience, limit):
 
 
 async def test_by_uuid_batch_checked(audience):
-    async with audience.db_state.session_factory() as db:
+    async with session(audience) as db:
         with pytest.raises(ValueError):
             await subscribers_by_uuid(
                 db,
@@ -132,9 +132,12 @@ async def test_by_uuid_batch_checked(audience):
 
 async def test_not_a_list(audience):
     assert (await create(audience, "contact")).status_code == 201
-    async with audience.db_state.session_factory() as db:
+    async with session(audience) as db:
         with pytest.raises(SubscriberFilterError) as err:
             await iter_subscribers(db, tenant_id=TENANT, type_key="contact")
         assert err.value.reason == "not_a_list"
         with pytest.raises(SubscriberFilterError):
             await count_subscribers(db, tenant_id=TENANT, type_key="contact")
+        with pytest.raises(SubscriberFilterError) as err:
+            await subscribers_by_uuid(db, tenant_id=TENANT, type_key="contact", uuids=["x"])
+        assert err.value.reason == "not_a_list"

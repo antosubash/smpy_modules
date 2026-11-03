@@ -32,11 +32,13 @@ from tests.support.app_harness import ADMIN, roles
 from tests.support.newsletter_contract import (
     TENANT,
     join,
+    published,
     session,
     subscription_events,
     transitions,
     unbound,
 )
+from tests.support.newsletter_contract import unsubscribe_committed as _unsubscribe
 from tests.support.newsletter_http import LIST, follow, signup
 from tests.support.public_submissions_support import create, update
 
@@ -57,21 +59,6 @@ async def _hit(client, uuid: str, tenant: str = TENANT):
     async with session(client) as db:
         found = await subscribers_by_uuid(db, tenant_id=tenant, type_key=LIST, uuids=[uuid])
     return found.get(uuid)
-
-
-async def _unsubscribe(client, uuid: str, *, tenant: str = TENANT, cutoff=None) -> bool:
-    async with session(client) as db:
-        wrote = await unsubscribe(
-            db,
-            tenant_id=tenant,
-            type_key=LIST,
-            uuid=uuid,
-            unless_confirmed_after=cutoff,
-            settings=SETTINGS,
-            bus=client.app.state.sm.event_bus,
-        )
-        await events.commit(db)
-    return wrote
 
 
 async def _set_tags(client, uuid: str, **kw):
@@ -202,12 +189,7 @@ async def _version(client, uuid: str) -> int:
 async def test_set_tags_that_changes_nothing_writes_nothing(audience):
     uuid = await _uuid(audience, "ada@example.org")  # ada has ["a"]
     before = await _version(audience, uuid)
-    seen = []
-
-    async def note(event):
-        seen.append(event)
-
-    audience.app.state.sm.event_bus.subscribe(RecordUpdated, note)
+    seen = published(audience, RecordUpdated)
     hit = await _set_tags(audience, uuid, add=["a"], remove=["b"])
     assert hit.tags == ["a"]
     assert await _version(audience, uuid) == before
@@ -242,12 +224,7 @@ async def test_set_tags_removing_from_a_subscriber_without_tags_writes_nothing(a
         row.data = {k: v for k, v in row.data.items() if k != "tags"}
         await events.commit(db)
     before = await _version(audience, uuid)
-    seen = []
-
-    async def note(event):
-        seen.append(event)
-
-    audience.app.state.sm.event_bus.subscribe(RecordUpdated, note)
+    seen = published(audience, RecordUpdated)
     hit = await _set_tags(audience, uuid, remove=["x"])
     assert hit.tags == []
     assert await _version(audience, uuid) == before
