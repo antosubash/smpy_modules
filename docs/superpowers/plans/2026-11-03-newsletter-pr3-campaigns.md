@@ -1005,3 +1005,62 @@ The form is grouped as Transport (transport, host, port, security, username, pas
 | `news`/`pagebuilder` extras with floors | 1 |
 | en/de locales | 6, 13–18 |
 | PR 2 deferred items: Important 1 → R10; `translate()` doc; `-test-support.tsx` exclude | 12, 14, 1 |
+
+## Amendments from the Codex plan review (2026-11-03)
+
+These override any task or ruling above that contradicts them.
+
+1. **R11 replaced: test sends go through the one dispatcher lock.** A test send takes PR 2's global
+   dispatch lock (Postgres advisory lock; the `newsletter_dispatch_lock` row on SQLite — spec
+   amendment 4) for admission *and* the SMTP calls. Inside the lock: count the rolling 24 h and
+   60 s windows from `newsletter_send_attempt` across all tenants, write one attempt row per
+   recipient immediately before its SMTP call, resolve it after. An attempt row that never
+   resolves (crash) stays counted for its window — conservative. Over budget → 429
+   `send_budget_exhausted`, nothing sent. Test: two concurrent test sends with a fake clock and a
+   cap of 3 never exceed 3 attempts. PR 4's dispatcher uses the same admission helper.
+2. **R15 replaced: an integer `revision` column.** A new alembic revision (off the current head,
+   no branch label) adds `newsletter_campaign.revision INTEGER NOT NULL DEFAULT 1`. PATCH and
+   Refresh both require `expected_revision`; the write is one conditional
+   `UPDATE … SET revision = revision + 1 WHERE id = :id AND tenant_id = :t AND status = 'draft' AND revision = :r`;
+   zero rows → 409 `stale` (or `not_a_draft` after re-reading status). The editor flushes pending
+   autosave before Refresh. Tests: concurrent PATCH/PATCH and PATCH/Refresh, exactly one wins.
+   This also removes the nullable `updated_at` problem.
+3. **Every campaign request checks list access.** One helper (`campaigns/access.py`) runs
+   `can_read_list` for the campaign's `list_type_key` on every read, list (filter out campaigns on
+   lists the caller cannot read), preview, card/refresh and test send — not only when the list is
+   chosen. Test: restrict the list's `allowed_roles` after creating a campaign → its read, preview
+   and test send are 403/404 for that caller.
+4. **SMTP envelope recovery.** After any MAIL/RCPT/DATA rejection the transport issues `RSET`
+   (as `aiosmtplib.sendmail` does) before the next recipient; a disconnect or timeout before DATA
+   is a pre-acceptance failure (reconnect, retryable); after the body was sent it is
+   *outcome unknown* (spec amendment 2). Tests on aiosmtpd: first recipient rejected, second
+   accepted; disconnect at RCPT then recovery.
+5. **All header inputs validated before admission.** Settings `from_name`, `from_address`,
+   `reply_to` and campaign subject/from-name/reply-to reject CR/LF and control characters at their
+   write (422, no echo) and are re-checked before the ledger admits an attempt. Settings-level
+   CR/LF tests.
+6. **R6 amended: a per-tenant public origin.** Content links (article and page cards, images) are
+   made absolute against the *campaign tenant's* public origin: on a multi-tenant host with
+   `tenants.subdomain_base`, the framework's canonical origin for that organisation (find the
+   framework helper; if none, `<scheme of public_base_url>://<org slug>.<subdomain_base>`), else
+   `public_base_url`. Never the request Host. Test: identical slugs in two tenants render two
+   different absolute URLs. Newsletter's own public routes (unsubscribe, later tracking) keep
+   `public_base_url`, since their tenant comes from the token.
+7. **R7 amended: the logo is served platform-scoped.** The email's logo URL is a newsletter public
+   route (`/newsletter/brand/logo`) that serves the SYSTEM-scope branding logo explicitly, never
+   the requesting tenant's override; no logo when branding has none. Test with a tenant override
+   present: the route still serves the system logo, anonymously.
+8. **Puck palette:** unavailable card components go into a hidden category and `other` is
+   `visible: false`. Test the palette with news absent, pagebuilder absent, both absent.
+9. **Viewers preview the saved campaign** with the GET preview; the unsaved POST preview is used
+   only for editable drafts by `newsletter.edit` holders. Test the viewer flow.
+10. **Route-guard test** walks effective routes with `iter_route_contexts(app.routes)` (as the
+    other modules' tests do), asserts the expected newsletter route set is non-empty and complete,
+    and asserts `bind_admin` and the permission are present on each (order: match PR 2's actual
+    router — CSRF outer is fine; rule and document it).
+11. **Sanitiser output escaping.** Every emitted attribute value is
+    `html.escape(value, quote=True)` after the scheme check (performed on the decoded,
+    whitespace/control-stripped, lowercased value). Tests: entity-encoded quotes and
+    `javascript:`/`data:`/`vbscript:` schemes (`&#106;avascript:`, `java\tscript:`), duplicate
+    `href`, comments, malformed nesting, `<script>` inside allowed tags, `<style>`, `<svg>`.
+12. **Drop `get_media_card`** from the pagebuilder contract; the picker uses the media search only.
