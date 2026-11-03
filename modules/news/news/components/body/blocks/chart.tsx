@@ -187,7 +187,7 @@ export const ChartBlock: ComponentConfig<ChartProps> = {
 function ChartRender({ caption, kind, series, title }: ChartProps) {
   const { t } = useT();
   const points = parseSeries(series);
-  if (points.length === 0) return <></>;
+  if (points.length === 0) return null;
   return (
     <figure className="my-8">
       {title && (

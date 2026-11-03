@@ -251,6 +251,10 @@ class NewsModule(ModuleBase):
         """
         for prefix in constants.PUBLIC_READ_PREFIXES:
             registry.add_prefix(prefix, methods={"GET"})
+        # The stats count is also HEADed (a prober's freshness check), and the
+        # registry matches on method, so a GET-only entry would still ask a
+        # HEAD for a session.
+        registry.add_prefix(constants.PUBLIC_STATS_PREFIX, methods={"GET", "HEAD"})
 
     def _exempt_public_routes(
         self, app: FastAPI, prefix: str, languages: tuple[str, ...]

@@ -149,7 +149,7 @@ test('images a user uploads count on their own Billing page', async ({ page, bro
     await page.goto('/billing/');
     await expect(page.getByRole('heading', { name: 'Billing' })).toBeVisible();
     const row = page.locator(STORAGE);
-    return (await row.count()) === 0 ? null : await row.innerText();
+    return (await row.count()) === 0 ? null : await row.textContent();
   };
   const before = await adminMeter();
 

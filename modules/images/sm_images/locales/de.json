@@ -658,5 +658,25 @@
     "size_medium": "Mittel",
     "size_large": "Groß",
     "count": "Anzahl der Bilder"
+  },
+  "stats": {
+    "label": "Live-Bildzahlen",
+    "title": "Überschrift",
+    "subtitle": "Unterüberschrift",
+    "surface": "Fläche",
+    "surface_default": "Standard",
+    "surface_lime": "Limette",
+    "surface_cards": "Karten",
+    "items": "Zahlen (bis zu 6)",
+    "item_label": "Beschriftung",
+    "item_prefix": "Präfix (z. B. ~)",
+    "item_suffix": "Suffix (z. B. +)",
+    "item_icon": "Symbolbild (optional)",
+    "item_metric": "Was angezeigt wird",
+    "item_metric_images": "Anzahl der Bilder",
+    "item_metric_located": "Anzahl der Bilder mit Ort",
+    "item_metric_collections": "Anzahl der öffentlichen Sammlungen",
+    "item_collection": "Sammlung (bei der Anzahl der Sammlungen ohne Wirkung)",
+    "item_collection_all": "Alle öffentlichen Sammlungen"
   }
 }

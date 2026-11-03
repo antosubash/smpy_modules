@@ -26,15 +26,17 @@ function json(body: unknown, status = 200) {
   });
 }
 
+let api: Api;
+
+/** Renders the hook and exposes what it returns as `api`. */
+function Harness() {
+  api = useArticleBody(7);
+  return null;
+}
+
 describe('useArticleBody — stale writes', () => {
-  let api: Api;
   let calls: { url: string; method: string; body: Record<string, unknown> | null }[];
   let responder: (url: string, method: string) => Response;
-
-  function Harness() {
-    api = useArticleBody(7);
-    return null;
-  }
 
   beforeEach(() => {
     calls = [];
@@ -102,7 +104,7 @@ describe('useArticleBody — stale writes', () => {
   });
 
   it('publishes once however many times it is clicked', async () => {
-    responder = (url, method) =>
+    responder = (_url, method) =>
       method === 'POST'
         ? json(detail('2026-01-01T00:00:09Z'))
         : json(detail('2026-01-01T00:00:00Z'));

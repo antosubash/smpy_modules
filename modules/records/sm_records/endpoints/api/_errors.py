@@ -32,8 +32,8 @@ FastAPI validation error on the very same screen rendered HTML.
 
 :class:`PublicErrorRoute` serves the anonymous public router. It answers the
 host-handled exceptions itself — through the host's own registered handler, so
-the body is unchanged — because the response has to carry the tenant header in
-``Vary`` and ``no-store`` in multi mode (:func:`~sm_records.endpoints.api.
+the body is unchanged — because the response has to carry ``no-store``, and the
+tenant header in ``Vary`` in multi mode (:func:`~sm_records.endpoints.api.
 _public_cache.error_headers`), and an exception left to propagate is rendered
 where nothing here can add a header: the framework's handler drops
 ``HTTPException.headers``.
