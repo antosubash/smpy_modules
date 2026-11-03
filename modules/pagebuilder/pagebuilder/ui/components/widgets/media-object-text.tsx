@@ -11,8 +11,6 @@ import { headingStyle, type MediaObjectWidgetProps } from './media-object-layout
 
 type TextBlockProps = MediaObjectWidgetProps & {
   isDark: boolean;
-  grid: boolean;
-  textMax: string;
 };
 
 export function MediaObjectText({
@@ -33,8 +31,6 @@ export function MediaObjectText({
   headingWidth = 'auto',
   layout = 'half',
   isDark,
-  grid,
-  textMax,
 }: TextBlockProps) {
   return (
     <>

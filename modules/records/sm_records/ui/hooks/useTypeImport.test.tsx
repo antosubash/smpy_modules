@@ -23,12 +23,20 @@ const DEFINITION = { key: 'book', label: 'Book', fields: [] };
 
 type Hook = ReturnType<typeof useTypeImport>;
 
+let hook: Hook | null = null;
+
+/** Renders the hook with `options` and exposes what it returns as `hook`. */
+function Probe({ options }: { options: Parameters<typeof useTypeImport>[0] }) {
+  hook = useTypeImport(options);
+  return null;
+}
+
 describe('useTypeImport — M3: update through the schema pipeline, create beside it', () => {
   it('sends an update for this type through useSchemaApply, with its version', async () => {
     posted.length = 0;
     const calls: { body: Record<string, unknown> }[] = [];
     const reset = vi.fn();
-    let hook: Hook | null = null;
+    hook = null;
     const run = async (
       attempt: (body: never) => Promise<TypeRead>,
       body: Record<string, unknown>,
@@ -37,18 +45,18 @@ describe('useTypeImport — M3: update through the schema pipeline, create besid
       // `useSchemaApply` merges force/orphaned onto the body it was given.
       return attempt(body as never);
     };
-    function Probe() {
-      hook = useTypeImport({
-        current: CURRENT,
-        run: run as never,
-        reset,
-        onCreated: () => {
-          throw new Error('should not create');
-        },
-      });
-      return null;
-    }
-    const view = await mount(<Probe />);
+    const view = await mount(
+      <Probe
+        options={{
+          current: CURRENT,
+          run: run as never,
+          reset,
+          onCreated: () => {
+            throw new Error('should not create');
+          },
+        }}
+      />,
+    );
     await act(async () => {
       await (hook as unknown as Hook).importDefinition(DEFINITION);
     });
@@ -61,19 +69,19 @@ describe('useTypeImport — M3: update through the schema pipeline, create besid
   it('creates when the definition names another type, and hands it back', async () => {
     posted.length = 0;
     const created: TypeRead[] = [];
-    let hook: Hook | null = null;
-    function Probe() {
-      hook = useTypeImport({
-        current: CURRENT,
-        run: (() => {
-          throw new Error('should not update');
-        }) as never,
-        reset: vi.fn(),
-        onCreated: (type) => created.push(type),
-      });
-      return null;
-    }
-    const view = await mount(<Probe />);
+    hook = null;
+    const view = await mount(
+      <Probe
+        options={{
+          current: CURRENT,
+          run: (() => {
+            throw new Error('should not update');
+          }) as never,
+          reset: vi.fn(),
+          onCreated: (type) => created.push(type),
+        }}
+      />,
+    );
     await act(async () => {
       await (hook as unknown as Hook).importDefinition({ ...DEFINITION, key: 'author' });
     });
