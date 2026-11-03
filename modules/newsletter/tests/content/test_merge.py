@@ -48,3 +48,14 @@ def test_text_fallback_raw():
         )
         == f"Ann {U}"
     )
+
+
+def test_escaped_fallback_near_cap_is_substituted():
+    import html
+
+    raw = "Tom & Jerry " * 8
+    check_merge("{{first_name|" + raw + "}}")
+    out = personalise_html(
+        "{{first_name|" + html.escape(raw) + "}}", first_name=None, unsubscribe_url=U
+    )
+    assert out == html.escape(raw) and "{{" not in out

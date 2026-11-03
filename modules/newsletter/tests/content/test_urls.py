@@ -18,6 +18,8 @@ from sm_newsletter.content.urls import (
         "http://a b",
         "\nhttp://a",
         "{{first_name}}",
+        "/\\evil",
+        "/\\\\evil",
     ],
 )
 def test_check_link_refuses(bad):
@@ -38,7 +40,15 @@ def test_check_link_length():
 def test_check_image():
     for ok in ["", "https://a/i.png", "//cdn/i.png", "/m.png"]:
         assert check_image(ok) == ok
-    for bad in ["javascript:x", "data:image/png;base64,xx", "///x", "a b"]:
+    for bad in [
+        "javascript:x",
+        "data:image/png;base64,xx",
+        "///x",
+        "a b",
+        "/\\evil",
+        "//?x",
+        "//#",
+    ]:
         with pytest.raises(ValueError):
             check_image(bad)
 

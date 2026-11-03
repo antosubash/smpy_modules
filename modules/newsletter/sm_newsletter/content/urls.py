@@ -28,7 +28,7 @@ def check_link(value: str) -> str:
     """http(s) with a host, ``mailto:``, a site path, or exactly the unsubscribe tag."""
     if value == UNSUBSCRIBE_TAG:
         return value
-    if not _plain(value) or "{{" in value:
+    if not _plain(value) or "{{" in value or "\\" in value:
         raise ValueError("not an allowed link")
     if _http(value):
         return value
@@ -43,11 +43,11 @@ def check_image(value: str) -> str:
     """Empty, http(s), protocol-relative with a host, or a site path."""
     if value == "":
         return value
-    if not _plain(value) or "{{" in value:
+    if not _plain(value) or "{{" in value or "\\" in value:
         raise ValueError("not an allowed image address")
     if _http(value):
         return value
-    if value.startswith("//") and len(value) > 2 and value[2] not in "/":
+    if value.startswith("//") and _http("https:" + value):
         return value
     if value.startswith("/") and not value.startswith("//"):
         return value
