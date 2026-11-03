@@ -196,6 +196,33 @@ async def test_reconcile_tenant_isolation(db_state):
     assert await _rows(db_state, "b") == []
 
 
+async def test_each_write_runs_under_its_own_tenant(db_state, monkeypatch):
+    """Two tenants, one address: every ``suppress_many`` call is made with its
+    ``tenant_id`` already bound, and neither tenant's row lands in the other."""
+    from simple_module_db import current_tenant_id
+
+    for tenant in ("a", "b"):
+        await seed_list(db_state, tenant)
+        await seed_subscriber(db_state, tenant, ADA, "unsubscribed")
+    calls: list[tuple[str | None, str]] = []
+    real = reconcile.suppress_many
+
+    async def spy(session, *, tenant_id, **kw):
+        calls.append((current_tenant_id.get(), tenant_id))
+        return await real(session, tenant_id=tenant_id, **kw)
+
+    monkeypatch.setattr(reconcile, "suppress_many", spy)
+    result = await reconcile_async(db_state.session_factory, now=T)
+
+    assert result == {"lists": 2, "suppressed": 2, "failed": 0}
+    assert sorted(calls) == [("a", "a"), ("b", "b")]
+    async with db_state.session_factory() as s:
+        stmt = select(Suppression.__table__.c.tenant_id).order_by("tenant_id")
+        assert list((await s.execute(stmt)).scalars()) == ["a", "b"]
+    assert await _rows(db_state, "a") == [("unsubscribed", LIST, "reconcile")]
+    assert await _rows(db_state, "b") == [("unsubscribed", LIST, "reconcile")]
+
+
 async def test_lost_event_trash_reconcile_purge_still_suppressed(db_state):
     """Amendment 6: an opt-out whose event was lost, then trashed, is picked up
     by the reconcile from the trash - and purging the record afterwards does
