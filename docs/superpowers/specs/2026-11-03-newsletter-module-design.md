@@ -437,3 +437,61 @@ their result.
   scheduler shows the estimated finish.
 - A crash between the SMTP accept and the commit loses that one message
   rather than risking a double send.
+
+## Amendments from the Codex plan review (2026-11-03)
+
+These override anything above that contradicts them.
+
+1. **Unsubscribe mirror is not trusted alone.** Records publishes
+   `SubscriptionChanged` after commit through a volatile callback, and the
+   event carries no address. So besides the event handler, newsletter runs a
+   **reconcile** (beat, hourly, per tenant) that walks records' unsubscribed
+   subscribers (`iter_subscribers(status="unsubscribed")`) and upserts
+   `unsubscribed` suppressions; freeze and the import also consult records'
+   status directly. Newsletter's own `/newsletter/u/` route writes its
+   suppression row in the same transaction as the records unsubscribe. The
+   remaining gap (crash, then an admin purge before the next reconcile) is
+   accepted.
+2. **Ambiguous SMTP outcomes are never retried.** Only failures known to have
+   happened before the message was accepted are retried: connect, TLS or
+   auth errors, and a 4xx on `MAIL`/`RCPT`/`DATA` start. A connection lost or
+   a timeout after the message body was sent marks the row `failed` with
+   *outcome unknown*, the same as an expired lease (records' `delivery.py`
+   documents the same window).
+3. **Eligibility vs. a concurrent unsubscribe.** The re-check just before
+   sending is a read, not a lock; an unsubscribe that commits in the
+   milliseconds between the check and the SMTP call can still get that one
+   message. Accepted: one-click unsubscribes must be honoured within two days
+   (Gmail/Yahoo), not atomically.
+4. **One dispatcher at a time, and a budget ledger.** Dispatch takes a global
+   lock (Postgres advisory lock; a lock row on SQLite) so two workers never
+   spend the same budget. The rolling-24 h and per-minute budgets count every
+   SMTP attempt that may have been accepted — `sent`, `outcome unknown` and
+   test sends — from a `newsletter_send_attempt` log written before each SMTP
+   call.
+5. **Unsubscribe ships with sending.** The `/newsletter/u/` page and the
+   one-click POST move from the tracking PR into the sending PR; no campaign
+   can be sent by a build without them.
+6. **Contracts never switch a bound tenant.** Records' and news' contract
+   functions bind with records' `tenant_scope` semantics: re-entering the
+   bound tenant is a no-op, naming another raises `TenantIsolationError`
+   (news gets the same guard).
+7. **Unsubscribe by an old link:** `unsubscribe(..., unless_confirmed_after)`
+   writes only when the subscriber is `confirmed` with `sm_confirmed_at` at
+   or before the cutoff; `pending` (a re-signup awaiting confirmation),
+   `unsubscribed`, trashed and unknown are no-ops returning `False`. No
+   generation id is added; the timestamp plus status is enough for one
+   campaign link.
+8. **`unsubscribe` returns whether this call wrote**, from the transition's
+   `Outcome.wrote` (records' `opt_in.leave` is extended to expose it), so two
+   concurrent calls attribute the unsubscribe once.
+9. **Per-list authorisation.** Records exposes
+   `can_read_list(session, *, tenant_id, type_key, roles)` built on its
+   `role_blocked`; newsletter's admin screens call it with the caller's
+   `CallerRoles`, and workers pass `roles=None` (records' "no caller").
+10. **DKIM covers the unsubscribe headers.** RFC 8058 requires a valid DKIM
+    signature covering `List-Unsubscribe` and `List-Unsubscribe-Post`.
+    Workspace's relay signs with the domain's DKIM key once it is enabled in
+    the Admin console. The module's docs (`docs/operations.md`) carry it as a
+    deployment checklist item, with how to confirm it from a test message's
+    `DKIM-Signature: … h=` list. No in-app verification in v1.

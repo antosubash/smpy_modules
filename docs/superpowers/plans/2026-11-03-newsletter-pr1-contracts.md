@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Contracts are the **only** import path another module may use; DTOs are plain `SQLModel`/`BaseModel`, never ORM rows (`CLAUDE.md`, `docs/module-layout.md`).
-- **Tenant pinned inside each function.** Every function takes `tenant_id: str` and runs under `simple_module_db.tenant_context(tenant_id)` itself. A read also adds `Record.tenant_id == tenant_id` (or `NewsArticle.tenant_id`) as a `WHERE`. Without that, a host with nothing bound reads every tenant.
+- **Tenant pinned inside each function.** Every function takes `tenant_id: str` and binds it with records' `sm_records.core.tenancy.tenant_scope(tenant_id)` semantics: re-entering the already-bound tenant is a no-op, naming a *different* bound tenant raises `TenantIsolationError` (news: a local equivalent guard in `news.core.tenancy`, same behaviour) — never the bare framework `tenant_context`, which silently replaces a binding. A read also adds `Record.tenant_id == tenant_id` (or `NewsArticle.tenant_id`) as a `WHERE`. Without that, a host with nothing bound reads every tenant.
 - An invalid `tenant_id` (`simple_module_db.is_valid_tenant_id` false) raises `ValueError` before any SQL runs.
 - Writes go through records' existing services (`opt_in.leave`, `record_service.update_record`). Never a bare `commit()`. The caller finishes with `simple_module_db.finalize_session` (or records' `events.commit`), so `SubscriptionChanged`/`RecordUpdated` publish after the commit. Write functions take `bus: Any | None = None` and call `sm_records.core.events.attach(session, bus)` when one is given.
 - Subscriber hits **never** carry `sm_nonce`, consent fields or IP hashes.
@@ -22,6 +22,8 @@
 - Docs: records' `docs/api-reference.md` gets a "Newsletter contract" subsection; news' `docs/` gets an "Article contract" note.
 
 ## Review Focus
+
+0. **A call naming tenant B while tenant A is bound raises `TenantIsolationError`** — Tasks 1 (fix-up in Task 2), 2 and 4 each test it.
 
 1. **A wrong tenant reads nothing:** a subscriber or article that exists in tenant `a` is invisible to a call naming `b`, including when no tenant is bound upstream. Tested in Tasks 1 and 4.
 2. **Trashed and non-confirmed subscribers never appear** in `iter_subscribers`/`count_subscribers`: pending, unsubscribed and in-trash records are excluded. Tested in Task 1.
@@ -114,6 +116,14 @@ async def set_tags(session, *, tenant_id: str, type_key: str, uuid: str,
 
 - `unsubscribe` is `opt_in.leave(..., still=lambda row: not row.is_deleted and confirmed_at(row) <= cutoff)`. `confirmed_at` is parsed from `data["sm_confirmed_at"]` (ISO string, aware UTC). `None` cutoff means unconditional.
 - `set_tags` is an `update_record` with `expected_version=record.version`, retried once on `Conflict`. The tag set keeps the stored order with new tags appended and duplicates dropped.
+
+
+**Additions from the Codex plan review (spec § Amendments 1, 6, 7, 8, 9)** — also part of this task:
+- **Task 1 fix-ups** (same contract file): switch the three read functions to `tenant_scope` semantics (Global Constraints) with a test that a call naming `"other"` inside `tenant_scope("default")` raises `TenantIsolationError`; a two-tenant test where tenant `"b"` has a same-keyed list with its own confirmed subscriber and neither tenant sees the other's; `subscribers_by_uuid` rejects a bare `str` for `uuids` with `ValueError`; `after` must be a non-negative `int` (not `bool`) else `ValueError`; a `not_a_list` test for `subscribers_by_uuid`.
+- `iter_subscribers`/`count_subscribers` gain `status: Literal["confirmed", "unsubscribed"] = "confirmed"` (the reconcile walks unsubscribed). Test: after an unsubscribe, `status="unsubscribed"` returns that hit and the default does not.
+- `unsubscribe` semantics: writes only when `status == "confirmed"` and `sm_confirmed_at <= unless_confirmed_after` (or cutoff `None`); `pending`, `unsubscribed`, trashed, unknown → `False`, no error. Test: an old link while the address is `pending` after a re-signup returns `False` and leaves it `pending`.
+- The boolean comes from the transition's `Outcome.wrote`: extend `opt_in.leave` to expose it (e.g. return the `Outcome`, updating its two existing callers) — not by re-reading status. Test: two `unsubscribe` calls run concurrently with `asyncio.gather` on two sessions — exactly one returns `True`, one event published.
+- `async def can_read_list(session, *, tenant_id: str, type_key: str, roles: Sequence[str] | CallerRoles | None) -> bool` in the contract, built on `records/services/_access.role_blocked`; `False` for a missing or non-subscription type; `roles=None` (worker/CLI) → `True` for an existing list. Test: a list with `allowed_roles=["editor"]` gives `False` for `["viewer"]`, `True` for `["editor"]` and for `None`.
 
 - [ ] **Step 1: Write the failing tests.**
   - `test_unsubscribe_suppresses_and_emits_once`: on a confirmed subscriber, with a bus whose `SubscriptionChanged` handler collects events, `unsubscribe(..., unless_confirmed_after=None)` returns `True`. After `finalize_session` the record's `sm_status == "unsubscribed"`, exactly one event `("confirmed","unsubscribed")` was published, and a second call returns `False` with no new event.
