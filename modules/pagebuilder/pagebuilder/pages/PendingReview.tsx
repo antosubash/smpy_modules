@@ -11,12 +11,12 @@ import {
 } from '@simple-module-py/ui/components/ui/table';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 
-import { ConfirmDialog } from '../components/ConfirmDialog';
-import { NoteDialog } from '../components/NoteDialog';
-import { approvePage, type PageRead, rejectPage } from '../utils/api';
-import { formatTimestamp } from '../utils/dates';
-import { keys, useT } from '../utils/i18n';
-import { publicPath } from '../utils/locale';
+import { ConfirmDialog } from '../ui/components/ConfirmDialog';
+import { NoteDialog } from '../ui/components/NoteDialog';
+import { approvePage, type PageRead, rejectPage } from '../ui/utils/api';
+import { formatTimestamp } from '../ui/utils/dates';
+import { keys, useT } from '../ui/utils/i18n';
+import { publicPath } from '../ui/utils/locale';
 
 /** Where pages serve publicly. Mirrors `PagebuilderSettings.public_route_prefix`. */
 const PUBLIC_PREFIX = '/p';

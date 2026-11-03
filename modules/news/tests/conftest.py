@@ -81,7 +81,7 @@ def _no_leaked_module_state():
     when there was, and it is not one now.
     """
     from news.core import settings as news_settings
-    from pagebuilder import locales
+    from pagebuilder.core import locales
 
     news_settings.reset()
     locales.reset()
@@ -94,15 +94,15 @@ def _no_leaked_module_state():
 def bilingual():
     """Configure the site to publish in English (default) and German.
 
-    Set through ``pagebuilder.locales`` because that is where the site's content
+    Set through ``pagebuilder.core.locales`` because that is where the site's content
     languages live. An article is no longer a page — it owns its own content and
     its own ``locale`` — but which languages the *site* publishes in is still one
     decision, not two, and offering a language the rest of the site does not have
     would strand every article written in it. Reset by ``_no_leaked_module_state``
     above.
     """
-    from pagebuilder import locales
-    from pagebuilder.settings import PagebuilderSettings
+    from pagebuilder.core import locales
+    from pagebuilder.core.settings import PagebuilderSettings
 
     locales.use(
         PagebuilderSettings(content_locales=("en", "de"), default_content_locale="en")

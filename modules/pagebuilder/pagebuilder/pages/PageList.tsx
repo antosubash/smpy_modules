@@ -10,13 +10,13 @@ import {
 } from '@simple-module-py/ui/components/ui/table';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import { toast } from 'sonner';
-import { NewPageDialog } from '../components/NewPageDialog';
-import { type BoardStage, PageBoard } from '../components/PageBoard';
-import { type PageListFilterState, PageListFilters } from '../components/PageListFilters';
-import { PageListRow } from '../components/PageListRow';
-import { deletePage, type PageRead } from '../utils/api';
-import { keys, useT } from '../utils/i18n';
-import { publishPage, restorePage, unpublishPage } from '../utils/pagesApi';
+import { NewPageDialog } from '../ui/components/NewPageDialog';
+import { type BoardStage, PageBoard } from '../ui/components/PageBoard';
+import { type PageListFilterState, PageListFilters } from '../ui/components/PageListFilters';
+import { PageListRow } from '../ui/components/PageListRow';
+import { deletePage, type PageRead } from '../ui/utils/api';
+import { keys, useT } from '../ui/utils/i18n';
+import { publishPage, restorePage, unpublishPage } from '../ui/utils/pagesApi';
 
 /** Where pages serve publicly. Mirrors `PagebuilderSettings.public_route_prefix`. */
 const PUBLIC_PREFIX = '/p';

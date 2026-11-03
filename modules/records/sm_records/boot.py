@@ -1,6 +1,6 @@
 """Wiring the anonymous read surface, once the settings are the real ones.
 
-Modelled on :mod:`pagebuilder.boot`, for the same reason and with the same
+Modelled on :mod:`pagebuilder.core.boot`, for the same reason and with the same
 consequence. ``public_route_prefix`` is a database-backed setting (there are
 no ``SM_RECORDS_*`` environment variables), and the host hydrates a module's
 settings at *lifespan start* — after ``register_routes`` and

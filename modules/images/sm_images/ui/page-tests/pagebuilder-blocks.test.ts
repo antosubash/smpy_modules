@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 describe('pagebuilder-blocks', () => {
   it('registers ImageGallery in its own palette group, by catalogue key', async () => {
     const { registeredBlocks } = await import(
-      '@simple-module-py/pagebuilder/pagebuilder/components/blockRegistry'
+      '@simple-module-py/pagebuilder/pagebuilder/ui/components/blockRegistry'
     );
     await import('../../pagebuilder-blocks');
     const mine = registeredBlocks().find((r) => 'ImageGallery' in r.blocks);

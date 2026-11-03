@@ -7,7 +7,7 @@ settings that viewer needs. They are deliberately the same names and defaults
 pagebuilder uses for the equivalent knob: a host running both should not have to
 learn two vocabularies to configure one site.
 
-Sourced exactly like :mod:`pagebuilder.settings`: no ``SM_NEWS_*`` env var and
+Sourced exactly like :mod:`pagebuilder.core.settings`: no ``SM_NEWS_*`` env var and
 no ``.env`` stanza, just the defaults below and whatever the settings module has
 stored. The module registers the class in ``register_settings`` and the host
 hydrates it at lifespan start.

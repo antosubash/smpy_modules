@@ -30,9 +30,9 @@ from simple_module_db import is_valid_tenant_id, tenant_context
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pagebuilder.endpoints.public_not_found import NOT_FOUND_DETAIL
-from pagebuilder.endpoints.public_not_found import render_not_found as _render
-from pagebuilder.settings import PagebuilderSettings
+from pagebuilder.core.settings import PagebuilderSettings
+from pagebuilder.web.endpoints.public_not_found import NOT_FOUND_DETAIL
+from pagebuilder.web.endpoints.public_not_found import render_not_found as _render
 
 __all__ = ["NOT_FOUND_DETAIL", "TenantMismatchError", "render_not_found"]
 

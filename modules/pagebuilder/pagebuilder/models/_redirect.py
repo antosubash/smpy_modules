@@ -6,7 +6,7 @@ from simple_module_db.mixins import MultiTenantMixin
 from sqlalchemy import Index
 from sqlmodel import Field
 
-from pagebuilder import locales
+from pagebuilder.core import locales
 from pagebuilder.models._base import Base
 
 
@@ -47,5 +47,3 @@ class PageRedirect(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupporte
     """
 
     page_id: int = Field(foreign_key="pagebuilder_pages.id", index=True, ondelete="CASCADE")
-
-

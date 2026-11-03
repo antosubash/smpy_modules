@@ -12,7 +12,7 @@ This provider adds the Vite origin to ``font-src`` in development and nothing
 otherwise; the production policy is unchanged. It belongs in the framework's
 ``dev_csp`` and can go once that widens ``font-src`` itself.
 
-A copy of ``pagebuilder.dev_csp``: the two modules do not depend on each
+A copy of ``pagebuilder.web.dev_csp``: the two modules do not depend on each
 other, and either one alone needs it. Change them together.
 """
 

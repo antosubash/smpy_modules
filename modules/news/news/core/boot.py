@@ -8,7 +8,7 @@ there is mounted at the wrong address. :meth:`news.module.NewsModule.on_startup`
 is the first moment the answers are real, and this is what it calls.
 
 Split out of ``module.py`` for the repo's 300-line cap, and named to match
-:mod:`pagebuilder.boot`, which does the same job for the same reason.
+:mod:`pagebuilder.core.boot`, which does the same job for the same reason.
 """
 
 from __future__ import annotations

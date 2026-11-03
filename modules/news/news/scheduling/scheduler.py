@@ -1,7 +1,7 @@
 """The in-process loop that publishes articles at their scheduled times.
 
 Lifted out of :mod:`news.module` when that file crossed the repo's 300-line
-cap, and shaped like :mod:`pagebuilder.scheduler` for the same reason: it is a
+cap, and shaped like :mod:`pagebuilder.scheduling.scheduler` for the same reason: it is a
 coherent piece to lift, because everything here is about *when* an article
 changes state and nothing else in the module registration is.
 

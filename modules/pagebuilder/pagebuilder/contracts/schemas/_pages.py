@@ -12,7 +12,7 @@ from pagebuilder.contracts.schemas._fields import (
     RequiredNote,
     UtcInstant,
 )
-from pagebuilder.locales import MAX_LOCALE_LEN
+from pagebuilder.core.locales import MAX_LOCALE_LEN
 from pagebuilder.models import PageStatus
 
 PuckData = dict[str, Any]

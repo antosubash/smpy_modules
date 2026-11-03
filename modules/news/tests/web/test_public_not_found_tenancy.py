@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
-from pagebuilder.layout_service import LayoutService
+from pagebuilder.content.layout_service import LayoutService
 from simple_module_db import tenant_context
 
 from tests.support.factories import make_article

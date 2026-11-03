@@ -17,7 +17,7 @@
  * an author gets the empty state *plus* the reason.
  */
 
-import { Section } from '@simple-module-py/pagebuilder/pagebuilder/components/widgets/_shared';
+import { Section } from '@simple-module-py/pagebuilder/pagebuilder/ui/components/widgets/_shared';
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { keys, useT } from '../../utils/i18n';

@@ -42,7 +42,7 @@ nothing. `parent_id` is breadcrumb-only and never part of the URL.
 
 The framework filters `MultiTenantMixin` tables only while a tenant is bound; with
 none bound a read is **unfiltered**. So every entry point binds one itself and
-never relies on one happening to be set (`pagebuilder/tenancy.py`):
+never relies on one happening to be set (`pagebuilder/core/tenancy/__init__.py`):
 
 | Entry point | Binding |
 |---|---|
@@ -66,18 +66,18 @@ only). The host hydrates them at **lifespan start**, after app construction. So:
 
 - `register_routes` reads no setting; the admin auth and CSRF dependencies read
   `app.state.pagebuilder.settings` per request.
-- `register_public_routes` does nothing. `on_startup` (`boot.py`) exempts the
+- `register_public_routes` does nothing. `on_startup` (`core/boot.py`) exempts the
   public prefixes (one per content locale, trailing `/` so `/p` never exempts
   `/pagebuilder/`), mounts one `locale_router` per locale, the default-locale
   alias, the SEO router and the media mount.
-- The CSRF check is the framework's `RequiresCsrf`, wrapped in `csrf.py` so
+- The CSRF check is the framework's `RequiresCsrf`, wrapped in `web/csrf.py` so
   `csrf_protect` is read per request. The view router shares the token as the
   `csrf_token` prop; there is no middleware and no cookie.
 
 Any field read in `on_startup` is marked `json_schema_extra=_RESTART`. Adding a
 field means adding it to the class; there is no env var to add.
 
-## Status machine (`service/_workflow.py`)
+## Status machine (`content/service/_workflow.py`)
 
 | From | Action | To | Revision | Side effects |
 |---|---|---|---|---|
@@ -91,14 +91,14 @@ field means adding it to the class; there is no env var to add.
 
 Anything else is 409. Saving (`PUT`) and restoring a revision write no revision;
 a revision always snapshots `draft_data` after the transition. Trash is
-orthogonal (`service/_trash.py`): `deleted_at` hides the row from every query via
+orthogonal (`content/service/_trash.py`): `deleted_at` hides the row from every query via
 `NOT_TRASHED`, restore sets status `draft`, and **purge** is the one method that
 commits itself — it must commit before publishing `PageDeleted`, because a
 subscriber's own session would otherwise hit SQLite's lock and the bus swallows
 handler errors. Purge clears revisions and redirects and nulls children's
 `parent_id` explicitly (SQLite does not enforce FKs and reuses ids).
 
-## The public viewer (`endpoints/public_views.py`)
+## The public viewer (`web/endpoints/public_views.py`)
 
 ```mermaid
 sequenceDiagram
@@ -120,18 +120,18 @@ sequenceDiagram
   `canonical_url` or `public_base_url` + path; **alternates** are the group's
   *published* pages, plus `x-default` = the
   default locale, omitted when fewer than two.
-- **`site_nav`** (`site_nav.py`) returns published, non-trashed pages in the
+- **`site_nav`** (`content/site_nav.py`) returns published, non-trashed pages in the
   page's locale with either flag, ordered by `lower(title)`. The
   SiteHeader/SiteFooter widgets append them after the layout's links,
   skipping hrefs the layout already has (trailing slash ignored, dropdown
   children included) — `appendPages` in
-  `components/widgets/_internal/site-nav-context.tsx`. Order is the layout's.
-- **Preview** (`/pagebuilder/{id}/preview`, `endpoints/preview_view.py`)
+  `ui/components/widgets/_internal/site-nav-context.tsx`. Order is the layout's.
+- **Preview** (`/pagebuilder/{id}/preview`, `web/endpoints/preview_view.py`)
   renders `draft_data` through the same `PublicPage` component with
   `index_in_search=False` and no alternates, so the preview cannot disagree
   with the live renderer. Its `preview` prop (`editor_href`, `status`) is what
   shows the draft bar; no public route sets it.
-- **Not found** (`endpoints/public_not_found.py`, #89): an unknown, draft,
+- **Not found** (`web/endpoints/public_not_found.py`, #89): an unknown, draft,
   trashed or not-yet-live slug renders `PageBuilder/PublicNotFound` with status
   404, one body for every cause (no oracle), `Cache-Control: no-store` plus the
   tenant `Vary`. A request that resolved no tenant gets the same page with no
@@ -139,9 +139,9 @@ sequenceDiagram
   by q-value (or refuses `text/html` with `q=0`) keeps
   `{"detail": "Page not found"}`; an Inertia visit always gets the page
   (`wants_json`, mirroring the framework's error-page rule). The frame's words
-  (skip link, not-found copy) come from `public_copy.py` in the *content*
+  (skip link, not-found copy) come from `web/public_copy.py` in the *content*
   locale, not the visitor's UI language.
-- **`PublicShell`** (`components/public/`) is the one frame for the page, the
+- **`PublicShell`** (`ui/components/public/`) is the one frame for the page, the
   preview and the 404: branding head, design-pack root class, skip link to
   `main#main`, a `min-h-dvh` column with `main` as `flex-1` (footer at the
   bottom of a short page), the preview bar, and `print.css` (header, footer,
@@ -150,7 +150,7 @@ sequenceDiagram
 - **Sitemap** uses a column-only query (no block JSON) and adds `xhtml:link`
   alternates per translation group.
 
-Redirects (`redirects.py`) are locale-scoped. `record` first deletes any redirect
+Redirects (`content/redirects.py`) are locale-scoped. `record` first deletes any redirect
 *from* the new slug (no loops) and from the old one (re-renames move it);
 `resolve` returns the *page's* current slug, so chains collapse to one hop.
 
@@ -163,7 +163,7 @@ streams to disk under the size cap, then generates WebP variants in a thread
 published JSON for the asset's URL — both the per-tenant URL and the pre-#38 flat
 one — ignoring trashed pages.
 
-## Snapshots (`snapshots/`)
+## Snapshots (`content/snapshots/`)
 
 - **Capture** writes pages (keyed by `(locale, slug)`), redirects and the layout
   as JSON documents, media URLs rewritten to `asset://<name>` sentinels, media
@@ -221,16 +221,16 @@ one — ignoring trashed pages.
   a matched asset it reused and the content-addressed blob store are never
   touched. The cost is a longer
   write transaction on a large bundle. Permissions are checked per section
-  (`access.py`); plan rows are kept off the audited row (`plan_views.py`).
+  (`web/access.py`); plan rows are kept off the audited row (`plan_views.py`).
   The screens render each section from its own catalogue keys
-  (`components/snapshots/SectionPlan.tsx`, `sectionSummary.ts`), so pagebuilder
+  (`ui/components/snapshots/SectionPlan.tsx`, `sectionSummary.ts`), so pagebuilder
   never names a contributor.
 
 ## Frontend
 
 - **Pages.** `pagebuilder/pages/*.tsx` are Inertia pages, registered by
   `import.meta.glob`: the file name *is* the page name (`PageBuilder/PageList`).
-- **Block palette.** `components/widgetCatalog.ts` lists the built-ins and their
+- **Block palette.** `ui/components/widgetCatalog.ts` lists the built-ins and their
   categories; `puckConfig.tsx` merges in `registerPuckBlocks` registrations
   (`{blocks, category?, layout?}`) and is memoised on the registry version.
   Built-in names are declared so a module cannot shadow one (a duplicate name
@@ -240,28 +240,28 @@ one — ignoring trashed pages.
   dependencies stay out of the entry chunk.
 - **Stored data** goes through `migrateContent` on every load (editor, public
   page, layout) to upgrade older Puck shapes.
-- **Markdown** lives in `utils/markdown.ts` (blocks, lists, emphasis, HTML export)
-  and `utils/markdown-links.ts` (links and images with the scheme allowlist);
+- **Markdown** lives in `ui/utils/markdown.ts` (blocks, lists, emphasis, HTML export)
+  and `ui/utils/markdown-links.ts` (links and images with the scheme allowlist);
   `_internal/rich-text.tsx` renders them for widget fields.
 - **i18n.** Every editor string is in `locales/en.json`, namespace
-  `pagebuilder`. `utils/i18n.ts` derives the `keys` tree from that JSON at
+  `pagebuilder`. `ui/utils/i18n.ts` derives the `keys` tree from that JSON at
   compile time, so `tsc` rejects an undefined key. Block configs are module-scope
   constants and cannot call hooks, so their labels hold keys and
   `localizeConfig.ts` resolves the assembled config (including `arrayFields` /
   `objectFields`) inside `PageEditor` and `LayoutEditor`. `defaultProps` stay
   literal: they are seed content saved into the document.
-- **Library helpers.** `conversion/` (`blocksToHtml`) and `translation/`
+- **Library helpers.** `ui/conversion/` (`blocksToHtml`) and `ui/translation/`
   (extract and re-apply translatable strings) are pure functions with no storage.
 
 ## Rules for contributors
 
 - **300-line cap** on every `.py`, `.ts` and `.tsx`, enforced by
   `scripts/check_file_size.py` (`make lint`). Nothing under `modules/` is exempt;
-  that is why `service/`, `models/`, `endpoints/api/` and `contracts/schemas/`
+  that is why `content/service/`, `models/`, `web/endpoints/api/` and `contracts/schemas/`
   are packages of mixins and sub-routers.
 - **Never add a file under `pagebuilder/pages/` unless it is a real Inertia
   page.** A stray `.tsx` there silently registers a page. Extractions go to
-  `components/`, `hooks/` or `utils/`.
+  `ui/components/`, `ui/hooks/` or `ui/utils/`.
 - **Every slug lookup, redirect and claim takes a locale.** One that does not is
   how `/de/p/x` starts serving the English page.
 - **Every new entry point binds a tenant** (`bind_admin`, `bind_public`, or
@@ -274,23 +274,23 @@ one — ignoring trashed pages.
 - **Literal API paths before `/pages/{page_id}`**, or `trash` parses as an id
   (422). Same for `/uploads/{id}/checked`, which is why `media_detail` is
   included before `uploads`.
-- New UI strings go in `locales/en.json`; `utils/i18n.test.ts` rejects unused
+- New UI strings go in `locales/en.json`; `ui/utils/i18n.test.ts` rejects unused
   entries and unfilled placeholders.
 
 ## File map
 
 | Path | Role |
 |---|---|
-| `module.py`, `boot.py` | registration hooks; startup wiring |
-| `settings.py`, `locales.py` | DB-backed settings; content-locale helpers |
-| `tenancy.py`, `access.py`, `csrf.py`, `permissions.py` | tenant binding; admin route dependencies; CSRF; permissions and roles |
+| `module.py`, `core/boot.py` | registration hooks; startup wiring |
+| `core/settings.py`, `core/locales.py` | DB-backed settings; content-locale helpers |
+| `core/tenancy/`, `web/access.py`, `web/csrf.py`, `core/permissions.py` | tenant binding; admin route dependencies; CSRF; permissions and roles |
 | `models/`, `contracts/` | tables; public DTOs and `PageDeleted` |
-| `service/` | `PagesService` (CRUD, workflow, revisions, trash, translations) |
-| `layout_service.py`, `site_nav.py`, `redirects.py`, `public_copy.py` | layout; nav flags; old slugs; the public frame's strings per content locale |
-| `media_*.py` | upload, images, queries, files, usage |
-| `scheduler.py` | per-tenant publish/unpublish/purge loop |
-| `snapshots/` | capture, archive, validate, plan, apply |
-| `endpoints/api/` | JSON API, one file per resource |
-| `endpoints/views.py`, `content_views.py`, `preview_view.py` | Inertia admin views |
-| `endpoints/public_views.py`, `public_not_found.py`, `seo.py` | public viewer and its 404; sitemap and robots |
-| `pages/`, `components/`, `hooks/`, `utils/` | frontend |
+| `content/service/` | `PagesService` (CRUD, workflow, revisions, trash, translations) |
+| `content/layout_service.py`, `content/site_nav.py`, `content/redirects.py`, `web/public_copy.py` | layout; nav flags; old slugs; the public frame's strings per content locale |
+| `media/media_*.py` | upload, images, queries, files, usage |
+| `scheduling/scheduler.py` | per-tenant publish/unpublish/purge loop |
+| `content/snapshots/` | capture, archive, validate, plan, apply |
+| `web/endpoints/api/` | JSON API, one file per resource |
+| `web/endpoints/views.py`, `web/endpoints/content_views.py`, `web/endpoints/preview_view.py` | Inertia admin views |
+| `web/endpoints/public_views.py`, `web/endpoints/public_not_found.py`, `web/endpoints/seo.py` | public viewer and its 404; sitemap and robots |
+| `pages/`, `ui/components/`, `ui/hooks/`, `ui/utils/` | frontend |

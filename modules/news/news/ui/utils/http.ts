@@ -34,7 +34,7 @@ export function isHttpStatus(e: unknown, status: number): boolean {
  * verbatim and rendered as a wall of markup, leaking the whole Inertia payload
  * into the DOM.
  *
- * Deliberately a sibling of `pagebuilder/utils/request.ts`'s `errorMessage`,
+ * Deliberately a sibling of `pagebuilder/ui/utils/request.ts`'s `errorMessage`,
  * and the two must be changed together: they answer the same question for the
  * same backend, and a difference between them shows up as one module
  * explaining a failure while the other shrugs at it.

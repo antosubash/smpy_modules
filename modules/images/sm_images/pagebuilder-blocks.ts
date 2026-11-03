@@ -12,7 +12,7 @@
  * `@simple-module-py/pagebuilder` is an optional peer dependency.
  */
 
-import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/components/blockRegistry';
+import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/ui/components/blockRegistry';
 
 import { ImageGalleryBlock } from './ui/components/block/ImageGalleryBlock';
 import { keys } from './ui/utils/i18n';

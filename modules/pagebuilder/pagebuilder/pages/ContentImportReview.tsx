@@ -5,18 +5,18 @@ import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedL
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { ConfirmDialog } from '../components/ConfirmDialog';
-import { NoteDialog } from '../components/NoteDialog';
-import { ImportPlanSummary } from '../components/snapshots/ImportPlanSummary';
-import { appliedSections, deniedSections } from '../components/snapshots/sectionSummary';
-import { keys, useT } from '../utils/i18n';
+import { ConfirmDialog } from '../ui/components/ConfirmDialog';
+import { NoteDialog } from '../ui/components/NoteDialog';
+import { ImportPlanSummary } from '../ui/components/snapshots/ImportPlanSummary';
+import { appliedSections, deniedSections } from '../ui/components/snapshots/sectionSummary';
+import { keys, useT } from '../ui/utils/i18n';
 import {
   approveImport,
   type PendingImport,
   rejectImport,
   type SectionLabels,
   type SnapshotCapabilities,
-} from '../utils/snapshotsApi';
+} from '../ui/utils/snapshotsApi';
 
 interface Props {
   pending: PendingImport | null;

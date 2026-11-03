@@ -60,7 +60,7 @@ class TestTheOptionalSections:
         assert "canopy" in results.pages[0].excerpt
 
     async def test_a_trashed_page_is_not_found(self, db) -> None:
-        from pagebuilder.service import PagesService
+        from pagebuilder.content.service.pages import PagesService
 
         page = await _page(db, "binned-page", title="Binned page")
         await PagesService(db).delete(page.id)

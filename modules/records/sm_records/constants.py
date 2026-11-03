@@ -236,7 +236,7 @@ MAX_LOCALE_LEN: Final = 16
 
 LOCALE_PATTERN: Final = r"^[a-z]{2,3}(-[a-z0-9]{2,8})*$"
 """A content locale, lowercased. Deliberately narrower than BCP 47's full
-grammar, for the reason :mod:`pagebuilder.locales` gives about its own: the tag
+grammar, for the reason :mod:`pagebuilder.core.locales` gives about its own: the tag
 is a column value and a query-string value, so accepting two spellings of one
 language would let ``?locale=DE`` and ``?locale=de`` address different sets.
 Matching is done case-insensitively by :func:`sm_records.locales.resolve`; the

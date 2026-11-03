@@ -26,7 +26,7 @@ FAMILIES: tuple[Family, ...] = (
     Family(
         "public cache headers",
         (
-            Copy(f"{PB}/public_cache.py", {"PagebuilderSettings": "Settings"}),
+            Copy(f"{PB}/web/public_cache.py", {"PagebuilderSettings": "Settings"}),
             Copy(f"{NEWS}/web/endpoints/public/_urls.py", {"NewsSettings": "Settings"}),
         ),
         shared=("SIGNED_IN_CACHE_CONTROL", "signed_in", "_user_key", "viewer_key", "cache_control"),
@@ -39,7 +39,7 @@ FAMILIES: tuple[Family, ...] = (
         "slug redirects",
         (
             Copy(
-                f"{PB}/redirects.py",
+                f"{PB}/content/redirects.py",
                 {
                     "PageRedirect": "DocRedirect",
                     "PageStatus": "DocStatus",
@@ -62,7 +62,7 @@ FAMILIES: tuple[Family, ...] = (
     ),
     Family(
         "content locales",
-        (Copy(f"{PB}/locales.py"), Copy(f"{NEWS}/core/locales.py")),
+        (Copy(f"{PB}/core/locales.py"), Copy(f"{NEWS}/core/locales.py")),
         shared=("is_default", "resolve", "path_prefix"),
         differ={
             "use": "Pagebuilder publishes its settings object; news publishes a vocabulary, "
@@ -82,7 +82,7 @@ FAMILIES: tuple[Family, ...] = (
                     "pagebuilder's editors only ever derive one.",
                 },
             ),
-            Copy(f"{PB}/utils/slugify.ts"),
+            Copy(f"{PB}/ui/utils/slugify.ts"),
         ),
     ),
     Family(
@@ -90,7 +90,7 @@ FAMILIES: tuple[Family, ...] = (
         (
             Copy(f"{NEWS}/web/csrf.py"),
             Copy(
-                f"{PB}/csrf.py",
+                f"{PB}/web/csrf.py",
                 own={
                     "_check": "Pagebuilder alone keeps `csrf_protect`, for a host that guards "
                     "writes above the app, so it wraps the framework check instead of mounting it.",
@@ -106,7 +106,7 @@ FAMILIES: tuple[Family, ...] = (
         (
             Copy(f"{NEWS}/ui/utils/csrf.ts"),
             Copy(
-                f"{PB}/utils/csrf.ts",
+                f"{PB}/ui/utils/csrf.ts",
                 own={
                     "isCsrfRefusalBody": "Media uploads go through XHR, which hands back a raw "
                     "body rather than a Response.",
@@ -135,7 +135,7 @@ FAMILIES: tuple[Family, ...] = (
                 },
             ),
             Copy(
-                f"{PB}/utils/request.ts",
+                f"{PB}/ui/utils/request.ts",
                 _AS_MODULE,
                 own={
                     "errorMessage": "See news' errorFrom.",
@@ -184,7 +184,7 @@ FAMILIES: tuple[Family, ...] = (
         "scheduler shutdown",
         (
             Copy(
-                f"{PB}/scheduler.py",
+                f"{PB}/scheduling/scheduler.py",
                 {
                     "_log": "logger",
                     "contextlib.suppress": "suppress",
@@ -205,14 +205,14 @@ FAMILIES: tuple[Family, ...] = (
     Family(
         "test scaffolding: default tenant",
         (
-            Copy("modules/pagebuilder/tests/tenant_fixture.py"),
+            Copy("modules/pagebuilder/tests/support/tenant_fixture.py"),
             Copy("modules/news/tests/support/tenant_fixture.py"),
         ),
     ),
     Family(
         "test scaffolding: header tenant",
         (
-            Copy("modules/pagebuilder/tests/tenant_app.py"),
+            Copy("modules/pagebuilder/tests/support/tenant_app.py"),
             Copy("modules/news/tests/support/tenant_app.py"),
         ),
         shared=("HeaderTenant", "as_tenant"),

@@ -10,7 +10,7 @@ another plugin for its configuration would make one installable module depend
 on another. See :attr:`sm_records.settings.RecordsSettings.content_locales`.
 
 **Every function here takes the settings object**, rather than reading a
-process-global the module published at startup the way ``pagebuilder.locales``
+process-global the module published at startup the way ``pagebuilder.core.locales``
 does. That is the shape the rest of this module already has: ``create_record``,
 ``list_records`` and every other service take ``settings=`` explicitly, because
 the hydrated instance lives on ``app.state.sm_records`` (``deps.get_settings``)

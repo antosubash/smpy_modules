@@ -2,7 +2,7 @@
  * The field-type registry: one component per entry of the closed field-type
  * set of design §6.1, behind a map.
  *
- * Mirrors `pagebuilder/components/blockRegistry.ts`. The lookup is *total* —
+ * Mirrors `pagebuilder/ui/components/blockRegistry.ts`. The lookup is *total* —
  * `getFieldComponent` never returns `undefined` — because the `type` string
  * it is given comes out of a Record Type row in the database, and a host can
  * be serving a bundle older than the module that wrote that row. An unknown

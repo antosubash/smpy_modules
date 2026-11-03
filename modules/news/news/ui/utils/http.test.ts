@@ -28,11 +28,11 @@ const INERTIA_SHELL =
   '<!DOCTYPE html><html><body><div id="app" data-page="{&quot;permissions&quot;:[]}"></div></body></html>';
 
 /**
- * The same six cases `pagebuilder/utils/request.test.ts` asserts. The two
+ * The same six cases `pagebuilder/ui/utils/request.test.ts` asserts. The two
  * helpers are deliberate siblings; these tests are what stops them drifting
  * apart again, which has now happened twice.
  */
-describe('errorFrom — matching pagebuilder/utils/request.ts', () => {
+describe('errorFrom — matching pagebuilder/ui/utils/request.ts', () => {
   it('prefers the API detail', async () => {
     expect((await errorFrom(response('{"detail":"Slug already in use."}'))).message).toBe(
       'Slug already in use.',

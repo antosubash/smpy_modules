@@ -29,7 +29,7 @@ def test_copies_have_not_drifted(family: Family) -> None:
 def test_use_pending_dialog_is_byte_identical() -> None:
     """Nothing in it is module-specific, so there is nothing to mask."""
     news = (REPO / NEWS / "ui/hooks/usePendingDialog.ts").read_bytes()
-    pagebuilder = (REPO / PB / "hooks/usePendingDialog.ts").read_bytes()
+    pagebuilder = (REPO / PB / "ui/hooks/usePendingDialog.ts").read_bytes()
     assert news == pagebuilder
 
 
@@ -46,7 +46,7 @@ def _literal(path: str, name: str) -> object:
 
 def test_per_viewer_vary_names_the_same_headers() -> None:
     """Spelled as a string in one and a tuple in the other, so compared by value."""
-    pagebuilder = _literal(f"{PB}/public_cache.py", "VARY")
+    pagebuilder = _literal(f"{PB}/web/public_cache.py", "VARY")
     news = _literal(f"{NEWS}/web/endpoints/public/_urls.py", "PER_VIEWER_VARY")
     assert pagebuilder == ", ".join(news)  # type: ignore[arg-type]
 
@@ -55,7 +55,7 @@ def test_slug_bound_is_one_number() -> None:
     """Both TypeScript copies cut at the column's length, which the fixture states."""
     fixture = json.loads((REPO / "tests/fixtures/slug_cases.json").read_text(encoding="utf-8"))
     assert _literal(f"{NEWS}/core/constants.py", "MAX_SLUG_LEN") == fixture["max_length"]
-    for path in (f"{NEWS}/ui/utils/slugify.ts", f"{PB}/utils/slugify.ts"):
+    for path in (f"{NEWS}/ui/utils/slugify.ts", f"{PB}/ui/utils/slugify.ts"):
         source = (REPO / path).read_text(encoding="utf-8")
         assert f"const MAX_SLUG_LEN = {fixture['max_length']};" in source, path
 

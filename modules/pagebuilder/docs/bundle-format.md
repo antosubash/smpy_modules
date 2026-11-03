@@ -3,7 +3,7 @@
 A **bundle** is what **Download** on the Import / Export screen produces and
 what **Upload bundle…** accepts: a `.zip` holding one snapshot of a site's
 pagebuilder content. This document is the format's contract. The reader and
-writer are `pagebuilder/snapshots/manifest.py` (the manifest) and
+writer are `pagebuilder/content/snapshots/manifest.py` (the manifest) and
 `archive.py` / `validate.py` (the rest of the zip); if they and this page
 disagree, that is a bug in one of them.
 

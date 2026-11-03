@@ -18,9 +18,9 @@ from typing import Any
 from httpx import ASGITransport, AsyncClient
 from news.core import locales as news_locales
 from news.module import NewsModule
-from pagebuilder.layout_service import LayoutService
+from pagebuilder.content.layout_service import LayoutService
 from pagebuilder.module import PagebuilderModule
-from pagebuilder.settings import PagebuilderSettings
+from pagebuilder.core.settings import PagebuilderSettings
 from simple_module_db import tenant_context
 from simple_module_hosting.middleware import TenantMiddleware
 
@@ -46,7 +46,7 @@ async def site_client(
     pagebuilder = PagebuilderModule()
     media = Path(tempfile.mkdtemp()) / "media"
     media.mkdir()
-    pagebuilder.settings = PagebuilderSettings(
+    pagebuilder.core.settings = PagebuilderSettings(
         media_root=media,
         content_locales=locales,
         default_content_locale=locales[0],

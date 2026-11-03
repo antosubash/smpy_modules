@@ -20,7 +20,7 @@ import { keys, useT } from '../utils/i18n';
  * The dialog stays open and shows the error on a rejected `onConfirm`, so a
  * delete that comes back `403` or `409` is visible instead of looking like
  * it went through. This is a self-contained copy of the same idea in
- * `pagebuilder/components/ConfirmDialog.tsx` rather than a shared import —
+ * `pagebuilder/ui/components/ConfirmDialog.tsx` rather than a shared import —
  * modules do not import each other's frontend code.
  */
 export function ConfirmDialog({

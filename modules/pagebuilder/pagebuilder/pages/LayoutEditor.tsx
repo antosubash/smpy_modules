@@ -1,26 +1,26 @@
 import { type Data, Puck } from '@puckeditor/core';
-import '../components/editor/puck-editor.css';
+import '../ui/components/editor/puck-editor.css';
 import { Head, router, usePage } from '@inertiajs/react';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useMemo, useState } from 'react';
 
-import { ConfirmDialog } from '../components/ConfirmDialog';
-import { BlockOutline } from '../components/editor/BlockOutline';
-import { NO_HEADER_ACTIONS } from '../components/editor/noHeaderActions';
-import { emptyLayoutData, getLayoutPuckConfig } from '../components/layoutPuckConfig';
-import { localizeConfig } from '../components/localizeConfig';
-import { useIsNarrow } from '../hooks/useIsNarrow';
-import { usePuckA11y } from '../hooks/usePuckA11y';
+import { ConfirmDialog } from '../ui/components/ConfirmDialog';
+import { BlockOutline } from '../ui/components/editor/BlockOutline';
+import { NO_HEADER_ACTIONS } from '../ui/components/editor/noHeaderActions';
+import { emptyLayoutData, getLayoutPuckConfig } from '../ui/components/layoutPuckConfig';
+import { localizeConfig } from '../ui/components/localizeConfig';
+import { useIsNarrow } from '../ui/hooks/useIsNarrow';
+import { usePuckA11y } from '../ui/hooks/usePuckA11y';
 import {
   type LayoutDetail,
   type LayoutRevisionRead,
   restoreLayoutRevision,
   saveLayout,
-} from '../utils/api';
-import { blockLabels, moveBlock, outlineOf } from '../utils/blockOutline';
-import { formatTimestamp } from '../utils/dates';
-import { keys, useT } from '../utils/i18n';
+} from '../ui/utils/api';
+import { blockLabels, moveBlock, outlineOf } from '../ui/utils/blockOutline';
+import { formatTimestamp } from '../ui/utils/dates';
+import { keys, useT } from '../ui/utils/i18n';
 
 interface Props {
   layout: LayoutDetail;

@@ -3,17 +3,17 @@ import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 
-import { SnapshotList } from '../components/snapshots/SnapshotList';
-import { snapshotFootnote } from '../components/snapshots/sectionSummary';
-import { UploadBundleDialog } from '../components/snapshots/UploadBundleDialog';
-import { useSnapshots } from '../hooks/useSnapshots';
-import { keys, useT } from '../utils/i18n';
+import { SnapshotList } from '../ui/components/snapshots/SnapshotList';
+import { snapshotFootnote } from '../ui/components/snapshots/sectionSummary';
+import { UploadBundleDialog } from '../ui/components/snapshots/UploadBundleDialog';
+import { useSnapshots } from '../ui/hooks/useSnapshots';
+import { keys, useT } from '../ui/utils/i18n';
 import type {
   PendingImport,
   SectionLabels,
   Snapshot,
   SnapshotCapabilities,
-} from '../utils/snapshotsApi';
+} from '../ui/utils/snapshotsApi';
 
 interface Props {
   snapshots: Snapshot[];

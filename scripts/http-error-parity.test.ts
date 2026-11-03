@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { errorFrom } from '../modules/news/news/ui/utils/http';
-import { errorMessage } from '../modules/pagebuilder/pagebuilder/utils/request';
+import { errorMessage } from '../modules/pagebuilder/pagebuilder/ui/utils/request';
 
 /**
  * News' `errorFrom` and pagebuilder's `errorMessage` are copies (#127): both

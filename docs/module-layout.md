@@ -160,7 +160,7 @@ Do it in small PRs, one module at a time, each containing only moves:
 | ai | 2 | 8 | 0 | follows this layout |
 | billing | 3 | 11 | 0 | follows this layout |
 | news | 2 | 10 | 0 | follows this layout |
-| pagebuilder | 30 | 14 | 99 | not moved yet |
+| pagebuilder | 2 | 11 | 0 | follows this layout |
 | records | 37 | 14 | 181 | not moved yet |
 
 Update this table when a module moves.
