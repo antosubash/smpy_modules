@@ -106,7 +106,7 @@ def test_configure_stores_the_mode_and_warns_when_the_setting_asked_for_tenancy(
     services = SimpleNamespace(tenancy=None)
     setattr(single.state, constants.PACKAGE, services)
     single.state.host = SimpleNamespace(settings=SimpleNamespace(multi_tenant=True))
-    with caplog.at_level(logging.WARNING, logger="sm_records.tenancy"):
+    with caplog.at_level(logging.WARNING, logger="sm_records.core.tenancy"):
         assert configure(single) is TenancyMode.SINGLE
     assert services.tenancy is TenancyMode.SINGLE
     assert "multi_tenant is on" in caplog.text
@@ -117,7 +117,7 @@ def test_configure_stores_the_mode_and_warns_when_the_setting_asked_for_tenancy(
     for wanted in (False, True):
         caplog.clear()
         multi.state.host = SimpleNamespace(settings=SimpleNamespace(multi_tenant=wanted))
-        with caplog.at_level(logging.WARNING, logger="sm_records.tenancy"):
+        with caplog.at_level(logging.WARNING, logger="sm_records.core.tenancy"):
             assert configure(multi) is TenancyMode.MULTI
         assert caplog.text == ""
 

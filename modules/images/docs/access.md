@@ -113,6 +113,28 @@ Public routes are `GET` and `HEAD` only: the collection page, the gallery
 `r/{size}`, `display` and `original` byte routes. An unknown slug, a foreign
 tenant and an unbound tenant all get the one 404 body.
 
+`/api/images/public/stats?metric=…&collection={slug}` answers one number,
+for the pagebuilder `ImageStats` block. `images` and `located`
+count exactly what the gallery lists (not trashed, past the redaction gate, with
+a current `small` rendition; `located` also needs both coordinates in
+range, the map's rule), for one public collection or summed over every
+public collection when `collection` is left out. `collections` counts the public
+collections. It never reads the stored `image_count`, which includes images the
+public must not see. For `images` and `located` a private, internal, trashed or unknown slug is the
+same 404; `collections` ignores `collection` (the block sends none), so it
+answers 200 whatever the slug. An unknown or missing `metric` is a 400.
+
+The answer is `{"value": n, "capped": bool}` and every count is bounded, since
+the route is anonymous: a count reads at most `MAX_COUNT + 1` (10,000) rows and
+past that answers `{"value": 10000, "capped": true}`, which the block shows as
+`10,000+`. The total over every public collection is one count, however many
+collections it spans: the collections are grouped by redaction gate
+(`redaction.gate_key`, decided in Python against the installed steps) and the
+statement holds each group to its own gate. Deciding the gates reads the
+collections, so at most `MAX_COLLECTIONS` (200) public ones are considered;
+past that the total is `{"value": null, "capped": true}` (the block shows a
+dash) rather than a partial sum. A named collection always answers.
+
 Every byte response can be revoked later (the collection goes private,
 `protect_originals` is switched on, anonymization is enabled, a share is
 withdrawn), so **every response revalidates**: nothing is `immutable` or carries
@@ -131,6 +153,11 @@ Who may share the answer:
 - A protected original is `private, no-store` for everyone, the owner included.
 - The map surfaces (points, `map.pmtiles`) follow the same split; the points
   ETag digests the answer itself, so a gated page never validates a raw one.
+- The counts follow the same split, `public, no-cache` when shareable and
+  `private, no-cache` otherwise, with no ETag. They revalidate like everything
+  else rather than carrying a `max-age`: the fallback tenant's answer has no
+  `Vary` that a request choosing another tenant would miss, so a fresh shared
+  copy could reach that request. Each count is bounded, so this is affordable.
 - Error answers on the public routes carry `no-store`.
 
 `public_asset_base_url`, when set, makes public pages link renditions of public

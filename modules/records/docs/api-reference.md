@@ -1232,6 +1232,7 @@ published records anonymously under `public_route_prefix`
 | Method | Path | Answers |
 |---|---|---|
 | `GET`, `HEAD` | `{prefix}/{type_key}` | `PublicRecordPage` |
+| `GET`, `HEAD` | `{prefix}/{type_key}/stats` | `PublicStatRead` — see [Live counts](#live-counts--type_keystats) |
 | `GET`, `HEAD` | `{prefix}/{type_key}/{uuid}` | `PublicRecordRead` |
 
 `PublicRecordRead` carries `uuid`, `slug`, `locale`, `display_title`,
@@ -1337,7 +1338,7 @@ either way.
 `?after=`, `?total=false` and the `max_count` bound all apply, and a client
 walking a large public type is exactly the caller that should use them.
 
-**Both anonymous reads are cacheable.** They carry a weak `ETag` over the
+**All three anonymous reads are cacheable.** They carry a weak `ETag` over the
 content they are about to return and `Cache-Control: public, max-age=N`, where
 `N` is the `public_cache_seconds` setting (60 by default). A conditional GET
 whose `If-None-Match` matches is a `304` with no body, carrying the same
@@ -1355,13 +1356,15 @@ is **signed in** is resolved to their own account's tenant, which no request
 header names, so their answer is `Cache-Control: private, max-age=N` instead.
 A single-tenant host sends neither: every read there is `default`.
 
-**Errors, on a multi-tenant host, are never storable.** The same URL can be a
-`200` for one tenant and a `404` for another, and HTTP lets a cache keep a
-`404` heuristically when nothing forbids it — so every public error response
-(the `404`, the `400` for a refused filter, sort or cursor, the `422` for a bad
-parameter, the `500`) carries the tenant header in `Vary` and
-`Cache-Control: no-store`. The bodies are unchanged. A single-tenant host
-sends errors as before.
+**Errors are never storable.** HTTP lets a cache keep a `404` heuristically
+when nothing forbids it, so a cache holding one would go on answering it after
+the type is made public or the record published — and on a multi-tenant host
+the same URL can be a `200` for one tenant and a `404` for another. So every
+public error response (the `404`, the `400` for a refused filter, sort, cursor,
+metric or locale, the `422` for a bad parameter, the `500`), on the listing,
+the record read and the stats route alike, carries `Cache-Control: no-store`,
+on a single-tenant host too; a multi-tenant host also names the tenant header
+in `Vary`. The bodies are unchanged.
 
 The validator covers the *content*, so it changes when the answer does — a row
 edited, a row unpublished out of the page, a different `?filter=`, a different
@@ -1374,6 +1377,45 @@ page of the same query — and not merely when some row somewhere was touched.
 > `simple_module_hosting/_inertia_shared.py:54`. This module writes nothing to
 > the session and does not work around it; until it is fixed upstream, these
 > headers help a browser and a private cache rather than a CDN.
+
+### Live counts — `{type_key}/stats`
+
+What the `RecordStats` page block shows (#88): one number about what the
+listing would return, without the page.
+
+```bash
+curl -s 'http://localhost:8000/api/records/public/product/stats?metric=sum:price&filter=in_stock:eq:true'
+```
+```json
+{"value": 112874.36, "capped": false}
+```
+
+- `metric=count` (the default) is the listing's `total` for the same
+  `?filter=` and `?locale=` — published, out of the trash, in the bound
+  tenant — and bounded the same way: past `max_count` (10,000) `value` is
+  `max_count` and `capped` is `true`, the listing's `total_capped`. The block
+  shows that as `10,000+`.
+- `metric=sum:<field>` is the sum of an indexed, single-valued
+  `number` field the public shape carries — an `int` when it is whole, a
+  `float` otherwise, `0` over no rows. The database's sum is returned as-is
+  (SQLite adds floats, so `0.1 + 0.2` is `0.30000000000000004`; Postgres
+  `numeric` gives `0.3`); the block rounds it to two decimals for display. It reads at most `max_count + 1` matching records: when more
+  match, the answer is `{"value": null, "capped": true}` — not available,
+  rather than the sum of some of them — and the block shows a dash. Narrow it
+  with `?filter=` to get a number.
+- `?filter=` is bounded by `max_filter_terms` (20) exactly as on the listing.
+- `?locale=` is resolved by the listing's own rule (absent → the default
+  content locale, case-insensitive, an unconfigured or dropped language a
+  `400`) and **always applied**, so a translated record counts once.
+- Every field named — filtered on *or* summed — goes through the listing's
+  allow-list. `sum:position`, `sum:<virtual field>` and
+  `filter=created_at:…` are the same `400` naming the field a refused filter
+  gets (`sum:<text field>` or a multi-valued field is a `400` saying it is not
+  a number field that can be summed): a sum under a filter that keeps one row is that row's value. Any
+  metric other than `count` and `sum:<field>` — `min` and `max` included — is
+  a `400` saying it is not a supported metric; there is no `group_by`.
+- Registered before `{type_key}/{uuid}`, so `stats` is never read as a uuid; a
+  record whose *slug* is `stats` is still served by its uuid.
 
 ---
 

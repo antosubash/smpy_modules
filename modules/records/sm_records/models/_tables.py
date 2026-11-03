@@ -42,10 +42,10 @@ __all__ = [
 
 MAX_COLLECTION_NAME_LEN = constants.MAX_COLLECTION_NAME_LEN
 RESERVED_COLLECTION_NAMES = constants.RESERVED_COLLECTION_NAMES
-"""Re-exported from :mod:`sm_records.constants`, which is where ``models._type``
+"""Re-exported from :mod:`sm_records.core.constants`, which is where ``models._type``
 reads its own constants from — that module must not import this one, whose
 import builds every table set. The ``collection`` column's width is
-:data:`~sm_records.constants.MAX_COLLECTION_COLUMN_LEN` and is deliberately
+:data:`~sm_records.core.constants.MAX_COLLECTION_COLUMN_LEN` and is deliberately
 wider than the name limit enforced here; see its docstring."""
 
 _KEY_RE = re.compile(constants.TYPE_KEY_PATTERN)
@@ -177,7 +177,7 @@ def table_sets() -> tuple[TableSet, ...]:
 
     The order is the global set *first* and then alphabetical, which matters
     to the one caller that iterates all of them and merges the results — "who
-    references this record" (:func:`sm_records.services._relations.referrers`)
+    references this record" (:func:`sm_records.records.services._relations.referrers`)
     — so a referrer list does not reorder itself when a collection is added.
     """
     return (GLOBAL, *(_sets[name] for name in collection_names()))

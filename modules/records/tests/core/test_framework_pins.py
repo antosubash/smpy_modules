@@ -85,7 +85,7 @@ def _with_entry(**fields):
 def test_unrecognised_arguments_are_multi_not_single(fields, caplog):
     app = _with_entry(**fields)
     assert tenancy.detect_mode(app) is TenancyMode.MULTI
-    with caplog.at_level(logging.WARNING, logger="sm_records.tenancy"):
+    with caplog.at_level(logging.WARNING, logger="sm_records.core.tenancy"):
         assert tenancy.configure(app) is TenancyMode.MULTI
     assert "does not recognise" in caplog.text
     assert tenancy.tenant_header(app) is None

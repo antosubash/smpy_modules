@@ -15,7 +15,7 @@ has to be spelled from its own prefix or the second ``CREATE INDEX`` fails.
 
 The longest identifier any table set builds is one of these —
 ``ix_<prefix>record_type_status_position`` — and it is what
-:data:`sm_records.constants.MAX_COLLECTION_NAME_LEN` is measured against, so a
+:data:`sm_records.core.constants.MAX_COLLECTION_NAME_LEN` is measured against, so a
 suffix here that grows shortens the longest collection name a host may declare.
 ``tests/test_collections_name_limit.py`` fails rather than the host's next
 migration. Foreign-key names are longer still and are *not* what the limit
@@ -52,7 +52,7 @@ Each gets a *second* index, ordered the way a descending page on it asks — see
 :func:`record_args`. Written out rather than derived because this module runs
 while ``__table_args__`` is being built, i.e. before the columns exist, so it
 cannot read nullability off the mapper the way
-:data:`sm_records.index._fixed.NOT_NULL_FIXED_COLUMNS` does.
+:data:`sm_records.records.index._fixed.NOT_NULL_FIXED_COLUMNS` does.
 ``tests/test_record_indexes.py`` is what keeps the two in step: it fails if a
 column becomes nullable, or stops being, without this list moving.
 """

@@ -1,7 +1,7 @@
 """The anonymous read API (design §10), mounted at ``public_route_prefix``.
 
 **No authentication dependency anywhere in this module, and no read of
-``request.state.user``.** That is the point of it: these two routes answer a
+``request.state.user``.** That is the point of it: these routes answer a
 caller with no session, and the prefix is exempted from ``AuthMiddleware`` by
 :mod:`sm_records.core.boot`. Anything that needed to know who was asking would
 belong on the admin API instead.
@@ -47,6 +47,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.contracts.public import (
     PublicRecordPage,
     PublicRecordRead,
+    PublicStatRead,
     public_record_read,
     public_records_read,
 )
@@ -55,6 +56,7 @@ from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import bind_public
 from sm_records.records.index.query import CursorError, Filter, QueryError, Sort
 from sm_records.records.services import public as public_service
+from sm_records.records.services.public_stats import UnsupportedMetricError, public_stat
 from sm_records.web.deps import (
     MAX_PAGE,
     PageCursor,
@@ -89,6 +91,26 @@ def _refused(exc: QueryError) -> HTTPException:
     and the last of them is a running operation (§10).
     """
     return HTTPException(status_code=400, detail=f"cannot filter or sort by {exc.field!r}")
+
+
+def _locale(settings: RecordsSettings, locale: str | None) -> str:
+    """The one language a public read is of — the listing's rule, shared.
+
+    Absent is the default content locale, never "all"; a value is matched
+    case-insensitively against ``content_locales``; anything else, including
+    a language since dropped, is a 400 naming it. One function, because the
+    stats block's count has to be the listing's ``total`` for every spelling.
+    """
+    chosen = locales.default(settings) if locale is None else locales.resolve(settings, locale)
+    if chosen is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"unknown locale {locale!r}; this site publishes in "
+                f"{', '.join(locales.supported(settings))}"
+            ),
+        )
+    return chosen
 
 
 _READ = sorted(constants.PUBLIC_ROUTE_METHODS)
@@ -158,15 +180,7 @@ async def list_public_records(
     flat 400 a refused filter is.
     """
     rtype = await public_service.get_public_type(db, type_key)
-    chosen = locales.default(settings) if locale is None else locales.resolve(settings, locale)
-    if chosen is None:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"unknown locale {locale!r}; this site publishes in "
-                f"{', '.join(locales.supported(settings))}"
-            ),
-        )
+    chosen = _locale(settings, locale)
     try:
         result = await public_service.list_public_records(
             db,
@@ -194,6 +208,40 @@ async def list_public_records(
         page_size=settings.clamp_page_size(page_size),
         media_url_template=public_file_url_template(request),
     )
+    return _public_cache.apply(request, response, payload, settings) or payload
+
+
+# Registered before ``/{type_key}/{uuid}``: Starlette matches in order, and
+# the record route would otherwise take ``stats`` for a uuid and answer 404.
+@_read_route("/{type_key}/stats", response_model=PublicStatRead)
+async def public_record_stats(
+    type_key: str,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(request_db),
+    settings: RecordsSettings = Depends(get_settings),
+    metric: str | None = Query(default=None),
+    filters: list[Filter] = Depends(parse_filters),
+    locale: str | None = Query(default=None, alias=constants.LOCALE_PARAM),
+) -> Any:
+    """``count`` (the default) or ``sum:<field>`` over what the listing shows.
+
+    The listing's gates and bound (``services.public_stats``): a public type,
+    published rows in one language, fields the public shape carries, and
+    ``max_count`` (``capped``). Refusals are the listing's 400 naming the
+    field, and a metric other than those two says it is not supported.
+    """
+    rtype = await public_service.get_public_type(db, type_key)
+    chosen = _locale(settings, locale)
+    try:
+        value, capped = await public_stat(
+            db, rtype, metric=metric, filters=filters, locale=chosen, cap=settings.max_count
+        )
+    except UnsupportedMetricError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except QueryError as exc:
+        raise _refused(exc) from exc
+    payload = PublicStatRead(value=value, capped=capped)
     return _public_cache.apply(request, response, payload, settings) or payload
 
 

@@ -123,6 +123,30 @@ async def test_a_head_request_carries_the_headers_too(public_client):
     assert resp.headers["cache-control"] == "public, max-age=60"
 
 
+async def test_single_tenant_error_answers_are_no_store(public_client):
+    """A public error is never storable, single-tenant host included (#88).
+
+    HTTP lets a cache keep a 404 heuristically when nothing says otherwise, so
+    a type made public a minute later, or a record published, would stay a 404
+    for whoever sits behind that cache. Only the tenant ``Vary`` is multi-mode
+    business; ``no-store`` is every error's.
+    """
+    await _type(public_client, "cacheerr")
+    for url in (
+        f"{_PUBLIC}/nosuch",
+        f"{_PUBLIC}/nosuch/stats",
+        f"{_PUBLIC}/cacheerr?filter=nosuch:eq:x",
+        f"{_PUBLIC}/cacheerr/stats?metric=max:name",
+        f"{_PUBLIC}/cacheerr/stats?locale=xx",
+        f"{_PUBLIC}/cacheerr?page=0",
+    ):
+        for method in ("GET", "HEAD"):
+            resp = await public_client.request(method, url)
+            assert resp.status_code >= 400, (method, url, resp.status_code)
+            assert resp.headers.get("cache-control") == "no-store", (method, url)
+            assert "etag" not in resp.headers, (method, url)
+
+
 async def test_the_admin_api_is_untouched(public_client):
     """Per-caller responses; the framework already forces those private."""
     await _type(public_client, "cacheadmin")

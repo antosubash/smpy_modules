@@ -35,13 +35,14 @@ from sqlalchemy import Select, and_, desc, distinct, func, select
 from sqlalchemy.orm import aliased
 
 from sm_records.models import TableSet, tables_for
+from sm_records.records.index._bounded import bounded_inner
 from sm_records.records.index._fields import declared_keys, indexed_map
 from sm_records.records.index._filters import filtered, resolve
 from sm_records.records.index._fixed import FIXED_COLUMNS, fixed_expression
 from sm_records.records.index._predicates import SORT_ATTR, QueryError
 from sm_records.schema.types import IndexKind
 
-__all__ = ["Metric", "aggregate_query", "parse_metric"]
+__all__ = ["Metric", "aggregate_query", "bounded_sum_query", "parse_metric"]
 
 FIXED_KIND: dict[str, IndexKind] = {
     "status": IndexKind.TEXT,
@@ -208,3 +209,48 @@ def aggregate_query(
     stmt = filtered(stmt, rtype, fields, filters)
     stmt = stmt.group_by(group_expr).order_by(desc(counted), group_expr).limit(cap + 1)
     return stmt, group_kind
+
+
+def bounded_sum_query(
+    rtype, fields: list[dict[str, Any]], filters, *, metric: Metric, cap: int, narrow: Any
+) -> Select:
+    """``(matched, sum)`` over at most ``cap + 1`` matching records — one row.
+
+    The anonymous stats sum (#88) is bounded the way the listing's ``total``
+    is, and by the same machinery: the inner query is
+    :func:`~sm_records.records.index.query.bounded_count_query`'s own
+    (:func:`~sm_records.records.index._bounded.bounded_inner` — the mapped
+    :func:`~sm_records.records.index._bounded.count_columns`, so the soft-delete filter
+    still reaches the ``LIMIT``, ``narrow`` and :func:`filtered` applied,
+    ``LIMIT cap + 1``) and the outer sums the field over an alias of it.
+    ``matched`` past ``cap`` means the sum covers only some of the matches,
+    which the caller reports as "not available" rather than a wrong number.
+
+    Chosen over a bounded count followed by an unbounded sum (which is the
+    full scan the bound exists to stop) and over ``SUM ... WHERE id IN
+    (limited)`` (which reads the matching rows twice, F4's measured trap): one
+    statement, the matching rows read once and at most ``cap + 1`` of them,
+    and the index table probed only for those. A **left** join, so a record
+    without a value still counts towards ``matched`` — the bound is on the
+    records scanned, not on the values found — and adds nothing to the sum.
+    ``_check_metric`` has refused a multi-valued field, so the join cannot
+    repeat a record.
+    """
+    if metric.field is None:
+        raise ValueError(f"{metric} names no field; count is bounded_count_query")
+    tables = tables_for(rtype)
+    record = tables.record
+    indexed, declared = indexed_map(fields), declared_keys(fields)
+    _, kind, join, many = _column(tables, rtype, indexed, declared, metric.field)
+    _check_metric(metric, kind, many)
+    inner = bounded_inner(rtype, fields, filters, cap=cap, narrow=narrow)
+    counted = aliased(record, inner.subquery())
+    if join is None:
+        value = fixed_expression(counted, metric.field)
+    else:
+        value = getattr(join[0], SORT_ATTR[kind])
+    stmt = select(func.count(counted.id), getattr(func, metric.op)(value)).select_from(counted)
+    if join is not None:
+        stmt = stmt.outerjoin(join[0], _on(counted, join[0], rtype.id, join[1]))
+    options = inner.get_execution_options()
+    return stmt.execution_options(**options) if options else stmt

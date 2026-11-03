@@ -165,8 +165,8 @@ async def test_a_single_tenant_host_reads_default_and_ignores_the_header(tmp_pat
             assert listed.headers["cache-control"].startswith("public, ")
             missing = await client.get(f"{PUBLIC}/nosuch", headers=headers)
             assert missing.status_code == 404
-            assert TENANT_HEADER.lower() not in _vary(missing), "single mode: errors as before"
-            assert "cache-control" not in missing.headers
+            assert TENANT_HEADER.lower() not in _vary(missing), "single mode: no tenant Vary"
+            assert missing.headers["cache-control"] == "no-store", "but never storable (#88)"
     await db_state.engine.dispose()
 
 

@@ -27,7 +27,7 @@ __all__ = [
     "tenant_header",
 ]
 
-logger = logging.getLogger("sm_records.tenancy")
+logger = logging.getLogger("sm_records.core.tenancy")
 
 _PACKAGE: Final = "records"
 """The prefix of this file's messages."""

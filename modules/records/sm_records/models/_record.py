@@ -87,7 +87,7 @@ it on read. Its ``tenant_id`` is also half of a composite foreign key to
 tenant is always its type's — which is what makes every ``type_id``-scoped
 index, unique constraint and index-table row per-tenant without a
 ``tenant_id`` of its own. Records bind ``default`` on a single-tenant host
-(:mod:`sm_records.tenancy`), so the non-nullable column forces nothing on one."""
+(:mod:`sm_records.core.tenancy`), so the non-nullable column forces nothing on one."""
 
 _REVISION_DOC = """Append-only snapshot of a record's payload, one per write.
 
@@ -200,10 +200,10 @@ def make_record_tables(prefix: str, *, class_suffix: str = "") -> RecordTables:
         badges, so the list turns the check off — and nothing could then show,
         count or filter what a forced change had left behind.
 
-        Written and cleared by :mod:`sm_records.services._invalid`, which
+        Written and cleared by :mod:`sm_records.records.services._invalid`, which
         documents when. A *timestamp* rather than a flag because "since when"
         is the only extra fact the marking knows; the filter grammar reads it
-        as the boolean ``invalid`` (:mod:`sm_records.index._fixed`), and the
+        as the boolean ``invalid`` (:mod:`sm_records.records.index._fixed`), and the
         public read shape does not carry it at all.
         """
 
