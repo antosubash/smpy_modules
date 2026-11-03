@@ -28,3 +28,7 @@ DEPENDS_ON = (_MODULE_SETTINGS, _MODULE_RECORDS, _MODULE_BACKGROUND_TASKS)
 
 TENANT_REQUIRED_CODE = "tenant_required"
 NOT_FOUND_DETAIL = "Not found"
+
+# The newsletter settings page (PR 3). Registered now as the settings'
+# ``manage_url`` so the generic Settings screen refuses newsletter writes.
+SETTINGS_URL = f"{VIEW_PREFIX}/settings"

@@ -181,6 +181,32 @@ FAMILIES: tuple[Family, ...] = (
         },
     ),
     Family(
+        "stored-secret crypto",
+        (
+            Copy(f"{AI}/core/crypto.py"),
+            Copy(
+                "modules/newsletter/sm_newsletter/core/crypto.py",
+                {"SmtpPasswordUnreadable": "AiKeyUnreadableError"},
+                messages=(
+                    "Newsletter setting %r is stored unencrypted; re-save it through "
+                    "the password endpoint to encrypt it.",
+                ),
+            ),
+        ),
+        shared=(
+            "ENC_PREFIX",
+            "set_secret_provider",
+            "_fernet_for",
+            "explicit_secret",
+            "_dotenv_secret",
+            "encrypt_value",
+        ),
+        differ={
+            "decrypt_value": "Each module raises its own unreadable-secret error.",
+            "_fernet": "Each names its own module in the missing-secret message.",
+        },
+    ),
+    Family(
         "scheduler shutdown",
         (
             Copy(
