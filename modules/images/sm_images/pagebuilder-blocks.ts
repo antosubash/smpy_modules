@@ -1,5 +1,5 @@
 /**
- * Registers the `ImageGallery` block in pagebuilder's palette when pagebuilder
+ * Registers the `ImageGallery` and `ImageStats` blocks in pagebuilder's palette when pagebuilder
  * is installed. Images knows about pagebuilder; pagebuilder knows nothing about
  * images.
  *
@@ -15,6 +15,7 @@
 import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/components/blockRegistry';
 
 import { ImageGalleryBlock } from './ui/components/block/ImageGalleryBlock';
+import { ImageStatsBlock } from './ui/components/block/ImageStatsBlock';
 import { keys } from './ui/utils/i18n';
 
 try {
@@ -29,4 +30,14 @@ try {
   // hot-reloading dev server that is a re-run of this module, and it must not
   // blank the editor.
   console.warn('[images] ImageGallery block not registered:', error);
+}
+
+// Its own guard: a clash on one name must not leave the other unregistered.
+try {
+  registerPuckBlocks({
+    blocks: { ImageStats: ImageStatsBlock },
+    category: { key: 'images', title: keys.images.block.palette_group },
+  });
+} catch (error) {
+  console.warn('[images] ImageStats block not registered:', error);
 }
