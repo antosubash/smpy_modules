@@ -57,6 +57,14 @@ class SmtpPasswordUnreadable(NewsletterError):  # noqa: N818 - the brief's name 
     detail = "The stored SMTP password cannot be read; enter it again"
 
 
+class InvalidPassword(NewsletterError):  # noqa: N818 - names the field
+    """A blank or oversized SMTP password; the detail never repeats the value."""
+
+    status = 422
+    code = "invalid_password"
+    detail = "The password must be 1 to 1024 characters and not blank"
+
+
 async def render(request: Request, exc: NewsletterError) -> JSONResponse:
     return JSONResponse({"detail": exc.detail, "code": exc.code}, status_code=exc.status)
 

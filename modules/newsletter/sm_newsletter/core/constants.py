@@ -6,7 +6,6 @@ PACKAGE = "sm_newsletter"
 MODULE_NAME = "Newsletter"
 DISTRIBUTION = "simple_module_newsletter"
 LOCALE_NAMESPACE = "newsletter"
-TABLE_PREFIX = "newsletter_"
 BASE_NAME = "newsletter"
 
 ROUTE_PREFIX_API = "/api/newsletter"

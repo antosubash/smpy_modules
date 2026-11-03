@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_newsletter.core import constants, crypto
 
 
-async def set_smtp_password(app: FastAPI, db: AsyncSession, password: str) -> bool:
-    """Persist ``password`` encrypted; True when the stored password is now set."""
+async def set_smtp_password(app: FastAPI, db: AsyncSession, password: str) -> None:
+    """Persist ``password`` encrypted and hot-swap the live settings."""
     # Plugin imports (settings is a declared dependency), local as ai's are.
     from settings.reload import apply_changes_and_reload
     from settings.service import SettingService
@@ -32,4 +32,3 @@ async def set_smtp_password(app: FastAPI, db: AsyncSession, password: str) -> bo
     # The reload runs after the commit; commit now so the live settings carry
     # the new value when the response is built.
     await finalize_session(db)
-    return True

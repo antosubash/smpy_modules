@@ -15,7 +15,7 @@ dependencies = [
     "simple_module_hosting>=0.0.42,<0.1",
     "simple_module_settings>=0.0.42,<0.1",
     "simple_module_background_tasks>=0.0.42,<0.1",
-    # floor: 0.0.13 — raise to the release that first ships contracts.newsletter (#306) when it is cut
+    # floor: 0.0.13 — raise to the records release that first ships contracts.newsletter's subscription_lists / subscription_list_tenants / include_trashed (newsletter PR 2; contracts.newsletter itself is #306)
     "simple_module_records>=0.0.13,<0.1",
     "cryptography>=42",
     "pydantic-settings>=2.0",
@@ -50,6 +50,7 @@ exclude = [
     "**/__tests__/**",
     "**/test-dom.tsx",
     "**/*-test-support.ts",
+    "**/*-test-support.tsx",
     "**/page-tests/**",
 ]
 artifacts = ["sm_newsletter/static/dist/**"]

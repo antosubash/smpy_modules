@@ -9,12 +9,20 @@ from sqlalchemy import Table
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.ext.asyncio import AsyncSession
 
-__all__ = ["insert_ignore"]
+__all__ = ["affected_rows", "insert_ignore"]
 
 _INSERTS: dict[str, Any] = {"postgresql": postgresql.insert, "sqlite": sqlite.insert}
 
 # One statement per chunk keeps SQLite under its bound-parameter limit.
 _CHUNK = 500
+
+
+def affected_rows(result: Any, dialect: str) -> int:
+    """``result.rowcount``, failing loudly on the driver's ``-1`` ("unknown")."""
+    count = result.rowcount
+    if count is None or count < 0:
+        raise RuntimeError(f"the {dialect} driver did not report a row count")
+    return int(count)
 
 
 async def insert_ignore(
@@ -30,7 +38,7 @@ async def insert_ignore(
     ``tenant_id`` in every row, since the tenant mixin stamps ORM flushes only.
     Does not commit.
     """
-    dialect = session.bind.dialect.name
+    dialect = session.get_bind().dialect.name
     insert = _INSERTS.get(dialect)
     if insert is None:
         raise ValueError(f"insert_ignore supports postgresql and sqlite, not {dialect}")
@@ -39,5 +47,5 @@ async def insert_ignore(
         chunk = list(rows[start : start + _CHUNK])
         stmt = insert(table).values(chunk).on_conflict_do_nothing(index_elements=list(conflict))
         result = await session.execute(stmt)
-        inserted += max(result.rowcount or 0, 0)
+        inserted += affected_rows(result, dialect)
     return inserted

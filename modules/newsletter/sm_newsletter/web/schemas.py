@@ -2,19 +2,14 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel
 
 
 class SmtpPasswordUpdate(BaseModel):
-    password: str = Field(min_length=1, max_length=1024)
+    """Unconstrained on purpose: a validation error would echo the submitted
+    value (``input``) back. The handler validates and never repeats it."""
 
-    @field_validator("password")
-    @classmethod
-    def _stripped(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            raise ValueError("password must not be blank")
-        return value
+    password: str
 
 
 class SmtpPasswordOut(BaseModel):

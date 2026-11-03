@@ -42,7 +42,8 @@ Settings are DB-backed (the framework's settings module), never environment
 variables. Configure them on the Settings screen or with
 `scripts/set_setting.py`. The SMTP password is the exception: it is stored
 encrypted under the host's secret key and written only through
-`PUT /api/newsletter/settings/smtp-password`. The generic Settings screen
+`PUT /api/newsletter/settings/smtp-password` (`scripts/set_setting.py` would
+store it in plaintext, accepted with a warning; use the endpoint). The generic Settings screen
 refuses newsletter writes; a dedicated settings page arrives in a later PR.
 
 ### Permissions

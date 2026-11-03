@@ -95,7 +95,7 @@ tenant is never shareable-cached (records #196; pagebuilder and news #192).
 The scheduler opens one session per tenant under `tenant_context`. News has its
 own copy, `news.core.tenancy`, and its scheduler ticks per tenant the same way;
 records' is `sm_records.core.tenancy` (its 403 is the `{"detail","code"}` envelope,
-code `tenant_required`) images' `sm_images.core.tenancy` is a copy of it, and newsletter's
+code `tenant_required`), images' `sm_images.core.tenancy` is a copy of it, and newsletter's
 `sm_newsletter.core.tenancy` is a copy of images'; images'
 Celery tasks never run unscoped — `images.reconcile` and `images.janitor`
 enumerate tenants in one narrow `all_tenants()` read and do each tenant's work
@@ -127,7 +127,8 @@ trashes with `soft_delete_record` and then calls `hard_delete_record`.
 unsubscribed subscribers, trash included, and only adds rows. Suppressions are
 tenant-wide: an opt-out on any list suppresses every list in the tenant. A
 confirmation clears that list's opt-out and the bounce/import rows created at or
-before it, never `complaint`.
+before it, never `complaint`. A confirmation clears only that list's opt-out
+row; opt-outs from other lists stay.
 
 **Never add a file under `modules/*/*/pages/` unless it is a real Inertia
 page.** The page name is derived from that path by `import.meta.glob`, so a
@@ -176,7 +177,8 @@ hydration happens at lifespan start, so a value read earlier is the pydantic
 default no matter what the database says. Mark such fields
 `json_schema_extra=_RESTART` so the Settings screen says a restart is needed.
 Newsletter's `smtp_password` is stored `enc:v1:` under `SM_SECRET_KEY` and written only
-through `PUT /api/newsletter/settings/smtp-password`; the generic Settings screen
+through `PUT /api/newsletter/settings/smtp-password` (`scripts/set_setting.py`
+would store it in plaintext, accepted with a warning; use the endpoint); the generic Settings screen
 refuses newsletter writes (`manage_url`).
 These settings are SYSTEM-scope: ai has one provider configuration and one
 API key per slot for the whole deployment, shared by every tenant. ai reads

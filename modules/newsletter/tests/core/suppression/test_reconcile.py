@@ -20,6 +20,7 @@ from sm_records.core import events
 from sm_records.core.tenancy import tenant_scope as records_scope
 from sm_records.records.services import records as record_service
 from sm_records.records.services import types as type_service
+from sm_records.records.services.errors import NotFound
 from sqlalchemy import select
 
 from tests.support.records_seed import LIST, seed_list, seed_subscriber
@@ -119,26 +120,31 @@ async def test_reconcile_with_no_lists(db_state):
 
 
 async def test_one_bad_list_does_not_stop_others(db_state, monkeypatch, caplog):
-    for tenant in ("a", "b"):
-        await seed_list(db_state, tenant)
-        await seed_subscriber(db_state, tenant, ADA, "unsubscribed")
+    """Tenant ``a`` (walked first) has two lists and its first one fails: the
+    second list and the next tenant are still reconciled."""
+    await seed_list(db_state, "a", "alpha")
+    await seed_list(db_state, "a", "news")
+    await seed_list(db_state, "b", "news")
+    await seed_subscriber(db_state, "a", BOB, "unsubscribed", "alpha")
+    await seed_subscriber(db_state, "a", ADA, "unsubscribed", "news")
+    await seed_subscriber(db_state, "b", CY, "unsubscribed", "news")
     real = reconcile.iter_subscribers
 
-    async def flaky(session, *, tenant_id, **kw):
-        if tenant_id == "b":
+    async def flaky(session, *, tenant_id, type_key, **kw):
+        if (tenant_id, type_key) == ("a", "alpha"):
             raise RuntimeError("records is having a bad day")
-        return await real(session, tenant_id=tenant_id, **kw)
+        return await real(session, tenant_id=tenant_id, type_key=type_key, **kw)
 
     monkeypatch.setattr(reconcile, "iter_subscribers", flaky)
     with caplog.at_level(logging.WARNING, logger=reconcile.__name__):
         result = await reconcile_async(db_state.session_factory, now=T)
 
-    assert result == {"lists": 2, "suppressed": 1, "failed": 1}
-    assert await _suppressed(db_state, "a", ADA) == {ADA}
-    assert await _suppressed(db_state, "b", ADA) == set()
+    assert result == {"lists": 3, "suppressed": 2, "failed": 1}
+    assert await _suppressed(db_state, "a", ADA, BOB) == {ADA}
+    assert await _suppressed(db_state, "b", CY) == {CY}
     warned = [r for r in caplog.records if r.levelno == logging.WARNING]
     assert warned and warned[0].exc_info is not None
-    assert f"list {LIST!r} in tenant b" in warned[0].getMessage()
+    assert "list 'alpha' in tenant a" in warned[0].getMessage()
 
 
 async def test_a_tenant_whose_lists_cannot_be_read_counts_as_one_failure(db_state, monkeypatch):
@@ -208,7 +214,7 @@ async def test_lost_event_trash_reconcile_purge_still_suppressed(db_state):
             await events.commit(db)
         async with db_state.session_factory() as db:
             rtype = await type_service.get_type(db, LIST)
-            with pytest.raises(Exception):  # noqa: B017 - records' own not-found
+            with pytest.raises(NotFound):
                 await record_service.get_deleted_record(db, rtype, uuid)
 
     assert await _rows(db_state) == [("unsubscribed", LIST, "reconcile")]

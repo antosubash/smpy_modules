@@ -26,7 +26,7 @@ from sm_newsletter.core.constants import (
 )
 from sm_newsletter.core.suppression.hashing import email_hash, normalise_email
 from sm_newsletter.core.tenancy import tenant_scope, valid_tenant
-from sm_newsletter.core.upsert import insert_ignore
+from sm_newsletter.core.upsert import affected_rows, insert_ignore
 from sm_newsletter.models import Suppression
 
 __all__ = ["clear_for_confirmation", "suppress", "suppress_many", "suppressed"]
@@ -188,7 +188,7 @@ async def clear_for_confirmation(
     )
     with tenant_scope(tenant):
         result = await session.execute(stmt)
-    return max(result.rowcount or 0, 0)
+    return affected_rows(result, session.get_bind().dialect.name)
 
 
 async def suppressed(session: AsyncSession, *, tenant_id: str, emails: Sequence[str]) -> set[str]:

@@ -8,9 +8,12 @@ from simple_module_hosting.permissions import RequiresPermission
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.core import constants
+from sm_newsletter.core.errors import InvalidPassword
 from sm_newsletter.core.tenancy import bind_admin
 from sm_newsletter.web import settings_service
 from sm_newsletter.web.schemas import SmtpPasswordOut, SmtpPasswordUpdate
+
+MAX_PASSWORD_LEN = 1024
 
 # ``bind_admin`` first: yield dependencies exit in reverse, and ``get_db``'s
 # commit (opened by the handler) has to happen while the tenant is still bound.
@@ -24,5 +27,10 @@ router = APIRouter(
 async def put_smtp_password(
     body: SmtpPasswordUpdate, request: Request, db: AsyncSession = Depends(get_db)
 ) -> SmtpPasswordOut:
-    stored = await settings_service.set_smtp_password(request.app, db, body.password)
-    return SmtpPasswordOut(has_password=stored)
+    password = body.password.strip()
+    if not password or len(password) > MAX_PASSWORD_LEN:
+        raise InvalidPassword()
+    await settings_service.set_smtp_password(request.app, db, password)
+    return SmtpPasswordOut(
+        has_password=bool(request.app.state.sm_newsletter.settings.smtp_password)
+    )

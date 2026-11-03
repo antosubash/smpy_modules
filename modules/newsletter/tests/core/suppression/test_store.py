@@ -97,6 +97,19 @@ async def test_suppress_many_dedupes_and_counts_inserts(db):
     assert len(await _rows(db)) == 3
 
 
+async def test_suppress_many_chunks_past_500_rows(db):
+    emails = [f"user{i}@example.org" for i in range(1200)]
+    kw = {"tenant_id": "default", "reason": "imported_cleaned", "source": "import"}
+    assert await suppress_many(db, emails=emails, now=T0, **kw) == 1200
+    assert len(await _rows(db)) == 1200
+    more = [*emails, "extra@example.org"]
+    assert await suppress_many(db, emails=more, now=T2, **kw) == 1
+    db.expire_all()
+    assert {r.created_at for r in await _rows(db)} == {T2}
+    got = await suppressed(db, tenant_id="default", emails=more)
+    assert len(got) == 1201
+
+
 async def _seed_all(db, *, now: datetime) -> None:
     for reason, list_key in [
         ("unsubscribed", "news"),
