@@ -30,15 +30,11 @@ from tests.support.newsletter_contract import (
     subscription_events,
     transitions,
     unsubscribe_committed,
+    uuid_of,
 )
-from tests.support.newsletter_http import LIST, records_of
+from tests.support.newsletter_http import LIST
 
 SETTINGS = RecordsSettings()
-
-
-async def _ada(client) -> str:
-    rows = await records_of(client)
-    return next(r["uuid"] for r in rows if r["data"]["sm_email"] == "ada@example.org")
 
 
 async def _call(client, db, uuid: str) -> bool:
@@ -66,7 +62,7 @@ async def _force(db, rtype, record, **values) -> None:
 
 
 async def test_two_sessions_one_after_the_other(audience):
-    uuid = await _ada(audience)
+    uuid = await uuid_of(audience, "ada@example.org")
     seen = subscription_events(audience)
     async with session(audience) as first, session(audience) as second:
         assert await _call(audience, first, uuid) is True
@@ -80,7 +76,7 @@ async def test_a_competitor_that_wrote_first_makes_this_call_false(audience, mon
     """The row moves to ``unsubscribed`` just before this call's write lands:
     its version check fails, it decides again from the moved row, and says it
     did not write — although the status it leaves is ``unsubscribed``."""
-    uuid = await _ada(audience)
+    uuid = await uuid_of(audience, "ada@example.org")
     seen = subscription_events(audience)
     real = transition_module.record_service.update_record
     moved: list[bool] = []
@@ -99,7 +95,7 @@ async def test_a_competitor_that_wrote_first_makes_this_call_false(audience, mon
 
 @pytest.mark.skipif(not USING_POSTGRES, reason="two real transactions need Postgres")
 async def test_two_unsubscribes_at_once_attribute_it_once(audience):
-    uuid = await _ada(audience)
+    uuid = await uuid_of(audience, "ada@example.org")
     seen = subscription_events(audience)
     answers = await asyncio.gather(
         unsubscribe_committed(audience, uuid), unsubscribe_committed(audience, uuid)
@@ -111,7 +107,7 @@ async def test_two_unsubscribes_at_once_attribute_it_once(audience):
 async def test_set_tags_retries_once_when_the_row_moved(audience, monkeypatch):
     """An edit that lands between the read and the write (a version bump) is
     read again and the tags merged onto it; a second miss is ``Conflict``."""
-    uuid = await _ada(audience)
+    uuid = await uuid_of(audience, "ada@example.org")
     real = campaign_writes.record_service.update_record
     calls: list[int] = []
 

@@ -12,7 +12,7 @@ from sm_records.contracts.newsletter import (
 )
 
 from tests.support.app_harness import ADMIN, roles
-from tests.support.newsletter_contract import TENANT, session, unbound
+from tests.support.newsletter_contract import TENANT, session, unbound, uuid_of
 from tests.support.newsletter_http import LIST, records_of
 from tests.support.public_submissions_support import create
 
@@ -25,11 +25,6 @@ async def _iter(client, **kw):
 async def _count(client, **kw):
     async with session(client) as db:
         return await count_subscribers(db, tenant_id=TENANT, type_key=LIST, **kw)
-
-
-async def _uuid_of(client, email: str) -> str:
-    hits, _ = await _iter(client)
-    return next(h.uuid for h in hits if h.email == email)
 
 
 async def test_iter_returns_only_confirmed_untrashed(audience):
@@ -106,11 +101,21 @@ async def test_by_uuid_any_status(audience):
 
 
 async def test_by_uuid_includes_trash(audience):
-    uuid = await _uuid_of(audience, "ada@example.org")
+    uuid = await uuid_of(audience, "ada@example.org")
     await audience.delete(f"/api/records/types/{LIST}/records/{uuid}", headers=roles(ADMIN))
     async with session(audience) as db:
         found = await subscribers_by_uuid(db, tenant_id=TENANT, type_key=LIST, uuids=[uuid])
     assert found[uuid].trashed is True
+
+
+async def test_limit_and_batch_accepted_at_the_cap(audience):
+    hits, _ = await _iter(audience, limit=MAX_SUBSCRIBER_BATCH)
+    assert len(hits) == 2
+    async with session(audience) as db:
+        found = await subscribers_by_uuid(
+            db, tenant_id=TENANT, type_key=LIST, uuids=["x"] * MAX_SUBSCRIBER_BATCH
+        )
+    assert found == {}
 
 
 @pytest.mark.parametrize("limit", [0, MAX_SUBSCRIBER_BATCH + 1, True, -1, "5", None])

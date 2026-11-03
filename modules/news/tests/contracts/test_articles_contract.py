@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 from news.contracts.articles import (
+    MAX_ARTICLE_SEARCH_LIMIT,
     get_article_card,
     search_articles,
 )
@@ -61,7 +62,14 @@ async def test_card_none_for_draft_and_unknown(db, seeded):
     assert card is not None and card.title == "Spring update"
 
 
-@pytest.mark.parametrize("limit", [0, 51, True])
+async def test_limit_accepted_at_the_cap(db, seeded):
+    hits = await search_articles(
+        db, tenant_id="default", pattern="%Spring%", limit=MAX_ARTICLE_SEARCH_LIMIT
+    )
+    assert len(hits) == 1
+
+
+@pytest.mark.parametrize("limit", [0, MAX_ARTICLE_SEARCH_LIMIT + 1, True])
 async def test_limit_checked(db, limit):
     with pytest.raises(ValueError):
         await search_articles(db, tenant_id="default", pattern="%", limit=limit)

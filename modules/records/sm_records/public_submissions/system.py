@@ -153,13 +153,6 @@ async def _reload(db: AsyncSession, record: Record) -> Record:
     return (await db.execute(stmt)).scalars().one()
 
 
-# Shared with `campaign_writes` (the newsletter contract's tag write). The
-# underscored names stay for this package's own callers and a test that patches
-# `_ordinary` in this module.
-ordinary = _ordinary
-reload = _reload
-
-
 async def _merge_marks(
     db: AsyncSession,
     rtype: RecordType,

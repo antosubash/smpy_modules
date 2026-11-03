@@ -1660,7 +1660,7 @@ rest as keywords, and returns plain objects.
 |---|---|
 | `iter_subscribers(session, *, tenant_id, type_key, filters=(), after=0, limit=500, status="confirmed")` | `(list[SubscriberHit], next_after \| None)`: untrashed subscribers in `status` (`confirmed` or `unsubscribed`), ANDed `"field:op:value"` filters, ordered by record id; pass `next_after` back as `after` |
 | `count_subscribers(session, *, tenant_id, type_key, filters=(), status="confirmed")` | how many `iter_subscribers` would walk |
-| `subscribers_by_uuid(session, *, tenant_id, type_key, uuids)` | `dict[uuid, SubscriberHit]`, any status, trashed included (`trashed=True`); unknown uuids absent |
+| `subscribers_by_uuid(session, *, tenant_id, type_key, uuids)` | `dict[uuid, SubscriberHit]`, any status, trashed included (`trashed=True`); unknown uuids absent; `ValueError` for a bare string, too many uuids or a non-`str` element |
 | `unsubscribe(session, *, tenant_id, type_key, uuid, unless_confirmed_after, settings, bus=None)` | `True` only if this call wrote |
 | `set_tags(session, *, tenant_id, type_key, uuid, add=(), remove=(), settings, bus=None)` | the `SubscriberHit` as written |
 | `can_read_list(session, *, tenant_id, type_key, roles)` | `bool` |
@@ -1685,7 +1685,7 @@ reads as empty (`[]`, `0`, `{}`) and as `False` for `unsubscribe` and
 `status` one of the two walkable values. `bool` and anything else raise
 `ValueError`. A filter term the index cannot answer raises
 `SubscriberFilterError` with records' reason (`unknown`, `not_indexed`,
-`reindexing`), `malformed` for one that does not parse, or `not_a_list` when
+`reindexing`, `bad_value`, `unsupported_op`), `malformed` for one that does not parse, or `not_a_list` when
 `type_key` is an existing type that is not a newsletter list.
 `can_read_list` answers `False` for that last case.
 
@@ -1701,7 +1701,10 @@ after that, to `bus` when one is given (`events.attach`). With `bus=None`
   `confirmed` with `sm_confirmed_at` at or before `unless_confirmed_after`
   (aware; `None` means unconditionally). A `pending` subscriber (a re-signup
   awaiting confirmation), an `unsubscribed`, trashed or unknown one, or one
-  confirmed after the cutoff is left alone and the answer is `False`. The
+  confirmed after the cutoff is left alone and the answer is `False`. A
+  confirmed subscriber whose `sm_confirmed_at` is missing or unparseable is
+  unsubscribed (a re-signup after the cutoff cannot be shown, and not honouring
+  an unsubscribe is the worse error). The
   answer is the transition's `Outcome.wrote`, so two concurrent calls report
   the unsubscribe once.
 - **`set_tags`** merges into the `tags` field with one `update_record` at the

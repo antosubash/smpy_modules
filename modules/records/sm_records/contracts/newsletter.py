@@ -189,6 +189,8 @@ async def subscribers_by_uuid(
     tenant = _checked_tenant(tenant_id)
     if isinstance(uuids, str):
         raise ValueError("uuids must be a sequence of uuids, not one string")
+    if not all(isinstance(u, str) for u in uuids):
+        raise ValueError("every uuid must be a str")
     if len(uuids) > MAX_SUBSCRIBER_BATCH:
         raise ValueError(f"at most {MAX_SUBSCRIBER_BATCH} uuids per call, got {len(uuids)}")
     with tenant_scope(tenant):
@@ -214,7 +216,10 @@ async def unsubscribe(
     ``True`` only if *this* call wrote. ``False``, and nothing written, for an
     unknown or trashed subscriber, one ``pending`` or already ``unsubscribed``,
     or one confirmed after ``unless_confirmed_after`` (a re-signup since the
-    mail; ``None`` means unconditionally). The cutoff must be aware.
+    mail; ``None`` means unconditionally). A confirmed subscriber whose
+    ``sm_confirmed_at`` is missing or unparseable *is* unsubscribed: a re-signup
+    after the cutoff cannot be proven, and not honouring an unsubscribe is the
+    worse error. The cutoff must be aware.
 
     Raises ``SubscriberFilterError("not_a_list")`` when ``type_key`` is an
     existing type that is not a newsletter list."""

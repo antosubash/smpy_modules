@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.contracts.public_submissions import KIND_SUBSCRIPTION
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType, tables_for
+from sm_records.public_submissions.subscribe import CONFIRMED, UNSUBSCRIBED
 from sm_records.records._grammar import FilterTermError, parse_term
 from sm_records.records.index._predicates import QueryError
 from sm_records.records.index.query import Filter, FilterOp, build_query, count_query
@@ -35,7 +36,7 @@ __all__ = [
     "stored_tags",
 ]
 
-WALKABLE: Final = ("confirmed", "unsubscribed")
+WALKABLE: Final = (CONFIRMED, UNSUBSCRIBED)
 """The statuses a walk may ask for: who is mailed, and who left (the
 newsletter's reconcile). ``pending`` is nobody's audience."""
 
@@ -43,7 +44,8 @@ newsletter's reconcile). ``pending`` is nobody's audience."""
 class SubscriberFilterError(ValueError):
     """A filter the list cannot answer, or a type that is not a list.
 
-    ``reason`` is records' own (``unknown``, ``not_indexed``, ``reindexing``),
+    ``reason`` is records' own ``QueryError.reason`` (``unknown``, ``not_indexed``,
+    ``reindexing``, ``bad_value``, ``unsupported_op``),
     ``malformed`` for a term that does not parse, or ``not_a_list``.
     """
 
@@ -88,7 +90,11 @@ def stored_tags(value: Any) -> list[str]:
 
 def _filters(raw: Sequence[str], status: str) -> list[Filter]:
     settings = RecordsSettings()
-    if isinstance(raw, str) or len(raw) > settings.max_filter_terms:
+    if isinstance(raw, str):
+        raise SubscriberFilterError(
+            "malformed", "filters must be a sequence of terms, not a string"
+        )
+    if len(raw) > settings.max_filter_terms:
         raise SubscriberFilterError("malformed", "too many filter terms")
     try:
         parsed = [parse_term(term, settings) for term in raw]
@@ -97,20 +103,21 @@ def _filters(raw: Sequence[str], status: str) -> list[Filter]:
     return [Filter("sm_status", FilterOp.EQ, status), *parsed]
 
 
-def _live(stmt, record, tenant_id: str):
-    return stmt.where(record.tenant_id == tenant_id, record.is_deleted.is_(False))
+def _in_tenant(stmt, record, tenant_id: str):
+    return stmt.where(record.tenant_id == tenant_id)
 
 
 def _query(rtype: RecordType, tenant_id: str, filters: Sequence[str], status: str, builder):
     """``builder``'s statement (``build_query``/``count_query``) for the terms,
-    pinned to the tenant's untrashed rows; with the type's record table."""
+    pinned to the tenant (the framework's soft-delete filter keeps the trash
+    out); with the type's record table."""
     terms = _filters(filters, status)
     record = tables_for(rtype).record
     try:
         stmt = builder(rtype, list(rtype.fields or []), terms)
     except QueryError as exc:
         raise SubscriberFilterError(exc.reason, str(exc)) from exc
-    return _live(stmt, record, tenant_id), record
+    return _in_tenant(stmt, record, tenant_id), record
 
 
 async def page(

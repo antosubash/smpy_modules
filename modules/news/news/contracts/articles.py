@@ -25,7 +25,7 @@ from pydantic import BaseModel, ConfigDict
 from simple_module_db import MissingTenantError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from news.content import card
+from news.content import card, query_filters
 from news.core.tenancy import tenant_scope
 from news.models import NewsArticle
 
@@ -33,6 +33,8 @@ __all__ = ["MAX_ARTICLE_SEARCH_LIMIT", "ArticleCard", "get_article_card", "searc
 
 MAX_ARTICLE_SEARCH_LIMIT = 50
 """The most cards one search returns."""
+
+_MAX_ID = 2**63 - 1
 
 
 def _checked_limit(limit: object) -> int:
@@ -94,8 +96,7 @@ async def search_articles(
             NewsArticle.tenant_id == tenant_id,
             NewsArticle.title.ilike(pattern, escape="\\"),
         )
-        if locale:
-            stmt = stmt.where(NewsArticle.locale == locale)
+        stmt = query_filters.locale(stmt, locale)
         stmt = stmt.order_by(
             NewsArticle.published_at.desc().nullslast(), NewsArticle.id.desc()
         ).limit(limit)
@@ -111,7 +112,12 @@ async def get_article_card(
 ) -> ArticleCard | None:
     """The card for one article, or ``None`` for an unknown, draft, trashed or
     other-tenant id."""
+    # `bool` is an `int`; and an id past BIGINT would overflow the driver, not miss.
+    if not isinstance(article_id, int) or isinstance(article_id, bool):
+        raise ValueError(f"article_id must be an int, got {type(article_id).__name__}")
     with tenant_scope(tenant_id):
+        if not 0 < article_id <= _MAX_ID:
+            return None
         stmt = card.base(include_drafts=False, category=None).where(
             NewsArticle.tenant_id == tenant_id, NewsArticle.id == article_id
         )

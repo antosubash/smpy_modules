@@ -76,6 +76,13 @@ async def test_by_uuid_refuses_a_bare_string(audience):
             await subscribers_by_uuid(db, tenant_id=TENANT, type_key=LIST, uuids="abc")
 
 
+@pytest.mark.parametrize("bad", [[1], [None]])
+async def test_by_uuid_refuses_non_string_elements(audience, bad):
+    async with session(audience) as db:
+        with pytest.raises(ValueError):
+            await subscribers_by_uuid(db, tenant_id=TENANT, type_key=LIST, uuids=bad)
+
+
 def test_a_naive_stored_timestamp_is_utc():
     from datetime import UTC, datetime
 

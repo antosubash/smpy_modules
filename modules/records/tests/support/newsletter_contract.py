@@ -15,7 +15,7 @@ from typing import Any
 import pytest_asyncio
 from simple_module_db.listeners import current_tenant_id
 from sm_records.contracts.events import SubscriptionChanged
-from sm_records.contracts.newsletter import unsubscribe
+from sm_records.contracts.newsletter import iter_subscribers, unsubscribe
 from sm_records.core import boot, events
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope
@@ -105,6 +105,17 @@ async def seed_list(db_state: Any, tenant: str, email: str) -> str:
             )
             await events.commit(db)
             return record.uuid
+
+
+async def uuid_of(client, email: str) -> str:
+    """The uuid of the subscriber ``email`` (confirmed or unsubscribed)."""
+    async with session(client) as db:
+        for status in ("confirmed", "unsubscribed"):
+            hits, _ = await iter_subscribers(db, tenant_id=TENANT, type_key=LIST, status=status)
+            for hit in hits:
+                if hit.email == email:
+                    return hit.uuid
+    raise AssertionError(f"no subscriber {email}")
 
 
 def published(client, event_type: type) -> list:

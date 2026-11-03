@@ -8,8 +8,9 @@ lookup here names it again as a ``WHERE``.
 
 **Unsubscribe** is :func:`.opt_in.leave` with a condition re-checked on the
 row each attempt: a live, ``confirmed`` subscriber confirmed at or before the
-cutoff. A re-signup since the mail (``pending`` again, or confirmed later) is
-left alone. The answer is the transition's ``Outcome.wrote``.
+cutoff, or one whose confirmation time is missing or unreadable (a re-signup
+after the cutoff cannot be shown). A re-signup since the mail (``pending``
+again, or confirmed later) is left alone. The answer is the transition's ``Outcome.wrote``.
 
 **Tags** are an ordinary ``update_record`` at the version read, retried once
 if the row moved in between; a value outside the field's choices is records'
@@ -29,7 +30,7 @@ from sm_records.models import Record, RecordType, tables_for
 from sm_records.public_submissions import opt_in
 from sm_records.public_submissions.campaign_reads import list_type, moment, stored_tags
 from sm_records.public_submissions.subscribe import CONFIRMED
-from sm_records.public_submissions.system import ordinary, reload
+from sm_records.public_submissions.system import _ordinary, _reload
 from sm_records.records.services import records as record_service
 from sm_records.records.services.errors import Conflict
 
@@ -43,13 +44,10 @@ class SubscriberNotFound(LookupError):  # noqa: N818 - the contract's name for i
     """No live subscriber of that uuid on that list, in that tenant."""
 
 
-async def _record(
-    db: AsyncSession, rtype: RecordType, tenant_id: str, uuid: str, *, trashed: bool
-) -> Record | None:
+async def _record(db: AsyncSession, rtype: RecordType, tenant_id: str, uuid: str) -> Record | None:
+    """The untrashed record (the framework's soft-delete filter applies)."""
     cls = tables_for(rtype).record
     stmt = select(cls).where(cls.tenant_id == tenant_id, cls.type_id == rtype.id, cls.uuid == uuid)
-    if trashed:
-        stmt = stmt.execution_options(include_deleted=True)
     return (await db.execute(stmt)).scalars().first()
 
 
@@ -61,7 +59,9 @@ def _holds(cutoff: datetime | None):
         if cutoff is None:
             return True
         confirmed_at = moment(data.get("sm_confirmed_at"))
-        return confirmed_at is not None and confirmed_at <= cutoff
+        # No provable confirmation time: a re-signup after the cutoff cannot be
+        # shown, and failing to honour an unsubscribe is the worse error.
+        return confirmed_at is None or confirmed_at <= cutoff
 
     return still
 
@@ -79,7 +79,7 @@ async def unsubscribe(
     rtype = await list_type(db, tenant_id, type_key)
     if rtype is None:
         return False
-    record = await _record(db, rtype, tenant_id, uuid, trashed=True)
+    record = await _record(db, rtype, tenant_id, uuid)
     if record is None:
         return False
     outcome = await opt_in.leave(db, rtype, record, settings, still=_holds(cutoff))
@@ -111,7 +111,7 @@ async def set_tags(
     :class:`SubscriberNotFound` for an unknown or trashed one (or no such
     list in this tenant). A merged list equal to the stored one writes nothing."""
     rtype = await list_type(db, tenant_id, type_key)
-    record = None if rtype is None else await _record(db, rtype, tenant_id, uuid, trashed=False)
+    record = None if rtype is None else await _record(db, rtype, tenant_id, uuid)
     if rtype is None or record is None:
         raise SubscriberNotFound(f"no subscriber {uuid!r} on {type_key!r}")
     for attempt in range(2):
@@ -119,7 +119,7 @@ async def set_tags(
         tags = _merged(stored, add, remove)
         # No stored tags is the empty list: removing a tag from such a
         # subscriber changes nothing and must not write.
-        if tags == (stored if isinstance(stored, list) else [] if stored is None else None):
+        if tags == ([] if stored is None else stored):
             return rtype, record  # nothing to change: no version bump, no event
         try:
             written = await record_service.update_record(
@@ -127,14 +127,14 @@ async def set_tags(
                 rtype,
                 record,
                 expected_version=record.version,
-                data={**ordinary(rtype, record), TAGS: tags},
+                data={**_ordinary(rtype, record), TAGS: tags},
                 settings=settings,
             )
             return rtype, written
         except Conflict:
             if attempt:
                 raise
-            record = await reload(db, record)
+            record = await _reload(db, record)
             if record.is_deleted:
                 raise SubscriberNotFound(f"no subscriber {uuid!r} on {type_key!r}") from None
     raise AssertionError("unreachable")  # pragma: no cover
