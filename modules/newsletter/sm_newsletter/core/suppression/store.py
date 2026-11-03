@@ -91,9 +91,12 @@ async def suppress_many(
     With ``refresh`` (the default) a row that already exists gets
     ``created_at = now`` and the new ``source``, so a repeated opt-out or
     bounce is newer than an earlier confirmation; a row already as new as
-    ``now`` is left alone. One atomic upsert per chunk
-    (:func:`~sm_newsletter.core.upsert.upsert_newest`): a row a confirmation
-    deletes concurrently is inserted again, never lost. ``refresh=False`` is a
+    ``now`` is left alone. One upsert per chunk (on SQLite preceded by a DO
+    NOTHING insert in the same write transaction;
+    :func:`~sm_newsletter.core.upsert.upsert_newest`): a row a confirmation
+    deletes concurrently is inserted again, never lost. Requires a
+    transactional (non-AUTOCOMMIT) SQLite connection, as the framework's
+    engine is. ``refresh=False`` is a
     pure insert-ignore (the reconcile's, so its count is idempotent and it
     never freshens a row).
     """

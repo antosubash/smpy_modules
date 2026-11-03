@@ -1,17 +1,22 @@
 """``INSERT … ON CONFLICT`` on the two backends the module supports.
 
 :func:`insert_ignore` is ``DO NOTHING``. :func:`upsert_newest` is ``DO
-UPDATE``, keeping the later of the stored and the offered time, in one
-statement per chunk, so a row deleted by a concurrent writer is simply
-inserted again rather than lost between an insert and a separate update.
+UPDATE … WHERE offered > stored``, keeping the later of the stored and the
+offered time: one upsert per chunk (on SQLite preceded by a ``DO NOTHING``
+insert in the same write transaction), so a row deleted by a concurrent
+writer is simply inserted again rather than lost between an insert and a
+separate update. Requires a transactional (non-AUTOCOMMIT) SQLite
+connection, as the framework's engine is. A row already as new as the offered
+time is locked by the conflict arm but not rewritten.
 
 Both return exactly how many rows were *inserted*:
 
 * ``DO NOTHING``: the driver's rowcount (skipped rows are not counted).
 * ``DO UPDATE`` on Postgres: ``RETURNING (xmax = 0)``. A freshly inserted
   tuple has no deleting/locking transaction (``xmax = 0``); a row the conflict
-  arm updated carries this transaction's id there. Same statement, so the
-  count is exact under concurrent writers at any isolation level.
+  arm updated carries this transaction's id there, and a row the ``WHERE``
+  skipped is not returned at all. Same statement, so the count is exact under
+  concurrent writers at any isolation level.
 * ``DO UPDATE`` on SQLite has no such marker (its rowcount counts updates
   too). Each chunk first runs the ``DO NOTHING`` insert, whose rowcount is the
   exact insert count, then the ``DO UPDATE``. The first is a write, so it opens
@@ -28,7 +33,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import Table, case, func, literal_column
+from sqlalchemy import Table, literal_column
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -79,24 +84,25 @@ async def upsert_newest(
 ) -> int:
     """Insert ``rows``; on a ``conflict`` keep the later ``time_column``.
 
-    An existing row gets ``time_column = max(stored, offered)``, and each
-    ``follow`` column takes the offered value only when the offered time is
-    strictly later. Returns how many rows were inserted (see the module
-    docstring for how, per dialect). Same caller contract as
+    An existing row takes the offered ``time_column`` and ``follow`` values
+    only when the offered time is strictly later; otherwise it is untouched.
+    Returns how many rows were inserted (see the module docstring for how, per
+    dialect). Same caller contract as
     :func:`insert_ignore`.
     """
     dialect, insert = _dialect(session)
-    later = func.greatest if dialect == "postgresql" else func.max  # SQLite's scalar max()
     inserted = 0
     for chunk in _chunks(rows):
         stmt = insert(table).values(chunk)
-        stored, offered = table.c[time_column], stmt.excluded[time_column]
-        newer = offered > stored
-        sets: dict[str, Any] = {time_column: later(stored, offered)}
-        for name in follow:
-            sets[name] = case((newer, stmt.excluded[name]), else_=table.c[name])
-        stmt = stmt.on_conflict_do_update(index_elements=list(conflict), set_=sets)
+        sets = {name: stmt.excluded[name] for name in (time_column, *follow)}
+        stmt = stmt.on_conflict_do_update(
+            index_elements=list(conflict),
+            set_=sets,
+            where=stmt.excluded[time_column] > table.c[time_column],
+        )
         if dialect == "postgresql":
+            # ``xmax = 0`` is a Postgres implementation detail (a fresh tuple has
+            # no locker); pinned by test_mixed_batch_past_500_counts_only_inserts.
             flags = (await session.execute(stmt.returning(literal_column("(xmax = 0)")))).scalars()
             inserted += sum(1 for fresh in flags if fresh)
         else:

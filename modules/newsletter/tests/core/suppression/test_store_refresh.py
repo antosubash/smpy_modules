@@ -125,3 +125,5 @@ async def test_a_refreshed_row_is_newer_than_an_earlier_confirmation(db):
         db, tenant_id="default", email=ADA, list_type_key="news", confirmed_at=T1
     )
     assert cleared == 0
+    [row] = await _rows(db)
+    assert (row.reason, row.created_at) == ("unsubscribed", T2)
