@@ -658,5 +658,25 @@
     "size_medium": "Medium",
     "size_large": "Large",
     "count": "Number of images"
+  },
+  "stats": {
+    "label": "Live image numbers",
+    "title": "Heading",
+    "subtitle": "Subheading",
+    "surface": "Surface",
+    "surface_default": "Default",
+    "surface_lime": "Lime",
+    "surface_cards": "Cards",
+    "items": "Numbers (up to 6)",
+    "item_label": "Label",
+    "item_prefix": "Prefix (e.g. ~)",
+    "item_suffix": "Suffix (e.g. +)",
+    "item_icon": "Icon (optional)",
+    "item_metric": "What to show",
+    "item_metric_images": "Number of images",
+    "item_metric_located": "Number of images with a location",
+    "item_metric_collections": "Number of public collections",
+    "item_collection": "Collection (ignored for the number of collections)",
+    "item_collection_all": "All public collections"
   }
 }

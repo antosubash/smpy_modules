@@ -10,7 +10,8 @@ no ``acme`` row changed, so every case here is also a write-isolation case.
 
 :func:`test_every_route_has_an_isolation_case` checks every route
 the module really mounts. A new route fails it until somebody writes its
-case — in this file, ``…_io`` or ``…_public`` — and marks it with ``@covers``.
+case — in this file, ``…_io``, ``…_public`` or ``test_public_stats`` — and
+marks it with ``@covers``.
 """
 
 from __future__ import annotations
@@ -18,8 +19,9 @@ from __future__ import annotations
 import pytest
 from sm_records import constants
 
-# Imported for their ``@covers`` marks: the route table is checked against all six.
+# Imported for their ``@covers`` marks: the route table is checked against all of them.
 from tests import (  # noqa: F401
+    test_public_stats,
     test_tenancy_isolation_io,
     test_tenancy_isolation_newsletter,
     test_tenancy_isolation_public,
