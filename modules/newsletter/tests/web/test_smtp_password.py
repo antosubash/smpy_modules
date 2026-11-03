@@ -110,11 +110,13 @@ async def test_put_stores_ciphertext(client, built):
     assert app.state.sm_newsletter.settings.smtp_password == stored
 
 
-async def test_password_is_stripped(client, built):
+@pytest.mark.parametrize("secret", ["  pa ss  ", "\tpw\n", "x" * 1024])
+async def test_password_is_stored_exactly_as_submitted(client, built, secret):
+    """Leading and trailing whitespace is part of a password, not padding."""
     _, state = built
-    res = await client.put(URL, json={"password": "  pw \n"}, headers=MANAGE)
-    assert res.status_code == 200
-    assert crypto.decrypt_value(await _stored(state), "smtp_password") == "pw"
+    res = await client.put(URL, json={"password": secret}, headers=MANAGE)
+    assert res.status_code == 200, res.text
+    assert crypto.decrypt_value(await _stored(state), "smtp_password") == secret
 
 
 async def test_put_requires_manage(client, built):
@@ -195,11 +197,13 @@ async def test_csrf_is_required_when_a_session_exists():
 
 
 @pytest.mark.unbound_tenant
-async def test_multi_tenant_without_a_tenant_is_403():
+async def test_multi_tenant_without_a_tenant_is_403_even_with_both_permissions():
+    """Both permissions do not stand in for a tenant: nothing resolved, nothing stored."""
+    both = {"x-perms": f"{constants.PERM_MANAGE},{constants.PERM_SETTINGS_EDIT}"}
     app, state = await _build(multi=True)
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-            res = await c.put(URL, json={"password": "pw"}, headers=MANAGE)
+            res = await c.put(URL, json={"password": "pw"}, headers=both)
         assert res.status_code == 403
         assert res.json()["code"] == "tenant_required"
         assert await _stored(state) is None

@@ -32,8 +32,10 @@ router = APIRouter(
 async def put_smtp_password(
     body: SmtpPasswordUpdate, request: Request, db: AsyncSession = Depends(get_db)
 ) -> SmtpPasswordOut:
-    password = body.password.strip()
-    if not password or len(password) > MAX_PASSWORD_LEN:
+    # Stored exactly as submitted: surrounding whitespace can be part of a
+    # password. Only an empty / all-whitespace or oversized value is refused.
+    password = body.password
+    if not password.strip() or len(password) > MAX_PASSWORD_LEN:
         raise InvalidPassword()
     await settings_service.set_smtp_password(request.app, db, password)
     return SmtpPasswordOut(
