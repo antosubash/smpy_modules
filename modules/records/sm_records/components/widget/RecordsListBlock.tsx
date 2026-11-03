@@ -126,7 +126,7 @@ const BASE_FIELDS = buildBaseFields(englishText);
  *  public" hint (`RecordsListRender.tsx`) exists to catch, and a filtered
  *  list could never trigger it — the select instead label-annotates each
  *  non-public entry below. */
-async function loadTypes() {
+export async function loadTypes() {
   try {
     return (await listTypes()).items;
   } catch {

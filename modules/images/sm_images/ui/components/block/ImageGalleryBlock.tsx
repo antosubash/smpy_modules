@@ -67,7 +67,7 @@ function buildFields(tr: Translate, collections: { label: string; value: string 
 /** Public collections only: a gallery of a private one would render nothing for
  *  a visitor, and offering it would be a trap. Empty when the editor is
  *  offline or signed out, which must not break the editor. */
-async function publicCollections(signal: AbortSignal) {
+export async function publicCollections(signal: AbortSignal) {
   const found: { label: string; value: string }[] = [];
   try {
     let cursor: string | null = null;

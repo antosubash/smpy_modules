@@ -16,6 +16,7 @@ from news.web.endpoints.api.articles import router as articles_router
 from news.web.endpoints.api.body import router as body_router
 from news.web.endpoints.api.categories import router as categories_router
 from news.web.endpoints.api.search import router as search_router
+from news.web.endpoints.api.stats import router as stats_router
 from news.web.endpoints.api.tags import router as tags_router
 from news.web.endpoints.api.translations import router as translations_router
 from news.web.endpoints.api.workflow import router as workflow_router
@@ -30,13 +31,14 @@ from news.web.endpoints.api.workflow import router as workflow_router
 # the session cookie's SameSite=Lax does not separate the console from an
 # organisation's public site, which is same-site with it. Reads pass, so the
 # anonymous feed reads are untouched; the token reaches the browser through
-# ``news.web.csrf``.
+# ``news.csrf``.
 router = APIRouter(dependencies=[Depends(bind_admin), Depends(RequiresCsrf())])
 router.include_router(articles_router)
 router.include_router(article_tags_router)
 router.include_router(body_router)
 router.include_router(categories_router)
 router.include_router(search_router)
+router.include_router(stats_router)
 router.include_router(tags_router)
 router.include_router(translations_router)
 router.include_router(workflow_router)
