@@ -68,6 +68,7 @@ __all__ = [
     "etag",
     "if_range_ok",
     "not_modified",
+    "stats_headers",
     "version",
 ]
 
@@ -110,6 +111,20 @@ def cache_headers(
         return NO_STORE if protected else PRIVATE
     shared = twin and collection.visibility == Visibility.PUBLIC and _shared_tenant(request)
     return PUBLIC_NO_CACHE if shared else PRIVATE
+
+
+def stats_headers(request: Any) -> str:
+    """The ``Cache-Control`` of the anonymous public counts (over one public
+    collection or all of them), under the same tenant rule as
+    :func:`cache_headers`.
+
+    Shareable answers revalidate (``no-cache``) like every other public route
+    rather than carrying a ``max-age``: the fallback tenant's answer has no
+    ``Vary`` that a cookie or header choosing another tenant would miss, so a
+    fresh copy in a shared cache could be served to that request without it
+    ever reaching here. Each count is bounded, so answering every view is
+    affordable."""
+    return PUBLIC_NO_CACHE if _shared_tenant(request) else PRIVATE
 
 
 def version(generation: int, key: str) -> str:
