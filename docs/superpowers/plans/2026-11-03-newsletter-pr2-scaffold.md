@@ -390,3 +390,37 @@ def reconcile_suppressions() -> dict[str, int]
 - [ ] **Step 1:** Run `~/.claude/bin/wait-for-headroom`, then the lint set from the root: `uv run ruff check modules/newsletter scripts host`, `uv run ruff format --check modules/newsletter host/tests/test_newsletter_wiring.py`, `uv run python scripts/check_file_size.py`, `uv run python scripts/check_rules.py`, `uv run python scripts/check_metadata.py`, `uv run python scripts/check_readmes.py`, `uv run python scripts/check_locales.py`, `uv run python scripts/check_hardcoded_strings.py`, `uv run python scripts/check_migration_heads.py`, `npx biome check modules/newsletter` and `npx tsc --noEmit -p modules/newsletter/tsconfig.json`. All pass. A WARNING at 280+ lines means split the file now.
 - [ ] **Step 2:** Run the targeted suites, one at a time. First the newsletter suite on SQLite: `cd modules/newsletter && uv run pytest -q -n 8`. Then the same with `SM_TEST_DATABASE_URL` set to Postgres. Then, from the root, `uv run pytest -q -n 8 scripts/tests host/tests/test_tenancy_parity.py host/tests/test_newsletter_wiring.py host/tests/test_host_boots.py`. Then `npx vitest run modules/newsletter`. All pass. Do **not** run the full records or host suites; `/ship` does.
 - [ ] **Step 3: Commit** `chore(newsletter): CI Postgres job, docs and roadmap`.
+
+## Amendments from the Codex plan review (2026-11-03)
+
+These override any task text above that contradicts them.
+
+1. **Unsubscribe suppressions are tenant-wide, not per list** (overrides the per-list ruling). An
+   unsubscribe on any list suppresses the address for every list in the tenant, so a later import
+   into another list cannot make it mailable (spec "suppression wins"). Keep `list_type_key` on the
+   row only as provenance; it is not part of the uniqueness key or the lookup.
+2. **Clearing on confirmation takes a cutoff.** The mirror reads the subscriber's `confirmed_at`
+   through `subscribers_by_uuid` and deletes only `unsubscribed`/`hard_bounce`/`imported_cleaned`
+   rows with `created_at <= confirmed_at` (never `complaint`). A repeated opt-out or bounce on an
+   existing row refreshes its `created_at`, so a newer suppression always survives a delayed
+   handler. Test: confirm, then bounce, then the delayed confirm handler runs -> bounce kept.
+3. **No `newsletter_list` registry table.** Records gets a tenant-pinned contract
+   `subscription_lists(session, *, tenant_id) -> list[str]` (type keys of kind `subscription`,
+   live types only) in `sm_records.contracts.newsletter`, tested in records. The reconcile walks
+   every list it returns. Drop the registry model, its migration table and `register_list`.
+4. **Records floor:** `simple_module_records>=0.0.13` (the workspace version) with
+   `# floor: 0.0.13 — raise to the release that first ships contracts.newsletter (#306) when it is cut`.
+   A `>=0.0.14` floor cannot resolve in the workspace; the version bump is a release action, not
+   this PR's.
+5. **`smtp_password` is never persisted in plaintext.** Copy ai's pattern: generic Settings-screen
+   writes of the field are refused (see `modules/ai/sm_ai/core/settings.py` and how ai stores keys
+   via `sm_ai/web/service.py`), and PR 2 adds the one write path: an admin endpoint
+   `PUT /api/newsletter/settings/smtp-password` (permission `newsletter.manage`, tenant-bound router
+   per CLAUDE.md, CSRF as the host's other admin JSON writes) that encrypts with `enc:v1:` and
+   persists. Test the stored row value is ciphertext. A plaintext value found at read time is
+   still accepted with a warning (an operator wrote the DB directly).
+6. **Reconcile sees trash.** Records' `iter_subscribers` gains `include_trashed: bool = False`,
+   accepted only with `status="unsubscribed"` (ValueError otherwise); the reconcile passes it.
+   Records test plus a newsletter test: lost event -> trash -> reconcile -> purge -> still suppressed.
+7. **`task_config.py` declares `QUEUES = {QUEUE_DEFAULT}`** (the newsletter queue), with a test that
+   a worker scoped to `newsletter` imports the newsletter tasks.
