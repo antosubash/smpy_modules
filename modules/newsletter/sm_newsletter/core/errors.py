@@ -65,6 +65,15 @@ class InvalidPassword(NewsletterError):  # noqa: N818 - names the field
     detail = "The password must be 1 to 1024 characters and not blank"
 
 
+class InvalidBody(NewsletterError):  # noqa: N818 - names the field
+    """A campaign body that is not a valid list of email blocks. The detail
+    names the path (``body[3].props.href: ...``) and never repeats the input."""
+
+    status = 422
+    code = "invalid_body"
+    detail = "The body is not valid"
+
+
 async def render(request: Request, exc: NewsletterError) -> JSONResponse:
     return JSONResponse({"detail": exc.detail, "code": exc.code}, status_code=exc.status)
 
