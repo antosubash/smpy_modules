@@ -1,4 +1,8 @@
-"""The hourly reconcile: records' opt-outs re-read into the suppression store."""
+"""The hourly reconcile: records' opt-outs re-read into the suppression store.
+
+A platform pass, run by the worker with no tenant bound, so every test here is
+``unbound_tenant``; the helpers bind the tenant they read or seed themselves.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +11,7 @@ from datetime import UTC, datetime
 
 import pytest
 from simple_module_db import finalize_session
+from simple_module_db.listeners import TenantIsolationError
 from sm_newsletter.core.suppression import reconcile, suppress, suppressed
 from sm_newsletter.core.suppression.reconcile import reconcile_async
 from sm_newsletter.core.tenancy import tenant_scope
@@ -18,6 +23,8 @@ from sm_records.records.services import types as type_service
 from sqlalchemy import select
 
 from tests.support.records_seed import LIST, seed_list, seed_subscriber
+
+pytestmark = pytest.mark.unbound_tenant
 
 T = datetime(2026, 11, 3, 12, 0, tzinfo=UTC)
 ADA, BOB, CY = "ada@example.org", "bob@example.org", "cy@example.org"
@@ -111,7 +118,6 @@ async def test_reconcile_with_no_lists(db_state):
     }
 
 
-@pytest.mark.unbound_tenant
 async def test_one_bad_list_does_not_stop_others(db_state, monkeypatch, caplog):
     for tenant in ("a", "b"):
         await seed_list(db_state, tenant)
@@ -135,7 +141,6 @@ async def test_one_bad_list_does_not_stop_others(db_state, monkeypatch, caplog):
     assert f"list {LIST!r} in tenant b" in warned[0].getMessage()
 
 
-@pytest.mark.unbound_tenant
 async def test_a_tenant_whose_lists_cannot_be_read_counts_as_one_failure(db_state, monkeypatch):
     for tenant in ("a", "b"):
         await seed_list(db_state, tenant)
@@ -153,6 +158,16 @@ async def test_a_tenant_whose_lists_cannot_be_read_counts_as_one_failure(db_stat
     assert await _suppressed(db_state, "b", ADA) == {ADA}
 
 
+async def test_reconcile_under_a_bound_tenant_is_refused(db_state):
+    """A request never enumerates every tenant: the pass does not unbind the
+    caller's tenant, so records' enumeration refuses it and nothing is written."""
+    await seed_list(db_state, "default")
+    await seed_subscriber(db_state, "default", ADA, "unsubscribed")
+    with tenant_scope("default"), pytest.raises(TenantIsolationError):
+        await reconcile_async(db_state.session_factory, now=T)
+    assert await _rows(db_state) == []
+
+
 async def test_a_failed_tenant_enumeration_propagates(db_state, monkeypatch):
     async def down(session):
         raise RuntimeError("database down")
@@ -162,7 +177,6 @@ async def test_a_failed_tenant_enumeration_propagates(db_state, monkeypatch):
         await reconcile_async(db_state.session_factory, now=T)
 
 
-@pytest.mark.unbound_tenant
 async def test_reconcile_tenant_isolation(db_state):
     for tenant in ("a", "b"):
         await seed_list(db_state, tenant)

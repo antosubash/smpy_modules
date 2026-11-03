@@ -6,7 +6,8 @@ correctness. Records is the truth, so the walk asks it:
 
 1. :func:`subscription_list_tenants` - which tenants own a list - in one short
    session with no tenant bound (records' one cross-tenant read; it refuses a
-   bound tenant);
+   bound tenant, and this pass never unbinds one: only the worker's
+   ``run_platform`` runs it unbound);
 2. per tenant, under :func:`~sm_newsletter.core.tenancy.tenant_scope`,
    :func:`subscription_lists`;
 3. per list, one fresh session per page: ``iter_subscribers(status=
@@ -29,7 +30,7 @@ import logging
 from collections.abc import Callable
 from datetime import datetime
 
-from simple_module_db import finalize_session, no_tenant
+from simple_module_db import finalize_session
 from sm_records.contracts.newsletter import (
     MAX_SUBSCRIBER_BATCH,
     iter_subscribers,
@@ -55,41 +56,43 @@ SessionFactory = Callable[[], AsyncSession]
 async def reconcile_async(session_factory: SessionFactory, *, now: datetime) -> dict[str, int]:
     """One pass over every tenant's lists; ``{"lists", "suppressed", "failed"}``.
 
-    ``now`` is the ``created_at`` of the rows this pass inserts. Runs with no
-    tenant bound whatever the caller's scope: it is a platform pass that binds
-    each tenant itself.
+    ``now`` is the ``created_at`` of the rows this pass inserts. A platform
+    pass: call it with **no tenant bound** (the worker's
+    :func:`~sm_newsletter.core.worker.run_platform` unbinds one). It never
+    unbinds the caller's tenant itself - under a bound tenant records' tenant
+    enumeration raises ``TenantIsolationError``, so a request can never reach
+    every tenant through it.
     """
     lists = inserted = failed = 0
-    with no_tenant():
-        async with session_factory() as session:
-            tenants = await subscription_list_tenants(session)
-        for tenant in tenants:
-            with tenant_scope(tenant):
+    async with session_factory() as session:
+        tenants = await subscription_list_tenants(session)
+    for tenant in tenants:
+        with tenant_scope(tenant):
+            try:
+                async with session_factory() as session:
+                    keys = await subscription_lists(session, tenant_id=tenant)
+            except Exception:
+                logger.warning(
+                    "newsletter: could not read the lists of tenant %s; "
+                    "its opt-outs wait for the next reconcile",
+                    tenant,
+                    exc_info=True,
+                )
+                failed += 1
+                continue
+            for key in keys:
+                lists += 1
                 try:
-                    async with session_factory() as session:
-                        keys = await subscription_lists(session, tenant_id=tenant)
+                    inserted += await _reconcile_list(session_factory, tenant, key, now)
                 except Exception:
                     logger.warning(
-                        "newsletter: could not read the lists of tenant %s; "
-                        "its opt-outs wait for the next reconcile",
+                        "newsletter: could not reconcile list %r in tenant %s; "
+                        "the next reconcile tries again",
+                        key,
                         tenant,
                         exc_info=True,
                     )
                     failed += 1
-                    continue
-                for key in keys:
-                    lists += 1
-                    try:
-                        inserted += await _reconcile_list(session_factory, tenant, key, now)
-                    except Exception:
-                        logger.warning(
-                            "newsletter: could not reconcile list %r in tenant %s; "
-                            "the next reconcile tries again",
-                            key,
-                            tenant,
-                            exc_info=True,
-                        )
-                        failed += 1
     return {"lists": lists, "suppressed": inserted, "failed": failed}
 
 
