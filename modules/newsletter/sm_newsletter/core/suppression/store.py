@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import and_, delete, or_, select, update
+from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.core import clock
@@ -26,7 +26,7 @@ from sm_newsletter.core.constants import (
 )
 from sm_newsletter.core.suppression.hashing import email_hash, normalise_email
 from sm_newsletter.core.tenancy import tenant_scope, valid_tenant
-from sm_newsletter.core.upsert import affected_rows, insert_ignore
+from sm_newsletter.core.upsert import affected_rows, insert_ignore, upsert_newest
 from sm_newsletter.models import Suppression
 
 __all__ = ["clear_for_confirmation", "suppress", "suppress_many", "suppressed"]
@@ -90,9 +90,12 @@ async def suppress_many(
 
     With ``refresh`` (the default) a row that already exists gets
     ``created_at = now`` and the new ``source``, so a repeated opt-out or
-    bounce is newer than an earlier confirmation; a row already newer than
-    ``now`` is left alone. ``refresh=False`` is a pure insert-ignore (the
-    reconcile's, so its count is idempotent and it never freshens a row).
+    bounce is newer than an earlier confirmation; a row already as new as
+    ``now`` is left alone. One atomic upsert per chunk
+    (:func:`~sm_newsletter.core.upsert.upsert_newest`): a row a confirmation
+    deletes concurrently is inserted again, never lost. ``refresh=False`` is a
+    pure insert-ignore (the reconcile's, so its count is idempotent and it
+    never freshens a row).
     """
     tenant = _tenant(tenant_id)
     _check_row(reason, source, list_type_key)
@@ -112,22 +115,11 @@ async def suppress_many(
         for h in hashes
     ]
     with tenant_scope(tenant):
-        inserted = await insert_ignore(session, _T, rows, conflict=_CONFLICT)
-        if refresh and inserted < len(hashes):
-            for start in range(0, len(hashes), _IN_CHUNK):
-                await session.execute(
-                    update(_T)
-                    .where(
-                        _T.c.tenant_id == tenant,
-                        _T.c.reason == reason,
-                        _T.c.list_type_key == list_type_key,
-                        _T.c.email_hash.in_(hashes[start : start + _IN_CHUNK]),
-                        _T.c.created_at < at,
-                    )
-                    .values(created_at=at, source=source)
-                    .execution_options(synchronize_session=False)
-                )
-    return inserted
+        if not refresh:
+            return await insert_ignore(session, _T, rows, conflict=_CONFLICT)
+        return await upsert_newest(
+            session, _T, rows, conflict=_CONFLICT, time_column="created_at", follow=("source",)
+        )
 
 
 async def suppress(
