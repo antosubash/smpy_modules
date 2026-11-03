@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_newsletter.core import constants
 from sm_newsletter.core.errors import InvalidPassword
 from sm_newsletter.core.tenancy import bind_admin
-from sm_newsletter.web import settings_service
-from sm_newsletter.web.schemas import SmtpPasswordOut, SmtpPasswordUpdate
+from sm_newsletter.web.schemas.settings import SmtpPasswordOut, SmtpPasswordUpdate
+from sm_newsletter.web.services import settings as settings_service
 
 MAX_PASSWORD_LEN = 1024
 

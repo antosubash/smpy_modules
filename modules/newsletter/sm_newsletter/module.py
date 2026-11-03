@@ -78,7 +78,7 @@ class NewsletterModule(ModuleBase):
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
         from simple_module_hosting.csrf import RequiresCsrf
 
-        from sm_newsletter.web.endpoints.api import router as api
+        from sm_newsletter.web.endpoints.settings_api import router as api
 
         # The framework's CSRF check on every write; reads pass. No view routes
         # until PR 3.
