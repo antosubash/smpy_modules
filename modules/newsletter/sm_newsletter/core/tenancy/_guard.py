@@ -15,9 +15,8 @@ imported by every router and this one is only needed at startup and by the CLI.
   ``NOT NULL`` 500, FACT 1a) and skips its tenant-change check, so a loaded row
   could silently move tenant (FACT 1a‴).
 
-Only **newsletter's** mappers (tables named ``newsletter_*``) are guarded —
-another module's ``MultiTenantMixin`` tables keep the framework's behaviour. And only
-mappers: a Core statement over
+Only **newsletter's** mappers are guarded — another module's ``MultiTenantMixin``
+tables keep the framework's behaviour. And only mappers: a Core statement over
 ``__table__``, ``text()`` or a mapper that appears only inside an ``exists()``
 or ``in_()`` is invisible here (FACT 1d), which is why §E makes an explicit
 ``tenant_id`` predicate mandatory for those shapes.
@@ -32,8 +31,8 @@ from simple_module_db.mixins import MultiTenantMixin
 from sqlalchemy import event
 from sqlalchemy.orm import ORMExecuteState, Session
 
-from sm_newsletter.core import constants
 from sm_newsletter.core.tenancy import ALL_TENANTS, TenantUnbound
+from sm_newsletter.models._base import Base
 
 __all__ = ["install", "is_guarded", "owned"]
 
@@ -44,9 +43,7 @@ def owned(cls: type) -> bool:
     """Is ``cls`` a tenant-owned newsletter class? Cached: the hot path asks per statement."""
     found = _owned_cache.get(cls)
     if found is None:
-        found = issubclass(cls, MultiTenantMixin) and str(
-            getattr(cls, "__tablename__", "")
-        ).startswith(constants.TABLE_PREFIX)
+        found = issubclass(cls, MultiTenantMixin) and issubclass(cls, Base)
         _owned_cache[cls] = found
     return found
 
