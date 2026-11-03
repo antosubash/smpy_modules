@@ -1,11 +1,11 @@
 import { Head } from '@inertiajs/react';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 
-import { ArchiveSearch } from '../components/ArchiveSearch';
-import { useDocumentLang } from '../hooks/useDocumentLang';
-import { type ArticleRead, formatArticleDate } from '../utils/api';
-import { archiveUrl } from '../utils/archiveUrl';
-import { keys, useT } from '../utils/i18n';
+import { ArchiveSearch } from '../ui/components/ArchiveSearch';
+import { useDocumentLang } from '../ui/hooks/useDocumentLang';
+import { type ArticleRead, formatArticleDate } from '../ui/utils/api';
+import { archiveUrl } from '../ui/utils/archiveUrl';
+import { keys, useT } from '../ui/utils/i18n';
 
 /** The archive's front page, and the same screen narrowed to one category,
  *  tag, byline or search.

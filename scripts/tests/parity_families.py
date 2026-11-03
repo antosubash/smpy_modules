@@ -26,8 +26,8 @@ FAMILIES: tuple[Family, ...] = (
     Family(
         "public cache headers",
         (
-            Copy(f"{PB}/public_cache.py", {"PagebuilderSettings": "Settings"}),
-            Copy(f"{NEWS}/endpoints/public/_urls.py", {"NewsSettings": "Settings"}),
+            Copy(f"{PB}/web/public_cache.py", {"PagebuilderSettings": "Settings"}),
+            Copy(f"{NEWS}/web/endpoints/public/_urls.py", {"NewsSettings": "Settings"}),
         ),
         shared=("SIGNED_IN_CACHE_CONTROL", "signed_in", "_user_key", "viewer_key", "cache_control"),
         differ={
@@ -39,7 +39,7 @@ FAMILIES: tuple[Family, ...] = (
         "slug redirects",
         (
             Copy(
-                f"{PB}/redirects.py",
+                f"{PB}/content/redirects.py",
                 {
                     "PageRedirect": "DocRedirect",
                     "PageStatus": "DocStatus",
@@ -49,7 +49,7 @@ FAMILIES: tuple[Family, ...] = (
                 },
             ),
             Copy(
-                f"{NEWS}/redirects.py",
+                f"{NEWS}/content/redirects.py",
                 {
                     "NewsArticleRedirect": "DocRedirect",
                     "ArticleStatus": "DocStatus",
@@ -62,7 +62,7 @@ FAMILIES: tuple[Family, ...] = (
     ),
     Family(
         "content locales",
-        (Copy(f"{PB}/locales.py"), Copy(f"{NEWS}/locales.py")),
+        (Copy(f"{PB}/core/locales.py"), Copy(f"{NEWS}/core/locales.py")),
         shared=("is_default", "resolve", "path_prefix"),
         differ={
             "use": "Pagebuilder publishes its settings object; news publishes a vocabulary, "
@@ -76,51 +76,51 @@ FAMILIES: tuple[Family, ...] = (
         "slugify (TypeScript)",
         (
             Copy(
-                f"{NEWS}/utils/slugify.ts",
+                f"{NEWS}/ui/utils/slugify.ts",
                 own={
                     "SLUG_PATTERN": "News' article screen lets an author type a slug; "
                     "pagebuilder's editors only ever derive one.",
                 },
             ),
-            Copy(f"{PB}/utils/slugify.ts"),
+            Copy(f"{PB}/ui/utils/slugify.ts"),
         ),
     ),
     Family(
         "CSRF token sharing (Python)",
         (
-            Copy(f"{NEWS}/csrf.py"),
+            Copy(f"{NEWS}/web/csrf.py"),
             Copy(
-                f"{PB}/csrf.py",
+                f"{PB}/web/csrf.py",
                 own={
                     "_check": "Pagebuilder alone keeps `csrf_protect`, for a host that guards "
                     "writes above the app, so it wraps the framework check instead of mounting it.",
                     "verify_csrf_if_configured": "See `_check`.",
                 },
             ),
-            Copy(f"{AI}/csrf.py"),
-            Copy(f"{RECORDS}/csrf.py"),
+            Copy(f"{AI}/web/csrf.py"),
+            Copy(f"{RECORDS}/web/csrf.py"),
         ),
     ),
     Family(
         "CSRF token store (TypeScript)",
         (
-            Copy(f"{NEWS}/utils/csrf.ts"),
+            Copy(f"{NEWS}/ui/utils/csrf.ts"),
             Copy(
-                f"{PB}/utils/csrf.ts",
+                f"{PB}/ui/utils/csrf.ts",
                 own={
                     "isCsrfRefusalBody": "Media uploads go through XHR, which hands back a raw "
                     "body rather than a Response.",
                 },
             ),
-            Copy(f"{AI}/utils/csrf.ts"),
-            Copy(f"{RECORDS}/utils/csrf.ts"),
+            Copy(f"{AI}/ui/utils/csrf.ts"),
+            Copy(f"{RECORDS}/ui/utils/csrf.ts"),
         ),
     ),
     Family(
         "admin HTTP client",
         (
             Copy(
-                f"{NEWS}/utils/http.ts",
+                f"{NEWS}/ui/utils/http.ts",
                 _AS_MODULE,
                 own={
                     "HttpError": "News' callers tell a stale write (409) from a vanished "
@@ -135,7 +135,7 @@ FAMILIES: tuple[Family, ...] = (
                 },
             ),
             Copy(
-                f"{PB}/utils/request.ts",
+                f"{PB}/ui/utils/request.ts",
                 _AS_MODULE,
                 own={
                     "errorMessage": "See news' errorFrom.",
@@ -151,7 +151,7 @@ FAMILIES: tuple[Family, ...] = (
         "secret encryption",
         (
             Copy(
-                f"{AI}/crypto.py",
+                f"{AI}/core/crypto.py",
                 {"AiKeyUnreadableError": "KeyUnreadableError"},
                 own={
                     "_dotenv_secret": "The AI module also runs in a Celery worker with no app, "
@@ -164,7 +164,7 @@ FAMILIES: tuple[Family, ...] = (
                 ),
             ),
             Copy(
-                f"{BILLING}/crypto.py",
+                f"{BILLING}/core/crypto.py",
                 {"BillingKeyUnreadableError": "KeyUnreadableError"},
                 own={
                     "BillingKeyUnreadableError": "AI keeps its error in sm_ai.contracts.errors, "
@@ -184,7 +184,7 @@ FAMILIES: tuple[Family, ...] = (
         "scheduler shutdown",
         (
             Copy(
-                f"{PB}/scheduler.py",
+                f"{PB}/scheduling/scheduler.py",
                 {
                     "_log": "logger",
                     "contextlib.suppress": "suppress",
@@ -193,7 +193,7 @@ FAMILIES: tuple[Family, ...] = (
                 messages=("pagebuilder.scheduler.stop_failed",),
             ),
             Copy(
-                f"{NEWS}/scheduler.py",
+                f"{NEWS}/scheduling/scheduler.py",
                 {"NewsSettings": "Settings"},
                 messages=("news.scheduler.stop_failed",),
             ),
@@ -205,15 +205,15 @@ FAMILIES: tuple[Family, ...] = (
     Family(
         "test scaffolding: default tenant",
         (
-            Copy("modules/pagebuilder/tests/tenant_fixture.py"),
-            Copy("modules/news/tests/tenant_fixture.py"),
+            Copy("modules/pagebuilder/tests/support/tenant_fixture.py"),
+            Copy("modules/news/tests/support/tenant_fixture.py"),
         ),
     ),
     Family(
         "test scaffolding: header tenant",
         (
-            Copy("modules/pagebuilder/tests/tenant_app.py"),
-            Copy("modules/news/tests/tenant_app.py"),
+            Copy("modules/pagebuilder/tests/support/tenant_app.py"),
+            Copy("modules/news/tests/support/tenant_app.py"),
         ),
         shared=("HeaderTenant", "as_tenant"),
     ),

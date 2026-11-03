@@ -1,0 +1,46 @@
+"""News REST API, assembled from one module per resource.
+
+Split by resource rather than kept in one file so each stays inside the repo's
+300-line cap, and so the draft-visibility rule and the publish gate each have a
+single home in ``_deps``.
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends
+from simple_module_hosting.csrf import RequiresCsrf
+
+from news.core.tenancy import bind_admin
+from news.web.endpoints.api.article_tags import router as article_tags_router
+from news.web.endpoints.api.articles import router as articles_router
+from news.web.endpoints.api.body import router as body_router
+from news.web.endpoints.api.categories import router as categories_router
+from news.web.endpoints.api.search import router as search_router
+from news.web.endpoints.api.stats import router as stats_router
+from news.web.endpoints.api.tags import router as tags_router
+from news.web.endpoints.api.translations import router as translations_router
+from news.web.endpoints.api.workflow import router as workflow_router
+
+# One binding for every API route. Router-level, so it runs before each
+# endpoint's ``get_db`` and its commit happens while the tenant is still bound.
+# The anonymous reads in ``PUBLIC_READ_PREFIXES`` come through here too: in
+# MULTI mode they run in the tenant the framework resolved (the subdomain), and
+# with none they are refused like any other admin read.
+#
+# Then the framework's CSRF check on every write (#110), billing's dependency:
+# the session cookie's SameSite=Lax does not separate the console from an
+# organisation's public site, which is same-site with it. Reads pass, so the
+# anonymous feed reads are untouched; the token reaches the browser through
+# ``news.csrf``.
+router = APIRouter(dependencies=[Depends(bind_admin), Depends(RequiresCsrf())])
+router.include_router(articles_router)
+router.include_router(article_tags_router)
+router.include_router(body_router)
+router.include_router(categories_router)
+router.include_router(search_router)
+router.include_router(stats_router)
+router.include_router(tags_router)
+router.include_router(translations_router)
+router.include_router(workflow_router)
+
+__all__ = ["router"]

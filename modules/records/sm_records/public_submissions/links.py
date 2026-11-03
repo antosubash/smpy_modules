@@ -35,9 +35,9 @@ from dataclasses import dataclass
 from typing import Final, Literal
 from urllib.parse import urlencode
 
-from sm_records import constants
-from sm_records.constants import TYPE_KEY_PATTERN
-from sm_records.tenancy import valid_tenant
+from sm_records.core import constants
+from sm_records.core.constants import TYPE_KEY_PATTERN
+from sm_records.core.tenancy import valid_tenant
 
 __all__ = [
     "CONFIRM",

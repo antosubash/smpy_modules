@@ -1,8 +1,8 @@
 import { Head } from '@inertiajs/react';
 
-import { type PublicCopy, PublicShell } from '../components/public/PublicShell';
-import type { SiteNav } from '../components/widgets/_internal/site-nav-context';
-import { keys, useT } from '../utils/i18n';
+import { type PublicCopy, PublicShell } from '../ui/components/public/PublicShell';
+import type { SiteNav } from '../ui/components/widgets/_internal/site-nav-context';
+import { keys, useT } from '../ui/utils/i18n';
 
 interface Props {
   locale?: string | null;

@@ -14,9 +14,9 @@ from uuid import uuid4
 
 import pytest
 from sm_records.models import RecordStatus, RevisionEvent
-from sm_records.seed.data import PRODUCT_CATEGORIES, TAG_POOL
-from sm_records.services import records as record_service
-from sm_records.services._common import type_id_map
+from sm_records.records.seed.data import PRODUCT_CATEGORIES, TAG_POOL
+from sm_records.records.services import records as record_service
+from sm_records.records.services._common import type_id_map
 
 from tests.perf._bench import Results, capture, repeat
 from tests.perf.conftest import REPS, load_type, type_counts

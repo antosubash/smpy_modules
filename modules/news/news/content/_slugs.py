@@ -10,15 +10,15 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from news.constants import MAX_SLUG_ATTEMPTS, MAX_SLUG_LEN
+from news.content.slugify import slugify, suffixed
+from news.core.constants import MAX_SLUG_ATTEMPTS, MAX_SLUG_LEN
 from news.models import NewsArticle
-from news.slugify import slugify, suffixed
 
 
 def slug_for_title(title: str) -> str:
     """News' own slug rule, bounded by the ``slug`` column.
 
-    ``news.slugify`` already produces something ``SLUG_PATTERN`` accepts — it
+    ``news.content.slugify`` already produces something ``SLUG_PATTERN`` accepts — it
     trims again after truncating, so the cut cannot leave a trailing hyphen —
     and falls back rather than returning an empty string. Both matter here: a
     slug that fails that pattern is a 422 the author has no way to act on.
@@ -31,7 +31,7 @@ def _stem_length(base: str) -> int:
 
     The longest suffix is the one that eats the most of the base, so cutting to
     that leaves a prefix common to ``base`` and to all of its variants. Tied to
-    :func:`news.slugify.suffixed`, which is what actually does the cutting —
+    :func:`news.content.slugify.suffixed`, which is what actually does the cutting —
     hence the shared helper rather than a second copy of the rule here.
     """
     longest = len(str(MAX_SLUG_ATTEMPTS + 1))
@@ -59,8 +59,8 @@ async def free_slug(db: AsyncSession, base: str, locale: str) -> str:
     Returns ``""`` when even the suffixed candidates are all taken, which the
     caller turns into an error rather than guessing further.
 
-    Not :func:`news.slugify.unique_slug`, though the two look alike and share
-    :func:`~news.slugify.suffixed` for the candidate shape. That one is the
+    Not :func:`news.content.slugify.unique_slug`, though the two look alike and share
+    :func:`~news.content.slugify.suffixed` for the candidate shape. That one is the
     category/tag rule: it tries 998 suffixes and raises when it runs out, both
     right for a slug nobody typed. An article slug is a URL a reader keeps, so
     this one stops at ``MAX_SLUG_ATTEMPTS`` and reports a 409 asking the author

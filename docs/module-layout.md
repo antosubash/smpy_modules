@@ -3,8 +3,8 @@
 How the files of a module in `modules/<name>/` are organised. `images`
 (`modules/images`) follows it in full and is the reference; its own map is
 [`modules/images/docs/code-layout.md`](../modules/images/docs/code-layout.md).
-The other modules predate it and move towards it one step at a time (see
-[Moving an existing module](#moving-an-existing-module)).
+All six modules follow this structure. The migration checklist below also
+applies when reorganising a new area.
 
 The aim is that someone new finds a file by asking *which feature is this?*,
 then opening that folder. A package root with thirty files answers nothing.
@@ -31,6 +31,8 @@ file has).
 | Path | Who looks it up |
 | --- | --- |
 | `__init__.py`, `module.py` | Python; the `simple_module` entry point |
+| `cli.py` | The `simple_module_cli.cli_plugins` entry point, where declared; Records also documents `python -m sm_records.cli` |
+| `index.py`, `collections.py`, `seed.py` (Records) | Documented host extension and in-process seed APIs; implementations live under `records/` |
 | `models/` | `simple_module_db` imports `<package>.models` for migrations |
 | `tasks.py`, `task_config.py` | `background_tasks`: Celery autodiscovery and the routes/beat loader |
 | `pages/` | the host's page glob; real Inertia pages only (`scripts/check_rules.py`) |
@@ -151,15 +153,15 @@ Do it in small PRs, one module at a time, each containing only moves:
 5. **No logic changes in the same PR**, so the review is just "is every move
    right".
 
-### Where each module stands (2026-10-30)
+### Where each module stands (2026-11-03)
 
 | Module | Root `.py` files | Root folders | Flat `tests/test_*.py` | State |
 | --- | --- | --- | --- | --- |
 | images | 4 | 11 | 0 | follows this layout |
-| ai | 13 | 6 | 14 | not moved yet |
-| billing | 28 | 9 | 53 | not moved yet |
-| news | 27 | 10 | 78 | not moved yet |
-| pagebuilder | 30 | 14 | 99 | not moved yet |
-| records | 37 | 14 | 181 | not moved yet |
+| ai | 2 | 8 | 0 | follows this layout |
+| billing | 3 | 11 | 0 | follows this layout |
+| news | 2 | 10 | 0 | follows this layout |
+| pagebuilder | 2 | 11 | 0 | follows this layout |
+| records | 6 | 10 | 0 | follows this layout |
 
 Update this table when a module moves.

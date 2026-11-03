@@ -16,7 +16,7 @@ import json
 from functools import cache
 from typing import Any, Final
 
-from sm_records import constants
+from sm_records.core import constants
 
 __all__ = ["FALLBACK", "catalogue_locale", "text"]
 

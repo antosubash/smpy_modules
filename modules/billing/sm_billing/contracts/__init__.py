@@ -10,30 +10,30 @@ subject from ``subject_for_request(request)``.
 
 from typing import Any
 
-from sm_billing.subject_keys import subject_for_tenant, subject_for_user, worker_subject_mode
-from sm_billing.subject_keys import subject_mode as current_subject_mode
+from sm_billing.core.subject_keys import subject_for_tenant, subject_for_user, worker_subject_mode
+from sm_billing.core.subject_keys import subject_mode as current_subject_mode
 
 
 def subject_for_request(request: Any) -> str:
-    """The subject a request bills: :func:`sm_billing.subjects.for_request`.
+    """The subject a request bills: :func:`sm_billing.core.subjects.for_request`.
 
     Pass it to ``entitlements.limit``/``has_feature`` (never
     ``request.state.tenant_id``, which in ``user`` mode is ``"default"`` for
     everyone). Imported lazily: ``subjects`` imports the error and model
     layers, which import this package.
     """
-    from sm_billing.subjects import for_request
+    from sm_billing.core.subjects import for_request
 
     return for_request(request)
 
 
 async def subject_exists(db: Any, subject: str) -> bool:
-    """Whether ``subject`` names something billable: :func:`sm_billing.subjects.exists`.
+    """Whether ``subject`` names something billable: :func:`sm_billing.core.subjects.exists`.
 
     ``"default"`` and an existing user's ``user:<uuid>`` are true; an unknown
     user or a non-canonical spelling is false. Imported lazily, as above.
     """
-    from sm_billing.subjects import exists
+    from sm_billing.core.subjects import exists
 
     return await exists(db, subject)
 

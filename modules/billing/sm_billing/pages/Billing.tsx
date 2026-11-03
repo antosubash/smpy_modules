@@ -8,14 +8,14 @@ import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedL
 import { ArrowRightLeft, Info, Loader2, Lock } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-import { CurrentPlanCard } from '../components/CurrentPlanCard';
-import { PlanCard } from '../components/PlanCard';
-import { UsageCard } from '../components/UsageCard';
-import { useCheckoutPolling } from '../hooks/useCheckoutPolling';
-import { api, BILLING_API } from '../utils/api';
-import { type PlanCta, planCta, priceLabel } from '../utils/format';
-import { keys, useT } from '../utils/i18n';
-import type { Interval, MeterUsage, Plan, Status, SubjectMode } from '../utils/types';
+import { CurrentPlanCard } from '../ui/components/CurrentPlanCard';
+import { PlanCard } from '../ui/components/PlanCard';
+import { UsageCard } from '../ui/components/UsageCard';
+import { useCheckoutPolling } from '../ui/hooks/useCheckoutPolling';
+import { api, BILLING_API } from '../ui/utils/api';
+import { type PlanCta, planCta, priceLabel } from '../ui/utils/format';
+import { keys, useT } from '../ui/utils/i18n';
+import type { Interval, MeterUsage, Plan, Status, SubjectMode } from '../ui/utils/types';
 
 interface Props {
   status: Status;

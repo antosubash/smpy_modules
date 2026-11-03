@@ -6,7 +6,7 @@ save-time check compiles them with, so a constraint means exactly what it has
 always meant. Matching a value somebody sent must not happen here, on the
 event loop (``re`` cannot be interrupted): the write paths check every
 patterned value first in a worker process under a deadline
-(:mod:`sm_records.services._patterns`) and validate inside :func:`checked`,
+(:mod:`sm_records.records.services._patterns`) and validate inside :func:`checked`,
 which hands this check the **verdicts** for exactly the ``(pattern, value)``
 pairs that were checked. A pair with a verdict is decided by it; on a write
 any other pair is matched here as before — nothing is switched off

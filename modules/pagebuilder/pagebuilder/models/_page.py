@@ -12,7 +12,7 @@ from sqlalchemy import JSON, Column, DateTime, Index
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field
 
-from pagebuilder import locales
+from pagebuilder.core import locales
 from pagebuilder.models._base import Base
 
 

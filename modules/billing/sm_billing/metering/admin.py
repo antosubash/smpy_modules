@@ -1,6 +1,6 @@
 """The admin usage screen's per-tenant drawer: ledger, holds and the repairs.
 
-Platform admin spans tenants (like the rest of ``sm_billing.admin``), so the
+Platform admin spans tenants (like the rest of ``sm_billing.web.services.admin``), so the
 tenant comes from the path, and every query here still filters on it — the
 usage tables carry no ``MultiTenantMixin``. Writes go through
 ``UsageService`` (its own short transactions, ``finalize_session``), never
@@ -14,11 +14,10 @@ from typing import TYPE_CHECKING
 from simple_module_db.tenancy import DEFAULT_TENANT_ID
 from sqlalchemy import func, select
 
-from sm_billing import constants as c
-from sm_billing import subjects
 from sm_billing.contracts.metering import LIVE_HOLD_STATUSES, MeterKind
-from sm_billing.errors import BillingError
-from sm_billing.lifecycle import is_multi_tenant
+from sm_billing.core import constants as c
+from sm_billing.core import subjects
+from sm_billing.core.errors import BillingError
 from sm_billing.metering.periods import as_utc
 from sm_billing.metering.report import page_numbers, tenant_summary
 from sm_billing.metering.schemas import (
@@ -29,6 +28,7 @@ from sm_billing.metering.schemas import (
     UsageHoldOut,
 )
 from sm_billing.models import UsageEvent, UsageHold
+from sm_billing.subscriptions.lifecycle import is_multi_tenant
 
 if TYPE_CHECKING:
     from fastapi import FastAPI

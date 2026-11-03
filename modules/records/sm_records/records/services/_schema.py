@@ -1,0 +1,267 @@
+"""Validating a proposed schema, and snapshotting the one that was accepted.
+
+Split from :mod:`sm_records.records.services.types` for the file cap. The grouping is
+real, though: everything here answers "may this ``fields`` list be stored?",
+which is the question design §6 and §8 are about, while ``types`` owns the row
+lifecycle around it.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from sm_records.core._text import NUL_PROBLEM, has_nul
+from sm_records.core.settings import RecordsSettings
+from sm_records.models import RecordType, RecordTypeRevision
+from sm_records.public_submissions.config import FIELD, settle
+from sm_records.public_submissions.spec import INTERNAL, inject
+from sm_records.records.services._common import type_id_map, utcnow
+from sm_records.records.services.errors import ValidationFailed
+from sm_records.schema.fields import FieldDefinition, FieldSchemaError, validate_fields
+from sm_records.schema.types import FieldType
+
+_TEXT_COLUMNS = ("label", "label_plural", "description", "icon")
+"""The type row's free-text columns. ``key`` is absent because it is matched
+against ``TYPE_KEY_PATTERN`` and ``collection`` because it is matched against
+the declared set."""
+
+
+def check_type_text(values: dict[str, Any], *, stored_label: str | None = None) -> None:
+    """Refuse a NUL in anything about a type that is stored as text.
+
+    Called by both write paths — ``create_type`` and ``update_type`` — over
+    whatever each of them is about to set, so a column absent from the call is
+    not examined and a column present is. A type's labels are written to a
+    ``varchar`` and its ``allowed_roles`` to a JSON column, and Postgres
+    refuses ``\x00`` in both from the driver: a 500 for a value that is simply
+    not storable, where the rest of this module answers 422 and names the
+    field. A blank ``label`` is refused for the same reason: it created a type
+    that listed as an empty row. Only the *input* paths call this, so stored
+    rows that predate the rule still read back.
+
+    ``stored_label`` is the update path's: a legacy type whose label is already
+    blank may be edited (fields, roles, ...) as long as the label is left as it
+    is. The rule bites when a label is being *set* to blank, not when it is
+    echoed back unchanged.
+    """
+    label = values.get("label")
+    if isinstance(label, str) and not label.strip() and label != stored_label:
+        raise ValidationFailed(
+            "label is required", [{"field": "label", "message": "label is required"}]
+        )
+    for name in _TEXT_COLUMNS:
+        if has_nul(values.get(name)):
+            raise ValidationFailed(
+                f"{name} {NUL_PROBLEM}", [{"field": name, "message": NUL_PROBLEM}]
+            )
+    for role in values.get("allowed_roles") or []:
+        if has_nul(role):
+            raise ValidationFailed(
+                f"allowed_roles {NUL_PROBLEM}",
+                [{"field": "allowed_roles", "message": NUL_PROBLEM}],
+            )
+
+
+def normalise(
+    fields_raw: list[dict[str, Any]], settings: RecordsSettings, *, kind: str | None = None
+):
+    """Validate a proposed field list and return ``(definitions, stored form)``.
+
+    The stored form is the *normalised* dump rather than what the caller sent:
+    the validator fills defaults (``on_delete``, ``many``) and promotes
+    ``unique`` to ``indexed``, and storing the raw input would make the next
+    edit's "did the fields change?" comparison answer yes to a no-op.
+
+    ``kind`` is the type's public-submissions kind: every inbound system entry
+    is dropped and that kind's canonical ``sm_*`` fields appended
+    (``public_submissions.spec.inject``) before anything is validated, so the
+    limits below count them and no caller can alter one.
+    """
+    fields_raw = inject(list(fields_raw or []), kind)
+    try:
+        # ``on_save``: this is the one path a proposed schema takes (type
+        # create, update, rollback and the preview of any of them), and the
+        # only one where a field key colliding with a registered index
+        # provider's virtual key may be refused — refusing it on a *load*
+        # takes an already-stored type offline. See ``schema._keys``.
+        defs = validate_fields(list(fields_raw or []), on_save=True)
+    except FieldSchemaError as exc:
+        raise ValidationFailed(
+            str(exc), [{"field": exc.key or "__root__", "message": exc.problem}]
+        ) from exc
+    if len(defs) > settings.max_fields_per_type:
+        raise ValidationFailed(
+            f"{len(defs)} fields exceeds the limit of {settings.max_fields_per_type}"
+        )
+    indexed = sum(1 for field in defs if field.indexed)
+    if indexed > settings.max_indexed_fields_per_type:
+        raise ValidationFailed(
+            f"{indexed} indexed fields exceeds the limit of "
+            f"{settings.max_indexed_fields_per_type}; every indexed field is a row "
+            "written per record per save"
+        )
+    return defs, [stored_form(field) for field in defs]
+
+
+def stored_form(field: FieldDefinition) -> dict[str, Any]:
+    """One definition as ``RecordType.fields`` stores it. ``system`` only when
+    set, so every ordinary field's stored dict — and therefore the no-op
+    comparison on save — is what it was before the flag existed."""
+    dumped = field.model_dump(mode="json")
+    if dumped.get("system") is None:
+        dumped.pop("system", None)
+    return dumped
+
+
+DISPLAY_FIELD_TYPES: frozenset[FieldType] = frozenset(
+    {
+        FieldType.TEXT,
+        FieldType.SELECT,
+        FieldType.EMAIL,
+        FieldType.URL,
+        FieldType.INTEGER,
+        FieldType.NUMBER,
+        FieldType.DATE,
+        FieldType.DATETIME,
+    }
+)
+"""What ``display_field`` may point at: the types ``_payload.display_title``
+can ``str()`` into something a person reads in a list column. ``json`` and
+``media`` stringify to ``str(dict)`` truncated at 300 characters,
+``multiselect`` to a Python list literal, ``relation`` to ``{'type': ...}``,
+``boolean`` to ``True``/``False`` and ``longtext`` to a paragraph — all
+accepted silently before, all useless as a title."""
+
+SLUG_FIELD_TYPES: frozenset[FieldType] = frozenset(
+    {FieldType.TEXT, FieldType.SELECT, FieldType.EMAIL, FieldType.URL}
+)
+"""What ``slug_field`` may point at — narrower than ``display_field``: a slug
+is an address, so it has to be per-record distinct free text. A ``boolean``
+slug field gives every record the slug ``true`` or ``false`` and the second
+write 409s; a date or a number is barely better."""
+
+_POINTER_TYPES: dict[str, frozenset[FieldType]] = {
+    "display_field": DISPLAY_FIELD_TYPES,
+    "slug_field": SLUG_FIELD_TYPES,
+}
+
+
+def check_pointers(
+    defs: list[FieldDefinition], display_field: str | None, slug_field: str | None
+) -> None:
+    by_key = {field.key: field for field in defs}
+    for name, value in (("display_field", display_field), ("slug_field", slug_field)):
+        if value is None:
+            continue
+        field = by_key.get(value)
+        if field is None:
+            raise ValidationFailed(
+                f"{name} {value!r} is not a field of this type",
+                [{"field": name, "message": f"{value!r} is not a declared field"}],
+            )
+        if field.system == INTERNAL:
+            # Its value is half of every link a subscriber is sent; as a title
+            # or a slug it would be on every list row and in every export.
+            problem = f"{value!r} is an internal system field and cannot be used as {name}"
+            raise ValidationFailed(problem, [{"field": name, "message": problem}])
+        allowed = _POINTER_TYPES[name]
+        if field.type not in allowed:
+            kinds = sorted(member.value for member in allowed)
+            raise ValidationFailed(
+                f"{name} cannot point at a {field.type.value} field; it takes one of {kinds}",
+                [
+                    {
+                        "field": name,
+                        "message": f"{value!r} is a {field.type.value} field, "
+                        f"which cannot be used as {name}",
+                    }
+                ],
+            )
+
+
+async def check_targets(db: AsyncSession, defs: list[FieldDefinition], self_key: str) -> None:
+    """Every ``relation`` must point at a type that exists.
+
+    The one rule ``schema.fields`` cannot enforce — it is pure and this needs a
+    query. A self-relation is allowed and is why ``self_key`` is passed rather
+    than read from the database: on a create, the type is not there yet.
+    """
+    known = set(await type_id_map(db)) | {self_key}
+    errors = [
+        {
+            "field": field.key,
+            "message": f"target type {field.options.get('target_type')!r} does not exist",
+        }
+        for field in defs
+        if field.type is FieldType.RELATION and field.options.get("target_type") not in known
+    ]
+    if errors:
+        raise ValidationFailed("; ".join(item["message"] for item in errors), errors)
+
+
+def pointers_moved(rtype: RecordType, changes: dict[str, Any]) -> bool:
+    """Does ``changes`` move ``display_field`` or ``slug_field`` off its value?"""
+    return any(
+        name in changes and changes[name] != getattr(rtype, name)
+        for name in ("display_field", "slug_field")
+    )
+
+
+async def write_type_row(
+    db: AsyncSession,
+    rtype: RecordType,
+    *,
+    changes: dict[str, Any],
+    fields: list[dict[str, Any]] | None,
+    expected_version: int,
+    actor: str | None,
+    take_snapshot: bool,
+) -> None:
+    """Write an accepted edit onto the type row, after its guarded bump.
+
+    Both type-edit paths end here; each passes its own ``take_snapshot`` rule,
+    because they differ on which edits write a ``records_type_revision`` row.
+
+    The public-submissions config is settled against the fields and
+    ``is_public`` the row is about to have (``public_submissions.config``), so
+    an edit, a schema change, a rollback and an import all meet its rules.
+    """
+    if fields is not None or {FIELD, "is_public"} & changes.keys():
+        settled = settle(
+            changes.get(FIELD, rtype.public_submissions),
+            fields if fields is not None else list(rtype.fields or []),
+            changes.get("is_public", rtype.is_public),
+        )
+        # Also when the caller sent one: ``settled`` is pruned, and may equal
+        # the stored config while the sent one (with a stale key) does not.
+        if FIELD in changes or settled != rtype.public_submissions:
+            changes[FIELD] = settled
+    for name, value in changes.items():
+        setattr(rtype, name, value)
+    if fields is not None:
+        rtype.fields = fields
+        rtype.schema_version = rtype.schema_version + 1
+    rtype.version = expected_version + 1
+    rtype.updated_by = actor
+    db.add(rtype)
+    await db.flush()
+    if take_snapshot:
+        await snapshot(db, rtype, actor)
+
+
+async def snapshot(db: AsyncSession, rtype: RecordType, actor: str | None) -> RecordTypeRevision:
+    revision = RecordTypeRevision(
+        type_id=rtype.id,
+        version=rtype.version,
+        schema_version=rtype.schema_version,
+        fields=list(rtype.fields or []),
+        display_field=rtype.display_field,
+        slug_field=rtype.slug_field,
+        created_at=utcnow(),
+        created_by=actor,
+    )
+    db.add(revision)
+    await db.flush()
+    return revision

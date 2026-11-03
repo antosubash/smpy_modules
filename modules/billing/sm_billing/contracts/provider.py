@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol, runtime_checkable
 
-from sm_billing.constants import PROVIDER_CHECKOUT_BLOCKING_STATUSES
+from sm_billing.core.constants import PROVIDER_CHECKOUT_BLOCKING_STATUSES
 
 
 class ProviderError(Exception):

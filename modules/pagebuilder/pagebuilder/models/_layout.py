@@ -41,5 +41,3 @@ class LayoutRevision(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ign
         sa_column=Column(JSON, nullable=False, default=dict),
     )
     note: str | None = Field(default=None, max_length=2000)
-
-

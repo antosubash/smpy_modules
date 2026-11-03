@@ -31,8 +31,8 @@ from typing import Any, Final
 
 import httpx
 
+from sm_records.core.settings import RecordsSettings
 from sm_records.public_submissions.errors import SubmissionRefused
-from sm_records.settings import RecordsSettings
 
 __all__ = [
     "PROVIDERS",

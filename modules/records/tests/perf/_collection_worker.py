@@ -82,7 +82,7 @@ async def _measure(session, engine, label: str, run, reps: int, out: list[dict[s
 
 
 async def main(path: Path, records: int, collections: int, reps: int) -> None:
-    from sm_records.collections import declare_collection
+    from sm_records.records.collections import declare_collection
 
     names = ["perfc", "perfd"][:collections]
     for name in names:
@@ -90,12 +90,12 @@ async def main(path: Path, records: int, collections: int, reps: int) -> None:
 
     from simple_module_db.listeners import register_listeners
     from simple_module_db.session import init_db
-    from sm_records.index.query import build_query
+    from sm_records.core.settings import RecordsSettings
     from sm_records.models import Base
-    from sm_records.services._relations import referrers
-    from sm_records.services.records import create_record
-    from sm_records.services.types import create_type
-    from sm_records.settings import RecordsSettings
+    from sm_records.records.index.query import build_query
+    from sm_records.records.services._relations import referrers
+    from sm_records.records.services.records import create_record
+    from sm_records.records.services.types import create_type
 
     if path.exists():
         path.unlink()
@@ -158,7 +158,7 @@ async def main(path: Path, records: int, collections: int, reps: int) -> None:
 
             await _measure(session, state.engine, f"list page 25 ({where})", page, reps, rows)
 
-            from sm_records.index.query import Filter, FilterOp
+            from sm_records.records.index.query import Filter, FilterOp
 
             async def filtered(rtype=rtype, fields=fields):
                 await session.execute(
@@ -169,7 +169,7 @@ async def main(path: Path, records: int, collections: int, reps: int) -> None:
                 session, state.engine, f"list, number gte filter ({where})", filtered, reps, rows
             )
 
-            from sm_records.index.query import Sort
+            from sm_records.records.index.query import Sort
 
             async def sorted_(rtype=rtype, fields=fields):
                 await session.execute(
@@ -200,7 +200,7 @@ async def main(path: Path, records: int, collections: int, reps: int) -> None:
 
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from sm_records.tenancy import DEFAULT_TENANT, tenant_scope
+    from sm_records.core.tenancy import DEFAULT_TENANT, tenant_scope
 
     # A single-tenant host's binding, as ``tests/conftest.py`` gives every
     # in-process test: the records tables are tenant-owned (tenancy design §B).

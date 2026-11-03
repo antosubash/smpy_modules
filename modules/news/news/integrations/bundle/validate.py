@@ -17,7 +17,7 @@ from typing import Any
 
 from pagebuilder.contracts.bundle import ValidateContext
 
-from news.constants import (
+from news.core.constants import (
     MAX_AUTHOR_LEN,
     MAX_CATEGORY_LEN,
     MAX_SLUG_LEN,

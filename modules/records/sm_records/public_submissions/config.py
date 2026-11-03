@@ -16,18 +16,18 @@ from typing import Any
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records._text import has_nul
-from sm_records.constants import LOCALE_PATTERN
 from sm_records.contracts.public_submissions import (
     KIND_SUBSCRIPTION,
     MAX_CONSENT_TEXT_LEN,
     PublicSubmissionsConfig,
 )
+from sm_records.core._text import has_nul
+from sm_records.core.constants import LOCALE_PATTERN
 from sm_records.models import RecordType
 from sm_records.public_submissions.spec import SUBMITTABLE_TYPES, is_system
-from sm_records.services._common import record_count
-from sm_records.services._lock import lock_type
-from sm_records.services.errors import Conflict, ValidationFailed
+from sm_records.records.services._common import record_count
+from sm_records.records.services._lock import lock_type
+from sm_records.records.services.errors import Conflict, ValidationFailed
 
 __all__ = ["FIELD", "check_change", "default_display", "kind_of", "parse", "settle"]
 

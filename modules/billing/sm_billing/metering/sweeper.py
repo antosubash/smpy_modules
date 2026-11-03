@@ -37,8 +37,8 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 
-from sm_billing import constants as c
 from sm_billing.contracts.metering import HoldStatus
+from sm_billing.core import constants as c
 from sm_billing.metering.retention import purge
 from sm_billing.models import UsageHold
 
@@ -63,7 +63,7 @@ async def _sleep(seconds: float) -> None:
 
 async def _refresh(app: FastAPI) -> None:
     """Follow settings saved on another worker (the ``usage_*`` fields too)."""
-    from sm_billing import live
+    from sm_billing.core import live
 
     await live.ensure_current(app)
 

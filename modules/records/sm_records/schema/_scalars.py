@@ -17,8 +17,8 @@ from datetime import datetime as _datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from sm_records._text import has_nul
-from sm_records.constants import NUMBER_PRECISION, NUMBER_SCALE
+from sm_records.core._text import has_nul
+from sm_records.core.constants import NUMBER_PRECISION, NUMBER_SCALE
 
 MAX_INT_DIGITS = NUMBER_PRECISION - NUMBER_SCALE
 """Digits left of the point that ``Numeric(19, 5)`` can hold."""

@@ -21,16 +21,16 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.public_submissions import KIND_FORM, KIND_SUBSCRIPTION
-from sm_records.deps import get_settings
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import bound_tenant
 from sm_records.models import Record, RecordType
 from sm_records.public_submissions import abuse, opt_in
 from sm_records.public_submissions.confirmation import PENDING, budget_wait, queue_confirmation
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.mail_runner import queue_notification
 from sm_records.public_submissions.system import try_system_update
-from sm_records.services import records as record_service
-from sm_records.settings import RecordsSettings
-from sm_records.tenancy import bound_tenant
+from sm_records.records.services import records as record_service
+from sm_records.web.deps import get_settings
 
 __all__ = [
     "RESEND_RATE",

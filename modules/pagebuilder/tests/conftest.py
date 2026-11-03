@@ -17,37 +17,24 @@ also override settings.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager
-from types import SimpleNamespace
-from typing import Any
+from collections.abc import AsyncIterator
 
 import pytest
-from fastapi import APIRouter, FastAPI
-from fastapi.templating import Jinja2Templates
-from httpx import ASGITransport, AsyncClient
-from pagebuilder.module import PagebuilderModule
-from pagebuilder.permissions import (
-    ALL_PERMISSIONS,
+from httpx import AsyncClient
+from pagebuilder.core.permissions import (
     PERM_APPROVE,
     PERM_EDIT,
     PERM_PUBLISH,
     ROLE_APPROVER,
     ROLE_EDITOR,
 )
-from pagebuilder.settings import PagebuilderSettings
 
 # ``pg_support`` owns the one decision every database fixture in this suite
 # makes: in-memory SQLite, or the Postgres database ``SM_TEST_DATABASE_URL``
 # names. See that module.
-from pg_support import arm_reset, make_db_state
-from settings.module_registry import ModuleSettingsRegistry
-from simple_module_core.permissions import PermissionRegistry
-from simple_module_inertia import InertiaConfig, inertia_dependency_factory
-from starlette.middleware.sessions import SessionMiddleware
-from stub_auth import _stub_user, _StubAuthMiddleware
+from pg_support import arm_reset
 
-_SESSION_SECRET = "pagebuilder-tests-secret"
+from tests.support.app import _client_fixture
 
 
 @pytest.fixture(autouse=True)
@@ -63,148 +50,6 @@ def _arm_database_reset():
     """
     arm_reset()
     yield
-
-
-# Tiny valid PNG header — matches the sniffer's PNG signature. Lives at
-# module scope so upload tests can import it instead of redefining.
-PNG_BYTES = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + b"\x00" * 16
-
-
-async def _build_app(
-    tmp_path,
-    *,
-    requires_auth: bool,
-    csrf_protect: bool,
-    inject_user: bool,
-    user_roles: tuple[str, ...] = ("admin",),
-    role_map: dict[str, list[str]] | None = None,
-    settings: dict[str, Any] | None = None,
-) -> tuple[FastAPI, Callable[[], Awaitable[None]]]:
-    media_root = tmp_path / "media"
-    media_root.mkdir(parents=True, exist_ok=True)
-
-    module = PagebuilderModule()
-    # Pre-seed module settings so the register_* hooks below see the
-    # test-override flags instead of scanning env vars.
-    module.settings = PagebuilderSettings(
-        media_root=media_root,
-        snapshot_root=tmp_path / "snapshots",  # not the cwd's var/: shared by xdist workers
-        requires_auth=requires_auth,
-        csrf_protect=csrf_protect,
-        **(settings or {}),
-    )
-
-    app = FastAPI()
-    # The settings module's registry, which ``register_settings`` registers
-    # the class against. Stubbed rather than mounted: these tests want the
-    # pre-seeded settings above, not a hydration round trip through a database
-    # the framework module owns.
-    app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
-    module.register_settings(app)
-    module.register_middleware(app)
-
-    # Mirror ``wire_module_routes``: build prefixed routers, hand them
-    # to the module, then mount them on the app.
-    api_router = APIRouter(prefix=module.meta.route_prefix, tags=[module.meta.name])
-    view_router = APIRouter(prefix=module.meta.view_prefix, tags=[module.meta.name])
-    module.register_routes(api_router, view_router)
-    app.include_router(api_router)
-    app.include_router(view_router)
-
-    # A database with pagebuilder's schema and no rows. ``make_db_state``
-    # keeps the two properties this harness has always depended on: a
-    # ``StaticPool`` so every ``async with factory()`` sees the same
-    # ``:memory:`` instance rather than a fresh empty one, and
-    # ``register_listeners`` so the audit hook flips the ``has_writes`` flag
-    # ``get_db`` reads to choose between commit and rollback — without it
-    # every API write is a silent rollback.
-    db_state = await make_db_state()
-
-    # Wire up a permissions registry so RequiresPermission can resolve
-    # non-admin roles. Without this, the framework's role-map fallback
-    # is empty and editor/publisher fixtures would silently get zero
-    # perms (the admin stub still works via DEFAULT_ROLE_PERMISSIONS).
-    sm_namespace: SimpleNamespace = SimpleNamespace(db=db_state)
-    if role_map is not None:
-        registry = PermissionRegistry()
-        registry.add_group("PageBuilder", list(ALL_PERMISSIONS))
-        for role, perms in role_map.items():
-            registry.map_role(role, perms)
-        sm_namespace.permissions = registry
-    app.state.sm = sm_namespace
-
-    # Minimal Inertia config — enough to short-circuit on
-    # ``X-Inertia: true`` without needing the real host templates.
-    templates_dir = tmp_path / "templates"
-    templates_dir.mkdir()
-    (templates_dir / "index.html").write_text('<html lang="en"></html>')  # host shell's (#187)
-    inertia_config = InertiaConfig(
-        environment="development",
-        version="1.0",
-        dev_url="http://localhost:5050",
-        templates=Jinja2Templates(directory=str(templates_dir)),
-        root_template_filename="index.html",
-        entrypoint_filename="main.tsx",
-        root_directory=".",
-        use_flash_errors=True,
-    )
-    app.state.inertia_dependency = inertia_dependency_factory(inertia_config)
-
-    if inject_user:
-        # Added before SessionMiddleware so it sits inside it at runtime
-        # (Starlette wraps outermost = last-added). Position doesn't
-        # actually matter here — stub-auth just stamps request.state —
-        # but keeping it inside the session matches the production order.
-        app.add_middleware(_StubAuthMiddleware, user=_stub_user(user_roles))
-
-    # SessionMiddleware is added last so it ends up outermost at runtime
-    # (Starlette runs the last-added middleware first on the way in).
-    # CsrfCookieMiddleware was already added by ``register_middleware``
-    # above — it needs to wrap outside the session so the session is
-    # fully populated by the time the cookie mirror reads it.
-    app.add_middleware(SessionMiddleware, secret_key=_SESSION_SECRET)
-
-    # Mount the public viewer + media static (production calls this in
-    # the lifespan startup hook).
-    await module.on_startup(app)
-
-    async def cleanup() -> None:
-        await db_state.engine.dispose()
-
-    return app, cleanup
-
-
-@asynccontextmanager
-async def _client_for(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
-
-
-async def _client_fixture(
-    tmp_path,
-    *,
-    requires_auth: bool,
-    csrf_protect: bool,
-    inject_user: bool,
-    user_roles: tuple[str, ...] = ("admin",),
-    role_map: dict[str, list[str]] | None = None,
-    settings: dict[str, Any] | None = None,
-) -> AsyncIterator[AsyncClient]:
-    app, cleanup = await _build_app(
-        tmp_path,
-        requires_auth=requires_auth,
-        csrf_protect=csrf_protect,
-        inject_user=inject_user,
-        user_roles=user_roles,
-        role_map=role_map,
-        settings=settings,
-    )
-    try:
-        async with _client_for(app) as c:
-            yield c
-    finally:
-        await cleanup()
 
 
 @pytest.fixture
@@ -269,3 +114,10 @@ async def approver_client(tmp_path) -> AsyncIterator[AsyncClient]:
         role_map={ROLE_APPROVER: [PERM_EDIT, PERM_PUBLISH, PERM_APPROVE]},
     ):
         yield c
+
+pytest_plugins = (
+    "tests.support.db_fixture",
+    "tests.support.locale_fixture",
+    "tests.support.snapshot_fixture",
+    "tests.support.tenant_fixture",
+)

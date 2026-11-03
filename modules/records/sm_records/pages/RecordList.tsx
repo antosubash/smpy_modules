@@ -1,22 +1,23 @@
 import { Head, usePage } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import type { SharedProps } from '@simple-module-py/ui/types';
-import { ColumnChooser, ColumnsNotice } from '../components/ColumnChooser';
-import { FilterBar } from '../components/FilterBar';
-import { MediaApiProvider } from '../components/media/MediaApiContext';
-import { displayedColumns } from '../components/RecordColumnCells';
-import { RecordListActions } from '../components/RecordListActions';
-import { RecordListBulk } from '../components/RecordListBulk';
-import { RecordListEmpty } from '../components/RecordListEmpty';
-import { RecordListFooter } from '../components/RecordListFooter';
-import { RecordListPublicUrl } from '../components/RecordListPublicUrl';
-import { RecordsLayout } from '../components/RecordsLayout';
-import { RecordTable } from '../components/RecordTable';
-import { useListColumns } from '../hooks/useListColumns';
-import { useRecordListMutations } from '../hooks/useRecordListMutations';
-import { useRecordListNav } from '../hooks/useRecordListNav';
-import { useRecordSelection } from '../hooks/useRecordSelection';
-import { useT } from '../utils/i18n';
+import { ColumnChooser, ColumnsNotice } from '../ui/components/ColumnChooser';
+import { FilterBar } from '../ui/components/FilterBar';
+import { MediaApiProvider } from '../ui/components/media/MediaApiContext';
+import { displayedColumns } from '../ui/components/RecordColumnCells';
+import { RecordListActions } from '../ui/components/RecordListActions';
+import { RecordListBulk } from '../ui/components/RecordListBulk';
+import { RecordListEmpty } from '../ui/components/RecordListEmpty';
+import { RecordListFooter } from '../ui/components/RecordListFooter';
+import { RecordListPublicUrl } from '../ui/components/RecordListPublicUrl';
+import { RecordsLayout } from '../ui/components/RecordsLayout';
+import { RecordTable } from '../ui/components/RecordTable';
+import type { Props } from '../ui/components/record-list-types';
+import { useListColumns } from '../ui/hooks/useListColumns';
+import { useRecordListMutations } from '../ui/hooks/useRecordListMutations';
+import { useRecordListNav } from '../ui/hooks/useRecordListNav';
+import { useRecordSelection } from '../ui/hooks/useRecordSelection';
+import { useT } from '../ui/utils/i18n';
 import {
   exportSearchParams,
   filterErrorMessage,
@@ -24,31 +25,8 @@ import {
   parseFilterParam,
   parseSort,
   parseTrashedParam,
-} from '../utils/listing';
-import type { MediaApi } from '../utils/media-api';
-import type { RecordListPage, TenancyMode, TypeRead } from '../utils/types';
+} from '../ui/utils/listing';
 
-type Props = {
-  type: TypeRead;
-  records: RecordListPage;
-  /** Every content locale the module runs (`views.py::record_list`); absent
-   *  degrades to "no language UI", same as the editor's own prop. */
-  content_locales?: string[];
-  /** `RecordsSettings.max_import_bytes` — the import menu refuses a bigger
-   *  file client-side and says the limit (R9/M13). Absent falls back to the
-   *  setting's own default. */
-  max_import_bytes?: number;
-  /** `RecordsSettings.public_route_prefix` (U14/Missing-15) — shown, with a
-   *  copy button, next to the type's label when `type.is_public` is on.
-   *  Absent falls back to the same default the type editor's own
-   *  `PublicField` uses. */
-  public_route_prefix?: string;
-  /** Where a `media` column resolves its thumbnails; `null` shows the id. */
-  media_api?: MediaApi | null;
-  /** Tenancy design §J — read-only; drives `TenantBadge` in `actions`. */
-  tenant?: string;
-  tenancy_mode?: TenancyMode;
-};
 /** The permission the "Trash" toggle costs — see `deps.py::parse_trashed`. */
 const EDIT_PERMISSION = 'records.edit';
 

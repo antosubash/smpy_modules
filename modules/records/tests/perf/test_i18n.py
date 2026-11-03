@@ -22,16 +22,15 @@ import time
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sm_records import settings_checks
+from sm_records.core.settings import RecordsSettings, settings_checks
 from sm_records.models import RecordStatus
-from sm_records.services import _claims
-from sm_records.services._translations import create_translation, published_siblings
-from sm_records.settings import RecordsSettings
+from sm_records.records.services import _claims
+from sm_records.records.services._translations import create_translation, published_siblings
 
-from tests.app_harness import build_app
 from tests.perf._bench import Results, Timing, capture, explain, repeat
 from tests.perf._http import API, get_ok, measure, plan_label
 from tests.perf.conftest import REPS, load_type, type_counts
+from tests.support.app_harness import build_app
 
 pytestmark = pytest.mark.perf
 
@@ -64,7 +63,7 @@ async def _translate_half(session, settings) -> tuple[int, int]:
     draft on purpose (§4.3) and what this file needs to measure is a public
     listing with something in it.
     """
-    from sm_records.index.query import build_query
+    from sm_records.records.index.query import build_query
 
     rtype = await load_type(session, TYPE)
     rtype.translatable = True
@@ -240,7 +239,7 @@ async def test_published_siblings_is_one_query_for_a_whole_page(perf_db_copy, tm
     the page, keyed by group. What it costs is therefore a function of the page
     size, not of the type — measured over a full page.
     """
-    from sm_records.index.query import build_query
+    from sm_records.records.index.query import build_query
 
     # The install's content locales: ``published_siblings`` narrows to them, so
     # a sibling in a language the site has stopped publishing is not advertised

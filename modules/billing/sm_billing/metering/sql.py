@@ -27,7 +27,7 @@ from typing import Any
 from sqlalchemy import and_, case, func, or_, select, true, update
 from sqlalchemy.dialects import postgresql, sqlite
 
-from sm_billing.constants import ENTITLED_STATUSES
+from sm_billing.core.constants import ENTITLED_STATUSES
 from sm_billing.models import Subscription, UsageEvent, UsagePeriod
 
 _INSERTS = {"postgresql": postgresql.insert, "sqlite": sqlite.insert}

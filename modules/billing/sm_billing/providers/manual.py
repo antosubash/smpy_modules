@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from sm_billing.constants import PROVIDER_MANUAL
 from sm_billing.contracts.provider import (
     CheckoutSession,
     CheckoutSnapshot,
@@ -19,6 +18,7 @@ from sm_billing.contracts.provider import (
     SubscriptionSnapshot,
     WebhookEvent,
 )
+from sm_billing.core.constants import PROVIDER_MANUAL
 
 _NO = "The manual billing provider has no payment integration."
 

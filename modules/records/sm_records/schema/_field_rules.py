@@ -7,8 +7,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from sm_records._text import NUL_PROBLEM, has_nul
-from sm_records.constants import TYPE_KEY_PATTERN
+from sm_records.core._text import NUL_PROBLEM, has_nul
+from sm_records.core.constants import TYPE_KEY_PATTERN
 from sm_records.schema._keys import KEY_RE as _KEY_RE
 from sm_records.schema._keys import FieldSchemaError
 from sm_records.schema._keys import require as _require

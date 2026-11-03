@@ -6,15 +6,15 @@ import type { SharedProps } from '@simple-module-py/ui/types';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ConfirmDialog } from '../ui/components/ConfirmDialog';
 import {
   type ArticleRead,
   formatArticleDate,
   listArticles,
   purgeArticle,
   restoreArticle,
-} from '../utils/api';
-import { keys, useT } from '../utils/i18n';
+} from '../ui/utils/api';
+import { keys, useT } from '../ui/utils/i18n';
 
 /** Binned articles, and the two things you can do with them.
  *

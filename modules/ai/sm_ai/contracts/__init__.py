@@ -8,7 +8,7 @@
         result = await agent.run(text, model=resolve_model())
 
 ``RequiresAiRequest`` charges the ``ai.requests`` meter when billing is
-installed and is a no-op otherwise (see ``sm_ai.metering``). Code that runs
+installed and is a no-op otherwise (see ``sm_ai.metering.requests``). Code that runs
 outside a request (a Celery task) calls ``await consume_requests(tenant_id,
 idempotency_key=..., source=...)`` before each model call instead.
 
@@ -20,9 +20,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sm_ai.constants import METER_REQUESTS
 from sm_ai.contracts.errors import AiError, AiKeyUnreadableError, AiNotConfiguredError
-from sm_ai.metering import RequiresAiRequest, consume_requests
+from sm_ai.core.constants import METER_REQUESTS
+from sm_ai.metering.requests import RequiresAiRequest, consume_requests
 
 if TYPE_CHECKING:
     from pydantic_ai import Embedder
@@ -36,7 +36,8 @@ def resolve_model(model_name: str | None = None, *, max_retries: int | None = No
     that meters each call (``consume_requests``) wants one charge to be at
     most one provider request. ``None`` keeps the SDK default.
     """
-    from sm_ai import resolve, services
+    from sm_ai.connections import resolve
+    from sm_ai.core import services
 
     return resolve.build_chat_model(
         services.current_settings(), model_name, max_retries=max_retries
@@ -45,14 +46,15 @@ def resolve_model(model_name: str | None = None, *, max_retries: int | None = No
 
 def resolve_embedder() -> Embedder:
     """A ready ``Embedder`` built from the host's AI settings."""
-    from sm_ai import resolve, services
+    from sm_ai.connections import resolve
+    from sm_ai.core import services
 
     return resolve.build_embedder(services.current_settings())
 
 
 def embedding_dim() -> int:
     """The configured embedding vector width (vector stores need it)."""
-    from sm_ai import services
+    from sm_ai.core import services
 
     dim = services.current_settings().embedding_dim
     if dim <= 0:

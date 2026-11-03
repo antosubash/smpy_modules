@@ -12,22 +12,22 @@ import {
   useState,
 } from 'react';
 
-import { MediaFilters } from '../components/media/MediaFilters';
-import { MediaFolderSidebar } from '../components/media/MediaFolderSidebar';
-import { MediaGrid } from '../components/media/MediaGrid';
-import { MediaHeader } from '../components/media/MediaHeader';
-import { MediaDropzone, MediaUploadQueue } from '../components/media/MediaUploadQueue';
-import type { ListFilters } from '../components/media/types';
-import { useDebounced } from '../hooks/useDebounced';
-import { useMediaUploads } from '../hooks/useMediaUploads';
+import { MediaFilters } from '../ui/components/media/MediaFilters';
+import { MediaFolderSidebar } from '../ui/components/media/MediaFolderSidebar';
+import { MediaGrid } from '../ui/components/media/MediaGrid';
+import { MediaHeader } from '../ui/components/media/MediaHeader';
+import { MediaDropzone, MediaUploadQueue } from '../ui/components/media/MediaUploadQueue';
+import type { ListFilters } from '../ui/components/media/types';
+import { useDebounced } from '../ui/hooks/useDebounced';
+import { useMediaUploads } from '../ui/hooks/useMediaUploads';
 import {
   deleteAssetIfUnused,
   listMedia,
   type MediaAssetRead,
   type MediaListResponse,
-} from '../utils/api';
-import { keys, useT } from '../utils/i18n';
-import { parseKB } from '../utils/mediaFormat';
+} from '../ui/utils/api';
+import { keys, useT } from '../ui/utils/i18n';
+import { parseKB } from '../ui/utils/mediaFormat';
 
 interface Props {
   initial: MediaListResponse;

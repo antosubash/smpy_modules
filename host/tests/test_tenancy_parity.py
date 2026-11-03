@@ -12,24 +12,24 @@ and fail the ``single`` rows here, rather than pass silently.
 
 from __future__ import annotations
 
-import news.tenancy
-import pagebuilder.tenancy
+import news.core.tenancy
+import pagebuilder.core.tenancy
 import pytest
-import sm_records._tenancy_mode
-import sm_records.tenancy
+import sm_records.core.tenancy
+import sm_records.core.tenancy._mode
 from fastapi import Request
 from httpx import ASGITransport, AsyncClient
 from simple_module_hosting import Settings, create_app
 
 _DETECTORS = {
-    "pagebuilder": pagebuilder.tenancy,
-    "news": news.tenancy,
-    "records": sm_records._tenancy_mode,
+    "pagebuilder": pagebuilder.core.tenancy,
+    "news": news.core.tenancy,
+    "records": sm_records.core.tenancy._mode,
 }
 _RESOLVERS = {
-    "pagebuilder": pagebuilder.tenancy,
-    "news": news.tenancy,
-    "records": sm_records.tenancy,
+    "pagebuilder": pagebuilder.core.tenancy,
+    "news": news.core.tenancy,
+    "records": sm_records.core.tenancy,
 }
 
 # Every row spells out all three settings, so a developer's .env cannot move it.
@@ -74,10 +74,10 @@ def test_the_detectors_agree_with_each_other_and_the_framework(host):
 
 def test_the_header_readers_agree(host):
     app, mode, header = host
-    assert sm_records._tenancy_mode.tenant_header(app) == header
+    assert sm_records.core.tenancy._mode.tenant_header(app) == header
     expected = () if mode == "single" else ("Cookie", header) if header else ("Cookie",)
     # tenant_vary reads the stored mode, which needs on_startup; detect on the fly.
-    for detector in (pagebuilder.tenancy, news.tenancy):
+    for detector in (pagebuilder.core.tenancy, news.core.tenancy):
         assert detector.tenant_vary(app) == expected
 
 
@@ -87,7 +87,7 @@ def test_create_app_still_leaves_state_sm(host):
     factory-built stack entry would turn every host MULTI."""
     app, _mode, _header = host
     assert getattr(app.state, "sm", None) is not None, "create_app no longer sets app.state.sm"
-    for detector in (pagebuilder.tenancy, news.tenancy):
+    for detector in (pagebuilder.core.tenancy, news.core.tenancy):
         assert detector._framework_mode(app) is not None
 
 

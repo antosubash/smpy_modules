@@ -30,7 +30,7 @@ limit = await entitlements.limit(tenant_id, "exports.per_month")
 Name keys `<module>.<thing>` (`storage.gb`, `exports.per_month`). An
 administrator then sets them per plan in the plan editor's Limits and Features.
 To have a key suggested in the editor, add it to `KNOWN_LIMIT_KEYS` in
-`sm_billing/constants.py`.
+`sm_billing/core/constants.py`.
 
 ## Metering usage (from another module)
 

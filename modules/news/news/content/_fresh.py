@@ -18,8 +18,8 @@ from fastapi import HTTPException
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from news.core.naive_utc import as_utc
 from news.models import ArticleStatus, NewsArticle
-from news.naive_utc import as_utc
 
 STALE_DETAIL = (
     "This article was changed somewhere else. Reload to get the latest version, "

@@ -44,10 +44,11 @@ from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import events
 from sm_records.contracts.events import SubscriptionChanged
 from sm_records.contracts.public_submissions_api import SubmitBody
-from sm_records.index.query import Filter, FilterOp, exists_query
+from sm_records.core import events
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import bound_tenant
 from sm_records.models import Record, RecordStatus, RecordType, tables_for
 from sm_records.public_submissions import abuse
 from sm_records.public_submissions.confirmation import budget_wait, queue_confirmation
@@ -55,13 +56,12 @@ from sm_records.public_submissions.definition import EMAIL_KEY, consent_text, pa
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.tokens import host_secret, ip_hash
 from sm_records.public_submissions.transition import Change, transition
+from sm_records.records.index.query import Filter, FilterOp, exists_query
+from sm_records.records.services import records as record_service
+from sm_records.records.services._common import SESSION_HAS_WRITES_KEY, utcnow
+from sm_records.records.services._payload import carry_system, field_defs, validate
+from sm_records.records.services.errors import Conflict, NotFound, ValidationFailed
 from sm_records.schema._text_checks import checked
-from sm_records.services import records as record_service
-from sm_records.services._common import SESSION_HAS_WRITES_KEY, utcnow
-from sm_records.services._payload import carry_system, field_defs, validate
-from sm_records.services.errors import Conflict, NotFound, ValidationFailed
-from sm_records.settings import RecordsSettings
-from sm_records.tenancy import bound_tenant
 
 __all__ = ["CONFIRMED", "PENDING", "UNSUBSCRIBED", "changed", "find", "normalise", "signup"]
 

@@ -23,10 +23,10 @@ import tracemalloc
 
 import pytest
 from sm_records.contracts.io import ImportFormat, ImportMode, OnError
-from sm_records.services import export as export_service
-from sm_records.services.errors import ImportRefused
-from sm_records.services.import_ import ImportOptions, import_records
-from sm_records.settings import RecordsSettings
+from sm_records.core.settings import RecordsSettings
+from sm_records.records.services import export as export_service
+from sm_records.records.services.errors import ImportRefused
+from sm_records.records.services.import_ import ImportOptions, import_records
 
 from tests.perf._bench import Results, Timing
 from tests.perf.conftest import load_type, type_counts

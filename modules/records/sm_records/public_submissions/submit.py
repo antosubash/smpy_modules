@@ -32,10 +32,12 @@ from typing import Any
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import events
 from sm_records.contracts.events import FormSubmitted
 from sm_records.contracts.public_submissions import KIND_SUBSCRIPTION
 from sm_records.contracts.public_submissions_api import SubmitBody
+from sm_records.core import events
+from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy import bound_tenant
 from sm_records.models import RecordStatus, RecordType
 from sm_records.public_submissions import abuse, captcha, subscribe
 from sm_records.public_submissions.definition import (
@@ -51,13 +53,11 @@ from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.mail_runner import queue_notification
 from sm_records.public_submissions.patterns import check_patterns
 from sm_records.public_submissions.tokens import TokenError, host_secret, ip_hash, verify_form
+from sm_records.records.services import records as record_service
+from sm_records.records.services._payload import field_defs
+from sm_records.records.services.errors import Conflict, ValidationFailed
 from sm_records.schema._text_checks import checked
 from sm_records.schema.types import FieldType
-from sm_records.services import records as record_service
-from sm_records.services._payload import field_defs
-from sm_records.services.errors import Conflict, ValidationFailed
-from sm_records.settings import RecordsSettings
-from sm_records.tenancy import bound_tenant
 
 __all__ = ["submit", "visitor_data"]
 

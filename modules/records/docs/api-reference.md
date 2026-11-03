@@ -1653,7 +1653,7 @@ here), and *Unsubscribe* a list's.
 
 ## Error table
 
-**This table is `sm_records/endpoints/api/_error_table.py`.** The rows below
+**This table is `sm_records/web/endpoints/api/_error_table.py`.** The rows below
 are that module's `ERROR_TABLE`, cell for cell and in order, and
 `tests/test_openapi_errors.py` fails if either moves without the other — a
 generated schema and a hand-maintained table are two descriptions of one

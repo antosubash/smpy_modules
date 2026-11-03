@@ -32,7 +32,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError, create_model
 from pydantic import Field as PydField
 
-from sm_records.constants import ORPHANED_KEY
+from sm_records.core.constants import ORPHANED_KEY
 from sm_records.schema._builders import annotation_for
 
 # Re-exported: callers import it from here, as before the split.

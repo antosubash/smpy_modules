@@ -441,10 +441,10 @@ framework's `SM013`–`SM016` diagnostics report a file that has drifted from th
 default.
 
 The frontend derives its key tree from that JSON at compile time —
-`news/utils/i18n.ts` — rather than from the framework's generated `keys`, which
+`news/ui/utils/i18n.ts` — rather than from the framework's generated `keys`, which
 only carries the namespaces of modules that live in the framework's own
 monorepo. The upshot is that `tsc` rejects a key the catalogue does not define,
-and `modules/news/news/utils/i18n.test.ts` rejects an entry nothing references,
+and `modules/news/news/ui/utils/i18n.test.ts` rejects an entry nothing references,
 a plural missing a form, and a placeholder nothing fills.
 
 Two things stay literal on purpose. A block's `defaultProps` are the seed

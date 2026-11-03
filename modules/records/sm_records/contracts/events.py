@@ -17,9 +17,9 @@ which is therefore the one that has to be complete in itself.
 **They are published after the commit, from the endpoint layer.** The service
 layer never imports FastAPI (``docs/architecture.md`` rule 1) and the bus
 arrives on ``app.state``, so the seam is the one ``menu.mark_dirty`` already
-uses; and :mod:`sm_records.deferred` is what makes it *after the commit*, so
+uses; and :mod:`sm_records.records.deferred` is what makes it *after the commit*, so
 no subscriber ever sees an event for a write that rolled back. See
-:mod:`sm_records.events`.
+:mod:`sm_records.core.events`.
 
 Field order is ``type_key`` first everywhere, because every subscriber that
 filters filters on it.

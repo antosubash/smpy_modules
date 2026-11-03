@@ -16,7 +16,7 @@ Start with the document that matches what you are trying to do.
 | A platform administrator setting up plans, or an organisation owner paying for one | [user-guide.md](user-guide.md) |
 | A developer calling the billing API, gating a feature on a plan, or metering usage | [api-reference.md](api-reference.md) |
 | An operator installing it, connecting Stripe, or answering "why is this organisation suspended?" | [operations.md](operations.md) |
-| A developer changing the module or adding a payment provider | [architecture.md](architecture.md) |
+| A developer changing the module or adding a payment provider | [architecture.md](architecture.md), [code-layout.md](code-layout.md) |
 | Running a single-tenant host where each user subscribes as themselves, or metering from a worker | [subjects.md](subjects.md) |
 
 ### [user-guide.md](user-guide.md) — for administrators and owners

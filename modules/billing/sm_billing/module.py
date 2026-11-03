@@ -5,7 +5,7 @@ them: it installs ``PlanEntitlements`` as ``app.state.tenants.entitlements``
 (so the seat limit ``tenants`` already enforces comes from the tenant's plan),
 reacts to membership events to keep per-seat quantities in step, drives
 ``TenantService.set_status`` when a subscription stops being paid, and cancels
-a deleted tenant's subscription (``sm_billing.teardown``).
+a deleted tenant's subscription (``sm_billing.subscriptions.deletion.teardown``).
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 from simple_module_core import ModuleBase, ModuleMeta
 from simple_module_core.menu import MenuItem, MenuRegistry, MenuSection
 
-from sm_billing import constants as c
+from sm_billing.core import constants as c
 
 if TYPE_CHECKING:
     from fastapi import APIRouter, FastAPI
@@ -60,9 +60,9 @@ class BillingModule(ModuleBase):
     def register_settings(self, app: FastAPI) -> None:
         from simple_module_core.module_settings import register_module_settings
 
-        from sm_billing import crypto
-        from sm_billing.services import BillingServices
-        from sm_billing.settings import BillingSettings
+        from sm_billing.core import crypto
+        from sm_billing.core.services import BillingServices
+        from sm_billing.core.settings import BillingSettings
 
         register_module_settings(
             app, c.PACKAGE, BillingSettings, lambda s: BillingServices(settings=s)
@@ -87,7 +87,7 @@ class BillingModule(ModuleBase):
         setattr(app.state, c.METERS_STATE_ATTR, MeterRegistry())
 
     def register_exception_handlers(self, app: FastAPI) -> None:
-        from sm_billing.errors import install_exception_handlers
+        from sm_billing.core.errors import install_exception_handlers
 
         install_exception_handlers(app)
 
@@ -126,12 +126,12 @@ class BillingModule(ModuleBase):
         )
 
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
-        from sm_billing.endpoints import routers
+        from sm_billing.web.endpoints import routers
 
         routers.include(api_router, view_router)
 
     def register_admin_routes(self, admin_router: APIRouter) -> None:
-        from sm_billing.endpoints import routers
+        from sm_billing.web.endpoints import routers
 
         routers.include_admin(admin_router)
 
@@ -142,21 +142,23 @@ class BillingModule(ModuleBase):
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
         if app is None:
             return
-        from sm_billing import live, seats, tenant_deleted
+        from sm_billing.core import live
+        from sm_billing.subscriptions import seats
+        from sm_billing.subscriptions.deletion import tenant_deleted
 
         seats.subscribe(bus, app)
         live.subscribe(bus, app)
         tenant_deleted.subscribe(bus, app)
 
     async def on_startup(self, app: FastAPI) -> None:
-        from sm_billing import startup
+        from sm_billing.core import startup
 
         await startup.run(app)
 
     async def on_shutdown(self, app: FastAPI) -> None:
         """Stop the reconcile loop and the usage sweeper — the host's lifespan
         calls this directly."""
-        from sm_billing import startup
+        from sm_billing.core import startup
 
         await startup.stop_reconcile(app)
         await startup.stop_usage_sweeper(app)

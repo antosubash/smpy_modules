@@ -1,6 +1,6 @@
 """The languages an article can be written in, as pagebuilder sees them.
 
-The seam, not the answer: :mod:`news.locales` is what the rest of this module
+The seam, not the answer: :mod:`news.core.locales` is what the rest of this module
 asks, and it borrows from here only where pagebuilder is installed. On a host
 that runs both, offering a language pagebuilder did not would mean two lists to
 keep in step — an article and a page are documents on the same site.
@@ -48,33 +48,33 @@ def hydrated_locales(app: Any) -> tuple[tuple[str, ...], str] | None:
 
 def content_locales() -> tuple[str, ...]:
     """Every language a page — and so an article — may be authored in."""
-    from pagebuilder import locales
+    from pagebuilder.core import locales
 
     return locales.supported()
 
 
 def default_locale() -> str:
     """The language that serves at the unprefixed public URL."""
-    from pagebuilder import locales
+    from pagebuilder.core import locales
 
     return locales.default()
 
 
 def is_default_locale(locale: str) -> bool:
-    from pagebuilder import locales
+    from pagebuilder.core import locales
 
     return locales.is_default(locale)
 
 
 def resolve_locale(value: str | None) -> str | None:
     """``value`` as a configured content locale, or ``None`` if it is not one."""
-    from pagebuilder import locales
+    from pagebuilder.core import locales
 
     return locales.resolve(value)
 
 
 def locale_path_prefix(locale: str) -> str:
     """The URL segment a language contributes — ``""`` for the default one."""
-    from pagebuilder import locales
+    from pagebuilder.core import locales
 
     return locales.path_prefix(locale)

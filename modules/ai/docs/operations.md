@@ -131,7 +131,7 @@ environment, or in the project `.env`; start a worker outside the project
 with `SM_PROJECT_ROOT` pointing at it), or, when that is unset, read access
 to the `host.secret_key` row the web app generated. Settings are cached per worker process for 60
 seconds, so a save on the AI page reaches workers within a minute without a
-restart; `sm_ai.services.invalidate()` forces a re-read. If the database
+restart; `sm_ai.core.services.invalidate()` forces a re-read. If the database
 can't be read, the worker uses the defaults for 5 seconds and then tries
 again; each read is capped at 5 seconds, and while one thread re-reads, the
 others keep the previous settings. A SQLite file that doesn't exist yet is

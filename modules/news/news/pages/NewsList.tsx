@@ -6,12 +6,12 @@ import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedL
 import type { SharedProps } from '@simple-module-py/ui/types';
 import { useEffect } from 'react';
 
-import { ArticleFilters } from '../components/ArticleFilters';
-import { ArticleRow } from '../components/ArticleRow';
-import { NewArticleDialog } from '../components/NewArticleDialog';
-import { useArticleList } from '../hooks/useArticleList';
-import { deleteArticle, publishArticle, trashArticle, updateArticle } from '../utils/api';
-import { keys, useT } from '../utils/i18n';
+import { ArticleFilters } from '../ui/components/ArticleFilters';
+import { ArticleRow } from '../ui/components/ArticleRow';
+import { NewArticleDialog } from '../ui/components/NewArticleDialog';
+import { useArticleList } from '../ui/hooks/useArticleList';
+import { deleteArticle, publishArticle, trashArticle, updateArticle } from '../ui/utils/api';
+import { keys, useT } from '../ui/utils/i18n';
 
 const CATEGORY_SUGGESTIONS_ID = 'news-category-suggestions';
 

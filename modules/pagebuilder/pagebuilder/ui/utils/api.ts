@@ -1,0 +1,13 @@
+/**
+ * Public entry point for the pagebuilder admin API client.
+ *
+ * The implementation is split across `types`, `request`, `pagesApi`, and
+ * `mediaApi`; this barrel keeps `import { savePage } from './api'`
+ * working for every consumer.
+ */
+
+export * from './locale';
+export * from './mediaApi';
+export * from './pagesApi';
+export { BASE, request } from './request';
+export * from './types';

@@ -8,7 +8,7 @@ left article rows that could be orphaned by a deletion news never saw.
 
 It owns its content now. ``NewsArticle`` carries the body, the address, the
 status and the SEO; :mod:`news.content` performs the writes;
-:mod:`news.endpoints.public` serves the reader. Pagebuilder is optional —
+:mod:`news.web.endpoints.public` serves the reader. Pagebuilder is optional —
 where a host runs it, the admin search screen gains a Pages and a Media section,
 the feed block joins its palette, and the site's content languages are its.
 Where a host does not, news publishes in one language and nothing here notices.
@@ -37,10 +37,10 @@ from simple_module_core.menu import MenuRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 
-from news import boot, constants, locales
-from news import settings as news_settings
-from news.scheduler import Scheduler
-from news.settings import NewsSettings
+from news.core import boot, constants, locales
+from news.core import settings as news_settings
+from news.core.settings import NewsSettings
+from news.scheduling.scheduler import Scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -124,8 +124,8 @@ class NewsModule(ModuleBase):
         return settings
 
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
-        from news.endpoints.api import router as api
-        from news.endpoints.views import router as views
+        from news.web.endpoints.api import router as api
+        from news.web.endpoints.views import router as views
 
         api_router.include_router(api)
         view_router.include_router(views)
@@ -137,13 +137,13 @@ class NewsModule(ModuleBase):
         )
 
     def register_menu_items(self, registry: MenuRegistry) -> None:
-        from news.menu import menu_items
+        from news.web.menu import menu_items
 
         registry.add_many(menu_items())
 
     def register_csp_sources(self, registry: CspSourceRegistry) -> None:
         """The article editor's bundled font, from the Vite origin in dev; see dev_csp."""
-        from news.dev_csp import vite_font_source
+        from news.web.dev_csp import vite_font_source
 
         registry.add_provider(vite_font_source)
 
@@ -151,7 +151,7 @@ class NewsModule(ModuleBase):
         """Re-publish the settings when an operator saves them.
 
         Everything this module reads per request goes through
-        ``news.settings.active()`` — a process-global, because the article
+        ``news.core.settings.active()`` — a process-global, because the article
         serializer is a pure function with no request to read ``app.state``
         from. The Settings screen assigns the new instance onto the services
         container and publishes this event; without picking it up, that global
@@ -178,8 +178,8 @@ class NewsModule(ModuleBase):
         no foreign row whose disappearance could orphan it, and nothing to
         reconcile after the fact.
         """
-        from news import tenancy
-        from news.endpoints.views import admin_router
+        from news.core import tenancy
+        from news.web.endpoints.views import admin_router
 
         # Single- or multi-tenant, read once off the built middleware stack,
         # before anything below can touch a news table. Also refuses a host
@@ -226,13 +226,8 @@ class NewsModule(ModuleBase):
         inside the wheel, so a host that pip-installed news has to resolve it
         through the package rather than off a source tree that isn't there.
 
-        The directory sits beside :mod:`news.locales`, which is a different
-        thing entirely — that one is the languages an *article* can be written
-        in, this one is the language the *console* speaks. They coexist because
-        the directory has no ``__init__.py``: an import of ``news.locales``
-        resolves the module, and this joins the path without importing
-        anything. Adding an ``__init__.py`` here would shadow the module and
-        take the public router down with it.
+        These console catalogues stay at the package root for discovery;
+        article language policy lives separately in :mod:`news.core.locales`.
         """
         base = Path(str(importlib.resources.files(__package__) / "locales"))
         return {constants.LOCALE_NAMESPACE: base}
@@ -261,7 +256,7 @@ class NewsModule(ModuleBase):
     ) -> None:
         """Exempt the public article viewer from auth, one prefix per language.
 
-        A method rather than a straight call to :mod:`news.boot` because it is
+        A method rather than a straight call to :mod:`news.core.boot` because it is
         the one piece of boot wiring that has to be exercisable on its own: what
         it exempts, and what it must *not*, is a security boundary with a test
         of its own.

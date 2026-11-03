@@ -6,8 +6,8 @@ from simple_module_db.mixins import MultiTenantMixin
 from sqlalchemy import Index
 from sqlmodel import Field
 
-from news import locales
-from news.constants import MAX_LOCALE_LEN, MAX_SLUG_LEN, MAX_TAG_LEN
+from news.core import locales
+from news.core.constants import MAX_LOCALE_LEN, MAX_SLUG_LEN, MAX_TAG_LEN
 from news.models._base import ARTICLE_TABLE, Base
 
 

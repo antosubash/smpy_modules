@@ -7,11 +7,11 @@ import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import { useEffect } from 'react';
 
-import { ConfirmDialog } from '../components/ConfirmDialog';
-import { MediaUsageList } from '../components/media/MediaUsageList';
-import { useMediaDetail } from '../hooks/useMediaDetail';
-import { keys, useT } from '../utils/i18n';
-import { formatBytes } from '../utils/mediaFormat';
+import { ConfirmDialog } from '../ui/components/ConfirmDialog';
+import { MediaUsageList } from '../ui/components/media/MediaUsageList';
+import { useMediaDetail } from '../ui/hooks/useMediaDetail';
+import { keys, useT } from '../ui/utils/i18n';
+import { formatBytes } from '../ui/utils/mediaFormat';
 
 const ALT_ID = 'media-alt-text';
 const CAPTION_ID = 'media-caption';

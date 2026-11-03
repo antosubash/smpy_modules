@@ -30,16 +30,16 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
     Family(
         "tenancy mode detection",
         (
-            Copy(f"{PB}/_tenancy_mode.py", {"pagebuilder": "MODULE"}),
-            Copy(f"{NEWS}/_tenancy_mode.py", {"news": "MODULE"}),
+            Copy(f"{PB}/core/tenancy/_mode.py", {"pagebuilder": "MODULE"}),
+            Copy(f"{NEWS}/core/tenancy/_mode.py", {"news": "MODULE"}),
         ),
     ),
     Family(
         "tenancy mode detection: records",
         (
-            Copy(f"{PB}/_tenancy_mode.py"),
+            Copy(f"{PB}/core/tenancy/_mode.py"),
             Copy(
-                f"{RECORDS}/_tenancy_mode.py",
+                f"{RECORDS}/core/tenancy/_mode.py",
                 {"logger": "_log"},
             ),
             Copy(f"{IMAGES}/core/tenancy/_mode.py", {"logger": "_log"}),
@@ -72,9 +72,9 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
         (
             # Both viewers answer a request that resolved no tenant with the
             # site's branded 404 (#89, #248), so bind_public_viewer is shared.
-            Copy(f"{PB}/tenancy.py", {"pagebuilder": "MODULE"}),
+            Copy(f"{PB}/core/tenancy/__init__.py", {"pagebuilder": "MODULE"}),
             Copy(
-                f"{NEWS}/tenancy.py",
+                f"{NEWS}/core/tenancy/__init__.py",
                 {"news": "MODULE"},
                 own={
                     "search_tenant": "News' search reads pagebuilder's tables from outside "
@@ -95,8 +95,8 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
     Family(
         "tenancy binding: records",
         (
-            Copy(f"{PB}/tenancy.py"),
-            Copy(f"{RECORDS}/tenancy.py", {"_resolved": "upstream_tenant"}),
+            Copy(f"{PB}/core/tenancy/__init__.py"),
+            Copy(f"{RECORDS}/core/tenancy/__init__.py", {"_resolved": "upstream_tenant"}),
             Copy(f"{IMAGES}/core/tenancy/__init__.py", {"_resolved": "upstream_tenant"}),
         ),
         shared=("resolve_public",),

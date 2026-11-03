@@ -1,29 +1,34 @@
 import { type Data, Puck } from '@puckeditor/core';
-import '../components/editor/puck-editor.css';
+import '../ui/components/editor/puck-editor.css';
 import { Head, usePage } from '@inertiajs/react';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { useMemo, useState } from 'react';
 
-import { NarrowCanvas } from '../components/editor/NarrowCanvas';
-import { NO_HEADER_ACTIONS } from '../components/editor/noHeaderActions';
-import { PageEditorToolbar } from '../components/editor/PageEditorToolbar';
-import { PageInspectorDrawer } from '../components/editor/PageInspectorDrawer';
-import { RevisionHistoryPanel } from '../components/editor/RevisionHistoryPanel';
-import { localizeConfig, localizeViewports } from '../components/localizeConfig';
-import { migrateContent } from '../components/migrateContent';
-import { editorViewports, emptyData, getPuckConfig, withRootTitle } from '../components/puckConfig';
-import { useAutosave } from '../hooks/useAutosave';
-import { useEditorForm } from '../hooks/useEditorForm';
-import { useIsNarrow } from '../hooks/useIsNarrow';
-import { usePageRevisions } from '../hooks/usePageRevisions';
-import { usePageSchedule } from '../hooks/usePageSchedule';
-import { usePageWorkflow } from '../hooks/usePageWorkflow';
-import { usePuckA11y } from '../hooks/usePuckA11y';
-import type { PageDetail, PageRestoreMarker, PageRevisionRead } from '../utils/api';
-import type { EditorSnapshot } from '../utils/editorSnapshot';
-import { keys, useT } from '../utils/i18n';
-import { publicPath } from '../utils/locale';
-import { slugify } from '../utils/slugify';
+import { NarrowCanvas } from '../ui/components/editor/NarrowCanvas';
+import { NO_HEADER_ACTIONS } from '../ui/components/editor/noHeaderActions';
+import { PageEditorToolbar } from '../ui/components/editor/PageEditorToolbar';
+import { PageInspectorDrawer } from '../ui/components/editor/PageInspectorDrawer';
+import { RevisionHistoryPanel } from '../ui/components/editor/RevisionHistoryPanel';
+import { localizeConfig, localizeViewports } from '../ui/components/localizeConfig';
+import { migrateContent } from '../ui/components/migrateContent';
+import {
+  editorViewports,
+  emptyData,
+  getPuckConfig,
+  withRootTitle,
+} from '../ui/components/puckConfig';
+import { useAutosave } from '../ui/hooks/useAutosave';
+import { useEditorForm } from '../ui/hooks/useEditorForm';
+import { useIsNarrow } from '../ui/hooks/useIsNarrow';
+import { usePageRevisions } from '../ui/hooks/usePageRevisions';
+import { usePageSchedule } from '../ui/hooks/usePageSchedule';
+import { usePageWorkflow } from '../ui/hooks/usePageWorkflow';
+import { usePuckA11y } from '../ui/hooks/usePuckA11y';
+import type { PageDetail, PageRestoreMarker, PageRevisionRead } from '../ui/utils/api';
+import type { EditorSnapshot } from '../ui/utils/editorSnapshot';
+import { keys, useT } from '../ui/utils/i18n';
+import { publicPath } from '../ui/utils/locale';
+import { slugify } from '../ui/utils/slugify';
 
 /** Where pages serve publicly. Mirrors `PagebuilderSettings.public_route_prefix`
  *  — the editor only needs it to show the URL, not to build one. */

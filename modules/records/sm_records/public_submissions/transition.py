@@ -31,13 +31,13 @@ from typing import Any, Final
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records import events
+from sm_records.core import events
+from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType
 from sm_records.public_submissions.system import _merge_marks, _ordinary, _reload
-from sm_records.services import records as record_service
-from sm_records.services._payload import field_defs
-from sm_records.services.errors import Conflict, ValidationFailed
-from sm_records.settings import RecordsSettings
+from sm_records.records.services import records as record_service
+from sm_records.records.services._payload import field_defs
+from sm_records.records.services.errors import Conflict, ValidationFailed
 
 __all__ = ["ATTEMPTS", "Change", "Outcome", "transition"]
 

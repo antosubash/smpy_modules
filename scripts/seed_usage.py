@@ -35,7 +35,7 @@ async def _seed(tenant_id: str) -> None:
     import demo_meters
     from sm_billing.metering.service import UsageService
     from sm_billing.metering.validate import TTL_MAX
-    from sm_billing.plans import seed_default_plan
+    from sm_billing.plans.service import seed_default_plan
 
     app = create_app(headless_settings())
     demo_meters.register(app)

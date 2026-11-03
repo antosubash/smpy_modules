@@ -26,11 +26,11 @@
  * not demand it of a host that never installs it.
  */
 
-import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/components/blockRegistry';
+import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/ui/components/blockRegistry';
 
-import { NewsFeedBlock } from './components/NewsFeed';
-import { NewsStatsBlock } from './components/NewsStats';
-import { keys } from './utils/i18n';
+import { NewsFeedBlock } from './ui/components/NewsFeed';
+import { NewsStatsBlock } from './ui/components/NewsStats';
+import { keys } from './ui/utils/i18n';
 
 try {
   registerPuckBlocks({

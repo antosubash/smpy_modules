@@ -2,15 +2,15 @@ import { Head } from '@inertiajs/react';
 import { type Data, Render } from '@puckeditor/core';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { useEffect, useMemo } from 'react';
-import { Byline } from '../components/Byline';
-import { articlePuckConfig } from '../components/body/articlePuckConfig';
-import { withBlockIds } from '../components/body/blockIds';
-import { articleOutline } from '../components/body/blocks/outline';
-import { type Alternate, LanguageSwitch } from '../components/LanguageSwitch';
-import { type ArticlePreviewState, PreviewBanner } from '../components/PreviewBanner';
-import { useDocumentLang } from '../hooks/useDocumentLang';
-import { formatArticleDate } from '../utils/api';
-import { useT } from '../utils/i18n';
+import { Byline } from '../ui/components/Byline';
+import { articlePuckConfig } from '../ui/components/body/articlePuckConfig';
+import { withBlockIds } from '../ui/components/body/blockIds';
+import { articleOutline } from '../ui/components/body/blocks/outline';
+import { type Alternate, LanguageSwitch } from '../ui/components/LanguageSwitch';
+import { type ArticlePreviewState, PreviewBanner } from '../ui/components/PreviewBanner';
+import { useDocumentLang } from '../ui/hooks/useDocumentLang';
+import { formatArticleDate } from '../ui/utils/api';
+import { useT } from '../ui/utils/i18n';
 
 /** What a reader gets at `{public_route_prefix}/{slug}`.
  *

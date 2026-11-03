@@ -9,8 +9,8 @@ That difference is the whole cost of the feature and the reason §7.5 refused
 it in v1: an aggregate maintained on write is a second source of truth, and a
 second source of truth can drift. Three things keep it honest, and all three
 have to exist together — the delta inside the write transaction
-(:mod:`sm_records.index.reduce`), the from-scratch rebuild and the verifier
-(:mod:`sm_records.index.reduce_rebuild`). Drift is therefore *detectable*,
+(:mod:`sm_records.records.index.reduce`), the from-scratch rebuild and the verifier
+(:mod:`sm_records.records.index.reduce_rebuild`). Drift is therefore *detectable*,
 which is the answer to §7.5 rather than a denial of it.
 
 **Inert when unused.** No spec registered means nothing ever writes here, and
@@ -26,7 +26,7 @@ from decimal import Decimal
 from sqlalchemy import DateTime, Index, Numeric
 from sqlmodel import Field
 
-from sm_records.constants import (
+from sm_records.core.constants import (
     MAX_KEY_LEN,
     NUMBER_PRECISION,
     NUMBER_SCALE,
@@ -38,7 +38,7 @@ REDUCE_GROUP_INDEX_NAME = f"uq_{INDEX_REDUCE_TABLE}_group"
 """The unique index on ``(type_id, key, group_value)``.
 
 Named here because two layers need the name: the table definition below and
-:func:`sm_records.index.reduce.bump`, which recognises the database's own
+:func:`sm_records.records.index.reduce.bump`, which recognises the database's own
 refusal of a racing first insert and retries the increment instead — exactly
 the pattern :attr:`~sm_records.models.TableSet.slug_signatures` documents for
 the slug claim, and for the same reason.
@@ -53,7 +53,7 @@ class IndexReduce(Base, table=True):  # ty: ignore[unsupported-base]
     A group whose ``count`` reaches zero is deleted rather than left at zero:
     the table is then exactly the set of non-empty groups, which is what makes
     "the stored rows" and "a fresh recompute" comparable row for row — the
-    property :func:`sm_records.index.reduce_rebuild.verify_type` checks.
+    property :func:`sm_records.records.index.reduce_rebuild.verify_type` checks.
 
     There is no ``record_id`` and no foreign key. A row here is a fold over
     records, not a projection of one, so nothing cascades into it: the writer
@@ -76,7 +76,7 @@ class IndexReduce(Base, table=True):  # ty: ignore[unsupported-base]
     type_id: int = Field(sa_column_kwargs={"nullable": False})
     key: str = Field(max_length=MAX_KEY_LEN, sa_column_kwargs={"nullable": False})
     """The spec's key — a virtual key, reserved and owned exactly as an index
-    provider's :class:`~sm_records.index.providers.VirtualField` key is."""
+    provider's :class:`~sm_records.records.index.providers.VirtualField` key is."""
     group_value: str = Field(max_length=REDUCE_GROUP_LEN, sa_column_kwargs={"nullable": False})
     """The group, rendered as text whatever the spec returned.
 

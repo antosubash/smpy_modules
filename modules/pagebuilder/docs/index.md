@@ -72,3 +72,5 @@ slug. Deleting moves a page to the trash for 30 days; purging removes it and
 announces `PageDeleted`. Every table is tenant-owned, and every entry point binds
 a tenant before it reads anything. Settings live in the database and are edited
 on the Settings screen; the ones that decide routes need a restart.
+
+- [Code layout](code-layout.md) — implementation areas and discovery paths.

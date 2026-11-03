@@ -19,11 +19,11 @@ from typing import Any
 from sqlmodel import Field as SQLField
 from sqlmodel import SQLModel
 
-from sm_records.constants import ORPHANED_KEY
 from sm_records.contracts.i18n import PublicTranslationRead, public_translation_read
+from sm_records.core.constants import ORPHANED_KEY
 from sm_records.models import Record, RecordType
+from sm_records.records.services._payload import field_defs, read_view
 from sm_records.schema.fields import FieldDefinition
-from sm_records.services._payload import field_defs, read_view
 
 __all__ = [
     "PublicRecordPage",
@@ -87,7 +87,7 @@ class PublicRecordPage(SQLModel):
     it when the host's media library serves files to anonymous callers, and
     ``null`` otherwise — which, with the framework ``file_storage`` module, is
     always: it exempts none of its routes from authentication
-    (:mod:`sm_records.media`). ``null`` means "do not try": a stored id is not
+    (:mod:`sm_records.web.media`). ``null`` means "do not try": a stored id is not
     a URL a visitor can load."""
 
 

@@ -6,7 +6,7 @@ import { apiCreateType, seedTextType, uniqueTypeKey } from './records-helpers';
 /**
  * Who may reach the Records admin.
  *
- * `sm_records/deps.py` guards the whole view router with `records.view` and
+ * `sm_records/web/deps.py` guards the whole view router with `records.view` and
  * every schema route with `records.manage_types` (design §10's three static
  * permissions).
  *

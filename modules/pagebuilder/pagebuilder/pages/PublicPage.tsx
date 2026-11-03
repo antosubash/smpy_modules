@@ -1,11 +1,11 @@
 import { Head } from '@inertiajs/react';
 import { type Data, Render } from '@puckeditor/core';
 
-import { migrateContent } from '../components/migrateContent';
-import type { PreviewInfo } from '../components/public/PreviewBar';
-import { type PublicCopy, PublicShell } from '../components/public/PublicShell';
-import { getPuckConfig } from '../components/puckConfig';
-import type { SiteNav } from '../components/widgets/_internal/site-nav-context';
+import { migrateContent } from '../ui/components/migrateContent';
+import type { PreviewInfo } from '../ui/components/public/PreviewBar';
+import { type PublicCopy, PublicShell } from '../ui/components/public/PublicShell';
+import { getPuckConfig } from '../ui/components/puckConfig';
+import type { SiteNav } from '../ui/components/widgets/_internal/site-nav-context';
 
 /** One language this document also exists in, as the server resolved it. */
 interface Alternate {

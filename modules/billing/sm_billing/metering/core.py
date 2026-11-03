@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sm_billing.contracts.metering import Allowed, Exceeded, Hold, HoldStatus, MeterKind
 from sm_billing.metering.periods import as_utc, current_period, provider_period
 from sm_billing.models import UsageGauge, UsageHold
-from sm_billing.resolve import effective_plan
+from sm_billing.plans.resolve import effective_plan
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker

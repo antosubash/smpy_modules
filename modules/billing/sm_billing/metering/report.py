@@ -17,13 +17,13 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
 
-from sm_billing import subjects
-from sm_billing.constants import ENTITLED_STATUSES
 from sm_billing.contracts.metering import LIVE_HOLD_STATUSES, MeterKind
+from sm_billing.core import subjects
+from sm_billing.core.constants import ENTITLED_STATUSES
 from sm_billing.metering.periods import as_utc, current_period, previous_period
 from sm_billing.metering.schemas import MeterUsageOut, Period, UsagePageOut, UsageRowOut
 from sm_billing.models import Plan, Subscription, UsageGauge, UsageHold, UsagePeriod
-from sm_billing.plans import PlanService
+from sm_billing.plans.service import PlanService
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession

@@ -6,12 +6,12 @@ import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import { useCallback, useEffect, useState } from 'react';
 
-import { CategoryDeleteDialog } from '../components/categories/CategoryDeleteDialog';
-import { CategoryRow } from '../components/categories/CategoryRow';
-import { TagPanel } from '../components/categories/TagPanel';
-import { useTaxonomy } from '../hooks/useTaxonomy';
-import { keys, useT } from '../utils/i18n';
-import { isManaged } from '../utils/taxonomyApi';
+import { CategoryDeleteDialog } from '../ui/components/categories/CategoryDeleteDialog';
+import { CategoryRow } from '../ui/components/categories/CategoryRow';
+import { TagPanel } from '../ui/components/categories/TagPanel';
+import { useTaxonomy } from '../ui/hooks/useTaxonomy';
+import { keys, useT } from '../ui/utils/i18n';
+import { isManaged } from '../ui/utils/taxonomyApi';
 
 /** Categories and tags — the two taxonomies, side by side.
  *

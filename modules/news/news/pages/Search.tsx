@@ -5,9 +5,9 @@ import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import { useEffect, useRef } from 'react';
 
-import { SearchSection } from '../components/search/SearchSection';
-import { useAdminSearch } from '../hooks/useAdminSearch';
-import { keys, useT } from '../utils/i18n';
+import { SearchSection } from '../ui/components/search/SearchSection';
+import { useAdminSearch } from '../ui/hooks/useAdminSearch';
+import { keys, useT } from '../ui/utils/i18n';
 
 const SEARCH_INPUT_ID = 'admin-search-input';
 

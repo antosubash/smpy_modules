@@ -75,16 +75,16 @@ from typing import Any, Literal, Protocol, runtime_checkable
 from simple_module_db import current_tenant_id
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pagebuilder.snapshots.assets import collect_sentinels
-from pagebuilder.snapshots.files import UnsafeBundlePathError, inside, write_json
-from pagebuilder.snapshots.match import (
+from pagebuilder.content.snapshots.assets import collect_sentinels
+from pagebuilder.content.snapshots.files import UnsafeBundlePathError, inside, write_json
+from pagebuilder.content.snapshots.match import (
     Identified,
     IdentityMatch,
     RestoreConflictError,
     match_by_identity,
 )
-from pagebuilder.snapshots.registry import SectionRegistry
-from pagebuilder.snapshots.validate import BundleError
+from pagebuilder.content.snapshots.registry import SectionRegistry
+from pagebuilder.content.snapshots.validate import BundleError
 
 
 class TenantMismatchError(RuntimeError):

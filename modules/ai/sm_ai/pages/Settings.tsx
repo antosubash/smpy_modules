@@ -5,7 +5,7 @@ import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedL
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-import { SlotCard } from '../components/SlotCard';
+import { SlotCard } from '../ui/components/SlotCard';
 import {
   type AiSettingsOut,
   listModels,
@@ -15,8 +15,8 @@ import {
   saveSettings,
   type TestResult,
   testSlot,
-} from '../utils/api';
-import { keys, useT } from '../utils/i18n';
+} from '../ui/utils/api';
+import { keys, useT } from '../ui/utils/i18n';
 
 const emptySlot = (): SlotValues => ({
   provider: '',

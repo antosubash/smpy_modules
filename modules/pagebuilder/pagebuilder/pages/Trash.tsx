@@ -6,10 +6,10 @@ import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedL
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { ConfirmDialog } from '../components/ConfirmDialog';
-import type { PageRead } from '../utils/api';
-import { keys, translate, useT } from '../utils/i18n';
-import { listTrash, purgePage, restorePage } from '../utils/pagesApi';
+import { ConfirmDialog } from '../ui/components/ConfirmDialog';
+import type { PageRead } from '../ui/utils/api';
+import { keys, translate, useT } from '../ui/utils/i18n';
+import { listTrash, purgePage, restorePage } from '../ui/utils/pagesApi';
 
 /** Matches `RETENTION_DAYS` in the service. Stated on screen because the
  *  promise — "emptied automatically" — is only trustworthy with a number. */

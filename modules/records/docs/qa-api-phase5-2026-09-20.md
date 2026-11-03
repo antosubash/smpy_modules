@@ -30,7 +30,7 @@ motivation — plants the collision deterministically.** README §"`uuid` across
 collections" blames "an importer that invents uuids some other way"; the
 module's own importer is enough.
 
-*Code:* `modules/records/sm_records/services/_relations.py`, in `referrers()`:
+*Code:* `modules/records/sm_records/records/services/_relations.py`, in `referrers()`:
 
 ```python
 select(ref.record_id, ref.field_key).where(ref.target_uuid == record.uuid)
@@ -167,7 +167,7 @@ precision"), applied to a column the host, not the module, invented.
 to the public shape**"); Phase 5 §3 ("it can show nothing the public API would
 not").
 
-*Code:* `modules/records/sm_records/services/public.py`, `_check_columns` — the
+*Code:* `modules/records/sm_records/records/services/public.py`, `_check_columns` — the
 allow-list covers fixed columns only; `index/_cursor.py::encode_cursor` then
 serialises the resolved sort value.
 

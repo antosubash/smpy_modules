@@ -14,9 +14,10 @@ from simple_module_core.menu import MenuRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 
-from pagebuilder import boot, locales, menu, tenancy
-from pagebuilder.scheduler import Scheduler
-from pagebuilder.settings import PagebuilderSettings
+from pagebuilder.core import boot, locales, tenancy
+from pagebuilder.core.settings import PagebuilderSettings
+from pagebuilder.scheduling.scheduler import Scheduler
+from pagebuilder.web import menu
 
 _log = logging.getLogger("simple_module.pagebuilder")
 
@@ -24,7 +25,7 @@ _PACKAGE = "pagebuilder"
 #: The prefix every key in ``pagebuilder/locales/*.json`` is registered under,
 #: so a console string is ``pagebuilder.<section>.<key>``. Deliberately the
 #: package name: the frontend derives the same prefix in
-#: ``pagebuilder/utils/i18n.ts``, and the two have to agree or every label in
+#: ``pagebuilder/ui/utils/i18n.ts``, and the two have to agree or every label in
 #: the editor renders as its own key.
 _LOCALE_NAMESPACE = _PACKAGE
 #: The framework's settings module, by ``ModuleMeta.name``. Depending on it is
@@ -94,16 +95,16 @@ class PagebuilderModule(ModuleBase):
         """
 
     def register_menu_items(self, registry: MenuRegistry) -> None:
-        """Contribute the admin surface to the host's sidebar (``pagebuilder.menu``)."""
+        """Contribute the admin surface to the host's sidebar (``pagebuilder.web.menu``)."""
         menu.register(registry)
 
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
-        from pagebuilder.access import (
+        from pagebuilder.web.access import (
             build_admin_dependencies,
             build_view_dependencies,
         )
-        from pagebuilder.endpoints.api import router as api
-        from pagebuilder.endpoints.views import router as views
+        from pagebuilder.web.endpoints.api import router as api
+        from pagebuilder.web.endpoints.views import router as views
 
         # No settings read here on purpose. Routers are built during app
         # construction, before the host hydrates settings from the DB, so a
@@ -119,7 +120,7 @@ class PagebuilderModule(ModuleBase):
 
         Everything here reads configuration the host has just hydrated from
         the database — the languages the site publishes in, where pages serve,
-        where media is mounted. See :mod:`pagebuilder.boot` for why this is
+        where media is mounted. See :mod:`pagebuilder.core.boot` for why this is
         late rather than during app construction.
         """
         # First: refuses a host pinned to another default tenant, and fixes
@@ -157,7 +158,7 @@ class PagebuilderModule(ModuleBase):
         """
         from simple_module_core.module_settings import register_module_settings
 
-        from pagebuilder.services import PagebuilderServices
+        from pagebuilder.core.services import PagebuilderServices
 
         register_module_settings(
             app,
@@ -174,7 +175,7 @@ class PagebuilderModule(ModuleBase):
         locales.use(self.settings or PagebuilderSettings())
 
     def register_permissions(self, registry: PermissionRegistry) -> None:
-        from pagebuilder.permissions import (
+        from pagebuilder.core.permissions import (
             ALL_PERMISSIONS,
             DEFAULT_ROLE_MAP,
         )
@@ -191,11 +192,11 @@ class PagebuilderModule(ModuleBase):
         resolve it through the package rather than off a source tree that isn't
         there.
 
-        The directory sits beside :mod:`pagebuilder.locales`, which is a
+        The directory sits beside :mod:`pagebuilder.core.locales`, which is a
         different thing entirely — that one is the languages a *page* can be
         authored in, this one is the language the *editor* speaks. They coexist
         because the directory has no ``__init__.py``: an import of
-        ``pagebuilder.locales`` resolves the module, and this joins the path
+        ``pagebuilder.core.locales`` resolves the module, and this joins the path
         without importing anything. Adding an ``__init__.py`` here would shadow
         the module and take the public viewer down with it.
         """
@@ -204,7 +205,7 @@ class PagebuilderModule(ModuleBase):
 
     def register_csp_sources(self, registry: CspSourceRegistry) -> None:
         """The editor's bundled font, from the Vite origin in dev; see dev_csp."""
-        from pagebuilder.dev_csp import vite_font_source
+        from pagebuilder.web.dev_csp import vite_font_source
 
         registry.add_provider(vite_font_source)
 

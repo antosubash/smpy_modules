@@ -18,7 +18,7 @@ from pagebuilder.contracts.bundle import RestoreContext, SectionApplied
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from news import redirects
+from news.content import redirects
 from news.integrations.bundle import taxonomy
 from news.integrations.bundle.documents import ArticleKey, batches, identity, write_article
 from news.integrations.bundle.prepare import Prepared, prepare

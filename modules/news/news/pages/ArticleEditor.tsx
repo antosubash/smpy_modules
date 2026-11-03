@@ -4,18 +4,18 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import { useEffect } from 'react';
-import { editorStatus } from '../components/articleStatus';
+import { editorStatus } from '../ui/components/articleStatus';
 
-import { ArticleDangerZone } from '../components/editor/ArticleDangerZone';
-import { ArticleInspector } from '../components/editor/ArticleInspector';
-import { ArticleTranslations } from '../components/editor/ArticleTranslations';
-import { HistoryCard } from '../components/editor/HistoryCard';
-import { ReviewCard } from '../components/editor/ReviewCard';
-import { ScheduleCard } from '../components/editor/ScheduleCard';
-import { SeoCard } from '../components/editor/SeoCard';
-import { useArticleEditor } from '../hooks/useArticleEditor';
-import { formatArticleDate } from '../utils/api';
-import { keys, useT } from '../utils/i18n';
+import { ArticleDangerZone } from '../ui/components/editor/ArticleDangerZone';
+import { ArticleInspector } from '../ui/components/editor/ArticleInspector';
+import { ArticleTranslations } from '../ui/components/editor/ArticleTranslations';
+import { HistoryCard } from '../ui/components/editor/HistoryCard';
+import { ReviewCard } from '../ui/components/editor/ReviewCard';
+import { ScheduleCard } from '../ui/components/editor/ScheduleCard';
+import { SeoCard } from '../ui/components/editor/SeoCard';
+import { useArticleEditor } from '../ui/hooks/useArticleEditor';
+import { formatArticleDate } from '../ui/utils/api';
+import { keys, useT } from '../ui/utils/i18n';
 
 /** The article editor — everything about an article except its body.
  *

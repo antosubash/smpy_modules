@@ -90,8 +90,8 @@ front of visitors who never saw that block. Register heavy blocks with
 component the first time a page actually renders the block:
 
 ```tsx
-import { lazyBlock } from '@simple-module-py/pagebuilder/pagebuilder/components/lazyBlock';
-import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/components/blockRegistry';
+import { lazyBlock } from '@simple-module-py/pagebuilder/pagebuilder/ui/components/lazyBlock';
+import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/ui/components/blockRegistry';
 
 registerPuckBlocks({
   blocks: {
@@ -163,7 +163,7 @@ The Settings screen says so next to the input.
 | `snapshot_root` | `var/pagebuilder/snapshots` | Snapshot + blob storage directory |
 | `snapshot_max_upload_bytes` | `209715200` | Ceiling on an uploaded bundle (200 MB) |
 | `snapshot_max_extracted_bytes` | `1073741824` | Ceiling on what a bundle may expand to (1 GB) |
-| `public_csp` | see `settings.py` | CSP header on public pages |
+| `public_csp` | see `core/settings.py` | CSP header on public pages |
 | `public_cache_max_age` | `60` | `max-age` on public pages |
 | `public_base_url` | `None` | Absolute base for canonical URLs and the sitemap |
 | `site_name` | `None` | OpenGraph site name |
@@ -251,16 +251,16 @@ same shape; the framework's `SM013`–`SM016` diagnostics report a file that has
 drifted from the default.
 
 The frontend derives its key tree from that JSON at compile time —
-`pagebuilder/utils/i18n.ts` — rather than from the framework's generated
+`pagebuilder/ui/utils/i18n.ts` — rather than from the framework's generated
 `keys`, which only carries the namespaces of modules that live in the
 framework's own monorepo. The upshot is that `tsc` rejects a key the catalogue
-does not define, and `pagebuilder/utils/i18n.test.ts` rejects an entry nothing
+does not define, and `pagebuilder/ui/utils/i18n.test.ts` rejects an entry nothing
 references, a plural missing a form, and a placeholder nothing fills.
 
 **Block labels are keys, resolved at the screen.** A Puck config is a
 module-scope constant — the palette is assembled before the app has rendered
 anything — so a block cannot call a hook where its labels are written. What it
-holds instead is the key, and `components/localizeConfig.ts` resolves the whole
+holds instead is the key, and `ui/components/localizeConfig.ts` resolves the whole
 assembled config once inside `PageEditor` and `LayoutEditor`: component labels,
 field labels (including the ones nested in an `array` or `object` field),
 select options, category titles and the viewport switcher. Because it walks the

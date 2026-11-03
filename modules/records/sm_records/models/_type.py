@@ -9,7 +9,7 @@ from simple_module_db.mixins import AuditMixin, MultiTenantMixin
 from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, UniqueConstraint, false
 from sqlmodel import Field
 
-from sm_records.constants import MAX_COLLECTION_COLUMN_LEN, MAX_KEY_LEN, MAX_LABEL_LEN
+from sm_records.core.constants import MAX_COLLECTION_COLUMN_LEN, MAX_KEY_LEN, MAX_LABEL_LEN
 from sm_records.models._base import TYPE_REVISION_TABLE, TYPE_TABLE, Base
 
 TYPE_KEY_INDEX = "uq_records_type_tenant_key"
@@ -77,7 +77,7 @@ class RecordType(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[
 
     **Set on create, changed only by a move.** ``PUT /types/{key}`` with a
     different value copies the type's records, revisions and index rows into
-    the target set in one transaction (:mod:`sm_records.services._type_move`).
+    the target set in one transaction (:mod:`sm_records.records.services._type_move`).
     References need no re-pointing: they name a target by uuid and type.
 
     Nullable with no backfill on purpose: that is what makes the migration

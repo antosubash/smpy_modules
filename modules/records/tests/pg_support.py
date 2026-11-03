@@ -57,7 +57,7 @@ def _extra_metadata() -> list[Any]:
     """Table sets that are not ``sm_records``'s but that the harness needs.
 
     ``permissions`` only when it is installed — see the import guard in
-    :mod:`tests.app_harness` for why its table has to exist even though this
+    :mod:`tests.support.app_harness` for why its table has to exist even though this
     module's ``Base`` never declares it.
     """
     try:

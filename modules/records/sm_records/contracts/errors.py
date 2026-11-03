@@ -1,7 +1,7 @@
 """The shapes a refusal takes on the wire, as models the schema can name.
 
 Every one of these is already produced by
-:mod:`sm_records.endpoints.api._error_bodies`; what was missing was a
+:mod:`sm_records.web.endpoints.api._error_bodies`; what was missing was a
 *declaration* of them, so ``GET /openapi.json`` documented only ``200``/``201``
 /``204`` and FastAPI's own ``422`` and a generated client saw none of the
 ``400``/``403``/``404``/``409``/``413`` contract the reference describes.
@@ -10,7 +10,7 @@ Deliberately four models and not one per row of that table. The table has
 thirty-nine rows because it enumerates *occasions*; the wire has a handful of
 shapes, and a client branches on the shape. Which occasions a given status
 covers is prose, and rides in the OpenAPI ``description`` that
-:mod:`sm_records.endpoints.api._responses` assembles from the same table.
+:mod:`sm_records.web.endpoints.api._responses` assembles from the same table.
 """
 
 from __future__ import annotations

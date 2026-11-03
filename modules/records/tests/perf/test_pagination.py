@@ -11,8 +11,8 @@ never a wall clock.
 from __future__ import annotations
 
 import pytest
-from sm_records.index.query import Filter, FilterOp, bounded_count_query, count_query
-from sm_records.settings import RecordsSettings
+from sm_records.core.settings import RecordsSettings
+from sm_records.records.index.query import Filter, FilterOp, bounded_count_query, count_query
 
 from tests.perf._bench import Results, capture, explain, repeat
 from tests.perf._http import API, get_ok, measure, plan_label

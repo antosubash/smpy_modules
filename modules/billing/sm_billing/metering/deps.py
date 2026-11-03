@@ -47,9 +47,10 @@ from fastapi import Depends, Request
 from simple_module_db.deps import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_billing import constants as c
 from sm_billing.contracts.metering import Allowed, Exceeded, QuotaExceededError
-from sm_billing.errors import BillingError
+from sm_billing.core import constants as c
+from sm_billing.core.errors import BillingError
+from sm_billing.core.subjects import for_request
 from sm_billing.metering.errors import IdempotencyReplay
 from sm_billing.metering.validate import (
     ADJUST_PREFIX,
@@ -59,7 +60,6 @@ from sm_billing.metering.validate import (
     SOURCE_MAX,
     check_text,
 )
-from sm_billing.subjects import for_request
 
 logger = logging.getLogger(__name__)
 

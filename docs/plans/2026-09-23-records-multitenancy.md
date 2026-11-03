@@ -173,7 +173,7 @@ no tenant of their own act in the tenant their header names, for operators who
 administer several tenants. It is off by default because it reproduces
 fact 3′, deliberately.
 
-### A.4 New module `sm_records/tenancy.py`
+### A.4 New module `sm_records/core/tenancy/__init__.py`
 
 ```python
 DEFAULT_TENANT: Final = "default"
@@ -738,7 +738,7 @@ Each phase leaves the suite green on both backends and is reviewable alone.
 
 | Phase | Content | Files | Tests | Effort |
 |---|---|---|---|---|
-| **1. Tenancy primitives** | `tenancy.py` (constants, mode detection, `tenant_scope`, resolvers, bind dependencies, guard); `TenantRequired` in `services/errors.py` + error table row; mode on the services container at `on_startup`. Nothing is wired yet. | `sm_records/tenancy.py`, `services/errors.py`, `endpoints/api/_error_table.py`, `docs/api-reference.md` error table, `module.py` | `test_tenancy_primitives.py`: scope set/reset/refuse re-bind, `TENANT_RE`, mode detection on real stacks, guard (spike 1g ported) | 0.5 d |
+| **1. Tenancy primitives** | `tenancy.py` (constants, mode detection, `tenant_scope`, resolvers, bind dependencies, guard); `TenantRequired` in `services/errors.py` + error table row; mode on the services container at `on_startup`. Nothing is wired yet. | `sm_records/core/tenancy/__init__.py`, `services/errors.py`, `endpoints/api/_error_table.py`, `docs/api-reference.md` error table, `module.py` | `test_tenancy_primitives.py`: scope set/reset/refuse re-bind, `TENANT_RE`, mode detection on real stacks, guard (spike 1g ported) | 0.5 d |
 | **2. Schema + migration** | Mixin on the 6 owned classes; composite FK in `record_args`; `(tenant_id,key)`/`(tenant_id,uuid)` uniques; `uuid_signatures`; migration revision; harness/fixtures run in `tenant_scope(DEFAULT_TENANT)`. | `models/_type.py`, `models/_record.py`, `models/_record_args.py`, `models/__init__.py`, `services/_claims.py`, `host/migrations/versions/<rev>_records_tenant_id.py`, `tests/conftest.py`, `tests/app_harness.py`, `tests/perf/conftest.py` | `test_migration_tenant_id.py` (K10), `test_collections_ddl.py`/`test_collections_inert.py` updated (the inert list gains the new indexes), K9, K8 at service level | 1.5 d |
 | **3. Request binding + explicit predicates** | `bind_admin`/`bind_public` on the three routers (API, views, public); explicit (b) predicates per §E; the natural-key lookups; `tenant_id=rtype.tenant_id` on creates; `install_guard` at startup. Single mode is now complete. | `endpoints/api/__init__.py`, `endpoints/views.py`, `endpoints/api/public.py`, `services/{types,records,public,_claims,_import_match,_referrer_page,_lifecycle,_empty_trash,_invalid,_common,_lock,revisions,_translations,_import_rows}.py`, `seed/runner.py` | K6 (whole suite in single mode), K7, K5 | 2 d |
 | **4. Out-of-request paths** | `defer()` capture/re-bind; `tenant_id` on events; reindex/preview runners; preview job `type_id` check; health `all_tenants` + per-tenant detail; `count_orphaned_locales`; CLI `--tenant` + `records tenants`. | `deferred.py`, `events.py`, `contracts/events.py`, `services/{reindex_runner,preview_runner,preview_jobs}.py`, `endpoints/api/preview.py`, `health.py`, `cli.py`, `cli_io.py`, `cli_verify.py` | K4, K11, `test_events*.py` updated | 1.5 d |
@@ -826,7 +826,7 @@ marked so a later phase can find it.
   answers first, so the 401 is reached only by harnesses.
 * **Deviation: the guard also refuses unbound deletes.** `before_flush` checks
   `session.deleted`, as well as new and modified objects. It lives in
-  `sm_records/_tenant_guard.py`; `tenancy.install_guard` delegates to it.
+  `sm_records/core/tenancy/_tenant_guard.py`; `tenancy.install_guard` delegates to it.
 * **Deviation: `uuid_taken` is in `services/_uuids.py`, not `_claims.py`.**
   `_claims.py` is at the file cap, and the uuid module is where the other uuid
   claims already live. `flush_write` and `_import_rows` both use it.
@@ -979,7 +979,7 @@ The out-of-request paths of §A.5. Items are marked the same way as above.
   matters in practice: on a multi-tenant host `/health/ready` runs inside
   `TenantMiddleware`, which binds whatever tenant a header names, and the test
   suite binds `default` around everything. So the new
-  `sm_records/_cross_tenant.py::read_all` clears the contextvar for exactly one
+  `sm_records/core/tenancy/_cross_tenant.py::read_all` clears the contextvar for exactly one
   `execute` (set and reset, FACT 1f) and tags the statement `all_tenants`.
   Health, the CLI's enumeration, `records tenants` and the reindex runner's
   type lookup all use it. Each one runs on a fresh session, and an autoflush

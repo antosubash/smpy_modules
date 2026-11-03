@@ -93,8 +93,8 @@ applied per request, and a tenant already resolved upstream always wins: a
 so a mis-detected child app fails closed — and a public answer for another
 tenant is never shareable-cached (records #196; pagebuilder and news #192).
 The scheduler opens one session per tenant under `tenant_context`. News has its
-own copy, `news.tenancy`, and its scheduler ticks per tenant the same way;
-records' is `sm_records.tenancy` (its 403 is the `{"detail","code"}` envelope,
+own copy, `news.core.tenancy`, and its scheduler ticks per tenant the same way;
+records' is `sm_records.core.tenancy` (its 403 is the `{"detail","code"}` envelope,
 code `tenant_required`) and images' `sm_images.core.tenancy` is a copy of it; images'
 Celery tasks never run unscoped — `images.reconcile` and `images.janitor`
 enumerate tenants in one narrow `all_tenants()` read and do each tenant's work
@@ -233,15 +233,15 @@ Everything else goes in one of a few areas: `core/` (what every feature
 builds on), `web/` (endpoints, schemas, services, serving), one folder per
 domain (images: `ingest/`, `pipeline/`, `jobs/`, `map/`) and `ui/` for the
 frontend that is not a page. Tests mirror the areas under `tests/`.
-New code in any module follows it. Other modules move towards it in PRs that
-contain only moves; the doc's table says how far each one has got.
+New code in any module follows it. All six modules follow it; structural changes keep the same moves-only
+review boundary.
 
 **300-line cap** on every `.py` / `.ts` / `.tsx`, enforced by
 `scripts/check_file_size.py`. Nothing under `modules/` is exempt. The check
 also lists files at 280+ lines as a WARNING: when you touch one, split it by
 responsibility rather than trimming comments until it fits (#133). A mixin
 split out of a service declares what it needs from the composing class as a
-`Protocol` (`pagebuilder/service/_host.py`, `news/content/_host.py`) — add a
+`Protocol` (`pagebuilder/content/service/_host.py`, `news/content/_host.py`) — add a
 member there before a mixin uses it; the `test_*_host.py` tests enforce it.
 
 **Every e2e spec file stands alone.** CI shards the suite by file
@@ -350,7 +350,7 @@ the target fails without it.
   The way round it, which news established and pagebuilder copied: derive `keys`
   from the module's own `locales/en.json` at compile time (`resolveJsonModule`
   plus a mapped type), so the catalogue *is* the key tree and `tsc` rejects a
-  key the JSON does not define. See `modules/news/news/utils/i18n.ts` — about
+  key the JSON does not define. See `modules/news/news/ui/utils/i18n.ts` — about
   ninety lines, and the reference implementation. Leaves are typed `string`
   rather than the literal, because the published `t()` narrows to the
   framework's union and rejects a literal outside it.

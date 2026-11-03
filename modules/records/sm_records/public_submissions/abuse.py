@@ -6,7 +6,7 @@ In the order they run, each failing closed: the master switch (the shared
 token to check: ``application/json`` forces a CORS preflight that no policy
 here admits, and the ``Origin`` (else ``Referer``) must be this host, the
 host's ``public_base_url`` or one the operator listed. The body cap is
-:mod:`sm_records._body_limit`, which runs before any of this.
+:mod:`sm_records.web._body_limit`, which runs before any of this.
 
 Then, from the submit pipeline, the two rate limits: per IP across every type,
 and per type across every IP (a flood from rotating addresses). Both count in
@@ -23,11 +23,11 @@ from urllib.parse import urlsplit
 from fastapi import Request
 from simple_module_core.rate_limit import InProcessWindowStore, WindowStore, parse_rate
 
-from sm_records.deps import get_settings
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.tokens import public_base_url
-from sm_records.services.errors import NotFound
-from sm_records.services.public import NOT_FOUND
+from sm_records.records.services.errors import NotFound
+from sm_records.records.services.public import NOT_FOUND
+from sm_records.web.deps import get_settings
 
 __all__ = [
     "client_ip",

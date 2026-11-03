@@ -15,7 +15,7 @@ Start with the document that matches what you are trying to do.
 | An administrator defining types and managing records | [user-guide.md](user-guide.md) |
 | A developer calling the module over HTTP | [api-reference.md](api-reference.md) |
 | An operator installing, configuring or running it | [operations.md](operations.md) |
-| A developer extending or modifying the module | [architecture.md](architecture.md) |
+| A developer extending or modifying the module | [architecture.md](architecture.md), [code-layout.md](code-layout.md) |
 | Anyone wondering what it costs at scale | [performance.md](performance.md) |
 
 ### [user-guide.md](user-guide.md) — for administrators

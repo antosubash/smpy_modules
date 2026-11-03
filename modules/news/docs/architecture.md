@@ -155,7 +155,7 @@ secrets) and is registered with `register_module_settings` under the package
 `scheduler_interval_seconds`) carry `requires_restart` and are read from
 `app.state.news.settings` in `on_startup`, after hydration. Per-request code
 reads the process-global `settings.active()`, republished on
-`SettingsReloaded`. Content languages live in `news.locales`, published once
+`SettingsReloaded`. Content languages live in `news.core.locales`, published once
 at startup from pagebuilder's hydrated settings or falling back to `en`.
 
 ## Console i18n

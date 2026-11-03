@@ -60,7 +60,7 @@ clean against HEAD at the time of every run below.
   commit.
 ## 2. Dataset
 
-Five demo Record Types from `sm_records.seed.types` — `company`, `contact`,
+Five demo Record Types from `sm_records.records.seed.types` — `company`, `contact`,
 `product`, `store`, `order` — with the relations and unique fields the seeder
 declares (`contact.email`, `product.sku`, `order.order_no` unique;
 `contact.company`, `store.manager`, `order.customer`, `order.products`

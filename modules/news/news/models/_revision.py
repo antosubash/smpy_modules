@@ -15,7 +15,7 @@ from sqlalchemy import JSON, Column
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field
 
-from news.constants import MAX_NOTE_LEN, MAX_TITLE_LEN, MAX_URL_LEN
+from news.core.constants import MAX_NOTE_LEN, MAX_TITLE_LEN, MAX_URL_LEN
 from news.models._base import ARTICLE_TABLE, Base
 
 

@@ -32,7 +32,7 @@ from decimal import Decimal
 from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Index, Numeric, Text
 from sqlmodel import Field, SQLModel
 
-from sm_records.constants import MAX_KEY_LEN, NUMBER_PRECISION, NUMBER_SCALE, TEXT_INDEX_LEN
+from sm_records.core.constants import MAX_KEY_LEN, NUMBER_PRECISION, NUMBER_SCALE, TEXT_INDEX_LEN
 from sm_records.models._base import (
     INDEX_BOOL_SUFFIX,
     INDEX_DATE_SUFFIX,
@@ -126,7 +126,7 @@ A ref row lives in the **referrer's** table set and names its target by
 ``(target_uuid, target_type_id)``, which is what makes a relation across
 collections expressible at all — and why "who references X" has to ask every
 declared set rather than one
-(:func:`sm_records.services._relations.referrers`)."""
+(:func:`sm_records.records.services._relations.referrers`)."""
 
 
 def _ref_args(table: str) -> tuple:
