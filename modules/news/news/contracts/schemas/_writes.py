@@ -13,7 +13,10 @@ from typing import Any
 
 from pydantic import Field, field_validator, model_validator
 
-from news.constants import (
+from news.content.display_date import as_display_date
+from news.contracts.schemas import _guards
+from news.contracts.schemas._guards import NoNul
+from news.core.constants import (
     MAX_AUTHOR_LEN,
     MAX_CATEGORY_LEN,
     MAX_LOCALE_LEN,
@@ -23,9 +26,6 @@ from news.constants import (
     MAX_URL_LEN,
     SLUG_PATTERN,
 )
-from news.contracts.schemas import _guards
-from news.contracts.schemas._guards import NoNul
-from news.display_date import as_display_date
 
 
 class ArticleCreate(NoNul):
@@ -58,7 +58,7 @@ class ArticleCreate(NoNul):
     author: str = Field(default="", max_length=MAX_AUTHOR_LEN)
 
     _display_date = field_validator("published_at")(as_display_date)
-    """Truncate to the calendar day as sent — see ``news.display_date``."""
+    """Truncate to the calendar day as sent — see ``news.content.display_date``."""
 
 
 class ArticleTranslationCreate(NoNul):
@@ -126,7 +126,7 @@ class ArticleUpdate(NoNul):
     goes through as before."""
 
     _display_date = field_validator("published_at")(as_display_date)
-    """Truncate to the calendar day as sent — see ``news.display_date``."""
+    """Truncate to the calendar day as sent — see ``news.content.display_date``."""
     _title = field_validator("title")(_guards.clean_title)
     _canonical = field_validator("canonical_url")(_guards.canonical_url)
     _og_image = field_validator("og_image")(_guards.og_image)

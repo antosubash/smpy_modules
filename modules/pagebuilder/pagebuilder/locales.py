@@ -14,7 +14,7 @@ exists: pages authored before there was such a thing as a locale are in the
 default one, and they stay exactly where they were.
 
 Resolved once at startup and published process-wide, mirroring
-:mod:`news.settings`: the model's column default and the URL builders are pure
+:mod:`news.core.settings`: the model's column default and the URL builders are pure
 functions with no request to read ``app.state`` from, and threading a settings
 argument through every one of them would put configuration on functions that
 have nothing else to do with it.

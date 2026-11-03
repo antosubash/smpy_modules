@@ -9,8 +9,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from news.content._revisions import RevisionsMixin
+from news.core.naive_utc import as_utc
 from news.models import NewsArticle
-from news.naive_utc import as_utc
 
 
 def _elapsed(value: datetime | None, now: datetime) -> bool:

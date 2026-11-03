@@ -14,7 +14,7 @@
  * `tests/e2e/pagebuilder-puck-a11y.spec.ts` fails if an upgrade renames
  * them, rather than this silently doing nothing.
  *
- * news keeps a copy (`modules/news/news/hooks/usePuckA11y.ts`, #286) because
+ * news keeps a copy (`modules/news/news/ui/hooks/usePuckA11y.ts`, #286) because
  * it cannot import this module: a fix here belongs there too.
  */
 

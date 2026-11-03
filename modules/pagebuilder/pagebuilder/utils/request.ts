@@ -65,7 +65,7 @@ export function fromValidationErrors(detail: unknown): string | null {
  * response that merely mislabelled itself, and the try/catch plus the markup
  * guard below already make the attempt safe.
  *
- * Deliberately a sibling of `news/utils/http.ts`'s `errorFrom`, and the two
+ * Deliberately a sibling of `news/ui/utils/http.ts`'s `errorFrom`, and the two
  * must be changed together: they answer the same question for the same
  * backend, and a difference between them shows up as one module explaining a
  * failure while the other shrugs at it. Both are covered by unit tests that

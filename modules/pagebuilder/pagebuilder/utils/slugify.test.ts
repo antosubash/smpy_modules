@@ -18,7 +18,7 @@ const fixture = JSON.parse(
  *  author has no way to act on. */
 const PAGE_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
-describe('slugify — matching news/slugify.py', () => {
+describe('slugify — matching news/content/slugify.py', () => {
   it.each(fixture.cases.map((c) => [c.input, c.expected] as const))(
     'folds %j to %j',
     (input, expected) => {

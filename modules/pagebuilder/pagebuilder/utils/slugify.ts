@@ -3,12 +3,12 @@
  * Unlike an article's, a page's slug is *not* minted by the server — the API
  * only validates the one the browser sends. That makes this function the rule
  * rather than a preview of it, which is exactly why it has to agree with the
- * only implementation that has a database behind it: `news/slugify.py`. It
+ * only implementation that has a database behind it: `news/content/slugify.py`. It
  * used to differ, and the symptom was an editor typing one headline into two
  * screens and being shown two different URLs.
  *
  * The shared cases live in `tests/fixtures/slug_cases.json`; the Python, this
- * file and `news/news/utils/slugify.ts` each have a test that reads them, so a
+ * file and `news/news/ui/utils/slugify.ts` each have a test that reads them, so a
  * change to any one of the three fails somewhere.
  */
 

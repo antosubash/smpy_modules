@@ -24,7 +24,7 @@ from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from news import tag_redirects
+from news.content.taxonomy import tag_redirects
 from news.integrations.bundle.documents import name_key
 from news.models import NewsArticle, NewsCategory, NewsTag, NewsTagRedirect
 

@@ -81,7 +81,7 @@ class Scheduler:
             # unnoticed. ``_run`` already logs and continues past a failed
             # tick, so anything reaching here died *before* the loop — a
             # missing ``app.state.sm``, an import that failed — and has a
-            # traceback worth seeing. Matches ``news.scheduler.Scheduler``.
+            # traceback worth seeing. Matches ``news.scheduling.scheduler.Scheduler``.
             with contextlib.suppress(asyncio.CancelledError):
                 await task
         except Exception:

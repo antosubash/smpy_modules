@@ -7,7 +7,7 @@ was re-exported through news' own DTO, and its CSRF cookie name and editor URL
 were hardcoded in the frontend.
 
 None of that is true any more. ``NewsArticle`` carries its own body, address,
-status and revisions, and :mod:`news.endpoints.public` serves them. What
+status and revisions, and :mod:`news.web.endpoints.public` serves them. What
 remains is genuinely optional — conveniences that only make sense on a
 site that happens to run both modules:
 
@@ -38,12 +38,12 @@ from urllib.parse import quote
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from news.constants import (
+from news.core.constants import (
     PAGEBUILDER_EDITOR_PATH,
     PAGEBUILDER_MEDIA_PATH,
     PAGEBUILDER_PAGES_PATH,
 )
-from news.tenancy import search_tenant
+from news.core.tenancy import search_tenant
 
 logger = logging.getLogger(__name__)
 

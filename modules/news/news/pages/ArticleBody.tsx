@@ -1,6 +1,6 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { type Overrides, Puck } from '@puckeditor/core';
-import '../components/body/puck-editor.css';
+import '../ui/components/body/puck-editor.css';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useEffect, useMemo } from 'react';
@@ -9,12 +9,12 @@ import {
   articlePuckConfig,
   articleViewports,
   emptyArticleData,
-} from '../components/body/articlePuckConfig';
-import { localizeConfig, localizeViewports } from '../components/body/localizeConfig';
-import { useArticleBody } from '../hooks/useArticleBody';
-import { useArticleOutline } from '../hooks/useArticleOutline';
-import { usePuckA11y } from '../hooks/usePuckA11y';
-import { keys, useT } from '../utils/i18n';
+} from '../ui/components/body/articlePuckConfig';
+import { localizeConfig, localizeViewports } from '../ui/components/body/localizeConfig';
+import { useArticleBody } from '../ui/hooks/useArticleBody';
+import { useArticleOutline } from '../ui/hooks/useArticleOutline';
+import { usePuckA11y } from '../ui/hooks/usePuckA11y';
+import { keys, useT } from '../ui/utils/i18n';
 
 /** The canvas an article's body is written in.
  *

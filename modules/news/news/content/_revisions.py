@@ -1,6 +1,6 @@
 """Revision recording, history and restore.
 
-Mixed into :class:`~news.content.ArticlesService`. The root of the mixin chain:
+Mixed into :class:`~news.content.articles.ArticlesService`. The root of the mixin chain:
 what the chain needs from the composing class is declared by
 :class:`~news.content._host.ArticlesHost`.
 """

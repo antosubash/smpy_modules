@@ -154,7 +154,7 @@ def display_title(rtype: RecordType, values: dict[str, Any]) -> str:
 
 
 def slugify(value: str) -> str:
-    """Minimal and local on purpose — ``news.slugify`` belongs to ``news``,
+    """Minimal and local on purpose — ``news.content.slugify`` belongs to ``news``,
     and a published module that imported it would depend on a sibling
     distribution for eight characters of regex."""
     return _SLUG_RE.sub("-", value.lower()).strip("-")[:MAX_SLUG_LEN].strip("-") or ""

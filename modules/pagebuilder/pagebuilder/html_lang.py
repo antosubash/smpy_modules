@@ -8,7 +8,7 @@ written into it on the way out. The client re-asserts it on mount
 (``hooks/useDocumentLang``) for client-side visits, where no new shell is
 served.
 
-A copy of ``news.endpoints.public._lang``: the two modules do not depend on
+A copy of ``news.web.endpoints.public._lang``: the two modules do not depend on
 each other, and the rule is small enough that sharing it would cost more than
 it saves. Change them together.
 """

@@ -6,8 +6,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
 
-from news.constants import MAX_CATEGORY_LEN, MAX_TAG_LEN
 from news.contracts.schemas._guards import NoNul
+from news.core.constants import MAX_CATEGORY_LEN, MAX_TAG_LEN
 
 
 def _trimmed(max_length: int) -> StringConstraints:

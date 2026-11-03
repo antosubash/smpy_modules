@@ -159,7 +159,7 @@ Do it in small PRs, one module at a time, each containing only moves:
 | images | 4 | 11 | 0 | follows this layout |
 | ai | 2 | 8 | 0 | follows this layout |
 | billing | 3 | 11 | 0 | follows this layout |
-| news | 27 | 10 | 78 | not moved yet |
+| news | 2 | 10 | 0 | follows this layout |
 | pagebuilder | 30 | 14 | 99 | not moved yet |
 | records | 37 | 14 | 181 | not moved yet |
 

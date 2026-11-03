@@ -81,8 +81,8 @@ def test_reset_rearms_the_warning(caplog: pytest.LogCaptureFixture) -> None:
 
 def test_news_borrow_follows_a_later_use() -> None:
     """News reads pagebuilder's locales through the seam when nothing was
-    published to ``news.locales``; an early borrow must not pin the default."""
-    news_locales = pytest.importorskip("news.locales")
+    published to ``news.core.locales``; an early borrow must not pin the default."""
+    news_locales = pytest.importorskip("news.core.locales")
     news_locales.reset()
     try:
         assert news_locales.supported() == PagebuilderSettings().content_locales

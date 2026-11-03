@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, model_validator
 
-from news.safe_url import is_http_url, is_site_relative
+from news.core.safe_url import is_http_url, is_site_relative
 
 HEADLINE_REQUIRED = "An article needs a headline."
 NUL_MESSAGE = "Text cannot contain a NUL (\\x00) character."

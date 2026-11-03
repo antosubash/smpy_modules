@@ -212,7 +212,7 @@ class ReconcileScheduler:
 
     def start(self, app: FastAPI, interval: timedelta) -> None:
         # Stopped from ``BillingModule.on_shutdown``: the host's custom lifespan
-        # never runs router shutdown handlers (see ``news.scheduler``).
+        # never runs router shutdown handlers (see ``news.scheduling.scheduler``).
         self.interval = interval
         self._task = asyncio.create_task(self._run(app, interval))
 

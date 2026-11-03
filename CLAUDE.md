@@ -93,7 +93,7 @@ applied per request, and a tenant already resolved upstream always wins: a
 so a mis-detected child app fails closed — and a public answer for another
 tenant is never shareable-cached (records #196; pagebuilder and news #192).
 The scheduler opens one session per tenant under `tenant_context`. News has its
-own copy, `news.tenancy`, and its scheduler ticks per tenant the same way;
+own copy, `news.core.tenancy`, and its scheduler ticks per tenant the same way;
 records' is `sm_records.tenancy` (its 403 is the `{"detail","code"}` envelope,
 code `tenant_required`) and images' `sm_images.core.tenancy` is a copy of it; images'
 Celery tasks never run unscoped — `images.reconcile` and `images.janitor`
@@ -350,7 +350,7 @@ the target fails without it.
   The way round it, which news established and pagebuilder copied: derive `keys`
   from the module's own `locales/en.json` at compile time (`resolveJsonModule`
   plus a mapped type), so the catalogue *is* the key tree and `tsc` rejects a
-  key the JSON does not define. See `modules/news/news/utils/i18n.ts` — about
+  key the JSON does not define. See `modules/news/news/ui/utils/i18n.ts` — about
   ninety lines, and the reference implementation. Leaves are typed `string`
   rather than the literal, because the published `t()` narrows to the
   framework's union and rejects a literal outside it.

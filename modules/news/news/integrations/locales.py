@@ -1,6 +1,6 @@
 """The languages an article can be written in, as pagebuilder sees them.
 
-The seam, not the answer: :mod:`news.locales` is what the rest of this module
+The seam, not the answer: :mod:`news.core.locales` is what the rest of this module
 asks, and it borrows from here only where pagebuilder is installed. On a host
 that runs both, offering a language pagebuilder did not would mean two lists to
 keep in step — an article and a page are documents on the same site.

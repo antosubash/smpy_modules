@@ -19,7 +19,7 @@ import { keys } from './i18n';
  *  - a `{placeholder}` that no call site fills, which reaches a reader as
  *    literal braces.
  *
- * Deliberately the same four checks `news/utils/i18n.test.ts` runs. Both
+ * Deliberately the same four checks `news/ui/utils/i18n.test.ts` runs. Both
  * modules derive their keys the same way, so a hole in one is a hole in both.
  */
 

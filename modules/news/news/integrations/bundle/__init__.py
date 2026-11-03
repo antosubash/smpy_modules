@@ -21,7 +21,7 @@ at module scope, and is imported only from
 :func:`news.integrations.pagebuilder.register_bundle_section`, so news itself
 never needs pagebuilder installed. It follows the contract's rules: it writes
 only through ``ctx.db``, flushes and never commits, and uses the tenant
-pagebuilder bound — it never resolves one (``news.tenancy`` is not consulted).
+pagebuilder bound — it never resolves one (``news.core.tenancy`` is not consulted).
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ from pagebuilder.contracts.bundle import (
     ValidateContext,
 )
 
-from news.constants import PERM_EDIT, PERM_PUBLISH
+from news.core.constants import PERM_EDIT, PERM_PUBLISH
 from news.integrations.bundle import apply, capture, plan, validate
 
 SECTION = "news"

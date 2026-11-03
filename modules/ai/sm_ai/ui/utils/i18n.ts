@@ -5,7 +5,7 @@
  * `@simple-module-py/i18n` only for locale directories inside its own
  * monorepo, so `keys.ai` does not exist there and `t('ai.x')` is a type error.
  * The module therefore derives its own pieces — the same approach as the news
- * module (see `modules/news/news/utils/i18n.ts` for the long-form rationale):
+ * module (see `modules/news/news/ui/utils/i18n.ts` for the long-form rationale):
  *
  * - `keys`, the nested tree of dotted keys, derived from `locales/en.json` at
  *   compile time, so a key the JSON lacks is a type error at the call site.

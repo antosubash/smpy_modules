@@ -1,6 +1,6 @@
 """Claiming a due article, so two schedulers cannot both flip it.
 
-:meth:`~news.content.ArticlesService.process_due` used to be a plain ``SELECT``
+:meth:`~news.content.articles.ArticlesService.process_due` used to be a plain ``SELECT``
 followed by a transition, which is correct in exactly one process and wrong in
 every other deployment. The in-process loop starts in *every* process that boots
 the module, so ``uvicorn -w 4``, gunicorn with workers and a Deployment with

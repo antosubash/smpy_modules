@@ -31,7 +31,7 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
         "tenancy mode detection",
         (
             Copy(f"{PB}/_tenancy_mode.py", {"pagebuilder": "MODULE"}),
-            Copy(f"{NEWS}/_tenancy_mode.py", {"news": "MODULE"}),
+            Copy(f"{NEWS}/core/tenancy/_mode.py", {"news": "MODULE"}),
         ),
     ),
     Family(
@@ -74,7 +74,7 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
             # site's branded 404 (#89, #248), so bind_public_viewer is shared.
             Copy(f"{PB}/tenancy.py", {"pagebuilder": "MODULE"}),
             Copy(
-                f"{NEWS}/tenancy.py",
+                f"{NEWS}/core/tenancy/__init__.py",
                 {"news": "MODULE"},
                 own={
                     "search_tenant": "News' search reads pagebuilder's tables from outside "

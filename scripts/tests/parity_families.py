@@ -27,7 +27,7 @@ FAMILIES: tuple[Family, ...] = (
         "public cache headers",
         (
             Copy(f"{PB}/public_cache.py", {"PagebuilderSettings": "Settings"}),
-            Copy(f"{NEWS}/endpoints/public/_urls.py", {"NewsSettings": "Settings"}),
+            Copy(f"{NEWS}/web/endpoints/public/_urls.py", {"NewsSettings": "Settings"}),
         ),
         shared=("SIGNED_IN_CACHE_CONTROL", "signed_in", "_user_key", "viewer_key", "cache_control"),
         differ={
@@ -49,7 +49,7 @@ FAMILIES: tuple[Family, ...] = (
                 },
             ),
             Copy(
-                f"{NEWS}/redirects.py",
+                f"{NEWS}/content/redirects.py",
                 {
                     "NewsArticleRedirect": "DocRedirect",
                     "ArticleStatus": "DocStatus",
@@ -62,7 +62,7 @@ FAMILIES: tuple[Family, ...] = (
     ),
     Family(
         "content locales",
-        (Copy(f"{PB}/locales.py"), Copy(f"{NEWS}/locales.py")),
+        (Copy(f"{PB}/locales.py"), Copy(f"{NEWS}/core/locales.py")),
         shared=("is_default", "resolve", "path_prefix"),
         differ={
             "use": "Pagebuilder publishes its settings object; news publishes a vocabulary, "
@@ -76,7 +76,7 @@ FAMILIES: tuple[Family, ...] = (
         "slugify (TypeScript)",
         (
             Copy(
-                f"{NEWS}/utils/slugify.ts",
+                f"{NEWS}/ui/utils/slugify.ts",
                 own={
                     "SLUG_PATTERN": "News' article screen lets an author type a slug; "
                     "pagebuilder's editors only ever derive one.",
@@ -88,7 +88,7 @@ FAMILIES: tuple[Family, ...] = (
     Family(
         "CSRF token sharing (Python)",
         (
-            Copy(f"{NEWS}/csrf.py"),
+            Copy(f"{NEWS}/web/csrf.py"),
             Copy(
                 f"{PB}/csrf.py",
                 own={
@@ -104,7 +104,7 @@ FAMILIES: tuple[Family, ...] = (
     Family(
         "CSRF token store (TypeScript)",
         (
-            Copy(f"{NEWS}/utils/csrf.ts"),
+            Copy(f"{NEWS}/ui/utils/csrf.ts"),
             Copy(
                 f"{PB}/utils/csrf.ts",
                 own={
@@ -120,7 +120,7 @@ FAMILIES: tuple[Family, ...] = (
         "admin HTTP client",
         (
             Copy(
-                f"{NEWS}/utils/http.ts",
+                f"{NEWS}/ui/utils/http.ts",
                 _AS_MODULE,
                 own={
                     "HttpError": "News' callers tell a stale write (409) from a vanished "
@@ -193,7 +193,7 @@ FAMILIES: tuple[Family, ...] = (
                 messages=("pagebuilder.scheduler.stop_failed",),
             ),
             Copy(
-                f"{NEWS}/scheduler.py",
+                f"{NEWS}/scheduling/scheduler.py",
                 {"NewsSettings": "Settings"},
                 messages=("news.scheduler.stop_failed",),
             ),
@@ -206,14 +206,14 @@ FAMILIES: tuple[Family, ...] = (
         "test scaffolding: default tenant",
         (
             Copy("modules/pagebuilder/tests/tenant_fixture.py"),
-            Copy("modules/news/tests/tenant_fixture.py"),
+            Copy("modules/news/tests/support/tenant_fixture.py"),
         ),
     ),
     Family(
         "test scaffolding: header tenant",
         (
             Copy("modules/pagebuilder/tests/tenant_app.py"),
-            Copy("modules/news/tests/tenant_app.py"),
+            Copy("modules/news/tests/support/tenant_app.py"),
         ),
         shared=("HeaderTenant", "as_tenant"),
     ),

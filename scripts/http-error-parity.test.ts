@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { errorFrom } from '../modules/news/news/utils/http';
+import { errorFrom } from '../modules/news/news/ui/utils/http';
 import { errorMessage } from '../modules/pagebuilder/pagebuilder/utils/request';
 
 /**

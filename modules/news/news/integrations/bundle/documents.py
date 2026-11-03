@@ -18,10 +18,10 @@ from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any
 
-from news import locales
-from news.constants import MAX_LOCALE_LEN
+from news.core import locales
+from news.core.constants import MAX_LOCALE_LEN
+from news.core.naive_utc import as_utc
 from news.models import ArticleStatus, NewsArticle
-from news.naive_utc import as_utc
 
 ArticleKey = tuple[str, str]
 """``(locale, slug)`` — an article's identity inside a bundle, as for pages."""

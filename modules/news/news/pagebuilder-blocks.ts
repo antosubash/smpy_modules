@@ -28,8 +28,8 @@
 
 import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/components/blockRegistry';
 
-import { NewsFeedBlock } from './components/NewsFeed';
-import { keys } from './utils/i18n';
+import { NewsFeedBlock } from './ui/components/NewsFeed';
+import { keys } from './ui/utils/i18n';
 
 try {
   registerPuckBlocks({
