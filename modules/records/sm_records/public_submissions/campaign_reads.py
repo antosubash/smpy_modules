@@ -14,12 +14,12 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any, Final
 
+from simple_module_db import is_valid_tenant_id
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.public_submissions import KIND_SUBSCRIPTION
 from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import valid_tenant
 from sm_records.core.tenancy._cross_tenant import read_all
 from sm_records.models import Record, RecordType, tables_for
 from sm_records.public_submissions.subscribe import CONFIRMED, UNSUBSCRIBED
@@ -92,10 +92,13 @@ async def list_tenants(db: AsyncSession) -> list[str]:
 
     The one cross-tenant read here: :func:`read_all` runs it inside the
     framework's ``all_tenants()`` and tags it past records' guard. The caller
-    refuses to run it under a bound tenant."""
+    refuses to run it under a bound tenant. An id is kept only if the
+    framework's ``is_valid_tenant_id`` accepts it — the check the per-tenant
+    contract calls make — so each result can be passed straight back to them
+    (records' ``valid_tenant`` would keep ``"platform"`` and ``"a\\n"``)."""
     stmt = select(RecordType.tenant_id, RecordType.public_submissions)
     rows = (await read_all(db, stmt)).all()
-    return sorted({str(t) for t, config in rows if _is_list(config) and valid_tenant(t)})
+    return sorted({str(t) for t, config in rows if _is_list(config) and is_valid_tenant_id(t)})
 
 
 def moment(value: Any) -> datetime | None:

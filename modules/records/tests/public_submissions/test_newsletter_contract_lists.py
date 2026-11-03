@@ -24,9 +24,11 @@ from sm_records.contracts.newsletter import (
 from sm_records.core import events
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope
+from sm_records.models import RecordType
 from sm_records.records.services import records as record_service
 from sm_records.records.services import types as type_service
 from sm_records.records.services._common import utcnow
+from sqlalchemy import delete, insert, select
 
 from tests.support.app_harness import ADMIN, roles
 from tests.support.newsletter_contract import TAGS, TENANT, join, session, unbound
@@ -171,6 +173,29 @@ async def test_tenants_owning_a_list_unbound_and_in_no_tenant(audience):
         assert await _tenants(audience) == ["b", TENANT]
     with no_tenant():
         assert await _tenants(audience) == ["b", TENANT]
+
+
+async def test_tenants_drop_ids_the_contract_would_refuse(audience):
+    # "platform" is the framework's reserved id: records' own pattern admits
+    # it, but ``subscription_lists`` would raise on it, so it is never listed.
+    # Tenant ids never change on a row, so the row is copied from one in "b"
+    # with a Core insert; then "b"'s own list is deleted.
+    table = RecordType.__table__
+    with unbound():
+        await _seed(audience.db_state, "b", LIST, config=list_config())
+        async with session(audience) as db:
+            row = dict(
+                (await db.execute(select(table).where(table.c.tenant_id == "b"))).one()._mapping
+            )
+            row.pop("id")
+            await db.execute(insert(table).values({**row, "tenant_id": "platform"}))
+            await db.commit()
+        seen = await _tenants(audience)
+        assert "b" in seen and "platform" not in seen
+        async with session(audience) as db:
+            await db.execute(delete(table).where(table.c.tenant_id == "b"))
+            await db.commit()
+        assert await _tenants(audience) == [TENANT]
 
 
 async def test_tenants_refused_under_a_bound_tenant(audience):
