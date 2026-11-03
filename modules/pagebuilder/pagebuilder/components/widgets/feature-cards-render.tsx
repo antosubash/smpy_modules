@@ -5,20 +5,10 @@
  *  which keeps the field definitions, so both stay under the 300-line cap. */
 
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
-import type { CSSProperties } from 'react';
 import { keys, useT } from '../../utils/i18n';
 import { cn } from '../../utils/widgetUtils';
 import { AccentText } from './_internal/accent-text';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
-import {
-  ChartAreaSolid,
-  MagnifyingGlassChartSolid,
-  PawSolid,
-  type SolidIconProps,
-  TemperatureSolid,
-  TreeSolid,
-  WaterSolid,
-} from './_internal/solid-icons';
 import { TextLink } from './_shared/text-link';
 
 // Named glyphs selectable per card — solid icons matching the GCA design

@@ -92,16 +92,14 @@ export function PublicGallery({
   // A visitor's broken API shows nothing rather than an error box, except on the
   // collection's own page, where an empty gallery would read as an empty collection.
   if (state === 'failed') {
-    return count ? (
-      <></>
-    ) : (
+    return count ? null : (
       <p role="alert" className="text-sm text-destructive">
         {t(keys.images.public.failed)}
       </p>
     );
   }
   if (state === 'ready' && items.length === 0) {
-    return count ? <></> : <p className="text-muted-foreground">{t(keys.images.public.empty)}</p>;
+    return count ? null : <p className="text-muted-foreground">{t(keys.images.public.empty)}</p>;
   }
   return (
     <div className="space-y-4">

@@ -87,16 +87,26 @@ export async function flush(ms = 0): Promise<void> {
   });
 }
 
+function Head() {
+  return null;
+}
+
+/** A thin passthrough stand-in for Inertia's Link. */
+function Link({ children, ...rest }: { children?: unknown; [key: string]: unknown }) {
+  return (
+    <a {...(rest as React.AnchorHTMLAttributes<HTMLAnchorElement>)}>
+      {children as React.ReactNode}
+    </a>
+  );
+}
+
 /** The mock every page test installs for `@inertiajs/react`. */
 export function inertiaMock() {
   return {
-    Head: () => null,
+    Head,
     usePage: () => ({ url: '/admin/images', props: {} }),
     router: { visit: vi.fn(), on: vi.fn() },
-    Link: ({ children, ...rest }: { children?: unknown; [key: string]: unknown }) => (
-      // biome-ignore lint/suspicious/noExplicitAny: a thin passthrough stand-in for Inertia's Link
-      <a {...(rest as any)}>{children as React.ReactNode}</a>
-    ),
+    Link,
   };
 }
 
