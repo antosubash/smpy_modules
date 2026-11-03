@@ -46,7 +46,7 @@ async def site_client(
     pagebuilder = PagebuilderModule()
     media = Path(tempfile.mkdtemp()) / "media"
     media.mkdir()
-    pagebuilder.core.settings = PagebuilderSettings(
+    pagebuilder.settings = PagebuilderSettings(
         media_root=media,
         content_locales=locales,
         default_content_locale=locales[0],
