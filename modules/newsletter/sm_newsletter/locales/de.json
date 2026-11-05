@@ -66,6 +66,111 @@
       "working": "Wird gelöscht"
     }
   },
+  "editor": {
+    "fallback_title": "Kampagne",
+    "loading": "Kampagne wird geladen",
+    "back": "Kampagnen",
+    "untitled": "Unbenannte Kampagne",
+    "list": "Liste: {list}",
+    "status": {
+      "saving": "Wird gespeichert",
+      "saved": "Gespeichert",
+      "stale": "Anderswo geändert",
+      "error": "Nicht gespeichert"
+    },
+    "reload": "Neu laden",
+    "read_only": "Sie können diese Kampagne ansehen, aber nicht ändern.",
+    "not_draft": "Diese Kampagne ist kein Entwurf mehr und kann nicht geändert werden.",
+    "incomplete": "In einem Block fehlt ein Pflichtfeld. Die E-Mail wird wieder gespeichert, sobald es ausgefüllt ist.",
+    "select_a_block": "Wählen Sie einen Block aus, um ihn zu bearbeiten.",
+    "integration_missing": "Diese Inhaltsquelle ist auf dieser Website nicht verfügbar.",
+    "meta": {
+      "title": "E-Mail-Angaben",
+      "name": "Name der Kampagne",
+      "subject": "Betreff",
+      "preheader": "Vorschautext",
+      "preheader_hint": "Wird in den meisten Postfächern nach dem Betreff angezeigt.",
+      "from_name": "Absendername",
+      "from_name_hint": "Leer lassen, um den Namen aus den Newsletter-Einstellungen zu verwenden.",
+      "reply_to": "Antwortadresse",
+      "reply_to_hint": "Leer lassen, um die Adresse aus den Newsletter-Einstellungen zu verwenden."
+    },
+    "card": {
+      "article": "Artikel",
+      "page": "Seite",
+      "current": "In der E-Mail angezeigt",
+      "none": "Noch nichts ausgewählt.",
+      "search_label": "Suchen",
+      "search_article": "Veröffentlichte Artikel durchsuchen",
+      "search_page": "Veröffentlichte Seiten durchsuchen",
+      "searching": "Suche läuft",
+      "no_results": "Keine Treffer.",
+      "refresh": "Aus der Quelle aktualisieren",
+      "refreshing": "Wird aktualisiert",
+      "copied_at": "Übernommen am {date}"
+    },
+    "media": {
+      "choose": "Aus Medien auswählen",
+      "close": "Schließen",
+      "search": "Medien durchsuchen",
+      "searching": "Suche läuft",
+      "no_results": "Keine Bilder gefunden."
+    }
+  },
+  "blocks": {
+    "categories": {
+      "content": "Inhalt",
+      "layout": "Layout",
+      "cards": "Karten"
+    },
+    "common": {
+      "align": "Ausrichtung",
+      "align_left": "Links",
+      "align_center": "Zentriert",
+      "align_right": "Rechts",
+      "link": "Link"
+    },
+    "heading": {
+      "label": "Überschrift",
+      "text": "Text",
+      "level": "Größe",
+      "level_1": "Groß",
+      "level_2": "Mittel"
+    },
+    "rich_text": {
+      "label": "Text",
+      "html": "Text"
+    },
+    "image": {
+      "label": "Bild",
+      "src": "Bildadresse",
+      "alt": "Alternativtext",
+      "href": "Link (optional)",
+      "width": "Breite in Pixeln",
+      "empty": "Bild auswählen"
+    },
+    "button": {
+      "label": "Schaltfläche",
+      "text": "Beschriftung"
+    },
+    "divider": {
+      "label": "Trennlinie"
+    },
+    "spacer": {
+      "label": "Abstand",
+      "size": "Größe",
+      "size_sm": "Klein",
+      "size_md": "Mittel",
+      "size_lg": "Groß"
+    },
+    "article_card": {
+      "label": "Artikelkarte"
+    },
+    "page_card": {
+      "label": "Seitenkarte"
+    },
+    "card_empty": "Wählen Sie in den Blockeinstellungen einen Eintrag aus."
+  },
   "errors": {
     "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
     "csrf_failed": "Ihre Sitzung ist abgelaufen. Laden Sie die Seite neu und versuchen Sie es erneut.",

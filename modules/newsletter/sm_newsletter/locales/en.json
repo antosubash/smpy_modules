@@ -66,6 +66,111 @@
       "working": "Deleting"
     }
   },
+  "editor": {
+    "fallback_title": "Campaign",
+    "loading": "Loading campaign",
+    "back": "Campaigns",
+    "untitled": "Untitled campaign",
+    "list": "List: {list}",
+    "status": {
+      "saving": "Saving",
+      "saved": "Saved",
+      "stale": "Changed elsewhere",
+      "error": "Not saved"
+    },
+    "reload": "Reload",
+    "read_only": "You can view this campaign but not change it.",
+    "not_draft": "This campaign is no longer a draft, so it cannot be changed.",
+    "incomplete": "A block is missing a required field. The email is saved again once it is filled in.",
+    "select_a_block": "Select a block to edit it.",
+    "integration_missing": "This content source is not available on this site.",
+    "meta": {
+      "title": "Email details",
+      "name": "Campaign name",
+      "subject": "Subject",
+      "preheader": "Preview text",
+      "preheader_hint": "Shown after the subject in most inboxes.",
+      "from_name": "Sender name",
+      "from_name_hint": "Leave empty to use the name from the newsletter settings.",
+      "reply_to": "Reply-to address",
+      "reply_to_hint": "Leave empty to use the address from the newsletter settings."
+    },
+    "card": {
+      "article": "Article",
+      "page": "Page",
+      "current": "Shown in the email",
+      "none": "Nothing chosen yet.",
+      "search_label": "Search",
+      "search_article": "Search published articles",
+      "search_page": "Search published pages",
+      "searching": "Searching",
+      "no_results": "Nothing matches.",
+      "refresh": "Refresh from source",
+      "refreshing": "Refreshing",
+      "copied_at": "Copied {date}"
+    },
+    "media": {
+      "choose": "Choose from media",
+      "close": "Close",
+      "search": "Search media",
+      "searching": "Searching",
+      "no_results": "No images found."
+    }
+  },
+  "blocks": {
+    "categories": {
+      "content": "Content",
+      "layout": "Layout",
+      "cards": "Cards"
+    },
+    "common": {
+      "align": "Alignment",
+      "align_left": "Left",
+      "align_center": "Centre",
+      "align_right": "Right",
+      "link": "Link"
+    },
+    "heading": {
+      "label": "Heading",
+      "text": "Text",
+      "level": "Size",
+      "level_1": "Large",
+      "level_2": "Medium"
+    },
+    "rich_text": {
+      "label": "Text",
+      "html": "Text"
+    },
+    "image": {
+      "label": "Image",
+      "src": "Image address",
+      "alt": "Alternative text",
+      "href": "Link (optional)",
+      "width": "Width in pixels",
+      "empty": "Choose an image"
+    },
+    "button": {
+      "label": "Button",
+      "text": "Label"
+    },
+    "divider": {
+      "label": "Divider"
+    },
+    "spacer": {
+      "label": "Spacer",
+      "size": "Size",
+      "size_sm": "Small",
+      "size_md": "Medium",
+      "size_lg": "Large"
+    },
+    "article_card": {
+      "label": "Article card"
+    },
+    "page_card": {
+      "label": "Page card"
+    },
+    "card_empty": "Choose an item in the block settings."
+  },
   "errors": {
     "generic": "Something went wrong. Please try again.",
     "csrf_failed": "Your session has expired. Reload the page and try again.",
