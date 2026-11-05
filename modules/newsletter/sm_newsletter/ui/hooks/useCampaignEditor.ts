@@ -95,40 +95,60 @@ export function useCampaignEditor(id: number) {
     void load();
   }, [load]);
 
+  /** The body on screen when it is complete and not what the server holds, else null. */
+  const pendingBody = useCallback((): Block[] | null => {
+    const body = normalizeBody(fromPuckData(dataRef.current));
+    return body.every(isComplete) && bodyKey(body) !== savedBodyRef.current ? body : null;
+  }, []);
+
   /** One PATCH with whatever is pending. Resolves `false` when something stayed unsaved. */
-  const send = useCallback(async (): Promise<boolean> => {
-    if (staleRef.current) return false;
-    const meta = edits.meta;
-    const body = edits.body;
-    const serialized = body ? bodyKey(body) : null;
-    const withBody = serialized !== null && serialized !== savedBodyRef.current;
-    if (!withBody && Object.keys(meta).length === 0) return true;
-    edits.meta = {};
-    edits.body = null;
-    edits.inFlight += 1;
-    edits.sync();
-    setStatus('saving');
-    try {
-      const detail = await api.patchCampaign(id, {
-        expected_revision: revisionRef.current,
-        ...meta,
-        ...(withBody ? { body: body as Block[] } : {}),
-      });
-      adopt(detail);
-      setStatus('saved');
-      setError(null);
-      return true;
-    } catch (e) {
-      // Kept for the next try, under anything typed since.
-      edits.meta = { ...meta, ...edits.meta };
-      if (withBody && edits.body === null) edits.body = body;
-      fail(e);
-      return false;
-    } finally {
-      edits.inFlight -= 1;
+  const send = useCallback(
+    async function send(): Promise<boolean> {
+      if (staleRef.current) return false;
+      const meta = edits.meta;
+      const body = edits.body;
+      const serialized = body ? bodyKey(body) : null;
+      const withBody = serialized !== null && serialized !== savedBodyRef.current;
+      if (!withBody && Object.keys(meta).length === 0) return true;
+      edits.meta = {};
+      edits.body = null;
+      edits.inFlight += 1;
       edits.sync();
-    }
-  }, [adopt, fail, id, edits]);
+      setStatus('saving');
+      try {
+        const detail = await api.patchCampaign(id, {
+          expected_revision: revisionRef.current,
+          ...meta,
+          ...(withBody ? { body: body as Block[] } : {}),
+        });
+        adopt(detail);
+        setStatus('saved');
+        setError(null);
+        // The canvas may have moved while a body was out (an undo back to the
+        // body the server held before this save): what it shows is measured
+        // against what the server holds now, and any difference goes out next.
+        const rest = withBody ? pendingBody() : null;
+        // Not when it is what this very request carried: a server that rewrote the
+        // body would otherwise be answered with the same save for ever.
+        if (rest && bodyKey(rest) !== serialized) {
+          edits.body = rest;
+          edits.clearTimer();
+          return await send();
+        }
+        return true;
+      } catch (e) {
+        // Kept for the next try, under anything typed since.
+        edits.meta = { ...meta, ...edits.meta };
+        if (withBody && edits.body === null) edits.body = body;
+        fail(e);
+        return false;
+      } finally {
+        edits.inFlight -= 1;
+        edits.sync();
+      }
+    },
+    [adopt, fail, id, edits, pendingBody],
+  );
 
   const enqueue = useCallback(<T>(task: () => Promise<T>): Promise<T> => {
     const run = queueRef.current.then(task);
