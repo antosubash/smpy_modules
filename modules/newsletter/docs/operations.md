@@ -26,15 +26,31 @@ neither, **the tick refuses and logs at ERROR**, before it recovers, freezes or
 connects. Campaigns stay as they are until it is fixed; until then the only
 sign is the log (`newsletter.dispatch refused: SecretMissing`). The same refusal
 applies to a stored SMTP password the key cannot decrypt, an unreadable settings
-row, and a plaintext password: the worker refuses a non-empty SMTP password
-stored without `enc:v1:`, so re-save it through
+row, and, on the `smtp` transport, a plaintext password: the worker refuses a
+non-empty SMTP password stored without `enc:v1:`, so re-save it through
 `PUT /api/newsletter/settings/smtp-password`.
 
 The secret signs the unsubscribe links as well. If it is rotated, links already
 sent stop verifying (they answer the same page, but unsubscribe nobody) and the
-encrypted password is unreadable until it is saved again. A worker that
-resolves its secret from the stored `host.secret_key` keeps the first value it
-read until it restarts.
+encrypted password is unreadable until it is saved again. A worker keeps
+decrypting the SMTP password with the first secret it resolved until it
+restarts (tokens re-resolve the secret each tick), so restart the workers after
+a rotation.
+
+## Unsubscribe links in access logs
+
+The module never logs a full send token, but uvicorn's access log and any
+proxy's record the path `/newsletter/u/<token>` of every click and one-click
+POST. A token is an opt-out capability for one address: redact that path in
+the access logs, or rotate and restrict them.
+
+## The console transport in a worker
+
+Campaign mail "sent" by the `console` transport in a Celery worker is captured
+in that worker's in-process ring, not the web process's, so the outbox screen
+(`GET /api/newsletter/outbox`) never shows it; only test sends (sent by the web
+process) appear there. The worker's log records only that each message went
+out (a reference and the recipient's domain).
 
 ## The DKIM checklist
 

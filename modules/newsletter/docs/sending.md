@@ -82,12 +82,17 @@ dispatcher tick: its audience becomes `newsletter_send` rows.
 ## The dispatcher
 
 `newsletter.dispatch` is a Celery beat task on the `newsletter` queue, every
-60 s. A tick runs for at most 50 s (`TICK_SECONDS`) and a queued copy expires
-after 55 s. Nothing else sends campaign mail.
+60 s. A tick stops starting new work after 50 s (`TICK_SECONDS`; one recipient
+in flight can run past it, up to its 45 s SMTP deadline) and a queued copy
+expires after 55 s. Nothing else sends campaign mail.
 
-1. Recover expired leases, then freeze what is due.
-2. Nothing `sending`: finish any campaign with no open rows and stop (no relay
-   connection).
+1. Recover expired leases, then freeze what is due. Freezing shares the tick's
+   time: a large freeze (about 100 pages for 100k subscribers) can use a whole
+   tick, so nothing is sent that minute, for any tenant. It is only slower,
+   never wrong: the claim and the per-page lease carry it on next tick.
+2. Nothing `sending`, or no budget left in either window: finish any campaign
+   with no open rows and stop, with no relay connection (a capped day neither
+   logs in every minute nor lets a refused login pause every campaign).
 3. Open one transport session for the tick. A refused login pauses every
    `sending` campaign (`smtp_auth`); any other connect or TLS failure only ends
    the tick.

@@ -196,7 +196,7 @@ default no matter what the database says. Mark such fields
 `json_schema_extra=_RESTART` so the Settings screen says a restart is needed.
 Newsletter's `smtp_password` is stored `enc:v1:` under `SM_SECRET_KEY` and written only
 through `PUT /api/newsletter/settings/smtp-password` (needs `newsletter.manage` and
-`settings.edit`; workers **refuse** a non-empty SMTP password stored without `enc:v1:`
+`settings.edit`; on the `smtp` transport workers **refuse** a non-empty SMTP password stored without `enc:v1:`
 (as `scripts/set_setting.py` would store it), and the dispatcher does not run until it is re-saved
 through that endpoint, so always use the endpoint); the generic Settings screen
 refuses newsletter writes (`manage_url`).
