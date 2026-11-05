@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns import lifecycle
 from sm_newsletter.campaigns.access import require_campaign
+from sm_newsletter.campaigns.checks import SCHEDULE_GRACE, SCHEDULE_HORIZON
 from sm_newsletter.campaigns.progress import estimate, progress
 from sm_newsletter.core import constants
 from sm_newsletter.core.clock import utcnow
@@ -158,6 +159,10 @@ def _parse_at(raw: str | None) -> datetime:
         parsed = datetime.fromisoformat(raw)
     except ValueError:
         raise InvalidCampaign("at: invalid value") from None
-    if parsed.tzinfo is None:
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise InvalidCampaign("at: invalid value")
+    now = utcnow()
+    # The window a schedule time may fall in (ruling S19), so the sum below cannot overflow.
+    if not now - SCHEDULE_GRACE <= parsed <= now + SCHEDULE_HORIZON:
+        raise InvalidCampaign("at: out of range")
     return parsed

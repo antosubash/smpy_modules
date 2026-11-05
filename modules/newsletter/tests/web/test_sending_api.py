@@ -177,7 +177,6 @@ async def test_progress_counts_each_status(client, built):
     res = await client.get(f"{API}/{cid}/progress", headers=VIEW)
     assert res.status_code == 200, res.text
     out = res.json()
-    assert out | {"estimated_finish": None} == out
     assert (out["recipients"], out["queued"], out["sending"], out["sent"]) == (11, 2, 1, 3)
     assert (out["failed"], out["bounced"], out["suppressed"], out["skipped"]) == (1, 1, 1, 1)
     assert (out["cancelled"], out["status"]) == (1, "paused")
@@ -238,3 +237,31 @@ async def test_send_without_the_csrf_token_403():
             assert ok.status_code == 200, ok.text
     finally:
         await state.engine.dispose()
+
+
+async def _create(client):
+    res = await client.post(
+        API,
+        json={"name": "n", "list_type_key": "news"},
+        headers={"x-perms": "newsletter.view,newsletter.edit"},
+    )
+    assert res.status_code == 201, res.text
+    return res.json()
+
+
+async def test_detail_holds_the_sending_fields(client):
+    created = await _create(client)
+    got = (await client.get(f"{API}/{created['id']}", headers=VIEW)).json()
+    assert got["scheduled_at"] is None and got["started_at"] is None and got["finished_at"] is None
+    assert got["paused_code"] is None and got["paused_detail"] is None
+    for key in ("failed_count", "bounced_count", "suppressed_count", "unsubscribe_count"):
+        assert got[key] == 0
+
+
+async def test_estimate_far_future_at_is_422_not_500(client, built):
+    _, state = built
+    cid = await seed_campaign(state, T)
+    for bad in ("9999-12-31T00:00:00+00:00", "2000-01-01T00:00:00+00:00"):
+        res = await client.get(f"{API}/{cid}/estimate", params={"at": bad}, headers=SEND)
+        assert (res.status_code, res.json()["code"]) == (422, "invalid_campaign")
+        assert "9999" not in res.text

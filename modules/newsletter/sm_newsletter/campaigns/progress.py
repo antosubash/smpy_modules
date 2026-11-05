@@ -39,7 +39,10 @@ def daily_rate(settings: NewsletterSettings) -> int:
 
 def estimate_finish(*, start: datetime, ahead: int, own: int, rate: int) -> datetime:
     """``start`` plus ``(ahead + own)`` messages at ``rate`` per day."""
-    return start + timedelta(seconds=_DAY_SECONDS * (ahead + own) / rate)
+    try:
+        return start + timedelta(seconds=_DAY_SECONDS * (ahead + own) / rate)
+    except OverflowError:
+        return datetime.max.replace(tzinfo=start.tzinfo)
 
 
 async def queued_ahead(
