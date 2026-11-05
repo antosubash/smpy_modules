@@ -1,7 +1,8 @@
 """What a POST to an unsubscribe link does (S8, S9).
 
 **Order.** The MAC is verified before any statement runs, a request whose host
-resolved another tenant is treated as forged, and only then is the token's
+resolved another tenant (``resolved_tenant``: the endpoint passes only a
+host-derived one) is treated as forged, and only then is the token's
 tenant bound and a session opened. Nothing here raises for a bad token: the
 caller answers the same page whatever this returns.
 

@@ -3,13 +3,16 @@
 Tenants A and B each have a list, a confirmed subscriber, a sent campaign and
 a ``sent`` row, and B's ids are never A's. A token pairing one tenant's ids
 with the other's, or a host that resolved another tenant, answers the same
-page as a genuine click and changes nothing in either tenant.
+page as a genuine click and changes nothing in either tenant. A tenant the
+visitor brought (a signed-in member's session) does not count against the link.
 """
 
 from __future__ import annotations
 
 import pytest
+from simple_module_hosting.middleware import TenantMiddleware, TenantResolution
 from sm_newsletter.core import tokens
+from starlette.middleware import Middleware
 
 from tests.support.app import SECRET
 from tests.support.unsub_world import (
@@ -86,9 +89,52 @@ async def test_same_tenant_second_campaign_with_first_campaigns_send_changes_not
     assert await snapshot(state, second) == before
 
 
-async def test_resolved_host_tenant_mismatch_changes_nothing(two):
+@pytest.mark.parametrize("source", ["subdomain", "fixed"])
+async def test_resolved_host_tenant_mismatch_changes_nothing(two, source):
+    """B's site (or a host fixed to B) opened A's link: the token counts as forged."""
     app, state, events, a, b = two
-    await _unchanged(app, state, events, a, b, a.token, **{"x-tenant": "b"})
+    headers = {"x-tenant": "b", "x-tenant-source": source}
+    await _unchanged(app, state, events, a, b, a.token, **headers)
+
+
+async def _unsubscribed_from_a_only(app, state, events, a: Sent, b: Sent, **headers: str) -> None:
+    before_b = await snapshot(state, b)
+    res = await call(app, "POST", a.token, data=ONE_CLICK, headers=headers or None)
+    assert res.content == await _any_post_page(app)
+    assert await status_of(state, a) == "unsubscribed"
+    assert await suppressions(state, "a") == [("unsubscribed", "news", "unsubscribe_page")]
+    assert await snapshot(state, b) == before_b
+    assert [(e.tenant_id, e.uuid) for e in events] == [("a", a.uuid)]
+
+
+@pytest.mark.parametrize("source", ["session", "claim", "header", "anon_header", "resolver"])
+async def test_a_visitor_derived_tenant_does_not_block_the_link(two, source):
+    """A member of B signed in on the apex clicks A's link: their session's
+    tenant says nothing about the link, so A's subscriber is unsubscribed."""
+    app, state, events, a, b = two
+    headers = {"x-tenant": "b", "x-tenant-source": source}
+    await _unsubscribed_from_a_only(app, state, events, a, b, **headers)
+
+
+@pytest.mark.parametrize(("source", "changes"), [("session", True), ("subdomain", False)])
+async def test_the_real_tenant_middleware(source, changes):
+    """The framework's ``TenantMiddleware`` sets ``tenant_id``/``tenant_source``;
+    its resolver is stubbed with what the tenants module answers for a signed-in
+    member of B (``session``) or B's subdomain."""
+    app, state, events, a, b = await _two(multi=True)
+    try:
+
+        async def resolver(_request):
+            return TenantResolution("b", source)
+
+        app.state.tenant_resolver = resolver
+        app.user_middleware.append(Middleware(TenantMiddleware))  # inside _Auth
+        if changes:
+            await _unsubscribed_from_a_only(app, state, events, a, b)
+        else:
+            await _unchanged(app, state, events, a, b, a.token)
+    finally:
+        await state.engine.dispose()
 
 
 async def test_multi_tenant_apex_binds_the_tokens_tenant():

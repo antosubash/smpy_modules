@@ -184,8 +184,12 @@ approximate and says "about".
 - **Tenancy.** The tenant comes from the verified token, not from the request:
   links are built on `public_base_url`, which on a multi-tenant host is the
   apex where no tenant resolves, so `bind_public` would refuse every link. The
-  MAC is verified before any statement; if the host did resolve a tenant that
-  differs from the token's, the token counts as forged.
+  MAC is verified before any statement; if the *host* resolved a tenant (the
+  framework's `tenant_source` is `subdomain` or `fixed`) that differs from the
+  token's, the token counts as forged. A tenant the visitor brought (a
+  signed-in member's `session`, `header` or `claim`, or an `anon_header`) is
+  ignored: a member of organisation A who clicks B's link on the apex is
+  unsubscribed from B.
 - **One answer.** A real, `test`, forged, oversized, already-used or
   other-tenant token gets the same 200 page, so the route is no oracle for which
   tokens exist. `/newsletter/u/test` (previews and test sends) is one of them.

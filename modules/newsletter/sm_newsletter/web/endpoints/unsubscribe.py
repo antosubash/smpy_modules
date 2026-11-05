@@ -16,8 +16,12 @@ one: the MAC covers the tenant, campaign and send.
 (``sm_records/web/endpoints/api/public_submissions_links.py``). The links are
 built on the host's ``public_base_url``, which on a multi-tenant host is the
 apex, where no tenant resolves, so binding the request's tenant would refuse
-every link. The MAC is verified before any statement, and a request whose host
-did resolve a tenant must name the token's, or the token counts as forged.
+every link. The MAC is verified before any statement, and a request whose
+*host* resolved a tenant (``request.state.tenant_source`` ``subdomain`` or
+``fixed``) must name the token's, or the token counts as forged. A tenant that
+came from the visitor - a signed-in member's session, header or claim, or an
+anonymous header - proves nothing about the link: a member of organisation A
+who clicks B's link on the apex is unsubscribed from B.
 
 **One answer.** A real, ``test``, forged, oversized, already-used or
 other-tenant token gets the same 200 page, so the route is no oracle and a
@@ -29,6 +33,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
+from simple_module_db import no_tenant
 
 from sm_newsletter.core import constants, tenancy
 from sm_newsletter.core.clock import utcnow
@@ -41,6 +46,17 @@ __all__ = ["PATH", "router"]
 PATH = f"{constants.UNSUBSCRIBE_PREFIX}{{token}}"
 
 router = APIRouter(tags=["newsletter-public"])
+
+HOST_SOURCES = frozenset({"subdomain", "fixed"})
+"""``TenantMiddleware`` sources that come from the host, not from the visitor."""
+
+
+def _host_tenant(request: Request) -> str | None:
+    """The tenant the request's host resolved, or ``None`` (S8)."""
+    if getattr(request.state, "tenant_source", None) not in HOST_SOURCES:
+        return None
+    tenant = getattr(request.state, "tenant_id", None)
+    return tenant if tenancy.valid_tenant(tenant) else None
 
 
 def _page(request: Request, *, done: bool) -> HTMLResponse:
@@ -63,10 +79,9 @@ async def unsubscribe_page(request: Request, token: str) -> HTMLResponse:
 
 @router.post(PATH, response_class=HTMLResponse, include_in_schema=False)
 async def unsubscribe_one_click(request: Request, token: str) -> HTMLResponse:
-    await unsubscribe_by_token(
-        request.app,
-        token,
-        resolved_tenant=tenancy._resolved(request),
-        now=utcnow(),
-    )
+    host_tenant = _host_tenant(request)
+    # A visitor-derived tenant (a member's session) is still bound by the
+    # middleware; the service binds the token's own, so leave it first.
+    with no_tenant():
+        await unsubscribe_by_token(request.app, token, resolved_tenant=host_tenant, now=utcnow())
     return _page(request, done=True)

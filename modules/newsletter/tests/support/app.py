@@ -55,6 +55,8 @@ class _Auth(BaseHTTPMiddleware):
         request.state.resolved_permissions = set(_csv(request.headers.get("x-perms", "")))
         if tenant := request.headers.get("x-tenant"):
             request.state.tenant_id = tenant
+        if source := request.headers.get("x-tenant-source"):
+            request.state.tenant_source = source  # as ``TenantMiddleware`` records it
         return await call_next(request)
 
 
