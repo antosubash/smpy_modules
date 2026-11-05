@@ -83,9 +83,13 @@ function DeleteDraft({
   return (
     <AlertDialog open={open} onOpenChange={change}>
       <AlertDialogTrigger asChild>
-        <Button type="button" variant="ghost" size="sm">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-label={t(copy.label, { name: campaign.name })}
+        >
           {t(copy.confirm)}
-          <span className="sr-only">{t(copy.label, { name: campaign.name })}</span>
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>

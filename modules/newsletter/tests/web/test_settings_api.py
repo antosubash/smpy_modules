@@ -207,3 +207,30 @@ async def test_relay_change_clears_a_password_the_live_copy_lacks(client, built)
     assert res.status_code == 200, res.text
     assert res.json()["password_cleared"] is True
     assert "smtp_password" not in await _overrides(state)
+
+
+async def test_password_committed_by_another_process_is_cleared_too(client, built, monkeypatch):
+    """Another process (no shared asyncio lock) commits a password after the relay
+    write decided and applied: the relay change still ends with no password."""
+    import settings.reload as reload_mod
+
+    app, state = built
+    real = reload_mod.apply_changes_and_reload
+
+    async def _foreign(*args, **kwargs):
+        result = await real(*args, **kwargs)
+        async with state.session_factory() as other:
+            store = SettingsStore(SettingService(other))
+            await store.set_override(
+                constants.PACKAGE, "smtp_password", crypto.encrypt_value("foreign-pw"), "string"
+            )
+            await other.commit()
+        return result
+
+    monkeypatch.setattr(reload_mod, "apply_changes_and_reload", _foreign)
+    res = await client.put(URL, json={"smtp_host": "moved.example.net"}, headers=BOTH)
+    assert res.status_code == 200, res.text
+    assert res.json()["password_cleared"] is True
+    assert res.json()["has_password"] is False
+    assert "smtp_password" not in await _overrides(state)
+    assert app.state.sm_newsletter.settings.smtp_password == ""

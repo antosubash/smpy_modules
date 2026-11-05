@@ -4,7 +4,7 @@ import '../ui/components/editor/puck-editor.css';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { campaignsUrl } from '../ui/components/campaigns/urls';
 import { CampaignMeta } from '../ui/components/editor/CampaignMeta';
@@ -14,6 +14,7 @@ import { localizeConfig } from '../ui/components/editor/localizeConfig';
 import { PreviewPane } from '../ui/components/editor/PreviewPane';
 import { buildConfig, type Capabilities } from '../ui/components/editor/puckConfig';
 import { type EditorStatus, useCampaignEditor } from '../ui/hooks/useCampaignEditor';
+import { useLeaveGuard } from '../ui/hooks/useLeaveGuard';
 import { normalizeBody } from '../ui/utils/bodyDraft';
 import { keys, useT } from '../ui/utils/i18n';
 import { fromPuckData } from '../ui/utils/puckData';
@@ -93,19 +94,10 @@ export default function CampaignEditor() {
     [t],
   );
 
-  // Closing or reloading the tab while an edit is not on the server — inside
-  // the debounce, after a failed save, or held back by an unfinished block —
-  // asks first, as news, pagebuilder and records do. An in-app visit unmounts
-  // the hook, which flushes what can be saved.
-  useEffect(() => {
-    if (!editor.dirty) return;
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [editor.dirty]);
+  useLeaveGuard({
+    dirty: editor.dirty,
+    held: !readOnly && editor.incomplete,
+  });
 
   const statusKey = STATUS_LABEL[editor.status];
   const title = campaign ? campaign.name || t(copy.untitled) : t(copy.fallback_title);

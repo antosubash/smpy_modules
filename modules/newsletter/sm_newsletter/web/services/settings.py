@@ -101,5 +101,13 @@ async def update_settings(app: FastAPI, db: AsyncSession, changes: dict[str, Any
             await apply_changes_and_reload(
                 app, app.state.sm.event_bus, store, package=constants.PACKAGE, changes=changed
             )
-            await finalize_session(db)
+        if moved:
+            # Unconditional DML inside this transaction: it runs under the writer
+            # lock and sees the latest commit, so a password another process
+            # committed after the read above is removed as well.
+            stored = await store.get_overrides(constants.PACKAGE)
+            cleared = cleared or "smtp_password" in stored
+            await store.clear_override(constants.PACKAGE, "smtp_password")
+        # Always end the transaction here: it releases the advisory lock.
+        await finalize_session(db)
     return cleared

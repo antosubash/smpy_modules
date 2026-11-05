@@ -134,6 +134,7 @@
     "read_only": "Sie können diese Kampagne ansehen, aber nicht ändern.",
     "not_draft": "Diese Kampagne ist kein Entwurf mehr und kann nicht geändert werden.",
     "incomplete": "In einem Block fehlt ein Pflichtfeld. Die E-Mail wird wieder gespeichert, sobald es ausgefüllt ist.",
+    "leave_held": "Diese Kampagne verlassen? Ein Block ist unvollständig, daher ist diese Änderung nicht gespeichert.",
     "select_a_block": "Wählen Sie einen Block aus, um ihn zu bearbeiten.",
     "integration_missing": "Diese Inhaltsquelle ist auf dieser Website nicht verfügbar.",
     "meta": {
