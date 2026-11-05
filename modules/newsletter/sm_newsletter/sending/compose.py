@@ -34,7 +34,8 @@ def compose(
     when a personalised header would carry a line break or control character;
     a first name is flattened to one line first, so it never causes one. ``fill``
     raises the same ``ValueError`` for a tracking placeholder with no stored link
-    when click tracking is on (with clicks off the placeholder is left alone).
+    when click tracking is off (with clicks on the placeholder becomes the click
+    URL and no stored link is read).
     Each purpose gets its own
     token (T17). ``fill`` runs on the trusted snapshot before ``personalise`` (B2),
     so recipient data never reaches it."""
