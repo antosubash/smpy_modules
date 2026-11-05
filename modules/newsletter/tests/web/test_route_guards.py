@@ -60,6 +60,7 @@ EXPECTED = {
     ("GET", f"{VIEW}/"),
     ("GET", f"{VIEW}/settings"),
     ("GET", f"{VIEW}/campaigns/{{campaign_id}}"),
+    ("GET", f"{VIEW}/campaigns/{{campaign_id}}/report"),
 }
 
 

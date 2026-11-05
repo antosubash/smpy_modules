@@ -52,6 +52,7 @@ NOT_FOUND_DETAIL = "Not found"
 # Inertia page names (``sm_newsletter/pages/<name>.tsx``).
 _PAGE_CAMPAIGNS = "Newsletter/Campaigns"
 _PAGE_EDITOR = "Newsletter/CampaignEditor"
+_PAGE_REPORT = "Newsletter/CampaignReport"
 _PAGE_SETTINGS = "Newsletter/Settings"
 
 # Sidebar. The same keys are in ``locales/*.json`` under ``menu``.
