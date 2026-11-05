@@ -236,6 +236,7 @@ def test_no_token_in_any_log(world, caplog):
     lines = [r.getMessage() for r in caplog.records]
     assert any("console transport" in line for line in lines)  # the capture saw the send
     assert not [line for line in lines if UNSUBSCRIBE_PREFIX in line]
+    assert not [line for line in lines if "/newsletter/o/" in line or "/newsletter/c/" in line]
     assert not [line for line in lines if any(mac in line for mac in macs)]
 
 
