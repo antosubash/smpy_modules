@@ -222,7 +222,7 @@ async def test_segment_has_rules_and_filters(db):
     await db.flush()
     assert seg.rules == []
     assert seg.filters == ["tag:vip"]
-    seg.rules = [{"field": "tags", "op": "has", "value": "vip"}]
+    seg.rules = [{"field": "tags", "op": "any", "value": ["vip"]}]
     await db.flush()
     cols = Base.metadata.tables["newsletter_segment"].c
     assert not cols.rules.nullable
