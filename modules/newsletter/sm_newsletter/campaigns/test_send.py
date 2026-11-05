@@ -1,13 +1,14 @@
 """Send a campaign to up to five addresses, as the subscriber would see it.
 
-Everything after the lookup runs inside the install-wide dispatch lock
-(:mod:`sm_newsletter.sending.lock`, amendment 1): the sender configuration and
-every header input are re-checked (amendment 5), the email is rendered, the
-budget admits all the recipients or none (ruling C2: a refusal is 429 with
-nothing sent and no ledger row), the transport session opens (a relay that
-cannot be reached is 502, before any row), and then per recipient one ledger
-row is committed ``pending`` before its SMTP call and closed with the result
-after it.
+Before the lock: the campaign lookup (ruling C4), the cancelled check, the
+sender configuration, the header inputs and the render, so a 404, 409 or 422
+never waits behind the dispatcher. Inside the install-wide dispatch lock
+(:mod:`sm_newsletter.sending.lock`, amendment 1): the exact header values
+being sent are re-checked (amendment 5), the budget admits all the recipients
+or none (ruling C2: a refusal is 429 with nothing sent and no ledger row), the
+transport session opens (a relay that cannot be reached is 502, before any
+row), and then per recipient the lock is renewed and one ledger row is
+committed ``pending`` before its SMTP call and closed with the result after it.
 
 The message is the campaign's own, with ``[TEST] `` before the subject, no
 recipient name and the test unsubscribe link (R1), whose token the unsubscribe
@@ -32,6 +33,7 @@ from sm_newsletter.core import constants
 from sm_newsletter.core.clock import utcnow
 from sm_newsletter.core.errors import (
     CampaignCancelled,
+    DispatchBusy,
     InvalidCampaign,
     PublicBaseUrlRequired,
     SenderNotConfigured,
@@ -74,40 +76,49 @@ async def send_test(
 ) -> list[TestSendResult]:
     """Send campaign ``campaign_id`` to ``recipients`` (already normalised, 1 to 5).
 
-    ``now`` pins the ledger's clock (tests); the rows of one call share it.
+    ``now`` pins the clock (tests): admission and every row use it. Without it
+    each row is stamped when its SMTP call starts. If the SQLite lock's lease
+    is lost mid-send (:meth:`HeldLock.renew`), the remaining recipients are
+    not sent and answer ``failed`` / ``dispatch_busy`` with no ledger row.
     """
     if not 1 <= len(recipients) <= MAX_TEST_RECIPIENTS:
         raise InvalidCampaign("recipients: invalid length")
     settings: NewsletterSettings = getattr(app.state, constants.PACKAGE).settings
     factory = app.state.sm.db.session_factory
-    async with dispatch_lock(factory, holder=HOLDER):
-        campaign = await require_campaign(
-            session, tenant_id=tenant_id, campaign_id=campaign_id, roles=roles
-        )
-        if campaign.status == "cancelled":
-            raise CampaignCancelled()
-        _check_sender(settings)
-        _check_headers(campaign)
-        message = await _message(app, tenant_id, campaign, settings)
-        transport = transport_for(settings)
-        at = now or utcnow()
-        await admit(factory, settings, n=len(recipients), now=at)
+    # Outside the lock: a 404, 409 or 422 never waits behind the dispatcher.
+    campaign = await require_campaign(
+        session, tenant_id=tenant_id, campaign_id=campaign_id, roles=roles
+    )
+    if campaign.status == "cancelled":
+        raise CampaignCancelled()
+    _check_sender(settings)
+    _check_headers(campaign)
+    message = await _message(app, tenant_id, campaign, settings)
+    transport = transport_for(settings)
+    await finalize_session(session)  # no read transaction held while waiting
+    async with dispatch_lock(factory, holder=HOLDER) as lock:
+        _check_message(message)  # amendment 5: the exact values sent, before admission
+        await admit(factory, settings, n=len(recipients), now=now or utcnow())
         results: list[TestSendResult] = []
         async with transport.session() as smtp:
             headers = dict(message.headers) if transport.supports_list_unsubscribe else {}
             for recipient in recipients:
+                try:
+                    await lock.renew()
+                except DispatchBusy:
+                    results.append(TestSendResult(recipient, "failed", None, DispatchBusy.code))
+                    continue
                 attempt = await ledger.open_attempt(
                     session,
                     tenant_id=tenant_id,
-                    campaign_id=campaign.id,
+                    campaign_id=campaign_id,
                     send_id=None,
                     kind=KIND,
                     recipient=recipient,
-                    now=at,
+                    now=now or utcnow(),
                 )
                 await finalize_session(session)
-                outgoing = replace(message, to=recipient, headers=headers)
-                result = await smtp.send(outgoing)
+                result = await smtp.send(replace(message, to=recipient, headers=headers))
                 await ledger.close_attempt(session, attempt, result)
                 await finalize_session(session)
                 results.append(
@@ -116,16 +127,27 @@ async def send_test(
     return results
 
 
+def _check_message(message: OutgoingMessage) -> None:
+    for field in ("sender", "subject", "reply_to"):
+        value = getattr(message, field)
+        if value is None:
+            continue
+        try:
+            check_header_text(value, field=field)
+        except ValueError as exc:
+            raise InvalidCampaign(str(exc)) from None
+
+
 def _check_sender(settings: NewsletterSettings) -> None:
     required = ["from_address", "physical_address"]
     if settings.transport == "smtp":
         required.append("smtp_host")
     for field in required:
-        if not str(getattr(settings, field)).strip():
+        if not (getattr(settings, field) or "").strip():
             raise SenderNotConfigured(f"{field} is not set")
     for field in ("from_name", "from_address", "reply_to"):
         try:
-            check_header_text(getattr(settings, field), field=field)
+            check_header_text(getattr(settings, field) or "", field=field)
         except ValueError as exc:
             raise SenderNotConfigured(str(exc)) from None
 

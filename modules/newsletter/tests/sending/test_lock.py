@@ -87,3 +87,67 @@ async def test_sqlite_expired_lease_is_taken_over(state):
     assert (await holder() or "").startswith("second:")
     await second.__aexit__(None, None, None)
     assert await holder() is None
+
+
+async def test_cancelled_inside_the_block_releases(state):
+    factory = state.session_factory
+    entered = asyncio.Event()
+
+    async def hold() -> None:
+        async with dispatch_lock(factory, holder="first", wait_s=1):
+            entered.set()
+            await asyncio.sleep(30)
+
+    task = asyncio.create_task(hold())
+    await entered.wait()
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+    async with dispatch_lock(factory, holder="second", wait_s=0.5):
+        pass
+
+
+async def test_cancelled_while_acquiring_never_leaks(state):
+    """Cancel after 0..N scheduler steps, so some cancels land mid-query
+    (on Postgres, possibly after the server granted the lock)."""
+    factory = state.session_factory
+
+    async def take() -> None:
+        async with dispatch_lock(factory, holder="racer", wait_s=1):
+            await asyncio.sleep(30)
+
+    for steps in range(25):
+        task = asyncio.create_task(take())
+        for _ in range(steps):
+            await asyncio.sleep(0)
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        async with dispatch_lock(factory, holder="after", wait_s=1):
+            pass
+
+
+@pytest.mark.skipif(USING_POSTGRES, reason="the lease is the SQLite lock row's")
+async def test_sqlite_renew_extends_or_reports_the_loss(state):
+    factory = state.session_factory
+
+    async def until() -> datetime:
+        async with factory() as db:
+            return (await db.execute(select(DispatchLock.locked_until))).scalar_one()
+
+    async with dispatch_lock(factory, holder="me", wait_s=1, lease_s=60) as held:
+        before = await until()
+        await asyncio.sleep(0.01)
+        await held.renew()
+        assert await until() > before
+        async with factory() as db:
+            await db.execute(update(DispatchLock).values(holder="thief:1"))
+            await finalize_session(db)
+        with pytest.raises(DispatchBusy):
+            await held.renew()
+    async with factory() as db:
+        assert (await db.execute(select(DispatchLock.holder))).scalar_one() == "thief:1"
+
+
+@pytest.mark.skipif(not USING_POSTGRES, reason="the advisory lock's renew")
+async def test_postgres_renew_is_a_no_op(state):
+    async with dispatch_lock(state.session_factory, holder="me", wait_s=1) as held:
+        await held.renew()
