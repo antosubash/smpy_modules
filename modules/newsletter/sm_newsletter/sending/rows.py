@@ -31,6 +31,7 @@ __all__ = [
     "bump",
     "claim",
     "next_row",
+    "pause_campaign",
     "record",
     "skip",
 ]
@@ -43,7 +44,9 @@ BACKOFF = (timedelta(minutes=5), timedelta(minutes=30))
 SkipStatus = Literal["suppressed", "skipped_unsubscribed"]
 
 QUEUED = "queued"
+CANCELLED = "cancelled"
 _LIVE = (QUEUED, SENDING)  # what ``record`` may still finish
+_RUNNING = (SENDING, PAUSED)  # a campaign whose queued rows may still go out
 _SEND = Send.__table__  # ty: ignore[unresolved-attribute]
 _CAMPAIGN = Campaign.__table__  # ty: ignore[unresolved-attribute]
 
@@ -129,16 +132,19 @@ async def record(
     tenant, campaign_id = send.tenant_id, send.campaign_id
     common: dict[str, Any] = {"lease_until": None, "last_error": result.detail}
     counted = {**common, "attempts": _SEND.c.attempts + 1}
+    terminal = {**counted, "retry_at": None}
     counter: str | None = None
     action = verdict.action
     if action == "sent":
-        values = {**counted, "status": "sent", "sent_at": now, "last_error": None}
+        values = {**terminal, "status": "sent", "sent_at": now, "last_error": None}
         counter = "sent_count"
     elif action == "retry":
+        # Read off the row as claimed, written as ``attempts + 1`` in SQL: the
+        # same number, because the dispatch lock serialises every writer.
         attempts = send.attempts + 1
         if attempts >= MAX_ATTEMPTS:
             values = {
-                **counted,
+                **terminal,
                 "status": "failed",
                 "error_kind": constants.ERROR_RETRIES_EXHAUSTED,
             }
@@ -146,10 +152,10 @@ async def record(
         else:
             values = {**counted, "status": QUEUED, "retry_at": now + BACKOFF[attempts - 1]}
     elif action in ("unknown", "fail"):
-        values = {**counted, "status": "failed", "error_kind": verdict.error_kind}
+        values = {**terminal, "status": "failed", "error_kind": verdict.error_kind}
         counter = "failed_count"
     elif action == "bounce":
-        values = {**counted, "status": "bounced", "error_kind": verdict.error_kind}
+        values = {**terminal, "status": "bounced", "error_kind": verdict.error_kind}
         counter = "bounced_count"
     elif action == "pause":
         values = {**common, "status": QUEUED}
@@ -171,11 +177,55 @@ async def record(
     elif action == "pause":
         assert verdict.pause_code is not None
         detail = " ".join(str(p) for p in (result.code, result.detail) if p not in (None, ""))
-        reason = paused_reason(verdict.pause_code, detail)
-        await transition(
+        await pause_campaign(
             session,
             tenant_id=tenant,
             campaign_id=campaign_id,
-            from_statuses=(SENDING,),
-            values={"status": PAUSED, "paused_reason": reason, "updated_at": now},
+            code=verdict.pause_code,
+            detail=detail,
+            now=now,
         )
+    if values["status"] == QUEUED:
+        await _cancel_if_stranded(session, send)
+
+
+async def pause_campaign(
+    session: AsyncSession,
+    *,
+    tenant_id: str,
+    campaign_id: int,
+    code: str,
+    detail: str = "",
+    now: datetime,
+) -> bool:
+    """``sending -> paused`` with ``code``; whether it moved."""
+    reason = paused_reason(code, detail)
+    return await transition(
+        session,
+        tenant_id=tenant_id,
+        campaign_id=campaign_id,
+        from_statuses=(SENDING,),
+        values={"status": PAUSED, "paused_reason": reason, "updated_at": now},
+    )
+
+
+async def _cancel_if_stranded(session: AsyncSession, send: Send) -> None:
+    """A row put back to ``queued`` after its campaign was cancelled mid-send
+    (a cancel moves only ``queued`` rows, and this one was ``sending``) ends
+    ``cancelled`` too, instead of waiting forever in a finished campaign."""
+    running = exists().where(
+        _CAMPAIGN.c.id == _SEND.c.campaign_id,
+        _CAMPAIGN.c.tenant_id == send.tenant_id,
+        _CAMPAIGN.c.status.in_(_RUNNING),
+    )
+    await session.execute(
+        update(_SEND)
+        .where(
+            _SEND.c.id == send.id,
+            _SEND.c.tenant_id == send.tenant_id,
+            _SEND.c.status == QUEUED,
+            ~running,
+        )
+        .values(status=CANCELLED)
+    )
+    mark_written(session)

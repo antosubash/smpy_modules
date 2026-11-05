@@ -4,7 +4,9 @@ The caller holds the dispatch lock. Per recipient, in this order:
 
 1. read the campaign (a shortcut: the claim decides) and its next due row;
 2. re-check the subscriber (still confirmed in records, not suppressed): an
-   ineligible row is skipped with no SMTP call and no ledger row;
+   ineligible row is skipped with no SMTP call and no ledger row, and a list
+   that is gone (deleted, or no longer a list) pauses the campaign with
+   ``list_unavailable``, as freeze does;
 3. compose from the render snapshot (a bad header fails the row, unsent);
 4. ``lock.renew()``;
 5. the reservation, one transaction: ``lock.fence``, the conditional claim
@@ -22,9 +24,14 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 
 from simple_module_db import finalize_session
-from sm_records.contracts.newsletter import subscribers_by_uuid
+from sm_records.contracts.newsletter import (
+    SubscriberFilterError,
+    subscribers_by_uuid,
+    subscription_lists,
+)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,6 +56,8 @@ Clock = Callable[[], datetime]
 
 _SKIP = Verdict("skip", False)
 _INVALID = Verdict("fail", False, error_kind=constants.ERROR_INVALID_MESSAGE)
+_NO_LIST = Verdict("pause", True, pause_code=constants.PAUSE_LIST_UNAVAILABLE)
+_LIST_GONE = "list_unavailable"
 
 
 @dataclass(frozen=True)
@@ -96,6 +105,16 @@ async def _deliver(
     row, list_key, render = found
     status = await _ineligible(session, tenant_id, list_key, row)
     await session.rollback()  # end the read before any write
+    if status == _LIST_GONE:
+        await rows.pause_campaign(
+            session,
+            tenant_id=tenant_id,
+            campaign_id=campaign_id,
+            code=constants.PAUSE_LIST_UNAVAILABLE,
+            now=clock(),
+        )
+        await finalize_session(session)
+        return Step(False, _NO_LIST)
     if status is not None:
         await rows.skip(session, row, status=status)
         await finalize_session(session)
@@ -142,11 +161,18 @@ async def _due(
 
 async def _ineligible(
     session: AsyncSession, tenant_id: str, list_key: str, row: Send
-) -> rows.SkipStatus | None:
-    """Why ``row`` must not be sent any more, or ``None``."""
-    hits = await subscribers_by_uuid(
-        session, tenant_id=tenant_id, type_key=list_key, uuids=[row.record_uuid]
-    )
+) -> rows.SkipStatus | Literal["list_unavailable"] | None:
+    """Why ``row`` must not be sent any more, or ``None``. The list gone (the
+    type deleted, or no longer a list) is about the campaign, not the
+    subscriber: :data:`_LIST_GONE`, and the campaign pauses as freeze's does."""
+    if list_key not in await subscription_lists(session, tenant_id=tenant_id):
+        return _LIST_GONE
+    try:
+        hits = await subscribers_by_uuid(
+            session, tenant_id=tenant_id, type_key=list_key, uuids=[row.record_uuid]
+        )
+    except SubscriberFilterError:  # de-listed since the check above
+        return _LIST_GONE
     hit = hits.get(row.record_uuid)
     if hit is None or hit.trashed or hit.status != "confirmed":
         return "skipped_unsubscribed"

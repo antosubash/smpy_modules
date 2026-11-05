@@ -99,6 +99,7 @@ async def test_retry_backoff_then_exhausted(state):
     await deliver(state, cid, smtp, now=second_retry)
     row = await one_row(state, cid)
     assert (row.status, row.error_kind, row.attempts) == ("failed", "retries_exhausted", 3)
+    assert row.retry_at is None  # terminal: no stale schedule
     assert (await counters(state, cid))["failed_count"] == 1
     assert len(smtp.sent) == 3
     assert await deliver(state, cid, smtp, now=second_retry + timedelta(days=1)) is None
