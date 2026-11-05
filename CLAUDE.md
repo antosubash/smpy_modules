@@ -219,7 +219,11 @@ snapshot written when the campaign was scheduled. `/newsletter/u/{token}` is the
 documented exception** to "the public surface binds the resolved tenant", after records' signed
 form token: it binds the tenant from the HMAC-verified token, answers an unknown, foreign or
 forged token exactly as it answers a real one (so it cannot probe which tokens exist), and
-carries no CSRF on purpose (RFC 8058). Only an RCPT-stage `5.1.x` bounces; any other 5xx pauses
+carries no CSRF on purpose (RFC 8058). `/newsletter/o/` and `/newsletter/c/` follow the same rule
+(tenant from the verified token, purpose-bound MACs, one answer for forged tokens); only a
+*host-derived* tenant (`subdomain`/`fixed`) can refuse a token, never a session or header one
+(`public_tenant.host_tenant`). The click route redirects only to the campaign's own stored
+`newsletter_link` URL, and tracking stores no IP or user agent. Only an RCPT-stage `5.1.x` bounces; any other 5xx pauses
 the campaign. Docs: `modules/newsletter/docs/sending.md` and `operations.md`.
 
 **A plugin registers images steps and presets from `images_extensions.py`, never
