@@ -100,7 +100,7 @@ async def test_post_is_idempotent(world):
 async def test_old_link_after_resignup_changes_nothing(world):
     """Review Focus 3: the person signed up and confirmed again after the mail."""
     app, state, events, s = world
-    genuine_page = (await call(app, "POST", "x.1.1.AAAA")).content
+    any_post_page = (await call(app, "POST", "x.1.1.AAAA")).content
     # Left the list some other way (records' own link), then came back.
     with records_scope(T):
         async with state.session_factory() as db:
@@ -118,7 +118,7 @@ async def test_old_link_after_resignup_changes_nothing(world):
     events.clear()
 
     res = await call(app, "POST", s.token, data=ONE_CLICK)
-    assert res.content == genuine_page
+    assert res.content == any_post_page
     assert await status_of(state, s) == "confirmed"
     assert await suppressions(state, T) == []
     assert (await counters(state, s))["unsubscribe_count"] == 0

@@ -40,13 +40,15 @@ class Sent:
         )
 
 
-async def sent_campaign(state: Any, tenant: str, email: str, *, new_list: bool = True) -> Sent:
-    """In ``tenant``: the list (unless ``new_list`` is false), ``email`` confirmed on
-    it, and a ``sent`` campaign whose one ``sent`` row went to ``email`` after the
-    confirmation."""
+async def sent_campaign(
+    state: Any, tenant: str, email: str, *, new_list: bool = True, status: str = "confirmed"
+) -> Sent:
+    """In ``tenant``: the list (unless ``new_list`` is false), ``email`` on it with
+    ``status``, and a ``sent`` campaign whose one ``sent`` row went to ``email``
+    after the subscriber was written."""
     if new_list:
         await seed_list(state, tenant)
-    uuid = await seed_subscriber(state, tenant, email, "confirmed")
+    uuid = await seed_subscriber(state, tenant, email, status)
     now = datetime.now(UTC)
     with tenant_scope(tenant):
         async with state.session_factory() as db:
