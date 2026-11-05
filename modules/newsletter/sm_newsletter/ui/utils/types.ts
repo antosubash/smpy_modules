@@ -30,6 +30,46 @@ export interface CampaignDetail extends CampaignSummary {
   reply_to: string | null;
   audience: string;
   body: Block[];
+  scheduled_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  paused_code: PausedCode | null;
+  paused_detail: string | null;
+  failed_count: number;
+  bounced_count: number;
+  suppressed_count: number;
+  unsubscribe_count: number;
+}
+
+export type PausedCode = 'manual' | 'smtp_rejected' | 'smtp_auth' | 'list_unavailable';
+
+/** `GET /campaigns/{id}/progress`. */
+export interface Progress {
+  status: string;
+  recipients: number;
+  queued: number;
+  sending: number;
+  sent: number;
+  failed: number;
+  bounced: number;
+  suppressed: number;
+  skipped: number;
+  cancelled: number;
+  paused_code: PausedCode | null;
+  paused_detail: string | null;
+  scheduled_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  estimated_finish: string | null;
+  daily_rate: number;
+}
+
+/** `GET /campaigns/{id}/estimate`. */
+export interface Estimate {
+  recipients: number;
+  estimated_finish: string;
+  overlaps: boolean;
+  daily_rate: number;
 }
 
 export interface CampaignPage {

@@ -297,5 +297,53 @@
     },
     "incomplete": "Unfinished blocks are not in the saved draft, so they are left out of the test.",
     "no_base_url": "The site's public base URL is not set (host settings), so test sends will be refused."
+  },
+  "sending": {
+    "send_button": "Send…",
+    "dialog": {
+      "title": "Send campaign",
+      "description": "Send \"{name}\" to the whole list. Once sending starts, the content can no longer be changed.",
+      "now": "Send now",
+      "later": "Schedule for later",
+      "at_label": "Send at",
+      "recipients": "{count} recipients",
+      "estimate": "Sending should finish around {date}.",
+      "overlap": "This overlaps with another campaign that is still sending, so it may finish later.",
+      "confirm": "Send",
+      "sending": "Sending…",
+      "cancel": "Cancel"
+    },
+    "panel": {
+      "scheduled_for": "Scheduled for {date}",
+      "progress": "{sent} of {total} sent",
+      "eta": "Estimated finish: {date} ({days} days at {rate} per day)",
+      "finished": "Finished {date}",
+      "paused": "Paused: {detail}",
+      "counts": {
+        "failed": "{count} failed",
+        "bounced": "{count} bounced",
+        "suppressed": "{count} suppressed",
+        "skipped": "{count} skipped",
+        "unsubscribed": "{count} unsubscribed"
+      }
+    },
+    "actions": {
+      "pause": "Pause",
+      "resume": "Resume",
+      "cancel": "Cancel sending",
+      "unschedule": "Unschedule"
+    },
+    "cancel_confirm": {
+      "title": "Cancel this campaign?",
+      "description": "Messages not yet sent will not be sent. This cannot be undone.",
+      "confirm": "Cancel sending",
+      "keep": "Keep sending"
+    },
+    "paused_code": {
+      "manual": "Paused by you",
+      "smtp_rejected": "The mail server rejected the messages",
+      "smtp_auth": "The mail server refused the login",
+      "list_unavailable": "The newsletter list is not available"
+    }
   }
 }

@@ -297,5 +297,53 @@
     },
     "incomplete": "Unfertige Blöcke sind nicht im gespeicherten Entwurf und fehlen daher im Test.",
     "no_base_url": "Die öffentliche Basis-URL der Website ist nicht gesetzt (Host-Einstellungen), daher werden Testsendungen abgelehnt."
+  },
+  "sending": {
+    "send_button": "Senden…",
+    "dialog": {
+      "title": "Kampagne senden",
+      "description": "\"{name}\" an die gesamte Liste senden. Sobald der Versand beginnt, kann der Inhalt nicht mehr geändert werden.",
+      "now": "Jetzt senden",
+      "later": "Für später planen",
+      "at_label": "Senden am",
+      "recipients": "{count} Empfänger",
+      "estimate": "Der Versand sollte etwa am {date} abgeschlossen sein.",
+      "overlap": "Das überschneidet sich mit einer anderen Kampagne, die noch versendet wird, und kann daher später fertig werden.",
+      "confirm": "Senden",
+      "sending": "Wird gesendet…",
+      "cancel": "Abbrechen"
+    },
+    "panel": {
+      "scheduled_for": "Geplant für {date}",
+      "progress": "{sent} von {total} gesendet",
+      "eta": "Voraussichtlich fertig: {date} ({days} Tage bei {rate} pro Tag)",
+      "finished": "Abgeschlossen am {date}",
+      "paused": "Pausiert: {detail}",
+      "counts": {
+        "failed": "{count} fehlgeschlagen",
+        "bounced": "{count} zurückgewiesen",
+        "suppressed": "{count} unterdrückt",
+        "skipped": "{count} übersprungen",
+        "unsubscribed": "{count} abgemeldet"
+      }
+    },
+    "actions": {
+      "pause": "Pausieren",
+      "resume": "Fortsetzen",
+      "cancel": "Versand abbrechen",
+      "unschedule": "Planung aufheben"
+    },
+    "cancel_confirm": {
+      "title": "Diese Kampagne abbrechen?",
+      "description": "Noch nicht gesendete Nachrichten werden nicht mehr gesendet. Das lässt sich nicht rückgängig machen.",
+      "confirm": "Versand abbrechen",
+      "keep": "Weiter senden"
+    },
+    "paused_code": {
+      "manual": "Von Ihnen pausiert",
+      "smtp_rejected": "Der Mailserver hat die Nachrichten abgelehnt",
+      "smtp_auth": "Der Mailserver hat die Anmeldung verweigert",
+      "list_unavailable": "Die Newsletter-Liste ist nicht verfügbar"
+    }
   }
 }
