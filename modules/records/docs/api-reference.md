@@ -1756,6 +1756,18 @@ tenant, `tenant_scope` binds it, every query pins it); argument errors are
   tenant without the list.
 - **`subscriber_admin_url(type_key, uuid=None)`** is the records console URL
   (`/admin/records/{key}` or `/admin/records/{key}/{uuid}`). Pure.
+- **`lock_confirmation(session, *, tenant_id, type_key, email)`** is the one
+  write-side call: the untrashed subscriber of `type_key` holding `email`
+  (normalised), its row **locked until the caller's transaction ends**, as a
+  `ConfirmProof(uuid, confirmed_at)` only when it is `confirmed` with a readable
+  `sm_confirmed_at`; `None` for an unknown, pending, unsubscribed or trashed
+  one, a tenant without the list, or a type that is no longer one. Newsletter's
+  suppression lift calls it inside its own write transaction. Every unsubscribe
+  (`opt_in.leave`: this contract's `unsubscribe`, records' own link) takes the
+  same row lock before it decides (`public_submissions.row_lock.lock_record`:
+  the type lock, then `SELECT … FOR UPDATE` on Postgres; on SQLite the type
+  lock is already the database's write lock), so an opt-out cannot land
+  between the lift's check and its commit.
 
 ---
 

@@ -8,11 +8,15 @@ with no such list reads as empty. Argument errors are ``ValueError`` before any
 query; a term records cannot answer raises :class:`SubscriberFilterError`.
 
 Browsing lists subscribers in **any** status; it is not an audience.
+
+:func:`lock_confirmation` is the one write-side call here: it locks the
+subscriber's row for newsletter's suppression lift (C2).
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Literal
 from urllib.parse import quote
 
@@ -22,8 +26,9 @@ from sqlmodel import SQLModel
 from sm_records.contracts._newsletter_args import SubscriberHit, _checked_tenant, _hit
 from sm_records.core.constants import VIEW_PREFIX
 from sm_records.core.tenancy import tenant_scope
-from sm_records.public_submissions import campaign_browse, campaign_reads
-from sm_records.public_submissions.campaign_reads import SubscriberFilterError
+from sm_records.public_submissions import campaign_browse, campaign_reads, subscribe
+from sm_records.public_submissions.campaign_reads import SubscriberFilterError, moment
+from sm_records.public_submissions.row_lock import lock_record
 from sm_records.schema.types import FieldType
 
 __all__ = [
@@ -32,6 +37,7 @@ __all__ = [
     "MAX_BROWSE_OFFSET",
     "MAX_SEARCH_LEN",
     "BrowseStatus",
+    "ConfirmProof",
     "FieldChoice",
     "ListField",
     "SubscriberFilterError",
@@ -39,6 +45,7 @@ __all__ = [
     "SubscriberPage",
     "browse_subscribers",
     "list_fields",
+    "lock_confirmation",
     "subscriber_admin_url",
     "subscriber_status_counts",
 ]
@@ -62,6 +69,13 @@ class ListField(SQLModel):
     many: bool
     choices: list[FieldChoice]
     system: bool
+
+
+class ConfirmProof(SQLModel):
+    """A live subscriber's confirmation, read under its row lock."""
+
+    uuid: str
+    confirmed_at: datetime
 
 
 class SubscriberPage(SQLModel):
@@ -183,3 +197,42 @@ def subscriber_admin_url(type_key: str, uuid: str | None = None) -> str:
     """The records console URL of a list, or of one subscriber. Pure."""
     base = f"{VIEW_PREFIX}/{quote(type_key, safe='')}"
     return base if uuid is None else f"{base}/{quote(uuid, safe='')}"
+
+
+async def lock_confirmation(
+    session: AsyncSession, *, tenant_id: str, type_key: str, email: str
+) -> ConfirmProof | None:
+    """The untrashed subscriber of ``type_key`` holding ``email`` (normalised),
+    locked to the end of the caller's transaction; a proof only when it is
+    ``confirmed`` with a readable ``sm_confirmed_at``.
+
+    ``None`` for an unknown, pending, unsubscribed or trashed one, a tenant
+    without that list, or a type that is no longer a list. Must run inside the
+    caller's write transaction: every unsubscribe takes the same lock before it
+    decides, so the answer holds until the caller commits or rolls back."""
+    tenant = _checked_tenant(tenant_id)
+    if not isinstance(email, str) or not isinstance(type_key, str):
+        raise ValueError("type_key and email must be str")
+    address = subscribe.normalise(email)
+    if not address:
+        return None
+    with tenant_scope(tenant):
+        try:
+            rtype = await campaign_reads.list_type(session, tenant, type_key)
+        except SubscriberFilterError:
+            return None
+        found = None if rtype is None else await subscribe.find(session, rtype, address)
+        if rtype is None or found is None:
+            return None
+        record = await lock_record(session, rtype, found)
+    data = record.data or {}
+    confirmed_at = moment(data.get("sm_confirmed_at"))
+    if (
+        record.is_deleted
+        or record.tenant_id != tenant
+        or subscribe.normalise(data.get("sm_email")) != address
+        or data.get("sm_status") != subscribe.CONFIRMED
+        or confirmed_at is None
+    ):
+        return None
+    return ConfirmProof(uuid=record.uuid, confirmed_at=confirmed_at)

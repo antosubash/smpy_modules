@@ -142,7 +142,9 @@ async def leave(
         }
         return values, _cleared(rtype, row)
 
-    outcome = await transition(db, rtype, record, derive, settings=settings)
+    # Locked: the row is decided from under the lock ``lock_confirmation``
+    # takes, so an unsubscribe and a suppression lift serialise (C2).
+    outcome = await transition(db, rtype, record, derive, settings=settings, lock=True)
     if outcome.wrote:
         before = outcome.before.get("sm_status")
         events.emit(db, changed(rtype, outcome.record, before, UNSUBSCRIBED))

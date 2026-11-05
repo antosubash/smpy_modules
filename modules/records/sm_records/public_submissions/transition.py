@@ -34,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.core import events
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType
+from sm_records.public_submissions.row_lock import lock_record
 from sm_records.public_submissions.system import _merge_marks, _ordinary, _reload
 from sm_records.records.services import records as record_service
 from sm_records.records.services._payload import field_defs
@@ -79,12 +80,16 @@ async def transition(
     derive: Callable[[Record], Change | None],
     *,
     settings: RecordsSettings,
+    lock: bool = False,
 ) -> Outcome:
     """Apply ``derive(row)`` to ``record`` as a compare-and-set, re-deciding it
     from the reloaded row on every attempt. ``Conflict`` if the row never
-    held still."""
+    held still.
+
+    ``lock=True`` reloads through :func:`.row_lock.lock_record` instead: the
+    row is decided from under a lock held to the end of the transaction."""
     for _ in range(ATTEMPTS):
-        record = await _reload(db, record)
+        record = await (lock_record(db, rtype, record) if lock else _reload(db, record))
         before = dict(record.data or {})
         change = derive(record)
         if change is None:
