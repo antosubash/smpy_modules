@@ -263,7 +263,15 @@
     "stale": "This campaign was changed elsewhere. Reload it to continue.",
     "tenant_required": "No organisation is active for this account.",
     "transport_unavailable": "The mail server is not available.",
-    "unknown_list": "No such newsletter list."
+    "unknown_list": "No such newsletter list.",
+    "invalid_segment": "The segment is not valid.",
+    "segment_name_taken": "A segment with that name already exists on this list.",
+    "segment_in_use": "A draft campaign still uses this segment.",
+    "unknown_segment": "No such segment.",
+    "segment_list_mismatch": "The segment belongs to a different list.",
+    "unknown_tag": "That tag does not exist on this list.",
+    "invalid_audience": "The audience is not valid.",
+    "invalid_query": "A query parameter is not valid."
   },
   "preview": {
     "tab_edit": "Edit",
