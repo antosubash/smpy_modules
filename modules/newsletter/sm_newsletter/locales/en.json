@@ -10,6 +10,62 @@
     "campaigns": "Campaigns",
     "settings": "Settings"
   },
+  "campaigns": {
+    "title": "Campaigns",
+    "description": "Write an email, preview it and send it to a newsletter list.",
+    "search_label": "Search campaigns",
+    "search_placeholder": "Search by name or subject",
+    "status_label": "Status",
+    "status_all": "All statuses",
+    "status": {
+      "draft": "Draft",
+      "scheduled": "Scheduled",
+      "sending": "Sending",
+      "paused": "Paused",
+      "sent": "Sent",
+      "cancelled": "Cancelled"
+    },
+    "loading": "Loading campaigns",
+    "empty_title": "No campaigns yet",
+    "empty_description": "Create a campaign to write your first email.",
+    "no_match": "No campaign matches your search.",
+    "clear": "Clear filters",
+    "columns": {
+      "name": "Name",
+      "subject": "Subject",
+      "status": "Status",
+      "list": "List",
+      "updated": "Updated",
+      "actions": "Actions"
+    },
+    "no_subject": "(no subject)",
+    "never": "Never",
+    "showing": "Showing {from}-{to} of {total}",
+    "previous": "Previous",
+    "next": "Next",
+    "new": {
+      "trigger": "New campaign",
+      "title": "New campaign",
+      "description": "Name the campaign and choose the list it goes to. You write the email next.",
+      "name_label": "Name",
+      "name_placeholder": "Spring offers",
+      "list_label": "Newsletter list",
+      "list_placeholder": "Choose a list",
+      "loading_lists": "Loading lists",
+      "no_lists": "There are no newsletter lists yet. Create a newsletter list in Records first, then come back.",
+      "cancel": "Cancel",
+      "create": "Create",
+      "creating": "Creating"
+    },
+    "delete": {
+      "label": "Delete {name}",
+      "title": "Delete this campaign?",
+      "description": "The draft \"{name}\" will be deleted. This cannot be undone.",
+      "cancel": "Cancel",
+      "confirm": "Delete",
+      "working": "Deleting"
+    }
+  },
   "errors": {
     "generic": "Something went wrong. Please try again.",
     "csrf_failed": "Your session has expired. Reload the page and try again.",

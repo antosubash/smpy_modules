@@ -10,6 +10,62 @@
     "campaigns": "Kampagnen",
     "settings": "Einstellungen"
   },
+  "campaigns": {
+    "title": "Kampagnen",
+    "description": "Schreiben Sie eine E-Mail, sehen Sie sie in der Vorschau an und senden Sie sie an eine Newsletter-Liste.",
+    "search_label": "Kampagnen durchsuchen",
+    "search_placeholder": "Nach Name oder Betreff suchen",
+    "status_label": "Status",
+    "status_all": "Alle Status",
+    "status": {
+      "draft": "Entwurf",
+      "scheduled": "Geplant",
+      "sending": "Wird gesendet",
+      "paused": "Pausiert",
+      "sent": "Gesendet",
+      "cancelled": "Abgebrochen"
+    },
+    "loading": "Kampagnen werden geladen",
+    "empty_title": "Noch keine Kampagnen",
+    "empty_description": "Legen Sie eine Kampagne an, um Ihre erste E-Mail zu schreiben.",
+    "no_match": "Keine Kampagne entspricht Ihrer Suche.",
+    "clear": "Filter zurücksetzen",
+    "columns": {
+      "name": "Name",
+      "subject": "Betreff",
+      "status": "Status",
+      "list": "Liste",
+      "updated": "Aktualisiert",
+      "actions": "Aktionen"
+    },
+    "no_subject": "(kein Betreff)",
+    "never": "Nie",
+    "showing": "{from}-{to} von {total}",
+    "previous": "Zurück",
+    "next": "Weiter",
+    "new": {
+      "trigger": "Neue Kampagne",
+      "title": "Neue Kampagne",
+      "description": "Benennen Sie die Kampagne und wählen Sie die Liste, an die sie geht. Die E-Mail schreiben Sie als Nächstes.",
+      "name_label": "Name",
+      "name_placeholder": "Frühjahrsangebote",
+      "list_label": "Newsletter-Liste",
+      "list_placeholder": "Liste wählen",
+      "loading_lists": "Listen werden geladen",
+      "no_lists": "Es gibt noch keine Newsletter-Listen. Legen Sie zuerst in Datensätze eine Newsletter-Liste an und kommen Sie dann zurück.",
+      "cancel": "Abbrechen",
+      "create": "Anlegen",
+      "creating": "Wird angelegt"
+    },
+    "delete": {
+      "label": "{name} löschen",
+      "title": "Diese Kampagne löschen?",
+      "description": "Der Entwurf „{name}“ wird gelöscht. Das lässt sich nicht rückgängig machen.",
+      "cancel": "Abbrechen",
+      "confirm": "Löschen",
+      "working": "Wird gelöscht"
+    }
+  },
   "errors": {
     "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
     "csrf_failed": "Ihre Sitzung ist abgelaufen. Laden Sie die Seite neu und versuchen Sie es erneut.",
