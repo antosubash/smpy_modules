@@ -212,4 +212,14 @@ describe('sending calls', () => {
     expect(sent.slice(3, 6).map((s) => s.body)).toEqual([undefined, undefined, undefined]);
     expect((fetchMock.mock.calls[6][1] as RequestInit).signal).toBe(signal);
   });
+
+  it('reads the campaign report', async () => {
+    const { api } = await load({ csrf_token: 'tok' });
+    const fetchMock = stubFetch(ok);
+    const signal = new AbortController().signal;
+    await api.report(7, signal);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(`${init.method ?? 'GET'} ${url}`).toBe('GET /api/newsletter/campaigns/7/report');
+    expect(init.signal).toBe(signal);
+  });
 });

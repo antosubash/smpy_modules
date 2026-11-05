@@ -42,7 +42,11 @@
       "status": "Status",
       "list": "List",
       "updated": "Updated",
-      "actions": "Actions"
+      "actions": "Actions",
+      "sent": "Sent",
+      "recipients": "Recipients",
+      "opens": "Opens",
+      "clicks": "Clicks"
     },
     "no_subject": "(no subject)",
     "never": "Never",
@@ -70,7 +74,10 @@
       "cancel": "Cancel",
       "confirm": "Delete",
       "working": "Deleting"
-    }
+    },
+    "no_rate": "—",
+    "report_link": "Report",
+    "report_label": "Report for {name}"
   },
   "settings": {
     "title": "Newsletter settings",
@@ -116,7 +123,7 @@
       "opens": "Track opens",
       "clicks": "Track clicks"
     },
-    "tracking_note": "Tracking applies from PR 5. These switches are stored but have no effect yet.",
+    "tracking_note": "Applies to emails sent from now on. Switching tracking off also stops counting opens and clicks of emails already sent. Nothing about the reader's device or address is stored.",
     "server_change_clears_password": "Changing the host, port, security or username removes the saved password. Enter it again afterwards.",
     "password_cleared_notice": "The saved password was removed because the server changed. Enter it again.",
     "saved_notice": "Settings saved.",
@@ -330,7 +337,8 @@
         "suppressed": "{count} suppressed",
         "skipped": "{count} skipped",
         "unsubscribed": "{count} unsubscribed"
-      }
+      },
+      "report": "View report"
     },
     "actions": {
       "pause": "Pause",
@@ -350,6 +358,59 @@
       "smtp_auth": "The mail server refused the login",
       "list_unavailable": "The newsletter list is not available",
       "https_required": "Real mail needs https, but this campaign was rendered with an http address"
+    }
+  },
+  "report": {
+    "title": "Report: {name}",
+    "back": "Back to campaigns",
+    "loading": "Loading report",
+    "refresh": "Refresh",
+    "not_started": "This campaign has not started sending yet.",
+    "open_editor": "Open in editor",
+    "stats": {
+      "recipients": "Recipients",
+      "accepted": "Accepted",
+      "accepted_hint": "Accepted by the mail server. Bounces that arrive later by email are not counted.",
+      "failed": "Failed",
+      "bounced": "Bounced",
+      "suppressed": "Suppressed",
+      "skipped": "Skipped",
+      "unsubscribed": "Unsubscribed",
+      "opens": "Opens",
+      "clicks": "Clicks",
+      "unique": "Unique",
+      "total": "Total",
+      "rate": "Rate",
+      "rate_hint": "Unique, among messages the mail server accepted",
+      "all_messages": "All messages, including those whose outcome is unknown: {unique} unique, {total} total"
+    },
+    "approx": {
+      "opens": "Approximate. Privacy features such as Apple Mail Privacy Protection load images automatically, so opens may be inflated.",
+      "clicks": "May include automated link scanners."
+    },
+    "tracking_off": {
+      "opens": "Open tracking is off.",
+      "clicks": "Click tracking is off."
+    },
+    "links": {
+      "title": "Links",
+      "url": "Link",
+      "unique": "Unique clicks",
+      "total": "Total clicks",
+      "empty": "No tracked links in this campaign."
+    },
+    "timeline": {
+      "title": "Activity over time",
+      "opens": "Opens",
+      "clicks": "Clicks",
+      "empty": "No opens or clicks yet.",
+      "window_hour": "First 72 hours",
+      "window_day": "First 90 days",
+      "caption": "First opens and first clicks per {bucket}, in UTC",
+      "bucket": {
+        "hour": "hour",
+        "day": "day"
+      }
     }
   }
 }
