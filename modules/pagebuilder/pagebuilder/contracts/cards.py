@@ -27,7 +27,7 @@ from simple_module_db import (
     is_valid_tenant_id,
     tenant_context,
 )
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pagebuilder.contracts.search import _checked_limit
@@ -38,7 +38,8 @@ from pagebuilder.models import NOT_TRASHED, MediaAsset, Page, PageStatus
 
 __all__ = ["MediaCard", "PageCard", "get_page_card", "search_media_cards", "search_page_cards"]
 
-_SVG = "image/svg+xml"
+# Any case, with or without parameters (``image/svg+xml; charset=utf-8``).
+_SVG_PREFIX = "image/svg%"
 
 
 class PageCard(BaseModel, frozen=True):
@@ -158,7 +159,7 @@ async def search_media_cards(
     stmt = select(MediaAsset).where(
         MediaAsset.tenant_id == tenant_id,
         MediaAsset.content_type.ilike("image/%"),  # type: ignore[attr-defined]
-        MediaAsset.content_type != _SVG,
+        ~func.lower(MediaAsset.content_type).like(_SVG_PREFIX),
         or_(
             MediaAsset.original_filename.ilike(pattern, escape="\\"),
             MediaAsset.filename.ilike(pattern, escape="\\"),

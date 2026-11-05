@@ -114,6 +114,8 @@ async def test_media_cards_exclude_svg_and_non_images(db) -> None:
     app = _app()
     png = await _asset(db, "a.png", "image/png")
     await _asset(db, "b.svg", "image/svg+xml")
+    await _asset(db, "d.svg", "IMAGE/SVG+XML")
+    await _asset(db, "e.svg", "image/svg+xml; charset=utf-8")
     await _asset(db, "c.pdf", "application/pdf")
 
     cards = await search_media_cards(app, db, tenant_id="default", pattern="%")
