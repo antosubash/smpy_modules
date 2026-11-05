@@ -165,7 +165,7 @@ async def schedule(
     if not parse_body(campaign.body):
         raise EmptyCampaign()
     ctx = await render_context(app, tenant_id=tenant_id)
-    row = build_render(settings, campaign, ctx, tenant_id=tenant_id, now=now)
+    snap = build_render(settings, campaign, ctx, tenant_id=tenant_id, now=now)
     when = check_scheduled_at(scheduled_at, now)
     check_https(settings, ctx)
     check_no_capability_fields(campaign)
@@ -173,7 +173,7 @@ async def schedule(
     scheduled = await _apply(
         session, tenant_id, campaign_id, roles, (DRAFT,), values, revision=expected_revision
     )
-    await store_render(session, row)
+    await store_render(session, snap)
     return scheduled
 
 
