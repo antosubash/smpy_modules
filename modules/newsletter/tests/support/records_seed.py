@@ -66,6 +66,16 @@ async def restrict_list(db_state: Any, tenant: str, key: str, allowed_roles: lis
             await events.commit(db)
 
 
+async def set_list_kind(db_state: Any, tenant: str, key: str, kind: str) -> None:
+    """Turn type ``key`` into another kind (``"form"``: no longer a list) or
+    back (``"subscription"``), as an admin editing the type would."""
+    with tenant_scope(tenant):
+        async with db_state.session_factory() as db:
+            rtype = await type_service.get_type(db, key)
+            rtype.public_submissions = {**(rtype.public_submissions or {}), "kind": kind}
+            await events.commit(db)
+
+
 async def seed_subscriber(
     db_state: Any,
     tenant: str,
