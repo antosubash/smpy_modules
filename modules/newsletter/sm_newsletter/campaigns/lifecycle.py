@@ -216,12 +216,17 @@ async def cancel(
         .execution_options(synchronize_session=False)
     )
     if campaign.started_at is None:
+        # In a savepoint: a refusal after waiting (Postgres's re-check) keeps
+        # the row lock, and rolling back to here releases it.
+        savepoint = await session.begin_nested()
         never_started = [Campaign.started_at.is_(None)]
         if await transition(
             session, **key, from_statuses=from_statuses, values=values, where=never_started
         ):
+            await savepoint.commit()
             await session.execute(queued)
             return await require_campaign(session, **key, roles=roles)
+        await savepoint.rollback()
         # Refused: it started meanwhile (cancel it as started) or cannot be
         # cancelled (the transition below raises, the guard wrote nothing).
     # Started: send rows first. The guard is a plain read, not a lock; the

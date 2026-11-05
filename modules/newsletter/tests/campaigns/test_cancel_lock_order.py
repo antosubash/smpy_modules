@@ -20,8 +20,10 @@ from simple_module_db import finalize_session
 from sm_newsletter.campaigns import lifecycle
 from sm_newsletter.core.errors import NewsletterError
 from sm_newsletter.core.tenancy import tenant_scope
+from sm_newsletter.models import Campaign
 from sm_newsletter.sending import freeze as freezing
-from sqlalchemy import event
+from sqlalchemy import event, select, update
+from sqlalchemy.exc import DBAPIError
 
 from tests.pg_support import USING_POSTGRES
 from tests.support.campaign_world import campaign_row, seed_sends, send_rows
@@ -30,6 +32,7 @@ from tests.support.sending import NOW, T
 
 ROUNDS = 5
 WAIT_S = 5.0
+SEND_TABLE = "newsletter_send"
 SETTLE_S = 0.3  # let the cancel's UPDATE reach the database and block
 
 
@@ -153,3 +156,64 @@ async def test_cancel_waits_for_a_freeze_page_and_cancels_its_rows(built, monkey
         assert result == freezing.FreezeResult(False, 0, 0)
     assert (await campaign_row(state, T, cid)).status == "cancelled"
     assert await statuses(state, cid) == {"cancelled": 4}
+
+
+@pytest.mark.skipif(not USING_POSTGRES, reason="row locks and the EPQ re-check are Postgres's")
+async def test_cancel_started_meanwhile_keeps_no_campaign_lock(built):
+    """The never-started ``UPDATE`` waits on a publish, then refuses: the
+    started path must begin with the campaign row free (B1), send rows first."""
+    _, state = built
+    cid = await due_campaign(state)
+    (sid,) = await seed_sends(state, T, cid, ["queued"])
+    hold, probes = _Hold(), []
+
+    async def probe() -> None:
+        with tenant_scope(T):
+            async with state.session_factory() as other:
+                stmt = select(Campaign.id).where(Campaign.tenant_id == T, Campaign.id == cid)
+                try:
+                    await other.execute(stmt.with_for_update(nowait=True))
+                    probes.append("free")
+                except DBAPIError:
+                    probes.append("locked")
+                await other.rollback()
+
+    async def publish() -> None:
+        with tenant_scope(T):
+            async with state.session_factory() as db:
+                await db.execute(
+                    update(Campaign)
+                    .where(Campaign.tenant_id == T, Campaign.id == cid)
+                    .values(status="sending", started_at=NOW)
+                )
+                await hold.park()  # uncommitted until cancel's UPDATE waits on it
+                await finalize_session(db)
+
+    async def cancel() -> str:
+        await asyncio.wait_for(hold.parked.wait(), WAIT_S)
+        with tenant_scope(T):
+            async with state.session_factory() as db:
+                real = db.execute
+
+                async def execute(stmt, *args, **kw):
+                    if getattr(getattr(stmt, "table", None), "name", None) == SEND_TABLE:
+                        await probe()  # just before the fallback's send UPDATE
+                    return await real(stmt, *args, **kw)
+
+                db.execute = execute  # ty: ignore[invalid-assignment]
+                campaign = await lifecycle.cancel(
+                    db, tenant_id=T, campaign_id=cid, roles=[], now=NOW
+                )
+                await finalize_session(db)
+                return campaign.status
+
+    with _watch_cancel(state, hold):
+        outcomes = await asyncio.gather(publish(), cancel(), return_exceptions=True)
+    errors = [o for o in outcomes if isinstance(o, BaseException)]
+    assert not errors, f"a transaction failed: {errors!r}"
+    assert hold.cancel_issued.is_set()
+    assert probes == ["free"]
+    assert outcomes[1] == "cancelled"
+    after = await campaign_row(state, T, cid)
+    assert (after.status, after.started_at is not None) == ("cancelled", True)
+    assert [(r.id, r.status) for r in await send_rows(state, T, cid)] == [(sid, "cancelled")]
