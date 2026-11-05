@@ -36,9 +36,11 @@ days]`; anything else is `422 invalid_campaign`. `/estimate` applies the same
 window to its `at`. The send dialog refuses a "Later" time that is already past
 when Confirm is pressed, and never turns it into "now".
 
-Scheduling checks, in order: draft and revision, list access, audience (only
-`all` is supported until PR 6; `tag:` and `segment:` are `422
-audience_unsupported`), the sender, the headers, a subject, at least one block
+Scheduling checks, in order: draft and revision, list access, audience (`all`,
+`tag:<choice>` or `segment:<id>`, resolved to records filter terms and
+dry-run counted: `422 unknown_tag`, `unknown_segment`,
+`segment_list_mismatch` or `invalid_segment`; the terms are stored on the
+render and freeze reads them from there), the sender, the headers, a subject, at least one block
 (`422 empty_campaign`), absolute links (`422 public_base_url_required`), the
 schedule window, HTTPS for both bases on the `smtp` transport (`422
 https_required`; the console transport allows `http://`), and no

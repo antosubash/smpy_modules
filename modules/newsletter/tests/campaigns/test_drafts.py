@@ -8,7 +8,6 @@ import pytest
 from simple_module_db import finalize_session
 from sm_newsletter.campaigns import access, drafts
 from sm_newsletter.core.errors import (
-    AudienceUnsupported,
     InvalidBody,
     ListForbidden,
     NotADraft,
@@ -16,13 +15,14 @@ from sm_newsletter.core.errors import (
     StaleCampaign,
     UnknownList,
 )
+from sm_newsletter.core.errors_audience import InvalidAudience, SegmentListMismatch, UnknownTag
 from sm_newsletter.core.tenancy import tenant_scope
-from sm_newsletter.models import Campaign
+from sm_newsletter.models import Campaign, Segment
 from sm_newsletter.web.schemas.campaigns import CampaignCreate, CampaignPatch
 from sqlalchemy import update
 
 from tests.pg_support import make_db_state
-from tests.support.records_seed import restrict_list, seed_list
+from tests.support.records_seed import TAGS, restrict_list, seed_list
 
 T = "default"
 NOBODY: list[str] = []  # a signed-in caller holding no roles
@@ -144,13 +144,32 @@ async def test_other_tenant_not_found(db_state):
             assert (items, total) == ([], 0)
 
 
-async def test_audience_segment_unsupported(db_state, db):
-    await seed_list(db_state, T)
+async def test_audience_validated_on_patch(db_state, db):
+    await seed_list(db_state, T, fields=[TAGS])
+    await seed_list(db_state, T, "other", fields=[TAGS])
     c = await _create(db)
-    for audience in ("segment:1", "tag:vip"):
-        with pytest.raises(AudienceUnsupported):
-            await _patch(db, c.id, expected_revision=1, audience=audience)
-    assert (await _patch(db, c.id, expected_revision=1, audience="all")).audience == "all"
+    with tenant_scope(T):
+        seg = Segment(tenant_id=T, name="o", list_type_key="other", filters=["tags:in:vip"])
+        db.add(seg)
+        await finalize_session(db)
+    assert (await _patch(db, c.id, expected_revision=1, audience="tag:vip")).audience == "tag:vip"
+    with pytest.raises(UnknownTag):
+        await _patch(db, c.id, expected_revision=2, audience="tag:nope")
+    with pytest.raises(SegmentListMismatch):
+        await _patch(db, c.id, expected_revision=2, audience=f"segment:{seg.id}")
+    with pytest.raises(InvalidAudience):
+        await _patch(db, c.id, expected_revision=2, audience="segment:012")
+    own = Segment(tenant_id=T, name="n", list_type_key="news", filters=["tags:in:vip"])
+    with tenant_scope(T):
+        db.add(own)
+        await finalize_session(db)
+    moved = await _patch(db, c.id, expected_revision=2, audience=f"segment:{own.id}")
+    assert moved.revision == 3
+    # Moving the list under a segment of the old one is refused, and nothing is written.
+    with pytest.raises(SegmentListMismatch):
+        await _patch(db, c.id, expected_revision=3, list_type_key="other")
+    row = await drafts.get_campaign(db, tenant_id=T, campaign_id=c.id, roles=NOBODY)
+    assert (row.list_type_key, row.audience, row.revision) == ("news", f"segment:{own.id}", 3)
 
 
 async def test_body_validated(db_state, db):

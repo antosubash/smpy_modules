@@ -239,7 +239,6 @@
   "errors": {
     "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
     "csrf_failed": "Ihre Sitzung ist abgelaufen. Laden Sie die Seite neu und versuchen Sie es erneut.",
-    "audience_unsupported": "Vorerst kann nur die gesamte Liste die Zielgruppe sein.",
     "block_not_found": "Diese Karte ist nicht mehr in der Kampagne.",
     "campaign_cancelled": "Eine abgebrochene Kampagne kann nicht als Test gesendet werden.",
     "card_source_gone": "Die Quelle der Karte ist nicht mehr veröffentlicht. Die gespeicherte Kopie wurde beibehalten.",

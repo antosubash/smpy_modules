@@ -56,6 +56,19 @@ def _arm_database_reset():
     yield
 
 
+@pytest.fixture(autouse=True)
+def _clear_records_model_cache():
+    """Records caches compiled validators by ``(type_id, key, version)``. Every
+    test's fresh database hands out ``type_id`` 1 again, so a ``news`` list
+    with a ``tags`` field after one without would validate against the stale
+    model (records' own conftest does the same)."""
+    from sm_records.schema.compile import clear_model_cache
+
+    clear_model_cache()
+    yield
+    clear_model_cache()
+
+
 @pytest_asyncio.fixture
 async def db_state() -> AsyncIterator[Any]:
     """In-memory SQLite by default; Postgres when ``SM_TEST_DATABASE_URL`` says so."""

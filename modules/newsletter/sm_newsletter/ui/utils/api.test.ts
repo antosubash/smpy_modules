@@ -140,7 +140,6 @@ describe('maps error codes to catalogue keys', () => {
 
 // Mirrors `sm_newsletter/core/errors.py`: add a code there, add it here and to both catalogues.
 const SERVER_CODES = [
-  'audience_unsupported',
   'block_not_found',
   'campaign_cancelled',
   'card_source_gone',

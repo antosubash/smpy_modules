@@ -12,11 +12,10 @@ from datetime import datetime, timedelta
 
 from simple_module_db import finalize_session
 from simple_module_db.tenancy import all_tenants
-from sm_records.contracts.newsletter import count_subscribers
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_newsletter.campaigns.audience import audience_filters
+from sm_newsletter.campaigns.audience import audience_count
 from sm_newsletter.campaigns.lifecycle import SENDING, split_paused
 from sm_newsletter.core import tenancy
 from sm_newsletter.core.settings import NewsletterSettings
@@ -138,11 +137,11 @@ async def estimate(
 ) -> EstimateOut:
     """When a send starting at ``at`` would end. The recipient count is approximate:
     suppressions are not subtracted."""
-    recipients = await count_subscribers(
+    recipients = await audience_count(
         session,
         tenant_id=tenant_id,
-        type_key=campaign.list_type_key,
-        filters=audience_filters(campaign.audience),
+        list_type_key=campaign.list_type_key,
+        audience=campaign.audience,
     )
     ahead = await queued_ahead(factory, started_before=None, exclude_campaign_id=None)
     rate = daily_rate(settings)

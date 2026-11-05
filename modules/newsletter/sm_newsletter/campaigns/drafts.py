@@ -109,8 +109,13 @@ async def update_draft(
     key = values.get("list_type_key")
     if key is not None and key != current.list_type_key:
         await check_list(session, tenant_id=tenant_id, type_key=key, roles=roles)
-    if "audience" in values:
-        audience_filters(values["audience"])
+    if "audience" in values or "list_type_key" in values:
+        await audience_filters(
+            session,
+            tenant_id=tenant_id,
+            list_type_key=values.get("list_type_key") or current.list_type_key,
+            audience=values.get("audience") or current.audience,
+        )
     if "body" in values:
         values["body"] = dump_body(parse_body(values["body"]))
     return await write_draft(

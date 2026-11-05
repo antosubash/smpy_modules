@@ -36,7 +36,6 @@ from sm_records.contracts.newsletter import (
 )
 from sqlalchemy import func, select
 
-from sm_newsletter.campaigns.audience import audience_filters
 from sm_newsletter.campaigns.checks import bases_https
 from sm_newsletter.campaigns.lifecycle import SENDING
 from sm_newsletter.core import constants
@@ -160,7 +159,7 @@ async def freeze(
         if claim is None or insecure:
             return _LOST
         # Only what the claim read: its list and audience belong to its generation.
-        list_key, audience = claim.list_type_key, claim.audience
+        list_key, filters = claim.list_type_key, claim.audience_filters
         async with factory() as session:
             lists = await subscription_lists(session, tenant_id=tenant_id)
             if list_key not in lists:
@@ -168,7 +167,6 @@ async def freeze(
                 await finalize_session(session)
                 return _LOST
             await finalize_session(session)
-        filters = audience_filters(audience)
         if not await _pages(factory, tenant_id, campaign_id, claim, list_key, filters, clock):
             return _LOST
         return await _publish(factory, tenant_id, campaign_id, claim, now, clock)

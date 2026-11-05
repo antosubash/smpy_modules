@@ -64,6 +64,7 @@ EXPECTED = {
     ("DELETE", f"{API}/segments/{{segment_id}}"),
     ("POST", f"{API}/segments/preview"),
     ("GET", f"{API}/lists/{{list_type_key}}/fields"),
+    ("GET", f"{API}/lists/{{list_type_key}}/audience-count"),
     ("GET", f"{VIEW}/"),
     ("GET", f"{VIEW}/settings"),
     ("GET", f"{VIEW}/campaigns/{{campaign_id}}"),

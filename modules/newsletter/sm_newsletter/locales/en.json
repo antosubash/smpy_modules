@@ -239,7 +239,6 @@
   "errors": {
     "generic": "Something went wrong. Please try again.",
     "csrf_failed": "Your session has expired. Reload the page and try again.",
-    "audience_unsupported": "Only the whole list can be the audience for now.",
     "block_not_found": "That card is no longer in this campaign.",
     "campaign_cancelled": "A cancelled campaign cannot be test sent.",
     "card_source_gone": "The card's source is no longer published. Its saved copy was kept.",
