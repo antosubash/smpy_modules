@@ -9,5 +9,31 @@
     "group": "Newsletter",
     "campaigns": "Campaigns",
     "settings": "Settings"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "csrf_failed": "Your session has expired. Reload the page and try again.",
+    "audience_unsupported": "Only the whole list can be the audience for now.",
+    "block_not_found": "That card is no longer in this campaign.",
+    "campaign_cancelled": "A cancelled campaign cannot be test sent.",
+    "card_source_gone": "The card's source is no longer published. Its saved copy was kept.",
+    "dispatch_busy": "Another send is in progress. Try again in a moment.",
+    "forbidden": "You do not have permission to do that.",
+    "integration_unavailable": "This content source is not available on this site.",
+    "invalid_body": "The email content is not valid.",
+    "invalid_campaign": "The campaign is not valid.",
+    "invalid_password": "The password must be 1 to 1024 characters and not blank.",
+    "invalid_settings": "The settings are not valid.",
+    "list_forbidden": "You may not use this newsletter list.",
+    "not_a_draft": "Only a draft campaign can be changed or deleted.",
+    "not_found": "That item no longer exists.",
+    "public_base_url_required": "Set the site's public base URL in Settings before sending a test.",
+    "send_budget_exhausted": "The sending limit has been reached. Try again later.",
+    "sender_not_configured": "Set the sender address in the newsletter settings first.",
+    "smtp_password_unreadable": "The stored SMTP password cannot be read. Enter it again.",
+    "stale": "This campaign was changed elsewhere. Reload it to continue.",
+    "tenant_required": "No organisation is active for this account.",
+    "transport_unavailable": "The mail server is not available.",
+    "unknown_list": "No such newsletter list."
   }
 }

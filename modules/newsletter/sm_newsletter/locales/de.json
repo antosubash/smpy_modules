@@ -9,5 +9,31 @@
     "group": "Newsletter",
     "campaigns": "Kampagnen",
     "settings": "Einstellungen"
+  },
+  "errors": {
+    "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
+    "csrf_failed": "Ihre Sitzung ist abgelaufen. Laden Sie die Seite neu und versuchen Sie es erneut.",
+    "audience_unsupported": "Vorerst kann nur die gesamte Liste die Zielgruppe sein.",
+    "block_not_found": "Diese Karte ist nicht mehr in der Kampagne.",
+    "campaign_cancelled": "Eine abgebrochene Kampagne kann nicht als Test gesendet werden.",
+    "card_source_gone": "Die Quelle der Karte ist nicht mehr veröffentlicht. Die gespeicherte Kopie wurde beibehalten.",
+    "dispatch_busy": "Ein anderer Versand läuft gerade. Versuchen Sie es gleich noch einmal.",
+    "forbidden": "Dazu fehlt Ihnen die Berechtigung.",
+    "integration_unavailable": "Diese Inhaltsquelle ist auf dieser Website nicht verfügbar.",
+    "invalid_body": "Der E-Mail-Inhalt ist ungültig.",
+    "invalid_campaign": "Die Kampagne ist ungültig.",
+    "invalid_password": "Das Passwort muss 1 bis 1024 Zeichen lang und darf nicht leer sein.",
+    "invalid_settings": "Die Einstellungen sind ungültig.",
+    "list_forbidden": "Sie dürfen diese Newsletter-Liste nicht verwenden.",
+    "not_a_draft": "Nur ein Entwurf kann geändert oder gelöscht werden.",
+    "not_found": "Dieser Eintrag existiert nicht mehr.",
+    "public_base_url_required": "Legen Sie in den Einstellungen die öffentliche Basis-URL der Website fest, bevor Sie einen Test senden.",
+    "send_budget_exhausted": "Das Sendelimit ist erreicht. Versuchen Sie es später erneut.",
+    "sender_not_configured": "Legen Sie zuerst die Absenderadresse in den Newsletter-Einstellungen fest.",
+    "smtp_password_unreadable": "Das gespeicherte SMTP-Passwort kann nicht gelesen werden. Geben Sie es erneut ein.",
+    "stale": "Diese Kampagne wurde anderswo geändert. Laden Sie sie neu, um fortzufahren.",
+    "tenant_required": "Für dieses Konto ist keine Organisation aktiv.",
+    "transport_unavailable": "Der Mailserver ist nicht verfügbar.",
+    "unknown_list": "Keine solche Newsletter-Liste."
   }
 }
