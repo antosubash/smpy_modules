@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from simple_module_db import finalize_session
 from sm_newsletter.core.clock import utcnow
+from sm_newsletter.core.errors import TransportUnavailable
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import DispatchLock
 from sm_newsletter.sending import deliver as delivering
@@ -68,6 +69,23 @@ async def test_daily_cap_rollover_two_days(built):
     assert (await campaign_row(state, T, cid)).status == "sent"
     assert sorted(sent_to(smtp)) == sorted(emails)
     assert busiest_day(await counted_times(state)) == 5
+
+
+async def test_a_capped_day_neither_connects_nor_pauses_on_a_bad_login(built):
+    """No budget left: the tick stops before the relay, so a capped day neither
+    logs in every minute nor lets a refused login pause every campaign."""
+    app, state = await built(daily_limit=2, per_minute_limit=100)
+    cid, _ = await due(state, 4)
+    assert (await run_tick(app, state, FakeTransport())).stopped == "budget"
+
+    smtp = FakeTransport()
+    capped = await run_tick(app, state, smtp, at=NOW + timedelta(hours=1))
+    assert (capped.spent, capped.stopped, smtp.opened) == (0, "budget", 0)
+
+    refused = FakeTransport(open_error=TransportUnavailable("auth: 535", stage="auth"))
+    again = await run_tick(app, state, refused, at=NOW + timedelta(hours=2))
+    assert (again.stopped, again.paused) == ("budget", 0)
+    assert (await campaign_row(state, T, cid)).status == "sending"
 
 
 async def test_per_minute_limit(built):

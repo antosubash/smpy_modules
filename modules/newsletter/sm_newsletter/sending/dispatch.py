@@ -4,7 +4,9 @@ One tick, run with no tenant bound:
 
 1. :func:`~.upkeep.recover_expired` (a dead sender's rows, S7), then
    :func:`~.freeze.start_due`.
-2. Nothing ``sending``: :func:`~.upkeep.finish_done`, and no relay connection.
+2. Nothing ``sending``, or no budget left: :func:`~.upkeep.finish_done`, and
+   no relay connection (a capped day neither logs in every minute nor lets a
+   refused login pause every campaign).
 3. One transport session for the whole tick. A refused login pauses every
    ``sending`` campaign (``smtp_auth``); any other failure only ends the tick.
 4. Slices until :data:`TICK_SECONDS`, each inside the dispatch lock: read the
@@ -102,8 +104,11 @@ async def tick(
     summary.recovered = await recover_expired(factory, now=clock())
     summary.started = await start_due(factory, now=clock(), clock=clock)
     if not await sending_campaigns(factory):
-        summary.finished = await finish_done(factory, now=clock())
         summary.stopped = "idle"
+    elif (await current_budget(factory, settings, now=clock())).left == 0:
+        summary.stopped = "budget"  # a capped day neither logs in nor auth-pauses
+    if summary.stopped is not None:
+        summary.finished = await finish_done(factory, now=clock())
         return summary
     async with AsyncExitStack() as stack:
         try:
