@@ -66,6 +66,58 @@
       "working": "Wird gelöscht"
     }
   },
+  "settings": {
+    "title": "Newsletter-Einstellungen",
+    "description": "Wie Newsletter versendet werden, von wem sie kommen und wie viele rausgehen.",
+    "loading": "Einstellungen werden geladen",
+    "read_only_note": "Sie können diese Einstellungen ansehen, aber nicht ändern. Dafür ist die Berechtigung settings.edit nötig.",
+    "transport": {
+      "title": "Versand",
+      "label": "Versandart",
+      "smtp": "SMTP-Server",
+      "console": "Konsole (nur Protokoll, es wird nichts gesendet)",
+      "host": "SMTP-Host",
+      "port": "Port",
+      "security": "Verschlüsselung",
+      "starttls": "STARTTLS",
+      "tls": "TLS (implizit)",
+      "username": "Benutzername"
+    },
+    "password": {
+      "label": "Passwort",
+      "saved": "Ein Passwort ist gespeichert.",
+      "not_saved": "Kein Passwort gespeichert.",
+      "placeholder": "Neues Passwort eingeben",
+      "save": "Passwort speichern",
+      "saving": "Passwort wird gespeichert",
+      "replace_hint": "Das Passwort ist nur beschreibbar. Ein neues ersetzt das gespeicherte."
+    },
+    "sender": {
+      "title": "Absender",
+      "from_address": "Absenderadresse",
+      "from_name": "Absendername",
+      "reply_to": "Antwortadresse",
+      "physical_address": "Postanschrift",
+      "physical_address_hint": "Wird in jeder E-Mail-Fußzeile angezeigt."
+    },
+    "limits": {
+      "title": "Limits",
+      "daily": "E-Mails pro Tag",
+      "per_minute": "E-Mails pro Minute"
+    },
+    "tracking": {
+      "title": "Tracking",
+      "opens": "Öffnungen erfassen",
+      "clicks": "Klicks erfassen"
+    },
+    "tracking_note": "Tracking gilt ab PR 5. Diese Schalter werden gespeichert, haben aber noch keine Wirkung.",
+    "server_change_clears_password": "Wenn Sie Host, Port, Verschlüsselung oder Benutzernamen ändern, wird das gespeicherte Passwort entfernt. Geben Sie es danach erneut ein.",
+    "password_cleared_notice": "Das gespeicherte Passwort wurde entfernt, weil sich der Server geändert hat. Geben Sie es erneut ein.",
+    "saved_notice": "Einstellungen gespeichert.",
+    "password_saved_notice": "Passwort gespeichert.",
+    "save": "Einstellungen speichern",
+    "saving": "Einstellungen werden gespeichert"
+  },
   "editor": {
     "fallback_title": "Kampagne",
     "loading": "Kampagne wird geladen",

@@ -66,6 +66,58 @@
       "working": "Deleting"
     }
   },
+  "settings": {
+    "title": "Newsletter settings",
+    "description": "How newsletters are sent, who they come from and how many go out.",
+    "loading": "Loading settings",
+    "read_only_note": "You can view these settings but not change them. Changing them needs the settings.edit permission.",
+    "transport": {
+      "title": "Transport",
+      "label": "Transport",
+      "smtp": "SMTP server",
+      "console": "Console (log only, nothing is sent)",
+      "host": "SMTP host",
+      "port": "Port",
+      "security": "Security",
+      "starttls": "STARTTLS",
+      "tls": "TLS (implicit)",
+      "username": "Username"
+    },
+    "password": {
+      "label": "Password",
+      "saved": "A password is saved.",
+      "not_saved": "No password is saved.",
+      "placeholder": "Enter a new password",
+      "save": "Save password",
+      "saving": "Saving password",
+      "replace_hint": "The password is write-only. Entering a new one replaces the saved one."
+    },
+    "sender": {
+      "title": "Sender",
+      "from_address": "From address",
+      "from_name": "From name",
+      "reply_to": "Reply-to address",
+      "physical_address": "Postal address",
+      "physical_address_hint": "Shown in every email footer."
+    },
+    "limits": {
+      "title": "Limits",
+      "daily": "Emails per day",
+      "per_minute": "Emails per minute"
+    },
+    "tracking": {
+      "title": "Tracking",
+      "opens": "Track opens",
+      "clicks": "Track clicks"
+    },
+    "tracking_note": "Tracking applies from PR 5. These switches are stored but have no effect yet.",
+    "server_change_clears_password": "Changing the host, port, security or username removes the saved password. Enter it again afterwards.",
+    "password_cleared_notice": "The saved password was removed because the server changed. Enter it again.",
+    "saved_notice": "Settings saved.",
+    "password_saved_notice": "Password saved.",
+    "save": "Save settings",
+    "saving": "Saving settings"
+  },
   "editor": {
     "fallback_title": "Campaign",
     "loading": "Loading campaign",
