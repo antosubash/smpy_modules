@@ -12,9 +12,11 @@ be mailed again: unsubscribes, hard bounces, complaints). Design:
 `docs/superpowers/specs/2026-11-03-newsletter-module-design.md` in the source
 repo; the guide is [`docs/index.md`](docs/index.md).
 
-**Status: scaffold.** The package registers its permissions and locales and
-nothing else yet: no screens, and one admin API endpoint, the one that sets the
-SMTP password. Campaigns, sending and tracking arrive in later pull requests.
+**Status: campaigns and content.** You can write a campaign in a Puck editor,
+preview it as the server renders it, and send a test to up to five addresses.
+Sending to a list, tracking and the unsubscribe page arrive in later pull
+requests. See [`docs/content.md`](docs/content.md) for blocks, merge fields and
+the URL rules.
 
 ## Install
 
@@ -31,7 +33,8 @@ workspace = true
 ```
 
 The module needs the framework's `settings` and `background_tasks` modules and
-`simple_module_records`. Migrations live in the consuming host (`make
+`simple_module_records`. The `news` and `pagebuilder` extras add article and page
+cards to the editor; without them those blocks are hidden. Migrations live in the consuming host (`make
 migration`), never in the wheel.
 
 ## Usage
@@ -45,16 +48,17 @@ encrypted under the host's secret key and written only through
 `PUT /api/newsletter/settings/smtp-password` (needs `newsletter.manage`
 and `settings.edit`; `scripts/set_setting.py` would
 store it in plaintext, accepted with a warning; use the endpoint). The generic Settings screen
-refuses newsletter writes; a dedicated settings page arrives in a later PR.
+refuses newsletter writes: use the module's own page, `/admin/newsletter/settings`.
+Changing the SMTP host, port, security or username clears the stored password.
 
 ### Permissions
 
 | Permission | Allows |
 | --- | --- |
-| `newsletter.view` | See campaigns, reports and suppressions |
+| `newsletter.view` | See campaigns and preview them, reports and suppressions |
 | `newsletter.edit` | Create and edit campaigns |
-| `newsletter.send` | Start, pause, resume and cancel a send |
-| `newsletter.manage` | Settings; the SMTP password too, together with `settings.edit` |
+| `newsletter.send` | Send a test; later, start, pause, resume and cancel a send |
+| `newsletter.manage` | The settings page; saving it and the SMTP password also need `settings.edit` |
 
 Every entry point binds a tenant: a single-tenant host uses `default`, a
 multi-tenant host the organisation the framework resolved (403
