@@ -86,3 +86,12 @@ def test_message_id_domain():
 
 def test_message_id_without_sender_domain_falls_back():
     assert build_mime(_msg(sender="nobody"))["Message-ID"].endswith("@localhost>")
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["From", "to", "Subject", "Reply-To", "Message-ID", "date", "MIME-Version", "Content-Type"],
+)
+def test_extra_header_cannot_replace_structural_ones(name):
+    with pytest.raises(ValueError):
+        build_mime(_msg(headers={name: "x"}))

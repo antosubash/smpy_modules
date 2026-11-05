@@ -168,3 +168,48 @@ async def test_non_ascii_address_rejected_and_session_continues(relay, make_tran
     assert after.outcome == "accepted"
     assert [e.rcpt_tos for e in rec.delivered] == [["after@example.com"]]
     assert all(b < 0x80 for b in rec.delivered[0].original_content)  # 7-bit on the wire
+
+
+async def test_garbled_final_reply_unknown_without_rset(relay, make_transport):
+    _, rec = relay
+    async with make_transport().session() as session:
+        result = await session.send(_msg("garble@example.com"))
+        after = await session.send(_msg("after@example.com"))
+    assert (result.outcome, result.code, result.detail) == ("unknown", None, "malformed reply")
+    assert "RSET" not in rec.commands  # the desynced connection was dropped, not reset
+    assert after.outcome == "accepted"
+
+
+async def test_stall_before_body_failed(relay, make_transport):
+    _, rec = relay
+    async with make_transport(timeout=0.2).session() as session:
+        result = await session.send(_msg("stallrcpt@example.com"))
+    assert (result.outcome, result.code) == ("failed", None)
+    assert rec.delivered == []
+
+
+async def test_stall_after_body_unknown(make_transport):
+    async with make_transport(timeout=0.2).session() as session:
+        result = await session.send(_msg("stalldata@example.com"))
+    assert (result.outcome, result.code) == ("unknown", None)
+
+
+async def test_bad_recipient_header_rejected_without_io(relay, make_transport):
+    _, rec = relay
+    async with make_transport().session() as session:
+        rec.commands.clear()
+        result = await session.send(_msg("x@example.com\r\nBcc: victim@example.com"))
+        after = await session.send(_msg("after@example.com"))
+    assert (result.outcome, result.code) == ("rejected", None)
+    assert "victim" not in result.detail
+    assert rec.commands == ["RCPT after@example.com"]  # nothing went out for the bad one
+    assert after.outcome == "accepted"
+
+
+def test_private_aiosmtplib_seam_exists():
+    """smtp.py writes the DATA body through these; an upgrade that drops them fails here."""
+    from aiosmtplib import SMTP
+    from aiosmtplib.protocol import SMTPProtocol
+
+    assert "protocol" in SMTP().__dict__
+    assert callable(SMTPProtocol.write) and callable(SMTPProtocol.read_response)

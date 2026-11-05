@@ -31,6 +31,10 @@ class OutgoingMessage:
     headers: Mapping[str, str]
 
 
+# Headers build_mime sets itself; an extra header may not replace them.
+_RESERVED = frozenset({"from", "to", "subject", "reply-to", "message-id", "date", "mime-version"})
+
+
 def envelope_address(value: str) -> str:
     """The bare address of a ``From``/``To`` header value."""
     return parseaddr(value)[1] or value
@@ -52,6 +56,8 @@ def build_mime(msg: OutgoingMessage) -> EmailMessage:
         check_header_text(name, field="header name")
         if ":" in name or " " in name or not name:
             raise ValueError("header name must be a non-empty token without ':' or spaces")
+        if name.lower() in _RESERVED or name.lower().startswith("content-"):
+            raise ValueError(f"header {name} is set by the message itself")
         check_header_text(value, field=f"header {name}")
 
     mime = EmailMessage(policy=SMTP)
@@ -63,7 +69,6 @@ def build_mime(msg: OutgoingMessage) -> EmailMessage:
     mime["Date"] = format_datetime(utcnow())
     mime["Message-ID"] = make_msgid(domain=_domain(msg.sender))
     for name, value in msg.headers.items():
-        del mime[name]
         mime[name] = value
     # Quoted-printable keeps the body 7-bit: no 8BITMIME needed, at any relay.
     mime.set_content(msg.text, cte="quoted-printable")

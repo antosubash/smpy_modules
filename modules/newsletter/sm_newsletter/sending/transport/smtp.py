@@ -8,6 +8,12 @@ or timeout after the body went out is ``unknown``. DATA is split for that
 reason: the ``DATA`` command through aiosmtplib, then the body written and its
 reply read on the client's protocol (dot-stuffed as aiosmtplib does).
 
+That is a private seam: ``SMTP.protocol``, ``SMTPProtocol.write`` and
+``SMTPProtocol.read_response`` are not documented API (checked against
+aiosmtplib 3.0 to 5.1; ``tests/sending/test_smtp.py`` asserts they exist). A
+session is sequential: the body read bypasses aiosmtplib's command lock, so
+never call ``send`` concurrently on one session.
+
 Nothing here logs or returns the username, the password or the relay's AUTH
 reply: :class:`TransportUnavailable` names the stage only.
 """
@@ -146,7 +152,12 @@ class _SmtpSession:
         self._client: aiosmtplib.SMTP | None = client
 
     async def send(self, msg: OutgoingMessage) -> DeliveryResult:
-        payload = build_mime(msg).as_bytes()
+        try:
+            payload = build_mime(msg).as_bytes()
+        except ValueError:
+            # A bad header value (a subscriber address with a control
+            # character): refused before any I/O; the value is never echoed.
+            return DeliveryResult("rejected", None, "a header value is not valid")
         if self._client is None or not self._client.is_connected:
             try:
                 self._client = await self._transport.connect()
@@ -165,6 +176,10 @@ class _SmtpSession:
             body_sent = True
             reply = await self._read_reply(client)
         except SMTPResponseException as exc:
+            if exc.code < 0:
+                # A malformed or oversized reply (aiosmtplib's -1): the stream is
+                # desynced and the relay's answer unknown, so no RSET.
+                return self._lost(body_sent, "malformed reply")
             await self._reset()
             return DeliveryResult("rejected", exc.code, exc.message)
         except UnicodeEncodeError:
@@ -172,10 +187,13 @@ class _SmtpSession:
             await self._reset()
             return DeliveryResult("rejected", None, "address is not ASCII (SMTPUTF8 unsupported)")
         except _LOST as exc:
-            self._drop()
-            outcome = "unknown" if body_sent else "failed"
-            return DeliveryResult(outcome, None, f"connection lost ({type(exc).__name__})")
+            return self._lost(body_sent, f"connection lost ({type(exc).__name__})")
         return DeliveryResult("accepted", reply.code, reply.message)
+
+    def _lost(self, body_sent: bool, detail: str) -> DeliveryResult:
+        """Drop the connection; ``unknown`` once the body went out, else ``failed``."""
+        self._drop()
+        return DeliveryResult("unknown" if body_sent else "failed", None, detail)
 
     def _write_body(self, client: aiosmtplib.SMTP, payload: bytes) -> None:
         protocol = client.protocol

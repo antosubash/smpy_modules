@@ -8,11 +8,15 @@ credential. The recipient's local part scripts the answer:
 - ``soft@`` → ``451`` after DATA;
 - ``droprcpt@`` → the connection drops at RCPT (no reply);
 - ``dropdata@`` → the connection drops after the body arrived (no reply);
+- ``garble@`` → a non-numeric final reply after the body;
+- ``stallrcpt@`` / ``stalldata@`` → no reply for ``STALL`` seconds at RCPT /
+  after the body (pair with a shorter client timeout);
 - anything else → accepted.
 """
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import ipaddress
 import socket
@@ -31,6 +35,7 @@ from cryptography.x509.oid import NameOID
 from sm_newsletter.sending.transport.smtp import SmtpConfig, SmtpTransport
 
 USERNAME = "relay-user"
+STALL = 0.6
 PASSWORD = "s3cret-Pa55word"
 
 
@@ -53,6 +58,8 @@ class ScriptedHandler:
         local = address.partition("@")[0]
         if local == "bounce":
             return "550 5.1.1 No such user"
+        if local == "stallrcpt":
+            await asyncio.sleep(STALL)
         if local == "droprcpt":
             server.transport.abort()
             return None
@@ -63,6 +70,10 @@ class ScriptedHandler:
         local = envelope.rcpt_tos[0].partition("@")[0]
         if local == "soft":
             return "451 4.3.0 Try again later"
+        if local == "garble":
+            return "garbage reply"
+        if local == "stalldata":
+            await asyncio.sleep(STALL)
         if local == "dropdata":
             server.transport.abort()
             return None
