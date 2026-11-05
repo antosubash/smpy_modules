@@ -11,13 +11,13 @@ import {
 } from '@simple-module-py/ui/components/ui/alert-dialog';
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { useCampaignProgress } from '../../hooks/useCampaignProgress';
 import { api, errorMessage } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 import { daysLeft, formatWhen } from '../../utils/progress';
-import type { CampaignDetail } from '../../utils/types';
+import type { CampaignDetail, Progress } from '../../utils/types';
 
 const copy = keys.newsletter.sending;
 const statusKeys = keys.newsletter.campaigns.status as Record<string, string>;
@@ -44,6 +44,7 @@ export function SendingPanel({ campaign, canSend, onChange }: Props) {
   const { progress, error: progressError } = useCampaignProgress(campaign.id, campaign.status);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useFollowWorker(campaign, progress, onChange);
 
   if (campaign.status === 'draft') return null;
   const when = (iso: string) => formatWhen(iso, locale ?? 'en');
@@ -140,6 +141,37 @@ export function SendingPanel({ campaign, canSend, onChange }: Props) {
       )}
     </section>
   );
+}
+
+/**
+ * The worker moves a campaign on its own (scheduled -> sending, sending -> sent
+ * or paused). When a poll answered *after* the page's copy last changed reports
+ * another status, re-read the campaign so the lines and buttons follow it.
+ * A poll from before that change (the answer still on screen) is ignored, and
+ * a draft has nothing the worker can move.
+ */
+function useFollowWorker(
+  campaign: CampaignDetail,
+  progress: Progress | null,
+  onChange: (c: CampaignDetail) => void,
+) {
+  const seen = useRef<{ status: string; stale: Progress | null } | null>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const { id, status } = campaign;
+  useEffect(() => {
+    if (seen.current?.status !== status) {
+      seen.current = { status, stale: progress };
+      return;
+    }
+    if (status === 'draft' || !progress || progress === seen.current.stale) return;
+    if (progress.status === status) return;
+    seen.current.stale = progress;
+    api.getCampaign(id).then(
+      (next) => onChangeRef.current(next),
+      () => undefined, // the next poll tries again
+    );
+  }, [id, status, progress]);
 }
 
 interface CancelProps {
