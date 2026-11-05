@@ -7,7 +7,8 @@ transport (which decrypts the password under that key).
 
 :func:`dispatch_async` is the task body. Any configuration failure refuses the
 whole tick before recovery, freeze or a relay connection: it is logged at ERROR
-by its class name only (never a value) and the summary says ``not_configured``.
+by its class name only (never a value; ``SettingsUnreadable`` adds its cause's
+class) and the summary says ``not_configured``.
 Campaigns stay as they are until the worker is fixed.
 """
 
@@ -98,6 +99,9 @@ async def dispatch_async(
         name = type(exc).__name__
         if isinstance(exc, PlaintextPassword):
             logger.error("newsletter.dispatch refused: %s; use %s", name, PASSWORD_ENDPOINT)
+        elif isinstance(exc, SettingsUnreadable):
+            cause = type(exc.__cause__).__name__
+            logger.error("newsletter.dispatch refused: %s (%s)", name, cause)
         else:
             logger.error("newsletter.dispatch refused: %s", name)
         return TickSummary(stopped="not_configured")

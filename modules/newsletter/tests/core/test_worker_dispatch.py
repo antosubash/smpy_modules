@@ -237,3 +237,22 @@ def test_no_token_in_any_log(world, caplog):
     assert any("console transport" in line for line in lines)  # the capture saw the send
     assert not [line for line in lines if UNSUBSCRIBE_PREFIX in line]
     assert not [line for line in lines if any(mac in line for mac in macs)]
+
+
+def test_unreadable_settings_log_the_causes_class(monkeypatch, caplog):
+    """The refusal names the cause's class (a misconfigured worker shows only in
+    its logs), never the cause's text."""
+    import background_tasks
+    from sm_newsletter.sending import runtime
+
+    def broken(*_args: Any, **_kw: Any) -> Any:
+        raise ConnectionRefusedError("db.internal:5432 password=hunter2")
+
+    monkeypatch.setattr(background_tasks, "settings_for", broken)
+    with caplog.at_level(logging.ERROR):
+        summary = asyncio.run(runtime.dispatch_async(None))  # ty: ignore[invalid-argument-type]
+
+    assert summary.stopped == "not_configured"
+    [line] = [r.getMessage() for r in caplog.records if "refused" in r.getMessage()]
+    assert "SettingsUnreadable" in line and "ConnectionRefusedError" in line
+    assert "hunter2" not in line
