@@ -95,7 +95,15 @@ REASON_UNSUBSCRIBED = "unsubscribed"
 REASONS = (REASON_HARD_BOUNCE, REASON_COMPLAINT, REASON_IMPORTED_CLEANED, REASON_UNSUBSCRIBED)
 # A later confirmation clears these; a complaint is never cleared.
 CLEARED_BY_CONFIRMATION = (REASON_HARD_BOUNCE, REASON_IMPORTED_CLEANED, REASON_UNSUBSCRIBED)
+SOURCE_ADMIN = "admin"
 SOURCES = ("records_event", "reconcile", "unsubscribe_page", "send", "import", "admin")
+
+# Reasons an admin may lift; a complaint is never lifted.
+LIFTABLE = (REASON_HARD_BOUNCE, REASON_IMPORTED_CLEANED, REASON_UNSUBSCRIBED)
+
+PERM_RECORDS_VIEW = "records.view"
+TAGS_FIELD = "tags"
+"""The subscription list's tags multiselect field."""
 
 MAX_TYPE_KEY_LEN = 64  # records' ``MAX_KEY_LEN``
 MAX_EMAIL_LEN = 320
@@ -108,12 +116,15 @@ PAUSE_SMTP_AUTH = "smtp_auth"
 PAUSE_LIST_UNAVAILABLE = "list_unavailable"
 PAUSE_HTTPS_REQUIRED = "https_required"
 """The snapshot's bases are not both ``https://`` and the transport is ``smtp``."""
+PAUSE_AUDIENCE_UNAVAILABLE = "audience_unavailable"
+"""The segment's audience could not be resolved (records unavailable or no view access)."""
 PAUSE_CODES = (
     PAUSE_MANUAL,
     PAUSE_SMTP_REJECTED,
     PAUSE_SMTP_AUTH,
     PAUSE_LIST_UNAVAILABLE,
     PAUSE_HTTPS_REQUIRED,
+    PAUSE_AUDIENCE_UNAVAILABLE,
 )
 
 # ``newsletter_send.error_kind`` of a row that ended ``failed`` or ``bounced``.

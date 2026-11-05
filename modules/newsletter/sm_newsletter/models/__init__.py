@@ -13,7 +13,7 @@ from sm_newsletter.models.link import Click, Link
 from sm_newsletter.models.render import CampaignRender
 from sm_newsletter.models.segment import Segment
 from sm_newsletter.models.send import Send, SendAttempt
-from sm_newsletter.models.suppression import Suppression
+from sm_newsletter.models.suppression import Suppression, SuppressionLift
 
 __all__ = [
     "Base",
@@ -26,4 +26,5 @@ __all__ = [
     "Send",
     "SendAttempt",
     "Suppression",
+    "SuppressionLift",
 ]
