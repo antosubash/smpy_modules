@@ -79,11 +79,10 @@ class NewsletterModule(ModuleBase):
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
         from simple_module_hosting.csrf import RequiresCsrf
 
-        from sm_newsletter.web.endpoints.settings_api import router as api
+        from sm_newsletter.web.endpoints import build_api_router
 
-        # The framework's CSRF check on every write; reads pass. No view routes
-        # until PR 3.
-        api_router.include_router(api, dependencies=[Depends(RequiresCsrf())])
+        # The framework's CSRF check on every write; reads pass.
+        api_router.include_router(build_api_router(), dependencies=[Depends(RequiresCsrf())])
 
     def register_public_routes(self, registry: PublicRouteRegistry) -> None:
         """The email logo (C8): anonymous, ``GET`` only, at a fixed path."""

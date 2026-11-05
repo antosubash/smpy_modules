@@ -1,79 +1,24 @@
 """``PUT /api/newsletter/settings/smtp-password``: the one place the password is written.
 
-The app is real where it matters: the module's own ``register_settings`` and
-``register_routes``, the framework's settings store on an in-memory database,
-its ``apply_changes_and_reload`` and the generic module-settings API. Only auth
-and the host's ``app.state.sm`` are stubbed.
+The app is ``tests.support.app.build_app``: the module's own settings and
+routes, the framework's settings store and the generic module-settings API,
+with only auth and the host's ``app.state.sm`` stubbed.
 """
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import pytest
 import pytest_asyncio
-from fastapi import APIRouter, FastAPI, Request
 from httpx import ASGITransport, AsyncClient
-from settings.endpoints.module_api import router as generic_settings_router
-from settings.models import Base as SettingsBase
 from settings.service import SettingService
 from settings.store import SettingsStore
-from simple_module_core.events import EventBus
-from simple_module_core.i18n import I18nRegistry
-from simple_module_hosting.csrf import CSRF_HEADER, get_csrf_token
+from simple_module_hosting.csrf import CSRF_HEADER
 from sm_newsletter.core import constants, crypto
-from sm_newsletter.core.errors import install_exception_handlers
-from sm_newsletter.core.tenancy import TenancyMode
-from sm_newsletter.module import NewsletterModule
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.sessions import SessionMiddleware
 
-from tests.pg_support import _pg
+from tests.support.app import build_app as _build
 
 URL = f"{constants.ROUTE_PREFIX_API}/settings/smtp-password"
-SECRET = "test-host-secret"
-
-
-class _Auth(BaseHTTPMiddleware):
-    """``x-perms`` (comma separated) is the signed-in user's permission set."""
-
-    async def dispatch(self, request, call_next):
-        request.state.user = SimpleNamespace(id="u", email="u@example.com", name="U", roles=[])
-        raw = request.headers.get("x-perms", "")
-        request.state.resolved_permissions = {p for p in raw.split(",") if p}
-        return await call_next(request)
-
-
 MANAGE = {"x-perms": f"{constants.PERM_MANAGE},{constants.PERM_SETTINGS_EDIT}"}
-
-
-async def _build(*, session: bool = False, multi: bool = False):
-    state = await _pg.make_db_state(SettingsBase.metadata)
-    app = FastAPI()
-    app.state.sm = SimpleNamespace(
-        db=state,
-        event_bus=EventBus(),
-        i18n_registry=I18nRegistry("en", ("en",)),
-        settings=SimpleNamespace(secret_key=SECRET, i18n_default_locale="en"),
-    )
-    module = NewsletterModule()
-    module.register_settings(app)
-    if multi:
-        app.state.sm_newsletter.tenancy = TenancyMode.MULTI
-    api = APIRouter(prefix=constants.ROUTE_PREFIX_API)
-    module.register_routes(api, APIRouter())
-    app.include_router(api)
-    app.include_router(generic_settings_router, prefix="/api/settings")
-    install_exception_handlers(app)
-
-    @app.get("/token")
-    async def token(request: Request):
-        return {"token": get_csrf_token(request)}
-
-    app.add_middleware(_Auth)
-    if session:
-        app.add_middleware(SessionMiddleware, secret_key="s")
-    return app, state
 
 
 @pytest_asyncio.fixture

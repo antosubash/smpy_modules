@@ -74,6 +74,50 @@ class InvalidBody(NewsletterError):  # noqa: N818 - names the field
     detail = "The body is not valid"
 
 
+class InvalidCampaign(NewsletterError):  # noqa: N818 - names the payload
+    """A campaign payload that fails its schema. The detail names the field and
+    the error type, never the submitted value (it may be a header injection)."""
+
+    status = 422
+    code = "invalid_campaign"
+    detail = "The campaign is not valid"
+
+
+class NotADraft(NewsletterError):  # noqa: N818 - the state it refuses
+    status = 409
+    code = "not_a_draft"
+    detail = "Only a draft campaign can be changed or deleted"
+
+
+class StaleCampaign(NewsletterError):  # noqa: N818 - the state it refuses
+    """The campaign moved on since the editor read it (``expected_revision``)."""
+
+    status = 409
+    code = "stale"
+    detail = "The campaign was changed elsewhere; reload it"
+
+
+class UnknownList(NewsletterError):  # noqa: N818 - names the field
+    status = 422
+    code = "unknown_list"
+    detail = "No such newsletter list"
+
+
+class ListForbidden(Forbidden):
+    """The list exists, but records' ``allowed_roles`` shut this caller out."""
+
+    code = "list_forbidden"
+    detail = "You may not use this newsletter list"
+
+
+class AudienceUnsupported(NewsletterError):  # noqa: N818 - names the field
+    """Only ``all`` until segments (PR 6) and tags (PR 4) exist."""
+
+    status = 422
+    code = "audience_unsupported"
+    detail = "Only the whole list can be the audience for now"
+
+
 async def render(request: Request, exc: NewsletterError) -> JSONResponse:
     return JSONResponse({"detail": exc.detail, "code": exc.code}, status_code=exc.status)
 
