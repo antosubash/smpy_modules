@@ -24,8 +24,9 @@ import { useState } from 'react';
 
 import { api, errorMessage } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
-import type { CampaignSummary } from '../../utils/types';
-import { editorUrl } from './urls';
+import { formatRate, hasStarted, rate } from '../../utils/report';
+import type { CampaignListItem, CampaignSummary } from '../../utils/types';
+import { editorUrl, reportUrl } from './urls';
 
 /** Every campaign status's label, as `keys` leaves rather than a template literal. */
 export const STATUS_LABELS: Record<string, string> = {
@@ -120,31 +121,36 @@ function DeleteDraft({
 }
 
 interface Props {
-  items: CampaignSummary[];
+  items: CampaignListItem[];
   canEdit: boolean;
   onDeleted: () => void;
 }
 
-/** Name (a link to the editor), subject, status, list and last change. Delete is offered on drafts, to editors only. */
+/** Name and subject, status, list, send date, recipients, open and click rates, last change; Report once sending began, Delete on drafts to editors. */
 export function CampaignTable({ items, canEdit, onDeleted }: Props) {
   const { t, locale } = useT();
   const copy = keys.newsletter.campaigns;
   const date = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
+  const pct = (part: number, whole: number) =>
+    formatRate(rate(part, whole), locale ?? 'en') ?? t(copy.no_rate);
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>{t(copy.columns.name)}</TableHead>
-          <TableHead>{t(copy.columns.subject)}</TableHead>
           <TableHead>{t(copy.columns.status)}</TableHead>
           <TableHead>{t(copy.columns.list)}</TableHead>
+          <TableHead>{t(copy.columns.sent)}</TableHead>
+          <TableHead>{t(copy.columns.recipients)}</TableHead>
+          <TableHead title={t(keys.newsletter.report.approx.opens)}>
+            {t(copy.columns.opens)}
+          </TableHead>
+          <TableHead>{t(copy.columns.clicks)}</TableHead>
           <TableHead>{t(copy.columns.updated)}</TableHead>
-          {canEdit && (
-            <TableHead>
-              <span className="sr-only">{t(copy.columns.actions)}</span>
-            </TableHead>
-          )}
+          <TableHead>
+            <span className="sr-only">{t(copy.columns.actions)}</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -154,9 +160,9 @@ export function CampaignTable({ items, canEdit, onDeleted }: Props) {
               <Link href={editorUrl(c.id)} className="hover:underline">
                 {c.name}
               </Link>
-            </TableCell>
-            <TableCell className="text-muted-foreground">
-              {c.subject || t(copy.no_subject)}
+              <div className="text-xs font-normal text-muted-foreground">
+                {c.subject || t(copy.no_subject)}
+              </div>
             </TableCell>
             <TableCell>
               <Badge variant={STATUS_VARIANT[c.status] ?? 'outline'}>
@@ -165,13 +171,27 @@ export function CampaignTable({ items, canEdit, onDeleted }: Props) {
             </TableCell>
             <TableCell>{c.list_type_key}</TableCell>
             <TableCell className="text-muted-foreground">
+              {c.started_at ? date.format(new Date(c.started_at)) : t(copy.never)}
+            </TableCell>
+            <TableCell>{c.recipient_count}</TableCell>
+            <TableCell>{pct(c.opens_unique_accepted, c.sent_count)}</TableCell>
+            <TableCell>{pct(c.clicks_unique_accepted, c.sent_count)}</TableCell>
+            <TableCell className="text-muted-foreground">
               {c.updated_at ? date.format(new Date(c.updated_at)) : t(copy.never)}
             </TableCell>
-            {canEdit && (
-              <TableCell className="text-right">
-                {c.status === 'draft' && <DeleteDraft campaign={c} onDeleted={onDeleted} />}
-              </TableCell>
-            )}
+            <TableCell className="text-right">
+              {hasStarted(c) && (
+                <Button asChild variant="ghost" size="sm">
+                  <Link href={reportUrl(c.id)}>
+                    {t(copy.report_link)}
+                    <span className="sr-only">{t(copy.report_label, { name: c.name })}</span>
+                  </Link>
+                </Button>
+              )}
+              {canEdit && c.status === 'draft' && (
+                <DeleteDraft campaign={c} onDeleted={onDeleted} />
+              )}
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
