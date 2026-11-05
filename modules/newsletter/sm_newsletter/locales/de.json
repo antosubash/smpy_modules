@@ -232,6 +232,7 @@
       "rejected": "Abgelehnt",
       "unknown": "Unbekannt",
       "failed": "Fehlgeschlagen"
-    }
+    },
+    "incomplete": "Unfertige Blöcke sind nicht im gespeicherten Entwurf und fehlen daher im Test."
   }
 }

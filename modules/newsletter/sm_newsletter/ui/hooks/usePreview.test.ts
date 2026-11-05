@@ -58,4 +58,62 @@ describe('usePreview', () => {
     expect(api.previewUnsaved).not.toHaveBeenCalled();
     expect(result.preview).toEqual(shown);
   });
+
+  it('coalesces rapid edits into one request', async () => {
+    input = { id: 3, editable: true, enabled: true, subject: 'a', preheader: '', body };
+    const root = await mount();
+    for (const subject of ['ab', 'abc', 'abcd']) {
+      input = { ...input, subject };
+      await act(async () => root.render(createElement(Harness)));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS - 100);
+      });
+    }
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
+    });
+    expect(api.previewUnsaved).toHaveBeenCalledTimes(1);
+    expect(api.previewUnsaved).toHaveBeenCalledWith(expect.objectContaining({ subject: 'abcd' }));
+  });
+
+  it('a stale response does not overwrite a newer one', async () => {
+    let first: (p: typeof shown) => void = () => {};
+    vi.mocked(api.previewUnsaved)
+      .mockReset()
+      .mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            first = r;
+          }),
+      )
+      .mockResolvedValueOnce({ ...shown, subject: 'newer' });
+    input = { id: 3, editable: true, enabled: true, subject: 'a', preheader: '', body };
+    const root = await mount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
+    });
+    input = { ...input, subject: 'b' };
+    await act(async () => root.render(createElement(Harness)));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
+    });
+    expect(result.preview?.subject).toBe('newer');
+    await act(async () => first({ ...shown, subject: 'older' }));
+    expect(result.preview?.subject).toBe('newer');
+  });
+
+  it('clears loading when the body becomes incomplete mid-request', async () => {
+    vi.mocked(api.previewUnsaved)
+      .mockReset()
+      .mockImplementation(() => new Promise(() => {}));
+    input = { id: 3, editable: true, enabled: true, subject: 'a', preheader: '', body };
+    const root = await mount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
+    });
+    expect(result.loading).toBe(true);
+    input = { ...input, body: [{ type: 'Heading', props: { id: 'h1' } }] };
+    await act(async () => root.render(createElement(Harness)));
+    expect(result.loading).toBe(false);
+  });
 });

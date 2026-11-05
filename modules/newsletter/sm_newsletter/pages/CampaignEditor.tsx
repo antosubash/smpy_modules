@@ -8,11 +8,11 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { campaignsUrl } from '../ui/components/campaigns/urls';
 import { CampaignMeta } from '../ui/components/editor/CampaignMeta';
+import { type EditorTab, EditorTabs } from '../ui/components/editor/EditorTabs';
 import { EditorActionsContext } from '../ui/components/editor/editorActions';
 import { localizeConfig } from '../ui/components/editor/localizeConfig';
 import { PreviewPane } from '../ui/components/editor/PreviewPane';
 import { buildConfig, type Capabilities } from '../ui/components/editor/puckConfig';
-import { TestSendDialog } from '../ui/components/editor/TestSendDialog';
 import { type EditorStatus, useCampaignEditor } from '../ui/hooks/useCampaignEditor';
 import { normalizeBody } from '../ui/utils/bodyDraft';
 import { keys, useT } from '../ui/utils/i18n';
@@ -38,7 +38,6 @@ const READ_ONLY: Partial<Permissions> = {
 };
 
 const copy = keys.newsletter.editor;
-const previewCopy = keys.newsletter.preview;
 
 /** Test sends are capped at five server-side; the page prop says what this host allows. */
 const DEFAULT_MAX_TEST_RECIPIENTS = 5;
@@ -70,7 +69,7 @@ export default function CampaignEditor() {
     [news, pagebuilder, t],
   );
   const actions = useMemo(() => ({ refresh: editor.refresh }), [editor.refresh]);
-  const [tab, setTab] = useState<'edit' | 'preview'>('edit');
+  const [tab, setTab] = useState<EditorTab>('edit');
   const previewBody = useMemo(() => normalizeBody(fromPuckData(editor.data)), [editor.data]);
   const isDraft = campaign?.status === 'draft';
   const readOnly = props.can_edit !== true || !isDraft || editor.status === 'stale';
@@ -131,24 +130,15 @@ export default function CampaignEditor() {
         </div>
         {campaign && (
           <>
-            {(['edit', 'preview'] as const).map((id) => (
-              <Button
-                key={id}
-                size="sm"
-                variant={tab === id ? 'default' : 'outline'}
-                aria-pressed={tab === id}
-                onClick={() => setTab(id)}
-              >
-                {t(id === 'edit' ? previewCopy.tab_edit : previewCopy.tab_preview)}
-              </Button>
-            ))}
-            {props.can_send === true && (
-              <TestSendDialog
-                campaignId={campaign.id}
-                max={props.max_test_recipients ?? DEFAULT_MAX_TEST_RECIPIENTS}
-                beforeSend={editor.flush}
-              />
-            )}
+            <EditorTabs
+              tab={tab}
+              onTab={setTab}
+              campaignId={campaign.id}
+              canSend={props.can_send === true}
+              maxRecipients={props.max_test_recipients ?? DEFAULT_MAX_TEST_RECIPIENTS}
+              flush={editor.flush}
+              incomplete={editor.incomplete}
+            />
           </>
         )}
         <span className="text-xs text-muted-foreground" aria-live="polite">

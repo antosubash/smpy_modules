@@ -42,7 +42,10 @@ export function usePreview(input: PreviewInput) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: `key` stands for the body; `latest` holds the current one.
   useEffect(() => {
     // A body with an unfinished block is not sent: the last preview stays.
-    if (!enabled || (editable && !complete)) return;
+    if (!enabled || (editable && !complete)) {
+      setLoading(false);
+      return;
+    }
     let current = true;
     const run = async () => {
       setLoading(true);

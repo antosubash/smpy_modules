@@ -232,6 +232,7 @@
       "rejected": "Rejected",
       "unknown": "Unknown",
       "failed": "Failed"
-    }
+    },
+    "incomplete": "Unfinished blocks are not in the saved draft, so they are left out of the test."
   }
 }

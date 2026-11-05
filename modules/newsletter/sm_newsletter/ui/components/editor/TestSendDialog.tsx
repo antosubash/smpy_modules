@@ -13,11 +13,12 @@ import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { useState } from 'react';
 
 import { api, errorMessage } from '../../utils/api';
-import { isHttpStatus } from '../../utils/http';
+import { HttpError, isHttpStatus } from '../../utils/http';
 import { keys, useT } from '../../utils/i18n';
 import type { TestSendResult } from '../../utils/types';
 
 const copy = keys.newsletter.test_send;
+const errorKeys = keys.newsletter.errors as Record<string, string>;
 const FIELD_ID = 'newsletter-test-send-recipients';
 const ADDRESS = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
 
@@ -43,10 +44,12 @@ interface Props {
   /** Saves what is pending; resolves false when something stayed unsaved. The
    *  server sends the saved campaign, so a test never runs on stale text. */
   beforeSend?: () => Promise<boolean>;
+  /** A block is unfinished, so the saved draft lacks it. */
+  incomplete?: boolean;
 }
 
 /** "Send test": the saved campaign to up to `max` addresses, with each one's outcome. */
-export function TestSendDialog({ campaignId, max, beforeSend }: Props) {
+export function TestSendDialog({ campaignId, max, beforeSend, incomplete }: Props) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
@@ -84,7 +87,10 @@ export function TestSendDialog({ campaignId, max, beforeSend }: Props) {
       }
       setResults((await api.testSend(campaignId, recipients)).results);
     } catch (e) {
-      setError(isHttpStatus(e, 422) ? t(copy.invalid_recipients) : errorMessage(e, t));
+      // The server's code wins (`public_base_url_required`, `sender_not_configured`);
+      // a 422 with no catalogue entry is a malformed recipient list.
+      const named = e instanceof HttpError && e.code !== null && Object.hasOwn(errorKeys, e.code);
+      setError(isHttpStatus(e, 422) && !named ? t(copy.invalid_recipients) : errorMessage(e, t));
     } finally {
       setPending(false);
     }
@@ -119,6 +125,7 @@ export function TestSendDialog({ campaignId, max, beforeSend }: Props) {
               placeholder={t(copy.placeholder)}
               onChange={(e) => setText(e.target.value)}
             />
+            {incomplete && <p className="text-sm text-amber-900">{t(copy.incomplete)}</p>}
             {problem && <p className="text-sm text-destructive">{problem}</p>}
             {error && (
               <p role="alert" className="text-sm text-destructive">

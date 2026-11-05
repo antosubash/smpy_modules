@@ -7,9 +7,9 @@ import en from '../../../locales/en.json';
 import { api } from '../../utils/api';
 import { TestSendDialog } from './TestSendDialog';
 
-vi.mock('../../utils/api', () => ({
+vi.mock('../../utils/api', async (original) => ({
+  ...(await original<typeof import('../../utils/api')>()),
   api: { testSend: vi.fn() },
-  errorMessage: () => 'failed',
 }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -77,5 +77,14 @@ describe('TestSendDialog', () => {
     await act(async () => button(copy.send)?.click());
     expect(api.testSend).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain(copy.unsaved);
+  });
+
+  it('notes that unfinished blocks are left out', async () => {
+    root = createRoot(document.body.appendChild(document.createElement('div')));
+    await act(async () =>
+      root.render(createElement(TestSendDialog, { campaignId: 7, max: 5, incomplete: true })),
+    );
+    await act(async () => button(copy.trigger)?.click());
+    expect(document.body.textContent).toContain(copy.incomplete);
   });
 });
