@@ -21,12 +21,15 @@ export function bucketLabel(at: string, bucket: 'hour' | 'day', locale: string):
     date,
   );
   if (bucket === 'day') return day;
-  const hour = new Intl.DateTimeFormat(locale, {
+  // Take the digits from the parts: some locales wrap the hour in words ("23 Uhr", "23 h").
+  const parts = new Intl.DateTimeFormat(locale, {
     hour: '2-digit',
+    minute: '2-digit',
     hourCycle: 'h23',
     timeZone: 'UTC',
-  }).format(date);
-  return `${day} ${hour.padStart(2, '0')}:00`;
+  }).formatToParts(date);
+  const pick = (type: string) => parts.find((p) => p.type === type)?.value ?? '00';
+  return `${day} ${pick('hour').padStart(2, '0')}:${pick('minute').padStart(2, '0')}`;
 }
 
 const STARTED = new Set(['sending', 'paused', 'sent', 'cancelled']);

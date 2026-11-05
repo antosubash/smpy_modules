@@ -39,6 +39,13 @@ describe('bucketLabel', () => {
     expect(label).toContain('5');
     expect(label).toContain('Nov');
   });
+  it.each(['de', 'fr'])('shows HH:00 without locale words in %s', (locale) => {
+    process.env.TZ = 'Pacific/Auckland';
+    const label = bucketLabel('2026-11-05T23:00:00Z', 'hour', locale);
+    expect(label).toContain('23:00');
+    expect(label).not.toContain('Uhr');
+    expect(label).not.toMatch(/\sh\b/);
+  });
   it('shows only the UTC date for a day bucket', () => {
     process.env.TZ = 'Pacific/Auckland';
     const label = bucketLabel('2026-11-05T23:00:00Z', 'day', 'en');

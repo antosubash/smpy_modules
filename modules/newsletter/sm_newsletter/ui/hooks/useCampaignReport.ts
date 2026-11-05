@@ -45,6 +45,7 @@ export function useCampaignReport(id: number) {
     const loop = async () => {
       const next = await fetchOnce(abort.signal);
       if (abort.signal.aborted) return;
+      // If the first fetch fails nothing polls; the Refresh button (reload) retries.
       // A failed poll keeps the last known state, so a blip does not end the polling.
       if (next) sending = next.status === 'sending';
       if (sending) timer = setTimeout(() => void loop(), REPORT_POLL_MS);
