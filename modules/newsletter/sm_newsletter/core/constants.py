@@ -16,6 +16,8 @@ BRAND_LOGO_PATH = f"{PUBLIC_PREFIX}brand/logo"
 # Previews and test sends have no send row, so no MAC: their unsubscribe links
 # carry this token, which the unsubscribe page treats like a forged one (R1).
 TEST_UNSUBSCRIBE_TOKEN = "test"
+# One unsubscribe link per send: ``{UNSUBSCRIBE_PREFIX}<token>``.
+UNSUBSCRIBE_PREFIX = f"{PUBLIC_PREFIX}u/"
 # The email accent without branding, or when branding sets no primary colour.
 DEFAULT_ACCENT = "#2563eb"
 
@@ -88,3 +90,20 @@ SOURCES = ("records_event", "reconcile", "unsubscribe_page", "send", "import", "
 
 MAX_TYPE_KEY_LEN = 64  # records' ``MAX_KEY_LEN``
 MAX_EMAIL_LEN = 320
+
+# Why a campaign is paused; ``paused_reason`` stores ``"<code>|<detail>"``.
+PAUSE_MANUAL = "manual"
+PAUSE_SMTP_REJECTED = "smtp_rejected"
+PAUSE_SMTP_AUTH = "smtp_auth"
+PAUSE_LIST_UNAVAILABLE = "list_unavailable"
+PAUSE_CODES = (PAUSE_MANUAL, PAUSE_SMTP_REJECTED, PAUSE_SMTP_AUTH, PAUSE_LIST_UNAVAILABLE)
+
+# ``newsletter_send.error_kind`` of a row that ended ``failed`` or ``bounced``.
+ERROR_OUTCOME_UNKNOWN = "outcome_unknown"
+ERROR_RETRIES_EXHAUSTED = "retries_exhausted"
+ERROR_INVALID_MESSAGE = "invalid_message"
+ERROR_HARD_BOUNCE = "hard_bounce"
+
+# Suppression sources the sending path writes (both are in ``SOURCES``).
+SOURCE_SEND = "send"
+SOURCE_UNSUBSCRIBE_PAGE = "unsubscribe_page"
