@@ -7,9 +7,9 @@ from simple_module_core.diagnostics._tenancy import check_tenant_unique_keys, mo
 from sm_newsletter import models
 from sm_newsletter.core.tenancy import TenantUnbound, all_tenants, install_guard
 from sm_newsletter.core.tenancy._guard import owned
-from sm_newsletter.models import Base, Campaign, CampaignRender, Send, Suppression
+from sm_newsletter.models import Base, Campaign, CampaignRender, Click, Link, Send, Suppression
 from sm_newsletter.module import NewsletterModule
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, insert, select, text
 from sqlalchemy.exc import IntegrityError
 
 LOCK_TABLE = "newsletter_dispatch_lock"
@@ -67,6 +67,51 @@ async def test_suppression_unique_per_reason_and_list(db):
     db.add(_suppression("unsubscribed", "news"))
     with pytest.raises(IntegrityError):
         await db.flush()
+
+
+async def _send_and_links(db, n_links=2):
+    c = await _campaign(db)
+    send = Send(campaign_id=c.id, record_uuid="u1", email="a@example.com")
+    other = Send(campaign_id=c.id, record_uuid="u2", email="b@example.com")
+    links = [Link(campaign_id=c.id, position=i, url=f"https://e.com/{i}") for i in range(n_links)]
+    db.add_all([send, other, *links])
+    await db.flush()
+    return send, other, links
+
+
+async def test_click_is_unique_per_send_and_link(db):
+    from datetime import UTC, datetime
+
+    send, other, (a, b) = await _send_and_links(db)
+    now = datetime.now(UTC)
+    db.add_all(
+        [
+            Click(send_id=send.id, link_id=a.id, clicked_at=now),
+            Click(send_id=send.id, link_id=b.id, clicked_at=now),
+            Click(send_id=other.id, link_id=a.id, clicked_at=now),
+        ]
+    )
+    await db.flush()
+    db.add(Click(send_id=send.id, link_id=a.id, clicked_at=now))
+    with pytest.raises(IntegrityError):
+        await db.flush()
+
+
+async def test_click_count_defaults_to_one(db):
+    from datetime import UTC, datetime
+
+    send, _other, (a, _b) = await _send_and_links(db)
+    await db.execute(
+        insert(Click.__table__).values(
+            tenant_id="default", send_id=send.id, link_id=a.id, clicked_at=datetime.now(UTC)
+        )
+    )
+    count = (
+        await db.execute(
+            select(Click.__table__.c.click_count).where(Click.__table__.c.send_id == send.id)
+        )
+    ).scalar_one()
+    assert count == 1
 
 
 async def test_tenant_stamped_from_scope(db):
