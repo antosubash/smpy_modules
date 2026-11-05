@@ -2,7 +2,10 @@
 
 The caller holds the dispatch lock. Per recipient, in this order:
 
-1. read the campaign (a shortcut: the claim decides) and its next due row;
+1. read the campaign (a shortcut: the claim decides) and its next due row; on
+   the ``smtp`` transport a snapshot whose bases are not both ``https://``
+   pauses the campaign (``https_required``) with no claim and no attempt (the
+   dispatcher pauses those before it connects; this is the backstop);
 2. re-check the subscriber (still confirmed in records, not suppressed): an
    ineligible row is skipped with no SMTP call and no ledger row, and a list
    that is gone (deleted, or no longer a list) pauses the campaign with
@@ -35,6 +38,7 @@ from sm_records.contracts.newsletter import (
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_newsletter.campaigns.checks import bases_https
 from sm_newsletter.campaigns.lifecycle import SENDING
 from sm_newsletter.core import constants
 from sm_newsletter.core.suppression import suppressed
@@ -59,6 +63,7 @@ _INVALID = Verdict("fail", False, error_kind=constants.ERROR_INVALID_MESSAGE)
 # Tenant-local: the campaign pauses, and the tick goes on with the others.
 _NO_LIST = Verdict("pause", False, pause_code=constants.PAUSE_LIST_UNAVAILABLE)
 _LIST_GONE = "list_unavailable"
+_INSECURE = Verdict("pause", False, pause_code=constants.PAUSE_HTTPS_REQUIRED)
 
 
 @dataclass(frozen=True)
@@ -78,44 +83,53 @@ async def deliver_one(
     secret: str,
     list_unsubscribe: bool,
     clock: Clock,
+    require_https: bool = False,
 ) -> Step | None:
     """One recipient of the campaign; ``None`` when there is nothing to send
     now (not ``sending``, no due row, or the claim lost to a pause, a cancel
-    or another sender: nothing was skipped). ``DispatchBusy`` from the lock
-    propagates with nothing reserved."""
+    or another sender: nothing was skipped). ``require_https`` (the ``smtp``
+    transport) refuses a snapshot whose bases are not both ``https://``.
+    ``DispatchBusy`` from the lock propagates with nothing reserved."""
     with tenant_scope(tenant_id):
         async with factory() as session:
+            found = await _due(session, tenant_id, campaign_id, clock())
+            if found is None:
+                await session.rollback()
+                return None
+            if require_https and not bases_https(found[2].content_base, found[2].public_base):
+                await session.rollback()  # end the read before any write
+                await _pause(session, tenant_id, campaign_id, constants.PAUSE_HTTPS_REQUIRED, clock)
+                return Step(False, _INSECURE)
             return await _deliver(
-                session, smtp, lock, tenant_id, campaign_id, secret, list_unsubscribe, clock
+                session, smtp, lock, found, tenant_id, campaign_id, secret, list_unsubscribe, clock
             )
+
+
+async def _pause(
+    session: AsyncSession, tenant_id: str, campaign_id: int, code: str, clock: Clock
+) -> None:
+    await rows.pause_campaign(
+        session, tenant_id=tenant_id, campaign_id=campaign_id, code=code, now=clock()
+    )
+    await finalize_session(session)
 
 
 async def _deliver(
     session: AsyncSession,
     smtp: TransportSession,
     lock: HeldLock,
+    found: tuple[Send, str, CampaignRender],
     tenant_id: str,
     campaign_id: int,
     secret: str,
     list_unsubscribe: bool,
     clock: Clock,
 ) -> Step | None:
-    found = await _due(session, tenant_id, campaign_id, clock())
-    if found is None:
-        await session.rollback()
-        return None
     row, list_key, render = found
     status = await _ineligible(session, tenant_id, list_key, row)
     await session.rollback()  # end the read before any write
     if status == _LIST_GONE:
-        await rows.pause_campaign(
-            session,
-            tenant_id=tenant_id,
-            campaign_id=campaign_id,
-            code=constants.PAUSE_LIST_UNAVAILABLE,
-            now=clock(),
-        )
-        await finalize_session(session)
+        await _pause(session, tenant_id, campaign_id, constants.PAUSE_LIST_UNAVAILABLE, clock)
         return Step(False, _NO_LIST)
     if status is not None:
         await rows.skip(session, row, status=status)

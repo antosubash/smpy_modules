@@ -85,6 +85,15 @@ describe('SendingPanel', () => {
     expect(api.resumeCampaign).toHaveBeenCalledWith(7);
   });
 
+  it('translates the https_required pause', async () => {
+    vi.mocked(api.progress).mockResolvedValue(progress({ status: 'paused' }));
+    await render(
+      campaign({ status: 'paused', paused_code: 'https_required', paused_detail: null }),
+    );
+    expect(host.textContent).toContain(copy.paused_code.https_required);
+    expect(host.textContent).not.toContain('https_required');
+  });
+
   it('asks before cancelling, and posts only after the confirmation', async () => {
     await render(campaign());
     await act(async () => button(copy.actions.cancel)?.click());

@@ -55,6 +55,7 @@ def build_render(
         ),
         reply_to=campaign.reply_to or settings.reply_to or None,
         public_base=ctx.public_base,
+        content_base=ctx.content_base,
         locale=ctx.locale,
         rendered_at=now,
     )

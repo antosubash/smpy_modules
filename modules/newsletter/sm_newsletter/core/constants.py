@@ -97,7 +97,15 @@ PAUSE_MANUAL = "manual"
 PAUSE_SMTP_REJECTED = "smtp_rejected"
 PAUSE_SMTP_AUTH = "smtp_auth"
 PAUSE_LIST_UNAVAILABLE = "list_unavailable"
-PAUSE_CODES = (PAUSE_MANUAL, PAUSE_SMTP_REJECTED, PAUSE_SMTP_AUTH, PAUSE_LIST_UNAVAILABLE)
+PAUSE_HTTPS_REQUIRED = "https_required"
+"""The snapshot's bases are not both ``https://`` and the transport is ``smtp``."""
+PAUSE_CODES = (
+    PAUSE_MANUAL,
+    PAUSE_SMTP_REJECTED,
+    PAUSE_SMTP_AUTH,
+    PAUSE_LIST_UNAVAILABLE,
+    PAUSE_HTTPS_REQUIRED,
+)
 
 # ``newsletter_send.error_kind`` of a row that ended ``failed`` or ``bounced``.
 ERROR_OUTCOME_UNKNOWN = "outcome_unknown"

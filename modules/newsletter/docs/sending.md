@@ -24,7 +24,8 @@ When no row matches, the campaign is re-read: missing is 404, a stale revision
 on send or unschedule is `409 stale`, sending a non-draft is `409
 not_a_draft`, anything else `409 invalid_transition`. The paused reason is
 stored as `"<code>|<detail>"`; the codes are `manual`, `smtp_rejected`,
-`smtp_auth` and `list_unavailable`, and the API returns them split as
+`smtp_auth`, `list_unavailable` and `https_required`, and the API returns them
+split as
 `paused_code` and `paused_detail`.
 
 "Send now" is "scheduled for now": `POST /campaigns/{id}/send` without
@@ -56,7 +57,9 @@ personalises that snapshot (merge fields, the unsubscribe link and headers).
 Consequence: a later change to the sender, branding or postal address does not
 reach a campaign that is already scheduled or sending. **Unscheduling** deletes
 the snapshot and returns the campaign to draft; scheduling again re-renders it
-with the current sender, branding, address and content.
+with the current sender, branding, address, content and both bases (the
+snapshot stores `content_base` and `public_base`, which the dispatcher checks
+for `https://` before SMTP delivery).
 
 ## Freeze
 
@@ -95,6 +98,13 @@ expires after 55 s. Nothing else sends campaign mail.
    time: a large freeze (about 100 pages for 100k subscribers) can use a whole
    tick, so nothing is sent that minute, for any tenant. It is only slower,
    never wrong: the claim and the per-page lease carry it on next tick.
+   On the `smtp` transport, every `sending` campaign whose stored snapshot does
+   not have `https://` for both `content_base` and `public_base` (an empty
+   `content_base` counts as not) is then paused with `https_required`, each in
+   its own tenant: scheduling checked the transport configured *then*, and a
+   switch from `console` to `smtp` must not send an `http://` snapshot through
+   the real relay. The rest go on; with none left, no connection is opened.
+   Delivery re-checks the snapshot per recipient before any claim or attempt.
 2. Nothing `sending`, or no budget left in either window: finish any campaign
    with no open rows and stop, with no relay connection (a capped day neither
    logs in every minute nor lets a refused login pause every campaign).

@@ -57,7 +57,12 @@ async def test_schedule_now_snapshots_and_schedules(built):
     assert "{{unsubscribe_url}}" in row.html and "{{unsubscribe_url}}" in row.text
     assert row.subject == "Hello"
     assert row.sender == "News <news@example.org>"
-    assert (row.public_base, row.locale, row.rendered_at) == (BASE_URL, "en", NOW)
+    assert (row.public_base, row.content_base, row.locale, row.rendered_at) == (
+        BASE_URL,
+        BASE_URL,
+        "en",
+        NOW,
+    )
 
 
 async def test_schedule_later_keeps_the_time(built):
@@ -169,7 +174,8 @@ async def test_console_transport_allows_http_base(built):
     app.state.sm.settings.public_base_url = "http://news.example.org"
     campaign = await _schedule(app, state, cid)
     assert campaign.status == "scheduled"
-    assert (await render_row(state, T, cid)).public_base == "http://news.example.org"
+    row = await render_row(state, T, cid)
+    assert (row.public_base, row.content_base) == ("http://news.example.org",) * 2
 
 
 async def test_smtp_transport_with_https_bases_schedules(built):

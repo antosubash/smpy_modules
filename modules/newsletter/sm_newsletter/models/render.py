@@ -39,5 +39,11 @@ class CampaignRender(Base, MultiTenantMixin, table=True):  # ty: ignore[unsuppor
     reply_to: str | None = Field(default=None, max_length=MAX_EMAIL_LEN)
     public_base: str = Field(max_length=2048)
     """No trailing slash; the unsubscribe link is built on it."""
+    content_base: str = Field(
+        default="", max_length=2048, sa_column_kwargs={"nullable": False, "server_default": ""}
+    )
+    """No trailing slash; the campaign tenant's origin its content links were
+    built on. Checked with ``public_base`` before SMTP delivery (an empty one
+    counts as not ``https://``)."""
     locale: str = Field(max_length=16)
     rendered_at: datetime = dt_col(nullable=False)

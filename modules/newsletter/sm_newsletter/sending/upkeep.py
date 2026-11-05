@@ -10,6 +10,10 @@
   ``sending`` (a row waiting for its retry is still ``queued``).
 - :func:`pause_all_sending`: a relay that refuses the login pauses every
   ``sending`` campaign of every tenant (S12).
+- :func:`pause_insecure`: on the ``smtp`` transport, every ``sending``
+  campaign whose stored snapshot has a base that is not ``https://`` (or no
+  ``content_base``) pauses with ``https_required`` before the relay session
+  opens: scheduling checked the transport configured *then* (A6).
 
 The enumerations are deliberate cross-tenant reads of ``(tenant_id, id)``
 pairs, under the framework's ``all_tenants()``. Each campaign's writes then run
@@ -24,7 +28,7 @@ from datetime import datetime
 
 from simple_module_db import finalize_session, mark_written
 from simple_module_db.tenancy import all_tenants
-from sqlalchemy import exists, select, update
+from sqlalchemy import exists, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
@@ -32,10 +36,16 @@ from sm_newsletter.campaigns.lifecycle import SENDING
 from sm_newsletter.core import constants, tenancy
 from sm_newsletter.core.clock import utcnow
 from sm_newsletter.core.tenancy import tenant_scope
-from sm_newsletter.models import Campaign, Send, SendAttempt
+from sm_newsletter.models import Campaign, CampaignRender, Send, SendAttempt
 from sm_newsletter.sending import rows
 
-__all__ = ["finish_done", "pause_all_sending", "recover_expired", "sending_campaigns"]
+__all__ = [
+    "finish_done",
+    "pause_all_sending",
+    "pause_insecure",
+    "recover_expired",
+    "sending_campaigns",
+]
 
 SessionFactory = Callable[[], AsyncSession]
 Pairs = list[tuple[str, int]]
@@ -45,6 +55,7 @@ RECOVERED_DETAIL = "The sender stopped before recording the relay's answer"
 _CAMPAIGN = Campaign.__table__  # ty: ignore[unresolved-attribute]
 _SEND = Send.__table__  # ty: ignore[unresolved-attribute]
 _ATTEMPT = SendAttempt.__table__  # ty: ignore[unresolved-attribute]
+_RENDER = CampaignRender.__table__  # ty: ignore[unresolved-attribute]
 _OPEN = (rows.QUEUED, SENDING)  # rows that keep a campaign from finishing
 
 
@@ -157,8 +168,36 @@ async def pause_all_sending(
     factory: SessionFactory, *, code: str, detail: str, now: datetime | None = None
 ) -> int:
     """Pause every tenant's ``sending`` campaigns with ``code``; how many moved."""
+    return await _pause(factory, await sending_campaigns(factory), code, detail, now)
+
+
+async def pause_insecure(factory: SessionFactory, *, now: datetime) -> int:
+    """Pause (``https_required``) every tenant's ``sending`` campaigns whose
+    snapshot is not ``https://`` on both bases; how many moved. Only for the
+    ``smtp`` transport: the caller decides."""
+    insecure = [
+        ~func.lower(_RENDER.c[column]).startswith("https://")
+        for column in ("content_base", "public_base")
+    ]
+    stmt = (
+        select(_CAMPAIGN.c.tenant_id, _CAMPAIGN.c.id)
+        .join(
+            _RENDER,
+            (_RENDER.c.tenant_id == _CAMPAIGN.c.tenant_id)
+            & (_RENDER.c.campaign_id == _CAMPAIGN.c.id),
+        )
+        .where(_CAMPAIGN.c.status == SENDING, or_(*insecure))
+        .order_by(_CAMPAIGN.c.id)
+    )
+    pairs = await _pairs(factory, stmt)
+    return await _pause(factory, pairs, constants.PAUSE_HTTPS_REQUIRED, "", now)
+
+
+async def _pause(
+    factory: SessionFactory, pairs: Pairs, code: str, detail: str, now: datetime | None
+) -> int:
     paused = 0
-    for tenant, campaign_id in await sending_campaigns(factory):
+    for tenant, campaign_id in pairs:
         with tenant_scope(tenant):
             async with factory() as session:
                 moved = await rows.pause_campaign(

@@ -41,7 +41,12 @@ export interface CampaignDetail extends CampaignSummary {
   unsubscribe_count: number;
 }
 
-export type PausedCode = 'manual' | 'smtp_rejected' | 'smtp_auth' | 'list_unavailable';
+export type PausedCode =
+  | 'manual'
+  | 'smtp_rejected'
+  | 'smtp_auth'
+  | 'list_unavailable'
+  | 'https_required';
 
 /** `GET /campaigns/{id}/progress`. */
 export interface Progress {

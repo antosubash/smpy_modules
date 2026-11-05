@@ -4,7 +4,9 @@ Adds what sending needs (PR 4):
 
 - ``newsletter_campaign_render``: the rendered email of a scheduled campaign,
   one row per campaign (the worker never builds the app, so scheduling stores
-  the render). It cascades with its campaign.
+  the render). It cascades with its campaign. ``content_base`` (default
+  ``''``) is the origin its content links were built on, checked with
+  ``public_base`` before SMTP delivery.
 - ``newsletter_send.first_name`` and ``retry_at``: the merge value stored at
   freeze, and the instant before which a queued row is not due.
 - ``newsletter_campaign.freeze_gen`` / ``freeze_owner`` / ``freeze_until`` and
@@ -42,6 +44,7 @@ def upgrade() -> None:
         sa.Column("sender", sa.String(length=600), nullable=False),
         sa.Column("reply_to", sa.String(length=320), nullable=True),
         sa.Column("public_base", sa.String(length=2048), nullable=False),
+        sa.Column("content_base", sa.String(length=2048), server_default="", nullable=False),
         sa.Column("locale", sa.String(length=16), nullable=False),
         sa.Column("rendered_at", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(

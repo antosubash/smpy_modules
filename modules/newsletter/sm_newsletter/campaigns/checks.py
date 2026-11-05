@@ -54,14 +54,18 @@ def check_scheduled_at(scheduled_at: datetime | None, now: datetime) -> datetime
     return scheduled_at
 
 
+def bases_https(*bases: str) -> bool:
+    """Whether every base is ``https://`` (an empty one is not)."""
+    return all(base.lower().startswith("https://") for base in bases)
+
+
 def check_https(settings: NewsletterSettings, ctx: RenderContext) -> None:
     """Amendment A6: real mail carries capability links, so both bases are
-    ``https://`` on the SMTP transport. The console transport allows ``http://``."""
-    if settings.transport != "smtp":
-        return
-    for base in (ctx.content_base, ctx.public_base):
-        if not base.lower().startswith("https://"):
-            raise HttpsRequired()
+    ``https://`` on the SMTP transport. The console transport allows ``http://``.
+    The transport can change after scheduling, so the dispatcher checks the
+    stored snapshot again before SMTP delivery (``sending.upkeep.pause_insecure``)."""
+    if settings.transport == "smtp" and not bases_https(ctx.content_base, ctx.public_base):
+        raise HttpsRequired()
 
 
 def check_no_capability_fields(campaign: Campaign) -> None:

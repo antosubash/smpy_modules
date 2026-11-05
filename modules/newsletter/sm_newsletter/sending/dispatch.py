@@ -3,7 +3,9 @@
 One tick, run with no tenant bound:
 
 1. :func:`~.upkeep.recover_expired` (a dead sender's rows, S7), then
-   :func:`~.freeze.start_due`.
+   :func:`~.freeze.start_due`; on the ``smtp`` transport,
+   :func:`~.upkeep.pause_insecure` pauses every campaign whose snapshot is not
+   ``https://`` (A6: the transport may have changed since it was scheduled).
 2. Nothing ``sending``, or no budget left: :func:`~.upkeep.finish_done`, and
    no relay connection (a capped day neither logs in every minute nor lets a
    refused login pause every campaign).
@@ -42,6 +44,7 @@ from sm_newsletter.sending.upkeep import (
     SessionFactory,
     finish_done,
     pause_all_sending,
+    pause_insecure,
     recover_expired,
     sending_campaigns,
 )
@@ -103,6 +106,8 @@ async def tick(
     summary = TickSummary()
     summary.recovered = await recover_expired(factory, now=clock())
     summary.started = await start_due(factory, now=clock(), clock=clock)
+    if settings.transport == "smtp":
+        summary.paused += await pause_insecure(factory, now=clock())
     if not await sending_campaigns(factory):
         summary.stopped = "idle"
     elif (await current_budget(factory, settings, now=clock())).left == 0:
@@ -192,6 +197,7 @@ async def _next(run: _Run, lock: HeldLock, campaigns: list[tuple[str, int]]) -> 
             secret=run.secret,
             list_unsubscribe=run.list_unsubscribe,
             clock=run.clock,
+            require_https=run.settings.transport == "smtp",
         )
         if step is not None:
             return step

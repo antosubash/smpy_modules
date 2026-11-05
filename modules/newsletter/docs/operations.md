@@ -69,7 +69,9 @@ unsubscribe; do not send to the list yet.
 
 The `smtp` transport talks to `smtp-relay.gmail.com` (port 587 with STARTTLS, or
 465 with implicit TLS) and needs `https://` for `content_base` and
-`public_base` when a campaign is scheduled.
+`public_base` when a campaign is scheduled, and again, on the stored snapshot,
+before each tick sends (a campaign scheduled on the console transport pauses
+with `https_required` once the transport is `smtp`).
 
 - **Headroom.** `daily_limit` and `per_minute_limit` are the rolling 24 hour and
   60 second windows, counted over every tenant of the install, test sends
@@ -80,10 +82,16 @@ The `smtp` transport talks to `smtp-relay.gmail.com` (port 587 with STARTTLS, or
   by the relay with something that is not a mailbox bounce (a policy or quota
   refusal, a bare 5xx). `smtp_auth` means the login was refused, and pauses
   every sending campaign. `list_unavailable` means its list was deleted or
-  stopped being a list. `manual` is a person's pause. The detail shows the relay's
+  stopped being a list. `https_required` means the campaign was rendered with an
+  `http://` base (scheduled on the console transport) and the transport is now
+  `smtp`. `manual` is a person's pause. The detail shows the relay's
   reply verbatim.
 - **Resuming.** Fix the cause (the password, the relay's allow list, the list),
-  then Resume on the campaign screen (`newsletter.send`). A paused row goes back
+  then Resume on the campaign screen (`newsletter.send`). `https_required` is
+  not fixed by changing the address: the render is a snapshot. A campaign still
+  `scheduled` is re-rendered by unscheduling and scheduling it again (with
+  `https://` addresses); one already paused has its audience frozen, so cancel
+  it and schedule a new one. A paused row goes back
   to `queued`, so nothing is skipped or duplicated. If it cannot be fixed,
   Cancel instead. A `421` or `4.7.x` reply is not a pause: it ends the tick and
   the rows retry later.

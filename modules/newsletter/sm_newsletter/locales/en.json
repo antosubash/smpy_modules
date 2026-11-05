@@ -346,7 +346,8 @@
       "manual": "Paused by you",
       "smtp_rejected": "The mail server rejected the messages",
       "smtp_auth": "The mail server refused the login",
-      "list_unavailable": "The newsletter list is not available"
+      "list_unavailable": "The newsletter list is not available",
+      "https_required": "Real mail needs https, but this campaign was rendered with an http address"
     }
   }
 }

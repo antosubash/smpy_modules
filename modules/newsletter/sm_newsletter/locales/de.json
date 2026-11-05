@@ -346,7 +346,8 @@
       "manual": "Von Ihnen pausiert",
       "smtp_rejected": "Der Mailserver hat die Nachrichten abgelehnt",
       "smtp_auth": "Der Mailserver hat die Anmeldung verweigert",
-      "list_unavailable": "Die Newsletter-Liste ist nicht verfügbar"
+      "list_unavailable": "Die Newsletter-Liste ist nicht verfügbar",
+      "https_required": "Echte E-Mails brauchen https, aber diese Kampagne wurde mit einer http-Adresse erstellt"
     }
   }
 }
