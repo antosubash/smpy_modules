@@ -5,6 +5,12 @@
     "unsubscribe": "Abmelden",
     "read_more": "Weiterlesen"
   },
+  "unsubscribe_page": {
+    "title": "Abmelden",
+    "intro": "Klicken Sie auf die Schaltfläche, um diese E-Mails nicht mehr zu erhalten.",
+    "button": "Abmelden",
+    "done": "Erledigt. Sie erhalten diese E-Mails nicht mehr."
+  },
   "menu": {
     "group": "Newsletter",
     "campaigns": "Kampagnen",

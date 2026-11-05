@@ -10,6 +10,8 @@ and settings' tables. Only auth and the host's ``app.state.sm`` are stubbed:
   narrowing reads;
 * ``x-tenant`` is the tenant the framework resolved (``request.state.tenant_id``).
 
+The public routes (logo, unsubscribe) are mounted at the root, as ``on_startup`` does.
+
 ``GET /token`` hands out the session's CSRF token when ``session=True``.
 """
 
@@ -32,6 +34,8 @@ from sm_newsletter.core.settings import NewsletterSettings
 from sm_newsletter.core.tenancy import TenancyMode
 from sm_newsletter.models import Base
 from sm_newsletter.module import NewsletterModule
+from sm_records.core.services import RecordsServices
+from sm_records.core.settings import RecordsSettings
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -92,6 +96,9 @@ async def build_app(
     if settings is not None:
         module.settings = NewsletterSettings(**settings)
     module.register_settings(app)
+    if getattr(app.state, "sm_records", None) is None:
+        # What records' ``register_settings`` leaves; the unsubscribe route reads it.
+        app.state.sm_records = RecordsServices(settings=RecordsSettings())
     if multi:
         app.state.sm_newsletter.tenancy = TenancyMode.MULTI
     api = APIRouter(prefix=constants.ROUTE_PREFIX_API)
@@ -99,6 +106,7 @@ async def build_app(
     module.register_routes(api, views)
     app.include_router(api)
     app.include_router(views)
+    module.mount_public_routes(app)
     app.state.inertia_dependency = lambda request, _=None: _FakeInertia()
     app.include_router(generic_settings_router, prefix="/api/settings")
     install_exception_handlers(app)

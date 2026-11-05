@@ -5,6 +5,12 @@
     "unsubscribe": "Unsubscribe",
     "read_more": "Read more"
   },
+  "unsubscribe_page": {
+    "title": "Unsubscribe",
+    "intro": "Press the button to stop receiving these emails.",
+    "button": "Unsubscribe",
+    "done": "Done. You will not receive these emails any more."
+  },
   "menu": {
     "group": "Newsletter",
     "campaigns": "Campaigns",

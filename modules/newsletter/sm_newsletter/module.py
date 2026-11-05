@@ -13,12 +13,18 @@ from simple_module_core.menu import MenuRegistry
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
+from simple_module_core.rate_limit import RateLimitRegistry, RateLimitRule
 
 from sm_newsletter.core import constants
 
 # Read from installed package metadata so pyproject.toml is the single source
 # of truth. The lockstep release bump edits pyproject only.
 _VERSION = importlib.metadata.version(constants.DISTRIBUTION)
+
+# The unsubscribe link's per-IP rates (S9). The POST is generous: one-click
+# posts arrive from mailbox providers' shared egress IPs, and a refused one
+# loses an opt-out. A forged token costs one HMAC and no query.
+_UNSUBSCRIBE_RATES = {"GET": "60/minute", "POST": "300/minute"}
 
 
 class NewsletterModule(ModuleBase):
@@ -93,20 +99,38 @@ class NewsletterModule(ModuleBase):
         registry.add_many(menu_items())
 
     def register_public_routes(self, registry: PublicRouteRegistry) -> None:
-        """The email logo (C8): anonymous, ``GET`` only, at a fixed path."""
+        """The email logo (C8): anonymous, ``GET`` only, at a fixed path. The
+        unsubscribe links (S9): anonymous ``GET`` and ``POST``, each method with
+        its own anonymous rate, which replaces the host's ``rate_limit_public``
+        (120/minute by default) - that one would cap the POST below its 300."""
         registry.add_exact(constants.BRAND_LOGO_PATH, methods={"GET"})
+        for method, rate in _UNSUBSCRIBE_RATES.items():
+            registry.add_prefix(constants.UNSUBSCRIBE_PREFIX, methods={method}, rate=rate)
+
+    def register_rate_limits(self, registry: RateLimitRegistry) -> None:
+        """The same per-IP rates for every caller, signed in or not (S9)."""
+        for method, rate in _UNSUBSCRIBE_RATES.items():
+            registry.add_prefix(
+                constants.UNSUBSCRIBE_PREFIX,
+                RateLimitRule(rate, key="ip", methods=frozenset({method})),
+            )
 
     @staticmethod
     def mount_public_routes(app: FastAPI) -> None:
         """Newsletter's public routes at the app root (``register_routes`` hands
-        out only prefixed routers). Once per app: ``on_startup`` runs again on a
-        lifespan restart."""
+        out only prefixed routers). Each router once per app, guarded by its own
+        path: ``on_startup`` runs again on a lifespan restart."""
         from fastapi.routing import iter_route_contexts
 
-        from sm_newsletter.web.endpoints.brand import router
+        from sm_newsletter.web.endpoints import brand, unsubscribe
 
-        if not any(r.path == constants.BRAND_LOGO_PATH for r in iter_route_contexts(app.routes)):
-            app.include_router(router)
+        mounted = {r.path for r in iter_route_contexts(app.routes)}
+        for path, router in (
+            (constants.BRAND_LOGO_PATH, brand.router),
+            (unsubscribe.PATH, unsubscribe.router),
+        ):
+            if path not in mounted:
+                app.include_router(router)
 
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
         """Mirror records' ``SubscriptionChanged`` into the suppression store.
