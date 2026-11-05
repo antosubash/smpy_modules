@@ -127,5 +127,6 @@ async def test_cancel_and_tracking_never_deadlock(state, monkeypatch):
         for _ in range(ROUNDS):
             gate.__init__()
             await _round(state, gate)
+            assert gate.cancel_started.is_set(), "cancel never reached its send UPDATE"
     finally:
         event.remove(sync_engine, "before_cursor_execute", on_execute)

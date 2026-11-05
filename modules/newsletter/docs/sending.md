@@ -136,10 +136,13 @@ row while its campaign is still `sending`, and a `pending` attempt row);
 then SMTP. The attempt row is committed before the SMTP call, so a crash never
 loses a count. Pause and cancel are conditional updates, so a pause or cancel
 before the claim sends nothing and writes no attempt; a cancel while a send is
-in flight ends that row `cancelled`. Every transaction that writes both a send
-row and its campaign (recording a result, cancel, the open and click counters)
-locks the send rows first and the campaign row last, so on Postgres they never
-deadlock one another.
+in flight ends that row `cancelled`. On Postgres, two lock orders keep these
+writes free of deadlocks. For a campaign that has started (the only one whose
+rows a result, an open or a click touches), recording a result, the open and
+click counters and cancel lock the send rows first and the campaign row last.
+For a campaign that never started, unschedule, freeze pages and cancel lock
+the campaign row first. No transaction mixes the two, because a never-started
+campaign has sent nothing to record or track.
 
 On SQLite the lock is a lease row (120 s) and the reservation is fenced on it,
 so a taken-over lease can never spend budget another holder counted. On

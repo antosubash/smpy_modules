@@ -33,7 +33,7 @@ from sm_newsletter.campaigns.checks import (
     check_sender,
 )
 from sm_newsletter.campaigns.snapshot import build_render, drop_render, store_render
-from sm_newsletter.campaigns.transition import apply_transition
+from sm_newsletter.campaigns.transition import apply_transition, transition
 from sm_newsletter.content.blocks import parse_body
 from sm_newsletter.content.context import render_context
 from sm_newsletter.core import constants
@@ -184,8 +184,17 @@ async def resume(
 async def cancel(
     session: AsyncSession, *, tenant_id: str, campaign_id: int, roles: Roles, now: datetime
 ) -> Campaign:
-    """``scheduled``/``sending``/``paused -> cancelled``; the ``queued`` rows too."""
-    await require_campaign(session, tenant_id=tenant_id, campaign_id=campaign_id, roles=roles)
+    """``scheduled``/``sending``/``paused -> cancelled``; the ``queued`` rows too.
+
+    Lock order (M4): a started campaign's rows are what tracking and
+    ``rows.record`` lock, send row then campaign row, so its cancel takes the
+    send rows first. A never-started campaign sent nothing; only
+    ``unschedule``, freeze pages and this lock its rows, all campaign row
+    first, which also makes this wait for a freeze page in flight.
+    """
+    campaign = await require_campaign(
+        session, tenant_id=tenant_id, campaign_id=campaign_id, roles=roles
+    )
     from_scheduled = Campaign.status == SCHEDULED
     values = {
         "status": CANCELLED,
@@ -196,6 +205,7 @@ async def cancel(
         "freeze_owner": None,
         "freeze_until": None,
     }
+    key = {"tenant_id": tenant_id, "campaign_id": campaign_id}
     from_statuses = (SCHEDULED, SENDING, PAUSED)
     queued = (
         update(Send)
@@ -205,20 +215,21 @@ async def cancel(
         .values(status=CANCELLED)
         .execution_options(synchronize_session=False)
     )
-    # Lock order (M4): send rows, then the campaign row, as tracking and
-    # ``rows.record`` take them. The guard is a plain read, not a lock; the
-    # transition below still decides, and a refusal rolls this back with it.
+    if campaign.started_at is None:
+        never_started = [Campaign.started_at.is_(None)]
+        if await transition(
+            session, **key, from_statuses=from_statuses, values=values, where=never_started
+        ):
+            await session.execute(queued)
+            return await require_campaign(session, **key, roles=roles)
+        # Refused: it started meanwhile (cancel it as started) or cannot be
+        # cancelled (the transition below raises, the guard wrote nothing).
+    # Started: send rows first. The guard is a plain read, not a lock; the
+    # transition still decides, and a refusal rolls this back with it.
     cancellable = exists().where(
         Campaign.id == campaign_id,
         Campaign.tenant_id == tenant_id,
         Campaign.status.in_(from_statuses),
     )
     await session.execute(queued.where(cancellable))
-    cancelled = await apply_transition(
-        session, tenant_id, campaign_id, roles, from_statuses, values
-    )
-    if cancelled.started_at is None:
-        # Never sent, so nothing else locks its rows: catch a freeze page that
-        # committed while the transition waited for it.
-        await session.execute(queued)
-    return cancelled
+    return await apply_transition(session, tenant_id, campaign_id, roles, from_statuses, values)

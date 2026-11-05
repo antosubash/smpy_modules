@@ -3,8 +3,12 @@
 Every unique count is a guarded ``UPDATE … WHERE <column> IS NULL`` whose
 rowcount says who won (T9); totals are ``n = n + 1``; a click is one row per
 ``(send, link)`` that ``insert_ignore`` either creates or that gets its
-``click_count`` bumped (T8). The module's one lock order, which ``cancel`` and
-``sending.rows.record`` follow too: send rows, then click row, then campaign row.
+``click_count`` bumped (T8). Lock order: send row, then click row, then
+campaign row. Every path that locks a *started* campaign's send rows and its
+campaign row (this, ``sending.rows.record``, ``cancel`` of a started campaign)
+takes them in that order; the never-started paths (``unschedule``, freeze
+pages, ``cancel`` of a never-started campaign) take the campaign row first,
+and no mail, so no tracking, exists for those rows.
 
 The callers bind the tenant and commit with ``finalize_session``; nothing here
 commits. Every statement pins ``tenant_id`` (and ``campaign_id`` on the send).
