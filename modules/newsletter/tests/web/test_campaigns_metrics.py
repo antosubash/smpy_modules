@@ -7,13 +7,13 @@ from httpx import ASGITransport, AsyncClient
 from simple_module_db import finalize_session
 from sm_newsletter.core import constants
 from sm_newsletter.core.tenancy import tenant_scope
-from sm_newsletter.tracking.record import record_open
+from sm_newsletter.tracking.record import record_click, record_open
 
 from tests.support.app import build_app
 from tests.support.campaign_world import seed_campaign, set_columns
 from tests.support.records_seed import seed_list
 from tests.support.sending import NOW
-from tests.support.tracking_world import send_row, sent_campaign, set_send
+from tests.support.tracking_world import link_ids, send_row, sent_campaign, set_send
 
 BASE = f"{constants.ROUTE_PREFIX_API}/campaigns"
 VIEW = {"x-perms": constants.PERM_VIEW}
@@ -45,10 +45,25 @@ async def test_list_has_metrics(client, built):
                 await record_open(db, tenant_id="default", campaign_id=cid, send_id=sid, now=NOW)
                 await finalize_session(db)
     assert (await send_row(state, "default", unknown)).opened_at is not None
+    (lid,) = await link_ids(state, "default", cid)
+    with tenant_scope("default"):
+        async with state.session_factory() as db:
+            await record_click(
+                db,
+                tenant_id="default",
+                campaign_id=cid,
+                send_id=accepted,
+                link_id=lid,
+                now=NOW,
+                count_open=True,
+            )
+            await finalize_session(db)
     empty = await seed_campaign(state, "default")
     items = {i["id"]: i for i in (await client.get(BASE, headers=VIEW)).json()["items"]}
     got = items[cid]
-    assert (got["opens_unique_accepted"], got["clicks_unique_accepted"]) == (1, 0)
+    assert (got["opens_unique_accepted"], got["clicks_unique_accepted"]) == (1, 1)
     assert got["started_at"] is not None and got["finished_at"] is not None
     assert items[empty]["opens_unique_accepted"] == 0
     assert items[empty]["started_at"] is None
+    detail = (await client.get(f"{BASE}/{cid}", headers=VIEW)).json()
+    assert "opens_unique_accepted" not in detail and "clicks_unique_accepted" not in detail

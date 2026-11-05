@@ -52,7 +52,8 @@ async def test_report_needs_view_permission(client, built):
 
 
 async def test_report_unknown_id_404(client):
-    assert (await client.get(f"{API}/9999/report", headers=VIEW)).status_code == 404
+    res = await client.get(f"{API}/9999/report", headers=VIEW)
+    assert (res.status_code, res.json()["code"]) == (404, "not_found")
 
 
 async def test_report_on_a_restricted_list_404(client, built):

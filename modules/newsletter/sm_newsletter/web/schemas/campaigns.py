@@ -135,9 +135,6 @@ class CampaignSummary(BaseModel):
     sent_count: int
     started_at: datetime | None
     finished_at: datetime | None
-    opens_unique_accepted: int = 0
-    clicks_unique_accepted: int = 0
-    """Unique opens and clicks of ``sent`` rows (B5); the list endpoint fills them."""
 
 
 class CampaignDetail(CampaignSummary):
@@ -165,8 +162,16 @@ class CampaignDetail(CampaignSummary):
         return own | {"paused_code": code, "paused_detail": detail}
 
 
+class CampaignListItem(CampaignSummary):
+    """A list row: unique opens and clicks of ``sent`` rows (B5), which only the
+    list computes (the detail has no such field)."""
+
+    opens_unique_accepted: int = 0
+    clicks_unique_accepted: int = 0
+
+
 class CampaignPage(BaseModel):
-    items: list[CampaignSummary]
+    items: list[CampaignListItem]
     total: int
 
 

@@ -25,9 +25,9 @@ from sm_newsletter.tracking.report import accepted_engagement
 from sm_newsletter.web.schemas.campaigns import (
     CampaignCreate,
     CampaignDetail,
+    CampaignListItem,
     CampaignPage,
     CampaignPatch,
-    CampaignSummary,
     parse_payload,
 )
 
@@ -66,7 +66,7 @@ async def list_campaigns(
     for campaign in items:
         opens, clicks = accepted.get(campaign.id, (0, 0))
         summaries.append(
-            CampaignSummary.model_validate(campaign).model_copy(
+            CampaignListItem.model_validate(campaign).model_copy(
                 update={"opens_unique_accepted": opens, "clicks_unique_accepted": clicks}
             )
         )
