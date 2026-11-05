@@ -74,6 +74,18 @@ class InvalidBody(NewsletterError):  # noqa: N818 - names the field
     detail = "The body is not valid"
 
 
+class InvalidSettings(NewsletterError):  # noqa: N818 - names the payload
+    """A settings payload that fails its schema. Names the field, never the value."""
+
+    status = 422
+    code = "invalid_settings"
+    detail = "The settings are not valid"
+
+
+class OutboxUnavailable(NotFound):
+    """The capture outbox exists only on the console transport."""
+
+
 class InvalidCampaign(NewsletterError):  # noqa: N818 - names the payload
     """A campaign payload that fails its schema. The detail names the field and
     the error type, never the submitted value (it may be a header injection)."""

@@ -24,7 +24,7 @@ from pydantic import (
 )
 
 from sm_newsletter.core.constants import MAX_TYPE_KEY_LEN
-from sm_newsletter.core.errors import InvalidCampaign
+from sm_newsletter.core.errors import InvalidCampaign, NewsletterError
 from sm_newsletter.core.headers import check_header_text
 
 
@@ -121,7 +121,9 @@ class CampaignPage(BaseModel):
     total: int
 
 
-def parse_payload[M: BaseModel](model: type[M], raw: object) -> M:
+def parse_payload[M: BaseModel](
+    model: type[M], raw: object, *, error: type[NewsletterError] = InvalidCampaign
+) -> M:
     """``model`` from a request body, or :class:`InvalidCampaign` naming the
     field and the error type - never pydantic's message or input, which can
     quote the value."""
@@ -133,4 +135,4 @@ def parse_payload[M: BaseModel](model: type[M], raw: object) -> M:
         # An unknown key is the client's text too: named only when it is a field.
         field = str(loc[0]) if loc and loc[0] in model.model_fields else "payload"
         reason = "invalid value" if err["type"] == "value_error" else err["type"]
-        raise InvalidCampaign(f"{field}: {reason}") from None
+        raise error(f"{field}: {reason}") from None

@@ -11,6 +11,7 @@ def build_api_router() -> APIRouter:
     from sm_newsletter.web.endpoints import (
         campaigns_api,
         cards_api,
+        outbox_api,
         preview_api,
         settings_api,
         test_send_api,
@@ -21,6 +22,7 @@ def build_api_router() -> APIRouter:
         settings_api.router,
         campaigns_api.router,
         cards_api.router,
+        outbox_api.router,
         preview_api.router,
         test_send_api.router,
     ):
