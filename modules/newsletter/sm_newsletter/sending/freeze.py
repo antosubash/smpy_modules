@@ -29,21 +29,14 @@ from datetime import datetime
 
 from simple_module_db import finalize_session
 from simple_module_db.listeners import TenantIsolationError, current_tenant_id
-from sm_records.contracts.newsletter import (
-    MAX_SUBSCRIBER_BATCH,
-    iter_subscribers,
-    subscription_lists,
-)
+from sm_records.contracts.newsletter import iter_subscribers, subscription_lists
 from sqlalchemy import func, select
 
 from sm_newsletter.campaigns.checks import bases_https
 from sm_newsletter.campaigns.lifecycle import SENDING
 from sm_newsletter.core import constants
 from sm_newsletter.core.clock import utcnow
-from sm_newsletter.core.constants import MAX_EMAIL_LEN, MAX_FIRST_NAME_LEN
-from sm_newsletter.core.suppression import normalise_email, suppressed
 from sm_newsletter.core.tenancy import tenant_scope
-from sm_newsletter.core.upsert import insert_ignore
 from sm_newsletter.models import Campaign, Send
 from sm_newsletter.sending.freeze_fence import (
     FREEZE_LEASE,
@@ -56,6 +49,7 @@ from sm_newsletter.sending.freeze_fence import (
     pause_unavailable,
     update_campaign,
 )
+from sm_newsletter.sending.freeze_pages import PAGE, QUEUED, SUPPRESSED, write_pages
 
 __all__ = [
     "FREEZE_LEASE",
@@ -70,9 +64,6 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
-
-PAGE = MAX_SUBSCRIBER_BATCH
-QUEUED, SUPPRESSED = "queued", "suppressed"
 
 _SEND = Send.__table__  # ty: ignore[unresolved-attribute]
 
@@ -167,61 +158,10 @@ async def freeze(
                 await finalize_session(session)
                 return _LOST
             await finalize_session(session)
-        if not await _pages(factory, tenant_id, campaign_id, claim, list_key, filters, clock):
+        pages = (factory, tenant_id, campaign_id, claim, list_key, filters, clock)
+        if not await write_pages(*pages, read=iter_subscribers, page=PAGE):
             return _LOST
         return await _publish(factory, tenant_id, campaign_id, claim, now, clock)
-
-
-async def _pages(
-    factory: SessionFactory,
-    tenant_id: str,
-    campaign_id: int,
-    claim: FreezeClaim,
-    list_key: str,
-    filters: list[str],
-    clock: Clock,
-) -> bool:
-    """Every page of the audience into send rows; ``False`` once the claim is lost."""
-    cursor: int | None = 0
-    while cursor is not None:
-        async with factory() as session:
-            hits, cursor = await iter_subscribers(
-                session,
-                tenant_id=tenant_id,
-                type_key=list_key,
-                filters=filters,
-                limit=PAGE,
-                after=cursor,
-            )
-            # Records caps neither length; the send columns do. A blank or
-            # over-long address could not be delivered and is left out; a long
-            # name is clipped (Postgres would refuse the whole page).
-            hits = [hit for hit in hits if 0 < len(hit.email.strip()) <= MAX_EMAIL_LEN]
-            emails = [hit.email for hit in hits]
-            blocked = await suppressed(session, tenant_id=tenant_id, emails=emails)
-            if not await hold_freeze(
-                session, claim, tenant_id=tenant_id, campaign_id=campaign_id, now=clock()
-            ):
-                await session.rollback()
-                return False
-            rows = [
-                {
-                    "tenant_id": tenant_id,
-                    "campaign_id": campaign_id,
-                    "record_uuid": hit.uuid,
-                    "email": hit.email.strip(),
-                    "first_name": (hit.first_name or "")[:MAX_FIRST_NAME_LEN] or None,
-                    "status": SUPPRESSED if normalise_email(hit.email) in blocked else QUEUED,
-                    "freeze_gen": claim.gen,
-                }
-                for hit in hits
-            ]
-            if rows:
-                await insert_ignore(
-                    session, _SEND, rows, conflict=["tenant_id", "campaign_id", "record_uuid"]
-                )
-            await finalize_session(session)
-    return True
 
 
 async def _publish(

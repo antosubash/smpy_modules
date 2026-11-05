@@ -22,6 +22,7 @@ from sm_newsletter.core.errors import NewsletterError
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import Campaign
 from sm_newsletter.sending import freeze as freezing
+from sm_newsletter.sending import freeze_pages
 from sqlalchemy import event, select, update
 from sqlalchemy.exc import DBAPIError
 
@@ -131,7 +132,7 @@ async def test_cancel_waits_for_a_freeze_page_and_cancels_its_rows(built, monkey
     await subscribers(state, 4)
     cid = await due_campaign(state)
     hold = _Hold()
-    real_insert = freezing.insert_ignore
+    real_insert = freeze_pages.insert_ignore
     pages = 0
 
     async def parked_insert(session, *args, **kw):
@@ -142,7 +143,7 @@ async def test_cancel_waits_for_a_freeze_page_and_cancels_its_rows(built, monkey
             await hold.park()  # page 2 holds the campaign row, its rows uncommitted
         return out
 
-    monkeypatch.setattr(freezing, "insert_ignore", parked_insert)
+    monkeypatch.setattr(freeze_pages, "insert_ignore", parked_insert)
     with _watch_cancel(state, hold):
         result, outcome = await asyncio.gather(
             run_freeze(state, cid), _cancel(state, cid, hold), return_exceptions=True
