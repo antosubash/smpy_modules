@@ -136,6 +136,7 @@ export default function CampaignEditor() {
               campaignId={campaign.id}
               canSend={props.can_send === true}
               maxRecipients={props.max_test_recipients ?? DEFAULT_MAX_TEST_RECIPIENTS}
+              baseUrlMissing={props.public_base_url_set === false}
               flush={editor.flush}
               incomplete={editor.incomplete}
             />

@@ -285,6 +285,7 @@
       "unknown": "Unbekannt",
       "failed": "Fehlgeschlagen"
     },
-    "incomplete": "Unfertige Blöcke sind nicht im gespeicherten Entwurf und fehlen daher im Test."
+    "incomplete": "Unfertige Blöcke sind nicht im gespeicherten Entwurf und fehlen daher im Test.",
+    "no_base_url": "Die öffentliche Basis-URL der Website ist nicht gesetzt (Host-Einstellungen), daher werden Testsendungen abgelehnt."
   }
 }

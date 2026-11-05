@@ -87,4 +87,20 @@ describe('TestSendDialog', () => {
     await act(async () => button(copy.trigger)?.click());
     expect(document.body.textContent).toContain(copy.incomplete);
   });
+
+  it('warns that test sends are refused without a public base URL', async () => {
+    root = createRoot(document.body.appendChild(document.createElement('div')));
+    await act(async () =>
+      root.render(createElement(TestSendDialog, { campaignId: 7, max: 5, baseUrlMissing: true })),
+    );
+    await act(async () => button(copy.trigger)?.click());
+    expect(document.body.textContent).toContain(copy.no_base_url);
+  });
+
+  it('shows no base URL note when the host has one', async () => {
+    root = createRoot(document.body.appendChild(document.createElement('div')));
+    await act(async () => root.render(createElement(TestSendDialog, { campaignId: 7, max: 5 })));
+    await act(async () => button(copy.trigger)?.click());
+    expect(document.body.textContent).not.toContain(copy.no_base_url);
+  });
 });

@@ -15,6 +15,8 @@ interface Props {
   maxRecipients: number;
   flush: () => Promise<boolean>;
   incomplete: boolean;
+  /** The host's `public_base_url` is unset: test sends will be refused. */
+  baseUrlMissing?: boolean;
 }
 
 /** The Edit / Preview switch, and "Send test" for a caller who may send. */
@@ -39,6 +41,7 @@ export function EditorTabs(props: Props) {
           max={props.maxRecipients}
           beforeSend={props.flush}
           incomplete={props.incomplete}
+          baseUrlMissing={props.baseUrlMissing}
         />
       )}
     </>

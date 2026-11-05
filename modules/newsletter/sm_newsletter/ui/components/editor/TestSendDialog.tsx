@@ -46,10 +46,12 @@ interface Props {
   beforeSend?: () => Promise<boolean>;
   /** A block is unfinished, so the saved draft lacks it. */
   incomplete?: boolean;
+  /** The host has no public base URL, so the server will refuse every test send. */
+  baseUrlMissing?: boolean;
 }
 
 /** "Send test": the saved campaign to up to `max` addresses, with each one's outcome. */
-export function TestSendDialog({ campaignId, max, beforeSend, incomplete }: Props) {
+export function TestSendDialog({ campaignId, max, beforeSend, incomplete, baseUrlMissing }: Props) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
@@ -125,6 +127,7 @@ export function TestSendDialog({ campaignId, max, beforeSend, incomplete }: Prop
               placeholder={t(copy.placeholder)}
               onChange={(e) => setText(e.target.value)}
             />
+            {baseUrlMissing && <p className="text-sm text-amber-900">{t(copy.no_base_url)}</p>}
             {incomplete && <p className="text-sm text-amber-900">{t(copy.incomplete)}</p>}
             {problem && <p className="text-sm text-destructive">{problem}</p>}
             {error && (

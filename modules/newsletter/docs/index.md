@@ -61,7 +61,8 @@ and the golden files: [`content.md`](content.md).
   token. No campaign is sent yet: sending arrives in PR 4.
 - **Transports.** `smtp` (aiosmtplib; STARTTLS or implicit TLS; `List-Unsubscribe`,
   `List-Unsubscribe-Post` and `Precedence: bulk` headers) and `console`, which logs
-  and keeps a capture readable at `GET /api/newsletter/outbox` (`newsletter.manage`).
+  and keeps a per-tenant capture readable at `GET /api/newsletter/outbox`
+  (`newsletter.manage`). On SQLite the dispatch lock is a lease row held for 120 s.
 
 ## Settings
 

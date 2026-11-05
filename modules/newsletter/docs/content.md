@@ -84,7 +84,8 @@ Puck's editor could produce outside the list are flattened to text.
 | `{{unsubscribe_url}}` | The recipient's unsubscribe address |
 
 Any other `{{` or `}}` in a heading, button label, image alt text or rich text
-is refused at save (`invalid_body`). `render` runs once per campaign and leaves
+is refused at save (`invalid_body`), and so is one in the subject or preheader
+(`invalid_campaign`, naming the field). `render` runs once per campaign and leaves
 the tags in; `personalise` fills them per recipient.
 
 A **preview** and a **test send** have no send row and no MAC, so
@@ -167,7 +168,7 @@ Order of events: the campaign lookup, the cancelled check, the sender
 configuration, the header inputs and the render all happen **before** the lock,
 so a 404, 409 or 422 never waits behind the dispatcher. Then, inside the
 install-wide dispatch lock (`sending/lock.py`: a Postgres advisory lock, or the
-`newsletter_dispatch_lock` lease row on SQLite; not acquired within 15 s is
+`newsletter_dispatch_lock` lease row on SQLite, with a 120 s lease; not acquired within 15 s is
 `409 dispatch_busy`):
 
 1. The header values are re-checked.
@@ -186,7 +187,8 @@ recipient: `accepted`, `rejected` (a refusal at MAIL/RCPT/DATA; the session issu
 `RSET` before the next recipient), `unknown` (the body was sent and the answer was
 lost or malformed) and `failed` (a known pre-acceptance failure, such as a
 connection lost or a timeout before DATA; retryable, the session reconnects).
-The `console` transport logs instead of sending and keeps a capture that
+The `console` transport logs instead of sending and keeps a per-tenant capture
+(the last 50 messages of each tenant) that
 `GET /api/newsletter/outbox` (`newsletter.manage`, `console` transport only)
 returns.
 
