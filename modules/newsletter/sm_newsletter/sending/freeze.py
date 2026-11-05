@@ -40,6 +40,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_newsletter.campaigns.audience import audience_filters
 from sm_newsletter.campaigns.lifecycle import SCHEDULED, SENDING
 from sm_newsletter.core.clock import utcnow
+from sm_newsletter.core.constants import MAX_EMAIL_LEN, MAX_FIRST_NAME_LEN
 from sm_newsletter.core.suppression import normalise_email, suppressed
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.core.upsert import insert_ignore
@@ -106,11 +107,14 @@ async def start_due(factory: SessionFactory, *, now: datetime, clock: Clock = ut
             result = await freeze(
                 factory, tenant_id=tenant, campaign_id=campaign_id, now=now, clock=clock
             )
-        except Exception:
-            logger.exception(
-                "newsletter: could not freeze campaign %s of tenant %s; the next tick retries",
+        except Exception as exc:
+            # The class only: a database error's text (and traceback) carries
+            # the page's SQL parameters, i.e. addresses and names.
+            logger.error(
+                "newsletter: could not freeze campaign %s of tenant %s (%s); the next tick retries",
                 campaign_id,
                 tenant,
+                type(exc).__name__,
             )
             continue
         started += int(result.started)
@@ -192,7 +196,10 @@ async def _pages(
                 limit=PAGE,
                 after=cursor,
             )
-            hits = [hit for hit in hits if hit.email.strip()]
+            # Records caps neither length; the send columns do. A blank or
+            # over-long address could not be delivered and is left out; a long
+            # name is clipped (Postgres would refuse the whole page).
+            hits = [hit for hit in hits if 0 < len(hit.email.strip()) <= MAX_EMAIL_LEN]
             emails = [hit.email for hit in hits]
             blocked = await suppressed(session, tenant_id=tenant_id, emails=emails)
             if not await hold_freeze(
@@ -206,7 +213,7 @@ async def _pages(
                     "campaign_id": campaign_id,
                     "record_uuid": hit.uuid,
                     "email": hit.email.strip(),
-                    "first_name": hit.first_name,
+                    "first_name": (hit.first_name or "")[:MAX_FIRST_NAME_LEN] or None,
                     "status": SUPPRESSED if normalise_email(hit.email) in blocked else QUEUED,
                     "freeze_gen": claim.gen,
                 }

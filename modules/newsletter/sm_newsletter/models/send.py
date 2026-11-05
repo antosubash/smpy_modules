@@ -9,7 +9,7 @@ from simple_module_db.mixins import MultiTenantMixin
 from sqlalchemy import Index, UniqueConstraint
 from sqlmodel import Field
 
-from sm_newsletter.core.constants import MAX_EMAIL_LEN
+from sm_newsletter.core.constants import MAX_EMAIL_LEN, MAX_FIRST_NAME_LEN
 from sm_newsletter.models._base import Base
 from sm_newsletter.models._cols import STATUS_LEN, big_pk, counter, dt_col, fk
 
@@ -28,7 +28,7 @@ class Send(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     campaign_id: int = fk("newsletter_campaign.id", ondelete="CASCADE")
     record_uuid: str = Field(max_length=32)
     email: str = Field(max_length=MAX_EMAIL_LEN)
-    first_name: str | None = Field(default=None, max_length=200)
+    first_name: str | None = Field(default=None, max_length=MAX_FIRST_NAME_LEN)
     """Stored at freeze for the worker's ``{{first_name}}`` merge."""
     status: str = Field(default="queued", max_length=STATUS_LEN)
     attempts: int = counter()

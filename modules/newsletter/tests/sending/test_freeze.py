@@ -9,6 +9,7 @@ import pytest
 from simple_module_db import finalize_session
 from simple_module_db.listeners import TenantIsolationError
 from sm_newsletter.campaigns import lifecycle
+from sm_newsletter.core.constants import MAX_EMAIL_LEN
 from sm_newsletter.core.suppression import suppress
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.sending import freeze as freezing
@@ -65,6 +66,33 @@ async def test_freeze_copies_first_name(built, monkeypatch):
     cid = await due_campaign(state)
     await run_freeze(state, cid)
     assert [row.first_name for row in await send_rows(state, T, cid)] == ["Ada"]
+
+
+async def test_freeze_clips_a_long_first_name_and_skips_a_too_long_email(built, monkeypatch):
+    """Records caps neither, but the send columns do: Postgres would refuse the
+    page (``StringDataRightTruncation``) and wedge the freeze forever."""
+    _, state, _ = built
+    ada = await seed_subscriber(state, T, "ada@example.org", "confirmed")
+    await seed_subscriber(state, T, "long@example.org", "confirmed")
+    real = freezing.iter_subscribers
+    too_long = "x" * MAX_EMAIL_LEN + "@example.org"
+
+    async def odd(session, **kw):
+        hits, nxt = await real(session, **kw)
+        return [
+            hit.model_copy(update={"first_name": "A" * 300})
+            if hit.uuid == ada
+            else hit.model_copy(update={"email": too_long})
+            for hit in hits
+        ], nxt
+
+    monkeypatch.setattr(freezing, "iter_subscribers", odd)
+    cid = await due_campaign(state)
+
+    assert await run_freeze(state, cid) == freezing.FreezeResult(True, 1, 0)
+    (row,) = await send_rows(state, T, cid)
+    assert (row.email, row.first_name) == ("ada@example.org", "A" * 200)
+    assert (await campaign_row(state, T, cid)).status == "sending"
 
 
 async def test_freeze_marks_suppressed_rows(built):
@@ -190,13 +218,18 @@ async def test_start_due_goes_on_after_a_failure(built, monkeypatch, caplog):
 
     async def flaky(factory, *, campaign_id, **kw):
         if campaign_id == first:
-            raise RuntimeError("boom")
+            raise RuntimeError("boom ada@example.org")
         return await real(factory, campaign_id=campaign_id, **kw)
 
     monkeypatch.setattr(freezing, "freeze", flaky)
     assert await start_due(state) == 1
     assert (await campaign_row(state, T, second)).status == "sending"
-    assert any(r.exc_info for r in caplog.records)
+    # The class only: a database error's text carries the page's SQL parameters
+    # (addresses and names), so neither the message nor a traceback is logged.
+    [failure] = [r for r in caplog.records if "could not freeze" in r.getMessage()]
+    assert "RuntimeError" in failure.getMessage()
+    assert "ada@example.org" not in failure.getMessage()
+    assert failure.exc_info is None
 
 
 @pytest.mark.unbound_tenant
