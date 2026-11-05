@@ -50,6 +50,7 @@ EXPECTED = {
     ("POST", f"{API}/campaigns/{{campaign_id}}/cancel"),
     ("GET", f"{API}/campaigns/{{campaign_id}}/progress"),
     ("GET", f"{API}/campaigns/{{campaign_id}}/estimate"),
+    ("GET", f"{API}/campaigns/{{campaign_id}}/report"),
     ("GET", f"{API}/cards/articles"),
     ("GET", f"{API}/cards/pages"),
     ("POST", f"{API}/cards/snapshot"),
