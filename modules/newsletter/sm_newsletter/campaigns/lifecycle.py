@@ -19,7 +19,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import case, delete, or_, update
+from sqlalchemy import case, delete, exists, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns._refusal import DRAFT
@@ -197,17 +197,28 @@ async def cancel(
         "freeze_until": None,
     }
     from_statuses = (SCHEDULED, SENDING, PAUSED)
-    cancelled = await apply_transition(
-        session, tenant_id, campaign_id, roles, from_statuses, values
-    )
-    await session.execute(
+    queued = (
         update(Send)
         .where(
-            Send.tenant_id == tenant_id,
-            Send.campaign_id == campaign_id,
-            Send.status == "queued",
+            Send.tenant_id == tenant_id, Send.campaign_id == campaign_id, Send.status == "queued"
         )
         .values(status=CANCELLED)
         .execution_options(synchronize_session=False)
     )
+    # Lock order (M4): send rows, then the campaign row, as tracking and
+    # ``rows.record`` take them. The guard is a plain read, not a lock; the
+    # transition below still decides, and a refusal rolls this back with it.
+    cancellable = exists().where(
+        Campaign.id == campaign_id,
+        Campaign.tenant_id == tenant_id,
+        Campaign.status.in_(from_statuses),
+    )
+    await session.execute(queued.where(cancellable))
+    cancelled = await apply_transition(
+        session, tenant_id, campaign_id, roles, from_statuses, values
+    )
+    if cancelled.started_at is None:
+        # Never sent, so nothing else locks its rows: catch a freeze page that
+        # committed while the transition waited for it.
+        await session.execute(queued)
     return cancelled

@@ -3,7 +3,8 @@
 Every unique count is a guarded ``UPDATE … WHERE <column> IS NULL`` whose
 rowcount says who won (T9); totals are ``n = n + 1``; a click is one row per
 ``(send, link)`` that ``insert_ignore`` either creates or that gets its
-``click_count`` bumped (T8). Lock order is send row, click row, campaign row.
+``click_count`` bumped (T8). The module's one lock order, which ``cancel`` and
+``sending.rows.record`` follow too: send rows, then click row, then campaign row.
 
 The callers bind the tenant and commit with ``finalize_session``; nothing here
 commits. Every statement pins ``tenant_id`` (and ``campaign_id`` on the send).
