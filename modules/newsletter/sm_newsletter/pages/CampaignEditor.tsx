@@ -152,7 +152,7 @@ export default function CampaignEditor() {
           {statusKey ? t(statusKey) : ''}
         </span>
       </header>
-      {campaign && (
+      {campaign && !isDraft && (
         <SendingPanel campaign={campaign} canSend={canSend} onChange={refreshCampaign} />
       )}
 

@@ -311,7 +311,10 @@
       "overlap": "Das überschneidet sich mit einer anderen Kampagne, die noch versendet wird, und kann daher später fertig werden.",
       "confirm": "Senden",
       "sending": "Wird gesendet…",
-      "cancel": "Abbrechen"
+      "cancel": "Abbrechen",
+      "unsaved": "Die letzten Änderungen konnten nicht gespeichert werden, daher wurde nichts gesendet.",
+      "incomplete": "Stellen Sie die unfertigen Blöcke fertig oder entfernen Sie sie, bevor Sie senden.",
+      "time_past": "Wählen Sie einen Zeitpunkt in der Zukunft."
     },
     "panel": {
       "scheduled_for": "Geplant für {date}",

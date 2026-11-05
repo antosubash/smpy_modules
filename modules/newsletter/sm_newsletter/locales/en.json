@@ -311,7 +311,10 @@
       "overlap": "This overlaps with another campaign that is still sending, so it may finish later.",
       "confirm": "Send",
       "sending": "Sending…",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "unsaved": "The latest edits could not be saved, so nothing was sent.",
+      "incomplete": "Finish or remove the unfinished blocks before sending.",
+      "time_past": "Choose a time in the future."
     },
     "panel": {
       "scheduled_for": "Scheduled for {date}",

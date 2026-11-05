@@ -1,13 +1,13 @@
 // @vitest-environment happy-dom
-// `flush` and `currentRevision`, what a real send relies on (A8). Its own file:
-// `useCampaignEditor.test.ts` is at the 300-line cap.
+// `flush` and `currentRevision`: what a real send relies on (A8), as opposed to
+// the autosave `save` that `useCampaignEditor.test.ts` covers.
 import type { Data } from '@puckeditor/core';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api } from '../utils/api';
-import type { CampaignDetail } from '../utils/types';
+import { campaign } from './campaignFixture';
 import { AUTOSAVE_DELAY_MS, useCampaignEditor } from './useCampaignEditor';
 
 vi.mock('../utils/api', async (importOriginal) => ({
@@ -19,34 +19,6 @@ vi.mock('../utils/api', async (importOriginal) => ({
 
 const getCampaign = vi.mocked(api.getCampaign);
 const patchCampaign = vi.mocked(api.patchCampaign);
-
-function campaign(revision: number): CampaignDetail {
-  return {
-    id: 7,
-    name: 'Spring',
-    subject: 'Hello',
-    status: 'draft',
-    list_type_key: 'news',
-    revision,
-    updated_at: null,
-    recipient_count: 0,
-    sent_count: 0,
-    preheader: '',
-    from_name: null,
-    reply_to: null,
-    audience: 'all',
-    scheduled_at: null,
-    started_at: null,
-    finished_at: null,
-    paused_code: null,
-    paused_detail: null,
-    failed_count: 0,
-    bounced_count: 0,
-    suppressed_count: 0,
-    unsubscribe_count: 0,
-    body: [],
-  };
-}
 
 const heading = (text: string): Data => ({
   root: { props: {} },

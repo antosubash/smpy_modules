@@ -36,10 +36,20 @@ interface Props {
   currentRevision: () => number;
 }
 
+/** Now, or a time; `scheduled` is null for now *and* for a later time that is not a
+ *  real future instant, so `when` is what tells them apart. */
+interface Choice {
+  when: When;
+  scheduled: string | null;
+}
+
+const inFuture = (iso: string | null): iso is string =>
+  iso !== null && Date.parse(iso) > Date.now();
+
 /** A future `datetime-local` value as ISO UTC, else null. */
 function futureIso(local: string): string | null {
   const iso = toUtcIso(local);
-  return iso && Date.parse(iso) > Date.now() ? iso : null;
+  return inFuture(iso) ? iso : null;
 }
 
 /** "Send…": now or at a time, with the recipients and when it should finish.
@@ -57,17 +67,22 @@ export function SendDialog(props: Props) {
   const [at, setAt] = useState('');
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [pending, setPending] = useState(false);
-  /** Set once Confirm's flush resolved true; the post waits for the render after it. */
-  const [armed, setArmed] = useState(false);
+  /** What Confirm chose, set once its flush resolved true; the post waits for the
+   *  render after it and sends only this, never a value recomputed since. */
+  const [armed, setArmed] = useState<Choice | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const scheduledAt = when === 'later' ? futureIso(at) : null;
   const blocked = when === 'later' && scheduledAt === null;
+  const timePast = blocked && at !== '';
 
-  const unsaved = useCallback(() => {
-    setError(t(keys.newsletter.test_send.unsaved));
-    setPending(false);
-  }, [t]);
+  const refuse = useCallback(
+    (key: string) => {
+      setError(t(key));
+      setPending(false);
+    },
+    [t],
+  );
 
   const change = async (next: boolean) => {
     if (pending) return;
@@ -77,7 +92,7 @@ export function SendDialog(props: Props) {
     setEstimate(null);
     if (!next) return;
     if (await flush()) setReady(true);
-    else unsaved();
+    else refuse(copy.unsaved);
   };
 
   useEffect(() => {
@@ -112,18 +127,23 @@ export function SendDialog(props: Props) {
 
   // After the render that carries the final save's state, so `dirty` and
   // `incomplete` here are what that save left behind, not what Confirm saw.
+  // A later time that slipped into the past while the save ran is refused, never
+  // sent as "now" (whose `scheduled_at` is null too).
   useEffect(() => {
     if (!armed) return;
-    setArmed(false);
-    if (dirty || incomplete) unsaved();
-    else void post(currentRevision(), scheduledAt);
-  }, [armed, dirty, incomplete, unsaved, post, currentRevision, scheduledAt]);
+    setArmed(null);
+    if (dirty || incomplete) refuse(copy.unsaved);
+    else if (armed.when === 'later' && !inFuture(armed.scheduled)) refuse(copy.time_past);
+    else void post(currentRevision(), armed.when === 'later' ? armed.scheduled : null);
+  }, [armed, dirty, incomplete, refuse, post, currentRevision]);
 
   const confirm = async () => {
+    const choice: Choice = { when, scheduled: when === 'later' ? futureIso(at) : null };
+    if (choice.when === 'later' && choice.scheduled === null) return refuse(copy.time_past);
     setPending(true);
     setError(null);
-    if (await flush()) setArmed(true);
-    else unsaved();
+    if (await flush()) setArmed(choice);
+    else refuse(copy.unsaved);
   };
 
   if (!canSend || campaign.status !== 'draft') return null;
@@ -135,12 +155,12 @@ export function SendDialog(props: Props) {
           type="button"
           size="sm"
           disabled={incomplete}
-          title={incomplete ? t(keys.newsletter.test_send.incomplete) : undefined}
+          title={incomplete ? t(copy.incomplete) : undefined}
         >
           {t(keys.newsletter.sending.send_button)}
         </Button>
       </DialogTrigger>
-      {incomplete && <span className="sr-only">{t(keys.newsletter.test_send.incomplete)}</span>}
+      {incomplete && <span className="sr-only">{t(copy.incomplete)}</span>}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t(copy.title)}</DialogTitle>
@@ -166,6 +186,7 @@ export function SendDialog(props: Props) {
                 disabled={pending}
                 onChange={(e) => setAt(e.target.value)}
               />
+              {timePast && <p className="text-sm text-destructive">{t(copy.time_past)}</p>}
             </div>
           )}
           {estimate && !blocked && (
@@ -193,7 +214,11 @@ export function SendDialog(props: Props) {
           >
             {t(copy.cancel)}
           </Button>
-          <Button type="button" disabled={pending || blocked} onClick={() => void confirm()}>
+          <Button
+            type="button"
+            disabled={pending || blocked || !ready || !estimate}
+            onClick={() => void confirm()}
+          >
             {pending ? t(copy.sending) : t(copy.confirm)}
           </Button>
         </DialogFooter>

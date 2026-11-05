@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import en from '../../../locales/en.json';
 import { api } from '../../utils/api';
+import { HttpError } from '../../utils/http';
 import type { CampaignDetail, Progress } from '../../utils/types';
 import { SendingPanel } from './SendingPanel';
 
@@ -88,6 +89,7 @@ describe('SendingPanel', () => {
   beforeEach(() => {
     onChange.mockReset();
     vi.mocked(api.progress).mockReset().mockResolvedValue(progress());
+    vi.mocked(api.unscheduleCampaign).mockReset();
     for (const fn of [api.pauseCampaign, api.resumeCampaign, api.cancelCampaign]) {
       vi.mocked(fn)
         .mockReset()
@@ -145,6 +147,20 @@ describe('SendingPanel', () => {
     await act(async () => confirm?.click());
     expect(api.cancelCampaign).toHaveBeenCalledWith(7);
     expect(onChange).toHaveBeenCalled();
+  });
+
+  it('keeps the cancel confirmation open, with the error, when the cancel is refused', async () => {
+    vi.mocked(api.cancelCampaign).mockRejectedValue(new HttpError('no', 409, 'invalid_transition'));
+    await render(campaign());
+    await act(async () => button(copy.actions.cancel)?.click());
+    const dialog = document.querySelector('[role="alertdialog"]') as HTMLElement;
+    const confirm = [...dialog.querySelectorAll('button')].find(
+      (b) => b.textContent === copy.cancel_confirm.confirm,
+    );
+    await act(async () => confirm?.click());
+    expect(onChange).not.toHaveBeenCalled();
+    const still = document.querySelector('[role="alertdialog"]');
+    expect(still?.textContent).toContain(en.errors.invalid_transition);
   });
 
   it('unschedules a scheduled campaign with its revision', async () => {

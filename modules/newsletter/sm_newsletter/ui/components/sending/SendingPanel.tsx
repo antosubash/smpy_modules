@@ -125,7 +125,7 @@ export function SendingPanel({ campaign, canSend, onChange }: Props) {
       </div>
       {actions.map((action) =>
         action === 'cancel' ? (
-          <CancelButton key={action} busy={busy} onConfirm={() => run('cancel')} />
+          <CancelButton key={action} busy={busy} error={error} onConfirm={() => run('cancel')} />
         ) : (
           <Button
             key={action}
@@ -142,8 +142,16 @@ export function SendingPanel({ campaign, canSend, onChange }: Props) {
   );
 }
 
+interface CancelProps {
+  busy: boolean;
+  /** The last action's failure, shown in the dialog that stays open after it. */
+  error: string | null;
+  /** Resolves false when the cancel was refused. */
+  onConfirm: () => Promise<boolean>;
+}
+
 /** "Cancel sending", behind a confirmation: unsent messages are dropped for good. */
-function CancelButton({ busy, onConfirm }: { busy: boolean; onConfirm: () => Promise<boolean> }) {
+function CancelButton({ busy, error, onConfirm }: CancelProps) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const confirm = copy.cancel_confirm;
@@ -159,15 +167,20 @@ function CancelButton({ busy, onConfirm }: { busy: boolean; onConfirm: () => Pro
           <AlertDialogTitle>{t(confirm.title)}</AlertDialogTitle>
           <AlertDialogDescription>{t(confirm.description)}</AlertDialogDescription>
         </AlertDialogHeader>
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>{t(confirm.keep)}</AlertDialogCancel>
           <AlertDialogAction
             disabled={busy}
             className="bg-destructive text-white hover:bg-destructive/90"
-            // Radix closes on click; it closes here only once the request is done.
+            // Radix closes on click; here it closes only once the cancel went through.
             onClick={(e) => {
               e.preventDefault();
-              void onConfirm().then(() => setOpen(false));
+              void onConfirm().then((ok) => ok && setOpen(false));
             }}
           >
             {t(confirm.confirm)}

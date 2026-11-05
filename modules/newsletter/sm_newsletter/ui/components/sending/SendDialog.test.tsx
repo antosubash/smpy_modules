@@ -118,7 +118,7 @@ describe('SendDialog', () => {
   it('is disabled while a block is unfinished', async () => {
     await render({ incomplete: true });
     expect(button(copy.send_button)?.disabled).toBe(true);
-    expect(document.body.textContent).toContain(en.test_send.incomplete);
+    expect(document.body.textContent).toContain(en.sending.dialog.incomplete);
   });
 
   it('flushes on open, then loads the estimate and shows the recipients', async () => {
@@ -143,6 +143,11 @@ describe('SendDialog', () => {
     expect(button(copy.dialog.confirm)?.disabled).toBe(true);
     await later('2020-01-01T09:00');
     expect(button(copy.dialog.confirm)?.disabled).toBe(true);
+    expect(document.body.textContent).toContain(copy.dialog.time_past);
+    // No estimate for a time that cannot be scheduled.
+    expect(document.body.textContent).not.toContain('42 recipients');
+    await act(async () => button(copy.dialog.confirm)?.click());
+    expect(sendCampaign).not.toHaveBeenCalled();
 
     await later('2099-01-01T09:00');
     const iso = toUtcIso('2099-01-01T09:00');
@@ -177,12 +182,55 @@ describe('SendDialog', () => {
     await act(async () => button(copy.dialog.confirm)?.click());
     expect(flush).toHaveBeenCalledTimes(2);
     expect(sendCampaign).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain(en.test_send.unsaved);
+    expect(document.body.textContent).toContain(en.sending.dialog.unsaved);
   });
 
   it('stops at open when the edits could not be saved', async () => {
     await open({ flush: vi.fn().mockResolvedValue(false) });
     expect(estimate).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain(en.test_send.unsaved);
+    expect(document.body.textContent).toContain(en.sending.dialog.unsaved);
+    expect(button(copy.dialog.confirm)?.disabled).toBe(true);
+  });
+
+  it('keeps Confirm disabled until the estimate has loaded', async () => {
+    let answer: (e: Awaited<ReturnType<typeof api.estimate>>) => void = () => {};
+    estimate.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    await open();
+    expect(button(copy.dialog.confirm)?.disabled).toBe(true);
+    await act(async () =>
+      answer({
+        recipients: 1,
+        estimated_finish: '2026-12-01T10:00:00Z',
+        overlaps: false,
+        daily_rate: 1,
+      }),
+    );
+    expect(button(copy.dialog.confirm)?.disabled).toBe(false);
+  });
+
+  it('never sends now when the later time slips into the past during the save', async () => {
+    const start = Date.now();
+    vi.useFakeTimers({ toFake: ['Date'], now: start });
+    try {
+      let saved: (ok: boolean) => void = () => {};
+      const flush = vi
+        .fn()
+        .mockResolvedValueOnce(true)
+        .mockReturnValueOnce(new Promise<boolean>((resolve) => (saved = resolve)));
+      await open({ flush });
+      const soon = new Date(start + 60_000);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      await later(
+        `${soon.getFullYear()}-${pad(soon.getMonth() + 1)}-${pad(soon.getDate())}T${pad(soon.getHours())}:${pad(soon.getMinutes())}`,
+      );
+      expect(button(copy.dialog.confirm)?.disabled).toBe(false);
+      await act(async () => button(copy.dialog.confirm)?.click());
+      vi.setSystemTime(start + 5 * 60_000);
+      await act(async () => saved(true));
+      expect(sendCampaign).not.toHaveBeenCalled();
+      expect(document.body.textContent).toContain(copy.dialog.time_past);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

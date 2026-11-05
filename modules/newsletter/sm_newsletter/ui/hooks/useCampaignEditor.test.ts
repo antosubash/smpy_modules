@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../utils/api';
 import { HttpError } from '../utils/http';
 import type { CampaignDetail } from '../utils/types';
+import { campaign } from './campaignFixture';
 import { AUTOSAVE_DELAY_MS, useCampaignEditor } from './useCampaignEditor';
 
 vi.mock('../utils/api', async (importOriginal) => ({
@@ -19,34 +20,6 @@ vi.mock('../utils/api', async (importOriginal) => ({
 const getCampaign = vi.mocked(api.getCampaign);
 const patchCampaign = vi.mocked(api.patchCampaign);
 const refreshCard = vi.mocked(api.refreshCard);
-
-function campaign(revision: number, body: CampaignDetail['body'] = []): CampaignDetail {
-  return {
-    id: 7,
-    name: 'Spring',
-    subject: 'Hello',
-    status: 'draft',
-    list_type_key: 'news',
-    revision,
-    updated_at: null,
-    recipient_count: 0,
-    sent_count: 0,
-    preheader: '',
-    from_name: null,
-    reply_to: null,
-    audience: 'all',
-    scheduled_at: null,
-    started_at: null,
-    finished_at: null,
-    paused_code: null,
-    paused_detail: null,
-    failed_count: 0,
-    bounced_count: 0,
-    suppressed_count: 0,
-    unsubscribe_count: 0,
-    body,
-  };
-}
 
 function data(text: string): Data {
   return {

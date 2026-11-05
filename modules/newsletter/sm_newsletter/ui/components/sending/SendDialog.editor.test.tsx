@@ -148,6 +148,6 @@ describe('SendDialog with the real editor hook', () => {
 
     expect(requests.some((r) => r.method === 'PATCH')).toBe(true);
     expect(sends()).toEqual([]);
-    expect(document.body.textContent).toContain(en.test_send.unsaved);
+    expect(document.body.textContent).toContain(en.sending.dialog.unsaved);
   });
 });
