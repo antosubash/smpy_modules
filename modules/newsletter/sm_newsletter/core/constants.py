@@ -57,7 +57,7 @@ SEND_STATUSES = (
 )
 # ``newsletter_send_attempt``: one row per recipient per SMTP attempt.
 ATTEMPT_KINDS = ("campaign", "test")
-ATTEMPT_OUTCOMES = ("pending", "accepted", "rejected", "unknown")
+ATTEMPT_OUTCOMES = ("pending", "accepted", "rejected", "unknown", "failed")
 
 # Suppression reasons. An ``unsubscribed`` row names its list as provenance;
 # the others carry ``""``. Lookups are tenant-wide whatever the list.

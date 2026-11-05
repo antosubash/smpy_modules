@@ -111,6 +111,10 @@ async def test_restricted_list_after_create_is_404(client, built):
     res = await client.patch(f"{BASE}/{cid}", json={"expected_revision": 1}, headers=EDIT)
     assert res.status_code == 404
     assert (await client.delete(f"{BASE}/{cid}", headers=EDIT)).status_code == 404
+    send = {"x-perms": constants.PERM_SEND}
+    test_send = {"recipients": ["a@example.org"]}
+    res = await client.post(f"{BASE}/{cid}/test-send", json=test_send, headers=send)
+    assert res.status_code == 404
     assert (await client.get(BASE, headers=VIEW)).json() == {"items": [], "total": 0}
     allowed = {**VIEW, "x-roles": "x"}
     assert (await client.get(f"{BASE}/{cid}", headers=allowed)).status_code == 200

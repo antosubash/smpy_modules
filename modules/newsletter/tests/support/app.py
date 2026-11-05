@@ -15,6 +15,7 @@ and settings' tables. Only auth and the host's ``app.state.sm`` are stubbed:
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -53,12 +54,19 @@ class _Auth(BaseHTTPMiddleware):
 
 
 async def build_app(
-    *, multi: bool = False, session: bool = False, settings: dict | None = None
+    *,
+    multi: bool = False,
+    session: bool = False,
+    settings: dict | None = None,
+    file: Path | None = None,
 ) -> tuple[FastAPI, Any]:
     """The app and its ``DatabaseState``; the caller disposes of the engine.
 
-    ``settings`` pins :class:`NewsletterSettings` fields without the database."""
-    state = await _pg.make_db_state(Base.metadata, *_extra_metadata(), SettingsBase.metadata)
+    ``settings`` pins :class:`NewsletterSettings` fields without the database;
+    ``file`` gives SQLite a file database with one connection per session (a race)."""
+    state = await _pg.make_db_state(
+        Base.metadata, *_extra_metadata(), SettingsBase.metadata, file=file
+    )
     app = FastAPI()
     app.state.sm = SimpleNamespace(
         db=state,

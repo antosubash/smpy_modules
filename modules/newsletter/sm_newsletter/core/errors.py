@@ -154,6 +154,44 @@ class TransportUnavailable(NewsletterError):  # noqa: N818 - the state it report
     detail = "The mail server is not available"
 
 
+class CampaignCancelled(NewsletterError):  # noqa: N818 - the state it refuses
+    status = 409
+    code = "campaign_cancelled"
+    detail = "A cancelled campaign cannot be test sent"
+
+
+class SenderNotConfigured(NewsletterError):  # noqa: N818 - names the setting
+    """A newsletter setting a send needs is blank or unusable; the detail names it."""
+
+    status = 422
+    code = "sender_not_configured"
+    detail = "The sender is not configured"
+
+
+class PublicBaseUrlRequired(NewsletterError):  # noqa: N818 - names the setting
+    """The host has no ``public_base_url``, so the email's links would be relative."""
+
+    status = 422
+    code = "public_base_url_required"
+    detail = "Set the site's public address (public_base_url) before sending"
+
+
+class SendBudgetExhausted(NewsletterError):  # noqa: N818 - the state it refuses
+    """The rolling daily or per-minute sending limit has no room for this send."""
+
+    status = 429
+    code = "send_budget_exhausted"
+    detail = "The sending limit is reached; try again later"
+
+
+class DispatchBusy(NewsletterError):  # noqa: N818 - the state it refuses
+    """Another send held the install-wide dispatch lock for the whole wait."""
+
+    status = 409
+    code = "dispatch_busy"
+    detail = "Another send is in progress; try again shortly"
+
+
 async def render(request: Request, exc: NewsletterError) -> JSONResponse:
     return JSONResponse({"detail": exc.detail, "code": exc.code}, status_code=exc.status)
 
