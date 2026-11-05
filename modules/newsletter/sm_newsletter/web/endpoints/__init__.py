@@ -13,6 +13,7 @@ def build_api_router() -> APIRouter:
         cards_api,
         outbox_api,
         preview_api,
+        sending_api,
         settings_api,
         test_send_api,
     )
@@ -24,6 +25,7 @@ def build_api_router() -> APIRouter:
         cards_api.router,
         outbox_api.router,
         preview_api.router,
+        sending_api.router,
         test_send_api.router,
     ):
         router.include_router(sub)

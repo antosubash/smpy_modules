@@ -21,8 +21,10 @@ from pydantic import (
     StrictInt,
     ValidationError,
     field_validator,
+    model_validator,
 )
 
+from sm_newsletter.campaigns.lifecycle import split_paused
 from sm_newsletter.content.merge import check_merge, check_no_capability
 from sm_newsletter.core.constants import MAX_TYPE_KEY_LEN
 from sm_newsletter.core.errors import InvalidCampaign, NewsletterError
@@ -139,6 +141,25 @@ class CampaignDetail(CampaignSummary):
     reply_to: str | None
     audience: str
     body: list[dict[str, Any]]
+    scheduled_at: datetime | None
+    started_at: datetime | None
+    finished_at: datetime | None
+    paused_code: str | None
+    paused_detail: str | None
+    failed_count: int
+    bounced_count: int
+    suppressed_count: int
+    unsubscribe_count: int
+
+    @model_validator(mode="before")
+    @classmethod
+    def _split_paused(cls, data: Any) -> Any:
+        """The stored ``"<code>|<detail>"`` reason as two fields (ruling S13)."""
+        if isinstance(data, dict) or not hasattr(data, "paused_reason"):
+            return data
+        code, detail = split_paused(data.paused_reason)
+        own = {n: getattr(data, n) for n in cls.model_fields if hasattr(data, n)}
+        return own | {"paused_code": code, "paused_detail": detail}
 
 
 class CampaignPage(BaseModel):

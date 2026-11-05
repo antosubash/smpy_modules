@@ -274,3 +274,12 @@ async def test_patch_subject_with_unsubscribe_tag_422(client, field):
         BASE, json={"name": "a", "list_type_key": "news", field: value}, headers=EDIT
     )
     assert (res.status_code, res.json()["code"]) == (422, "invalid_campaign")
+
+
+async def test_detail_holds_the_sending_fields(client):
+    created = await _create(client)
+    got = (await client.get(f"{BASE}/{created['id']}", headers=VIEW)).json()
+    assert got["scheduled_at"] is None and got["started_at"] is None and got["finished_at"] is None
+    assert got["paused_code"] is None and got["paused_detail"] is None
+    for key in ("failed_count", "bounced_count", "suppressed_count", "unsubscribe_count"):
+        assert got[key] == 0
