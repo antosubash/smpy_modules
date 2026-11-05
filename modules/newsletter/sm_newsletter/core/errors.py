@@ -144,6 +144,16 @@ class BlockNotFound(NewsletterError):  # noqa: N818 - HTTP vocabulary, deliberat
     detail = "No such card in this campaign"
 
 
+class TransportUnavailable(NewsletterError):  # noqa: N818 - the state it reports
+    """The mail relay could not be reached, secured or logged in to. The detail
+    names the stage (``connect``, ``tls``, ``auth``) and never holds the
+    username, the password or the server's AUTH reply."""
+
+    status = 502
+    code = "transport_unavailable"
+    detail = "The mail server is not available"
+
+
 async def render(request: Request, exc: NewsletterError) -> JSONResponse:
     return JSONResponse({"detail": exc.detail, "code": exc.code}, status_code=exc.status)
 
