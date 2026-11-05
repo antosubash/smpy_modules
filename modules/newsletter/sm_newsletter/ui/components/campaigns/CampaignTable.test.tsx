@@ -54,8 +54,19 @@ describe('CampaignTable', () => {
     expect(cells).toContain('5.0%');
     const link = host.querySelector(`a[href="/admin/newsletter/campaigns/7/report"]`);
     expect(link).not.toBeNull();
-    expect(link?.textContent).toContain(en.campaigns.report_link);
-    expect(link?.textContent).toContain('Report for Spring');
+    expect(link?.textContent).toBe(en.campaigns.report_link);
+    expect(link?.getAttribute('aria-label')).toBe('Report for Spring');
+  });
+
+  it('shows 0.0% (not a dash) for a sent campaign with no opens, and explains Opens', async () => {
+    const host = await render([item({ opens_unique_accepted: 0, clicks_unique_accepted: 0 })]);
+    const cells = [...host.querySelectorAll('td')].map((c) => c.textContent);
+    expect(cells.filter((c) => c === '0.0%')).toHaveLength(2);
+    expect(cells).not.toContain('—');
+    const head = [...host.querySelectorAll('th')].find(
+      (h) => h.textContent === en.campaigns.columns.opens,
+    );
+    expect(head?.getAttribute('title')).toBe(en.report.approx.opens);
   });
 
   it('shows a dash for a draft and offers no report', async () => {

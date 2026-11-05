@@ -38,7 +38,6 @@
     "clear": "Filter zurücksetzen",
     "columns": {
       "name": "Name",
-      "subject": "Betreff",
       "status": "Status",
       "list": "Liste",
       "updated": "Aktualisiert",

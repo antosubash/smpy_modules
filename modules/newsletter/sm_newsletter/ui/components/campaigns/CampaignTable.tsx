@@ -182,9 +182,8 @@ export function CampaignTable({ items, canEdit, onDeleted }: Props) {
             <TableCell className="text-right">
               {hasStarted(c) && (
                 <Button asChild variant="ghost" size="sm">
-                  <Link href={reportUrl(c.id)}>
+                  <Link href={reportUrl(c.id)} aria-label={t(copy.report_label, { name: c.name })}>
                     {t(copy.report_link)}
-                    <span className="sr-only">{t(copy.report_label, { name: c.name })}</span>
                   </Link>
                 </Button>
               )}
