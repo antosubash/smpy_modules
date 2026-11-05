@@ -63,6 +63,8 @@ def parse(secret: str, token: object) -> SendToken | None:
     if not valid_tenant(tenant_id):
         return None
     campaign_id, send_id = int(campaign_raw), int(send_raw)
+    if f"{campaign_id}.{send_id}" != f"{campaign_raw}.{send_raw}":
+        return None  # a leading zero: one send has exactly one token
     if not hmac.compare_digest(_mac(secret, tenant_id, campaign_id, send_id), mac):
         return None
     return SendToken(tenant_id, campaign_id, send_id)

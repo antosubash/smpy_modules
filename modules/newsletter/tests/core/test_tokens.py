@@ -60,3 +60,10 @@ def test_url_has_no_at_sign_and_joins_the_prefix():
     url = tokens.unsubscribe_url("https://x.example/", _tok())
     assert "@" not in url
     assert url.startswith("https://x.example/") and "/u/" in url
+
+
+@pytest.mark.parametrize("raw", ["03.9", "3.09", "003.009", "+3.9"])
+def test_non_canonical_ids_are_refused(raw):
+    """``03`` and ``3`` would both verify: one send, one token."""
+    tenant, _, _, mac = _tok().rsplit(".", 3)
+    assert tokens.parse(SECRET, f"{tenant}.{raw}.{mac}") is None
