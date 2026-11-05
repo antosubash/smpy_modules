@@ -257,3 +257,20 @@ async def test_status_filter_constrained(client):
     res = await client.get(BASE, params={"status": "drafts-typo"}, headers=VIEW)
     assert (res.status_code, res.json()["code"]) == (422, "invalid_campaign")
     assert "drafts-typo" not in res.text
+
+
+@pytest.mark.parametrize("field", ["subject", "preheader"])
+async def test_patch_subject_with_unsubscribe_tag_422(client, field):
+    # A7: a capability-bearing merge field would put a send token in a header.
+    cid = (await _create(client))["id"]
+    value = "Hi {{unsubscribe_url}} secret"
+    res = await client.patch(
+        f"{BASE}/{cid}", json={"expected_revision": 1, field: value}, headers=EDIT
+    )
+    assert (res.status_code, res.json()["code"]) == (422, "invalid_campaign")
+    assert field in res.json()["detail"]
+    assert "unsubscribe_url" not in res.text and "secret" not in res.text
+    res = await client.post(
+        BASE, json={"name": "a", "list_type_key": "news", field: value}, headers=EDIT
+    )
+    assert (res.status_code, res.json()["code"]) == (422, "invalid_campaign")
