@@ -163,14 +163,16 @@ async def pause_unavailable(
     claim: FreezeClaim,
     now: datetime,
     code: str = constants.PAUSE_LIST_UNAVAILABLE,
+    *,
+    detail: str = "",
 ) -> None:
-    """``scheduled -> paused`` (``list_unavailable``, or ``code``) if the claim
+    """``scheduled -> paused`` (``list_unavailable``, or ``code`` with ``detail``) if the claim
     holds, releasing it, with ``started_at`` left empty: ``resume`` sends a
     never-started campaign back to ``scheduled`` without a new generation, so
     the next tick can claim it, and ``unschedule`` takes it back to draft."""
     values = {
         "status": PAUSED,
-        "paused_reason": paused_reason(code),
+        "paused_reason": paused_reason(code, detail),
         "freeze_owner": None,
         "freeze_until": None,
         "revision": Campaign.revision + 1,

@@ -4,6 +4,10 @@ Every page renews the claim (:func:`~.freeze_fence.hold_freeze`) inside its own
 transaction before writing, so its rows commit only while the claim holds. The
 lock order is the never-started campaign's: the campaign row first (the
 renewal), then the send rows.
+
+A term records cannot answer (``SubscriberFilterError``) rolls that page back
+and raises :class:`FilterRefused` with records' reason; earlier pages stay, as
+a crashed freezer's would, under this generation.
 """
 
 from __future__ import annotations
@@ -15,6 +19,7 @@ from typing import Any
 from simple_module_db import finalize_session
 from sm_records.contracts.newsletter import (
     MAX_SUBSCRIBER_BATCH,
+    SubscriberFilterError,
     SubscriberHit,
     iter_subscribers,
 )
@@ -25,12 +30,21 @@ from sm_newsletter.core.upsert import insert_ignore
 from sm_newsletter.models import Send
 from sm_newsletter.sending.freeze_fence import FreezeClaim, SessionFactory, hold_freeze
 
-__all__ = ["PAGE", "QUEUED", "SUPPRESSED", "write_pages"]
+__all__ = ["PAGE", "QUEUED", "SUPPRESSED", "FilterRefused", "write_pages"]
 
 PAGE = MAX_SUBSCRIBER_BATCH
 QUEUED, SUPPRESSED = "queued", "suppressed"
 
 _SEND = Send.__table__  # ty: ignore[unresolved-attribute]
+
+
+class FilterRefused(Exception):  # noqa: N818 - the name the plan gives it
+    """Records refused the audience's terms (or the list); ``reason`` is records'."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
 
 Reader = Callable[..., Awaitable[tuple[list[SubscriberHit], int | None]]]
 
@@ -47,21 +61,26 @@ async def write_pages(
     read: Reader = iter_subscribers,
     page: int = PAGE,
 ) -> bool:
-    """Every page of the audience into send rows; ``False`` once the claim is lost.
+    """Every page of the audience into send rows; ``False`` once the claim is
+    lost, :class:`FilterRefused` when records refuses a term.
 
     ``read`` and ``page`` default to records' reader and its largest batch;
     :mod:`.freeze` passes its own names so a test can swap them there."""
     cursor: int | None = 0
     while cursor is not None:
         async with factory() as session:
-            hits, cursor = await read(
-                session,
-                tenant_id=tenant_id,
-                type_key=list_key,
-                filters=list(filters),
-                limit=page,
-                after=cursor,
-            )
+            try:
+                hits, cursor = await read(
+                    session,
+                    tenant_id=tenant_id,
+                    type_key=list_key,
+                    filters=list(filters),
+                    limit=page,
+                    after=cursor,
+                )
+            except SubscriberFilterError as exc:
+                await session.rollback()
+                raise FilterRefused(exc.reason) from None
             # Records caps neither length; the send columns do. A blank or
             # over-long address could not be delivered and is left out; a long
             # name is clipped (Postgres would refuse the whole page).

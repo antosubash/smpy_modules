@@ -14,7 +14,7 @@ tenant and the allowed *from* statuses, with `revision = revision + 1`.
 | send or schedule (`newsletter.send`) | `draft`, at `expected_revision` | `scheduled` | render snapshot written; `scheduled_at` |
 | unschedule (`newsletter.send`) | `scheduled`, or `paused` with `started_at` empty (never frozen), at `expected_revision` | `draft` | snapshot and send rows deleted; `scheduled_at` and the paused reason cleared; a `paused` campaign that started is `409 invalid_transition` |
 | freeze (worker) | `scheduled` | `sending` | `started_at`, `recipient_count`, `suppressed_count` |
-| freeze, list gone or snapshot not https on `smtp` (worker) | `scheduled` | `paused` (`list_unavailable`, `https_required`) | `started_at` stays empty; nothing frozen |
+| freeze, list gone, audience refused by records or snapshot not https on `smtp` (worker) | `scheduled` | `paused` (`list_unavailable`, `audience_unavailable`, `https_required`) | `started_at` stays empty; nothing frozen |
 | pause (`newsletter.send`) or auto-pause | `sending` | `paused` | reason |
 | resume (`newsletter.send`) | `paused` | `sending` if `started_at` is set, else `scheduled` at now | reason cleared |
 | cancel (`newsletter.send`) | `scheduled`, `sending`, `paused` | `cancelled` | `finished_at`; remaining `queued` rows become `cancelled` |
@@ -24,7 +24,7 @@ When no row matches, the campaign is re-read: missing is 404, a stale revision
 on send or unschedule is `409 stale`, sending a non-draft is `409
 not_a_draft`, anything else `409 invalid_transition`. The paused reason is
 stored as `"<code>|<detail>"`; the codes are `manual`, `smtp_rejected`,
-`smtp_auth`, `list_unavailable` and `https_required`, and the API returns them
+`smtp_auth`, `list_unavailable`, `https_required` and `audience_unavailable`, and the API returns them
 split as
 `paused_code` and `paused_detail`.
 
@@ -91,6 +91,16 @@ dispatcher tick: its audience becomes `newsletter_send` rows.
   so does a snapshot that is not `https://` (`https_required`). Nothing is
   frozen, so the campaign can be resumed (back to `scheduled`) or unscheduled
   to draft.
+- **The audience is the snapshot.** The freeze reads the terms scheduling
+  stored on the render (`audience_filters`; `[]`, as on a render written
+  before audiences existed, is the whole list), never the segment: editing or
+  deleting a segment after scheduling changes nothing until the campaign is
+  unscheduled and scheduled again. When records refuses a stored term while
+  freezing, `reindexing` leaves the campaign `scheduled` (a WARNING; the claim
+  expires and a later tick retries), `not_a_list` pauses with
+  `list_unavailable`, and any other reason pauses with `audience_unavailable`,
+  records' reason as the detail. The refused page is rolled back; both pauses
+  are conditional on the claim, like the one above.
 
 ## The dispatcher
 

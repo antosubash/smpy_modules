@@ -14,6 +14,10 @@ record_uuid)`` and stamped with the generation; the counts come from the rows
 of that generation. A crashed freezer's rows stay, and after
 :data:`FREEZE_LEASE` the next tick claims the campaign again and goes on.
 
+**Audience.** The claim's read carries the render's ``audience_filters``;
+a term records refuses pauses the campaign or, while it reindexes, leaves it
+``scheduled`` (:func:`_refused`).
+
 **Tenancy.** :func:`due_campaigns` is a deliberate cross-tenant read returning
 ``(tenant_id, id)`` pairs. :func:`start_due` runs with no tenant bound and
 freezes each campaign under its own tenant, each step in a fresh session.
@@ -49,7 +53,13 @@ from sm_newsletter.sending.freeze_fence import (
     pause_unavailable,
     update_campaign,
 )
-from sm_newsletter.sending.freeze_pages import PAGE, QUEUED, SUPPRESSED, write_pages
+from sm_newsletter.sending.freeze_pages import (
+    PAGE,
+    QUEUED,
+    SUPPRESSED,
+    FilterRefused,
+    write_pages,
+)
 
 __all__ = [
     "FREEZE_LEASE",
@@ -159,9 +169,37 @@ async def freeze(
                 return _LOST
             await finalize_session(session)
         pages = (factory, tenant_id, campaign_id, claim, list_key, filters, clock)
-        if not await write_pages(*pages, read=iter_subscribers, page=PAGE):
+        try:
+            if not await write_pages(*pages, read=iter_subscribers, page=PAGE):
+                return _LOST
+        except FilterRefused as refused:
+            await _refused(factory, tenant_id, campaign_id, claim, now, refused.reason)
             return _LOST
         return await _publish(factory, tenant_id, campaign_id, claim, now, clock)
+
+
+async def _refused(
+    factory: SessionFactory,
+    tenant_id: str,
+    campaign_id: int,
+    claim: FreezeClaim,
+    now: datetime,
+    reason: str,
+) -> None:
+    """Records refused the snapshot's terms. ``reindexing`` passes: the campaign
+    stays ``scheduled`` and the claim expires, so a later tick retries. A type
+    that is no longer a list pauses ``list_unavailable``; anything else pauses
+    ``audience_unavailable`` with records' reason. Both under the claim."""
+    if reason == "reindexing":
+        logger.warning("newsletter: campaign %s of %s waits for a reindex", campaign_id, tenant_id)
+        return
+    if reason == "not_a_list":
+        code, detail = constants.PAUSE_LIST_UNAVAILABLE, ""
+    else:
+        code, detail = constants.PAUSE_AUDIENCE_UNAVAILABLE, reason
+    async with factory() as session:
+        await pause_unavailable(session, tenant_id, campaign_id, claim, now, code, detail=detail)
+        await finalize_session(session)
 
 
 async def _publish(
