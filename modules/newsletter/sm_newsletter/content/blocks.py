@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import re
 from typing import Annotated, Any, Literal
 
@@ -15,7 +16,7 @@ from pydantic import (
     ValidationError,
 )
 
-from sm_newsletter.content.merge import check_merge
+from sm_newsletter.content.merge import MAX_FALLBACK, check_merge
 from sm_newsletter.content.richtext import clean
 from sm_newsletter.content.urls import check_image, check_link
 from sm_newsletter.core.errors import InvalidBody
@@ -34,6 +35,7 @@ BLOCK_TYPES = (
 MAX_BLOCKS = 200
 
 _TAGS = re.compile(r"<[^>]*>")
+_FIELD = re.compile(r"\{\{first_name\|([^|{}]*)\}\}")
 
 
 def _merge(value: str) -> str:
@@ -44,8 +46,14 @@ def _merge(value: str) -> str:
 def _rich(value: str) -> str:
     """Clean first (entities decode to the text a reader sees), then check the merge fields."""
     cleaned = clean(value)
-    check_merge(cleaned)  # a tag inside a field leaves its braces behind
-    check_merge(_TAGS.sub("", cleaned))  # and a field split across tags still counts as text
+    for m in _FIELD.finditer(cleaned):
+        fallback = m.group(1) or ""
+        # A fallback is plain text: markup in it would unbalance the tree once substituted.
+        if "<" in fallback or ">" in fallback or len(html.unescape(fallback)) > MAX_FALLBACK:
+            raise ValueError("invalid merge fallback")
+    text = html.unescape(cleaned)  # the fallback is capped as typed, not as escaped
+    check_merge(text)  # a tag inside a field leaves its braces behind
+    check_merge(_TAGS.sub("", text))  # and a field split across tags still counts as text
     return cleaned
 
 

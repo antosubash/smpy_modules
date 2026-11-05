@@ -22,6 +22,8 @@ DROP_CONTENT = frozenset(
 )
 RENAME = {"b": "strong", "i": "em"}
 MAX_DEPTH = 20
+MAX_OPEN = 200  # open elements tracked; past it a start tag is treated as unknown
+_CONTROLS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _STRIP_INNER = re.compile(r"[\t\n\r\x00-\x1f\x7f]")
 _NORMAL_WEIGHT = re.compile(r"font-weight:\s*(normal|400)", re.I)
 
@@ -43,9 +45,7 @@ class _Cleaner(HTMLParser):
         self.stack: list[tuple[str, bool]] = []  # (name, emitted)
         self.drop: str | None = None
         self.drop_n = 0
-
-    def _emitted(self) -> int:
-        return sum(1 for _, e in self.stack if e)
+        self.n_emitted = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if self.drop:
@@ -63,15 +63,18 @@ class _Cleaner(HTMLParser):
         if name == "br":
             self.out.append("<br>")
             return
+        if len(self.stack) >= MAX_OPEN:
+            return
         href = None
         if name == "a":
             href = _href(next((v for k, v in attrs if k == "href"), None))
             if href is None or any(n == "a" for n, _ in self.stack):
                 self.stack.append(("a", False))  # unwrapped, but its </a> must not close another
                 return
-        emitted = self._emitted() < MAX_DEPTH
+        emitted = self.n_emitted < MAX_DEPTH
         self.stack.append((name, emitted))
         if emitted:
+            self.n_emitted += 1
             if href is not None:
                 self.out.append(f'<a href="{html.escape(href, quote=True)}">')
             else:
@@ -92,12 +95,13 @@ class _Cleaner(HTMLParser):
                 while len(self.stack) > i:
                     n, emitted = self.stack.pop()
                     if emitted:
+                        self.n_emitted -= 1
                         self.out.append(f"</{n}>")
                 return
 
     def handle_data(self, data: str) -> None:
         if not self.drop:
-            self.out.append(html.escape(data, quote=False))
+            self.out.append(html.escape(_CONTROLS.sub("", data), quote=False))
 
     def finish(self) -> str:
         self.close()
