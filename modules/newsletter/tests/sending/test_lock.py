@@ -180,3 +180,52 @@ async def test_discard_logs_a_failed_invalidate():
             raise RuntimeError("gone")
 
     await _discard(_BrokenConn())  # ty: ignore[invalid-argument-type]
+
+
+async def _lock_row(factory) -> tuple[str | None, datetime | None]:
+    async with factory() as db:
+        row = (await db.execute(select(DispatchLock.holder, DispatchLock.locked_until))).one()
+        return row[0], row[1]
+
+
+async def _fence(held, factory) -> None:
+    async with factory() as db:
+        try:
+            await held.fence(db)
+        except DispatchBusy:
+            await db.rollback()
+            raise
+        await finalize_session(db)
+
+
+@pytest.mark.skipif(USING_POSTGRES, reason="the lease is the SQLite lock row's")
+async def test_fence_inside_transaction(state):
+    factory = state.session_factory
+    async with dispatch_lock(factory, holder="me", wait_s=1, lease_s=60) as held:
+        _, before = await _lock_row(factory)
+        await asyncio.sleep(0.01)
+        await _fence(held, factory)
+        me, after = await _lock_row(factory)
+        assert after is not None and before is not None and after > before
+        past = datetime.now(UTC) - timedelta(seconds=1)
+        async with factory() as db:
+            await db.execute(update(DispatchLock).values(locked_until=past))
+            await finalize_session(db)
+        with pytest.raises(DispatchBusy):
+            await _fence(held, factory)  # expired, even though still named holder
+        future = datetime.now(UTC) + timedelta(seconds=60)
+        async with factory() as db:
+            await db.execute(update(DispatchLock).values(holder="thief:1", locked_until=future))
+            await finalize_session(db)
+        with pytest.raises(DispatchBusy):
+            await _fence(held, factory)
+        assert (await _lock_row(factory))[0] == "thief:1"  # the fence took nothing back
+    assert me is not None and me.startswith("me:")
+
+
+@pytest.mark.skipif(not USING_POSTGRES, reason="the advisory lock's fence")
+async def test_postgres_fence_is_a_no_op(state):
+    lock = dispatch_lock(state.session_factory, holder="me", wait_s=1)
+    async with lock as held, state.session_factory() as db:
+        await held.fence(db)
+        await finalize_session(db)
