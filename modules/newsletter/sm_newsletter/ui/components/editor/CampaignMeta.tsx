@@ -29,9 +29,11 @@ const FIELDS: { name: MetaField; label: string; hint?: string; max: number; type
 ];
 
 /** What a field sends: an optional sender field left blank is `null` (the
- *  settings' value applies), and a blank name is not sent at all (it is
- *  required, and refusing it would only flash an error while retyping). */
-function toPatch(name: MetaField, value: string): MetaPatch | null {
+ *  settings' value applies). A blank name, and a reply-to the input itself
+ *  finds invalid (`foo@` mid-typing), are not sent at all: the server would
+ *  refuse the whole PATCH, and the body edits riding with it. */
+export function toPatch(name: MetaField, value: string, valid = true): MetaPatch | null {
+  if (!valid) return null;
   if (name === 'from_name' || name === 'reply_to') {
     return { [name]: value.trim() === '' ? null : value };
   }
@@ -56,9 +58,10 @@ export function CampaignMeta({ campaign, readOnly, onChange }: CampaignMetaProps
     reply_to: campaign.reply_to ?? '',
   }));
 
-  function change(name: MetaField, value: string) {
+  function change(name: MetaField, input: HTMLInputElement) {
+    const value = input.value;
     setValues((v) => ({ ...v, [name]: value }));
-    const patch = toPatch(name, value);
+    const patch = toPatch(name, value, input.checkValidity());
     if (patch) onChange(patch);
   }
 
@@ -76,7 +79,7 @@ export function CampaignMeta({ campaign, readOnly, onChange }: CampaignMetaProps
               maxLength={field.max}
               readOnly={readOnly}
               aria-describedby={field.hint ? `${id}-hint` : undefined}
-              onChange={(e) => change(field.name, e.target.value)}
+              onChange={(e) => change(field.name, e.target)}
             />
             {field.hint && (
               <p id={`${id}-hint`} className="text-xs text-muted-foreground">

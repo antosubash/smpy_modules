@@ -16,11 +16,12 @@ import type { Data } from '@puckeditor/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '../utils/api';
-import { isComplete, normalizeBody } from '../utils/bodyDraft';
+import { bodyKey, isComplete, normalizeBody } from '../utils/bodyDraft';
 import { errorMessage, isCode } from '../utils/http';
 import { useT } from '../utils/i18n';
 import { fromPuckData, toPuckData } from '../utils/puckData';
 import type { Block, CampaignDetail } from '../utils/types';
+import { type MetaPatch, usePendingEdits } from './usePendingEdits';
 
 /** How long after the last edit a save fires: a sentence is one request, and
  *  closing the tab loses a moment's work at most. */
@@ -28,10 +29,7 @@ export const AUTOSAVE_DELAY_MS = 1500;
 
 export type EditorStatus = 'idle' | 'saving' | 'saved' | 'stale' | 'error';
 
-/** The campaign's own fields the editor writes besides the body. */
-export type MetaPatch = Partial<
-  Pick<CampaignDetail, 'name' | 'subject' | 'preheader' | 'from_name' | 'reply_to'>
->;
+export type { MetaPatch } from './usePendingEdits';
 
 const EMPTY: Data = { root: { props: {} }, content: [] };
 
@@ -45,46 +43,40 @@ export function useCampaignEditor(id: number) {
   const [data, setData] = useState<Data>(EMPTY);
   const [status, setStatus] = useState<EditorStatus>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [incomplete, setIncomplete] = useState(false);
   /** Bumped when the body is replaced from outside Puck, so the canvas remounts. */
   const [reloadKey, setReloadKey] = useState(0);
 
   const revisionRef = useRef(0);
-  /** The normalised body the server holds, serialised: a save fires only for a real change
+  /** The normalised body the server holds (`bodyKey`): a save fires only for a real change
    *  (Puck's `onChange` also runs on selection). */
   const savedBodyRef = useRef('[]');
   const dataRef = useRef<Data>(EMPTY);
-  /** What the next save carries: a complete body that differs from the saved one, and meta. */
-  const bodyRef = useRef<Block[] | null>(null);
-  const metaRef = useRef<MetaPatch>({});
   const staleRef = useRef(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queueRef = useRef<Promise<unknown>>(Promise.resolve());
-
-  const clearTimer = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = null;
-  }, []);
+  const { dirty, incomplete, edits } = usePendingEdits();
 
   /** Adopt the server's campaign; edits typed while the request was out stay on top. */
-  const adopt = useCallback((detail: CampaignDetail) => {
-    revisionRef.current = detail.revision;
-    savedBodyRef.current = JSON.stringify(normalizeBody(detail.body));
-    setCampaign({ ...detail, ...metaRef.current });
-  }, []);
+  const adopt = useCallback(
+    (detail: CampaignDetail) => {
+      revisionRef.current = detail.revision;
+      savedBodyRef.current = bodyKey(normalizeBody(detail.body));
+      setCampaign({ ...detail, ...edits.meta });
+    },
+    [edits],
+  );
 
   const fail = useCallback(
     (e: unknown) => {
       if (isStale(e)) {
         staleRef.current = true;
-        clearTimer();
+        edits.clearTimer();
         setStatus('stale');
       } else {
         setStatus('error');
       }
       setError(errorMessage(e, t));
     },
-    [clearTimer, t],
+    [edits, t],
   );
 
   const load = useCallback(async () => {
@@ -106,13 +98,15 @@ export function useCampaignEditor(id: number) {
   /** One PATCH with whatever is pending. Resolves `false` when something stayed unsaved. */
   const send = useCallback(async (): Promise<boolean> => {
     if (staleRef.current) return false;
-    const meta = metaRef.current;
-    const body = bodyRef.current;
-    const serialized = body ? JSON.stringify(body) : null;
+    const meta = edits.meta;
+    const body = edits.body;
+    const serialized = body ? bodyKey(body) : null;
     const withBody = serialized !== null && serialized !== savedBodyRef.current;
     if (!withBody && Object.keys(meta).length === 0) return true;
-    metaRef.current = {};
-    bodyRef.current = null;
+    edits.meta = {};
+    edits.body = null;
+    edits.inFlight += 1;
+    edits.sync();
     setStatus('saving');
     try {
       const detail = await api.patchCampaign(id, {
@@ -126,12 +120,15 @@ export function useCampaignEditor(id: number) {
       return true;
     } catch (e) {
       // Kept for the next try, under anything typed since.
-      metaRef.current = { ...meta, ...metaRef.current };
-      if (withBody && bodyRef.current === null) bodyRef.current = body;
+      edits.meta = { ...meta, ...edits.meta };
+      if (withBody && edits.body === null) edits.body = body;
       fail(e);
       return false;
+    } finally {
+      edits.inFlight -= 1;
+      edits.sync();
     }
-  }, [adopt, fail, id]);
+  }, [adopt, fail, id, edits]);
 
   const enqueue = useCallback(<T>(task: () => Promise<T>): Promise<T> => {
     const run = queueRef.current.then(task);
@@ -140,38 +137,47 @@ export function useCampaignEditor(id: number) {
   }, []);
 
   const flush = useCallback(() => {
-    clearTimer();
+    edits.clearTimer();
+    edits.sync();
     return enqueue(send);
-  }, [clearTimer, enqueue, send]);
+  }, [edits, enqueue, send]);
 
   const schedule = useCallback(() => {
     if (staleRef.current) return;
-    clearTimer();
-    timerRef.current = setTimeout(() => void flush(), AUTOSAVE_DELAY_MS);
-  }, [clearTimer, flush]);
+    edits.clearTimer();
+    edits.timer = setTimeout(() => {
+      edits.timer = null;
+      void flush();
+    }, AUTOSAVE_DELAY_MS);
+    edits.sync();
+  }, [edits, flush]);
 
-  /** Puck's `onChange`. */
-  const onChange = useCallback(
+  /** Take `next` as what is on screen and work out what the next save carries. */
+  const track = useCallback(
     (next: Data) => {
       dataRef.current = next;
       setData(next);
       const body = normalizeBody(fromPuckData(next));
       const complete = body.every(isComplete);
-      setIncomplete(!complete);
-      bodyRef.current = complete && JSON.stringify(body) !== savedBodyRef.current ? body : null;
-      if (bodyRef.current) schedule();
+      edits.markIncomplete(!complete);
+      edits.body = complete && bodyKey(body) !== savedBodyRef.current ? body : null;
+      if (edits.body) schedule();
+      else edits.sync();
     },
-    [schedule],
+    [edits, schedule],
   );
+
+  /** Puck's `onChange`. */
+  const onChange = track;
 
   /** A change to the campaign's details, saved with the same debounce as the body. */
   const saveMeta = useCallback(
     (patch: MetaPatch) => {
-      metaRef.current = { ...metaRef.current, ...patch };
+      edits.meta = { ...edits.meta, ...patch };
       setCampaign((c) => (c ? { ...c, ...patch } : c));
       schedule();
     },
-    [schedule],
+    [edits, schedule],
   );
 
   /** Re-snapshot one card server-side. The pending autosave goes first, so the
@@ -197,8 +203,10 @@ export function useCampaignEditor(id: number) {
                 : item,
             ),
           };
-          dataRef.current = next;
-          setData(next);
+          // Recomputed here rather than left to the remount's `onChange`: an
+          // edit made while the request was out must not write the old
+          // snapshot back over the refresh.
+          track(next);
           setReloadKey((k) => k + 1);
           setStatus('saved');
           setError(null);
@@ -207,28 +215,30 @@ export function useCampaignEditor(id: number) {
         }
       });
     },
-    [adopt, enqueue, fail, flush, id],
+    [adopt, enqueue, fail, flush, id, track],
   );
 
   /** Drop what is on screen for the server's copy: the way out of `stale`. */
   const reload = useCallback(async () => {
-    clearTimer();
+    edits.clearTimer();
     staleRef.current = false;
-    bodyRef.current = null;
-    metaRef.current = {};
-    setIncomplete(false);
+    edits.body = null;
+    edits.meta = {};
+    edits.markIncomplete(false);
+    edits.sync();
     setError(null);
     setStatus('idle');
     await load();
     setReloadKey((k) => k + 1);
-  }, [clearTimer, load]);
+  }, [edits, load]);
 
-  /** Leaving inside the debounce window must not drop the last edit. */
+  /** Leaving must not drop an edit still waiting for its save — inside the
+   *  debounce window, or left over after a failed one. */
   useEffect(
     () => () => {
-      if (timerRef.current) void flush();
+      if (edits.timer || edits.hasPending()) void flush();
     },
-    [flush],
+    [edits, flush],
   );
 
   return {
@@ -242,5 +252,6 @@ export function useCampaignEditor(id: number) {
     refresh,
     reload,
     reloadKey,
+    dirty,
   };
 }

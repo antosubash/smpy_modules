@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isComplete, normalizeBody } from './bodyDraft';
+import { bodyKey, isComplete, normalizeBody } from './bodyDraft';
 
 describe('bodyDraft', () => {
   it('requires the fields content/blocks.py requires', () => {
@@ -19,5 +19,16 @@ describe('bodyDraft', () => {
       { type: 'Image', props: { id: 'a', src: '/x.png', alt: '', href: '', width: Number.NaN } },
     ]);
     expect(image.props).toEqual({ id: 'a', src: '/x.png', alt: '' });
+  });
+});
+
+describe('bodyKey', () => {
+  it('ignores key order', () => {
+    expect(bodyKey([{ type: 'Heading', props: { text: 'A', id: 'h' } }])).toBe(
+      bodyKey([{ props: { id: 'h', text: 'A' }, type: 'Heading' }]),
+    );
+    expect(bodyKey([{ type: 'Heading', props: { id: 'h', text: 'A' } }])).not.toBe(
+      bodyKey([{ type: 'Heading', props: { id: 'h', text: 'B' } }]),
+    );
   });
 });

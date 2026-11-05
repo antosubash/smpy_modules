@@ -45,3 +45,22 @@ export function normalizeBody(body: Block[]): Block[] {
     return { ...block, props };
   });
 }
+
+function sortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeys);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.keys(value as Record<string, unknown>)
+        .sort()
+        .map((k) => [k, sortKeys((value as Record<string, unknown>)[k])]),
+    );
+  }
+  return value;
+}
+
+/** A serialisation that ignores key order, for "is this the body the server
+ *  holds?". Puck puts a new block's `id` last and the server puts it first, so
+ *  plain `JSON.stringify` would call two identical bodies different. */
+export function bodyKey(body: Block[]): string {
+  return JSON.stringify(sortKeys(body));
+}

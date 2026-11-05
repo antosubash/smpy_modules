@@ -53,11 +53,17 @@ function Harness() {
   return null;
 }
 
-let root: Root;
+let root: Root | null = null;
 
 async function mount() {
   root = createRoot(document.createElement('div'));
-  await act(async () => root.render(createElement(Harness)));
+  await act(async () => root?.render(createElement(Harness)));
+}
+
+async function unmount() {
+  const mounted = root;
+  root = null;
+  if (mounted) await act(async () => mounted.unmount());
 }
 
 async function wait(ms: number) {
@@ -75,7 +81,7 @@ describe('useCampaignEditor', () => {
     getCampaign.mockResolvedValue(campaign(3));
   });
   afterEach(async () => {
-    await act(async () => root.unmount());
+    await unmount();
     vi.useRealTimers();
   });
 
@@ -202,6 +208,63 @@ describe('useCampaignEditor', () => {
     await act(async () => editor.refresh('c1'));
     expect(refreshCard).not.toHaveBeenCalled();
     expect(editor.status).toBe('error');
+  });
+
+  it('tracks dirty until the server holds every edit', async () => {
+    patchCampaign.mockRejectedValueOnce(new HttpError('boom', 500)).mockResolvedValue(campaign(4));
+    await mount();
+    expect(editor.dirty).toBe(false);
+
+    await act(async () => editor.onChange(data('A')));
+    expect(editor.dirty).toBe(true); // waiting for the debounce
+    await wait(AUTOSAVE_DELAY_MS);
+    expect(editor.status).toBe('error');
+    expect(editor.dirty).toBe(true); // the failed edit is still only here
+
+    await act(async () => editor.onChange(data('AB')));
+    await wait(AUTOSAVE_DELAY_MS);
+    expect(editor.status).toBe('saved');
+    expect(editor.dirty).toBe(false);
+
+    const unfinished: Data = {
+      root: { props: {} },
+      content: [{ type: 'Image', props: { id: 'i1', src: '', alt: '', width: 600 } }],
+    };
+    await act(async () => editor.onChange(unfinished));
+    expect(editor.dirty).toBe(true); // held back by the unfinished block
+  });
+
+  it('flushes edits left over after a failed save on unmount', async () => {
+    patchCampaign.mockRejectedValueOnce(new HttpError('boom', 500)).mockResolvedValue(campaign(4));
+    await mount();
+    await act(async () => editor.onChange(data('A')));
+    await wait(AUTOSAVE_DELAY_MS);
+    expect(patchCampaign).toHaveBeenCalledTimes(1);
+
+    // No timer is pending now; leaving must still send what is unsaved.
+    await unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(patchCampaign).toHaveBeenCalledTimes(2);
+    expect(patchCampaign.mock.calls[1][1].body?.[0].props.text).toBe('A');
+  });
+
+  it('does not resend the saved body in another key order', async () => {
+    getCampaign.mockResolvedValue(
+      campaign(3, [{ type: 'Heading', props: { id: 'h1', text: 'A', level: '2', align: 'left' } }]),
+    );
+    await mount();
+    // Puck puts `id` last on a block it inserted; the server puts it first.
+    await act(async () =>
+      editor.onChange({
+        root: { props: {} },
+        content: [{ type: 'Heading', props: { text: 'A', level: '2', align: 'left', id: 'h1' } }],
+      }),
+    );
+    await wait(AUTOSAVE_DELAY_MS * 2);
+    expect(patchCampaign).not.toHaveBeenCalled();
+    expect(editor.dirty).toBe(false);
   });
 
   it('a stale refresh marks the editor stale', async () => {

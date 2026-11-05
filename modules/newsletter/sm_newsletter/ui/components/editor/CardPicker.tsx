@@ -12,7 +12,13 @@
  * note; the card's snapshot still renders and the block can still be deleted.
  */
 
-import { type CustomField, createUsePuck, FieldLabel, useGetPuck } from '@puckeditor/core';
+import {
+  type CustomField,
+  createUsePuck,
+  FieldLabel,
+  type PuckApi,
+  useGetPuck,
+} from '@puckeditor/core';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useEffect, useState } from 'react';
@@ -23,6 +29,36 @@ import type { CardHit, CardKind, CardSnapshot } from '../../utils/types';
 import { useEditorActions } from './editorActions';
 
 const SEARCH_DEBOUNCE_MS = 250;
+
+const CARD_TYPE: Record<CardKind, string> = { article: 'ArticleCard', page: 'PageCard' };
+
+/** The parts of Puck's API `applySnapshot` uses. */
+type PuckLike = Pick<PuckApi, 'getItemById' | 'getSelectorForId' | 'dispatch'>;
+
+/**
+ * Write `snapshot` into the card block `blockId`, keeping its id.
+ *
+ * Found by id, not by selection, and only if it is still a card of `kind`:
+ * the block may have been deleted, or another block selected, while the
+ * snapshot request was out. Returns whether anything was written.
+ */
+export function applySnapshot(
+  puck: PuckLike,
+  blockId: string,
+  kind: CardKind,
+  snapshot: CardSnapshot,
+): boolean {
+  const item = puck.getItemById(blockId);
+  const at = puck.getSelectorForId(blockId);
+  if (!item || !at || item.type !== CARD_TYPE[kind]) return false;
+  puck.dispatch({
+    type: 'replace',
+    destinationIndex: at.index,
+    destinationZone: at.zone,
+    data: { type: item.type, props: { ...snapshot, id: blockId } },
+  });
+  return true;
+}
 
 const copy = keys.newsletter.editor.card;
 const usePuck = createUsePuck();
@@ -75,19 +111,14 @@ export function CardPicker({ kind, available, readOnly }: CardPickerProps) {
   const blockId = typeof current.id === 'string' ? current.id : null;
 
   async function pick(hit: CardHit) {
+    // The block this field belongs to, fixed before the request: the writer
+    // may select another block while it is out.
+    const target = getPuck().selectedItem?.props.id;
+    if (typeof target !== 'string') return;
     setBusy(true);
     try {
       const snapshot = await api.snapshot(kind, hit.source_id);
-      const puck = getPuck();
-      const item = puck.selectedItem;
-      const at = item ? puck.getSelectorForId(item.props.id) : undefined;
-      if (!item || !at) return;
-      puck.dispatch({
-        type: 'replace',
-        destinationIndex: at.index,
-        destinationZone: at.zone,
-        data: { type: item.type, props: { ...snapshot, id: item.props.id } },
-      });
+      applySnapshot(getPuck(), target, kind, snapshot);
       search.setError(null);
     } catch (e) {
       search.setError(errorMessage(e, t));

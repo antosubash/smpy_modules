@@ -4,7 +4,7 @@ import '../ui/components/editor/puck-editor.css';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import { campaignsUrl } from '../ui/components/campaigns/urls';
 import { CampaignMeta } from '../ui/components/editor/CampaignMeta';
@@ -83,6 +83,20 @@ export default function CampaignEditor() {
     }),
     [t],
   );
+
+  // Closing or reloading the tab while an edit is not on the server — inside
+  // the debounce, after a failed save, or held back by an unfinished block —
+  // asks first, as news, pagebuilder and records do. An in-app visit unmounts
+  // the hook, which flushes what can be saved.
+  useEffect(() => {
+    if (!editor.dirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [editor.dirty]);
 
   const statusKey = STATUS_LABEL[editor.status];
   const title = campaign ? campaign.name || t(copy.untitled) : t(copy.fallback_title);
