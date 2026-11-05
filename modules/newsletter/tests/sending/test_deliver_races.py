@@ -160,7 +160,7 @@ async def test_pause_before_claim_sends_nothing(state, monkeypatch):
     _after_eligibility(monkeypatch, lambda: _transition(state, cid, lifecycle.pause))
     smtp = FakeTransport()
 
-    assert await deliver(state, cid, smtp) == SKIP
+    assert await deliver(state, cid, smtp) is None
     await _nothing_happened(state, cid, smtp)
     assert (await campaign_row(state, T, cid)).status == "paused"
 
@@ -170,7 +170,7 @@ async def test_cancel_before_claim_sends_nothing(state, monkeypatch):
     _after_eligibility(monkeypatch, lambda: _transition(state, cid, lifecycle.cancel))
     smtp = FakeTransport()
 
-    assert await deliver(state, cid, smtp) == SKIP
+    assert await deliver(state, cid, smtp) is None
     await _nothing_happened(state, cid, smtp, status="cancelled")
 
 
@@ -180,7 +180,7 @@ async def test_claim_requires_queued_row(state, monkeypatch):
     _after_eligibility(monkeypatch, lambda: set_send_status(state, row.id, "sending"))
     smtp = FakeTransport()
 
-    assert await deliver(state, cid, smtp) == SKIP
+    assert await deliver(state, cid, smtp) is None
     await _nothing_happened(state, cid, smtp, status="sending")
 
 

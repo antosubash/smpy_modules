@@ -32,7 +32,7 @@ from tests.support.freeze_world import world
 from tests.support.records_seed import set_list_kind
 from tests.support.sending import NOW, T
 
-LIST_PAUSE = Step(False, Verdict("pause", True, pause_code="list_unavailable"))
+LIST_PAUSE = Step(False, Verdict("pause", False, pause_code="list_unavailable"))
 
 
 @pytest.fixture

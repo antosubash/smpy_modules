@@ -12,8 +12,10 @@ One tick, run with no tenant bound:
    first, across tenants), release. A test send waits at most one slice.
 5. :func:`~.upkeep.finish_done`.
 
-A verdict that stops the tick (a relay quota reply, a pause) ends it after
-that recipient; a lost or busy lock ends it with nothing reserved.
+A verdict that stops the tick (a relay quota reply, a relay refusal) ends it
+after that recipient; a list gone pauses only its campaign. A slice also ends
+after :data:`MAX_SLICE_STEPS` recipients, skips included. A lost or busy lock
+ends the tick with nothing reserved.
 """
 
 from __future__ import annotations
@@ -42,11 +44,14 @@ from sm_newsletter.sending.upkeep import (
     sending_campaigns,
 )
 
-__all__ = ["HOLDER", "SLICE", "TICK_SECONDS", "TickSummary", "tick"]
+__all__ = ["HOLDER", "MAX_SLICE_STEPS", "SLICE", "TICK_SECONDS", "TickSummary", "tick"]
 
 logger = logging.getLogger(__name__)
 
 SLICE = 10
+MAX_SLICE_STEPS = SLICE * 5
+"""Recipients a slice may pass over (skips included) before it releases the
+lock, so a run of skipped rows never keeps a test send waiting a whole tick."""
 TICK_SECONDS = 50.0
 HOLDER = "dispatcher"
 
@@ -148,11 +153,14 @@ async def _slice(run: _Run, lock: HeldLock) -> str | None:
     n = min(budget.left, SLICE)
     if n == 0:
         return "budget"
-    spent = 0
+    spent = steps = 0
     campaigns = await sending_campaigns(run.factory)  # a campaign that has nothing
     while spent < n:  # to send now leaves the list until the next slice
         if run.late():
             return "deadline"
+        if steps >= MAX_SLICE_STEPS:
+            return None
+        steps += 1
         step = await _next(run, lock, campaigns)
         if step is None:
             return "idle"

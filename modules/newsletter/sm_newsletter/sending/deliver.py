@@ -56,7 +56,8 @@ Clock = Callable[[], datetime]
 
 _SKIP = Verdict("skip", False)
 _INVALID = Verdict("fail", False, error_kind=constants.ERROR_INVALID_MESSAGE)
-_NO_LIST = Verdict("pause", True, pause_code=constants.PAUSE_LIST_UNAVAILABLE)
+# Tenant-local: the campaign pauses, and the tick goes on with the others.
+_NO_LIST = Verdict("pause", False, pause_code=constants.PAUSE_LIST_UNAVAILABLE)
 _LIST_GONE = "list_unavailable"
 
 
@@ -79,7 +80,8 @@ async def deliver_one(
     clock: Clock,
 ) -> Step | None:
     """One recipient of the campaign; ``None`` when there is nothing to send
-    now (not ``sending``, or no due row). ``DispatchBusy`` from the lock
+    now (not ``sending``, no due row, or the claim lost to a pause, a cancel
+    or another sender: nothing was skipped). ``DispatchBusy`` from the lock
     propagates with nothing reserved."""
     with tenant_scope(tenant_id):
         async with factory() as session:
@@ -128,8 +130,8 @@ async def _deliver(
         return Step(False, _INVALID)
     await lock.renew()
     attempt = await _reserve(session, lock, tenant_id, campaign_id, row, clock)
-    if attempt is None:
-        return Step(False, _SKIP)
+    if attempt is None:  # the claim lost: the row or the campaign moved
+        return None
     return await _send(session, smtp, attempt, row, message, clock)
 
 
