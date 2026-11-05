@@ -183,9 +183,12 @@ approximate and says "about".
   reads nothing: no statement, no tenant binding. A mail scanner that follows
   links unsubscribes nobody.
 - **POST** (the button, or RFC 8058's `List-Unsubscribe=One-Click`; any body is
-  accepted and none is read) runs records' `unsubscribe` with the cutoff
-  `send.sent_at`, else the campaign's `started_at`: a person who confirmed again
-  after the mail keeps the subscription. The suppression (`unsubscribed`, the
+  accepted and none is read) runs records' `unsubscribe` with the cutoff of
+  when this message went out: `send.sent_at`; for an unknown outcome (no
+  `sent_at`) the latest `newsletter_send_attempt.attempted_at` of that send,
+  because a campaign can run for days after `started_at`; else the campaign's
+  `started_at`; else now. A person who confirmed again after the mail keeps the
+  subscription. The suppression (`unsubscribed`, the
   campaign's list, source `unsubscribe_page`) is written in the same
   transaction when records wrote, and also when the subscriber is gone, trashed
   or already unsubscribed, or the type stopped being a list. It is never written

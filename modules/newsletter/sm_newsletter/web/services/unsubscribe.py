@@ -7,8 +7,9 @@ tenant bound and a session opened. Nothing here raises for a bad token: the
 caller answers the same page whatever this returns.
 
 **Records is the truth.** The opt-out is records' ``unsubscribe`` with the
-cutoff ``send.sent_at`` (else the campaign's start): a person who signed up and
-confirmed again after the mail keeps the subscription, and nothing is written.
+cutoff of when this message went out (:func:`_cutoff`): a person who signed up
+and confirmed again after the mail keeps the subscription, and nothing is
+written.
 
 **The suppression** (``unsubscribed``, the campaign's list,
 ``unsubscribe_page``) goes in the same transaction when records wrote, and also
@@ -30,13 +31,13 @@ from sm_records.contracts.newsletter import (
     subscribers_by_uuid,
     unsubscribe,
 )
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.core import constants, tokens
 from sm_newsletter.core.suppression import suppress
 from sm_newsletter.core.tenancy import tenant_scope
-from sm_newsletter.models import Campaign, Send
+from sm_newsletter.models import Campaign, Send, SendAttempt
 from sm_newsletter.sending.rows import bump
 
 __all__ = ["unsubscribe_by_token"]
@@ -45,6 +46,7 @@ logger = logging.getLogger(__name__)
 
 _SEND = Send.__table__  # ty: ignore[unresolved-attribute]
 _CAMPAIGN = Campaign.__table__  # ty: ignore[unresolved-attribute]
+_ATTEMPT = SendAttempt.__table__  # ty: ignore[unresolved-attribute]
 _GONE = frozenset({"unsubscribed"})
 _warned_no_secret = False
 
@@ -102,7 +104,7 @@ async def _apply(app: Any, session: AsyncSession, claims: tokens.SendToken, now:
     ).one_or_none()
     if send is None or campaign is None:
         return False
-    cutoff = _aware(send.sent_at or campaign.started_at or now)
+    cutoff = await _cutoff(session, tenant, claims.send_id, send.sent_at, campaign.started_at, now)
     list_key = campaign.list_type_key
     try:
         wrote = await unsubscribe(
@@ -131,6 +133,26 @@ async def _apply(app: Any, session: AsyncSession, claims: tokens.SendToken, now:
         await bump(session, tenant_id=tenant, campaign_id=claims.campaign_id, unsubscribe_count=1)
         logger.info("newsletter: send %s unsubscribed", claims.send_id)
     return wrote
+
+
+async def _cutoff(
+    session: AsyncSession,
+    tenant: str,
+    send_id: int,
+    sent_at: datetime | None,
+    started_at: datetime | None,
+    now: datetime,
+) -> datetime:
+    """When this message went out: ``sent_at``; for an unknown outcome (no
+    ``sent_at``) the latest attempt opened for this send, since a campaign can
+    run for days after its ``started_at``; else the start, else ``now``."""
+    if sent_at is not None:
+        return _aware(sent_at)
+    stmt = select(func.max(_ATTEMPT.c.attempted_at)).where(
+        _ATTEMPT.c.tenant_id == tenant, _ATTEMPT.c.send_id == send_id
+    )
+    attempted = (await session.execute(stmt)).scalar_one_or_none()
+    return _aware(attempted or started_at or now)
 
 
 async def _gone(session: AsyncSession, tenant: str, list_key: str, uuid: str) -> bool:
