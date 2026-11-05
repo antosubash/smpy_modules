@@ -306,7 +306,8 @@
       "now": "Jetzt senden",
       "later": "Für später planen",
       "at_label": "Senden am",
-      "recipients": "{count} Empfänger",
+      "recipients_one": "{count} Empfänger",
+      "recipients_other": "{count} Empfänger",
       "estimate": "Der Versand sollte etwa am {date} abgeschlossen sein.",
       "overlap": "Das überschneidet sich mit einer anderen Kampagne, die noch versendet wird, und kann daher später fertig werden.",
       "confirm": "Senden",
@@ -319,7 +320,8 @@
     "panel": {
       "scheduled_for": "Geplant für {date}",
       "progress": "{sent} von {total} gesendet",
-      "eta": "Voraussichtlich fertig: {date} ({days} Tage bei {rate} pro Tag)",
+      "eta_one": "Voraussichtlich fertig: {date} ({count} Tag bei {rate} pro Tag)",
+      "eta_other": "Voraussichtlich fertig: {date} ({count} Tage bei {rate} pro Tag)",
       "finished": "Abgeschlossen am {date}",
       "paused": "Pausiert: {detail}",
       "counts": {

@@ -12,9 +12,9 @@ tenant and the allowed *from* statuses, with `revision = revision + 1`.
 | Action (permission) | From | To | Also |
 | --- | --- | --- | --- |
 | send or schedule (`newsletter.send`) | `draft`, at `expected_revision` | `scheduled` | render snapshot written; `scheduled_at` |
-| unschedule (`newsletter.send`) | `scheduled`, at `expected_revision` | `draft` | snapshot and send rows deleted; `scheduled_at` cleared |
+| unschedule (`newsletter.send`) | `scheduled`, or `paused` with `started_at` empty (never frozen), at `expected_revision` | `draft` | snapshot and send rows deleted; `scheduled_at` and the paused reason cleared; a `paused` campaign that started is `409 invalid_transition` |
 | freeze (worker) | `scheduled` | `sending` | `started_at`, `recipient_count`, `suppressed_count` |
-| freeze, list gone (worker) | `scheduled` | `paused` (`list_unavailable`) | `started_at` stays empty |
+| freeze, list gone or snapshot not https on `smtp` (worker) | `scheduled` | `paused` (`list_unavailable`, `https_required`) | `started_at` stays empty; nothing frozen |
 | pause (`newsletter.send`) or auto-pause | `sending` | `paused` | reason |
 | resume (`newsletter.send`) | `paused` | `sending` if `started_at` is set, else `scheduled` at now | reason cleared |
 | cancel (`newsletter.send`) | `scheduled`, `sending`, `paused` | `cancelled` | `finished_at`; remaining `queued` rows become `cancelled` |
@@ -85,7 +85,10 @@ dispatcher tick: its audience becomes `newsletter_send` rows.
   and audience the freeze uses come from the same read as the generation the
   claim pins (they change only on a draft), never from an earlier read.
 - If the list is gone or no longer a list when freezing, the campaign pauses
-  with `list_unavailable` and the claim is released.
+  with `list_unavailable` and the claim is released; on the `smtp` transport,
+  so does a snapshot that is not `https://` (`https_required`). Nothing is
+  frozen, so the campaign can be resumed (back to `scheduled`) or unscheduled
+  to draft.
 
 ## The dispatcher
 
@@ -98,13 +101,17 @@ expires after 55 s. Nothing else sends campaign mail.
    time: a large freeze (about 100 pages for 100k subscribers) can use a whole
    tick, so nothing is sent that minute, for any tenant. It is only slower,
    never wrong: the claim and the per-page lease carry it on next tick.
-   On the `smtp` transport, every `sending` campaign whose stored snapshot does
-   not have `https://` for both `content_base` and `public_base` (an empty
-   `content_base` counts as not) is then paused with `https_required`, each in
-   its own tenant: scheduling checked the transport configured *then*, and a
-   switch from `console` to `smtp` must not send an `http://` snapshot through
-   the real relay. The rest go on; with none left, no connection is opened.
-   Delivery re-checks the snapshot per recipient before any claim or attempt.
+   On the `smtp` transport a snapshot without `https://` for both
+   `content_base` and `public_base` (an empty `content_base` counts as not) is
+   refused: scheduling checked the transport configured *then*, and a switch
+   from `console` to `smtp` must not send an `http://` snapshot through the
+   real relay. A due campaign is paused with `https_required` at freeze, under
+   its claim and before any row is written (`started_at` stays empty, so it can
+   be unscheduled, fixed and scheduled again, which re-renders it). Every
+   campaign already `sending` with such a snapshot is then paused too, each in
+   its own tenant; that one has started, so it can only be cancelled. The rest
+   go on; with none left, no connection is opened. Delivery re-checks the
+   snapshot per recipient before any claim or attempt.
 2. Nothing `sending`, or no budget left in either window: finish any campaign
    with no open rows and stop, with no relay connection (a capped day neither
    logs in every minute nor lets a refused login pause every campaign).

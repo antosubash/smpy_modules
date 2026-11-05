@@ -73,6 +73,12 @@ describe('SendingPanel', () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ status: 'paused' }));
   });
 
+  it('says "1 day", not "1 days", when one day is left', async () => {
+    vi.mocked(api.progress).mockResolvedValue(progress({ queued: 40, sending: 0 }));
+    await render(campaign());
+    expect(host.textContent).toContain('(1 day at 100 per day)');
+  });
+
   it('offers Resume for a paused campaign, with the reason translated and the detail shown', async () => {
     vi.mocked(api.progress).mockResolvedValue(progress({ status: 'paused' }));
     await render(
@@ -128,6 +134,23 @@ describe('SendingPanel', () => {
     await render(campaign({ status: 'scheduled', scheduled_at: '2026-12-01T10:00:00Z' }));
     await act(async () => button(copy.actions.unschedule)?.click());
     expect(api.unscheduleCampaign).toHaveBeenCalledWith(7, 3);
+  });
+
+  it('offers Unschedule for a paused campaign that never started', async () => {
+    vi.mocked(api.unscheduleCampaign).mockResolvedValue(campaign({ status: 'draft' }));
+    vi.mocked(api.progress).mockResolvedValue(progress({ status: 'paused' }));
+    await render(campaign({ status: 'paused', paused_code: 'https_required', started_at: null }));
+    expect(button(copy.actions.resume)).toBeDefined();
+    expect(button(copy.actions.cancel)).toBeDefined();
+    await act(async () => button(copy.actions.unschedule)?.click());
+    expect(api.unscheduleCampaign).toHaveBeenCalledWith(7, 3);
+  });
+
+  it('offers no Unschedule for a paused campaign that started', async () => {
+    vi.mocked(api.progress).mockResolvedValue(progress({ status: 'paused' }));
+    await render(campaign({ status: 'paused', started_at: '2026-11-05T12:00:00Z' }));
+    expect(button(copy.actions.resume)).toBeDefined();
+    expect(button(copy.actions.unschedule)).toBeUndefined();
   });
 
   it('shows no action without can_send', async () => {

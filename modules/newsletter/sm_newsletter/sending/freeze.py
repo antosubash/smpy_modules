@@ -37,7 +37,9 @@ from sm_records.contracts.newsletter import (
 from sqlalchemy import func, select
 
 from sm_newsletter.campaigns.audience import audience_filters
+from sm_newsletter.campaigns.checks import bases_https
 from sm_newsletter.campaigns.lifecycle import SENDING
+from sm_newsletter.core import constants
 from sm_newsletter.core.clock import utcnow
 from sm_newsletter.core.constants import MAX_EMAIL_LEN, MAX_FIRST_NAME_LEN
 from sm_newsletter.core.suppression import normalise_email, suppressed
@@ -91,8 +93,11 @@ class FreezeResult:
 _LOST = FreezeResult(started=False, queued=0, suppressed=0)
 
 
-async def start_due(factory: SessionFactory, *, now: datetime, clock: Clock = utcnow) -> int:
-    """Freeze every due campaign; how many moved to ``sending``.
+async def start_due(
+    factory: SessionFactory, *, now: datetime, clock: Clock = utcnow, require_https: bool = False
+) -> int:
+    """Freeze every due campaign; how many moved to ``sending``. With
+    ``require_https`` (the ``smtp`` transport) an insecure snapshot pauses instead.
 
     A platform pass: with a tenant bound it raises ``TenantIsolationError``
     before reading anything. One campaign's failure is logged and the rest go on.
@@ -104,7 +109,12 @@ async def start_due(factory: SessionFactory, *, now: datetime, clock: Clock = ut
     for tenant, campaign_id in await due_campaigns(factory, now=now):
         try:
             result = await freeze(
-                factory, tenant_id=tenant, campaign_id=campaign_id, now=now, clock=clock
+                factory,
+                tenant_id=tenant,
+                campaign_id=campaign_id,
+                now=now,
+                clock=clock,
+                require_https=require_https,
             )
         except Exception as exc:
             # The class only: a database error's text (and traceback) carries
@@ -127,17 +137,27 @@ async def freeze(
     campaign_id: int,
     now: datetime,
     clock: Clock = utcnow,
+    require_https: bool = False,
 ) -> FreezeResult:
     """Freeze one campaign's audience and start it (S18, under the fence):
     ``now`` is the due cutoff the claim re-checks and ``started_at``; the
-    lease is reckoned from ``clock()``."""
+    lease is reckoned from ``clock()``. With ``require_https`` a snapshot
+    whose bases are not both ``https://`` pauses the campaign from
+    ``scheduled`` (``https_required``, nothing frozen) under the claim."""
     with tenant_scope(tenant_id):
         async with factory() as session:
             claim = await claim_freeze(
                 session, tenant_id=tenant_id, campaign_id=campaign_id, now=clock(), due_by=now
             )
+            insecure = claim is not None and require_https
+            insecure = insecure and not bases_https(claim.content_base, claim.public_base)
+            if insecure:
+                logger.warning("newsletter: campaign %s of %s needs https", campaign_id, tenant_id)
+                await pause_unavailable(
+                    session, tenant_id, campaign_id, claim, now, constants.PAUSE_HTTPS_REQUIRED
+                )
             await finalize_session(session)
-        if claim is None:
+        if claim is None or insecure:
             return _LOST
         # Only what the claim read: its list and audience belong to its generation.
         list_key, audience = claim.list_type_key, claim.audience

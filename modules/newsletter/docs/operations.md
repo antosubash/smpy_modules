@@ -88,10 +88,12 @@ with `https_required` once the transport is `smtp`).
   reply verbatim.
 - **Resuming.** Fix the cause (the password, the relay's allow list, the list),
   then Resume on the campaign screen (`newsletter.send`). `https_required` is
-  not fixed by changing the address: the render is a snapshot. A campaign still
-  `scheduled` is re-rendered by unscheduling and scheduling it again (with
-  `https://` addresses); one already paused has its audience frozen, so cancel
-  it and schedule a new one. A paused row goes back
+  not fixed by changing the address: the render is a snapshot. A campaign
+  paused at freeze (never started: the panel offers Unschedule) goes back to
+  draft with Unschedule; fix the addresses to `https://` and schedule it again,
+  which re-renders it. The same works for `list_unavailable` at freeze. One that
+  had already started sending has its audience frozen, so cancel it and
+  schedule a new campaign. A paused row goes back
   to `queued`, so nothing is skipped or duplicated. If it cannot be fixed,
   Cancel instead. A `421` or `4.7.x` reply is not a pause: it ends the tick and
   the rows retry later.

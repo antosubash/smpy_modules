@@ -10,12 +10,38 @@ from sm_newsletter.campaigns import lifecycle
 from sm_newsletter.core.constants import CAMPAIGN_STATUSES
 from sm_newsletter.core.errors import InvalidTransition, NewsletterError, NotFound
 from sm_newsletter.core.tenancy import tenant_scope
+from sm_newsletter.models import Campaign
+from sqlalchemy import select
 
-from tests.support.campaign_world import campaign_row, seed_campaign, seed_sends, send_rows
+from tests.support.campaign_world import (
+    campaign_row,
+    render_row,
+    seed_campaign,
+    seed_render,
+    seed_sends,
+    send_rows,
+    set_columns,
+)
 from tests.support.records_seed import seed_list
 from tests.support.sending import NOW, T, make_app
 
-ACTIONS = {"pause": lifecycle.pause, "resume": lifecycle.resume, "cancel": lifecycle.cancel}
+
+async def _unschedule(db, *, tenant_id, campaign_id, roles, now):
+    stmt = select(Campaign.revision).where(
+        Campaign.id == campaign_id, Campaign.tenant_id == tenant_id
+    )
+    revision = (await db.execute(stmt)).scalar_one_or_none() or 0  # unschedule 404s
+    return await lifecycle.unschedule(
+        db, tenant_id=tenant_id, campaign_id=campaign_id, roles=roles, expected_revision=revision
+    )
+
+
+ACTIONS = {
+    "pause": lifecycle.pause,
+    "resume": lifecycle.resume,
+    "cancel": lifecycle.cancel,
+    "unschedule": _unschedule,
+}
 # (action, from) -> to; every other pair is 409 ``invalid_transition``.
 ALLOWED = {
     ("pause", "sending"): "paused",
@@ -23,6 +49,7 @@ ALLOWED = {
     ("cancel", "scheduled"): "cancelled",
     ("cancel", "sending"): "cancelled",
     ("cancel", "paused"): "cancelled",
+    ("unschedule", "scheduled"): "draft",  # paused only before freeze (started_at NULL)
 }
 
 
@@ -79,6 +106,38 @@ async def test_resume_before_freeze_goes_back_to_scheduled(built):
         None,
     )
     assert campaign.started_at is None
+
+
+async def test_unschedule_never_started_paused_returns_to_draft(built):
+    """Paused at freeze (``list_unavailable``, ``https_required``): nothing was
+    sent, so it can go back to draft and be scheduled afresh."""
+    _, state, _ = built
+    cid = await seed_campaign(state, T, status="paused", started_at=None, scheduled_at=NOW)
+    reason = lifecycle.paused_reason("https_required")
+    await set_columns(state, T, cid, paused_reason=reason, freeze_owner="freeze:x")
+    await seed_render(state, T, cid)
+    await seed_sends(state, T, cid, ["queued"])
+    before = await campaign_row(state, T, cid)
+
+    campaign = await _act(state, "unschedule", cid)
+
+    assert (campaign.status, campaign.scheduled_at, campaign.paused_reason) == ("draft", None, None)
+    assert (campaign.freeze_gen, campaign.freeze_owner) == (before.freeze_gen + 1, None)
+    assert campaign.revision == before.revision + 1
+    assert await render_row(state, T, cid) is None
+    assert await send_rows(state, T, cid) == []
+
+
+async def test_unschedule_started_paused_is_invalid(built):
+    _, state, _ = built
+    cid = await seed_campaign(state, T, status="paused", started_at=NOW)
+    await seed_render(state, T, cid)
+    before = await campaign_row(state, T, cid)
+    with pytest.raises(InvalidTransition):
+        await _act(state, "unschedule", cid)
+    after = await campaign_row(state, T, cid)
+    assert (after.status, after.revision) == ("paused", before.revision)
+    assert await render_row(state, T, cid) is not None
 
 
 async def test_cancel_from_scheduled_bumps_freeze_gen(built):

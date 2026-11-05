@@ -31,6 +31,14 @@ const ACTIONS: Record<string, Action[]> = {
   sending: ['pause', 'cancel'],
   paused: ['resume', 'cancel'],
 };
+/** Paused before it was ever frozen (at freeze: list gone, https required):
+ * nothing was sent, so it can also go back to draft and be scheduled afresh. */
+const PAUSED_UNSTARTED: Action[] = ['resume', 'unschedule', 'cancel'];
+
+function actionsFor(campaign: CampaignDetail): Action[] {
+  if (campaign.status === 'paused' && !campaign.started_at) return PAUSED_UNSTARTED;
+  return ACTIONS[campaign.status] ?? [];
+}
 
 interface Props {
   campaign: CampaignDetail;
@@ -82,7 +90,7 @@ export function SendingPanel({ campaign, canSend, onChange }: Props) {
     const days = daysLeft(progress);
     if (days !== null && progress.estimated_finish) {
       const date = when(progress.estimated_finish);
-      lines.push(t(copy.panel.eta, { date, days, rate: progress.daily_rate }));
+      lines.push(t(copy.panel.eta, { date, count: days, rate: progress.daily_rate }));
     }
   }
   if (status === 'paused') {
@@ -107,7 +115,7 @@ export function SendingPanel({ campaign, canSend, onChange }: Props) {
     );
   }
 
-  const actions = canSend ? (ACTIONS[status] ?? []) : [];
+  const actions = canSend ? actionsFor(campaign) : [];
   return (
     <section className="flex flex-wrap items-center gap-3 border-b px-4 py-2 text-sm">
       <Badge variant="secondary">

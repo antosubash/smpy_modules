@@ -233,4 +233,28 @@ describe('SendDialog', () => {
       vi.useRealTimers();
     }
   });
+
+  it('opens on "Send now" again after a later time was chosen and the dialog closed', async () => {
+    await open();
+    await later('2099-01-01T09:00');
+    await act(async () => button(copy.dialog.cancel)?.click());
+    await act(async () => button(copy.send_button)?.click());
+    const now = document.querySelector('[role="radio"][value="now"]');
+    expect(now?.getAttribute('aria-checked')).toBe('true');
+    expect(document.querySelector('input[type="datetime-local"]')).toBeNull();
+    await act(async () => button(copy.dialog.confirm)?.click());
+    expect(sendCampaign).toHaveBeenCalledWith(7, { expected_revision: 5, scheduled_at: null });
+  });
+
+  it('says "1 recipient" for one', async () => {
+    estimate.mockResolvedValue({
+      recipients: 1,
+      estimated_finish: '2026-12-01T10:00:00Z',
+      overlaps: false,
+      daily_rate: 100,
+    });
+    await open();
+    expect(document.body.textContent).toContain('1 recipient');
+    expect(document.body.textContent).not.toContain('1 recipients');
+  });
 });

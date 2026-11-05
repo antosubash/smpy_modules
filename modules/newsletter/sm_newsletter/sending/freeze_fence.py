@@ -21,7 +21,7 @@ from typing import Any
 
 from simple_module_db import finalize_session, mark_written
 from simple_module_db.tenancy import all_tenants
-from sqlalchemy import exists, or_, select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns.lifecycle import PAUSED, SCHEDULED, paused_reason
@@ -56,6 +56,10 @@ class FreezeClaim:
     gen: int
     list_type_key: str
     audience: str
+    content_base: str = ""
+    public_base: str = ""
+    """The snapshot's bases, read with the generation: :func:`~.freeze.freeze`
+    refuses an insecure one on the ``smtp`` transport before writing a page."""
 
 
 def held(tenant_id: str, campaign_id: int, claim: FreezeClaim) -> list[Any]:
@@ -98,21 +102,30 @@ async def claim_freeze(
         Campaign.status == SCHEDULED,
         Campaign.scheduled_at <= due_by,
     ]
-    has_render = exists().where(
-        CampaignRender.tenant_id == tenant_id, CampaignRender.campaign_id == Campaign.id
+    render = and_(CampaignRender.tenant_id == tenant_id, CampaignRender.campaign_id == Campaign.id)
+    stmt = (
+        select(
+            Campaign.freeze_gen,
+            Campaign.list_type_key,
+            Campaign.audience,
+            CampaignRender.campaign_id,
+            CampaignRender.content_base,
+            CampaignRender.public_base,
+        )
+        .select_from(Campaign)
+        .outerjoin(CampaignRender, render)
     )
-    stmt = select(Campaign.freeze_gen, Campaign.list_type_key, Campaign.audience, has_render)
     row = (await session.execute(stmt.where(*key))).first()
     if row is None:
         return None
-    gen, list_key, audience, rendered = row
-    if not rendered:
+    gen, list_key, audience, rendered, content_base, public_base = row
+    if rendered is None:
         logger.error(
             "newsletter: scheduled campaign %s of %s has no render", campaign_id, tenant_id
         )
         return None
     owner = f"freeze:{secrets.token_hex(8)}"
-    claim = FreezeClaim(owner=owner, gen=gen, list_type_key=list_key, audience=audience)
+    claim = FreezeClaim(owner, gen, list_key, audience, content_base, public_base)
     free = or_(Campaign.freeze_owner.is_(None), Campaign.freeze_until < now)
     values = {"freeze_owner": claim.owner, "freeze_until": now + FREEZE_LEASE}
     taken = await update_campaign(session, [*key, Campaign.freeze_gen == gen, free], values)
@@ -143,14 +156,20 @@ async def due_campaigns(factory: SessionFactory, *, now: datetime) -> list[tuple
 
 
 async def pause_unavailable(
-    session: AsyncSession, tenant_id: str, campaign_id: int, claim: FreezeClaim, now: datetime
+    session: AsyncSession,
+    tenant_id: str,
+    campaign_id: int,
+    claim: FreezeClaim,
+    now: datetime,
+    code: str = constants.PAUSE_LIST_UNAVAILABLE,
 ) -> None:
-    """``scheduled -> paused`` (``list_unavailable``) if the claim holds,
-    releasing it: ``resume`` sends a never-started campaign back to
-    ``scheduled`` without a new generation, so the next tick can claim it."""
+    """``scheduled -> paused`` (``list_unavailable``, or ``code``) if the claim
+    holds, releasing it, with ``started_at`` left empty: ``resume`` sends a
+    never-started campaign back to ``scheduled`` without a new generation, so
+    the next tick can claim it, and ``unschedule`` takes it back to draft."""
     values = {
         "status": PAUSED,
-        "paused_reason": paused_reason(constants.PAUSE_LIST_UNAVAILABLE),
+        "paused_reason": paused_reason(code),
         "freeze_owner": None,
         "freeze_until": None,
         "revision": Campaign.revision + 1,

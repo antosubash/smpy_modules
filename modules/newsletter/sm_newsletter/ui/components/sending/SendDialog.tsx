@@ -91,6 +91,10 @@ export function SendDialog(props: Props) {
     setError(null);
     setEstimate(null);
     if (!next) return;
+    // Every opening starts at "now": a time kept from an earlier opening (or from a
+    // schedule since undone) would otherwise go out as a schedule nobody chose this time.
+    setWhen('now');
+    setAt('');
     if (await flush()) setReady(true);
     else refuse(copy.unsaved);
   };

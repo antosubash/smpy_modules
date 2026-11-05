@@ -21,7 +21,7 @@ from typing import Any
 
 from simple_module_db import mark_written
 from simple_module_db.listeners import current_user_id
-from sqlalchemy import case, delete, update
+from sqlalchemy import case, delete, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns._refusal import DRAFT, refusal
@@ -39,7 +39,13 @@ from sm_newsletter.content.blocks import parse_body
 from sm_newsletter.content.context import render_context
 from sm_newsletter.core import constants
 from sm_newsletter.core.clock import utcnow
-from sm_newsletter.core.errors import EmptyCampaign, InvalidCampaign, NotADraft, StaleCampaign
+from sm_newsletter.core.errors import (
+    EmptyCampaign,
+    InvalidCampaign,
+    InvalidTransition,
+    NotADraft,
+    StaleCampaign,
+)
 from sm_newsletter.core.settings import NewsletterSettings
 from sm_newsletter.models import Campaign, Send
 
@@ -76,14 +82,16 @@ async def transition(
     from_statuses: tuple[str, ...],
     values: dict[str, Any],
     expected_revision: int | None = None,
+    where: list[Any] | None = None,
 ) -> bool:
     """Write ``values`` onto the campaign if its status is one of
-    ``from_statuses`` (and its revision ``expected_revision``), bumping the
-    revision. Whether a row changed; never commits."""
+    ``from_statuses`` (and its revision ``expected_revision``, and ``where``),
+    bumping the revision. Whether a row changed; never commits."""
     where = [
         Campaign.id == campaign_id,
         Campaign.tenant_id == tenant_id,
         Campaign.status.in_(from_statuses),
+        *(where or []),
     ]
     if expected_revision is not None:
         where.append(Campaign.revision == expected_revision)
@@ -110,11 +118,17 @@ async def _apply(
     *,
     revision: int | None = None,
     stale_on_revision: bool = True,
+    where: list[Any] | None = None,
 ) -> Campaign:
     """:func:`transition`, its refusal when nothing changed, and the campaign re-read."""
     key = {"tenant_id": tenant_id, "campaign_id": campaign_id}
     if not await transition(
-        session, **key, from_statuses=from_statuses, values=values, expected_revision=revision
+        session,
+        **key,
+        from_statuses=from_statuses,
+        values=values,
+        expected_revision=revision,
+        where=where,
     ):
         pinned = stale_on_revision and revision is not None
         raise await refusal(session, **key, from_statuses=from_statuses, pinned_revision=pinned)
@@ -166,11 +180,26 @@ async def schedule(
 async def unschedule(
     session: AsyncSession, *, tenant_id: str, campaign_id: int, roles: Roles, expected_revision: int
 ) -> Campaign:
-    """``scheduled -> draft``: the snapshot and any send rows are deleted."""
-    await require_campaign(session, tenant_id=tenant_id, campaign_id=campaign_id, roles=roles)
-    values = {"status": DRAFT, "scheduled_at": None, **_FENCE}
+    """``scheduled -> draft``, or ``paused -> draft`` for a campaign never
+    frozen (``started_at`` empty: paused at freeze, nothing sent); the
+    snapshot and any send rows are deleted. A started campaign can only be
+    cancelled: 409 ``invalid_transition``."""
+    campaign = await require_campaign(
+        session, tenant_id=tenant_id, campaign_id=campaign_id, roles=roles
+    )
+    if campaign.status == PAUSED and campaign.started_at is not None:
+        raise InvalidTransition()
+    values = {"status": DRAFT, "scheduled_at": None, "paused_reason": None, **_FENCE}
+    never_started = or_(Campaign.status == SCHEDULED, Campaign.started_at.is_(None))
     draft = await _apply(
-        session, tenant_id, campaign_id, roles, (SCHEDULED,), values, revision=expected_revision
+        session,
+        tenant_id,
+        campaign_id,
+        roles,
+        (SCHEDULED, PAUSED),
+        values,
+        revision=expected_revision,
+        where=[never_started],
     )
     await drop_render(session, tenant_id=tenant_id, campaign_id=campaign_id)
     await session.execute(

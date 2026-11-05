@@ -3,9 +3,10 @@
 One tick, run with no tenant bound:
 
 1. :func:`~.upkeep.recover_expired` (a dead sender's rows, S7), then
-   :func:`~.freeze.start_due`; on the ``smtp`` transport,
-   :func:`~.upkeep.pause_insecure` pauses every campaign whose snapshot is not
-   ``https://`` (A6: the transport may have changed since it was scheduled).
+   :func:`~.freeze.start_due`. On the ``smtp`` transport a snapshot that is
+   not ``https://`` (A6: the transport may have changed since it was
+   scheduled) pauses a due campaign at freeze, before anything is frozen, and
+   :func:`~.upkeep.pause_insecure` pauses one already ``sending``.
 2. Nothing ``sending``, or no budget left: :func:`~.upkeep.finish_done`, and
    no relay connection (a capped day neither logs in every minute nor lets a
    refused login pause every campaign).
@@ -105,8 +106,9 @@ async def tick(
     deadline = time.monotonic() + deadline_s
     summary = TickSummary()
     summary.recovered = await recover_expired(factory, now=clock())
-    summary.started = await start_due(factory, now=clock(), clock=clock)
-    if settings.transport == "smtp":
+    smtp_only = settings.transport == "smtp"
+    summary.started = await start_due(factory, now=clock(), clock=clock, require_https=smtp_only)
+    if smtp_only:  # the campaigns already sending when the transport changed
         summary.paused += await pause_insecure(factory, now=clock())
     if not await sending_campaigns(factory):
         summary.stopped = "idle"
