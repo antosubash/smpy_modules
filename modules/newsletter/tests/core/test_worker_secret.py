@@ -11,6 +11,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from tests.pg_support import USING_POSTGRES
+from tests.support.worker_env import isolate_worker_env, reset_worker_caches
 
 pytestmark = pytest.mark.skipif(
     USING_POSTGRES, reason="the worker secret test points sync_db at its own SQLite file"
@@ -23,12 +24,9 @@ def _enc(plain: str, under: str) -> str:
 
 @pytest.fixture
 def clean(tmp_path, monkeypatch):
-    monkeypatch.setenv("SM_PROJECT_ROOT", str(tmp_path))
-    monkeypatch.delenv("SM_SECRET_KEY", raising=False)
-    crypto._dotenv_secret.cache_clear()
-    monkeypatch.setattr(crypto, "_secret_provider", None)
+    isolate_worker_env(monkeypatch, tmp_path)
     yield tmp_path
-    crypto._dotenv_secret.cache_clear()
+    reset_worker_caches()
 
 
 @pytest.fixture
