@@ -205,3 +205,55 @@ async def test_invalid_payloads_422(client):
         assert res.status_code == 422, (body, res.text)
     res = await client.get(BASE, params={"limit": 101}, headers=VIEW)
     assert res.status_code == 422
+
+
+@pytest.mark.parametrize("field", ["subject", "preheader", "from_name", "reply_to"])
+@pytest.mark.parametrize("sep", ["\u2028", "\u2029", "\x85", "\x9b"])
+async def test_unicode_line_separators_422(client, field, sep):
+    # I1: Python's email package refuses these in a header; refuse them at save.
+    cid = (await _create(client))["id"]
+    value = f"a@example.com{sep}secret"
+    res = await client.patch(
+        f"{BASE}/{cid}", json={"expected_revision": 1, field: value}, headers=EDIT
+    )
+    assert res.status_code == 422
+    assert field in res.json()["detail"]
+    assert "secret" not in res.text
+
+
+async def test_subject_keeps_an_emoji_zwj_sequence(client):
+    created = await _create(client, subject="Family \U0001f468\u200d\U0001f469\u200d\U0001f467")
+    assert created["subject"].endswith("\U0001f467")
+
+
+@pytest.mark.parametrize("field", ["subject", "preheader"])
+@pytest.mark.parametrize(
+    "value", ["Hi {{firstname}}", "Hi {{ first_name }}", "{{first_name|" + "x" * 101 + "}}"]
+)
+async def test_unknown_merge_field_in_header_422(client, field, value):
+    # I2: the subject and preheader follow the body's merge-field rule.
+    cid = (await _create(client))["id"]
+    res = await client.patch(
+        f"{BASE}/{cid}", json={"expected_revision": 1, field: value}, headers=EDIT
+    )
+    assert (res.status_code, res.json()["code"]) == (422, "invalid_campaign")
+    assert field in res.json()["detail"]
+    assert "firstname" not in res.text and "xxxx" not in res.text
+    res = await client.post(
+        BASE, json={"name": "a", "list_type_key": "news", field: value}, headers=EDIT
+    )
+    assert (res.status_code, res.json()["code"]) == (422, "invalid_campaign")
+
+
+async def test_known_merge_fields_in_subject_accepted(client):
+    created = await _create(client, subject="Hi {{first_name|friend}}", preheader="{{first_name}}")
+    assert created["subject"] == "Hi {{first_name|friend}}"
+
+
+async def test_status_filter_constrained(client):
+    await _create(client)
+    ok = await client.get(BASE, params={"status": "draft"}, headers=VIEW)
+    assert ok.status_code == 200 and ok.json()["total"] == 1
+    res = await client.get(BASE, params={"status": "drafts-typo"}, headers=VIEW)
+    assert (res.status_code, res.json()["code"]) == (422, "invalid_campaign")
+    assert "drafts-typo" not in res.text

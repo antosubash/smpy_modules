@@ -258,3 +258,9 @@ def test_blocks_rich_text_checks_merge_on_cleaned_output():
         ]
     )
     assert ok[0].props.html == "<p>{{first_name|Hi}}</p>"
+
+
+@pytest.mark.parametrize("ch", ["\u202e", "\u200b", "\ufeff", "\x85"])
+def test_href_with_format_or_c1_character_dropped_keeps_text(ch):
+    # I5: the link is dropped, the text stays.
+    assert clean(f'<a href="https://example.org/{ch}x">click</a>') == "click"

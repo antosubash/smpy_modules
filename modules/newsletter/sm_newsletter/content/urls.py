@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 from urllib.parse import urlsplit
 
 UNSUBSCRIBE_TAG = "{{unsubscribe_url}}"
@@ -9,8 +10,9 @@ MAX_URL = 2000
 
 
 def _plain(value: str) -> bool:
+    """No whitespace, control (Cc) or format (Cf: RLO, ZWSP, BOM) characters."""
     return len(value) <= MAX_URL and not any(
-        ch.isspace() or ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value
+        ch.isspace() or unicodedata.category(ch) in ("Cc", "Cf") for ch in value
     )
 
 
@@ -52,11 +54,6 @@ def check_image(value: str) -> str:
     if value.startswith("/") and not value.startswith("//"):
         return value
     raise ValueError("not an allowed image address")
-
-
-def is_relative(url: str) -> bool:
-    """True when the URL still needs a host (a site path or protocol-relative)."""
-    return url.startswith("/")
 
 
 def absolute(base: str, url: str) -> str:

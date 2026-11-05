@@ -95,3 +95,9 @@ def test_message_id_without_sender_domain_falls_back():
 def test_extra_header_cannot_replace_structural_ones(name):
     with pytest.raises(ValueError):
         build_mime(_msg(headers={name: "x"}))
+
+
+@pytest.mark.parametrize("name", ["Cc", "BCC", "Sender"])
+def test_reserved_recipient_headers_refused(name):
+    with pytest.raises(ValueError, match="set by the message"):
+        build_mime(_msg(headers={name: "x@example.org"}))

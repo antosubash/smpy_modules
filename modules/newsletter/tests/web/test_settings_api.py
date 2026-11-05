@@ -146,7 +146,9 @@ async def test_unknown_and_password_keys_refused_without_echo(client, extra):
 
 
 @pytest.mark.parametrize("field", ["from_name", "from_address", "reply_to"])
-@pytest.mark.parametrize("bad", ["a\r\nBcc: x@evil.test", "a\nb", "a\tb", "a\x00b"])
+@pytest.mark.parametrize(
+    "bad", ["a\r\nBcc: x@evil.test", "a\nb", "a\tb", "a\x00b", "a\u2028b", "a\x85b"]
+)
 async def test_put_refuses_control_chars_without_echo(client, built, field, bad):
     _, state = built
     res = await client.put(URL, json={field: bad}, headers=BOTH)
@@ -156,6 +158,7 @@ async def test_put_refuses_control_chars_without_echo(client, built, field, bad)
 
 
 @pytest.mark.parametrize("field", ["from_name", "from_address", "reply_to"])
-def test_model_refuses_control_chars(field):
+@pytest.mark.parametrize("bad", ["x\r\ny", "x\u2028y", "x\u2029y", "x\x85y"])
+def test_model_refuses_control_chars(field, bad):
     with pytest.raises(ValueError, match=field):
-        NewsletterSettings(**{field: "x\r\ny"})
+        NewsletterSettings(**{field: bad})

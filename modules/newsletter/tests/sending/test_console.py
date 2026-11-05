@@ -88,3 +88,13 @@ def test_transport_for_picks_by_setting():
     assert isinstance(smtp, SmtpTransport)
     assert smtp.name == "smtp" and smtp.supports_list_unsubscribe
     assert "plain-pw" not in repr(smtp)
+
+
+@pytest.mark.parametrize("subject", ["Hi\u2028there", "Hi\x85there", "Hi\r\nBcc: x@evil.test"])
+async def test_bad_header_is_rejected_not_raised(subject):
+    # I1: answer like the SMTP session, so the caller closes its attempt row.
+    async with ConsoleTransport().session() as session:
+        result = await session.send(_msg("a@example.com", subject))
+    assert (result.outcome, result.code) == ("rejected", None)
+    assert result.detail == "a header value is not valid"
+    assert console.captured("default") == []

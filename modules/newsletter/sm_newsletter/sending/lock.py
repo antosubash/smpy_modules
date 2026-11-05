@@ -134,10 +134,14 @@ async def _advisory(session_factory: SessionFactory, wait_s: float) -> AsyncIter
 
 async def _discard(conn: AsyncConnection) -> None:
     """Drop ``conn`` for good rather than pool it: the advisory lock dies with it.
-    Shielded, so a second cancel cannot stop it half way."""
+    Shielded, so a second cancel cannot stop it half way; that cancel still
+    propagates to the caller once logged."""
     try:
         await asyncio.shield(conn.invalidate())
-    except BaseException:
+    except asyncio.CancelledError:
+        logger.warning("newsletter: cancelled while dropping the dispatch lock's connection")
+        raise
+    except Exception:
         logger.warning("newsletter: could not drop the dispatch lock's connection", exc_info=True)
 
 

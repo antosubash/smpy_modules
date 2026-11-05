@@ -151,3 +151,32 @@ async def test_sqlite_renew_extends_or_reports_the_loss(state):
 async def test_postgres_renew_is_a_no_op(state):
     async with dispatch_lock(state.session_factory, holder="me", wait_s=1) as held:
         await held.renew()
+
+
+async def test_cancel_while_discarding_propagates():
+    # I3: a cancel that lands while the connection is being dropped must not
+    # be swallowed, or the task keeps running after its caller cancelled it.
+    from sm_newsletter.sending.lock import _discard
+
+    started = asyncio.Event()
+
+    class _SlowConn:
+        async def invalidate(self) -> None:
+            started.set()
+            await asyncio.sleep(10)
+
+    task = asyncio.create_task(_discard(_SlowConn()))  # ty: ignore[invalid-argument-type]
+    await started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+
+async def test_discard_logs_a_failed_invalidate():
+    from sm_newsletter.sending.lock import _discard
+
+    class _BrokenConn:
+        async def invalidate(self) -> None:
+            raise RuntimeError("gone")
+
+    await _discard(_BrokenConn())  # ty: ignore[invalid-argument-type]

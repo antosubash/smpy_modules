@@ -4,7 +4,6 @@ from sm_newsletter.content.urls import (
     absolute,
     check_image,
     check_link,
-    is_relative,
 )
 
 
@@ -69,6 +68,18 @@ def test_absolute(base, url, want):
     assert absolute(base, url) == want
 
 
-def test_is_relative():
-    assert is_relative("/x") and is_relative("//h/x")
-    assert not is_relative("https://a") and not is_relative("mailto:a@b")
+# I5: format characters (RLO, ZWSP, BOM) and C1 controls make a link look like
+# something it is not; refuse them anywhere in a link or an image address.
+SPOOF = ["\u202e", "\u200b", "\ufeff", "\x85", "\x9b"]
+
+
+@pytest.mark.parametrize("ch", SPOOF)
+def test_format_and_c1_characters_refused(ch):
+    with pytest.raises(ValueError):
+        check_link(f"https://exa{ch}mple.org/")
+    with pytest.raises(ValueError):
+        check_link(f"https://example.org/{ch}gnp.exe")
+    with pytest.raises(ValueError):
+        check_image(f"https://example.org/a{ch}.png")
+    with pytest.raises(ValueError):
+        check_image(f"/media/a{ch}.png")

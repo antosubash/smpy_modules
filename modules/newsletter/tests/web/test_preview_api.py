@@ -49,6 +49,7 @@ async def _draft(client) -> int:
 
 async def test_preview_saved_matches_render(client, built):
     app, _ = built
+    app.state.sm.settings.public_base_url = "https://news.example.org"
     cid = await _draft(client)
     res = await client.get(f"{API}/campaigns/{cid}/preview", headers=VIEW)
     assert res.status_code == 200, res.text
@@ -61,7 +62,11 @@ async def test_preview_saved_matches_render(client, built):
         "text": mail.text,
         "warnings": list(tpl.warnings),
     }
-    assert "/newsletter/u/test" in mail.html or not ctx.public_base
+    unsub = "https://news.example.org/newsletter/u/test"
+    for part in (res.json()["html"], res.json()["text"]):
+        assert unsub in part
+        # Every occurrence of the test path is the absolute one, never relative.
+        assert part.count("/newsletter/u/test") == part.count(unsub)
 
 
 async def test_preview_unsaved_validates_body(client):
@@ -75,6 +80,10 @@ async def test_preview_unsaved_validates_body(client):
     hdr = await client.post(f"{API}/preview", json={"subject": "a\nb"}, headers=EDIT)
     assert hdr.status_code == 422
     assert "a\nb" not in hdr.text
+    for field in ("subject", "preheader"):
+        merge = await client.post(f"{API}/preview", json={field: "{{firstname}}"}, headers=EDIT)
+        assert merge.status_code == 422
+        assert field in merge.json()["detail"] and "firstname" not in merge.text
 
 
 async def test_preview_warns_relative_without_base(client):

@@ -60,7 +60,11 @@ def add_capture_hook(fn: CaptureHook) -> Callable[[], None]:
 
 class _ConsoleSession:
     async def send(self, msg: OutgoingMessage) -> DeliveryResult:
-        mime = build_mime(msg)  # the same header checks as a real send
+        try:
+            mime = build_mime(msg)  # the same header checks as a real send
+        except ValueError:
+            # Answer like the SMTP session, so the caller closes its row.
+            return DeliveryResult("rejected", None, "a header value is not valid")
         item = CapturedMessage(
             tenant_id=bound_tenant(),
             to=msg.to,

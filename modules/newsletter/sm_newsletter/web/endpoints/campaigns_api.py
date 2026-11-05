@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns import access, drafts
 from sm_newsletter.core import constants
+from sm_newsletter.core.errors import InvalidCampaign
 from sm_newsletter.core.tenancy import bind_admin
 from sm_newsletter.web.schemas.campaigns import (
     CampaignCreate,
@@ -39,12 +40,15 @@ _EDIT = [Depends(RequiresPermission(constants.PERM_EDIT))]
 async def list_campaigns(
     request: Request,
     tenant: str = Depends(bind_admin),
-    status: str | None = Query(None, max_length=24),
+    status: str | None = Query(None),
     q: str | None = Query(None, max_length=200),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=drafts.MAX_PAGE),
     db: AsyncSession = Depends(get_db),
 ) -> CampaignPage:
+    # Checked here, not by FastAPI, whose 422 would echo the value back.
+    if status is not None and status not in constants.CAMPAIGN_STATUSES:
+        raise InvalidCampaign("status: invalid value")
     items, total = await drafts.list_campaigns(
         db,
         tenant_id=tenant,

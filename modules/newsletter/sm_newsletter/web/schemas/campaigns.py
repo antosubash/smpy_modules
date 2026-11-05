@@ -23,6 +23,7 @@ from pydantic import (
     field_validator,
 )
 
+from sm_newsletter.content.merge import check_merge
 from sm_newsletter.core.constants import MAX_TYPE_KEY_LEN
 from sm_newsletter.core.errors import InvalidCampaign, NewsletterError
 from sm_newsletter.core.headers import check_header_text
@@ -32,14 +33,21 @@ def _header(field: str) -> AfterValidator:
     return AfterValidator(lambda v: v if v is None else check_header_text(v, field=field))
 
 
+def _merge(value: str | None) -> str | None:
+    if value is not None:
+        check_merge(value)
+    return value
+
+
 def _blank_is_none(value: Any) -> Any:
     return None if isinstance(value, str) and not value.strip() else value
 
 
 Name = Annotated[str, Field(min_length=1, max_length=200)]
 ListKey = Annotated[str, Field(min_length=1, max_length=MAX_TYPE_KEY_LEN)]
-Subject = Annotated[str, Field(max_length=300), _header("subject")]
-Preheader = Annotated[str, Field(max_length=300), _header("preheader")]
+# Merge fields follow the body's rule: an unknown or malformed ``{{…}}`` is refused.
+Subject = Annotated[str, Field(max_length=300), _header("subject"), AfterValidator(_merge)]
+Preheader = Annotated[str, Field(max_length=300), _header("preheader"), AfterValidator(_merge)]
 FromName = Annotated[str | None, Field(max_length=200), _header("from_name")]
 # Checked for control characters before the address parser sees it.
 ReplyTo = Annotated[

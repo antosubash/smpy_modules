@@ -32,7 +32,20 @@ class OutgoingMessage:
 
 
 # Headers build_mime sets itself; an extra header may not replace them.
-_RESERVED = frozenset({"from", "to", "subject", "reply-to", "message-id", "date", "mime-version"})
+_RESERVED = frozenset(
+    {
+        "from",
+        "to",
+        "cc",
+        "bcc",
+        "sender",
+        "subject",
+        "reply-to",
+        "message-id",
+        "date",
+        "mime-version",
+    }
+)
 
 
 def envelope_address(value: str) -> str:

@@ -133,3 +133,18 @@ async def test_cancelled_campaign_refused(built):
         await finalize_session(db)
     with pytest.raises(CampaignCancelled):
         await send(app, state, cid, ["a@example.org"])
+
+
+async def test_console_header_failure_closes_the_row(built, monkeypatch):
+    # I1: a header the stdlib refuses after every check passed answers
+    # ``rejected`` and closes its row, instead of a 500 that leaks ``pending``.
+    app, state, cid = built
+
+    def refuse(_msg):
+        raise ValueError("Header values may not contain linefeed")
+
+    monkeypatch.setattr(console, "build_mime", refuse)
+    results = await send(app, state, cid, ["a@example.org"])
+    assert [(r.recipient, r.outcome) for r in results] == [("a@example.org", "rejected")]
+    assert [r.outcome for r in await attempt_rows(state)] == ["rejected"]
+    assert console.captured(T) == []
