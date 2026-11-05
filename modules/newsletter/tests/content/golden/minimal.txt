@@ -1,0 +1,8 @@
+Just text.
+
+--
+You are receiving this email because you subscribed to updates from Acme.
+Acme Ltd
+1 Main Street
+Town
+Unsubscribe: {{unsubscribe_url}}

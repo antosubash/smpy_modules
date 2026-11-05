@@ -11,6 +11,13 @@ BASE_NAME = "newsletter"
 ROUTE_PREFIX_API = "/api/newsletter"
 VIEW_PREFIX = "/admin/newsletter"
 PUBLIC_PREFIX = "/newsletter/"
+# The SYSTEM-scope branding logo, served anonymously for emails (ruling C8).
+BRAND_LOGO_PATH = f"{PUBLIC_PREFIX}brand/logo"
+# Previews and test sends have no send row, so no MAC: their unsubscribe links
+# carry this token, which the unsubscribe page treats like a forged one (R1).
+TEST_UNSUBSCRIBE_TOKEN = "test"
+# The email accent without branding, or when branding sets no primary colour.
+DEFAULT_ACCENT = "#2563eb"
 
 PERM_GROUP = MODULE_NAME
 PERM_GROUP_KEY = "newsletter.permission_group"

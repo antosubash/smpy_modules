@@ -1,0 +1,31 @@
+Hello {{first_name|friend}}
+===========================
+
+This week
+---------
+
+Read this and that (/about).
+
+- one
+- two
+
+Quoted
+
+Hero (/hero)
+
+Read more: /news
+
+----
+
+Spring & summer
+What is new.
+/news/spring
+
+About us
+https://other.example.net/about
+
+Leave: {{unsubscribe_url}}
+
+--
+You are receiving this email because you subscribed to updates from Acme.
+Unsubscribe: {{unsubscribe_url}}

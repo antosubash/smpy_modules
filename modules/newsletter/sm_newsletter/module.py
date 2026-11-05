@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, FastAPI
 from simple_module_core.events import EventBus
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
+from simple_module_core.public_routes import PublicRouteRegistry
 
 from sm_newsletter.core import constants
 
@@ -84,6 +85,22 @@ class NewsletterModule(ModuleBase):
         # until PR 3.
         api_router.include_router(api, dependencies=[Depends(RequiresCsrf())])
 
+    def register_public_routes(self, registry: PublicRouteRegistry) -> None:
+        """The email logo (C8): anonymous, ``GET`` only, at a fixed path."""
+        registry.add_exact(constants.BRAND_LOGO_PATH, methods={"GET"})
+
+    @staticmethod
+    def mount_public_routes(app: FastAPI) -> None:
+        """Newsletter's public routes at the app root (``register_routes`` hands
+        out only prefixed routers). Once per app: ``on_startup`` runs again on a
+        lifespan restart."""
+        from fastapi.routing import iter_route_contexts
+
+        from sm_newsletter.web.endpoints.brand import router
+
+        if not any(r.path == constants.BRAND_LOGO_PATH for r in iter_route_contexts(app.routes)):
+            app.include_router(router)
+
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
         """Mirror records' ``SubscriptionChanged`` into the suppression store.
 
@@ -96,11 +113,13 @@ class NewsletterModule(ModuleBase):
         mirror.subscribe(bus, app)
 
     async def on_startup(self, app: FastAPI) -> None:
-        """The tenancy mode, read off the built middleware stack, and the
-        fail-closed guard on the framework's session class - as images does."""
+        """The tenancy mode, read off the built middleware stack, the public
+        routes, and the fail-closed guard on the framework's session class - as
+        images does."""
         from sm_newsletter.core import tenancy
 
         tenancy.configure(app)
+        self.mount_public_routes(app)
         db = getattr(getattr(app.state, "sm", None), "db", None)
         if (session_class := getattr(db, "sync_session_class", None)) is not None:
             tenancy.install_guard(session_class)

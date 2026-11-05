@@ -1,1 +1,8 @@
-{"permission_group": "Newsletter"}
+{
+  "permission_group": "Newsletter",
+  "email": {
+    "footer_reason": "You are receiving this email because you subscribed to updates from {app_name}.",
+    "unsubscribe": "Unsubscribe",
+    "read_more": "Read more"
+  }
+}
