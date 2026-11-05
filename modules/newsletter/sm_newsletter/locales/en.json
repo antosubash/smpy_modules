@@ -4,5 +4,10 @@
     "footer_reason": "You are receiving this email because you subscribed to updates from {app_name}.",
     "unsubscribe": "Unsubscribe",
     "read_more": "Read more"
+  },
+  "menu": {
+    "group": "Newsletter",
+    "campaigns": "Campaigns",
+    "settings": "Settings"
   }
 }

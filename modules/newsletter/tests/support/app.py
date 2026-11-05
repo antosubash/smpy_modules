@@ -20,6 +20,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, Request
+from fastapi.responses import JSONResponse
 from settings.endpoints.module_api import router as generic_settings_router
 from settings.models import Base as SettingsBase
 from simple_module_core.events import EventBus
@@ -53,6 +54,19 @@ class _Auth(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+class _FakeInertia:
+    """Answers a view with the component and props it would render, as JSON."""
+
+    def __init__(self) -> None:
+        self.shared: dict[str, Any] = {}
+
+    def share(self, **props: Any) -> None:
+        self.shared.update(props)
+
+    async def render(self, component: str, props: dict | None = None) -> JSONResponse:
+        return JSONResponse({"component": component, "props": {**self.shared, **(props or {})}})
+
+
 async def build_app(
     *,
     multi: bool = False,
@@ -81,8 +95,11 @@ async def build_app(
     if multi:
         app.state.sm_newsletter.tenancy = TenancyMode.MULTI
     api = APIRouter(prefix=constants.ROUTE_PREFIX_API)
-    module.register_routes(api, APIRouter())
+    views = APIRouter(prefix=constants.VIEW_PREFIX)
+    module.register_routes(api, views)
     app.include_router(api)
+    app.include_router(views)
+    app.state.inertia_dependency = lambda request, _=None: _FakeInertia()
     app.include_router(generic_settings_router, prefix="/api/settings")
     install_exception_handlers(app)
 

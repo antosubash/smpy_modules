@@ -39,6 +39,22 @@ DEPENDS_ON = (_MODULE_SETTINGS, _MODULE_RECORDS, _MODULE_BACKGROUND_TASKS)
 TENANT_REQUIRED_CODE = "tenant_required"
 NOT_FOUND_DETAIL = "Not found"
 
+# Inertia page names (``sm_newsletter/pages/<name>.tsx``).
+_PAGE_CAMPAIGNS = "Newsletter/Campaigns"
+_PAGE_EDITOR = "Newsletter/CampaignEditor"
+_PAGE_SETTINGS = "Newsletter/Settings"
+
+# Sidebar. The same keys are in ``locales/*.json`` under ``menu``.
+MENU_GROUP = "Newsletter"
+MENU_GROUP_KEY = "newsletter.menu.group"
+MENU_URL = f"{VIEW_PREFIX}/"
+MENU_LABEL_CAMPAIGNS = "Campaigns"
+MENU_LABEL_KEY_CAMPAIGNS = "newsletter.menu.campaigns"
+MENU_ICON_CAMPAIGNS = "mail"
+MENU_LABEL_SETTINGS = "Settings"
+MENU_LABEL_KEY_SETTINGS = "newsletter.menu.settings"
+MENU_ICON_SETTINGS = "settings"
+
 # The newsletter settings page (PR 3). Registered now as the settings'
 # ``manage_url`` so the generic Settings screen refuses newsletter writes.
 SETTINGS_URL = f"{VIEW_PREFIX}/settings"

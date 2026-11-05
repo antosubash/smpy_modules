@@ -9,6 +9,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
 from simple_module_core.events import EventBus
+from simple_module_core.menu import MenuRegistry
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
@@ -80,9 +81,16 @@ class NewsletterModule(ModuleBase):
         from simple_module_hosting.csrf import RequiresCsrf
 
         from sm_newsletter.web.endpoints import build_api_router
+        from sm_newsletter.web.endpoints.views import router as views
 
         # The framework's CSRF check on every write; reads pass.
         api_router.include_router(build_api_router(), dependencies=[Depends(RequiresCsrf())])
+        view_router.include_router(views)
+
+    def register_menu_items(self, registry: MenuRegistry) -> None:
+        from sm_newsletter.web.endpoints.menu import menu_items
+
+        registry.add_many(menu_items())
 
     def register_public_routes(self, registry: PublicRouteRegistry) -> None:
         """The email logo (C8): anonymous, ``GET`` only, at a fixed path."""
