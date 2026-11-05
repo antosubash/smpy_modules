@@ -26,6 +26,11 @@ def _http(value: str) -> bool:
         return False
 
 
+def is_http_link(value: str) -> bool:
+    """A plain ``http(s)://`` URL with a host: what click tracking may rewrite."""
+    return _plain(value) and _http(value)
+
+
 def check_link(value: str) -> str:
     """http(s) with a host, ``mailto:``, a site path, or exactly the unsubscribe tag."""
     if value == UNSUBSCRIBE_TAG:

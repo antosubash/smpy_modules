@@ -51,8 +51,8 @@ def db(clean):
 def _check(resolved: str) -> None:
     secret.install(resolved)
     assert crypto.decrypt_value(_enc("pw", resolved), "smtp_password") == "pw"
-    token = tokens.sign(resolved, tenant_id="default", campaign_id=1, send_id=2)
-    assert tokens.parse(resolved, token) is not None
+    token = tokens.sign(resolved, purpose="u", tenant_id="default", campaign_id=1, send_id=2)
+    assert tokens.parse(resolved, token, purpose="u") is not None
 
 
 def test_env_and_stored_row_env_wins(db, monkeypatch):
@@ -62,7 +62,9 @@ def test_env_and_stored_row_env_wins(db, monkeypatch):
     _check("env-secret")
     assert (
         tokens.parse(
-            "row-secret", tokens.sign("env-secret", tenant_id="default", campaign_id=1, send_id=2)
+            "row-secret",
+            tokens.sign("env-secret", purpose="u", tenant_id="default", campaign_id=1, send_id=2),
+            purpose="u",
         )
         is None
     )

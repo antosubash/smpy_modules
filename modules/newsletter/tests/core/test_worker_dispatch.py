@@ -165,7 +165,7 @@ def test_dispatch_task_sends_through_the_worker_runtime(world):
     captured = console.captured(T)
     assert sorted(m.to for m in captured) == ["s0@example.org", "s1@example.org"]
     for message in captured:
-        claims = tokens.parse(SECRET, _token(message))
+        claims = tokens.parse(SECRET, _token(message), purpose="u")
         assert claims is not None
         assert (claims.tenant_id, claims.campaign_id) == (T, world.cid)
     assert asyncio.run(_state_of(world.db_file, world.cid)) == ("sent", ["sent", "sent"], 2)

@@ -25,7 +25,7 @@ def compose(
     a first name is flattened to one line first, so it never causes one."""
     assert send.id is not None
     token = tokens.sign(
-        secret, tenant_id=send.tenant_id, campaign_id=send.campaign_id, send_id=send.id
+        secret, purpose="u", tenant_id=send.tenant_id, campaign_id=send.campaign_id, send_id=send.id
     )
     url = tokens.unsubscribe_url(render.public_base, token)
     template = RenderedTemplate(

@@ -62,7 +62,7 @@ def test_one_unsubscribe_url_everywhere_carrying_the_send():
     assert in_html == in_text
     assert msg.headers["List-Unsubscribe"] == f"<{in_text}>"
     token = in_text.rsplit("/", 1)[1]
-    assert tokens.parse(SECRET, token) == tokens.SendToken("org.a", 7, 42)
+    assert tokens.parse(SECRET, token, purpose="u") == tokens.SendToken("org.a", 7, 42)
 
 
 def test_the_address_is_not_in_the_url():

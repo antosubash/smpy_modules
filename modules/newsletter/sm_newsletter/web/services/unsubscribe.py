@@ -72,7 +72,7 @@ async def unsubscribe_by_token(
     secret = _secret(app)
     if not secret:
         return False
-    claims = tokens.parse(secret, token)
+    claims = tokens.parse(secret, token, purpose="u")
     if claims is None:
         return False
     if resolved_tenant is not None and resolved_tenant != claims.tenant_id:

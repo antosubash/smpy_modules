@@ -76,7 +76,7 @@ def sent_to(smtp: FakeTransport) -> list[str]:
 def token_of(message: Any) -> tokens.SendToken | None:
     """The verified token of the unsubscribe link in ``message``'s text."""
     raw = message.text.split(constants.UNSUBSCRIBE_PREFIX, 1)[1].split()[0]
-    return tokens.parse(SECRET, raw)
+    return tokens.parse(SECRET, raw, purpose="u")
 
 
 async def counted_times(state: Any) -> list[datetime]:
