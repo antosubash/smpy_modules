@@ -250,7 +250,7 @@
     "list_forbidden": "Sie dürfen diese Newsletter-Liste nicht verwenden.",
     "not_a_draft": "Nur ein Entwurf kann geändert oder gelöscht werden.",
     "not_found": "Dieser Eintrag existiert nicht mehr.",
-    "public_base_url_required": "Legen Sie in den Einstellungen die öffentliche Basis-URL der Website fest, bevor Sie einen Test senden.",
+    "public_base_url_required": "Legen Sie in den Einstellungen die öffentliche Basis-URL der Website fest, bevor Sie senden.",
     "send_budget_exhausted": "Das Sendelimit ist erreicht. Versuchen Sie es später erneut.",
     "sender_not_configured": "Legen Sie zuerst die Absenderadresse in den Newsletter-Einstellungen fest.",
     "smtp_password_unreadable": "Das gespeicherte SMTP-Passwort kann nicht gelesen werden. Geben Sie es erneut ein.",

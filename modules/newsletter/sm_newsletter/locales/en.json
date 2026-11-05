@@ -250,7 +250,7 @@
     "list_forbidden": "You may not use this newsletter list.",
     "not_a_draft": "Only a draft campaign can be changed or deleted.",
     "not_found": "That item no longer exists.",
-    "public_base_url_required": "Set the site's public base URL in Settings before sending a test.",
+    "public_base_url_required": "Set the site's public base URL in Settings before sending.",
     "send_budget_exhausted": "The sending limit has been reached. Try again later.",
     "sender_not_configured": "Set the sender address in the newsletter settings first.",
     "smtp_password_unreadable": "The stored SMTP password cannot be read. Enter it again.",
