@@ -83,6 +83,9 @@ describe('CampaignTable', () => {
     const deletes = (h: HTMLElement) =>
       [...h.querySelectorAll('button')].filter((b) => b.textContent?.includes('Delete'));
     expect(deletes(host)).toHaveLength(1);
+    // One name, not the visible "Delete" followed by an sr-only "Delete <name>".
+    expect(deletes(host)[0].textContent).toBe('Delete');
+    expect(deletes(host)[0].getAttribute('aria-label')).toBe(`Delete ${drafts[0].name}`);
     act(() => root.unmount());
     document.body.innerHTML = '';
     host = await render(drafts, false);

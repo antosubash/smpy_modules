@@ -64,10 +64,15 @@ async def list_campaigns(
     )
     summaries = []
     for campaign in items:
-        opens, clicks = accepted.get(campaign.id, (0, 0))
+        # ``sent_count`` from the same statement as the numerators (B5).
+        sent, opens, clicks = accepted.get(campaign.id, (campaign.sent_count, 0, 0))
         summaries.append(
             CampaignListItem.model_validate(campaign).model_copy(
-                update={"opens_unique_accepted": opens, "clicks_unique_accepted": clicks}
+                update={
+                    "sent_count": sent,
+                    "opens_unique_accepted": opens,
+                    "clicks_unique_accepted": clicks,
+                }
             )
         )
     return CampaignPage(items=summaries, total=total)

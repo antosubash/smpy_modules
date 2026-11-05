@@ -137,7 +137,7 @@ async def test_report_pins_tenant(state):
             accepted = await accepted_engagement(db, tenant_id="A", campaign_ids=[a, b])
     assert [(s.unique, s.total) for s in stats_a] == [(0, 0)]
     assert cross == []
-    assert accepted == {a: (0, 0), b: (0, 0)}
+    assert accepted == {a: (0, 0, 0), b: (0, 0, 0)}
     assert (await _report(state, b, tenant="B")).clicks_unique == 1
 
 
@@ -187,6 +187,8 @@ async def test_accepted_engagement_for_a_page(state):
     two, (s2, _s3) = await sent_campaign(state, "A", recipients=2)
     none = await seed_campaign(state, "A", status="draft")
     other, (so,) = await sent_campaign(state, "B")
+    await set_columns(state, "A", one, sent_count=1)
+    await set_columns(state, "A", two, sent_count=2)
     (l1,) = await link_ids(state, "A", one)
     await _click(state, one, s1, l1, tenant="A")
     await _open(state, two, s2, tenant="A")
@@ -195,5 +197,5 @@ async def test_accepted_engagement_for_a_page(state):
         async with state.session_factory() as db:
             got = await accepted_engagement(db, tenant_id="A", campaign_ids=[one, two, none, other])
             empty = await accepted_engagement(db, tenant_id="A", campaign_ids=[])
-    assert got == {one: (1, 1), two: (1, 0), none: (0, 0), other: (0, 0)}
+    assert got == {one: (1, 1, 1), two: (2, 1, 0), none: (0, 0, 0), other: (0, 0, 0)}
     assert empty == {}

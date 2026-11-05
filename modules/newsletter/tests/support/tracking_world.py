@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Any
 
 from simple_module_db import finalize_session
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import CampaignRender, Click, Link, Send
+from sm_newsletter.sending import rows
+from sm_newsletter.sending.classify import Verdict
+from sm_newsletter.sending.transport import DeliveryResult
 from sqlalchemy import select, update
 
 from tests.support.campaign_world import campaign_row, seed_campaign, seed_sends
@@ -87,3 +91,15 @@ async def link_ids(state: Any, tenant: str, campaign_id: int) -> list[int]:
         async with state.session_factory() as db:
             stmt = select(Link.id).where(Link.tenant_id == tenant, Link.campaign_id == campaign_id)
             return list((await db.execute(stmt.order_by(Link.position))).scalars())
+
+
+async def accept(state: Any, tenant: str, send_id: int, now: datetime) -> None:
+    """The relay accepts one ``sending`` row: ``rows.record`` marks it ``sent``
+    and bumps ``sent_count`` in one committed transaction."""
+    with tenant_scope(tenant):
+        async with state.session_factory() as db:
+            stmt = select(Send).where(Send.tenant_id == tenant, Send.id == send_id)
+            send = (await db.execute(stmt)).scalars().one()
+            accepted = DeliveryResult("accepted", 250, "ok")
+            await rows.record(db, send, Verdict("sent", False), accepted, now=now)
+            await finalize_session(db)

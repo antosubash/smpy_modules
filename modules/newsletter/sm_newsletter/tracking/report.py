@@ -1,9 +1,9 @@
 """A campaign's report: its counters, per-link clicks and a timeline (T14, B5, B6).
 
 The counters come off the campaign row (every send); the rate numerators
-``*_accepted`` are counted from the rows whose status is ``sent``, so a rate
-over ``sent_count`` never passes 100 % (B5). Every statement pins ``tenant_id``.
-Returns dataclasses only: the web layer maps them.
+``*_accepted`` are counted from the rows whose status is ``sent``, read with
+``sent_count`` in one statement, so a rate never passes 100 % (B5). Every
+statement pins ``tenant_id``. Returns dataclasses only: the web layer maps them.
 """
 
 from __future__ import annotations
@@ -11,8 +11,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import case, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.core.settings import NewsletterSettings
@@ -23,6 +24,8 @@ __all__ = ["LinkStat", "Report", "accepted_engagement", "campaign_report", "link
 
 _SENT = "sent"
 _SKIPPED = "skipped_unsubscribed"
+_SEND = Send.__table__  # ty: ignore[unresolved-attribute]
+_CAMPAIGN = Campaign.__table__  # ty: ignore[unresolved-attribute]
 
 
 @dataclass(frozen=True)
@@ -78,24 +81,38 @@ async def link_stats(session: AsyncSession, *, tenant_id: str, campaign_id: int)
 
 async def accepted_engagement(
     session: AsyncSession, *, tenant_id: str, campaign_ids: Sequence[int]
-) -> dict[int, tuple[int, int]]:
-    """``{campaign id: (opens, clicks)}`` over sends whose status is ``sent`` (B5)."""
-    found = dict.fromkeys(campaign_ids, (0, 0))
+) -> dict[int, tuple[int, int, int]]:
+    """``{campaign id: (sent_count, opens, clicks)}``, the opens and clicks over
+    sends whose status is ``sent`` (B5), all read by ONE statement.
+
+    A rate's denominator and numerator must come from the same snapshot: read
+    apart (READ COMMITTED), a send accepted in between counts in the numerator
+    but not in ``sent_count``, and the rate passes 100 %.
+    """
+    found = dict.fromkeys(campaign_ids, (0, 0, 0))
     if not found:
         return found
-    opened = func.sum(case((Send.opened_at.is_not(None), 1), else_=0))
-    clicked = func.sum(case((Send.first_clicked_at.is_not(None), 1), else_=0))
-    stmt = (
-        select(Send.campaign_id, opened, clicked)
-        .where(
-            Send.tenant_id == tenant_id,
-            Send.campaign_id.in_(list(found)),  # ty: ignore[unresolved-attribute]
-            Send.status == _SENT,
+
+    def accepted(column: Any) -> Any:
+        return (
+            select(func.count())
+            .where(
+                _SEND.c.tenant_id == tenant_id,
+                _SEND.c.campaign_id == _CAMPAIGN.c.id,
+                _SEND.c.status == _SENT,
+                column.is_not(None),
+            )
+            .scalar_subquery()
         )
-        .group_by(Send.campaign_id)
-    )
-    for cid, opens, clicks in await session.execute(stmt):
-        found[int(cid)] = (int(opens or 0), int(clicks or 0))
+
+    stmt = select(
+        _CAMPAIGN.c.id,
+        _CAMPAIGN.c.sent_count,
+        accepted(_SEND.c.opened_at),
+        accepted(_SEND.c.first_clicked_at),
+    ).where(_CAMPAIGN.c.tenant_id == tenant_id, _CAMPAIGN.c.id.in_(list(found)))
+    for cid, sent, opens, clicks in await session.execute(stmt):
+        found[int(cid)] = (int(sent or 0), int(opens or 0), int(clicks or 0))
     return found
 
 
@@ -135,7 +152,10 @@ async def campaign_report(
 ) -> Report:
     assert campaign.id is not None
     cid = campaign.id
+    # ``sent`` and both accepted numerators from one statement (B5), not off
+    # the row loaded earlier: an acceptance in between would break the pair.
     accepted = await accepted_engagement(session, tenant_id=tenant_id, campaign_ids=[cid])
+    sent, opens_accepted, clicks_accepted = accepted[cid]
     bucket, timeline = await _timeline(session, tenant_id, campaign, now)
     return Report(
         campaign_id=cid,
@@ -143,7 +163,7 @@ async def campaign_report(
         started_at=campaign.started_at,
         finished_at=campaign.finished_at,
         recipients=campaign.recipient_count,
-        sent=campaign.sent_count,
+        sent=sent,
         failed=campaign.failed_count,
         bounced=campaign.bounced_count,
         suppressed=campaign.suppressed_count,
@@ -153,8 +173,8 @@ async def campaign_report(
         opens_total=campaign.open_total_count,
         clicks_unique=campaign.click_unique_count,
         clicks_total=campaign.click_total_count,
-        opens_unique_accepted=accepted[cid][0],
-        clicks_unique_accepted=accepted[cid][1],
+        opens_unique_accepted=opens_accepted,
+        clicks_unique_accepted=clicks_accepted,
         tracking_opens=settings.tracking_opens,
         tracking_clicks=settings.tracking_clicks,
         links=await link_stats(session, tenant_id=tenant_id, campaign_id=cid),
