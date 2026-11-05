@@ -7,6 +7,7 @@ import asyncio
 import pytest
 from simple_module_db import finalize_session
 from sm_newsletter.campaigns import lifecycle
+from sm_newsletter.campaigns.transition import transition
 from sm_newsletter.core.constants import CAMPAIGN_STATUSES
 from sm_newsletter.core.errors import InvalidTransition, NewsletterError, NotFound
 from sm_newsletter.core.tenancy import tenant_scope
@@ -90,7 +91,7 @@ async def test_resume_before_freeze_goes_back_to_scheduled(built):
     _, state, _ = built
     cid = await seed_campaign(state, T, status="paused", started_at=None)
     async with state.session_factory() as db:
-        ok = await lifecycle.transition(
+        ok = await transition(
             db,
             tenant_id=T,
             campaign_id=cid,
@@ -195,7 +196,7 @@ async def test_transition_pins_the_tenant():
                 with pytest.raises(NotFound):
                     await _act(state, action, theirs, tenant=T)
             async with state.session_factory() as db:
-                changed = await lifecycle.transition(
+                changed = await transition(
                     db,
                     tenant_id=T,
                     campaign_id=theirs,
