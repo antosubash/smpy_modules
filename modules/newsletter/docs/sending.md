@@ -76,6 +76,11 @@ dispatcher tick: its audience becomes `newsletter_send` rows.
   and the old owner then writes nothing. Schedule, unschedule and
   cancel-from-`scheduled` bump `freeze_gen`, so an interrupted freeze cannot
   leak its rows into a rescheduled campaign.
+- **The claim re-checks what it claims.** Its `UPDATE` also requires
+  `scheduled_at <= ` the tick's cutoff, so a campaign unscheduled and
+  rescheduled for later after the due list was read is not started. The list
+  and audience the freeze uses come from the same read as the generation the
+  claim pins (they change only on a draft), never from an earlier read.
 - If the list is gone or no longer a list when freezing, the campaign pauses
   with `list_unavailable` and the claim is released.
 

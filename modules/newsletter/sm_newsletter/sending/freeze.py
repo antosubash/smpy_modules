@@ -34,17 +34,16 @@ from sm_records.contracts.newsletter import (
     iter_subscribers,
     subscription_lists,
 )
-from sqlalchemy import exists, func, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
 
 from sm_newsletter.campaigns.audience import audience_filters
-from sm_newsletter.campaigns.lifecycle import SCHEDULED, SENDING
+from sm_newsletter.campaigns.lifecycle import SENDING
 from sm_newsletter.core.clock import utcnow
 from sm_newsletter.core.constants import MAX_EMAIL_LEN, MAX_FIRST_NAME_LEN
 from sm_newsletter.core.suppression import normalise_email, suppressed
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.core.upsert import insert_ignore
-from sm_newsletter.models import Campaign, CampaignRender, Send
+from sm_newsletter.models import Campaign, Send
 from sm_newsletter.sending.freeze_fence import (
     FREEZE_LEASE,
     FreezeClaim,
@@ -134,16 +133,14 @@ async def freeze(
     lease is reckoned from ``clock()``."""
     with tenant_scope(tenant_id):
         async with factory() as session:
-            campaign = await _ready(session, tenant_id, campaign_id)
-            claim = None
-            if campaign is not None:
-                claim = await claim_freeze(
-                    session, tenant_id=tenant_id, campaign_id=campaign_id, now=clock(), due_by=now
-                )
+            claim = await claim_freeze(
+                session, tenant_id=tenant_id, campaign_id=campaign_id, now=clock(), due_by=now
+            )
             await finalize_session(session)
-        if campaign is None or claim is None:
+        if claim is None:
             return _LOST
-        list_key, audience = campaign
+        # Only what the claim read: its list and audience belong to its generation.
+        list_key, audience = claim.list_type_key, claim.audience
         async with factory() as session:
             lists = await subscription_lists(session, tenant_id=tenant_id)
             if list_key not in lists:
@@ -155,25 +152,6 @@ async def freeze(
         if not await _pages(factory, tenant_id, campaign_id, claim, list_key, filters, clock):
             return _LOST
         return await _publish(factory, tenant_id, campaign_id, claim, now, clock)
-
-
-async def _ready(session: AsyncSession, tenant_id: str, campaign_id: int) -> tuple[str, str] | None:
-    """``(list_type_key, audience)`` of a scheduled campaign with a render, else ``None``."""
-    has_render = exists().where(
-        CampaignRender.tenant_id == tenant_id, CampaignRender.campaign_id == Campaign.id
-    )
-    stmt = select(Campaign.list_type_key, Campaign.audience, has_render).where(
-        Campaign.id == campaign_id, Campaign.tenant_id == tenant_id, Campaign.status == SCHEDULED
-    )
-    row = (await session.execute(stmt)).first()
-    if row is None:
-        return None
-    if not row[2]:
-        logger.error(
-            "newsletter: scheduled campaign %s of %s has no render", campaign_id, tenant_id
-        )
-        return None
-    return row[0], row[1]
 
 
 async def _pages(

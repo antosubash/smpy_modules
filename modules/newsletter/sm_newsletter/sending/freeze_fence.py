@@ -12,6 +12,7 @@ Also the due-campaign enumeration, the one cross-tenant read of freezing.
 
 from __future__ import annotations
 
+import logging
 import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -20,12 +21,12 @@ from typing import Any
 
 from simple_module_db import finalize_session, mark_written
 from simple_module_db.tenancy import all_tenants
-from sqlalchemy import or_, select, update
+from sqlalchemy import exists, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns.lifecycle import PAUSED, SCHEDULED, paused_reason
 from sm_newsletter.core import constants, tenancy
-from sm_newsletter.models import Campaign
+from sm_newsletter.models import Campaign, CampaignRender
 
 __all__ = [
     "FREEZE_LEASE",
@@ -39,6 +40,8 @@ __all__ = [
     "update_campaign",
 ]
 
+logger = logging.getLogger(__name__)
+
 FREEZE_LEASE = timedelta(minutes=5)
 
 SessionFactory = Callable[[], AsyncSession]
@@ -47,8 +50,12 @@ _CAMPAIGN = Campaign.__table__  # ty: ignore[unresolved-attribute]
 
 @dataclass(frozen=True)
 class FreezeClaim:
+    """A freeze owner for one generation, and that generation's audience."""
+
     owner: str
     gen: int
+    list_type_key: str
+    audience: str
 
 
 def held(tenant_id: str, campaign_id: int, claim: FreezeClaim) -> list[Any]:
@@ -76,21 +83,36 @@ async def claim_freeze(
     session: AsyncSession, *, tenant_id: str, campaign_id: int, now: datetime, due_by: datetime
 ) -> FreezeClaim | None:
     """Take the freeze of a scheduled campaign due by ``due_by`` (the tick's
-    cutoff) that nobody holds (or whose holder's lease ran out); ``None``
-    otherwise. ``now`` is the clock the lease is reckoned from. The cutoff is
-    re-checked here, not only in :func:`due_campaigns`: a campaign unscheduled
-    and rescheduled for later in between is not due. Leaves ``revision``
-    alone; never commits."""
+    cutoff), with a render, that nobody holds (or whose holder's lease ran
+    out); ``None`` otherwise. ``now`` is the clock the lease is reckoned from.
+
+    The cutoff is re-checked here, not only in :func:`due_campaigns`: a
+    campaign unscheduled and rescheduled for later in between is not due. The
+    list and audience come from the same read as the generation the
+    ``UPDATE`` pins: they change only on a draft, and leaving ``scheduled``
+    bumps the generation, so the claim carries exactly what it claimed.
+    Leaves ``revision`` alone; never commits."""
     key = [
         Campaign.id == campaign_id,
         Campaign.tenant_id == tenant_id,
         Campaign.status == SCHEDULED,
         Campaign.scheduled_at <= due_by,
     ]
-    gen = (await session.execute(select(Campaign.freeze_gen).where(*key))).scalar_one_or_none()
-    if gen is None:
+    has_render = exists().where(
+        CampaignRender.tenant_id == tenant_id, CampaignRender.campaign_id == Campaign.id
+    )
+    stmt = select(Campaign.freeze_gen, Campaign.list_type_key, Campaign.audience, has_render)
+    row = (await session.execute(stmt.where(*key))).first()
+    if row is None:
         return None
-    claim = FreezeClaim(owner=f"freeze:{secrets.token_hex(8)}", gen=gen)
+    gen, list_key, audience, rendered = row
+    if not rendered:
+        logger.error(
+            "newsletter: scheduled campaign %s of %s has no render", campaign_id, tenant_id
+        )
+        return None
+    owner = f"freeze:{secrets.token_hex(8)}"
+    claim = FreezeClaim(owner=owner, gen=gen, list_type_key=list_key, audience=audience)
     free = or_(Campaign.freeze_owner.is_(None), Campaign.freeze_until < now)
     values = {"freeze_owner": claim.owner, "freeze_until": now + FREEZE_LEASE}
     taken = await update_campaign(session, [*key, Campaign.freeze_gen == gen, free], values)

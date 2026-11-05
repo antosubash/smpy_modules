@@ -182,7 +182,7 @@ async def test_expired_freeze_lease_is_taken_over(built, monkeypatch):
     await subscribers(state, 1)
     cid = await due_campaign(state)
     gen = (await campaign_row(state, T, cid)).freeze_gen
-    old = freezing.FreezeClaim(owner="freeze:old", gen=gen)
+    old = freezing.FreezeClaim(owner="freeze:old", gen=gen, list_type_key="news", audience="all")
     await set_columns(
         state, T, cid, freeze_owner=old.owner, freeze_until=NOW - timedelta(seconds=1)
     )
