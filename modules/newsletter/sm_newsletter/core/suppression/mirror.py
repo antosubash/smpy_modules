@@ -14,7 +14,8 @@ event's ``status_after`` - a stale event (the subscriber moved on since) does
 nothing:
 
 * ``unsubscribed`` (trashed or not: a trashed opt-out is still an opt-out) -
-  the list's ``unsubscribed`` row, refreshed on repeat, ``"suppressed"``.
+  the list's ``unsubscribed`` row, its ``created_at`` refreshed on repeat but
+  its ``source`` kept (a page opt-out stays ``unsubscribe_page``), ``"suppressed"``.
 * ``pending -> confirmed`` - a double-opt-in confirmation (records' confirm
   link) - and not trashed, with a ``confirmed_at``: the clear a confirmation
   lifts, cut off at that time so a bounce recorded after it survives a delayed
@@ -96,6 +97,7 @@ async def _act(session: AsyncSession, event: SubscriptionChanged, hit: Any) -> O
             reason=REASON_UNSUBSCRIBED,
             source=SOURCE,
             list_type_key=event.type_key,
+            keep_source=True,  # the first writer's source stands (a page opt-out)
         )
         return "suppressed"
     if _link_confirmation(event) and not hit.trashed and hit.confirmed_at is not None:
