@@ -377,9 +377,6 @@
       "unsubscribed": "Abgemeldet",
       "opens": "Öffnungen",
       "clicks": "Klicks",
-      "unique": "Eindeutig",
-      "total": "Gesamt",
-      "rate": "Quote",
       "rate_hint": "Eindeutig, bezogen auf die vom Mailserver angenommenen Nachrichten",
       "all_messages": "Alle Nachrichten, auch solche mit unbekanntem Ausgang: {unique} eindeutig, {total} gesamt"
     },

@@ -42,7 +42,11 @@ a rotation.
 The module never logs a full send token, but uvicorn's access log and any
 proxy's record the path `/newsletter/u/<token>` of every click and one-click
 POST. A token is an opt-out capability for one address: redact that path in
-the access logs, or rotate and restrict them.
+the access logs, or rotate and restrict them. The same logs also record
+`/newsletter/o/<token>.gif` and `/newsletter/c/<token>/<N>`. Those tokens are
+bound to their purpose and cannot unsubscribe anyone, but a holder of a leaked
+one can inflate that one send's open or click totals and tie a send id to a
+reader's activity, so redact those prefixes too.
 
 ## The console transport in a worker
 

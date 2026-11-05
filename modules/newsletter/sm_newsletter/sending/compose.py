@@ -1,9 +1,10 @@
 """One recipient's message, personalised from the campaign's render snapshot.
 
 The worker never renders (ruling S1): it fills the snapshot's merge tags with
-the row's first name and the send's own unsubscribe link (ruling S10: one
-token per send, minted here and never stored). The same URL lands in the
-HTML, the text and, when the transport can carry it, ``List-Unsubscribe``.
+the row's first name and the send's own unsubscribe link. Tokens are minted
+here and never stored, one per purpose (ruling T17: ``u``, ``o``, ``c``). The
+unsubscribe URL lands in the HTML, the text and, when the transport can carry
+it, ``List-Unsubscribe``.
 """
 
 from __future__ import annotations
@@ -31,8 +32,10 @@ def compose(
 ) -> OutgoingMessage:
     """``send``'s message. ``ValueError`` (naming the field, never the value)
     when a personalised header would carry a line break or control character;
-    a first name is flattened to one line first, so it never causes one, and the
-    same for a tracking placeholder with no stored link. Each purpose gets its own
+    a first name is flattened to one line first, so it never causes one. ``fill``
+    raises the same ``ValueError`` for a tracking placeholder with no stored link
+    when click tracking is on (with clicks off the placeholder is left alone).
+    Each purpose gets its own
     token (T17). ``fill`` runs on the trusted snapshot before ``personalise`` (B2),
     so recipient data never reaches it."""
     assert send.id is not None

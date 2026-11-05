@@ -123,6 +123,17 @@ async def test_click_redirects_to_exact_stored_url():
         await state.engine.dispose()
 
 
+async def test_click_redirect_percent_encodes_non_ascii_url():
+    app, state = await tracking_app()
+    try:
+        cid, (sid,) = await sent_campaign(state, T, links=("https://e.org/ü?q=ä#x",))
+        res = await get(app, click_path(sign("c", T, cid, sid)))
+        assert res.status_code == 302
+        assert res.headers["location"] == "https://e.org/%C3%BC?q=%C3%A4#x"
+    finally:
+        await state.engine.dispose()
+
+
 async def test_click_unknown_position_404(world):
     app, state, cid, sid = world
     _not_found(await get(app, click_path(sign("c", T, cid, sid), 2)))

@@ -32,7 +32,9 @@ first appearance (a card's image, title and "Read more" share one).
 - Previews and test sends carry no placeholders and are never tracked.
 
 The click path carries the link's position, never a URL: `/newsletter/c/{token}/{N}`
-redirects (302) only to that campaign's own stored `newsletter_link` URL.
+redirects (302) only to that campaign's own stored `newsletter_link` URL, URI-encoded
+(the `Location` is the stored URL with any character not legal in a URI
+percent-encoded, so `ü` becomes `%C3%BC`).
 
 ## The token
 

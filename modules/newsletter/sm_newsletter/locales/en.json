@@ -377,9 +377,6 @@
       "unsubscribed": "Unsubscribed",
       "opens": "Opens",
       "clicks": "Clicks",
-      "unique": "Unique",
-      "total": "Total",
-      "rate": "Rate",
       "rate_hint": "Unique, among messages the mail server accepted",
       "all_messages": "All messages, including those whose outcome is unknown: {unique} unique, {total} total"
     },

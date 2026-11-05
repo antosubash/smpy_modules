@@ -231,10 +231,13 @@ approximate and says "about".
 
 ## Tokens
 
-One token per send: `{tenant}.{campaign_id}.{send_id}.{mac}`, where `mac` is the
-base64url of an HMAC-SHA256 over `newsletter|send|{tenant}|{campaign}|{send}`
-truncated to 128 bits. It is split from the right, because a tenant may contain
-dots. Tokens are minted at send time and never stored. The secret is the host's
-`secret_key` in the web process and `core/secret.py`'s resolution in a worker
-(see [`operations.md`](operations.md)). PR 5 reuses the same token for opens and
-clicks.
+Each message carries three purpose-bound tokens (T17): `u` (unsubscribe), `o`
+(open) and `c` (click). Each has the shape `{tenant}.{campaign_id}.{send_id}.{mac}`,
+where `mac` is the base64url of an HMAC-SHA256 over
+`newsletter|{purpose}|{tenant}|{campaign}|{send}` truncated to 128 bits. A token
+minted for one purpose fails the other routes, so a leaked open or click URL
+cannot unsubscribe anyone (see [`tracking.md`](tracking.md)). A token is split
+from the right, because a tenant may contain dots. Tokens are minted at send
+time and never stored; the open and click tokens only when that kind of tracking
+is on. The secret is the host's `secret_key` in the web process and
+`core/secret.py`'s resolution in a worker (see [`operations.md`](operations.md)).

@@ -114,7 +114,9 @@ async def click_by_token(
                     position=int(position),
                 )
             except Exception:
-                logger.warning("newsletter: could not read the link for send %s", claims.send_id)
+                logger.warning(
+                    "newsletter: could not read the link for send %s", claims.send_id, exc_info=True
+                )
                 return None
             if link is None:
                 return None
