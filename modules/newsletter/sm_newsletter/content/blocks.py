@@ -16,6 +16,7 @@ from pydantic import (
 )
 
 from sm_newsletter.content.merge import check_merge
+from sm_newsletter.content.richtext import clean
 from sm_newsletter.content.urls import check_image, check_link
 from sm_newsletter.core.errors import InvalidBody
 from sm_newsletter.core.headers import check_header_text
@@ -40,9 +41,12 @@ def _merge(value: str) -> str:
     return value
 
 
-def _rich_merge(value: str) -> str:
-    check_merge(_TAGS.sub("", value))
-    return value
+def _rich(value: str) -> str:
+    """Clean first (entities decode to the text a reader sees), then check the merge fields."""
+    cleaned = clean(value)
+    check_merge(cleaned)  # a tag inside a field leaves its braces behind
+    check_merge(_TAGS.sub("", cleaned))  # and a field split across tags still counts as text
+    return cleaned
 
 
 def _heading_text(value: str) -> str:
@@ -68,8 +72,7 @@ class HeadingProps(_Props):
 
 
 class RichTextProps(_Props):
-    # Task 5 wires richtext.clean in here; until then the value is stored as given.
-    html: Annotated[str, Field(max_length=20000), AfterValidator(_rich_merge)]
+    html: Annotated[str, Field(max_length=20000), AfterValidator(_rich)]
 
 
 class ImageProps(_Props):
