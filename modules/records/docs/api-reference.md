@@ -1737,6 +1737,26 @@ after that, to `bus` when one is given (`events.attach`). With `bus=None`
   `roles=None` means no caller (a worker, the CLI) and is not blocked. The
   newsletter module's screens pass the signed-in caller's `CallerRoles`.
 
+**Admin reads** (`sm_records.contracts.newsletter_admin`, newsletter PR 6) serve
+the console, not the sender. Same tenant rules as above (the caller names the
+tenant, `tenant_scope` binds it, every query pins it); argument errors are
+`ValueError` before a query, a term records cannot answer is
+`SubscriberFilterError`.
+
+- **`list_fields`** returns the fields a segment can filter on: `indexed`, not
+  `system="internal"`, not `relation`, in declared order, as `ListField`
+  (`key`, `label`, `type`, `many` for a multiselect, `choices`, `system`).
+  `[]` for a tenant without the list; `not_a_list` for a type that is not one.
+- **`browse_subscribers`** lists untrashed subscribers in **any** status (or
+  `status`), newest first, with `offset` paging (0 to 100 000), `limit` 1 to 100
+  and an exact `total`, as `SubscriberPage`. `search` (at most 200 characters,
+  no NUL) is a case-insensitive literal substring of the address.
+- **`subscriber_status_counts`** returns `{"pending", "confirmed",
+  "unsubscribed"}` counts over the same `filters` and `search`; zeros for a
+  tenant without the list.
+- **`subscriber_admin_url(type_key, uuid=None)`** is the records console URL
+  (`/admin/records/{key}` or `/admin/records/{key}/{uuid}`). Pure.
+
 ---
 
 ## Error table
