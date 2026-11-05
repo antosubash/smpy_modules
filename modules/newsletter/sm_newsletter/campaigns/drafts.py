@@ -125,13 +125,35 @@ async def update_draft(
         raise AudienceUnsupported()
     if "body" in values:
         values["body"] = dump_body(parse_body(values["body"]))
+    return await write_draft(
+        session,
+        tenant_id=tenant_id,
+        campaign_id=campaign_id,
+        expected_revision=patch.expected_revision,
+        values=values,
+        roles=roles,
+    )
+
+
+async def write_draft(
+    session: AsyncSession,
+    *,
+    tenant_id: str,
+    campaign_id: int,
+    expected_revision: int,
+    values: dict[str, Any],
+    roles: Roles,
+) -> Campaign:
+    """Write already-validated ``values`` onto the draft at ``expected_revision``
+    and bump its revision: the one conditional ``UPDATE`` every draft change
+    (PATCH, card refresh) goes through. Zero rows raises the reason."""
     stmt = (
         update(Campaign)
         .where(
             Campaign.id == campaign_id,
             Campaign.tenant_id == tenant_id,
             Campaign.status == DRAFT,
-            Campaign.revision == patch.expected_revision,
+            Campaign.revision == expected_revision,
         )
         # A Core-style UPDATE skips the audit listener: stamp what it would.
         .values(

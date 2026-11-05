@@ -118,6 +118,32 @@ class AudienceUnsupported(NewsletterError):  # noqa: N818 - names the field
     detail = "Only the whole list can be the audience for now"
 
 
+class IntegrationUnavailable(NewsletterError):  # noqa: N818 - the state it refuses
+    """The content source a card or the media picker reads (news, pagebuilder)
+    is not installed or not mounted on this host."""
+
+    status = 409
+    code = "integration_unavailable"
+    detail = "This content source is not available on this site"
+
+
+class CardSourceGone(NewsletterError):  # noqa: N818 - the state it refuses
+    """A card's article or page is no longer published (unpublished, trashed or
+    deleted); the stored snapshot is kept."""
+
+    status = 409
+    code = "card_source_gone"
+    detail = "The card's source is no longer published; its snapshot was kept"
+
+
+class BlockNotFound(NewsletterError):  # noqa: N818 - HTTP vocabulary, deliberately
+    """No card block with that id in the campaign's body."""
+
+    status = 404
+    code = "block_not_found"
+    detail = "No such card in this campaign"
+
+
 async def render(request: Request, exc: NewsletterError) -> JSONResponse:
     return JSONResponse({"detail": exc.detail, "code": exc.code}, status_code=exc.status)
 
