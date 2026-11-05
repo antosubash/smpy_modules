@@ -158,12 +158,18 @@ class BlockNotFound(NewsletterError):  # noqa: N818 - HTTP vocabulary, deliberat
 
 class TransportUnavailable(NewsletterError):  # noqa: N818 - the state it reports
     """The mail relay could not be reached, secured or logged in to. The detail
-    names the stage (``connect``, ``tls``, ``auth``) and never holds the
-    username, the password or the server's AUTH reply."""
+    names the stage (``connect``, ``tls``, ``auth``), as does ``stage``, and
+    never holds the username, the password or the server's AUTH reply."""
+
+    stage: str | None
 
     status = 502
     code = "transport_unavailable"
     detail = "The mail server is not available"
+
+    def __init__(self, detail: str | None = None, *, stage: str | None = None) -> None:
+        super().__init__(detail)
+        self.stage = stage
 
 
 class CampaignCancelled(NewsletterError):  # noqa: N818 - the state it refuses

@@ -29,6 +29,8 @@ class OutgoingMessage:
     text: str
     reply_to: str | None
     headers: Mapping[str, str]
+    # "campaign=<id> send=<id>" or "test campaign=<id>": for logs only, never a header.
+    ref: str = ""
 
 
 # Headers build_mime sets itself; an extra header may not replace them.

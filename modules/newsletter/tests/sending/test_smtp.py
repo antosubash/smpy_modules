@@ -3,12 +3,14 @@
 import logging
 import socket
 import ssl
+import time
 from dataclasses import replace
 from email import message_from_bytes
 
 import pytest
 from sm_newsletter.core.errors import TransportUnavailable
 from sm_newsletter.sending.transport.message import OutgoingMessage, unsubscribe_headers
+from sm_newsletter.sending.transport.smtp import SmtpConfig
 
 from tests.sending.conftest import PASSWORD, USERNAME
 
@@ -60,6 +62,7 @@ async def test_rcpt_550_rejected_with_code(relay, make_transport):
         accepted = await session.send(_msg("second@example.com"))
     assert rejected.outcome == "rejected"
     assert rejected.code == 550
+    assert rejected.stage == "rcpt"
     assert "5.1.1" in rejected.detail
     # RSET cleared the failed envelope; the second transaction is its own.
     assert "RSET" in rec.commands
@@ -72,7 +75,7 @@ async def test_451_rejected_with_code(relay, make_transport):
     async with make_transport().session() as session:
         result = await session.send(_msg("soft@example.com"))
         after = await session.send(_msg("next@example.com"))
-    assert (result.outcome, result.code) == ("rejected", 451)
+    assert (result.outcome, result.code, result.stage) == ("rejected", 451, "data")
     assert after.outcome == "accepted"
     assert [e.rcpt_tos for e in rec.delivered] == [["next@example.com"]]
 
@@ -107,6 +110,7 @@ async def test_reconnect_failure_is_failed_not_raised(make_transport):
         result = await session.send(_msg("after@example.com"))
     assert result.outcome == "failed"
     assert "connect" in result.detail
+    assert result.stage == "connect"
 
 
 async def test_auth_failure_raises_transport_unavailable_without_password_in_detail(
@@ -124,6 +128,17 @@ async def test_auth_failure_raises_transport_unavailable_without_password_in_det
         assert secret not in str(exc.value)
         assert secret not in secrets_logged.text
     assert exc.value.__cause__ is None and exc.value.__suppress_context__
+    assert exc.value.stage == "auth"
+
+
+async def test_reconnect_auth_failure_reports_stage(make_transport):
+    transport = make_transport(timeout=2.0)
+    async with transport.session() as session:
+        await session.send(_msg("droprcpt@example.com"))
+        transport._config = replace(transport._config, password="wrong-" + PASSWORD)
+        result = await session.send(_msg("after@example.com"))
+    assert (result.outcome, result.code, result.stage) == ("failed", None, "auth")
+    assert PASSWORD not in result.detail
 
 
 def _closed_port() -> int:
@@ -137,6 +152,7 @@ async def test_connect_failure_names_stage(make_transport):
         async with make_transport(port=_closed_port(), timeout=2.0).session():
             pass
     assert "connect" in exc.value.detail
+    assert exc.value.stage == "connect"
 
 
 async def test_untrusted_certificate_names_tls_stage(relay):
@@ -150,6 +166,7 @@ async def test_untrusted_certificate_names_tls_stage(relay):
         async with SmtpTransport(config, tls_context=ssl.create_default_context()).session():
             pass
     assert "tls" in exc.value.detail
+    assert exc.value.stage == "tls"
 
 
 async def test_no_login_without_username(make_transport):
@@ -213,3 +230,32 @@ def test_private_aiosmtplib_seam_exists():
 
     assert "protocol" in SMTP().__dict__
     assert callable(SMTPProtocol.write) and callable(SMTPProtocol.read_response)
+
+
+async def test_send_deadline_bounds_one_recipient(make_transport):
+    """A4: one recipient is bounded by ``send_deadline``, a stalled command included."""
+    transport = make_transport(timeout=0.2, send_deadline=0.3)
+    async with transport.session() as session:
+        for local, outcome, stage in (
+            ("stallrcpt", "failed", "rcpt"),
+            ("stalldata", "unknown", "data"),
+        ):
+            started = time.monotonic()
+            result = await session.send(_msg(f"{local}@example.com"))
+            assert time.monotonic() - started < 0.5
+            assert (result.outcome, result.code, result.stage) == (outcome, None, stage)
+
+
+async def test_send_deadline_covers_the_reconnect(make_transport):
+    transport = make_transport(timeout=2.0, send_deadline=0.3)
+    async with transport.session() as session:
+        await session.send(_msg("droprcpt@example.com"))
+        started = time.monotonic()
+        result = await session.send(_msg("stallrcpt@example.com"))
+        assert time.monotonic() - started < 0.5
+    assert (result.outcome, result.stage) == ("failed", "rcpt")
+
+
+def test_default_bounds_sit_under_the_sqlite_lease():
+    config = SmtpConfig(host="h", port=25, security="starttls", username="", password="")
+    assert (config.timeout, config.send_deadline) == (20, 45)

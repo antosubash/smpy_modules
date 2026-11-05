@@ -176,6 +176,7 @@ async def _message(
     email = personalise(template, first_name=None, unsubscribe_url=unsubscribe)
     name = campaign.from_name or settings.from_name
     return OutgoingMessage(
+        ref=f"test campaign={campaign.id}",
         sender=formataddr((name, settings.from_address.strip())),
         to="",
         subject=check_header_text(TEST_SUBJECT_PREFIX + email.subject, field="subject"),
