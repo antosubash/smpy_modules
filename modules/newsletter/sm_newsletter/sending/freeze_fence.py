@@ -73,14 +73,19 @@ async def update_campaign(session: AsyncSession, where: list[Any], values: dict[
 
 
 async def claim_freeze(
-    session: AsyncSession, *, tenant_id: str, campaign_id: int, now: datetime
+    session: AsyncSession, *, tenant_id: str, campaign_id: int, now: datetime, due_by: datetime
 ) -> FreezeClaim | None:
-    """Take the freeze of a scheduled campaign nobody holds (or whose holder's
-    lease ran out); ``None`` otherwise. Leaves ``revision`` alone; never commits."""
+    """Take the freeze of a scheduled campaign due by ``due_by`` (the tick's
+    cutoff) that nobody holds (or whose holder's lease ran out); ``None``
+    otherwise. ``now`` is the clock the lease is reckoned from. The cutoff is
+    re-checked here, not only in :func:`due_campaigns`: a campaign unscheduled
+    and rescheduled for later in between is not due. Leaves ``revision``
+    alone; never commits."""
     key = [
         Campaign.id == campaign_id,
         Campaign.tenant_id == tenant_id,
         Campaign.status == SCHEDULED,
+        Campaign.scheduled_at <= due_by,
     ]
     gen = (await session.execute(select(Campaign.freeze_gen).where(*key))).scalar_one_or_none()
     if gen is None:

@@ -22,7 +22,7 @@ from sqlalchemy import select
 
 from tests.support.deliver_world import SECRET
 from tests.support.fake_transport import FakeTransport
-from tests.support.freeze_world import due_campaign, run_freeze, subscribers
+from tests.support.freeze_world import DUE, due_campaign, run_freeze, subscribers
 from tests.support.records_seed import seed_list
 from tests.support.sending import NOW, T, make_app
 
@@ -49,18 +49,22 @@ async def run_tick(
     )
 
 
-async def due(state: Any, n: int, *, tenant: str = T) -> tuple[int, list[str]]:
-    """``n`` subscribers ``<tenant><i>@example.org`` and a due ``scheduled``
-    campaign of ``tenant``; the list ``news`` is seeded first outside ``default``."""
+async def due(
+    state: Any, n: int, *, tenant: str = T, due_at: datetime = DUE
+) -> tuple[int, list[str]]:
+    """``n`` subscribers ``<tenant><i>@example.org`` and a ``scheduled``
+    campaign of ``tenant`` due at ``due_at``; the list ``news`` is seeded first
+    outside ``default``."""
     if tenant != T:
         await seed_list(state, tenant)
     emails = await subscribers(state, n, tenant=tenant, prefix=tenant)
-    return await due_campaign(state, tenant), emails
+    return await due_campaign(state, tenant, due_at=due_at), emails
 
 
 async def started(state: Any, n: int, *, tenant: str = T, at: datetime) -> tuple[int, list[str]]:
-    """As :func:`due`, frozen into ``sending`` with ``started_at = at``."""
-    cid, emails = await due(state, n, tenant=tenant)
+    """As :func:`due`, frozen into ``sending`` with ``started_at = at`` (due
+    by then: the claim re-checks the cutoff)."""
+    cid, emails = await due(state, n, tenant=tenant, due_at=min(DUE, at))
     assert (await run_freeze(state, cid, tenant=tenant, now=at)).started
     return cid, emails
 

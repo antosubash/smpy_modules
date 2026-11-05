@@ -31,10 +31,11 @@ async def world(tmp_path: Path) -> tuple[Any, Any, int]:
         return await make_app(file=tmp_path / "freeze.db")
 
 
-async def due_campaign(state: Any, tenant: str = T, *, list_key: str = "news") -> int:
-    """A ``scheduled`` campaign of ``tenant``, due a minute ago, with its render."""
+async def due_campaign(state: Any, tenant: str = T, *, list_key: str = "news", due_at=DUE) -> int:
+    """A ``scheduled`` campaign of ``tenant``, due at ``due_at`` (a minute ago),
+    with its render."""
     cid = await seed_campaign(
-        state, tenant, status="scheduled", list_key=list_key, scheduled_at=DUE
+        state, tenant, status="scheduled", list_key=list_key, scheduled_at=due_at
     )
     await seed_render(state, tenant, cid)
     return cid
@@ -90,7 +91,8 @@ async def unschedule(state: Any, cid: int, tenant: str = T) -> None:
             await finalize_session(db)
 
 
-async def schedule(app: Any, state: Any, cid: int, tenant: str = T) -> None:
+async def schedule(app: Any, state: Any, cid: int, tenant: str = T, *, when=None) -> None:
+    """Schedule ``cid`` at ``when`` (``None``: due now, at :data:`DUE`)."""
     revision = (await campaign_row(state, tenant, cid)).revision
     with tenant_scope(tenant):
         async with state.session_factory() as db:
@@ -101,7 +103,7 @@ async def schedule(app: Any, state: Any, cid: int, tenant: str = T) -> None:
                 campaign_id=cid,
                 roles=[],
                 expected_revision=revision,
-                scheduled_at=None,
+                scheduled_at=when,
                 now=DUE,
             )
             await finalize_session(db)

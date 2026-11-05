@@ -145,7 +145,7 @@ async def test_live_claim_is_not_taken_and_claiming_keeps_the_revision(built):
     cid = await due_campaign(state)
     before = await campaign_row(state, T, cid)
     async with state.session_factory() as db:
-        claim = await freezing.claim_freeze(db, tenant_id=T, campaign_id=cid, now=NOW)
+        claim = await freezing.claim_freeze(db, tenant_id=T, campaign_id=cid, now=NOW, due_by=NOW)
         await finalize_session(db)
     assert claim is not None and claim.owner.startswith("freeze:")
     assert claim.gen == before.freeze_gen
@@ -168,7 +168,9 @@ async def _hold(state, claim, cid, now) -> bool:
 async def _claim(state, cid, now):
     with tenant_scope(T):
         async with state.session_factory() as db:
-            claim = await freezing.claim_freeze(db, tenant_id=T, campaign_id=cid, now=now)
+            claim = await freezing.claim_freeze(
+                db, tenant_id=T, campaign_id=cid, now=now, due_by=now
+            )
             await finalize_session(db)
             return claim
 
@@ -228,3 +230,38 @@ async def test_each_page_renews_the_lease_from_the_clock(built, monkeypatch):
     assert seen["until"] == later + freezing.FREEZE_LEASE
     assert seen["claim"] is None
     assert (await campaign_row(state, T, cid)).started_at == NOW
+
+
+@pytest.mark.unbound_tenant
+async def test_rescheduled_for_later_after_enumeration_is_not_claimed(built, monkeypatch):
+    """Unscheduled and rescheduled for tomorrow between the due enumeration and
+    the claim: the claim re-checks ``scheduled_at`` against the tick's cutoff."""
+    app, state, _ = built
+    await subscribers(state, 2)
+    cid = await due_campaign(state)
+    tomorrow = NOW + timedelta(days=1)
+    real = freezing.due_campaigns
+
+    async def then_reschedule(factory, *, now):
+        due = await real(factory, now=now)
+        await unschedule(state, cid)
+        await schedule(app, state, cid, when=tomorrow)
+        return due
+
+    monkeypatch.setattr(freezing, "due_campaigns", then_reschedule)
+    assert await start_due(state) == 0
+
+    campaign = await campaign_row(state, T, cid)
+    assert (campaign.status, campaign.scheduled_at, campaign.freeze_owner) == (
+        "scheduled",
+        tomorrow,
+        None,
+    )
+    assert await send_rows(state, T, cid) == []
+    with tenant_scope(T):
+        async with state.session_factory() as db:
+            claim = await freezing.claim_freeze(
+                db, tenant_id=T, campaign_id=cid, now=NOW, due_by=NOW
+            )
+            await finalize_session(db)
+    assert claim is None

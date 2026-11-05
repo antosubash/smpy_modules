@@ -130,14 +130,15 @@ async def freeze(
     clock: Clock = utcnow,
 ) -> FreezeResult:
     """Freeze one campaign's audience and start it (S18, under the fence):
-    ``started_at`` is ``now``, the lease is reckoned from ``clock()``."""
+    ``now`` is the due cutoff the claim re-checks and ``started_at``; the
+    lease is reckoned from ``clock()``."""
     with tenant_scope(tenant_id):
         async with factory() as session:
             campaign = await _ready(session, tenant_id, campaign_id)
             claim = None
             if campaign is not None:
                 claim = await claim_freeze(
-                    session, tenant_id=tenant_id, campaign_id=campaign_id, now=clock()
+                    session, tenant_id=tenant_id, campaign_id=campaign_id, now=clock(), due_by=now
                 )
             await finalize_session(session)
         if campaign is None or claim is None:
