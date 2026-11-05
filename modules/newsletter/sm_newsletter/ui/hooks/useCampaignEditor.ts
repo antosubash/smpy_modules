@@ -253,5 +253,7 @@ export function useCampaignEditor(id: number) {
     reload,
     reloadKey,
     dirty,
+    /** Save what is pending now; false when something stayed unsaved. */
+    flush,
   };
 }

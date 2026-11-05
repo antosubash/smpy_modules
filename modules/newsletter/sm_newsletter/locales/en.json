@@ -196,5 +196,42 @@
     "tenant_required": "No organisation is active for this account.",
     "transport_unavailable": "The mail server is not available.",
     "unknown_list": "No such newsletter list."
+  },
+  "preview": {
+    "tab_edit": "Edit",
+    "tab_preview": "Preview",
+    "tab_html": "HTML",
+    "tab_text": "Plain text",
+    "desktop": "Desktop",
+    "mobile": "Mobile",
+    "loading": "Updating preview",
+    "subject": "Subject:",
+    "frame_title": "Email preview",
+    "warning": {
+      "relative_urls": "Some links or images are relative and will not work in an inbox. Use full addresses.",
+      "physical_address_missing": "No postal address is set in the newsletter settings, so the footer has none.",
+      "empty_body": "The email has no content yet."
+    }
+  },
+  "test_send": {
+    "trigger": "Send test",
+    "title": "Send a test email",
+    "description": "Sends the saved draft to up to {max} addresses. Nobody is added to the list.",
+    "recipients": "Recipients",
+    "placeholder": "name@example.com, one per line or separated by commas",
+    "too_many": "Enter at most {max} addresses.",
+    "invalid_address": "\"{address}\" is not a valid email address.",
+    "invalid_recipients": "One of the addresses was refused as invalid.",
+    "unsaved": "The latest edits could not be saved yet, so no test was sent.",
+    "results": "Test results",
+    "send": "Send",
+    "sending": "Sending",
+    "close": "Close",
+    "outcome": {
+      "accepted": "Accepted",
+      "rejected": "Rejected",
+      "unknown": "Unknown",
+      "failed": "Failed"
+    }
   }
 }

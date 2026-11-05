@@ -196,5 +196,42 @@
     "tenant_required": "Für dieses Konto ist keine Organisation aktiv.",
     "transport_unavailable": "Der Mailserver ist nicht verfügbar.",
     "unknown_list": "Keine solche Newsletter-Liste."
+  },
+  "preview": {
+    "tab_edit": "Bearbeiten",
+    "tab_preview": "Vorschau",
+    "tab_html": "HTML",
+    "tab_text": "Nur Text",
+    "desktop": "Desktop",
+    "mobile": "Mobil",
+    "loading": "Vorschau wird aktualisiert",
+    "subject": "Betreff:",
+    "frame_title": "E-Mail-Vorschau",
+    "warning": {
+      "relative_urls": "Einige Links oder Bilder sind relativ und funktionieren im Posteingang nicht. Verwenden Sie vollständige Adressen.",
+      "physical_address_missing": "In den Newsletter-Einstellungen ist keine Postadresse hinterlegt, daher fehlt sie in der Fußzeile.",
+      "empty_body": "Die E-Mail hat noch keinen Inhalt."
+    }
+  },
+  "test_send": {
+    "trigger": "Test senden",
+    "title": "Test-E-Mail senden",
+    "description": "Sendet den gespeicherten Entwurf an bis zu {max} Adressen. Niemand wird zur Liste hinzugefügt.",
+    "recipients": "Empfänger",
+    "placeholder": "name@example.com, eine pro Zeile oder durch Kommas getrennt",
+    "too_many": "Geben Sie höchstens {max} Adressen ein.",
+    "invalid_address": "„{address}“ ist keine gültige E-Mail-Adresse.",
+    "invalid_recipients": "Eine der Adressen wurde als ungültig abgelehnt.",
+    "unsaved": "Die letzten Änderungen konnten noch nicht gespeichert werden, daher wurde kein Test gesendet.",
+    "results": "Testergebnisse",
+    "send": "Senden",
+    "sending": "Wird gesendet",
+    "close": "Schließen",
+    "outcome": {
+      "accepted": "Angenommen",
+      "rejected": "Abgelehnt",
+      "unknown": "Unbekannt",
+      "failed": "Fehlgeschlagen"
+    }
   }
 }
