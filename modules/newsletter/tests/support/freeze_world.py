@@ -50,11 +50,26 @@ async def subscribers(
     return emails
 
 
-async def run_freeze(state: Any, cid: int, *, tenant: str = T, now=NOW) -> freezing.FreezeResult:
+def pinned(now=NOW):
+    """A clock that always says ``now``."""
+    return lambda: now
+
+
+async def run_freeze(
+    state: Any, cid: int, *, tenant: str = T, now=NOW, clock=None
+) -> freezing.FreezeResult:
     with tenant_scope(tenant):
         return await freezing.freeze(
-            state.session_factory, tenant_id=tenant, campaign_id=cid, now=now
+            state.session_factory,
+            tenant_id=tenant,
+            campaign_id=cid,
+            now=now,
+            clock=clock or pinned(now),
         )
+
+
+async def start_due(state: Any, now=NOW) -> int:
+    return await freezing.start_due(state.session_factory, now=now, clock=pinned(now))
 
 
 async def statuses(state: Any, cid: int, tenant: str = T) -> Counter[str]:

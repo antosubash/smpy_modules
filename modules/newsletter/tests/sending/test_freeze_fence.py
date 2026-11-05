@@ -20,6 +20,7 @@ from tests.support.freeze_world import (
     gate_page,
     run_freeze,
     schedule,
+    start_due,
     statuses,
     subscribers,
     unschedule,
@@ -75,7 +76,7 @@ async def test_interrupted_freeze_then_unschedule_reschedule_uses_new_list(built
     await unschedule(state, cid)
     await set_columns(state, T, cid, list_type_key="other")
     await schedule(app, state, cid)
-    assert await freezing.start_due(state.session_factory, now=NOW) == 1
+    assert await start_due(state) == 1
 
     campaign = await campaign_row(state, T, cid)
     assert (campaign.status, campaign.recipient_count) == ("sending", 2)
@@ -156,7 +157,25 @@ async def test_live_claim_is_not_taken_and_claiming_keeps_the_revision(built):
     assert (await campaign_row(state, T, cid)).freeze_owner == claim.owner
 
 
-async def test_expired_freeze_lease_is_taken_over(built):
+async def _hold(state, claim, cid, now) -> bool:
+    with tenant_scope(T):
+        async with state.session_factory() as db:
+            held = await freezing.hold_freeze(db, claim, tenant_id=T, campaign_id=cid, now=now)
+            await finalize_session(db)
+            return held
+
+
+async def _claim(state, cid, now):
+    with tenant_scope(T):
+        async with state.session_factory() as db:
+            claim = await freezing.claim_freeze(db, tenant_id=T, campaign_id=cid, now=now)
+            await finalize_session(db)
+            return claim
+
+
+async def test_expired_freeze_lease_is_taken_over(built, monkeypatch):
+    """The old owner is fenced out at the takeover, while the campaign is still
+    ``scheduled`` (not merely because it went on to ``sending``)."""
     _, state, _ = built
     await subscribers(state, 1)
     cid = await due_campaign(state)
@@ -165,12 +184,47 @@ async def test_expired_freeze_lease_is_taken_over(built):
     await set_columns(
         state, T, cid, freeze_owner=old.owner, freeze_until=NOW - timedelta(seconds=1)
     )
+    seen = {}
 
+    async def at_takeover() -> None:
+        campaign = await campaign_row(state, T, cid)
+        seen["status"], seen["owner"] = campaign.status, campaign.freeze_owner
+        seen["old_holds"] = await _hold(state, old, cid, NOW)
+        seen["other_claims"] = await _claim(state, cid, NOW)
+
+    gate_page(monkeypatch, 1, at_takeover)
     assert await run_freeze(state, cid) == freezing.FreezeResult(True, 1, 0)
 
-    with tenant_scope(T):
-        async with state.session_factory() as db:
-            held = await freezing.hold_freeze(db, old, tenant_id=T, campaign_id=cid, now=NOW)
-            await finalize_session(db)
-    assert held is False
+    assert seen["status"] == "scheduled"
+    assert seen["owner"] not in (None, old.owner)
+    assert seen["old_holds"] is False
+    assert seen["other_claims"] is None
     assert (await campaign_row(state, T, cid)).status == "sending"
+
+
+async def test_each_page_renews_the_lease_from_the_clock(built, monkeypatch):
+    """A freeze longer than ``FREEZE_LEASE`` keeps its claim: each renewal reads
+    the clock, not the tick's ``now``."""
+    _, state, _ = built
+    monkeypatch.setattr(freezing, "PAGE", 2)
+    await subscribers(state, 4)
+    cid = await due_campaign(state)
+    later = NOW + freezing.FREEZE_LEASE + timedelta(minutes=1)
+    clock = {"now": NOW}
+    seen = {}
+
+    async def slow_page() -> None:
+        clock["now"] = later  # page 1 took longer than a whole lease
+
+    async def page_two() -> None:
+        seen["until"] = (await campaign_row(state, T, cid)).freeze_until
+        seen["claim"] = await _claim(state, cid, NOW + freezing.FREEZE_LEASE + timedelta(seconds=1))
+
+    gate_page(monkeypatch, 1, slow_page)
+    gate_page(monkeypatch, 2, page_two)
+    result = await run_freeze(state, cid, clock=lambda: clock["now"])
+
+    assert result == freezing.FreezeResult(True, 4, 0)
+    assert seen["until"] == later + freezing.FREEZE_LEASE
+    assert seen["claim"] is None
+    assert (await campaign_row(state, T, cid)).started_at == NOW

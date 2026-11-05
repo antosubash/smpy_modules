@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -38,6 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns.audience import audience_filters
 from sm_newsletter.campaigns.lifecycle import SCHEDULED, SENDING
+from sm_newsletter.core.clock import utcnow
 from sm_newsletter.core.suppression import normalise_email, suppressed
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.core.upsert import insert_ignore
@@ -73,6 +75,11 @@ QUEUED, SUPPRESSED = "queued", "suppressed"
 
 _SEND = Send.__table__  # ty: ignore[unresolved-attribute]
 
+Clock = Callable[[], datetime]
+"""The wall clock the fence reads: every claim and renewal asks it afresh, so a
+long freeze keeps its lease. ``now`` stays the tick's (the due cutoff and
+``started_at``)."""
+
 
 @dataclass(frozen=True)
 class FreezeResult:
@@ -84,7 +91,7 @@ class FreezeResult:
 _LOST = FreezeResult(started=False, queued=0, suppressed=0)
 
 
-async def start_due(factory: SessionFactory, *, now: datetime) -> int:
+async def start_due(factory: SessionFactory, *, now: datetime, clock: Clock = utcnow) -> int:
     """Freeze every due campaign; how many moved to ``sending``.
 
     A platform pass: with a tenant bound it raises ``TenantIsolationError``
@@ -96,7 +103,9 @@ async def start_due(factory: SessionFactory, *, now: datetime) -> int:
     started = 0
     for tenant, campaign_id in await due_campaigns(factory, now=now):
         try:
-            result = await freeze(factory, tenant_id=tenant, campaign_id=campaign_id, now=now)
+            result = await freeze(
+                factory, tenant_id=tenant, campaign_id=campaign_id, now=now, clock=clock
+            )
         except Exception:
             logger.exception(
                 "newsletter: could not freeze campaign %s of tenant %s; the next tick retries",
@@ -109,16 +118,22 @@ async def start_due(factory: SessionFactory, *, now: datetime) -> int:
 
 
 async def freeze(
-    factory: SessionFactory, *, tenant_id: str, campaign_id: int, now: datetime
+    factory: SessionFactory,
+    *,
+    tenant_id: str,
+    campaign_id: int,
+    now: datetime,
+    clock: Clock = utcnow,
 ) -> FreezeResult:
-    """Freeze one campaign's audience and start it (S18, under the fence)."""
+    """Freeze one campaign's audience and start it (S18, under the fence):
+    ``started_at`` is ``now``, the lease is reckoned from ``clock()``."""
     with tenant_scope(tenant_id):
         async with factory() as session:
             campaign = await _ready(session, tenant_id, campaign_id)
             claim = None
             if campaign is not None:
                 claim = await claim_freeze(
-                    session, tenant_id=tenant_id, campaign_id=campaign_id, now=now
+                    session, tenant_id=tenant_id, campaign_id=campaign_id, now=clock()
                 )
             await finalize_session(session)
         if campaign is None or claim is None:
@@ -132,9 +147,9 @@ async def freeze(
                 return _LOST
             await finalize_session(session)
         filters = audience_filters(audience)
-        if not await _pages(factory, tenant_id, campaign_id, claim, list_key, filters, now):
+        if not await _pages(factory, tenant_id, campaign_id, claim, list_key, filters, clock):
             return _LOST
-        return await _publish(factory, tenant_id, campaign_id, claim, now)
+        return await _publish(factory, tenant_id, campaign_id, claim, now, clock)
 
 
 async def _ready(session: AsyncSession, tenant_id: str, campaign_id: int) -> tuple[str, str] | None:
@@ -163,7 +178,7 @@ async def _pages(
     claim: FreezeClaim,
     list_key: str,
     filters: list[str],
-    now: datetime,
+    clock: Clock,
 ) -> bool:
     """Every page of the audience into send rows; ``False`` once the claim is lost."""
     cursor: int | None = 0
@@ -181,7 +196,7 @@ async def _pages(
             emails = [hit.email for hit in hits]
             blocked = await suppressed(session, tenant_id=tenant_id, emails=emails)
             if not await hold_freeze(
-                session, claim, tenant_id=tenant_id, campaign_id=campaign_id, now=now
+                session, claim, tenant_id=tenant_id, campaign_id=campaign_id, now=clock()
             ):
                 await session.rollback()
                 return False
@@ -206,14 +221,19 @@ async def _pages(
 
 
 async def _publish(
-    factory: SessionFactory, tenant_id: str, campaign_id: int, claim: FreezeClaim, now: datetime
+    factory: SessionFactory,
+    tenant_id: str,
+    campaign_id: int,
+    claim: FreezeClaim,
+    now: datetime,
+    clock: Clock,
 ) -> FreezeResult:
     """Count this generation's rows and move the campaign to ``sending``, if
     the claim still holds (renewed first, so the count and the move see the
     same rows)."""
     async with factory() as session:
         if not await hold_freeze(
-            session, claim, tenant_id=tenant_id, campaign_id=campaign_id, now=now
+            session, claim, tenant_id=tenant_id, campaign_id=campaign_id, now=clock()
         ):
             await session.rollback()
             return _LOST

@@ -18,6 +18,7 @@ from tests.support.freeze_world import (
     due_campaign,
     emails,
     run_freeze,
+    start_due,
     statuses,
     subscribers,
     world,
@@ -143,7 +144,7 @@ async def test_list_restored_then_resumed_freezes_at_once(built):
             await finalize_session(db)
     assert resumed.status == "scheduled"
 
-    assert await freezing.start_due(state.session_factory, now=NOW) == 1
+    assert await start_due(state) == 1
     assert (await campaign_row(state, T, cid)).status == "sending"
     assert await statuses(state, cid) == {"queued": 2}
 
@@ -157,7 +158,7 @@ async def test_start_due_only_due_and_scheduled(built):
         state, T, status="scheduled", scheduled_at=NOW + timedelta(minutes=5)
     )
 
-    assert await freezing.start_due(state.session_factory, now=NOW) == 1
+    assert await start_due(state) == 1
 
     assert (await campaign_row(state, T, due)).status == "sending"
     for cid, status in ((later, "scheduled"), (draft, "draft")):
@@ -174,7 +175,7 @@ async def test_start_due_per_tenant(built):
         await subscribers(state, 1, tenant=tenant, prefix=tenant)
         cids[tenant] = await due_campaign(state, tenant)
 
-    assert await freezing.start_due(state.session_factory, now=NOW) == 2
+    assert await start_due(state) == 2
 
     for tenant, cid in cids.items():
         rows = await send_rows(state, tenant, cid)
@@ -193,7 +194,7 @@ async def test_start_due_goes_on_after_a_failure(built, monkeypatch, caplog):
         return await real(factory, campaign_id=campaign_id, **kw)
 
     monkeypatch.setattr(freezing, "freeze", flaky)
-    assert await freezing.start_due(state.session_factory, now=NOW) == 1
+    assert await start_due(state) == 1
     assert (await campaign_row(state, T, second)).status == "sending"
     assert any(r.exc_info for r in caplog.records)
 
@@ -206,5 +207,5 @@ async def test_start_due_refuses_a_bound_tenant(built):
     await seed_list(state, "other")
     cid = await due_campaign(state, "other")
     with tenant_scope(T), pytest.raises(TenantIsolationError):
-        await freezing.start_due(state.session_factory, now=NOW)
+        await start_due(state)
     assert (await campaign_row(state, "other", cid)).status == "scheduled"
