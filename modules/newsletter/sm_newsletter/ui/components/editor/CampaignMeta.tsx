@@ -41,9 +41,10 @@ export function toPatch(name: MetaField, value: string, valid = true): MetaPatch
   return { [name]: value };
 }
 
-/** The server's `EmailStr` wants a dot in the domain; the browser's `type=email`
- *  accepts `a@b`, which would make the server refuse the whole PATCH. */
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Closer to the server's `EmailStr` than the browser's `type=email` (which
+ *  accepts `a@b`, `.a@b.io`, `a@b.1`): a value the server refuses would make it
+ *  refuse the whole PATCH. Stricter on international domains, never looser. */
+const EMAIL = /^[^\s@.]+(\.[^\s@.]+)*@([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]+$/;
 
 export function isReplyTo(value: string): boolean {
   return value.trim() === '' || EMAIL.test(value);

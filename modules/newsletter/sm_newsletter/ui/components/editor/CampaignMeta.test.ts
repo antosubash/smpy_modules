@@ -25,6 +25,10 @@ describe('CampaignMeta toPatch', () => {
 describe('CampaignMeta isReplyTo', () => {
   it('wants a dot in the domain, as the server does', () => {
     expect(isReplyTo('a@b')).toBe(false);
+    for (const bad of ['.a@b.io', 'a.@b.io', 'a..b@c.io', 'a@b.1', 'a@-b.io', 'a@b_c.io']) {
+      expect(isReplyTo(bad)).toBe(false);
+    }
+    expect(isReplyTo('a@b.co.uk')).toBe(true);
     expect(isReplyTo('a@b.io')).toBe(true);
     expect(isReplyTo('')).toBe(true);
   });
