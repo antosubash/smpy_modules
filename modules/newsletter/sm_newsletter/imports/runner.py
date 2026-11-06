@@ -215,10 +215,14 @@ async def run_import_async(
     tenant_id: str,
     import_id: int,
     records_settings: Any,
-    clock: Callable[[], datetime] = utcnow,
-    slice_seconds: float = SLICE_SECONDS,
+    clock: Callable[[], datetime] | None = None,
+    slice_seconds: float | None = None,
 ) -> SliceResult:
-    """One slice of the import ``import_id`` of ``tenant_id``."""
+    """One slice of the import ``import_id`` of ``tenant_id`` (``clock`` and ``slice_seconds``
+    default to ``utcnow`` and ``SLICE_SECONDS``, looked up per call)."""
+    clock = clock or utcnow
+    if slice_seconds is None:
+        slice_seconds = SLICE_SECONDS
     with tenant_scope(tenant_id):
         step = _Slice(factory, tenant_id, import_id, records_settings, clock)
         failure: str | None = None

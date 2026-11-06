@@ -24,7 +24,7 @@ from typing import Any
 from celery import shared_task
 from celery.signals import worker_process_init
 
-from sm_newsletter.task_config import DISPATCH, RECONCILE_SUPPRESSIONS
+from sm_newsletter.task_config import DISPATCH, IMPORT_JANITOR, RECONCILE_SUPPRESSIONS, RUN_IMPORT
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +64,50 @@ def dispatch() -> dict[str, Any]:
         summary["paused"],
         summary["finished"],
         summary["stopped"],
+    )
+    return summary
+
+
+@shared_task(name=RUN_IMPORT)
+def run_import(tenant_id: str, import_id: int) -> str:
+    """One slice of an import. ``more`` (the slice already released its lease, D2)
+    sends the next one; a failure is recorded on the job and the result is the fixed
+    string ``"failed"``, never an exception that could carry an address (D6)."""
+    from sm_newsletter.core.errors_import import ImportFailed
+    from sm_newsletter.core.worker import run_platform
+    from sm_newsletter.imports.launch import enqueue, records_worker_settings
+    from sm_newsletter.imports.runner import run_import_async
+
+    try:
+        result: str = run_platform(
+            lambda factory: run_import_async(
+                factory,
+                tenant_id=tenant_id,
+                import_id=import_id,
+                records_settings=records_worker_settings(),
+            )
+        )
+    except ImportFailed:
+        return "failed"
+    if result == "more":
+        enqueue(tenant_id, import_id)
+    return result
+
+
+@shared_task(name=IMPORT_JANITOR)
+def import_janitor() -> dict[str, int]:
+    """One janitor pass; returns (and logs) its counts."""
+    from sm_newsletter.core.clock import utcnow
+    from sm_newsletter.core.worker import run_platform
+    from sm_newsletter.imports.janitor import janitor_async
+
+    now = utcnow()
+    summary = run_platform(lambda factory: janitor_async(factory, now=now))
+    logger.info(
+        "newsletter.import_janitor: %d expired, %d relaunched, %d failed",
+        summary["expired"],
+        summary["relaunched"],
+        summary["failed"],
     )
     return summary
 
