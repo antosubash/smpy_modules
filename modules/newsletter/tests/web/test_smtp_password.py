@@ -160,6 +160,18 @@ async def test_put_invalid_is_422(client, built, body):
     assert await _stored(state) is None
 
 
+async def test_put_lone_surrogate_is_422_not_a_500(client, built):
+    _, state = built
+    res = await client.put(
+        URL,
+        content=b'{"password": "ab\\ud800"}',
+        headers={**MANAGE, "content-type": "application/json"},
+    )
+    assert res.status_code == 422
+    assert res.json()["code"] == "invalid_password"
+    assert await _stored(state) is None
+
+
 @pytest.mark.parametrize("secret", ["   \n ", "x" * 1025, "p" * 2000])
 async def test_put_invalid_never_echoes_the_value(client, built, secret):
     res = await client.put(URL, json={"password": secret}, headers=MANAGE)

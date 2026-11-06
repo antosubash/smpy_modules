@@ -49,7 +49,7 @@ class TenantRequired(Forbidden):
     detail = "No organisation is active for this account"
 
 
-class SmtpPasswordUnreadable(NewsletterError):  # noqa: N818 - the brief's name for it
+class SmtpPasswordUnreadable(NewsletterError):  # noqa: N818 - names the failure, not an *Error
     """The stored SMTP password cannot be decrypted (the key changed)."""
 
     status = 500

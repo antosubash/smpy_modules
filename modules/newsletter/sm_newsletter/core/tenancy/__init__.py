@@ -45,7 +45,7 @@ from contextlib import contextmanager
 from typing import Any, Final
 
 from fastapi import HTTPException, Request
-from simple_module_db import tenant_context
+from simple_module_db import is_valid_tenant_id, tenant_context
 from simple_module_db.listeners import TenantIsolationError, current_tenant_id
 
 from sm_newsletter.core.constants import NOT_FOUND_DETAIL
@@ -101,7 +101,12 @@ class TenantUnbound(RuntimeError):  # noqa: N818 - the design's name for it
 
 
 def valid_tenant(value: object) -> bool:
-    return isinstance(value, str) and TENANT_RE.match(value) is not None
+    """The framework's own check (``fullmatch``, and never ``"platform"``).
+
+    ``TENANT_RE.match`` alone accepts ``"a\\n"`` (``$`` matches before a trailing
+    newline) and the reserved platform id, which the contracts newsletter
+    reads through refuse."""
+    return is_valid_tenant_id(value)
 
 
 # --- binding -----------------------------------------------------------------
