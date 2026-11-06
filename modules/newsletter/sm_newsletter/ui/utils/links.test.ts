@@ -30,6 +30,8 @@ describe('normalizeLink', () => {
     ]) {
       expect(normalizeLink(bad)).toBeNull();
     }
+    expect(isAllowedLink('https://a.com/x\u00ad')).toBe(false); // Cf, as urls.py
+    expect(isAllowedLink('https://a.com/\u2066x')).toBe(false);
     expect(isAllowedLink('mailto:')).toBe(false);
     expect(isAllowedLink(`https://a.com/${'x'.repeat(2000)}`)).toBe(false);
   });

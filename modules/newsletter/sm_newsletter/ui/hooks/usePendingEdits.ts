@@ -69,8 +69,11 @@ export function usePendingEdits() {
         setIncomplete(value);
       },
       markInvalid: (field, value) => {
-        if (value) e.invalid.add(field);
-        else e.invalid.delete(field);
+        if (value) {
+          e.invalid.add(field);
+          // An earlier, still-queued value of this field must not be saved under it.
+          delete (e.meta as Record<string, unknown>)[field];
+        } else e.invalid.delete(field);
         setMetaInvalid(e.invalid.size > 0);
         e.sync();
       },

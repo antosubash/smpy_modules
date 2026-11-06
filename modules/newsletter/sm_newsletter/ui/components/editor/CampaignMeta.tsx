@@ -10,7 +10,7 @@
 
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import type { MetaPatch } from '../../hooks/useCampaignEditor';
 import { keys, useT } from '../../utils/i18n';
@@ -69,12 +69,24 @@ export function CampaignMeta({ campaign, readOnly, onChange, onInvalid }: Campai
 
   const [errors, setErrors] = useState<Partial<Record<MetaField, string>>>({});
 
+  // A remount (card refresh, reload) drops the typed value and its message, so the
+  // editor must not keep counting that field as unsaveable.
+  const reported = useRef(new Set<MetaField>());
+  useEffect(() => {
+    const pending = reported.current;
+    return () => {
+      for (const field of pending) onInvalid?.(field, false);
+    };
+  }, [onInvalid]);
+
   function change(name: MetaField, input: HTMLInputElement) {
     const value = input.value;
     setValues((v) => ({ ...v, [name]: value }));
     const valid = input.checkValidity();
     const problem = fieldError(name, value, valid);
     setErrors((e) => ({ ...e, [name]: problem ?? undefined }));
+    if (problem) reported.current.add(name);
+    else reported.current.delete(name);
     onInvalid?.(name, problem !== null);
     const patch = toPatch(name, value, valid);
     if (patch) onChange(patch);

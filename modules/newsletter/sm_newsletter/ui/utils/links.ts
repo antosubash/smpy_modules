@@ -8,8 +8,9 @@ const BARE_DOMAIN = /^[^\s/:@\\]+\.[^\s/:@\\]{2,}(?:[/?#]\S*)?$/;
 const BARE_EMAIL = /^[^\s/:@\\]+@[^\s/:@\\]+\.[^\s/:@\\]{2,}$/;
 
 function plain(value: string): boolean {
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are the point
-  return value.length <= MAX_URL && !/[\s\u0000-\u001f\u007f-\u009f​-‏‪-‮⁠-⁤﻿]/.test(value);
+  // Whitespace, control (Cc) and format (Cf: soft hyphen, RLO, ZWSP, BOM) characters,
+  // as `content/urls.py` `_plain` refuses them.
+  return value.length <= MAX_URL && !/[\s\p{Cc}\p{Cf}]/u.test(value);
 }
 
 /** True for http(s) with a host, `mailto:` with an address, or a site path. */

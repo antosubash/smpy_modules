@@ -79,6 +79,9 @@ describe('useCampaignEditor, unsaveable edits', () => {
     patchCampaign.mockResolvedValue(campaign(4));
     await mount();
 
+    // A valid partial value is queued, then the field becomes unsaveable:
+    // the queued value must not be saved under it.
+    await act(async () => editor.saveMeta({ reply_to: 'a@example.org' }));
     await act(async () => editor.markMetaInvalid('reply_to', true));
     expect(editor.metaInvalid).toBe(true);
     expect(editor.dirty).toBe(true);
