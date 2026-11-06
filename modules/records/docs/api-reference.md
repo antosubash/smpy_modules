@@ -1795,6 +1795,54 @@ import. Same tenant rules as above; none of it commits. Part 1:
   no duplicate values, else `ValueError`. `TagsFieldMissing` when `tags` is
   absent on a list with records, or is not a multiselect.
 
+Part 2:
+
+- **`import_subscribers(session, *, tenant_id, type_key, rows, settings, now,
+  source="Mailchimp")`** applies one batch of `ImportRow`s (`email`, `status`
+  `confirmed` or `unsubscribed`, `fields` by ordinary field key, `tags` as
+  choice values, aware `confirmed_at`, `consent_at`, `unsubscribed_at`) and
+  returns one `ImportResult` (`email` normalised, `outcome`, `dropped`) per
+  row, in input order. It takes the list's type lock, looks every address up in
+  one indexed query (trash included), and decides each row from the record
+  holding it:
+
+  | Record | `confirmed` row | `unsubscribed` row |
+  |---|---|---|
+  | none | created `confirmed`: `created` | created `unsubscribed`, address only: `created_unsubscribed` |
+  | `confirmed` | new tags appended, empty mapped fields filled: `updated` / `unchanged` | unsubscribed (as the unsubscribe link does) unless confirmed after `unsubscribed_at`: `unsubscribed` / `kept_confirmed` |
+  | `pending` | no write: `kept_pending` | no write: `kept_pending` |
+  | `unsubscribed` | no write: `kept_unsubscribed` | no write: `kept_unsubscribed` |
+  | trashed | no write: `trashed` | no write: `trashed` |
+
+  An existing record is decided under the subscriber's row lock, and a merge is
+  an ordinary validating `update_record`. A pending signup is never confirmed
+  and nobody who left is resubscribed. A value records refuses (a select value
+  that is neither a choice value nor a label, text over `max_length`, a tag that
+  is not a choice) is dropped from the row's new values and named in `dropped`;
+  the stored value stays. An address records cannot store, or a second refusal,
+  is `invalid`.
+
+  A created confirmed subscriber gets `sm_confirmed_at` = `confirmed_at`, else
+  `consent_at`, else `now`, and `sm_consent_at` = `consent_at`, else `now`
+  (both never later than `now`); `sm_consent_text` = `Imported from <source> on
+  <YYYY-MM-DD of now, UTC>` (`CONSENT_TEMPLATE`, stored in English); the
+  default content locale; a fresh nonce; no IP hash or source page. A created
+  unsubscribed one gets `sm_unsubscribed_at` = `unsubscribed_at`, else `now`, a
+  nonce and nothing else, the shape an unsubscribe leaves.
+
+  **It publishes nothing**: no `RecordCreated`, `RecordUpdated` or
+  `SubscriptionChanged` (the batch runs muted), so other listeners do not see
+  imported people. **It writes no suppression**: the caller writes newsletter's
+  suppressions in the same transaction, after records' rows (lock order: the
+  record row, then the suppression rows). `ValueError` before any query for
+  more than `MAX_IMPORT_BATCH` (500) rows, one address twice after normalising,
+  a naive datetime or an unknown status; `not_a_list` for a type that is not a
+  list, `LookupError` for no such list.
+- **`opted_out_anywhere(session, *, tenant_id, emails)`** returns the
+  normalised addresses among `emails` that are `unsubscribed` on any of the
+  tenant's lists, trash included: one indexed query per list. At most 500
+  addresses, else `ValueError`.
+
 ---
 
 ## Error table

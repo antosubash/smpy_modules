@@ -7,11 +7,13 @@ the same tenant rule: the caller names the tenant, it is validated, bound with
 caller finishes its transaction with ``simple_module_db.finalize_session``.
 
 Part 1: :func:`create_list`, :func:`importable_fields`, :func:`add_tag_choices`.
+Part 2: :func:`import_subscribers` (R3-R5, D5) and :func:`opted_out_anywhere` (D1).
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +23,15 @@ from sm_records.contracts._newsletter_args import _checked_tenant
 from sm_records.contracts.newsletter_admin import FieldChoice, _field
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope
-from sm_records.public_submissions import campaign_lists, campaign_reads
+from sm_records.public_submissions import campaign_import, campaign_lists, campaign_reads
+from sm_records.public_submissions.campaign_import import (
+    CONSENT_TEMPLATE,
+    MAX_IMPORT_BATCH,
+    ImportOutcome,
+    ImportResult,
+    ImportRow,
+    ImportStatus,
+)
 from sm_records.public_submissions.campaign_lists import (
     MAPPABLE_TYPES,
     MAX_CHOICE_LEN,
@@ -34,13 +44,19 @@ from sm_records.public_submissions.campaign_lists import (
 from sm_records.public_submissions.campaign_reads import SubscriberFilterError
 
 __all__ = [
+    "CONSENT_TEMPLATE",
     "MAPPABLE_TYPES",
     "MAX_CHOICE_LEN",
+    "MAX_IMPORT_BATCH",
     "MAX_NEW_CHOICES",
     "RECORDS_PACKAGE",
     "TAGS_FIELD",
     "FieldChoice",
     "ImportField",
+    "ImportOutcome",
+    "ImportResult",
+    "ImportRow",
+    "ImportStatus",
     "ImportTargets",
     "InvalidListKey",
     "ListExists",
@@ -49,7 +65,9 @@ __all__ = [
     "TagsFieldMissing",
     "add_tag_choices",
     "create_list",
+    "import_subscribers",
     "importable_fields",
+    "opted_out_anywhere",
 ]
 
 RECORDS_PACKAGE = "sm_records"  # the `settings_for` key (R13)
@@ -136,3 +154,46 @@ async def add_tag_choices(
         return await campaign_lists.add_choices(
             session, rtype, choices, settings=settings, actor=actor
         )
+
+
+async def import_subscribers(
+    session: AsyncSession,
+    *,
+    tenant_id: str,
+    type_key: str,
+    rows: Sequence[ImportRow],
+    settings: RecordsSettings,
+    now: datetime,
+    source: str = "Mailchimp",
+) -> list[ImportResult]:
+    """Apply one batch of imported subscribers to the list; one result per
+    row, in input order (R3's records column, R4's system values).
+
+    Never confirms a ``pending`` signup, never resubscribes an ``unsubscribed``
+    or trashed record, and writes into a confirmed one only through a
+    validating ``update_record`` under the row lock (D5). Publishes nothing:
+    the batch runs inside ``events.muted`` (R5). Writes no suppression: that is
+    the caller's.
+
+    ``ValueError`` before any query for more than ``MAX_IMPORT_BATCH`` rows, an
+    address twice (after normalising), a naive datetime or an unknown status;
+    ``SubscriberFilterError("not_a_list")`` for a type that is not a list,
+    ``LookupError`` for no such list in the tenant."""
+    tenant = _checked_tenant(tenant_id)
+    checked = campaign_import.checked_rows(rows, now, source)
+    with tenant_scope(tenant):
+        return await campaign_import.run(
+            session, tenant, type_key, checked, settings=settings, now=now, source=source
+        )
+
+
+async def opted_out_anywhere(
+    session: AsyncSession, *, tenant_id: str, emails: Sequence[str]
+) -> set[str]:
+    """The normalised addresses among ``emails`` that are ``unsubscribed`` on
+    any of the tenant's lists, trash included (D1). At most
+    ``MAX_IMPORT_BATCH`` addresses (``ValueError``)."""
+    tenant = _checked_tenant(tenant_id)
+    wanted = campaign_import.checked_emails(emails)
+    with tenant_scope(tenant):
+        return await campaign_import.opted_out(session, tenant, wanted)
