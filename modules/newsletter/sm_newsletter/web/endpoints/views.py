@@ -1,4 +1,4 @@
-"""Inertia screens: the campaign list, segments, suppressions, the editor and the settings page.
+"""Inertia screens: the campaign list, segments, subscribers, suppressions, the editor and the settings page.
 
 ``bind_admin`` first (as in every admin router here), then the shared CSRF
 token. The data is fetched client-side from ``/api/newsletter``; the props only
@@ -7,7 +7,7 @@ carry what the first paint needs.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from simple_module_core.permissions import grants
 from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
@@ -55,6 +55,32 @@ async def segments_page(request: Request, inertia: InertiaDep) -> InertiaRespons
     return await inertia.render(
         constants._PAGE_SEGMENTS,
         {**tenancy.view_props(request), "can_edit": grants(held, constants.PERM_EDIT)},
+    )
+
+
+@router.get(
+    "/subscribers",
+    response_model=None,
+    dependencies=[
+        Depends(RequiresPermission(constants.PERM_VIEW)),
+        Depends(RequiresPermission(constants.PERM_RECORDS_VIEW)),
+    ],
+)
+async def subscribers_page(
+    request: Request,
+    inertia: InertiaDep,
+    initial_list: str | None = Query(default=None, alias="list", max_length=64),
+) -> InertiaResponse:
+    """``?list=`` preselects a list; the search text never reaches a URL."""
+    held = await ensure_resolved_permissions(request)
+    return await inertia.render(
+        constants._PAGE_SUBSCRIBERS,
+        {
+            **tenancy.view_props(request),
+            "can_edit": grants(held, constants.PERM_EDIT),
+            "can_manage": grants(held, constants.PERM_MANAGE),
+            "initial_list": initial_list,
+        },
     )
 
 

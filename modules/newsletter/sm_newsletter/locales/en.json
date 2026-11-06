@@ -16,6 +16,7 @@
     "campaigns": "Campaigns",
     "settings": "Settings",
     "segments": "Segments",
+    "subscribers": "Subscribers",
     "suppressions": "Suppressions"
   },
   "campaigns": {
@@ -134,6 +135,52 @@
     "cancel": "Cancel",
     "saving": "Saving…",
     "max_rules": "At most 10 rules."
+  },
+  "subscribers": {
+    "title": "Subscribers",
+    "description": "Search a list's subscribers, tag them and see how they engage.",
+    "list_label": "List",
+    "search_label": "Search subscribers",
+    "search_placeholder": "Email or name",
+    "tag_label": "Tag",
+    "tag_all": "All tags",
+    "segment_label": "Segment",
+    "segment_all": "All subscribers",
+    "empty": "No subscribers match.",
+    "email": "Email",
+    "name": "Name",
+    "status": {
+      "label": "Status",
+      "all": "All",
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "unsubscribed": "Unsubscribed"
+    },
+    "tags": "Tags",
+    "suppressed": "Won't receive newsletters",
+    "confirmed_at": "Confirmed",
+    "open_in_records": "Open in records",
+    "edit_in_records": "Edit in records",
+    "trashed": "In the trash",
+    "detail": {
+      "title": "Subscriber",
+      "engagement": "Engagement",
+      "campaigns_sent": "Campaigns sent",
+      "last_sent": "Last campaign",
+      "never_sent": "Not sent a campaign yet",
+      "opened": "Opened",
+      "clicked": "Clicked",
+      "suppressions": "Suppressions",
+      "suppressions_empty": "No suppression records on the lists you can read.",
+      "tags_save": "Save tags",
+      "unsubscribe": "Unsubscribe"
+    },
+    "unsubscribe_confirm": {
+      "title": "Unsubscribe this address?",
+      "description": "{email} will receive no more campaigns from this list. They can sign up again later.",
+      "confirm": "Unsubscribe",
+      "keep": "Keep"
+    }
   },
   "suppressions": {
     "title": "Suppressions",

@@ -16,6 +16,7 @@
     "campaigns": "Kampagnen",
     "settings": "Einstellungen",
     "segments": "Segmente",
+    "subscribers": "Abonnenten",
     "suppressions": "Sperrliste"
   },
   "campaigns": {
@@ -134,6 +135,52 @@
     "cancel": "Abbrechen",
     "saving": "Wird gespeichert…",
     "max_rules": "Höchstens 10 Regeln."
+  },
+  "subscribers": {
+    "title": "Abonnenten",
+    "description": "Abonnenten einer Liste suchen, verschlagworten und ihr Engagement ansehen.",
+    "list_label": "Liste",
+    "search_label": "Abonnenten suchen",
+    "search_placeholder": "E-Mail oder Name",
+    "tag_label": "Tag",
+    "tag_all": "Alle Tags",
+    "segment_label": "Segment",
+    "segment_all": "Alle Abonnenten",
+    "empty": "Keine passenden Abonnenten.",
+    "email": "E-Mail",
+    "name": "Name",
+    "status": {
+      "label": "Status",
+      "all": "Alle",
+      "pending": "Ausstehend",
+      "confirmed": "Bestätigt",
+      "unsubscribed": "Abgemeldet"
+    },
+    "tags": "Tags",
+    "suppressed": "Erhält keine Newsletter",
+    "confirmed_at": "Bestätigt",
+    "open_in_records": "In Datensätzen öffnen",
+    "edit_in_records": "In Datensätzen bearbeiten",
+    "trashed": "Im Papierkorb",
+    "detail": {
+      "title": "Abonnent",
+      "engagement": "Engagement",
+      "campaigns_sent": "Gesendete Kampagnen",
+      "last_sent": "Letzte Kampagne",
+      "never_sent": "Noch keine Kampagne gesendet",
+      "opened": "Geöffnet",
+      "clicked": "Angeklickt",
+      "suppressions": "Sperren",
+      "suppressions_empty": "Keine Sperreinträge auf den Listen, die Sie lesen dürfen.",
+      "tags_save": "Tags speichern",
+      "unsubscribe": "Abmelden"
+    },
+    "unsubscribe_confirm": {
+      "title": "Diese Adresse abmelden?",
+      "description": "{email} erhält keine weiteren Kampagnen von dieser Liste. Eine erneute Anmeldung ist später möglich.",
+      "confirm": "Abmelden",
+      "keep": "Behalten"
+    }
   },
   "suppressions": {
     "title": "Sperrliste",

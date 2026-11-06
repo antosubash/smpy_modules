@@ -153,12 +153,19 @@ def test_menu_items():
     assert [(i.label, i.icon, i.order, i.permissions) for i in items] == [
         ("Campaigns", "mail", 300, [constants.PERM_VIEW]),
         ("Segments", "filter", 310, [constants.PERM_VIEW]),
+        (
+            "Subscribers",
+            "users",
+            320,
+            [constants.PERM_VIEW, constants.PERM_RECORDS_VIEW],
+        ),
         ("Suppressions", "shield", 330, [constants.PERM_MANAGE]),
         ("Settings", "settings", 390, [constants.PERM_MANAGE]),
     ]
     assert [i.url for i in items] == [
         f"{VIEW}/",
         constants.SEGMENTS_URL,
+        constants.SUBSCRIBERS_URL,
         constants.SUPPRESSIONS_URL,
         constants.SETTINGS_URL,
     ]
@@ -194,3 +201,40 @@ def test_menu_has_suppressions():
     (item,) = [i for i in menu_items() if i.label == "Suppressions"]
     assert (item.icon, item.order, item.permissions) == ("shield", 330, [constants.PERM_MANAGE])
     assert item.url == f"{VIEW}/suppressions"
+
+
+SUBSCRIBERS_READ = {"x-perms": f"{constants.PERM_VIEW},{constants.PERM_RECORDS_VIEW}"}
+
+
+async def test_subscribers_page_props(client):
+    res = await client.get(f"{VIEW}/subscribers", headers=SUBSCRIBERS_READ)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["component"] == constants._PAGE_SUBSCRIBERS
+    assert body["props"]["tenant"] == "default"
+    assert (body["props"]["can_edit"], body["props"]["can_manage"]) == (False, False)
+    assert body["props"].get("initial_list") is None
+    full = (await client.get(f"{VIEW}/subscribers", headers=ALL_RECORDS)).json()["props"]
+    assert (full["can_edit"], full["can_manage"]) == (True, True)
+
+
+ALL_RECORDS = {"x-perms": f"{ALL['x-perms']},{constants.PERM_RECORDS_VIEW}"}
+
+
+async def test_subscribers_page_passes_initial_list(client):
+    res = await client.get(f"{VIEW}/subscribers?list=news", headers=SUBSCRIBERS_READ)
+    assert res.json()["props"]["initial_list"] == "news"
+
+
+async def test_subscribers_page_needs_both_permissions(client):
+    only_view = {"x-perms": constants.PERM_VIEW}
+    only_records = {"x-perms": constants.PERM_RECORDS_VIEW}
+    for headers in (only_view, only_records, {"x-perms": ""}):
+        assert (await client.get(f"{VIEW}/subscribers", headers=headers)).status_code == 403
+
+
+def test_menu_has_subscribers():
+    (item,) = [i for i in menu_items() if i.label == "Subscribers"]
+    assert (item.icon, item.order) == ("users", 320)
+    assert item.permissions == [constants.PERM_VIEW, constants.PERM_RECORDS_VIEW]
+    assert item.url == f"{VIEW}/subscribers"
