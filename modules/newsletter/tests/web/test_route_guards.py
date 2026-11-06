@@ -56,6 +56,7 @@ EXPECTED = {
     ("POST", f"{API}/cards/snapshot"),
     ("GET", f"{API}/media"),
     ("GET", f"{API}/outbox"),
+    ("POST", f"{API}/outbox/dispatch"),
     ("GET", f"{API}/lists"),
     ("POST", f"{API}/lists"),
     ("POST", f"{API}/imports"),

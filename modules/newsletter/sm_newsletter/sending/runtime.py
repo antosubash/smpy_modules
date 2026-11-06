@@ -18,12 +18,16 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
+
+from simple_module_db.tenancy import no_tenant
 
 from sm_newsletter.core import constants, crypto
 from sm_newsletter.core.clock import utcnow
 from sm_newsletter.core.errors import SmtpPasswordUnreadable
 from sm_newsletter.core.secret import SecretMissing, install, resolve_worker_secret
 from sm_newsletter.core.settings import NewsletterSettings
+from sm_newsletter.core.tokens import host_secret
 from sm_newsletter.sending.dispatch import TickSummary, tick
 from sm_newsletter.sending.transport import Transport, transport_for
 from sm_newsletter.sending.upkeep import SessionFactory
@@ -36,6 +40,7 @@ __all__ = [
     "dispatch_async",
     "dispatch_config",
     "refuse_plaintext_password",
+    "tick_in_app",
 ]
 
 logger = logging.getLogger(__name__)
@@ -112,3 +117,19 @@ async def dispatch_async(
         transport=config.transport,
         clock=clock,
     )
+
+
+async def tick_in_app(app: Any) -> TickSummary:
+    """One dispatcher tick in the web process (the development and e2e hook, R17).
+
+    Settings, secret and transport are the web process's own, as the test send reads
+    them; the tick runs under ``no_tenant()`` as a worker's does.
+    """
+    settings: NewsletterSettings = getattr(app.state, constants.PACKAGE).settings
+    with no_tenant():
+        return await tick(
+            app.state.sm.db.session_factory,
+            settings=settings,
+            secret=host_secret(app),
+            transport=transport_for(settings),
+        )
