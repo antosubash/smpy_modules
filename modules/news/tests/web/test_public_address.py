@@ -32,6 +32,8 @@ from news.models import ArticleStatus
 
 from tests.support.factories import make_article
 
+INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+
 pytestmark = pytest.mark.asyncio
 
 NEWS = "/news"
@@ -148,7 +150,7 @@ class TestTheViewer:
         # Asked as Inertia would, so the response is the props rather than the
         # shell template — the body is what this is about.
         response = await anon_client.get(
-            f"{NEWS}/two-versions", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+            f"{NEWS}/two-versions", headers=INERTIA
         )
 
         assert "live" in response.text
@@ -165,7 +167,7 @@ class TestTheViewer:
         await _seed(anon_client, "knows-itself")
 
         response = await anon_client.get(
-            f"{NEWS}/knows-itself", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+            f"{NEWS}/knows-itself", headers=INERTIA
         )
 
         assert response.json()["props"]["slug"] == "knows-itself"
@@ -199,7 +201,7 @@ class TestCachingHeaders:
         page = await anon_client.get(f"{NEWS}/two-shapes")
         assert "X-Inertia" in page.headers["Vary"]
 
-        inertia = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+        inertia = INERTIA
         visit = await anon_client.get(
             f"{NEWS}/two-shapes", headers={**inertia, "If-None-Match": page.headers["ETag"]}
         )

@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 from sm_billing.web.schemas import MAX_AMOUNT, PlanIn
 
-from tests.support.api_helpers import arm_csrf
+from tests.support.api_helpers import INERTIA, arm_csrf
 from tests.support.helpers import make_plan
 
 ADMIN = "/api/billing/admin"
@@ -85,6 +85,6 @@ async def test_legacy_out_of_range_plan_still_lists(app, admin):
     legacy = next(p for p in response.json() if p["key"] == "legacy")
     assert legacy["amount_month"] == over_bound
     page = await admin.get(
-        "/admin/billing/plans", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+        "/admin/billing/plans", headers=INERTIA
     )
     assert page.status_code == 200

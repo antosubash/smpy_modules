@@ -12,7 +12,7 @@ from sm_billing.core.subjects import subject_for_user
 from sm_billing.models import Customer, Subscription, UsageEvent
 from sqlalchemy import select
 
-from tests.support.api_helpers import arm_csrf
+from tests.support.api_helpers import INERTIA, arm_csrf
 from tests.support.fake_provider import FakeProvider
 from tests.support.helpers import make_plan
 from tests.support.quota_helpers import PREFIX
@@ -47,7 +47,7 @@ async def test_status_is_per_user(user_mode_app, user_client):
         assert (await a.get("/api/billing/status")).json()["plan"]["key"].startswith("metered")
         assert (await b.get("/api/billing/status")).json()["plan"]["key"] == "free"
         # The page renders for a signed-in user; there is no organisation to pick.
-        page = await a.get("/billing/", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"})
+        page = await a.get("/billing/", headers=INERTIA)
         assert page.status_code == 200, page.text
         props = page.json()["props"]
         assert props["status"]["plan"]["key"].startswith("metered")

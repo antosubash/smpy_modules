@@ -13,7 +13,7 @@ development app that mounts them; it is never published.
 
 **Pin policy differs by role.** Published modules depend on the framework with
 *ranges* (`simple_module_core>=0.0.36,<0.1`). The host pins *exactly*
-(`simple_module_hosting==0.0.38`). Never give a published module an `==` pin —
+(`simple_module_hosting==0.0.44`). Never give a published module an `==` pin —
 it becomes uninstallable in any host running a newer framework build.
 `scripts/check_rules.py` (in `make lint` and CI) rejects one, and also any
 requirement on another module of this repo (news' `pagebuilder` extra) without
@@ -68,7 +68,8 @@ label used twice — keep dropping a duplicate label when porting.
 `c5d8e2f1a903` and `f6c2d4e8b109` follow `c4e9b2a7d613`. Upstream's
 `b8d4f2a6c901` (audit_log) and `c9d2e4f6a810` (oidc) are not ported: neither
 module is installed here, so their tables do not exist. `e731a1b2c3d4` refuses
-to run while two accounts' emails differ only by letter case, and names them.
+to run while two accounts' emails differ only by letter case, and prints them masked
+(`a***@host`) with the query that lists them.
 `host/migrations/env.py` ignores the false change autogenerate reports on SQLite
 for a mixed column-and-expression index (it reflects `created_at DESC` as a plain
 column, so `tenant_browse` would be dropped and recreated on every run). One on

@@ -20,6 +20,8 @@ from news.models import ArticleStatus, NewsArticleTag, NewsCategory, NewsTag
 
 from tests.support.factories import make_article
 
+INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+
 pytestmark = pytest.mark.asyncio
 
 NEWS = "/news"
@@ -36,7 +38,7 @@ class TestFrontDoor:
         await _seed(anon_client, "second")
 
         response = await anon_client.get(
-            f"{NEWS}/", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+            f"{NEWS}/", headers=INERTIA
         )
 
         assert response.status_code == 200
@@ -49,7 +51,7 @@ class TestFrontDoor:
         await _seed(anon_client, "hidden", status=ArticleStatus.DRAFT)
 
         response = await anon_client.get(
-            f"{NEWS}/", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+            f"{NEWS}/", headers=INERTIA
         )
 
         assert [i["slug"] for i in response.json()["props"]["items"]] == ["live"]
@@ -61,7 +63,7 @@ class TestFrontDoor:
         await _seed(anon_client, "unlisted", show_in_feed=False)
 
         response = await anon_client.get(
-            f"{NEWS}/", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+            f"{NEWS}/", headers=INERTIA
         )
 
         assert [i["slug"] for i in response.json()["props"]["items"]] == ["listed"]
@@ -81,7 +83,7 @@ class TestFrontDoor:
 
     async def test_an_empty_archive_still_answers(self, anon_client) -> None:
         response = await anon_client.get(
-            f"{NEWS}/", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+            f"{NEWS}/", headers=INERTIA
         )
         assert response.status_code == 200
         assert response.json()["props"]["items"] == []
@@ -93,10 +95,10 @@ class TestPaging:
             await _seed(anon_client, f"article-{index:02d}")
 
         first = await anon_client.get(
-            f"{NEWS}/", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+            f"{NEWS}/", headers=INERTIA
         )
         second = await anon_client.get(
-            f"{NEWS}/?page=2", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+            f"{NEWS}/?page=2", headers=INERTIA
         )
 
         assert len(first.json()["props"]["items"]) == 12
@@ -119,7 +121,7 @@ class TestCategoryArchive:
 
         response = await anon_client.get(
             f"{NEWS}/category/field-notes",
-            headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"},
+            headers=INERTIA,
         )
 
         props = response.json()["props"]
@@ -132,7 +134,7 @@ class TestCategoryArchive:
         await _seed(anon_client, "typed", category="Ad hoc")
 
         response = await anon_client.get(
-            f"{NEWS}/category/Ad hoc", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+            f"{NEWS}/category/Ad hoc", headers=INERTIA
         )
 
         assert [i["slug"] for i in response.json()["props"]["items"]] == ["typed"]
@@ -153,7 +155,7 @@ class TestTagArchive:
         await self._tag(anon_client, tagged, "Canopy", "canopy")
 
         response = await anon_client.get(
-            f"{NEWS}/tag/canopy", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+            f"{NEWS}/tag/canopy", headers=INERTIA
         )
 
         assert [i["slug"] for i in response.json()["props"]["items"]] == ["tagged"]
@@ -169,7 +171,7 @@ class TestTagArchive:
         assert "%" in path
 
         response = await anon_client.get(
-            path, headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+            path, headers=INERTIA
         )
 
         assert response.status_code == 200, response.text
@@ -181,7 +183,7 @@ class TestTagArchive:
         await _seed(anon_client, "something")
 
         response = await anon_client.get(
-            f"{NEWS}/tag/gone", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+            f"{NEWS}/tag/gone", headers=INERTIA
         )
 
         assert response.status_code == 200

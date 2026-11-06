@@ -8,6 +8,8 @@ from httpx import AsyncClient
 # package is ambiguous and resolves to the framework's own.
 from tests.support.page_helpers import create_draft
 
+INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+
 pytestmark = pytest.mark.asyncio
 
 
@@ -164,7 +166,7 @@ async def test_public_viewer_renders_layout_props_when_set(
     )
     page = await _publish_page(authed_client)
     response = await authed_client.get(
-        f"/p/{page['slug']}", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+        f"/p/{page['slug']}", headers=INERTIA
     )
     assert response.status_code == 200
     props = response.json()["props"]
@@ -185,7 +187,7 @@ async def test_public_viewer_skips_empty_slots(
     )
     page = await _publish_page(authed_client)
     response = await authed_client.get(
-        f"/p/{page['slug']}", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+        f"/p/{page['slug']}", headers=INERTIA
     )
     props = response.json()["props"]
     assert props["layout_header"] is None
@@ -197,7 +199,7 @@ async def test_public_viewer_renders_pages_when_layout_unset(
 ) -> None:
     page = await _publish_page(authed_client, slug="bare")
     response = await authed_client.get(
-        f"/p/{page['slug']}", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+        f"/p/{page['slug']}", headers=INERTIA
     )
     props = response.json()["props"]
     assert props["layout_header"] is None
@@ -216,7 +218,7 @@ async def test_layout_edit_takes_effect_without_republishing_each_page(
     )
     for slug in (page_a["slug"], page_b["slug"]):
         response = await authed_client.get(
-            f"/p/{slug}", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+            f"/p/{slug}", headers=INERTIA
         )
         assert response.json()["props"]["layout_header"] == _HEADER_DATA
 

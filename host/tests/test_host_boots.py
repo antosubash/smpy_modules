@@ -7,6 +7,7 @@ minimal app instead of the real host.
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import importlib
 import os
@@ -242,9 +243,7 @@ def test_nothing_imports_a_deprecated_framework_path():
     count too: they go red on the same bump.
     """
     deprecated = _deprecated_framework_paths()
-    assert "tenants.resolver" in deprecated  # the scan itself still finds them
-    from_package = re.compile(r"^\s*from ([\w.]+) import ([\w, ]+)")
-    plain = re.compile(r"^\s*(?:from|import) ([\w.]+)")
+    assert deprecated  # the scan itself still finds some
     offenders = []
     for path in [
         *REPO.glob("modules/*/*/**/*.py"),
@@ -253,12 +252,13 @@ def test_nothing_imports_a_deprecated_framework_path():
     ]:
         if "versions" in path.parts or path.name == Path(__file__).name:
             continue
-        for number, line in enumerate(path.read_text().splitlines(), start=1):
-            names = []
-            if match := plain.match(line):
-                names.append(match.group(1))
-            if match := from_package.match(line):
-                names += [f"{match.group(1)}.{n.strip()}" for n in match.group(2).split(",")]
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+                names = [node.module, *(f"{node.module}.{a.name}" for a in node.names)]
+            else:
+                continue
             if deprecated.intersection(names):
-                offenders.append(f"{path.relative_to(REPO)}:{number}")
+                offenders.append(f"{path.relative_to(REPO)}:{node.lineno}")
     assert offenders == []

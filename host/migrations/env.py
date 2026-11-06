@@ -72,7 +72,7 @@ def include_object(object_, name, type_, reflected, compare_to):
 
 
 def _get_url() -> str:
-    """Read database URL from settings, convert async to sync driver."""
+    """The URL the setup wizard hands over, else settings; async driver made sync."""
     url = config.attributes.get(ALEMBIC_DATABASE_URL_ATTRIBUTE) or Settings().database_url
     return url.replace("+aiosqlite", "").replace("+asyncpg", "+psycopg2")
 

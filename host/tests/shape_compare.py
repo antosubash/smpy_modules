@@ -60,7 +60,8 @@ def shape(response: httpx.Response, secret: str):
     nonces.update(found.decode() for found in _BODY_NONCE.findall(content))
     assert len(nonces) <= 1, f"a response uses one CSP nonce, got {nonces}"
     for nonce in nonces:
-        headers["content-security-policy"] = policy.replace(nonce, "<nonce>")
+        if "content-security-policy" in headers:
+            headers["content-security-policy"] = policy.replace(nonce, "<nonce>")
         content = content.replace(nonce.encode(), b"<nonce>")
         # Compressed, a random nonce moves the size by a few bytes; the decoded
         # body compared above already covers what that length described.
