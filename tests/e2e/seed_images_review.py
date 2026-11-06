@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import sys
 import uuid
 from collections.abc import Mapping
@@ -34,6 +35,9 @@ from sqlalchemy import select  # noqa: E402
 E2E_SQLITE = ROOT / "host" / "test.db"
 """The SQLite file ``playwright.config.ts`` gives the e2e server."""
 
+E2E_SHARD_SQLITE = re.compile(r"shard-[1-9][0-9]*/test\.db")
+"""Each host's copy under ``.e2e-shards/`` in a ``make e2e-parallel`` run."""
+
 
 def guard(env: Mapping[str, str]) -> str | None:
     """Why this script must not run against ``env``, or ``None``.
@@ -41,9 +45,9 @@ def guard(env: Mapping[str, str]) -> str | None:
     It writes rows straight to the database, so it needs an explicit opt-in
     (``SM_E2E_SEED=1``), one of the framework's non-production environments
     (``NON_PROD_ENVIRONMENTS``: everything else, ``staging`` included, counts
-    as production) and *exactly* the e2e database: the SQLite file above, or,
-    for a Postgres run, the URL the spec names in ``SM_E2E_DATABASE``. A look-alike
-    name is not enough.
+    as production) and *exactly* the e2e database: the SQLite file above, a
+    shard's copy under ``.e2e-shards/``, or, for a Postgres run, the URL the spec
+    names in ``SM_E2E_DATABASE``. A look-alike name is not enough.
     """
     if env.get("SM_E2E_SEED") != "1":
         return "set SM_E2E_SEED=1 to seed (test databases only)"
@@ -57,7 +61,12 @@ def guard(env: Mapping[str, str]) -> str | None:
 
     parsed = make_url(url)
     if parsed.get_backend_name() == "sqlite":
-        if Path(parsed.database or "").resolve() != E2E_SQLITE.resolve():
+        path = Path(parsed.database or "").resolve()
+        shards = (ROOT / ".e2e-shards").resolve()
+        in_shard = path.is_relative_to(shards) and E2E_SHARD_SQLITE.fullmatch(
+            path.relative_to(shards).as_posix()
+        )
+        if path != E2E_SQLITE.resolve() and not in_shard:
             return f"{parsed.database!r} is not the e2e database {str(E2E_SQLITE)!r}"
         return None
     if parsed.get_backend_name() != "postgresql":
