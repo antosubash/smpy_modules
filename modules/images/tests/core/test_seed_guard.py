@@ -33,6 +33,17 @@ def test_the_e2e_sqlite_file_with_the_opt_in_is_allowed(guard):
     assert guard({**OK, "SM_ENVIRONMENT": "testing"}) is None
 
 
+def test_a_shards_copy_is_allowed_and_nothing_else_beside_it(guard):
+    shards = ROOT / ".e2e-shards"
+    url = lambda path: {**OK, "SM_DATABASE_URL": f"sqlite+aiosqlite:///{path}"}  # noqa: E731
+    assert guard(url(shards / "shard-2" / "test.db")) is None
+    assert guard(url(shards / "template.db"))
+    assert guard(url(shards / "shard-2" / "other.db"))
+    assert guard(url(shards / "shard-0" / "test.db"))
+    assert guard(url(shards / "shard-2" / ".." / ".." / "host" / "app.db"))
+    assert guard(url(ROOT / "elsewhere" / ".e2e-shards" / "shard-2" / "test.db"))
+
+
 def test_a_postgres_run_needs_the_database_the_spec_names(guard):
     pg = {**OK, "SM_DATABASE_URL": PG}
     assert guard(pg)  # nothing names it
