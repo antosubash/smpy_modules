@@ -1769,7 +1769,115 @@ tenant, `tenant_scope` binds it, every query pins it); argument errors are
   same row lock before it decides (`public_submissions.row_lock.lock_record`:
   the type lock, then `SELECT … FOR UPDATE` on Postgres; on SQLite the type
   lock is already the database's write lock), so an opt-out cannot land
-  between the lift's check and its commit.
+  between the lift's check and its commit. Before both, it takes the address's
+  **opt-out lock** (`public_submissions.address_lock`: `pg_advisory_xact_lock`
+  on a signed 64-bit key of the tenant and the address's SHA-256; nothing on
+  SQLite), which the import's `lock_import_batch` takes too. The full order is
+  **address lock(s), ascending key → type lock → row lock → newsletter rows**.
+
+#### Newsletter import contract
+
+`sm_records.contracts.newsletter_import` (newsletter PR 7) serves the Mailchimp
+import. Same tenant rules as above; none of it commits. Part 1:
+
+- **`create_list(session, *, tenant_id, key, label, settings, actor=None)`**
+  creates a subscription list with optional `first_name` and `last_name` (text,
+  at most 100 characters, not indexed), `double_opt_in` on, signup `enabled`
+  off, shown in the menu; returns the key. `ListExists` when the key is taken in
+  the tenant, `InvalidListKey` when records refuses the key or label.
+- **`importable_fields(session, *, tenant_id, type_key)`** returns
+  `ImportTargets`: `fields` (`ImportField`: ordinary, non-system fields of type
+  text, longtext, email, url or select, except `tags`, in declared order, with
+  select choices), `tag_choices` (the `tags` field's current choices, read even
+  when it is not indexed, so a caller can pick collision-free values) and `tags` (`present` for a `tags` multiselect, `creatable`
+  with no `tags` field and no records, trash included, else `missing`). `None`
+  for no such list; `not_a_list` for a type that is not one.
+- **`add_tag_choices(session, *, tenant_id, type_key, labels, settings,
+  actor=None)`** decides each label's value under the type lock, against the
+  `tags` choices as they are then (`tag_choice_values`), appends the missing
+  ones (creating the multiselect on a list with no records) and returns the
+  authoritative `{label: value}` mapping; existing values and their labels are
+  kept. Read, resolve and append happen under one lock, so a choice another
+  writer added between a caller's own read and this call is seen, never
+  overwritten or mistaken for the caller's. At most 500 labels, each 1 to 100
+  characters without control characters, no duplicates, else `ValueError`.
+  `TagsFieldMissing` when `tags` is absent on a list with records, or is not a
+  multiselect (or there is no such list).
+- **`tag_choice_values(labels, existing)`** is that value rule, pure, for a
+  preview: a label an existing `FieldChoice` carries reuses its value; else the
+  label itself when it has no comma and no choice holds it; else its slug, `-`,
+  8 hex characters of its SHA-256, and `-2`, `-3`… while that is taken too.
+  Labels are resolved in sorted order, so the answer is deterministic.
+
+Part 2:
+
+- **`import_subscribers(session, *, tenant_id, type_key, rows, settings, now,
+  source="Mailchimp")`** applies one batch of `ImportRow`s (`email`, `status`
+  `confirmed` or `unsubscribed`, `fields` by ordinary field key, `tags` as
+  choice values, aware `confirmed_at`, `consent_at`, `unsubscribed_at`) and
+  returns one `ImportResult` (`email` normalised, `outcome`, `dropped`) per
+  row, in input order. It takes the list's type lock, looks every address up in
+  one indexed query (trash included), and decides each row from the record
+  holding it:
+
+  | Record | `confirmed` row | `unsubscribed` row |
+  |---|---|---|
+  | none | created `confirmed`: `created` | created `unsubscribed`, address only: `created_unsubscribed` |
+  | `confirmed` | new tags appended, empty mapped fields filled: `updated` / `unchanged` | unsubscribed (as the unsubscribe link does) unless confirmed after `unsubscribed_at`: `unsubscribed` / `kept_confirmed` |
+  | `pending` | no write: `kept_pending` | no write: `kept_pending` |
+  | `unsubscribed` | no write: `kept_unsubscribed` | no write: `kept_unsubscribed` |
+  | trashed | no write: `trashed` | no write: `trashed` |
+
+  An existing record is decided under the subscriber's row lock, and a merge is
+  an ordinary validating `update_record`. A pending signup is never confirmed
+  and nobody who left is resubscribed. A value records refuses (a select value
+  that is neither a choice value nor a label, text over `max_length`, a tag that
+  is not a choice) is dropped from the row's new values and named in `dropped`;
+  the stored value stays. An address records cannot store, or a second refusal,
+  is `invalid`.
+
+  A created confirmed subscriber gets `sm_confirmed_at` = `confirmed_at`, else
+  `consent_at`, else `now`, and `sm_consent_at` = `consent_at`, else `now`
+  (both never later than `now`); `sm_consent_text` = `Imported from <source> on
+  <YYYY-MM-DD of now, UTC>` (`CONSENT_TEMPLATE`, stored in English); the
+  default content locale; a fresh nonce; no IP hash or source page. A created
+  unsubscribed one gets `sm_unsubscribed_at` = `unsubscribed_at`, else `now`, a
+  nonce and nothing else, the shape an unsubscribe leaves.
+
+  **It publishes nothing**: no `RecordCreated`, `RecordUpdated` or
+  `SubscriptionChanged` (the batch runs muted), so other listeners do not see
+  imported people. **It writes no suppression**: the caller writes newsletter's
+  suppressions in the same transaction, after records' rows (lock order: the
+  record row, then the suppression rows). `ValueError` before any query for
+  more than `MAX_IMPORT_BATCH` (500) rows, one address twice after normalising,
+  a naive datetime or an unknown status; `not_a_list` for a type that is not a
+  list, `LookupError` for no such list.
+
+  **The caller must check `opted_out_anywhere` first** (D1): this call decides
+  only from the record on *this* list, so a subscribed row for someone
+  unsubscribed on another of the tenant's lists (trash included) would be
+  created `confirmed` here. Skip every `confirmed` row whose address
+  `opted_out_anywhere` reports (newsletter's import does, together with its
+  own suppressions) before passing the batch in, and read both after
+  `lock_import_batch`.
+- **`opted_out_anywhere(session, *, tenant_id, emails)`** returns the
+  normalised addresses among `emails` that are `unsubscribed` on any of the
+  tenant's lists, trash included: one indexed query per list. At most 500
+  addresses, else `ValueError`.
+- **`lock_import_batch(session, *, tenant_id, type_key, emails)`** takes, until
+  the caller's transaction ends, the opt-out lock of every address in `emails`
+  in ascending key order (Postgres `pg_advisory_xact_lock`; nothing on SQLite),
+  then the list's type lock (on SQLite, the database's write lock). Every
+  unsubscribe takes the address lock before its type and row locks, so an
+  `opted_out_anywhere` (or suppression) read made after this call stays true
+  until the caller commits: an opt-out on another list cannot land between the
+  read and the create. Call it first in the batch's transaction. `LookupError`
+  for no such list, `ValueError` for `emails` not a sequence of `str`.
+- **`address_lock_key(tenant_id, email)`** and
+  **`address_lock_key_from_hash(tenant_id, digest)`** are that key: the first
+  8 bytes, signed, of a namespaced SHA-256 of the tenant and the address's hex
+  SHA-256 after records' normalisation (strip, lower-case), which is exactly
+  newsletter's suppression `email_hash`. Pure.
 
 ---
 

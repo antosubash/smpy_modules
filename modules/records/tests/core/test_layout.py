@@ -78,3 +78,13 @@ def test_newsletter_admin_contract_imports_cleanly_first():
         "assert n.MAX_BROWSE_LIMIT == 100 and n.BROWSE_STATUSES[0] == 'pending'"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_newsletter_import_contract_imports_cleanly_first():
+    """In a fresh interpreter, with nothing imported before it, the import
+    contract loads without an import cycle."""
+    code = (
+        "import sm_records.contracts.newsletter_import as n; "
+        "assert n.MAX_NEW_CHOICES == 500 and n.RECORDS_PACKAGE == 'sm_records'"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)

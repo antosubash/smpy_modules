@@ -6,7 +6,9 @@ records' own link and newsletter's unsubscribe page) and the contract's
 row stays true until the transaction that made it ends: an opt-out cannot
 land between newsletter's "confirmed after the opt-out?" check and its lift.
 
-The type lock comes first, as everywhere in records
+Before it, :func:`.opt_in.leave` takes the address's opt-out lock
+(:mod:`.address_lock`), as newsletter's import batch does for each of its
+addresses before its type lock. The type lock comes next, as everywhere in records
 (``services._lock.lock_types``): nobody waits for a row lock while holding a
 type lock someone else's writer of that row needs, and an unsubscribe's
 ``update_record`` takes the type lock anyway. Then the row:

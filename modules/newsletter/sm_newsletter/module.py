@@ -8,6 +8,7 @@ import weakref
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
+from simple_module_core.body_limits import BodyLimitRegistry
 from simple_module_core.events import EventBus
 from simple_module_core.menu import MenuRegistry
 from simple_module_core.module import ModuleBase, ModuleMeta
@@ -141,6 +142,15 @@ class NewsletterModule(ModuleBase):
         ):
             if path not in mounted:
                 app.include_router(router)
+
+    def register_body_limits(self, registry: BodyLimitRegistry) -> None:
+        """Raise the body ceiling on the import upload to ``MAX_UPLOAD_BYTES`` plus 1 MiB of
+        multipart framing (R7)."""
+        from sm_newsletter.imports.constants import MAX_UPLOAD_BYTES, MiB
+
+        registry.add_regex(
+            rf"^{constants.ROUTE_PREFIX_API}/imports/?$", MAX_UPLOAD_BYTES + MiB, methods={"POST"}
+        )
 
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
         """Mirror records' ``SubscriptionChanged`` into the suppression store.
