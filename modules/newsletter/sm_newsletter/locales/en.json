@@ -15,7 +15,8 @@
     "group": "Newsletter",
     "campaigns": "Campaigns",
     "settings": "Settings",
-    "segments": "Segments"
+    "segments": "Segments",
+    "suppressions": "Suppressions"
   },
   "campaigns": {
     "title": "Campaigns",
@@ -133,6 +134,57 @@
     "cancel": "Cancel",
     "saving": "Saving…",
     "max_rules": "At most 10 rules."
+  },
+  "suppressions": {
+    "title": "Suppressions",
+    "description": "Addresses that no newsletter is sent to, and the lifts that were audited.",
+    "tab_active": "Suppressed",
+    "tab_lifted": "Lifted",
+    "reason_label": "Reason",
+    "reason_all": "All reasons",
+    "lookup_label": "Look up an email address",
+    "lookup_submit": "Look up",
+    "lookup_clear": "Clear lookup",
+    "all_lists": "All lists",
+    "empty": "Nothing is suppressed.",
+    "fingerprint": "Fingerprint",
+    "reason": "Reason",
+    "list": "List",
+    "source": "Source",
+    "created": "Suppressed on",
+    "reasons": {
+      "hard_bounce": "Hard bounce",
+      "complaint": "Complaint",
+      "imported_cleaned": "Imported as cleaned",
+      "unsubscribed": "Unsubscribed"
+    },
+    "sources": {
+      "records_event": "Records event",
+      "reconcile": "Reconcile",
+      "unsubscribe_page": "Unsubscribe page",
+      "send": "Send",
+      "import": "Import",
+      "admin": "Admin"
+    },
+    "lift": {
+      "action": "Lift",
+      "title": "Lift this suppression",
+      "email_label": "Email address",
+      "note_label": "Why is this safe to lift?",
+      "confirm": "Lift suppression",
+      "cancel": "Cancel",
+      "hard_bounce_warning": "This address bounced. Lift it only once the mailbox works again. Type the address to confirm it is the one you mean.",
+      "opt_out_warning": "This person opted out. The lift is allowed only because records shows them confirmed again afterwards. On a list without double opt-in, anyone can type an address into the form, so check that the owner really asked to come back.",
+      "cleaned_hint": "This address was imported as cleaned. Confirm it is deliverable before lifting.",
+      "done": "Suppression lifted."
+    },
+    "log": {
+      "empty": "Nothing has been lifted.",
+      "suppressed_at": "Suppressed on",
+      "lifted_at": "Lifted on",
+      "lifted_by": "Lifted by",
+      "note": "Note"
+    }
   },
   "settings": {
     "title": "Newsletter settings",

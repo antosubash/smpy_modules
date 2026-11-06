@@ -31,6 +31,16 @@ def menu_items() -> list[MenuItem]:
             permissions=[constants.PERM_VIEW],
         ),
         MenuItem(
+            label=constants.MENU_LABEL_SUPPRESSIONS,
+            label_key=constants.MENU_LABEL_KEY_SUPPRESSIONS,
+            url=constants.SUPPRESSIONS_URL,
+            icon=constants.MENU_ICON_SUPPRESSIONS,
+            order=330,
+            group=constants.MENU_GROUP,
+            group_key=constants.MENU_GROUP_KEY,
+            permissions=[constants.PERM_MANAGE],
+        ),
+        MenuItem(
             label=constants.MENU_LABEL_SETTINGS,
             label_key=constants.MENU_LABEL_KEY_SETTINGS,
             url=constants.SETTINGS_URL,

@@ -18,6 +18,7 @@ API = constants.ROUTE_PREFIX_API
 VIEW = constants.VIEW_PREFIX
 READ = {"x-perms": constants.PERM_VIEW}
 EDIT = {"x-perms": f"{constants.PERM_VIEW},{constants.PERM_EDIT}"}
+MANAGE = {"x-perms": constants.PERM_MANAGE}
 ALL = {"x-perms": ",".join((*constants.PERMISSIONS, constants.PERM_SETTINGS_EDIT))}
 LOCALES = Path(__file__).parents[2] / "sm_newsletter" / "locales"
 
@@ -152,9 +153,15 @@ def test_menu_items():
     assert [(i.label, i.icon, i.order, i.permissions) for i in items] == [
         ("Campaigns", "mail", 300, [constants.PERM_VIEW]),
         ("Segments", "filter", 310, [constants.PERM_VIEW]),
+        ("Suppressions", "shield", 330, [constants.PERM_MANAGE]),
         ("Settings", "settings", 390, [constants.PERM_MANAGE]),
     ]
-    assert [i.url for i in items] == [f"{VIEW}/", constants.SEGMENTS_URL, constants.SETTINGS_URL]
+    assert [i.url for i in items] == [
+        f"{VIEW}/",
+        constants.SEGMENTS_URL,
+        constants.SUPPRESSIONS_URL,
+        constants.SETTINGS_URL,
+    ]
     for lang in ("en", "de"):
         # The catalogue's namespace prefix is not part of the file's key tree.
         tree = json.loads((LOCALES / f"{lang}.json").read_text())
@@ -168,3 +175,22 @@ def test_menu_has_segments():
     (item,) = [i for i in menu_items() if i.label == "Segments"]
     assert (item.icon, item.order, item.permissions) == ("filter", 310, [constants.PERM_VIEW])
     assert item.url == f"{VIEW}/segments"
+
+
+async def test_suppressions_page_props(client):
+    res = await client.get(f"{VIEW}/suppressions", headers=MANAGE)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["component"] == constants._PAGE_SUPPRESSIONS
+    assert body["props"]["tenant"] == "default"
+
+
+async def test_suppressions_page_needs_manage(client):
+    assert (await client.get(f"{VIEW}/suppressions", headers=READ)).status_code == 403
+    assert (await client.get(f"{VIEW}/suppressions", headers={"x-perms": ""})).status_code == 403
+
+
+def test_menu_has_suppressions():
+    (item,) = [i for i in menu_items() if i.label == "Suppressions"]
+    assert (item.icon, item.order, item.permissions) == ("shield", 330, [constants.PERM_MANAGE])
+    assert item.url == f"{VIEW}/suppressions"

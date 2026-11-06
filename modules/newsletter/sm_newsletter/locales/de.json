@@ -15,7 +15,8 @@
     "group": "Newsletter",
     "campaigns": "Kampagnen",
     "settings": "Einstellungen",
-    "segments": "Segmente"
+    "segments": "Segmente",
+    "suppressions": "Sperrliste"
   },
   "campaigns": {
     "title": "Kampagnen",
@@ -133,6 +134,57 @@
     "cancel": "Abbrechen",
     "saving": "Wird gespeichert…",
     "max_rules": "Höchstens 10 Regeln."
+  },
+  "suppressions": {
+    "title": "Sperrliste",
+    "description": "Adressen, an die kein Newsletter gesendet wird, und die protokollierten Aufhebungen.",
+    "tab_active": "Gesperrt",
+    "tab_lifted": "Aufgehoben",
+    "reason_label": "Grund",
+    "reason_all": "Alle Gründe",
+    "lookup_label": "E-Mail-Adresse nachschlagen",
+    "lookup_submit": "Nachschlagen",
+    "lookup_clear": "Suche zurücksetzen",
+    "all_lists": "Alle Listen",
+    "empty": "Nichts ist gesperrt.",
+    "fingerprint": "Fingerabdruck",
+    "reason": "Grund",
+    "list": "Liste",
+    "source": "Quelle",
+    "created": "Gesperrt am",
+    "reasons": {
+      "hard_bounce": "Harter Bounce",
+      "complaint": "Beschwerde",
+      "imported_cleaned": "Als bereinigt importiert",
+      "unsubscribed": "Abgemeldet"
+    },
+    "sources": {
+      "records_event": "Records-Ereignis",
+      "reconcile": "Abgleich",
+      "unsubscribe_page": "Abmeldeseite",
+      "send": "Versand",
+      "import": "Import",
+      "admin": "Admin"
+    },
+    "lift": {
+      "action": "Aufheben",
+      "title": "Sperre aufheben",
+      "email_label": "E-Mail-Adresse",
+      "note_label": "Warum ist die Aufhebung unbedenklich?",
+      "confirm": "Sperre aufheben",
+      "cancel": "Abbrechen",
+      "hard_bounce_warning": "Diese Adresse ist als Bounce zurückgekommen. Heben Sie die Sperre erst auf, wenn das Postfach wieder funktioniert. Geben Sie die Adresse zur Bestätigung ein.",
+      "opt_out_warning": "Diese Person hat sich abgemeldet. Die Aufhebung ist nur erlaubt, weil Records sie danach wieder als bestätigt zeigt. Bei einer Liste ohne Double-Opt-in kann jeder eine Adresse in das Formular eintippen. Prüfen Sie also, ob die Inhaberin oder der Inhaber wirklich zurückkehren wollte.",
+      "cleaned_hint": "Diese Adresse wurde als bereinigt importiert. Prüfen Sie vor dem Aufheben, ob sie zustellbar ist.",
+      "done": "Sperre aufgehoben."
+    },
+    "log": {
+      "empty": "Nichts wurde aufgehoben.",
+      "suppressed_at": "Gesperrt am",
+      "lifted_at": "Aufgehoben am",
+      "lifted_by": "Aufgehoben von",
+      "note": "Notiz"
+    }
   },
   "settings": {
     "title": "Newsletter-Einstellungen",
