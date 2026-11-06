@@ -148,8 +148,14 @@ default when tags were found and the list can hold them.
   batch. A choice's **value** is deterministic and never contains a comma:
   an existing choice with the same label is reused; else the label itself when
   it has no comma and is not taken; else the label's slug plus `-` and 8 hex
-  characters of its SHA-256. Labels stay as written, so `Customers, 2020` and
-  `Customers; 2020` stay distinct.
+  characters of its SHA-256, with `-2`, `-3`… appended while another choice
+  holds that too. Labels stay as written, so `Customers, 2020` and
+  `Customers; 2020` stay distinct. The rule is records' (`tag_choice_values`):
+  the preview shows its values against the choices at staging, and the tags
+  step hands records the labels (`add_tag_choices`), which reads the choices,
+  resolves every label and appends the new ones under one type lock and
+  returns the mapping the import then uses, so a choice added meanwhile under
+  another label is never mistaken for this import's.
 - A list without a `tags` field gets one only while it holds **no records,
   trash included**. Otherwise tags are unavailable and the screen says to add a
   `tags` multiselect in records first.
@@ -230,11 +236,12 @@ task `newsletter.run_import(tenant_id, import_id)` on the `newsletter` queue.
 - The hourly `newsletter.import_janitor` beat task relaunches a `queued` or
   `running` import whose lease ran out (a lost message) and deletes staged or
   failed imports older than 24 hours. A staged import is timed from its
-  creation, a failed one from when it failed, so "Apply again" has a full day. The delete repeats that test with the pass's own cutoff, so a job queued, or
-  retried and failed again, since the pass read it is kept. A
-  `queued` import is timed from its creation: one staged long ago and queued
-  just now is relaunched by the next pass, which is harmless (a second launch
-  of a job somebody runs answers `busy`).
+  creation, a failed one from when it failed, so "Apply again" has a full day.
+  The delete repeats that test with the pass's own cutoff, so a job queued, or
+  retried and failed again, since the pass read it is kept. A `queued` import
+  is timed from its creation: one staged long ago and queued just now is
+  relaunched by the next pass, which is harmless (a second launch of a job
+  somebody runs answers `busy`).
 
 ## What an import publishes
 

@@ -160,7 +160,7 @@ async def test_tags_added_once_and_unavailable_turns_tags_off(state, monkeypatch
     real = tags_step.add_tag_choices
 
     async def counted(session, **kw):
-        calls.append([c.value for c in kw["choices"]])
+        calls.append(list(kw["labels"]))
         return await real(session, **kw)
 
     monkeypatch.setattr(tags_step, "add_tag_choices", counted)

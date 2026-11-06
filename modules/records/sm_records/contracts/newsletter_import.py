@@ -6,7 +6,8 @@ the same tenant rule: the caller names the tenant, it is validated, bound with
 ``TenantIsolationError``) and pinned in every query. Nothing here commits; the
 caller finishes its transaction with ``simple_module_db.finalize_session``.
 
-Part 1: :func:`create_list`, :func:`importable_fields`, :func:`add_tag_choices`.
+Part 1: :func:`create_list`, :func:`importable_fields`, :func:`add_tag_choices`
+(and its pure value rule, :func:`tag_choice_values`).
 Part 2: :func:`import_subscribers` (R3-R5, D5) and :func:`opted_out_anywhere` (D1),
 both after :func:`lock_import_batch` (Codex finding 1).
 """
@@ -47,6 +48,7 @@ from sm_records.public_submissions.campaign_lists import (
     TagsFieldMissing,
 )
 from sm_records.public_submissions.campaign_reads import SubscriberFilterError
+from sm_records.public_submissions.tag_values import tag_values
 
 __all__ = [
     "CONSENT_TEMPLATE",
@@ -76,6 +78,7 @@ __all__ = [
     "importable_fields",
     "lock_import_batch",
     "opted_out_anywhere",
+    "tag_choice_values",
 ]
 
 RECORDS_PACKAGE = "sm_records"  # the `settings_for` key (R13)
@@ -154,18 +157,20 @@ async def add_tag_choices(
     *,
     tenant_id: str,
     type_key: str,
-    choices: Sequence[FieldChoice],
+    labels: Sequence[str],
     settings: RecordsSettings,
     actor: str | None = None,
-) -> list[str]:
-    """Append the missing ``choices`` to the list's ``tags`` multiselect,
-    creating the field on a list with no records; the values actually added,
-    in the given order (existing values and their labels are kept).
+) -> dict[str, str]:
+    """Each label's ``tags`` choice value (:func:`tag_choice_values`), decided
+    under the list's type lock against its choices as they are then, the
+    missing ones appended (creating the multiselect on a list with no
+    records): the authoritative label -> value mapping. Existing values and
+    their labels are kept; a label a choice already carries reuses its value.
 
-    ``ValueError`` for more than ``MAX_NEW_CHOICES``, a value or label that is
+    ``ValueError`` for more than ``MAX_NEW_CHOICES`` labels, a label that is
     not 1-``MAX_CHOICE_LEN`` characters without control characters, or a
-    duplicate value; ``TagsFieldMissing`` when ``tags`` is absent on a list
-    with records, or is not a multiselect. ``None`` for no such list raises
+    duplicate label; ``TagsFieldMissing`` when ``tags`` is absent on a list
+    with records, or is not a multiselect. No such list raises
     ``TagsFieldMissing`` too."""
     tenant = _checked_tenant(tenant_id)
     with tenant_scope(tenant):
@@ -173,8 +178,15 @@ async def add_tag_choices(
         if rtype is None:
             raise TagsFieldMissing(type_key)
         return await campaign_lists.add_choices(
-            session, rtype, choices, settings=settings, actor=actor
+            session, rtype, labels, settings=settings, actor=actor
         )
+
+
+def tag_choice_values(labels: Sequence[str], existing: Sequence[FieldChoice]) -> dict[str, str]:
+    """The value rule :func:`add_tag_choices` applies (D8), for a preview: a
+    label a choice carries reuses its value, else the label itself (no comma,
+    not taken), else its slug plus a hash, ``-2``, ``-3``… while taken. Pure."""
+    return tag_values(labels, [(c.value, c.label) for c in existing])
 
 
 async def import_subscribers(

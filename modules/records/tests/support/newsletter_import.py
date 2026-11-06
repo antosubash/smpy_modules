@@ -13,11 +13,9 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sm_records.contracts.newsletter_admin import FieldChoice
 from sm_records.contracts.newsletter_import import (
     ImportResult,
     ImportRow,
-    add_tag_choices,
     create_list,
     import_subscribers,
 )
@@ -62,19 +60,17 @@ async def make_list(site, tenant: str = TENANT, key: str = KEY) -> None:
         async with session(site) as db:
             rtype = await _rtype(db, key)
             team = field("team", "select", choices=[{"value": "x", "label": "X"}])
+            tags = field(
+                "tags",
+                "multiselect",
+                choices=[{"value": "a", "label": "A"}, {"value": "b", "label": "B"}],
+            )
             await type_service.update_type(
                 db,
                 rtype,
-                fields_raw=[*rtype.fields, team],
+                fields_raw=[*rtype.fields, team, tags],
                 expected_version=rtype.version,
                 settings=SETTINGS,
-            )
-            await events.commit(db)
-    async with session(site) as db:
-        with unbound():
-            choices = [FieldChoice(value="a", label="A"), FieldChoice(value="b", label="B")]
-            await add_tag_choices(
-                db, tenant_id=tenant, type_key=key, choices=choices, settings=SETTINGS
             )
             await events.commit(db)
 

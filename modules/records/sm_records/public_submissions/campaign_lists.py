@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordType
 from sm_records.public_submissions.campaign_reads import KIND_SUBSCRIPTION
+from sm_records.public_submissions.tag_values import tag_values
 from sm_records.records.services import types as type_service
 from sm_records.records.services._common import record_count
 from sm_records.records.services._lock import lock_type
@@ -113,36 +114,28 @@ async def tags_state(
     return "missing" if held else "creatable"
 
 
-def _checked(choices: object) -> list[tuple[str, str]]:
-    if isinstance(choices, str) or not isinstance(choices, Sequence):
-        raise ValueError("choices must be a sequence")
-    if len(choices) > MAX_NEW_CHOICES:
-        raise ValueError(f"at most {MAX_NEW_CHOICES} choices")
-    out: list[tuple[str, str]] = []
-    for choice in choices:
-        pair = (getattr(choice, "value", None), getattr(choice, "label", None))
-        for text in pair:
-            if (
-                not isinstance(text, str)
-                or not 1 <= len(text) <= MAX_CHOICE_LEN
-                or any(unicodedata.category(c) == "Cc" for c in text)
-            ):
-                raise ValueError(
-                    f"a choice value and label are 1-{MAX_CHOICE_LEN} characters, "
-                    "without control characters"
-                )
-        out.append(pair)  # type: ignore[arg-type]
-    if len({v for v, _ in out}) != len(out):
-        raise ValueError("duplicate choice values")
-    return out
+def _checked(labels: object) -> list[str]:
+    if isinstance(labels, str) or not isinstance(labels, Sequence):
+        raise ValueError("labels must be a sequence of str")
+    if len(labels) > MAX_NEW_CHOICES:
+        raise ValueError(f"at most {MAX_NEW_CHOICES} labels")
+    for text in labels:
+        if (
+            not isinstance(text, str)
+            or not 1 <= len(text) <= MAX_CHOICE_LEN
+            or any(unicodedata.category(c) == "Cc" for c in text)
+        ):
+            raise ValueError(
+                f"a label is 1-{MAX_CHOICE_LEN} characters, without control characters"
+            )
+    if len(set(labels)) != len(labels):
+        raise ValueError("duplicate labels")
+    return list(labels)
 
 
-def _with_choices(
-    rtype: RecordType, wanted: list[tuple[str, str]], held: int
-) -> tuple[list[dict[str, Any]], list[str]] | None:
-    """The fields with the missing choices appended, and those values; ``None``
-    when ``tags`` is absent and cannot be created."""
-    fields = [dict(f) if isinstance(f, dict) else f for f in rtype.fields or []]
+def _tags_in(fields: list[Any], held: int) -> dict[str, Any] | None:
+    """The ``tags`` multiselect in ``fields`` (appended, empty, on a list with no
+    records); ``None`` when it is absent and cannot be created, or not one."""
     tags = next((f for f in fields if isinstance(f, dict) and f.get("key") == TAGS_FIELD), None)
     if tags is None:
         if held:
@@ -155,36 +148,48 @@ def _with_choices(
             "options": {"choices": []},
         }
         fields.append(tags)
-    elif tags.get("type") != _MULTISELECT:
-        return None
-    options = dict(tags.get("options") or {})
-    choices = [dict(c) for c in options.get("choices") or [] if isinstance(c, dict)]
-    known = {c.get("value") for c in choices}
-    added = [(v, lab) for v, lab in wanted if v not in known]
-    choices.extend({"value": v, "label": lab} for v, lab in added)
-    tags["options"] = {**options, "choices": choices}
-    return fields, [v for v, _ in added]
+    return tags if tags.get("type") == _MULTISELECT else None
+
+
+def _pairs(choices: list[dict[str, Any]]) -> list[tuple[str, str]]:
+    out = []
+    for c in choices:
+        value = str(c.get("value"))
+        out.append((value, str(c.get("label") or value)))
+    return out
 
 
 async def add_choices(
     db: AsyncSession,
     rtype: RecordType,
-    choices: Sequence[Any],
+    labels: Sequence[Any],
     *,
     settings: RecordsSettings,
     actor: str | None,
-) -> list[str]:
-    wanted = _checked(choices)
+) -> dict[str, str]:
+    """Each label's choice value, decided (:func:`.tag_values.tag_values`) and the
+    missing ones appended under the type lock, from the choices as they are then."""
+    wanted = _checked(labels)
+    if not wanted:
+        return {}
     await lock_type(db, rtype)
     for attempt in (1, 2):  # one retry on a lost version race
         await db.refresh(rtype)
+        fields = [dict(f) if isinstance(f, dict) else f for f in rtype.fields or []]
         held = await record_count(db, rtype, include_deleted=True)
-        built = _with_choices(rtype, wanted, held)
-        if built is None:
+        tags = _tags_in(fields, held)
+        if tags is None:
             raise TagsFieldMissing(rtype.key)
-        fields, added = built
+        options = dict(tags.get("options") or {})
+        choices = [dict(c) for c in options.get("choices") or [] if isinstance(c, dict)]
+        current = _pairs(choices)
+        mapping = tag_values(wanted, current)
+        known = {value for value, _ in current}
+        added = [label for label in wanted if mapping[label] not in known]
         if not added:
-            return []
+            return mapping
+        choices.extend({"value": mapping[label], "label": label} for label in added)
+        tags["options"] = {**options, "choices": choices}
         try:
             await type_service.update_type(
                 db,
@@ -198,5 +203,5 @@ async def add_choices(
             if attempt == 2:
                 raise
             continue
-        return added
-    return []  # pragma: no cover
+        return mapping
+    return {}  # pragma: no cover

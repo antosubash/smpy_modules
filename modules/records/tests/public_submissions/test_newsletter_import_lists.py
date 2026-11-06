@@ -18,6 +18,7 @@ from sm_records.contracts.newsletter_import import (
     add_tag_choices,
     create_list,
     importable_fields,
+    tag_choice_values,
 )
 from sm_records.core import events
 from sm_records.core.settings import RecordsSettings
@@ -31,10 +32,6 @@ from tests.support.newsletter_contract import TENANT, seed_list, session, unboun
 from tests.support.newsletter_http import LIST
 
 SETTINGS = RecordsSettings()
-
-
-def _c(*values: str) -> list[FieldChoice]:
-    return [FieldChoice(value=v, label=v.upper()) for v in values]
 
 
 async def _make(site, tenant: str = TENANT, key: str = "weekly") -> str:
@@ -67,14 +64,14 @@ async def _targets(site, key: str = "weekly", tenant: str = TENANT) -> ImportTar
             return await importable_fields(db, tenant_id=tenant, type_key=key)
 
 
-async def _add(site, choices, key: str = "weekly", tenant: str = TENANT) -> list[str]:
+async def _add(site, labels, key: str = "weekly", tenant: str = TENANT) -> dict[str, str]:
     async with session(site) as db:
         with unbound():
             added = await add_tag_choices(
                 db,
                 tenant_id=tenant,
                 type_key=key,
-                choices=choices,
+                labels=labels,
                 settings=SETTINGS,
             )
             await events.commit(db)
@@ -160,23 +157,33 @@ async def test_importable_fields_unknown_is_none_and_form_raises(site):
 
 async def test_add_tag_choices_appends_once(site):
     await _make(site)
-    assert await _add(site, _c("a", "b")) == ["a", "b"]
-    renamed = [FieldChoice(value="b", label="Other"), FieldChoice(value="c", label="C")]
-    assert await _add(site, renamed) == ["c"]
-    assert await _tag_values(site) == ["a", "b", "c"]
+    assert await _add(site, ["A", "B"]) == {"A": "A", "B": "B"}
+    assert await _add(site, ["C", "B"]) == {"B": "B", "C": "C"}
+    assert await _tag_values(site) == ["A", "B", "C"]
+    version = await _version(site)
+    assert await _add(site, ["A"]) == {"A": "A"}
+    assert await _version(site) == version
+
+
+async def test_add_tag_choices_resolves_under_the_lock(site):
+    """The value rule runs against the stored choices: a comma, or a value another label
+    holds, gets slug plus hash (and a counter while taken); a known label is reused."""
+    await _make(site)
+    comma = (await _add(site, ["a, b"]))["a, b"]
+    assert comma.startswith("a-b-") and "," not in comma
+    taken = (await _add(site, [comma]))[comma]  # that value is held by "a, b"
+    assert taken not in (comma, "a, b") and taken.startswith(comma)
     async with session(site) as db:
         with unbound():
             fields = await list_fields(db, tenant_id=TENANT, type_key="weekly")
     tags = next(f for f in fields if f.key == "tags")
-    assert {c.value: c.label for c in tags.choices} == {"a": "A", "b": "B", "c": "C"}
-    version = await _version(site)
-    assert await _add(site, _c("a")) == []
-    assert await _version(site) == version
+    assert {c.value: c.label for c in tags.choices} == {comma: "a, b", taken: comma}
+    assert tag_choice_values(["a, b", comma], tags.choices) == {"a, b": comma, comma: taken}
 
 
 async def test_add_tag_choices_creates_field_on_empty_list(site):
     await _make(site)
-    await _add(site, _c("a"))
+    await _add(site, ["a"])
     async with session(site) as db:
         with unbound():
             fields = await list_fields(db, tenant_id=TENANT, type_key="weekly")
@@ -222,27 +229,29 @@ async def test_add_tag_choices_refuses_populated_list_without_field(site):
             await events.commit(db)
     before = await _version(site)
     with pytest.raises(TagsFieldMissing):
-        await _add(site, _c("a"))
+        await _add(site, ["a"])
     assert await _version(site) == before
     assert (await _targets(site)).tags == "missing"
 
 
 @pytest.mark.parametrize(
-    "choices",
+    "labels",
     [
-        [FieldChoice(value=f"v{i}", label="x") for i in range(501)],
-        [FieldChoice(value="", label="x")],
-        [FieldChoice(value="a", label="l" * 101)],
-        [FieldChoice(value="a\x00", label="x")],
-        [FieldChoice(value="a", label="x"), FieldChoice(value="a", label="y")],
+        [f"v{i}" for i in range(501)],
+        [""],
+        ["l" * 101],
+        ["a\x00"],
+        ["a", "a"],
+        "abc",
+        [FieldChoice(value="a", label="A")],
     ],
-    ids=["too_many", "empty_value", "long_label", "nul", "duplicate"],
+    ids=["too_many", "empty", "long_label", "nul", "duplicate", "str", "not_str"],
 )
-async def test_add_tag_choices_validates(site, choices):
+async def test_add_tag_choices_validates(site, labels):
     await _make(site)
     before = await _version(site)
     with pytest.raises(ValueError):
-        await _add(site, choices)
+        await _add(site, labels)
     assert await _version(site) == before
     assert await _tag_values(site) == []
 

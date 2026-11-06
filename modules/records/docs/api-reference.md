@@ -1792,13 +1792,22 @@ import. Same tenant rules as above; none of it commits. Part 1:
   when it is not indexed, so a caller can pick collision-free values) and `tags` (`present` for a `tags` multiselect, `creatable`
   with no `tags` field and no records, trash included, else `missing`). `None`
   for no such list; `not_a_list` for a type that is not one.
-- **`add_tag_choices(session, *, tenant_id, type_key, choices, settings,
-  actor=None)`** appends the missing `FieldChoice`s to `tags` under the type
-  lock (creating the multiselect on a list with no records) and returns the
-  values actually added; existing values and their labels are kept. At most 500
-  choices, each value and label 1 to 100 characters without control characters,
-  no duplicate values, else `ValueError`. `TagsFieldMissing` when `tags` is
-  absent on a list with records, or is not a multiselect.
+- **`add_tag_choices(session, *, tenant_id, type_key, labels, settings,
+  actor=None)`** decides each label's value under the type lock, against the
+  `tags` choices as they are then (`tag_choice_values`), appends the missing
+  ones (creating the multiselect on a list with no records) and returns the
+  authoritative `{label: value}` mapping; existing values and their labels are
+  kept. Read, resolve and append happen under one lock, so a choice another
+  writer added between a caller's own read and this call is seen, never
+  overwritten or mistaken for the caller's. At most 500 labels, each 1 to 100
+  characters without control characters, no duplicates, else `ValueError`.
+  `TagsFieldMissing` when `tags` is absent on a list with records, or is not a
+  multiselect (or there is no such list).
+- **`tag_choice_values(labels, existing)`** is that value rule, pure, for a
+  preview: a label an existing `FieldChoice` carries reuses its value; else the
+  label itself when it has no comma and no choice holds it; else its slug, `-`,
+  8 hex characters of its SHA-256, and `-2`, `-3`… while that is taken too.
+  Labels are resolved in sorted order, so the answer is deterministic.
 
 Part 2:
 
