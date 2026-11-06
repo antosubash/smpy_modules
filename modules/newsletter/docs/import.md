@@ -230,7 +230,9 @@ task `newsletter.run_import(tenant_id, import_id)` on the `newsletter` queue.
   the batch, and then its mirror suppresses the address on B too. On SQLite the
   type lock's `UPDATE` is the database's write lock, taken before the read.
   Lock order: **address locks → type lock → row locks → suppression rows**.
-  An unsubscribe of an address being imported waits up to one batch.
+  An unsubscribe of an address being imported waits up to one batch. A batch
+  holds up to 200 advisory locks in Postgres' shared lock table, so running
+  imports in parallel would need a look at `max_locks_per_transaction`.
 - A failure is recorded on the import as `import_failed`; the log carries the
   class name and the import id only, never an address.
 - The hourly `newsletter.import_janitor` beat task relaunches a `queued` or
