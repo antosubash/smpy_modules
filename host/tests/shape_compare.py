@@ -45,8 +45,8 @@ def cookies(response: httpx.Response, secret: str) -> list[tuple]:
 def shape(response: httpx.Response, secret: str):
     """Everything observable, nothing normalised by pattern: status, the raw body
     bytes (httpx undoes gzip only), every header but the clock and timings, and
-    the decoded cookies. Content-Length is compared as sent, unless a nonce makes
-    its compressed size vary.
+    the decoded cookies. Content-Length is compared as sent, except on a compressed
+    page, where the nonce makes it vary.
 
     One value is substituted. The framework stamps each response with a random
     CSP nonce, on the page's scripts and (outside development) in its policy, so
@@ -63,10 +63,10 @@ def shape(response: httpx.Response, secret: str):
         if "content-security-policy" in headers:
             headers["content-security-policy"] = policy.replace(nonce, "<nonce>")
         content = content.replace(nonce.encode(), b"<nonce>")
-        # Compressed, a random nonce moves the size by a few bytes; the decoded
-        # body compared above already covers what that length described.
-        if "content-encoding" in headers:
-            headers.pop("content-length", None)
+    # A page's random nonce moves its gzipped size by a few bytes, and a HEAD has no
+    # body to find the nonce in. A GET's decoded bytes cover what that length described.
+    if "content-encoding" in headers and "text/html" in headers.get("content-type", ""):
+        headers.pop("content-length", None)
     return response.status_code, content, headers, cookies(response, secret)
 
 
