@@ -159,6 +159,14 @@ campaign has sent nothing to record or track. A cancel that finds the campaign
 started meanwhile rolls back to a savepoint, releasing the campaign row, before
 it takes the started order.
 
+PR 6's people screens add two more paths, both taking **records' lock domain
+first** (its type lock, then the record row) and newsletter rows after: the
+suppression lift (`lock_confirmation`, then the conditional suppression delete,
+then the lift insert) and the admin unsubscribe (records' unsubscribe, then the
+suppression upsert). Neither touches campaign, send or click rows, so the two
+orders above are unaffected. Audience changes and `schedule` touch only the
+campaign row (reading a segment takes no lock). See [`audience.md`](audience.md).
+
 On SQLite the lock is a lease row (120 s) and the reservation is fenced on it,
 so a taken-over lease can never spend budget another holder counted. On
 Postgres it is a session advisory lock. One recipient's SMTP work is bounded by

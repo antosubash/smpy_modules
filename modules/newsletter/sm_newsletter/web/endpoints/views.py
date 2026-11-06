@@ -1,4 +1,4 @@
-"""Inertia screens: the campaign list, segments, subscribers, suppressions, the editor and the settings page.
+"""Inertia screens: campaigns, segments, subscribers, suppressions, the editor, settings.
 
 ``bind_admin`` first (as in every admin router here), then the shared CSRF
 token. The data is fetched client-side from ``/api/newsletter``; the props only

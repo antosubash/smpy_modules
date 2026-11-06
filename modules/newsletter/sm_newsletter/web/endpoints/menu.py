@@ -8,7 +8,11 @@ from sm_newsletter.core import constants
 
 
 def menu_items() -> list[MenuItem]:
-    """Campaigns and Segments (``newsletter.view``), Subscribers (that and ``records.view``) and Settings (``newsletter.manage``)."""
+    """The rail entries.
+
+    Campaigns and Segments need ``newsletter.view``, Subscribers that and
+    ``records.view``, Suppressions and Settings ``newsletter.manage``.
+    """
     return [
         MenuItem(
             label=constants.MENU_LABEL_CAMPAIGNS,

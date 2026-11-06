@@ -20,7 +20,8 @@ unsubscribe page with RFC 8058 one-click. Open and click tracking and a campaign
 [`docs/tracking.md`](docs/tracking.md). See [`docs/content.md`](docs/content.md) for blocks, merge fields
 and the URL rules, [`docs/sending.md`](docs/sending.md) for how sending works and
 [`docs/operations.md`](docs/operations.md) for what must run (worker and beat,
-the secret, the DKIM checklist).
+the secret, the DKIM checklist). Segments, campaign audiences, the subscriber
+screen and suppression lifts: [`docs/audience.md`](docs/audience.md).
 
 ## Install
 
@@ -56,14 +57,24 @@ re-saved through the endpoint, so always use the endpoint). The generic Settings
 refuses newsletter writes: use the module's own page, `/admin/newsletter/settings`.
 Changing the SMTP host, port, security or username clears the stored password.
 
+### Screens
+
+| Screen | URL | Needs |
+| --- | --- | --- |
+| Campaigns | `/admin/newsletter/` | `newsletter.view` |
+| Segments | `/admin/newsletter/segments` | `newsletter.view` (edit: `newsletter.edit`) |
+| Subscribers | `/admin/newsletter/subscribers` | `newsletter.view` and `records.view` |
+| Suppressions | `/admin/newsletter/suppressions` | `newsletter.manage` |
+| Settings | `/admin/newsletter/settings` | `newsletter.manage` |
+
 ### Permissions
 
 | Permission | Allows |
 | --- | --- |
-| `newsletter.view` | See campaigns and preview them, reports and suppressions |
-| `newsletter.edit` | Create and edit campaigns |
+| `newsletter.view` | See campaigns and preview them, reports, segments; with `records.view`, the subscriber screen |
+| `newsletter.edit` | Create and edit campaigns and segments; tag and untag subscribers (with `records.view`) |
 | `newsletter.send` | Send a test; later, start, pause, resume and cancel a send |
-| `newsletter.manage` | The settings page; saving it and the SMTP password also need `settings.edit` |
+| `newsletter.manage` | The settings page (saving it and the SMTP password also need `settings.edit`), the suppressions screen and its lifts, and unsubscribing a subscriber (with `records.view`) |
 
 Every entry point binds a tenant: a single-tenant host uses `default`, a
 multi-tenant host the organisation the framework resolved (403

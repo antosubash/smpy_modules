@@ -14,7 +14,7 @@ so it is planned against the code as it then stands. Each one goes through
 | 3 | `2026-11-03-newsletter-pr3-campaigns.md` | campaigns + content: block model, email renderer (HTML + text), Puck editor, preview, article/page cards, test send over SMTP transport, settings page |
 | 4 | `2026-11-03-newsletter-pr4-sending.md` | sending: freeze, single dispatcher + budget ledger, daily cap and per-minute throttle, retries (pre-acceptance only), pause/resume/cancel, bounce classification, **the unsubscribe page and one-click POST** |
 | 5 | `2026-11-03-newsletter-pr5-tracking.md` | tracking (open, click) and reports |
-| 6 | (later) | segments and the subscriber screen |
+| 6 | `2026-11-03-newsletter-pr6-segments.md` | segments, campaign audiences (`all`, `tag:`, `segment:`), the subscriber screen with tags and admin unsubscribe, suppression lifts (spec amendment 11) |
 | 7 | (later) | Mailchimp import, with records' `import_subscribers` and a tag-choices contract added there, where its only caller is; docs; e2e spec |
 
 ## Notes for PR 4 (from PR 3)
@@ -45,3 +45,14 @@ so it is planned against the code as it then stands. Each one goes through
   (`tracking/timeline.py`). Events outside it count in the totals only.
 - Segments need no tracking change: tracking is per send and link, and never
   reads the audience.
+
+## Notes for PR 7 (from PR 6)
+
+- The tag-choices **read** shipped in PR 6 (`list_fields`, in
+  `sm_records.contracts.newsletter_admin`); PR 7 adds only `add_tag_choices`, the
+  write, beside `import_subscribers`.
+- The import must never emit `pending → confirmed` (PR 2): that is the one event
+  that clears suppressions.
+- Imported people's "signed up" (records' `created_at`, what a segment's "Signed up"
+  rule reads) is the import time.
+- The e2e "send to a tag" uses the audience picker's *A tag*.
