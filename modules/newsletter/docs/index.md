@@ -80,6 +80,9 @@ writes (`manage_url`).
   harvest the credential at AUTH. The page warns before saving.
 - `from_name`, `from_address` and `reply_to` refuse CR, LF and control characters
   (422, no echo).
+- Input is bounded: `smtp_host` 253, `smtp_username` 320, `from_name` 200,
+  `physical_address` 500 characters (422 above that). A malformed body to the
+  password endpoint is `422 invalid_password` and never echoes the input.
 - `smtp_password` is stored encrypted and written only through
   `PUT /api/newsletter/settings/smtp-password` (needs `newsletter.manage` and
   `settings.edit`; `scripts/set_setting.py` would store it in plaintext, accepted

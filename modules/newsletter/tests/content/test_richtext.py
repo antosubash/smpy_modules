@@ -264,3 +264,8 @@ def test_blocks_rich_text_checks_merge_on_cleaned_output():
 def test_href_with_format_or_c1_character_dropped_keeps_text(ch):
     # I5: the link is dropped, the text stays.
     assert clean(f'<a href="https://example.org/{ch}x">click</a>') == "click"
+
+
+def test_unwrapped_normal_weight_b_does_not_close_an_outer_strong():
+    raw = '<strong>a<b style="font-weight:normal">b</b>c</strong>d'
+    assert clean(raw) == "<strong>abc</strong>d"

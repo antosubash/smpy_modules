@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from sm_newsletter.core.constants import MAX_EMAIL_LEN
 from sm_newsletter.core.headers import check_header_text
 
 # Changing where the relay is, or who logs in to it, clears the stored password:
@@ -14,7 +15,7 @@ SERVER_FIELDS = ("smtp_host", "smtp_port", "smtp_security", "smtp_username")
 
 # Input bounds only; ``SettingsOut`` stays unbounded so a stored value never 500s.
 MAX_HOST = 253
-MAX_USERNAME = 320
+MAX_USERNAME = MAX_EMAIL_LEN  # a login is often the address
 MAX_FROM_NAME = 200
 MAX_PHYSICAL_ADDRESS = 500
 
