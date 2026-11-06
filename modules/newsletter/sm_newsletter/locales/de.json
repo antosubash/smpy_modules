@@ -17,7 +17,8 @@
     "settings": "Einstellungen",
     "segments": "Segmente",
     "subscribers": "Abonnenten",
-    "suppressions": "Sperrliste"
+    "suppressions": "Sperrliste",
+    "import": "Import"
   },
   "campaigns": {
     "title": "Kampagnen",
@@ -611,6 +612,77 @@
         "hour": "Stunde",
         "day": "Tag"
       }
+    }
+  },
+  "import": {
+    "title": "Abonnenten importieren",
+    "description": "Übernehmen Sie Kontakte aus einem Mailchimp-Export: Liste wählen, CSV-Dateien hochladen, Spaltenzuordnung prüfen und importieren.",
+    "list_label": "Newsletter-Liste",
+    "new_list": "Neue Liste",
+    "upload_label": "Mailchimp-Export",
+    "upload_hint": "CSV-Dateien oder ein ZIP-Archiv mit den CSV-Dateien, die Mailchimp exportiert. Jede Datei wird als eine Art von Kontakten gelesen.",
+    "upload": "Hochladen",
+    "files": "Dateien",
+    "kind": "Art",
+    "rows": "Zeilen",
+    "duplicates": "Duplikate",
+    "invalid": "Ungültig",
+    "columns": "Spalten",
+    "column": "Spalte",
+    "target": "Importieren als",
+    "not_imported": "Nicht importieren",
+    "tags_switch": "Tags importieren",
+    "tags_found": "Gefundene Tags",
+    "tags_missing_hint": "Diese Liste hat kein Tags-Feld, daher können keine Tags importiert werden.",
+    "tags_hint_segments": "Mailchimp-Segmente werden nicht als Tags exportiert. Importiert werden nur die eigenen Tags der Kontakte.",
+    "apply": "Import starten",
+    "applying": "Wird gestartet ...",
+    "discard": "Verwerfen",
+    "history": "Frühere Importe",
+    "history_empty": "Noch keine Importe.",
+    "errors": "Zeilen, die nicht importiert werden konnten",
+    "errors_download": "Alle als CSV herunterladen",
+    "errors_more": "Angezeigt werden die ersten {{shown}} von {{total}}.",
+    "done": "Der Import ist abgeschlossen.",
+    "failed": "Der Import ist fehlgeschlagen.",
+    "progress": "{{processed}} von {{total}} Zeilen verarbeitet",
+    "summary": "{{total}} Zeilen in {{files}} Dateien",
+    "suppression_note": "Abgemeldete und bereinigte Kontakte erhalten nie E-Mails. Bestehende Abmeldungen und Bounces bleiben bestehen.",
+    "kinds": {
+      "subscribed": "Angemeldet",
+      "unsubscribed": "Abgemeldet",
+      "cleaned": "Bereinigt",
+      "ignored": "Ignoriert"
+    },
+    "status": {
+      "staged": "Wartet auf Zuordnung",
+      "queued": "In der Warteschlange",
+      "running": "Läuft",
+      "done": "Fertig",
+      "failed": "Fehlgeschlagen"
+    },
+    "counts": {
+      "created": "Angelegt",
+      "updated": "Aktualisiert",
+      "skipped": "Übersprungen",
+      "suppressed": "Gesperrt",
+      "failed": "Fehlgeschlagen"
+    },
+    "row_errors": {
+      "invalid_email": "Keine gültige E-Mail-Adresse.",
+      "cell_too_long": "Ein Wert ist zu lang.",
+      "tag_invalid": "Ein Tag ist ungültig.",
+      "invalid_value": "Ein Wert ist für sein Feld ungültig.",
+      "record_refused": "Der Datensatz wurde abgelehnt.",
+      "tags_unavailable": "Die Liste hat kein Tags-Feld."
+    },
+    "new_list_dialog": {
+      "title": "Neue Liste",
+      "key": "Schlüssel",
+      "key_hint": "Buchstaben, Ziffern und Bindestriche. Er kann später nicht geändert werden.",
+      "label": "Name",
+      "create": "Liste anlegen",
+      "cancel": "Abbrechen"
     }
   }
 }

@@ -17,7 +17,8 @@
     "settings": "Settings",
     "segments": "Segments",
     "subscribers": "Subscribers",
-    "suppressions": "Suppressions"
+    "suppressions": "Suppressions",
+    "import": "Import"
   },
   "campaigns": {
     "title": "Campaigns",
@@ -611,6 +612,77 @@
         "hour": "hour",
         "day": "day"
       }
+    }
+  },
+  "import": {
+    "title": "Import subscribers",
+    "description": "Bring contacts in from a Mailchimp export: choose a list, upload the CSV files, check the column mapping, then import.",
+    "list_label": "Newsletter list",
+    "new_list": "New list",
+    "upload_label": "Mailchimp export",
+    "upload_hint": "CSV files, or a ZIP of the CSV files Mailchimp exports. Each file is read as one kind of contact.",
+    "upload": "Upload",
+    "files": "Files",
+    "kind": "Kind",
+    "rows": "Rows",
+    "duplicates": "Duplicates",
+    "invalid": "Invalid",
+    "columns": "Columns",
+    "column": "Column",
+    "target": "Imported as",
+    "not_imported": "Not imported",
+    "tags_switch": "Import tags",
+    "tags_found": "Tags found",
+    "tags_missing_hint": "This list has no tags field, so tags cannot be imported.",
+    "tags_hint_segments": "Mailchimp segments are not exported as tags. Only each contact's own tags are imported.",
+    "apply": "Start import",
+    "applying": "Starting...",
+    "discard": "Discard",
+    "history": "Earlier imports",
+    "history_empty": "No imports yet.",
+    "errors": "Rows that could not be imported",
+    "errors_download": "Download all as CSV",
+    "errors_more": "Showing the first {{shown}} of {{total}}.",
+    "done": "The import is finished.",
+    "failed": "The import failed.",
+    "progress": "{{processed}} of {{total}} rows processed",
+    "summary": "{{total}} rows in {{files}} files",
+    "suppression_note": "Unsubscribed and cleaned contacts are never mailed. Existing opt-outs and bounces stay.",
+    "kinds": {
+      "subscribed": "Subscribed",
+      "unsubscribed": "Unsubscribed",
+      "cleaned": "Cleaned",
+      "ignored": "Ignored"
+    },
+    "status": {
+      "staged": "Waiting for mapping",
+      "queued": "Queued",
+      "running": "Running",
+      "done": "Done",
+      "failed": "Failed"
+    },
+    "counts": {
+      "created": "Created",
+      "updated": "Updated",
+      "skipped": "Skipped",
+      "suppressed": "Suppressed",
+      "failed": "Failed"
+    },
+    "row_errors": {
+      "invalid_email": "Not a valid email address.",
+      "cell_too_long": "A value is too long.",
+      "tag_invalid": "A tag is not valid.",
+      "invalid_value": "A value is not valid for its field.",
+      "record_refused": "The record was refused.",
+      "tags_unavailable": "The list has no tags field."
+    },
+    "new_list_dialog": {
+      "title": "New list",
+      "key": "Key",
+      "key_hint": "Letters, digits and hyphens. It cannot be changed later.",
+      "label": "Name",
+      "create": "Create list",
+      "cancel": "Cancel"
     }
   }
 }
