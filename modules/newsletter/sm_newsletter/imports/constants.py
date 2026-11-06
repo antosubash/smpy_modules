@@ -23,6 +23,11 @@ MAX_ROWS = 250_000
 MAX_COLUMNS = 200
 MAX_CELL = 4096
 """Characters."""
+MAX_LINE = 4 * MiB
+"""Bytes in one physical line. MAX_COLUMNS x MAX_CELL is 800k characters, 3.2 MiB even if every
+character took four bytes, so this admits any row the other limits admit and nothing larger."""
+MAX_HEADER_KEY = 200
+"""Characters of a header kept in a field key or a row error."""
 MAX_TAGS_PER_ROW = 50
 MAX_TAG_LEN = 100
 MAX_NEW_TAGS = 500

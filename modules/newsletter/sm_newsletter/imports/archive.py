@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import zipfile
+import zlib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import BinaryIO
@@ -26,6 +27,8 @@ from sm_newsletter.imports.constants import (
 )
 
 MAX_NAME = 200
+ARCHIVE_ERRORS = (zipfile.BadZipFile, zlib.error, EOFError, OSError, ValueError)
+"""What a lying or corrupt entry raises while it is read."""
 _METHODS = (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)
 
 
@@ -125,6 +128,9 @@ def _wanted(filename: str) -> bool:
 
 def _opener(archive: zipfile.ZipFile, info: zipfile.ZipInfo) -> Callable[[], BinaryIO]:
     def open_entry() -> BinaryIO:
-        return archive.open(info)  # type: ignore[return-value]
+        try:
+            return archive.open(info)  # type: ignore[return-value]
+        except (*ARCHIVE_ERRORS, NotImplementedError) as exc:
+            raise ImportZipUnsafe from exc
 
     return open_entry

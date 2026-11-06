@@ -20,14 +20,18 @@ from sm_newsletter.core.errors_import import (
     ImportNoEmailColumn,
     ImportNotUtf8,
     ImportTooManyColumns,
+    ImportZipUnsafe,
 )
 from sm_newsletter.core.suppression import normalise_email
+from sm_newsletter.imports.archive import ARCHIVE_ERRORS
 from sm_newsletter.imports.constants import (
     EMAIL_HEADERS,
     IGNORED,
     MAILCHIMP_SYSTEM,
     MAX_CELL,
     MAX_COLUMNS,
+    MAX_HEADER_KEY,
+    MAX_LINE,
     TAGS_HEADER,
 )
 from sm_newsletter.imports.tags import parse_tags, tag_values
@@ -86,13 +90,20 @@ class _OneLine(io.RawIOBase):
     def __init__(self, binary: BinaryIO) -> None:
         self._binary = binary
         self._rest = b""
+        self._line = 0
 
     def readable(self) -> bool:
         return True
 
     def readinto(self, buffer) -> int:  # type: ignore[no-untyped-def]
         if not self._rest:
-            self._rest = self._binary.readline()
+            self._line += 1
+            try:
+                self._rest = self._binary.readline(MAX_LINE + 1)
+            except ARCHIVE_ERRORS as exc:
+                raise ImportZipUnsafe from exc
+            if len(self._rest) > MAX_LINE:
+                raise ImportMalformedCsv(f"The file is not valid CSV (line {self._line})")
         chunk, self._rest = self._rest[: len(buffer)], self._rest[len(buffer) :]
         buffer[: len(chunk)] = chunk
         return len(chunk)
@@ -170,6 +181,7 @@ def read_header(stream: TextIO) -> Header:
         raise ImportMalformedCsv("The file is not valid CSV (line 1)") from exc
     if len(names) > MAX_COLUMNS:
         raise ImportTooManyColumns
+    names = [n[:MAX_HEADER_KEY] for n in names]
     keys = [header_key(n) for n in names]
     email = next((keys.index(h) for h in EMAIL_HEADERS if h in keys), None)
     if email is None:
@@ -179,7 +191,10 @@ def read_header(stream: TextIO) -> Header:
     mappable = [
         i
         for i, key in enumerate(keys)
-        if i not in (email, tags) and key not in MAILCHIMP_SYSTEM and key
+        if i not in (email, tags)
+        and key not in MAILCHIMP_SYSTEM
+        and key not in EMAIL_HEADERS
+        and key
     ]
     return Header(delimiter, names, email, tags, times, mappable)
 
