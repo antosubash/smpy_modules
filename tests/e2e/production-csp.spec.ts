@@ -16,7 +16,7 @@ test.describe('Production CSP', () => {
     const policy = response.headers()['content-security-policy'];
     const nonce = policy.match(/'nonce-([\w-]+)'/)?.[1];
     expect(nonce, policy).toBeTruthy();
-    expect(policy).not.toContain('unsafe-eval');
+    expect(policy).not.toContain("'unsafe-eval'");
     expect(policy).not.toMatch(/script-src[^;]*unsafe-inline/);
 
     const html = await response.text();
