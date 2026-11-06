@@ -20,6 +20,8 @@ from tests.support.import_world import (
     queued,
     records_of,
     run_all,
+    set_job,
+    set_rows,
     suppress_at,
     suppressed_of,
     suppression_rows,
@@ -68,15 +70,21 @@ async def test_apply_writes_records_and_suppressions(state):
     assert None not in (await outcomes(state, jid)).values()
 
 
-async def test_tag_values_final_and_distinct(tmp_path):
+@pytest.mark.parametrize("indexed", [True, False], ids=["indexed", "not-indexed"])
+async def test_tag_values_final_and_distinct(tmp_path, indexed):
+    """D8, also on a list whose ``tags`` field is not indexed (T6b): its existing choices are
+    still seen, so the label "VIP" never lands on the unrelated existing value ``VIP``."""
     _app, state = await build_app(file=tmp_path / "tags.db")
-    tags = {**TAGS, "options": {"choices": [{"value": "VIP", "label": "Very important"}]}}
+    choices = {"choices": [{"value": "VIP", "label": "Very important"}]}
+    tags = {**TAGS, "indexed": indexed, "options": choices}
     await seed_list(state, "default", fields=[FIELDS[0], FIELDS[1], tags])
     try:
         jid = await queued(
             state,
             upload(SUB, [[ADA, "", "", '"Customers, 2020"'], [BOB, "", "", "Customers; 2020,VIP"]]),
         )
+        preview = {t["label"]: t["value"] for t in (await job_row(state, jid)).tags_found}
+        assert preview["VIP"] != "VIP"  # staging's preview sees the choice too
         assert await run_all(state.session_factory, jid) == ["done"]
         job = await job_row(state, jid)
         values = {t["label"]: t["value"] for t in job.tags_found}
@@ -151,3 +159,20 @@ async def test_apply_pins_the_tenant(state):
     assert {k: v.data for k, v in (await records_of(state, "other")).items()} == before_records
     assert await suppression_rows(state, "other") == before_rows
     assert {r[1] for r in await suppression_rows(state)} == {"unsubscribed", "imported_cleaned"}
+
+
+async def test_label_missing_from_tags_found_is_a_row_error(state):
+    """Cannot happen after T6a; if it ever does, the label is reported, not dropped silently."""
+    jid = await queued(state, upload(SUB, [[ADA, "", "", "VIP,Events"]]))
+    await set_job(state, jid, tags_found=[{"label": "VIP", "value": "vip", "count": 1}])
+    result = await apply_now(state, jid)
+    assert result.errors == [{"file": 0, "line": 2, "code": "tag_invalid", "field": "tags"}]
+    assert (await records_of(state))[ADA].data["tags"] == ["vip"]
+
+
+async def test_unknown_kind_is_refused_not_suppressed(state):
+    jid = await queued(state, upload(CLEAN, [[ADA, "", "", ""]]))
+    await set_rows(state, jid, kind="ignored")
+    with pytest.raises(ValueError, match="unknown staged row kind"):
+        await apply_now(state, jid)
+    assert await suppression_rows(state) == []

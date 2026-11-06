@@ -32,6 +32,7 @@ __all__ = [
     "add_choices",
     "create",
     "mappable_fields",
+    "tags_field",
     "tags_state",
 ]
 
@@ -96,7 +97,8 @@ def mappable_fields(rtype: RecordType) -> list[dict[str, Any]]:
     return [f for f in fields if f.get("key") != TAGS_FIELD and f.get("type") in MAPPABLE_TYPES]
 
 
-def _tags(rtype: RecordType) -> dict[str, Any] | None:
+def tags_field(rtype: RecordType) -> dict[str, Any] | None:
+    """The list's ``tags`` field definition, indexed or not; ``None`` without one."""
     fields = [f for f in rtype.fields or [] if isinstance(f, dict)]
     return next((f for f in fields if f.get("key") == TAGS_FIELD), None)
 
@@ -104,7 +106,7 @@ def _tags(rtype: RecordType) -> dict[str, Any] | None:
 async def tags_state(
     db: AsyncSession, rtype: RecordType
 ) -> Literal["present", "creatable", "missing"]:
-    tags = _tags(rtype)
+    tags = tags_field(rtype)
     if tags is not None:
         return "present" if tags.get("type") == _MULTISELECT else "missing"
     held = await record_count(db, rtype, include_deleted=True)

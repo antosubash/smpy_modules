@@ -18,7 +18,6 @@ from sm_newsletter.imports import runner
 from sm_newsletter.imports.apply import BatchResult, apply_batch
 from sm_newsletter.imports.service import queue_apply
 from sm_newsletter.models import ImportEntry, ImportJob, Suppression
-from sm_records.contracts.newsletter_admin import list_fields
 from sm_records.contracts.newsletter_import import importable_fields
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope as records_scope
@@ -43,6 +42,7 @@ __all__ = [
     "counts",
     "export",
     "job_row",
+    "list_shape",
     "outcomes",
     "people",
     "pinned",
@@ -52,6 +52,7 @@ __all__ = [
     "run",
     "run_all",
     "set_job",
+    "set_rows",
     "snapshot",
     "staged_count",
     "staged_outcomes",
@@ -93,6 +94,18 @@ async def set_job(state: Any, job_id: int, *, tenant: str = "default", **values:
             await s.execute(
                 update(ImportJob)
                 .where(ImportJob.id == job_id, ImportJob.tenant_id == tenant)
+                .values(**values)
+            )
+            await s.commit()
+
+
+async def set_rows(state: Any, job_id: int, *, tenant: str = "default", **values: Any) -> None:
+    """Rewrite every staged row of the import (test-only)."""
+    with tenant_scope(tenant):
+        async with state.session_factory() as s:
+            await s.execute(
+                update(ImportEntry)
+                .where(ImportEntry.import_id == job_id, ImportEntry.tenant_id == tenant)
                 .values(**values)
             )
             await s.commit()
@@ -204,11 +217,9 @@ async def job_row(state, jid, tenant="default") -> ImportJob:
             return (await s.execute(select(ImportJob).where(ImportJob.id == jid))).scalar_one()
 
 
-async def tag_choices(state) -> dict[str, str]:
-    with tenant_scope("default"):
-        async with state.session_factory() as s:
-            fields = await list_fields(s, tenant_id="default", type_key="news")
-    return {c.value: c.label for f in fields if f.key == "tags" for c in f.choices}
+async def tag_choices(state: Any) -> dict[str, str]:
+    """Value -> label of list ``news``'s ``tags`` choices, indexed field or not."""
+    return dict((await list_shape(state))[1])
 
 
 def people(prefix: str, n: int, tags: str = "") -> list[list[str]]:
@@ -250,4 +261,15 @@ async def snapshot(state, jid) -> tuple:
         await suppression_rows(state),
         await staged_count(state, jid),
         job.model_dump(),
+        await list_shape(state),
     )
+
+
+async def list_shape(state: Any, tenant: str = "default", key: str = "news") -> tuple:
+    """The list type's version and its ``tags`` choices: what a tags-step write changes."""
+    with records_scope(tenant):
+        async with state.session_factory() as s:
+            rtype = await type_service.get_type(s, key)
+            tags = next((f for f in rtype.fields or [] if f.get("key") == "tags"), {})
+            choices = (tags.get("options") or {}).get("choices") or []
+            return rtype.version, [(c["value"], c.get("label")) for c in choices]

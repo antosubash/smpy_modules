@@ -12,8 +12,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from sm_records.contracts.newsletter_admin import FieldChoice, list_fields
-from sm_records.contracts.newsletter_import import TAGS_FIELD, TagsFieldMissing, add_tag_choices
+from sm_records.contracts.newsletter_admin import FieldChoice
+from sm_records.contracts.newsletter_import import (
+    TagsFieldMissing,
+    add_tag_choices,
+    importable_fields,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.imports.constants import KEEP_ERRORS
@@ -34,8 +38,8 @@ async def tags_once(
     session: AsyncSession, *, tenant_id: str, job: ImportJob, owner: str, records_settings: Any
 ) -> None:
     """Decide the final values, add the new choices, mark the step done; fenced."""
-    fields = await list_fields(session, tenant_id=tenant_id, type_key=job.list_type_key)
-    existing = next((f.choices for f in fields if f.key == TAGS_FIELD), [])
+    targets = await importable_fields(session, tenant_id=tenant_id, type_key=job.list_type_key)
+    existing = targets.tag_choices if targets is not None else []  # indexed or not (T6b)
     values = tag_values([t["label"] for t in job.tags_found], existing)
     found = [{**t, "value": values[t["label"]]} for t in job.tags_found]
     known = {c.value for c in existing}

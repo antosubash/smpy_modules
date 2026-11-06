@@ -182,10 +182,21 @@ async def test_too_many_new_tags_refused(state, monkeypatch):
                 )  # fmt: skip
 
 
-async def test_existing_tags_do_not_count_as_new(state, monkeypatch):
-    monkeypatch.setattr(staging, "MAX_NEW_TAGS", 1)
+async def test_existing_tags_count_towards_the_limit(state, monkeypatch):
+    """T6a: every distinct label counts, existing choices too, so ``tags_found`` always holds
+    every label a row carries and none is dropped at apply."""
+    monkeypatch.setattr(staging, "MAX_NEW_TAGS", 2)
+    files = [upload(SUB, [["a@x.org", "", "", "VIP,Events,fresh"]])]
+    with tenant_scope("default"):
+        async with state.session_factory() as s:
+            with pytest.raises(ImportTooManyTags):
+                await staging.stage(
+                    s, tenant_id="default", list_type_key="news", sources=sources(files),
+                    created_by=None, now=NOW,
+                )  # fmt: skip
+    monkeypatch.setattr(staging, "MAX_NEW_TAGS", 3)
     jid = await staged(state, upload(SUB, [["a@x.org", "", "", "VIP,Events,fresh"]]))
-    assert len((await job_of(state, jid)).tags_found) == 3
+    assert {t["label"] for t in (await job_of(state, jid)).tags_found} == {"VIP", "Events", "fresh"}
 
 
 async def test_stage_pins_the_tenant(state):

@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Any, TextIO
 
 from simple_module_db import mark_written
-from sm_records.contracts.newsletter_admin import FieldChoice, SubscriberFilterError, list_fields
+from sm_records.contracts.newsletter_admin import FieldChoice, SubscriberFilterError
 from sm_records.contracts.newsletter_import import ImportTargets, importable_fields
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,7 +52,6 @@ from sm_newsletter.models import ImportEntry, ImportJob
 
 __all__ = ["stage"]
 
-TOP_TAGS = 500
 _CONFLICT = ("tenant_id", "import_id", "email_hash")
 
 
@@ -91,7 +90,7 @@ async def stage(
     committed. :class:`NotFound` for no such list, ``ImportTooManyRows`` /
     ``ImportTooManyTags`` over the limits."""
     targets = await _targets(session, tenant_id, list_type_key)
-    existing = await _tag_choices(session, tenant_id, list_type_key)
+    existing = targets.tag_choices  # indexed or not (T6b): list_fields sees indexed only
     peeks = [_peek(s) for s in sources]
     columns, remaps = _columns(peeks)
     with tenant_scope(tenant_id):
@@ -135,11 +134,6 @@ async def _targets(session: AsyncSession, tenant_id: str, key: str) -> ImportTar
     if targets is None:
         raise NotFound()
     return targets
-
-
-async def _tag_choices(session: AsyncSession, tenant_id: str, key: str) -> list[FieldChoice]:
-    fields = await list_fields(session, tenant_id=tenant_id, type_key=key)
-    return next((f.choices for f in fields if f.key == "tags"), [])
 
 
 @contextmanager
@@ -241,8 +235,9 @@ async def _tags_found(
     session: AsyncSession, tenant_id: str, job_id: int | None, existing: Sequence[FieldChoice]
 ) -> list[dict[str, Any]]:
     """``[{label, value, count}]`` over the subscribed rows that were staged, most frequent
-    first, at most ``TOP_TAGS``; ``ImportTooManyTags`` when more than ``MAX_NEW_TAGS`` labels
-    are not yet choices. ``value`` is a preview: the tags step decides the final one (D8)."""
+    first; ``ImportTooManyTags`` when there are more than ``MAX_NEW_TAGS`` distinct labels
+    (T6a), so every label of every row is here and none is dropped at apply. ``value`` is a
+    preview: the tags step decides the final one (D8)."""
     stmt = select(ImportEntry.tags).where(
         ImportEntry.tenant_id == tenant_id,
         ImportEntry.import_id == job_id,
@@ -254,9 +249,8 @@ async def _tags_found(
     ).partitions():
         for labels in batch:
             counts.update(labels or [])
-    known = {c.label for c in existing}
-    if sum(1 for label in counts if label not in known) > MAX_NEW_TAGS:
+    if len(counts) > MAX_NEW_TAGS:
         raise ImportTooManyTags
-    top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:TOP_TAGS]
+    top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
     values = tag_values([label for label, _ in top], existing)
     return [{"label": label, "value": values[label], "count": n} for label, n in top]

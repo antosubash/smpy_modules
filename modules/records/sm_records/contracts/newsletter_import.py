@@ -83,6 +83,9 @@ class ImportField(SQLModel):
 class ImportTargets(SQLModel):
     fields: list[ImportField]
     tags: Literal["present", "creatable", "missing"]
+    tag_choices: list[FieldChoice] = []
+    """The ``tags`` multiselect's current choices, whether or not the field is
+    indexed (``list_fields`` shows indexed fields only); ``[]`` without one."""
 
 
 async def create_list(
@@ -125,7 +128,17 @@ async def importable_fields(
                     key=shaped.key, label=shaped.label, type=shaped.type, choices=shaped.choices
                 )
             )
-        return ImportTargets(fields=fields, tags=await campaign_lists.tags_state(session, rtype))
+        raw_tags = campaign_lists.tags_field(rtype)
+        tag_choices = (
+            _field(raw_tags).choices
+            if raw_tags is not None and raw_tags.get("type") == "multiselect"
+            else []
+        )
+        return ImportTargets(
+            fields=fields,
+            tags=await campaign_lists.tags_state(session, rtype),
+            tag_choices=tag_choices,
+        )
 
 
 async def add_tag_choices(

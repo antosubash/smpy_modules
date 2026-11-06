@@ -13,6 +13,7 @@ import pytest
 import pytest_asyncio
 from sm_newsletter.imports import runner, tags_step
 from sm_newsletter.models import ImportJob
+from sm_records.contracts.newsletter_admin import FieldChoice
 from sqlalchemy import update
 
 from tests.imports.world import FIELDS, upload
@@ -87,13 +88,16 @@ class _Pause:
     def __init__(self, fail: bool = False) -> None:
         self.paused, self.resume, self.calls, self.fail = asyncio.Event(), asyncio.Event(), 0, fail
 
-    async def gate(self) -> None:
+    async def gate(self) -> bool:
+        """Whether this was the paused call."""
         self.calls += 1
-        if self.calls == 1:
-            self.paused.set()
-            await self.resume.wait()
-            if self.fail:
-                raise RuntimeError(f"boom {SENTINEL}@example.org")
+        if self.calls != 1:
+            return False
+        self.paused.set()
+        await self.resume.wait()
+        if self.fail:
+            raise RuntimeError(f"boom {SENTINEL}@example.org")
+        return True
 
 
 async def _race(state, jid, pause: _Pause) -> str:
@@ -127,15 +131,20 @@ async def test_stale_worker_after_takeover_changes_nothing(state, monkeypatch, f
 
 
 async def test_stale_worker_in_tags_step_changes_nothing(state, monkeypatch):
+    """A's tags step, resumed after B finished, would add a choice B never added (A was shown
+    a list where "Brand new" is taken by another label, so its value is hashed): the fence
+    must roll that records write back, which ``list_shape`` in the snapshot would show."""
     pause = _Pause()
-    real = tags_step.list_fields
+    real = tags_step.importable_fields
 
     async def gated(session, **kw):
-        fields = await real(session, **kw)
-        await pause.gate()
-        return fields
+        targets = await real(session, **kw)
+        if await pause.gate():
+            taken = FieldChoice(value="Brand new", label="Someone else's")
+            targets = targets.model_copy(update={"tag_choices": [*targets.tag_choices, taken]})
+        return targets
 
-    monkeypatch.setattr(tags_step, "list_fields", gated)
+    monkeypatch.setattr(tags_step, "importable_fields", gated)
     jid = await queued(
         state,
         upload(SUB, people("s", 3, "Brand new")),
@@ -145,3 +154,4 @@ async def test_stale_worker_in_tags_step_changes_nothing(state, monkeypatch):
     assert await _race(state, jid, pause) == "busy"
     job = await job_row(state, jid)
     assert job.tags_added is True
+    assert {t["value"] for t in job.tags_found} == {"Brand new"}  # B's, not A's hashed value

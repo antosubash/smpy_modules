@@ -36,6 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.core.constants import REASON_IMPORTED_CLEANED, REASON_UNSUBSCRIBED
 from sm_newsletter.core.suppression import suppress_many, suppressed
+from sm_newsletter.imports.constants import KINDS
 from sm_newsletter.models import ImportEntry, ImportJob
 
 __all__ = ["CLEANED", "SKIPPED_SUPPRESSED", "BatchResult", "apply_batch"]
@@ -135,6 +136,12 @@ async def _to_records(
     return results
 
 
+def _unmapped(row: ImportEntry, tag_map: dict[str, str]) -> bool:
+    """A label with no value in ``tags_found``: staging refuses over ``MAX_NEW_TAGS`` distinct
+    labels (T6a), so this cannot happen; if it ever does it is a row error, not a silent drop."""
+    return any(label not in tag_map for label in row.tags or [])
+
+
 def _error(row: ImportEntry, code: str, field_key: str | None) -> dict[str, Any]:
     return {"file": row.file_index, "line": row.line, "code": code, "field": field_key}
 
@@ -169,16 +176,19 @@ async def apply_batch(
     """Apply ``rows`` of ``job``: records, then suppressions, then each row's outcome."""
     result = BatchResult()
     outcome: dict[int | None, str] = {}
+    tag_map = _tag_map(job)
     subscribed = [r for r in rows if r.kind == "subscribed"]
     refused = await _refused(session, tenant_id, [r.email for r in subscribed])
     to_records: list[ImportEntry] = []
     for row in rows:
+        if row.kind not in KINDS:  # never a tenant-wide suppression for a kind not known here
+            raise ValueError("unknown staged row kind")
         if row.kind == "subscribed" and row.email in refused:
             outcome[row.id] = SKIPPED_SUPPRESSED
-        elif row.kind in ("subscribed", "unsubscribed"):
-            to_records.append(row)
-        else:
+        elif row.kind == "cleaned":
             outcome[row.id] = CLEANED
+        else:
+            to_records.append(row)
     answers = await _to_records(
         session,
         tenant_id=tenant_id,
@@ -193,6 +203,8 @@ async def apply_batch(
         result.errors.extend(_error(row, "invalid_value", key) for key in answer.dropped)
         if answer.outcome == "invalid":
             result.errors.append(_error(row, "record_refused", None))
+        if row.kind == "subscribed" and tag_map and _unmapped(row, tag_map):
+            result.errors.append(_error(row, "tag_invalid", "tags"))
     await _suppress(session, tenant_id, job, rows, outcome, now)
     await _store(session, tenant_id, job, outcome)
     for row in rows:
