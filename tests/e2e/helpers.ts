@@ -62,7 +62,8 @@ export async function moduleCsrfHeader(
     | '/admin/images/'
     | '/pagebuilder/'
     | '/ai/'
-    | '/admin/billing/usage' = '/admin/news/',
+    | '/admin/billing/usage'
+    | '/admin/newsletter/' = '/admin/news/',
 ): Promise<Record<string, string>> {
   const html = await (await page.request.get(view)).text();
   const json = html.match(/<script data-page="app" type="application\/json">([^<]*)<\/script>/);
