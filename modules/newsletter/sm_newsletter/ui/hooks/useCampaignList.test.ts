@@ -74,4 +74,20 @@ describe('useCampaignList', () => {
       offset: 0,
     });
   });
+
+  it('steps back a page when the last row of the last page is deleted', async () => {
+    listCampaigns.mockResolvedValue({ items: [], total: 51 });
+    await mount();
+    await act(async () => list.nextPage());
+    expect(list.offset).toBe(list.pageSize);
+
+    listCampaigns.mockResolvedValue({ items: [], total: 50 });
+    await act(async () => list.reload());
+    expect(list.offset).toBe(0);
+    expect(listCampaigns.mock.calls.at(-1)?.[0]).toEqual({
+      q: undefined,
+      status: undefined,
+      offset: 0,
+    });
+  });
 });

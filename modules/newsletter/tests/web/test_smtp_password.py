@@ -166,3 +166,15 @@ async def test_multi_tenant_without_a_tenant_is_403_even_with_both_permissions()
         assert await _stored(state) is None
     finally:
         await state.engine.dispose()
+
+
+@pytest.mark.parametrize(
+    "body", [{"password": ["hunter2-secret"]}, {"passwd": "hunter2-secret"}, ["hunter2-secret"]]
+)
+async def test_a_malformed_body_never_echoes_the_value(client, built, body):
+    _, state = built
+    res = await client.put(URL, json=body, headers=MANAGE)
+    assert res.status_code == 422
+    assert res.json()["code"] == "invalid_password"
+    assert "hunter2-secret" not in res.text
+    assert await _stored(state) is None

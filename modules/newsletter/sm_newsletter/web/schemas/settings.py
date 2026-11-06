@@ -12,6 +12,12 @@ from sm_newsletter.core.headers import check_header_text
 # otherwise the credential could be sent to a server of the caller's choosing.
 SERVER_FIELDS = ("smtp_host", "smtp_port", "smtp_security", "smtp_username")
 
+# Input bounds only; ``SettingsOut`` stays unbounded so a stored value never 500s.
+MAX_HOST = 253
+MAX_USERNAME = 320
+MAX_FROM_NAME = 200
+MAX_PHYSICAL_ADDRESS = 500
+
 
 class SmtpPasswordUpdate(BaseModel):
     """Unconstrained on purpose: a validation error would echo the submitted
@@ -57,18 +63,18 @@ class SettingsUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     transport: Literal["smtp", "console"] | None = None
-    smtp_host: str | None = None
+    smtp_host: str | None = Field(default=None, max_length=MAX_HOST)
     smtp_port: int | None = Field(default=None, ge=1, le=65535)
     smtp_security: Literal["starttls", "tls"] | None = None
-    smtp_username: str | None = None
+    smtp_username: str | None = Field(default=None, max_length=MAX_USERNAME)
     from_address: EmailStr | Literal[""] | None = None
-    from_name: str | None = None
+    from_name: str | None = Field(default=None, max_length=MAX_FROM_NAME)
     reply_to: EmailStr | Literal[""] | None = None
     daily_limit: int | None = Field(default=None, ge=1)
     per_minute_limit: int | None = Field(default=None, ge=1)
     tracking_opens: bool | None = None
     tracking_clicks: bool | None = None
-    physical_address: str | None = None
+    physical_address: str | None = Field(default=None, max_length=MAX_PHYSICAL_ADDRESS)
 
     @field_validator("from_address", "from_name", "reply_to")
     @classmethod

@@ -68,7 +68,9 @@ Render warnings are `relative_urls`, `physical_address_missing` and
 `em`), keeps no attribute but `a[href]` (which must pass the link rule; a
 duplicate `href` keeps the first), and escapes all text. The contents of
 `script style iframe object embed template svg math head title noscript` are
-dropped; any other tag is unwrapped and its text kept. Nesting is capped at 20.
+dropped; any other tag is unwrapped and its text kept. At most 20 elements are open
+at once (a deeper start tag is unwrapped, its text kept), and past 200 tracked
+open elements a start tag is treated as unknown.
 
 It runs at save (the stored value is the cleaned form) and again at render, so a
 row written around the API is still safe. The admin preview is an
