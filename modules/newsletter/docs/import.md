@@ -191,8 +191,11 @@ field's key at apply time and, for a staging refusal, the column's header text
 error never echoes a cell's value**, logs carry counts and the import id only,
 and HTTP refusals name a file by index and line, never by name. The first 1 000
 errors are kept. `GET /api/newsletter/imports/{id}/errors.csv` downloads them with the
-file names; every cell starting with `=`, `+`, `-`, `@`, tab or CR is prefixed
-with `'` so a spreadsheet cannot run it.
+file names. Free-text cells (file name, field) are always prefixed with `'` unless
+empty or purely numeric; the other cells are prefixed when their left-stripped form
+starts with `=`, `+`, `-`, `@`, tab, CR, LF or a full-width `＝ ＋ － ＠`. Every cell is
+quoted and `;` in a file name becomes `_`, so a semicolon-locale parser cannot split a
+cell into a formula.
 
 ## Workers, slices and the janitor
 

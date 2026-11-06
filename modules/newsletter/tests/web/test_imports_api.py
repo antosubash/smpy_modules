@@ -143,3 +143,5 @@ async def test_errors_csv_neutralises_formulas(client):
     assert rows[1][:2] == ["0", "'=cmd.csv"]
     assert rows[1][3] == "invalid_email"
     assert all(not c.startswith(("=", "+", "-", "@")) for r in rows for c in r)
+    assert rows[1][2] == "2"  # line number stays numeric
+    assert got.text.splitlines()[1].startswith('"0","\'=cmd.csv"')
