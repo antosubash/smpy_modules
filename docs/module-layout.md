@@ -3,7 +3,7 @@
 How the files of a module in `modules/<name>/` are organised. `images`
 (`modules/images`) follows it in full and is the reference; its own map is
 [`modules/images/docs/code-layout.md`](../modules/images/docs/code-layout.md).
-All six modules follow this structure. The migration checklist below also
+All seven modules follow this structure. The migration checklist below also
 applies when reorganising a new area.
 
 The aim is that someone new finds a file by asking *which feature is this?*,

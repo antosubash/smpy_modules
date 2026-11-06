@@ -80,7 +80,7 @@ is `POST /pages/{id}/translations`, which creates a sibling sharing a
 `translation_group`. Every slug lookup and redirect takes a locale; adding one
 that does not is how `/de/p/x` starts serving the English page.
 
-**Every pagebuilder, news, records and images entry point binds a tenant (#38, #112).**
+**Every pagebuilder, news, records, images and newsletter entry point binds a tenant (#38, #112).**
 Their tables carry `MultiTenantMixin`, and the framework filters them only
 while a tenant is bound — on a host with `multi_tenant` off nothing is bound
 and a read is *unfiltered*. Routers get `tenancy.bind_admin`/`bind_public`,
@@ -95,10 +95,12 @@ tenant is never shareable-cached (records #196; pagebuilder and news #192).
 The scheduler opens one session per tenant under `tenant_context`. News has its
 own copy, `news.core.tenancy`, and its scheduler ticks per tenant the same way;
 records' is `sm_records.core.tenancy` (its 403 is the `{"detail","code"}` envelope,
-code `tenant_required`) and images' `sm_images.core.tenancy` is a copy of it; images'
+code `tenant_required`), images' `sm_images.core.tenancy` is a copy of it, and newsletter's
+`sm_newsletter.core.tenancy` is a copy of images'; images'
 Celery tasks never run unscoped — `images.reconcile` and `images.janitor`
 enumerate tenants in one narrow `all_tenants()` read and do each tenant's work
-under `tenant_context`; billing reads the same `request.state.tenant_id`
+under `tenant_context`, and newsletter's hourly reconcile does the same, enumerating
+tenants through records' `subscription_list_tenants` (worker-only); billing reads the same `request.state.tenant_id`
 through `context.billing_context`. Another module reads pagebuilder only
 through `pagebuilder.contracts` (news' search calls
 `search_pages`/`search_media`, #130); the caller names the tenant and the
@@ -119,6 +121,15 @@ trash (`empty_trash`; both reach `_purge_ids`) and deleting the type
 `records_submission_delivery` claims first, through `forget_deliveries`; a
 new way of deleting records must go through one of them. The retention sweep
 trashes with `soft_delete_record` and then calls `hard_delete_record`.
+
+**Newsletter mirrors records' unsubscribes into `newsletter_suppression`.** The
+`SubscriptionChanged` handler writes them, and an hourly reconcile walks records'
+unsubscribed subscribers, trash included, and only adds rows. Suppressions are
+tenant-wide: an opt-out on any list suppresses every list in the tenant. Only a
+double-opt-in confirmation (records' confirm link, the one `pending → confirmed`
+event) clears anything: that list's opt-out and the bounce/import rows created at
+or before it, never `complaint`, never another list's opt-out. A single-opt-in
+signup (`None → confirmed`, anyone can type the address) clears nothing.
 
 **Never add a file under `modules/*/*/pages/` unless it is a real Inertia
 page.** The page name is derived from that path by `import.meta.glob`, so a
@@ -155,7 +166,7 @@ one place provider state becomes local state), and response models
 (`PlanOut`) must not inherit input bounds — a stored row that predates a bound
 would 500 every screen listing plans. Its docs are in `modules/billing/docs/`.
 
-**`pagebuilder`, `news`, `billing`, `ai` and `images` read no environment variables.** Their settings are
+**`pagebuilder`, `news`, `billing`, `ai`, `images` and `newsletter` read no environment variables.** Their settings are
 DB-backed through the framework's settings module (`register_module_settings`),
 and each class drops pydantic-settings' env, `.env` and secrets sources — so
 adding a field means adding it to the class, not to `.env.example`, and an
@@ -166,6 +177,11 @@ or with `scripts/set_setting.py`. Anything the module reads while booting
 hydration happens at lifespan start, so a value read earlier is the pydantic
 default no matter what the database says. Mark such fields
 `json_schema_extra=_RESTART` so the Settings screen says a restart is needed.
+Newsletter's `smtp_password` is stored `enc:v1:` under `SM_SECRET_KEY` and written only
+through `PUT /api/newsletter/settings/smtp-password` (needs `newsletter.manage` and
+`settings.edit`; `scripts/set_setting.py`
+would store it in plaintext, accepted with a warning; use the endpoint); the generic Settings screen
+refuses newsletter writes (`manage_url`).
 These settings are SYSTEM-scope: ai has one provider configuration and one
 API key per slot for the whole deployment, shared by every tenant. ai reads
 two things from the environment, both only as the framework's
@@ -233,7 +249,7 @@ Everything else goes in one of a few areas: `core/` (what every feature
 builds on), `web/` (endpoints, schemas, services, serving), one folder per
 domain (images: `ingest/`, `pipeline/`, `jobs/`, `map/`) and `ui/` for the
 frontend that is not a page. Tests mirror the areas under `tests/`.
-New code in any module follows it. All six modules follow it; structural changes keep the same moves-only
+New code in any module follows it. All seven modules follow it; structural changes keep the same moves-only
 review boundary.
 
 **300-line cap** on every `.py` / `.ts` / `.tsx`, enforced by
@@ -273,7 +289,7 @@ Without that stack, one container matching CI's image is enough:
 docker run -d --name smpy-postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=smpy_modules postgres:16
 ```
 
-Redis and Celery are used by the **images** module (framework
+Redis and Celery are used by the **images** and **newsletter** modules (framework
 `background_tasks`, host pinned `==0.0.42`): `SM_REDIS_URL` points at dev-services'
 Redis, and `make worker` / `worker-imports` / `worker-heavy` / `worker-gpu` /
 `beat` run `host/worker.py` (`build_runner_celery`) with one queue set each.
@@ -307,7 +323,7 @@ the target fails without it.
 
 ## Known deferred work
 
-- **UI i18n — done in every module, in English and German.** All six ship
+- **UI i18n — done in every module, in English and German.** All seven ship
   `locales/en.json` and `locales/de.json` and route every string through
   `t()`. `scripts/check_locales.py` (in `make lint` and CI) fails when a
   translation's key tree or placeholders drift from `en.json` — add a key to

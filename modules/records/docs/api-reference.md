@@ -1658,8 +1658,10 @@ rest as keywords, and returns plain objects.
 
 | Function | Returns |
 |---|---|
-| `iter_subscribers(session, *, tenant_id, type_key, filters=(), after=0, limit=500, status="confirmed")` | `(list[SubscriberHit], next_after \| None)`: untrashed subscribers in `status` (`confirmed` or `unsubscribed`), ANDed `"field:op:value"` filters, ordered by record id; pass `next_after` back as `after` |
-| `count_subscribers(session, *, tenant_id, type_key, filters=(), status="confirmed")` | how many `iter_subscribers` would walk |
+| `iter_subscribers(session, *, tenant_id, type_key, filters=(), after=0, limit=500, status="confirmed", include_trashed=False)` | `(list[SubscriberHit], next_after \| None)`: untrashed subscribers in `status` (`confirmed` or `unsubscribed`), ANDed `"field:op:value"` filters, ordered by record id; pass `next_after` back as `after`. `include_trashed=True` adds the trash (`trashed=True` on those hits) and is accepted only with `status="unsubscribed"` |
+| `count_subscribers(session, *, tenant_id, type_key, filters=(), status="confirmed", include_trashed=False)` | how many `iter_subscribers` would walk, under the same `include_trashed` rule |
+| `subscription_lists(session, *, tenant_id)` | `list[str]`: the keys of the tenant's newsletter lists (types whose `public_submissions.kind` is `subscription`), sorted; `[]` for a tenant with none |
+| `subscription_list_tenants(session)` | `list[str]`: every valid tenant id that owns at least one newsletter list, sorted. The contract's one cross-tenant read, for a worker; see **Enumerating tenants** |
 | `subscribers_by_uuid(session, *, tenant_id, type_key, uuids)` | `dict[uuid, SubscriberHit]`, any status, trashed included (`trashed=True`); unknown uuids absent; `ValueError` for a bare string, too many uuids or a non-`str` element |
 | `unsubscribe(session, *, tenant_id, type_key, uuid, unless_confirmed_after, settings, bus=None)` | `True` only if this call wrote |
 | `set_tags(session, *, tenant_id, type_key, uuid, add=(), remove=(), settings, bus=None)` | the `SubscriberHit` as written |
@@ -1679,6 +1681,22 @@ also pins `tenant_id` as a `WHERE`, since on a single-tenant host nothing is
 bound and the framework's filter then does nothing. A tenant with no such list
 reads as empty (`[]`, `0`, `{}`) and as `False` for `unsubscribe` and
 `can_read_list`, exactly like an unknown address.
+
+**Enumerating tenants.** `subscription_list_tenants` is the exception to the
+rule above: it names no tenant and reads every tenant's types, in one
+statement run inside the framework's `all_tenants()` (and tagged past records'
+guard). It must be called with no tenant bound — a worker, or inside
+`no_tenant()` or `all_tenants()` — and raises `TenantIsolationError` under a
+bound tenant, so a request can never enumerate other tenants. Use a fresh
+session, then one session per tenant for that tenant's reads. Types are
+hard-deleted, so every type it sees is live; invalid tenant ids are dropped.
+
+**The trash.** `include_trashed` exists for the newsletter module's
+suppression reconcile: an opt-out keeps counting while its record waits in the
+trash, so a lost `SubscriptionChanged` is caught before the purge. It must be
+a `bool`, and `True` with any `status` but `unsubscribed` raises `ValueError`
+before any SQL — the trash is never mailed. With `False` (the default) the
+queries are the untrashed ones.
 
 **Arguments.** `limit` is an `int` from 1 to `MAX_SUBSCRIBER_BATCH` (1000);
 `after` a non-negative `int`; `uuids` at most 1000 and not a bare string;

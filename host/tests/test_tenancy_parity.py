@@ -15,6 +15,8 @@ from __future__ import annotations
 import news.core.tenancy
 import pagebuilder.core.tenancy
 import pytest
+import sm_newsletter.core.tenancy
+import sm_newsletter.core.tenancy._mode
 import sm_records.core.tenancy
 import sm_records.core.tenancy._mode
 from fastapi import Request
@@ -25,11 +27,13 @@ _DETECTORS = {
     "pagebuilder": pagebuilder.core.tenancy,
     "news": news.core.tenancy,
     "records": sm_records.core.tenancy._mode,
+    "newsletter": sm_newsletter.core.tenancy._mode,
 }
 _RESOLVERS = {
     "pagebuilder": pagebuilder.core.tenancy,
     "news": news.core.tenancy,
     "records": sm_records.core.tenancy,
+    "newsletter": sm_newsletter.core.tenancy,
 }
 
 # Every row spells out all three settings, so a developer's .env cannot move it.

@@ -18,6 +18,7 @@ members = [
     "simple-module-billing",
     "simple-module-images",
     "simple-module-news",
+    "simple-module-newsletter",
     "simple-module-pagebuilder",
     "simple-module-python-modules",
     "simple-module-records",
@@ -2657,6 +2658,44 @@ requires-dist = [
 provides-extras = ["dev", "pagebuilder"]
 
 [[package]]
+name = "simple-module-newsletter"
+version = "0.0.13"
+source = { editable = "modules/newsletter" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "pydantic-settings" },
+    { name = "simple-module-background-tasks" },
+    { name = "simple-module-core" },
+    { name = "simple-module-db" },
+    { name = "simple-module-hosting" },
+    { name = "simple-module-records" },
+    { name = "simple-module-settings" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "simple-module-test" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cryptography", specifier = ">=42" },
+    { name = "pydantic-settings", specifier = ">=2.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
+    { name = "simple-module-background-tasks", specifier = ">=0.0.42,<0.1" },
+    { name = "simple-module-core", specifier = ">=0.0.42,<0.1" },
+    { name = "simple-module-db", specifier = ">=0.0.42,<0.1" },
+    { name = "simple-module-hosting", specifier = ">=0.0.42,<0.1" },
+    { name = "simple-module-records", editable = "modules/records" },
+    { name = "simple-module-settings", specifier = ">=0.0.42,<0.1" },
+    { name = "simple-module-test", marker = "extra == 'dev'", specifier = ">=0.0.42,<0.1" },
+]
+provides-extras = ["dev"]
+
+[[package]]
 name = "simple-module-pagebuilder"
 version = "0.0.13"
 source = { editable = "modules/pagebuilder" }
@@ -2893,6 +2932,7 @@ dependencies = [
     { name = "simple-module-hosting" },
     { name = "simple-module-images" },
     { name = "simple-module-news" },
+    { name = "simple-module-newsletter" },
     { name = "simple-module-pagebuilder" },
     { name = "simple-module-permissions" },
     { name = "simple-module-records" },
@@ -2925,6 +2965,7 @@ requires-dist = [
     { name = "simple-module-hosting", specifier = "==0.0.42" },
     { name = "simple-module-images", editable = "modules/images" },
     { name = "simple-module-news", editable = "modules/news" },
+    { name = "simple-module-newsletter", editable = "modules/newsletter" },
     { name = "simple-module-pagebuilder", editable = "modules/pagebuilder" },
     { name = "simple-module-permissions", specifier = "==0.0.42" },
     { name = "simple-module-records", editable = "modules/records" },
