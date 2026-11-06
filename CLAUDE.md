@@ -306,7 +306,7 @@ Without that stack, one container matching CI's image is enough:
 docker run -d --name smpy-postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=smpy_modules postgres:16
 ```
 
-Redis and Celery are used by the **images** module (framework
+Redis and Celery are used by the **images** and **newsletter** modules (framework
 `background_tasks`, host pinned `==0.0.42`): `SM_REDIS_URL` points at dev-services'
 Redis, and `make worker` / `worker-imports` / `worker-heavy` / `worker-gpu` /
 `beat` run `host/worker.py` (`build_runner_celery`) with one queue set each.

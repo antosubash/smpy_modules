@@ -231,7 +231,7 @@ def tenant_header(app: Any) -> str | None:
 def configure(app: Any) -> TenancyMode:
     """Detect the mode once, store it on the services container, and warn when
     the host's setting asked for tenancy the stack does not have. Called from
-    ``ImagesModule.on_startup``.
+    ``NewsletterModule.on_startup``.
 
     One direction only: ``multi_tenant`` is on but the stack has no
     ``TenantMiddleware``, which since framework 0.0.35 means the setting
