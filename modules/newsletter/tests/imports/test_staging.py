@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import io
+
 import pytest
 import pytest_asyncio
 from sm_newsletter.core.errors_import import ImportTooManyRows, ImportTooManyTags
@@ -12,7 +14,8 @@ from sm_newsletter.imports.archive import sources
 from sm_newsletter.models import ImportEntry, ImportJob
 from sqlalchemy import func, select
 
-from tests.imports.world import FIELDS, NOW, job_of, rows_of, staged, upload
+from tests.imports.fixtures import csv_bytes
+from tests.imports.world import FIELDS, HEAD, NOW, job_of, rows_of, staged, upload
 from tests.support.app import build_app
 from tests.support.records_seed import seed_list
 
@@ -203,3 +206,41 @@ async def test_unknown_list_is_not_found(state):
                     sources=sources([upload(SUB, [["a@x.org", "", "", ""]])]),
                     created_by=None, now=NOW,
                 )  # fmt: skip
+
+
+class _Tracked(io.BytesIO):
+    def __init__(self, data: bytes) -> None:
+        super().__init__(data)
+        self.opened = 0
+
+    def __enter__(self):
+        return self
+
+
+async def test_owned_streams_are_closed_and_uploads_are_not(state):
+    from sm_newsletter.imports.archive import Source
+
+    data = csv_bytes(HEAD, [["a@x.org", "", "", ""]])
+    owned, shared = [], _Tracked(data)
+
+    def open_owned():
+        owned.append(io.BytesIO(data))
+        return owned[-1]
+
+    def open_shared():
+        shared.seek(0)
+        return shared
+
+    files = [Source(0, SUB, open_owned, owned=True), Source(1, UNSUB, open_shared)]
+    with tenant_scope("default"):
+        async with state.session_factory() as s:
+            await staging.stage(
+                s,
+                tenant_id="default",
+                list_type_key="news",
+                sources=files,
+                created_by=None,
+                now=NOW,
+            )
+    assert len(owned) == 2 and all(b.closed for b in owned)  # peeked, then staged
+    assert not shared.closed

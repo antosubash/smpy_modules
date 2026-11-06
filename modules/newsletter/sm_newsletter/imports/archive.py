@@ -39,6 +39,9 @@ class Source:
     index: int
     name: str
     open: Callable[[], BinaryIO]
+    owned: bool = False
+    """``open`` returns a stream of its own (a ZIP entry) that the reader closes; a CSV upload's
+    stream is the caller's and is reused."""
 
 
 def clean_name(raw: str) -> str:
@@ -103,7 +106,7 @@ def _zip_sources(stream: BinaryIO) -> list[Source]:
     if not chosen:
         raise ImportNotCsv
     return [
-        Source(n, clean_name(info.filename), _opener(archive, info))
+        Source(n, clean_name(info.filename), _opener(archive, info), owned=True)
         for n, info in enumerate(chosen)
     ]
 

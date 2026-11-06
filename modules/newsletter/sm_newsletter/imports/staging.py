@@ -10,10 +10,11 @@ commits: a refusal raised here is followed by the caller's rollback, which remov
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, TextIO
 
 from simple_module_db import mark_written
 from sm_records.contracts.newsletter_admin import FieldChoice, SubscriberFilterError, list_fields
@@ -141,9 +142,22 @@ async def _tag_choices(session: AsyncSession, tenant_id: str, key: str) -> list[
     return next((f.choices for f in fields if f.key == "tags"), [])
 
 
+@contextmanager
+def _text(source: Source) -> Iterator[TextIO]:
+    """The file as text; a stream the source owns (a ZIP entry) is closed after, a CSV upload's
+    is left to its caller."""
+    binary = source.open()
+    try:
+        yield text_stream(binary)
+    finally:
+        if source.owned:
+            binary.close()
+
+
 def _peek(source: Source) -> _Peek:
-    """Header and kind of one file; an ignored file is not parsed beyond its name."""
-    header = read_header(text_stream(source.open()))
+    """Header and kind of one file."""
+    with _text(source) as stream:
+        header = read_header(stream)
     return _Peek(source, detect_kind(source.name, header), header)
 
 
@@ -176,8 +190,6 @@ async def _stage_file(
     tally: _Tally,
 ) -> int:
     """Stream one file into chunks; the rows of it that were staged."""
-    stream = text_stream(peek.source.open())
-    header = read_header(stream)
     buffer: list[dict[str, Any]] = []
     staged = 0
 
@@ -193,33 +205,35 @@ async def _stage_file(
         if tally.total > MAX_ROWS:
             raise ImportTooManyRows
 
-    for item in read_rows(stream, header, peek.kind):
-        if not isinstance(item, Parsed):
-            tally.error(peek.source.index, item.line, item.code, item.field)
-            if item.code == "invalid_email":
-                tally.invalid += 1
-            continue
-        tally.seq += 1
-        buffer.append(
-            {
-                "tenant_id": tenant_id,
-                "import_id": job_id,
-                "seq": tally.seq,
-                "file_index": peek.source.index,
-                "line": item.line,
-                "kind": peek.kind,
-                "email": item.email,
-                "email_hash": email_hash(item.email),
-                "fields": {str(remap[i]): v for i, v in item.fields.items()},
-                "tags": item.tags,
-                "event_at": item.event_at,
-                "consent_at": item.consent_at,
-                "outcome": None,
-            }
-        )
-        if len(buffer) >= STAGE_CHUNK:
-            await flush()
-    await flush()
+    with _text(peek.source) as stream:
+        header = read_header(stream)
+        for item in read_rows(stream, header, peek.kind):
+            if not isinstance(item, Parsed):
+                tally.error(peek.source.index, item.line, item.code, item.field)
+                if item.code == "invalid_email":
+                    tally.invalid += 1
+                continue
+            tally.seq += 1
+            buffer.append(
+                {
+                    "tenant_id": tenant_id,
+                    "import_id": job_id,
+                    "seq": tally.seq,
+                    "file_index": peek.source.index,
+                    "line": item.line,
+                    "kind": peek.kind,
+                    "email": item.email,
+                    "email_hash": email_hash(item.email),
+                    "fields": {str(remap[i]): v for i, v in item.fields.items()},
+                    "tags": item.tags,
+                    "event_at": item.event_at,
+                    "consent_at": item.consent_at,
+                    "outcome": None,
+                }
+            )
+            if len(buffer) >= STAGE_CHUNK:
+                await flush()
+        await flush()
     return staged
 
 

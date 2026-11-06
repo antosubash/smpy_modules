@@ -52,8 +52,11 @@ def validate(
             raise ImportBadMapping(f"The column mapping is not valid ({where})")
         if key in used:
             raise ImportBadMapping(f"The column mapping is not valid ({where})")
+        canonical = str(int(column))  # "007" is column 7: the staged rows are keyed "7"
+        if canonical in fields:
+            raise ImportBadMapping(f"The column mapping is not valid ({where})")
         used.add(key)
-        fields[str(column)] = key
+        fields[canonical] = key
     tags = raw.get("tags", False)
     if not isinstance(tags, bool) or (tags and targets.tags == "missing"):
         raise ImportBadMapping("The column mapping is not valid (tags)")

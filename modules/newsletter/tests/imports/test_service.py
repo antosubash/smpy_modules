@@ -85,7 +85,6 @@ async def test_set_mapping_only_while_staged(world):
     with tenant_scope("default"):
         async with state.session_factory() as s:
             targets = await importable_fields(s, tenant_id="default", type_key="news")
-            job = await job_of(state, jid)
             got = await service.set_mapping(
                 s, tenant_id="default", job=await s.get(ImportJob, jid),
                 raw={"fields": {"0": "last_name"}, "tags": False}, targets=targets,
@@ -99,8 +98,8 @@ async def test_set_mapping_only_while_staged(world):
                     raw={"fields": {"9": "last_name"}},
                     targets=targets,
                 )
-            assert job.status == "staged"
             await s.commit()
+    assert (await job_of(state, jid)).mapping == {"fields": {"0": "last_name"}, "tags": False}
     await _set_status(state, jid, "queued")
     with tenant_scope("default"):
         async with state.session_factory() as s:

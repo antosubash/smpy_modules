@@ -64,6 +64,10 @@ def test_validate_accepts_and_normalises():
         ({"fields": {"0": "nope"}}, "fields.0", "present"),
         ({"fields": {"0": "city", "1": "city"}}, "fields.1", "present"),
         ({"fields": {"0": 5}}, "fields.0", "present"),
+        ({"fields": {"0": "city", "00": "first_name"}}, "fields.00", "present"),
+        ({"fields": {"+1": "city"}}, "fields.+1", "present"),
+        ({"fields": {" 1": "city"}}, "fields. 1", "present"),
+        ({"fields": {"-1": "city"}}, "fields.-1", "present"),
         ({"fields": []}, "fields", "present"),
         ({"fields": {}, "tags": True}, "tags", "missing"),
         ({"tags": "yes"}, "tags", "present"),
@@ -76,3 +80,14 @@ def test_validate_refusals(raw, detail, tags):
         validate(raw, columns=_cols("A", "B"), targets=_targets(tags), tags_found=FOUND)
     assert detail in str(err.value)
     assert "nope" not in str(err.value).replace("fields.0", "")
+
+
+def test_validate_canonicalises_column_indices():
+    cols = _cols(*(f"c{i}" for i in range(9)))
+    got = validate(
+        {"fields": {"007": "city", "00": "first_name"}},
+        columns=cols,
+        targets=_targets(),
+        tags_found=[],
+    )
+    assert got["fields"] == {"7": "city", "0": "first_name"}
