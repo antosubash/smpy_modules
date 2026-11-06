@@ -142,3 +142,24 @@ async def test_detail_suppressed_is_tenant_wide_not_visibility_filtered(db_state
         )
     assert got.suppressed is True
     assert got.suppressions == []
+
+
+async def test_unreadable_list_rows_disclose_only_a_boolean(db_state):
+    """TL1: browse and detail expose the tenant-wide flag and nothing of list A's rows."""
+    ids = await _world(db_state)
+    await seed_list(db_state, "default", key="secretlist")
+    await seed_row(
+        db_state, "default", BOB, "unsubscribed", key="secretlist", source="unsubscribe_page"
+    )
+    await restrict_list(db_state, "default", "secretlist", ["editor"])
+    result = await _browse(db_state, roles=["viewer"])
+    by = {r.hit.email: r for r in result.rows}
+    assert by[BOB].suppressed is True and by[ADA].suppressed is False
+    async with db_state.session_factory() as s:
+        got = await detail(
+            s, tenant_id="default", list_type_key="news", uuid=ids["bob"], roles=["viewer"]
+        )
+    assert got.suppressed is True and got.suppressions == []
+    for text in (repr(result), repr(got)):
+        for needle in ("secretlist", "unsubscribe_page", "hard_bounce", "email_hash"):
+            assert needle not in text, needle

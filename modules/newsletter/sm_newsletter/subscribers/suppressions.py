@@ -5,6 +5,14 @@ list is one the caller may read (records' narrowing, through
 :func:`~sm_newsletter.campaigns.access.readable_lists`); the per-reason counts
 use the same visibility. Rows carry the hash, never an address: the console
 shows a fingerprint, and the lookup hashes what the admin typed.
+
+Decision (ruling TL1): the subscriber browse and detail keep a tenant-wide
+``suppressed`` flag that is *not* narrowed by this visibility. Suppressions are
+tenant-wide by design, so the flag means "this address will receive no
+newsletter mail", and an admin of a readable list needs to know that. The
+accepted disclosure is that single boolean; for a list the caller cannot read,
+the kind (reason), source, list, ``created_at``, version and fingerprint of the
+rows stay hidden, and every row-shaped answer goes through :func:`visible`.
 """
 
 from __future__ import annotations

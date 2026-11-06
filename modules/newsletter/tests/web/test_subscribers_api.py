@@ -8,7 +8,7 @@ from sm_newsletter.core import constants
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from tests.support.app import build_app
-from tests.support.lift_world import seed_row
+from tests.support.lift_world import rows, seed_row
 from tests.support.records_seed import TAGS, restrict_list, seed_list, seed_subscriber
 
 API = constants.ROUTE_PREFIX_API
@@ -122,3 +122,49 @@ async def test_unreadable_opt_out_still_marks_suppressed(built, client):
     body = res.json()
     assert res.status_code == 200, res.text
     assert body["subscriber"]["suppressed"] is True and body["suppressions"] == []
+
+
+async def test_unreadable_list_discloses_only_a_boolean(built, client):
+    """TL1: the tenant-wide flag is the whole disclosure; nothing about list A's rows."""
+    _, state, ada = built
+    await seed_list(state, "default", key="secretlist")
+    await seed_row(
+        state, "default", ADA, "unsubscribed", key="secretlist", source="unsubscribe_page"
+    )
+    await restrict_list(state, "default", "secretlist", ["editor"])
+    stored = await rows(state, "default")
+    assert len(stored) == 1
+    secrets = [
+        "secretlist",
+        "unsubscribe_page",
+        "fingerprint",
+        '"reason"',
+        '"list_type_key"',
+        '"source"',
+        '"version"',
+    ]
+    for r in stored:
+        secrets += [r.email_hash[:12], r.created_at.isoformat()]
+    for res in (
+        await client.get(f"{API}/lists/news/subscribers/{ada}", headers=VIEW),
+        await client.post(SEARCH, json={}, headers=VIEW),
+    ):
+        assert res.status_code == 200, res.text
+        for needle in secrets:
+            assert needle not in res.text, needle
+    detail = (await client.get(f"{API}/lists/news/subscribers/{ada}", headers=VIEW)).json()
+    assert detail["subscriber"]["suppressed"] is True and detail["suppressions"] == []
+    page = (await client.post(SEARCH, json={}, headers=VIEW)).json()
+    by = {i["email"]: i for i in page["items"]}
+    assert by[ADA]["suppressed"] is True and by[BOB]["suppressed"] is False
+    assert set(by[ADA]) == {
+        "uuid",
+        "email",
+        "status",
+        "first_name",
+        "last_name",
+        "tags",
+        "confirmed_at",
+        "trashed",
+        "suppressed",
+    }
