@@ -55,3 +55,33 @@ class InvalidQuery(NewsletterError):  # noqa: N818 - names the parameter
     status = 422
     code = "invalid_query"
     detail = "A query parameter is not valid"
+
+
+class LiftNotAllowed(NewsletterError):  # noqa: N818 - the state it refuses
+    """A complaint is never lifted."""
+
+    status = 409
+    code = "lift_not_allowed"
+    detail = "This suppression cannot be lifted"
+
+
+class OptOutStands(NewsletterError):  # noqa: N818 - the state it refuses
+    """An opt-out is lifted only after a later confirmation on that list."""
+
+    status = 409
+    code = "opt_out_stands"
+    detail = "The address has not confirmed on this list since it unsubscribed"
+
+
+class LiftEmailMismatch(NewsletterError):  # noqa: N818 - names the field
+    status = 422
+    code = "lift_email_mismatch"
+    detail = "The address does not match this suppression"
+
+
+class SuppressionChanged(NewsletterError):  # noqa: N818 - the state it refuses
+    """The row changed (or went) since the admin read it."""
+
+    status = 409
+    code = "suppression_changed"
+    detail = "This suppression changed since it was loaded; reload and try again"

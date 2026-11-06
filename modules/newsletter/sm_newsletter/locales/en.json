@@ -270,7 +270,11 @@
     "segment_list_mismatch": "The segment belongs to a different list.",
     "unknown_tag": "That tag does not exist on this list.",
     "invalid_audience": "The audience is not valid.",
-    "invalid_query": "A query parameter is not valid."
+    "invalid_query": "A query parameter is not valid.",
+    "lift_not_allowed": "This suppression cannot be lifted.",
+    "opt_out_stands": "The address has not confirmed on this list since it unsubscribed, so the opt-out stands.",
+    "lift_email_mismatch": "The address does not match this suppression.",
+    "suppression_changed": "This suppression changed since you loaded it. Reload and try again."
   },
   "preview": {
     "tab_edit": "Edit",

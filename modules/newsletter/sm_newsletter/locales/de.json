@@ -270,7 +270,11 @@
     "segment_list_mismatch": "Das Segment gehört zu einer anderen Liste.",
     "unknown_tag": "Dieses Tag gibt es auf dieser Liste nicht.",
     "invalid_audience": "Die Zielgruppe ist ungültig.",
-    "invalid_query": "Ein Abfrageparameter ist ungültig."
+    "invalid_query": "Ein Abfrageparameter ist ungültig.",
+    "lift_not_allowed": "Diese Sperre kann nicht aufgehoben werden.",
+    "opt_out_stands": "Die Adresse hat sich seit der Abmeldung nicht erneut für diese Liste bestätigt; die Abmeldung bleibt bestehen.",
+    "lift_email_mismatch": "Die Adresse passt nicht zu dieser Sperre.",
+    "suppression_changed": "Diese Sperre hat sich seit dem Laden geändert. Neu laden und erneut versuchen."
   },
   "preview": {
     "tab_edit": "Bearbeiten",
