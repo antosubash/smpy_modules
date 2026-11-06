@@ -142,6 +142,24 @@ def test_tag_values_collision_with_existing_choice():
     assert mc.tag_values(["!!!"], [])["!!!"].startswith("tag-") is False  # label itself, no comma
 
 
+def test_tag_values_fallback_already_taken():
+    """The hashed fallback is itself a value another label holds: never reused, resolved
+    deterministically with a counter until free."""
+    fallback = mc.tag_values(["VIP"], [FieldChoice(value="VIP", label="Very important")])["VIP"]
+    taken = [
+        FieldChoice(value="VIP", label="Very important"),
+        FieldChoice(value=fallback, label="Someone else"),
+    ]
+    values = mc.tag_values(["VIP"], taken)
+    assert values["VIP"] not in {c.value for c in taken}
+    assert values == {"VIP": f"{fallback}-2"}
+    taken.append(FieldChoice(value=f"{fallback}-2", label="A third"))
+    assert mc.tag_values(["VIP"], taken) == {"VIP": f"{fallback}-3"}
+    assert (
+        len(mc.tag_values(["x" * 100], [FieldChoice(value="x" * 100, label="y")])["x" * 100]) <= 100
+    )
+
+
 def test_tag_values_empty_slug():
     assert mc.tag_values(["a,"], [])["a,"].startswith("a-")
     assert mc.tag_values([",,"], [])[",,"].startswith("tag-")

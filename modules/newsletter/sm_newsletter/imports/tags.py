@@ -37,8 +37,19 @@ def _slug(label: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", label.casefold()).strip("-") or "tag"
 
 
+def _fallback(label: str, taken: set[str]) -> str:
+    """Slug plus a hash; ``-2``, ``-3``... appended while another choice holds it."""
+    base = f"{_slug(label)[:80]}-{hashlib.sha256(label.encode()).hexdigest()[:8]}"
+    value, n = base, 1
+    while value in taken:
+        n += 1
+        value = f"{base}-{n}"
+    return value
+
+
 def tag_values(labels: Sequence[str], existing: Sequence[FieldChoice]) -> dict[str, str]:
-    """Label to choice value (D8): reused, else the label, else slug plus a hash."""
+    """Label to choice value (D8): reused, else the label, else slug plus a hash (and a
+    counter while that is taken). Labels in sorted order, so the result is deterministic."""
     by_label: dict[str, str] = {}
     for choice in existing:
         by_label.setdefault(choice.label, choice.value)
@@ -50,7 +61,6 @@ def tag_values(labels: Sequence[str], existing: Sequence[FieldChoice]) -> dict[s
         elif "," not in label and label not in taken:
             result[label] = label
         else:
-            digest = hashlib.sha256(label.encode()).hexdigest()[:8]
-            result[label] = f"{_slug(label)[:80]}-{digest}"
+            result[label] = _fallback(label, taken)
         taken.add(result[label])
     return result
