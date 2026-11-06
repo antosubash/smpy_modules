@@ -27,7 +27,7 @@ from tests.support.app import build_app
 
 API = constants.ROUTE_PREFIX_API
 VIEW = constants.VIEW_PREFIX
-ALLOWED = {*constants.PERMISSIONS, constants.PERM_SETTINGS_EDIT}
+ALLOWED = {*constants.PERMISSIONS, constants.PERM_SETTINGS_EDIT, constants.PERM_RECORDS_VIEW}
 UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
 
 EXPECTED = {
@@ -65,6 +65,8 @@ EXPECTED = {
     ("POST", f"{API}/segments/preview"),
     ("GET", f"{API}/lists/{{list_type_key}}/fields"),
     ("GET", f"{API}/lists/{{list_type_key}}/audience-count"),
+    ("POST", f"{API}/lists/{{list_type_key}}/subscribers/search"),
+    ("GET", f"{API}/lists/{{list_type_key}}/subscribers/{{uuid}}"),
     ("GET", f"{API}/suppressions"),
     ("POST", f"{API}/suppressions/lookup"),
     ("POST", f"{API}/suppressions/{{suppression_id}}/lift"),

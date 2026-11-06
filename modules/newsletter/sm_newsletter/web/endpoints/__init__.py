@@ -18,6 +18,7 @@ def build_api_router() -> APIRouter:
         segments_api,
         sending_api,
         settings_api,
+        subscribers_api,
         suppressions_api,
         test_send_api,
     )
@@ -33,6 +34,7 @@ def build_api_router() -> APIRouter:
         segments_api.router,
         audience_api.router,
         sending_api.router,
+        subscribers_api.router,
         suppressions_api.router,
         test_send_api.router,
     ):

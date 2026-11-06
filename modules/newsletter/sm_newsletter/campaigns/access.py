@@ -60,3 +60,12 @@ async def require_campaign(
     ):
         raise NotFound()
     return campaign
+
+
+async def require_list(
+    session: AsyncSession, *, tenant_id: str, list_type_key: str, roles: Roles
+) -> None:
+    """:class:`NotFound` unless ``list_type_key`` is one of the tenant's lists
+    this caller may read: a missing, unreadable or non-list key answers alike."""
+    if list_type_key not in await readable_lists(session, tenant_id=tenant_id, roles=roles):
+        raise NotFound()
