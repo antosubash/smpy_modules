@@ -91,6 +91,15 @@ export const RichTextBlock: ComponentConfig<RichTextProps> = {
           isAllowedUri: (url) => isAllowedLink(url),
         },
       },
+      // Puck re-renders its menu only when this state changes, and its own selector
+      // does not cover the selection: without this the link button would keep the
+      // enabled state it had when the editor mounted.
+      tiptap: {
+        selector: ({ editor }) => ({
+          hasSelection: editor ? !editor.state.selection.empty : false,
+          inLink: editor ? editor.isActive('link') : false,
+        }),
+      },
       // Puck's menu has no link button; add one after its groups.
       renderMenu: ({ children, editor, readOnly }) => (
         <RichTextMenu>
