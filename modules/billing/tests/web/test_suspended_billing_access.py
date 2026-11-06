@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from tenants.models import Membership
-from tenants.resolver import forget
+from tenants.resolution.resolver import forget
 
 from tests.support.api_helpers import INERTIA, arm_csrf, create_tenant, page_props
 from tests.support.fake_provider import FakeProvider

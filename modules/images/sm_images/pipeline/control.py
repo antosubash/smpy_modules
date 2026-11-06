@@ -143,7 +143,7 @@ async def launch_restart(
             runtime, tenant, collection_id, inner, run_as=run_as, access_basis=access_basis
         )
         return
-    from background_tasks.tenant_context import TENANT_HEADER
+    from background_tasks.executions.tenant_context import TENANT_HEADER
 
     from sm_images.task_config import QUEUE_IMPORTS
     from sm_images.tasks import restart_collection

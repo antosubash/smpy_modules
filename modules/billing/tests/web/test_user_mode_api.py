@@ -47,7 +47,7 @@ async def test_status_is_per_user(user_mode_app, user_client):
         assert (await a.get("/api/billing/status")).json()["plan"]["key"].startswith("metered")
         assert (await b.get("/api/billing/status")).json()["plan"]["key"] == "free"
         # The page renders for a signed-in user; there is no organisation to pick.
-        page = await a.get("/billing/", headers={"X-Inertia": "true"})
+        page = await a.get("/billing/", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"})
         assert page.status_code == 200, page.text
         props = page.json()["props"]
         assert props["status"]["plan"]["key"].startswith("metered")

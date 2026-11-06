@@ -64,6 +64,25 @@ a raw token must keep the plaintext itself (the table holds only a digest).
 `f5b1c3e8a207` is ported **without** its upstream `("file_storage",)` branch
 label, because `ca297bbf33bf` already carries it here and Alembic refuses a
 label used twice — keep dropping a duplicate label when porting.
+0.0.43's `a738c2e4f601` and `e731a1b2c3d4` and 0.0.44's `e805a1b2c3d4`,
+`c5d8e2f1a903` and `f6c2d4e8b109` follow `c4e9b2a7d613`. Upstream's
+`b8d4f2a6c901` (audit_log) and `c9d2e4f6a810` (oidc) are not ported: neither
+module is installed here, so their tables do not exist. `e731a1b2c3d4` refuses
+to run while two accounts' emails differ only by letter case, and names them.
+`host/migrations/env.py` skips comparing a mixed column-and-expression index on
+SQLite: it reflects `created_at DESC` as a plain column, so autogenerate would
+otherwise drop and recreate `tenant_browse` on every run.
+**Since 0.0.44 most framework modules follow the module layout**, and the old
+flat paths (`tenants.resolver`, `settings.service`, …) warn and go in 0.0.46
+(a few in 0.1.0). Import the new path, and raise that dependency's floor to the
+release that first shipped it; `host/tests/test_host_boots.py` fails on any
+import of a path the installed framework marks `deprecated_module`.
+**Since 0.0.43 the production CSP is nonce-based** (`'nonce-…' 'strict-dynamic'`,
+no `unsafe-inline` or `unsafe-eval`): an executable `<script>` in a template needs
+`nonce="{{ request.state.csp_nonce }}"`, and `eval`/`new Function` no longer run.
+An Inertia GET without `X-Inertia-Version` gets a 409, so a test client sends it;
+the adapter strips `ETag` from every Inertia payload and marks it `private,
+no-store`; and the page JSON lives only in `<script data-page="app">`.
 SQLModel is unpinned since 0.0.38
 (framework 0.0.37+ imports its `UTCDateTime`): a bare `datetime` field is
 `timestamptz` now, which is why `9d83e789a5b4` retypes the framework's
@@ -274,7 +293,7 @@ docker run -d --name smpy-postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e
 ```
 
 Redis and Celery are used by the **images** module (framework
-`background_tasks`, host pinned `==0.0.42`): `SM_REDIS_URL` points at dev-services'
+`background_tasks`, host pinned `==0.0.44`): `SM_REDIS_URL` points at dev-services'
 Redis, and `make worker` / `worker-imports` / `worker-heavy` / `worker-gpu` /
 `beat` run `host/worker.py` (`build_runner_celery`) with one queue set each.
 `make dev` starts none of them. With no worker, set

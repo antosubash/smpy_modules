@@ -59,9 +59,9 @@ async def store_settings(app, **values: Any) -> None:
     database too keeps ``live.ensure_current`` from reverting it on the next
     request, as it reverts a value only one worker holds.
     """
-    from settings.hydrate import value_type_for_field
-    from settings.service import SettingService
-    from settings.store import SettingsStore
+    from settings.core.service import SettingService
+    from settings.module_settings.store import SettingsStore
+    from simple_module_core.settings_hydrate import value_type_for_field
     from simple_module_db import finalize_session
     from sm_billing.core.constants import PACKAGE
 

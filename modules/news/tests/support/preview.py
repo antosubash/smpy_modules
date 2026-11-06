@@ -43,11 +43,11 @@ def body_with(marker: str) -> dict:
 def page_props(rendered: str) -> dict:
     """The Inertia props out of the rendered shell.
 
-    The attribute holds the page JSON with ``<``, ``>``, ``&`` and the quote
-    written as unicode escapes, which are ordinary JSON and need no unescaping
-    of their own.
+    The ``data-page`` script element holds the page JSON with ``<``, ``>``, ``&``
+    and the quote written as unicode escapes, which are ordinary JSON and need
+    no unescaping of their own.
     """
-    match = re.search(r"data-page='(.*?)'></div>", rendered, re.S)
+    match = re.search(r'<script data-page="app" type="application/json">([^<]*)</script>', rendered)
     assert match is not None, rendered[:500]
     return json.loads(match.group(1))["props"]
 

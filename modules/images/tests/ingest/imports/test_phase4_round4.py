@@ -30,7 +30,7 @@ def _bare() -> runtime_mod.Runtime:
 @pytest.fixture
 def configured(monkeypatch):
     """Pin the worker engine's policy as a configured worker would have it."""
-    from background_tasks import sync_db
+    from background_tasks.core import sync_db
 
     def pin(multi):
         tenancy = sync_db.WorkerTenancy(multi_tenant=multi, default_tenant=None)
@@ -40,14 +40,14 @@ def configured(monkeypatch):
 
 
 async def test_an_unconfigured_worker_policy_is_multi_tenant(monkeypatch):
-    from background_tasks import sync_db
+    from background_tasks.core import sync_db
 
     monkeypatch.setattr(sync_db, "worker_tenancy", lambda: None)  # nothing pinned
     assert _bare().is_multi_tenant() is True
 
 
 async def test_an_unreadable_worker_policy_is_multi_tenant(configured, monkeypatch):
-    from background_tasks import sync_db
+    from background_tasks.core import sync_db
 
     configured(False)
 
@@ -98,7 +98,7 @@ async def _users(imp) -> None:
 
 @pytest.mark.skipif(USING_POSTGRES, reason="creates the users/tenants tables ad hoc")
 async def test_an_unknown_mode_cancels_a_non_member(imp, monkeypatch):
-    from background_tasks import sync_db
+    from background_tasks.core import sync_db
 
     await _users(imp)
     monkeypatch.setattr(sync_db, "worker_tenancy", lambda: None)

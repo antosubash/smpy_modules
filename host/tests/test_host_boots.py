@@ -13,6 +13,8 @@ import os
 import re
 import subprocess
 import sys
+from importlib.metadata import entry_points
+from importlib.util import find_spec
 from pathlib import Path
 
 import pytest
@@ -221,23 +223,42 @@ def test_no_module_imports_the_deprecated_settings_shim():
     assert result.returncode == 0, result.stderr[-2000:]
 
 
-def test_shipped_code_imports_no_deprecated_settings_shim():
+def _deprecated_framework_paths() -> set[str]:
+    """Every module path the installed framework marks ``deprecated_module``."""
+    declaration = re.compile(r'deprecated_module\(\s*"([\w.]+)"')
+    packages = {entry.value.split(".")[0] for entry in entry_points(group="simple_module")}
+    paths = set()
+    for package in packages:
+        for path in Path(find_spec(package).origin).parent.rglob("*.py"):
+            paths.update(declaration.findall(path.read_text()))
+    return paths
+
+
+def test_nothing_imports_a_deprecated_framework_path():
     """The boot test above misses imports made later, inside a function: the
-    worker's settings load, billing's live check and records' CLI (#273). The
-    framework's ``settings.registration``, ``settings.hydrate`` and
-    ``settings.module_registry`` all warn on import and go away in 0.1.0.
-    Tests may still use them; shipped code and scripts may not.
+    worker's settings load, billing's live check and records' CLI (#273). A
+    published module's range is ``<0.1``, so an alias the framework removes
+    (most go in 0.0.46) would break it for every host on the newer build. Tests
+    count too: they go red on the same bump.
     """
-    shim = re.compile(r"^\s*(from|import) settings\.(registration|hydrate|module_registry)\b")
-    shipped = [
-        path
-        for path in [*REPO.glob("modules/*/*/**/*.py"), *REPO.glob("scripts/*.py")]
-        if "tests" not in path.relative_to(REPO).parts
-    ]
-    offenders = [
-        f"{path.relative_to(REPO)}:{number}"
-        for path in shipped
-        for number, line in enumerate(path.read_text().splitlines(), start=1)
-        if shim.match(line)
-    ]
+    deprecated = _deprecated_framework_paths()
+    assert "tenants.resolver" in deprecated  # the scan itself still finds them
+    from_package = re.compile(r"^\s*from ([\w.]+) import ([\w, ]+)")
+    plain = re.compile(r"^\s*(?:from|import) ([\w.]+)")
+    offenders = []
+    for path in [
+        *REPO.glob("modules/*/*/**/*.py"),
+        *REPO.glob("host/**/*.py"),
+        *REPO.glob("scripts/*.py"),
+    ]:
+        if "versions" in path.parts or path.name == Path(__file__).name:
+            continue
+        for number, line in enumerate(path.read_text().splitlines(), start=1):
+            names = []
+            if match := plain.match(line):
+                names.append(match.group(1))
+            if match := from_package.match(line):
+                names += [f"{match.group(1)}.{n.strip()}" for n in match.group(2).split(",")]
+            if deprecated.intersection(names):
+                offenders.append(f"{path.relative_to(REPO)}:{number}")
     assert offenders == []

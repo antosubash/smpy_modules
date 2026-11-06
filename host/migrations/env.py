@@ -21,8 +21,9 @@ from logging.config import fileConfig
 
 from alembic import context
 from simple_module_db import build_module_metadata, make_include_object, render_item
+from simple_module_hosting.migrations import ALEMBIC_DATABASE_URL_ATTRIBUTE
 from simple_module_hosting.settings import Settings
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import Column, engine_from_config, pool
 
 logger = logging.getLogger("alembic.env")
 
@@ -39,12 +40,33 @@ if find_spec("records_collections") is not None:
     import records_collections  # noqa: F401
 
 target_metadata = build_module_metadata()
-include_object = make_include_object(target_metadata)
+_include_object = make_include_object(target_metadata)
+
+# An index mixing columns and an expression (file_storage's ``tenant_browse``,
+# ``created_at DESC``, framework 0.0.44). SQLite reflects it as plain columns, so
+# autogenerate reports a change on every run, and ``make migration`` would write
+# a drop and recreate of it. Postgres reflects it faithfully and keeps comparing.
+_EXPRESSION_INDEXES = frozenset(
+    index.name
+    for table in target_metadata.tables.values()
+    for index in table.indexes
+    if any(not isinstance(element, Column) for element in index.expressions)
+)
+
+
+def include_object(object_, name, type_, reflected, compare_to):
+    if (
+        type_ == "index"
+        and name in _EXPRESSION_INDEXES
+        and context.get_context().dialect.name == "sqlite"
+    ):
+        return False
+    return _include_object(object_, name, type_, reflected, compare_to)
 
 
 def _get_url() -> str:
     """Read database URL from settings, convert async to sync driver."""
-    url = Settings().database_url
+    url = config.attributes.get(ALEMBIC_DATABASE_URL_ATTRIBUTE) or Settings().database_url
     return url.replace("+aiosqlite", "").replace("+asyncpg", "+psycopg2")
 
 

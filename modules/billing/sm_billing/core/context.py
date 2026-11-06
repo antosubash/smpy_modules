@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from tenants.constants import SESSION_ACTIVE_TENANT, TenantStatus
+from tenants.core.constants import SESSION_ACTIVE_TENANT, TenantStatus
 from tenants.models import Membership, Tenant
 
 from sm_billing.core import constants as c

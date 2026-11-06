@@ -30,7 +30,7 @@ PERM_PLATFORM_VIEW: Final = "billing.platform.view"
 PERM_PLATFORM_MANAGE: Final = "billing.platform.manage"
 
 # Tenant roles as the tenants resolver appends them to the principal
-# (``tenants.constants.TENANT_ROLE_PREFIX`` + role) for the active tenant only.
+# (``tenants.core.constants.TENANT_ROLE_PREFIX`` + role) for the active tenant only.
 ROLE_TENANT_OWNER: Final = "tenant:owner"
 ROLE_TENANT_ADMIN: Final = "tenant:admin"
 TENANT_ROLE_OWNER: Final = "owner"

@@ -16,8 +16,8 @@ import pytest
 from fastapi import FastAPI
 from pagebuilder.core.settings import PagebuilderSettings
 from pagebuilder.module import PagebuilderModule
-from settings.hydrate import hydrate_settings, value_type_for_field
-from settings.module_registry import ModuleSettingsRegistry
+from simple_module_core.module_settings import ModuleSettingsRegistry
+from simple_module_core.settings_hydrate import hydrate_settings, value_type_for_field
 
 PACKAGE = "pagebuilder"
 

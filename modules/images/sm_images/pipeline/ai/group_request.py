@@ -42,7 +42,7 @@ async def dispatch_group(
 
         await run_group(runtime, tenant, prompt_id, group_id)
         return
-    from background_tasks.tenant_context import TENANT_HEADER
+    from background_tasks.executions.tenant_context import TENANT_HEADER
 
     from sm_images.tasks import run_group_prompt_task
 

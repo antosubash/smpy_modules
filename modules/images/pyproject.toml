@@ -16,9 +16,9 @@ dependencies = [
     "simple_module_inertia>=0.0.41,<0.1",
     "simple_module_settings>=0.0.41,<0.1",
     # depends_on: shares (the access policy), the storage backend, the workers.
-    "simple_module_sharing>=0.0.42,<0.1",  # floor: contracts.forget_resource first shipped in 0.0.42
-    "simple_module_file_storage>=0.0.41,<0.1",
-    "simple_module_background_tasks>=0.0.42,<0.1",  # floor: sync_db.worker_tenancy first shipped in 0.0.42
+    "simple_module_sharing>=0.0.44,<0.1",  # floor: sharing.core.policy path first shipped in 0.0.44
+    "simple_module_file_storage>=0.0.44,<0.1",  # floor: file_storage.core.settings path first shipped in 0.0.44
+    "simple_module_background_tasks>=0.0.44,<0.1",  # floor: background_tasks.core, .executions and .outbox paths first shipped in 0.0.44
     "pydantic-settings>=2.0",
     "httpx>=0.27",
     "Pillow>=10.0",

@@ -84,5 +84,7 @@ async def test_legacy_out_of_range_plan_still_lists(app, admin):
     assert response.status_code == 200, response.text
     legacy = next(p for p in response.json() if p["key"] == "legacy")
     assert legacy["amount_month"] == over_bound
-    page = await admin.get("/admin/billing/plans", headers={"X-Inertia": "true"})
+    page = await admin.get(
+        "/admin/billing/plans", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+    )
     assert page.status_code == 200

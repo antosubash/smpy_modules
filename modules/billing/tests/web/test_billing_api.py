@@ -248,7 +248,7 @@ async def test_get_context_requires_a_user(app):
     from types import SimpleNamespace
 
     from sm_billing.web.deps import get_context
-    from tenants.errors import TenantError
+    from tenants.core.errors import TenantError
 
     request = SimpleNamespace(state=SimpleNamespace(), scope={}, app=app)
     with pytest.raises(TenantError) as exc:
