@@ -125,7 +125,11 @@ export function TestSendDialog({ campaignId, max, beforeSend, incomplete, baseUr
               value={text}
               disabled={pending}
               placeholder={t(copy.placeholder)}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => {
+                setText(e.target.value);
+                // The results belong to the addresses that were sent.
+                setResults(null);
+              }}
             />
             {baseUrlMissing && <p className="text-sm text-amber-900">{t(copy.no_base_url)}</p>}
             {incomplete && <p className="text-sm text-amber-900">{t(copy.incomplete)}</p>}
