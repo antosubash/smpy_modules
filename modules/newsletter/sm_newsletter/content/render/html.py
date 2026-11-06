@@ -69,7 +69,7 @@ def _image(b: ImageBlock, ctx: RenderContext) -> str:
     width = min(p.width, _CONTENT_WIDTH)
     img = (
         f'<img src="{url(ctx.content_base, p.src)}" width="{width}" alt="{esc(p.alt)}"'
-        f' style="{s.IMAGE}">'
+        f' style="{s.fluid_image(width)}">'
     )
     return f'<a href="{url(ctx.content_base, p.href)}">{img}</a>' if p.href else img
 
@@ -91,7 +91,8 @@ def _card(p: CardProps, ctx: RenderContext) -> str:
     if p.image_url:
         out += (
             f'<a href="{href}"><img src="{url(ctx.content_base, p.image_url)}"'
-            f' width="{_CONTENT_WIDTH}" alt="{inert(p.title)}" style="{s.IMAGE}"></a>'
+            f' width="{_CONTENT_WIDTH}" alt="{inert(p.title)}"'
+            f' style="{s.fluid_image(_CONTENT_WIDTH)}"></a>'
         )
     if p.title:
         title_link = f"color:{s.TEXT_COLOR};text-decoration:none"

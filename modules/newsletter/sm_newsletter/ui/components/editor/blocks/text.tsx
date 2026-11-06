@@ -6,11 +6,13 @@
  * as written.
  */
 
-import type { ComponentConfig, RichText } from '@puckeditor/core';
+import { type ComponentConfig, type RichText, RichTextMenu } from '@puckeditor/core';
 
 import { keys } from '../../../utils/i18n';
+import { isAllowedLink } from '../../../utils/links';
 
 import { block, FONT } from './email';
+import { LinkControl } from './LinkControl';
 
 const copy = keys.newsletter.blocks;
 
@@ -78,7 +80,26 @@ export const RichTextBlock: ComponentConfig<RichTextProps> = {
         codeBlock: false,
         horizontalRule: false,
         textAlign: false,
+        // Only what `content/urls.py` keeps; clicking must not follow a link
+        // while editing, and a typed address is not turned into one behind
+        // the writer's back.
+        link: {
+          openOnClick: false,
+          autolink: false,
+          linkOnPaste: false,
+          protocols: ['mailto'],
+          isAllowedUri: (url) => isAllowedLink(url),
+        },
       },
+      // Puck's menu has no link button; add one after its groups.
+      renderMenu: ({ children, editor, readOnly }) => (
+        <RichTextMenu>
+          {children}
+          <RichTextMenu.Group>
+            <LinkControl editor={editor} readOnly={readOnly} />
+          </RichTextMenu.Group>
+        </RichTextMenu>
+      ),
     },
   },
   defaultProps: { html: '<p>Write your message here.</p>' },

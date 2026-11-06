@@ -50,8 +50,16 @@ HEADING = {
     "2": f"margin:0;font-family:{FONT};font-size:22px;line-height:1.3;color:{TEXT_COLOR}",
 }
 APP_NAME = f"font-family:{FONT};font-size:20px;font-weight:bold;color:{TEXT_COLOR}"
-IMAGE = "display:block;max-width:100%;height:auto;border:0"
-LOGO = f"display:block;max-width:{LOGO_WIDTH}px;height:auto;border:0"
+
+
+def fluid_image(max_width: int) -> str:
+    """An image that shrinks with its cell: ``width:100%`` takes no min-content
+    width in an auto-layout table (a bare ``width`` attribute does, which is what
+    pushed the email past a phone viewport); Outlook reads the ``width`` attribute."""
+    return f"display:block;width:100%;max-width:{max_width}px;height:auto;border:0"
+
+
+LOGO = fluid_image(LOGO_WIDTH)
 BUTTON_LINK = (
     f"display:inline-block;padding:12px 24px;font-family:{FONT};font-size:16px;"
     "font-weight:bold;color:#ffffff;text-decoration:none;border-radius:6px"

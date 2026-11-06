@@ -41,13 +41,22 @@ export function toPatch(name: MetaField, value: string, valid = true): MetaPatch
   return { [name]: value };
 }
 
+/** Why a typed value cannot be saved, as a catalogue key; null when it can. */
+export function fieldError(name: MetaField, value: string, valid = true): string | null {
+  if (name === 'name' && value.trim() === '') return copy.name_required;
+  if (!valid) return copy.reply_to_invalid;
+  return null;
+}
+
 interface CampaignMetaProps {
   campaign: CampaignDetail;
   readOnly: boolean;
   onChange: (patch: MetaPatch) => void;
+  /** A field's value cannot be saved (true) or was fixed (false). */
+  onInvalid?: (field: MetaField, invalid: boolean) => void;
 }
 
-export function CampaignMeta({ campaign, readOnly, onChange }: CampaignMetaProps) {
+export function CampaignMeta({ campaign, readOnly, onChange, onInvalid }: CampaignMetaProps) {
   const { t } = useT();
   const idPrefix = useId();
   const [values, setValues] = useState<Record<MetaField, string>>(() => ({
@@ -58,10 +67,16 @@ export function CampaignMeta({ campaign, readOnly, onChange }: CampaignMetaProps
     reply_to: campaign.reply_to ?? '',
   }));
 
+  const [errors, setErrors] = useState<Partial<Record<MetaField, string>>>({});
+
   function change(name: MetaField, input: HTMLInputElement) {
     const value = input.value;
     setValues((v) => ({ ...v, [name]: value }));
-    const patch = toPatch(name, value, input.checkValidity());
+    const valid = input.checkValidity();
+    const problem = fieldError(name, value, valid);
+    setErrors((e) => ({ ...e, [name]: problem ?? undefined }));
+    onInvalid?.(name, problem !== null);
+    const patch = toPatch(name, value, valid);
     if (patch) onChange(patch);
   }
 
@@ -78,9 +93,19 @@ export function CampaignMeta({ campaign, readOnly, onChange }: CampaignMetaProps
               value={values[field.name]}
               maxLength={field.max}
               readOnly={readOnly}
-              aria-describedby={field.hint ? `${id}-hint` : undefined}
+              aria-invalid={errors[field.name] ? true : undefined}
+              aria-describedby={
+                [errors[field.name] ? `${id}-error` : '', field.hint ? `${id}-hint` : '']
+                  .filter(Boolean)
+                  .join(' ') || undefined
+              }
               onChange={(e) => change(field.name, e.target)}
             />
+            {errors[field.name] && (
+              <p id={`${id}-error`} role="alert" className="text-xs text-destructive">
+                {t(errors[field.name] as string)}
+              </p>
+            )}
             {field.hint && (
               <p id={`${id}-hint`} className="text-xs text-muted-foreground">
                 {t(field.hint)}

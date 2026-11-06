@@ -128,7 +128,8 @@
       "saving": "Wird gespeichert",
       "saved": "Gespeichert",
       "stale": "Anderswo geändert",
-      "error": "Nicht gespeichert"
+      "error": "Nicht gespeichert",
+      "invalid": "Nicht gespeichert: markiertes Feld korrigieren"
     },
     "reload": "Neu laden",
     "read_only": "Sie können diese Kampagne ansehen, aber nicht ändern.",
@@ -146,7 +147,9 @@
       "from_name": "Absendername",
       "from_name_hint": "Leer lassen, um den Namen aus den Newsletter-Einstellungen zu verwenden.",
       "reply_to": "Antwortadresse",
-      "reply_to_hint": "Leer lassen, um die Adresse aus den Newsletter-Einstellungen zu verwenden."
+      "reply_to_hint": "Leer lassen, um die Adresse aus den Newsletter-Einstellungen zu verwenden.",
+      "name_required": "Gib einen Kampagnennamen ein. Er wird nicht gespeichert, solange er leer ist.",
+      "reply_to_invalid": "Gib eine gültige E-Mail-Adresse ein. Sie wird erst dann gespeichert."
     },
     "card": {
       "article": "Artikel",
@@ -192,7 +195,10 @@
     },
     "rich_text": {
       "label": "Text",
-      "html": "Text"
+      "html": "Text",
+      "link_title": "Link",
+      "link_prompt": "Link-Adresse. Leer lassen, um den Link zu entfernen.",
+      "link_invalid": "Diese Adresse kann nicht verwendet werden. Nutze https://, http://, mailto: oder einen Seitenpfad wie /about."
     },
     "image": {
       "label": "Bild",

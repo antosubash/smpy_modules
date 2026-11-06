@@ -26,6 +26,8 @@ interface PendingEdits {
   meta: MetaPatch;
   /** The body is held back because a block lacks a required field. */
   incomplete: boolean;
+  /** Details fields whose typed value the server would refuse, so it was never sent. */
+  invalid: Set<string>;
   inFlight: number;
   timer: ReturnType<typeof setTimeout> | null;
   hasPending(): boolean;
@@ -34,20 +36,30 @@ interface PendingEdits {
   sync(): void;
   clearTimer(): void;
   markIncomplete(value: boolean): void;
+  markInvalid(field: string, value: boolean): void;
 }
 
 export function usePendingEdits() {
   const [dirty, setDirty] = useState(false);
   const [incomplete, setIncomplete] = useState(false);
+  const [metaInvalid, setMetaInvalid] = useState(false);
   const [edits] = useState<PendingEdits>(() => {
     const e: PendingEdits = {
       body: null,
       meta: {},
       incomplete: false,
+      invalid: new Set<string>(),
       inFlight: 0,
       timer: null,
       hasPending: () => e.body !== null || Object.keys(e.meta).length > 0,
-      sync: () => setDirty(e.timer !== null || e.inFlight > 0 || e.hasPending() || e.incomplete),
+      sync: () =>
+        setDirty(
+          e.timer !== null ||
+            e.inFlight > 0 ||
+            e.hasPending() ||
+            e.incomplete ||
+            e.invalid.size > 0,
+        ),
       clearTimer: () => {
         if (e.timer) clearTimeout(e.timer);
         e.timer = null;
@@ -56,8 +68,14 @@ export function usePendingEdits() {
         e.incomplete = value;
         setIncomplete(value);
       },
+      markInvalid: (field, value) => {
+        if (value) e.invalid.add(field);
+        else e.invalid.delete(field);
+        setMetaInvalid(e.invalid.size > 0);
+        e.sync();
+      },
     };
     return e;
   });
-  return { dirty, incomplete, edits };
+  return { dirty, incomplete, metaInvalid, edits };
 }

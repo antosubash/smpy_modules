@@ -53,7 +53,7 @@ export function useCampaignEditor(id: number) {
   const dataRef = useRef<Data>(EMPTY);
   const staleRef = useRef(false);
   const queueRef = useRef<Promise<unknown>>(Promise.resolve());
-  const { dirty, incomplete, edits } = usePendingEdits();
+  const { dirty, incomplete, metaInvalid, edits } = usePendingEdits();
 
   /** Adopt the server's campaign; edits typed while the request was out stay on top. */
   const adopt = useCallback(
@@ -200,6 +200,12 @@ export function useCampaignEditor(id: number) {
     [edits, schedule],
   );
 
+  /** The details form reports a field whose typed value cannot be saved (or is fixed again). */
+  const markMetaInvalid = useCallback(
+    (field: string, invalid: boolean) => edits.markInvalid(field, invalid),
+    [edits],
+  );
+
   /** Re-snapshot one card server-side. The pending autosave goes first, so the
    *  refresh is made against the revision that holds it; if it could not be
    *  saved, nothing is refreshed (adopting the server's body would drop it). */
@@ -245,7 +251,8 @@ export function useCampaignEditor(id: number) {
     edits.body = null;
     edits.meta = {};
     edits.markIncomplete(false);
-    edits.sync();
+    edits.invalid.clear();
+    edits.markInvalid('', false);
     setError(null);
     setStatus('idle');
     await load();
@@ -266,6 +273,8 @@ export function useCampaignEditor(id: number) {
     data,
     onChange,
     saveMeta,
+    markMetaInvalid,
+    metaInvalid,
     status,
     error,
     incomplete,

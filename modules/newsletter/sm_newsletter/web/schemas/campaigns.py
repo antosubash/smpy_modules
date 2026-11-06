@@ -43,7 +43,13 @@ def _blank_is_none(value: Any) -> Any:
     return None if isinstance(value, str) and not value.strip() else value
 
 
-Name = Annotated[str, Field(min_length=1, max_length=200)]
+def _not_blank(value: str) -> str:
+    if not value.strip():
+        raise ValueError("must not be blank")
+    return value
+
+
+Name = Annotated[str, Field(min_length=1, max_length=200), AfterValidator(_not_blank)]
 ListKey = Annotated[str, Field(min_length=1, max_length=MAX_TYPE_KEY_LEN)]
 # Merge fields follow the body's rule: an unknown or malformed ``{{…}}`` is refused.
 Subject = Annotated[str, Field(max_length=300), _header("subject"), AfterValidator(_merge)]

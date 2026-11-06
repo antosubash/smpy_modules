@@ -128,7 +128,8 @@
       "saving": "Saving",
       "saved": "Saved",
       "stale": "Changed elsewhere",
-      "error": "Not saved"
+      "error": "Not saved",
+      "invalid": "Not saved: fix the marked field"
     },
     "reload": "Reload",
     "read_only": "You can view this campaign but not change it.",
@@ -146,7 +147,9 @@
       "from_name": "Sender name",
       "from_name_hint": "Leave empty to use the name from the newsletter settings.",
       "reply_to": "Reply-to address",
-      "reply_to_hint": "Leave empty to use the address from the newsletter settings."
+      "reply_to_hint": "Leave empty to use the address from the newsletter settings.",
+      "name_required": "Enter a campaign name. It is not saved while it is empty.",
+      "reply_to_invalid": "Enter a valid email address. It is not saved until you do."
     },
     "card": {
       "article": "Article",
@@ -192,7 +195,10 @@
     },
     "rich_text": {
       "label": "Text",
-      "html": "Text"
+      "html": "Text",
+      "link_title": "Link",
+      "link_prompt": "Link address. Leave empty to remove the link.",
+      "link_invalid": "That address cannot be used. Use https://, http://, mailto: or a site path like /about."
     },
     "image": {
       "label": "Image",

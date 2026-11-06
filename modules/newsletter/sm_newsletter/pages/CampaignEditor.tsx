@@ -96,10 +96,13 @@ export default function CampaignEditor() {
 
   useLeaveGuard({
     dirty: editor.dirty,
-    held: !readOnly && editor.incomplete,
+    held: !readOnly && (editor.incomplete || editor.metaInvalid),
   });
 
-  const statusKey = STATUS_LABEL[editor.status];
+  const statusKey =
+    editor.metaInvalid && !readOnly && editor.status !== 'stale'
+      ? copy.status.invalid
+      : STATUS_LABEL[editor.status];
   const title = campaign ? campaign.name || t(copy.untitled) : t(copy.fallback_title);
 
   return (
@@ -170,6 +173,7 @@ export default function CampaignEditor() {
             campaign={campaign}
             readOnly={readOnly}
             onChange={editor.saveMeta}
+            onInvalid={editor.markMetaInvalid}
           />
           {tab === 'preview' && (
             <PreviewPane
