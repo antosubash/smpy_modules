@@ -7,7 +7,8 @@ the same tenant rule: the caller names the tenant, it is validated, bound with
 caller finishes its transaction with ``simple_module_db.finalize_session``.
 
 Part 1: :func:`create_list`, :func:`importable_fields`, :func:`add_tag_choices`.
-Part 2: :func:`import_subscribers` (R3-R5, D5) and :func:`opted_out_anywhere` (D1).
+Part 2: :func:`import_subscribers` (R3-R5, D5) and :func:`opted_out_anywhere` (D1),
+both after :func:`lock_import_batch` (Codex finding 1).
 """
 
 from __future__ import annotations
@@ -24,6 +25,10 @@ from sm_records.contracts.newsletter_admin import FieldChoice, _field
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope
 from sm_records.public_submissions import campaign_import, campaign_lists, campaign_reads
+from sm_records.public_submissions.address_lock import address_key as address_lock_key
+from sm_records.public_submissions.address_lock import (
+    address_key_from_hash as address_lock_key_from_hash,
+)
 from sm_records.public_submissions.campaign_import import (
     CONSENT_TEMPLATE,
     MAX_IMPORT_BATCH,
@@ -64,9 +69,12 @@ __all__ = [
     "SubscriberFilterError",
     "TagsFieldMissing",
     "add_tag_choices",
+    "address_lock_key",
+    "address_lock_key_from_hash",
     "create_list",
     "import_subscribers",
     "importable_fields",
+    "lock_import_batch",
     "opted_out_anywhere",
 ]
 
@@ -215,3 +223,22 @@ async def opted_out_anywhere(
     wanted = campaign_import.checked_emails(emails)
     with tenant_scope(tenant):
         return await campaign_import.opted_out(session, tenant, wanted)
+
+
+async def lock_import_batch(
+    session: AsyncSession, *, tenant_id: str, type_key: str, emails: Sequence[str]
+) -> None:
+    """Hold, to the end of the caller's transaction, the opt-out lock of every
+    address in ``emails`` (``pg_advisory_xact_lock`` on
+    :func:`address_lock_key`, ascending; nothing on SQLite), then the list's
+    type lock. Every unsubscribe takes the address lock first too, so the
+    caller's :func:`opted_out_anywhere` and suppression reads made after this
+    stay true until it commits.
+
+    Call it first in the batch's transaction, before any read the admission
+    decides from, and before newsletter's own row locks. ``ValueError`` for
+    ``emails`` not a sequence of ``str``; ``LookupError`` for no such list."""
+    tenant = _checked_tenant(tenant_id)
+    wanted = campaign_import.checked_emails(emails, cap=None)
+    with tenant_scope(tenant):
+        await campaign_import.lock_batch(session, tenant, type_key, wanted)

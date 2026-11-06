@@ -166,7 +166,10 @@ never the live segment.
 - Newsletter then writes `unsubscribed` (list) and `imported_cleaned` suppressions with
   `refresh=False`, in the same transaction, and never calls `clear_for_confirmation`.
 - A subscribed address newsletter already suppresses, or records holds `unsubscribed` on any
-  list of the tenant (`opted_out_anywhere`), is not created.
+  list of the tenant (`opted_out_anywhere`), is not created. Both are read after
+  `lock_import_batch`: records' per-address opt-out locks (`pg_advisory_xact_lock`, ascending
+  key, which every `opt_in.leave` takes first too), then the type lock. Order: address locks
+  → type → row → newsletter rows. On SQLite the type-lock `UPDATE` comes before the read.
 - Uploads are staged in `newsletter_import_row` (addresses, deleted when the import ends or
   after 24 h) and applied by `newsletter.run_import` in leased 45 s slices under
   `tenant_scope`. Eager hosts run it inline.

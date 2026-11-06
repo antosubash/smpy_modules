@@ -1769,7 +1769,11 @@ tenant, `tenant_scope` binds it, every query pins it); argument errors are
   same row lock before it decides (`public_submissions.row_lock.lock_record`:
   the type lock, then `SELECT … FOR UPDATE` on Postgres; on SQLite the type
   lock is already the database's write lock), so an opt-out cannot land
-  between the lift's check and its commit.
+  between the lift's check and its commit. Before both, it takes the address's
+  **opt-out lock** (`public_submissions.address_lock`: `pg_advisory_xact_lock`
+  on a signed 64-bit key of the tenant and the address's SHA-256; nothing on
+  SQLite), which the import's `lock_import_batch` takes too. The full order is
+  **address lock(s), ascending key → type lock → row lock → newsletter rows**.
 
 #### Newsletter import contract
 
@@ -1845,11 +1849,26 @@ Part 2:
   unsubscribed on another of the tenant's lists (trash included) would be
   created `confirmed` here. Skip every `confirmed` row whose address
   `opted_out_anywhere` reports (newsletter's import does, together with its
-  own suppressions) before passing the batch in.
+  own suppressions) before passing the batch in, and read both after
+  `lock_import_batch`.
 - **`opted_out_anywhere(session, *, tenant_id, emails)`** returns the
   normalised addresses among `emails` that are `unsubscribed` on any of the
   tenant's lists, trash included: one indexed query per list. At most 500
   addresses, else `ValueError`.
+- **`lock_import_batch(session, *, tenant_id, type_key, emails)`** takes, until
+  the caller's transaction ends, the opt-out lock of every address in `emails`
+  in ascending key order (Postgres `pg_advisory_xact_lock`; nothing on SQLite),
+  then the list's type lock (on SQLite, the database's write lock). Every
+  unsubscribe takes the address lock before its type and row locks, so an
+  `opted_out_anywhere` (or suppression) read made after this call stays true
+  until the caller commits: an opt-out on another list cannot land between the
+  read and the create. Call it first in the batch's transaction. `LookupError`
+  for no such list, `ValueError` for `emails` not a sequence of `str`.
+- **`address_lock_key(tenant_id, email)`** and
+  **`address_lock_key_from_hash(tenant_id, digest)`** are that key: the first
+  8 bytes, signed, of a namespaced SHA-256 of the tenant and the address's hex
+  SHA-256 after records' normalisation (strip, lower-case), which is exactly
+  newsletter's suppression `email_hash`. Pure.
 
 ---
 

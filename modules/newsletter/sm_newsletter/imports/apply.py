@@ -1,8 +1,10 @@
 """One batch of staged rows, applied in the caller's transaction (R2, R3, R5, R15, D1, D8).
 
-Lock order: records first (its contract takes the list's type lock, then row locks), then
-newsletter's suppression rows. Nothing here commits; the runner commits only when its fenced
-job ``UPDATE`` matched (D3).
+Lock order: records' opt-out lock of every address of the batch (ascending key) and the
+list's type lock (``lock_import_batch``, before the refusal read), then records' row locks,
+then newsletter's suppression rows. Every unsubscribe takes the address lock first too, so
+the refusal read holds until the batch commits (on SQLite the type lock's ``UPDATE`` is the
+write lock). Nothing here commits; the runner commits only if its fenced ``UPDATE`` matched.
 
 The HARD invariant, newsletter's half:
 
@@ -29,6 +31,7 @@ from sm_records.contracts.newsletter_import import (
     ImportRow,
     ImportTargets,
     import_subscribers,
+    lock_import_batch,
     opted_out_anywhere,
 )
 from sqlalchemy import update
@@ -66,9 +69,14 @@ def _chunks(items: Sequence[Any]) -> list[Sequence[Any]]:
     return [items[i : i + MAX_IMPORT_BATCH] for i in range(0, len(items), MAX_IMPORT_BATCH)]
 
 
-async def _refused(session: AsyncSession, tenant_id: str, emails: list[str]) -> set[str]:
-    """The subscribed addresses that may not be admitted: suppressed here, or opted out of
-    any of the tenant's lists in records (D1). Reads only, before any records write."""
+async def _refused(
+    session: AsyncSession, tenant_id: str, job: ImportJob, rows: list[ImportEntry]
+) -> set[str]:
+    """The batch's locks (every address, then the list), then the subscribed addresses that
+    may not be admitted: suppressed here, or opted out of any of the tenant's lists (D1)."""
+    emails = [r.email for r in rows]
+    await lock_import_batch(session, tenant_id=tenant_id, type_key=job.list_type_key, emails=emails)
+    emails = [r.email for r in rows if r.kind == "subscribed"]
     if not emails:
         return set()
     refused = set(await suppressed(session, tenant_id=tenant_id, emails=emails))
@@ -177,8 +185,7 @@ async def apply_batch(
     result = BatchResult()
     outcome: dict[int | None, str] = {}
     tag_map = _tag_map(job)
-    subscribed = [r for r in rows if r.kind == "subscribed"]
-    refused = await _refused(session, tenant_id, [r.email for r in subscribed])
+    refused = await _refused(session, tenant_id, job, rows)
     to_records: list[ImportEntry] = []
     for row in rows:
         if row.kind not in KINDS:  # never a tenant-wide suppression for a kind not known here

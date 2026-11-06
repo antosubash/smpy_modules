@@ -214,6 +214,17 @@ task `newsletter.run_import(tenant_id, import_id)` on the `newsletter` queue.
   nothing.
 - Records holds its type lock for the whole batch (lookup, create, update), so
   signups to the list being imported wait up to one batch's transaction.
+- **Admission holds until the batch commits.** A batch first takes records'
+  per-address opt-out lock for every one of its addresses, in ascending key
+  order (`lock_import_batch`: `pg_advisory_xact_lock` on Postgres), then the
+  list's type lock, and only then reads newsletter's suppressions and records'
+  opt-outs (`opted_out_anywhere`). Every unsubscribe, on any list, takes the
+  same address lock before its own type and row locks, so an opt-out on list A
+  either commits before the read (and the address is skipped on B) or waits for
+  the batch, and then its mirror suppresses the address on B too. On SQLite the
+  type lock's `UPDATE` is the database's write lock, taken before the read.
+  Lock order: **address locks → type lock → row locks → suppression rows**.
+  An unsubscribe of an address being imported waits up to one batch.
 - A failure is recorded on the import as `import_failed`; the log carries the
   class name and the import id only, never an address.
 - The hourly `newsletter.import_janitor` beat task relaunches a `queued` or

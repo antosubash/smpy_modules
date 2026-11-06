@@ -3,8 +3,10 @@
 The contract, :mod:`sm_records.contracts.newsletter_import`, checks the
 arguments and binds the tenant; this module runs a batch. Nothing here commits.
 
-A batch takes the list's type lock first (the lock every record write of the
-list takes, PR 6's ``row_lock`` order: type, then row), so the addresses it
+The caller takes :func:`lock_batch` first (every address's opt-out lock, then
+the list's type lock), before its opt-out reads. A batch takes the type lock
+again (the lock every record write of the list takes, PR 6's ``row_lock``
+order: type, then row; re-taking it is free), so the addresses it
 looks up in one indexed query (trash included) stay as read for the rest of
 the caller's transaction, then decides each row with
 :func:`.campaign_import_rows.apply`. The whole batch runs inside
@@ -30,6 +32,7 @@ from sm_records.core import events
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType, tables_for
 from sm_records.public_submissions import campaign_import_rows, campaign_reads
+from sm_records.public_submissions.address_lock import lock_addresses
 from sm_records.public_submissions.campaign_reads import SubscriberFilterError
 from sm_records.public_submissions.definition import EMAIL_KEY
 from sm_records.public_submissions.subscribe import UNSUBSCRIBED, normalise
@@ -46,6 +49,7 @@ __all__ = [
     "ImportStatus",
     "checked_emails",
     "checked_rows",
+    "lock_batch",
     "opted_out",
     "run",
 ]
@@ -126,10 +130,10 @@ def checked_rows(rows: object, now: object, source: object) -> list[tuple[Import
     return out
 
 
-def checked_emails(emails: object) -> list[str]:
+def checked_emails(emails: object, *, cap: int | None = MAX_IMPORT_BATCH) -> list[str]:
     if isinstance(emails, str | bytes) or not isinstance(emails, Sequence):
         raise ValueError("emails must be a sequence of str")
-    if len(emails) > MAX_IMPORT_BATCH:
+    if cap is not None and len(emails) > cap:
         raise ValueError(f"at most {MAX_IMPORT_BATCH} addresses per call, got {len(emails)}")
     if not all(isinstance(e, str) for e in emails):
         raise ValueError("emails must be a sequence of str")
@@ -152,6 +156,18 @@ async def _matching(
         stmt = stmt.where(cls.tenant_id == tenant).execution_options(include_deleted=True)
         out.extend((await db.execute(stmt)).scalars().all())
     return out
+
+
+async def lock_batch(db: AsyncSession, tenant: str, type_key: str, emails: list[str]) -> None:
+    """The batch's locks, to the end of the transaction: every address's
+    opt-out lock (ascending key order), then the list's type lock. On SQLite the
+    type lock's ``UPDATE`` is the database's write lock, taken before the
+    caller's opt-out reads. ``LookupError`` for no such list in the tenant."""
+    rtype = await campaign_reads.list_type(db, tenant, type_key)
+    if rtype is None:
+        raise LookupError(f"no newsletter list {type_key!r}")
+    await lock_addresses(db, tenant, emails)
+    await lock_type(db, rtype)
 
 
 async def run(
