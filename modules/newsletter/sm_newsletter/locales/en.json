@@ -1,1 +1,292 @@
-{"permission_group": "Newsletter"}
+{
+  "permission_group": "Newsletter",
+  "email": {
+    "footer_reason": "You are receiving this email because you subscribed to updates from {app_name}.",
+    "unsubscribe": "Unsubscribe",
+    "read_more": "Read more"
+  },
+  "menu": {
+    "group": "Newsletter",
+    "campaigns": "Campaigns",
+    "settings": "Settings"
+  },
+  "campaigns": {
+    "title": "Campaigns",
+    "description": "Write an email, preview it and send it to a newsletter list.",
+    "search_label": "Search campaigns",
+    "search_placeholder": "Search by name or subject",
+    "status_label": "Status",
+    "status_all": "All statuses",
+    "status": {
+      "draft": "Draft",
+      "scheduled": "Scheduled",
+      "sending": "Sending",
+      "paused": "Paused",
+      "sent": "Sent",
+      "cancelled": "Cancelled"
+    },
+    "loading": "Loading campaigns",
+    "empty_title": "No campaigns yet",
+    "empty_description": "Create a campaign to write your first email.",
+    "no_match": "No campaign matches your search.",
+    "clear": "Clear filters",
+    "columns": {
+      "name": "Name",
+      "subject": "Subject",
+      "status": "Status",
+      "list": "List",
+      "updated": "Updated",
+      "actions": "Actions"
+    },
+    "no_subject": "(no subject)",
+    "never": "Never",
+    "showing": "Showing {from}-{to} of {total}",
+    "previous": "Previous",
+    "next": "Next",
+    "new": {
+      "trigger": "New campaign",
+      "title": "New campaign",
+      "description": "Name the campaign and choose the list it goes to. You write the email next.",
+      "name_label": "Name",
+      "name_placeholder": "Spring offers",
+      "list_label": "Newsletter list",
+      "list_placeholder": "Choose a list",
+      "loading_lists": "Loading lists",
+      "no_lists": "There are no newsletter lists yet. Create a newsletter list in Records first, then come back.",
+      "cancel": "Cancel",
+      "create": "Create",
+      "creating": "Creating"
+    },
+    "delete": {
+      "label": "Delete {name}",
+      "title": "Delete this campaign?",
+      "description": "The draft \"{name}\" will be deleted. This cannot be undone.",
+      "cancel": "Cancel",
+      "confirm": "Delete",
+      "working": "Deleting"
+    }
+  },
+  "settings": {
+    "title": "Newsletter settings",
+    "description": "How newsletters are sent, who they come from and how many go out.",
+    "loading": "Loading settings",
+    "read_only_note": "You can view these settings but not change them. Changing them needs the settings.edit permission.",
+    "transport": {
+      "title": "Transport",
+      "label": "Transport",
+      "smtp": "SMTP server",
+      "console": "Console (log only, nothing is sent)",
+      "host": "SMTP host",
+      "port": "Port",
+      "security": "Security",
+      "starttls": "STARTTLS",
+      "tls": "TLS (implicit)",
+      "username": "Username"
+    },
+    "password": {
+      "label": "Password",
+      "saved": "A password is saved.",
+      "not_saved": "No password is saved.",
+      "placeholder": "Enter a new password",
+      "save": "Save password",
+      "saving": "Saving password",
+      "replace_hint": "The password is write-only. Entering a new one replaces the saved one."
+    },
+    "sender": {
+      "title": "Sender",
+      "from_address": "From address",
+      "from_name": "From name",
+      "reply_to": "Reply-to address",
+      "physical_address": "Postal address",
+      "physical_address_hint": "Shown in every email footer."
+    },
+    "limits": {
+      "title": "Limits",
+      "daily": "Emails per day",
+      "per_minute": "Emails per minute"
+    },
+    "tracking": {
+      "title": "Tracking",
+      "opens": "Track opens",
+      "clicks": "Track clicks"
+    },
+    "tracking_note": "Tracking applies from PR 5. These switches are stored but have no effect yet.",
+    "server_change_clears_password": "Changing the host, port, security or username removes the saved password. Enter it again afterwards.",
+    "password_cleared_notice": "The saved password was removed because the server changed. Enter it again.",
+    "saved_notice": "Settings saved.",
+    "password_saved_notice": "Password saved.",
+    "save": "Save settings",
+    "saving": "Saving settings"
+  },
+  "editor": {
+    "fallback_title": "Campaign",
+    "loading": "Loading campaign",
+    "back": "Campaigns",
+    "untitled": "Untitled campaign",
+    "list": "List: {list}",
+    "status": {
+      "saving": "Saving",
+      "saved": "Saved",
+      "stale": "Changed elsewhere",
+      "error": "Not saved"
+    },
+    "reload": "Reload",
+    "read_only": "You can view this campaign but not change it.",
+    "not_draft": "This campaign is no longer a draft, so it cannot be changed.",
+    "incomplete": "A block is missing a required field. The email is saved again once it is filled in.",
+    "leave_held": "Leave this campaign? A block is unfinished, so that change is not saved.",
+    "select_a_block": "Select a block to edit it.",
+    "integration_missing": "This content source is not available on this site.",
+    "meta": {
+      "title": "Email details",
+      "name": "Campaign name",
+      "subject": "Subject",
+      "preheader": "Preview text",
+      "preheader_hint": "Shown after the subject in most inboxes.",
+      "from_name": "Sender name",
+      "from_name_hint": "Leave empty to use the name from the newsletter settings.",
+      "reply_to": "Reply-to address",
+      "reply_to_hint": "Leave empty to use the address from the newsletter settings."
+    },
+    "card": {
+      "article": "Article",
+      "page": "Page",
+      "current": "Shown in the email",
+      "none": "Nothing chosen yet.",
+      "search_label": "Search",
+      "search_article": "Search published articles",
+      "search_page": "Search published pages",
+      "searching": "Searching",
+      "no_results": "Nothing matches.",
+      "refresh": "Refresh from source",
+      "refreshing": "Refreshing",
+      "copied_at": "Copied {date}"
+    },
+    "media": {
+      "choose": "Choose from media",
+      "close": "Close",
+      "search": "Search media",
+      "searching": "Searching",
+      "no_results": "No images found."
+    }
+  },
+  "blocks": {
+    "categories": {
+      "content": "Content",
+      "layout": "Layout",
+      "cards": "Cards"
+    },
+    "common": {
+      "align": "Alignment",
+      "align_left": "Left",
+      "align_center": "Centre",
+      "align_right": "Right",
+      "link": "Link"
+    },
+    "heading": {
+      "label": "Heading",
+      "text": "Text",
+      "level": "Size",
+      "level_1": "Large",
+      "level_2": "Medium"
+    },
+    "rich_text": {
+      "label": "Text",
+      "html": "Text"
+    },
+    "image": {
+      "label": "Image",
+      "src": "Image address",
+      "alt": "Alternative text",
+      "href": "Link (optional)",
+      "width": "Width in pixels",
+      "empty": "Choose an image"
+    },
+    "button": {
+      "label": "Button",
+      "text": "Label"
+    },
+    "divider": {
+      "label": "Divider"
+    },
+    "spacer": {
+      "label": "Spacer",
+      "size": "Size",
+      "size_sm": "Small",
+      "size_md": "Medium",
+      "size_lg": "Large"
+    },
+    "article_card": {
+      "label": "Article card"
+    },
+    "page_card": {
+      "label": "Page card"
+    },
+    "card_empty": "Choose an item in the block settings."
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "csrf_failed": "Your session has expired. Reload the page and try again.",
+    "audience_unsupported": "Only the whole list can be the audience for now.",
+    "block_not_found": "That card is no longer in this campaign.",
+    "campaign_cancelled": "A cancelled campaign cannot be test sent.",
+    "card_source_gone": "The card's source is no longer published. Its saved copy was kept.",
+    "dispatch_busy": "Another send is in progress. Try again in a moment.",
+    "forbidden": "You do not have permission to do that.",
+    "integration_unavailable": "This content source is not available on this site.",
+    "invalid_body": "The email content is not valid.",
+    "invalid_campaign": "The campaign is not valid.",
+    "invalid_password": "The password must be 1 to 1024 characters and not blank.",
+    "invalid_settings": "The settings are not valid.",
+    "list_forbidden": "You may not use this newsletter list.",
+    "not_a_draft": "Only a draft campaign can be changed or deleted.",
+    "not_found": "That item no longer exists.",
+    "public_base_url_required": "Set the site's public base URL in Settings before sending a test.",
+    "send_budget_exhausted": "The sending limit has been reached. Try again later.",
+    "sender_not_configured": "Set the sender address in the newsletter settings first.",
+    "smtp_password_unreadable": "The stored SMTP password cannot be read. Enter it again.",
+    "stale": "This campaign was changed elsewhere. Reload it to continue.",
+    "tenant_required": "No organisation is active for this account.",
+    "transport_unavailable": "The mail server is not available.",
+    "unknown_list": "No such newsletter list."
+  },
+  "preview": {
+    "tab_edit": "Edit",
+    "tab_preview": "Preview",
+    "tab_html": "HTML",
+    "tab_text": "Plain text",
+    "desktop": "Desktop",
+    "mobile": "Mobile",
+    "loading": "Updating preview",
+    "subject": "Subject:",
+    "frame_title": "Email preview",
+    "warning": {
+      "relative_urls": "Some links or images are relative and will not work in an inbox. Use full addresses.",
+      "physical_address_missing": "No postal address is set in the newsletter settings, so the footer has none.",
+      "empty_body": "The email has no content yet."
+    }
+  },
+  "test_send": {
+    "trigger": "Send test",
+    "title": "Send a test email",
+    "description": "Sends the saved draft to up to {max} addresses. Nobody is added to the list.",
+    "recipients": "Recipients",
+    "placeholder": "name@example.com, one per line or separated by commas",
+    "too_many": "Enter at most {max} addresses.",
+    "invalid_address": "\"{address}\" is not a valid email address.",
+    "invalid_recipients": "One of the addresses was refused as invalid.",
+    "unsaved": "The latest edits could not be saved yet, so no test was sent.",
+    "results": "Test results",
+    "send": "Send",
+    "sending": "Sending",
+    "close": "Close",
+    "outcome": {
+      "accepted": "Accepted",
+      "rejected": "Rejected",
+      "unknown": "Unknown",
+      "failed": "Failed"
+    },
+    "incomplete": "Unfinished blocks are not in the saved draft, so they are left out of the test.",
+    "no_base_url": "The site's public base URL is not set (host settings), so test sends will be refused."
+  }
+}

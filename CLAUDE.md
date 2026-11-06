@@ -122,6 +122,23 @@ trash (`empty_trash`; both reach `_purge_ids`) and deleting the type
 new way of deleting records must go through one of them. The retention sweep
 trashes with `soft_delete_record` and then calls `hard_delete_record`.
 
+**Newsletter content and test sends.** Email HTML is produced only by
+`sm_newsletter.content.render`. Rich text is re-serialised from an allow-list at
+save and again at render. Card and media lookups go through
+`news.contracts.articles` and `pagebuilder.contracts.cards` only
+(`content/integrations/` is the one package that imports them, guarded). A
+settings write that changes the SMTP host, port, security or username clears the
+stored password. Campaign writes are guarded by an integer `revision`
+(`expected_revision`, 409 `stale`), and every campaign request re-checks the
+caller's list access (404 for an unreadable list). A test send takes the
+install-wide dispatch lock (`sending/lock.py`: Postgres advisory lock, SQLite
+lease row) and counts against the rolling budget through
+`newsletter_send_attempt`; admission is all-or-nothing and writes no row on
+refusal. Content links use the campaign tenant's public origin, while the
+unsubscribe and logo routes use `public_base_url`; the email logo is
+`/newsletter/brand/logo` (the SYSTEM-scope branding logo). Docs:
+`modules/newsletter/docs/content.md`.
+
 **Newsletter mirrors records' unsubscribes into `newsletter_suppression`.** The
 `SubscriptionChanged` handler writes them, and an hourly reconcile walks records'
 unsubscribed subscribers, trash included, and only adds rows. Suppressions are

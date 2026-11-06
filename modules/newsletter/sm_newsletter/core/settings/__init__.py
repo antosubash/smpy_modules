@@ -15,9 +15,11 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import SettingsConfigDict
 from simple_module_core.settings_base import DbBackedSettings
+
+from sm_newsletter.core.headers import check_header_text
 
 __all__ = ["NewsletterSettings"]
 
@@ -69,3 +71,9 @@ class NewsletterSettings(DbBackedSettings):
 
     physical_address: str = ""
     """Postal address printed in every campaign footer."""
+
+    @field_validator("from_name", "from_address", "reply_to")
+    @classmethod
+    def _no_header_injection(cls, value: str, info) -> str:
+        """These end up in mail headers: no line breaks or control characters."""
+        return check_header_text(value, field=info.field_name)

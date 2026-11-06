@@ -147,8 +147,8 @@ export type TranslateParams = Record<string, unknown>;
 export type Translate = (key: string, params?: TranslateParams) => string;
 
 /**
- * `t()` for code that runs outside React — the API client's error decoder is
- * the only caller.
+ * `t()` for code that runs outside React (the API client's error decoder is
+ * *a* caller; any non-component code may be another).
  *
  * Resolved at call time against the shared i18next instance, so it reads the
  * language in force when the message is produced. That is what makes it safe
