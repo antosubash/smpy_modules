@@ -9,7 +9,7 @@ import { keys, type Translate } from './i18n';
 export const BASE = '/api/newsletter';
 
 /** The catalogue key for a failure no code names (and for a CSRF refusal). */
-export const CSRF_CODE = 'csrf_failed';
+const CSRF_CODE = 'csrf_failed';
 
 /** A failed response: its status (409 stale vs. 404 gone) and the server's code. */
 export class HttpError extends Error {

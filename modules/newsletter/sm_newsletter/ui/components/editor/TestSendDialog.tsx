@@ -30,7 +30,7 @@ const OUTCOMES: Record<string, string> = {
 };
 
 /** Addresses separated by commas or line breaks, trimmed, lower-cased, deduplicated. */
-export function parseRecipients(text: string): string[] {
+function parseRecipients(text: string): string[] {
   const found = text
     .split(/[\n,;]+/)
     .map((a) => a.trim().toLowerCase())

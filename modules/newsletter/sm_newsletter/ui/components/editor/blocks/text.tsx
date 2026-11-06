@@ -14,7 +14,7 @@ import { block, FONT } from './email';
 
 const copy = keys.newsletter.blocks;
 
-export const alignOptions = [
+const alignOptions = [
   { label: copy.common.align_left, value: 'left' },
   { label: copy.common.align_center, value: 'center' },
 ];

@@ -19,7 +19,7 @@ export type MetaPatch = Partial<
   Pick<CampaignDetail, 'name' | 'subject' | 'preheader' | 'from_name' | 'reply_to'>
 >;
 
-export interface PendingEdits {
+interface PendingEdits {
   /** The next save's body: complete, and different from the saved one. */
   body: Block[] | null;
   /** The next save's campaign fields. */

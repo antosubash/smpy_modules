@@ -1,6 +1,6 @@
 /** Wire types of `/api/newsletter`, mirroring `sm_newsletter/web/schemas/*.py`. */
 
-export type BlockType =
+type BlockType =
   | 'Heading'
   | 'RichText'
   | 'Image'

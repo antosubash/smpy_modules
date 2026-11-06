@@ -141,7 +141,7 @@ function flatten(node: Record<string, unknown>, prefix: string, out: Record<stri
 const english: Record<string, string> = flatten(en, NAMESPACE, {});
 
 /** Interpolation values — `{name}` placeholders, and `count` for plurals. */
-export type TranslateParams = Record<string, unknown>;
+type TranslateParams = Record<string, unknown>;
 
 /** What every call site in this module translates with. */
 export type Translate = (key: string, params?: TranslateParams) => string;

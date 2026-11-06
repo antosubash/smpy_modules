@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from simple_module_db import like_contains_pattern
+
 MAX_QUERY = 100
 SEARCH_LIMIT = 20
 MAX_SOURCE_ID = 2**31 - 1
@@ -35,6 +37,4 @@ class MediaHit:
 def like_pattern(q: str) -> str:
     """``%q%`` for a ``LIKE ... ESCAPE '\\'``: ``q`` stripped, at most
     :data:`MAX_QUERY` characters, with ``\\``, ``%`` and ``_`` escaped."""
-    text = q.strip()[:MAX_QUERY]
-    text = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    return f"%{text}%"
+    return like_contains_pattern(q.strip()[:MAX_QUERY])

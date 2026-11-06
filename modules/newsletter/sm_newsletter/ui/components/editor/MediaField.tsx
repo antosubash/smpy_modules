@@ -16,13 +16,10 @@ import { AutoField, type CustomField, FieldLabel } from '@puckeditor/core';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useEffect, useState } from 'react';
-
 import { SEARCH_DEBOUNCE_MS } from '../../hooks/useCampaignList';
 import { api, errorMessage } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 import type { MediaHit } from '../../utils/types';
-
-/** As the campaign list's search box: one request per word, not per keystroke. */
 
 const copy = keys.newsletter.editor.media;
 

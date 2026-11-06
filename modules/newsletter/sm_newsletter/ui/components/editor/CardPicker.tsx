@@ -22,7 +22,6 @@ import {
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useEffect, useState } from 'react';
-
 import { SEARCH_DEBOUNCE_MS } from '../../hooks/useCampaignList';
 import { api, errorMessage } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';

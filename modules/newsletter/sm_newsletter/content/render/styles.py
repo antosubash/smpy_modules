@@ -23,7 +23,7 @@ _COLOR = re.compile(r"^#[0-9a-fA-F]{3,8}$")
 
 
 def is_color(value: str) -> bool:
-    return bool(_COLOR.match(value))
+    return _COLOR.fullmatch(value) is not None
 
 
 def link_style(accent: str) -> str:

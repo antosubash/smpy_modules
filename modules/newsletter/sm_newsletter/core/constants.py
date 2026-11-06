@@ -55,8 +55,8 @@ MENU_LABEL_SETTINGS = "Settings"
 MENU_LABEL_KEY_SETTINGS = "newsletter.menu.settings"
 MENU_ICON_SETTINGS = "settings"
 
-# The newsletter settings page (PR 3). Registered now as the settings'
-# ``manage_url`` so the generic Settings screen refuses newsletter writes.
+# The newsletter settings page; also the settings' ``manage_url``, so the
+# generic Settings screen refuses newsletter writes.
 SETTINGS_URL = f"{VIEW_PREFIX}/settings"
 
 # Campaign and send lifecycles (``str`` columns, ``max_length=24``).
