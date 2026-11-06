@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 from simple_module_db.deps import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
-from tenants.deps import ActiveTenantContext, require_active_tenant, require_user_id
+from tenants.web.deps import ActiveTenantContext, require_active_tenant, require_user_id
 
 from sm_billing.core import constants as c
 from sm_billing.core.context import BillingContext, billing_context, is_user_mode, user_context

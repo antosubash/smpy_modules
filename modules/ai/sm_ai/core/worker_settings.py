@@ -196,8 +196,8 @@ async def _bounded_read(database_url: str) -> tuple[AiSettings, str]:
 
 
 async def _read(database_url: str) -> tuple[AiSettings, str]:
-    from settings.service import SettingService
-    from settings.store import SettingsStore
+    from settings.core.service import SettingService
+    from settings.module_settings.store import SettingsStore
     from simple_module_core.settings_hydrate import hydrate_settings
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
     from sqlalchemy.pool import NullPool

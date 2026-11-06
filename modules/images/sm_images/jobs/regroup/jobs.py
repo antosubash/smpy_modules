@@ -247,7 +247,7 @@ async def launch(runtime: Runtime, tenant: str, job_id: uuid.UUID, generation: i
         await run_regroup(runtime, tenant, job_id, generation)
         return
     # Celery stays out of the module's import time (see ``sm_images.tasks``).
-    from background_tasks.tenant_context import TENANT_HEADER
+    from background_tasks.executions.tenant_context import TENANT_HEADER
 
     from sm_images.task_config import QUEUE_IMPORTS
     from sm_images.tasks import run_regroup_task

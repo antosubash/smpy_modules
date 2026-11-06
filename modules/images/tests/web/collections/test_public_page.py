@@ -70,7 +70,9 @@ async def test_private_collection_list_is_404(client, g, who):
 
 
 async def test_page_is_served_anonymously_with_safe_props(client, g):
-    got = await client.get(f"/images/c/{g.slugs['pub']}", headers={"X-Inertia": "true"})
+    got = await client.get(
+        f"/images/c/{g.slugs['pub']}", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+    )
     assert got.status_code == 200, got.text
     page = got.json()
     assert page["component"] == "Images/PublicCollection"

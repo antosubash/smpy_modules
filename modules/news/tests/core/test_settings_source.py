@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from news.core import constants
 from news.core.settings import NewsSettings
 from news.module import NewsModule
-from settings.module_registry import ModuleSettingsRegistry
+from simple_module_core.module_settings import ModuleSettingsRegistry
 
 
 def _registry(app):

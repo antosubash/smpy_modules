@@ -8,7 +8,7 @@ builds, and ``can`` is checked never to say yes where ``filter`` says no.
 from __future__ import annotations
 
 import pytest
-from sharing.policy import resolve_roles
+from sharing.core.policy import resolve_roles
 from simple_module_core.resources import (
     ACTION_DELETE,
     ACTION_EDIT,

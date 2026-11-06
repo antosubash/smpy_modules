@@ -5,8 +5,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from fastapi import FastAPI
-from settings.module_registry import ModuleSettingsRegistry
 from simple_module_core.menu import MenuRegistry
+from simple_module_core.module_settings import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry
 from sm_ai.core import constants, services
 from sm_ai.module import AiModule

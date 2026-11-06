@@ -85,7 +85,7 @@ async def admin(authenticated_client):
 
 @pytest.fixture(autouse=True)
 def _fresh_membership_cache():
-    from tenants.resolver import forget
+    from tenants.resolution.resolver import forget
 
     forget(None)
     yield

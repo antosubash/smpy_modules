@@ -142,7 +142,7 @@ A published page response carries:
 
 | Header | Value |
 |---|---|
-| `ETag` | weak, from the page's id and `updated_at`, the layout's `updated_at`, the representation (HTML or Inertia JSON) and the nav list. An `If-None-Match` hit is a 304. |
+| `ETag` | weak, from the page's id and `updated_at`, the layout's `updated_at`, the representation (HTML or Inertia JSON) and the nav list. An `If-None-Match` hit is a 304. On a real host the framework's Inertia adapter removes it from an Inertia JSON response and sets `private, no-store` instead; a full page keeps both. |
 | `Cache-Control` | `public, max-age=<public_cache_max_age>, stale-while-revalidate=<public_cache_swr>` |
 | `Vary` | `X-Inertia`, plus the tenant headers on a multi-tenant host |
 | `Content-Language` | the page's locale |

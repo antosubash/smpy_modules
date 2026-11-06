@@ -18,7 +18,7 @@ from tests.support.tenant_app import as_tenant, create_published, multi_client
 
 A, B = as_tenant("acme"), as_tenant("globex")
 NEWS = "/news"
-INERTIA = {"X-Inertia": "true"}
+INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
 
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.unbound_tenant]

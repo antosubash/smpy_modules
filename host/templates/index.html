@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     {% inertia_head %}
     {% if request.app.state.sm.inertia_config.environment == "development" %}
-    <script type="module">
+    <script type="module" nonce="{{ request.state.csp_nonce }}">
       import RefreshRuntime from "{{ request.app.state.sm.inertia_config.dev_url }}/@react-refresh";
       RefreshRuntime.injectIntoGlobalHook(window);
       window.$RefreshReg$ = () => {};

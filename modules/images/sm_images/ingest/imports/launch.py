@@ -32,7 +32,7 @@ async def launch_runner(runtime: Runtime, tenant: str, job_id: uuid.UUID, genera
 
         await run_import(runtime, tenant, job_id, generation)
         return
-    from background_tasks.tenant_context import TENANT_HEADER
+    from background_tasks.executions.tenant_context import TENANT_HEADER
 
     from sm_images.ingest.imports.tasks import import_geojson
     from sm_images.task_config import QUEUE_IMPORTS
@@ -48,7 +48,7 @@ async def launch_reset(runtime: Runtime, tenant: str, job_id: uuid.UUID, generat
 
         await run_reset(runtime, tenant, job_id, generation)
         return
-    from background_tasks.tenant_context import TENANT_HEADER
+    from background_tasks.executions.tenant_context import TENANT_HEADER
 
     from sm_images.ingest.imports.tasks import reset_import
     from sm_images.task_config import QUEUE_IMPORTS
@@ -68,7 +68,7 @@ async def launch_downloads(
 
         await download_items_async(runtime, tenant, job_id, generation, list(ids))
         return
-    from background_tasks.tenant_context import TENANT_HEADER
+    from background_tasks.executions.tenant_context import TENANT_HEADER
 
     from sm_images.ingest.imports.tasks import download_items
     from sm_images.task_config import QUEUE_DEFAULT
