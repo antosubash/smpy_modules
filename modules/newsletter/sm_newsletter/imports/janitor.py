@@ -2,9 +2,11 @@
 
 One narrow read with no tenant bound (``all_tenants()``) of ``(tenant, id, status)`` for:
 
-* ``staged`` or ``failed`` jobs older than ``STAGED_TTL``: deleted (their staged rows with
-  them) - staged rows hold addresses;
-* ``queued`` jobs older than ``LEASE``: the message was lost;
+* ``staged`` jobs older than ``STAGED_TTL`` (from ``created_at``) and ``failed`` jobs older
+  than it from when they failed (``finished_at``, else ``created_at``): deleted, their staged
+  rows with them - staged rows hold addresses;
+* ``queued`` jobs older than ``LEASE`` from ``created_at``: the message was lost (a job
+  staged long ago and queued just now is relaunched at once; the claim answers ``busy``);
 * ``running`` jobs whose lease was released (``lease_owner IS NULL``) more than ``LEASE``
   ago - a slice whose follow-up message was lost (D2) - or whose owned lease has run out.
 
@@ -22,7 +24,7 @@ from itertools import groupby
 
 from simple_module_db import finalize_session
 from simple_module_db.tenancy import all_tenants as framework_all_tenants
-from sqlalchemy import and_, delete, or_, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.core import tenancy
@@ -41,9 +43,11 @@ def _candidates(now: datetime):
     stale = now - LEASE
     return select(ImportJob.tenant_id, ImportJob.id, ImportJob.status).where(
         or_(
+            and_(ImportJob.status == STAGED, ImportJob.created_at < now - STAGED_TTL),
+            # A failed import is timed from when it failed (F1), so "Apply again" gets its day.
             and_(
-                ImportJob.status.in_((STAGED, FAILED)),  # ty: ignore[unresolved-attribute]
-                ImportJob.created_at < now - STAGED_TTL,
+                ImportJob.status == FAILED,
+                func.coalesce(ImportJob.finished_at, ImportJob.created_at) < now - STAGED_TTL,
             ),
             and_(ImportJob.status == QUEUED, ImportJob.created_at < stale),
             and_(
@@ -102,17 +106,30 @@ async def janitor_async(factory: SessionFactory, *, now: datetime) -> dict[str, 
 
 
 async def _expire(factory: SessionFactory, tenant_id: str, ids: list[int]) -> None:
+    """Delete the jobs still ``staged``/``failed`` first, then the rows of those jobs only.
+
+    The status guard decides which jobs go; a ``queue_apply`` that won the race since the
+    candidate read keeps its job and its rows (and one that comes later finds nothing, 409).
+    """
     async with factory() as session:
-        for stmt in (
-            delete(ImportEntry).where(
-                ImportEntry.tenant_id == tenant_id,
-                ImportEntry.import_id.in_(ids),  # ty: ignore[unresolved-attribute]
-            ),
-            delete(ImportJob).where(
+        gone = await session.execute(
+            delete(ImportJob)
+            .where(
                 ImportJob.tenant_id == tenant_id,
                 ImportJob.id.in_(ids),  # ty: ignore[unresolved-attribute]
                 ImportJob.status.in_((STAGED, FAILED)),  # ty: ignore[unresolved-attribute]
-            ),
-        ):
-            await session.execute(stmt.execution_options(synchronize_session=False))
+            )
+            .returning(ImportJob.id)
+            .execution_options(synchronize_session=False)
+        )
+        deleted = [r[0] for r in gone.all()]
+        if deleted:
+            await session.execute(
+                delete(ImportEntry)
+                .where(
+                    ImportEntry.tenant_id == tenant_id,
+                    ImportEntry.import_id.in_(deleted),  # ty: ignore[unresolved-attribute]
+                )
+                .execution_options(synchronize_session=False)
+            )
         await finalize_session(session)

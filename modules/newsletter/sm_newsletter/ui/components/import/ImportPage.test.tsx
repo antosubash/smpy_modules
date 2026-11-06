@@ -106,6 +106,36 @@ describe('Import page', () => {
     expect(text()).toContain(en.import.status.queued);
   });
 
+  it('keeps the controls disabled through the save and the apply, and starts once', async () => {
+    const original = globalThis.fetch;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (init?.method === 'POST' && String(url).endsWith('/apply')) await gate;
+        return original(url, init);
+      }),
+    );
+    await render();
+    calls.length = 0;
+    await act(async () => {
+      button(en.import.apply)?.click();
+      button(en.import.apply)?.click();
+    });
+    const busyButton = button(en.import.applying) as HTMLButtonElement;
+    expect(busyButton.disabled).toBe(true);
+    expect((button(en.import.discard) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => {
+      release();
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    const writes = calls.filter((c) => c.method !== 'GET').map((c) => `${c.method} ${c.path}`);
+    expect(writes).toEqual(['PATCH /imports/7', 'POST /imports/7/apply']);
+  });
+
   it('does not apply when saving the mapping fails', async () => {
     const original = globalThis.fetch;
     vi.stubGlobal(
@@ -123,6 +153,14 @@ describe('Import page', () => {
     });
     expect(calls.some((c) => c.path.endsWith('/apply'))).toBe(false);
     expect(text()).toContain(en.errors.import_bad_mapping);
+  });
+
+  it('labels the history buttons with their visible text', async () => {
+    await render();
+    const open = [...document.querySelectorAll('button')].find(
+      (b) => b.textContent === en.import.open,
+    );
+    expect(open?.getAttribute('aria-label')).toBe('Open import 7');
   });
 
   it('asks before discarding', async () => {

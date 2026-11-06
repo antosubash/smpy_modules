@@ -23,7 +23,7 @@ A Mailchimp import ([`import.md`](import.md)) is applied by the Celery task
 `newsletter.run_import` on the same `newsletter` queue (`make worker` serves it
 with `-c 4`, so a long import never starves the minute's dispatch tick). The
 hourly beat task `newsletter.import_janitor` relaunches an import whose message
-was lost and deletes staged or failed imports older than 24 hours (their staged
+was lost and deletes staged imports older than 24 hours (from creation) and failed ones 24 hours after they failed (their staged
 addresses with them). With Celery eager and no beat, an import still runs: the
 request applies every slice inline; only the janitor does not run.
 

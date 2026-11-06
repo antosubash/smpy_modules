@@ -215,7 +215,11 @@ task `newsletter.run_import(tenant_id, import_id)` on the `newsletter` queue.
   class name and the import id only, never an address.
 - The hourly `newsletter.import_janitor` beat task relaunches a `queued` or
   `running` import whose lease ran out (a lost message) and deletes staged or
-  failed imports older than 24 hours.
+  failed imports older than 24 hours. A staged import is timed from its
+  creation, a failed one from when it failed, so "Apply again" has a full day. A
+  `queued` import is timed from its creation: one staged long ago and queued
+  just now is relaunched by the next pass, which is harmless (a second launch
+  of a job somebody runs answers `busy`).
 
 ## What an import publishes
 

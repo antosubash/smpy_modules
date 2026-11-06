@@ -21,8 +21,10 @@ from sm_records.core import events
 from tests.imports.world import FIELDS, upload
 from tests.support.app import build_app
 from tests.support.import_world import (
+    CLEAN,
     NOW,
     SUB,
+    UNSUB,
     apply_now,
     outcomes,
     queued,
@@ -124,3 +126,20 @@ async def test_no_pending_to_confirmed_event(state, monkeypatch):
     records = await records_of(state)
     assert records[ADA].data["sm_status"] == "pending"
     assert records[BOB].data["sm_status"] == "confirmed"
+
+
+@pytest.mark.parametrize("existing", ["hard_bounce", "complaint"])
+@pytest.mark.parametrize(
+    ("name", "reason", "key"),
+    [(UNSUB, "unsubscribed", "news"), (CLEAN, "imported_cleaned", "")],
+)
+async def test_different_reason_suppression_is_left_alone(state, existing, name, reason, key):
+    earlier = NOW - timedelta(days=30)
+    await suppress_at(state, ADA, existing, at=earlier)  # address-wide reasons carry no list key
+    before = await suppression_rows(state)
+    jid = await queued(state, upload(name, [[ADA, "", "", ""]]))
+    await apply_now(state, jid)
+    after = await suppression_rows(state)
+    assert all(row in after for row in before)  # reason, source and created_at unchanged
+    added = [row for row in after if row not in before]
+    assert [(r[1], r[2], r[3]) for r in added] == [(reason, key, "import")]

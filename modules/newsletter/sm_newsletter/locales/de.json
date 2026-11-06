@@ -691,7 +691,7 @@
     "apply_again": "Import erneut starten",
     "another": "Weiteren Export importieren",
     "open": "Öffnen",
-    "import_label": "Import {id}",
+    "open_import": "Import {id} öffnen",
     "mapping_title": "Spaltenzuordnung",
     "error_file": "Datei",
     "error_line": "Zeile",

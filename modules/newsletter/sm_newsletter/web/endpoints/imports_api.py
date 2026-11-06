@@ -28,7 +28,7 @@ from sm_newsletter.core.errors import NotFound
 from sm_newsletter.core.errors_import import ImportBadMapping, ImportNotCsv, ImportTooManyFiles
 from sm_newsletter.core.tenancy import bind_admin
 from sm_newsletter.imports import archive, launch, service, staging
-from sm_newsletter.imports.constants import MAX_FILES, MAX_UPLOAD_BYTES
+from sm_newsletter.imports.constants import MAX_FILES
 from sm_newsletter.imports.csv_safe import errors_csv
 from sm_newsletter.models import ImportJob
 from sm_newsletter.web.schemas.campaigns import parse_payload
@@ -61,8 +61,9 @@ async def _out(db: AsyncSession, tenant: str, job: ImportJob) -> ImportOut:
 
 async def _read_upload(request: Request) -> tuple[str, list[UploadFile]]:
     try:
+        # ``max_part_size`` limits only non-file parts (the ``list`` field); files spool to disk.
         form = await request.form(
-            max_part_size=MAX_UPLOAD_BYTES, max_files=MAX_FILES, max_fields=MAX_FIELDS
+            max_part_size=4 * 1024, max_files=MAX_FILES, max_fields=MAX_FIELDS
         )
     except (MultiPartException, HTTPException) as exc:
         # Starlette words these itself and never quotes the upload; ours are fixed, too.

@@ -118,3 +118,34 @@ async def export_for(st, tenant: str) -> int:
     jid = await stage_in(st, upload(SUB, people("q", 2)), tenant=tenant)
     await queue(st, jid, tenant)
     return jid
+
+
+async def test_failed_is_timed_from_when_it_failed(world):
+    st, _ = world
+    jid = await staged(st, upload(SUB, people("f", 2)))
+    now = NOW + STAGED_TTL + timedelta(hours=1)
+    await set_job(st, jid, status="failed", error_code="import_failed", finished_at=now)
+    summary = await janitor_async(st.session_factory, now=now + timedelta(minutes=5))
+    assert summary == {"expired": 0, "relaunched": 0, "failed": 0}
+    assert await exists(st, jid) and await staged_count(st, jid) == 2
+    later = await janitor_async(st.session_factory, now=now + STAGED_TTL + timedelta(seconds=1))
+    assert later["expired"] == 1 and not await exists(st, jid)
+
+
+async def test_queued_between_read_and_expire_keeps_rows_and_job(world, monkeypatch):
+    from sm_newsletter.imports import janitor
+
+    st, _ = world
+    raced = await staged(st, upload(SUB, people("r", 3)))
+    plain = await staged(st, upload(SUB, people("p", 2)))
+    real = janitor._expire
+
+    async def late(factory, tenant_id, ids):
+        await queue(st, raced, tenant_id)  # queue_apply wins after the candidate read
+        await real(factory, tenant_id, ids)
+
+    monkeypatch.setattr(janitor, "_expire", late)
+    await janitor_async(st.session_factory, now=LATER)
+    assert await exists(st, raced) and await staged_count(st, raced) == 3
+    assert (await job_of(st, raced)).status == "queued"
+    assert not await exists(st, plain) and await staged_count(st, plain) == 0

@@ -14,7 +14,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import type { SharedProps } from '@simple-module-py/ui/types';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { ImportErrors } from '../ui/components/import/ImportErrors';
 import { ImportHistory } from '../ui/components/import/ImportHistory';
@@ -57,6 +57,9 @@ export default function Import() {
   const [listKey, setListKey] = useState(props.lists?.[0] ?? '');
   const [mapping, setMapping] = useState<ImportMapping>({ fields: {}, tags: false });
   const [confirming, setConfirming] = useState(false);
+  // Held across the save and the apply, between which `busy` drops for a moment.
+  const [starting, setStarting] = useState(false);
+  const startingNow = useRef(false); // a second click in the same tick sees the state unchanged
 
   const jobId = job?.id ?? null;
   const staged = job?.status === 'staged';
@@ -75,7 +78,15 @@ export default function Import() {
     setListKey(key);
   };
   const start = async () => {
-    if (await saveMapping(mapping)) await apply();
+    if (startingNow.current) return;
+    startingNow.current = true;
+    setStarting(true);
+    try {
+      if (await saveMapping(mapping)) await apply();
+    } finally {
+      startingNow.current = false;
+      setStarting(false);
+    }
   };
 
   return (
@@ -127,13 +138,13 @@ export default function Import() {
               />
             </Step>
             <div className="flex gap-2">
-              <Button type="button" disabled={busy} onClick={() => void start()}>
-                {busy ? t(copy.applying) : t(copy.apply)}
+              <Button type="button" disabled={busy || starting} onClick={() => void start()}>
+                {busy || starting ? t(copy.applying) : t(copy.apply)}
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                disabled={busy}
+                disabled={busy || starting}
                 onClick={() => setConfirming(true)}
               >
                 {t(copy.discard)}

@@ -691,7 +691,7 @@
     "apply_again": "Start import again",
     "another": "Import another export",
     "open": "Open",
-    "import_label": "Import {id}",
+    "open_import": "Open import {id}",
     "mapping_title": "Column mapping",
     "error_file": "File",
     "error_line": "Line",

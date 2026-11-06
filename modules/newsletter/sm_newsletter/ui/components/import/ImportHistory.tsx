@@ -46,7 +46,12 @@ export function ImportHistory({ refreshKey, onOpen }: Props) {
     };
   }, [refreshKey, t]);
 
-  if (error) return <p className="text-sm text-destructive">{error}</p>;
+  if (error)
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        {error}
+      </p>
+    );
   if (items === null) return null;
   if (items.length === 0)
     return <p className="text-sm text-muted-foreground">{t(copy.history_empty)}</p>;
@@ -78,7 +83,7 @@ export function ImportHistory({ refreshKey, onOpen }: Props) {
                 type="button"
                 variant="ghost"
                 size="sm"
-                aria-label={t(copy.import_label, { id: item.id })}
+                aria-label={t(copy.open_import, { id: item.id })}
                 onClick={() => onOpen(item.id)}
               >
                 {t(copy.open)}

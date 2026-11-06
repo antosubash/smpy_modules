@@ -168,6 +168,7 @@ class _Slice:
         values = {
             "status": FAILED,
             "error_code": ImportFailed.code,
+            "finished_at": self.clock(),
             "lease_owner": None,
             "lease_until": None,
         }
