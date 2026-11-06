@@ -30,7 +30,10 @@ export default function Segments() {
 
   const [lists, setLists] = useState<string[] | null>(null);
   const [listKey, setListKey] = useState('');
-  const [items, setItems] = useState<Segment[] | null>(null);
+  // Items carry the list they were fetched for: only the current list's are shown or acted on.
+  const [loaded, setLoaded] = useState<{ listKey: string; items: Segment[] } | null>(null);
+  const items = loaded !== null && loaded.listKey === listKey ? loaded.items : null;
+  const generation = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Segment | null>(null);
   const [open, setOpen] = useState(false);
@@ -47,18 +50,21 @@ export default function Segments() {
   }, []);
 
   const reload = useCallback(() => {
+    const mine = ++generation.current; // a later request supersedes this one
     if (!listKey) return;
     api
       .listSegments(listKey)
       .then((s) => {
-        setItems(s);
+        if (mine !== generation.current) return;
+        setLoaded({ listKey, items: s });
         setError(null);
       })
-      .catch((e) => setError(errorMessage(e, tRef.current)));
+      .catch((e) => {
+        if (mine === generation.current) setError(errorMessage(e, tRef.current));
+      });
   }, [listKey]);
 
   useEffect(() => {
-    setItems(null);
     reload();
   }, [reload]);
 

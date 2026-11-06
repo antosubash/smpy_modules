@@ -94,6 +94,38 @@ describe('Segments page', () => {
     expect(previews()).toHaveLength(1);
   });
 
+  it("keeps list B's table when list A's response lands after B's", async () => {
+    const seg = (id: number, name: string, list: string) => ({
+      id,
+      name,
+      list_type_key: list,
+      rules: [],
+      updated_at: null,
+    });
+    let resolveNews: (r: Response) => void = () => {};
+    fetchMock.mockImplementation((url: string) => {
+      if (url.endsWith('/lists')) return Promise.resolve(json(['news', 'events']));
+      if (url.endsWith('/fields')) return Promise.resolve(json(fields));
+      if (url.includes('list_type_key=news'))
+        return new Promise<Response>((r) => (resolveNews = r));
+      if (url.includes('list_type_key=events'))
+        return Promise.resolve(json([seg(2, 'Events-only', 'events')]));
+      return Promise.resolve(json([]));
+    });
+    await render();
+    const list = document.getElementById('newsletter-segments-list') as HTMLSelectElement;
+    await act(async () => {
+      list.value = 'events';
+      list.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await wait(10);
+    expect(document.body.textContent).toContain('Events-only');
+    await act(async () => resolveNews(json([seg(1, 'News-only', 'news')])));
+    await wait(10);
+    expect(document.body.textContent).toContain('Events-only');
+    expect(document.body.textContent).not.toContain('News-only');
+  });
+
   it('never mounts the editor for a viewer', async () => {
     page.props = { can_edit: false };
     await render();
