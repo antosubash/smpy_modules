@@ -460,6 +460,7 @@
     "import_too_many_columns": "The file has too many columns.",
     "import_too_many_tags": "The upload would add too many new tags.",
     "import_bad_mapping": "The column mapping is not valid.",
+    "import_failed": "The import failed. Fix the cause and try again.",
     "import_not_staged": "This import is no longer waiting for a mapping.",
     "import_running": "An import is already running.",
     "list_exists": "A list with that key already exists.",

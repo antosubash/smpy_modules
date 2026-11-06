@@ -100,3 +100,12 @@ class InvalidListKey(NewsletterError):  # noqa: N818 - names the field
     status = 422
     code = "invalid_list_key"
     detail = "The list key is not valid"
+
+
+class ImportFailed(NewsletterError):  # noqa: N818 - the state it reports
+    """A fixed message: the worker raises it ``from None``, so no original exception (which
+    can carry an address) is chained into a task result or a traceback (D6)."""
+
+    status = 500
+    code = "import_failed"
+    detail = "The import failed"

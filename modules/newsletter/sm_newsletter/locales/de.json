@@ -460,6 +460,7 @@
     "import_too_many_columns": "Die Datei hat zu viele Spalten.",
     "import_too_many_tags": "Der Upload würde zu viele neue Tags anlegen.",
     "import_bad_mapping": "Die Spaltenzuordnung ist ungültig.",
+    "import_failed": "Der Import ist fehlgeschlagen. Beheben Sie die Ursache und versuchen Sie es erneut.",
     "import_not_staged": "Dieser Import wartet nicht mehr auf eine Zuordnung.",
     "import_running": "Ein Import läuft bereits.",
     "list_exists": "Eine Liste mit diesem Schlüssel gibt es bereits.",

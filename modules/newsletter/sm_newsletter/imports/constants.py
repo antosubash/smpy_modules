@@ -97,4 +97,5 @@ ROW_ERROR_CODES = (
     "tag_invalid",
     "invalid_value",
     "record_refused",
+    "tags_unavailable",
 )
