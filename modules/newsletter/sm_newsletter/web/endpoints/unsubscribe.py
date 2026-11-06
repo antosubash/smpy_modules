@@ -35,9 +35,10 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from simple_module_db import no_tenant
 
-from sm_newsletter.core import constants, tenancy
+from sm_newsletter.core import constants
 from sm_newsletter.core.clock import utcnow
 from sm_newsletter.core.messages import server_copy
+from sm_newsletter.web.endpoints.public_tenant import host_tenant
 from sm_newsletter.web.endpoints.unsubscribe_page import KEYS, render_page
 from sm_newsletter.web.services.unsubscribe import unsubscribe_by_token
 
@@ -46,17 +47,6 @@ __all__ = ["PATH", "router"]
 PATH = f"{constants.UNSUBSCRIBE_PREFIX}{{token}}"
 
 router = APIRouter(tags=["newsletter-public"])
-
-HOST_SOURCES = frozenset({"subdomain", "fixed"})
-"""``TenantMiddleware`` sources that come from the host, not from the visitor."""
-
-
-def _host_tenant(request: Request) -> str | None:
-    """The tenant the request's host resolved, or ``None`` (S8)."""
-    if getattr(request.state, "tenant_source", None) not in HOST_SOURCES:
-        return None
-    tenant = getattr(request.state, "tenant_id", None)
-    return tenant if tenancy.valid_tenant(tenant) else None
 
 
 def _page(request: Request, *, done: bool) -> HTMLResponse:
@@ -79,9 +69,10 @@ async def unsubscribe_page(request: Request, token: str) -> HTMLResponse:
 
 @router.post(PATH, response_class=HTMLResponse, include_in_schema=False)
 async def unsubscribe_one_click(request: Request, token: str) -> HTMLResponse:
-    host_tenant = _host_tenant(request)
     # A visitor-derived tenant (a member's session) is still bound by the
     # middleware; the service binds the token's own, so leave it first.
     with no_tenant():
-        await unsubscribe_by_token(request.app, token, resolved_tenant=host_tenant, now=utcnow())
+        await unsubscribe_by_token(
+            request.app, token, resolved_tenant=host_tenant(request), now=utcnow()
+        )
     return _page(request, done=True)

@@ -87,3 +87,26 @@ async def campaign_editor(
             "max_test_recipients": MAX_TEST_RECIPIENTS,
         },
     )
+
+
+@router.get(
+    "/campaigns/{campaign_id}/report",
+    response_model=None,
+    dependencies=[Depends(RequiresPermission(constants.PERM_VIEW))],
+)
+async def campaign_report(
+    campaign_id: int,
+    request: Request,
+    inertia: InertiaDep,
+    tenant: str = Depends(bind_admin),
+    db: AsyncSession = Depends(get_db),
+) -> InertiaResponse:
+    """The id and the name for the title; the report is fetched client-side. The
+    lookup still runs here so an unknown or unreadable campaign is a 404 page."""
+    campaign = await require_campaign(
+        db, tenant_id=tenant, campaign_id=campaign_id, roles=caller_roles(request)
+    )
+    return await inertia.render(
+        constants._PAGE_REPORT,
+        {**tenancy.view_props(request), "campaign_id": campaign_id, "name": campaign.name},
+    )

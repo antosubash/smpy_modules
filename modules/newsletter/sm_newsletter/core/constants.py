@@ -18,6 +18,14 @@ BRAND_LOGO_PATH = f"{PUBLIC_PREFIX}brand/logo"
 TEST_UNSUBSCRIBE_TOKEN = "test"
 # One unsubscribe link per send: ``{UNSUBSCRIBE_PREFIX}<token>``.
 UNSUBSCRIBE_PREFIX = f"{PUBLIC_PREFIX}u/"
+# The open pixel ``{OPEN_PREFIX}<token>.gif`` and the click redirect
+# ``{CLICK_PREFIX}<token>/<position>``.
+OPEN_PREFIX = f"{PUBLIC_PREFIX}o/"
+CLICK_PREFIX = f"{PUBLIC_PREFIX}c/"
+# At most this many distinct links per campaign are tracked, each at most
+# MAX_LINK_URL characters (``Link.url``'s max_length).
+MAX_TRACKED_LINKS = 100
+MAX_LINK_URL = 2048
 # The email accent without branding, or when branding sets no primary colour.
 DEFAULT_ACCENT = "#2563eb"
 
@@ -44,6 +52,7 @@ NOT_FOUND_DETAIL = "Not found"
 # Inertia page names (``sm_newsletter/pages/<name>.tsx``).
 _PAGE_CAMPAIGNS = "Newsletter/Campaigns"
 _PAGE_EDITOR = "Newsletter/CampaignEditor"
+_PAGE_REPORT = "Newsletter/CampaignReport"
 _PAGE_SETTINGS = "Newsletter/Settings"
 
 # Sidebar. The same keys are in ``locales/*.json`` under ``menu``.

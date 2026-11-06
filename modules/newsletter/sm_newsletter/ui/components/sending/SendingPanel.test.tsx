@@ -10,6 +10,10 @@ import type { CampaignDetail } from '../../utils/types';
 import { campaign, progress } from './panelFixture';
 import { SendingPanel } from './SendingPanel';
 
+vi.mock('@inertiajs/react', () => ({
+  Link: ({ href, children }: { href: string; children: unknown }) =>
+    createElement('a', { href }, children as never),
+}));
 vi.mock('../../utils/api', async (original) => ({
   ...(await original<typeof import('../../utils/api')>()),
   api: {
@@ -177,5 +181,18 @@ describe('SendingPanel', () => {
       expect(host.textContent).toContain(text);
     }
     expect(host.querySelectorAll('button')).toHaveLength(0);
+  });
+
+  it.each(['sending', 'sent'])('links to the report once %s', async (status) => {
+    vi.mocked(api.progress).mockResolvedValue(progress({ status }));
+    await render(campaign({ status, started_at: '2026-11-01T10:00:00Z' }));
+    const link = host.querySelector('a[href="/admin/newsletter/campaigns/7/report"]');
+    expect(link?.textContent).toBe(copy.panel.report);
+  });
+
+  it('has no report link while only scheduled', async () => {
+    vi.mocked(api.progress).mockResolvedValue(progress({ status: 'scheduled' }));
+    await render(campaign({ status: 'scheduled', scheduled_at: '2026-12-01T10:00:00Z' }));
+    expect(host.querySelector('a[href$="/report"]')).toBeNull();
   });
 });

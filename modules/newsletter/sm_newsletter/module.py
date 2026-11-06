@@ -25,6 +25,10 @@ _VERSION = importlib.metadata.version(constants.DISTRIBUTION)
 # posts arrive from mailbox providers' shared egress IPs, and a refused one
 # loses an opt-out. A forged token costs one HMAC and no query.
 _UNSUBSCRIBE_RATES = {"GET": "60/minute", "POST": "300/minute"}
+# The open pixel and the click redirect, per IP, GET only (T11): image proxies
+# fetch pixels from shared egress IPs right after a send, and a refused click
+# breaks a reader's navigation.
+_TRACKING_RATES = {constants.OPEN_PREFIX: "600/minute", constants.CLICK_PREFIX: "300/minute"}
 
 
 class NewsletterModule(ModuleBase):
@@ -102,18 +106,23 @@ class NewsletterModule(ModuleBase):
         """The email logo (C8): anonymous, ``GET`` only, at a fixed path. The
         unsubscribe links (S9): anonymous ``GET`` and ``POST``, each method with
         its own anonymous rate, which replaces the host's ``rate_limit_public``
-        (120/minute by default) - that one would cap the POST below its 300."""
+        (120/minute by default) - that one would cap the POST below its 300.
+        The open pixel and click redirect (T11): anonymous ``GET``, likewise."""
         registry.add_exact(constants.BRAND_LOGO_PATH, methods={"GET"})
         for method, rate in _UNSUBSCRIBE_RATES.items():
             registry.add_prefix(constants.UNSUBSCRIBE_PREFIX, methods={method}, rate=rate)
+        for prefix, rate in _TRACKING_RATES.items():
+            registry.add_prefix(prefix, methods={"GET"}, rate=rate)
 
     def register_rate_limits(self, registry: RateLimitRegistry) -> None:
-        """The same per-IP rates for every caller, signed in or not (S9)."""
+        """The same per-IP rates for every caller, signed in or not (S9, T11)."""
         for method, rate in _UNSUBSCRIBE_RATES.items():
             registry.add_prefix(
                 constants.UNSUBSCRIBE_PREFIX,
                 RateLimitRule(rate, key="ip", methods=frozenset({method})),
             )
+        for prefix, rate in _TRACKING_RATES.items():
+            registry.add_prefix(prefix, RateLimitRule(rate, key="ip", methods=frozenset({"GET"})))
 
     @staticmethod
     def mount_public_routes(app: FastAPI) -> None:
@@ -122,12 +131,13 @@ class NewsletterModule(ModuleBase):
         path: ``on_startup`` runs again on a lifespan restart."""
         from fastapi.routing import iter_route_contexts
 
-        from sm_newsletter.web.endpoints import brand, unsubscribe
+        from sm_newsletter.web.endpoints import brand, tracking, unsubscribe
 
         mounted = {r.path for r in iter_route_contexts(app.routes)}
         for path, router in (
             (constants.BRAND_LOGO_PATH, brand.router),
             (unsubscribe.PATH, unsubscribe.router),
+            (tracking.OPEN_PATH, tracking.router),
         ):
             if path not in mounted:
                 app.include_router(router)

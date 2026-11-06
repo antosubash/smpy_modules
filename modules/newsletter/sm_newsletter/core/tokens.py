@@ -1,7 +1,10 @@
-"""The per-send token every tracked link carries (S10).
+"""The per-send tokens every tracked link carries (S10, T17).
 
 ``{tenant}.{campaign_id}.{send_id}.{mac}``: HMAC-SHA256 under the host's
 ``secret_key``, base64url, truncated to 128 bits, compared in constant time.
+The MAC covers a purpose (``u`` unsubscribe, ``o`` open, ``c`` click) that is
+never in the token: each route implies it, so a token minted for one purpose
+fails ``parse`` for the others and a leaked click URL cannot unsubscribe anyone.
 Minted when the mail is built and never stored. The tenant may itself contain
 dots, so the token is split from the right. ``parse`` never raises and runs no
 statement: a forged token is refused before the database is touched.
@@ -13,12 +16,26 @@ import base64
 import hashlib
 import hmac
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import Any, Final, Literal
 
-from sm_newsletter.core.constants import UNSUBSCRIBE_PREFIX
+from sm_newsletter.core.constants import CLICK_PREFIX, OPEN_PREFIX, UNSUBSCRIBE_PREFIX
 from sm_newsletter.core.tenancy import valid_tenant
 
-__all__ = ["MAX_TOKEN", "SendToken", "host_secret", "parse", "sign", "unsubscribe_url"]
+__all__ = [
+    "MAX_TOKEN",
+    "PURPOSES",
+    "Purpose",
+    "SendToken",
+    "click_url",
+    "host_secret",
+    "open_url",
+    "parse",
+    "sign",
+    "unsubscribe_url",
+]
+
+Purpose = Literal["u", "o", "c"]
+PURPOSES: Final = ("u", "o", "c")
 
 MAX_TOKEN: Final = 200
 _MAC_BYTES: Final = 16
@@ -32,23 +49,26 @@ class SendToken:
     send_id: int
 
 
-def _mac(secret: str, tenant_id: str, campaign_id: int, send_id: int) -> str:
-    message = f"newsletter|send|{tenant_id}|{campaign_id}|{send_id}".encode()
+def _mac(secret: str, purpose: str, tenant_id: str, campaign_id: int, send_id: int) -> str:
+    message = f"newsletter|{purpose}|{tenant_id}|{campaign_id}|{send_id}".encode()
     digest = hmac.new(secret.encode(), message, hashlib.sha256).digest()[:_MAC_BYTES]
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
 
 
-def sign(secret: str, *, tenant_id: str, campaign_id: int, send_id: int) -> str:
+def sign(secret: str, *, purpose: Purpose, tenant_id: str, campaign_id: int, send_id: int) -> str:
     if not secret:
         raise ValueError("a send token needs a secret")
+    if purpose not in PURPOSES:
+        raise ValueError("unknown token purpose")
     if not valid_tenant(tenant_id):
         raise ValueError("invalid tenant")
-    return f"{tenant_id}.{campaign_id}.{send_id}.{_mac(secret, tenant_id, campaign_id, send_id)}"
+    mac = _mac(secret, purpose, tenant_id, campaign_id, send_id)
+    return f"{tenant_id}.{campaign_id}.{send_id}.{mac}"
 
 
-def parse(secret: str, token: object) -> SendToken | None:
+def parse(secret: str, token: object, *, purpose: Purpose) -> SendToken | None:
     """The claims when the MAC verifies, else ``None``. Never raises."""
-    if not secret or not isinstance(token, str):
+    if not secret or purpose not in PURPOSES or not isinstance(token, str):
         return None
     if not token.isascii() or len(token) > MAX_TOKEN:
         return None
@@ -65,13 +85,21 @@ def parse(secret: str, token: object) -> SendToken | None:
     campaign_id, send_id = int(campaign_raw), int(send_raw)
     if f"{campaign_id}.{send_id}" != f"{campaign_raw}.{send_raw}":
         return None  # a leading zero: one send has exactly one token
-    if not hmac.compare_digest(_mac(secret, tenant_id, campaign_id, send_id), mac):
+    if not hmac.compare_digest(_mac(secret, purpose, tenant_id, campaign_id, send_id), mac):
         return None
     return SendToken(tenant_id, campaign_id, send_id)
 
 
 def unsubscribe_url(public_base: str, token: str) -> str:
     return f"{public_base.rstrip('/')}{UNSUBSCRIBE_PREFIX}{token}"
+
+
+def open_url(public_base: str, token: str) -> str:
+    return f"{public_base.rstrip('/')}{OPEN_PREFIX}{token}.gif"
+
+
+def click_url(public_base: str, token: str, position: int) -> str:
+    return f"{public_base.rstrip('/')}{CLICK_PREFIX}{token}/{position}"
 
 
 def host_secret(app: Any) -> str:

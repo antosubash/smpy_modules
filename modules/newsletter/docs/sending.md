@@ -136,7 +136,16 @@ row while its campaign is still `sending`, and a `pending` attempt row);
 then SMTP. The attempt row is committed before the SMTP call, so a crash never
 loses a count. Pause and cancel are conditional updates, so a pause or cancel
 before the claim sends nothing and writes no attempt; a cancel while a send is
-in flight ends that row `cancelled`.
+in flight ends that row `cancelled`. On Postgres, two lock orders keep these
+writes free of deadlocks. For a campaign that has started (the only one whose
+rows a result, an open or a click touches), recording a result, skipping a
+suppressed row, recovering an expired lease, the open and click counters and
+cancel lock the send rows first and the campaign row last.
+For a campaign that never started, unschedule, freeze pages and cancel lock
+the campaign row first. No transaction mixes the two, because a never-started
+campaign has sent nothing to record or track. A cancel that finds the campaign
+started meanwhile rolls back to a savepoint, releasing the campaign row, before
+it takes the started order.
 
 On SQLite the lock is a lease row (120 s) and the reservation is fenced on it,
 so a taken-over lease can never spend budget another holder counted. On
@@ -231,10 +240,13 @@ approximate and says "about".
 
 ## Tokens
 
-One token per send: `{tenant}.{campaign_id}.{send_id}.{mac}`, where `mac` is the
-base64url of an HMAC-SHA256 over `newsletter|send|{tenant}|{campaign}|{send}`
-truncated to 128 bits. It is split from the right, because a tenant may contain
-dots. Tokens are minted at send time and never stored. The secret is the host's
-`secret_key` in the web process and `core/secret.py`'s resolution in a worker
-(see [`operations.md`](operations.md)). PR 5 reuses the same token for opens and
-clicks.
+Each message carries three purpose-bound tokens (T17): `u` (unsubscribe), `o`
+(open) and `c` (click). Each has the shape `{tenant}.{campaign_id}.{send_id}.{mac}`,
+where `mac` is the base64url of an HMAC-SHA256 over
+`newsletter|{purpose}|{tenant}|{campaign}|{send}` truncated to 128 bits. A token
+minted for one purpose fails the other routes, so a leaked open or click URL
+cannot unsubscribe anyone (see [`tracking.md`](tracking.md)). A token is split
+from the right, because a tenant may contain dots. Tokens are minted at send
+time and never stored; the open and click tokens only when that kind of tracking
+is on. The secret is the host's `secret_key` in the web process and
+`core/secret.py`'s resolution in a worker (see [`operations.md`](operations.md)).

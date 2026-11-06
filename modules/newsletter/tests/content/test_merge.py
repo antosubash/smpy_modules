@@ -75,3 +75,11 @@ def test_check_no_capability():
     assert "unsubscribe_url" not in str(err.value)
     assert check_no_capability("Hi {{first_name|x}}", field="preheader") == "Hi {{first_name|x}}"
     assert UNSUBSCRIBE_TAG in CAPABILITY_TAGS
+
+
+@pytest.mark.parametrize("tag", ["{{open_pixel}}", "{{link:1}}"])
+def test_tracking_placeholders_are_capabilities(tag):
+    with pytest.raises(ValueError):
+        check_no_capability(f"x {tag}", field="subject")
+    with pytest.raises(ValueError):
+        check_merge(tag)

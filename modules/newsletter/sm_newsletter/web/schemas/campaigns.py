@@ -133,6 +133,8 @@ class CampaignSummary(BaseModel):
     updated_at: datetime | None
     recipient_count: int
     sent_count: int
+    started_at: datetime | None
+    finished_at: datetime | None
 
 
 class CampaignDetail(CampaignSummary):
@@ -142,8 +144,6 @@ class CampaignDetail(CampaignSummary):
     audience: str
     body: list[dict[str, Any]]
     scheduled_at: datetime | None
-    started_at: datetime | None
-    finished_at: datetime | None
     paused_code: str | None
     paused_detail: str | None
     failed_count: int
@@ -162,8 +162,16 @@ class CampaignDetail(CampaignSummary):
         return own | {"paused_code": code, "paused_detail": detail}
 
 
+class CampaignListItem(CampaignSummary):
+    """A list row: unique opens and clicks of ``sent`` rows (B5), which only the
+    list computes (the detail has no such field)."""
+
+    opens_unique_accepted: int = 0
+    clicks_unique_accepted: int = 0
+
+
 class CampaignPage(BaseModel):
-    items: list[CampaignSummary]
+    items: list[CampaignListItem]
     total: int
 
 

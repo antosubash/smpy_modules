@@ -35,20 +35,20 @@ from sm_records.contracts.newsletter import (
     subscribers_by_uuid,
     subscription_lists,
 )
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns.checks import bases_https
-from sm_newsletter.campaigns.lifecycle import SENDING
 from sm_newsletter.core import constants
 from sm_newsletter.core.suppression import suppressed
 from sm_newsletter.core.tenancy import tenant_scope
-from sm_newsletter.models import Campaign, CampaignRender, Send, SendAttempt
+from sm_newsletter.models import CampaignRender, Send, SendAttempt
 from sm_newsletter.sending import ledger, rows
 from sm_newsletter.sending.classify import Verdict, classify
 from sm_newsletter.sending.compose import compose
+from sm_newsletter.sending.due import next_due
 from sm_newsletter.sending.lock import HeldLock
 from sm_newsletter.sending.transport import DeliveryResult, OutgoingMessage, TransportSession
+from sm_newsletter.tracking.rewrite import TRACKING_OFF, Tracking
 
 __all__ = ["KIND", "Step", "deliver_one"]
 
@@ -84,15 +84,17 @@ async def deliver_one(
     list_unsubscribe: bool,
     clock: Clock,
     require_https: bool = False,
+    tracking: Tracking = TRACKING_OFF,
 ) -> Step | None:
     """One recipient of the campaign; ``None`` when there is nothing to send
     now (not ``sending``, no due row, or the claim lost to a pause, a cancel
-    or another sender: nothing was skipped). ``require_https`` (the ``smtp``
+    or another sender: nothing was skipped). ``tracking`` fills the snapshot's
+    link and pixel placeholders (the tick's settings, B7). ``require_https`` (the ``smtp``
     transport) refuses a snapshot whose bases are not both ``https://``.
     ``DispatchBusy`` from the lock propagates with nothing reserved."""
     with tenant_scope(tenant_id):
         async with factory() as session:
-            found = await _due(session, tenant_id, campaign_id, clock())
+            found = await next_due(session, tenant_id, campaign_id, clock())
             if found is None:
                 await session.rollback()
                 return None
@@ -101,7 +103,12 @@ async def deliver_one(
                 await _pause(session, tenant_id, campaign_id, constants.PAUSE_HTTPS_REQUIRED, clock)
                 return Step(False, _INSECURE)
             return await _deliver(
-                session, smtp, lock, found, tenant_id, campaign_id, secret, list_unsubscribe, clock
+                session,
+                smtp,
+                lock,
+                found,
+                (tenant_id, campaign_id, secret, list_unsubscribe, tracking),
+                clock,
             )
 
 
@@ -118,14 +125,12 @@ async def _deliver(
     session: AsyncSession,
     smtp: TransportSession,
     lock: HeldLock,
-    found: tuple[Send, str, CampaignRender],
-    tenant_id: str,
-    campaign_id: int,
-    secret: str,
-    list_unsubscribe: bool,
+    found: tuple[Send, str, CampaignRender, dict[int, str]],
+    params: tuple[str, int, str, bool, Tracking],
     clock: Clock,
 ) -> Step | None:
-    row, list_key, render = found
+    tenant_id, campaign_id, secret, list_unsubscribe, tracking = params
+    row, list_key, render, links = found
     status = await _ineligible(session, tenant_id, list_key, row)
     await session.rollback()  # end the read before any write
     if status == _LIST_GONE:
@@ -136,7 +141,14 @@ async def _deliver(
         await finalize_session(session)
         return Step(False, _SKIP)
     try:
-        message = compose(render, row, secret=secret, list_unsubscribe=list_unsubscribe)
+        message = compose(
+            render,
+            row,
+            secret=secret,
+            list_unsubscribe=list_unsubscribe,
+            tracking=tracking,
+            links=links,
+        )
     except ValueError as exc:
         refused = DeliveryResult("rejected", None, str(exc))
         await rows.record(session, row, _INVALID, refused, now=clock())
@@ -147,32 +159,6 @@ async def _deliver(
     if attempt is None:  # the claim lost: the row or the campaign moved
         return None
     return await _send(session, smtp, attempt, row, message, clock)
-
-
-async def _due(
-    session: AsyncSession, tenant_id: str, campaign_id: int, now: datetime
-) -> tuple[Send, str, CampaignRender] | None:
-    """The next due row, the campaign's list and its render, detached from the
-    session (so the reads can end), or ``None``."""
-    stmt = select(Campaign.status, Campaign.list_type_key).where(
-        Campaign.id == campaign_id, Campaign.tenant_id == tenant_id
-    )
-    campaign = (await session.execute(stmt)).first()
-    if campaign is None or campaign[0] != SENDING:
-        return None
-    row = await rows.next_row(session, tenant_id=tenant_id, campaign_id=campaign_id, now=now)
-    if row is None:
-        return None
-    render_stmt = select(CampaignRender).where(
-        CampaignRender.tenant_id == tenant_id, CampaignRender.campaign_id == campaign_id
-    )
-    render = (await session.execute(render_stmt)).scalars().first()
-    if render is None:
-        logger.error("newsletter: sending campaign %s has no render", campaign_id)
-        return None
-    session.expunge(row)
-    session.expunge(render)
-    return row, campaign[1], render
 
 
 async def _ineligible(

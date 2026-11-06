@@ -63,7 +63,9 @@ async def _unchanged(app, state, events, a: Sent, b: Sent, token: str, **headers
 async def test_signed_token_pairing_tenant_a_with_b_send_id_changes_nothing(two):
     """B's campaign and send ids, signed under tenant A: A has no such rows."""
     app, state, events, a, b = two
-    token = tokens.sign(SECRET, tenant_id="a", campaign_id=b.campaign_id, send_id=b.send_id)
+    token = tokens.sign(
+        SECRET, purpose="u", tenant_id="a", campaign_id=b.campaign_id, send_id=b.send_id
+    )
     await _unchanged(app, state, events, a, b, token)
 
 
@@ -71,8 +73,10 @@ async def test_signed_token_pairing_a_campaign_with_b_send_changes_nothing(two):
     """The tenant is A and the campaign A's; the send is B's. The
     ``(id, tenant_id, campaign_id)`` pin finds nothing."""
     app, state, events, a, b = two
-    token = tokens.sign(SECRET, tenant_id="a", campaign_id=a.campaign_id, send_id=b.send_id)
-    claims = tokens.parse(SECRET, token)
+    token = tokens.sign(
+        SECRET, purpose="u", tenant_id="a", campaign_id=a.campaign_id, send_id=b.send_id
+    )
+    claims = tokens.parse(SECRET, token, purpose="u")
     assert claims is not None and claims.send_id == b.send_id
     await _unchanged(app, state, events, a, b, token)
 
@@ -83,7 +87,9 @@ async def test_same_tenant_second_campaign_with_first_campaigns_send_changes_not
     app, state, events, a, b = two
     second = await sent_campaign(state, "a", "eve@example.org", new_list=False)
     assert second.campaign_id != a.campaign_id
-    token = tokens.sign(SECRET, tenant_id="a", campaign_id=second.campaign_id, send_id=a.send_id)
+    token = tokens.sign(
+        SECRET, purpose="u", tenant_id="a", campaign_id=second.campaign_id, send_id=a.send_id
+    )
     before = await snapshot(state, second)
     await _unchanged(app, state, events, a, b, token)
     assert await snapshot(state, second) == before

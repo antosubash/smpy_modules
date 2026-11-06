@@ -21,12 +21,13 @@ from sm_newsletter.campaigns import access, drafts
 from sm_newsletter.core import constants
 from sm_newsletter.core.errors import InvalidCampaign
 from sm_newsletter.core.tenancy import bind_admin
+from sm_newsletter.tracking.report import accepted_engagement
 from sm_newsletter.web.schemas.campaigns import (
     CampaignCreate,
     CampaignDetail,
+    CampaignListItem,
     CampaignPage,
     CampaignPatch,
-    CampaignSummary,
     parse_payload,
 )
 
@@ -58,7 +59,23 @@ async def list_campaigns(
         offset=offset,
         limit=limit,
     )
-    return CampaignPage(items=[CampaignSummary.model_validate(c) for c in items], total=total)
+    accepted = await accepted_engagement(
+        db, tenant_id=tenant, campaign_ids=[c.id for c in items if c.id is not None]
+    )
+    summaries = []
+    for campaign in items:
+        # ``sent_count`` from the same statement as the numerators (B5).
+        sent, opens, clicks = accepted.get(campaign.id, (campaign.sent_count, 0, 0))
+        summaries.append(
+            CampaignListItem.model_validate(campaign).model_copy(
+                update={
+                    "sent_count": sent,
+                    "opens_unique_accepted": opens,
+                    "clicks_unique_accepted": clicks,
+                }
+            )
+        )
+    return CampaignPage(items=summaries, total=total)
 
 
 @router.post("/campaigns", response_model=CampaignDetail, status_code=201, dependencies=_EDIT)

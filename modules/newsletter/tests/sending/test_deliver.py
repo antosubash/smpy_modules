@@ -13,6 +13,7 @@ from sm_newsletter.sending import rows
 from sm_newsletter.sending.classify import Verdict
 from sm_newsletter.sending.deliver import Step
 from sm_newsletter.sending.transport import DeliveryResult
+from sm_newsletter.tracking.rewrite import Tracking
 from sqlalchemy import select, update
 
 from tests.support.campaign_world import campaign_row
@@ -28,6 +29,7 @@ from tests.support.deliver_world import (
 from tests.support.fake_transport import FakeTransport
 from tests.support.freeze_world import world
 from tests.support.sending import NOW, T
+from tests.support.tracking_world import track_render
 
 
 @pytest.fixture
@@ -184,3 +186,14 @@ async def test_invalid_message_fails_before_any_attempt(state):
     assert (row.status, row.error_kind) == ("failed", "invalid_message")
     assert (await counters(state, cid))["failed_count"] == 1
     assert (smtp.sent, await attempts(state)) == ([], [])
+
+
+async def test_deliver_passes_tracking_and_links(state):
+    cid, _ = await sending_campaign(state)
+    await track_render(state, cid)
+    smtp = FakeTransport()
+
+    await deliver(state, cid, smtp, tracking=Tracking(True, True))
+
+    (message,) = smtp.sent
+    assert "/newsletter/c/" in message.html and "/newsletter/o/" in message.html

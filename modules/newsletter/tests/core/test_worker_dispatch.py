@@ -165,7 +165,7 @@ def test_dispatch_task_sends_through_the_worker_runtime(world):
     captured = console.captured(T)
     assert sorted(m.to for m in captured) == ["s0@example.org", "s1@example.org"]
     for message in captured:
-        claims = tokens.parse(SECRET, _token(message))
+        claims = tokens.parse(SECRET, _token(message), purpose="u")
         assert claims is not None
         assert (claims.tenant_id, claims.campaign_id) == (T, world.cid)
     assert asyncio.run(_state_of(world.db_file, world.cid)) == ("sent", ["sent", "sent"], 2)
@@ -236,6 +236,7 @@ def test_no_token_in_any_log(world, caplog):
     lines = [r.getMessage() for r in caplog.records]
     assert any("console transport" in line for line in lines)  # the capture saw the send
     assert not [line for line in lines if UNSUBSCRIBE_PREFIX in line]
+    assert not [line for line in lines if "/newsletter/o/" in line or "/newsletter/c/" in line]
     assert not [line for line in lines if any(mac in line for mac in macs)]
 
 
