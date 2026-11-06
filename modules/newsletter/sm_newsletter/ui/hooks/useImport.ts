@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { errorMessage } from '../utils/http';
+import { errorMessage, HttpError } from '../utils/http';
 import { useT } from '../utils/i18n';
 import * as importApi from '../utils/importApi';
 import type { ImportJob, ImportMapping } from '../utils/importTypes';
@@ -24,6 +24,7 @@ export function useImport(initialId: number | null) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const mounted = useRef(new AbortController());
+  const latest = useRef(0);
   const tRef = useRef(t);
   tRef.current = t;
   const jobId = job?.id ?? null;
@@ -38,16 +39,17 @@ export function useImport(initialId: number | null) {
   /** Runs a call, adopting its job (null clears it); the failure becomes `error`. */
   const run = useCallback(async (call: () => Promise<ImportJob | null>) => {
     const { signal } = mounted.current;
+    const ticket = ++latest.current;
     setBusy(true);
     setError(null);
     try {
       const next = await call();
-      if (signal.aborted) return;
+      if (signal.aborted || ticket !== latest.current) return;
       setJob(next);
     } catch (e) {
-      if (!signal.aborted) setError(errorMessage(e, tRef.current));
+      if (!signal.aborted && ticket === latest.current) setError(errorMessage(e, tRef.current));
     } finally {
-      if (!signal.aborted) setBusy(false);
+      if (!signal.aborted && ticket === latest.current) setBusy(false);
     }
   }, []);
 
@@ -78,6 +80,8 @@ export function useImport(initialId: number | null) {
         } catch (e) {
           if (stopped || signal.aborted) return;
           setError(errorMessage(e, tRef.current));
+          // A refusal (gone, forbidden) will not change by asking again.
+          if (e instanceof HttpError && e.status >= 400 && e.status < 500) return;
         }
         next();
       }, IMPORT_POLL_MS);

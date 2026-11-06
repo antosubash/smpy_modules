@@ -2,7 +2,7 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
+import { HttpError } from '../utils/http';
 import * as importApi from '../utils/importApi';
 import type { ImportJob } from '../utils/importTypes';
 import { IMPORT_POLL_MS, useImport } from './useImport';
@@ -14,7 +14,18 @@ vi.mock('../utils/importApi', () => ({
   applyImport: vi.fn(),
   discardImport: vi.fn(),
 }));
-vi.mock('../utils/http', () => ({ errorMessage: (e: { code?: string }) => `shown ${e.code}` }));
+vi.mock('../utils/http', () => ({
+  errorMessage: (e: { code?: string }) => `shown ${e.code}`,
+  HttpError: class HttpError extends Error {
+    status: number;
+    code: string | null;
+    constructor(message: string, status: number, code: string | null = null) {
+      super(message);
+      this.status = status;
+      this.code = code;
+    }
+  },
+}));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -101,5 +112,34 @@ describe('useImport', () => {
     expect(result.job?.status).toBe('queued');
     await tick(IMPORT_POLL_MS);
     expect(importApi.getImport).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops polling on a 4xx refusal but keeps retrying a 5xx', async () => {
+    initial = 4;
+    await mount();
+    vi.mocked(importApi.getImport).mockRejectedValue(new HttpError('x', 503));
+    await tick(IMPORT_POLL_MS * 2);
+    expect(importApi.getImport).toHaveBeenCalledTimes(3);
+    vi.mocked(importApi.getImport).mockRejectedValue(new HttpError('x', 404, 'not_found'));
+    await tick(IMPORT_POLL_MS);
+    expect(importApi.getImport).toHaveBeenCalledTimes(4);
+    await tick(IMPORT_POLL_MS * 3);
+    expect(importApi.getImport).toHaveBeenCalledTimes(4);
+    expect(result.error).toBe('shown not_found');
+  });
+
+  it('lets only the latest request set the job and clear busy', async () => {
+    await mount();
+    const pending: Array<(j: ImportJob) => void> = [];
+    vi.mocked(importApi.getImport).mockImplementation(
+      () => new Promise<ImportJob>((resolve) => pending.push(resolve)),
+    );
+    await act(async () => result.open(1));
+    await act(async () => result.open(2));
+    await act(async () => pending[1]({ ...job('staged'), id: 2 }));
+    expect(result.job?.id).toBe(2);
+    expect(result.busy).toBe(false);
+    await act(async () => pending[0]({ ...job('staged'), id: 1 }));
+    expect(result.job?.id).toBe(2);
   });
 });
