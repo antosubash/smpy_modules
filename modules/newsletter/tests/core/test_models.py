@@ -35,6 +35,8 @@ TABLES = {
     "newsletter_click",
     "newsletter_suppression",
     "newsletter_suppression_lift",
+    "newsletter_import",
+    "newsletter_import_row",
     LOCK_TABLE,
 }
 
