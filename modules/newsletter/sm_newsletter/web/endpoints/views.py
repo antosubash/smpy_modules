@@ -1,4 +1,4 @@
-"""Inertia screens: the campaign list, the editor and the settings page.
+"""Inertia screens: the campaign list, segments, the editor and the settings page.
 
 ``bind_admin`` first (as in every admin router here), then the shared CSRF
 token. The data is fetched client-side from ``/api/newsletter``; the props only
@@ -42,6 +42,19 @@ async def _flags(request: Request) -> dict[str, bool]:
 async def campaign_list(request: Request, inertia: InertiaDep) -> InertiaResponse:
     return await inertia.render(
         constants._PAGE_CAMPAIGNS, {**tenancy.view_props(request), **await _flags(request)}
+    )
+
+
+@router.get(
+    "/segments",
+    response_model=None,
+    dependencies=[Depends(RequiresPermission(constants.PERM_VIEW))],
+)
+async def segments_page(request: Request, inertia: InertiaDep) -> InertiaResponse:
+    held = await ensure_resolved_permissions(request)
+    return await inertia.render(
+        constants._PAGE_SEGMENTS,
+        {**tenancy.view_props(request), "can_edit": grants(held, constants.PERM_EDIT)},
     )
 
 

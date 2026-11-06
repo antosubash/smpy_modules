@@ -14,7 +14,8 @@
   "menu": {
     "group": "Newsletter",
     "campaigns": "Kampagnen",
-    "settings": "Einstellungen"
+    "settings": "Einstellungen",
+    "segments": "Segmente"
   },
   "campaigns": {
     "title": "Kampagnen",
@@ -77,6 +78,61 @@
     "no_rate": "—",
     "report_link": "Bericht",
     "report_label": "Bericht für {name}"
+  },
+  "segments": {
+    "title": "Segmente",
+    "description": "Speichern Sie Regeln, um eine Kampagne an einen Teil einer Liste zu senden.",
+    "list_label": "Liste",
+    "new": "Neues Segment",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "empty": "Noch keine Segmente in dieser Liste.",
+    "name": "Name",
+    "rules": "Regeln",
+    "add_rule": "Regel hinzufügen",
+    "remove_rule": "Regel entfernen",
+    "field": "Feld",
+    "op": "Bedingung",
+    "value": "Wert",
+    "count": "Etwa {count} Abonnenten passen",
+    "saved": "Segment gespeichert.",
+    "delete_confirm": {
+      "title": "Dieses Segment löschen?",
+      "description": "„{name}“ wird entfernt. Das kann nicht rückgängig gemacht werden.",
+      "confirm": "Löschen",
+      "keep": "Behalten"
+    },
+    "ops": {
+      "is": "ist",
+      "is_not": "ist nicht",
+      "any": "ist eines von",
+      "all": "hat alle von",
+      "none": "hat keines von",
+      "contains": "enthält",
+      "starts_with": "beginnt mit",
+      "gt": "ist größer als",
+      "gte": "ist mindestens",
+      "lt": "ist kleiner als",
+      "lte": "ist höchstens",
+      "before": "liegt vor",
+      "since": "liegt am oder nach"
+    },
+    "signup_field": "Angemeldet am",
+    "bool": {
+      "true": "Ja",
+      "false": "Nein"
+    },
+    "updated": "Aktualisiert",
+    "summary_none": "Alle in der Liste",
+    "pick": "Auswählen…",
+    "count_loading": "Abonnenten werden gezählt…",
+    "name_label": "Segmentname",
+    "title_new": "Neues Segment",
+    "title_edit": "Segment bearbeiten",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "saving": "Wird gespeichert…",
+    "max_rules": "Höchstens 10 Regeln."
   },
   "settings": {
     "title": "Newsletter-Einstellungen",

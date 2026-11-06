@@ -57,6 +57,17 @@ async def test_campaigns_view_props(client):
     assert full["tenant"] == "default"
 
 
+async def test_segments_page_props(client):
+    res = await client.get(f"{VIEW}/segments", headers=READ)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["component"] == constants._PAGE_SEGMENTS
+    assert body["props"]["can_edit"] is False
+    assert body["props"]["tenant"] == "default"
+    full = (await client.get(f"{VIEW}/segments", headers=EDIT)).json()["props"]
+    assert full["can_edit"] is True
+
+
 async def test_editor_props(client, built):
     cid = await _campaign(client)
     res = await client.get(f"{VIEW}/campaigns/{cid}", headers=EDIT)
@@ -112,7 +123,7 @@ async def test_report_unreadable_list_404(client, built):
 
 async def test_views_need_view_permission(client):
     cid = await _campaign(client)
-    for path in ("/", f"/campaigns/{cid}", f"/campaigns/{cid}/report"):
+    for path in ("/", "/segments", f"/campaigns/{cid}", f"/campaigns/{cid}/report"):
         assert (await client.get(f"{VIEW}{path}", headers={"x-perms": ""})).status_code == 403
 
 
@@ -140,9 +151,10 @@ def test_menu_items():
     items = menu_items()
     assert [(i.label, i.icon, i.order, i.permissions) for i in items] == [
         ("Campaigns", "mail", 300, [constants.PERM_VIEW]),
+        ("Segments", "filter", 310, [constants.PERM_VIEW]),
         ("Settings", "settings", 390, [constants.PERM_MANAGE]),
     ]
-    assert [i.url for i in items] == [f"{VIEW}/", constants.SETTINGS_URL]
+    assert [i.url for i in items] == [f"{VIEW}/", constants.SEGMENTS_URL, constants.SETTINGS_URL]
     for lang in ("en", "de"):
         # The catalogue's namespace prefix is not part of the file's key tree.
         tree = json.loads((LOCALES / f"{lang}.json").read_text())
@@ -150,3 +162,9 @@ def test_menu_items():
             assert item.group_key == constants.MENU_GROUP_KEY
             for key in (item.label_key, item.group_key):
                 assert _has(tree, key.removeprefix(f"{constants.LOCALE_NAMESPACE}."))
+
+
+def test_menu_has_segments():
+    (item,) = [i for i in menu_items() if i.label == "Segments"]
+    assert (item.icon, item.order, item.permissions) == ("filter", 310, [constants.PERM_VIEW])
+    assert item.url == f"{VIEW}/segments"

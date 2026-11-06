@@ -14,7 +14,8 @@
   "menu": {
     "group": "Newsletter",
     "campaigns": "Campaigns",
-    "settings": "Settings"
+    "settings": "Settings",
+    "segments": "Segments"
   },
   "campaigns": {
     "title": "Campaigns",
@@ -77,6 +78,61 @@
     "no_rate": "—",
     "report_link": "Report",
     "report_label": "Report for {name}"
+  },
+  "segments": {
+    "title": "Segments",
+    "description": "Save a set of rules to send a campaign to part of a list.",
+    "list_label": "List",
+    "new": "New segment",
+    "edit": "Edit",
+    "delete": "Delete",
+    "empty": "No segments on this list yet.",
+    "name": "Name",
+    "rules": "Rules",
+    "add_rule": "Add rule",
+    "remove_rule": "Remove rule",
+    "field": "Field",
+    "op": "Condition",
+    "value": "Value",
+    "count": "About {count} subscribers match",
+    "saved": "Segment saved.",
+    "delete_confirm": {
+      "title": "Delete this segment?",
+      "description": "\"{name}\" will be removed. This cannot be undone.",
+      "confirm": "Delete",
+      "keep": "Keep"
+    },
+    "ops": {
+      "is": "is",
+      "is_not": "is not",
+      "any": "is any of",
+      "all": "has all of",
+      "none": "has none of",
+      "contains": "contains",
+      "starts_with": "starts with",
+      "gt": "is greater than",
+      "gte": "is at least",
+      "lt": "is less than",
+      "lte": "is at most",
+      "before": "is before",
+      "since": "is on or after"
+    },
+    "signup_field": "Signed up",
+    "bool": {
+      "true": "Yes",
+      "false": "No"
+    },
+    "updated": "Updated",
+    "summary_none": "Everyone on the list",
+    "pick": "Choose…",
+    "count_loading": "Counting subscribers…",
+    "name_label": "Segment name",
+    "title_new": "New segment",
+    "title_edit": "Edit segment",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "max_rules": "At most 10 rules."
   },
   "settings": {
     "title": "Newsletter settings",

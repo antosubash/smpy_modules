@@ -51,6 +51,7 @@ NOT_FOUND_DETAIL = "Not found"
 
 # Inertia page names (``sm_newsletter/pages/<name>.tsx``).
 _PAGE_CAMPAIGNS = "Newsletter/Campaigns"
+_PAGE_SEGMENTS = "Newsletter/Segments"
 _PAGE_EDITOR = "Newsletter/CampaignEditor"
 _PAGE_REPORT = "Newsletter/CampaignReport"
 _PAGE_SETTINGS = "Newsletter/Settings"
@@ -62,12 +63,16 @@ MENU_URL = f"{VIEW_PREFIX}/"
 MENU_LABEL_CAMPAIGNS = "Campaigns"
 MENU_LABEL_KEY_CAMPAIGNS = "newsletter.menu.campaigns"
 MENU_ICON_CAMPAIGNS = "mail"
+MENU_LABEL_SEGMENTS = "Segments"
+MENU_LABEL_KEY_SEGMENTS = "newsletter.menu.segments"
+MENU_ICON_SEGMENTS = "filter"
 MENU_LABEL_SETTINGS = "Settings"
 MENU_LABEL_KEY_SETTINGS = "newsletter.menu.settings"
 MENU_ICON_SETTINGS = "settings"
 
 # The newsletter settings page (PR 3). Registered now as the settings'
 # ``manage_url`` so the generic Settings screen refuses newsletter writes.
+SEGMENTS_URL = f"{VIEW_PREFIX}/segments"
 SETTINGS_URL = f"{VIEW_PREFIX}/settings"
 
 # Campaign and send lifecycles (``str`` columns, ``max_length=24``).

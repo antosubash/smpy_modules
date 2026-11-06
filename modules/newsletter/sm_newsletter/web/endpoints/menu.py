@@ -8,7 +8,7 @@ from sm_newsletter.core import constants
 
 
 def menu_items() -> list[MenuItem]:
-    """Campaigns (``newsletter.view``) and Settings (``newsletter.manage``)."""
+    """Campaigns and Segments (``newsletter.view``) and Settings (``newsletter.manage``)."""
     return [
         MenuItem(
             label=constants.MENU_LABEL_CAMPAIGNS,
@@ -16,6 +16,16 @@ def menu_items() -> list[MenuItem]:
             url=constants.MENU_URL,
             icon=constants.MENU_ICON_CAMPAIGNS,
             order=300,
+            group=constants.MENU_GROUP,
+            group_key=constants.MENU_GROUP_KEY,
+            permissions=[constants.PERM_VIEW],
+        ),
+        MenuItem(
+            label=constants.MENU_LABEL_SEGMENTS,
+            label_key=constants.MENU_LABEL_KEY_SEGMENTS,
+            url=constants.SEGMENTS_URL,
+            icon=constants.MENU_ICON_SEGMENTS,
+            order=310,
             group=constants.MENU_GROUP,
             group_key=constants.MENU_GROUP_KEY,
             permissions=[constants.PERM_VIEW],

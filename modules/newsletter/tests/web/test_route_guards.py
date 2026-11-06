@@ -74,6 +74,7 @@ EXPECTED = {
     ("POST", f"{API}/suppressions/{{suppression_id}}/lift"),
     ("GET", f"{API}/suppressions/lifts"),
     ("GET", f"{VIEW}/"),
+    ("GET", f"{VIEW}/segments"),
     ("GET", f"{VIEW}/settings"),
     ("GET", f"{VIEW}/campaigns/{{campaign_id}}"),
     ("GET", f"{VIEW}/campaigns/{{campaign_id}}/report"),
