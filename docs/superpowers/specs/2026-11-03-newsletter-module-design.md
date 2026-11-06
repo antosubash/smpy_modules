@@ -495,3 +495,16 @@ These override anything above that contradicts them.
     the Admin console. The module's docs (`docs/operations.md`) carry it as a
     deployment checklist item, with how to confirm it from a test message's
     `DKIM-Signature: … h=` list. No in-app verification in v1.
+11. **Lifting an `unsubscribed` suppression (PR 6, team lead, 2026-11-05).** This
+    amends §Data model, "The subscriber screen shows a suppressed address with its
+    reason. An admin with `newsletter.manage` can lift a `hard_bounce` or
+    `imported_cleaned` suppression". An admin with `newsletter.manage` may also
+    lift an `unsubscribed` suppression, **only** while records shows that address
+    on the row's list as `confirmed`, untrashed, with `sm_confirmed_at` later than
+    the suppression's `created_at`. Every lift needs the address typed (its hash
+    must match the row's) and a note, and is recorded in
+    `newsletter_suppression_lift`. A `complaint` is never lifted. Why: two cases
+    deferred from PR 2 have no other remedy. A stale opt-out on a single-opt-in
+    list (records purged the old record, and a new signup was `None → confirmed`,
+    which the mirror deliberately never clears), and a double-opt-in confirmation
+    whose clearing event was lost.

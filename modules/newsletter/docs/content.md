@@ -130,8 +130,10 @@ answers the card, media and refresh routes with `409 integration_unavailable`.
 
 ## Campaigns
 
-Drafts only in this release (`status = draft`); audience is `all`
-(`segment:` and `tag:` get `422 audience_unsupported`).
+Drafts only in this release (`status = draft`); audience is `all`,
+`tag:<choice>` (a choice of the list's `tags` field) or `segment:<id>` (a
+saved segment of the same list), validated on every PATCH that changes the
+audience or the list.
 
 - **Revision.** `newsletter_campaign.revision` is an integer. PATCH and Refresh
   require `expected_revision`; the write is one conditional `UPDATE ... SET

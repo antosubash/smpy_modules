@@ -18,7 +18,7 @@ import type { CampaignDetail } from '../../utils/types';
 
 const copy = keys.newsletter.editor.meta;
 
-type MetaField = keyof MetaPatch;
+type MetaField = Exclude<keyof MetaPatch, 'audience'>;
 
 const FIELDS: { name: MetaField; label: string; hint?: string; max: number; type?: string }[] = [
   { name: 'name', label: copy.name, max: 200 },

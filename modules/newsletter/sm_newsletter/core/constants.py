@@ -51,6 +51,9 @@ NOT_FOUND_DETAIL = "Not found"
 
 # Inertia page names (``sm_newsletter/pages/<name>.tsx``).
 _PAGE_CAMPAIGNS = "Newsletter/Campaigns"
+_PAGE_SEGMENTS = "Newsletter/Segments"
+_PAGE_SUBSCRIBERS = "Newsletter/Subscribers"
+_PAGE_SUPPRESSIONS = "Newsletter/Suppressions"
 _PAGE_EDITOR = "Newsletter/CampaignEditor"
 _PAGE_REPORT = "Newsletter/CampaignReport"
 _PAGE_SETTINGS = "Newsletter/Settings"
@@ -62,12 +65,24 @@ MENU_URL = f"{VIEW_PREFIX}/"
 MENU_LABEL_CAMPAIGNS = "Campaigns"
 MENU_LABEL_KEY_CAMPAIGNS = "newsletter.menu.campaigns"
 MENU_ICON_CAMPAIGNS = "mail"
+MENU_LABEL_SEGMENTS = "Segments"
+MENU_LABEL_KEY_SEGMENTS = "newsletter.menu.segments"
+MENU_ICON_SEGMENTS = "filter"
+MENU_LABEL_SUBSCRIBERS = "Subscribers"
+MENU_LABEL_KEY_SUBSCRIBERS = "newsletter.menu.subscribers"
+MENU_ICON_SUBSCRIBERS = "users"
+MENU_LABEL_SUPPRESSIONS = "Suppressions"
+MENU_LABEL_KEY_SUPPRESSIONS = "newsletter.menu.suppressions"
+MENU_ICON_SUPPRESSIONS = "shield"
 MENU_LABEL_SETTINGS = "Settings"
 MENU_LABEL_KEY_SETTINGS = "newsletter.menu.settings"
 MENU_ICON_SETTINGS = "settings"
 
 # The newsletter settings page (PR 3). Registered now as the settings'
 # ``manage_url`` so the generic Settings screen refuses newsletter writes.
+SEGMENTS_URL = f"{VIEW_PREFIX}/segments"
+SUBSCRIBERS_URL = f"{VIEW_PREFIX}/subscribers"
+SUPPRESSIONS_URL = f"{VIEW_PREFIX}/suppressions"
 SETTINGS_URL = f"{VIEW_PREFIX}/settings"
 
 # Campaign and send lifecycles (``str`` columns, ``max_length=24``).
@@ -95,7 +110,15 @@ REASON_UNSUBSCRIBED = "unsubscribed"
 REASONS = (REASON_HARD_BOUNCE, REASON_COMPLAINT, REASON_IMPORTED_CLEANED, REASON_UNSUBSCRIBED)
 # A later confirmation clears these; a complaint is never cleared.
 CLEARED_BY_CONFIRMATION = (REASON_HARD_BOUNCE, REASON_IMPORTED_CLEANED, REASON_UNSUBSCRIBED)
+SOURCE_ADMIN = "admin"
 SOURCES = ("records_event", "reconcile", "unsubscribe_page", "send", "import", "admin")
+
+# Reasons an admin may lift; a complaint is never lifted.
+LIFTABLE = (REASON_HARD_BOUNCE, REASON_IMPORTED_CLEANED, REASON_UNSUBSCRIBED)
+
+PERM_RECORDS_VIEW = "records.view"
+TAGS_FIELD = "tags"
+"""The subscription list's tags multiselect field."""
 
 MAX_TYPE_KEY_LEN = 64  # records' ``MAX_KEY_LEN``
 MAX_EMAIL_LEN = 320
@@ -108,12 +131,15 @@ PAUSE_SMTP_AUTH = "smtp_auth"
 PAUSE_LIST_UNAVAILABLE = "list_unavailable"
 PAUSE_HTTPS_REQUIRED = "https_required"
 """The snapshot's bases are not both ``https://`` and the transport is ``smtp``."""
+PAUSE_AUDIENCE_UNAVAILABLE = "audience_unavailable"
+"""The segment's audience could not be resolved (records unavailable or no view access)."""
 PAUSE_CODES = (
     PAUSE_MANUAL,
     PAUSE_SMTP_REJECTED,
     PAUSE_SMTP_AUTH,
     PAUSE_LIST_UNAVAILABLE,
     PAUSE_HTTPS_REQUIRED,
+    PAUSE_AUDIENCE_UNAVAILABLE,
 )
 
 # ``newsletter_send.error_kind`` of a row that ended ``failed`` or ``bounced``.

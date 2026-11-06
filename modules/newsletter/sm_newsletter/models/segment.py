@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from simple_module_db.mixins import AuditMixin, MultiTenantMixin
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Field
@@ -21,3 +23,5 @@ class Segment(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[uns
     name: str = Field(max_length=200)
     list_type_key: str = Field(max_length=MAX_TYPE_KEY_LEN)
     filters: list[str] = json_col(list)
+    rules: list[dict[str, Any]] = json_col(list, server_default="'[]'")
+    """The editor's rows; ``filters`` stays the compiled terms."""

@@ -86,7 +86,10 @@ with `https_required` once the transport is `smtp`).
   by the relay with something that is not a mailbox bounce (a policy or quota
   refusal, a bare 5xx). `smtp_auth` means the login was refused, and pauses
   every sending campaign. `list_unavailable` means its list was deleted or
-  stopped being a list. `https_required` means the campaign was rendered with an
+  stopped being a list. `audience_unavailable` means records refused the
+  audience's stored filter terms at freeze (the detail is records' reason,
+  e.g. `not_indexed` after a field lost its index): unschedule, fix the
+  segment or the field, and schedule again. `https_required` means the campaign was rendered with an
   `http://` base (scheduled on the console transport) and the transport is now
   `smtp`. `manual` is a person's pause. The detail shows the relay's
   reply verbatim.

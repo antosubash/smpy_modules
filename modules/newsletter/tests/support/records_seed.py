@@ -24,6 +24,15 @@ from sm_records.records.services._common import utcnow
 from starlette.requests import Request
 
 LIST = "news"
+TAGS = {
+    "key": "tags",
+    "type": "multiselect",
+    "label": "Tags",
+    "indexed": True,
+    "options": {
+        "choices": [{"value": "vip", "label": "VIP"}, {"value": "events", "label": "Events"}]
+    },
+}
 
 
 async def seed_list(
@@ -33,6 +42,7 @@ async def seed_list(
     *,
     double_opt_in: bool | None = None,
     allowed_roles: list[str] | None = None,
+    fields: list[dict[str, Any]] | None = None,
 ) -> None:
     """In ``tenant``, the newsletter list ``key`` (a subscription-kind type);
     records' default is double opt-in. Without it records requires consent.
@@ -48,7 +58,7 @@ async def seed_list(
                 db,
                 key=key,
                 label=key,
-                fields_raw=[],
+                fields_raw=list(fields or []),
                 public_submissions=config,
                 settings=RecordsSettings(),
                 allowed_roles=allowed_roles,
@@ -84,6 +94,7 @@ async def seed_subscriber(
     key: str = LIST,
     *,
     trashed: bool = False,
+    data: dict[str, Any] | None = None,
 ) -> str:
     """One subscriber of ``key`` in ``tenant`` with ``status``; its uuid.
 
@@ -101,12 +112,29 @@ async def seed_subscriber(
         async with db_state.session_factory() as db:
             rtype = await type_service.get_type(db, key)
             record = await record_service.create_record(
-                db, rtype, data={}, settings=settings, system=system
+                db, rtype, data=dict(data or {}), settings=settings, system=system
             )
             if trashed:
                 await record_service.soft_delete_record(db, rtype, record, settings=settings)
             await events.commit(db)
             return record.uuid
+
+
+async def backdate(db_state: Any, tenant: str, uuid: str, created_at: Any, key: str = LIST) -> None:
+    """Set a subscriber's ``created_at`` (test-only: through records' tables)."""
+    from sm_records.models import tables_for
+    from sqlalchemy import update
+
+    with tenant_scope(tenant):
+        async with db_state.session_factory() as db:
+            rtype = await type_service.get_type(db, key)
+            table = tables_for(rtype).record
+            await db.execute(
+                update(table)
+                .where(table.uuid == uuid, table.tenant_id == tenant)
+                .values(created_at=created_at)
+            )
+            await events.commit(db)
 
 
 # Records' public-submissions paths without the HTTP layer: no form token,

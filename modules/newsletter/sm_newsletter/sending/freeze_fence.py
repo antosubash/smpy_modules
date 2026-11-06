@@ -50,12 +50,13 @@ _CAMPAIGN = Campaign.__table__  # ty: ignore[unresolved-attribute]
 
 @dataclass(frozen=True)
 class FreezeClaim:
-    """A freeze owner for one generation, and that generation's audience."""
+    """A freeze owner for one generation, and that generation's audience: the
+    filter terms its render snapshotted at scheduling."""
 
     owner: str
     gen: int
     list_type_key: str
-    audience: str
+    audience_filters: list[str]
     content_base: str = ""
     public_base: str = ""
     """The snapshot's bases, read with the generation: :func:`~.freeze.freeze`
@@ -92,8 +93,8 @@ async def claim_freeze(
 
     The cutoff is re-checked here, not only in :func:`due_campaigns`: a
     campaign unscheduled and rescheduled for later in between is not due. The
-    list and audience come from the same read as the generation the
-    ``UPDATE`` pins: they change only on a draft, and leaving ``scheduled``
+    list and the audience's filters (the render's) come from the same read as
+    the generation the ``UPDATE`` pins: they change only on a draft, and leaving ``scheduled``
     bumps the generation, so the claim carries exactly what it claimed.
     Leaves ``revision`` alone; never commits."""
     key = [
@@ -107,7 +108,7 @@ async def claim_freeze(
         select(
             Campaign.freeze_gen,
             Campaign.list_type_key,
-            Campaign.audience,
+            CampaignRender.audience_filters,
             CampaignRender.campaign_id,
             CampaignRender.content_base,
             CampaignRender.public_base,
@@ -118,14 +119,14 @@ async def claim_freeze(
     row = (await session.execute(stmt.where(*key))).first()
     if row is None:
         return None
-    gen, list_key, audience, rendered, content_base, public_base = row
+    gen, list_key, filters, rendered, content_base, public_base = row
     if rendered is None:
         logger.error(
             "newsletter: scheduled campaign %s of %s has no render", campaign_id, tenant_id
         )
         return None
     owner = f"freeze:{secrets.token_hex(8)}"
-    claim = FreezeClaim(owner, gen, list_key, audience, content_base, public_base)
+    claim = FreezeClaim(owner, gen, list_key, list(filters or []), content_base, public_base)
     free = or_(Campaign.freeze_owner.is_(None), Campaign.freeze_until < now)
     values = {"freeze_owner": claim.owner, "freeze_until": now + FREEZE_LEASE}
     taken = await update_campaign(session, [*key, Campaign.freeze_gen == gen, free], values)
@@ -162,14 +163,16 @@ async def pause_unavailable(
     claim: FreezeClaim,
     now: datetime,
     code: str = constants.PAUSE_LIST_UNAVAILABLE,
+    *,
+    detail: str = "",
 ) -> None:
-    """``scheduled -> paused`` (``list_unavailable``, or ``code``) if the claim
+    """``scheduled -> paused`` (``list_unavailable``, or ``code`` with ``detail``) if the claim
     holds, releasing it, with ``started_at`` left empty: ``resume`` sends a
     never-started campaign back to ``scheduled`` without a new generation, so
     the next tick can claim it, and ``unschedule`` takes it back to draft."""
     values = {
         "status": PAUSED,
-        "paused_reason": paused_reason(code),
+        "paused_reason": paused_reason(code, detail),
         "freeze_owner": None,
         "freeze_until": None,
         "revision": Campaign.revision + 1,

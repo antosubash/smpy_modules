@@ -15,6 +15,7 @@ NEWSLETTER_TABLES = {
     "newsletter_link",
     "newsletter_click",
     "newsletter_suppression",
+    "newsletter_suppression_lift",
     "newsletter_dispatch_lock",
 }
 
@@ -35,7 +36,13 @@ VIEW_PATHS = {
     "/admin/newsletter/settings",
     "/admin/newsletter/campaigns/{campaign_id}",
 }
-MENU_URLS = {"/admin/newsletter/", "/admin/newsletter/settings"}
+MENU_URLS = {
+    "/admin/newsletter/",
+    "/admin/newsletter/segments",
+    "/admin/newsletter/subscribers",
+    "/admin/newsletter/suppressions",
+    "/admin/newsletter/settings",
+}
 
 
 def test_views_and_menu_mounted():
@@ -74,3 +81,21 @@ def test_tracking_routes_are_public():
     assert pixel.headers["content-type"] == "image/gif"
     click = client.get("/newsletter/c/test/1", follow_redirects=False)
     assert click.status_code == 404
+
+
+def test_people_screens_are_mounted():
+    app = create_app(Settings())
+    paths = {ctx.path for ctx in iter_route_contexts(app.routes)}
+    assert {
+        "/admin/newsletter/segments",
+        "/admin/newsletter/subscribers",
+        "/admin/newsletter/suppressions",
+    } <= paths
+    perms = {
+        i.url: set(i.permissions)
+        for i in app.state.sm.menu_registry.all_items
+        if i.group == "Newsletter"
+    }
+    assert perms["/admin/newsletter/segments"] == {"newsletter.view"}
+    assert perms["/admin/newsletter/subscribers"] == {"newsletter.view", "records.view"}
+    assert perms["/admin/newsletter/suppressions"] == {"newsletter.manage"}

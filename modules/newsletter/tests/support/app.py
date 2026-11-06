@@ -28,6 +28,7 @@ from settings.endpoints.module_api import router as generic_settings_router
 from settings.models import Base as SettingsBase
 from simple_module_core.events import EventBus
 from simple_module_core.i18n import I18nRegistry
+from simple_module_db.listeners import current_user_id
 from simple_module_hosting.csrf import get_csrf_token
 from sm_newsletter.core import constants
 from sm_newsletter.core.errors import install_exception_handlers
@@ -53,6 +54,7 @@ class _Auth(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         roles = _csv(request.headers.get("x-roles", ""))
         request.state.user = SimpleNamespace(id="u", email="u@example.com", name="U", roles=roles)
+        current_user_id.set("u")  # what the framework's auth middleware does
         request.state.resolved_permissions = set(_csv(request.headers.get("x-perms", "")))
         if tenant := request.headers.get("x-tenant"):
             request.state.tenant_id = tenant

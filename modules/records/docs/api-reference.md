@@ -1730,12 +1730,46 @@ after that, to `bus` when one is given (`events.attach`). With `bus=None`
   Stored order is kept, new tags are appended, duplicates dropped, and a tag in
   both `add` and `remove` is removed. A merge equal to the stored list writes
   nothing: no version bump, no event. A tag outside the field's choices raises
-  `ValidationFailed` with nothing written; an unknown or trashed subscriber
+  `ValidationFailed` (re-exported from `sm_records.contracts.newsletter`, so a
+  caller can catch it without importing records' internals) with nothing
+  written; an unknown or trashed subscriber
   raises `SubscriberNotFound`.
 - **`can_read_list`** is records' own per-type narrowing (`allowed_roles`,
   widened by a `records.type.<key>` grant when `roles` is a `CallerRoles`).
   `roles=None` means no caller (a worker, the CLI) and is not blocked. The
   newsletter module's screens pass the signed-in caller's `CallerRoles`.
+
+**Admin reads** (`sm_records.contracts.newsletter_admin`, newsletter PR 6) serve
+the console, not the sender. Same tenant rules as above (the caller names the
+tenant, `tenant_scope` binds it, every query pins it); argument errors are
+`ValueError` before a query, a term records cannot answer is
+`SubscriberFilterError`.
+
+- **`list_fields`** returns the fields a segment can filter on: `indexed`, not
+  `system="internal"`, not `relation`, in declared order, as `ListField`
+  (`key`, `label`, `type`, `many` for a multiselect, `choices`, `system`).
+  `[]` for a tenant without the list; `not_a_list` for a type that is not one.
+- **`browse_subscribers`** lists untrashed subscribers in **any** status (or
+  `status`), newest first, with `offset` paging (0 to 100 000), `limit` 1 to 100
+  and an exact `total`, as `SubscriberPage`. `search` (at most 200 characters,
+  no NUL) is a case-insensitive literal substring of the address.
+- **`subscriber_status_counts`** returns `{"pending", "confirmed",
+  "unsubscribed"}` counts over the same `filters` and `search`; zeros for a
+  tenant without the list.
+- **`subscriber_admin_url(type_key, uuid=None)`** is the records console URL
+  (`/admin/records/{key}` or `/admin/records/{key}/{uuid}`). Pure.
+- **`lock_confirmation(session, *, tenant_id, type_key, email)`** is the one
+  write-side call: the untrashed subscriber of `type_key` holding `email`
+  (normalised), its row **locked until the caller's transaction ends**, as a
+  `ConfirmProof(uuid, confirmed_at)` only when it is `confirmed` with a readable
+  `sm_confirmed_at`; `None` for an unknown, pending, unsubscribed or trashed
+  one, a tenant without the list, or a type that is no longer one. Newsletter's
+  suppression lift calls it inside its own write transaction. Every unsubscribe
+  (`opt_in.leave`: this contract's `unsubscribe`, records' own link) takes the
+  same row lock before it decides (`public_submissions.row_lock.lock_record`:
+  the type lock, then `SELECT … FOR UPDATE` on Postgres; on SQLite the type
+  lock is already the database's write lock), so an opt-out cannot land
+  between the lift's check and its commit.
 
 ---
 

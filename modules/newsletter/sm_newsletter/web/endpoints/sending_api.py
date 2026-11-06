@@ -139,9 +139,8 @@ async def get_estimate(
     db: AsyncSession = Depends(get_db),
 ) -> EstimateOut:
     start = _parse_at(at)
-    campaign = await require_campaign(
-        db, tenant_id=tenant, campaign_id=campaign_id, roles=caller_roles(request)
-    )
+    roles = caller_roles(request)
+    campaign = await require_campaign(db, tenant_id=tenant, campaign_id=campaign_id, roles=roles)
     return await estimate(
         db,
         _factory(request),
@@ -149,6 +148,7 @@ async def get_estimate(
         tenant_id=tenant,
         campaign=campaign,
         at=start,
+        roles=roles,
     )
 
 

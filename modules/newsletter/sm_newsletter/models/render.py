@@ -18,7 +18,7 @@ from sqlmodel import Field
 
 from sm_newsletter.core.constants import MAX_EMAIL_LEN
 from sm_newsletter.models._base import Base
-from sm_newsletter.models._cols import dt_col
+from sm_newsletter.models._cols import dt_col, json_col
 
 
 class CampaignRender(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
@@ -47,3 +47,5 @@ class CampaignRender(Base, MultiTenantMixin, table=True):  # ty: ignore[unsuppor
     counts as not ``https://``)."""
     locale: str = Field(max_length=16)
     rendered_at: datetime = dt_col(nullable=False)
+    audience_filters: list[str] = json_col(list, server_default="'[]'")
+    """The compiled segment terms the audience was resolved with at scheduling."""

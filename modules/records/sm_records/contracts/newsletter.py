@@ -55,6 +55,7 @@ from sm_records.public_submissions import campaign_reads, campaign_writes
 from sm_records.public_submissions.campaign_reads import SubscriberFilterError
 from sm_records.public_submissions.campaign_writes import SubscriberNotFound
 from sm_records.records.services._access import CallerRoles, role_blocked
+from sm_records.records.services.errors import ValidationFailed
 
 __all__ = [
     "MAX_SUBSCRIBER_BATCH",
@@ -62,6 +63,7 @@ __all__ = [
     "SubscriberFilterError",
     "SubscriberHit",
     "SubscriberNotFound",
+    "ValidationFailed",
     "caller_roles",
     "can_read_list",
     "count_subscribers",
@@ -224,7 +226,7 @@ async def set_tags(
     The stored order is kept, new tags appended, duplicates dropped, and a tag
     in both ``add`` and ``remove`` removed. :class:`SubscriberNotFound` for an
     unknown or trashed one; a tag outside the field's choices raises records'
-    ``ValidationFailed`` unchanged, with nothing written. A merge that leaves the
+    ``ValidationFailed`` (re-exported here) unchanged, with nothing written. A merge that leaves the
     stored tags as they are writes nothing (no version bump, no event).
 
     Raises ``SubscriberFilterError("not_a_list")`` for an existing type that is

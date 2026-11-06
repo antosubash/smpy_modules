@@ -15,14 +15,15 @@ source repository, and the delivery order is
 | 2 | this package: scaffold, tenancy, settings, models, suppressions, hourly reconcile | merged |
 | 3 | campaigns, content blocks, renderer, preview, Puck editor, test send, settings page | merged |
 | 4 | sending, throttling, retries, unsubscribe page | in review (stacked below this PR) |
-| 5 | open and click tracking, reports | this PR |
-| 6 | segments and the subscriber screen | planned |
+| 5 | open and click tracking, reports | merged |
+| 6 | segments, audiences, the subscriber and suppression screens | this PR |
 | 7 | Mailchimp import, docs, e2e | planned |
 
 Sending is described in [`sending.md`](sending.md) (status machine, freeze, the
 dispatcher, verdicts, the unsubscribe route) and what has to run for it in
 [`operations.md`](operations.md) (worker and beat, the secret, the DKIM
-checklist, the relay).
+checklist, the relay). Segments, campaign audiences, the subscriber screen and
+suppression lifts are in [`audience.md`](audience.md).
 
 ## Campaigns and content
 
@@ -38,7 +39,8 @@ and the golden files: [`content.md`](content.md).
 - **Screens.** `/admin/newsletter/` (campaign list), `/admin/newsletter/campaigns/{id}`
   (a newsletter-only Puck editor with a 600 px single column, a preview pane and a
   test-send dialog) and `/admin/newsletter/settings`. The sidebar has Campaigns
-  (`newsletter.view`) and Settings (`newsletter.manage`).
+  (`newsletter.view`) and Settings (`newsletter.manage`). The people screens
+  (Segments, Subscribers, Suppressions) are in [`audience.md`](audience.md).
 - **Writes are revision-guarded.** PATCH and card Refresh carry `expected_revision`;
   a stale one is `409 stale`, a campaign that left draft `409 not_a_draft`.
 - **List access is re-checked on every campaign request**, so a list restricted

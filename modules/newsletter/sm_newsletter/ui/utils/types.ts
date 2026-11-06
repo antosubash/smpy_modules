@@ -52,7 +52,8 @@ export type PausedCode =
   | 'smtp_rejected'
   | 'smtp_auth'
   | 'list_unavailable'
-  | 'https_required';
+  | 'https_required'
+  | 'audience_unavailable';
 
 /** `GET /campaigns/{id}/progress`. */
 export interface Progress {
@@ -190,3 +191,5 @@ export interface SettingsOut {
 
 export type SettingsUpdate = Partial<Omit<SettingsOut, 'has_password'>>;
 export type SettingsSaved = SettingsOut & { password_cleared: boolean };
+
+export * from './subscriberTypes';

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from simple_module_db.types import AwareDateTime
-from sqlalchemy import JSON, BigInteger, Column, ForeignKey, Integer
+from sqlalchemy import JSON, BigInteger, Column, ForeignKey, Integer, text
 from sqlmodel import Field
 
 from sm_newsletter.core.clock import utcnow
@@ -43,10 +43,15 @@ def dt_col(*, index: bool = False, nullable: bool = True) -> Any:
     )
 
 
-def json_col(default_factory: Any) -> Any:
+def json_col(default_factory: Any, *, server_default: str | None = None) -> Any:
     return Field(
         default_factory=default_factory,
-        sa_column=Column(JSON, nullable=False, default=default_factory),
+        sa_column=Column(
+            JSON,
+            nullable=False,
+            default=default_factory,
+            server_default=text(server_default) if server_default else None,
+        ),
     )
 
 

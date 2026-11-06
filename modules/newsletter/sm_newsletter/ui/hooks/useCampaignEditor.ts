@@ -53,7 +53,7 @@ export function useCampaignEditor(id: number) {
   const dataRef = useRef<Data>(EMPTY);
   const staleRef = useRef(false);
   const queueRef = useRef<Promise<unknown>>(Promise.resolve());
-  const { dirty, incomplete, edits } = usePendingEdits();
+  const { dirty, incomplete, audienceUnfinished, edits } = usePendingEdits();
 
   /** Adopt the server's campaign; edits typed while the request was out stay on top. */
   const adopt = useCallback(
@@ -156,8 +156,8 @@ export function useCampaignEditor(id: number) {
     return enqueue(send);
   }, [edits, enqueue, send]);
 
-  /** `save`, but false while a block is unfinished: a real send must not leave one out (A8). */
-  const flush = useCallback(async () => (await save()) && !edits.incomplete, [edits, save]);
+  /** `save`, but false while a block or the audience is unfinished: a send must wait (A8). */
+  const flush = useCallback(async () => (await save()) && !edits.blocked(), [edits, save]);
   const currentRevision = useCallback(() => revisionRef.current, []);
 
   const schedule = useCallback(() => {
@@ -184,9 +184,6 @@ export function useCampaignEditor(id: number) {
     },
     [edits, schedule],
   );
-
-  /** Puck's `onChange`. */
-  const onChange = track;
 
   /** A change to the campaign's details, saved with the same debounce as the body. */
   const saveMeta = useCallback(
@@ -258,8 +255,11 @@ export function useCampaignEditor(id: number) {
   return {
     campaign,
     data,
-    onChange,
+    onChange: track, // Puck's `onChange`
     saveMeta,
+    /** The audience picker's `onUnfinished`; `audienceUnfinished` blocks a send. */
+    holdAudience: edits.markAudienceUnfinished,
+    audienceUnfinished,
     status,
     error,
     incomplete,

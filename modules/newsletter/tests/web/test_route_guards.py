@@ -27,7 +27,7 @@ from tests.support.app import build_app
 
 API = constants.ROUTE_PREFIX_API
 VIEW = constants.VIEW_PREFIX
-ALLOWED = {*constants.PERMISSIONS, constants.PERM_SETTINGS_EDIT}
+ALLOWED = {*constants.PERMISSIONS, constants.PERM_SETTINGS_EDIT, constants.PERM_RECORDS_VIEW}
 UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
 
 EXPECTED = {
@@ -57,7 +57,26 @@ EXPECTED = {
     ("GET", f"{API}/media"),
     ("GET", f"{API}/outbox"),
     ("GET", f"{API}/lists"),
+    ("GET", f"{API}/segments"),
+    ("POST", f"{API}/segments"),
+    ("GET", f"{API}/segments/{{segment_id}}"),
+    ("PATCH", f"{API}/segments/{{segment_id}}"),
+    ("DELETE", f"{API}/segments/{{segment_id}}"),
+    ("POST", f"{API}/segments/preview"),
+    ("GET", f"{API}/lists/{{list_type_key}}/fields"),
+    ("GET", f"{API}/lists/{{list_type_key}}/audience-count"),
+    ("POST", f"{API}/lists/{{list_type_key}}/subscribers/search"),
+    ("GET", f"{API}/lists/{{list_type_key}}/subscribers/{{uuid}}"),
+    ("POST", f"{API}/lists/{{list_type_key}}/subscribers/{{uuid}}/tags"),
+    ("POST", f"{API}/lists/{{list_type_key}}/subscribers/{{uuid}}/unsubscribe"),
+    ("GET", f"{API}/suppressions"),
+    ("POST", f"{API}/suppressions/lookup"),
+    ("POST", f"{API}/suppressions/{{suppression_id}}/lift"),
+    ("GET", f"{API}/suppressions/lifts"),
     ("GET", f"{VIEW}/"),
+    ("GET", f"{VIEW}/segments"),
+    ("GET", f"{VIEW}/subscribers"),
+    ("GET", f"{VIEW}/suppressions"),
     ("GET", f"{VIEW}/settings"),
     ("GET", f"{VIEW}/campaigns/{{campaign_id}}"),
     ("GET", f"{VIEW}/campaigns/{{campaign_id}}/report"),

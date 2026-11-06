@@ -32,6 +32,8 @@ interface Props {
   flush: () => Promise<boolean>;
   dirty: boolean;
   incomplete: boolean;
+  /** A tag or segment audience is chosen without its value: nothing may be sent. */
+  audienceUnfinished?: boolean;
   /** The revision the editor's last save produced. */
   currentRevision: () => number;
 }
@@ -60,6 +62,8 @@ function futureIso(local: string): string | null {
  */
 export function SendDialog(props: Props) {
   const { campaign, canSend, onSent, flush, dirty, incomplete, currentRevision } = props;
+  const audienceUnfinished = props.audienceUnfinished === true;
+  const held = incomplete ? copy.incomplete : audienceUnfinished ? copy.audience_unfinished : null;
   const { t, locale } = useT();
   const [open, setOpen] = useState(false);
   const [ready, setReady] = useState(false);
@@ -136,10 +140,10 @@ export function SendDialog(props: Props) {
   useEffect(() => {
     if (!armed) return;
     setArmed(null);
-    if (dirty || incomplete) refuse(copy.unsaved);
+    if (dirty || held) refuse(copy.unsaved);
     else if (armed.when === 'later' && !inFuture(armed.scheduled)) refuse(copy.time_past);
     else void post(currentRevision(), armed.when === 'later' ? armed.scheduled : null);
-  }, [armed, dirty, incomplete, refuse, post, currentRevision]);
+  }, [armed, dirty, held, refuse, post, currentRevision]);
 
   const confirm = async () => {
     const choice: Choice = { when, scheduled: when === 'later' ? futureIso(at) : null };
@@ -155,20 +159,16 @@ export function SendDialog(props: Props) {
   return (
     <Dialog open={open} onOpenChange={(next) => void change(next)}>
       <DialogTrigger asChild>
-        <Button
-          type="button"
-          size="sm"
-          disabled={incomplete}
-          title={incomplete ? t(copy.incomplete) : undefined}
-        >
+        <Button type="button" size="sm" disabled={held !== null} title={held ? t(held) : undefined}>
           {t(keys.newsletter.sending.send_button)}
         </Button>
       </DialogTrigger>
-      {incomplete && <span className="sr-only">{t(copy.incomplete)}</span>}
+      {held && <span className="sr-only">{t(held)}</span>}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t(copy.title)}</DialogTitle>
           <DialogDescription>{t(copy.description, { name: campaign.name })}</DialogDescription>
+          <p className="text-sm text-muted-foreground">{t(copy.audience_frozen)}</p>
         </DialogHeader>
 
         <div className="grid gap-3 py-2">

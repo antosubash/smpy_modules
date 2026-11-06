@@ -147,14 +147,6 @@ class ListForbidden(Forbidden):
     detail = "You may not use this newsletter list"
 
 
-class AudienceUnsupported(NewsletterError):  # noqa: N818 - names the field
-    """Only ``all`` until segments and the tag picker arrive (PR 6, ruling S3)."""
-
-    status = 422
-    code = "audience_unsupported"
-    detail = "Only the whole list can be the audience until segments arrive"
-
-
 class IntegrationUnavailable(NewsletterError):  # noqa: N818 - the state it refuses
     """The content source a card or the media picker reads (news, pagebuilder)
     is not installed or not mounted on this host."""

@@ -14,7 +14,10 @@
   "menu": {
     "group": "Newsletter",
     "campaigns": "Campaigns",
-    "settings": "Settings"
+    "settings": "Settings",
+    "segments": "Segments",
+    "subscribers": "Subscribers",
+    "suppressions": "Suppressions"
   },
   "campaigns": {
     "title": "Campaigns",
@@ -77,6 +80,160 @@
     "no_rate": "—",
     "report_link": "Report",
     "report_label": "Report for {name}"
+  },
+  "segments": {
+    "title": "Segments",
+    "description": "Save a set of rules to send a campaign to part of a list.",
+    "list_label": "List",
+    "new": "New segment",
+    "edit": "Edit",
+    "delete": "Delete",
+    "empty": "No segments on this list yet.",
+    "name": "Name",
+    "rules": "Rules",
+    "add_rule": "Add rule",
+    "remove_rule": "Remove rule",
+    "field": "Field",
+    "op": "Condition",
+    "value": "Value",
+    "count_one": "About {count} subscriber matches",
+    "count_other": "About {count} subscribers match",
+    "count_incomplete": "Incomplete rules are not counted.",
+    "saved": "Segment saved.",
+    "delete_confirm": {
+      "title": "Delete this segment?",
+      "description": "\"{name}\" will be removed. This cannot be undone.",
+      "confirm": "Delete",
+      "keep": "Keep"
+    },
+    "ops": {
+      "is": "is",
+      "is_not": "is not",
+      "any": "is any of",
+      "all": "has all of",
+      "none": "has none of",
+      "contains": "contains",
+      "starts_with": "starts with",
+      "gt": "is greater than",
+      "gte": "is at least",
+      "lt": "is less than",
+      "lte": "is at most",
+      "before": "is before",
+      "since": "is on or after"
+    },
+    "signup_field": "Signed up",
+    "bool": {
+      "true": "Yes",
+      "false": "No"
+    },
+    "updated": "Updated",
+    "summary_none": "Everyone on the list",
+    "pick": "Choose…",
+    "count_loading": "Counting subscribers…",
+    "name_label": "Segment name",
+    "title_new": "New segment",
+    "title_edit": "Edit segment",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "max_rules": "At most 10 rules."
+  },
+  "subscribers": {
+    "title": "Subscribers",
+    "description": "Search a list's subscribers, tag them and see how they engage.",
+    "list_label": "List",
+    "search_label": "Search subscribers",
+    "search_placeholder": "Email address",
+    "tag_label": "Tag",
+    "tag_all": "All tags",
+    "segment_label": "Segment",
+    "segment_all": "All subscribers",
+    "empty": "No subscribers match.",
+    "email": "Email",
+    "name": "Name",
+    "status": {
+      "label": "Status",
+      "all": "All",
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "unsubscribed": "Unsubscribed"
+    },
+    "tags": "Tags",
+    "suppressed": "Won't receive newsletters",
+    "confirmed_at": "Confirmed",
+    "open_in_records": "Open in records",
+    "edit_in_records": "Edit in records",
+    "trashed": "In the trash",
+    "detail": {
+      "title": "Subscriber",
+      "engagement": "Engagement",
+      "campaigns_sent": "Campaigns sent",
+      "last_sent": "Last campaign",
+      "never_sent": "Not sent a campaign yet",
+      "opened": "Opened",
+      "clicked": "Clicked",
+      "suppressions": "Suppressions",
+      "suppressions_empty": "No suppression records on the lists you can read.",
+      "tags_save": "Save tags",
+      "unsubscribe": "Unsubscribe"
+    },
+    "unsubscribe_confirm": {
+      "title": "Unsubscribe this address?",
+      "description": "{email} will receive no newsletters from any list. An opt-out is recorded; only a lift by an administrator or a confirmed double opt-in clears it.",
+      "confirm": "Unsubscribe",
+      "keep": "Keep"
+    }
+  },
+  "suppressions": {
+    "title": "Suppressions",
+    "description": "Addresses that no newsletter is sent to, and the lifts that were audited.",
+    "tab_active": "Suppressed",
+    "tab_lifted": "Lifted",
+    "reason_label": "Reason",
+    "reason_all": "All reasons",
+    "lookup_label": "Look up an email address",
+    "lookup_submit": "Look up",
+    "lookup_clear": "Clear lookup",
+    "all_lists": "All lists",
+    "empty": "Nothing is suppressed.",
+    "fingerprint": "Fingerprint",
+    "reason": "Reason",
+    "list": "List",
+    "source": "Source",
+    "created": "Suppressed on",
+    "reasons": {
+      "hard_bounce": "Hard bounce",
+      "complaint": "Complaint",
+      "imported_cleaned": "Imported as cleaned",
+      "unsubscribed": "Unsubscribed"
+    },
+    "sources": {
+      "records_event": "Records event",
+      "reconcile": "Reconcile",
+      "unsubscribe_page": "Unsubscribe page",
+      "send": "Send",
+      "import": "Import",
+      "admin": "Admin"
+    },
+    "lift": {
+      "action": "Lift",
+      "title": "Lift this suppression",
+      "email_label": "Email address",
+      "note_label": "Why is this safe to lift?",
+      "confirm": "Lift suppression",
+      "cancel": "Cancel",
+      "hard_bounce_warning": "This address bounced. Lift it only once the mailbox works again. Type the address to confirm it is the one you mean.",
+      "opt_out_warning": "This person opted out. The lift is allowed only because records shows them confirmed again afterwards. On a list without double opt-in, anyone can type an address into the form, so check that the owner really asked to come back.",
+      "cleaned_hint": "This address was imported as cleaned. Confirm it is deliverable before lifting.",
+      "done": "Suppression lifted."
+    },
+    "log": {
+      "empty": "Nothing has been lifted.",
+      "suppressed_at": "Suppressed on",
+      "lifted_at": "Lifted on",
+      "lifted_by": "Lifted by",
+      "note": "Note"
+    }
   },
   "settings": {
     "title": "Newsletter settings",
@@ -146,7 +303,7 @@
     "read_only": "You can view this campaign but not change it.",
     "not_draft": "This campaign is no longer a draft, so it cannot be changed.",
     "incomplete": "A block is missing a required field. The email is saved again once it is filled in.",
-    "leave_held": "Leave this campaign? A block is unfinished, so that change is not saved.",
+    "leave_held": "Leave this campaign? A block is unfinished or an audience is not chosen, so that change is not saved.",
     "select_a_block": "Select a block to edit it.",
     "integration_missing": "This content source is not available on this site.",
     "meta": {
@@ -181,6 +338,21 @@
       "searching": "Searching",
       "no_results": "No images found."
     }
+  },
+  "audience": {
+    "title": "Audience",
+    "all": "Whole list",
+    "tag": "A tag",
+    "segment": "A segment",
+    "tag_label": "Tag",
+    "segment_label": "Segment",
+    "count_one": "About {count} subscriber",
+    "count_other": "About {count} subscribers",
+    "count_loading": "Counting subscribers…",
+    "no_tags": "This list has no tags yet.",
+    "no_segments": "This list has no segments yet.",
+    "segment_missing": "The saved segment no longer exists. Choose another audience before sending.",
+    "tag_missing": "The saved tag is no longer available on this list. Choose another audience before sending."
   },
   "blocks": {
     "categories": {
@@ -239,7 +411,6 @@
   "errors": {
     "generic": "Something went wrong. Please try again.",
     "csrf_failed": "Your session has expired. Reload the page and try again.",
-    "audience_unsupported": "Only the whole list can be the audience for now.",
     "block_not_found": "That card is no longer in this campaign.",
     "campaign_cancelled": "A cancelled campaign cannot be test sent.",
     "card_source_gone": "The card's source is no longer published. Its saved copy was kept.",
@@ -263,7 +434,20 @@
     "stale": "This campaign was changed elsewhere. Reload it to continue.",
     "tenant_required": "No organisation is active for this account.",
     "transport_unavailable": "The mail server is not available.",
-    "unknown_list": "No such newsletter list."
+    "unknown_list": "No such newsletter list.",
+    "invalid_segment": "The segment is not valid.",
+    "segment_name_taken": "A segment with that name already exists on this list.",
+    "segment_in_use": "A draft campaign still uses this segment.",
+    "unknown_segment": "No such segment.",
+    "segment_list_mismatch": "The segment belongs to a different list.",
+    "unknown_tag": "That tag does not exist on this list.",
+    "not_subscribed": "That address is not subscribed to this list.",
+    "invalid_audience": "The audience is not valid.",
+    "invalid_query": "A query parameter is not valid.",
+    "lift_not_allowed": "This suppression cannot be lifted.",
+    "opt_out_stands": "The address has not confirmed on this list since it unsubscribed, so the opt-out stands.",
+    "lift_email_mismatch": "The address does not match this suppression.",
+    "suppression_changed": "This suppression changed since you loaded it. Reload and try again."
   },
   "preview": {
     "tab_edit": "Edit",
@@ -308,7 +492,7 @@
     "send_button": "Send…",
     "dialog": {
       "title": "Send campaign",
-      "description": "Send \"{name}\" to the whole list. Once sending starts, the content can no longer be changed.",
+      "description": "Send \"{name}\". Once sending starts, the content can no longer be changed.",
       "now": "Send now",
       "later": "Schedule for later",
       "at_label": "Send at",
@@ -321,7 +505,9 @@
       "cancel": "Cancel",
       "unsaved": "The latest edits could not be saved, so nothing was sent.",
       "incomplete": "Finish or remove the unfinished blocks before sending.",
-      "time_past": "Choose a time in the future."
+      "audience_unfinished": "Pick a tag or segment, or go back to the whole list, before sending.",
+      "time_past": "Choose a time in the future.",
+      "audience_frozen": "The audience is fixed once the campaign is scheduled."
     },
     "panel": {
       "scheduled_for": "Scheduled for {date}",
@@ -356,7 +542,8 @@
       "smtp_rejected": "The mail server rejected the messages",
       "smtp_auth": "The mail server refused the login",
       "list_unavailable": "The newsletter list is not available",
-      "https_required": "Real mail needs https, but this campaign was rendered with an http address"
+      "https_required": "Real mail needs https, but this campaign was rendered with an http address",
+      "audience_unavailable": "The audience is no longer available"
     }
   },
   "report": {

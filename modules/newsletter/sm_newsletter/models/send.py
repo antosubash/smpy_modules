@@ -22,6 +22,7 @@ class Send(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
             "tenant_id", "campaign_id", "record_uuid", name="uq_newsletter_send_campaign_record"
         ),
         Index("ix_newsletter_send_campaign_status", "campaign_id", "status", "id"),
+        Index("ix_newsletter_send_record", "tenant_id", "record_uuid", "id"),
     )
 
     id: int | None = big_pk()

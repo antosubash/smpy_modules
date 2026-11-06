@@ -7,6 +7,7 @@ import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
 import { useMemo, useState } from 'react';
 
 import { campaignsUrl } from '../ui/components/campaigns/urls';
+import { AudiencePicker } from '../ui/components/editor/AudiencePicker';
 import { CampaignMeta } from '../ui/components/editor/CampaignMeta';
 import { type EditorTab, EditorTabs } from '../ui/components/editor/EditorTabs';
 import { EditorActionsContext } from '../ui/components/editor/editorActions';
@@ -101,7 +102,7 @@ export default function CampaignEditor() {
 
   useLeaveGuard({
     dirty: editor.dirty,
-    held: !readOnly && editor.incomplete,
+    held: !readOnly && (editor.incomplete || editor.audienceUnfinished),
   });
 
   const statusKey = STATUS_LABEL[editor.status];
@@ -144,6 +145,7 @@ export default function CampaignEditor() {
               flush={editor.flush}
               dirty={editor.dirty}
               incomplete={editor.incomplete}
+              audienceUnfinished={editor.audienceUnfinished}
               currentRevision={editor.currentRevision}
             />
           </>
@@ -187,6 +189,13 @@ export default function CampaignEditor() {
             campaign={campaign}
             readOnly={readOnly}
             onChange={editor.saveMeta}
+          />
+          <AudiencePicker
+            key={`audience-${editor.reloadKey}`}
+            campaign={campaign}
+            readOnly={readOnly}
+            onChange={editor.saveMeta}
+            onUnfinished={editor.holdAudience}
           />
           {tab === 'preview' && (
             <PreviewPane
