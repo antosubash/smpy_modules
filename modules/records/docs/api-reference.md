@@ -1771,6 +1771,30 @@ tenant, `tenant_scope` binds it, every query pins it); argument errors are
   lock is already the database's write lock), so an opt-out cannot land
   between the lift's check and its commit.
 
+#### Newsletter import contract
+
+`sm_records.contracts.newsletter_import` (newsletter PR 7) serves the Mailchimp
+import. Same tenant rules as above; none of it commits. Part 1:
+
+- **`create_list(session, *, tenant_id, key, label, settings, actor=None)`**
+  creates a subscription list with optional `first_name` and `last_name` (text,
+  at most 100 characters, not indexed), `double_opt_in` on, signup `enabled`
+  off, shown in the menu; returns the key. `ListExists` when the key is taken in
+  the tenant, `InvalidListKey` when records refuses the key or label.
+- **`importable_fields(session, *, tenant_id, type_key)`** returns
+  `ImportTargets`: `fields` (`ImportField`: ordinary, non-system fields of type
+  text, longtext, email, url or select, except `tags`, in declared order, with
+  select choices) and `tags` (`present` for a `tags` multiselect, `creatable`
+  with no `tags` field and no records, trash included, else `missing`). `None`
+  for no such list; `not_a_list` for a type that is not one.
+- **`add_tag_choices(session, *, tenant_id, type_key, choices, settings,
+  actor=None)`** appends the missing `FieldChoice`s to `tags` under the type
+  lock (creating the multiselect on a list with no records) and returns the
+  values actually added; existing values and their labels are kept. At most 500
+  choices, each value and label 1 to 100 characters without control characters,
+  no duplicate values, else `ValueError`. `TagsFieldMissing` when `tags` is
+  absent on a list with records, or is not a multiselect.
+
 ---
 
 ## Error table
