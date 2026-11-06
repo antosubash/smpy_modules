@@ -39,16 +39,23 @@ logger = logging.getLogger(__name__)
 SessionFactory = Callable[[], AsyncSession]
 
 
+def _expirable(cutoff: datetime):
+    """``staged`` from ``created_at``, ``failed`` from when it failed (F1), before ``cutoff``:
+    the candidate read and the guarded delete both decide by it, with the same cutoff."""
+    return or_(
+        and_(ImportJob.status == STAGED, ImportJob.created_at < cutoff),
+        and_(
+            ImportJob.status == FAILED,
+            func.coalesce(ImportJob.finished_at, ImportJob.created_at) < cutoff,
+        ),
+    )
+
+
 def _candidates(now: datetime):
     stale = now - LEASE
     return select(ImportJob.tenant_id, ImportJob.id, ImportJob.status).where(
         or_(
-            and_(ImportJob.status == STAGED, ImportJob.created_at < now - STAGED_TTL),
-            # A failed import is timed from when it failed (F1), so "Apply again" gets its day.
-            and_(
-                ImportJob.status == FAILED,
-                func.coalesce(ImportJob.finished_at, ImportJob.created_at) < now - STAGED_TTL,
-            ),
+            _expirable(now - STAGED_TTL),
             and_(ImportJob.status == QUEUED, ImportJob.created_at < stale),
             and_(
                 ImportJob.status == RUNNING,
@@ -82,8 +89,9 @@ async def janitor_async(factory: SessionFactory, *, now: datetime) -> dict[str, 
             expired = [r[1] for r in rows if r[2] in (STAGED, FAILED)]
             if expired:
                 try:
-                    await _expire(factory, tenant_id, expired)
-                    summary["expired"] += len(expired)
+                    summary["expired"] += await _expire(
+                        factory, tenant_id, expired, now - STAGED_TTL
+                    )
                 except Exception as exc:
                     logger.warning(
                         "newsletter import janitor: expiring failed: %s", type(exc).__name__
@@ -105,11 +113,13 @@ async def janitor_async(factory: SessionFactory, *, now: datetime) -> dict[str, 
     return summary
 
 
-async def _expire(factory: SessionFactory, tenant_id: str, ids: list[int]) -> None:
-    """Delete the jobs still ``staged``/``failed`` first, then the rows of those jobs only.
+async def _expire(factory: SessionFactory, tenant_id: str, ids: list[int], cutoff: datetime) -> int:
+    """Delete the jobs still expirable by ``cutoff`` first, then the rows of those jobs only;
+    how many jobs went.
 
-    The status guard decides which jobs go; a ``queue_apply`` that won the race since the
-    candidate read keeps its job and its rows (and one that comes later finds nothing, 409).
+    The guard repeats the candidate read's predicate with its cutoff: a ``queue_apply`` that
+    won the race since that read keeps its job and its rows (one that comes later finds
+    nothing, 409), and so does a job retried and failed again since (freshly timed).
     """
     async with factory() as session:
         gone = await session.execute(
@@ -117,7 +127,7 @@ async def _expire(factory: SessionFactory, tenant_id: str, ids: list[int]) -> No
             .where(
                 ImportJob.tenant_id == tenant_id,
                 ImportJob.id.in_(ids),  # ty: ignore[unresolved-attribute]
-                ImportJob.status.in_((STAGED, FAILED)),  # ty: ignore[unresolved-attribute]
+                _expirable(cutoff),
             )
             .returning(ImportJob.id)
             .execution_options(synchronize_session=False)
@@ -133,3 +143,4 @@ async def _expire(factory: SessionFactory, tenant_id: str, ids: list[int]) -> No
                 .execution_options(synchronize_session=False)
             )
         await finalize_session(session)
+        return len(deleted)

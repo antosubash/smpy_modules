@@ -140,12 +140,36 @@ async def test_queued_between_read_and_expire_keeps_rows_and_job(world, monkeypa
     plain = await staged(st, upload(SUB, people("p", 2)))
     real = janitor._expire
 
-    async def late(factory, tenant_id, ids):
+    async def late(factory, tenant_id, ids, *rest):
         await queue(st, raced, tenant_id)  # queue_apply wins after the candidate read
-        await real(factory, tenant_id, ids)
+        return await real(factory, tenant_id, ids, *rest)
 
     monkeypatch.setattr(janitor, "_expire", late)
     await janitor_async(st.session_factory, now=LATER)
     assert await exists(st, raced) and await staged_count(st, raced) == 3
     assert (await job_of(st, raced)).status == "queued"
     assert not await exists(st, plain) and await staged_count(st, plain) == 0
+
+
+async def test_failed_again_between_read_and_expire_survives(world, monkeypatch):
+    """A failed job, expired when read, is retried and fails again before the delete: it is
+    ``failed`` once more but freshly timed, so the guarded delete must not take it."""
+    from sm_newsletter.imports import janitor
+
+    st, _ = world
+    raced = await staged(st, upload(SUB, people("r", 3)))
+    plain = await staged(st, upload(SUB, people("p", 2)))
+    for jid in (raced, plain):
+        await set_job(st, jid, status="failed", error_code="import_failed", finished_at=NOW)
+    now = NOW + STAGED_TTL + timedelta(seconds=1)
+    real = janitor._expire
+
+    async def late(factory, tenant_id, ids, *rest):
+        await set_job(st, raced, status="failed", finished_at=now)  # "Apply again", failed again
+        return await real(factory, tenant_id, ids, *rest)
+
+    monkeypatch.setattr(janitor, "_expire", late)
+    summary = await janitor_async(st.session_factory, now=now)
+    assert await exists(st, raced) and await staged_count(st, raced) == 3
+    assert not await exists(st, plain) and await staged_count(st, plain) == 0
+    assert summary["expired"] == 1
