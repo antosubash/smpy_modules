@@ -25,7 +25,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@simple-module-py/ui/components/ui/sheet';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useListFields } from '../../hooks/useListFields';
 import { useSubscriber } from '../../hooks/useSubscriber';
@@ -56,6 +56,11 @@ export function SubscriberSheet({ listKey, uuid, canEdit, canManage, onClose, on
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [lifting, setLifting] = useState<Suppression | null>(null);
+  const [liftDone, setLiftDone] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset when another subscriber opens
+  useEffect(() => {
+    setLiftDone(false);
+  }, [uuid]);
 
   const subscriber = detail?.subscriber ?? null;
   const choices = fields?.find((f) => f.key === 'tags')?.choices ?? [];
@@ -96,6 +101,11 @@ export function SubscriberSheet({ listKey, uuid, canEdit, canManage, onClose, on
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}
+          </p>
+        )}
+        {liftDone && !error && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {t(keys.newsletter.suppressions.lift.done)}
           </p>
         )}
         {subscriber && detail && (
@@ -168,7 +178,15 @@ export function SubscriberSheet({ listKey, uuid, canEdit, canManage, onClose, on
                     )}
                   </div>
                   {canManage && active && s.block === null && (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => setLifting(s)}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setLiftDone(false);
+                        setLifting(s);
+                      }}
+                    >
                       {t(keys.newsletter.suppressions.lift.action)}
                     </Button>
                   )}
@@ -206,8 +224,15 @@ export function SubscriberSheet({ listKey, uuid, canEdit, canManage, onClose, on
           knownEmail={subscriber?.email}
           open
           onOpenChange={(o) => !o && setLifting(null)}
-          onLifted={changed}
-          onStale={reload}
+          onLifted={() => {
+            setActionError(null);
+            setLiftDone(true);
+            changed();
+          }}
+          onStale={(message) => {
+            setActionError(message);
+            reload();
+          }}
         />
       )}
     </Sheet>

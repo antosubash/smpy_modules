@@ -2,7 +2,9 @@
  *
  *  A hard bounce never pre-fills the address, so lifting means typing it. The
  *  `version` posted is the one of the row the dialog was opened on (C3): a row
- *  that changed meanwhile is refused with `suppression_changed`. */
+ *  that changed meanwhile is refused with `suppression_changed`, and the dialog
+ *  then closes and hands the message to `onStale`, since every retry from it
+ *  would post the same stale version. */
 
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
@@ -33,8 +35,9 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onLifted: () => void;
-  /** The row changed under the dialog (`suppression_changed`): reload the list. */
-  onStale?: () => void;
+  /** The row changed under the dialog (`suppression_changed`): the dialog closes;
+   *  show `message` and reload the list. */
+  onStale?: (message: string) => void;
 }
 
 const initialEmail = (s: Suppression, known?: string) =>
@@ -75,8 +78,13 @@ export function LiftDialog({
       onLifted();
       onOpenChange(false);
     } catch (e) {
-      setError(errorMessage(e, t));
-      if (isCode(e, 'suppression_changed')) onStale?.();
+      const message = errorMessage(e, t);
+      if (isCode(e, 'suppression_changed')) {
+        onStale?.(message);
+        onOpenChange(false);
+      } else {
+        setError(message);
+      }
     } finally {
       setPending(false);
     }

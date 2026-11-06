@@ -142,7 +142,7 @@
     "description": "Abonnenten einer Liste suchen, verschlagworten und ihr Engagement ansehen.",
     "list_label": "Liste",
     "search_label": "Abonnenten suchen",
-    "search_placeholder": "E-Mail oder Name",
+    "search_placeholder": "E-Mail-Adresse",
     "tag_label": "Tag",
     "tag_all": "Alle Tags",
     "segment_label": "Segment",

@@ -32,6 +32,7 @@ export default function Suppressions() {
   const [lookup, setLookup] = useState<{ email: string; items: Suppression[] } | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [lifting, setLifting] = useState<Suppression | null>(null);
+  const [notice, setNotice] = useState<{ text: string; failed: boolean } | null>(null);
 
   const runLookup = async () => {
     const email = typed.trim();
@@ -50,8 +51,21 @@ export default function Suppressions() {
   };
   const refresh = () => {
     list.reload();
-    if (lookup)
-      void api.lookupSuppressions(lookup.email).then((items) => setLookup({ ...lookup, items }));
+    if (!lookup) return;
+    const { email } = lookup;
+    api
+      .lookupSuppressions(email)
+      // Only into the lookup still shown: one cleared or replaced meanwhile stays so.
+      .then((items) => setLookup((cur) => (cur && cur.email === email ? { email, items } : cur)))
+      .catch((e) => setLookupError(errorMessage(e, tRef.current)));
+  };
+  const lifted = () => {
+    setNotice({ text: t(copy.lift.done), failed: false });
+    refresh();
+  };
+  const stale = (message: string) => {
+    setNotice({ text: message, failed: true });
+    refresh();
   };
 
   const shown = lookup ? lookup.items : list.items;
@@ -82,6 +96,14 @@ export default function Suppressions() {
           {error && (
             <p role="alert" className="mb-4 text-sm text-destructive">
               {error}
+            </p>
+          )}
+          {notice && (
+            <p
+              role={notice.failed ? 'alert' : 'status'}
+              className={`mb-4 text-sm ${notice.failed ? 'text-destructive' : 'text-muted-foreground'}`}
+            >
+              {notice.text}
             </p>
           )}
           <div className="mb-4 flex flex-wrap items-end gap-4">
@@ -135,7 +157,15 @@ export default function Suppressions() {
               <p className="font-medium">{t(copy.empty)}</p>
             </div>
           ) : (
-            shown !== null && <SuppressionTable items={shown} onLift={setLifting} />
+            shown !== null && (
+              <SuppressionTable
+                items={shown}
+                onLift={(s) => {
+                  setNotice(null);
+                  setLifting(s);
+                }}
+              />
+            )
           )}
 
           {!lookup && shown !== null && shown.length > 0 && (
@@ -176,8 +206,8 @@ export default function Suppressions() {
               knownEmail={lookup?.email}
               open
               onOpenChange={(o) => !o && setLifting(null)}
-              onLifted={refresh}
-              onStale={refresh}
+              onLifted={lifted}
+              onStale={stale}
             />
           )}
         </>

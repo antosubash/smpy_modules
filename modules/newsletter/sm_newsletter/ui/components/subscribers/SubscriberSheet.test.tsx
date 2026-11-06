@@ -63,6 +63,7 @@ describe('SubscriberSheet', () => {
   let detail: SubscriberDetail;
   let fetchMock: ReturnType<typeof vi.fn>;
   let unsubscribe: () => Response;
+  let lift: () => Response;
   const onChanged = vi.fn();
   const onClose = vi.fn();
 
@@ -71,6 +72,7 @@ describe('SubscriberSheet', () => {
     onClose.mockReset();
     detail = detailOf();
     unsubscribe = () => json(subscriber);
+    lift = () => json({ id: 1 });
     fetchMock = vi.fn(async (url: string) => {
       if (url.endsWith('/fields')) {
         return json([
@@ -89,6 +91,7 @@ describe('SubscriberSheet', () => {
         ]);
       }
       if (url.endsWith('/unsubscribe')) return unsubscribe();
+      if (url.endsWith('/lift')) return lift();
       if (url.endsWith('/tags')) return json(subscriber);
       return json(detail);
     });
@@ -189,6 +192,31 @@ describe('SubscriberSheet', () => {
     expect((document.getElementById('newsletter-lift-email') as HTMLInputElement).value).toBe(
       'ada@example.com',
     );
+  });
+
+  async function liftCleaned() {
+    detail = detailOf({ suppressions: [suppression({ reason: 'imported_cleaned' })] });
+    await render({ canEdit: false, canManage: true });
+    act(() => button(en.suppressions.lift.action)?.click());
+    const note = document.getElementById('newsletter-lift-note') as HTMLTextAreaElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(
+        note,
+        'ok',
+      );
+      note.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => button(en.suppressions.lift.confirm)?.click());
+  }
+
+  it('confirms a lift, and closes the dialog with the reason when the row changed', async () => {
+    await liftCleaned();
+    expect(document.querySelector('[role="status"]')?.textContent).toBe(en.suppressions.lift.done);
+    act(() => root.unmount());
+    lift = () => json({ detail: 'x', code: 'suppression_changed' }, 409);
+    await liftCleaned();
+    expect(document.getElementById('newsletter-lift-note')).toBeNull();
+    expect(text()).toContain(en.errors.suppression_changed);
   });
 
   it('an opt_out_stands row has no lift and shows the reason', async () => {

@@ -123,13 +123,13 @@ describe('LiftDialog', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it('shows suppression_changed and asks the page to reload', async () => {
+  it('closes on suppression_changed and hands the message to the page', async () => {
     next = () => json({ detail: 'x', code: 'suppression_changed' }, 409);
     await open('imported_cleaned', 'a@example.com');
     type(note(), 'n');
     await act(async () => confirm()?.click());
-    expect(document.body.textContent).toContain(en.errors.suppression_changed);
-    expect(onStale).toHaveBeenCalledTimes(1);
+    expect(onStale).toHaveBeenCalledWith(en.errors.suppression_changed);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(onLifted).not.toHaveBeenCalled();
   });
 
