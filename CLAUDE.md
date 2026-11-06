@@ -269,7 +269,10 @@ member there before a mixin uses it; the `test_*_host.py` tests enforce it.
 **Every e2e spec file stands alone.** CI shards the suite by file
 (`--shard=i/3`, one host and database per shard, #119), so a spec cannot rely
 on data or settings another file created. Seed what you need in the file
-itself; suite-wide settings belong in `tests/e2e/start-test-server.sh`. The
+itself; suite-wide settings belong in `tests/e2e/start-test-server.sh`. Locally,
+`make e2e-parallel` runs the same bundle suite in three shards on one machine
+(`scripts/e2e_shards.mjs`: one template database copied per shard, each with its
+own host, port and upload directories); `make e2e-bundle` stays serial. The
 `E2E (Playwright)` job merges the shards' reports and is the one status that
 covers all of them.
 
