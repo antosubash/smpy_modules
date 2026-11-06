@@ -109,7 +109,14 @@ export function useCampaignEditor(id: number) {
       const body = edits.body;
       const serialized = body ? bodyKey(body) : null;
       const withBody = serialized !== null && serialized !== savedBodyRef.current;
-      if (!withBody && Object.keys(meta).length === 0) return true;
+      if (!withBody && Object.keys(meta).length === 0) {
+        // A queued body that now equals what the server holds (an `onChange` that landed
+        // while the save carrying it was out) is nothing to save; left set it would
+        // keep `dirty` true for good.
+        edits.body = null;
+        edits.sync();
+        return true;
+      }
       edits.meta = {};
       edits.body = null;
       edits.inFlight += 1;
@@ -138,7 +145,12 @@ export function useCampaignEditor(id: number) {
         return true;
       } catch (e) {
         // Kept for the next try, under anything typed since.
-        edits.meta = { ...meta, ...edits.meta };
+        // A field that has since become invalid is not put back: its old value is not
+        // what the form shows.
+        const kept = Object.fromEntries(
+          Object.entries(meta).filter(([k]) => !edits.invalid.has(k)),
+        );
+        edits.meta = { ...kept, ...edits.meta };
         if (withBody && edits.body === null) edits.body = body;
         fail(e);
         return false;
@@ -251,8 +263,7 @@ export function useCampaignEditor(id: number) {
     edits.body = null;
     edits.meta = {};
     edits.markIncomplete(false);
-    edits.invalid.clear();
-    edits.markInvalid('', false);
+    edits.clearInvalid();
     setError(null);
     setStatus('idle');
     await load();

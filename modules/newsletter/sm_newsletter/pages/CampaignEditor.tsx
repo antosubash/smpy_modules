@@ -132,7 +132,9 @@ export default function CampaignEditor() {
               canSend={props.can_send === true}
               maxRecipients={props.max_test_recipients ?? DEFAULT_MAX_TEST_RECIPIENTS}
               baseUrlMissing={props.public_base_url_set === false}
-              flush={editor.flush}
+              // A details field the server would refuse is held back: a test now
+              // would go out from the last saved version without saying so.
+              flush={() => (editor.metaInvalid ? Promise.resolve(false) : editor.flush())}
               incomplete={editor.incomplete}
             />
           </>

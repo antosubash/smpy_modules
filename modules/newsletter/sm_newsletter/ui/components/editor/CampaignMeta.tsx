@@ -41,6 +41,14 @@ export function toPatch(name: MetaField, value: string, valid = true): MetaPatch
   return { [name]: value };
 }
 
+/** The server's `EmailStr` wants a dot in the domain; the browser's `type=email`
+ *  accepts `a@b`, which would make the server refuse the whole PATCH. */
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function isReplyTo(value: string): boolean {
+  return value.trim() === '' || EMAIL.test(value);
+}
+
 /** Why a typed value cannot be saved, as a catalogue key; null when it can. */
 export function fieldError(name: MetaField, value: string, valid = true): string | null {
   if (name === 'name' && value.trim() === '') return copy.name_required;
@@ -82,7 +90,7 @@ export function CampaignMeta({ campaign, readOnly, onChange, onInvalid }: Campai
   function change(name: MetaField, input: HTMLInputElement) {
     const value = input.value;
     setValues((v) => ({ ...v, [name]: value }));
-    const valid = input.checkValidity();
+    const valid = input.checkValidity() && (name !== 'reply_to' || isReplyTo(value));
     const problem = fieldError(name, value, valid);
     setErrors((e) => ({ ...e, [name]: problem ?? undefined }));
     if (problem) reported.current.add(name);

@@ -14,6 +14,7 @@ const copy = keys.newsletter.blocks.rich_text;
 
 /** The few Tiptap editor members this uses. */
 interface EditorLike {
+  state: { selection: { empty: boolean } };
   isActive(name: string): boolean;
   getAttributes(name: string): Record<string, unknown>;
   chain(): {
@@ -67,7 +68,8 @@ export function LinkControl({ editor, readOnly }: { editor: unknown; readOnly: b
         </svg>
       }
       active={ed?.isActive('link') ?? false}
-      disabled={readOnly || !ed}
+      // Nothing to link: no selected text and the cursor is not in a link.
+      disabled={readOnly || !ed || (ed.state.selection.empty && !ed.isActive('link'))}
       onClick={toggle}
     />
   );

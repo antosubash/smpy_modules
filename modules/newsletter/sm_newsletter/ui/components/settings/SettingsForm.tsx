@@ -12,10 +12,11 @@ import type { SettingsOut, SettingsUpdate } from '../../utils/types';
 import { Field, Section } from './FormParts';
 import { PasswordField } from './PasswordField';
 
-/** The fields that, when changed, make the server drop the stored password
- *  (mirrors the server's `SERVER_FIELDS`). */
 // The server's input bounds (`web/schemas/settings.py`).
 const MAX = { host: 253, username: 320, from_name: 200, physical_address: 500 } as const;
+
+/** The fields that, when changed, make the server drop the stored password
+ *  (mirrors the server's `SERVER_FIELDS`). */
 const SERVER_FIELDS = ['smtp_host', 'smtp_port', 'smtp_security', 'smtp_username'] as const;
 
 type Draft = Omit<SettingsOut, 'has_password'>;

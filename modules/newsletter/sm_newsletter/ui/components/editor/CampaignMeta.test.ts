@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { fieldError, toPatch } from './CampaignMeta';
+import { fieldError, isReplyTo, toPatch } from './CampaignMeta';
 
 describe('CampaignMeta toPatch', () => {
   it('leaves an invalid reply-to out of the PATCH', () => {
@@ -19,5 +19,13 @@ describe('CampaignMeta toPatch', () => {
     expect(fieldError('reply_to', 'user@example.com', true)).toBeNull();
     expect(fieldError('name', '  ')).toBe('newsletter.editor.meta.name_required');
     expect(fieldError('subject', '')).toBeNull();
+  });
+});
+
+describe('CampaignMeta isReplyTo', () => {
+  it('wants a dot in the domain, as the server does', () => {
+    expect(isReplyTo('a@b')).toBe(false);
+    expect(isReplyTo('a@b.io')).toBe(true);
+    expect(isReplyTo('')).toBe(true);
   });
 });

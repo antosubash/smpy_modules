@@ -37,6 +37,7 @@ interface PendingEdits {
   clearTimer(): void;
   markIncomplete(value: boolean): void;
   markInvalid(field: string, value: boolean): void;
+  clearInvalid(): void;
 }
 
 export function usePendingEdits() {
@@ -75,6 +76,11 @@ export function usePendingEdits() {
           delete (e.meta as Record<string, unknown>)[field];
         } else e.invalid.delete(field);
         setMetaInvalid(e.invalid.size > 0);
+        e.sync();
+      },
+      clearInvalid: () => {
+        e.invalid.clear();
+        setMetaInvalid(false);
         e.sync();
       },
     };
