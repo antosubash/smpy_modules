@@ -150,6 +150,12 @@ describe('SendingPanel', () => {
     expect(api.unscheduleCampaign).toHaveBeenCalledWith(7, 3);
   });
 
+  it('translates the audience_unavailable pause', async () => {
+    vi.mocked(api.progress).mockResolvedValue(progress({ status: 'paused' }));
+    await render(campaign({ status: 'paused', paused_code: 'audience_unavailable' }));
+    expect(host.textContent).toContain(copy.paused_code.audience_unavailable);
+  });
+
   it('offers no Unschedule for a paused campaign that started', async () => {
     vi.mocked(api.progress).mockResolvedValue(progress({ status: 'paused' }));
     await render(campaign({ status: 'paused', started_at: '2026-11-05T12:00:00Z' }));

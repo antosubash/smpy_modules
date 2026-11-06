@@ -169,6 +169,7 @@ export function SendDialog(props: Props) {
         <DialogHeader>
           <DialogTitle>{t(copy.title)}</DialogTitle>
           <DialogDescription>{t(copy.description, { name: campaign.name })}</DialogDescription>
+          <p className="text-sm text-muted-foreground">{t(copy.audience_frozen)}</p>
         </DialogHeader>
 
         <div className="grid gap-3 py-2">

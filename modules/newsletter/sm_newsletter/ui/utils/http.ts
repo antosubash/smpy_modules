@@ -68,7 +68,12 @@ export async function read<T>(path: string, signal?: AbortSignal): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function write<T>(path: string, method: string, body?: unknown): Promise<T | null> {
+export async function write<T>(
+  path: string,
+  method: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T | null> {
   const response = await fetch(`${BASE}${path}`, {
     method,
     credentials: 'same-origin',
@@ -78,6 +83,7 @@ export async function write<T>(path: string, method: string, body?: unknown): Pr
       ...csrfHeaders(method),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
   });
   if (!response.ok) throw await errorFrom(response);
   return response.status === 204 ? null : ((await response.json()) as T);

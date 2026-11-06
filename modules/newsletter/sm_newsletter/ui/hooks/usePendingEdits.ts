@@ -16,7 +16,7 @@ import type { Block, CampaignDetail } from '../utils/types';
 
 /** The campaign's own fields the editor writes besides the body. */
 export type MetaPatch = Partial<
-  Pick<CampaignDetail, 'name' | 'subject' | 'preheader' | 'from_name' | 'reply_to'>
+  Pick<CampaignDetail, 'name' | 'subject' | 'preheader' | 'from_name' | 'reply_to' | 'audience'>
 >;
 
 export interface PendingEdits {

@@ -10,13 +10,25 @@ import type {
   CardKind,
   CardSnapshot,
   Estimate,
+  Lift,
+  LiftPage,
+  ListField,
   MediaHit,
   Preview,
   Progress,
   Report,
+  Rule,
+  Segment,
+  SegmentBody,
   SettingsOut,
   SettingsSaved,
   SettingsUpdate,
+  Subscriber,
+  SubscriberDetail,
+  SubscriberPage,
+  SubscriberSearch,
+  Suppression,
+  SuppressionPage,
   TestSendResult,
 } from './types';
 
@@ -31,8 +43,13 @@ function query(params: Record<string, string | number | undefined>): string {
   return text ? `?${text}` : '';
 }
 
-async function send<T>(path: string, method: string, body?: unknown): Promise<T> {
-  return (await write<T>(path, method, body)) as T;
+async function send<T>(
+  path: string,
+  method: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
+  return (await write<T>(path, method, body, signal)) as T;
 }
 
 export const api = {
@@ -76,4 +93,47 @@ export const api = {
   putSettings: (b: SettingsUpdate) => send<SettingsSaved>('/settings', 'PUT', b),
   putPassword: (password: string) =>
     send<{ has_password: boolean }>('/settings/smtp-password', 'PUT', { password }),
+  listFields: (key: string) => read<ListField[]>(`/lists/${encodeURIComponent(key)}/fields`),
+  audienceCount: (key: string, audience: string, signal?: AbortSignal) =>
+    read<{ count: number }>(
+      `/lists/${encodeURIComponent(key)}/audience-count${query({ audience })}`,
+      signal,
+    ),
+  listSegments: (list?: string) => read<Segment[]>(`/segments${query({ list_type_key: list })}`),
+  getSegment: (id: number) => read<Segment>(`/segments/${id}`),
+  createSegment: (b: SegmentBody) => send<Segment>('/segments', 'POST', b),
+  patchSegment: (id: number, b: { name?: string; rules?: Rule[] }) =>
+    send<Segment>(`/segments/${id}`, 'PATCH', b),
+  deleteSegment: async (id: number): Promise<void> => {
+    await write(`/segments/${id}`, 'DELETE');
+  },
+  previewSegment: (b: { list_type_key: string; rules: Rule[] }, signal?: AbortSignal) =>
+    send<{ count: number }>('/segments/preview', 'POST', b, signal),
+  searchSubscribers: (key: string, body: SubscriberSearch, signal?: AbortSignal) =>
+    send<SubscriberPage>(
+      `/lists/${encodeURIComponent(key)}/subscribers/search`,
+      'POST',
+      body,
+      signal,
+    ),
+  getSubscriber: (key: string, uuid: string) =>
+    read<SubscriberDetail>(`/lists/${encodeURIComponent(key)}/subscribers/${uuid}`),
+  tagSubscriber: (key: string, uuid: string, b: { add: string[]; remove: string[] }) =>
+    send<Subscriber>(`/lists/${encodeURIComponent(key)}/subscribers/${uuid}/tags`, 'POST', b),
+  unsubscribeSubscriber: (key: string, uuid: string) =>
+    send<Subscriber>(
+      `/lists/${encodeURIComponent(key)}/subscribers/${uuid}/unsubscribe`,
+      'POST',
+      {},
+    ),
+  listSuppressions: (
+    p: { reason?: string; offset?: number; limit?: number },
+    signal?: AbortSignal,
+  ) => read<SuppressionPage>(`/suppressions${query(p)}`, signal),
+  lookupSuppressions: (email: string) =>
+    send<Suppression[]>('/suppressions/lookup', 'POST', { email }),
+  liftSuppression: (id: number, b: { version: string; email: string; note: string }) =>
+    send<Lift>(`/suppressions/${id}/lift`, 'POST', b),
+  listLifts: (p: { offset?: number; limit?: number }, signal?: AbortSignal) =>
+    read<LiftPage>(`/suppressions/lifts${query(p)}`, signal),
 };

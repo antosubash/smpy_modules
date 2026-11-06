@@ -182,6 +182,19 @@
       "no_results": "Keine Bilder gefunden."
     }
   },
+  "audience": {
+    "title": "Zielgruppe",
+    "all": "Gesamte Liste",
+    "tag": "Ein Tag",
+    "segment": "Ein Segment",
+    "tag_label": "Tag",
+    "segment_label": "Segment",
+    "count": "Etwa {count} Abonnenten",
+    "count_loading": "Abonnenten werden gezählt…",
+    "no_tags": "Diese Liste hat noch keine Tags.",
+    "no_segments": "Diese Liste hat noch keine Segmente.",
+    "segment_missing": "Das gespeicherte Segment existiert nicht mehr. Wählen Sie vor dem Versand eine andere Zielgruppe."
+  },
   "blocks": {
     "categories": {
       "content": "Inhalt",
@@ -333,7 +346,8 @@
       "cancel": "Abbrechen",
       "unsaved": "Die letzten Änderungen konnten nicht gespeichert werden, daher wurde nichts gesendet.",
       "incomplete": "Stellen Sie die unfertigen Blöcke fertig oder entfernen Sie sie, bevor Sie senden.",
-      "time_past": "Wählen Sie einen Zeitpunkt in der Zukunft."
+      "time_past": "Wählen Sie einen Zeitpunkt in der Zukunft.",
+      "audience_frozen": "Die Zielgruppe steht fest, sobald die Kampagne geplant ist."
     },
     "panel": {
       "scheduled_for": "Geplant für {date}",
@@ -368,7 +382,8 @@
       "smtp_rejected": "Der Mailserver hat die Nachrichten abgelehnt",
       "smtp_auth": "Der Mailserver hat die Anmeldung verweigert",
       "list_unavailable": "Die Newsletter-Liste ist nicht verfügbar",
-      "https_required": "Echte E-Mails brauchen https, aber diese Kampagne wurde mit einer http-Adresse erstellt"
+      "https_required": "Echte E-Mails brauchen https, aber diese Kampagne wurde mit einer http-Adresse erstellt",
+      "audience_unavailable": "Die Zielgruppe ist nicht mehr verfügbar"
     }
   },
   "report": {
