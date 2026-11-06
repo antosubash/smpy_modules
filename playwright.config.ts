@@ -135,8 +135,10 @@ export default defineConfig({
     // #473), and Playwright never counts a 404 as "up".
     url: `${APP_URL}/health/live`,
     // Never in bundle mode: a dev stack already on API_PORT would be reused
-    // and the run would pass without ever loading the bundle.
-    reuseExistingServer: !CI && !BUNDLE,
+    // and the run would pass without ever loading the bundle. Nor for the
+    // newsletter run: a `make dev` stack is not Celery-eager, so the dispatch
+    // hook the spec sends through would be a 404 there.
+    reuseExistingServer: !CI && !BUNDLE && !NEWSLETTER,
     timeout: 180_000,
     stdout: 'pipe',
     stderr: 'pipe',

@@ -154,9 +154,15 @@ test.describe('Newsletter', () => {
       await page.goto(`/admin/newsletter/subscribers?list=${listKey}`);
       await page.getByRole('button', { name: /^Unsubscribed \(\d+\)$/ }).click();
       await expect(page.getByRole('cell', { name: cy })).toBeVisible();
-      await page.getByRole('button', { name: /^All \(\d+\)$/ }).click();
+      // dee was only ever cleaned: a suppression, no record, so no tab lists dee.
       await page.getByRole('searchbox', { name: 'Search subscribers' }).fill(dee);
-      await expect(page.getByText('No subscribers match.')).toBeVisible();
+      for (const tab of ['All', 'Confirmed', 'Pending', 'Unsubscribed']) {
+        const button = page.getByRole('button', { name: new RegExp(`^${tab} \\(\\d+\\)$`) });
+        await button.click();
+        await expect(button).toHaveAttribute('aria-pressed', 'true');
+        await expect(page.getByText('No subscribers match.')).toBeVisible();
+        await expect(page.getByRole('cell', { name: dee })).toHaveCount(0);
+      }
     });
 
     await test.step('a campaign with an article card', async () => {

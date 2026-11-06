@@ -129,7 +129,7 @@ describe('an unfinished audience choice', () => {
     await act(async () => radio('all').click());
     expect(sendButton().disabled).toBe(false);
     await act(async () => radio('tag').click());
-    const select = document.querySelector('select[id$="-tag"]') as HTMLSelectElement;
+    const select = document.querySelector('select[id$="-tag-value"]') as HTMLSelectElement;
     await act(async () => {
       select.value = 'vip';
       select.dispatchEvent(new Event('change', { bubbles: true }));
