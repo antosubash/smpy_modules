@@ -193,7 +193,8 @@
     "count_loading": "Counting subscribers…",
     "no_tags": "This list has no tags yet.",
     "no_segments": "This list has no segments yet.",
-    "segment_missing": "The saved segment no longer exists. Choose another audience before sending."
+    "segment_missing": "The saved segment no longer exists. Choose another audience before sending.",
+    "tag_missing": "The saved tag is no longer available on this list. Choose another audience before sending."
   },
   "blocks": {
     "categories": {
@@ -333,7 +334,7 @@
     "send_button": "Send…",
     "dialog": {
       "title": "Send campaign",
-      "description": "Send \"{name}\" to the whole list. Once sending starts, the content can no longer be changed.",
+      "description": "Send \"{name}\". Once sending starts, the content can no longer be changed.",
       "now": "Send now",
       "later": "Schedule for later",
       "at_label": "Send at",

@@ -54,7 +54,7 @@ export function AudiencePicker({ campaign, readOnly, onChange }: Props) {
   const kind: Kind = pending ?? choice.kind;
   const complete = pending === null;
   const audience = complete ? formatAudience(choice) : '';
-  const { count, loading } = useAudienceCount(listKey, audience);
+  const { count, loading, error } = useAudienceCount(listKey, audience);
 
   const apply = (next: AudienceChoice) => {
     setChoice(next);
@@ -71,6 +71,12 @@ export function AudiencePicker({ campaign, readOnly, onChange }: Props) {
     choice.kind === 'segment' &&
     segments !== null &&
     !segments.some((s) => s.id === choice.segmentId);
+
+  const tagMissing =
+    choice.kind === 'tag' &&
+    fields !== null &&
+    hasTags &&
+    !tagChoices.some((c) => c.value === choice.tag);
 
   const kinds: Kind[] = hasTags ? ['all', 'tag', 'segment'] : ['all', 'segment'];
 
@@ -148,7 +154,17 @@ export function AudiencePicker({ campaign, readOnly, onChange }: Props) {
           {t(copy.segment_missing)}
         </p>
       )}
-      {complete && !missing && (
+      {tagMissing && (
+        <p role="alert" className="text-sm text-destructive">
+          {t(copy.tag_missing)}
+        </p>
+      )}
+      {complete && !missing && error !== null && !loading && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      {complete && !missing && (error === null || loading) && (
         <p className="text-sm text-muted-foreground" aria-live="polite">
           {count !== null && !loading ? t(copy.count, { count }) : t(copy.count_loading)}
         </p>

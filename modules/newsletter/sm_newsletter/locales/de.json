@@ -193,7 +193,8 @@
     "count_loading": "Abonnenten werden gezählt…",
     "no_tags": "Diese Liste hat noch keine Tags.",
     "no_segments": "Diese Liste hat noch keine Segmente.",
-    "segment_missing": "Das gespeicherte Segment existiert nicht mehr. Wählen Sie vor dem Versand eine andere Zielgruppe."
+    "segment_missing": "Das gespeicherte Segment existiert nicht mehr. Wählen Sie vor dem Versand eine andere Zielgruppe.",
+    "tag_missing": "Das gespeicherte Tag ist in dieser Liste nicht mehr verfügbar. Wählen Sie vor dem Versand eine andere Zielgruppe."
   },
   "blocks": {
     "categories": {
@@ -333,7 +334,7 @@
     "send_button": "Senden…",
     "dialog": {
       "title": "Kampagne senden",
-      "description": "\"{name}\" an die gesamte Liste senden. Sobald der Versand beginnt, kann der Inhalt nicht mehr geändert werden.",
+      "description": "\"{name}\" senden. Sobald der Versand beginnt, kann der Inhalt nicht mehr geändert werden.",
       "now": "Jetzt senden",
       "later": "Für später planen",
       "at_label": "Senden am",

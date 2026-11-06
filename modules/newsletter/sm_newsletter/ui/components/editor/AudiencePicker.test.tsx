@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import en from '../../../locales/en.json';
 import { campaign } from '../../hooks/campaignFixture';
 import { api } from '../../utils/api';
+import { HttpError } from '../../utils/http';
 import type { ListField, Segment } from '../../utils/types';
 import { AudiencePicker } from './AudiencePicker';
 
@@ -99,6 +100,23 @@ describe('AudiencePicker', () => {
   it('warns about a saved segment that no longer exists', async () => {
     await render('segment:99');
     expect(document.body.textContent).toContain(copy.segment_missing);
+  });
+
+  it('warns about a saved tag that is no longer a choice', async () => {
+    await render('tag:gone');
+    expect(document.body.textContent).toContain(copy.tag_missing);
+  });
+
+  it('does not warn about a saved tag that is still a choice', async () => {
+    await render('tag:vip');
+    expect(document.body.textContent).not.toContain(copy.tag_missing);
+  });
+
+  it('shows the error, not "counting", when the count fails', async () => {
+    vi.mocked(api.audienceCount).mockRejectedValue(new HttpError('x', 422, 'invalid_audience'));
+    await render('tag:vip');
+    expect(document.body.textContent).toContain(en.errors.invalid_audience);
+    expect(document.body.textContent).not.toContain(copy.count_loading);
   });
 
   it('is disabled when read-only', async () => {
