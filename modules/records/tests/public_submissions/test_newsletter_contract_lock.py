@@ -63,6 +63,19 @@ async def test_lock_confirmation_pins_tenant_and_list(audience):
     assert theirs is not None and theirs.uuid == other
 
 
+async def test_lock_confirmation_row_purged_before_the_lock(audience, monkeypatch):
+    """A purge landing between the find and the lock answers ``None``, not a 500."""
+    from sm_records.contracts import newsletter_admin
+    from sm_records.public_submissions.row_lock import lock_record
+
+    async def purged(db, rtype, record):
+        gone = type(record)(id=-1, tenant_id=record.tenant_id)
+        return await lock_record(db, rtype, gone)
+
+    monkeypatch.setattr(newsletter_admin, "lock_record", purged)
+    assert await _proof(audience, ADA) is None
+
+
 async def _unsubscribe(db, uuid: str) -> bool:
     from sm_records.contracts.newsletter import unsubscribe
 

@@ -20,6 +20,7 @@ from datetime import datetime
 from typing import Literal
 from urllib.parse import quote
 
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
@@ -224,7 +225,10 @@ async def lock_confirmation(
         found = None if rtype is None else await subscribe.find(session, rtype, address)
         if rtype is None or found is None:
             return None
-        record = await lock_record(session, rtype, found)
+        try:
+            record = await lock_record(session, rtype, found)
+        except NoResultFound:  # purged between the find and the lock
+            return None
     data = record.data or {}
     confirmed_at = moment(data.get("sm_confirmed_at"))
     if (

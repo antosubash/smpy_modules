@@ -1730,7 +1730,9 @@ after that, to `bus` when one is given (`events.attach`). With `bus=None`
   Stored order is kept, new tags are appended, duplicates dropped, and a tag in
   both `add` and `remove` is removed. A merge equal to the stored list writes
   nothing: no version bump, no event. A tag outside the field's choices raises
-  `ValidationFailed` with nothing written; an unknown or trashed subscriber
+  `ValidationFailed` (re-exported from `sm_records.contracts.newsletter`, so a
+  caller can catch it without importing records' internals) with nothing
+  written; an unknown or trashed subscriber
   raises `SubscriberNotFound`.
 - **`can_read_list`** is records' own per-type narrowing (`allowed_roles`,
   widened by a `records.type.<key>` grant when `roles` is a `CallerRoles`).
