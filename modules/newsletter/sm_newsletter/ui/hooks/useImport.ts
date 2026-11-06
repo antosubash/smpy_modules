@@ -36,18 +36,21 @@ export function useImport(initialId: number | null) {
     return () => abort.abort();
   }, []);
 
-  /** Runs a call, adopting its job (null clears it); the failure becomes `error`. */
-  const run = useCallback(async (call: () => Promise<ImportJob | null>) => {
+  /** Runs a call, adopting its job (null clears it); the failure becomes `error`.
+   *  Resolves `true` only when the call succeeded and its answer was adopted. */
+  const run = useCallback(async (call: () => Promise<ImportJob | null>): Promise<boolean> => {
     const { signal } = mounted.current;
     const ticket = ++latest.current;
     setBusy(true);
     setError(null);
     try {
       const next = await call();
-      if (signal.aborted || ticket !== latest.current) return;
+      if (signal.aborted || ticket !== latest.current) return false;
       setJob(next);
+      return true;
     } catch (e) {
       if (!signal.aborted && ticket === latest.current) setError(errorMessage(e, tRef.current));
+      return false;
     } finally {
       if (!signal.aborted && ticket === latest.current) setBusy(false);
     }
@@ -99,17 +102,17 @@ export function useImport(initialId: number | null) {
   );
   const saveMapping = useCallback(
     (mapping: ImportMapping) =>
-      jobId === null ? Promise.resolve() : run(() => importApi.setMapping(jobId, mapping)),
+      jobId === null ? Promise.resolve(false) : run(() => importApi.setMapping(jobId, mapping)),
     [run, jobId],
   );
   const apply = useCallback(
-    () => (jobId === null ? Promise.resolve() : run(() => importApi.applyImport(jobId))),
+    () => (jobId === null ? Promise.resolve(false) : run(() => importApi.applyImport(jobId))),
     [run, jobId],
   );
   const discard = useCallback(
     () =>
       jobId === null
-        ? Promise.resolve()
+        ? Promise.resolve(false)
         : run(async () => {
             await importApi.discardImport(jobId);
             return null;

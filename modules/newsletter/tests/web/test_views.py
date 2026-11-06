@@ -160,6 +160,7 @@ def test_menu_items():
             [constants.PERM_VIEW, constants.PERM_RECORDS_VIEW],
         ),
         ("Suppressions", "shield", 330, [constants.PERM_MANAGE]),
+        ("Import", "upload", 360, [constants.PERM_MANAGE]),
         ("Settings", "settings", 390, [constants.PERM_MANAGE]),
     ]
     assert [i.url for i in items] == [
@@ -167,6 +168,7 @@ def test_menu_items():
         constants.SEGMENTS_URL,
         constants.SUBSCRIBERS_URL,
         constants.SUPPRESSIONS_URL,
+        constants.IMPORT_URL,
         constants.SETTINGS_URL,
     ]
     for lang in ("en", "de"):
@@ -238,3 +240,33 @@ def test_menu_has_subscribers():
     assert (item.icon, item.order) == ("users", 320)
     assert item.permissions == [constants.PERM_VIEW, constants.PERM_RECORDS_VIEW]
     assert item.url == f"{VIEW}/subscribers"
+
+
+async def test_import_page_props(client):
+    res = await client.get(f"{VIEW}/import", headers=MANAGE)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["component"] == constants._PAGE_IMPORT
+    assert body["props"]["tenant"] == "default"
+    assert body["props"]["lists"] == ["news"]
+    assert body["props"]["initial_import"] is None
+    opened = (await client.get(f"{VIEW}/import?id=7", headers=MANAGE)).json()["props"]
+    assert opened["initial_import"] == 7
+
+
+async def test_import_page_needs_manage(client):
+    for headers in (READ, EDIT, {"x-perms": ""}):
+        assert (await client.get(f"{VIEW}/import", headers=headers)).status_code == 403
+
+
+async def test_import_page_lists_only_readable(built, client):
+    _, state = built
+    await restrict_list(state, "default", "news", ["nobody"])
+    res = await client.get(f"{VIEW}/import", headers=MANAGE)
+    assert res.json()["props"]["lists"] == []
+
+
+def test_menu_has_import():
+    (item,) = [i for i in menu_items() if i.label == "Import"]
+    assert (item.icon, item.order, item.permissions) == ("upload", 360, [constants.PERM_MANAGE])
+    assert item.url == f"{VIEW}/import"

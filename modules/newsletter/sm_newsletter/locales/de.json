@@ -679,10 +679,30 @@
     "new_list_dialog": {
       "title": "Neue Liste",
       "key": "Schlüssel",
-      "key_hint": "Buchstaben, Ziffern und Bindestriche. Er kann später nicht geändert werden.",
+      "key_hint": "Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben. Er kann später nicht geändert werden.",
       "label": "Name",
       "create": "Liste anlegen",
-      "cancel": "Abbrechen"
-    }
+      "cancel": "Abbrechen",
+      "creating": "Wird angelegt..."
+    },
+    "choose_list": "Liste wählen",
+    "no_lists": "Es gibt noch keine Newsletter-Liste. Legen Sie eine an, um hineinzuimportieren.",
+    "uploading": "Wird hochgeladen...",
+    "apply_again": "Import erneut starten",
+    "another": "Weiteren Export importieren",
+    "open": "Öffnen",
+    "import_label": "Import {id}",
+    "mapping_title": "Spaltenzuordnung",
+    "error_file": "Datei",
+    "error_line": "Zeile",
+    "error_problem": "Problem",
+    "error_field": "Feld",
+    "discard_confirm": {
+      "title": "Diesen Import verwerfen?",
+      "description": "Die hochgeladenen Dateien werden gelöscht und nichts wird importiert.",
+      "keep": "Behalten",
+      "confirm": "Ja, verwerfen"
+    },
+    "status_label": "Status"
   }
 }

@@ -1,4 +1,4 @@
-"""Inertia screens: campaigns, segments, subscribers, suppressions, the editor, settings.
+"""Inertia screens: campaigns, segments, subscribers, suppressions, import, the editor, settings.
 
 ``bind_admin`` first (as in every admin router here), then the shared CSRF
 token. The data is fetched client-side from ``/api/newsletter``; the props only
@@ -16,7 +16,7 @@ from simple_module_inertia import InertiaResponse
 from sm_records.contracts.newsletter import caller_roles
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_newsletter.campaigns.access import require_campaign
+from sm_newsletter.campaigns.access import readable_lists, require_campaign
 from sm_newsletter.campaigns.test_send import MAX_TEST_RECIPIENTS
 from sm_newsletter.content.integrations import capabilities
 from sm_newsletter.core import constants, tenancy
@@ -91,6 +91,26 @@ async def subscribers_page(
 )
 async def suppressions_page(request: Request, inertia: InertiaDep) -> InertiaResponse:
     return await inertia.render(constants._PAGE_SUPPRESSIONS, tenancy.view_props(request))
+
+
+@router.get(
+    "/import",
+    response_model=None,
+    dependencies=[Depends(RequiresPermission(constants.PERM_MANAGE))],
+)
+async def import_page(
+    request: Request,
+    inertia: InertiaDep,
+    tenant: str = Depends(bind_admin),
+    db: AsyncSession = Depends(get_db),
+    initial_import: int | None = Query(default=None, alias="id", ge=1),
+) -> InertiaResponse:
+    """The lists the caller may read; ``?id=`` reopens one import (fetched client-side)."""
+    lists = await readable_lists(db, tenant_id=tenant, roles=caller_roles(request))
+    return await inertia.render(
+        constants._PAGE_IMPORT,
+        {**tenancy.view_props(request), "lists": lists, "initial_import": initial_import},
+    )
 
 
 @router.get(

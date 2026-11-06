@@ -679,10 +679,30 @@
     "new_list_dialog": {
       "title": "New list",
       "key": "Key",
-      "key_hint": "Letters, digits and hyphens. It cannot be changed later.",
+      "key_hint": "Lowercase letters, digits and underscores, starting with a letter. It cannot be changed later.",
       "label": "Name",
       "create": "Create list",
-      "cancel": "Cancel"
-    }
+      "cancel": "Cancel",
+      "creating": "Creating..."
+    },
+    "choose_list": "Choose a list",
+    "no_lists": "There is no newsletter list yet. Create one to import into.",
+    "uploading": "Uploading...",
+    "apply_again": "Start import again",
+    "another": "Import another export",
+    "open": "Open",
+    "import_label": "Import {id}",
+    "mapping_title": "Column mapping",
+    "error_file": "File",
+    "error_line": "Line",
+    "error_problem": "Problem",
+    "error_field": "Field",
+    "discard_confirm": {
+      "title": "Discard this import?",
+      "description": "The uploaded files are deleted and nothing is imported.",
+      "keep": "Keep it",
+      "confirm": "Yes, discard"
+    },
+    "status_label": "Status"
   }
 }
