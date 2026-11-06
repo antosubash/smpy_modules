@@ -7,9 +7,9 @@ from simple_module_core.diagnostics._tenancy import check_tenant_unique_keys, mo
 from sm_newsletter import models
 from sm_newsletter.core.tenancy import TenantUnbound, all_tenants, install_guard
 from sm_newsletter.core.tenancy._guard import owned
-from sm_newsletter.models import Base, Campaign, Send, Suppression
+from sm_newsletter.models import Base, Campaign, CampaignRender, Send, Suppression
 from sm_newsletter.module import NewsletterModule
-from sqlalchemy import select
+from sqlalchemy import delete, select, text
 from sqlalchemy.exc import IntegrityError
 
 LOCK_TABLE = "newsletter_dispatch_lock"
@@ -18,6 +18,7 @@ TABLES = {
     "newsletter_segment",
     "newsletter_send",
     "newsletter_send_attempt",
+    "newsletter_campaign_render",
     "newsletter_link",
     "newsletter_click",
     "newsletter_suppression",
@@ -73,7 +74,7 @@ async def test_tenant_stamped_from_scope(db):
     assert c.tenant_id == "default"
 
 
-def test_the_tables_are_exactly_the_eight():
+def test_the_tables_are_exactly_the_nine():
     assert set(Base.metadata.tables) == TABLES
 
 
@@ -107,3 +108,51 @@ async def test_unbound_select_and_flush_raise(db_state):
         session.add(Campaign(name="x", list_type_key="news"))
         with pytest.raises(TenantUnbound):
             await session.flush()
+
+
+async def test_render_row_is_tenant_owned_and_cascades(db):
+    c = await _campaign(db)
+    db.add(
+        CampaignRender(
+            campaign_id=c.id,
+            subject="Hi {{first_name}}",
+            html="<p>x</p>",
+            text="x",
+            sender="Acme <news@example.com>",
+            public_base="https://example.com",
+            locale="en",
+        )
+    )
+    await db.flush()
+    render = await db.get(CampaignRender, c.id)
+    assert render.tenant_id == "default"
+    assert render.reply_to is None
+    assert render.rendered_at is not None
+    if db.bind.dialect.name == "sqlite":
+        await db.execute(text("PRAGMA foreign_keys=ON"))
+    await db.execute(delete(Campaign).where(Campaign.id == c.id))
+    await db.flush()
+    db.expunge_all()
+    assert await db.get(CampaignRender, c.id) is None
+
+
+async def test_send_has_first_name_and_retry_at(db):
+    c = await _campaign(db)
+    s = Send(campaign_id=c.id, record_uuid="u1", email="a@example.com")
+    db.add(s)
+    await db.flush()
+    assert s.first_name is None
+    assert s.retry_at is None
+    cols = Base.metadata.tables["newsletter_send"].c
+    assert cols.first_name.nullable and cols.retry_at.nullable
+
+
+def test_freeze_columns():
+    tables = Base.metadata.tables
+    for name in ("newsletter_send", "newsletter_campaign"):
+        col = tables[name].c.freeze_gen
+        assert not col.nullable
+        assert str(col.server_default.arg) == "0"
+    campaign = tables["newsletter_campaign"].c
+    assert campaign.freeze_owner.nullable and campaign.freeze_until.nullable
+    assert campaign.freeze_owner.type.length == 64

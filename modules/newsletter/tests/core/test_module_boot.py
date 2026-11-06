@@ -56,3 +56,44 @@ async def test_on_startup_configures_tenancy_and_installs_the_guard(monkeypatch)
     bare = SimpleNamespace(state=SimpleNamespace())
     await NewsletterModule().on_startup(bare)
     assert calls == [("configure", bare), ("mount", bare)]
+
+
+def test_unsubscribe_prefix_is_public_for_get_and_post_with_its_own_rates():
+    """The anonymous rate is the rule's own, not the host's ``rate_limit_public``
+    (120/minute by default): one-click POSTs arrive from providers' shared IPs."""
+    from simple_module_core.public_routes import PublicRouteRegistry
+
+    registry = PublicRouteRegistry()
+    NewsletterModule().register_public_routes(registry)
+    url = f"{constants.UNSUBSCRIBE_PREFIX}t.1.2.mac"
+    assert registry.matches("GET", url) and registry.matches("POST", url)
+    assert not registry.matches("PUT", url)
+    assert registry.match("GET", url).rate == "60/minute"
+    assert registry.match("POST", url).rate == "300/minute"
+    assert registry.matches("GET", constants.BRAND_LOGO_PATH)
+    assert not registry.matches("POST", constants.BRAND_LOGO_PATH)
+
+
+def test_unsubscribe_rate_rules_per_method():
+    from simple_module_core.rate_limit import RateLimitRegistry
+
+    registry = RateLimitRegistry()
+    NewsletterModule().register_rate_limits(registry)
+    url = f"{constants.UNSUBSCRIBE_PREFIX}t.1.2.mac"
+    get, post = registry.match("GET", url), registry.match("POST", url)
+    assert (get.rate, get.key, get.methods) == ("60/minute", "ip", frozenset({"GET"}))
+    assert (post.rate, post.key, post.methods) == ("300/minute", "ip", frozenset({"POST"}))
+    assert registry.match("PUT", url) is None
+    assert registry.match("GET", "/newsletter/brand/logo") is None
+
+
+def test_mount_public_routes_mounts_each_router_once():
+    from fastapi import FastAPI
+    from fastapi.routing import iter_route_contexts
+
+    app = FastAPI()
+    NewsletterModule.mount_public_routes(app)
+    NewsletterModule.mount_public_routes(app)  # a lifespan restart
+    paths = [r.path for r in iter_route_contexts(app.routes)]
+    assert paths.count(constants.BRAND_LOGO_PATH) == 1
+    assert paths.count(f"{constants.UNSUBSCRIBE_PREFIX}{{token}}") == 2  # GET and POST

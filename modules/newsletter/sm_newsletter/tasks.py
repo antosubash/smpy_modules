@@ -8,9 +8,12 @@ in :mod:`sm_newsletter.task_config`.
 * ``newsletter.reconcile_suppressions()`` - the hourly beat: every tenant's
   list opt-outs re-read from records into the suppression store
   (:mod:`sm_newsletter.core.suppression.reconcile`).
+* ``newsletter.dispatch()`` - the beat every minute: one dispatcher tick
+  (:mod:`sm_newsletter.sending.runtime`), refused as ``not_configured`` while
+  the worker has no secret key or no readable SMTP password.
 
 Bodies run through :mod:`sm_newsletter.core.worker`: no app, a fresh event
-loop per task, and the reconcile binds each tenant itself.
+loop per task, and each body binds every tenant itself.
 """
 
 from __future__ import annotations
@@ -21,7 +24,7 @@ from typing import Any
 from celery import shared_task
 from celery.signals import worker_process_init
 
-from sm_newsletter.task_config import RECONCILE_SUPPRESSIONS
+from sm_newsletter.task_config import DISPATCH, RECONCILE_SUPPRESSIONS
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +43,27 @@ def reconcile_suppressions() -> dict[str, int]:
         summary["lists"],
         summary["suppressed"],
         summary["failed"],
+    )
+    return summary
+
+
+@shared_task(name=DISPATCH)
+def dispatch() -> dict[str, Any]:
+    """One dispatcher tick; returns (and logs) its summary."""
+    from dataclasses import asdict
+
+    from sm_newsletter.core.worker import run_platform
+    from sm_newsletter.sending.runtime import dispatch_async
+
+    summary = asdict(run_platform(dispatch_async))
+    logger.info(
+        "newsletter.dispatch: %d started, %d spent, %d skipped, %d paused, %d finished (%s)",
+        summary["started"],
+        summary["spent"],
+        summary["skipped"],
+        summary["paused"],
+        summary["finished"],
+        summary["stopped"],
     )
     return summary
 

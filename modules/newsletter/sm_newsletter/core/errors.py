@@ -101,6 +101,31 @@ class NotADraft(NewsletterError):  # noqa: N818 - the state it refuses
     detail = "Only a draft campaign can be changed or deleted"
 
 
+class InvalidTransition(NewsletterError):  # noqa: N818 - the state it refuses
+    """The action does not apply to the campaign's current status (ruling S14)."""
+
+    status = 409
+    code = "invalid_transition"
+    detail = "This action does not apply to the campaign in its current state"
+
+
+class EmptyCampaign(NewsletterError):  # noqa: N818 - the state it refuses
+    """A campaign with no blocks cannot be sent."""
+
+    status = 422
+    code = "empty_campaign"
+    detail = "Add content to the campaign before sending it"
+
+
+class HttpsRequired(NewsletterError):  # noqa: N818 - names the setting
+    """On the SMTP transport, the email's links and the unsubscribe page must be
+    ``https://`` (amendment A6): the unsubscribe link carries a capability."""
+
+    status = 422
+    code = "https_required"
+    detail = "The site's public address must use https before sending"
+
+
 class StaleCampaign(NewsletterError):  # noqa: N818 - the state it refuses
     """The campaign moved on since the editor read it (``expected_revision``)."""
 
@@ -123,11 +148,11 @@ class ListForbidden(Forbidden):
 
 
 class AudienceUnsupported(NewsletterError):  # noqa: N818 - names the field
-    """Only ``all`` until segments (PR 6) and tags (PR 4) exist."""
+    """Only ``all`` until segments and the tag picker arrive (PR 6, ruling S3)."""
 
     status = 422
     code = "audience_unsupported"
-    detail = "Only the whole list can be the audience for now"
+    detail = "Only the whole list can be the audience until segments arrive"
 
 
 class IntegrationUnavailable(NewsletterError):  # noqa: N818 - the state it refuses
@@ -158,12 +183,18 @@ class BlockNotFound(NewsletterError):  # noqa: N818 - HTTP vocabulary, deliberat
 
 class TransportUnavailable(NewsletterError):  # noqa: N818 - the state it reports
     """The mail relay could not be reached, secured or logged in to. The detail
-    names the stage (``connect``, ``tls``, ``auth``) and never holds the
-    username, the password or the server's AUTH reply."""
+    names the stage (``connect``, ``tls``, ``auth``), as does ``stage``, and
+    never holds the username, the password or the server's AUTH reply."""
+
+    stage: str | None
 
     status = 502
     code = "transport_unavailable"
     detail = "The mail server is not available"
+
+    def __init__(self, detail: str | None = None, *, stage: str | None = None) -> None:
+        super().__init__(detail)
+        self.stage = stage
 
 
 class CampaignCancelled(NewsletterError):  # noqa: N818 - the state it refuses

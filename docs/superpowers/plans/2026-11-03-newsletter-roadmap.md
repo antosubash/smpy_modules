@@ -12,7 +12,7 @@ so it is planned against the code as it then stands. Each one goes through
 | 1 | `2026-11-03-newsletter-pr1-contracts.md` | records `contracts.newsletter` (iter incl. status, count, by-uuid, unsubscribe, tags, can_read_list); news `contracts.articles` (search, card) |
 | 2 | `2026-11-03-newsletter-pr2-scaffold.md` | `modules/newsletter` scaffold per `docs/adding-a-module.md` and `docs/module-layout.md`; models, migrations, settings, tenancy, permissions; suppression mirror from `SubscriptionChanged` and the hourly suppression reconcile; the SMTP password endpoint (`PUT /api/newsletter/settings/smtp-password`); records contract additions (`subscription_lists`, `subscription_list_tenants`, `iter_subscribers(include_trashed=)`) |
 | 3 | `2026-11-03-newsletter-pr3-campaigns.md` | campaigns + content: block model, email renderer (HTML + text), Puck editor, preview, article/page cards, test send over SMTP transport, settings page |
-| 4 | (later) | sending: freeze, single dispatcher + budget ledger, daily cap and per-minute throttle, retries (pre-acceptance only), pause/resume/cancel, bounce classification, **the unsubscribe page and one-click POST** |
+| 4 | `2026-11-03-newsletter-pr4-sending.md` | sending: freeze, single dispatcher + budget ledger, daily cap and per-minute throttle, retries (pre-acceptance only), pause/resume/cancel, bounce classification, **the unsubscribe page and one-click POST** |
 | 5 | (later) | tracking (open, click) and reports |
 | 6 | (later) | segments and the subscriber screen |
 | 7 | (later) | Mailchimp import, with records' `import_subscribers` and a tag-choices contract added there, where its only caller is; docs; e2e spec |
@@ -28,3 +28,12 @@ so it is planned against the code as it then stands. Each one goes through
   against the budget) to the retry path.
 - The worker app needs `app.state.sm_newsletter.tenancy` and `app.state.tenants`
   so `render_context` can compute each tenant's public origin.
+
+## Notes for PR 5
+
+- Reuse `core.tokens.sign` for `/o/` and `/c/`: one token per send, the same MAC
+  scheme as `/u/`.
+- Link rewriting must happen in `campaigns/snapshot.py`, writing `newsletter_link`
+  rows when the campaign is scheduled (the worker only personalises the snapshot).
+- The tag audience moved to PR 6 (S3): `tag:` and `segment:` stay
+  `422 audience_unsupported` until then.

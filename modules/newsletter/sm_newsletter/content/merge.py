@@ -8,6 +8,10 @@ import re
 from sm_newsletter.content.urls import UNSUBSCRIBE_TAG
 
 MAX_FALLBACK = 100
+CAPABILITY_TAGS = (UNSUBSCRIBE_TAG,)
+"""Merge fields whose value carries a send token (amendment A7). They may sit in
+the body, never in a header or the preheader: a subject is logged and indexed
+by mailbox providers. PR 5 adds its own."""
 _UNSUB = r"\{\{unsubscribe_url\}\}"
 # Validation caps the raw fallback; substitution sees it HTML-escaped (up to 6x
 # longer), so it is uncapped.
@@ -20,6 +24,14 @@ def check_merge(text: str) -> None:
     rest = _VALID.sub("", text)
     if "{{" in rest or "}}" in rest:
         raise ValueError("unknown or malformed merge field")
+
+
+def check_no_capability(text: str, *, field: str) -> str:
+    """``text``, or ValueError naming ``field`` (never the value) when it holds
+    a capability-bearing merge field."""
+    if any(tag in text for tag in CAPABILITY_TAGS):
+        raise ValueError(f"{field}: merge field not allowed here")
+    return text
 
 
 def _personalise(s: str, name: str, unsubscribe_url: str) -> str:

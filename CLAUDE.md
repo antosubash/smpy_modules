@@ -196,8 +196,9 @@ default no matter what the database says. Mark such fields
 `json_schema_extra=_RESTART` so the Settings screen says a restart is needed.
 Newsletter's `smtp_password` is stored `enc:v1:` under `SM_SECRET_KEY` and written only
 through `PUT /api/newsletter/settings/smtp-password` (needs `newsletter.manage` and
-`settings.edit`; `scripts/set_setting.py`
-would store it in plaintext, accepted with a warning; use the endpoint); the generic Settings screen
+`settings.edit`; on the `smtp` transport workers **refuse** a non-empty SMTP password stored without `enc:v1:`
+(as `scripts/set_setting.py` would store it), and the dispatcher does not run until it is re-saved
+through that endpoint, so always use the endpoint); the generic Settings screen
 refuses newsletter writes (`manage_url`).
 These settings are SYSTEM-scope: ai has one provider configuration and one
 API key per slot for the whole deployment, shared by every tenant. ai reads
@@ -210,6 +211,16 @@ its own NullPool engine on the host database, `metering._own_factory`). Images
 always passes its factory, so that fallback is for other callers. Images' workers never build the app, so they read
 the same class with `background_tasks.settings_for(ImagesSettings, "sm_images")`
 (DB-backed, cached about 30 s).
+
+**Newsletter campaigns are sent only by the `newsletter.dispatch` beat.** It holds the
+install-wide `dispatch_lock` per slice (at most 10 counted sends), and each recipient's attempt
+row is committed before its SMTP call; the worker never renders, it personalises the render
+snapshot written when the campaign was scheduled. `/newsletter/u/{token}` is the **second
+documented exception** to "the public surface binds the resolved tenant", after records' signed
+form token: it binds the tenant from the HMAC-verified token, answers an unknown, foreign or
+forged token exactly as it answers a real one (so it cannot probe which tokens exist), and
+carries no CSRF on purpose (RFC 8058). Only an RCPT-stage `5.1.x` bounces; any other 5xx pauses
+the campaign. Docs: `modules/newsletter/docs/sending.md` and `operations.md`.
 
 **A plugin registers images steps and presets from `images_extensions.py`, never
 from `on_startup`.** Celery workers do not run module hooks, and a dependant's

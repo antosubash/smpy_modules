@@ -9,9 +9,7 @@ whose tenant comes from the token.
 
 from __future__ import annotations
 
-import json
 import logging
-from importlib import resources
 from typing import Any
 from urllib.parse import quote, urlsplit
 
@@ -19,6 +17,7 @@ from sm_newsletter.content.render.styles import is_color
 from sm_newsletter.content.render.types import Branding, FooterCopy, RenderContext
 from sm_newsletter.content.urls import absolute
 from sm_newsletter.core import constants
+from sm_newsletter.core.messages import host_locale, server_copy
 from sm_newsletter.core.tenancy import TenancyMode, mode_of
 
 logger = logging.getLogger(__name__)
@@ -50,18 +49,10 @@ def _branding(app: Any, public_base: str, from_name: str) -> Branding:
     return Branding(getattr(theme, "app_name", "") or from_name or _FALLBACK_NAME, accent, logo)
 
 
-def _package_messages() -> dict[str, str]:
-    raw = (resources.files("sm_newsletter") / "locales" / "en.json").read_text(encoding="utf-8")
-    return json.loads(raw)["email"]
-
-
-def _footer(app: Any, locale: str, app_name: str) -> FooterCopy:
-    """The ``newsletter.email.*`` strings in the host's default language (R12)."""
-    registry = getattr(app.state.sm, "i18n_registry", None)
-    messages = registry.messages(locale) if registry is not None else {}
-    fallback = _package_messages()
-    prefix = f"{constants.LOCALE_NAMESPACE}.email."
-    copy = {key: messages.get(prefix + key) or fallback[key] for key in _KEYS}
+def _footer(app: Any, app_name: str) -> FooterCopy:
+    """The ``newsletter.email.*`` strings in the host's default language (R12),
+    the same as the unsubscribe page's."""
+    _, copy = server_copy(app, "email", _KEYS)
     reason = copy["footer_reason"].replace("{app_name}", app_name)
     return FooterCopy(reason=reason, unsubscribe=copy["unsubscribe"], read_more=copy["read_more"])
 
@@ -102,7 +93,7 @@ async def render_context(app: Any, *, tenant_id: str) -> RenderContext:
     """Everything :func:`~sm_newsletter.content.render.render` needs for ``tenant_id``."""
     host = app.state.sm.settings
     public_base = (getattr(host, "public_base_url", "") or "").rstrip("/")
-    locale = getattr(host, "i18n_default_locale", "") or "en"
+    locale = host_locale(app)
     settings = getattr(app.state, constants.PACKAGE).settings
     branding = _branding(app, public_base, settings.from_name)
     return RenderContext(
@@ -110,6 +101,6 @@ async def render_context(app: Any, *, tenant_id: str) -> RenderContext:
         public_base=public_base,
         branding=branding,
         physical_address=settings.physical_address,
-        footer=_footer(app, locale, branding.app_name),
+        footer=_footer(app, branding.app_name),
         locale=locale,
     )

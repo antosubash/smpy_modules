@@ -21,9 +21,11 @@ from pydantic import (
     StrictInt,
     ValidationError,
     field_validator,
+    model_validator,
 )
 
-from sm_newsletter.content.merge import check_merge
+from sm_newsletter.campaigns.lifecycle import split_paused
+from sm_newsletter.content.merge import check_merge, check_no_capability
 from sm_newsletter.core.constants import MAX_TYPE_KEY_LEN
 from sm_newsletter.core.errors import InvalidCampaign, NewsletterError
 from sm_newsletter.core.headers import check_header_text
@@ -39,15 +41,32 @@ def _merge(value: str | None) -> str | None:
     return value
 
 
+def _no_capability(field: str) -> AfterValidator:
+    return AfterValidator(lambda v: v if v is None else check_no_capability(v, field=field))
+
+
 def _blank_is_none(value: Any) -> Any:
     return None if isinstance(value, str) and not value.strip() else value
 
 
 Name = Annotated[str, Field(min_length=1, max_length=200)]
 ListKey = Annotated[str, Field(min_length=1, max_length=MAX_TYPE_KEY_LEN)]
-# Merge fields follow the body's rule: an unknown or malformed ``{{…}}`` is refused.
-Subject = Annotated[str, Field(max_length=300), _header("subject"), AfterValidator(_merge)]
-Preheader = Annotated[str, Field(max_length=300), _header("preheader"), AfterValidator(_merge)]
+# Merge fields follow the body's rule: an unknown or malformed ``{{…}}`` is refused,
+# and so is one that carries a send token (amendment A7).
+Subject = Annotated[
+    str,
+    Field(max_length=300),
+    _header("subject"),
+    AfterValidator(_merge),
+    _no_capability("subject"),
+]
+Preheader = Annotated[
+    str,
+    Field(max_length=300),
+    _header("preheader"),
+    AfterValidator(_merge),
+    _no_capability("preheader"),
+]
 FromName = Annotated[str | None, Field(max_length=200), _header("from_name")]
 # Checked for control characters before the address parser sees it.
 ReplyTo = Annotated[
@@ -122,6 +141,25 @@ class CampaignDetail(CampaignSummary):
     reply_to: str | None
     audience: str
     body: list[dict[str, Any]]
+    scheduled_at: datetime | None
+    started_at: datetime | None
+    finished_at: datetime | None
+    paused_code: str | None
+    paused_detail: str | None
+    failed_count: int
+    bounced_count: int
+    suppressed_count: int
+    unsubscribe_count: int
+
+    @model_validator(mode="before")
+    @classmethod
+    def _split_paused(cls, data: Any) -> Any:
+        """The stored ``"<code>|<detail>"`` reason as two fields (ruling S13)."""
+        if isinstance(data, dict) or not hasattr(data, "paused_reason"):
+            return data
+        code, detail = split_paused(data.paused_reason)
+        own = {n: getattr(data, n) for n in cls.model_fields if hasattr(data, n)}
+        return own | {"paused_code": code, "paused_detail": detail}
 
 
 class CampaignPage(BaseModel):

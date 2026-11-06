@@ -13,6 +13,8 @@ import { EditorActionsContext } from '../ui/components/editor/editorActions';
 import { localizeConfig } from '../ui/components/editor/localizeConfig';
 import { PreviewPane } from '../ui/components/editor/PreviewPane';
 import { buildConfig, type Capabilities } from '../ui/components/editor/puckConfig';
+import { SendDialog } from '../ui/components/sending/SendDialog';
+import { SendingPanel } from '../ui/components/sending/SendingPanel';
 import { type EditorStatus, useCampaignEditor } from '../ui/hooks/useCampaignEditor';
 import { useLeaveGuard } from '../ui/hooks/useLeaveGuard';
 import { normalizeBody } from '../ui/utils/bodyDraft';
@@ -74,6 +76,9 @@ export default function CampaignEditor() {
   const previewBody = useMemo(() => normalizeBody(fromPuckData(editor.data)), [editor.data]);
   const isDraft = campaign?.status === 'draft';
   const readOnly = props.can_edit !== true || !isDraft || editor.status === 'stale';
+  const canSend = props.can_send === true;
+  // A send, schedule or status change answers with the campaign: take the server's copy.
+  const refreshCampaign = () => void editor.reload();
 
   // Stable: Puck treats a new override as a new component and remounts what
   // it wraps, which would drop focus from the field being typed in.
@@ -126,11 +131,20 @@ export default function CampaignEditor() {
               tab={tab}
               onTab={setTab}
               campaignId={campaign.id}
-              canSend={props.can_send === true}
+              canSend={canSend}
               maxRecipients={props.max_test_recipients ?? DEFAULT_MAX_TEST_RECIPIENTS}
               baseUrlMissing={props.public_base_url_set === false}
-              flush={editor.flush}
+              flush={editor.save}
               incomplete={editor.incomplete}
+            />
+            <SendDialog
+              campaign={campaign}
+              canSend={canSend}
+              onSent={refreshCampaign}
+              flush={editor.flush}
+              dirty={editor.dirty}
+              incomplete={editor.incomplete}
+              currentRevision={editor.currentRevision}
             />
           </>
         )}
@@ -138,6 +152,9 @@ export default function CampaignEditor() {
           {statusKey ? t(statusKey) : ''}
         </span>
       </header>
+      {campaign && !isDraft && (
+        <SendingPanel campaign={campaign} canSend={canSend} onChange={refreshCampaign} />
+      )}
 
       {editor.error && (
         <div

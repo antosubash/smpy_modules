@@ -9,8 +9,10 @@ import type {
   CardHit,
   CardKind,
   CardSnapshot,
+  Estimate,
   MediaHit,
   Preview,
+  Progress,
   SettingsOut,
   SettingsSaved,
   SettingsUpdate,
@@ -57,6 +59,17 @@ export const api = {
     send<Preview>('/preview', 'POST', b),
   testSend: (id: number, recipients: string[]) =>
     send<{ results: TestSendResult[] }>(`/campaigns/${id}/test-send`, 'POST', { recipients }),
+  sendCampaign: (id: number, b: { expected_revision: number; scheduled_at: string | null }) =>
+    send<CampaignDetail>(`/campaigns/${id}/send`, 'POST', b),
+  unscheduleCampaign: (id: number, expected_revision: number) =>
+    send<CampaignDetail>(`/campaigns/${id}/unschedule`, 'POST', { expected_revision }),
+  pauseCampaign: (id: number) => send<CampaignDetail>(`/campaigns/${id}/pause`, 'POST'),
+  resumeCampaign: (id: number) => send<CampaignDetail>(`/campaigns/${id}/resume`, 'POST'),
+  cancelCampaign: (id: number) => send<CampaignDetail>(`/campaigns/${id}/cancel`, 'POST'),
+  progress: (id: number, signal?: AbortSignal) =>
+    read<Progress>(`/campaigns/${id}/progress`, signal),
+  estimate: (id: number, at: string | null) =>
+    read<Estimate>(`/campaigns/${id}/estimate${query({ at: at ?? undefined })}`),
   getSettings: () => read<SettingsOut>('/settings'),
   putSettings: (b: SettingsUpdate) => send<SettingsSaved>('/settings', 'PUT', b),
   putPassword: (password: string) =>

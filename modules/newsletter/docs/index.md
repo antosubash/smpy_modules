@@ -13,11 +13,16 @@ source repository, and the delivery order is
 | --- | --- | --- |
 | 1 | records `contracts.newsletter`, news `contracts.articles` | merged |
 | 2 | this package: scaffold, tenancy, settings, models, suppressions, hourly reconcile | merged |
-| 3 | campaigns, content blocks, renderer, preview, Puck editor, test send, settings page | this PR |
-| 4 | sending, throttling, retries, unsubscribe page | planned |
+| 3 | campaigns, content blocks, renderer, preview, Puck editor, test send, settings page | merged |
+| 4 | sending, throttling, retries, unsubscribe page | this PR |
 | 5 | open and click tracking, reports | planned |
 | 6 | segments and the subscriber screen | planned |
 | 7 | Mailchimp import, docs, e2e | planned |
+
+Sending is described in [`sending.md`](sending.md) (status machine, freeze, the
+dispatcher, verdicts, the unsubscribe route) and what has to run for it in
+[`operations.md`](operations.md) (worker and beat, the secret, the DKIM
+checklist, the relay).
 
 ## Campaigns and content
 
@@ -82,8 +87,8 @@ writes (`manage_url`).
   (422, no echo).
 - `smtp_password` is stored encrypted and written only through
   `PUT /api/newsletter/settings/smtp-password` (needs `newsletter.manage` and
-  `settings.edit`; `scripts/set_setting.py` would store it in plaintext, accepted
-  with a warning; use the endpoint).
+  `settings.edit`; `scripts/set_setting.py` would store it in plaintext, which
+  the workers refuse: the dispatcher does not run until it is re-saved through the endpoint).
 
 ## Suppressions
 

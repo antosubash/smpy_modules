@@ -42,6 +42,12 @@ class Campaign(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[un
     revision: int = Field(default=1, sa_column_kwargs={"nullable": False, "server_default": "1"})
     """Bumped by every write; an editor's PATCH names the one it read."""
     paused_reason: str | None = Field(default=None, max_length=1000)
+    freeze_gen: int = Field(default=0, sa_column_kwargs={"nullable": False, "server_default": "0"})
+    """Bumped by schedule, unschedule and cancel-from-scheduled; fences an
+    interrupted freeze."""
+    freeze_owner: str | None = Field(default=None, max_length=64)
+    freeze_until: datetime | None = dt_col()
+    """The freeze claim: one owner at a time, until this instant."""
     scheduled_at: datetime | None = dt_col()
     started_at: datetime | None = dt_col()
     finished_at: datetime | None = dt_col()
