@@ -1,5 +1,6 @@
 /** What a segment rule's value is, per field type and operator (mirrors `segments/rules.py`). */
 
+import { HttpError, isCode } from './http';
 import type { ListField, Rule, RuleOp } from './types';
 
 export type ValueInput = 'choices' | 'choice' | 'text' | 'number' | 'date' | 'boolean';
@@ -30,4 +31,11 @@ export function emptyRule(field: ListField): Rule {
 export function ruleComplete(rule: Rule): boolean {
   if (!rule.field) return false;
   return Array.isArray(rule.value) ? rule.value.length > 0 : rule.value.trim() !== '';
+}
+
+/** The rule a 422 `rules[i]: …` detail names, if any. */
+export function invalidRuleIndex(e: unknown): number | null {
+  if (!isCode(e, 'invalid_segment') || !(e instanceof HttpError)) return null;
+  const match = /^rules\[(\d+)\]/.exec(e.message);
+  return match ? Number(match[1]) : null;
 }

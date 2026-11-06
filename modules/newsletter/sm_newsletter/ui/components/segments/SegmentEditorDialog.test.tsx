@@ -62,20 +62,22 @@ describe('SegmentEditorDialog', () => {
     [...document.querySelectorAll('button')].find((b) => b.textContent === label) as
       | HTMLButtonElement
       | undefined;
-  async function open(segment: Segment | null = null) {
-    root = createRoot(document.body.appendChild(document.createElement('div')));
-    await act(async () =>
+  const draw = (segment: Segment | null, isOpen: boolean) =>
+    act(async () =>
       root.render(
         createElement(SegmentEditorDialog, {
           listKey: 'news',
           segment,
           fields,
-          open: true,
+          open: isOpen,
           onOpenChange: vi.fn(),
           onSaved,
         }),
       ),
     );
+  async function open(segment: Segment | null = null) {
+    root = createRoot(document.body.appendChild(document.createElement('div')));
+    await draw(segment, true);
     await wait(COUNT_DEBOUNCE_MS + 100);
   }
   async function type(el: HTMLInputElement, value: string) {
@@ -84,6 +86,8 @@ describe('SegmentEditorDialog', () => {
       el.dispatchEvent(new Event('input', { bubbles: true }));
     });
   }
+  const previews = () =>
+    fetchMock.mock.calls.filter(([u]) => String(u).endsWith('/segments/preview'));
   const rows = () => document.querySelectorAll('[data-rule-row]');
   const saveCalls = () =>
     fetchMock.mock.calls.filter(([u]) => !String(u).endsWith('/segments/preview'));
@@ -134,5 +138,51 @@ describe('SegmentEditorDialog', () => {
     for (let i = 0; i < 10; i++) await act(async () => button(copy.add_rule)?.click());
     expect(rows().length).toBe(10);
     expect(button(copy.add_rule)?.disabled).toBe(true);
+  });
+
+  it('asks nothing while closed', async () => {
+    root = createRoot(document.body.appendChild(document.createElement('div')));
+    await draw(null, false);
+    await wait(COUNT_DEBOUNCE_MS + 100);
+    expect(previews()).toHaveLength(0);
+  });
+
+  it('shows the loading copy, not the old count, on reopen', async () => {
+    await open();
+    expect(document.body.textContent).toContain('About 5 subscribers match');
+    await draw(null, false);
+    await draw(null, true);
+    expect(document.body.textContent).toContain(copy.count_loading);
+    expect(document.body.textContent).not.toContain('About 5 subscribers match');
+  });
+
+  it('highlights the row a preview 422 names, past an incomplete row', async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).endsWith('/segments/preview')
+        ? json({ detail: 'rules[0]: value must be a number', code: 'invalid_segment' }, 422)
+        : next(),
+    );
+    const segment: Segment = {
+      id: 1,
+      name: 'S',
+      list_type_key: 'news',
+      rules: [
+        { field: 'city', op: 'is', value: '' },
+        { field: 'city', op: 'is', value: 'x' },
+      ],
+      updated_at: null,
+    };
+    await open(segment);
+    const marks = [...rows()].map((r) => r.getAttribute('data-invalid'));
+    expect(marks).toEqual(['false', 'true']);
+  });
+
+  it('says incomplete rules are not counted', async () => {
+    await open();
+    expect(document.body.textContent).not.toContain(copy.count_incomplete);
+    await act(async () => button(copy.add_rule)?.click());
+    expect(document.body.textContent).toContain(copy.count_incomplete);
+    await type(document.querySelector('input[aria-label="Value"]') as HTMLInputElement, 'Berlin');
+    expect(document.body.textContent).not.toContain(copy.count_incomplete);
   });
 });

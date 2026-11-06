@@ -97,6 +97,7 @@
     "op": "Bedingung",
     "value": "Wert",
     "count": "Etwa {count} Abonnenten passen",
+    "count_incomplete": "Unvollständige Regeln werden nicht mitgezählt.",
     "saved": "Segment gespeichert.",
     "delete_confirm": {
       "title": "Dieses Segment löschen?",

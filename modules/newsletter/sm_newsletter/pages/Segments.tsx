@@ -123,7 +123,7 @@ export default function Segments() {
         )
       )}
 
-      {ready && (
+      {ready && canEdit && (
         <SegmentEditorDialog
           listKey={listKey}
           segment={editing}

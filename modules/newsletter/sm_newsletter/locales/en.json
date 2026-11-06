@@ -97,6 +97,7 @@
     "op": "Condition",
     "value": "Value",
     "count": "About {count} subscribers match",
+    "count_incomplete": "Incomplete rules are not counted.",
     "saved": "Segment saved.",
     "delete_confirm": {
       "title": "Delete this segment?",

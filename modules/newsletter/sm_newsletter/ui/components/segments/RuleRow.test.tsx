@@ -33,6 +33,18 @@ const fields: ListField[] = [
     ops: ['is', 'is_not', 'contains', 'starts_with'],
   },
   {
+    key: 'plan',
+    label: 'Plan',
+    type: 'select',
+    many: false,
+    choices: [
+      { value: 'gold', label: 'Gold' },
+      { value: 'silver', label: 'Silver' },
+    ],
+    system: false,
+    ops: ['is', 'is_not', 'any'],
+  },
+  {
     key: 'created_at',
     label: 'Signed up',
     type: 'datetime',
@@ -86,9 +98,15 @@ describe('RuleRow', () => {
     expect([...select(copy.field).options].map((o) => o.textContent)).toContain(copy.signup_field);
   });
 
-  it('clears the value when the op switches between a list and a single value', async () => {
+  it('keeps the value when the op switches between two single-value ops', async () => {
     const onChange = await render({ field: 'city', op: 'is', value: 'x' });
     await choose(select(copy.op), 'contains');
     expect(onChange).toHaveBeenCalledWith({ field: 'city', op: 'contains', value: 'x' });
+  });
+
+  it('clears the value when the op switches from a list to a single value', async () => {
+    const onChange = await render({ field: 'plan', op: 'any', value: ['gold', 'silver'] });
+    await choose(select(copy.op), 'is');
+    expect(onChange).toHaveBeenCalledWith({ field: 'plan', op: 'is', value: '' });
   });
 });

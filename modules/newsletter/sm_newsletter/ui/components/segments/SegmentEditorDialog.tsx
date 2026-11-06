@@ -15,21 +15,13 @@ import { useEffect, useState } from 'react';
 
 import { useSegmentPreview } from '../../hooks/useSegmentPreview';
 import { api, errorMessage } from '../../utils/api';
-import { HttpError, isCode } from '../../utils/http';
 import { keys, useT } from '../../utils/i18n';
-import { emptyRule } from '../../utils/rules';
+import { emptyRule, invalidRuleIndex, ruleComplete } from '../../utils/rules';
 import type { ListField, Rule, Segment } from '../../utils/types';
 import { RuleRow } from './RuleRow';
 
 const copy = keys.newsletter.segments;
 export const MAX_RULES = 10;
-
-/** The rule a 422 `rules[i]: …` detail names, if any. */
-export function invalidRuleIndex(e: unknown): number | null {
-  if (!isCode(e, 'invalid_segment') || !(e instanceof HttpError)) return null;
-  const match = /^rules\[(\d+)\]/.exec(e.message);
-  return match ? Number(match[1]) : null;
-}
 
 interface Props {
   listKey: string;
@@ -54,7 +46,8 @@ export function SegmentEditorDialog({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [badRow, setBadRow] = useState<number | null>(null);
-  const preview = useSegmentPreview(listKey, rules);
+  const preview = useSegmentPreview(listKey, rules, open);
+  const incomplete = rules.some((r) => !ruleComplete(r));
 
   useEffect(() => {
     if (!open) return;
@@ -121,7 +114,7 @@ export function SegmentEditorDialog({
                   rule={rule}
                   fields={fields}
                   disabled={pending}
-                  invalid={badRow === i}
+                  invalid={(badRow ?? preview.badRow) === i}
                   onChange={(r) => edit(rules.map((x, j) => (j === i ? r : x)))}
                   onRemove={() => edit(rules.filter((_, j) => j !== i))}
                 />
@@ -150,6 +143,9 @@ export function SegmentEditorDialog({
                   ? t(copy.count_loading)
                   : t(copy.count, { count: preview.count })}
               </p>
+            )}
+            {incomplete && (
+              <p className="text-sm text-muted-foreground">{t(copy.count_incomplete)}</p>
             )}
             {error && (
               <p role="alert" className="text-sm text-destructive">
