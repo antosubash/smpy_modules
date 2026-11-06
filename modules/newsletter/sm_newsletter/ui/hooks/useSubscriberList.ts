@@ -2,11 +2,29 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api, errorMessage } from '../utils/api';
 import { useT } from '../utils/i18n';
-import type { Subscriber, SubscriberPage, SubscriberStatus } from '../utils/types';
+import type { SubscriberPage, SubscriberStatus } from '../utils/types';
 import { SEARCH_DEBOUNCE_MS } from './useCampaignList';
 
 /** The API's default page size (`limit` on `POST …/subscribers/search`). */
 export const PAGE_SIZE = 50;
+
+interface Filters {
+  listKey: string;
+  status: string;
+  q: string;
+  tag: string;
+  segment: string;
+  offset: number;
+}
+type Result = SubscriberPage & { listKey: string };
+const initial = (listKey: string): Filters => ({
+  listKey,
+  status: '',
+  q: '',
+  tag: '',
+  segment: '',
+  offset: 0,
+});
 
 const EMPTY_COUNTS: SubscriberPage['counts'] = { pending: 0, confirmed: 0, unsubscribed: 0 };
 
@@ -19,36 +37,25 @@ const EMPTY_COUNTS: SubscriberPage['counts'] = { pending: 0, confirmed: 0, unsub
  */
 export function useSubscriberList(listKey: string) {
   const { t } = useT();
-  const [status, setStatusState] = useState('');
-  const [q, setQState] = useState('');
-  const [debouncedQ, setDebouncedQ] = useState('');
-  const [tag, setTagState] = useState('');
-  const [segment, setSegmentState] = useState('');
-  const [offset, setOffset] = useState(0);
-  const [items, setItems] = useState<Subscriber[] | null>(null);
-  const [total, setTotal] = useState(0);
-  const [counts, setCounts] = useState<SubscriberPage['counts']>(EMPTY_COUNTS);
-  const [recordsUrl, setRecordsUrl] = useState('');
+  // Everything that belongs to one list is stored with its key; a state stamped
+  // with another list's key reads as the defaults, in the same render, so no
+  // request ever carries the previous list's filters.
+  const [stored, setStored] = useState<Filters>(() => initial(listKey));
+  const [debounced, setDebounced] = useState({ listKey, q: '' });
+  const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const latest = useRef(0);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQ(q), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [q]);
+  const f = stored.listKey === listKey ? stored : initial(listKey);
+  const debouncedQ = debounced.listKey === listKey ? debounced.q : '';
+  const page = result && result.listKey === listKey ? result : null;
+  const { status, q, tag, segment, offset } = f;
 
-  // A different list starts from scratch.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on listKey only
   useEffect(() => {
-    setStatusState('');
-    setQState('');
-    setDebouncedQ('');
-    setTagState('');
-    setSegmentState('');
-    setOffset(0);
-    setItems(null);
-  }, [listKey]);
+    const timer = setTimeout(() => setDebounced({ listKey, q }), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [listKey, q]);
 
   // `version` is not read: bumping it is how `reload` re-runs this effect.
   // biome-ignore lint/correctness/useExhaustiveDependencies: see above
@@ -68,13 +75,10 @@ export function useSubscriberList(listKey: string) {
         },
         controller.signal,
       )
-      .then((page) => {
+      .then((p) => {
         if (request !== latest.current) return;
         setError(null);
-        setItems(page.items);
-        setTotal(page.total);
-        setCounts(page.counts);
-        setRecordsUrl(page.records_url);
+        setResult({ listKey, ...p });
       })
       .catch((e) => {
         if (request !== latest.current || controller.signal.aborted) return;
@@ -83,30 +87,28 @@ export function useSubscriberList(listKey: string) {
     return () => controller.abort();
   }, [listKey, debouncedQ, status, tag, segment, offset, version, t]);
 
-  const setQ = useCallback((next: string) => {
-    setQState(next);
-    setOffset(0);
-  }, []);
-  const setStatus = useCallback((next: string) => {
-    setStatusState(next);
-    setOffset(0);
-  }, []);
-  const setTag = useCallback((next: string) => {
-    setTagState(next);
-    setOffset(0);
-  }, []);
-  const setSegment = useCallback((next: string) => {
-    setSegmentState(next);
-    setOffset(0);
-  }, []);
+  const patch = useCallback(
+    (change: Partial<Filters>) =>
+      setStored((cur) => ({
+        ...(cur.listKey === listKey ? cur : initial(listKey)),
+        offset: 0,
+        ...change,
+      })),
+    [listKey],
+  );
+  const setQ = useCallback((next: string) => patch({ q: next }), [patch]);
+  const setStatus = useCallback((next: string) => patch({ status: next }), [patch]);
+  const setTag = useCallback((next: string) => patch({ tag: next }), [patch]);
+  const setSegment = useCallback((next: string) => patch({ segment: next }), [patch]);
+  const setOffset = useCallback((next: number) => patch({ offset: next }), [patch]);
   /** Refetch the current page, e.g. after a tag change or an unsubscribe. */
   const reload = useCallback(() => setVersion((v) => v + 1), []);
 
   return {
-    items,
-    total,
-    counts,
-    recordsUrl,
+    items: page?.items ?? null,
+    total: page?.total ?? 0,
+    counts: page?.counts ?? EMPTY_COUNTS,
+    recordsUrl: page?.records_url ?? '',
     status,
     setStatus,
     q,

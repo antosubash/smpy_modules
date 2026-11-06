@@ -10,8 +10,9 @@ import { PAGE_SIZE, useSubscriberList } from './useSubscriberList';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let list: ReturnType<typeof useSubscriberList>;
+let listKey = 'news';
 function Harness() {
-  list = useSubscriberList('news');
+  list = useSubscriberList(listKey);
   return null;
 }
 
@@ -35,6 +36,7 @@ describe('useSubscriberList', () => {
   let respond: (body: Record<string, unknown>) => Promise<Response>;
 
   beforeEach(() => {
+    listKey = 'news';
     respond = async () => json(page([]));
     fetchMock = vi.fn((_url: string, init?: RequestInit) =>
       respond(JSON.parse(String(init?.body ?? '{}'))),
@@ -119,5 +121,27 @@ describe('useSubscriberList', () => {
     expect(list.items?.map((i) => i.email)).toEqual(['new@example.com']);
     expect(list.counts.confirmed).toBe(2);
     expect(list.recordsUrl).toBe('/admin/records/news');
+  });
+
+  it("never sends the previous list's filters to a new list, and clears the counts", async () => {
+    await mount();
+    await act(async () => list.setSegment('7'));
+    await act(async () => list.setTag('vip'));
+    expect(list.counts.confirmed).toBe(2);
+    const before = fetchMock.mock.calls.length;
+    listKey = 'other';
+    await act(async () => root.render(createElement(Harness)));
+    const fresh = fetchMock.mock.calls.slice(before);
+    expect(fresh.length).toBeGreaterThan(0);
+    for (const [url, init] of fresh) {
+      expect(url).toBe('/api/newsletter/lists/other/subscribers/search');
+      expect(JSON.parse(String(init.body))).toMatchObject({
+        segment: null,
+        tag: null,
+        status: null,
+      });
+    }
+    expect(list.segment).toBe('');
+    expect(list.tag).toBe('');
   });
 });

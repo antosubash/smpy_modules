@@ -59,6 +59,7 @@ export default function Subscribers() {
   useEffect(() => {
     setSegments([]);
     setOpen(null);
+    setLoadError(null);
     if (!listKey) return;
     let live = true;
     api

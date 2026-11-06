@@ -177,7 +177,7 @@
     },
     "unsubscribe_confirm": {
       "title": "Unsubscribe this address?",
-      "description": "{email} will receive no more campaigns from this list. They can sign up again later.",
+      "description": "{email} will receive no newsletters from any list. An opt-out is recorded; only a lift by an administrator or a confirmed double opt-in clears it.",
       "confirm": "Unsubscribe",
       "keep": "Keep"
     }

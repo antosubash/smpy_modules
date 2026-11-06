@@ -177,7 +177,7 @@
     },
     "unsubscribe_confirm": {
       "title": "Diese Adresse abmelden?",
-      "description": "{email} erhält keine weiteren Kampagnen von dieser Liste. Eine erneute Anmeldung ist später möglich.",
+      "description": "{email} erhält von keiner Liste mehr Newsletter. Der Widerspruch wird vermerkt; nur eine Aufhebung durch eine Administratorin oder einen Administrator oder eine bestätigte Double-Opt-in-Anmeldung hebt ihn auf.",
       "confirm": "Abmelden",
       "keep": "Behalten"
     }
