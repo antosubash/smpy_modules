@@ -69,9 +69,11 @@ label used twice — keep dropping a duplicate label when porting.
 `b8d4f2a6c901` (audit_log) and `c9d2e4f6a810` (oidc) are not ported: neither
 module is installed here, so their tables do not exist. `e731a1b2c3d4` refuses
 to run while two accounts' emails differ only by letter case, and names them.
-`host/migrations/env.py` skips comparing a mixed column-and-expression index on
-SQLite: it reflects `created_at DESC` as a plain column, so autogenerate would
-otherwise drop and recreate `tenant_browse` on every run.
+`host/migrations/env.py` ignores the false change autogenerate reports on SQLite
+for a mixed column-and-expression index (it reflects `created_at DESC` as a plain
+column, so `tenant_browse` would be dropped and recreated on every run). One on
+other columns is still reported; a missing one only by the Postgres check, because
+Alembic skips expression indexes on SQLite.
 **Since 0.0.44 most framework modules follow the module layout**, and the old
 flat paths (`tenants.resolver`, `settings.service`, …) warn and go in 0.0.46
 (a few in 0.1.0). Import the new path, and raise that dependency's floor to the

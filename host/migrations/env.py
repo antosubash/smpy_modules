@@ -42,23 +42,30 @@ if find_spec("records_collections") is not None:
 target_metadata = build_module_metadata()
 _include_object = make_include_object(target_metadata)
 
-# An index mixing columns and an expression (file_storage's ``tenant_browse``,
-# ``created_at DESC``, framework 0.0.44). SQLite reflects it as plain columns, so
-# autogenerate reports a change on every run, and ``make migration`` would write
-# a drop and recreate of it. Postgres reflects it faithfully and keeps comparing.
-_EXPRESSION_INDEXES = frozenset(
-    index.name
-    for table in target_metadata.tables.values()
-    for index in table.indexes
-    if any(not isinstance(element, Column) for element in index.expressions)
-)
+
+def _index_signature(index) -> tuple[bool, list[str]]:
+    """Uniqueness and column names, with ``created_at DESC`` read as ``created_at``."""
+    return bool(index.unique), [
+        element.name if isinstance(element, Column) else str(element).split()[0]
+        for element in index.expressions
+    ]
 
 
 def include_object(object_, name, type_, reflected, compare_to):
+    """Drop one false change: an index mixing columns and an expression.
+
+    SQLite reflects file_storage's ``tenant_browse`` (``created_at DESC``, framework
+    0.0.44) as plain columns, so autogenerate reports a change on every run and
+    ``make migration`` would write a drop and recreate of it. Only that comparison
+    is skipped, and only when the columns agree: one on other columns is still
+    reported. Postgres reflects it faithfully, so CI's check there sees the rest.
+    """
     if (
         type_ == "index"
-        and name in _EXPRESSION_INDEXES
+        and compare_to is not None
         and context.get_context().dialect.name == "sqlite"
+        and any(not isinstance(element, Column) for element in object_.expressions)
+        and _index_signature(object_) == _index_signature(compare_to)
     ):
         return False
     return _include_object(object_, name, type_, reflected, compare_to)
