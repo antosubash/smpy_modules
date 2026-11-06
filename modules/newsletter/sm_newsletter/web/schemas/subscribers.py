@@ -15,6 +15,7 @@ from sm_records.contracts.newsletter_admin import (
 )
 
 from sm_newsletter.campaigns.audience import MAX_SEGMENT_ID, MAX_TAG_LEN
+from sm_newsletter.subscribers.actions import MAX_TAG_VALUES
 from sm_newsletter.subscribers.browse import SubscriberDetail, SubscriberRow
 from sm_newsletter.subscribers.engagement import Engagement
 from sm_newsletter.web.schemas.suppressions import SuppressionOut
@@ -29,6 +30,17 @@ class SubscriberSearchIn(BaseModel):
     segment: int | None = Field(default=None, ge=1, le=MAX_SEGMENT_ID)
     offset: int = Field(default=0, ge=0, le=MAX_BROWSE_OFFSET)
     limit: int = Field(default=50, ge=1, le=MAX_BROWSE_LIMIT)
+
+
+class SubscriberTagsIn(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    add: list[str] = Field(default_factory=list, max_length=MAX_TAG_VALUES)
+    remove: list[str] = Field(default_factory=list, max_length=MAX_TAG_VALUES)
+
+
+class EmptyIn(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
 
 
 class SubscriberOut(BaseModel):

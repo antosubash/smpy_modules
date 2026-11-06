@@ -269,6 +269,7 @@
     "unknown_segment": "Kein solches Segment.",
     "segment_list_mismatch": "Das Segment gehört zu einer anderen Liste.",
     "unknown_tag": "Dieses Tag gibt es auf dieser Liste nicht.",
+    "not_subscribed": "Diese Adresse ist auf dieser Liste nicht angemeldet.",
     "invalid_audience": "Die Zielgruppe ist ungültig.",
     "invalid_query": "Ein Abfrageparameter ist ungültig.",
     "lift_not_allowed": "Diese Sperre kann nicht aufgehoben werden.",

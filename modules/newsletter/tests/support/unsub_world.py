@@ -97,12 +97,16 @@ async def call(
         )
 
 
-async def status_of(state: Any, s: Sent) -> str | None:
-    with tenant_scope(s.tenant):
+async def status_of_uuid(state: Any, tenant: str, uuid: str) -> str | None:
+    with tenant_scope(tenant):
         async with state.session_factory() as db:
-            hits = await subscribers_by_uuid(db, tenant_id=s.tenant, type_key=LIST, uuids=[s.uuid])
-    hit = hits.get(s.uuid)
+            hits = await subscribers_by_uuid(db, tenant_id=tenant, type_key=LIST, uuids=[uuid])
+    hit = hits.get(uuid)
     return None if hit is None else hit.status
+
+
+async def status_of(state: Any, s: Sent) -> str | None:
+    return await status_of_uuid(state, s.tenant, s.uuid)
 
 
 async def suppressions(state: Any, tenant: str) -> list[tuple[str, str, str]]:

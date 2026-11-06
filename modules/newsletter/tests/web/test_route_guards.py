@@ -67,6 +67,8 @@ EXPECTED = {
     ("GET", f"{API}/lists/{{list_type_key}}/audience-count"),
     ("POST", f"{API}/lists/{{list_type_key}}/subscribers/search"),
     ("GET", f"{API}/lists/{{list_type_key}}/subscribers/{{uuid}}"),
+    ("POST", f"{API}/lists/{{list_type_key}}/subscribers/{{uuid}}/tags"),
+    ("POST", f"{API}/lists/{{list_type_key}}/subscribers/{{uuid}}/unsubscribe"),
     ("GET", f"{API}/suppressions"),
     ("POST", f"{API}/suppressions/lookup"),
     ("POST", f"{API}/suppressions/{{suppression_id}}/lift"),

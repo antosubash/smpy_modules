@@ -85,3 +85,11 @@ class SuppressionChanged(NewsletterError):  # noqa: N818 - the state it refuses
     status = 409
     code = "suppression_changed"
     detail = "This suppression changed since it was loaded; reload and try again"
+
+
+class NotSubscribed(NewsletterError):  # noqa: N818 - the state it refuses
+    """Only a confirmed subscriber can be unsubscribed."""
+
+    status = 409
+    code = "not_subscribed"
+    detail = "This address is not subscribed to the list"

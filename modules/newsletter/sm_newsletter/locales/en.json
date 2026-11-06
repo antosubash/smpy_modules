@@ -269,6 +269,7 @@
     "unknown_segment": "No such segment.",
     "segment_list_mismatch": "The segment belongs to a different list.",
     "unknown_tag": "That tag does not exist on this list.",
+    "not_subscribed": "That address is not subscribed to this list.",
     "invalid_audience": "The audience is not valid.",
     "invalid_query": "A query parameter is not valid.",
     "lift_not_allowed": "This suppression cannot be lifted.",
