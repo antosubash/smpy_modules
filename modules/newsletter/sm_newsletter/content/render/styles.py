@@ -28,7 +28,7 @@ def is_color(value: str) -> bool:
 
 def link_style(accent: str) -> str:
     """The link style; ``accent`` must be a hex colour, since it lands in a style attribute."""
-    if not _COLOR.match(accent):
+    if not is_color(accent):
         raise ValueError("accent must be a hex colour")
     return f"color:{accent};text-decoration:underline"
 
@@ -61,7 +61,7 @@ CARD_TEXT = f"margin:0 0 8px;font-family:{FONT};font-size:15px;line-height:1.5;c
 CARD_LINK_BASE = f"font-family:{FONT};font-size:15px;font-weight:bold"
 
 
-def accent_link(accent: str, *, underline: bool = False) -> str:
+def accent_link(accent: str) -> str:
     """A link in the accent colour; validated like :func:`link_style`."""
     link_style(accent)
-    return f"color:{accent};text-decoration:{'underline' if underline else 'none'}"
+    return f"color:{accent};text-decoration:none"
