@@ -13,10 +13,11 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
-from sm_records.contracts.newsletter import SubscriberFilterError
+from sm_records.contracts.newsletter import SubscriberFilterError, can_read_list
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_newsletter.campaigns.access import Roles
 from sm_newsletter.core.constants import TAGS_FIELD
 from sm_newsletter.core.errors_audience import (
     InvalidAudience,
@@ -80,7 +81,7 @@ async def _tag_filters(
 
 
 async def _segment_filters(
-    session: AsyncSession, *, tenant_id: str, list_type_key: str, segment_id: int
+    session: AsyncSession, *, tenant_id: str, list_type_key: str, segment_id: int, roles: Roles
 ) -> list[str]:
     stmt = select(Segment.list_type_key, Segment.filters).where(
         Segment.id == segment_id, Segment.tenant_id == tenant_id
@@ -89,16 +90,24 @@ async def _segment_filters(
     if row is None:
         raise UnknownSegment()
     if row.list_type_key != list_type_key:
+        # Only a caller who may read the segment's own list learns it exists.
+        if not await can_read_list(
+            session, tenant_id=tenant_id, type_key=row.list_type_key, roles=roles
+        ):
+            raise UnknownSegment()
         raise SegmentListMismatch()
     return list(row.filters)
 
 
 async def audience_filters(
-    session: AsyncSession, *, tenant_id: str, list_type_key: str, audience: str
+    session: AsyncSession, *, tenant_id: str, list_type_key: str, audience: str, roles: Roles
 ) -> list[str]:
     """The records filter terms for ``audience`` on ``list_type_key``: none for
     the whole list. 422 ``unknown_tag``, ``unknown_segment`` or
-    ``segment_list_mismatch`` when the list cannot answer it."""
+    ``segment_list_mismatch`` when the list cannot answer it. ``roles`` is the
+    caller (callers have already checked ``list_type_key`` is readable): a
+    segment on another list it cannot read is ``unknown_segment``, like a
+    missing one."""
     parsed = parse_audience(audience)
     if parsed.kind == "all":
         return []
@@ -107,16 +116,16 @@ async def audience_filters(
         assert parsed.tag is not None
         return await _tag_filters(session, **key, tag=parsed.tag)
     assert parsed.segment_id is not None
-    return await _segment_filters(session, **key, segment_id=parsed.segment_id)
+    return await _segment_filters(session, **key, segment_id=parsed.segment_id, roles=roles)
 
 
 async def audience_count(
-    session: AsyncSession, *, tenant_id: str, list_type_key: str, audience: str
+    session: AsyncSession, *, tenant_id: str, list_type_key: str, audience: str, roles: Roles
 ) -> int:
     """Confirmed subscribers of ``list_type_key`` in ``audience`` (suppressions
     not subtracted); 422 ``invalid_segment`` when records refuses a term."""
     filters = await audience_filters(
-        session, tenant_id=tenant_id, list_type_key=list_type_key, audience=audience
+        session, tenant_id=tenant_id, list_type_key=list_type_key, audience=audience, roles=roles
     )
     return await filter_count(
         session, tenant_id=tenant_id, list_type_key=list_type_key, filters=filters

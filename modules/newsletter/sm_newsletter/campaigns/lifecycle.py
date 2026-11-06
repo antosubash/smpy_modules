@@ -96,7 +96,7 @@ async def schedule(
         raise StaleCampaign()
     await check_list(session, tenant_id=tenant_id, type_key=campaign.list_type_key, roles=roles)
     key = {"tenant_id": tenant_id, "list_type_key": campaign.list_type_key}
-    filters = await audience_filters(session, **key, audience=campaign.audience)
+    filters = await audience_filters(session, **key, audience=campaign.audience, roles=roles)
     await filter_count(session, **key, filters=filters)  # G6: what records cannot answer, now
     check_sender(settings)
     check_campaign_headers(campaign)

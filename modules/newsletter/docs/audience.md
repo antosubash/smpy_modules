@@ -52,6 +52,10 @@ A campaign's `audience` is one of:
 - `tag:<value>`: exactly one tag, which must be a choice of the list's `tags`
   field (`422 unknown_tag` otherwise). Several tags is a segment;
 - `segment:<id>`: a segment of the tenant that belongs to the campaign's list.
+  A segment of another list is `422 segment_list_mismatch` only when the caller
+  may read that list; one on a list they cannot read answers `422
+  unknown_segment` exactly like a missing id, on the audience count, the
+  subscriber search and a campaign PATCH alike (no existence oracle).
 
 A PATCH validates the audience against the new or current list, and an invalid
 one never echoes the submitted value.

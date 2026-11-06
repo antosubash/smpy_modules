@@ -65,6 +65,7 @@ async def _filters(
     list_type_key: str,
     tag: str | None,
     segment_id: int | None,
+    roles: Roles,
 ) -> list[str]:
     out: list[str] = []
     for audience in (
@@ -73,7 +74,11 @@ async def _filters(
     ):
         if audience is not None:
             out += await audience_filters(
-                session, tenant_id=tenant_id, list_type_key=list_type_key, audience=audience
+                session,
+                tenant_id=tenant_id,
+                list_type_key=list_type_key,
+                audience=audience,
+                roles=roles,
             )
     return out
 
@@ -100,7 +105,12 @@ async def browse(
 ) -> BrowseResult:
     await require_list(session, tenant_id=tenant_id, list_type_key=list_type_key, roles=roles)
     filters = await _filters(
-        session, tenant_id=tenant_id, list_type_key=list_type_key, tag=tag, segment_id=segment_id
+        session,
+        tenant_id=tenant_id,
+        list_type_key=list_type_key,
+        tag=tag,
+        segment_id=segment_id,
+        roles=roles,
     )
     try:
         page = await browse_subscribers(

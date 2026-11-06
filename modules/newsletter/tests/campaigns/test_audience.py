@@ -19,7 +19,7 @@ from sm_newsletter.core.errors_audience import (
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import Segment
 
-from tests.support.records_seed import TAGS, seed_list, seed_subscriber
+from tests.support.records_seed import TAGS, restrict_list, seed_list, seed_subscriber
 
 T = "default"
 
@@ -32,8 +32,10 @@ async def _segment(db, *, key="news", tenant=T, filters=("tags:in:vip",)) -> int
         return seg.id
 
 
-async def _filters(db, audience, *, key="news", tenant=T):
-    return await audience_filters(db, tenant_id=tenant, list_type_key=key, audience=audience)
+async def _filters(db, audience, *, key="news", tenant=T, roles=None):
+    return await audience_filters(
+        db, tenant_id=tenant, list_type_key=key, audience=audience, roles=roles
+    )
 
 
 def test_parse_audience_forms():
@@ -81,6 +83,17 @@ async def test_segment_filters_mismatch_and_unknown(db_state, db):
         await _filters(db, f"segment:{sid + 100}")
 
 
+async def test_segment_on_unreadable_list_is_unknown(db_state, db):
+    await seed_list(db_state, T, fields=[TAGS])
+    await seed_list(db_state, T, "other", fields=[TAGS])
+    sid = await _segment(db, key="other")
+    await restrict_list(db_state, T, "other", ["editor"])
+    with pytest.raises(UnknownSegment):
+        await _filters(db, f"segment:{sid}", roles=[])
+    with pytest.raises(SegmentListMismatch):
+        await _filters(db, f"segment:{sid}", roles=["editor"])
+
+
 @pytest.mark.unbound_tenant
 async def test_segment_of_other_tenant_is_unknown(db_state, db):
     await seed_list(db_state, T, fields=[TAGS])
@@ -97,6 +110,11 @@ async def test_audience_count(db_state, db):
     await seed_subscriber(db_state, T, "a@example.org", "confirmed", data={"tags": ["vip"]})
     await seed_subscriber(db_state, T, "b@example.org", "confirmed", data={"tags": ["events"]})
     await seed_subscriber(db_state, T, "c@example.org", "pending", data={"tags": ["vip"]})
-    count = await audience_count(db, tenant_id=T, list_type_key="news", audience="tag:vip")
+    count = await audience_count(
+        db, tenant_id=T, list_type_key="news", audience="tag:vip", roles=None
+    )
     assert count == 1
-    assert await audience_count(db, tenant_id=T, list_type_key="news", audience="all") == 2
+    everyone = await audience_count(
+        db, tenant_id=T, list_type_key="news", audience="all", roles=None
+    )
+    assert everyone == 2

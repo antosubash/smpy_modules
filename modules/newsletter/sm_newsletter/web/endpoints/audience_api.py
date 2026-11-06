@@ -58,10 +58,10 @@ async def count_audience(
 ) -> CountOut:
     if len(audience) > MAX_AUDIENCE_LEN:  # here, not in the signature: a 422 never echoes it
         raise InvalidAudience()
-    readable = await readable_lists(db, tenant_id=tenant, roles=caller_roles(request))
-    if list_type_key not in readable:
+    roles = caller_roles(request)
+    if list_type_key not in await readable_lists(db, tenant_id=tenant, roles=roles):
         raise NotFound()
     count = await audience_count(
-        db, tenant_id=tenant, list_type_key=list_type_key, audience=audience
+        db, tenant_id=tenant, list_type_key=list_type_key, audience=audience, roles=roles
     )
     return CountOut(count=count)

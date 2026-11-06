@@ -15,6 +15,7 @@ from simple_module_db.tenancy import all_tenants
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_newsletter.campaigns.access import Roles
 from sm_newsletter.campaigns.audience import audience_count
 from sm_newsletter.campaigns.lifecycle import SENDING, split_paused
 from sm_newsletter.core import tenancy
@@ -134,6 +135,7 @@ async def estimate(
     tenant_id: str,
     campaign: Campaign,
     at: datetime,
+    roles: Roles,
 ) -> EstimateOut:
     """When a send starting at ``at`` would end. The recipient count is approximate:
     suppressions are not subtracted."""
@@ -142,6 +144,7 @@ async def estimate(
         tenant_id=tenant_id,
         list_type_key=campaign.list_type_key,
         audience=campaign.audience,
+        roles=roles,
     )
     ahead = await queued_ahead(factory, started_before=None, exclude_campaign_id=None)
     rate = daily_rate(settings)
