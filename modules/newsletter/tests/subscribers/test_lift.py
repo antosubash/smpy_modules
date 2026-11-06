@@ -22,7 +22,7 @@ from sm_newsletter.subscribers.lift import NOTE_MAX, lift, list_lifts
 from sm_newsletter.subscribers.suppressions import rows_for_email
 
 from tests.support.lift_world import lifts, purge, rows, seed_row
-from tests.support.records_seed import seed_list, seed_subscriber
+from tests.support.records_seed import restrict_list, seed_list, seed_subscriber
 
 pytestmark = pytest.mark.unbound_tenant
 
@@ -37,7 +37,9 @@ async def _row(db_state, email=ADA, tenant="default"):
     return found[0]
 
 
-async def _lift(db_state, row, *, email=ADA, note="asked us by phone", version=None, sid=None):
+async def _lift(
+    db_state, row, *, email=ADA, note="asked us by phone", version=None, sid=None, roles=None
+):
     with tenant_scope("default"):
         async with db_state.session_factory() as s:
             token = current_user_id.set("admin-1")
@@ -45,7 +47,7 @@ async def _lift(db_state, row, *, email=ADA, note="asked us by phone", version=N
                 out = await lift(
                     s,
                     tenant_id="default",
-                    roles=None,
+                    roles=roles,
                     suppression_id=row.id if sid is None else sid,
                     version=row.version if version is None else version,
                     email=email,
@@ -177,3 +179,34 @@ async def test_reconcile_does_not_resurrect_lifted_unsubscribe(db_state):
     await _lift(db_state, row)
     result = await reconcile_async(db_state.session_factory, now=NOW)
     assert result["suppressed"] == 0 and await rows(db_state) == []
+
+
+async def test_restricted_list_lift_is_404(db_state):
+    """Focus 5: a write on a row of a list the caller cannot read is a 404."""
+    row = await _unsubscribed_row(db_state, NOW - timedelta(hours=1))
+    await seed_subscriber(db_state, "default", ADA, "confirmed")  # liftable for a reader
+    await restrict_list(db_state, "default", "news", ["editor"])
+    with pytest.raises(NotFound):
+        await _lift(db_state, row, roles=["viewer"])
+    assert len(await rows(db_state)) == 1 and await lifts(db_state) == []
+    await _lift(db_state, row, roles=["editor"])
+    assert await rows(db_state) == []
+
+
+async def test_restricted_list_lifts_hidden(db_state):
+    """Focus 5: a lift on a list the caller cannot read is absent from the log
+    and its total; a tenant-wide lift stays visible."""
+    row = await _unsubscribed_row(db_state, NOW - timedelta(hours=1))
+    await seed_subscriber(db_state, "default", ADA, "confirmed")
+    await _lift(db_state, row)
+    await seed_row(db_state, "default", "bo@example.org", "hard_bounce", at=NOW)
+    await _lift(db_state, await _row(db_state, email="bo@example.org"), email="bo@example.org")
+    await restrict_list(db_state, "default", "news", ["editor"])
+
+    async def log(roles):
+        async with db_state.session_factory() as s:
+            page, total = await list_lifts(s, tenant_id="default", roles=roles, offset=0, limit=10)
+        return sorted(r.reason for r in page), total
+
+    assert await log(["viewer"]) == (["hard_bounce"], 1)
+    assert await log(["editor"]) == (["hard_bounce", "unsubscribed"], 2)

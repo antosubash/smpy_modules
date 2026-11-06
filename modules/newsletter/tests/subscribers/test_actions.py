@@ -85,6 +85,24 @@ async def test_unknown_tag_refused_nothing_written(world):
     assert (await _tags(world, uuid, remove=["gone"])).tags == ["vip"]
 
 
+async def test_choice_removed_before_the_write_is_unknown_tag(world, monkeypatch):
+    """Records refusing a tag that stopped being a choice after the check is a
+    422 ``unknown_tag``, not a 500, and writes nothing."""
+    from sm_newsletter.subscribers import actions
+
+    _, state, seen = world
+    uuid = await seed_subscriber(state, "default", ADA, "confirmed", data={"tags": ["vip"]})
+
+    async def everything(*_args: Any) -> set[str]:
+        return {"vip", "events", "retired"}
+
+    monkeypatch.setattr(actions, "_choices", everything)
+    with pytest.raises(UnknownTag):
+        await _tags(world, uuid, add=["retired"])
+    assert seen == []
+    assert (await _tags(world, uuid)).tags == ["vip"]
+
+
 async def test_tag_input_bounds(world):
     _, state, _ = world
     uuid = await seed_subscriber(state, "default", ADA, "confirmed", data={"tags": []})

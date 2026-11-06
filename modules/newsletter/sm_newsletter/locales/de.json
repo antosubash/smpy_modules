@@ -434,7 +434,7 @@
     "unknown_list": "Keine solche Newsletter-Liste.",
     "invalid_segment": "Das Segment ist ungültig.",
     "segment_name_taken": "Auf dieser Liste gibt es bereits ein Segment mit diesem Namen.",
-    "segment_in_use": "Eine Kampagnenvorlage verwendet dieses Segment noch.",
+    "segment_in_use": "Ein Kampagnenentwurf verwendet dieses Segment noch.",
     "unknown_segment": "Kein solches Segment.",
     "segment_list_mismatch": "Das Segment gehört zu einer anderen Liste.",
     "unknown_tag": "Dieses Tag gibt es auf dieser Liste nicht.",

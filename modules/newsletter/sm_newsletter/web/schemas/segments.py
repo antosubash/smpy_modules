@@ -31,7 +31,7 @@ class SegmentCreate(BaseModel):
 
 
 class SegmentPatch(BaseModel):
-    """The list cannot change; a field sent as ``null`` is refused."""
+    """The list cannot change; a field left out or sent as ``null`` stays as it is."""
 
     model_config = ConfigDict(extra="forbid")
 

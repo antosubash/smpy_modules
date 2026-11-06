@@ -112,3 +112,19 @@ async def test_list_fields_unreadable_list_404(built, client):
     assert (await client.get(f"{API}/lists/nope/fields", headers=VIEW)).status_code == 404
     ok = await client.get(f"{API}/lists/news/fields", headers={**VIEW, "x-roles": "editor"})
     assert ok.status_code == 200
+
+
+async def test_records_refusal_never_echoes_the_value(built, client):
+    """A number records cannot quantize passes newsletter's own check and is
+    refused by records; the 422 names records' reason only, never the value."""
+    _, state = built
+    score = {"key": "score", "type": "number", "label": "Score", "indexed": True}
+    await seed_list(state, "default", "scored", fields=[score])
+    body = {"list_type_key": "scored", "rules": [{"field": "score", "op": "gt", "value": "1e30"}]}
+    res = await client.post(f"{BASE}/preview", json=body, headers=VIEW)
+    assert res.status_code == 422, res.text
+    assert res.json()["code"] == "invalid_segment"
+    assert "1e30" not in res.text
+    assert "score" not in res.json()["detail"].removeprefix("filter: ")
+    created = await client.post(BASE, json={"name": "n", **body}, headers=EDIT)
+    assert created.status_code == 422 and "1e30" not in created.text

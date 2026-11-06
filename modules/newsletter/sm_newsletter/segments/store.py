@@ -43,12 +43,12 @@ async def filter_count(
             session, tenant_id=tenant_id, type_key=list_type_key, filters=filters
         )
     except SubscriberFilterError as exc:
-        raise InvalidSegment(f"filter: {exc}") from None
+        raise InvalidSegment(f"filter: {exc.reason}") from None
 
 
 async def _compile(
     session: AsyncSession, *, tenant_id: str, list_type_key: str, rules: list[Rule]
-) -> list[str]:
+) -> tuple[list[str], int]:
     fields = await fields_for(session, tenant_id=tenant_id, list_type_key=list_type_key)
     try:
         filters = compile_rules(rules, fields)

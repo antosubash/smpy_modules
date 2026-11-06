@@ -17,6 +17,7 @@ from sm_records.contracts.newsletter import (
     SubscriberFilterError,
     SubscriberHit,
     SubscriberNotFound,
+    ValidationFailed,
     set_tags,
     subscribers_by_uuid,
     unsubscribe,
@@ -105,6 +106,8 @@ async def set_subscriber_tags(
         )
     except (SubscriberNotFound, SubscriberFilterError):
         raise NotFound() from None
+    except ValidationFailed:  # a choice removed since _choices read it
+        raise UnknownTag() from None
     await finalize_session(session)
     return hit
 
