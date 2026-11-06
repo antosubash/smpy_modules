@@ -14,9 +14,9 @@ from sm_records.contracts.newsletter_admin import lock_confirmation
 from sm_records.contracts.newsletter_import import ImportRow
 from sm_records.core import events
 from sm_records.core.tenancy import tenant_scope
-from sm_records.models import RecordType
+from sm_records.models import RecordType, tables_for
 from sm_records.records.services import records as record_service
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from tests.pg_support import USING_POSTGRES
 from tests.support.newsletter_contract import TENANT, session, unbound
@@ -56,7 +56,7 @@ async def test_concurrent_signup_conflict_redecides(site):
     assert (await stored(site, ADA)).data["sm_status"] == "pending"
 
 
-@pytest.mark.parametrize(
+PATHS = pytest.mark.parametrize(
     ("row", "outcome"),
     [
         (
@@ -65,8 +65,12 @@ async def test_concurrent_signup_conflict_redecides(site):
         ),
         (ImportRow(email=ADA, status="confirmed", tags=["a"]), "updated"),
     ],
+    ids=["unsubscribe", "merge"],
 )
-async def test_import_takes_the_row_lock(site, row, outcome):
+
+
+@PATHS
+async def test_import_waits_for_lock_confirmation(site, row, outcome):
     await make_list(site)
     await seed(site, ADA, confirmed_at=T)
     async with session(site) as first:
@@ -77,3 +81,56 @@ async def test_import_takes_the_row_lock(site, row, outcome):
         assert not task.done()
         await first.commit()
     assert outcomes(await asyncio.wait_for(task, 10)) == {ADA: outcome}
+
+
+@PATHS
+async def test_import_takes_the_row_lock(site, row, outcome):
+    """Session 1 holds only Ada's row lock (no type lock), so the import's
+    batch-start type lock passes and only its ``lock_record`` can wait."""
+    await make_list(site)
+    await seed(site, ADA, confirmed_at=T)
+    ada = await stored(site, ADA)
+    async with session(site) as first:
+        with unbound(), tenant_scope(TENANT):
+            rtype = (
+                await first.execute(select(RecordType).where(RecordType.key == KEY))
+            ).scalar_one()
+            cls = tables_for(rtype).record
+            await first.execute(select(cls.id).where(cls.id == ada.id).with_for_update())
+        task = asyncio.create_task(run(site, [row]))
+        await asyncio.sleep(0.3)
+        assert not task.done()
+        await first.commit()
+    assert outcomes(await asyncio.wait_for(task, 10)) == {ADA: outcome}
+
+
+@PATHS
+async def test_import_decides_from_the_locked_row(site, row, outcome):
+    """Session 1 holds Ada's row lock and unsubscribes her (a raw write, so
+    no type lock): the import decides from the row as committed under the
+    lock, ``kept_unsubscribed``, and writes nothing."""
+    del outcome  # the same for both paths here
+    await make_list(site)
+    await seed(site, ADA, confirmed_at=T)
+    ada = await stored(site, ADA)
+    left = {**ada.data, "sm_status": "unsubscribed", "sm_confirmed_at": None}
+    async with session(site) as first:
+        with unbound(), tenant_scope(TENANT):
+            rtype = (
+                await first.execute(select(RecordType).where(RecordType.key == KEY))
+            ).scalar_one()
+            cls = tables_for(rtype).record
+            await first.execute(select(cls.id).where(cls.id == ada.id).with_for_update())
+            await first.execute(
+                update(cls)
+                .where(cls.id == ada.id)
+                .values(data=left, version=ada.version + 1)
+                .execution_options(synchronize_session=False)
+            )
+        task = asyncio.create_task(run(site, [row]))
+        await asyncio.sleep(0.3)
+        assert not task.done()
+        await events.commit(first)
+    assert outcomes(await asyncio.wait_for(task, 10)) == {ADA: "kept_unsubscribed"}
+    after = await stored(site, ADA)
+    assert (after.version, after.data["sm_status"]) == (ada.version + 1, "unsubscribed")

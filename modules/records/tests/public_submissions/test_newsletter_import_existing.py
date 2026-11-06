@@ -11,6 +11,7 @@ from datetime import timedelta
 
 import pytest
 from sm_records.contracts.newsletter_import import ImportRow
+from sm_records.records.services import records as record_service
 
 from tests.support.newsletter_import import NOW, T, make_list, outcomes, run, seed, stored
 
@@ -101,3 +102,33 @@ async def test_trashed_is_never_written(site):
     assert set(outcomes(await run(site, rows)).values()) == {"trashed"}
     after = [await stored(site, e) for e in (ADA, "bob@example.org")]
     assert [(r.version, r.is_deleted) for r in after] == [(r.version, True) for r in before]
+
+
+async def test_existing_record_is_decided_under_the_row_lock(site, monkeypatch):
+    """Both paths into a confirmed record take PR 6's ``lock_record`` before
+    they write (the merge's ``update_record`` comes after it)."""
+    from sm_records.public_submissions import campaign_import_rows
+
+    await make_list(site)
+    await seed(site, ADA)
+    await seed(site, "bob@example.org", confirmed_at=T)
+    calls: list[str] = []
+    lock, update = campaign_import_rows.lock_record, record_service.update_record
+
+    async def locking(db, rtype, record):
+        calls.append(f"lock {record.data['sm_email']}")
+        return await lock(db, rtype, record)
+
+    async def updating(db, rtype, record, **kw):
+        calls.append(f"update {record.data['sm_email']}")
+        return await update(db, rtype, record, **kw)
+
+    monkeypatch.setattr(campaign_import_rows, "lock_record", locking)
+    monkeypatch.setattr(campaign_import_rows.record_service, "update_record", updating)
+    rows = [
+        row(ADA, tags=["a"]),
+        row("bob@example.org", "unsubscribed", unsubscribed_at=T + timedelta(1)),
+    ]
+    assert [r.outcome for r in await run(site, rows)] == ["updated", "unsubscribed"]
+    assert calls[:2] == [f"lock {ADA}", f"update {ADA}"]
+    assert calls[2] == "lock bob@example.org"

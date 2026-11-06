@@ -1838,6 +1838,13 @@ Part 2:
   more than `MAX_IMPORT_BATCH` (500) rows, one address twice after normalising,
   a naive datetime or an unknown status; `not_a_list` for a type that is not a
   list, `LookupError` for no such list.
+
+  **The caller must check `opted_out_anywhere` first** (D1): this call decides
+  only from the record on *this* list, so a subscribed row for someone
+  unsubscribed on another of the tenant's lists (trash included) would be
+  created `confirmed` here. Skip every `confirmed` row whose address
+  `opted_out_anywhere` reports (newsletter's import does, together with its
+  own suppressions) before passing the batch in.
 - **`opted_out_anywhere(session, *, tenant_id, emails)`** returns the
   normalised addresses among `emails` that are `unsubscribed` on any of the
   tenant's lists, trash included: one indexed query per list. At most 500

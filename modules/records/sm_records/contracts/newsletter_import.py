@@ -175,6 +175,11 @@ async def import_subscribers(
     the batch runs inside ``events.muted`` (R5). Writes no suppression: that is
     the caller's.
 
+    **The caller must skip every confirmed row whose address
+    :func:`opted_out_anywhere` reports** (D1): this call decides only from the
+    record on *this* list, so someone unsubscribed on another list of the
+    tenant would otherwise be created confirmed here.
+
     ``ValueError`` before any query for more than ``MAX_IMPORT_BATCH`` rows, an
     address twice (after normalising), a naive datetime or an unknown status;
     ``SubscriberFilterError("not_a_list")`` for a type that is not a list,

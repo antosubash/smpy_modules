@@ -23,8 +23,11 @@ from sm_records.contracts.newsletter_import import (
 from sm_records.core import events
 from sm_records.core.locales import default
 from sm_records.core.tenancy import tenant_scope
+from sm_records.models import RecordType
 from sm_records.public_submissions.campaign_reads import moment
+from sm_records.records.services import records as record_service
 from sm_records.records.services import types as type_service
+from sqlalchemy import select
 
 from tests.support.app_harness import field
 from tests.support.newsletter_contract import TENANT, session, unbound
@@ -39,6 +42,7 @@ from tests.support.newsletter_import import (
     run,
     seed,
     stored,
+    system,
 )
 
 ADA = "ada@example.org"
@@ -155,6 +159,17 @@ async def test_import_publishes_no_events(site):
         "invalid",
     ]
     assert spy.seen == []
+    # Positive control: the same spy, attached the same way, sees an
+    # ordinary (unmuted) write, so the silence above is the import's.
+    async with session(site) as db:
+        events.attach(db, spy)
+        with unbound(), tenant_scope(TENANT):
+            rtype = (await db.execute(select(RecordType).where(RecordType.key == KEY))).scalar_one()
+            await record_service.create_record(
+                db, rtype, data={}, settings=SETTINGS, system=system("ctl@x.org", "confirmed")
+            )
+        await events.commit(db)
+    assert [type(e).__name__ for e in spy.seen] == ["RecordCreated"]
 
 
 async def test_invalid_value_is_dropped_not_fatal(site):
