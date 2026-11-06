@@ -95,7 +95,7 @@ class SubscriberDetailOut(BaseModel):
             for row, block in d.suppressions
         ]
         return cls(
-            subscriber=SubscriberOut.of(SubscriberRow(hit=d.hit, suppressed=bool(d.suppressions))),
+            subscriber=SubscriberOut.of(SubscriberRow(hit=d.hit, suppressed=d.suppressed)),
             engagement=EngagementOut.of(d.engagement),
             suppressions=sup,
             records_url=d.records_url,

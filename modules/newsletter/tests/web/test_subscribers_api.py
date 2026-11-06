@@ -8,7 +8,8 @@ from sm_newsletter.core import constants
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from tests.support.app import build_app
-from tests.support.records_seed import TAGS, seed_list, seed_subscriber
+from tests.support.lift_world import seed_row
+from tests.support.records_seed import TAGS, restrict_list, seed_list, seed_subscriber
 
 API = constants.ROUTE_PREFIX_API
 SEARCH = f"{API}/lists/news/subscribers/search"
@@ -103,10 +104,21 @@ async def test_search_is_a_post_body(client):
     posted = list(SEEN)
     got = await client.get(f"{API}/lists/news/subscribers?q=ada@", headers=VIEW)
     assert got.status_code in (404, 405)
-    assert posted and not any("ada" in url for url in posted)
+    assert posted and not any("ada" in url or "q=" in url for url in posted)
 
 
 async def test_bad_uuid_404(client):
     for bad in ("nope", "A" * 32, "a" * 31):
         res = await client.get(f"{API}/lists/news/subscribers/{bad}", headers=VIEW)
         assert res.status_code == 404, bad
+
+
+async def test_unreadable_opt_out_still_marks_suppressed(built, client):
+    _, state, ada = built
+    await seed_list(state, "default", key="other")
+    await seed_row(state, "default", ADA, "unsubscribed", key="other")
+    await restrict_list(state, "default", "other", ["editor"])
+    res = await client.get(f"{API}/lists/news/subscribers/{ada}", headers=VIEW)
+    body = res.json()
+    assert res.status_code == 200, res.text
+    assert body["subscriber"]["suppressed"] is True and body["suppressions"] == []

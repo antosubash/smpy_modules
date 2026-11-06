@@ -21,23 +21,18 @@ from sm_records.contracts.newsletter_admin import (
     subscriber_admin_url,
     subscriber_status_counts,
 )
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns.access import Roles, require_list
 from sm_newsletter.campaigns.audience import audience_filters
 from sm_newsletter.core.errors import NotFound
 from sm_newsletter.core.errors_audience import InvalidSegment
-from sm_newsletter.core.suppression import email_hash
-from sm_newsletter.core.tenancy import tenant_scope
-from sm_newsletter.models import Suppression
+from sm_newsletter.core.suppression import normalise_email, suppressed
 from sm_newsletter.subscribers.engagement import Engagement, engagement
 from sm_newsletter.subscribers.lift import subscriber_on_list
 from sm_newsletter.subscribers.suppressions import SuppressionRow, lift_block, rows_for_email
 
 __all__ = ["BrowseResult", "SubscriberDetail", "SubscriberRow", "browse", "detail"]
-
-_T = Suppression.__table__
 
 
 @dataclass(frozen=True)
@@ -58,6 +53,8 @@ class SubscriberDetail:
     hit: SubscriberHit
     engagement: Engagement
     suppressions: list[tuple[SuppressionRow, str | None]]
+    suppressed: bool
+    """Tenant-wide, as sending reads it: not narrowed by what the caller may see."""
     records_url: str
 
 
@@ -81,25 +78,11 @@ async def _filters(
     return out
 
 
-async def _suppressed(
-    session: AsyncSession, *, tenant_id: str, list_type_key: str, emails: list[str]
-) -> set[str]:
-    """The hashes among ``emails`` suppressed on this list (or address-wide)."""
-    hashes: set[str] = set()
-    for email in emails:
-        try:
-            hashes.add(email_hash(email))
-        except ValueError:
-            continue
-    if not hashes:
-        return set()
-    with tenant_scope(tenant_id):
-        stmt = select(_T.c.email_hash).where(
-            _T.c.tenant_id == tenant_id,
-            _T.c.email_hash.in_(hashes),
-            _T.c.list_type_key.in_(("", list_type_key)),
-        )
-        return {h for (h,) in (await session.execute(stmt)).all()}
+def _is_in(email: str, stopped: set[str]) -> bool:
+    try:
+        return normalise_email(email) in stopped
+    except ValueError:
+        return False
 
 
 async def browse(
@@ -135,20 +118,8 @@ async def browse(
         )
     except SubscriberFilterError:
         raise InvalidSegment("filter: refused") from None
-    stopped = await _suppressed(
-        session,
-        tenant_id=tenant_id,
-        list_type_key=list_type_key,
-        emails=[h.email for h in page.items],
-    )
-
-    def flag(email: str) -> bool:
-        try:
-            return email_hash(email) in stopped
-        except ValueError:
-            return False
-
-    rows = [SubscriberRow(hit=h, suppressed=flag(h.email)) for h in page.items]
+    stopped = await suppressed(session, tenant_id=tenant_id, emails=[h.email for h in page.items])
+    rows = [SubscriberRow(hit=h, suppressed=_is_in(h.email, stopped)) for h in page.items]
     return BrowseResult(rows=rows, total=page.total, counts=counts)
 
 
@@ -187,5 +158,8 @@ async def detail(
         hit=hit,
         engagement=await engagement(session, tenant_id=tenant_id, record_uuid=uuid),
         suppressions=suppressions,
+        suppressed=_is_in(
+            hit.email, await suppressed(session, tenant_id=tenant_id, emails=[hit.email])
+        ),
         records_url=subscriber_admin_url(list_type_key, uuid),
     )

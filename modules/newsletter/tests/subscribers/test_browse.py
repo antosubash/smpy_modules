@@ -85,10 +85,12 @@ async def _bad_segment(db_state):
 async def test_suppressed_flag(db_state):
     await _world(db_state)
     await seed_row(db_state, "default", ADA, "hard_bounce")
-    await seed_row(db_state, "default", BOB, "unsubscribed", key="other")  # another list
+    await seed_row(
+        db_state, "default", BOB, "unsubscribed", key="other"
+    )  # tenant-wide: still suppressed here
     res = await _browse(db_state)
     flags = {r.hit.email: r.suppressed for r in res.rows}
-    assert flags == {ADA: True, BOB: False, CY: False, DI: False}
+    assert flags == {ADA: True, BOB: True, CY: False, DI: False}
 
 
 async def test_unreadable_or_non_list_is_404(db_state):
@@ -127,3 +129,16 @@ async def test_detail_other_tenants_uuid_404(db_state):
     async with db_state.session_factory() as s:
         with pytest.raises(NotFound):
             await detail(s, tenant_id="default", list_type_key="news", uuid=theirs, roles=None)
+
+
+async def test_detail_suppressed_is_tenant_wide_not_visibility_filtered(db_state):
+    ids = await _world(db_state)
+    await seed_list(db_state, "default", key="other")
+    await seed_row(db_state, "default", BOB, "unsubscribed", key="other")
+    await restrict_list(db_state, "default", "other", ["editor"])
+    async with db_state.session_factory() as s:
+        got = await detail(
+            s, tenant_id="default", list_type_key="news", uuid=ids["bob"], roles=["viewer"]
+        )
+    assert got.suppressed is True
+    assert got.suppressions == []
