@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi.routing import iter_route_contexts
+from simple_module_core.app_state import get_body_limits
 from simple_module_db import build_module_metadata
 from simple_module_hosting import Settings, create_app
 
@@ -17,6 +18,8 @@ NEWSLETTER_TABLES = {
     "newsletter_suppression",
     "newsletter_suppression_lift",
     "newsletter_dispatch_lock",
+    "newsletter_import",
+    "newsletter_import_row",
 }
 
 
@@ -41,6 +44,7 @@ MENU_URLS = {
     "/admin/newsletter/segments",
     "/admin/newsletter/subscribers",
     "/admin/newsletter/suppressions",
+    "/admin/newsletter/import",
     "/admin/newsletter/settings",
 }
 
@@ -99,3 +103,18 @@ def test_people_screens_are_mounted():
     assert perms["/admin/newsletter/segments"] == {"newsletter.view"}
     assert perms["/admin/newsletter/subscribers"] == {"newsletter.view", "records.view"}
     assert perms["/admin/newsletter/suppressions"] == {"newsletter.manage"}
+
+
+def test_import_is_mounted():
+    app = create_app(Settings())
+    routes = {(ctx.path, m) for ctx in iter_route_contexts(app.routes) for m in ctx.methods or ()}
+    assert ("/admin/newsletter/import", "GET") in routes
+    assert ("/api/newsletter/imports", "POST") in routes
+    items = {
+        i.url: set(i.permissions)
+        for i in app.state.sm.menu_registry.all_items
+        if i.group == "Newsletter"
+    }
+    assert items["/admin/newsletter/import"] == {"newsletter.manage"}
+    limit = get_body_limits(app).limit_for("POST", "/api/newsletter/imports")
+    assert limit is not None and limit > Settings().max_request_body_bytes

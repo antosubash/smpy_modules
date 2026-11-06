@@ -12,7 +12,7 @@ be mailed again: unsubscribes, hard bounces, complaints). Design:
 `docs/superpowers/specs/2026-11-03-newsletter-module-design.md` in the source
 repo; the guide is [`docs/index.md`](docs/index.md).
 
-**Status: sending.** You can write a campaign in a Puck editor, preview it as the
+**Status: complete.** You can write a campaign in a Puck editor, preview it as the
 server renders it, send a test to up to five addresses, and send it to a list:
 a beat task (`newsletter.dispatch`) freezes the audience and sends within a
 daily cap and a per-minute rate, with retries, pause, resume and cancel, and an
@@ -21,7 +21,10 @@ unsubscribe page with RFC 8058 one-click. Open and click tracking and a campaign
 and the URL rules, [`docs/sending.md`](docs/sending.md) for how sending works and
 [`docs/operations.md`](docs/operations.md) for what must run (worker and beat,
 the secret, the DKIM checklist). Segments, campaign audiences, the subscriber
-screen and suppression lifts: [`docs/audience.md`](docs/audience.md).
+screen and suppression lifts: [`docs/audience.md`](docs/audience.md). A one-time
+Mailchimp import (ZIP or CSVs, statuses and tags kept, opt-outs and bounces
+become suppressions, nothing is ever resubscribed or confirmed):
+[`docs/import.md`](docs/import.md).
 
 ## Install
 
@@ -65,6 +68,7 @@ Changing the SMTP host, port, security or username clears the stored password.
 | Segments | `/admin/newsletter/segments` | `newsletter.view` (edit: `newsletter.edit`) |
 | Subscribers | `/admin/newsletter/subscribers` | `newsletter.view` and `records.view` |
 | Suppressions | `/admin/newsletter/suppressions` | `newsletter.manage` |
+| Import | `/admin/newsletter/import` | `newsletter.manage` |
 | Settings | `/admin/newsletter/settings` | `newsletter.manage` |
 
 ### Permissions
@@ -74,7 +78,7 @@ Changing the SMTP host, port, security or username clears the stored password.
 | `newsletter.view` | See campaigns and preview them, reports, segments; with `records.view`, the subscriber screen |
 | `newsletter.edit` | Create and edit campaigns and segments; tag and untag subscribers (with `records.view`) |
 | `newsletter.send` | Send a test; later, start, pause, resume and cancel a send |
-| `newsletter.manage` | The settings page (saving it and the SMTP password also need `settings.edit`), the suppressions screen and its lifts, and unsubscribing a subscriber (with `records.view`) |
+| `newsletter.manage` | The settings page (saving it and the SMTP password also need `settings.edit`), the suppressions screen and its lifts, and unsubscribing a subscriber (with `records.view`), the Mailchimp import and creating a list (a records list type, without `records.manage_types`) |
 
 Every entry point binds a tenant: a single-tenant host uses `default`, a
 multi-tenant host the organisation the framework resolved (403

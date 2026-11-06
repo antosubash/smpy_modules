@@ -1784,7 +1784,8 @@ import. Same tenant rules as above; none of it commits. Part 1:
 - **`importable_fields(session, *, tenant_id, type_key)`** returns
   `ImportTargets`: `fields` (`ImportField`: ordinary, non-system fields of type
   text, longtext, email, url or select, except `tags`, in declared order, with
-  select choices) and `tags` (`present` for a `tags` multiselect, `creatable`
+  select choices), `tag_choices` (the `tags` field's current choices, read even
+  when it is not indexed, so a caller can pick collision-free values) and `tags` (`present` for a `tags` multiselect, `creatable`
   with no `tags` field and no records, trash included, else `missing`). `None`
   for no such list; `not_a_list` for a type that is not one.
 - **`add_tag_choices(session, *, tenant_id, type_key, choices, settings,

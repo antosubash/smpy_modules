@@ -67,6 +67,22 @@ A version that is fully on PyPI but whose `finalize` cannot complete (say
 `main` refuses pushes from Actions) is still tagged once the tag step has run;
 bumping `main` by hand to that version is then the only step left.
 
+## First newsletter release
+
+Before publishing `simple_module_newsletter` for the first time, raise its three
+floors in `modules/newsletter/pyproject.toml` from `0.0.13` to the release that
+first ships what it needs:
+
+- `simple_module_records>=` the release with `contracts.newsletter`,
+  `contracts.newsletter_admin` and `contracts.newsletter_import`;
+- the `news` extra's `simple_module_news>=` the release with `contracts.articles`;
+- the `pagebuilder` extra's `simple_module_pagebuilder>=` the release with
+  `contracts.cards`.
+
+Update each `# floor:` comment with the new floor. `scripts/check_rules.py`
+checks that the comment exists, not the value, and never compares it with the
+lockstep version.
+
 ## Supply chain
 
 - **What reaches PyPI is what `build` built.** `build` writes the sha256 of

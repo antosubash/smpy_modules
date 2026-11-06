@@ -15,7 +15,11 @@ so it is planned against the code as it then stands. Each one goes through
 | 4 | `2026-11-03-newsletter-pr4-sending.md` | sending: freeze, single dispatcher + budget ledger, daily cap and per-minute throttle, retries (pre-acceptance only), pause/resume/cancel, bounce classification, **the unsubscribe page and one-click POST** |
 | 5 | `2026-11-03-newsletter-pr5-tracking.md` | tracking (open, click) and reports |
 | 6 | `2026-11-03-newsletter-pr6-segments.md` | segments, campaign audiences (`all`, `tag:`, `segment:`), the subscriber screen with tags and admin unsubscribe, suppression lifts (spec amendment 11) |
-| 7 | (later) | Mailchimp import, with records' `import_subscribers` and a tag-choices contract added there, where its only caller is; docs; e2e spec |
+| 7 | `2026-11-03-newsletter-pr7-import.md` | Mailchimp import, with records' `import_subscribers` and a tag-choices contract added there, where its only caller is; docs; e2e spec |
+
+All seven rows are done.
+
+**Roadmap complete (2026-11-06): all seven PRs delivered.**
 
 ## Notes for PR 4 (from PR 3)
 
