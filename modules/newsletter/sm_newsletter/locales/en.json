@@ -96,7 +96,8 @@
     "field": "Field",
     "op": "Condition",
     "value": "Value",
-    "count": "About {count} subscribers match",
+    "count_one": "About {count} subscriber matches",
+    "count_other": "About {count} subscribers match",
     "count_incomplete": "Incomplete rules are not counted.",
     "saved": "Segment saved.",
     "delete_confirm": {
@@ -302,7 +303,7 @@
     "read_only": "You can view this campaign but not change it.",
     "not_draft": "This campaign is no longer a draft, so it cannot be changed.",
     "incomplete": "A block is missing a required field. The email is saved again once it is filled in.",
-    "leave_held": "Leave this campaign? A block is unfinished, so that change is not saved.",
+    "leave_held": "Leave this campaign? A block is unfinished or an audience is not chosen, so that change is not saved.",
     "select_a_block": "Select a block to edit it.",
     "integration_missing": "This content source is not available on this site.",
     "meta": {
@@ -345,7 +346,8 @@
     "segment": "A segment",
     "tag_label": "Tag",
     "segment_label": "Segment",
-    "count": "About {count} subscribers",
+    "count_one": "About {count} subscriber",
+    "count_other": "About {count} subscribers",
     "count_loading": "Counting subscribers…",
     "no_tags": "This list has no tags yet.",
     "no_segments": "This list has no segments yet.",
@@ -503,6 +505,7 @@
       "cancel": "Cancel",
       "unsaved": "The latest edits could not be saved, so nothing was sent.",
       "incomplete": "Finish or remove the unfinished blocks before sending.",
+      "audience_unfinished": "Pick a tag or segment, or go back to the whole list, before sending.",
       "time_past": "Choose a time in the future.",
       "audience_frozen": "The audience is fixed once the campaign is scheduled."
     },

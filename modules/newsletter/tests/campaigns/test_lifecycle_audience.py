@@ -48,3 +48,16 @@ async def test_schedule_refuses_filter_records_cannot_answer(built, monkeypatch)
     assert (err.value.status, err.value.code) == (422, "invalid_segment")
     assert (await campaign_row(state, T, cid)).status == "draft"
     assert await render_row(state, T, cid) is None
+
+
+@pytest.mark.parametrize("audience", ["tag:", "segment:"])
+async def test_schedule_refuses_half_set_audience(built, audience):
+    """Codex P1: even a half-set audience written behind the PATCH's back is
+    never scheduled (it would not mean the whole list)."""
+    app, state, cid = built
+    await set_columns(state, T, cid, audience=audience)
+    with pytest.raises(NewsletterError) as err:
+        await _schedule(app, state, cid)
+    assert (err.value.status, err.value.code) == (422, "invalid_audience")
+    assert (await campaign_row(state, T, cid)).status == "draft"
+    assert await render_row(state, T, cid) is None

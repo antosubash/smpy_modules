@@ -3,8 +3,8 @@
  *
  * Split out of `useCampaignEditor`, which owns the requests: this owns the
  * bookkeeping they read and write — the next save's body and meta, the
- * debounce timer, the requests in flight, an unfinished block — and turns it
- * into the one `dirty` flag the page guards leaving with.
+ * debounce timer, the requests in flight, an unfinished block or audience
+ * choice — and turns it into the one `dirty` flag the page guards leaving with.
  *
  * `edits` is one object for the editor's lifetime (mutable fields, like refs),
  * so callbacks can depend on it without being rebuilt.
@@ -26,6 +26,9 @@ export interface PendingEdits {
   meta: MetaPatch;
   /** The body is held back because a block lacks a required field. */
   incomplete: boolean;
+  /** A tag or segment audience is chosen but no value yet: the saved audience
+   *  is still the old one, so nothing may be sent. */
+  audienceUnfinished: boolean;
   inFlight: number;
   timer: ReturnType<typeof setTimeout> | null;
   hasPending(): boolean;
@@ -34,6 +37,9 @@ export interface PendingEdits {
   sync(): void;
   clearTimer(): void;
   markIncomplete(value: boolean): void;
+  markAudienceUnfinished(value: boolean): void;
+  /** What a real send must not go out with: an unfinished block or audience. */
+  blocked(): boolean;
   /** A save takes what is pending and goes out: nothing is pending, one more in flight. */
   begin(): void;
   /** The save came back, either way. */
@@ -47,15 +53,17 @@ export interface PendingEdits {
 export function usePendingEdits() {
   const [dirty, setDirty] = useState(false);
   const [incomplete, setIncomplete] = useState(false);
+  const [audienceUnfinished, setAudienceUnfinished] = useState(false);
   const [edits] = useState<PendingEdits>(() => {
     const e: PendingEdits = {
       body: null,
       meta: {},
       incomplete: false,
+      audienceUnfinished: false,
       inFlight: 0,
       timer: null,
       hasPending: () => e.body !== null || Object.keys(e.meta).length > 0,
-      sync: () => setDirty(e.timer !== null || e.inFlight > 0 || e.hasPending() || e.incomplete),
+      sync: () => setDirty(e.timer !== null || e.inFlight > 0 || e.hasPending() || e.blocked()),
       clearTimer: () => {
         if (e.timer) clearTimeout(e.timer);
         e.timer = null;
@@ -64,6 +72,12 @@ export function usePendingEdits() {
         e.incomplete = value;
         setIncomplete(value);
       },
+      markAudienceUnfinished: (value) => {
+        e.audienceUnfinished = value;
+        setAudienceUnfinished(value);
+        e.sync();
+      },
+      blocked: () => e.incomplete || e.audienceUnfinished,
       begin: () => {
         e.meta = {};
         e.body = null;
@@ -83,10 +97,10 @@ export function usePendingEdits() {
         e.body = null;
         e.meta = {};
         e.markIncomplete(false);
-        e.sync();
+        e.markAudienceUnfinished(false);
       },
     };
     return e;
   });
-  return { dirty, incomplete, edits };
+  return { dirty, incomplete, audienceUnfinished, edits };
 }

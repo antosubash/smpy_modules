@@ -102,7 +102,7 @@ export default function CampaignEditor() {
 
   useLeaveGuard({
     dirty: editor.dirty,
-    held: !readOnly && editor.incomplete,
+    held: !readOnly && (editor.incomplete || editor.audienceUnfinished),
   });
 
   const statusKey = STATUS_LABEL[editor.status];
@@ -145,6 +145,7 @@ export default function CampaignEditor() {
               flush={editor.flush}
               dirty={editor.dirty}
               incomplete={editor.incomplete}
+              audienceUnfinished={editor.audienceUnfinished}
               currentRevision={editor.currentRevision}
             />
           </>
@@ -194,6 +195,7 @@ export default function CampaignEditor() {
             campaign={campaign}
             readOnly={readOnly}
             onChange={editor.saveMeta}
+            onUnfinished={editor.holdAudience}
           />
           {tab === 'preview' && (
             <PreviewPane

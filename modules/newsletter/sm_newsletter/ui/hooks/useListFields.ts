@@ -17,6 +17,8 @@ export function useListFields(listKey: string) {
     let live = true;
     setFields(null);
     setError(null);
+    // No list yet (the pages' first render, or a tenant without lists): `/lists//fields` is a 404.
+    if (!listKey) return;
     api
       .listFields(listKey)
       .then((f) => live && setFields(f))

@@ -66,6 +66,16 @@ async def test_crud_round_trip(client):
     assert (await client.get(f"{BASE}/{sid}", headers=VIEW)).status_code == 404
 
 
+async def test_a_new_segment_reports_its_creation_as_last_change(client):
+    """The audit listener stamps ``updated_at`` on update only; the Segments table's
+    "Updated" column was blank for a segment nobody had edited yet."""
+    created = await _create(client)
+    assert created["updated_at"] is not None
+    assert "created_at" not in created
+    listed = (await client.get(BASE, headers=VIEW)).json()[0]
+    assert listed["updated_at"] == created["updated_at"]
+
+
 async def test_permissions(client):
     sid = (await _create(client))["id"]
     body = {"name": "n", "list_type_key": "news", "rules": []}

@@ -3,7 +3,9 @@
  * live "about N subscribers" under it. A choice is saved through the editor's
  * `saveMeta` (`onChange({ audience })`), so it shares the debounce, the
  * revision and the flush of every other edit. A tag or segment not picked yet
- * saves nothing and asks for no count.
+ * saves nothing and asks for no count, and is reported through `onUnfinished`:
+ * the saved audience is still the old one, so the editor blocks sending until
+ * a value is picked or the choice is reverted.
  */
 
 import { Label } from '@simple-module-py/ui/components/ui/label';
@@ -27,9 +29,11 @@ interface Props {
   campaign: CampaignDetail;
   readOnly: boolean;
   onChange: (patch: MetaPatch) => void;
+  /** True while a tag or segment kind is chosen without its value. */
+  onUnfinished?: (unfinished: boolean) => void;
 }
 
-export function AudiencePicker({ campaign, readOnly, onChange }: Props) {
+export function AudiencePicker({ campaign, readOnly, onChange, onUnfinished }: Props) {
   const { t } = useT();
   const id = useId();
   const listKey = campaign.list_type_key;
@@ -53,6 +57,12 @@ export function AudiencePicker({ campaign, readOnly, onChange }: Props) {
   const hasTags = fields === null || fields.some((f) => f.key === 'tags');
   const kind: Kind = pending ?? choice.kind;
   const complete = pending === null;
+
+  useEffect(() => {
+    onUnfinished?.(!complete);
+  }, [complete, onUnfinished]);
+  // Unmounting (a reload) leaves nothing unfinished behind.
+  useEffect(() => () => onUnfinished?.(false), [onUnfinished]);
   const audience = complete ? formatAudience(choice) : '';
   const { count, loading, error } = useAudienceCount(listKey, audience);
 

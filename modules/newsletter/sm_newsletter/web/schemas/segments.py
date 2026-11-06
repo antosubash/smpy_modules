@@ -6,7 +6,14 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 from sm_records.contracts.newsletter_admin import ListField
 
 from sm_newsletter.core.constants import MAX_TYPE_KEY_LEN
@@ -54,6 +61,16 @@ class SegmentOut(BaseModel):
     list_type_key: str
     rules: list[Rule]
     updated_at: datetime | None
+    # Read off the row only to fill ``updated_at``; never sent.
+    created_at: datetime | None = Field(default=None, exclude=True)
+
+    @model_validator(mode="after")
+    def _created_is_last_change(self) -> SegmentOut:
+        """The audit listener stamps ``updated_at`` on an update only, so a segment
+        nobody has edited reports its creation as its last change."""
+        if self.updated_at is None:
+            self.updated_at = self.created_at
+        return self
 
 
 class CountOut(BaseModel):

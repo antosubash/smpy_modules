@@ -58,7 +58,11 @@ A campaign's `audience` is one of:
   subscriber search and a campaign PATCH alike (no existence oracle).
 
 A PATCH validates the audience against the new or current list, and an invalid
-one never echoes the submitted value.
+one never echoes the submitted value; a kind without its value (`tag:`,
+`segment:`) is `422 invalid_audience`, so a half-set audience is never stored.
+In the editor, choosing "A tag" or "A segment" without picking one saves
+nothing (the campaign keeps its old audience), and until a value is picked or
+the choice is reverted the Send button is disabled and the send flush refuses.
 
 **Scheduling snapshots the audience.** `schedule` resolves it to filter terms,
 dry-runs `count_subscribers` with them (so a filter records cannot answer is a

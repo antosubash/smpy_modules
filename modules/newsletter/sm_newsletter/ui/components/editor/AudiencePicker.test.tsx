@@ -130,4 +130,11 @@ describe('AudiencePicker', () => {
     expect(api.audienceCount).toHaveBeenCalledWith('news', 'all', expect.any(AbortSignal));
     expect(document.body.textContent).toContain('About 42 subscribers');
   });
+
+  it('says "1 subscriber" for one', async () => {
+    vi.mocked(api.audienceCount).mockResolvedValue({ count: 1 });
+    await render();
+    expect(document.body.textContent).toContain('About 1 subscriber');
+    expect(document.body.textContent).not.toContain('About 1 subscribers');
+  });
 });
