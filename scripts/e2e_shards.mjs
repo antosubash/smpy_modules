@@ -7,7 +7,8 @@
 //   E2E_SHARDS=3 node scripts/e2e_shards.mjs [extra playwright args]
 //
 // Bundle only: the dev stack would need a Vite server per shard. SQLite only:
-// the template is a file. Every shard runs to its end, so one failure does not
+// the template is a file. Default mode only: multi-tenant and per-user billing
+// write boot-time settings into the template, and CI runs those small suites. Every shard runs to its end, so one failure does not
 // hide another's. Output goes to .e2e-shards/: shard-<i>.log for each shard's
 // list and its host, and merged.log for all the tests in one report.
 import { spawn, spawnSync } from 'node:child_process';
@@ -25,6 +26,11 @@ const sqliteUrl = (path) => `sqlite+aiosqlite:///${path}`;
 
 if (!Number.isInteger(SHARDS) || SHARDS < 1) {
   console.error(`E2E_SHARDS must be a positive whole number, got ${process.env.E2E_SHARDS}`);
+  process.exit(2);
+}
+
+if (process.env.E2E_MULTI_TENANT || process.env.E2E_BILLING_USER) {
+  console.error('make e2e-parallel runs the default suite only; use make e2e-bundle for this mode');
   process.exit(2);
 }
 
@@ -49,6 +55,14 @@ const prepared = spawnSync('tests/e2e/start-test-server.sh', {
   },
 });
 if (prepared.status !== 0) process.exit(prepared.status ?? 1);
+
+const children = [];
+// Stopping the runner stops its shards, whose Playwright then stops their hosts.
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    for (const child of children) child.kill(signal);
+  });
+}
 
 function runShard(shard) {
   const dir = join(WORK, `shard-${shard}`);
@@ -80,10 +94,13 @@ function runShard(shard) {
       },
     },
   );
-  child.stdout.pipe(log);
-  child.stderr.pipe(log);
+  // `end: false`: whichever stream ended first would otherwise close the log.
+  child.stdout.pipe(log, { end: false });
+  child.stderr.pipe(log, { end: false });
+  children.push(child);
   return new Promise((done) => {
     child.on('close', (code) => {
+      log.end();
       console.log(`Shard ${shard}/${SHARDS}: ${code === 0 ? 'passed' : `failed (${code})`}, log ${logPath}`);
       done(code ?? 1);
     });
@@ -100,5 +117,6 @@ const merged = spawnSync(
   { cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
 );
 writeFileSync(join(WORK, 'merged.log'), merged.stdout ?? '');
+if (merged.status !== 0) console.error(`Merging the reports failed:\n${merged.stderr}`);
 console.log(`${SHARDS} shards in ${Math.round((Date.now() - started) / 1000)}s`);
-process.exit(codes.some((code) => code !== 0) ? 1 : 0);
+process.exit(merged.status === 0 && codes.every((code) => code === 0) ? 0 : 1);
