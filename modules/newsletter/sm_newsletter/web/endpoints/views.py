@@ -20,6 +20,7 @@ from sm_newsletter.campaigns.access import readable_lists, require_campaign
 from sm_newsletter.campaigns.test_send import MAX_TEST_RECIPIENTS
 from sm_newsletter.content.integrations import capabilities
 from sm_newsletter.core import constants, tenancy
+from sm_newsletter.core.host import public_base_url
 from sm_newsletter.core.tenancy import bind_admin
 from sm_newsletter.web.endpoints.csrf import share_csrf_token
 
@@ -143,7 +144,6 @@ async def campaign_editor(
     await require_campaign(
         db, tenant_id=tenant, campaign_id=campaign_id, roles=caller_roles(request)
     )
-    host = getattr(request.app.state.sm, "settings", None)
     return await inertia.render(
         constants._PAGE_EDITOR,
         {
@@ -151,7 +151,7 @@ async def campaign_editor(
             "campaign_id": campaign_id,
             **await _flags(request),
             "capabilities": capabilities(request.app),
-            "public_base_url_set": bool(getattr(host, "public_base_url", "") or ""),
+            "public_base_url_set": bool(public_base_url(request.app)),
             "max_test_recipients": MAX_TEST_RECIPIENTS,
         },
     )

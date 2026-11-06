@@ -17,6 +17,7 @@ from sm_newsletter.content.render.styles import is_color
 from sm_newsletter.content.render.types import Branding, FooterCopy, RenderContext
 from sm_newsletter.content.urls import absolute
 from sm_newsletter.core import constants
+from sm_newsletter.core.host import public_base_url
 from sm_newsletter.core.messages import host_locale, server_copy
 from sm_newsletter.core.tenancy import TenancyMode, mode_of
 
@@ -91,8 +92,7 @@ async def _content_base(app: Any, tenant_id: str, public_base: str) -> str:
 
 async def render_context(app: Any, *, tenant_id: str) -> RenderContext:
     """Everything :func:`~sm_newsletter.content.render.render` needs for ``tenant_id``."""
-    host = app.state.sm.settings
-    public_base = (getattr(host, "public_base_url", "") or "").rstrip("/")
+    public_base = public_base_url(app).rstrip("/")
     locale = host_locale(app)
     settings = getattr(app.state, constants.PACKAGE).settings
     branding = _branding(app, public_base, settings.from_name)

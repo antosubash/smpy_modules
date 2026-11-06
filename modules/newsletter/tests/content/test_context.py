@@ -130,3 +130,16 @@ async def test_tenants_get_their_own_content_origin(tenants_db):
     assert (await render_context(app, tenant_id="nope")).content_base == "http://example.org:8000"
     single = make_app(base="https://example.org", mode=TenancyMode.MULTI, db=tenants_db)
     assert (await render_context(single, tenant_id="t1")).content_base == "https://example.org"
+
+
+async def test_public_base_is_the_live_host_setting():
+    """A ``host.public_base_url`` saved at runtime reloads ``app.state.host``, not the boot
+    snapshot ``app.state.sm.settings``; the live value wins, a cleared one included."""
+    app = make_app(base="https://boot.example.org")
+    app.state.host = SimpleNamespace(
+        settings=SimpleNamespace(public_base_url="https://live.example/")
+    )
+    c = await render_context(app, tenant_id="default")
+    assert (c.public_base, c.content_base) == ("https://live.example", "https://live.example")
+    app.state.host.settings.public_base_url = ""
+    assert (await render_context(app, tenant_id="default")).public_base == ""

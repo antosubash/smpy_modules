@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -86,6 +87,10 @@ async def test_editor_props(client, built):
     app.state.sm.settings.public_base_url = "https://example.com"
     again = (await client.get(f"{VIEW}/campaigns/{cid}", headers=EDIT)).json()["props"]
     assert again["public_base_url_set"] is True
+    # The host's live settings (reloaded on a runtime save) win over the boot snapshot.
+    app.state.host = SimpleNamespace(settings=SimpleNamespace(public_base_url=""))
+    live = (await client.get(f"{VIEW}/campaigns/{cid}", headers=EDIT)).json()["props"]
+    assert live["public_base_url_set"] is False
 
 
 async def test_editor_unknown_campaign_404(client):
