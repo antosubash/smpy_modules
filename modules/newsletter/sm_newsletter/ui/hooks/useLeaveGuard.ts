@@ -5,7 +5,7 @@
  * debounce, after a failed save, or held back) asks through `beforeunload`, as
  * news, pagebuilder and records do. An in-app Inertia visit unmounts the editor,
  * which flushes what can be saved, so it asks only when something cannot be:
- * `held`, an unfinished block (records' `useUnsavedGuard`).
+ * `held`, an unfinished block or an invalid details field (records' `useUnsavedGuard`).
  */
 
 import { router } from '@inertiajs/react';

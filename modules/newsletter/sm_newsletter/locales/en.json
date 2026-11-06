@@ -135,7 +135,7 @@
     "read_only": "You can view this campaign but not change it.",
     "not_draft": "This campaign is no longer a draft, so it cannot be changed.",
     "incomplete": "A block is missing a required field. The email is saved again once it is filled in.",
-    "leave_held": "Leave this campaign? A block is unfinished, so that change is not saved.",
+    "leave_held": "Leave this campaign? A block is unfinished or a field is invalid, so that change is not saved.",
     "select_a_block": "Select a block to edit it.",
     "integration_missing": "This content source is not available on this site.",
     "meta": {

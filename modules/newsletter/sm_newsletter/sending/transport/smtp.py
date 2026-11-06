@@ -101,8 +101,9 @@ class SmtpTransport:
         )
         try:
             await client.connect()
-        except (SMTPException, OSError) as exc:
+        except (SMTPException, OSError, UnicodeError) as exc:
             # aiosmtplib wraps an implicit-TLS handshake failure in SMTPConnectError.
+            # UnicodeError: a host name IDNA cannot encode (e.g. a label over 63).
             tls = isinstance(exc, ssl.SSLError) or isinstance(exc.__cause__, ssl.SSLError)
             raise TransportUnavailable(_stage("tls" if tls else "connect", exc)) from exc
         try:

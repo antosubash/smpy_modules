@@ -139,6 +139,14 @@ async def test_connect_failure_names_stage(make_transport):
     assert "connect" in exc.value.detail
 
 
+async def test_unencodable_host_is_unavailable_not_a_crash(make_transport):
+    # A 64+ character label cannot be IDNA-encoded: a settings value, not a bug.
+    with pytest.raises(TransportUnavailable) as exc:
+        async with make_transport(host="a" * 253, timeout=2.0).session():
+            pass
+    assert "connect" in exc.value.detail
+
+
 async def test_untrusted_certificate_names_tls_stage(relay):
     from sm_newsletter.sending.transport.smtp import SmtpConfig, SmtpTransport
 
