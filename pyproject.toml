@@ -21,6 +21,9 @@ dev = [
     "ruff>=0.8",
     "packaging>=24",
     "tomlkit>=0.13",
+    # The newsletter tests run a local SMTP server; the Postgres job syncs
+    # no extras, so a module's `dev` extra alone does not reach it.
+    "aiosmtpd>=1.4.6",
 ]
 
 [tool.ruff]
