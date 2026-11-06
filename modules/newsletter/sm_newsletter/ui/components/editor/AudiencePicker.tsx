@@ -109,12 +109,12 @@ export function AudiencePicker({ campaign, readOnly, onChange, onUnfinished }: P
 
       {kind === 'tag' && (
         <div className="flex items-center gap-2">
-          <Label htmlFor={`${id}-tag`}>{t(copy.tag_label)}</Label>
+          <Label htmlFor={`${id}-tag-value`}>{t(copy.tag_label)}</Label>
           {tagChoices.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t(copy.no_tags)}</p>
           ) : (
             <NativeSelect
-              id={`${id}-tag`}
+              id={`${id}-tag-value`}
               disabled={readOnly}
               value={choice.kind === 'tag' && !pending ? choice.tag : ''}
               onChange={(e) => e.target.value && apply({ kind: 'tag', tag: e.target.value })}
@@ -134,12 +134,12 @@ export function AudiencePicker({ campaign, readOnly, onChange, onUnfinished }: P
 
       {kind === 'segment' && (
         <div className="flex items-center gap-2">
-          <Label htmlFor={`${id}-segment`}>{t(copy.segment_label)}</Label>
+          <Label htmlFor={`${id}-segment-value`}>{t(copy.segment_label)}</Label>
           {segments !== null && segments.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t(copy.no_segments)}</p>
           ) : (
             <NativeSelect
-              id={`${id}-segment`}
+              id={`${id}-segment-value`}
               disabled={readOnly}
               value={choice.kind === 'segment' && !pending && !missing ? choice.segmentId : ''}
               onChange={(e) =>

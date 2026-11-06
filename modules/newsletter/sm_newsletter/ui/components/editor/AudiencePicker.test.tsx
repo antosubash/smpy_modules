@@ -67,7 +67,7 @@ describe('AudiencePicker', () => {
   const radio = (label: string) =>
     document.querySelector(`[role="radio"][id$="-${label}"]`) as HTMLButtonElement | null;
   const select = (id: string) =>
-    document.querySelector(`select[id$="-${id}"]`) as HTMLSelectElement;
+    document.querySelector(`select[id$="-${id}-value"]`) as HTMLSelectElement;
   async function choose(el: HTMLSelectElement, value: string) {
     await act(async () => {
       el.value = value;
@@ -81,6 +81,17 @@ describe('AudiencePicker', () => {
     expect(onChange).not.toHaveBeenCalled();
     await choose(select('tag'), 'vip');
     expect(onChange).toHaveBeenCalledWith({ audience: 'tag:vip' });
+  });
+
+  it('names each select with its own label, not the radio of the same kind', async () => {
+    await render();
+    await act(async () => radio('tag')?.click());
+    const label = [...document.querySelectorAll('label')].find(
+      (l) => l.textContent === copy.tag_label,
+    );
+    expect(document.getElementById(label?.htmlFor ?? '')).toBe(select('tag'));
+    const ids = [...document.querySelectorAll('[id]')].map((el) => el.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('saves a chosen segment', async () => {
