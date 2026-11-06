@@ -29,9 +29,25 @@ def test_lead_space_and_wide_triggers_are_neutralised(cell):
 
 def test_free_text_is_always_prefixed_unless_numeric():
     assert neutralise_text("report.csv") == "'report.csv"
-    assert neutralise_text("a;=1+1") == "'a;=1+1"
+    assert neutralise_text("a;=1+1") == "'a_=1+1"
     assert neutralise_text("") == ""
     assert neutralise_text("42") == "42"
+
+
+def test_free_text_separators_are_replaced():
+    assert neutralise_text("x;=1+1") == "'x_=1+1"
+    assert neutralise_text("a\tb") == "'a_b"
+    assert neutralise_text("a\r\nb") == "'a__b"
+
+
+def test_file_name_with_control_separators_is_sanitised():
+    job = ImportJob(
+        files=[{"name": "a\tb\rc\nd.csv", "kind": "subscribed", "rows": 1}],
+        errors=[{"file": 0, "line": 2, "code": "invalid_email", "field": "x;=1+1"}],
+    )
+    rows = list(csv.reader(io.StringIO(errors_csv(job))))
+    assert rows[1][1] == "'a_b_c_d.csv"
+    assert rows[1][4] == "'x_=1+1"
 
 
 def test_semicolon_file_name_cannot_split_and_every_cell_is_quoted():

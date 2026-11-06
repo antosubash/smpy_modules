@@ -5,8 +5,8 @@ field) are prefixed with ``'`` whenever they are non-empty and not purely numeri
 trigger spelling (leading whitespace, full-width forms, a smuggled newline) can slip past.
 Fixed columns (file index, line, code) go through :func:`neutralise`, which prefixes a cell
 whose left-stripped form starts with a formula trigger. Every cell is quoted
-(``QUOTE_ALL``) and ``;`` is replaced in file names, so a semicolon-locale parser cannot
-split a cell into a formula. No cell value is ever echoed (R16).
+(``QUOTE_ALL``) and ``;``, tab, CR and LF are replaced by ``_`` in every free-text cell,
+so a semicolon-locale parser cannot split a cell into a formula. No cell value is ever echoed (R16).
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from sm_newsletter.models import ImportJob
 __all__ = ["HEADER", "errors_csv", "neutralise", "neutralise_text"]
 
 HEADER = ("file", "file_name", "line", "code", "field")
+_SEPARATORS = str.maketrans({";": "_", "\t": "_", "\r": "_", "\n": "_"})
 _TRIGGERS = ("=", "+", "-", "@", "\t", "\r", "\n", "\uff1d", "\uff0b", "\uff0d", "\uff20")
 
 
@@ -28,7 +29,8 @@ def neutralise(cell: str) -> str:
 
 
 def neutralise_text(cell: str) -> str:
-    """Free text: prefixed with ``'`` unless empty or purely ASCII digits."""
+    """Free text: ``;``, tab, CR and LF become ``_``, then ``'`` unless empty or ASCII digits."""
+    cell = cell.translate(_SEPARATORS)
     if not cell or (cell.isascii() and cell.isdigit()):
         return cell
     return f"'{cell}"
@@ -36,7 +38,7 @@ def neutralise_text(cell: str) -> str:
 
 def errors_csv(job: ImportJob) -> str:
     """Every kept row error of ``job``: ``file,file_name,line,code,field``."""
-    names = [str(f.get("name", "")).replace(";", "_") for f in job.files or []]
+    names = [str(f.get("name", "")) for f in job.files or []]
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\r\n", quoting=csv.QUOTE_ALL)
     writer.writerow(HEADER)

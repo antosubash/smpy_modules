@@ -194,7 +194,7 @@ errors are kept. `GET /api/newsletter/imports/{id}/errors.csv` downloads them wi
 file names. Free-text cells (file name, field) are always prefixed with `'` unless
 empty or purely numeric; the other cells are prefixed when their left-stripped form
 starts with `=`, `+`, `-`, `@`, tab, CR, LF or a full-width `＝ ＋ － ＠`. Every cell is
-quoted and `;` in a file name becomes `_`, so a semicolon-locale parser cannot split a
+quoted and `;`, tab, CR and LF in a free-text cell become `_`, so a semicolon-locale parser cannot split a
 cell into a formula.
 
 ## Workers, slices and the janitor
