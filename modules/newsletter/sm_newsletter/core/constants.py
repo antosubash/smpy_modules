@@ -59,8 +59,6 @@ REASON_COMPLAINT = "complaint"
 REASON_IMPORTED_CLEANED = "imported_cleaned"
 REASON_UNSUBSCRIBED = "unsubscribed"
 REASONS = (REASON_HARD_BOUNCE, REASON_COMPLAINT, REASON_IMPORTED_CLEANED, REASON_UNSUBSCRIBED)
-# A later confirmation clears these; a complaint is never cleared.
-CLEARED_BY_CONFIRMATION = (REASON_HARD_BOUNCE, REASON_IMPORTED_CLEANED, REASON_UNSUBSCRIBED)
 SOURCES = ("records_event", "reconcile", "unsubscribe_page", "send", "import", "admin")
 
 MAX_TYPE_KEY_LEN = 64  # records' ``MAX_KEY_LEN``
