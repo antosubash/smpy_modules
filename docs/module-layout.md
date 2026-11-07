@@ -152,6 +152,14 @@ Do it in small PRs, one module at a time, each containing only moves:
      registers them.
 5. **No logic changes in the same PR**, so the review is just "is every move
    right".
+6. **Alias the old paths before releasing.** Downstream hosts import module
+   internals, so a move without aliases breaks them on upgrade (#319).
+   `scripts/moved_paths.py --generate` builds them from the renames between
+   two release tags (`OLD_REF`/`NEW_REF` in `scripts/moved_paths_common.py`,
+   v0.0.13 → v0.0.14 for the first set; a second set means teaching it to keep
+   the first). It writes `core/moved_paths.json` and the TS stubs, and the
+   package `__init__.py` calls `install(__name__)`. Pick a `remove_in` two
+   releases out, and list the moves in `CHANGELOG.md`.
 
 ### Where each module stands (2026-11-03)
 
