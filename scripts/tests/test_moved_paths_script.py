@@ -244,3 +244,12 @@ def test_new_paths_and_comments_are_not_old_imports(repo):
         "from pb.content.service import pages\n", encoding="utf-8"
     )
     assert moved_paths.check(root) == []
+
+
+def test_old_import_after_a_multiline_comment_reports_its_own_line(repo):
+    root, _ = repo
+    (root / M / "ui/late.ts").write_text(
+        "/*\n one\n two\n*/\nimport { getPage } from '../utils/api';\n", encoding="utf-8"
+    )
+    errors = moved_paths.check(root)
+    assert any("ui/late.ts:5:" in e for e in errors), errors

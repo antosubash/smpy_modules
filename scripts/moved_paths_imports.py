@@ -15,6 +15,7 @@ from pathlib import Path
 
 from check_rules import JS_NOISE
 from moved_paths_common import HOOK, Package
+from moved_paths_common import owner as package_owner
 from moved_paths_ts import is_stub
 
 _SPECIFIER = re.compile(r"""(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])([^'"\n]+)\1""")
@@ -32,11 +33,7 @@ def _files(root: Path, suffixes: tuple[str, ...]) -> list[Path]:
 
 
 def _owner(path: Path, root: Path, pkgs: list[Package]) -> tuple[Package, str] | None:
-    rel = path.relative_to(root).as_posix()
-    for pkg in pkgs:
-        if rel.startswith(f"{pkg.rel}/"):
-            return pkg, rel[len(pkg.rel) + 1 :]
-    return None
+    return package_owner(path.relative_to(root).as_posix(), pkgs)
 
 
 def _imported(tree: ast.AST, here: str | None) -> list[tuple[int, str]]:
@@ -110,11 +107,17 @@ def ts_offenders(root: Path, pkgs: list[Package]) -> list[str]:
         if is_stub(path):
             continue
         text = path.read_text(encoding="utf-8")
-        code = JS_NOISE.sub(lambda m: m.group(0) if m.group(0)[0] in "'\"`" else " ", text)
+        # A comment keeps its newlines so the reported line numbers stay true.
+        code = JS_NOISE.sub(
+            lambda m: (
+                m.group(0) if m.group(0)[0] in "'\"`" else "\n" * m.group(0).count("\n") or " "
+            ),
+            text,
+        )
         owner = _owner(path, root, pkgs)
         for match in _SPECIFIER.finditer(code):
             target = _resolve(match.group(2), path, root, owner, npm)
-            if target is not None and target.suffix in (".ts", ".tsx", ".css") and is_stub(target):
+            if target is not None and is_stub(target):
                 line = code.count("\n", 0, match.start()) + 1
                 errors.append(
                     f"{path.relative_to(root)}:{line}: imports the old path {match.group(2)}"

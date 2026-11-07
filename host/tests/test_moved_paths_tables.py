@@ -14,7 +14,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
-from packaging.version import Version
+from simple_module_core.deprecation import deprecate, expired_deprecations
 
 REPO = Path(__file__).resolve().parents[2]
 PROBE = Path(__file__).with_name("moved_paths_probe.py")
@@ -112,12 +112,16 @@ def test_every_package_installs_its_hook():
 
 
 def test_the_aliases_go_in_their_removal_release():
-    """Two releases of warnings, then the aliases go (#319)."""
-    version = tomllib.loads((REPO / "pyproject.toml").read_text(encoding="utf-8"))["project"]
-    for name in HOOKS:
-        remove_in = _table(name)["remove_in"]
-        assert Version(version["version"]) < Version(remove_in), (
-            f"version {version['version']} reached remove_in {remove_in}: delete the 0.0.14 "
-            "moved-path aliases (the TS/CSS stubs, core/moved_paths.*, the install() lines and "
-            "the __getattr__/__path__ lines that name #319)"
-        )
+    """Two releases of warnings, then the aliases go (#319). The framework's own
+    rule decides: a pre-release of ``remove_in`` already counts as due."""
+    pyproject = tomllib.loads((REPO / "pyproject.toml").read_text(encoding="utf-8"))
+    version = pyproject["project"]["version"]
+    ours = {
+        deprecate(f"{name} moved paths", remove_in=_table(name)["remove_in"]).name for name in HOOKS
+    }
+    due = ours & {d.name for d in expired_deprecations(version)}
+    assert not due, (
+        f"version {version} reached remove_in: delete the 0.0.14 moved-path aliases (the "
+        "TS/CSS stubs, core/moved_paths.*, the install() lines and the "
+        "__getattr__/__path__ lines that name #319)"
+    )

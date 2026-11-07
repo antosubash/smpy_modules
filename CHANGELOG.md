@@ -52,7 +52,7 @@ name the module they affect.
   | news | `news.endpoints.api.articles` | `news.web.endpoints.api.articles` and `._article_listing` |
   | billing | `sm_billing.plans` (`PlanService`, `PlanError`, `seed_default_plan`) | `sm_billing.plans.service` |
   | billing | `sm_billing.admin` | `sm_billing.web.services.admin` and `.subscription_list` |
-  | billing | `sm_billing.teardown` | `sm_billing.subscriptions.deletion.teardown` and `sm_billing.core.live` |
+  | billing | `sm_billing.teardown` | `sm_billing.subscriptions.deletion.teardown` and `.tenant_deleted` |
   | ai | `sm_ai.metering` (`RequiresAiRequest`, `register_meter`, `billing_metering_installed`) | `sm_ai.metering.requests` |
 
 - pagebuilder and news need `@puckeditor/core ^0.24` (was `^0.23`).

@@ -21,11 +21,15 @@ EXPORTS_JS = Path(__file__).with_name("moved_paths_exports.mjs")
 MARKER = "/** @deprecated Moved to "
 CSS_MARKER = "/* @deprecated Moved to "
 TS_SUFFIXES = (".ts", ".tsx")
+STUB_SUFFIXES = (*TS_SUFFIXES, ".css")
 LINE_WIDTH = 100
 
 
 def is_stub(path: Path) -> bool:
-    return path.read_text(encoding="utf-8").startswith((MARKER, CSS_MARKER))
+    """Whether ``path`` is a TS or CSS file ``--generate`` wrote."""
+    return path.suffix in STUB_SUFFIXES and path.read_text(encoding="utf-8").startswith(
+        (MARKER, CSS_MARKER)
+    )
 
 
 def sources(root: Path, pkg: Package) -> list[str]:

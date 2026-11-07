@@ -48,7 +48,7 @@ def generate(root: Path, listing: str, old_root: Path) -> dict[Package, dict]:
     dirs = dir_map(moves)
     for pkg in pkgs:  # last run's stubs go first, so they never count as a new home
         for path in (root / pkg.rel).rglob("*"):
-            if path.suffix in (*ts.TS_SUFFIXES, ".css") and ts.is_stub(path):
+            if ts.is_stub(path):
                 path.unlink()
     new = ts.surfaces(root, {p: ts.sources(root, p) for p in pkgs})
     old_ts = {
@@ -144,8 +144,7 @@ def _check_ts(root: Path, pkg: Package, table: dict, surf: dict[str, dict]) -> l
                         errors.append(f"{pkg.rel}/{rel}: {target} exports no {group[:-1]} {name}")
     for path in (root / pkg.rel).rglob("*"):
         rel = path.relative_to(root / pkg.rel).as_posix()
-        stubby = path.suffix in (*ts.TS_SUFFIXES, ".css") and ts.is_stub(path)
-        if stubby and rel not in stubs and rel not in css:
+        if ts.is_stub(path) and rel not in stubs and rel not in css:
             errors.append(f"{pkg.rel}/{rel}: a moved-path stub the table does not list")
     return errors
 

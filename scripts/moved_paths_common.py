@@ -23,11 +23,6 @@ SKIP = re.compile(
     r"(^|/)(tests|__tests__|e2e|docs|page-tests)/|\.test\.[jt]sx?$|(^|/)test-dom\.tsx$"
     r"|-test-support\.ts$"
 )
-# Pairings git gets wrong, keyed by the old repo-relative path; ``None`` means
-# "treat as deleted" (the names are then looked up in the new tree). Git pairs
-# identical files across packages, which the same-package rule already
-# undoes, so this is for a same-package mispairing that needs a human call.
-OVERRIDES: dict[str, str | None] = {}
 
 
 @dataclass(frozen=True)
@@ -65,15 +60,19 @@ def packages(root: Path) -> list[Package]:
     return found
 
 
+def owner(rel: str, pkgs: list[Package]) -> tuple[Package, str] | None:
+    """The package a repo-relative path lies in, and the path relative to its directory."""
+    for pkg in pkgs:
+        if rel.startswith(f"{pkg.rel}/"):
+            return pkg, rel[len(pkg.rel) + 1 :]
+    return None
+
+
 def parse_moves(listing: str, pkgs: list[Package]) -> list[Move]:
     """The renames and deletes of package sources in a ``--name-status`` listing."""
-    by_prefix = {f"{p.rel}/": p for p in pkgs}
 
     def locate(path: str) -> tuple[Package, str] | None:
-        for prefix, pkg in by_prefix.items():
-            if path.startswith(prefix) and not SKIP.search(path):
-                return pkg, path[len(prefix) :]
-        return None
+        return None if SKIP.search(path) else owner(path, pkgs)
 
     moves = []
     for line in listing.splitlines():
@@ -84,9 +83,9 @@ def parse_moves(listing: str, pkgs: list[Package]) -> list[Move]:
         old = locate(fields[1])
         if old is None:
             continue
-        new_path = fields[2] if status == "R" else None
-        new_path = OVERRIDES.get(fields[1], new_path)
-        new = locate(new_path) if new_path else None
+        new = locate(fields[2]) if status == "R" else None
+        # Git pairs identical files across packages (empty ``__init__.py``s); a
+        # pairing outside the package counts as a delete.
         same_package = new is not None and new[0] == old[0]
         moves.append(Move(old[0], old[1], new[1] if same_package else None))
     return moves
