@@ -16,7 +16,7 @@ from simple_module_db.mixins import MultiTenantMixin
 from sqlalchemy import Column, ForeignKey, Integer, Text
 from sqlmodel import Field
 
-from sm_newsletter.core.constants import MAX_EMAIL_LEN
+from sm_newsletter.core.constants import MAX_EMAIL_LEN, MAX_SENDER_LEN
 from sm_newsletter.models._base import Base
 from sm_newsletter.models._cols import dt_col
 
@@ -34,7 +34,7 @@ class CampaignRender(Base, MultiTenantMixin, table=True):  # ty: ignore[unsuppor
     """Merge tags still in place."""
     html: str = Field(sa_column=Column(Text, nullable=False))
     text: str = Field(sa_column=Column(Text, nullable=False))
-    sender: str = Field(max_length=600)
+    sender: str = Field(max_length=MAX_SENDER_LEN)
     """The formatted ``From``: ``Name <address>``."""
     reply_to: str | None = Field(default=None, max_length=MAX_EMAIL_LEN)
     public_base: str = Field(max_length=2048)

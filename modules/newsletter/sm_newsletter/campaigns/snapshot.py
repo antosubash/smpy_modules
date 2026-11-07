@@ -65,6 +65,10 @@ def build_render(
             check_header_text(value or "", field=field)
         except ValueError as exc:
             raise InvalidCampaign(str(exc)) from None
+    # A non-ASCII name is encoded (a 200-character CJK name is ~820 characters):
+    # past the column Postgres would answer 500 here, so refuse it as a 422.
+    if len(row.sender) > constants.MAX_SENDER_LEN:
+        raise InvalidCampaign("sender: too long")
     return row
 
 

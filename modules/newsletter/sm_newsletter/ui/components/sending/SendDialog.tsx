@@ -11,7 +11,7 @@ import {
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@simple-module-py/ui/components/ui/radio-group';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api, errorMessage } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
@@ -71,6 +71,8 @@ export function SendDialog(props: Props) {
    *  render after it and sends only this, never a value recomputed since. */
   const [armed, setArmed] = useState<Choice | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Bumped on every open/close, so a flush that outlives its opening is ignored. */
+  const opening = useRef(0);
 
   const scheduledAt = when === 'later' ? futureIso(at) : null;
   const blocked = when === 'later' && scheduledAt === null;
@@ -86,6 +88,7 @@ export function SendDialog(props: Props) {
 
   const change = async (next: boolean) => {
     if (pending) return;
+    const mine = ++opening.current;
     setOpen(next);
     setReady(false);
     setError(null);
@@ -95,13 +98,17 @@ export function SendDialog(props: Props) {
     // schedule since undone) would otherwise go out as a schedule nobody chose this time.
     setWhen('now');
     setAt('');
-    if (await flush()) setReady(true);
+    const saved = await flush();
+    if (mine !== opening.current) return;
+    if (saved) setReady(true);
     else refuse(copy.unsaved);
   };
 
   useEffect(() => {
     if (!open || !ready || blocked) return;
     let live = true;
+    // The figures belong to the time they were asked for: never keep them under another.
+    setEstimate(null);
     api.estimate(campaign.id, scheduledAt).then(
       (e) => live && setEstimate(e),
       (e) => live && setError(errorMessage(e, t)),

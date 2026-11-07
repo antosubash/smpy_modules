@@ -222,6 +222,27 @@ describe('SendDialog', () => {
     expect(sendCampaign).toHaveBeenCalledWith(7, { expected_revision: 5, scheduled_at: null });
   });
 
+  it('drops the estimate of the previous time while the next one loads', async () => {
+    await open();
+    expect(button(copy.dialog.confirm)?.disabled).toBe(false);
+    estimate.mockReturnValue(new Promise(() => {}));
+    await later('2099-01-01T09:00');
+    expect(button(copy.dialog.confirm)?.disabled).toBe(true);
+  });
+
+  it('ignores a save that finishes after its opening was closed', async () => {
+    let first: (ok: boolean) => void = () => {};
+    const flush = vi
+      .fn()
+      .mockReturnValueOnce(new Promise<boolean>((resolve) => (first = resolve)))
+      .mockReturnValueOnce(new Promise<boolean>(() => {}));
+    await open({ flush });
+    await act(async () => button(copy.dialog.cancel)?.click());
+    await act(async () => button(copy.send_button)?.click());
+    await act(async () => first(true));
+    expect(estimate).not.toHaveBeenCalled();
+  });
+
   it('says "1 recipient" for one', async () => {
     estimate.mockResolvedValue({
       recipients: 1,

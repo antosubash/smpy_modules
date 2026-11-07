@@ -57,3 +57,12 @@ async def test_snapshot_rejects_header_injection_in_settings(built):
     assert err.value.status == 422
     assert "Bcc" not in err.value.detail
     assert await render_row(state, T, cid) is None
+
+
+async def test_snapshot_refuses_an_encoded_sender_past_the_column(built):
+    app, state, cid = built
+    await set_columns(state, T, cid, from_name="新" * 200)
+    with pytest.raises(NewsletterError) as err:
+        await _snapshot(app, state, cid)
+    assert err.value.status == 422
+    assert await render_row(state, T, cid) is None

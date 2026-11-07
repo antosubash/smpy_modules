@@ -89,6 +89,7 @@ SOURCES = ("records_event", "reconcile", "unsubscribe_page", "send", "import", "
 MAX_TYPE_KEY_LEN = 64  # records' ``MAX_KEY_LEN``
 MAX_EMAIL_LEN = 320
 MAX_FIRST_NAME_LEN = 200
+MAX_SENDER_LEN = 600  # an encoded "Name <address>" header
 
 # Why a campaign is paused; ``paused_reason`` stores ``"<code>|<detail>"``,
 # clipped to ``MAX_PAUSED_REASON`` (the column's length).
