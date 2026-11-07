@@ -31,7 +31,6 @@ from moved_paths_common import (
     REMOVE_IN,
     Package,
     dir_map,
-    git_rename_args,
     packages,
     parse_moves,
     read_table,
@@ -97,13 +96,14 @@ def _check_python(root: Path, pkg: Package, table: dict) -> list[str]:
             errors.append(f"package prefix {prefix} is not a package")
     for module, attrs in table.get("attributes", {}).items():
         path = py.module_file(root, pkg, module)
-        if path is None or py.GETATTR_CALL not in path.read_text(encoding="utf-8"):
+        text = path.read_text(encoding="utf-8") if path else ""
+        if path is None or py.GETATTR_CALL not in text:
             errors.append(
                 f"{module} lends {sorted(attrs)} but has no __getattr__ calling moved_attribute"
             )
         # `import *` reads __all__ (or the module dict) and never asks __getattr__
         # for a name it does not list, so a lent name must be in __all__.
-        elif not set(attrs) <= set(py.dunder_all(path.read_text(encoding="utf-8")) or ()):
+        elif not set(attrs) <= set(py.dunder_all(text) or ()):
             errors.append(f"{module} lends {sorted(attrs)}; list them in its __all__")
         for name, target in attrs.items():
             if name not in current.get(target, py.Surface()).bound:
@@ -188,7 +188,18 @@ def main(argv: list[str] | None = None) -> int:
             print(error, file=sys.stderr)
         return 1 if errors else 0
     listing = subprocess.run(
-        ["git", "-C", str(root), *git_rename_args(OLD_REF, NEW_REF)[1:]],
+        [
+            "git",
+            "-C",
+            str(root),
+            "diff",
+            "--name-status",
+            "-M50",
+            OLD_REF,
+            NEW_REF,
+            "--",
+            "modules",
+        ],
         capture_output=True,
         text=True,
         check=True,

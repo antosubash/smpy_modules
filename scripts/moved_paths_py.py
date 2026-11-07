@@ -73,10 +73,9 @@ def old_public(source: str, is_init: bool) -> list[str]:
     """
     if (listed := dunder_all(source)) is not None:
         return listed
-    tree = ast.parse(source)
-    names = {n for n in surface(source).defined if not n.startswith("_")}
+    names = set(surface(source).defined)
     if is_init:
-        for node in _statements(tree.body):
+        for node in _statements(ast.parse(source).body):
             if isinstance(node, ast.ImportFrom) and node.level:
                 names.update(a.asname or a.name for a in node.names if a.name != "*")
     return sorted(n for n in names if not n.startswith("_"))
@@ -123,8 +122,8 @@ def _home(
     old: str,
     prefer: list[str],
     current: dict[str, Surface],
-    old_source: str | None = None,
-    source_of=None,
+    old_source: str | None,
+    source_of,
 ) -> str | None:
     """The current module that defines ``name``.
 
@@ -140,7 +139,7 @@ def _home(
     was = definition(old_source, name)
 
     def likeness(m: str) -> float:
-        now = definition(source_of(m), name) if source_of and was else None
+        now = definition(source_of(m), name) if was else None
         return difflib.SequenceMatcher(None, was, now).ratio() if was and now else 0.0
 
     homes.sort(
@@ -256,10 +255,8 @@ def _prefix(root: Path, pkg: Package, init: Move, py: list[Move], dirs: dict) ->
     for move in py:
         if move.old.startswith(f"{old_dir}/") and move.old != init.old:
             expected = new_dir + move.old[len(old_dir) :]
-            if move.new != expected and not (move.new is None and _exists(root, pkg, expected)):
+            if move.new != expected and not (
+                move.new is None and (root / pkg.rel / expected).is_file()
+            ):
                 return None
     return pkg.dotted(f"{new_dir}/__init__.py")
-
-
-def _exists(root: Path, pkg: Package, rel: str) -> bool:
-    return (root / pkg.rel / rel).is_file()

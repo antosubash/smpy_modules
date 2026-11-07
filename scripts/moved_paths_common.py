@@ -65,10 +65,6 @@ def packages(root: Path) -> list[Package]:
     return found
 
 
-def git_rename_args(old_ref: str = OLD_REF, new_ref: str = NEW_REF) -> list[str]:
-    return ["git", "diff", "--name-status", "-M50", old_ref, new_ref, "--", "modules"]
-
-
 def parse_moves(listing: str, pkgs: list[Package]) -> list[Move]:
     """The renames and deletes of package sources in a ``--name-status`` listing."""
     by_prefix = {f"{p.rel}/": p for p in pkgs}
@@ -83,7 +79,7 @@ def parse_moves(listing: str, pkgs: list[Package]) -> list[Move]:
     for line in listing.splitlines():
         fields = line.split("\t")
         status = fields[0][:1]
-        if status not in "RD" or not fields[0]:
+        if status not in ("R", "D"):
             continue
         old = locate(fields[1])
         if old is None:

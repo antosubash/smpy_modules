@@ -129,9 +129,8 @@ def plan(pkg: Package, moves: list[Move], dirs: dict, old: dict[str, dict], new:
             if home is None:
                 lost.append(name)
                 continue
-            kind = "types" if was["exports"][name]["kind"] == "type" else "values"
-            if new[home]["exports"][name]["kind"] == "type":
-                kind = "types"
+            kinds = (was["exports"][name]["kind"], new[home]["exports"][name]["kind"])
+            kind = "types" if "type" in kinds else "values"
             spec[kind].setdefault(home, []).append(name)
         if primary and new[primary]["default"]:
             spec["default"] = primary
