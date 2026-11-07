@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import en from '../../../locales/en.json';
+import { campaign as baseCampaign } from '../../hooks/campaignFixture';
 import { api } from '../../utils/api';
 import { HttpError } from '../../utils/http';
 import { toUtcIso } from '../../utils/progress';
@@ -22,32 +23,7 @@ const estimate = vi.mocked(api.estimate);
 const sendCampaign = vi.mocked(api.sendCampaign);
 
 function campaign(over: Partial<CampaignDetail> = {}): CampaignDetail {
-  return {
-    id: 7,
-    name: 'Spring',
-    subject: 'Hello',
-    status: 'draft',
-    list_type_key: 'news',
-    revision: 3,
-    updated_at: null,
-    recipient_count: 0,
-    sent_count: 0,
-    preheader: '',
-    from_name: null,
-    reply_to: null,
-    audience: 'all',
-    body: [],
-    scheduled_at: null,
-    started_at: null,
-    finished_at: null,
-    paused_code: null,
-    paused_detail: null,
-    failed_count: 0,
-    bounced_count: 0,
-    suppressed_count: 0,
-    unsubscribe_count: 0,
-    ...over,
-  };
+  return { ...baseCampaign(3), ...over };
 }
 
 type Props = Parameters<typeof SendDialog>[0];

@@ -18,9 +18,9 @@ import { api, errorMessage } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 import { daysLeft, formatWhen } from '../../utils/progress';
 import type { CampaignDetail, Progress } from '../../utils/types';
+import { STATUS_LABELS } from '../campaigns/CampaignTable';
 
 const copy = keys.newsletter.sending;
-const statusKeys = keys.newsletter.campaigns.status as Record<string, string>;
 const pausedKeys = copy.paused_code as Record<string, string>;
 
 type Action = 'pause' | 'resume' | 'unschedule' | 'cancel';
@@ -34,6 +34,13 @@ const ACTIONS: Record<string, Action[]> = {
 /** Paused before it was ever frozen (at freeze: list gone, https required):
  * nothing was sent, so it can also go back to draft and be scheduled afresh. */
 const PAUSED_UNSTARTED: Action[] = ['resume', 'unschedule', 'cancel'];
+
+const CALLS: Record<Action, (c: CampaignDetail) => Promise<CampaignDetail>> = {
+  pause: (c) => api.pauseCampaign(c.id),
+  resume: (c) => api.resumeCampaign(c.id),
+  cancel: (c) => api.cancelCampaign(c.id),
+  unschedule: (c) => api.unscheduleCampaign(c.id, c.revision),
+};
 
 function actionsFor(campaign: CampaignDetail): Action[] {
   if (campaign.status === 'paused' && !campaign.started_at) return PAUSED_UNSTARTED;
@@ -61,16 +68,7 @@ export function SendingPanel({ campaign, canSend, onChange }: Props) {
     setBusy(true);
     setError(null);
     try {
-      const id = campaign.id;
-      const next =
-        action === 'pause'
-          ? await api.pauseCampaign(id)
-          : action === 'resume'
-            ? await api.resumeCampaign(id)
-            : action === 'cancel'
-              ? await api.cancelCampaign(id)
-              : await api.unscheduleCampaign(id, campaign.revision);
-      onChange(next);
+      onChange(await CALLS[action](campaign));
       return true;
     } catch (e) {
       setError(errorMessage(e, t));
@@ -119,7 +117,7 @@ export function SendingPanel({ campaign, canSend, onChange }: Props) {
   return (
     <section className="flex flex-wrap items-center gap-3 border-b px-4 py-2 text-sm">
       <Badge variant="secondary">
-        {Object.hasOwn(statusKeys, status) ? t(statusKeys[status]) : status}
+        {Object.hasOwn(STATUS_LABELS, status) ? t(STATUS_LABELS[status]) : status}
       </Badge>
       <div className="min-w-0 flex-1 space-y-0.5">
         {lines.map((line, i) => (

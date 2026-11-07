@@ -1,33 +1,10 @@
 // Fixtures shared by the SendingPanel tests.
+
+import { campaign as baseCampaign } from '../../hooks/campaignFixture';
 import type { CampaignDetail, Progress } from '../../utils/types';
 
 export function campaign(over: Partial<CampaignDetail> = {}): CampaignDetail {
-  return {
-    id: 7,
-    name: 'Spring',
-    subject: 'Hello',
-    status: 'sending',
-    list_type_key: 'news',
-    revision: 3,
-    updated_at: null,
-    recipient_count: 300,
-    sent_count: 100,
-    preheader: '',
-    from_name: null,
-    reply_to: null,
-    audience: 'all',
-    body: [],
-    scheduled_at: null,
-    started_at: null,
-    finished_at: null,
-    paused_code: null,
-    paused_detail: null,
-    failed_count: 0,
-    bounced_count: 0,
-    suppressed_count: 0,
-    unsubscribe_count: 0,
-    ...over,
-  };
+  return { ...baseCampaign(3), status: 'sending', recipient_count: 300, sent_count: 100, ...over };
 }
 
 export function progress(over: Partial<Progress> = {}): Progress {

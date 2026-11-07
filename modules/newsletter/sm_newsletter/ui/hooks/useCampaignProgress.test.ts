@@ -117,11 +117,4 @@ describe('useCampaignProgress', () => {
     await tick(PROGRESS_POLL_MS);
     expect(result.error).toBeNull();
   });
-
-  it('reload fetches now', async () => {
-    status = 'sent';
-    await mount();
-    await act(async () => result.reload());
-    expect(api.progress).toHaveBeenCalledTimes(2);
-  });
 });

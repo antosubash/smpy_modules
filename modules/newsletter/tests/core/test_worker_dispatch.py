@@ -19,7 +19,7 @@ import pytest
 from background_tasks import sync_db
 from simple_module_db.stored_settings import Setting
 from sm_newsletter import tasks
-from sm_newsletter.core import crypto, tokens, worker
+from sm_newsletter.core import tokens, worker
 from sm_newsletter.core.clock import utcnow
 from sm_newsletter.core.constants import UNSUBSCRIBE_PREFIX
 from sm_newsletter.core.tenancy import tenant_scope
@@ -33,7 +33,7 @@ from tests.support.campaign_world import campaign_row, seed_campaign, seed_rende
 from tests.support.freeze_world import subscribers
 from tests.support.records_seed import seed_list
 from tests.support.sending import T
-from tests.support.worker_env import isolate_worker_env, reset_worker_caches
+from tests.support.worker_env import encrypted, isolate_worker_env, reset_worker_caches
 
 pytestmark = pytest.mark.skipif(
     USING_POSTGRES, reason="the worker test points sync_db at its own SQLite file"
@@ -138,10 +138,6 @@ async def _state_of(db_file: Path, cid: int) -> tuple[str, list[str], int]:
     return campaign.status, rows, attempts
 
 
-def _enc(plain: str, under: str) -> str:
-    return crypto.ENC_PREFIX + crypto._fernet_for(under).encrypt(plain.encode()).decode()
-
-
 def _token(message: console.CapturedMessage) -> str:
     header = message.headers["List-Unsubscribe"]
     return header.split(UNSUBSCRIBE_PREFIX, 1)[1].split(">", 1)[0]
@@ -186,7 +182,7 @@ def test_dispatch_refuses_unreadable_password(world, listener, caplog):
     """S11's fifth case: an ``enc:v1:`` password under another secret is
     refused before any connection, never sent as ciphertext."""
     world.put("host.secret_key", SECRET)
-    world.smtp_to(listener.getsockname()[1], _enc("pw", "another-secret"))
+    world.smtp_to(listener.getsockname()[1], encrypted("pw", "another-secret"))
 
     with caplog.at_level(logging.ERROR):
         summary = tasks.dispatch()

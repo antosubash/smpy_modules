@@ -21,7 +21,6 @@ export function useCampaignProgress(id: number, status: string | undefined) {
   const { t } = useT();
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const controller = useRef<AbortController | null>(null);
   const tRef = useRef(t);
   tRef.current = t;
 
@@ -45,7 +44,6 @@ export function useCampaignProgress(id: number, status: string | undefined) {
   useEffect(() => {
     if (status === undefined) return;
     const abort = new AbortController();
-    controller.current = abort;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const loop = async () => {
       const next = await fetchOnce(abort.signal);
@@ -61,9 +59,5 @@ export function useCampaignProgress(id: number, status: string | undefined) {
     };
   }, [fetchOnce, status]);
 
-  const reload = useCallback(async () => {
-    await fetchOnce((controller.current ?? new AbortController()).signal);
-  }, [fetchOnce]);
-
-  return { progress, error, reload };
+  return { progress, error };
 }

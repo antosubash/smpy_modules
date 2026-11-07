@@ -23,7 +23,6 @@ and every Core statement pins ``tenant_id``.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from datetime import datetime
 
 from simple_module_db import finalize_session, mark_written
@@ -34,10 +33,10 @@ from sqlalchemy.sql import Select
 
 from sm_newsletter.campaigns.lifecycle import SENDING
 from sm_newsletter.core import constants, tenancy
-from sm_newsletter.core.clock import utcnow
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import Campaign, CampaignRender, Send, SendAttempt
 from sm_newsletter.sending import rows
+from sm_newsletter.sending.ledger import SessionFactory
 
 __all__ = [
     "finish_done",
@@ -45,9 +44,9 @@ __all__ = [
     "pause_insecure",
     "recover_expired",
     "sending_campaigns",
+    "tenant_pairs",
 ]
 
-SessionFactory = Callable[[], AsyncSession]
 Pairs = list[tuple[str, int]]
 
 SENT = "sent"
@@ -59,7 +58,7 @@ _RENDER = CampaignRender.__table__  # ty: ignore[unresolved-attribute]
 _OPEN = (rows.QUEUED, SENDING)  # rows that keep a campaign from finishing
 
 
-async def _pairs(factory: SessionFactory, stmt: Select) -> Pairs:
+async def tenant_pairs(factory: SessionFactory, stmt: Select) -> Pairs:
     """Run a ``(tenant_id, id)`` enumeration across every tenant."""
     with all_tenants():
         async with factory() as session:
@@ -75,7 +74,7 @@ async def sending_campaigns(factory: SessionFactory) -> Pairs:
         .where(_CAMPAIGN.c.status == SENDING)
         .order_by(_CAMPAIGN.c.started_at, _CAMPAIGN.c.id)
     )
-    return await _pairs(factory, stmt)
+    return await tenant_pairs(factory, stmt)
 
 
 async def recover_expired(factory: SessionFactory, *, now: datetime) -> int:
@@ -86,7 +85,7 @@ async def recover_expired(factory: SessionFactory, *, now: datetime) -> int:
         .order_by(_SEND.c.id)
     )
     recovered = 0
-    for tenant, send_id in await _pairs(factory, stmt):
+    for tenant, send_id in await tenant_pairs(factory, stmt):
         with tenant_scope(tenant):
             async with factory() as session:
                 recovered += await _recover(session, tenant, send_id, now)
@@ -165,7 +164,7 @@ async def finish_done(factory: SessionFactory, *, now: datetime) -> int:
 
 
 async def pause_all_sending(
-    factory: SessionFactory, *, code: str, detail: str, now: datetime | None = None
+    factory: SessionFactory, *, code: str, detail: str, now: datetime
 ) -> int:
     """Pause every tenant's ``sending`` campaigns with ``code``; how many moved."""
     return await _pause(factory, await sending_campaigns(factory), code, detail, now)
@@ -189,12 +188,12 @@ async def pause_insecure(factory: SessionFactory, *, now: datetime) -> int:
         .where(_CAMPAIGN.c.status == SENDING, or_(*insecure))
         .order_by(_CAMPAIGN.c.id)
     )
-    pairs = await _pairs(factory, stmt)
+    pairs = await tenant_pairs(factory, stmt)
     return await _pause(factory, pairs, constants.PAUSE_HTTPS_REQUIRED, "", now)
 
 
 async def _pause(
-    factory: SessionFactory, pairs: Pairs, code: str, detail: str, now: datetime | None
+    factory: SessionFactory, pairs: Pairs, code: str, detail: str, now: datetime
 ) -> int:
     paused = 0
     for tenant, campaign_id in pairs:
@@ -206,7 +205,7 @@ async def _pause(
                     campaign_id=campaign_id,
                     code=code,
                     detail=detail,
-                    now=now or utcnow(),
+                    now=now,
                 )
                 await finalize_session(session)
         paused += int(moved)

@@ -174,7 +174,7 @@ class _SmtpSession:
         try:
             async with asyncio.timeout(self._transport._config.send_deadline):
                 return await self._transact(msg, payload, stage, body_sent)
-        except _LOST as exc:  # includes the deadline's TimeoutError
+        except _LOST as exc:  # a lost connection in _transact, or the deadline's TimeoutError
             return self._lost(body_sent[0], f"connection lost ({type(exc).__name__})", stage[0])
 
     async def _transact(
@@ -211,8 +211,6 @@ class _SmtpSession:
             # aiosmtplib encodes MAIL/RCPT as ASCII; SMTPUTF8 is not negotiated.
             await self._reset()
             return DeliveryResult("rejected", None, "address is not ASCII (SMTPUTF8 unsupported)")
-        except _LOST as exc:
-            return self._lost(body_sent[0], f"connection lost ({type(exc).__name__})", stage[0])
         return DeliveryResult("accepted", reply.code, reply.message, "data")
 
     def _lost(self, body_sent: bool, detail: str, stage: Stage) -> DeliveryResult:

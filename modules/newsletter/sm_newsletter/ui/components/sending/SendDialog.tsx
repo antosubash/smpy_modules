@@ -100,7 +100,7 @@ export function SendDialog(props: Props) {
   };
 
   useEffect(() => {
-    if (!open || !ready || (when === 'later' && scheduledAt === null)) return;
+    if (!open || !ready || blocked) return;
     let live = true;
     api.estimate(campaign.id, scheduledAt).then(
       (e) => live && setEstimate(e),
@@ -109,7 +109,7 @@ export function SendDialog(props: Props) {
     return () => {
       live = false;
     };
-  }, [open, ready, when, scheduledAt, campaign.id, t]);
+  }, [open, ready, blocked, scheduledAt, campaign.id, t]);
 
   const post = useCallback(
     async (revision: number, scheduled: string | null) => {
@@ -138,7 +138,7 @@ export function SendDialog(props: Props) {
     setArmed(null);
     if (dirty || incomplete) refuse(copy.unsaved);
     else if (armed.when === 'later' && !inFuture(armed.scheduled)) refuse(copy.time_past);
-    else void post(currentRevision(), armed.when === 'later' ? armed.scheduled : null);
+    else void post(currentRevision(), armed.scheduled);
   }, [armed, dirty, incomplete, refuse, post, currentRevision]);
 
   const confirm = async () => {

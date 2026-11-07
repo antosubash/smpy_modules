@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any
 
+from simple_module_core.datetimes import aware
 from simple_module_db import finalize_session
 from simple_module_db.tenancy import all_tenants
 from sm_newsletter.core import constants, tenancy, tokens
@@ -23,17 +23,11 @@ from sqlalchemy import select
 from tests.support.deliver_world import SECRET
 from tests.support.fake_transport import FakeTransport
 from tests.support.freeze_world import DUE, due_campaign, run_freeze, subscribers
+from tests.support.freeze_world import world as world  # re-exported for the dispatch tests
 from tests.support.records_seed import seed_list
-from tests.support.sending import NOW, T, make_app
+from tests.support.sending import NOW, T
 
 DAY = timedelta(hours=24)
-
-
-async def world(tmp_path: Path, **settings: Any) -> tuple[Any, Any, int]:
-    """``make_app`` on a file database with ``settings``: the app, its state
-    and a draft campaign's id (for test sends)."""
-    with tenant_scope(T):
-        return await make_app(file=tmp_path / "dispatch.db", **settings)
 
 
 async def run_tick(
@@ -90,11 +84,7 @@ async def counted_times(state: Any) -> list[datetime]:
     with all_tenants():
         async with state.session_factory() as db:
             found = (await db.execute(tenancy.all_tenants(stmt))).scalars().all()
-    return [_aware(at) for at in found]
-
-
-def _aware(at: datetime) -> datetime:
-    return at if at.tzinfo is not None else at.replace(tzinfo=NOW.tzinfo)
+    return [aware(at) for at in found]
 
 
 def busiest_day(times: Sequence[datetime]) -> int:

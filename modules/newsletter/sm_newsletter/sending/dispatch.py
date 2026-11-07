@@ -27,10 +27,8 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
-from datetime import datetime
 
 from sm_newsletter.core import constants
 from sm_newsletter.core.clock import utcnow
@@ -38,7 +36,7 @@ from sm_newsletter.core.errors import DispatchBusy, TransportUnavailable
 from sm_newsletter.core.settings import NewsletterSettings
 from sm_newsletter.sending.budget import current_budget
 from sm_newsletter.sending.deliver import Step, deliver_one
-from sm_newsletter.sending.freeze import start_due
+from sm_newsletter.sending.freeze import Clock, start_due
 from sm_newsletter.sending.lock import HeldLock, dispatch_lock
 from sm_newsletter.sending.transport import Transport, TransportSession
 from sm_newsletter.sending.upkeep import (
@@ -60,8 +58,6 @@ MAX_SLICE_STEPS = SLICE * 5
 lock, so a run of skipped rows never keeps a test send waiting a whole tick."""
 TICK_SECONDS = 50.0
 HOLDER = "dispatcher"
-
-Clock = Callable[[], datetime]
 
 
 @dataclass

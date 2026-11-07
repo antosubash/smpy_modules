@@ -27,3 +27,8 @@ def isolate_worker_env(monkeypatch: Any, root: Path) -> None:
 def reset_worker_caches() -> None:
     crypto._dotenv_secret.cache_clear()
     clear_settings_cache()
+
+
+def encrypted(plain: str, under: str) -> str:
+    """``plain`` as a stored secret encrypted under the key ``under``."""
+    return crypto.ENC_PREFIX + crypto._fernet_for(under).encrypt(plain.encode()).decode()
