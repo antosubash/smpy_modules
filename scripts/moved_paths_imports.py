@@ -13,13 +13,10 @@ import os
 import re
 from pathlib import Path
 
+from check_rules import JS_NOISE
 from moved_paths_common import HOOK, Package
 from moved_paths_ts import is_stub
 
-# Comments go, strings stay: the specifiers are strings.
-_TOKENS = re.compile(
-    r"//[^\n]*|/\*.*?\*/|'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\"|`(?:\\.|[^`\\])*`", re.S
-)
 _SPECIFIER = re.compile(r"""(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])([^'"\n]+)\1""")
 _PROBES = ("", ".ts", ".tsx", "/index.ts", "/index.tsx")
 _SKIP_PARTS = {"node_modules", "dist", "versions", "__pycache__"}
@@ -113,7 +110,7 @@ def ts_offenders(root: Path, pkgs: list[Package]) -> list[str]:
         if is_stub(path):
             continue
         text = path.read_text(encoding="utf-8")
-        code = _TOKENS.sub(lambda m: m.group(0) if m.group(0)[0] in "'\"`" else " ", text)
+        code = JS_NOISE.sub(lambda m: m.group(0) if m.group(0)[0] in "'\"`" else " ", text)
         owner = _owner(path, root, pkgs)
         for match in _SPECIFIER.finditer(code):
             target = _resolve(match.group(2), path, root, owner, npm)

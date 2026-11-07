@@ -153,6 +153,10 @@ def _specifier(old: str, target: str) -> str:
     return rel if rel.startswith(".") else f"./{rel}"
 
 
+def _header(marker: str, to: str) -> str:
+    return f"{marker}`{to}` in 0.0.14; this path goes in {REMOVE_IN} (#319). */"
+
+
 def _export(keyword: str, names: list[str], spec: str) -> str:
     line = f"{keyword} {{ {', '.join(names)} }} from '{spec}';"
     if len(line) <= LINE_WIDTH:
@@ -168,7 +172,7 @@ def render(old: str, spec: dict) -> str:
         or spec.get("default")
         or next(iter({**spec.get("values", {}), **spec.get("types", {})}))
     )
-    lines = [f"{MARKER}`{to}` in 0.0.14; this path goes in {REMOVE_IN} (#319). */"]
+    lines = [_header(MARKER, to)]
     if spec.get("star"):
         lines.append(f"export * from '{_specifier(old, spec['star'])}';")
     if spec.get("default"):
@@ -180,7 +184,4 @@ def render(old: str, spec: dict) -> str:
 
 
 def render_css(old: str, target: str) -> str:
-    rel = os.path.relpath(target, str(PurePosixPath(old).parent)).replace(os.sep, "/")
-    rel = rel if rel.startswith(".") else f"./{rel}"
-    header = f"{CSS_MARKER}`{target}` in 0.0.14; this path goes in {REMOVE_IN} (#319). */"
-    return f'{header}\n@import "{rel}";\n'
+    return f'{_header(CSS_MARKER, target)}\n@import "{_specifier(old, target)}";\n'

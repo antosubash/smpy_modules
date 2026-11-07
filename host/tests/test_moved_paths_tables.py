@@ -38,6 +38,12 @@ def _run(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _python(code: str, *flags: str) -> str:
+    result = _run(*flags, "-c", code)
+    assert result.returncode == 0, result.stderr[-2000:]
+    return result.stdout
+
+
 @pytest.mark.parametrize("package", sorted(HOOKS))
 def test_every_old_path_warns_and_is_the_new_module(package):
     """New paths import without a warning; each old one warns once and is the
@@ -58,9 +64,8 @@ def test_from_package_import_locales_is_the_real_module_again(package, attr):
     """``locales/`` is a data-only directory now, which Python would import as
     an empty namespace package; the alias must win."""
     code = f"from {package} import locales; print(locales.__name__, callable(locales.{attr}))"
-    result = _run("-W", "ignore::DeprecationWarning", "-c", code)
-    assert result.returncode == 0, result.stderr[-2000:]
-    assert result.stdout.split() == [f"{package}.core.locales", "True"]
+    out = _python(code, "-W", "ignore::DeprecationWarning")
+    assert out.split() == [f"{package}.core.locales", "True"]
 
 
 def test_billing_teardown_subscribe_is_the_tenant_deleted_subscriber():
@@ -71,9 +76,8 @@ def test_billing_teardown_subscribe_is_the_tenant_deleted_subscriber():
         "from sm_billing.subscriptions.deletion import tenant_deleted\n"
         "print(old.subscribe is tenant_deleted.subscribe)"
     )
-    result = _run("-W", "ignore::DeprecationWarning", "-c", code)
-    assert result.returncode == 0, result.stderr[-2000:]
-    assert result.stdout.strip() == "True"
+    out = _python(code, "-W", "ignore::DeprecationWarning")
+    assert out.strip() == "True"
 
 
 @pytest.mark.parametrize(
@@ -92,9 +96,8 @@ def test_star_import_from_a_lending_package_reaches_its_old_names(package, name,
         f"    from {package} import *\n"
         f"print({name} is h.{name}, any('{package}.{name}' in str(w.message) for w in seen))"
     )
-    result = _run("-c", code)
-    assert result.returncode == 0, result.stderr[-2000:]
-    assert result.stdout.split() == ["True", "True"]
+    out = _python(code)
+    assert out.split() == ["True", "True"]
 
 
 def test_the_hook_copies_are_identical():
