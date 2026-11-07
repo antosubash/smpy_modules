@@ -101,6 +101,10 @@ def _check_python(root: Path, pkg: Package, table: dict) -> list[str]:
             errors.append(
                 f"{module} lends {sorted(attrs)} but has no __getattr__ calling moved_attribute"
             )
+        # `import *` reads __all__ (or the module dict) and never asks __getattr__
+        # for a name it does not list, so a lent name must be in __all__.
+        elif not set(attrs) <= set(py.dunder_all(path.read_text(encoding="utf-8")) or ()):
+            errors.append(f"{module} lends {sorted(attrs)}; list them in its __all__")
         for name, target in attrs.items():
             if name not in current.get(target, py.Surface()).bound:
                 errors.append(f"{module}.{name} -> {target}, which has no {name}")

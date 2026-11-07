@@ -38,6 +38,7 @@ OLD = {
     "index/query.py": "def q():\n    pass\n\n\ndef gone():\n    pass\n",
     "locales.py": "def is_default():\n    pass\n",
     "metering.py": "def meter():\n    pass\n",
+    "teardown.py": "def subscribe(bus):\n    bus.on('TenantDeleted', cancel_subscriptions)\n",
     "components/Hero.tsx": "export function Hero() {}\nexport default Hero;\n"
     "export type HeroProps = { a: number };\nexport function heroGone() {}\n",
     "components/x.css": ".x {}\n",
@@ -59,8 +60,17 @@ NEW = {
     "records/index/query.py": "def q():\n    pass\n",
     "core/locales.py": "def is_default():\n    pass\n",
     "locales/en.json": "{}\n",
-    "metering/__init__.py": f"from ..core.moved_paths import moved_attribute\n\n\n{GETATTR}",
+    "metering/__init__.py": (
+        f"from ..core.moved_paths import moved_attribute\n\n__all__ = ['meter']\n\n\n{GETATTR}"
+    ),
     "metering/requests.py": "def meter():\n    pass\n",
+    # Two current `subscribe`s; the shorter path is the unrelated one.
+    "core/live.py": "def subscribe(bus):\n    bus.on('SettingsReloaded', rebuild)\n",
+    "subscriptions/__init__.py": "",
+    "subscriptions/deletion/__init__.py": "",
+    "subscriptions/deletion/tenant_deleted.py": (
+        "def subscribe(bus):\n    bus.on('TenantDeleted', cancel_subscriptions)\n"
+    ),
     "ui/components/Hero.tsx": "export function Hero() {}\nexport default Hero;\n",
     # A class, re-exported type-only: the stub must say `export type` too.
     "ui/components/hero-props.ts": "class Impl {}\nexport type { Impl as HeroProps };\n",
@@ -79,6 +89,7 @@ LISTING = "\n".join(
         f"D\t{M}/index/query.py",
         f"R090\t{M}/locales.py\t{M}/core/locales.py",
         f"D\t{M}/metering.py",
+        f"D\t{M}/teardown.py",
         f"R080\t{M}/components/Hero.tsx\t{M}/ui/components/Hero.tsx",
         f"R100\t{M}/components/x.css\t{M}/ui/components/x.css",
         f"R081\t{M}/utils/api.ts\t{M}/ui/utils/api.ts",
@@ -147,6 +158,14 @@ def test_a_name_that_is_a_real_package_again_lends_through_getattr(repo):
     assert table["attributes"] == {"pb.metering": {"meter": "pb.metering.requests"}}
 
 
+def test_a_shared_name_goes_to_the_definition_like_the_old_one(repo):
+    # Shortest-path alone picked core.live, the settings-reload subscriber,
+    # for billing's old teardown.subscribe (#319 review).
+    _, table = repo
+    assert table["modules"]["pb.teardown"] == ["pb.subscriptions.deletion.tenant_deleted"]
+    assert table["names"]["pb.teardown"] == ["subscribe"]
+
+
 def test_ts_stubs(repo):
     root, table = repo
     assert _read(root, "components/Hero.tsx") == (
@@ -182,6 +201,15 @@ def test_check_catches_a_package_that_stopped_lending(repo):
     root, _ = repo
     (root / M / "metering/__init__.py").write_text("", encoding="utf-8")
     assert any("pb.metering lends" in e for e in moved_paths.check(root))
+
+
+def test_check_catches_a_lending_package_without_all(repo):
+    # `import *` never asks __getattr__ for a name __all__ does not list.
+    root, _ = repo
+    (root / M / "metering/__init__.py").write_text(
+        f"from ..core.moved_paths import moved_attribute\n\n\n{GETATTR}", encoding="utf-8"
+    )
+    assert any("list them in its __all__" in e for e in moved_paths.check(root))
 
 
 @pytest.mark.parametrize(

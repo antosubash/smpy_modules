@@ -41,7 +41,7 @@
     "sm_billing.sync": "sm_billing.subscriptions.sync",
     "sm_billing.teardown": [
       "sm_billing.subscriptions.deletion.teardown",
-      "sm_billing.core.live"
+      "sm_billing.subscriptions.deletion.tenant_deleted"
     ],
     "sm_billing.teardown_claim": "sm_billing.subscriptions.deletion.teardown_claim",
     "sm_billing.webhooks": "sm_billing.subscriptions.webhooks"

@@ -7,6 +7,7 @@ fake tree in the tests and on the v0.0.13 sources, which are not installed.
 from __future__ import annotations
 
 import ast
+import difflib
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -57,15 +58,22 @@ def surface(source: str) -> Surface:
     return found
 
 
+def dunder_all(source: str) -> list[str] | None:
+    """The module's literal ``__all__``, if it has one."""
+    for node in ast.parse(source).body:
+        if isinstance(node, ast.Assign) and "__all__" in _targets(node.targets[0]):
+            return sorted(ast.literal_eval(node.value))
+    return None
+
+
 def old_public(source: str, is_init: bool) -> list[str]:
     """What an old module exported: ``__all__``, else its public definitions.
 
     A package ``__init__`` also exported what it imported from its own package.
     """
+    if (listed := dunder_all(source)) is not None:
+        return listed
     tree = ast.parse(source)
-    for node in tree.body:
-        if isinstance(node, ast.Assign) and "__all__" in _targets(node.targets[0]):
-            return sorted(ast.literal_eval(node.value))
     names = {n for n in surface(source).defined if not n.startswith("_")}
     if is_init:
         for node in _statements(tree.body):
@@ -95,15 +103,55 @@ def index(root: Path, pkg: Package) -> dict[str, Surface]:
     return found
 
 
-def _home(name: str, old: str, prefer: list[str], current: dict[str, Surface]) -> str | None:
-    """The current module that defines ``name``: a preferred one, the old leaf, the shortest."""
+def definition(source: str | None, name: str) -> str | None:
+    """The top-level ``def``/``class``/assignment that binds ``name``, as source."""
+    if source is None:
+        return None
+    for node in _statements(ast.parse(source).body):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            if node.name == name:
+                return ast.unparse(node)
+        elif isinstance(node, ast.Assign | ast.AnnAssign) and name in _targets(
+            node.targets[0] if isinstance(node, ast.Assign) else node.target
+        ):
+            return ast.unparse(node)
+    return None
+
+
+def _home(
+    name: str,
+    old: str,
+    prefer: list[str],
+    current: dict[str, Surface],
+    old_source: str | None = None,
+    source_of=None,
+) -> str | None:
+    """The current module that defines ``name``.
+
+    A preferred one wins. Otherwise, when several modules define it, the one whose
+    definition is closest to the old one: a shared name such as ``subscribe`` must
+    not land on an unrelated function (``sm_billing.teardown.subscribe``). Last
+    resorts are the old leaf name and the shortest path.
+    """
     homes = [m for m, s in current.items() if name in s.defined]
     if not homes:
         return None
     leaf = old.rsplit(".", 1)[-1]
-    homes.sort(key=lambda m: (m not in prefer, m.rsplit(".", 1)[-1] != leaf, m.count("."), m))
+    was = definition(old_source, name)
+
+    def likeness(m: str) -> float:
+        now = definition(source_of(m), name) if source_of and was else None
+        return difflib.SequenceMatcher(None, was, now).ratio() if was and now else 0.0
+
+    homes.sort(
+        key=lambda m: (m not in prefer, -likeness(m), m.rsplit(".", 1)[-1] != leaf, m.count("."), m)
+    )
     if len(homes) > 1 and homes[0] not in prefer:
-        print(f"note: {old}.{name} -> {homes[0]} (also in {', '.join(homes[1:])})", file=sys.stderr)
+        print(
+            f"note: {old}.{name} -> {homes[0]} ({likeness(homes[0]):.2f} like the old one;"
+            f" also in {', '.join(homes[1:])})",
+            file=sys.stderr,
+        )
     return homes[0]
 
 
@@ -113,10 +161,20 @@ def build(root: Path, old_root: Path, pkg: Package, moves: list[Move], dirs: dic
     table: dict = {"modules": {}, "packages": {}, "names": {}, "attributes": {}, "removed": {}}
     py = [m for m in moves if m.package == pkg and m.old.endswith(".py")]
     exported: dict[str, list[str]] = {}
+
+    def source_of(dotted: str) -> str | None:
+        path = module_file(root, pkg, dotted)
+        return path.read_text(encoding="utf-8") if path else None
+
     for move in py:
         old = pkg.dotted(move.old)
         is_init = move.old.endswith("__init__.py")
-        wanted = old_public((old_root / pkg.rel / move.old).read_text(encoding="utf-8"), is_init)
+        old_source = (old_root / pkg.rel / move.old).read_text(encoding="utf-8")
+        wanted = old_public(old_source, is_init)
+
+        def home(n: str, candidates: list[str], old=old, old_source=old_source) -> str | None:
+            return _home(n, old, candidates, current, old_source, source_of)
+
         exported[old] = wanted
         candidates = [
             pkg.dotted(p) for p in (move.new, guess(move, dirs)) if p and p.endswith(".py")
@@ -126,7 +184,7 @@ def build(root: Path, old_root: Path, pkg: Package, moves: list[Move], dirs: dic
             raise SystemExit(f"{old} is a namespace package with modules today; alias it by hand")
         if old in current:  # the old name is a real module again: it lends its lost names
             missing = [n for n in wanted if n not in current[old].bound]
-            homes = {n: _home(n, old, candidates, current) for n in missing}
+            homes = {n: home(n, candidates) for n in missing}
             if found := {n: h for n, h in homes.items() if h}:
                 table["attributes"][old] = found
             if lost := sorted(n for n, h in homes.items() if not h):
@@ -141,7 +199,7 @@ def build(root: Path, old_root: Path, pkg: Package, moves: list[Move], dirs: dic
             homes = {
                 n: (primary if primary and n in current[primary].bound else None) for n in wanted
             }
-            homes |= {n: _home(n, old, candidates, current) for n, h in homes.items() if not h}
+            homes |= {n: home(n, candidates) for n, h in homes.items() if not h}
             sources = [m for m in dict.fromkeys([primary, *homes.values()]) if m]
             table["modules"][old] = sources
             table["names"][old] = sorted(n for n, h in homes.items() if h)

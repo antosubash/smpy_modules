@@ -63,6 +63,40 @@ def test_from_package_import_locales_is_the_real_module_again(package, attr):
     assert result.stdout.split() == [f"{package}.core.locales", "True"]
 
 
+def test_billing_teardown_subscribe_is_the_tenant_deleted_subscriber():
+    """In 0.0.13 it subscribed to ``TenantDeleted``. A name match alone picked
+    ``core.live.subscribe``, the settings-reload subscriber (#319 review)."""
+    code = (
+        "import sm_billing.teardown as old\n"
+        "from sm_billing.subscriptions.deletion import tenant_deleted\n"
+        "print(old.subscribe is tenant_deleted.subscribe)"
+    )
+    result = _run("-W", "ignore::DeprecationWarning", "-c", code)
+    assert result.returncode == 0, result.stderr[-2000:]
+    assert result.stdout.strip() == "True"
+
+
+@pytest.mark.parametrize(
+    ("package", "name", "home"),
+    [
+        ("sm_billing.plans", "PlanService", "sm_billing.plans.service"),
+        ("sm_ai.metering", "RequiresAiRequest", "sm_ai.metering.requests"),
+    ],
+)
+def test_star_import_from_a_lending_package_reaches_its_old_names(package, name, home):
+    """``import *`` never asks ``__getattr__`` for a name ``__all__`` omits."""
+    code = (
+        "import warnings\nwarnings.simplefilter('error', DeprecationWarning)\n"
+        f"import {home} as h\nwarnings.simplefilter('always', DeprecationWarning)\n"
+        "with warnings.catch_warnings(record=True) as seen:\n"
+        f"    from {package} import *\n"
+        f"print({name} is h.{name}, any('{package}.{name}' in str(w.message) for w in seen))"
+    )
+    result = _run("-c", code)
+    assert result.returncode == 0, result.stderr[-2000:]
+    assert result.stdout.split() == ["True", "True"]
+
+
 def test_the_hook_copies_are_identical():
     texts = {name: path.read_bytes() for name, path in HOOKS.items()}
     assert len(set(texts.values())) == 1, "core/moved_paths.py differs between packages"
