@@ -120,7 +120,7 @@ async def tick(
     if not await any_due(factory, now=clock()):
         summary.stopped = "idle"  # nothing sending, or every row waiting out its backoff
     elif not await _room(factory, settings, clock, deadline, sleep):
-        summary.stopped = "budget"  # a capped day neither logs in nor auth-pauses
+        summary.stopped = "budget"  # a capped window neither logs in nor auth-pauses
     if summary.stopped is not None:
         summary.finished = await finish_done(factory, now=clock())
         return summary
