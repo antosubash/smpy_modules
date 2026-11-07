@@ -265,6 +265,10 @@
     "transport_unavailable": "Der Mailserver ist nicht verfügbar.",
     "unknown_list": "Keine solche Newsletter-Liste."
   },
+  "errors_field": {
+    "subject_required": "Geben Sie vor dem Senden einen Betreff ein.",
+    "schedule_out_of_range": "Wählen Sie einen Zeitpunkt innerhalb des nächsten Jahres."
+  },
   "preview": {
     "tab_edit": "Bearbeiten",
     "tab_preview": "Vorschau",
@@ -321,13 +325,14 @@
       "cancel": "Abbrechen",
       "unsaved": "Die letzten Änderungen konnten nicht gespeichert werden, daher wurde nichts gesendet.",
       "incomplete": "Stellen Sie die unfertigen Blöcke fertig oder entfernen Sie sie, bevor Sie senden.",
-      "time_past": "Wählen Sie einen Zeitpunkt in der Zukunft."
+      "time_past": "Wählen Sie einen Zeitpunkt in der Zukunft.",
+      "time_far": "Wählen Sie einen Zeitpunkt innerhalb des nächsten Jahres."
     },
     "panel": {
       "scheduled_for": "Geplant für {date}",
       "progress": "{sent} von {total} gesendet",
-      "eta_one": "Voraussichtlich fertig: {date} ({count} Tag bei {rate} pro Tag)",
-      "eta_other": "Voraussichtlich fertig: {date} ({count} Tage bei {rate} pro Tag)",
+      "eta_one": "Voraussichtlich fertig: {date}",
+      "eta_other": "Voraussichtlich fertig: {date}",
       "finished": "Abgeschlossen am {date}",
       "paused": "Pausiert: {detail}",
       "counts": {

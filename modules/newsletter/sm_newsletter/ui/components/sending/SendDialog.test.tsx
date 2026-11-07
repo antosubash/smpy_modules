@@ -19,6 +19,12 @@ vi.mock('../../utils/api', async (original) => ({
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const copy = en.sending;
+/** A schedulable time: tomorrow at 09:00, local (the horizon is 366 days). */
+const SOON = (() => {
+  const d = new Date(Date.now() + 86_400_000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T09:00`;
+})();
 const estimate = vi.mocked(api.estimate);
 const sendCampaign = vi.mocked(api.sendCampaign);
 
@@ -125,8 +131,8 @@ describe('SendDialog', () => {
     await act(async () => button(copy.dialog.confirm)?.click());
     expect(sendCampaign).not.toHaveBeenCalled();
 
-    await later('2099-01-01T09:00');
-    const iso = toUtcIso('2099-01-01T09:00');
+    await later(SOON);
+    const iso = toUtcIso(SOON);
     expect(estimate).toHaveBeenLastCalledWith(7, iso);
     expect(button(copy.dialog.confirm)?.disabled).toBe(false);
     await act(async () => button(copy.dialog.confirm)?.click());
@@ -212,7 +218,7 @@ describe('SendDialog', () => {
 
   it('opens on "Send now" again after a later time was chosen and the dialog closed', async () => {
     await open();
-    await later('2099-01-01T09:00');
+    await later(SOON);
     await act(async () => button(copy.dialog.cancel)?.click());
     await act(async () => button(copy.send_button)?.click());
     const now = document.querySelector('[role="radio"][value="now"]');
@@ -226,7 +232,7 @@ describe('SendDialog', () => {
     await open();
     expect(button(copy.dialog.confirm)?.disabled).toBe(false);
     estimate.mockReturnValue(new Promise(() => {}));
-    await later('2099-01-01T09:00');
+    await later(SOON);
     expect(button(copy.dialog.confirm)?.disabled).toBe(true);
   });
 

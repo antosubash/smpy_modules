@@ -42,6 +42,9 @@ const CALLS: Record<Action, (c: CampaignDetail) => Promise<CampaignDetail>> = {
   unschedule: (c) => api.unscheduleCampaign(c.id, c.revision),
 };
 
+/** Stopped for good: what went out is the campaign's own count. */
+const STOPPED = new Set(['sent', 'cancelled']);
+
 function actionsFor(campaign: CampaignDetail): Action[] {
   if (campaign.status === 'paused' && !campaign.started_at) return PAUSED_UNSTARTED;
   return ACTIONS[campaign.status] ?? [];
@@ -87,9 +90,11 @@ export function SendingPanel({ campaign, canSend, onChange }: Props) {
     lines.push(t(copy.panel.progress, { sent: progress.sent, total: progress.recipients }));
     const days = daysLeft(progress);
     if (days !== null && progress.estimated_finish) {
-      const date = when(progress.estimated_finish);
-      lines.push(t(copy.panel.eta, { date, count: days, rate: progress.daily_rate }));
+      lines.push(t(copy.panel.eta, { date: when(progress.estimated_finish), count: days }));
     }
+  } else if (STOPPED.has(status) || (status === 'paused' && campaign.started_at)) {
+    const total = campaign.recipient_count;
+    lines.push(t(copy.panel.progress, { sent: campaign.sent_count, total }));
   }
   if (status === 'paused') {
     const code = campaign.paused_code;

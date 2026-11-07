@@ -43,13 +43,21 @@ interface Choice {
   scheduled: string | null;
 }
 
+/** The latest a send can be scheduled; mirrors `SCHEDULE_HORIZON` in
+ *  `campaigns/checks.py`, which stays the authority. */
+const HORIZON_MS = 366 * 86_400_000;
+
 const inFuture = (iso: string | null): iso is string =>
   iso !== null && Date.parse(iso) > Date.now();
 
-/** A future `datetime-local` value as ISO UTC, else null. */
+const tooFar = (iso: string | null): boolean =>
+  iso !== null && Date.parse(iso) > Date.now() + HORIZON_MS;
+
+/** A `datetime-local` value as ISO UTC when it is a time that can be scheduled
+ *  (in the future and within the horizon), else null. */
 function futureIso(local: string): string | null {
   const iso = toUtcIso(local);
-  return inFuture(iso) ? iso : null;
+  return inFuture(iso) && !tooFar(iso) ? iso : null;
 }
 
 /** "Send…": now or at a time, with the recipients and when it should finish.
@@ -71,12 +79,15 @@ export function SendDialog(props: Props) {
    *  render after it and sends only this, never a value recomputed since. */
   const [armed, setArmed] = useState<Choice | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Why the estimate for the current choice failed; it belongs to that choice only. */
+  const [estimateError, setEstimateError] = useState<string | null>(null);
   /** Bumped on every open/close, so a flush that outlives its opening is ignored. */
   const opening = useRef(0);
 
   const scheduledAt = when === 'later' ? futureIso(at) : null;
   const blocked = when === 'later' && scheduledAt === null;
-  const timePast = blocked && at !== '';
+  const timeFar = blocked && tooFar(toUtcIso(at));
+  const timePast = blocked && at !== '' && !timeFar;
 
   const refuse = useCallback(
     (key: string) => {
@@ -105,13 +116,15 @@ export function SendDialog(props: Props) {
   };
 
   useEffect(() => {
+    // The figures, and a failure to get them, belong to the time they were asked
+    // for: never keep them under another.
+    setEstimateError(null);
     if (!open || !ready || blocked) return;
     let live = true;
-    // The figures belong to the time they were asked for: never keep them under another.
     setEstimate(null);
     api.estimate(campaign.id, scheduledAt).then(
       (e) => live && setEstimate(e),
-      (e) => live && setError(errorMessage(e, t)),
+      (e) => live && setEstimateError(errorMessage(e, t)),
     );
     return () => {
       live = false;
@@ -198,6 +211,7 @@ export function SendDialog(props: Props) {
                 onChange={(e) => setAt(e.target.value)}
               />
               {timePast && <p className="text-sm text-destructive">{t(copy.time_past)}</p>}
+              {timeFar && <p className="text-sm text-destructive">{t(copy.time_far)}</p>}
             </div>
           )}
           {estimate && !blocked && (
@@ -209,9 +223,9 @@ export function SendDialog(props: Props) {
               {estimate.overlaps && <p className="text-amber-900">{t(copy.overlap)}</p>}
             </div>
           )}
-          {error && (
+          {(error ?? estimateError) && (
             <p role="alert" className="text-sm text-destructive">
-              {error}
+              {error ?? estimateError}
             </p>
           )}
         </div>

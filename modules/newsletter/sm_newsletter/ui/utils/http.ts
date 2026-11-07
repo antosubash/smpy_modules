@@ -49,11 +49,24 @@ export async function errorFrom(response: Response): Promise<HttpError> {
   return new HttpError(message, response.status, code);
 }
 
-/** What a person is shown: the catalogue's text for the server's code, else
- *  the generic line. Never the raw `detail`. */
+/** The `invalid_campaign` details (`<field>: <problem>`) that name what to fix.
+ *  The detail is only looked up here, never shown. */
+const INVALID_CAMPAIGN: Record<string, string> = {
+  'subject: required': keys.newsletter.errors_field.subject_required,
+  'scheduled_at: out of range': keys.newsletter.errors_field.schedule_out_of_range,
+  'at: out of range': keys.newsletter.errors_field.schedule_out_of_range,
+};
+
+/** What a person is shown: the catalogue's text for the server's code (for
+ *  `invalid_campaign`, the field's own line when the detail is a known one),
+ *  else the generic line. Never the raw `detail`. */
 export function errorMessage(e: unknown, t: Translate): string {
   const errors = keys.newsletter.errors as Record<string, string>;
   const code = e instanceof HttpError ? e.code : null;
+  const detail = e instanceof HttpError ? e.message : '';
+  if (code === 'invalid_campaign' && Object.hasOwn(INVALID_CAMPAIGN, detail)) {
+    return t(INVALID_CAMPAIGN[detail]);
+  }
   if (code && Object.hasOwn(errors, code) && code !== 'generic') return t(errors[code]);
   return t(keys.newsletter.errors.generic);
 }

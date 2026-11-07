@@ -265,6 +265,10 @@
     "transport_unavailable": "The mail server is not available.",
     "unknown_list": "No such newsletter list."
   },
+  "errors_field": {
+    "subject_required": "Add a subject before sending.",
+    "schedule_out_of_range": "Choose a time within the next year."
+  },
   "preview": {
     "tab_edit": "Edit",
     "tab_preview": "Preview",
@@ -321,13 +325,14 @@
       "cancel": "Cancel",
       "unsaved": "The latest edits could not be saved, so nothing was sent.",
       "incomplete": "Finish or remove the unfinished blocks before sending.",
-      "time_past": "Choose a time in the future."
+      "time_past": "Choose a time in the future.",
+      "time_far": "Choose a time within the next year."
     },
     "panel": {
       "scheduled_for": "Scheduled for {date}",
       "progress": "{sent} of {total} sent",
-      "eta_one": "Estimated finish: {date} ({count} day at {rate} per day)",
-      "eta_other": "Estimated finish: {date} ({count} days at {rate} per day)",
+      "eta_one": "Estimated finish: {date}",
+      "eta_other": "Estimated finish: {date}",
       "finished": "Finished {date}",
       "paused": "Paused: {detail}",
       "counts": {
