@@ -86,7 +86,11 @@ async def _content_base(app: Any, tenant_id: str, public_base: str) -> str:
         logger.warning("newsletter: tenant %r has no organisation slug", tenant_id)
         return public_base
     parts = urlsplit(public_base)
-    port = f":{parts.port}" if parts.port else ""
+    try:
+        port = f":{parts.port}" if parts.port else ""
+    except ValueError:  # a malformed port: the host's own origin, as with no slug
+        logger.warning("newsletter: public_base_url has a malformed port")
+        return public_base
     return f"{parts.scheme}://{slug}.{sub}{port}"
 
 
