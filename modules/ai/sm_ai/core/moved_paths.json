@@ -1,3 +1,45 @@
 {
-  "remove_in": "0.0.17"
+  "attributes": {
+    "sm_ai.metering": {
+      "RequiresAiRequest": "sm_ai.metering.requests",
+      "billing_metering_installed": "sm_ai.metering.requests",
+      "register_meter": "sm_ai.metering.requests"
+    }
+  },
+  "modules": {
+    "sm_ai.constants": "sm_ai.core.constants",
+    "sm_ai.crypto": "sm_ai.core.crypto",
+    "sm_ai.csrf": "sm_ai.web.csrf",
+    "sm_ai.deps": "sm_ai.web.deps",
+    "sm_ai.discovery": "sm_ai.connections.discovery",
+    "sm_ai.endpoints": "sm_ai.web.endpoints",
+    "sm_ai.endpoints.api": "sm_ai.web.endpoints.api",
+    "sm_ai.endpoints.views": "sm_ai.web.endpoints.views",
+    "sm_ai.resolve": "sm_ai.connections.resolve",
+    "sm_ai.service": "sm_ai.web.service",
+    "sm_ai.services": "sm_ai.core.services",
+    "sm_ai.settings": "sm_ai.core.settings",
+    "sm_ai.worker_settings": "sm_ai.core.worker_settings"
+  },
+  "packages": {
+    "sm_ai.endpoints": "sm_ai.web.endpoints"
+  },
+  "remove_in": "0.0.17",
+  "ts": {
+    "components/SlotCard.tsx": {
+      "star": "ui/components/SlotCard.tsx"
+    },
+    "utils/api.ts": {
+      "star": "ui/utils/api.ts"
+    },
+    "utils/csrf.ts": {
+      "star": "ui/utils/csrf.ts"
+    },
+    "utils/i18n.ts": {
+      "star": "ui/utils/i18n.ts"
+    },
+    "utils/quotaError.ts": {
+      "star": "ui/utils/quotaError.ts"
+    }
+  }
 }
