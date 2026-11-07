@@ -225,6 +225,8 @@ def test_check_catches_a_lending_package_without_all(repo):
         ("ui/use.ts", "import { getPage } from '../utils/api';\n", "old path ../utils/api"),
         ("ui/use2.tsx", "export { Gallery } from '@/fields/picker/gallery';\n", "@/fields"),
         ("ui/use3.ts", "const m = import('@simple-module-py/pb/components/Hero');\n", "Hero"),
+        ("ui/use4.ts", "vi.mock('../utils/api', () => ({}));\n", "old path ../utils/api"),
+        ("ui/use5.ts", "const a = require('../utils/api');\n", "old path ../utils/api"),
     ],
 )
 def test_check_catches_an_internal_import_of_an_old_path(repo, rel, text, needle):

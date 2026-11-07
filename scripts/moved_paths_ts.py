@@ -145,7 +145,8 @@ def plan(pkg: Package, moves: list[Move], dirs: dict, old: dict[str, dict], new:
             )
             if spec["default"] is None:
                 lost.append("default")
-        ts[move.old] = {k: v for k, v in spec.items() if v}
+        if stub := {k: v for k, v in spec.items() if v}:  # nothing to re-export: no stub
+            ts[move.old] = stub
         if lost:
             removed[move.old] = lost
     return ts, css, removed

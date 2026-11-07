@@ -18,7 +18,12 @@ from moved_paths_common import HOOK, Package
 from moved_paths_common import owner as package_owner
 from moved_paths_ts import is_stub
 
-_SPECIFIER = re.compile(r"""(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])([^'"\n]+)\1""")
+# `from`, `import`, `require(` and the test runner's module calls (`vi.mock(`,
+# `vi.importActual(`, `jest.mock(`): a mock of a stub path would silently miss the real module.
+_SPECIFIER = re.compile(
+    r"""(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*"""
+    r"""|\b(?:vi|jest)\.\w+\s*\(\s*)(['"])([^'"\n]+)\1"""
+)
 _PROBES = ("", ".ts", ".tsx", "/index.ts", "/index.tsx")
 _SKIP_PARTS = {"node_modules", "dist", "versions", "__pycache__"}
 

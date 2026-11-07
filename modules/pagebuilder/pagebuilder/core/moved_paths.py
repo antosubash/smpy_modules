@@ -34,7 +34,7 @@ import sys
 import types
 from pathlib import Path
 
-from simple_module_core.deprecation import deprecate
+from simple_module_core.deprecation import Deprecation
 
 _TABLE = Path(__file__).with_name("moved_paths.json")
 
@@ -45,11 +45,13 @@ def _table() -> dict:
 
 
 def _warn(name: str, use: str, level: int) -> None:
-    # The framework's registry and message, but not ``deprecated_module``: on
-    # Python 3.12 its ``skip_file_prefixes`` is ignored and the warning would
-    # name this file. ``level`` steps over our own frames; warnings steps over
+    # The framework's message, but neither ``deprecated_module`` (on Python 3.12
+    # its ``skip_file_prefixes`` is ignored and the warning would name this file)
+    # nor its registry: ``remove_in`` there is a *framework* version, so a host's
+    # expiry check would find every alias (0.0.17 < the framework's 0.0.4x)
+    # overdue. ``level`` steps over our own frames; warnings steps over
     # importlib's frozen ones by itself, so the warning names the importer.
-    deprecate(name, remove_in=_table()["remove_in"], use=use).warn(stacklevel=level)
+    Deprecation(name, remove_in=_table()["remove_in"], use=use).warn(stacklevel=level)
 
 
 class MovedPathFinder(importlib.abc.MetaPathFinder, importlib.abc.Loader):

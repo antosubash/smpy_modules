@@ -14,7 +14,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
-from simple_module_core.deprecation import deprecate, expired_deprecations
+from packaging.version import Version
 
 REPO = Path(__file__).resolve().parents[2]
 PROBE = Path(__file__).with_name("moved_paths_probe.py")
@@ -100,6 +100,21 @@ def test_star_import_from_a_lending_package_reaches_its_old_names(package, name,
     assert out.split() == ["True", "True"]
 
 
+def test_old_paths_stay_out_of_the_framework_deprecation_registry():
+    """The registry's ``remove_in`` is a framework version: an alias registered
+    with 0.0.17 would look overdue to a host's expiry check on framework 0.0.4x."""
+    out = _python(
+        "import sm_billing.teardown, pagebuilder.service, sm_ai.metering\n"
+        "sm_ai.metering.RequiresAiRequest\n"
+        "from simple_module_core.deprecation import registered_deprecations\n"
+        "ours = ('sm_ai', 'sm_billing', 'news', 'pagebuilder', 'sm_records')\n"
+        "print([d.name for d in registered_deprecations() if d.name.startswith(ours)])",
+        "-W",
+        "ignore::DeprecationWarning",
+    )
+    assert out.strip() == "[]"
+
+
 def test_the_hook_copies_are_identical():
     texts = {name: path.read_bytes() for name, path in HOOKS.items()}
     assert len(set(texts.values())) == 1, "core/moved_paths.py differs between packages"
@@ -112,16 +127,16 @@ def test_every_package_installs_its_hook():
 
 
 def test_the_aliases_go_in_their_removal_release():
-    """Two releases of warnings, then the aliases go (#319). The framework's own
-    rule decides: a pre-release of ``remove_in`` already counts as due."""
+    """Two releases of warnings, then the aliases go (#319). The framework's rule
+    (``expired_deprecations``): a pre-release of ``remove_in`` already counts as
+    due. Not through its registry, whose ``remove_in`` is a framework version."""
     pyproject = tomllib.loads((REPO / "pyproject.toml").read_text(encoding="utf-8"))
     version = pyproject["project"]["version"]
-    ours = {
-        deprecate(f"{name} moved paths", remove_in=_table(name)["remove_in"]).name for name in HOOKS
-    }
-    due = ours & {d.name for d in expired_deprecations(version)}
+    current = Version(Version(version).base_version)
+    due = [name for name in HOOKS if current >= Version(_table(name)["remove_in"])]
     assert not due, (
         f"version {version} reached remove_in: delete the 0.0.14 moved-path aliases (the "
         "TS/CSS stubs, core/moved_paths.*, the install() lines and the "
-        "__getattr__/__path__ lines that name #319)"
+        "__getattr__/__all__/__path__ lines that name #319; an __all__ left behind lists "
+        "names nothing supplies, so a star import raises)"
     )
