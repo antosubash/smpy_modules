@@ -99,10 +99,12 @@ class MovedPathFinder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
         for attr in names:
             source = next(s for s in sources if hasattr(s, attr))
             setattr(module, attr, getattr(source, attr))
-        # The table holds the old module's ``__all__`` when it had one (which may
-        # list a private name, ``pagebuilder.service._UNSET``), else its public
-        # names, so a star import gets what it got in 0.0.13.
-        module.__all__ = list(names)
+        # A star import without ``__all__`` takes the public names, plus any child
+        # already imported (``news.endpoints.api``), as in 0.0.13. Only a private
+        # name the old ``__all__`` listed (``pagebuilder.service._UNSET``) needs
+        # one; the table holds that ``__all__`` whenever the old module had it.
+        if any(attr.startswith("_") for attr in names):
+            module.__all__ = list(names)
         _warn(name, " / ".join(new or ()), level=3)
 
 

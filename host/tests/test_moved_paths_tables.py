@@ -113,6 +113,18 @@ def test_star_import_from_a_combined_alias_keeps_the_old_all():
     assert out.split() == ["True", "True"]
 
 
+@pytest.mark.parametrize("package", ["news.endpoints", "sm_records.endpoints"])
+def test_star_import_from_a_compat_package_keeps_its_loaded_children(package):
+    """In 0.0.13 these had no ``__all__``, so a star import also took the
+    already-imported ``api`` child; an ``__all__`` on the alias would drop it."""
+    out = _python(
+        f"import {package}.api\nfrom {package} import *\nprint('api' in dir())",
+        "-W",
+        "ignore::DeprecationWarning",
+    )
+    assert out.strip() == "True"
+
+
 def test_old_paths_stay_out_of_the_framework_deprecation_registry():
     """The registry's ``remove_in`` is a framework version: an alias registered
     with 0.0.17 would look overdue to a host's expiry check on framework 0.0.4x."""
