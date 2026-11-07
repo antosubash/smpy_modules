@@ -63,6 +63,7 @@ class MovedPathFinder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
         self.modules: dict[str, str | list[str]] = table.get("modules", {})
         self.packages: dict[str, str | None] = table.get("packages", {})
         self.names: dict[str, list[str]] = table.get("names", {})
+        self.declared: frozenset[str] = frozenset(table.get("all", ()))
 
     def target(self, name: str) -> str | list[str] | None:
         """The new name (or names) behind ``name``, if it is an old one."""
@@ -99,11 +100,11 @@ class MovedPathFinder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
         for attr in names:
             source = next(s for s in sources if hasattr(s, attr))
             setattr(module, attr, getattr(source, attr))
-        # A star import without ``__all__`` takes the public names, plus any child
-        # already imported (``news.endpoints.api``), as in 0.0.13. Only a private
-        # name the old ``__all__`` listed (``pagebuilder.service._UNSET``) needs
-        # one; the table holds that ``__all__`` whenever the old module had it.
-        if any(attr.startswith("_") for attr in names):
+        # ``all`` lists the old modules that declared ``__all__`` (whose ``names``
+        # are that list, private ones included: ``pagebuilder.service._UNSET``).
+        # The rest had none, so a star import takes the public names plus any
+        # child already imported (``news.endpoints.api``), as in 0.0.13.
+        if name in self.declared:
             module.__all__ = list(names)
         _warn(name, " / ".join(new or ()), level=3)
 

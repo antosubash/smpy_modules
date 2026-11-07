@@ -155,11 +155,12 @@ def _home(
 
 
 def build(root: Path, old_root: Path, pkg: Package, moves: list[Move], dirs: dict) -> dict:
-    """The ``modules``/``packages``/``names``/``attributes``/``removed`` tables."""
+    """The ``modules``/``packages``/``names``/``all``/``attributes``/``removed`` tables."""
     current = index(root, pkg)
     table: dict = {"modules": {}, "packages": {}, "names": {}, "attributes": {}, "removed": {}}
     py = [m for m in moves if m.package == pkg and m.old.endswith(".py")]
     exported: dict[str, list[str]] = {}
+    declared: set[str] = set()  # old modules with a literal __all__
 
     def source_of(dotted: str) -> str | None:
         path = module_file(root, pkg, dotted)
@@ -170,6 +171,8 @@ def build(root: Path, old_root: Path, pkg: Package, moves: list[Move], dirs: dic
         is_init = move.old.endswith("__init__.py")
         old_source = (old_root / pkg.rel / move.old).read_text(encoding="utf-8")
         wanted = old_public(old_source, is_init)
+        if dunder_all(old_source) is not None:
+            declared.add(old)
 
         def home(n: str, candidates: list[str], old=old, old_source=old_source) -> str | None:
             return _home(n, old, candidates, current, old_source, source_of)
@@ -216,6 +219,9 @@ def build(root: Path, old_root: Path, pkg: Package, moves: list[Move], dirs: dic
             # package of its own, so its children's attributes land there.
             table["modules"][parent] = [table["modules"][parent]]
             table["names"][parent] = exported[parent]
+    # A combined alias whose old module declared __all__ declares the same, so a
+    # star import neither drops a private name nor picks up a loaded child.
+    table["all"] = sorted(declared & table["names"].keys())
     return {k: v for k, v in table.items() if v}
 
 

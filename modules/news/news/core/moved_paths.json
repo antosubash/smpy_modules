@@ -1,4 +1,7 @@
 {
+  "all": [
+    "news.endpoints.api"
+  ],
   "css": {
     "components/body/puck-editor.css": "ui/components/body/puck-editor.css"
   },

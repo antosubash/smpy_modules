@@ -1,4 +1,8 @@
 {
+  "all": [
+    "sm_records.endpoints.api",
+    "sm_records.services"
+  ],
   "modules": {
     "sm_records._body_limit": "sm_records.web._body_limit",
     "sm_records._cross_tenant": "sm_records.core.tenancy._cross_tenant",

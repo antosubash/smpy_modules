@@ -1,4 +1,7 @@
 {
+  "all": [
+    "pagebuilder.service"
+  ],
   "css": {
     "components/editor/puck-editor.css": "ui/components/editor/puck-editor.css",
     "components/public/print.css": "ui/components/public/print.css"

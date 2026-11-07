@@ -125,6 +125,25 @@ def test_star_import_from_a_compat_package_keeps_its_loaded_children(package):
     assert out.strip() == "True"
 
 
+@pytest.mark.parametrize(
+    ("package", "child"),
+    [
+        ("news.endpoints.api", "articles"),
+        ("sm_records.endpoints.api", "types"),
+        ("sm_records.services", "records"),
+    ],
+)
+def test_star_import_from_a_declared_alias_takes_only_its_old_all(package, child):
+    """These declared ``__all__`` in 0.0.13, so a star import never took a loaded
+    child (``types`` would shadow the stdlib module in the importer)."""
+    out = _python(
+        f"import {package}.{child}\nfrom {package} import *\nprint({child!r} in dir())",
+        "-W",
+        "ignore::DeprecationWarning",
+    )
+    assert out.strip() == "False"
+
+
 def test_old_paths_stay_out_of_the_framework_deprecation_registry():
     """The registry's ``remove_in`` is a framework version: an alias registered
     with 0.0.17 would look overdue to a host's expiry check on framework 0.0.4x."""
