@@ -7,14 +7,19 @@ One tick, run with no tenant bound:
    not ``https://`` (A6: the transport may have changed since it was
    scheduled) pauses a due campaign at freeze, before anything is frozen, and
    :func:`~.upkeep.pause_insecure` pauses one already ``sending``.
-2. Nothing ``sending``, or no budget left: :func:`~.upkeep.finish_done`, and
-   no relay connection (a capped day neither logs in every minute nor lets a
-   refused login pause every campaign).
+2. No row due (nothing ``sending``, or every ``queued`` row waiting for its
+   ``retry_at``: :func:`~.upkeep.any_due`), or no budget left before the
+   deadline (the day window full, or the minute window not freeing in time):
+   :func:`~.upkeep.finish_done`, and no relay connection (an idle or capped
+   minute neither logs in nor lets a refused login pause every campaign).
 3. One transport session for the whole tick. A refused login pauses every
    ``sending`` campaign (``smtp_auth``); any other failure only ends the tick.
 4. Slices until :data:`TICK_SECONDS`, each inside the dispatch lock: read the
    budget, send at most ``min(budget.left, SLICE)`` (oldest-started campaign
    first, across tenants), release. A test send waits at most one slice.
+   With only the minute window full, the tick waits (outside the lock) for it
+   to free while that comes before the deadline: the last tick's sends are
+   still inside the minute when the next one starts.
 5. :func:`~.upkeep.finish_done`.
 
 A verdict that stops the tick (a relay quota reply, a relay refusal) ends it
@@ -25,8 +30,10 @@ ends the tick with nothing reserved.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 
@@ -34,13 +41,14 @@ from sm_newsletter.core import constants
 from sm_newsletter.core.clock import utcnow
 from sm_newsletter.core.errors import DispatchBusy, TransportUnavailable
 from sm_newsletter.core.settings import NewsletterSettings
-from sm_newsletter.sending.budget import current_budget
+from sm_newsletter.sending.budget import current_budget, minute_wait
 from sm_newsletter.sending.deliver import Step, deliver_one
 from sm_newsletter.sending.freeze import Clock, start_due
 from sm_newsletter.sending.lock import HeldLock, dispatch_lock
 from sm_newsletter.sending.transport import Transport, TransportSession
 from sm_newsletter.sending.upkeep import (
     SessionFactory,
+    any_due,
     finish_done,
     pause_all_sending,
     pause_insecure,
@@ -58,6 +66,7 @@ MAX_SLICE_STEPS = SLICE * 5
 lock, so a run of skipped rows never keeps a test send waiting a whole tick."""
 TICK_SECONDS = 50.0
 HOLDER = "dispatcher"
+Sleep = Callable[[float], Awaitable[object]]
 
 
 @dataclass
@@ -83,6 +92,7 @@ class _Run:
     clock: Clock
     deadline: float
     summary: TickSummary
+    sleep: Sleep
 
     def late(self) -> bool:
         return time.monotonic() >= self.deadline
@@ -97,6 +107,7 @@ async def tick(
     clock: Clock = utcnow,
     deadline_s: float = TICK_SECONDS,
     lock_wait_s: float = 15,
+    sleep: Sleep = asyncio.sleep,
 ) -> TickSummary:
     """One dispatcher pass; what it did and why it stopped."""
     deadline = time.monotonic() + deadline_s
@@ -106,9 +117,9 @@ async def tick(
     summary.started = await start_due(factory, now=clock(), clock=clock, require_https=smtp_only)
     if smtp_only:  # the campaigns already sending when the transport changed
         summary.paused += await pause_insecure(factory, now=clock())
-    if not await sending_campaigns(factory):
-        summary.stopped = "idle"
-    elif (await current_budget(factory, settings, now=clock())).left == 0:
+    if not await any_due(factory, now=clock()):
+        summary.stopped = "idle"  # nothing sending, or every row waiting out its backoff
+    elif not await _room(factory, settings, clock, deadline, sleep):
         summary.stopped = "budget"  # a capped day neither logs in nor auth-pauses
     if summary.stopped is not None:
         summary.finished = await finish_done(factory, now=clock())
@@ -135,6 +146,7 @@ async def tick(
             clock,
             deadline,
             summary,
+            sleep,
         )
         summary.stopped = await _slices(run, lock_wait_s)
     summary.finished = await finish_done(factory, now=clock())
@@ -149,9 +161,30 @@ async def _slices(run: _Run, lock_wait_s: float) -> str:
                 stopped = await _slice(run, lock)
         except DispatchBusy:
             return "busy"
+        if stopped == "budget" and await _room(
+            run.factory, run.settings, run.clock, run.deadline, run.sleep
+        ):
+            continue
         if stopped is not None:
             return stopped
     return "deadline"
+
+
+async def _room(
+    factory: SessionFactory,
+    settings: NewsletterSettings,
+    clock: Clock,
+    deadline: float,
+    sleep: Sleep,
+) -> bool:
+    """Whether a send fits before ``deadline``, after waiting out a full minute
+    window (outside the lock, so a test send is not held up)."""
+    wait = await minute_wait(factory, settings, now=clock())
+    if wait is None or (wait and time.monotonic() + wait >= deadline):
+        return False
+    if wait:
+        await sleep(wait)
+    return True
 
 
 async def _slice(run: _Run, lock: HeldLock) -> str | None:

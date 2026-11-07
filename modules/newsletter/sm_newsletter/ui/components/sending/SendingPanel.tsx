@@ -13,7 +13,7 @@ import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 
-import { useCampaignProgress } from '../../hooks/useCampaignProgress';
+import { PROGRESS_POLL_MS, useCampaignProgress } from '../../hooks/useCampaignProgress';
 import { api, errorMessage } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 import { daysLeft, formatWhen } from '../../utils/progress';
@@ -168,15 +168,27 @@ function useFollowWorker(
   useEffect(() => {
     if (seen.current?.status !== status) {
       seen.current = { status, stale: progress };
-      return;
+      return undefined;
     }
-    if (status === 'draft' || !progress || progress === seen.current.stale) return;
-    if (progress.status === status) return;
+    if (status === 'draft' || !progress || progress === seen.current.stale) return undefined;
+    if (progress.status === status) return undefined;
     seen.current.stale = progress;
-    api.getCampaign(id).then(
-      (next) => onChangeRef.current(next),
-      () => undefined, // the next poll tries again
-    );
+    // A poll that left the live states was the last one, so a failed re-read is
+    // retried here, not by "the next poll".
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let live = true;
+    const follow = () =>
+      api.getCampaign(id).then(
+        (next) => live && onChangeRef.current(next),
+        () => {
+          if (live) timer = setTimeout(follow, PROGRESS_POLL_MS);
+        },
+      );
+    void follow();
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
   }, [id, status, progress]);
 }
 

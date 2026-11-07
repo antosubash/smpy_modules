@@ -2,6 +2,9 @@
 
 - :func:`sending_campaigns`: every tenant's ``sending`` campaigns, oldest
   started first, the order the budget is spent in.
+- :func:`any_due`: whether any tenant's ``sending`` campaign has a row the
+  next delivery would take now (the test of :func:`~.rows.next_row`), so a
+  tick with every row waiting out its backoff opens no relay connection.
 - :func:`recover_expired`: a ``sending`` row whose lease ran out belongs to a
   sender that died between its reservation and its result (S7). It ends
   ``failed/outcome_unknown`` and its ``pending`` attempt ``unknown``: never
@@ -39,6 +42,7 @@ from sm_newsletter.sending import rows
 from sm_newsletter.sending.ledger import SessionFactory
 
 __all__ = [
+    "any_due",
     "finish_done",
     "pause_all_sending",
     "pause_insecure",
@@ -75,6 +79,25 @@ async def sending_campaigns(factory: SessionFactory) -> Pairs:
         .order_by(_CAMPAIGN.c.started_at, _CAMPAIGN.c.id)
     )
     return await tenant_pairs(factory, stmt)
+
+
+async def any_due(factory: SessionFactory, *, now: datetime) -> bool:
+    """Whether a ``sending`` campaign of any tenant has a ``queued`` row due at
+    ``now`` (no ``retry_at``, or past it)."""
+    stmt = (
+        select(_SEND.c.tenant_id, _SEND.c.id)
+        .join(
+            _CAMPAIGN,
+            (_CAMPAIGN.c.tenant_id == _SEND.c.tenant_id) & (_CAMPAIGN.c.id == _SEND.c.campaign_id),
+        )
+        .where(
+            _CAMPAIGN.c.status == SENDING,
+            _SEND.c.status == rows.QUEUED,
+            or_(_SEND.c.retry_at.is_(None), _SEND.c.retry_at <= now),
+        )
+        .limit(1)
+    )
+    return bool(await tenant_pairs(factory, stmt))
 
 
 async def recover_expired(factory: SessionFactory, *, now: datetime) -> int:

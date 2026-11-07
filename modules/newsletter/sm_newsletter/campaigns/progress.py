@@ -20,6 +20,7 @@ from sm_newsletter.campaigns.lifecycle import SENDING, split_paused
 from sm_newsletter.core import tenancy
 from sm_newsletter.core.settings import NewsletterSettings
 from sm_newsletter.models import Campaign, Send
+from sm_newsletter.sending.budget import DAY, MINUTE
 from sm_newsletter.sending.ledger import SessionFactory
 from sm_newsletter.web.schemas.sending import EstimateOut, ProgressOut
 
@@ -27,8 +28,8 @@ __all__ = ["daily_rate", "estimate", "estimate_finish", "progress", "queued_ahea
 
 _SEND = Send.__table__  # ty: ignore[unresolved-attribute]
 _CAMPAIGN = Campaign.__table__  # ty: ignore[unresolved-attribute]
-_DAY_SECONDS = 86400
-_MINUTES_PER_DAY = 1440
+_DAY_SECONDS = DAY.total_seconds()
+_MINUTES_PER_DAY = DAY // MINUTE
 
 
 def daily_rate(settings: NewsletterSettings) -> int:

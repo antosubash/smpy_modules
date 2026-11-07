@@ -112,9 +112,12 @@ expires after 55 s. Nothing else sends campaign mail.
    its own tenant; that one has started, so it can only be cancelled. The rest
    go on; with none left, no connection is opened. Delivery re-checks the
    snapshot per recipient before any claim or attempt.
-2. Nothing `sending`, or no budget left in either window: finish any campaign
-   with no open rows and stop, with no relay connection (a capped day neither
-   logs in every minute nor lets a refused login pause every campaign).
+2. No row due (nothing `sending`, or every `queued` row still waiting for its
+   `retry_at`, as during a 5 or 30 minute backoff), or no budget left (the
+   24 h window full, or the 60 s window not freeing before the deadline):
+   finish any campaign with no open rows and stop, with no relay connection
+   (an idle or capped minute neither logs in nor lets a refused login pause
+   every campaign).
 3. Open one transport session for the tick. A refused login pauses every
    `sending` campaign (`smtp_auth`); any other connect or TLS failure only ends
    the tick.
@@ -124,6 +127,13 @@ expires after 55 s. Nothing else sends campaign mail.
    A slice also ends after `MAX_SLICE_STEPS = 50` steps, skipped rows
    included, so a run of skips never holds the lock. A test send therefore
    waits at most one slice.
+   When only the 60 s window is full, the tick waits outside the lock until
+   its oldest attempt leaves it, as long as that comes before the deadline,
+   and goes on: the previous tick's sends landed just after it started, so
+   they are still inside the minute when the next tick starts, and stopping
+   there would send only every other minute. Throughput is therefore
+   `min(daily_limit, per_minute_limit x 1440)` a day, the rate the progress
+   estimate uses. A full 24 h window stops the tick at once.
 5. The oldest-started campaign goes first, across tenants. Several campaigns
    share the one budget, and a campaign that cannot finish today carries on the
    next day, as long as the worker and beat run.

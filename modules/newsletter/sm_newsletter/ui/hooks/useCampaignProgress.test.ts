@@ -87,6 +87,13 @@ describe('useCampaignProgress', () => {
     expect(result.progress?.status).toBe('sent');
   });
 
+  it('does not fetch for a draft', async () => {
+    status = 'draft';
+    await mount();
+    await tick(PROGRESS_POLL_MS);
+    expect(api.progress).not.toHaveBeenCalled();
+  });
+
   it('stops polling when a poll returns sent', async () => {
     status = 'sending';
     await mount();

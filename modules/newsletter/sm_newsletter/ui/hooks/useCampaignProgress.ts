@@ -1,7 +1,7 @@
 /**
  * Live delivery counts for a campaign that is scheduled or sending.
  *
- * One fetch on mount (and whenever the id or status changes); while the
+ * One fetch on mount (and whenever the id or status changes; none for a draft); while the
  * campaign is `scheduled` or `sending` the latest answer is re-fetched every
  * `PROGRESS_POLL_MS`, and polling stops as soon as an answer reports any other
  * status. Unmounting aborts the request in flight.
@@ -42,7 +42,8 @@ export function useCampaignProgress(id: number, status: string | undefined) {
   );
 
   useEffect(() => {
-    if (status === undefined) return;
+    // A draft has no send rows to count; the panel shows nothing for it.
+    if (status === undefined || status === 'draft') return;
     const abort = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const loop = async () => {
