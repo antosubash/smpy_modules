@@ -266,8 +266,8 @@ stubs). Never edit or import them: `scripts/moved_paths.py --check` (`make lint`
 CI) fails on a stub that drifts from its table and on any repo import of an old
 path. `host/tests/test_moved_paths_tables.py` fails once the version reaches
 `remove_in`; then delete the stubs, both `core/moved_paths.*` files, the
-`install(__name__)` lines, the `__getattr__`/`__path__`/`__all__` compat lines
-(ai's `metering`, billing's `plans`, records' `index` and `seed`),
+`install(__name__)` lines, the `__getattr__`/`__all__` lines (ai's `metering`,
+billing's `plans`) and the `__path__` lines (records' `index` and `seed`),
 `scripts/moved_paths*` with its test and the `--check` lines in the Makefile and
 `ci.yml`, `host/tests/test_moved_paths*.py` and `moved_paths_probe.py`, and the
 stub filter in the `test_layout.py` of ai, billing and news.
