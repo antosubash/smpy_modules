@@ -100,6 +100,19 @@ def test_star_import_from_a_lending_package_reaches_its_old_names(package, name,
     assert out.split() == ["True", "True"]
 
 
+def test_star_import_from_a_combined_alias_keeps_the_old_all():
+    """0.0.13's ``pagebuilder.service`` listed the private ``_UNSET`` in its
+    ``__all__``; the alias built from several modules must list it too."""
+    out = _python(
+        "from pagebuilder.service import *\n"
+        "from pagebuilder.content.service import pages\n"
+        "print(_UNSET is pages._UNSET, PagesService is pages.PagesService)",
+        "-W",
+        "ignore::DeprecationWarning",
+    )
+    assert out.split() == ["True", "True"]
+
+
 def test_old_paths_stay_out_of_the_framework_deprecation_registry():
     """The registry's ``remove_in`` is a framework version: an alias registered
     with 0.0.17 would look overdue to a host's expiry check on framework 0.0.4x."""

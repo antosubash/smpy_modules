@@ -95,9 +95,14 @@ class MovedPathFinder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
             sys.modules[name] = replacement  # what the import statement returns
             return
         sources = [importlib.import_module(each) for each in new or ()]
-        for attr in self.names.get(name, ()):
+        names = self.names.get(name, ())
+        for attr in names:
             source = next(s for s in sources if hasattr(s, attr))
             setattr(module, attr, getattr(source, attr))
+        # The table holds the old module's ``__all__`` when it had one (which may
+        # list a private name, ``pagebuilder.service._UNSET``), else its public
+        # names, so a star import gets what it got in 0.0.13.
+        module.__all__ = list(names)
         _warn(name, " / ".join(new or ()), level=3)
 
 
