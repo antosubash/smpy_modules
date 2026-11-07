@@ -58,4 +58,24 @@ describe('NewCampaignDialog', () => {
     expect(document.querySelector('select')).toBeNull();
     expect((createButton() as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it('creates once for clicks in the same tick', async () => {
+    vi.mocked(api.createCampaign).mockReset();
+    vi.mocked(api.createCampaign).mockReturnValue(new Promise(() => {}));
+    await open(['news']);
+    const name = document.querySelector('input') as HTMLInputElement;
+    const select = document.querySelector('select') as HTMLSelectElement;
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      set?.call(name, 'Spring');
+      name.dispatchEvent(new Event('input', { bubbles: true }));
+      select.value = 'news';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const form = document.querySelector('form') as HTMLFormElement;
+    await act(async () => {
+      for (let i = 0; i < 5; i++) form.requestSubmit();
+    });
+    expect(api.createCampaign).toHaveBeenCalledTimes(1);
+  });
 });

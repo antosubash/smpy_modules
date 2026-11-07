@@ -28,7 +28,7 @@ export interface Capabilities {
 const copy = keys.newsletter.blocks.categories;
 
 /** The single column the email is laid out in (`styles.WIDTH`). */
-export const EMAIL_WIDTH = 600;
+const EMAIL_WIDTH = 600;
 
 function EmailColumn({ children }: { children?: ReactNode }) {
   return (

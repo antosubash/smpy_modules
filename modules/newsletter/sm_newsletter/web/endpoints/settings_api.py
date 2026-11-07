@@ -61,13 +61,22 @@ async def put_settings(
 
 @router.put("/smtp-password", response_model=SmtpPasswordOut, dependencies=_EDIT)
 async def put_smtp_password(
-    body: SmtpPasswordUpdate, request: Request, db: AsyncSession = Depends(get_db)
+    request: Request, payload: Any = Body(...), db: AsyncSession = Depends(get_db)
 ) -> SmtpPasswordOut:
+    # Unparsed body: FastAPI's own 422 would echo the submitted input, which
+    # may be a password of the wrong type or a mistyped key.
+    body = parse_payload(SmtpPasswordUpdate, payload, error=InvalidPassword)
     # Stored exactly as submitted: surrounding whitespace can be part of a
     # password. Only an empty / all-whitespace or oversized value is refused.
     password = body.password
     if not password.strip() or len(password) > MAX_PASSWORD_LEN:
         raise InvalidPassword()
+    try:
+        password.encode()
+    except UnicodeEncodeError:
+        # A lone surrogate (valid JSON, not valid UTF-8) would 500 in the
+        # cipher, and the error text quotes the offending character.
+        raise InvalidPassword() from None
     await settings_service.set_smtp_password(request.app, db, password)
     return SmtpPasswordOut(
         has_password=bool(request.app.state.sm_newsletter.settings.smtp_password)

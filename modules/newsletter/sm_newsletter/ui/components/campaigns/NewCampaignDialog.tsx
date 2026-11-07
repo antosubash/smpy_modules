@@ -12,7 +12,7 @@ import {
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { api, errorMessage } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
@@ -38,6 +38,8 @@ export function NewCampaignDialog() {
   const [list, setList] = useState('');
   const [lists, setLists] = useState<string[] | null>(null);
   const [pending, setPending] = useState(false);
+  // Synchronous: clicks in one tick all see the same `pending` state.
+  const creating = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,14 +74,20 @@ export function NewCampaignDialog() {
   const canCreate = !pending && name.trim() !== '' && list !== '';
 
   const create = async () => {
+    if (creating.current) return;
+    creating.current = true;
     setPending(true);
     setError(null);
+    const done = () => {
+      creating.current = false;
+      setPending(false);
+    };
     try {
       const campaign = await api.createCampaign({ name: name.trim(), list_type_key: list });
-      router.visit(editorUrl(campaign.id), { onFinish: () => setPending(false) });
+      router.visit(editorUrl(campaign.id), { onFinish: done });
     } catch (e) {
       setError(errorMessage(e, t));
-      setPending(false);
+      done();
     }
   };
 

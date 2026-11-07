@@ -57,8 +57,8 @@ MENU_LABEL_SETTINGS = "Settings"
 MENU_LABEL_KEY_SETTINGS = "newsletter.menu.settings"
 MENU_ICON_SETTINGS = "settings"
 
-# The newsletter settings page (PR 3). Registered now as the settings'
-# ``manage_url`` so the generic Settings screen refuses newsletter writes.
+# The newsletter settings page; also the settings' ``manage_url``, so the
+# generic Settings screen refuses newsletter writes.
 SETTINGS_URL = f"{VIEW_PREFIX}/settings"
 
 # Campaign and send lifecycles (``str`` columns, ``max_length=24``).
@@ -84,8 +84,6 @@ REASON_COMPLAINT = "complaint"
 REASON_IMPORTED_CLEANED = "imported_cleaned"
 REASON_UNSUBSCRIBED = "unsubscribed"
 REASONS = (REASON_HARD_BOUNCE, REASON_COMPLAINT, REASON_IMPORTED_CLEANED, REASON_UNSUBSCRIBED)
-# A later confirmation clears these; a complaint is never cleared.
-CLEARED_BY_CONFIRMATION = (REASON_HARD_BOUNCE, REASON_IMPORTED_CLEANED, REASON_UNSUBSCRIBED)
 SOURCES = ("records_event", "reconcile", "unsubscribe_page", "send", "import", "admin")
 
 MAX_TYPE_KEY_LEN = 64  # records' ``MAX_KEY_LEN``

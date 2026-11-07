@@ -26,7 +26,9 @@ and never echoes the input.
 
 The layout is one 600 px column of nested tables with inline styles, so it holds
 in clients that ignore `<style>`. A fixed header (logo or app name) and a fixed
-footer wrap the blocks; the editor cannot remove either.
+footer wrap the blocks; the editor cannot remove either. Images (blocks, card
+images, logo) are fluid: `width:100%` with a `max-width`, plus the `width`
+attribute for Outlook, so a wide image shrinks with the cell on a phone.
 
 ## URLs
 
@@ -68,12 +70,21 @@ Render warnings are `relative_urls`, `physical_address_missing` and
 `em`), keeps no attribute but `a[href]` (which must pass the link rule; a
 duplicate `href` keeps the first), and escapes all text. The contents of
 `script style iframe object embed template svg math head title noscript` are
-dropped; any other tag is unwrapped and its text kept. Nesting is capped at 20.
+dropped; any other tag is unwrapped and its text kept. At most 20 elements are open
+at once (a deeper start tag is unwrapped, its text kept), and past 200 tracked
+open elements a start tag is treated as unknown.
 
 It runs at save (the stored value is the cleaned form) and again at render, so a
 row written around the API is still safe. The admin preview is an
 `<iframe sandbox="" srcDoc>` as a second layer. Headings, code and anything else
 Puck's editor could produce outside the list are flattened to text.
+
+Puck's rich-text menu has no link button, so the editor adds one (`LinkControl`):
+it asks for an address with a prompt, adds `https://` to a bare domain and
+`mailto:` to a bare address, and refuses what the server would strip
+(`ui/utils/links.ts` mirrors `content.urls`). Typed or pasted addresses are not
+turned into links automatically. The `{{unsubscribe_url}}` tag is not accepted
+there; the footer carries the unsubscribe link.
 
 ## Merge fields
 

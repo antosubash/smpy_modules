@@ -22,13 +22,11 @@ import {
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { useEffect, useState } from 'react';
-
+import { SEARCH_DEBOUNCE_MS } from '../../hooks/useCampaignList';
 import { api, errorMessage } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 import type { CardHit, CardKind, CardSnapshot } from '../../utils/types';
 import { useEditorActions } from './editorActions';
-
-const SEARCH_DEBOUNCE_MS = 250;
 
 const CARD_TYPE: Record<CardKind, string> = { article: 'ArticleCard', page: 'PageCard' };
 

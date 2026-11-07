@@ -134,13 +134,14 @@
       "saving": "Wird gespeichert",
       "saved": "Gespeichert",
       "stale": "Anderswo geändert",
-      "error": "Nicht gespeichert"
+      "error": "Nicht gespeichert",
+      "invalid": "Nicht gespeichert: markiertes Feld korrigieren"
     },
     "reload": "Neu laden",
     "read_only": "Sie können diese Kampagne ansehen, aber nicht ändern.",
     "not_draft": "Diese Kampagne ist kein Entwurf mehr und kann nicht geändert werden.",
     "incomplete": "In einem Block fehlt ein Pflichtfeld. Die E-Mail wird wieder gespeichert, sobald es ausgefüllt ist.",
-    "leave_held": "Diese Kampagne verlassen? Ein Block ist unvollständig, daher ist diese Änderung nicht gespeichert.",
+    "leave_held": "Diese Kampagne verlassen? Ein Block ist unvollständig oder ein Feld ist ungültig, daher ist diese Änderung nicht gespeichert.",
     "select_a_block": "Wählen Sie einen Block aus, um ihn zu bearbeiten.",
     "integration_missing": "Diese Inhaltsquelle ist auf dieser Website nicht verfügbar.",
     "meta": {
@@ -152,7 +153,9 @@
       "from_name": "Absendername",
       "from_name_hint": "Leer lassen, um den Namen aus den Newsletter-Einstellungen zu verwenden.",
       "reply_to": "Antwortadresse",
-      "reply_to_hint": "Leer lassen, um die Adresse aus den Newsletter-Einstellungen zu verwenden."
+      "reply_to_hint": "Leer lassen, um die Adresse aus den Newsletter-Einstellungen zu verwenden.",
+      "name_required": "Gib einen Kampagnennamen ein. Er wird nicht gespeichert, solange er leer ist.",
+      "reply_to_invalid": "Gib eine gültige E-Mail-Adresse ein. Sie wird erst dann gespeichert."
     },
     "card": {
       "article": "Artikel",
@@ -198,7 +201,10 @@
     },
     "rich_text": {
       "label": "Text",
-      "html": "Text"
+      "html": "Text",
+      "link_title": "Link",
+      "link_prompt": "Link-Adresse. Leer lassen, um den Link zu entfernen.",
+      "link_invalid": "Diese Adresse kann nicht verwendet werden. Nutze https://, http://, mailto: oder einen Seitenpfad wie /about."
     },
     "image": {
       "label": "Bild",
