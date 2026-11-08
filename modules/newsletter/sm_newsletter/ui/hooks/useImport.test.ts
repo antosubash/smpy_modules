@@ -72,6 +72,17 @@ describe('useImport', () => {
     expect(importApi.getImport).toHaveBeenCalledTimes(3);
   });
 
+  it('returns to the start when polling gets a 404', async () => {
+    initial = 4;
+    await mount();
+    expect(result.job?.status).toBe('queued');
+    vi.mocked(importApi.getImport).mockRejectedValue(new HttpError('gone', 404, 'not_found'));
+    await tick(IMPORT_POLL_MS);
+    expect(result.job).toBeNull();
+    await tick(IMPORT_POLL_MS * 3);
+    expect(importApi.getImport).toHaveBeenCalledTimes(2);
+  });
+
   it('does not poll a staged job', async () => {
     vi.mocked(importApi.getImport).mockResolvedValue(job('staged'));
     initial = 4;

@@ -20,7 +20,7 @@ from sm_newsletter.core.errors_import import (
     ImportRunning,
 )
 from sm_newsletter.imports import mapping, staging
-from sm_newsletter.imports.constants import DONE, FAILED, QUEUED, STAGED
+from sm_newsletter.imports.constants import DONE, FAILED, QUEUED, RUNNING, STAGED
 from sm_newsletter.models import ImportEntry, ImportJob
 
 __all__ = ["discard", "get_import", "list_imports", "queue_apply", "set_mapping"]
@@ -134,7 +134,9 @@ async def discard(
         stmt = stmt.where(ImportJob.status == expected_status)
     gone = await session.execute(stmt.execution_options(synchronize_session=False))
     if gone.rowcount != 1:  # ty: ignore[unresolved-attribute]
-        raise ImportChanged() if expected_status is not None else ImportRunning()
+        # Naming a status that can never be discarded is the plain refusal, not a race.
+        stale = expected_status is not None and expected_status not in (QUEUED, RUNNING)
+        raise ImportChanged() if stale else ImportRunning()
     await session.execute(
         delete(ImportEntry)
         .where(ImportEntry.import_id == job.id, ImportEntry.tenant_id == tenant_id)

@@ -203,6 +203,10 @@ async def test_discard_running_refused(world, status):
         async with state.session_factory() as s:
             with pytest.raises(errors_import.ImportRunning):
                 await service.discard(s, tenant_id="default", job=await s.get(ImportJob, jid))
+            with pytest.raises(errors_import.ImportRunning):
+                await service.discard(
+                    s, tenant_id="default", job=await s.get(ImportJob, jid), expected_status=status
+                )
     assert await _counts(state) == (1, 1)
 
 

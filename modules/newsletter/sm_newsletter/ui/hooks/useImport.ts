@@ -106,8 +106,12 @@ export function useImport(initialId: number | null) {
         } catch (e) {
           if (stopped || signal.aborted) return;
           setError(errorMessage(e, tRef.current));
-          // A refusal (gone, forbidden) will not change by asking again.
-          if (e instanceof HttpError && e.status >= 400 && e.status < 500) return;
+          // A refusal (gone, forbidden) will not change by asking again; a 404 means the
+          // import was discarded elsewhere, so return to the start like `resync` does.
+          if (e instanceof HttpError && e.status >= 400 && e.status < 500) {
+            if (e.status === 404) setJob(null);
+            return;
+          }
         }
         next();
       }, IMPORT_POLL_MS);
