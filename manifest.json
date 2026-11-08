@@ -1,0 +1,109 @@
+{
+  "synthetic": true,
+  "sourceActivities": 1596703,
+  "publicActivities": 1228231,
+  "applicationActivities": 368472,
+  "apiOrigin": "http://localhost:8000",
+  "captureAfterPerformance": true,
+  "screenshots": [
+    {
+      "file": "01-desktop-overview.png",
+      "caption": "Demo website, 30 UTC days; 459,967 pageviews and 76,680 custom events. Synthetic traffic, real production bundle/API.",
+      "state": {
+        "property": "Demo website",
+        "days": 30,
+        "filters": {},
+        "chart": "pageviews"
+      },
+      "visuallyInspected": true,
+      "commit": "8fbbac30"
+    },
+    {
+      "file": "02-filters-open.png",
+      "caption": "Compact filter popover over the same real synthetic 30-day report; no applied filters.",
+      "state": {
+        "property": "Demo website",
+        "days": 30,
+        "filters": {},
+        "popover": "Filters"
+      },
+      "visuallyInspected": true,
+      "commit": "8fbbac30"
+    },
+    {
+      "file": "03-geography-austria-vienna.png",
+      "caption": "Austria \u2192 Vienna region drilldown, Cities tab; 105,763 pageviews and 17,669 events over 30 days. Synthetic traffic.",
+      "state": {
+        "property": "Demo website",
+        "days": 30,
+        "filters": {
+          "country": "AT",
+          "region": "Vienna"
+        },
+        "locationTab": "Cities"
+      },
+      "visuallyInspected": true,
+      "commit": "8fbbac30"
+    },
+    {
+      "file": "04-events-format.png",
+      "caption": "Download events, Events chart and format property breakdown selected; 19,169 matching custom events across 30 days. Synthetic traffic.",
+      "state": {
+        "property": "Demo website",
+        "days": 30,
+        "filters": {
+          "event_name": "download"
+        },
+        "chart": "events",
+        "eventsTab": "format"
+      },
+      "visuallyInspected": true,
+      "commit": "8fbbac30"
+    },
+    {
+      "file": "05-application-normalized-paths.png",
+      "caption": "Demo application, 30 days; 137,987 pageviews and 23,010 events with normalized :id routes. Synthetic traffic.",
+      "state": {
+        "property": "Demo application",
+        "days": 30,
+        "filters": {},
+        "chart": "pageviews"
+      },
+      "visuallyInspected": true,
+      "commit": "8fbbac30"
+    },
+    {
+      "file": "06-mobile-390px.png",
+      "caption": "390\u00d71100 clean mobile viewport; Demo website, 90 dates, 1,052,725 pageviews and 175,506 events. Synthetic traffic.",
+      "state": {
+        "property": "Demo website",
+        "days": 90,
+        "viewport": {
+          "width": 390,
+          "height": 1100
+        },
+        "filters": {},
+        "chart": "pageviews"
+      },
+      "visuallyInspected": true,
+      "commit": "8fbbac30"
+    },
+    {
+      "file": "07-dark-desktop.png",
+      "caption": "1440\u00d71000 actual automatic system dark theme. Demo website, 90 days, real synthetic API data; 1,052,725 pageviews and 175,506 events; chart #60a5fa. No DOM class injection.",
+      "state": {
+        "property": "Demo website",
+        "days": 90,
+        "theme": "actual OS dark preference, automatically applied by host",
+        "filters": {},
+        "chart": "pageviews"
+      },
+      "visuallyInspected": true,
+      "commit": "8fbbac30"
+    }
+  ],
+  "status": "FINAL",
+  "commit": "8fbbac30",
+  "rootVisualReview": "Accepted: populated compact desktop, clean mobile, actual automatic dark",
+  "browserClosed": true
+}
