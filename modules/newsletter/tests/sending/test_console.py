@@ -10,8 +10,7 @@ from sm_newsletter.sending.transport.smtp import SmtpTransport
 
 
 @pytest.fixture(autouse=True)
-def _empty_outbox(monkeypatch):
-    monkeypatch.setattr(console, "_outbox", {})
+def _no_hooks(monkeypatch):
     monkeypatch.setattr(console, "_hooks", [])
 
 

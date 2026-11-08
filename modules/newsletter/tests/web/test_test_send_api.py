@@ -21,13 +21,6 @@ SENDER = {
 }
 
 
-@pytest.fixture(autouse=True)
-def _empty_outbox():
-    console._outbox.clear()
-    yield
-    console._outbox.clear()
-
-
 @pytest_asyncio.fixture
 async def built():
     app, state = await build_app(settings=SENDER)
