@@ -38,7 +38,8 @@ percent-encoded, so `ü` becomes `%C3%BC`).
 
 ## The token
 
-Each message carries three tokens, `{tenant}.{campaign}.{send}.{mac}`, each an
+A message carries up to three tokens (an open or click token only while that
+kind of tracking is on), `{tenant}.{campaign}.{send}.{mac}`, each an
 HMAC under the host secret bound to a purpose: `u` (unsubscribe), `o` (open),
 `c` (click). A token minted for one purpose fails the other two routes, so a
 click URL leaked from a history or proxy log cannot unsubscribe anyone. Tokens
