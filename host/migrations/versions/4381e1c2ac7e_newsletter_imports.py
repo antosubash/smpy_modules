@@ -54,6 +54,9 @@ def upgrade() -> None:
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_newsletter_import")),
+        # ``?id=`` names an import, so on SQLite an id must never come back after a
+        # discard (a plain ``INTEGER PRIMARY KEY`` reuses the highest one).
+        sqlite_autoincrement=True,
     )
     op.create_index(
         "ix_newsletter_import_at", "newsletter_import", ["tenant_id", "created_at"], unique=False

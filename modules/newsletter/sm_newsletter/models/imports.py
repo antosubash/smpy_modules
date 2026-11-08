@@ -19,6 +19,10 @@ class ImportJob(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported-b
     __table_args__ = (
         Index("ix_newsletter_import_at", "tenant_id", "created_at"),
         Index("ix_newsletter_import_status", "status", "lease_until"),
+        # ``?id=`` and a stale tab's discard name an import by id, so an id must
+        # never come back: plain ``INTEGER PRIMARY KEY`` on SQLite reuses the
+        # highest one after a delete (Postgres sequences never do).
+        {"sqlite_autoincrement": True},
     )
 
     id: int | None = big_pk()

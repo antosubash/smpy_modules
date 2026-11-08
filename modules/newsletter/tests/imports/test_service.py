@@ -155,6 +155,17 @@ async def test_discard_deletes_rows(world, status):
     assert await _counts(state) == (0, 0)
 
 
+async def test_a_discarded_import_id_is_never_handed_out_again(world):
+    """A stale ``?id=`` tab must not reach a newer import (SQLite ``AUTOINCREMENT``)."""
+    _, state = world
+    jid = await _staged(state)
+    with tenant_scope("default"):
+        async with state.session_factory() as s:
+            await service.discard(s, tenant_id="default", job=await s.get(ImportJob, jid))
+            await s.commit()
+    assert await _staged(state) != jid
+
+
 async def test_discard_expected_status_mismatch_keeps_import(world):
     _, state = world
     jid = await _staged(state)
