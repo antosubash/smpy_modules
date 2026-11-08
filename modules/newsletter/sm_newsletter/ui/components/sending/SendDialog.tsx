@@ -192,7 +192,14 @@ export function SendDialog(props: Props) {
         </DialogHeader>
 
         <div className="grid gap-3 py-2">
-          <RadioGroup value={when} onValueChange={(v) => setWhen(v as When)} disabled={pending}>
+          <RadioGroup
+            value={when}
+            onValueChange={(v) => {
+              setWhen(v as When);
+              setError(null);
+            }}
+            disabled={pending}
+          >
             {(['now', 'later'] as const).map((id) => (
               <div key={id} className="flex items-center gap-2">
                 <RadioGroupItem id={`newsletter-send-${id}`} value={id} />
@@ -208,7 +215,10 @@ export function SendDialog(props: Props) {
                 type="datetime-local"
                 value={at}
                 disabled={pending}
-                onChange={(e) => setAt(e.target.value)}
+                onChange={(e) => {
+                  setAt(e.target.value);
+                  setError(null);
+                }}
               />
               {timePast && <p className="text-sm text-destructive">{t(copy.time_past)}</p>}
               {timeFar && <p className="text-sm text-destructive">{t(copy.time_far)}</p>}

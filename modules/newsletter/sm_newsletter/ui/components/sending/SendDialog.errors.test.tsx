@@ -117,6 +117,25 @@ describe('SendDialog refusals', () => {
     expect(estimate).toHaveBeenCalledTimes(1);
   });
 
+  it('takes a time just inside the 366-day horizon and refuses one just past it', async () => {
+    const MINUTE = 1 / 1440;
+    await open();
+    await later(localIn(366 - 2 * MINUTE));
+    expect(document.body.textContent).not.toContain(copy.dialog.time_far);
+    await later(localIn(366 + 2 * MINUTE));
+    expect(document.body.textContent).toContain(copy.dialog.time_far);
+  });
+
+  it("drops a refused send's message as soon as the time is changed", async () => {
+    sendCampaign.mockRejectedValue(new HttpError('x', 409, 'invalid_campaign'));
+    await open();
+    await later(localIn(30));
+    await act(async () => button(copy.dialog.confirm)?.click());
+    expect(alertText()).not.toBeNull();
+    await later(localIn(31));
+    expect(alertText()).toBeNull();
+  });
+
   it('says to add a subject when the send is refused for a missing one', async () => {
     sendCampaign.mockRejectedValue(new HttpError('subject: required', 422, 'invalid_campaign'));
     await open();

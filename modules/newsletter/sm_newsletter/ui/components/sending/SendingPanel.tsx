@@ -92,7 +92,10 @@ export function SendingPanel({ campaign, canSend, onChange }: Props) {
     if (days !== null && progress.estimated_finish) {
       lines.push(t(copy.panel.eta, { date: when(progress.estimated_finish), count: days }));
     }
-  } else if (STOPPED.has(status) || (status === 'paused' && campaign.started_at)) {
+  } else if (
+    (STOPPED.has(status) && campaign.recipient_count > 0) ||
+    (status === 'paused' && campaign.started_at)
+  ) {
     const total = campaign.recipient_count;
     lines.push(t(copy.panel.progress, { sent: campaign.sent_count, total }));
   }

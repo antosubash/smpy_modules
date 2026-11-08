@@ -91,6 +91,12 @@ describe('SendingPanel', () => {
     expect(host.textContent).toContain('120 of 300 sent');
   });
 
+  it('shows no sent count for a cancelled campaign that never had recipients', async () => {
+    vi.mocked(api.progress).mockResolvedValue(progress({ status: 'cancelled' }));
+    await render(campaign({ status: 'cancelled', sent_count: 0, recipient_count: 0 }));
+    expect(host.textContent).not.toContain(' sent');
+  });
+
   it('shows no sent count for a paused campaign that never started', async () => {
     vi.mocked(api.progress).mockResolvedValue(progress({ status: 'paused' }));
     await render(campaign({ status: 'paused', sent_count: 0, started_at: null }));
