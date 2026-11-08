@@ -9,7 +9,7 @@ from simple_module_hosting.permissions import RequiresPermission
 from sm_records.contracts.newsletter import SubscriberFilterError, caller_roles
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_newsletter.campaigns.access import readable_lists
+from sm_newsletter.campaigns.access import require_list
 from sm_newsletter.campaigns.audience import audience_count
 from sm_newsletter.core import constants
 from sm_newsletter.core.errors import NotFound
@@ -34,9 +34,9 @@ async def list_fields(
     tenant: str = Depends(bind_admin),
     db: AsyncSession = Depends(get_db),
 ) -> list[ListFieldOut]:
-    readable = await readable_lists(db, tenant_id=tenant, roles=caller_roles(request))
-    if list_type_key not in readable:
-        raise NotFound()
+    await require_list(
+        db, tenant_id=tenant, list_type_key=list_type_key, roles=caller_roles(request)
+    )
     try:
         fields = await store.fields_for(db, tenant_id=tenant, list_type_key=list_type_key)
     except SubscriberFilterError:
@@ -59,8 +59,7 @@ async def count_audience(
     if len(audience) > MAX_AUDIENCE_LEN:  # here, not in the signature: a 422 never echoes it
         raise InvalidAudience()
     roles = caller_roles(request)
-    if list_type_key not in await readable_lists(db, tenant_id=tenant, roles=roles):
-        raise NotFound()
+    await require_list(db, tenant_id=tenant, list_type_key=list_type_key, roles=roles)
     count = await audience_count(
         db, tenant_id=tenant, list_type_key=list_type_key, audience=audience, roles=roles
     )

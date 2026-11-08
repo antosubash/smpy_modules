@@ -5,13 +5,13 @@ The search body is parsed with ``parse_payload`` (error ``invalid_query``), so a
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from sm_records.contracts.newsletter_admin import (
     MAX_BROWSE_LIMIT,
     MAX_BROWSE_OFFSET,
     MAX_SEARCH_LEN,
+    BrowseStatus,
 )
 
 from sm_newsletter.campaigns.audience import MAX_SEGMENT_ID, MAX_TAG_LEN
@@ -24,7 +24,7 @@ from sm_newsletter.web.schemas.suppressions import SuppressionOut
 class SubscriberSearchIn(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    status: Literal["pending", "confirmed", "unsubscribed"] | None = None
+    status: BrowseStatus | None = None
     q: str | None = Field(default=None, max_length=MAX_SEARCH_LEN)
     tag: str | None = Field(default=None, min_length=1, max_length=MAX_TAG_LEN)
     segment: int | None = Field(default=None, ge=1, le=MAX_SEGMENT_ID)

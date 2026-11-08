@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns.access import Roles, require_list
 from sm_newsletter.campaigns.audience import audience_filters
+from sm_newsletter.core import constants
 from sm_newsletter.core.errors import NotFound
 from sm_newsletter.core.errors_audience import InvalidSegment
 from sm_newsletter.core.suppression import normalise_email, suppressed
@@ -139,7 +140,7 @@ async def _confirmed_at(
 ) -> datetime | None:
     """Display-only: when this address's confirmed subscription began, for an
     opt-out row (the lift re-checks under its own lock)."""
-    if row.reason != "unsubscribed" or not row.list_type_key:
+    if row.reason != constants.REASON_UNSUBSCRIBED or not row.list_type_key:
         return None
     if row.list_type_key == key:
         found = hit if hit.status == "confirmed" and not hit.trashed else None

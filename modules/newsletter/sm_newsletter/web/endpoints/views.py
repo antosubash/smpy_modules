@@ -69,7 +69,9 @@ async def segments_page(request: Request, inertia: InertiaDep) -> InertiaRespons
 async def subscribers_page(
     request: Request,
     inertia: InertiaDep,
-    initial_list: str | None = Query(default=None, alias="list", max_length=64),
+    initial_list: str | None = Query(
+        default=None, alias="list", max_length=constants.MAX_TYPE_KEY_LEN
+    ),
 ) -> InertiaResponse:
     """``?list=`` preselects a list; the search text never reaches a URL."""
     held = await ensure_resolved_permissions(request)

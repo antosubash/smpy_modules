@@ -26,7 +26,7 @@ import { keys, useT } from '../../utils/i18n';
 import type { Suppression } from '../../utils/types';
 
 const copy = keys.newsletter.suppressions.lift;
-export const MAX_NOTE = 500;
+const MAX_NOTE = 500;
 
 interface Props {
   suppression: Suppression;

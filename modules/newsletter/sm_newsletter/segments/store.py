@@ -16,13 +16,12 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_newsletter.campaigns.access import Roles, check_list, readable_lists
+from sm_newsletter.campaigns._refusal import DRAFT
+from sm_newsletter.campaigns.access import Roles, check_list, readable_lists, require_list
 from sm_newsletter.core.errors import NotFound
 from sm_newsletter.core.errors_audience import InvalidSegment, SegmentInUse, SegmentNameTaken
 from sm_newsletter.models import Campaign, Segment
 from sm_newsletter.segments.rules import Rule, RuleError, compile_rules, segment_fields
-
-DRAFT = "draft"
 
 
 async def fields_for(
@@ -91,8 +90,9 @@ async def get_segment(
     segment = await _find(session, tenant_id=tenant_id, segment_id=segment_id)
     if segment is None:
         raise NotFound()
-    if segment.list_type_key not in await readable_lists(session, tenant_id=tenant_id, roles=roles):
-        raise NotFound()
+    await require_list(
+        session, tenant_id=tenant_id, list_type_key=segment.list_type_key, roles=roles
+    )
     return segment
 
 
@@ -151,7 +151,6 @@ async def update_segment(
     rules: list[Rule] | None,
 ) -> Segment:
     segment = await get_segment(session, tenant_id=tenant_id, segment_id=segment_id, roles=roles)
-    await check_list(session, tenant_id=tenant_id, type_key=segment.list_type_key, roles=roles)
     values: dict[str, object] = {}
     if rules is not None:
         values["filters"], _ = await _compile(
