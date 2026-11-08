@@ -86,5 +86,30 @@
   "status": "Status",
   "tracking_on": "Erfassung aktiviert",
   "tracking_off": "Erfassung pausiert",
-  "event_property": "Ereigniseigenschaft: {name}"
+  "event_property": "Ereigniseigenschaft: {name}",
+  "ui": {
+    "overview": "Übersicht",
+    "sources": "Quellen",
+    "audience": "Zielgruppe",
+    "campaigns": "Kampagnen",
+    "date_range": "Zeitraum",
+    "today": "Heute",
+    "last_7_days": "Letzte 7 Tage",
+    "last_30_days": "Letzte 30 Tage",
+    "last_90_days": "Letzte 90 Tage",
+    "custom_range": "Eigene Daten",
+    "apply": "Anwenden",
+    "filters_button": "Filter",
+    "manage": "Eigenschaft verwalten",
+    "close": "Schließen",
+    "show_more": "Mehr anzeigen",
+    "show_less": "Weniger anzeigen",
+    "chart_data": "Diagrammdaten anzeigen",
+    "chart_metric": "Diagrammkennzahl",
+    "active_now": "{count} gerade aktiv",
+    "activity": "Aktivität",
+    "date_help": "Datumsangaben werden in UTC angezeigt.",
+    "clear_filter": "Filter {name} entfernen",
+    "settings": "Eigenschaftseinstellungen"
+  }
 }
