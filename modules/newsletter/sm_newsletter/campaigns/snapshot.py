@@ -106,7 +106,6 @@ async def store_render(session: AsyncSession, snap: Snapshot) -> CampaignRender:
                 for i, url in enumerate(snap.links, start=1)
             ],
         )
-        mark_written(session)
     return row
 
 

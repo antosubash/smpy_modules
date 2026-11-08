@@ -112,7 +112,7 @@ async def accepted_engagement(
         accepted(_SEND.c.first_clicked_at),
     ).where(_CAMPAIGN.c.tenant_id == tenant_id, _CAMPAIGN.c.id.in_(list(found)))
     for cid, sent, opens, clicks in await session.execute(stmt):
-        found[int(cid)] = (int(sent or 0), int(opens or 0), int(clicks or 0))
+        found[int(cid)] = (int(sent), int(opens), int(clicks))
     return found
 
 
@@ -120,7 +120,7 @@ async def _skipped(session: AsyncSession, tenant_id: str, campaign_id: int) -> i
     stmt = select(func.count()).where(
         Send.tenant_id == tenant_id, Send.campaign_id == campaign_id, Send.status == _SKIPPED
     )
-    return int(await session.scalar(stmt) or 0)
+    return int((await session.execute(stmt)).scalar_one())
 
 
 async def _timeline(

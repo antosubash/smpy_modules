@@ -49,7 +49,7 @@ def bucketize(
     start, now = _utc(start), _utc(now)
     b0 = start.replace(minute=0, second=0, microsecond=0)
     bucket: Bucket = "hour"
-    step, cap = HOUR, 72
+    step, cap = HOUR, HOURLY_WINDOW // HOUR
     if now - b0 > HOURLY_WINDOW:
         bucket, step, cap = "day", DAY, MAX_DAYS
         b0 = b0.replace(hour=0)

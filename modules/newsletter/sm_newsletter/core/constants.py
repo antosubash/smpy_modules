@@ -23,7 +23,8 @@ UNSUBSCRIBE_PREFIX = f"{PUBLIC_PREFIX}u/"
 OPEN_PREFIX = f"{PUBLIC_PREFIX}o/"
 CLICK_PREFIX = f"{PUBLIC_PREFIX}c/"
 # At most this many distinct links per campaign are tracked, each at most
-# MAX_LINK_URL characters (``Link.url``'s max_length).
+# MAX_LINK_URL characters (``Link.url``'s max_length; ``content.urls.MAX_URL``,
+# 2000, is the tighter bound in practice).
 MAX_TRACKED_LINKS = 100
 MAX_LINK_URL = 2048
 # The email accent without branding, or when branding sets no primary colour.

@@ -2,6 +2,8 @@ import logging
 
 import pytest
 from sm_newsletter.content.render import render
+from sm_newsletter.content.urls import MAX_URL
+from sm_newsletter.core.constants import MAX_TRACKED_LINKS
 from sm_newsletter.tracking.rewrite import PIXEL_TAG, Tracking, fill, prepare
 
 from tests.content.test_render import CARD, body, ctx, inp
@@ -52,14 +54,32 @@ def test_prepare_unescapes_href():
     assert out.links == ("https://e.org/?a=1&b=2#f",)
 
 
-def test_prepare_caps_distinct_links(caplog):
-    urls = [f"https://e.org/{i}" for i in range(101)]
+def test_prepare_tracks_exactly_the_cap_without_a_warning(caplog):
+    urls = [f"https://e.org/{i}" for i in range(MAX_TRACKED_LINKS)]
     with caplog.at_level(logging.WARNING):
         out = prepare(_html(*urls), own_base=BASE, campaign_id=7)
-    assert len(out.links) == 100
-    assert f'href="{urls[100]}"' in out.html
+    assert out.links == tuple(urls)
+    assert not [r for r in caplog.records if r.levelno == logging.WARNING]
+
+
+def test_prepare_caps_distinct_links(caplog):
+    urls = [f"https://e.org/{i}" for i in range(MAX_TRACKED_LINKS + 1)]
+    with caplog.at_level(logging.WARNING):
+        out = prepare(_html(*urls), own_base=BASE, campaign_id=7)
+    assert len(out.links) == MAX_TRACKED_LINKS
+    assert f'href="{urls[MAX_TRACKED_LINKS]}"' in out.html
     warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
     assert len(warnings) == 1 and "campaign 7 " in warnings[0].getMessage()
+
+
+def test_prepare_tracks_a_url_of_exactly_the_limit_and_leaves_one_more(caplog):
+    prefix = "https://e.org/"
+    at_limit = prefix + "a" * (MAX_URL - len(prefix))
+    over = at_limit + "a"
+    with caplog.at_level(logging.WARNING):
+        out = prepare(_html(at_limit, over), own_base=BASE, campaign_id=7)
+    assert out.links == (at_limit,) and over in out.html
+    assert len([r for r in caplog.records if r.levelno == logging.WARNING]) == 1
 
 
 def test_prepare_leaves_overlong_url(caplog):

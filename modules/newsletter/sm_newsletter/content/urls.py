@@ -6,6 +6,9 @@ import unicodedata
 from urllib.parse import urlsplit
 
 UNSUBSCRIBE_TAG = "{{unsubscribe_url}}"
+# The tracking placeholders in a snapshot (``tracking.rewrite`` writes them).
+PIXEL_TAG = "{{open_pixel}}"
+LINK_PREFIX = "{{link:"
 MAX_URL = 2000
 
 

@@ -48,16 +48,6 @@ logger = logging.getLogger(__name__)
 _SEND = Send.__table__  # ty: ignore[unresolved-attribute]
 _CAMPAIGN = Campaign.__table__  # ty: ignore[unresolved-attribute]
 _ATTEMPT = SendAttempt.__table__  # ty: ignore[unresolved-attribute]
-_warned_no_secret = False
-
-
-def _secret(app: Any) -> str:
-    global _warned_no_secret
-    secret = tokens.host_secret(app)
-    if not secret and not _warned_no_secret:
-        _warned_no_secret = True
-        logger.error("newsletter: no host secret_key; every unsubscribe link is refused")
-    return secret
 
 
 async def unsubscribe_by_token(
@@ -65,13 +55,14 @@ async def unsubscribe_by_token(
 ) -> bool:
     """``True`` only when records wrote. An invalid or foreign token is ``False``
     with no statement run."""
-    secret = _secret(app)
-    if not secret:
-        return False
-    claims = tokens.parse(secret, token, purpose="u")
+    claims = tokens.verify(
+        app,
+        token,
+        purpose="u",
+        resolved_tenant=resolved_tenant,
+        refused="every unsubscribe link is refused",
+    )
     if claims is None:
-        return False
-    if resolved_tenant is not None and resolved_tenant != claims.tenant_id:
         return False
     with tenant_scope(claims.tenant_id):
         async with app.state.sm.db.session_factory() as session:

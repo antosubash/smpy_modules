@@ -94,7 +94,9 @@ async def deliver_one(
     ``DispatchBusy`` from the lock propagates with nothing reserved."""
     with tenant_scope(tenant_id):
         async with factory() as session:
-            found = await next_due(session, tenant_id, campaign_id, clock())
+            found = await next_due(
+                session, tenant_id, campaign_id, clock(), read_links=not tracking.clicks
+            )
             if found is None:
                 await session.rollback()
                 return None
