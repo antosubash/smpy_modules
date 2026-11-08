@@ -26,6 +26,11 @@ test('analytics opt-in, public and app tracking, events, unknown locations and d
   try {
     await page.goto('/analytics/');
     await expect(page.getByRole('heading', { name: 'Analytics', exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /^(Manage property|New property)$/ }),
+    ).toBeVisible();
+    if (await page.getByRole('button', { name: 'Manage property', exact: true }).isVisible())
+      await page.getByRole('button', { name: 'Manage property', exact: true }).click();
     await page.getByRole('button', { name: 'New property', exact: true }).click();
     const name = `Public ${slug}`;
     await page.getByLabel('Name', { exact: true }).fill(name);
@@ -45,10 +50,11 @@ test('analytics opt-in, public and app tracking, events, unknown locations and d
       properties: { id: string }[];
     };
     expect(disabled.properties.some((property) => property.id === publicId)).toBe(false);
+    await page.getByRole('button', { name: 'Manage property', exact: true }).click();
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
     await page.getByLabel('Enable tracking', { exact: true }).check();
     await page.getByRole('button', { name: 'Save property', exact: true }).click();
-    await expect(page.getByText('Tracking enabled · Public pages', { exact: true })).toBeVisible();
+    await expect(page.getByText('Tracking enabled', { exact: true })).toBeVisible();
     const pageview = page.waitForResponse(
       (response) =>
         response.url().endsWith('/api/analytics/collect') && response.request().method() === 'POST',
@@ -77,7 +83,12 @@ test('analytics opt-in, public and app tracking, events, unknown locations and d
       page.getByRole('heading', { name: 'Visitor locations', exact: true }),
     ).toBeVisible();
     await expect(page.getByText('download', { exact: true }).first()).toBeVisible();
+    await page.getByRole('button', { name: 'Filters', exact: true }).click();
     await page.getByLabel('Country', { exact: true }).selectOption('__unknown__');
+    await page.getByRole('button', { name: 'Apply', exact: true }).click();
+    await expect(
+      page.getByRole('button', { name: 'Remove Country filter', exact: true }),
+    ).toContainText('Unknown');
     await expect(
       page.getByRole('heading', { name: 'Visitor locations', exact: true }),
     ).toBeVisible();
@@ -90,6 +101,7 @@ test('analytics opt-in, public and app tracking, events, unknown locations and d
       report.breakdowns.path.some((row: { value: string }) => row.value.includes('token=')),
     ).toBe(false);
 
+    await page.getByRole('button', { name: 'Manage property', exact: true }).click();
     await page.getByRole('button', { name: 'New property', exact: true }).click();
     const appName = `App ${slug}`;
     await page.getByLabel('Name', { exact: true }).fill(appName);
@@ -118,6 +130,7 @@ test('analytics opt-in, public and app tracking, events, unknown locations and d
     );
     await page.goto('/analytics/');
     await page.getByLabel('Property', { exact: true }).selectOption(appId);
+    await page.getByRole('button', { name: 'Manage property', exact: true }).click();
     await page.getByRole('button', { name: 'Delete property', exact: true }).click();
     const confirmation = page.getByRole('alertdialog');
     await expect(confirmation).toContainText('permanently deletes');
