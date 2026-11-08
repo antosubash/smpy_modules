@@ -101,6 +101,22 @@ test('analytics opt-in, public and app tracking, events, unknown locations and d
       report.breakdowns.path.some((row: { value: string }) => row.value.includes('token=')),
     ).toBe(false);
 
+    const viewport = page.viewportSize();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('button', { name: 'Filters', exact: true }).click();
+    await page.getByLabel('Page path', { exact: true }).fill(`/${'long-path-'.repeat(40)}`);
+    await page.getByRole('button', { name: 'Apply', exact: true }).click();
+    const longChip = page.getByRole('button', { name: 'Remove Page path filter', exact: true });
+    await expect(longChip).toBeVisible();
+    expect(await longChip.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+      true,
+    );
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+    if (viewport) await page.setViewportSize(viewport);
+
     await page.getByRole('button', { name: 'Manage property', exact: true }).click();
     await page.getByRole('button', { name: 'New property', exact: true }).click();
     const appName = `App ${slug}`;

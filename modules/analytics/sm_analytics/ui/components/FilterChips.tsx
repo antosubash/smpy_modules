@@ -52,7 +52,7 @@ export function FilterChips({
                 })
               }
             >
-              <span className="min-w-0 break-all text-left">
+              <span className="min-w-0 whitespace-normal break-all text-left">
                 {name}: {label}
               </span>
               <X className="size-3 shrink-0" aria-hidden="true" />

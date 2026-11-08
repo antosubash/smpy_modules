@@ -16,7 +16,9 @@ export function useAnalytics() {
     region: '',
     city: '',
   }));
-  const [report, setReport] = useState<Report | null>(null);
+  const scope = JSON.stringify([selected, filters]);
+  const [snapshot, setSnapshot] = useState<{ scope: string; data: Report } | null>(null);
+  const report = snapshot?.scope === scope ? snapshot.data : null;
   const [geo, setGeo] = useState<GeoStatus | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -51,9 +53,8 @@ export function useAnalytics() {
       controller.abort();
     };
   }, [listRefresh]);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: refresh triggers recent-activity polling.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scope includes selected and filters; refresh triggers polling.
   useEffect(() => {
-    setReport(null);
     if (!selected) return;
     const controller = new AbortController();
     setLoading(true);
@@ -61,7 +62,7 @@ export function useAnalytics() {
     reportPending.current = true;
     loadReport(selected, filters, controller.signal)
       .then((next) => {
-        if (!controller.signal.aborted) setReport(next);
+        if (!controller.signal.aborted) setSnapshot({ scope, data: next });
       })
       .catch((reason: Error) => {
         if (!controller.signal.aborted) setError(reason.message);
@@ -76,13 +77,13 @@ export function useAnalytics() {
       controller.abort();
       reportPending.current = false;
     };
-  }, [selected, filters, refresh]);
+  }, [scope, refresh]);
   useEffect(
     () =>
       router.on('navigate', () => {
         setSelected('');
         setProperties([]);
-        setReport(null);
+        setSnapshot(null);
         setLoading(true);
         setListRefresh((n) => n + 1);
       }),

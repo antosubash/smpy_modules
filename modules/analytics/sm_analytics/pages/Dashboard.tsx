@@ -97,7 +97,7 @@ export default function Dashboard({ can_manage = false }: { can_manage?: boolean
                   {t(property.enabled ? keys.analytics.tracking_on : keys.analytics.tracking_off)}
                 </span>
               )}
-              {data.report && !data.loading && (
+              {data.report && (
                 <span className="text-xs tabular-nums text-muted-foreground">
                   {t(keys.analytics.ui.active_now, { count: data.report.recent.visitors })}
                 </span>
@@ -142,12 +142,12 @@ export default function Dashboard({ can_manage = false }: { can_manage?: boolean
           {property && (
             <FilterChips value={data.filters} onChange={data.setFilters} report={data.report} />
           )}
-          {data.loading && (
+          {data.loading && !data.report && (
             <p role="status" className="py-8 text-center text-sm text-muted-foreground">
               {t(keys.analytics.loading)}
             </p>
           )}
-          {data.report && !data.loading && (
+          {data.report && (
             <ReportView report={data.report} filters={data.filters} onFilter={data.setFilters} />
           )}
         </div>
