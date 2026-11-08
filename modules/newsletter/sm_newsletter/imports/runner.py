@@ -244,7 +244,6 @@ async def run_import_async(
                 failure,
                 type(exc).__name__,
             )
-            recorded = True
         else:
             if not recorded:
                 logger.info(

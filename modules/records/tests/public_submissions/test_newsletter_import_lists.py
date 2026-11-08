@@ -21,7 +21,6 @@ from sm_records.contracts.newsletter_import import (
     tag_choice_values,
 )
 from sm_records.core import events
-from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope
 from sm_records.models import RecordType
 from sm_records.records.services import types as type_service
@@ -30,18 +29,7 @@ from sqlalchemy import select
 from tests.support.app_harness import field
 from tests.support.newsletter_contract import TENANT, seed_list, session, unbound
 from tests.support.newsletter_http import LIST
-
-SETTINGS = RecordsSettings()
-
-
-async def _make(site, tenant: str = TENANT, key: str = "weekly") -> str:
-    async with session(site) as db:
-        with unbound():
-            made = await create_list(
-                db, tenant_id=tenant, key=key, label="Weekly", settings=SETTINGS
-            )
-            await events.commit(db)
-    return made
+from tests.support.newsletter_import import SETTINGS, new_list
 
 
 async def _tag_values(site, key: str = "weekly") -> list[str]:
@@ -79,7 +67,7 @@ async def _add(site, labels, key: str = "weekly", tenant: str = TENANT) -> dict[
 
 
 async def test_create_list_is_a_subscription_list_with_names(site):
-    assert await _make(site) == "weekly"
+    assert await new_list(site) == "weekly"
     async with session(site) as db:
         with unbound():
             assert "weekly" in await subscription_lists(db, tenant_id=TENANT)
@@ -99,14 +87,14 @@ async def test_create_list_is_a_subscription_list_with_names(site):
 
 
 async def test_create_list_twice_raises_list_exists(site):
-    await _make(site)
+    await new_list(site)
     with pytest.raises(ListExists):
-        await _make(site)
+        await new_list(site)
 
 
 async def test_create_list_bad_key_raises_invalid_list_key(site):
     with pytest.raises(InvalidListKey):
-        await _make(site, key="Bad Key")
+        await new_list(site, key="Bad Key")
 
 
 async def test_importable_fields_skips_system_tags_and_unmappable(site):
@@ -156,7 +144,7 @@ async def test_importable_fields_unknown_is_none_and_form_raises(site):
 
 
 async def test_add_tag_choices_appends_once(site):
-    await _make(site)
+    await new_list(site)
     assert await _add(site, ["A", "B"]) == {"A": "A", "B": "B"}
     assert await _add(site, ["C", "B"]) == {"B": "B", "C": "C"}
     assert await _tag_values(site) == ["A", "B", "C"]
@@ -168,7 +156,7 @@ async def test_add_tag_choices_appends_once(site):
 async def test_add_tag_choices_resolves_under_the_lock(site):
     """The value rule runs against the stored choices: a comma, or a value another label
     holds, gets slug plus hash (and a counter while taken); a known label is reused."""
-    await _make(site)
+    await new_list(site)
     comma = (await _add(site, ["a, b"]))["a, b"]
     assert comma.startswith("a-b-") and "," not in comma
     taken = (await _add(site, [comma]))[comma]  # that value is held by "a, b"
@@ -182,7 +170,7 @@ async def test_add_tag_choices_resolves_under_the_lock(site):
 
 
 async def test_add_tag_choices_creates_field_on_empty_list(site):
-    await _make(site)
+    await new_list(site)
     await _add(site, ["a"])
     async with session(site) as db:
         with unbound():
@@ -248,7 +236,7 @@ async def test_add_tag_choices_refuses_populated_list_without_field(site):
     ids=["too_many", "empty", "long_label", "nul", "duplicate", "str", "not_str"],
 )
 async def test_add_tag_choices_validates(site, labels):
-    await _make(site)
+    await new_list(site)
     before = await _version(site)
     with pytest.raises(ValueError):
         await _add(site, labels)
@@ -256,12 +244,21 @@ async def test_add_tag_choices_validates(site, labels):
     assert await _tag_values(site) == []
 
 
+async def test_add_tag_choices_accepts_the_limits(site):
+    """500 labels of 100 characters each: the largest ``add_tag_choices`` takes."""
+    await new_list(site)
+    labels = [f"{i:03d}" + "x" * 97 for i in range(500)]
+    added = await _add(site, labels)
+    assert set(added) == set(labels)
+    assert len(await _tag_values(site)) == 500
+
+
 async def test_import_lists_pin_the_tenant(site):
     with unbound():
         await seed_list(site.db_state, "other", "ada@example.org")
     assert await _targets(site, LIST, tenant="other") is not None
     assert await _targets(site, LIST, tenant=TENANT) is None
-    assert await _make(site, key=LIST) == LIST
+    assert await new_list(site, key=LIST) == LIST
 
 
 async def test_bound_other_tenant_raises(site):

@@ -11,6 +11,7 @@ from sm_newsletter.core.errors_import import (
     ImportZipUnsafe,
 )
 from sm_newsletter.imports.archive import sources
+from sm_newsletter.imports.constants import MAX_FILES, MAX_ZIP_ENTRIES
 
 from tests.imports.fixtures import csv_bytes, zip_bytes
 
@@ -42,6 +43,13 @@ def test_plain_csv_parts():
     assert [(s.index, s.name) for s in found] == [(0, "p0.csv"), (1, "p1.csv"), (2, "p2.csv")]
     assert found[1].open().read() == CSV
     assert found[1].open().read() == CSV
+
+
+def test_the_file_and_entry_caps_are_inclusive():
+    four = [_upload(f"p{i}.csv", CSV) for i in range(MAX_FILES)]
+    assert len(sources(four)) == MAX_FILES
+    full = zip_bytes({f"{i}.csv": CSV for i in range(MAX_ZIP_ENTRIES)})
+    assert len(sources([_upload("x.zip", full)])) == MAX_ZIP_ENTRIES
 
 
 def test_name_is_basename_without_control_chars():

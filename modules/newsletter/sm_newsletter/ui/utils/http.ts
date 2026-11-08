@@ -61,12 +61,18 @@ const INVALID_CAMPAIGN: Record<string, string> = {
  *  `invalid_campaign`, the field's own line when the detail is a known one),
  *  else the generic line. Never the raw `detail`. */
 export function errorMessage(e: unknown, t: Translate): string {
-  const errors = keys.newsletter.errors as Record<string, string>;
   const code = e instanceof HttpError ? e.code : null;
   const detail = e instanceof HttpError ? e.message : '';
   if (code === 'invalid_campaign' && Object.hasOwn(INVALID_CAMPAIGN, detail)) {
     return t(INVALID_CAMPAIGN[detail]);
   }
+  return codeMessage(code, t);
+}
+
+/** The catalogue's text for a server error code (a job's stored `error_code`,
+ *  say), else the generic line. */
+export function codeMessage(code: string | null | undefined, t: Translate): string {
+  const errors = keys.newsletter.errors as Record<string, string>;
   if (code && Object.hasOwn(errors, code) && code !== 'generic') return t(errors[code]);
   return t(keys.newsletter.errors.generic);
 }

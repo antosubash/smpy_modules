@@ -15,6 +15,7 @@ import { errorMessage } from '../../utils/http';
 import { keys, useT } from '../../utils/i18n';
 import { listImports } from '../../utils/importApi';
 import type { ImportSummary } from '../../utils/importTypes';
+import { formatWhen } from '../../utils/progress';
 import { STATUS_LABELS } from './ImportProgress';
 
 const copy = keys.newsletter.import;
@@ -29,7 +30,6 @@ export function ImportHistory({ refreshKey, onOpen }: Props) {
   const { t, locale } = useT();
   const [items, setItems] = useState<ImportSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const date = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey is the trigger
   useEffect(() => {
@@ -71,7 +71,7 @@ export function ImportHistory({ refreshKey, onOpen }: Props) {
             <TableCell>
               {item.list_type_key}
               <span className="ml-2 text-xs text-muted-foreground">
-                {date.format(new Date(item.created_at))}
+                {formatWhen(item.created_at, locale ?? 'en')}
               </span>
             </TableCell>
             <TableCell>{t(STATUS_LABELS[item.status])}</TableCell>

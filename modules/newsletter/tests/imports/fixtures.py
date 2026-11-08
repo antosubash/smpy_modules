@@ -9,7 +9,6 @@ import zipfile
 from collections.abc import Mapping, Sequence
 
 _CENTRAL = b"PK\x01\x02"
-_LOCAL = b"PK\x03\x04"
 
 
 def csv_bytes(

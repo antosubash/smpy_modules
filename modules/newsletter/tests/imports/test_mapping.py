@@ -68,6 +68,7 @@ def test_validate_accepts_and_normalises():
         ({"fields": {"+1": "city"}}, "fields.+1", "present"),
         ({"fields": {" 1": "city"}}, "fields. 1", "present"),
         ({"fields": {"-1": "city"}}, "fields.-1", "present"),
+        ({"fields": {"9" * 5000: "city"}}, "fields.", "present"),
         ({"fields": []}, "fields", "present"),
         ({"fields": {}, "tags": True}, "tags", "missing"),
         ({"tags": "yes"}, "tags", "present"),

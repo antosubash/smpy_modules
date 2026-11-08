@@ -11,6 +11,10 @@ in :mod:`sm_newsletter.task_config`.
 * ``newsletter.dispatch()`` - the beat every minute: one dispatcher tick
   (:mod:`sm_newsletter.sending.runtime`), refused as ``not_configured`` while
   the worker has no secret key or no readable SMTP password.
+* ``newsletter.run_import(tenant_id, import_id)`` - one slice of a Mailchimp import,
+  enqueued again until it is done (:mod:`sm_newsletter.imports.runner`).
+* ``newsletter.import_janitor()`` - the hourly beat: expires unapplied imports and
+  relaunches lost ones (:mod:`sm_newsletter.imports.janitor`).
 
 Bodies run through :mod:`sm_newsletter.core.worker`: no app, a fresh event
 loop per task, and each body binds every tenant itself.

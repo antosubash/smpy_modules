@@ -64,4 +64,11 @@ def validate(
 
 
 def _is_column(column: object, count: int) -> bool:
-    return isinstance(column, str) and column.isascii() and column.isdigit() and int(column) < count
+    # The length bound keeps ``int()`` under Python's 4300-digit limit (a ValueError, a 500).
+    return (
+        isinstance(column, str)
+        and len(column) <= 9
+        and column.isascii()
+        and column.isdigit()
+        and int(column) < count
+    )

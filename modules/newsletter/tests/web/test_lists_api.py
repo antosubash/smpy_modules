@@ -46,6 +46,14 @@ async def test_bad_keys_are_422(client):
         assert (res.status_code, res.json()["code"]) == (422, "invalid_list_key"), body
 
 
+async def test_key_and_label_limits_are_inclusive(client):
+    longest = {"key": "k" * 64, "label": "L" * 200}
+    res = await client.post(URL, json=longest, headers=MANAGE)
+    assert (res.status_code, res.json()) == (201, {"key": "k" * 64})
+    res = await client.post(URL, json={"key": "ok", "label": "L" * 201}, headers=MANAGE)
+    assert (res.status_code, res.json()["code"]) == (422, "invalid_list_key")
+
+
 async def test_edit_permission_is_not_enough(client):
     res = await client.post(URL, json={"key": "weekly", "label": "W"}, headers=EDIT)
     assert res.status_code == 403

@@ -111,6 +111,20 @@ async def test_other_tenants_import_404(client):
     assert (await client.get(IMPORTS, headers=other)).json() == []
 
 
+@pytest.mark.parametrize("raw", ["0", "-1", str(2**31 - 1), str(2**31), str(2**63), "9" * 20])
+async def test_out_of_range_import_ids_404_not_500(client, raw):
+    url = f"{IMPORTS}/{raw}"
+    for method, path in (
+        ("GET", url),
+        ("PATCH", url),
+        ("POST", f"{url}/apply"),
+        ("DELETE", url),
+        ("GET", f"{url}/errors.csv"),
+    ):
+        res = await client.request(method, path, headers=MANAGE, json={"mapping": {}})
+        assert res.status_code == 404, (method, path)
+
+
 async def test_unknown_or_missing_list_404(client):
     part = csv_part(SUB, [["a@example.org"] * 4])
     assert (await upload(client, part, key="nope")).status_code == 404

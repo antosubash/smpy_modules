@@ -176,7 +176,9 @@ async def add_choices(
     for attempt in (1, 2):  # one retry on a lost version race
         await db.refresh(rtype)
         fields = [dict(f) if isinstance(f, dict) else f for f in rtype.fields or []]
-        held = await record_count(db, rtype, include_deleted=True)
+        # The count only decides whether a missing field can be created.
+        has_tags = any(isinstance(f, dict) and f.get("key") == TAGS_FIELD for f in fields)
+        held = 0 if has_tags else await record_count(db, rtype, include_deleted=True)
         tags = _tags_in(fields, held)
         if tags is None:
             raise TagsFieldMissing(rtype.key)

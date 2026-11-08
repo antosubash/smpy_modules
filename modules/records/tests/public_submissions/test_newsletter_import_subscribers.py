@@ -36,7 +36,6 @@ from tests.support.newsletter_import import (
     KEY,
     NOW,
     SETTINGS,
-    Spy,
     T,
     make_list,
     outcomes,
@@ -46,6 +45,7 @@ from tests.support.newsletter_import import (
     stored,
     system,
 )
+from tests.support.retention_support import Bus
 
 
 async def _hit(site, email: str):
@@ -140,7 +140,7 @@ async def test_import_publishes_no_events(site):
         row("bin@x.org"),
         row("not an address"),
     ]
-    spy = Spy()
+    spy = Bus()
     results = await run(site, rows, spy=spy)
     assert [r.outcome for r in results] == [
         "created",
@@ -154,7 +154,7 @@ async def test_import_publishes_no_events(site):
         "trashed",
         "invalid",
     ]
-    assert spy.seen == []
+    assert spy.published == []
     # Positive control: the same spy, attached the same way, sees an
     # ordinary (unmuted) write, so the silence above is the import's.
     async with session(site) as db:
@@ -165,7 +165,7 @@ async def test_import_publishes_no_events(site):
                 db, rtype, data={}, settings=SETTINGS, system=system("ctl@x.org", "confirmed")
             )
         await events.commit(db)
-    assert [type(e).__name__ for e in spy.seen] == ["RecordCreated"]
+    assert [type(e).__name__ for e in spy.published] == ["RecordCreated"]
 
 
 async def test_invalid_value_is_dropped_not_fatal(site):
@@ -185,6 +185,17 @@ async def test_unknown_tag_is_dropped(site):
     [result] = await run(site, [row(ADA, tags=["a", "zzz"])])
     assert (result.outcome, result.dropped) == ("created", ["tags"])
     assert (await _hit(site, ADA)).tags == []
+
+
+async def test_a_full_batch_and_a_full_lookup_are_accepted(site):
+    """``MAX_IMPORT_BATCH`` (500) rows and addresses are the largest either call takes."""
+    await make_list(site)
+    emails = [f"{i}@x.org" for i in range(500)]
+    results = await run(site, [row(e) for e in emails])
+    assert [r.outcome for r in results] == ["created"] * 500
+    async with session(site) as db:
+        with unbound():
+            assert await opted_out_anywhere(db, tenant_id=TENANT, emails=emails) == set()
 
 
 async def test_batch_arguments_refused(site):

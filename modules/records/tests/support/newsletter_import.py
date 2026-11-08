@@ -29,6 +29,7 @@ from sm_records.records.services import types as type_service
 
 from tests.support.app_harness import field
 from tests.support.newsletter_contract import TENANT, session, unbound
+from tests.support.retention_support import Bus
 
 SETTINGS = RecordsSettings()
 KEY = "weekly"
@@ -37,21 +38,19 @@ T = NOW - timedelta(days=30)
 ADA = "ada@example.org"
 
 
-class Spy:
-    """A bus that records everything published to it."""
-
-    def __init__(self) -> None:
-        self.seen: list[Any] = []
-
-    async def publish(self, event: Any) -> None:
-        self.seen.append(event)
+async def new_list(site, tenant: str = TENANT, key: str = KEY) -> str:
+    """Just ``create_list``, committed: the list's key, without the extra fields."""
+    async with session(site) as db:
+        with unbound():
+            made = await create_list(
+                db, tenant_id=tenant, key=key, label="Weekly", settings=SETTINGS
+            )
+            await events.commit(db)
+    return made
 
 
 async def make_list(site, tenant: str = TENANT, key: str = KEY) -> None:
-    async with session(site) as db:
-        with unbound():
-            await create_list(db, tenant_id=tenant, key=key, label="Weekly", settings=SETTINGS)
-            await events.commit(db)
+    await new_list(site, tenant, key)
     with unbound(), tenant_scope(tenant):
         async with session(site) as db:
             rtype = await type_service.get_type(db, key)
@@ -125,11 +124,11 @@ async def run(
     *,
     tenant: str = TENANT,
     key: str = KEY,
-    spy: Spy | None = None,
+    spy: Bus | None = None,
     now: datetime = NOW,
 ) -> list[ImportResult]:
     async with session(site) as db:
-        events.attach(db, spy or Spy())
+        events.attach(db, spy or Bus())
         with unbound():
             results = await import_subscribers(
                 db, tenant_id=tenant, type_key=key, rows=rows, settings=SETTINGS, now=now

@@ -8,6 +8,7 @@ from typing import Annotated, Any
 from pydantic import BaseModel, ConfigDict, StringConstraints
 from sm_records.contracts.newsletter_import import ImportTargets
 
+from sm_newsletter.core.constants import MAX_TYPE_KEY_LEN
 from sm_newsletter.imports.constants import KEEP_ERRORS
 from sm_newsletter.models import ImportJob
 
@@ -28,7 +29,7 @@ assert ERRORS_SHOWN <= KEEP_ERRORS
 class ListCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    key: Annotated[str, StringConstraints(min_length=1, max_length=64)]
+    key: Annotated[str, StringConstraints(min_length=1, max_length=MAX_TYPE_KEY_LEN)]
     label: Annotated[str, StringConstraints(min_length=1, max_length=200)]
 
 

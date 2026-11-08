@@ -9,6 +9,7 @@ commits: a refusal raised here is followed by the caller's rollback, which remov
 
 from __future__ import annotations
 
+import asyncio
 from collections import Counter
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -45,9 +46,9 @@ from sm_newsletter.imports.mailchimp import (
     header_key,
     read_header,
     read_rows,
-    tag_values,
     text_stream,
 )
+from sm_newsletter.imports.tags import tag_values
 from sm_newsletter.models import ImportEntry, ImportJob
 
 __all__ = ["stage"]
@@ -186,6 +187,7 @@ async def _stage_file(
     """Stream one file into chunks; the rows of it that were staged."""
     buffer: list[dict[str, Any]] = []
     staged = 0
+    seen = 0
 
     async def flush() -> None:
         nonlocal staged
@@ -202,6 +204,9 @@ async def _stage_file(
     with _text(peek.source) as stream:
         header = read_header(stream)
         for item in read_rows(stream, header, peek.kind):
+            seen += 1
+            if seen % STAGE_CHUNK == 0:
+                await asyncio.sleep(0)  # rows that never reach a flush must not starve the loop
             if not isinstance(item, Parsed):
                 tally.error(peek.source.index, item.line, item.code, item.field)
                 if item.code == "invalid_email":

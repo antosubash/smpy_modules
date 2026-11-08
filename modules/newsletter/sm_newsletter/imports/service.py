@@ -11,7 +11,7 @@ from sm_records.contracts.newsletter_import import ImportTargets
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_newsletter.campaigns.access import Roles, readable_lists, require_list
+from sm_newsletter.campaigns.access import MAX_ID, Roles, readable_lists, require_list
 from sm_newsletter.core.errors import NotFound
 from sm_newsletter.core.errors_import import ImportNotStaged, ImportRunning
 from sm_newsletter.imports import mapping
@@ -25,7 +25,10 @@ async def get_import(
     session: AsyncSession, *, tenant_id: str, import_id: int, roles: Roles
 ) -> ImportJob:
     """The tenant's import, read fresh; :class:`NotFound` when there is none or its list is
-    unreadable to this caller."""
+    unreadable to this caller. An id outside Postgres' 32-bit ``INTEGER`` is a 404 before
+    the query, never a driver error."""
+    if not 0 < import_id <= MAX_ID:
+        raise NotFound()
     stmt = (
         select(ImportJob)
         .where(ImportJob.id == import_id, ImportJob.tenant_id == tenant_id)

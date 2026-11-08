@@ -24,6 +24,7 @@ import { ListPicker } from '../ui/components/import/ListPicker';
 import { MappingTable } from '../ui/components/import/MappingTable';
 import { UploadStep } from '../ui/components/import/UploadStep';
 import { useImport } from '../ui/hooks/useImport';
+import { codeMessage } from '../ui/utils/http';
 import { keys, useT } from '../ui/utils/i18n';
 import type { ImportMapping } from '../ui/utils/importTypes';
 
@@ -164,11 +165,7 @@ export default function Import() {
             <div className="grid gap-4">
               {job.status === 'failed' && (
                 <p role="alert" className="text-sm text-destructive">
-                  {t(
-                    Object.hasOwn(keys.newsletter.errors, job.error_code ?? '')
-                      ? (keys.newsletter.errors as Record<string, string>)[job.error_code ?? '']
-                      : keys.newsletter.errors.generic,
-                  )}
+                  {codeMessage(job.error_code, t)}
                 </p>
               )}
               <ImportCounts job={job} />

@@ -12,7 +12,7 @@ from sm_newsletter.core.errors_import import (
     ImportTooManyColumns,
 )
 from sm_newsletter.imports import mailchimp as mc
-from sm_newsletter.imports.constants import MAX_CELL
+from sm_newsletter.imports.constants import MAX_CELL, MAX_COLUMNS
 from sm_records.contracts.newsletter_admin import FieldChoice
 
 from tests.imports.fixtures import csv_bytes
@@ -121,6 +121,8 @@ def test_tag_rules():
     labels, dropped = mc.parse_tags(",".join(f"t{i}" for i in range(51)))
     assert len(labels) == 50
     assert dropped
+    assert mc.parse_tags(",".join(f"t{i}" for i in range(50)))[1] is False
+    assert mc.parse_tags("t" * 100) == (["t" * 100], False)
 
 
 def test_tag_values_distinct_and_deterministic():
@@ -186,6 +188,18 @@ def test_cell_too_long_drops_cell_keeps_row():
     assert rows[0] == mc.RowError(line=2, code="cell_too_long", field="first name")
     assert isinstance(rows[1], mc.Parsed)
     assert rows[1].fields == {}
+
+
+def test_a_cell_of_exactly_max_cell_is_kept():
+    data = csv_bytes(["Email Address", "First Name"], [["a@example.com", "x" * MAX_CELL]])
+    _, rows = _read(data)
+    assert [type(r) for r in rows] == [mc.Parsed]
+    assert list(rows[0].fields.values()) == ["x" * MAX_CELL]
+
+
+def test_max_columns_exactly_is_accepted():
+    header = ["Email Address", *[f"c{i}" for i in range(MAX_COLUMNS - 1)]]
+    _read(csv_bytes(header, []))
 
 
 def test_long_email_cell_is_invalid_email():
