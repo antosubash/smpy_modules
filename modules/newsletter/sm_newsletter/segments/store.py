@@ -16,13 +16,18 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_newsletter.campaigns.access import Roles, check_list, readable_lists
+from sm_newsletter.campaigns._refusal import DRAFT
+from sm_newsletter.campaigns.access import (
+    MAX_ID,
+    Roles,
+    check_list,
+    readable_lists,
+    require_list,
+)
 from sm_newsletter.core.errors import NotFound
 from sm_newsletter.core.errors_audience import InvalidSegment, SegmentInUse, SegmentNameTaken
 from sm_newsletter.models import Campaign, Segment
 from sm_newsletter.segments.rules import Rule, RuleError, compile_rules, segment_fields
-
-DRAFT = "draft"
 
 
 async def fields_for(
@@ -60,12 +65,18 @@ async def _compile(
     return filters, count
 
 
-async def _find(session: AsyncSession, *, tenant_id: str, segment_id: int) -> Segment | None:
+async def _find(
+    session: AsyncSession, *, tenant_id: str, segment_id: int, lock: bool = False
+) -> Segment | None:
+    if not 0 < segment_id <= MAX_ID:
+        return None
     stmt = (
         select(Segment)
         .where(Segment.id == segment_id, Segment.tenant_id == tenant_id)
         .execution_options(populate_existing=True)
     )
+    if lock:
+        stmt = stmt.with_for_update()
     return (await session.execute(stmt)).scalars().first()
 
 
@@ -86,13 +97,15 @@ async def list_segments(
 
 
 async def get_segment(
-    session: AsyncSession, *, tenant_id: str, segment_id: int, roles: Roles
+    session: AsyncSession, *, tenant_id: str, segment_id: int, roles: Roles, lock: bool = False
 ) -> Segment:
-    segment = await _find(session, tenant_id=tenant_id, segment_id=segment_id)
+    """``lock``: ``SELECT … FOR UPDATE`` (Postgres; a no-op on SQLite)."""
+    segment = await _find(session, tenant_id=tenant_id, segment_id=segment_id, lock=lock)
     if segment is None:
         raise NotFound()
-    if segment.list_type_key not in await readable_lists(session, tenant_id=tenant_id, roles=roles):
-        raise NotFound()
+    await require_list(
+        session, tenant_id=tenant_id, list_type_key=segment.list_type_key, roles=roles
+    )
     return segment
 
 
@@ -150,8 +163,11 @@ async def update_segment(
     name: str | None,
     rules: list[Rule] | None,
 ) -> Segment:
-    segment = await get_segment(session, tenant_id=tenant_id, segment_id=segment_id, roles=roles)
-    await check_list(session, tenant_id=tenant_id, type_key=segment.list_type_key, roles=roles)
+    # Locked like ``delete_segment``: a delete that commits first leaves this
+    # UPDATE matching no row, and two PATCHes would overwrite each other.
+    segment = await get_segment(
+        session, tenant_id=tenant_id, segment_id=segment_id, roles=roles, lock=True
+    )
     values: dict[str, object] = {}
     if rules is not None:
         values["filters"], _ = await _compile(
@@ -181,7 +197,11 @@ async def update_segment(
 async def delete_segment(
     session: AsyncSession, *, tenant_id: str, segment_id: int, roles: Roles
 ) -> None:
-    await get_segment(session, tenant_id=tenant_id, segment_id=segment_id, roles=roles)
+    # The row lock serialises this check-then-delete with a draft PATCH naming
+    # the segment, which takes the same lock (``audience_filters(lock=True)``):
+    # either the PATCH commits first and this sees the draft (409), or it waits
+    # and then finds no segment (422 ``unknown_segment``).
+    await get_segment(session, tenant_id=tenant_id, segment_id=segment_id, roles=roles, lock=True)
     in_use = await session.execute(
         select(Campaign.id)
         .where(

@@ -12,6 +12,8 @@ credential. The recipient's local part scripts the answer:
 - ``stallrcpt@`` / ``stalldata@`` → no reply for ``STALL`` seconds at RCPT /
   after the body (pair with a shorter client timeout);
 - anything else → accepted.
+
+Also the ``state`` fixture the delivery tests share.
 """
 
 from __future__ import annotations
@@ -33,6 +35,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 from sm_newsletter.sending.transport.smtp import SmtpConfig, SmtpTransport
+
+from tests.support.freeze_world import world
 
 USERNAME = "relay-user"
 STALL = 0.6
@@ -169,3 +173,11 @@ def make_transport(relay, client_tls):
         return SmtpTransport(replace(config, **overrides), tls_context=client_tls)
 
     return make
+
+
+@pytest.fixture
+async def state(tmp_path):
+    """A file-database app's state, for the delivery tests."""
+    _, db_state, _ = await world(tmp_path)
+    yield db_state
+    await db_state.engine.dispose()

@@ -52,7 +52,7 @@ __all__ = [
 ]
 
 BrowseStatus = Literal["pending", "confirmed", "unsubscribed"]
-BROWSE_STATUSES: tuple[str, ...] = ("pending", "confirmed", "unsubscribed")
+BROWSE_STATUSES: tuple[str, ...] = campaign_browse.STATUSES
 MAX_BROWSE_LIMIT = 100
 MAX_BROWSE_OFFSET = 100_000
 MAX_SEARCH_LEN = 200

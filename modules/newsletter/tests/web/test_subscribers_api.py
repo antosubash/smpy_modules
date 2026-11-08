@@ -5,6 +5,11 @@ from __future__ import annotations
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sm_newsletter.core import constants
+from sm_records.contracts.newsletter_admin import (
+    MAX_BROWSE_LIMIT,
+    MAX_BROWSE_OFFSET,
+    MAX_SEARCH_LEN,
+)
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from tests.support.app import build_app
@@ -86,6 +91,7 @@ async def test_invalid_query_never_echoes(client):
     for body in (
         {"status": "SECRETSTATUS"},
         {"q": "SECRET" * 40},
+        {"q": "SECRET\x00"},  # records refuses a NUL with a ValueError: never a 500
         {"tag": "SECRET" * 40},
         {"segment": 0},
         {"limit": 0},
@@ -96,6 +102,13 @@ async def test_invalid_query_never_echoes(client):
         res = await client.post(SEARCH, json=body, headers=VIEW)
         assert (res.status_code, res.json()["code"]) == (422, "invalid_query"), body
         assert "SECRET" not in res.text
+
+
+async def test_every_search_bound_holds_at_its_edge(client):
+    """One past each bound is a 422 above; the bound itself is accepted."""
+    body = {"q": "x" * MAX_SEARCH_LEN, "limit": MAX_BROWSE_LIMIT, "offset": MAX_BROWSE_OFFSET}
+    res = await client.post(SEARCH, json=body, headers=VIEW)
+    assert res.status_code == 200, res.text
 
 
 async def test_search_is_a_post_body(client):

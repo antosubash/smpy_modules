@@ -53,7 +53,7 @@ export function useCampaignEditor(id: number) {
   const dataRef = useRef<Data>(EMPTY);
   const staleRef = useRef(false);
   const queueRef = useRef<Promise<unknown>>(Promise.resolve());
-  const { dirty, incomplete, audienceUnfinished, edits } = usePendingEdits();
+  const { dirty, incomplete, audienceUnfinished, metaInvalid, edits } = usePendingEdits();
 
   /** Adopt the server's campaign; edits typed while the request was out stay on top. */
   const adopt = useCallback(
@@ -109,7 +109,14 @@ export function useCampaignEditor(id: number) {
       const body = edits.body;
       const serialized = body ? bodyKey(body) : null;
       const withBody = serialized !== null && serialized !== savedBodyRef.current;
-      if (!withBody && Object.keys(meta).length === 0) return true;
+      if (!withBody && Object.keys(meta).length === 0) {
+        // A queued body that now equals what the server holds (an `onChange` that landed
+        // while the save carrying it was out) is nothing to save; left set it would
+        // keep `dirty` true for good.
+        edits.body = null;
+        edits.sync();
+        return true;
+      }
       edits.begin();
       setStatus('saving');
       try {
@@ -195,6 +202,12 @@ export function useCampaignEditor(id: number) {
     [edits, schedule],
   );
 
+  /** The details form reports a field whose typed value cannot be saved (or is fixed again). */
+  const markMetaInvalid = useCallback(
+    (field: string, invalid: boolean) => edits.markInvalid(field, invalid),
+    [edits],
+  );
+
   /** Re-snapshot one card server-side. The pending autosave goes first, so the
    *  refresh is made against the revision that holds it; if it could not be
    *  saved, nothing is refreshed (adopting the server's body would drop it). */
@@ -260,6 +273,8 @@ export function useCampaignEditor(id: number) {
     /** The audience picker's `onUnfinished`; `audienceUnfinished` blocks a send. */
     holdAudience: edits.markAudienceUnfinished,
     audienceUnfinished,
+    markMetaInvalid,
+    metaInvalid,
     status,
     error,
     incomplete,

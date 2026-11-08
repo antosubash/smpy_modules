@@ -11,15 +11,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from tests.pg_support import USING_POSTGRES
-from tests.support.worker_env import isolate_worker_env, reset_worker_caches
+from tests.support.worker_env import encrypted, isolate_worker_env, reset_worker_caches
 
 pytestmark = pytest.mark.skipif(
     USING_POSTGRES, reason="the worker secret test points sync_db at its own SQLite file"
 )
-
-
-def _enc(plain: str, under: str) -> str:
-    return crypto.ENC_PREFIX + crypto._fernet_for(under).encrypt(plain.encode()).decode()
 
 
 @pytest.fixture
@@ -50,7 +46,7 @@ def db(clean):
 
 def _check(resolved: str) -> None:
     secret.install(resolved)
-    assert crypto.decrypt_value(_enc("pw", resolved), "smtp_password") == "pw"
+    assert crypto.decrypt_value(encrypted("pw", resolved), "smtp_password") == "pw"
     token = tokens.sign(resolved, purpose="u", tenant_id="default", campaign_id=1, send_id=2)
     assert tokens.parse(resolved, token, purpose="u") is not None
 
@@ -102,7 +98,7 @@ def test_wrong_secret_never_yields_plaintext(db, monkeypatch):
     monkeypatch.setenv("SM_SECRET_KEY", "env-secret")
     secret.install(secret.resolve_worker_secret())
     with pytest.raises(SmtpPasswordUnreadable):
-        crypto.decrypt_value(_enc("pw", "other"), "smtp_password")
+        crypto.decrypt_value(encrypted("pw", "other"), "smtp_password")
 
 
 def test_install_keeps_an_app_provider(clean, monkeypatch):

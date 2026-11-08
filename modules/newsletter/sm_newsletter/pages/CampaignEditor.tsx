@@ -27,6 +27,7 @@ interface EditorProps {
   campaign_id: number;
   can_edit?: boolean;
   can_send?: boolean;
+  can_count?: boolean;
   capabilities?: Capabilities;
   public_base_url_set?: boolean;
   max_test_recipients?: number;
@@ -102,10 +103,13 @@ export default function CampaignEditor() {
 
   useLeaveGuard({
     dirty: editor.dirty,
-    held: !readOnly && (editor.incomplete || editor.audienceUnfinished),
+    held: !readOnly && (editor.incomplete || editor.audienceUnfinished || editor.metaInvalid),
   });
 
-  const statusKey = STATUS_LABEL[editor.status];
+  const statusKey =
+    editor.metaInvalid && !readOnly && editor.status !== 'stale'
+      ? copy.status.invalid
+      : STATUS_LABEL[editor.status];
   const title = campaign ? campaign.name || t(copy.untitled) : t(copy.fallback_title);
 
   return (
@@ -135,14 +139,16 @@ export default function CampaignEditor() {
               canSend={canSend}
               maxRecipients={props.max_test_recipients ?? DEFAULT_MAX_TEST_RECIPIENTS}
               baseUrlMissing={props.public_base_url_set === false}
-              flush={editor.save}
+              // A details field the server would refuse is held back: a test now
+              // would go out from the last saved version without saying so.
+              flush={() => (editor.metaInvalid ? Promise.resolve(false) : editor.save())}
               incomplete={editor.incomplete}
             />
             <SendDialog
               campaign={campaign}
               canSend={canSend}
               onSent={refreshCampaign}
-              flush={editor.flush}
+              flush={() => (editor.metaInvalid ? Promise.resolve(false) : editor.flush())}
               dirty={editor.dirty}
               incomplete={editor.incomplete}
               audienceUnfinished={editor.audienceUnfinished}
@@ -189,11 +195,13 @@ export default function CampaignEditor() {
             campaign={campaign}
             readOnly={readOnly}
             onChange={editor.saveMeta}
+            onInvalid={editor.markMetaInvalid}
           />
           <AudiencePicker
             key={`audience-${editor.reloadKey}`}
             campaign={campaign}
             readOnly={readOnly}
+            canCount={props.can_count === true}
             onChange={editor.saveMeta}
             onUnfinished={editor.holdAudience}
           />

@@ -37,26 +37,21 @@ __all__ = ["click_by_token", "open_by_token"]
 
 logger = logging.getLogger(__name__)
 
-_POSITION: Final = re.compile(r"[0-9]{1,4}")
-_warned_no_secret = False
+# A link number as ``prepare`` writes it: no leading zero, at most three
+# digits (``MAX_TRACKED_LINKS`` is 100), so ``01`` is not a second spelling of 1.
+_POSITION: Final = re.compile(r"[1-9][0-9]{0,2}")
 
 
 def _claims(
     app: Any, token: str, purpose: Purpose, resolved_tenant: str | None
 ) -> SendToken | None:
-    global _warned_no_secret
-    secret = tokens.host_secret(app)
-    if not secret:
-        if not _warned_no_secret:
-            _warned_no_secret = True
-            logger.error("newsletter: no host secret_key; opens and clicks are not recorded")
-        return None
-    claims = tokens.parse(secret, token, purpose=purpose)
-    if claims is None:
-        return None
-    if resolved_tenant is not None and resolved_tenant != claims.tenant_id:
-        return None
-    return claims
+    return tokens.verify(
+        app,
+        token,
+        purpose=purpose,
+        resolved_tenant=resolved_tenant,
+        refused="opens and clicks are not recorded",
+    )
 
 
 async def _record(

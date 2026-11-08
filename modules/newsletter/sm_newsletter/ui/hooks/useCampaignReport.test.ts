@@ -2,7 +2,7 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
+import { report } from '../components/report/fixture';
 import { api } from '../utils/api';
 import type { Report } from '../utils/types';
 import { REPORT_POLL_MS, useCampaignReport } from './useCampaignReport';
@@ -14,30 +14,7 @@ vi.mock('../utils/api', () => ({
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const snap = (status: string): Report => ({
-  campaign_id: 7,
-  status,
-  started_at: '2026-11-05T10:00:00Z',
-  finished_at: null,
-  recipients: 10,
-  sent: 5,
-  failed: 0,
-  bounced: 0,
-  suppressed: 0,
-  skipped: 0,
-  unsubscribed: 0,
-  opens_unique: 2,
-  opens_total: 3,
-  clicks_unique: 1,
-  clicks_total: 1,
-  opens_unique_accepted: 2,
-  clicks_unique_accepted: 1,
-  tracking_opens: true,
-  tracking_clicks: true,
-  links: [],
-  bucket: 'hour',
-  timeline: [],
-});
+const snap = (status: string): Report => report({ status });
 
 let result: ReturnType<typeof useCampaignReport>;
 

@@ -30,6 +30,9 @@ export const OP_LABELS: Record<RuleOp, string> = {
   since: copy.ops.since,
 };
 
+/** The API's cap on one rule value (`segments.rules.MAX_VALUE_LEN`); more is a 422. */
+export const MAX_VALUE_LEN = 200;
+
 /** The synthetic signup-time field is named by the catalogue, not by the server's English label. */
 export const SIGNUP_FIELD = 'created_at';
 
@@ -154,6 +157,7 @@ export function RuleRow({ rule, fields, onChange, onRemove, disabled, invalid }:
           aria-label={t(copy.value)}
           type={input === 'text' ? 'text' : input}
           step={input === 'number' ? 'any' : undefined}
+          maxLength={input === 'text' ? MAX_VALUE_LEN : undefined}
           disabled={disabled}
           value={typeof rule.value === 'string' ? rule.value : ''}
           onChange={(e) => onChange({ ...rule, value: e.target.value })}

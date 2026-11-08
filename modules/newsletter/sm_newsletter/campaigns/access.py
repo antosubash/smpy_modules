@@ -20,6 +20,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_newsletter.core.errors import ListForbidden, NotFound, UnknownList
 from sm_newsletter.models import Campaign
 
+MAX_ID = 2**31 - 1
+"""The largest id a row can have: the id column is a plain ``INTEGER``, signed
+32-bit on Postgres (SQLite takes 64 bits, but Postgres is the bound). A larger
+id in a URL would overflow the query parameter instead of matching nothing."""
+
+MAX_BIG_ID = 2**63 - 1
+"""The same bound for a :func:`~sm_newsletter.models._cols.big_pk` table
+(``BIGINT`` on Postgres), such as the suppressions."""
+
 Roles = Sequence[str] | CallerRoles | None
 """What records' ``can_read_list`` takes; ``None`` is no caller (a worker)."""
 
@@ -49,6 +58,8 @@ async def require_campaign(
 ) -> Campaign:
     """The tenant's campaign ``campaign_id``, read fresh; :class:`NotFound` when
     there is none *or* its list is unreadable to this caller."""
+    if not 0 < campaign_id <= MAX_ID:
+        raise NotFound()
     stmt = (
         select(Campaign)
         .where(Campaign.id == campaign_id, Campaign.tenant_id == tenant_id)
@@ -67,5 +78,8 @@ async def require_list(
 ) -> None:
     """:class:`NotFound` unless ``list_type_key`` is one of the tenant's lists
     this caller may read: a missing, unreadable or non-list key answers alike."""
-    if list_type_key not in await readable_lists(session, tenant_id=tenant_id, roles=roles):
+    # One list's check, not `readable_lists`' (a records lookup for every list of the tenant).
+    if list_type_key not in await subscription_lists(session, tenant_id=tenant_id):
+        raise NotFound()
+    if not await can_read_list(session, tenant_id=tenant_id, type_key=list_type_key, roles=roles):
         raise NotFound()

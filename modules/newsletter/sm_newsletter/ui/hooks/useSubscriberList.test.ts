@@ -144,4 +144,18 @@ describe('useSubscriberList', () => {
     expect(list.segment).toBe('');
     expect(list.tag).toBe('');
   });
+
+  it('drops the previous answer and reports the error when the API refuses a request', async () => {
+    respond = async () => json(page(['old@example.com'], 1));
+    await mount();
+    expect(list.items?.length).toBe(1);
+    respond = async () =>
+      new Response(JSON.stringify({ detail: 'x', code: 'invalid_query' }), {
+        status: 422,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    await act(async () => list.setStatus('pending'));
+    expect(list.error).not.toBeNull();
+    expect(list.items).toBeNull();
+  });
 });

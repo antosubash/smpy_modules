@@ -95,7 +95,10 @@ async def confirm(
             raise _expired()
         return {"sm_status": CONFIRMED, "sm_confirmed_at": utcnow()}, None
 
-    outcome = await transition(db, rtype, record, derive, settings=settings)
+    try:
+        outcome = await transition(db, rtype, record, derive, settings=settings)
+    except NotFound:  # purged since the lookup, like a trashed row
+        raise _expired() from None
     if not outcome.wrote:
         return "already_confirmed"
     events.emit(db, changed(rtype, outcome.record, PENDING, CONFIRMED))
@@ -128,7 +131,8 @@ async def leave(
 
     The transition's :class:`~.transition.Outcome`: ``wrote`` says whether
     *this* call unsubscribed — of two concurrent ones, exactly one — which
-    re-reading the status afterwards cannot tell."""
+    re-reading the status afterwards cannot tell. ``NotFound`` if the row was
+    purged since ``record`` was loaded."""
 
     def derive(row: Record) -> Change | None:
         if (row.data or {}).get("sm_status") == UNSUBSCRIBED or (still and not still(row)):
@@ -169,4 +173,7 @@ async def unsubscribe(
     def holds(row: Record) -> bool:
         return not row.is_deleted and links.matches(secret, link, (row.data or {}).get("sm_nonce"))
 
-    await leave(db, rtype, record, settings, still=holds)
+    try:
+        await leave(db, rtype, record, settings, still=holds)
+    except NotFound:  # purged since the lookup: answered as an unknown subscriber
+        return

@@ -19,6 +19,11 @@ reason, instead of returning everyone.
 anything else raise ``ValueError`` before a query runs. ``after`` is a
 non-negative ``int`` the same way.
 
+**Trash and tenants.** ``include_trashed=True`` (``status="unsubscribed"``
+only) walks the trash too, for newsletter's reconcile. :func:`subscription_lists`
+names a tenant's lists; :func:`subscription_list_tenants` is the one
+cross-tenant read, for a worker with no tenant bound.
+
 **Writes** (:func:`unsubscribe`, :func:`set_tags`) run in the caller's
 transaction and never commit; the caller finishes it with
 ``simple_module_db.finalize_session`` (or records' ``events.commit``), and only

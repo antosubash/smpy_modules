@@ -17,8 +17,11 @@ create on a list the caller cannot read is 403 `list_forbidden`).
 
 - **AND only.** Every rule must hold. "Any of several values" is the `any`
   operator on one field (it compiles to `in`); OR across fields is not offered.
-  At most 10 rules and 20 compiled terms.
-- **Fields.** Every filterable field records reports for the list, except
+  At most 10 rules and 20 compiled terms; a rule value is at most 200
+  characters (`MAX_VALUE_LEN`) and a segment name 200. The editor's inputs carry the
+  same caps, as does the subscriber search box (records' `MAX_SEARCH_LEN`, 200).
+- **Fields.** Every filterable field records reports for the list, of a type in
+  the table below, except
   `sm_status` (there is no status rule: a campaign only mails `confirmed`
   subscribers), plus **Signed up**, records' `created_at`. For a person added by
   the Mailchimp import (PR 7) that is the import time, so "signed up since"
@@ -42,7 +45,25 @@ create on a list the caller cannot read is 403 `list_forbidden`).
   confirmed, untrashed, matching. Suppressions are not subtracted, so the real
   number sent can be lower (see [`sending.md`](sending.md)). Incomplete rules
   are ignored by the preview.
+- **Counting needs `records.view`.** A rule can name `sm_email` or any other
+  subscriber field, so a count answers questions about subscribers (a run of
+  `starts_with` counts would spell out addresses). Counts follow the
+  subscriber screen:
+
+  | Count | Route | Permission |
+  | --- | --- | --- |
+  | segment editor preview | `POST /segments/preview` | `newsletter.view` + `records.view` |
+  | whole list | `GET /lists/{key}/audience-count?audience=all` | `newsletter.view` |
+  | tag or segment | `GET /lists/{key}/audience-count?audience=tag:…\|segment:…` | `newsletter.view` + `records.view` |
+  | send estimate | `GET /campaigns/{id}/estimate` | `newsletter.send`; `recipients` is `null` for a tag or segment audience without `records.view`, and the finish is computed on the whole list (an upper bound) |
+
+  The segments and editor pages pass `can_count` (`records.view`), and without
+  it the screens ask for no tag, segment or preview count and say only people
+  who may view subscribers see it. A read-only campaign asks for no count at all.
 - Deleting a segment that a **draft** campaign names is `409 segment_in_use`.
+- A segment id is never reused, because a campaign stores `segment:<id>`: the
+  table is `AUTOINCREMENT` on SQLite (the model and the migration both say so);
+  Postgres sequences already behave that way.
 
 ## Audiences
 

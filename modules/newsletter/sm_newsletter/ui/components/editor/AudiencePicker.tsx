@@ -6,6 +6,9 @@
  * saves nothing and asks for no count, and is reported through `onUnfinished`:
  * the saved audience is still the old one, so the editor blocks sending until
  * a value is picked or the choice is reverted.
+ *
+ * A tag or segment count needs `records.view` (`canCount`); without it, and on a
+ * read-only campaign, no count is asked for.
  */
 
 import { Label } from '@simple-module-py/ui/components/ui/label';
@@ -16,7 +19,7 @@ import { useEffect, useId, useState } from 'react';
 import { useAudienceCount } from '../../hooks/useAudienceCount';
 import { useListFields } from '../../hooks/useListFields';
 import type { MetaPatch } from '../../hooks/usePendingEdits';
-import { api } from '../../utils/api';
+import { api, errorMessage } from '../../utils/api';
 import { type AudienceChoice, formatAudience, parseAudience } from '../../utils/audience';
 import { keys, useT } from '../../utils/i18n';
 import type { CampaignDetail, Segment } from '../../utils/types';
@@ -28,30 +31,41 @@ type Kind = AudienceChoice['kind'];
 interface Props {
   campaign: CampaignDetail;
   readOnly: boolean;
+  /** The page's `can_count` (`records.view`). */
+  canCount?: boolean;
   onChange: (patch: MetaPatch) => void;
   /** True while a tag or segment kind is chosen without its value. */
   onUnfinished?: (unfinished: boolean) => void;
 }
 
-export function AudiencePicker({ campaign, readOnly, onChange, onUnfinished }: Props) {
+export function AudiencePicker({
+  campaign,
+  readOnly,
+  canCount = true,
+  onChange,
+  onUnfinished,
+}: Props) {
   const { t } = useT();
   const id = useId();
   const listKey = campaign.list_type_key;
   const { fields } = useListFields(listKey);
   const [segments, setSegments] = useState<Segment[] | null>(null);
+  const [segmentsError, setSegmentsError] = useState<string | null>(null);
   const [choice, setChoice] = useState<AudienceChoice>(() => parseAudience(campaign.audience));
   const [pending, setPending] = useState<Kind | null>(null);
 
   useEffect(() => {
     let live = true;
+    setSegmentsError(null);
+    setSegments(null); // another list's segments must not judge this list's choice
     api
       .listSegments(listKey)
       .then((s) => live && setSegments(s))
-      .catch(() => live && setSegments([]));
+      .catch((e) => live && setSegmentsError(errorMessage(e, t)));
     return () => {
       live = false;
     };
-  }, [listKey]);
+  }, [listKey, t]);
 
   const tagChoices = fields?.find((f) => f.key === 'tags')?.choices ?? [];
   const hasTags = fields === null || fields.some((f) => f.key === 'tags');
@@ -64,7 +78,9 @@ export function AudiencePicker({ campaign, readOnly, onChange, onUnfinished }: P
   // Unmounting (a reload) leaves nothing unfinished behind.
   useEffect(() => () => onUnfinished?.(false), [onUnfinished]);
   const audience = complete ? formatAudience(choice) : '';
-  const { count, loading, error } = useAudienceCount(listKey, audience);
+  const hidden = !canCount && audience !== 'all';
+  const counted = !readOnly && !hidden;
+  const { count, loading, error } = useAudienceCount(listKey, counted ? audience : '');
 
   const apply = (next: AudienceChoice) => {
     setChoice(next);
@@ -135,7 +151,11 @@ export function AudiencePicker({ campaign, readOnly, onChange, onUnfinished }: P
       {kind === 'segment' && (
         <div className="flex items-center gap-2">
           <Label htmlFor={`${id}-segment-value`}>{t(copy.segment_label)}</Label>
-          {segments !== null && segments.length === 0 ? (
+          {segmentsError !== null ? (
+            <p role="alert" className="text-sm text-destructive">
+              {segmentsError}
+            </p>
+          ) : segments !== null && segments.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t(copy.no_segments)}</p>
           ) : (
             <NativeSelect
@@ -169,12 +189,15 @@ export function AudiencePicker({ campaign, readOnly, onChange, onUnfinished }: P
           {t(copy.tag_missing)}
         </p>
       )}
-      {complete && !missing && error !== null && !loading && (
+      {complete && !missing && hidden && !readOnly && (
+        <p className="text-sm text-muted-foreground">{t(copy.count_hidden)}</p>
+      )}
+      {counted && complete && !missing && error !== null && !loading && (
         <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       )}
-      {complete && !missing && (error === null || loading) && (
+      {counted && complete && !missing && (error === null || loading) && (
         <p className="text-sm text-muted-foreground" aria-live="polite">
           {count !== null && !loading ? t(copy.count, { count }) : t(copy.count_loading)}
         </p>

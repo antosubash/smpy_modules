@@ -36,6 +36,17 @@ def test_a_201_character_token_is_none():
     assert tokens.parse(SECRET, "t" * 201, purpose="u") is None
 
 
+def test_a_token_of_exactly_max_token_characters_is_read(monkeypatch):
+    """No real tenant makes one that long, so the tenant check is lifted: a
+    signed token of :data:`~tokens.MAX_TOKEN` characters verifies, one more does not."""
+    monkeypatch.setattr(tokens, "valid_tenant", lambda _value: True)
+    tenant = "t" * (tokens.MAX_TOKEN - len(_tok(tenant="")))
+    at_limit, over = _tok(tenant), _tok(tenant + "t")
+    assert (len(at_limit), len(over)) == (tokens.MAX_TOKEN, tokens.MAX_TOKEN + 1)
+    assert tokens.parse(SECRET, at_limit, purpose="u") == tokens.SendToken(tenant, 3, 9)
+    assert tokens.parse(SECRET, over, purpose="u") is None
+
+
 def test_another_secret_is_none():
     assert tokens.parse("other", _tok(), purpose="u") is None
 
@@ -60,6 +71,16 @@ def test_url_has_no_at_sign_and_joins_the_prefix():
     url = tokens.unsubscribe_url("https://x.example/", _tok())
     assert "@" not in url
     assert url.startswith("https://x.example/") and "/u/" in url
+
+
+def test_ids_of_18_digits_verify_and_19_do_not():
+    """The digit cap keeps ``int()`` bounded; a signed 19-digit id is still refused."""
+    big = 10**17
+    assert tokens.parse(SECRET, _tok(c=big, s=big), purpose="u") == tokens.SendToken(
+        "default", big, big
+    )
+    assert tokens.parse(SECRET, _tok(c=10 * big, s=9), purpose="u") is None
+    assert tokens.parse(SECRET, _tok(c=3, s=10 * big), purpose="u") is None
 
 
 @pytest.mark.parametrize("raw", ["03.9", "3.09", "003.009", "+3.9"])

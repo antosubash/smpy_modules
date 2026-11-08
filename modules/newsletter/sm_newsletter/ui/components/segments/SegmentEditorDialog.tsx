@@ -21,6 +21,7 @@ import type { ListField, Rule, Segment } from '../../utils/types';
 import { RuleRow } from './RuleRow';
 
 const copy = keys.newsletter.segments;
+/** The API's cap (`segments.rules.MAX_RULES`); a row past it would be a 422. */
 export const MAX_RULES = 10;
 
 interface Props {
@@ -30,6 +31,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: (s: Segment) => void;
+  /** The page's `can_count` (`records.view`): without it no count is asked for. */
+  canCount?: boolean;
 }
 
 export function SegmentEditorDialog({
@@ -39,6 +42,7 @@ export function SegmentEditorDialog({
   open,
   onOpenChange,
   onSaved,
+  canCount = true,
 }: Props) {
   const { t } = useT();
   const [name, setName] = useState('');
@@ -46,7 +50,7 @@ export function SegmentEditorDialog({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [badRow, setBadRow] = useState<number | null>(null);
-  const preview = useSegmentPreview(listKey, rules, open);
+  const preview = useSegmentPreview(listKey, rules, open && canCount);
   const incomplete = rules.some((r) => !ruleComplete(r));
 
   useEffect(() => {
@@ -60,6 +64,7 @@ export function SegmentEditorDialog({
   const edit = (next: Rule[]) => {
     setRules(next);
     setBadRow(null);
+    setError(null);
   };
 
   const save = async () => {
@@ -101,7 +106,10 @@ export function SegmentEditorDialog({
               value={name}
               maxLength={200}
               disabled={pending}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                setError(null);
+              }}
             />
 
             <p className="text-sm font-medium">{t(copy.rules)}</p>
@@ -126,14 +134,20 @@ export function SegmentEditorDialog({
                 variant="outline"
                 size="sm"
                 disabled={pending || fields.length === 0 || rules.length >= MAX_RULES}
-                title={rules.length >= MAX_RULES ? t(copy.max_rules) : undefined}
                 onClick={() => edit([...rules, emptyRule(fields[0])])}
               >
                 {t(copy.add_rule)}
               </Button>
+              {rules.length >= MAX_RULES && (
+                <p className="mt-1 text-sm text-muted-foreground">{t(copy.max_rules)}</p>
+              )}
             </div>
 
-            {preview.error ? (
+            {!canCount ? (
+              <p className="text-sm text-muted-foreground">
+                {t(keys.newsletter.audience.count_hidden)}
+              </p>
+            ) : preview.error && preview.error !== error ? (
               <p role="alert" className="text-sm text-destructive">
                 {preview.error}
               </p>

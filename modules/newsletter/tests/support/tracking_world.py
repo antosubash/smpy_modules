@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import datetime
 from typing import Any
 
@@ -12,10 +12,11 @@ from sm_newsletter.models import CampaignRender, Click, Link, Send
 from sm_newsletter.sending import rows
 from sm_newsletter.sending.classify import Verdict
 from sm_newsletter.sending.transport import DeliveryResult
+from sm_newsletter.tracking.record import record_click, record_open
 from sqlalchemy import select, update
 
 from tests.support.campaign_world import campaign_row, seed_campaign, seed_sends
-from tests.support.sending import T
+from tests.support.sending import NOW, T
 
 TARGET = "https://example.com/story?a=1&b=2"
 TRACKED_HTML = (
@@ -103,3 +104,48 @@ async def accept(state: Any, tenant: str, send_id: int, now: datetime) -> None:
             accepted = DeliveryResult("accepted", 250, "ok")
             await rows.record(db, send, Verdict("sent", False), accepted, now=now)
             await finalize_session(db)
+
+
+async def committed(state: Any, work: Callable[[Any], Awaitable[Any]], tenant: str = T) -> Any:
+    """Run ``work(db)`` in one tenant-scoped session and commit it with
+    ``finalize_session``; returns what ``work`` returned."""
+    with tenant_scope(tenant):
+        async with state.session_factory() as db:
+            out = await work(db)
+            await finalize_session(db)
+            return out
+
+
+async def opened(state: Any, cid: int, sid: int, *, tenant: str = T, now: datetime = NOW) -> bool:
+    """``record_open`` for one send, committed."""
+
+    def work(db: Any) -> Awaitable[bool]:
+        return record_open(db, tenant_id=tenant, campaign_id=cid, send_id=sid, now=now)
+
+    return await committed(state, work, tenant)
+
+
+async def clicked(
+    state: Any,
+    cid: int,
+    sid: int,
+    lid: int,
+    *,
+    tenant: str = T,
+    now: datetime = NOW,
+    count_open: bool = True,
+) -> bool:
+    """``record_click`` for one send and link, committed."""
+
+    def work(db: Any) -> Awaitable[bool]:
+        return record_click(
+            db,
+            tenant_id=tenant,
+            campaign_id=cid,
+            send_id=sid,
+            link_id=lid,
+            now=now,
+            count_open=count_open,
+        )
+
+    return await committed(state, work, tenant)

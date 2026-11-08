@@ -35,6 +35,8 @@ from sm_newsletter.web.services.tracking import click_by_token, open_by_token
 
 __all__ = ["CLICK_PATH", "GIF", "NO_STORE", "OPEN_PATH", "router"]
 
+_CLICK_ANY: Final = f"{constants.CLICK_PREFIX}{{rest:path}}"
+
 OPEN_PATH: Final = f"{constants.OPEN_PREFIX}{{token}}.gif"
 CLICK_PATH: Final = f"{constants.CLICK_PREFIX}{{token}}/{{position}}"
 
@@ -45,6 +47,9 @@ NO_STORE: Final[dict[str, str]] = {
     "Cache-Control": "no-store, no-cache, must-revalidate, private",
     "Pragma": "no-cache",
     "Expires": "0",
+    # The host's security-headers middleware overwrites this with
+    # ``strict-origin-when-cross-origin``, which still sends a redirect target
+    # the origin only, never the token in the path (docs/tracking.md).
     "Referrer-Policy": "no-referrer",
     "X-Robots-Tag": "noindex",
 }
@@ -70,7 +75,18 @@ async def click_redirect(request: Request, token: str, position: str) -> Respons
             request.app, token, position, resolved_tenant=resolved, now=utcnow()
         )
     if url is None:
-        return Response(
-            constants.NOT_FOUND_DETAIL, status_code=404, media_type="text/plain", headers=NO_STORE
-        )
+        return _not_found()
     return RedirectResponse(url, status_code=302, headers=NO_STORE)
+
+
+@router.get(_CLICK_ANY, include_in_schema=False)
+async def click_malformed(rest: str) -> Response:
+    """Anything else under the click prefix (no or an empty link number, extra
+    segments): the click route's one fixed 404, not the host's HTML page."""
+    return _not_found()
+
+
+def _not_found() -> Response:
+    return Response(
+        constants.NOT_FOUND_DETAIL, status_code=404, media_type="text/plain", headers=NO_STORE
+    )

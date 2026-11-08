@@ -21,7 +21,6 @@ from sm_records.contracts.newsletter import (
     MAX_SUBSCRIBER_BATCH,
     SubscriberFilterError,
     SubscriberHit,
-    iter_subscribers,
 )
 
 from sm_newsletter.core.constants import MAX_EMAIL_LEN, MAX_FIRST_NAME_LEN
@@ -38,7 +37,7 @@ QUEUED, SUPPRESSED = "queued", "suppressed"
 _SEND = Send.__table__  # ty: ignore[unresolved-attribute]
 
 
-class FilterRefused(Exception):  # noqa: N818 - the name the plan gives it
+class FilterRefused(Exception):  # noqa: N818 - an outcome freeze handles, not an API error
     """Records refused the audience's terms (or the list); ``reason`` is records'."""
 
     def __init__(self, reason: str) -> None:
@@ -58,14 +57,14 @@ async def write_pages(
     filters: Sequence[str],
     clock: Callable[[], datetime],
     *,
-    read: Reader = iter_subscribers,
-    page: int = PAGE,
+    read: Reader,
+    page: int,
 ) -> bool:
     """Every page of the audience into send rows; ``False`` once the claim is
     lost, :class:`FilterRefused` when records refuses a term.
 
-    ``read`` and ``page`` default to records' reader and its largest batch;
-    :mod:`.freeze` passes its own names so a test can swap them there."""
+    ``read`` (records' ``iter_subscribers``) and ``page`` (``PAGE``) are passed by
+    :mod:`.freeze` under its own names, so a test can swap them there."""
     cursor: int | None = 0
     while cursor is not None:
         async with factory() as session:

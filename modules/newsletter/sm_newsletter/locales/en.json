@@ -298,13 +298,14 @@
       "saving": "Saving",
       "saved": "Saved",
       "stale": "Changed elsewhere",
-      "error": "Not saved"
+      "error": "Not saved",
+      "invalid": "Not saved: fix the marked field"
     },
     "reload": "Reload",
     "read_only": "You can view this campaign but not change it.",
     "not_draft": "This campaign is no longer a draft, so it cannot be changed.",
     "incomplete": "A block is missing a required field. The email is saved again once it is filled in.",
-    "leave_held": "Leave this campaign? A block is unfinished or an audience is not chosen, so that change is not saved.",
+    "leave_held": "Leave this campaign? A block is unfinished, an audience is not chosen or a field is invalid, so that change is not saved.",
     "select_a_block": "Select a block to edit it.",
     "integration_missing": "This content source is not available on this site.",
     "meta": {
@@ -316,7 +317,9 @@
       "from_name": "Sender name",
       "from_name_hint": "Leave empty to use the name from the newsletter settings.",
       "reply_to": "Reply-to address",
-      "reply_to_hint": "Leave empty to use the address from the newsletter settings."
+      "reply_to_hint": "Leave empty to use the address from the newsletter settings.",
+      "name_required": "Enter a campaign name. It is not saved while it is empty.",
+      "reply_to_invalid": "Enter a valid email address. It is not saved until you do."
     },
     "card": {
       "article": "Article",
@@ -350,6 +353,7 @@
     "count_one": "About {count} subscriber",
     "count_other": "About {count} subscribers",
     "count_loading": "Counting subscribers…",
+    "count_hidden": "Only people who may view subscribers see this count.",
     "no_tags": "This list has no tags yet.",
     "no_segments": "This list has no segments yet.",
     "segment_missing": "The saved segment no longer exists. Choose another audience before sending.",
@@ -377,7 +381,10 @@
     },
     "rich_text": {
       "label": "Text",
-      "html": "Text"
+      "html": "Text",
+      "link_title": "Link",
+      "link_prompt": "Link address. Leave empty to remove the link.",
+      "link_invalid": "That address cannot be used. Use https://, http://, mailto: or a site path like /about."
     },
     "image": {
       "label": "Image",
@@ -430,7 +437,7 @@
     "not_found": "That item no longer exists.",
     "public_base_url_required": "Set the site's public base URL in Settings before sending.",
     "send_budget_exhausted": "The sending limit has been reached. Try again later.",
-    "sender_not_configured": "Set the sender address in the newsletter settings first.",
+    "sender_not_configured": "Complete the sender settings first: the From address, the postal address and, for SMTP, the SMTP host.",
     "smtp_password_unreadable": "The stored SMTP password cannot be read. Enter it again.",
     "stale": "This campaign was changed elsewhere. Reload it to continue.",
     "tenant_required": "No organisation is active for this account.",
@@ -466,6 +473,10 @@
     "import_running": "An import is already running.",
     "list_exists": "A list with that key already exists.",
     "invalid_list_key": "The list key is not valid."
+  },
+  "errors_field": {
+    "subject_required": "Add a subject before sending.",
+    "schedule_out_of_range": "Choose a time within the next year."
   },
   "preview": {
     "tab_edit": "Edit",
@@ -525,13 +536,14 @@
       "incomplete": "Finish or remove the unfinished blocks before sending.",
       "audience_unfinished": "Pick a tag or segment, or go back to the whole list, before sending.",
       "time_past": "Choose a time in the future.",
+      "time_far": "Choose a time within the next year.",
       "audience_frozen": "The audience is fixed once the campaign is scheduled."
     },
     "panel": {
       "scheduled_for": "Scheduled for {date}",
       "progress": "{sent} of {total} sent",
-      "eta_one": "Estimated finish: {date} ({count} day at {rate} per day)",
-      "eta_other": "Estimated finish: {date} ({count} days at {rate} per day)",
+      "eta_one": "Estimated finish: {date}",
+      "eta_other": "Estimated finish: {date}",
       "finished": "Finished {date}",
       "paused": "Paused: {detail}",
       "counts": {

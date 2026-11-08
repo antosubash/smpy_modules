@@ -58,6 +58,12 @@ describe('SubscriberFilters', () => {
     expect(byLabel(en.subscribers.segment_label)).not.toBeNull();
   });
 
+  it('caps the search text at the length the API accepts', () => {
+    render([city]);
+    const input = byLabel(en.subscribers.search_label) as HTMLInputElement;
+    expect(input.maxLength).toBe(200);
+  });
+
   it('offers the tag choices and reports a pick', () => {
     const props = render([tags]);
     const select = byLabel(en.subscribers.tag_label) as HTMLSelectElement;

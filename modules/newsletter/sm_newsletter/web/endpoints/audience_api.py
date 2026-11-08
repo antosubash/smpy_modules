@@ -1,5 +1,6 @@
 """``GET /lists/{list_type_key}/fields`` (what a segment rule may name) and
-``/audience-count`` (how many confirmed subscribers an audience reaches)."""
+``/audience-count`` (how many confirmed subscribers an audience reaches; a tag
+or segment also needs ``records.view``)."""
 
 from __future__ import annotations
 
@@ -9,18 +10,16 @@ from simple_module_hosting.permissions import RequiresPermission
 from sm_records.contracts.newsletter import SubscriberFilterError, caller_roles
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_newsletter.campaigns.access import readable_lists
-from sm_newsletter.campaigns.audience import audience_count
+from sm_newsletter.campaigns.access import require_list
+from sm_newsletter.campaigns.audience import AUDIENCE_ALL, audience_count
 from sm_newsletter.core import constants
 from sm_newsletter.core.errors import NotFound
-from sm_newsletter.core.errors_audience import InvalidAudience
 from sm_newsletter.core.tenancy import bind_admin
 from sm_newsletter.segments import store
 from sm_newsletter.segments.rules import ops_for
 from sm_newsletter.web.schemas.segments import CountOut, ListFieldOut
 
 router = APIRouter(dependencies=[Depends(bind_admin)])
-MAX_AUDIENCE_LEN = 140  # newsletter_campaign.audience
 
 
 @router.get(
@@ -34,9 +33,9 @@ async def list_fields(
     tenant: str = Depends(bind_admin),
     db: AsyncSession = Depends(get_db),
 ) -> list[ListFieldOut]:
-    readable = await readable_lists(db, tenant_id=tenant, roles=caller_roles(request))
-    if list_type_key not in readable:
-        raise NotFound()
+    await require_list(
+        db, tenant_id=tenant, list_type_key=list_type_key, roles=caller_roles(request)
+    )
     try:
         fields = await store.fields_for(db, tenant_id=tenant, list_type_key=list_type_key)
     except SubscriberFilterError:
@@ -56,11 +55,13 @@ async def count_audience(
     tenant: str = Depends(bind_admin),
     db: AsyncSession = Depends(get_db),
 ) -> CountOut:
-    if len(audience) > MAX_AUDIENCE_LEN:  # here, not in the signature: a 422 never echoes it
-        raise InvalidAudience()
+    if audience != AUDIENCE_ALL:
+        # A tag or segment count evaluates subscriber fields (a rule can name
+        # ``sm_email``), so it needs ``records.view``; the whole list does not,
+        # so the editor's estimate still works for a campaign author without it.
+        await RequiresPermission(constants.PERM_RECORDS_VIEW)(request)
     roles = caller_roles(request)
-    if list_type_key not in await readable_lists(db, tenant_id=tenant, roles=roles):
-        raise NotFound()
+    await require_list(db, tenant_id=tenant, list_type_key=list_type_key, roles=roles)
     count = await audience_count(
         db, tenant_id=tenant, list_type_key=list_type_key, audience=audience, roles=roles
     )

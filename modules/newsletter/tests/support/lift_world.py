@@ -15,8 +15,6 @@ from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import Suppression, SuppressionLift
 from sqlalchemy import select
 
-ADMIN_ROLES = ["editor"]
-
 
 async def seed_row(
     db_state: Any,

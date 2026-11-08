@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sm_newsletter.core import constants
@@ -13,6 +14,7 @@ API = constants.ROUTE_PREFIX_API
 BASE = f"{API}/segments"
 VIEW = {"x-perms": constants.PERM_VIEW}
 EDIT = {"x-perms": f"{constants.PERM_VIEW},{constants.PERM_EDIT}"}
+READER = {"x-perms": f"{constants.PERM_VIEW},{constants.PERM_RECORDS_VIEW}"}
 RULES = [{"field": "tags", "op": "any", "value": ["vip"]}]
 
 
@@ -48,7 +50,7 @@ async def test_crud_round_trip(client):
     assert (await client.get(BASE, headers=VIEW)).json()[0]["id"] == sid
     assert (await client.get(f"{BASE}?list_type_key=other", headers=VIEW)).json() == []
     prev = await client.post(
-        f"{BASE}/preview", json={"list_type_key": "news", "rules": RULES}, headers=VIEW
+        f"{BASE}/preview", json={"list_type_key": "news", "rules": RULES}, headers=READER
     )
     assert prev.json() == {"count": 1}
     res = await client.patch(f"{BASE}/{sid}", json={"name": "Everyone", "rules": []}, headers=EDIT)
@@ -64,6 +66,16 @@ async def test_crud_round_trip(client):
     assert (clash.status_code, clash.json()["code"]) == (409, "segment_name_taken")
     assert (await client.delete(f"{BASE}/{sid}", headers=EDIT)).status_code == 204
     assert (await client.get(f"{BASE}/{sid}", headers=VIEW)).status_code == 404
+
+
+@pytest.mark.parametrize("sid", [str(2**31 - 1), str(2**31), str(2**63)])
+async def test_out_of_range_segment_ids_404_not_500(client, sid):
+    """The id column is a 32-bit ``INTEGER`` on Postgres: a larger id answers
+    404 before the query instead of overflowing its parameter."""
+    url = f"{BASE}/{sid}"
+    assert (await client.get(url, headers=VIEW)).status_code == 404
+    assert (await client.patch(url, json={"name": "x"}, headers=EDIT)).status_code == 404
+    assert (await client.delete(url, headers=EDIT)).status_code == 404
 
 
 async def test_a_new_segment_reports_its_creation_as_last_change(client):
@@ -106,6 +118,18 @@ async def test_422_never_echoes_values(client):
     assert res.status_code == 422 and "SECRET-VALUE" not in res.text
 
 
+async def test_missing_body_answers_the_envelope(client):
+    """No body was FastAPI's raw 422 array, unlike every other refusal here."""
+    sid = (await _create(client))["id"]
+    for res in (
+        await client.post(BASE, headers=EDIT),
+        await client.post(f"{BASE}/preview", headers=READER),
+        await client.patch(f"{BASE}/{sid}", headers=EDIT),
+    ):
+        assert res.status_code == 422, res.text
+        assert res.json()["code"] == "invalid_segment"
+
+
 async def test_list_fields_includes_ops_and_signup(client):
     res = await client.get(f"{API}/lists/news/fields", headers=VIEW)
     assert res.status_code == 200, res.text
@@ -131,7 +155,7 @@ async def test_records_refusal_never_echoes_the_value(built, client):
     score = {"key": "score", "type": "number", "label": "Score", "indexed": True}
     await seed_list(state, "default", "scored", fields=[score])
     body = {"list_type_key": "scored", "rules": [{"field": "score", "op": "gt", "value": "1e30"}]}
-    res = await client.post(f"{BASE}/preview", json=body, headers=VIEW)
+    res = await client.post(f"{BASE}/preview", json=body, headers=READER)
     assert res.status_code == 422, res.text
     assert res.json()["code"] == "invalid_segment"
     assert "1e30" not in res.text

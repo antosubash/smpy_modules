@@ -23,23 +23,15 @@ from tests.support.deliver_world import (
     attempts,
     counters,
     deliver,
-    in_other_session,
     one_row,
     sending_campaign,
 )
+from tests.support.dispatch_world import lifecycle_action
 from tests.support.fake_transport import FakeTransport
-from tests.support.freeze_world import world
 from tests.support.records_seed import set_list_kind
-from tests.support.sending import NOW, T
+from tests.support.sending import T
 
 LIST_PAUSE = Step(False, Verdict("pause", False, pause_code="list_unavailable"))
-
-
-@pytest.fixture
-async def state(tmp_path):
-    _, db_state, _ = await world(tmp_path)
-    yield db_state
-    await db_state.engine.dispose()
 
 
 async def _delete_list(state, n: int) -> None:
@@ -86,10 +78,7 @@ async def test_list_no_longer_a_list_pauses_the_campaign(state, monkeypatch, see
 
 def _cancel_during_smtp(state, cid):
     async def cancel(_msg) -> None:
-        async def write(db) -> None:
-            await lifecycle.cancel(db, tenant_id=T, campaign_id=cid, roles=[], now=NOW)
-
-        await in_other_session(state, write)
+        await lifecycle_action(state, lifecycle.cancel, cid)
 
     return cancel
 
@@ -135,10 +124,7 @@ async def test_retry_while_paused_stays_queued(state):
     soft = DeliveryResult("rejected", 451, "4.3.0 Try again later", "data")
 
     async def pause(_msg) -> None:
-        async def write(db) -> None:
-            await lifecycle.pause(db, tenant_id=T, campaign_id=cid, roles=[], now=NOW)
-
-        await in_other_session(state, write)
+        await lifecycle_action(state, lifecycle.pause, cid)
 
     await deliver(state, cid, FakeTransport({email: soft}, on_send=pause))
 

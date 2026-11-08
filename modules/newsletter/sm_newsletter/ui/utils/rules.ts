@@ -3,7 +3,7 @@
 import { HttpError, isCode } from './http';
 import type { ListField, Rule, RuleOp } from './types';
 
-export type ValueInput = 'choices' | 'choice' | 'text' | 'number' | 'date' | 'boolean';
+type ValueInput = 'choices' | 'choice' | 'text' | 'number' | 'date' | 'boolean';
 
 const LIST_OPS: readonly RuleOp[] = ['any', 'all', 'none'];
 

@@ -143,3 +143,13 @@ async def test_public_base_is_the_live_host_setting():
     assert (c.public_base, c.content_base) == ("https://live.example", "https://live.example")
     app.state.host.settings.public_base_url = ""
     assert (await render_context(app, tenant_id="default")).public_base == ""
+
+
+async def test_a_malformed_port_falls_back_to_the_host_origin(tenants_db):
+    app = make_app(
+        base="https://example.org:abc",
+        mode=TenancyMode.MULTI,
+        subdomain_base="example.org",
+        db=tenants_db,
+    )
+    assert (await render_context(app, tenant_id="t1")).content_base == "https://example.org:abc"

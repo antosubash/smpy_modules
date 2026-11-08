@@ -5,7 +5,9 @@ from __future__ import annotations
 import gc
 from types import SimpleNamespace
 
+import pytest
 from fastapi import FastAPI
+from pydantic import ValidationError
 from simple_module_core.module_settings import ModuleSettingsRegistry, module_settings_registry
 from sm_newsletter.core import constants, crypto
 from sm_newsletter.core.services import NewsletterServices
@@ -43,6 +45,20 @@ def test_settings_ignore_env(monkeypatch):
 def test_no_field_needs_a_restart():
     for name, field in NewsletterSettings.model_fields.items():
         assert not (field.json_schema_extra or {}).get("requires_restart"), name
+
+
+@pytest.mark.parametrize(
+    ("field", "low", "high"),
+    [("smtp_port", 1, 65535), ("daily_limit", 1, None), ("per_minute_limit", 1, None)],
+)
+def test_numeric_bounds_hold_at_the_limit(field, low, high):
+    assert getattr(NewsletterSettings(**{field: low}), field) == low
+    with pytest.raises(ValidationError):
+        NewsletterSettings(**{field: low - 1})
+    if high is not None:
+        assert getattr(NewsletterSettings(**{field: high}), field) == high
+        with pytest.raises(ValidationError):
+            NewsletterSettings(**{field: high + 1})
 
 
 def test_password_never_in_repr():

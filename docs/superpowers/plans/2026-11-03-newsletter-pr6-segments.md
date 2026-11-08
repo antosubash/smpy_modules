@@ -732,8 +732,9 @@ async def transition(..., unstarted: bool = False) -> bool    # adds `started_at
 - **`progress.estimate`.** `recipients = await audience_count(...)`.
 - **The new route:** `GET /lists/{list_type_key}/audience-count?audience=` (view) → `CountOut`.
   - 404 for an unreadable list.
-  - An `audience` over 140 characters → 422 `invalid_audience`, checked in the handler so it
-    never echoes.
+  - An `audience` over 140 characters → 422 `invalid_audience`: `parse_audience` refuses it
+    (a tag is at most 100 characters), and the handler takes the query as a plain `str` so
+    FastAPI never builds a 422 that echoes it.
 - **The send API.** `POST /campaigns/{id}/unschedule` (`sending_api.py`) sends
   `expected_revision` only for `scheduled`. Its schema makes it optional (`int | None`). A
   missing one on a `scheduled` campaign → 422 `invalid_campaign`.

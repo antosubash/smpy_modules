@@ -125,3 +125,12 @@ async def test_placeholder_in_content_is_invalid_campaign_422(built, monkeypatch
         await _snapshot(app, state, cid)
     assert (err.value.status, err.value.code) == (422, "invalid_campaign")
     assert "open_pixel" not in err.value.detail
+
+
+async def test_snapshot_refuses_an_encoded_sender_past_the_column(built):
+    app, state, cid = built
+    await set_columns(state, T, cid, from_name="新" * 200)
+    with pytest.raises(NewsletterError) as err:
+        await _snapshot(app, state, cid)
+    assert err.value.status == 422
+    assert await render_row(state, T, cid) is None

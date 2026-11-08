@@ -38,13 +38,16 @@ re-serialised from an allow-list at save and at render. Details, the URL rules
 and the golden files: [`content.md`](content.md).
 
 - **Screens.** `/admin/newsletter/` (campaign list), `/admin/newsletter/campaigns/{id}`
-  (a newsletter-only Puck editor with a 600 px single column, a preview pane and a
-  test-send dialog) and `/admin/newsletter/settings`. The sidebar has Campaigns
-  (`newsletter.view`) and Settings (`newsletter.manage`). The people screens
-  (Segments, Subscribers, Suppressions) are in [`audience.md`](audience.md);
-  Import (`/admin/newsletter/import`, `newsletter.manage`) is in [`import.md`](import.md).
-- **Writes are revision-guarded.** PATCH and card Refresh carry `expected_revision`;
-  a stale one is `409 stale`, a campaign that left draft `409 not_a_draft`.
+  (a newsletter-only Puck editor with a 600 px single column, a preview pane, a
+  test-send dialog, a send dialog for a draft and, once it is scheduled, a sending
+  panel with live progress) and `/admin/newsletter/settings`. The sidebar has Campaigns
+  (`newsletter.view`) and Settings (`newsletter.manage`) and, between them, the
+  people screens Segments, Subscribers and Suppressions
+  ([`audience.md`](audience.md)); Import (`/admin/newsletter/import`,
+  `newsletter.manage`) is in [`import.md`](import.md).
+- **Writes are revision-guarded.** PATCH, card Refresh, send and unschedule carry
+  `expected_revision`; a stale one is `409 stale`, a campaign that left draft
+  `409 not_a_draft`.
 - **List access is re-checked on every campaign request**, so a list restricted
   after a campaign was made hides the campaign (404) from callers who can no
   longer read it.
@@ -67,8 +70,8 @@ and the golden files: [`content.md`](content.md).
   Admission is all-or-nothing: over budget is `429 send_budget_exhausted`, nothing
   sent and no rows written. Per-recipient outcomes are `accepted`, `rejected`,
   `unknown` and `failed` (a known pre-acceptance failure; not counted). Its unsubscribe link
-  is `<public_base_url>/newsletter/u/test`, which PR 4's page treats like a forged
-  token. No campaign is sent yet: sending arrives in PR 4.
+  is `<public_base_url>/newsletter/u/test`, which the unsubscribe page answers like
+  a forged token. A test send never sends a campaign: see [`sending.md`](sending.md).
 - **Transports.** `smtp` (aiosmtplib; STARTTLS or implicit TLS; `List-Unsubscribe`,
   `List-Unsubscribe-Post` and `Precedence: bulk` headers) and `console`, which logs
   and keeps a per-tenant capture readable at `GET /api/newsletter/outbox`
@@ -119,6 +122,9 @@ writes (`manage_url`).
   harvest the credential at AUTH. The page warns before saving.
 - `from_name`, `from_address` and `reply_to` refuse CR, LF and control characters
   (422, no echo).
+- Input is bounded: `smtp_host` 253, `smtp_username` 320, `from_name` 200,
+  `physical_address` 500 characters (422 above that). A malformed body to the
+  password endpoint is `422 invalid_password` and never echoes the input.
 - `smtp_password` is stored encrypted and written only through
   `PUT /api/newsletter/settings/smtp-password` (needs `newsletter.manage` and
   `settings.edit`; `scripts/set_setting.py` would store it in plaintext, which
@@ -136,9 +142,10 @@ A suppression says "never mail this address". Suppressions are **tenant-wide**:
 - A double-opt-in confirmation on list L (the subscriber following records'
   confirm link) clears L's `unsubscribed` row and any `hard_bounce` or
   `imported_cleaned` row created at or before the confirmation. It never clears
-  a `complaint`, and never another list's opt-out. Nothing else clears a
-  suppression: a signup on a single-opt-in list is confirmed at once but proves
-  nothing about the mailbox (anyone can type the address), so it clears nothing.
+  a `complaint`, and never another list's opt-out. A signup on a single-opt-in
+  list is confirmed at once but proves nothing about the mailbox (anyone can
+  type the address), so it clears nothing. The one other way a row goes is an
+  admin's audited lift ([`audience.md`](audience.md)).
 - An hourly reconcile re-adds the opt-outs records holds, trashed subscribers
   included. It only adds; it never removes a suppression. It is the Celery task
   `newsletter.reconcile_suppressions` on the `newsletter` queue (`make worker`

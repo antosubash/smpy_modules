@@ -38,21 +38,9 @@ async def test_queued_ahead_counts_queued_rows_of_sending_campaigns_started_earl
         paused = await seed_campaign(state, "other", status="paused", started_at=early)
         await seed_sends(state, "other", paused, ["queued"])
         factory = state.session_factory
-        assert (
-            await progress.queued_ahead(factory, started_before=None, exclude_campaign_id=None) == 3
-        )
-        assert (
-            await progress.queued_ahead(factory, started_before=NOW, exclude_campaign_id=None) == 3
-        )
-        assert (
-            await progress.queued_ahead(
-                factory, started_before=NOW - timedelta(hours=1), exclude_campaign_id=None
-            )
-            == 2
-        )
-        assert (
-            await progress.queued_ahead(factory, started_before=early, exclude_campaign_id=None)
-            == 0
-        )
+        assert await progress.queued_ahead(factory, started_before=None) == 3
+        assert await progress.queued_ahead(factory, started_before=NOW) == 3
+        assert await progress.queued_ahead(factory, started_before=NOW - timedelta(hours=1)) == 2
+        assert await progress.queued_ahead(factory, started_before=early) == 0
     finally:
         await state.engine.dispose()

@@ -53,12 +53,12 @@ describe('AudiencePicker', () => {
     document.body.innerHTML = '';
   });
 
-  async function render(audience = 'all', readOnly = false) {
+  async function render(audience = 'all', readOnly = false, canCount = true) {
     const host = document.body.appendChild(document.createElement('div'));
     root = createRoot(host);
     const c = { ...campaign(1), audience };
     await act(async () =>
-      root.render(createElement(AudiencePicker, { campaign: c, readOnly, onChange })),
+      root.render(createElement(AudiencePicker, { campaign: c, readOnly, canCount, onChange })),
     );
     await act(async () => {
       await new Promise((r) => setTimeout(r, 400));
@@ -147,5 +147,30 @@ describe('AudiencePicker', () => {
     await render();
     expect(document.body.textContent).toContain('About 1 subscriber');
     expect(document.body.textContent).not.toContain('About 1 subscribers');
+  });
+
+  it('shows an error, not "segment no longer exists", when the segments fail to load', async () => {
+    vi.mocked(api.listSegments).mockRejectedValue(new HttpError('x', 500, null));
+    await render('segment:3');
+    expect(document.body.textContent).not.toContain(copy.segment_missing);
+    expect(document.body.textContent).toContain(en.errors.generic);
+  });
+
+  it('asks for no count on a read-only campaign', async () => {
+    await render('tag:vip', true);
+    expect(api.audienceCount).not.toHaveBeenCalled();
+    expect(document.body.textContent).not.toContain(copy.count_loading);
+  });
+
+  it('asks for no tag or segment count without records.view', async () => {
+    await render('tag:vip', false, false);
+    expect(api.audienceCount).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain(copy.count_hidden);
+  });
+
+  it('still counts the whole list without records.view', async () => {
+    await render('all', false, false);
+    expect(api.audienceCount).toHaveBeenCalledWith('news', 'all', expect.any(AbortSignal));
+    expect(document.body.textContent).not.toContain(copy.count_hidden);
   });
 });

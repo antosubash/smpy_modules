@@ -12,6 +12,9 @@ import type { SettingsOut, SettingsUpdate } from '../../utils/types';
 import { Field, Section } from './FormParts';
 import { PasswordField } from './PasswordField';
 
+// The server's input bounds (`web/schemas/settings.py`).
+const MAX = { host: 253, username: 320, from_name: 200, physical_address: 500 } as const;
+
 /** The fields that, when changed, make the server drop the stored password
  *  (mirrors the server's `SERVER_FIELDS`). */
 const SERVER_FIELDS = ['smtp_host', 'smtp_port', 'smtp_security', 'smtp_username'] as const;
@@ -97,6 +100,7 @@ export function SettingsForm({ initial, canWrite }: Props) {
         <Field id={id('host')} label={t(copy.transport.host)}>
           <Input
             id={id('host')}
+            maxLength={MAX.host}
             value={draft.smtp_host}
             disabled={busy || !smtp}
             onChange={(e) => set('smtp_host', e.target.value)}
@@ -127,6 +131,7 @@ export function SettingsForm({ initial, canWrite }: Props) {
         <Field id={id('username')} label={t(copy.transport.username)}>
           <Input
             id={id('username')}
+            maxLength={MAX.username}
             autoComplete="off"
             value={draft.smtp_username}
             disabled={busy || !smtp}
@@ -163,6 +168,7 @@ export function SettingsForm({ initial, canWrite }: Props) {
         <Field id={id('from-name')} label={t(copy.sender.from_name)}>
           <Input
             id={id('from-name')}
+            maxLength={MAX.from_name}
             value={draft.from_name}
             disabled={busy}
             onChange={(e) => set('from_name', e.target.value)}
@@ -184,6 +190,7 @@ export function SettingsForm({ initial, canWrite }: Props) {
         >
           <Textarea
             id={id('physical')}
+            maxLength={MAX.physical_address}
             rows={3}
             value={draft.physical_address}
             disabled={busy}

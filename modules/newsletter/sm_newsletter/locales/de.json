@@ -298,13 +298,14 @@
       "saving": "Wird gespeichert",
       "saved": "Gespeichert",
       "stale": "Anderswo geändert",
-      "error": "Nicht gespeichert"
+      "error": "Nicht gespeichert",
+      "invalid": "Nicht gespeichert: markiertes Feld korrigieren"
     },
     "reload": "Neu laden",
     "read_only": "Sie können diese Kampagne ansehen, aber nicht ändern.",
     "not_draft": "Diese Kampagne ist kein Entwurf mehr und kann nicht geändert werden.",
     "incomplete": "In einem Block fehlt ein Pflichtfeld. Die E-Mail wird wieder gespeichert, sobald es ausgefüllt ist.",
-    "leave_held": "Diese Kampagne verlassen? Ein Block ist unvollständig oder eine Zielgruppe ist nicht gewählt, daher ist diese Änderung nicht gespeichert.",
+    "leave_held": "Diese Kampagne verlassen? Ein Block ist unvollständig, eine Zielgruppe ist nicht gewählt oder ein Feld ist ungültig, daher ist diese Änderung nicht gespeichert.",
     "select_a_block": "Wählen Sie einen Block aus, um ihn zu bearbeiten.",
     "integration_missing": "Diese Inhaltsquelle ist auf dieser Website nicht verfügbar.",
     "meta": {
@@ -316,7 +317,9 @@
       "from_name": "Absendername",
       "from_name_hint": "Leer lassen, um den Namen aus den Newsletter-Einstellungen zu verwenden.",
       "reply_to": "Antwortadresse",
-      "reply_to_hint": "Leer lassen, um die Adresse aus den Newsletter-Einstellungen zu verwenden."
+      "reply_to_hint": "Leer lassen, um die Adresse aus den Newsletter-Einstellungen zu verwenden.",
+      "name_required": "Gib einen Kampagnennamen ein. Er wird nicht gespeichert, solange er leer ist.",
+      "reply_to_invalid": "Gib eine gültige E-Mail-Adresse ein. Sie wird erst dann gespeichert."
     },
     "card": {
       "article": "Artikel",
@@ -350,6 +353,7 @@
     "count_one": "Etwa {count} Abonnent",
     "count_other": "Etwa {count} Abonnenten",
     "count_loading": "Abonnenten werden gezählt…",
+    "count_hidden": "Diese Anzahl sehen nur Personen, die Abonnenten ansehen dürfen.",
     "no_tags": "Diese Liste hat noch keine Tags.",
     "no_segments": "Diese Liste hat noch keine Segmente.",
     "segment_missing": "Das gespeicherte Segment existiert nicht mehr. Wählen Sie vor dem Versand eine andere Zielgruppe.",
@@ -377,7 +381,10 @@
     },
     "rich_text": {
       "label": "Text",
-      "html": "Text"
+      "html": "Text",
+      "link_title": "Link",
+      "link_prompt": "Link-Adresse. Leer lassen, um den Link zu entfernen.",
+      "link_invalid": "Diese Adresse kann nicht verwendet werden. Nutze https://, http://, mailto: oder einen Seitenpfad wie /about."
     },
     "image": {
       "label": "Bild",
@@ -430,7 +437,7 @@
     "not_found": "Dieser Eintrag existiert nicht mehr.",
     "public_base_url_required": "Legen Sie in den Einstellungen die öffentliche Basis-URL der Website fest, bevor Sie senden.",
     "send_budget_exhausted": "Das Sendelimit ist erreicht. Versuchen Sie es später erneut.",
-    "sender_not_configured": "Legen Sie zuerst die Absenderadresse in den Newsletter-Einstellungen fest.",
+    "sender_not_configured": "Vervollständigen Sie zuerst die Absender-Einstellungen: die Absenderadresse, die Postanschrift und bei SMTP den SMTP-Server.",
     "smtp_password_unreadable": "Das gespeicherte SMTP-Passwort kann nicht gelesen werden. Geben Sie es erneut ein.",
     "stale": "Diese Kampagne wurde anderswo geändert. Laden Sie sie neu, um fortzufahren.",
     "tenant_required": "Für dieses Konto ist keine Organisation aktiv.",
@@ -466,6 +473,10 @@
     "import_running": "Ein Import läuft bereits.",
     "list_exists": "Eine Liste mit diesem Schlüssel gibt es bereits.",
     "invalid_list_key": "Der Listenschlüssel ist ungültig."
+  },
+  "errors_field": {
+    "subject_required": "Geben Sie vor dem Senden einen Betreff ein.",
+    "schedule_out_of_range": "Wählen Sie einen Zeitpunkt innerhalb des nächsten Jahres."
   },
   "preview": {
     "tab_edit": "Bearbeiten",
@@ -525,13 +536,14 @@
       "incomplete": "Stellen Sie die unfertigen Blöcke fertig oder entfernen Sie sie, bevor Sie senden.",
       "audience_unfinished": "Wählen Sie vor dem Versand ein Tag oder ein Segment oder kehren Sie zur gesamten Liste zurück.",
       "time_past": "Wählen Sie einen Zeitpunkt in der Zukunft.",
+      "time_far": "Wählen Sie einen Zeitpunkt innerhalb des nächsten Jahres.",
       "audience_frozen": "Die Zielgruppe steht fest, sobald die Kampagne geplant ist."
     },
     "panel": {
       "scheduled_for": "Geplant für {date}",
       "progress": "{sent} von {total} gesendet",
-      "eta_one": "Voraussichtlich fertig: {date} ({count} Tag bei {rate} pro Tag)",
-      "eta_other": "Voraussichtlich fertig: {date} ({count} Tage bei {rate} pro Tag)",
+      "eta_one": "Voraussichtlich fertig: {date}",
+      "eta_other": "Voraussichtlich fertig: {date}",
       "finished": "Abgeschlossen am {date}",
       "paused": "Pausiert: {detail}",
       "counts": {

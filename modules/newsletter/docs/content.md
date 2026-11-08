@@ -26,7 +26,9 @@ and never echoes the input.
 
 The layout is one 600 px column of nested tables with inline styles, so it holds
 in clients that ignore `<style>`. A fixed header (logo or app name) and a fixed
-footer wrap the blocks; the editor cannot remove either.
+footer wrap the blocks; the editor cannot remove either. Images (blocks, card
+images, logo) are fluid: `width:100%` with a `max-width`, plus the `width`
+attribute for Outlook, so a wide image shrinks with the cell on a phone.
 
 ## URLs
 
@@ -68,12 +70,21 @@ Render warnings are `relative_urls`, `physical_address_missing` and
 `em`), keeps no attribute but `a[href]` (which must pass the link rule; a
 duplicate `href` keeps the first), and escapes all text. The contents of
 `script style iframe object embed template svg math head title noscript` are
-dropped; any other tag is unwrapped and its text kept. Nesting is capped at 20.
+dropped; any other tag is unwrapped and its text kept. At most 20 elements are open
+at once (a deeper start tag is unwrapped, its text kept), and past 200 tracked
+open elements a start tag is treated as unknown.
 
 It runs at save (the stored value is the cleaned form) and again at render, so a
 row written around the API is still safe. The admin preview is an
 `<iframe sandbox="" srcDoc>` as a second layer. Headings, code and anything else
 Puck's editor could produce outside the list are flattened to text.
+
+Puck's rich-text menu has no link button, so the editor adds one (`LinkControl`):
+it asks for an address with a prompt, adds `https://` to a bare domain and
+`mailto:` to a bare address, and refuses what the server would strip
+(`ui/utils/links.ts` mirrors `content.urls`). Typed or pasted addresses are not
+turned into links automatically. The `{{unsubscribe_url}}` tag is not accepted
+there; the footer carries the unsubscribe link.
 
 ## Merge fields
 
@@ -91,7 +102,7 @@ the tags in; `personalise` fills them per recipient.
 A **preview** and a **test send** have no send row and no MAC, so
 `{{unsubscribe_url}}`, the footer link and the `List-Unsubscribe` header all point
 at `<public_base_url>/newsletter/u/test`
-(`constants.TEST_UNSUBSCRIBE_TOKEN`). The unsubscribe page (PR 4) must answer
+(`constants.TEST_UNSUBSCRIBE_TOKEN`). The unsubscribe page answers
 that token like a forged one. Tracking is never added to a preview or test send.
 
 ## Footer and branding
@@ -100,11 +111,12 @@ The footer states why the recipient got the message (`newsletter.email.footer_re
 with the app name), prints the `physical_address` setting, and links to
 unsubscribe. Its strings come from the `newsletter.email.*` catalogue keys in the
 host's `i18n_default_locale`, falling back to the package's `en.json`; a
-per-campaign or per-subscriber language is PR 4's call.
+per-campaign or per-subscriber language is not supported: the footer and the
+unsubscribe page speak the host's language.
 
 Branding is the **system** theme (`app_name`, `primary_color`, `logo_file_id` from
 the framework's branding module), never a tenant's override: the sender identity
-is install-wide, and PR 4's worker has no request. Without branding the name is
+is install-wide, and the worker has no request. Without branding the name is
 `from_name` (or "Newsletter") and the accent is `#2563eb`. The logo is
 `<public_base_url>/newsletter/brand/logo?v=<logo_file_id>`, an anonymous route
 that serves the system-scope logo explicitly (404 when there is none).
@@ -130,10 +142,11 @@ answers the card, media and refresh routes with `409 integration_unavailable`.
 
 ## Campaigns
 
-Drafts only in this release (`status = draft`); audience is `all`,
+The content endpoints edit a draft (`status = draft`; scheduling and sending are
+in [`sending.md`](sending.md)). The audience is `all`,
 `tag:<choice>` (a choice of the list's `tags` field) or `segment:<id>` (a
 saved segment of the same list), validated on every PATCH that changes the
-audience or the list.
+audience or the list ([`audience.md`](audience.md)).
 
 - **Revision.** `newsletter_campaign.revision` is an integer. PATCH and Refresh
   require `expected_revision`; the write is one conditional `UPDATE ... SET

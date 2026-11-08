@@ -8,10 +8,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from sm_newsletter.core.constants import LIFTABLE
+from sm_newsletter.core.constants import LIFTABLE, MAX_EMAIL_LEN
 from sm_newsletter.subscribers.suppressions import FINGERPRINT_LEN, SuppressionRow
-
-MAX_EMAIL_LEN = 320
 
 
 class LookupIn(BaseModel):

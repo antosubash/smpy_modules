@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sm_newsletter.core import constants
@@ -116,6 +117,19 @@ async def test_lift_errors(client):
         url, json={"version": item["version"], "email": ADA, "note": " "}, headers=MANAGE
     )
     assert (blank.status_code, blank.json()["code"]) == (422, "invalid_query")
+
+
+@pytest.mark.parametrize("sid", [str(2**63 - 1), str(2**63), "9" * 20])
+async def test_out_of_range_suppression_ids_404_not_500(client, sid):
+    """The id column is a 64-bit ``BIGINT`` on Postgres: a larger id answers
+    404 before the query instead of overflowing its parameter."""
+    item = await _ada(client)
+    res = await client.post(
+        f"{BASE}/{sid}/lift",
+        json={"version": item["version"], "email": ADA, "note": "n"},
+        headers=MANAGE,
+    )
+    assert res.status_code == 404
 
 
 async def test_lift_with_stale_version_is_409(built, client):

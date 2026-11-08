@@ -1,4 +1,4 @@
-"""Celery app for the worker and beat processes (images, background_tasks).
+"""Celery app for the worker and beat processes (images, newsletter, background_tasks).
 
 The web process never imports this. Run it from the repo root, with ``host`` on
 the path so ``-A worker:celery`` resolves; the Makefile targets (``make worker``,

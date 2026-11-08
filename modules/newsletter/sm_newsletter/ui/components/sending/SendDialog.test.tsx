@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import en from '../../../locales/en.json';
+import { campaign as baseCampaign } from '../../hooks/campaignFixture';
 import { api } from '../../utils/api';
 import { HttpError } from '../../utils/http';
 import { toUtcIso } from '../../utils/progress';
@@ -18,36 +19,17 @@ vi.mock('../../utils/api', async (original) => ({
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const copy = en.sending;
+/** A schedulable time: tomorrow at 09:00, local (the horizon is 366 days). */
+const SOON = (() => {
+  const d = new Date(Date.now() + 86_400_000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T09:00`;
+})();
 const estimate = vi.mocked(api.estimate);
 const sendCampaign = vi.mocked(api.sendCampaign);
 
 function campaign(over: Partial<CampaignDetail> = {}): CampaignDetail {
-  return {
-    id: 7,
-    name: 'Spring',
-    subject: 'Hello',
-    status: 'draft',
-    list_type_key: 'news',
-    revision: 3,
-    updated_at: null,
-    recipient_count: 0,
-    sent_count: 0,
-    preheader: '',
-    from_name: null,
-    reply_to: null,
-    audience: 'all',
-    body: [],
-    scheduled_at: null,
-    started_at: null,
-    finished_at: null,
-    paused_code: null,
-    paused_detail: null,
-    failed_count: 0,
-    bounced_count: 0,
-    suppressed_count: 0,
-    unsubscribe_count: 0,
-    ...over,
-  };
+  return { ...baseCampaign(3), ...over };
 }
 
 type Props = Parameters<typeof SendDialog>[0];
@@ -157,8 +139,8 @@ describe('SendDialog', () => {
     await act(async () => button(copy.dialog.confirm)?.click());
     expect(sendCampaign).not.toHaveBeenCalled();
 
-    await later('2099-01-01T09:00');
-    const iso = toUtcIso('2099-01-01T09:00');
+    await later(SOON);
+    const iso = toUtcIso(SOON);
     expect(estimate).toHaveBeenLastCalledWith(7, iso);
     expect(button(copy.dialog.confirm)?.disabled).toBe(false);
     await act(async () => button(copy.dialog.confirm)?.click());
@@ -244,7 +226,7 @@ describe('SendDialog', () => {
 
   it('opens on "Send now" again after a later time was chosen and the dialog closed', async () => {
     await open();
-    await later('2099-01-01T09:00');
+    await later(SOON);
     await act(async () => button(copy.dialog.cancel)?.click());
     await act(async () => button(copy.send_button)?.click());
     const now = document.querySelector('[role="radio"][value="now"]');
@@ -252,6 +234,27 @@ describe('SendDialog', () => {
     expect(document.querySelector('input[type="datetime-local"]')).toBeNull();
     await act(async () => button(copy.dialog.confirm)?.click());
     expect(sendCampaign).toHaveBeenCalledWith(7, { expected_revision: 5, scheduled_at: null });
+  });
+
+  it('drops the estimate of the previous time while the next one loads', async () => {
+    await open();
+    expect(button(copy.dialog.confirm)?.disabled).toBe(false);
+    estimate.mockReturnValue(new Promise(() => {}));
+    await later(SOON);
+    expect(button(copy.dialog.confirm)?.disabled).toBe(true);
+  });
+
+  it('ignores a save that finishes after its opening was closed', async () => {
+    let first: (ok: boolean) => void = () => {};
+    const flush = vi
+      .fn()
+      .mockReturnValueOnce(new Promise<boolean>((resolve) => (first = resolve)))
+      .mockReturnValueOnce(new Promise<boolean>(() => {}));
+    await open({ flush });
+    await act(async () => button(copy.dialog.cancel)?.click());
+    await act(async () => button(copy.send_button)?.click());
+    await act(async () => first(true));
+    expect(estimate).not.toHaveBeenCalled();
   });
 
   it('says "1 recipient" for one', async () => {

@@ -9,7 +9,7 @@
 
 import { createContext, useContext } from 'react';
 
-export interface EditorActions {
+interface EditorActions {
   /** Re-snapshot one card block from its source (`useCampaignEditor().refresh`). */
   refresh(blockId: string): Promise<void>;
 }

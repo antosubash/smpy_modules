@@ -47,8 +47,9 @@ describe('LinkTable', () => {
     expect(document.querySelector('table')).toBeNull();
   });
 
-  it('shows the click-tracking note with the empty state when tracking is off', async () => {
+  it('shows only the click-tracking note, not the empty state, when tracking is off', async () => {
     await render({ links: [], trackingOff: true });
     expect(document.body.textContent).toContain(en.report.tracking_off.clicks);
+    expect(document.body.textContent).not.toContain(en.report.links.empty);
   });
 });

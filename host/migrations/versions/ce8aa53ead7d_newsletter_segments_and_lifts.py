@@ -4,7 +4,8 @@ Adds ``newsletter_segment.rules`` (the editor's rows) and
 ``newsletter_campaign_render.audience_filters`` (the compiled terms snapshot),
 both ``JSON NOT NULL DEFAULT '[]'``; the ``newsletter_suppression_lift`` audit
 table; and the ``ix_newsletter_send_record`` and
-``ix_newsletter_suppression_reason_at`` indexes. No branch label.
+``ix_newsletter_suppression_reason_at`` indexes. On SQLite ``newsletter_segment``
+is rebuilt with ``AUTOINCREMENT`` so a segment id is never reused. No branch label.
 
 Revision ID: ce8aa53ead7d
 Revises: d4aac5b187d9
@@ -59,7 +60,16 @@ def upgrade() -> None:
         batch_op.add_column(
             sa.Column("audience_filters", sa.JSON(), server_default=sa.text("'[]'"), nullable=False)
         )
-    with op.batch_alter_table("newsletter_segment", schema=None) as batch_op:
+    # A campaign names its segment as ``segment:<id>``, so on SQLite the table is
+    # rebuilt with ``AUTOINCREMENT``: a plain ``INTEGER PRIMARY KEY`` hands the
+    # highest id out again once its row is deleted. Postgres sequences never do.
+    sqlite = op.get_bind().dialect.name == "sqlite"
+    with op.batch_alter_table(
+        "newsletter_segment",
+        schema=None,
+        recreate="always" if sqlite else "auto",
+        table_kwargs={"sqlite_autoincrement": True},
+    ) as batch_op:
         batch_op.add_column(
             sa.Column("rules", sa.JSON(), server_default=sa.text("'[]'"), nullable=False)
         )

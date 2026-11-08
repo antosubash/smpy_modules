@@ -1,7 +1,8 @@
 """Where the renderer's bases, branding and footer copy come from (R6, R7, R12, C7, C8).
 
-Never the request: PR 4's worker renders with none, and the request ``Host``
-is spoofable. Two bases (ruling C7): ``content_base`` is the campaign tenant's
+Never the request: scheduling renders once, in a request that may be anyone's,
+and the worker that sends the result has none; the request ``Host`` is
+spoofable. Two bases (ruling C7): ``content_base`` is the campaign tenant's
 public origin, for its own links, images and cards; ``public_base`` is the
 host's ``public_base_url``, for newsletter's own routes (unsubscribe, logo),
 whose tenant comes from the token.
@@ -86,7 +87,11 @@ async def _content_base(app: Any, tenant_id: str, public_base: str) -> str:
         logger.warning("newsletter: tenant %r has no organisation slug", tenant_id)
         return public_base
     parts = urlsplit(public_base)
-    port = f":{parts.port}" if parts.port else ""
+    try:
+        port = f":{parts.port}" if parts.port else ""
+    except ValueError:  # a malformed port: the host's own origin, as with no slug
+        logger.warning("newsletter: public_base_url has a malformed port")
+        return public_base
     return f"{parts.scheme}://{slug}.{sub}{port}"
 
 

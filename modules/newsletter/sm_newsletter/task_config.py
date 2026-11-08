@@ -2,9 +2,10 @@
 
 * ``newsletter`` - ``newsletter.reconcile_suppressions``, the hourly re-read of
   records' opt-outs into the suppression store, and ``newsletter.dispatch``,
-  the dispatcher tick every minute. A tick runs for at most 50 s, and a queued
-  one expires after 55 s, so a backlog (a stopped worker, a slow broker) is
-  dropped rather than run late on top of the next tick.
+  the dispatcher tick every minute. A tick stops starting new work after 50 s
+  (``sending.dispatch.TICK_SECONDS``), and a queued one expires after 55 s, so a
+  backlog (a stopped worker, a slow broker) is dropped rather than run late on
+  top of the next tick.
 * ``newsletter.run_import`` (one slice of a Mailchimp import, re-enqueued until
   done) and ``newsletter.import_janitor``, the hourly expiry of unapplied
   imports and relaunch of lost ones.

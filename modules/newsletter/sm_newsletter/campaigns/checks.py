@@ -4,6 +4,7 @@ scheduling, and the checks only scheduling makes (ruling S19, A6, A7)."""
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime, timedelta
 
 from sm_newsletter.content.merge import check_no_capability
@@ -28,15 +29,20 @@ def check_sender(settings: NewsletterSettings) -> None:
             raise SenderNotConfigured(str(exc)) from None
 
 
-def check_campaign_headers(campaign: Campaign) -> None:
-    for field in ("subject", "from_name", "reply_to"):
-        value = getattr(campaign, field)
+def check_headers(obj: object, fields: Iterable[str]) -> None:
+    """Each of ``obj``'s ``fields`` that is set is valid header text."""
+    for field in fields:
+        value = getattr(obj, field)
         if value is None:
             continue
         try:
             check_header_text(value, field=field)
         except ValueError as exc:
             raise InvalidCampaign(str(exc)) from None
+
+
+def check_campaign_headers(campaign: Campaign) -> None:
+    check_headers(campaign, ("subject", "from_name", "reply_to"))
 
 
 SCHEDULE_GRACE = timedelta(seconds=60)

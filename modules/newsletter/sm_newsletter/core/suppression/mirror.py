@@ -44,7 +44,11 @@ from typing import Any, Literal
 from simple_module_core.events import EventBus
 from simple_module_db import finalize_session
 from sm_records.contracts.events import SubscriptionChanged
-from sm_records.contracts.newsletter import SubscriberFilterError, subscribers_by_uuid
+from sm_records.contracts.newsletter import (
+    SubscriberFilterError,
+    SubscriberHit,
+    subscribers_by_uuid,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.core.constants import REASON_UNSUBSCRIBED
@@ -88,7 +92,7 @@ async def apply(event: SubscriptionChanged, session_factory: Callable[[], AsyncS
             return outcome
 
 
-async def _act(session: AsyncSession, event: SubscriptionChanged, hit: Any) -> Outcome:
+async def _act(session: AsyncSession, event: SubscriptionChanged, hit: SubscriberHit) -> Outcome:
     if hit.status == "unsubscribed":
         await suppress(
             session,

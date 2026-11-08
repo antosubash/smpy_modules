@@ -35,7 +35,8 @@ function Engagement({
   off,
 }: EngagementProps) {
   const { t, locale } = useT();
-  const rateText = formatRate(rate(unique, accepted), locale ?? 'en') ?? '—';
+  const rateText =
+    formatRate(rate(unique, accepted), locale ?? 'en') ?? t(keys.newsletter.campaigns.no_rate);
   return (
     <div className="rounded-lg border p-4">
       <div className="text-sm text-muted-foreground">{label}</div>

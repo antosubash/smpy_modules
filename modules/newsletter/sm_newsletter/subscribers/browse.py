@@ -25,14 +25,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns.access import Roles, require_list
 from sm_newsletter.campaigns.audience import audience_filters
+from sm_newsletter.core import constants
 from sm_newsletter.core.errors import NotFound
 from sm_newsletter.core.errors_audience import InvalidSegment
 from sm_newsletter.core.suppression import normalise_email, suppressed
+from sm_newsletter.segments.rules import MAX_TERMS
 from sm_newsletter.subscribers.engagement import Engagement, engagement
 from sm_newsletter.subscribers.lift import subscriber_on_list
 from sm_newsletter.subscribers.suppressions import SuppressionRow, lift_block, rows_for_email
 
-__all__ = ["BrowseResult", "SubscriberDetail", "SubscriberRow", "browse", "detail"]
+__all__ = [
+    "BrowseResult",
+    "SubscriberDetail",
+    "SubscriberRow",
+    "browse",
+    "detail",
+    "is_stopped",
+    "stopped_among",
+]
 
 
 @dataclass(frozen=True)
@@ -80,14 +90,33 @@ async def _filters(
                 audience=audience,
                 roles=roles,
             )
+    if len(out) > MAX_TERMS:  # a tag on top of a segment at the cap: records would refuse it
+        raise InvalidSegment(f"filter: a tag and this segment exceed {MAX_TERMS} terms together")
     return out
 
 
-def _is_in(email: str, stopped: set[str]) -> bool:
+def is_stopped(email: str, stopped: set[str]) -> bool:
+    """Whether ``email`` (any spelling) is in ``stopped``, the normalised suppressed set."""
     try:
         return normalise_email(email) in stopped
     except ValueError:
         return False
+
+
+def _normalises(email: str) -> bool:
+    try:
+        normalise_email(email)
+    except ValueError:
+        return False
+    return True
+
+
+async def stopped_among(session: AsyncSession, *, tenant_id: str, emails: list[str]) -> set[str]:
+    """``suppressed`` over the addresses that are addresses at all: a record with a
+    blank ``sm_email`` is never suppressed (``is_stopped``), and must not make
+    ``suppressed`` raise for the whole page."""
+    usable = [e for e in emails if _normalises(e)]
+    return await suppressed(session, tenant_id=tenant_id, emails=usable) if usable else set()
 
 
 async def browse(
@@ -129,8 +158,10 @@ async def browse(
     except SubscriberFilterError:
         raise InvalidSegment("filter: refused") from None
     # Tenant-wide on purpose (TL1): a boolean only, no row detail; see subscribers/suppressions.py.
-    stopped = await suppressed(session, tenant_id=tenant_id, emails=[h.email for h in page.items])
-    rows = [SubscriberRow(hit=h, suppressed=_is_in(h.email, stopped)) for h in page.items]
+    stopped = await stopped_among(
+        session, tenant_id=tenant_id, emails=[h.email for h in page.items]
+    )
+    rows = [SubscriberRow(hit=h, suppressed=is_stopped(h.email, stopped)) for h in page.items]
     return BrowseResult(rows=rows, total=page.total, counts=counts)
 
 
@@ -139,7 +170,7 @@ async def _confirmed_at(
 ) -> datetime | None:
     """Display-only: when this address's confirmed subscription began, for an
     opt-out row (the lift re-checks under its own lock)."""
-    if row.reason != "unsubscribed" or not row.list_type_key:
+    if row.reason != constants.REASON_UNSUBSCRIBED or not row.list_type_key:
         return None
     if row.list_type_key == key:
         found = hit if hit.status == "confirmed" and not hit.trashed else None
@@ -169,8 +200,8 @@ async def detail(
         hit=hit,
         engagement=await engagement(session, tenant_id=tenant_id, record_uuid=uuid),
         suppressions=suppressions,
-        suppressed=_is_in(
-            hit.email, await suppressed(session, tenant_id=tenant_id, emails=[hit.email])
+        suppressed=is_stopped(
+            hit.email, await stopped_among(session, tenant_id=tenant_id, emails=[hit.email])
         ),
         records_url=subscriber_admin_url(list_type_key, uuid),
     )

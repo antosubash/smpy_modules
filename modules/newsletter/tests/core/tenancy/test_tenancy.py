@@ -37,6 +37,13 @@ def test_invalid_tenant_refused():
         pass
 
 
+@pytest.mark.parametrize("tenant", ["platform", "a\n", "default\n"])
+def test_the_frameworks_reserved_and_newline_ids_are_refused(tenant):
+    """``$`` matches before a trailing newline, and ``platform`` is reserved."""
+    with pytest.raises(ValueError), tenant_scope(tenant):
+        pass
+
+
 class _Upstream(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         tenant = request.headers.get("x-up")

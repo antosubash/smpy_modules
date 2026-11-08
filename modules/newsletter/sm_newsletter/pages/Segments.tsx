@@ -16,6 +16,7 @@ import type { Segment } from '../ui/utils/types';
 
 interface SegmentsProps {
   can_edit?: boolean;
+  can_count?: boolean;
 }
 
 /** Saved segments of one list, with a rule editor. Creating, editing and deleting need `can_edit`. */
@@ -137,6 +138,7 @@ export default function Segments() {
           open={open}
           onOpenChange={setOpen}
           onSaved={reload}
+          canCount={props.can_count === true}
         />
       )}
     </PageShell>

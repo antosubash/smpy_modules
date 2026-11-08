@@ -59,6 +59,22 @@ async def test_get_page_has_button_and_changes_nothing(world):
     assert events == []
 
 
+async def test_failed_post_answers_503_with_the_button_and_commits_nothing(world, monkeypatch):
+    app, state, events, s = world
+
+    async def boom(*_a, **_k):  # after records wrote and the suppression was added
+        raise RuntimeError("ada@example.org")
+
+    monkeypatch.setattr("sm_newsletter.web.services.unsubscribe.bump", boom)
+    res = await call(app, "POST", s.token, data=ONE_CLICK)
+    assert res.status_code == 503
+    assert '<form method="post"' in res.text and ADA not in res.text
+    assert await status_of(state, s) == "confirmed"
+    assert await suppressions(state, T) == []
+    assert (await counters(state, s))["unsubscribe_count"] == 0
+    assert events == []
+
+
 async def test_get_is_identical_for_real_test_and_forged(world):
     app, _, _, s = world
     bodies = {

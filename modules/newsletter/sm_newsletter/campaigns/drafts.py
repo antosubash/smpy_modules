@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from simple_module_db import mark_written
+from simple_module_db import LIKE_ESCAPE_CHAR, like_contains_pattern, mark_written
 from simple_module_db.listeners import current_user_id
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,10 +59,6 @@ async def get_campaign(
     )
 
 
-def _escape_like(text: str) -> str:
-    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
 async def list_campaigns(
     session: AsyncSession,
     *,
@@ -82,7 +78,7 @@ async def list_campaigns(
     if status:
         where.append(Campaign.status == status)
     if q:
-        where.append(Campaign.name.ilike(f"%{_escape_like(q)}%", escape="\\"))
+        where.append(Campaign.name.ilike(like_contains_pattern(q), escape=LIKE_ESCAPE_CHAR))
     total = await session.scalar(select(func.count()).select_from(Campaign).where(*where))
     stmt = (
         select(Campaign)
@@ -116,6 +112,7 @@ async def update_draft(
             list_type_key=values.get("list_type_key") or current.list_type_key,
             audience=values.get("audience") or current.audience,
             roles=roles,
+            lock=True,
         )
     if "body" in values:
         values["body"] = dump_body(parse_body(values["body"]))

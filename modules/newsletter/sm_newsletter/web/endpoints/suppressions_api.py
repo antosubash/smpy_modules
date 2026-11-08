@@ -45,8 +45,6 @@ async def list_suppressions(
     limit: int = Query(50, ge=1, le=MAX_LIMIT),
     db: AsyncSession = Depends(get_db),
 ) -> SuppressionPage:
-    if reason is not None and reason not in constants.REASONS:
-        raise InvalidQuery("reason: unknown")
     items, total, counts = await suppressions.list_suppressions(
         db,
         tenant_id=tenant,
