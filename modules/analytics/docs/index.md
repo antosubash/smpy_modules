@@ -39,6 +39,23 @@ Other properties are discarded. Event names are 1–50 characters; up to 20 scal
 string/number/boolean values are accepted, with strings limited to 500 characters.
 Requests are limited to 8 KiB. Collection retries and offline replay are disabled.
 
+## Export a report
+
+Choose a property, UTC date range and filters, then select **Export CSV** after
+the report finishes loading. The download contains the applied property and
+filter scope, four totals, daily pageview/event counts and every returned
+breakdown row (up to 50 per dimension, including approved event properties).
+Dates are inclusive UTC. Visitors and sessions retain the estimates described
+below. Empty filters are recorded as `All`; unknown geographic values are
+recorded separately as `Unknown`.
+
+The CSV uses stable English column names and includes Unicode labels. Text that
+could be interpreted as a spreadsheet formula is prefixed with an apostrophe.
+This exports the currently loaded authorized report locally, without another
+server query. It excludes the separate five-minute recent-activity list and is
+not an export of every stored event. Export is unavailable during loading or
+after an error; refresh successfully before trying again.
+
 ## Country, region and city
 
 Provision an official GeoLite2 City MMDB file separately from the Python package.

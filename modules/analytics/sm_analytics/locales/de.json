@@ -110,6 +110,9 @@
     "activity": "Aktivität",
     "date_help": "Datumsangaben in UTC. Das Enddatum muss am oder nach dem Startdatum und innerhalb von 366 Tagen liegen.",
     "clear_filter": "Filter {name} entfernen",
-    "settings": "Eigenschaftseinstellungen"
+    "settings": "Eigenschaftseinstellungen",
+    "export_csv": "CSV exportieren",
+    "export_help": "Aktuellen Bericht herunterladen: Summen, täglicher Traffic und bis zu 50 Zeilen je Aufschlüsselung. Zeitraum und Filter sind enthalten.",
+    "export_failed": "CSV-Export fehlgeschlagen. Bitte erneut versuchen."
   }
 }

@@ -110,6 +110,9 @@
     "activity": "Activity",
     "date_help": "Dates are shown in UTC. The end date must be on or after the start date, within 366 days.",
     "clear_filter": "Remove {name} filter",
-    "settings": "Property settings"
+    "settings": "Property settings",
+    "export_csv": "Export CSV",
+    "export_help": "Download the current report: totals, daily traffic and up to 50 rows per breakdown. Dates and filters are included.",
+    "export_failed": "CSV export failed. Try again."
   }
 }

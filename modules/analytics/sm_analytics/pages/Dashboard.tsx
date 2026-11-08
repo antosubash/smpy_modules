@@ -6,6 +6,7 @@ import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedL
 import { DateRangeControl } from '../ui/components/DateRangeControl';
 import { FilterChips } from '../ui/components/FilterChips';
 import { PropertySettings } from '../ui/components/PropertySettings';
+import { ReportExport } from '../ui/components/ReportExport';
 import { ReportFilters } from '../ui/components/ReportFilters';
 import { ReportView } from '../ui/components/ReportView';
 import { deleteProperty, saveProperty } from '../ui/utils/api';
@@ -114,6 +115,12 @@ export default function Dashboard({ can_manage = false }: { can_manage?: boolean
                     value={data.filters}
                     onChange={data.setFilters}
                     report={data.report}
+                  />
+                  <ReportExport
+                    property={property}
+                    filters={data.filters}
+                    report={data.report}
+                    busy={data.loading || Boolean(data.error)}
                   />
                   {settings}
                 </>
