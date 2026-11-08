@@ -5,6 +5,7 @@ description = "Anonymous tenant-scoped web and application analytics with local 
 requires-python = ">=3.12"
 readme = "README.md"
 license = "MIT"
+keywords = ["simple-module", "analytics", "geoip", "web-analytics"]
 dependencies = [
     "simple_module_core>=0.0.44,<0.1",
     "simple_module_db>=0.0.44,<0.1",
@@ -13,6 +14,9 @@ dependencies = [
     "simple_module_settings>=0.0.44,<0.1", # floor: settings module layout first shipped in 0.0.44
     "pydantic-settings>=2.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/antosubash/simple_module_python_modules"
 
 [project.optional-dependencies]
 geoip = ["geoip2>=5.2,<6"]

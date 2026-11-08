@@ -51,3 +51,47 @@ it('does not paint a previous property report after selection changes', async ()
     vi.unstubAllGlobals();
   }
 });
+
+it('lets a report finish when it takes longer than the polling interval', async () => {
+  vi.useFakeTimers();
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  let resolveReport = (_value: Response) => {};
+  const pending = new Promise<Response>((resolve) => {
+    resolveReport = resolve;
+  });
+  let reportSignal: AbortSignal | undefined;
+  const fetcher = vi.fn((url: string, options: RequestInit) => {
+    if (url.endsWith('/properties')) return Promise.resolve(Response.json([{ id: 'a' }]));
+    if (url.endsWith('/status')) return Promise.resolve(Response.json({ geo: { enabled: false } }));
+    reportSignal = options.signal as AbortSignal;
+    return pending;
+  });
+  vi.stubGlobal('fetch', fetcher);
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+  try {
+    await act(async () => {
+      root.render(<Probe />);
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(120000);
+    });
+    expect(fetcher.mock.calls.filter(([url]) => url.includes('/report'))).toHaveLength(1);
+    expect(reportSignal?.aborted).toBe(false);
+    await act(async () => {
+      resolveReport(Response.json({ totals: { pageviews: 7 } }));
+    });
+    expect(container.textContent).toBe('7');
+    await act(async () => {
+      vi.advanceTimersByTime(30000);
+    });
+    expect(fetcher.mock.calls.filter(([url]) => url.includes('/report'))).toHaveLength(2);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  }
+});

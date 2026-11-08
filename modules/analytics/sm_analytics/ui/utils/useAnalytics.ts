@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { geoStatus, listProperties, loadReport } from './api';
 import type { Filters, GeoStatus, Property, Report } from './types';
 
@@ -22,6 +22,7 @@ export function useAnalytics() {
   const [loading, setLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
   const [listRefresh, setListRefresh] = useState(0);
+  const reportPending = useRef(false);
   const reload = () => {
     setListRefresh((n) => n + 1);
     setRefresh((n) => n + 1);
@@ -57,6 +58,7 @@ export function useAnalytics() {
     const controller = new AbortController();
     setLoading(true);
     setError('');
+    reportPending.current = true;
     loadReport(selected, filters, controller.signal)
       .then((next) => {
         if (!controller.signal.aborted) setReport(next);
@@ -65,9 +67,15 @@ export function useAnalytics() {
         if (!controller.signal.aborted) setError(reason.message);
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) {
+          reportPending.current = false;
+          setLoading(false);
+        }
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      reportPending.current = false;
+    };
   }, [selected, filters, refresh]);
   useEffect(
     () =>
@@ -82,7 +90,8 @@ export function useAnalytics() {
   );
   useEffect(() => {
     const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') setRefresh((n) => n + 1);
+      if (document.visibilityState === 'visible' && !reportPending.current)
+        setRefresh((n) => n + 1);
     }, 30000);
     return () => clearInterval(timer);
   }, []);
