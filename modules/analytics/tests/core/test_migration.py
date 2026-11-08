@@ -26,6 +26,18 @@ def test_migration_creates_and_removes_only_analytics_tables(tmp_path):
                 "analytics_session",
                 "analytics_event",
             }
+            index_spec = spec_from_file_location(
+                "analytics_indexes",
+                revision.parent / "b6d4e2a0c913_analytics_query_indexes.py",
+            )
+            indexes = module_from_spec(index_spec)
+            index_spec.loader.exec_module(indexes)
+            before = inspect(connection).get_indexes("analytics_event")
+            indexes.upgrade()
+            assert compare_metadata(context, Base.metadata) == []
+            indexes.downgrade()
+            assert inspect(connection).get_indexes("analytics_event") == before
+            indexes.upgrade()
             assert compare_metadata(context, Base.metadata) == []
             migration.downgrade()
             assert inspect(connection).get_table_names() == []

@@ -99,6 +99,41 @@ A backlog may need repeated sweeps. Property deletion permanently removes its
 events and sessions after confirmation in the screen; pausing keeps existing data.
 Analytics settings are database-backed; `SM_ANALYTICS_*` variables have no effect.
 
+## Query indexes
+
+All report and collection predicates include a tenant. The host migration
+`b6d4e2a0c913` adds indexes to match independently optional filters and the
+property-independent retention sweep; consuming hosts must migrate their own
+schema to match the module metadata.
+
+| Statements | Index access |
+| --- | --- |
+| Property lookup, collection lock/update, property deletion | Property primary key; tenant is checked on the selected row |
+| Property listing, enabled public configuration, scheduler tenant enumeration | Property `tenant_id` index; the small property list is sorted by name after filtering |
+| Duplicate event lookup | Unique `(tenant_id, property_id, event_id)` constraint |
+| Visitor's latest session and session deletion by property | `(tenant_id, property_id, visitor, last_seen)`; latest lookup scans backwards |
+| Unfiltered totals, daily and ranked breakdowns, active visitors, recent events | Event `(tenant_id, property_id, created_at)`; recent events scan backwards |
+| Standalone country, region, city, path or event-name filters | One event `(tenant_id, property_id, <filter>, created_at)` index per supported equality filter |
+| Allowed JSON event-property breakdowns | Event-name/time index narrows the selected event; JSON extraction/grouping happens on those rows |
+| Expired event/session candidate IDs, across every property in a tenant | Covering `(tenant_id, created_at, id)` / `(tenant_id, last_seen, id)` |
+| Session orphan check | Event `session_id` index, with tenant checked on matching events |
+| Batched expiry deletion and property cascade deletion | Primary key for selected IDs; event/session tenant/property index prefixes for whole-property deletion |
+
+Combined filters use a selective indexed prefix and check remaining conditions;
+a separate index for every combination would multiply collection cost. The old
+country/region/city hierarchy index is replaced because it cannot bound time
+contiguously when intermediate location filters are absent. An empty Unknown
+value uses the same equality index; All omits the predicate.
+
+These indexes narrow matching rows; exact distinct counts, UTC date grouping,
+JSON extraction and top-50 rankings still aggregate raw history. A wide report
+may legitimately use a sequential scan, and ranking/date groups may need a sort.
+No indexes are added on every displayed dimension or arbitrary JSON property.
+Daily rollups remain the next step for consistently interactive long ranges.
+Index creation uses normal transactional DDL and can block writes during a large
+migration; allow maintenance time and additional disk space. Each collected event
+also maintains the new indexes, so measure ingestion on the target deployment.
+
 ## Verification and capacity
 
 Run `uv run pytest` from this module directory; set the repo's guarded
@@ -108,10 +143,26 @@ A representative nine-million-event benchmark is opt-in; its results are specifi
 to the backend and hardware measured. Until measured on a deployment, 100,000
 events/day is a design target, not a capacity guarantee.
 
-The initial SQLite measurement used nine million events (about 3.3 GB): a
-seven-day full report took 7.8 seconds and a 90-day report took 104 seconds.
-The collector measured 4.1 events/second in the restricted test environment,
-which required periodic asyncio wakeups. These are local observations, not
-production guarantees. Long-range reports scan raw history; daily rollups would
-be needed for consistently interactive reports at this volume. Postgres was not
-benchmarked.
+A local 2026-11-08 benchmark reused synthetic nine-million-event histories on
+SQLite and Postgres 16. The following compares the original index set with this
+migration (seconds per complete service report):
+
+| Backend | 7 days before / after | 90 days before / after | C1 committed events/s before / after |
+| --- | --- | --- | --- |
+| SQLite | 7.14 / 7.23 | 102.39 / 103.12 | 117.75 / 111.91 |
+| Postgres | 3.93 / 4.25 | 55.62 / 55.99 | 120.72 / 126.44 |
+
+After measurements use one report per range and 1000 individually committed
+collector calls. Before report values are medians of three samples except the
+Postgres 90-day report (one). Histories also contain 3000–4000 prior synthetic
+collector events; these remain in after reports. Timings are cache-influenced,
+local observations, not a statistically controlled throughput or capacity claim.
+The SQLite write sample was about 5% slower; deployments must remeasure ingestion.
+
+All analytics indexes, including primary/unique indexes, grew from 1.91 to
+4.15 GB on SQLite and 1.42 to 2.24 GB on Postgres. Index builds took about
+104 / 149 seconds respectively on these owned fixtures. The fixture uses short
+paths and mostly empty location codes, so other traffic can have larger indexes.
+Selective filters and tenant-wide cleanup now have the intended range prefixes;
+broad reports still aggregate raw history and show no material latency gain.
+Daily rollups would be needed for consistently interactive long-range reports.
