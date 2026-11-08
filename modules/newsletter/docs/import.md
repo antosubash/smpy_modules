@@ -27,7 +27,7 @@ recreated from them on the Segments screen afterwards.
 | subscribed | a `confirmed` subscriber | nothing |
 | unsubscribed | an `unsubscribed` record (address only) | an `unsubscribed` suppression, source `import` |
 | cleaned | no subscriber | an `imported_cleaned` suppression |
-| nonsubscribed | nothing: listed as `ignored`, no row staged | nothing |
+| nonsubscribed | nothing: listed as `ignored`, never opened or parsed (even an empty or odd one cannot refuse the upload), no row staged | nothing |
 
 Both suppression kinds are written at once, in the same transaction as records'
 change, so the address is suppressed tenant-wide without waiting for the hourly
@@ -92,8 +92,8 @@ time, so a segment's "Signed up" rule means "added" for imported people.
   (`import_no_email_column`). A second email-like column is not offered for
   mapping.
 - A header used by two columns (two `Phone` columns, a second `TAGS`, a second
-  `Email Address`; compared after trimming, dropping a BOM and case-folding; empty headers
-  aside) refuses the file (`import_duplicate_column`, 422): the
+  `Email Address`; compared after trimming, dropping a BOM and case-folding;
+  empty headers aside) refuses the file (`import_duplicate_column`, 422): the
   later cell would silently overwrite the earlier one. The error names the
   header, never a cell.
 - `OPTIN_TIME`, `CONFIRM_TIME`, `UNSUB_TIME` and `CLEAN_TIME` are Mailchimp's
@@ -264,6 +264,11 @@ Uploaded rows are staged in `newsletter_import_row` (addresses, a few mapped
 values, the outcome), the job in `newsletter_import`. **Staged addresses are
 deleted when the import ends, or after 24 hours** if nobody applied it or it
 failed. The counts, the kept errors and the tag labels found stay on the import.
+
+**Discard still works when the list is gone.** If the list was deleted (or is no
+longer a list) after the upload, `DELETE /imports/{id}` removes the import and its
+staged addresses anyway; every other route on it answers 404. A list that exists
+but is not readable to the caller is still a 404 there too.
 
 ## The end-to-end spec
 
