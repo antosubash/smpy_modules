@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Literal
+from typing import Annotated, Literal
 from urllib.parse import urlsplit
 from uuid import UUID
 
@@ -16,6 +16,7 @@ from pydantic import (
     StrictFloat,
     StrictInt,
     StrictStr,
+    StringConstraints,
     field_validator,
     model_validator,
 )
@@ -50,7 +51,7 @@ def origin(value: str) -> str:
 
 class PropertyIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    name: str = Field(min_length=1, max_length=100)
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
     kind: Literal["public", "application"] = "public"
     origins: list[str] = Field(min_length=1, max_length=20)
     enabled: bool = False

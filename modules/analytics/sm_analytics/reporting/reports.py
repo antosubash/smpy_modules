@@ -134,6 +134,9 @@ async def report(
                         "country",
                         "region",
                         "city",
+                        "country_name",
+                        "region_name",
+                        "city_name",
                     )
                 }
                 for e in recent

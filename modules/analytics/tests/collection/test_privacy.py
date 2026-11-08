@@ -51,3 +51,15 @@ def test_collector_rejects_nested_and_unbounded_event_values():
         CollectIn(**base, properties={"nested": {"secret": "value"}})
     with pytest.raises(ValidationError):
         CollectIn(**base, properties={"text": "x" * 501})
+
+
+def test_collector_preserves_event_property_whitespace():
+    event = CollectIn(
+        property_id="p",
+        event_id="f040a315-7057-41aa-bb33-311aab4dcc02",
+        kind="event",
+        path="/",
+        name="click",
+        properties={"text": "  value  "},
+    )
+    assert event.properties == {"text": "  value  "}

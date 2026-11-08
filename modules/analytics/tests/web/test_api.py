@@ -121,10 +121,13 @@ async def test_opt_in_origin_privacy_and_no_cross_tenant_access(client, factory)
 async def test_report_rejects_invalid_dates_and_preserves_unknown_filter(client):
     data = {"name": "Test", "origins": ["https://example.com"]}
     prop = (await client.post("/api/analytics/properties", json=data)).json()
-    for query in ("start=2026-11-09&end=2026-11-08", "start=2020-01-01&end=2026-01-01"):
-        assert (
-            await client.get(f"/api/analytics/properties/{prop['id']}/report?{query}")
-        ).status_code == 422
+    for query, reason in (
+        ("start=2026-11-09&end=2026-11-08", "Report end date must be on or after start date"),
+        ("start=2020-01-01&end=2026-01-01", "Report dates must span at most 366 days"),
+    ):
+        response = await client.get(f"/api/analytics/properties/{prop['id']}/report?{query}")
+        assert response.status_code == 422
+        assert response.json()["detail"] == reason
 
 
 @pytest.mark.asyncio
@@ -152,3 +155,20 @@ async def test_management_requires_session_csrf_but_collector_does_not(client):
         json={"property_id": "unknown", "event_id": str(uuid4()), "kind": "pageview", "path": "/"},
     )
     assert response.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_property_names_are_trimmed_before_bounds_on_create_and_update(client):
+    data = {"name": "  " + "x" * 100 + "  ", "origins": ["https://example.com"]}
+    created = await client.post("/api/analytics/properties", json=data)
+    assert created.status_code == 201, created.text
+    assert created.json()["name"] == "x" * 100
+    url = f"/api/analytics/properties/{created.json()['id']}"
+    updated = await client.put(url, json=data | {"name": "  Renamed\t"})
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "Renamed"
+    for name in ("   ", "\t\n", "x" * 101):
+        rejected = data | {"name": name}
+        assert (await client.post("/api/analytics/properties", json=rejected)).status_code == 422
+        assert (await client.put(url, json=rejected)).status_code == 422
+    assert (await client.get("/api/analytics/properties")).json()[0]["name"] == "Renamed"

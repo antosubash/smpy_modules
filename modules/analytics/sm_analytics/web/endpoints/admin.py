@@ -100,7 +100,9 @@ async def read_report(
     prop = await property_for(db, property_id)
     end = end or datetime.now(UTC).date()
     start = start or end - timedelta(days=min(6, (end - date.min).days))
-    if end < start or (end - start).days > 365 or end >= date.max:
+    if end < start:
+        raise HTTPException(422, "Report end date must be on or after start date")
+    if (end - start).days > 365 or end >= date.max:
         raise HTTPException(422, "Report dates must span at most 366 days")
     response.headers["Cache-Control"] = "private, no-store"
     return await report(

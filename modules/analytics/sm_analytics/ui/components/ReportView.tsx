@@ -218,8 +218,13 @@ export function ReportView({
                     <td className="break-all py-2 pr-4">{event.path}</td>
                     <td className="py-2 pr-4">{event.name || t(keys.analytics.pageviews)}</td>
                     <td className="py-2">
-                      {[event.city, event.region, event.country].filter(Boolean).join(', ') ||
-                        t(keys.analytics.unknown)}
+                      {[
+                        event.city_name || event.city,
+                        event.region_name || event.region,
+                        event.country_name || event.country,
+                      ]
+                        .filter(Boolean)
+                        .join(', ') || t(keys.analytics.unknown)}
                     </td>
                   </tr>
                 ))}

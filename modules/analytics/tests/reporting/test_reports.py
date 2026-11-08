@@ -37,6 +37,10 @@ async def test_reports_filter_geography_and_keep_unknown(factory):
                     created_at=now,
                     country=country,
                     country_name="Austria" if country else "",
+                    region="AT-9" if country else "",
+                    region_name="Vienna" if country else "",
+                    city="2761369" if country else "",
+                    city_name="Vienna" if country else "",
                 )
             )
         db.add(
@@ -58,6 +62,23 @@ async def test_reports_filter_geography_and_keep_unknown(factory):
         assert result["breakdowns"]["country"] == [
             {"value": "AT", "label": "Austria", "count": 2},
             {"value": "", "label": "Unknown", "count": 1},
+        ]
+        known = next(event for event in result["recent"]["events"] if event["country"] == "AT")
+        assert {key: known[key] for key in ("country", "region", "city")} == {
+            "country": "AT",
+            "region": "AT-9",
+            "city": "2761369",
+        }
+        assert {key: known[key] for key in ("country_name", "region_name", "city_name")} == {
+            "country_name": "Austria",
+            "region_name": "Vienna",
+            "city_name": "Vienna",
+        }
+        unknown = next(event for event in result["recent"]["events"] if not event["country"])
+        assert [unknown[key] for key in ("country_name", "region_name", "city_name")] == [
+            "",
+            "",
+            "",
         ]
         result = await report(
             db, "a", prop, start=now.date(), end=now.date(), now=now, filters={"country": ""}

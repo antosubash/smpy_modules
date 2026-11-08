@@ -41,6 +41,9 @@ export type Report = {
       country: string;
       region: string;
       city: string;
+      country_name?: string;
+      region_name?: string;
+      city_name?: string;
     }[];
   };
 };
