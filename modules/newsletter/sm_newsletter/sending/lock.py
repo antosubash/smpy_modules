@@ -1,8 +1,8 @@
 """The install-wide dispatch lock: one sender spends the SMTP budget at a time.
 
 Admission (count the windows, then send) is only safe when nobody else can
-count or send in between, so every sender - a test send now, PR 4's dispatcher
-later - runs its admission *and* its SMTP calls inside :func:`dispatch_lock`.
+count or send in between, so every sender - a test send, the dispatcher's
+slice - runs its admission *and* its SMTP calls inside :func:`dispatch_lock`.
 
 - **Postgres**: the session-level advisory lock :data:`ADVISORY_KEY`, polled
   with ``pg_try_advisory_lock`` on one dedicated connection (``AUTOCOMMIT``,
@@ -16,8 +16,9 @@ later - runs its admission *and* its SMTP calls inside :func:`dispatch_lock`.
   their blocks shorter than the lease, or call :meth:`HeldLock.renew` before
   each SMTP call: it extends the lease, and raises ``DispatchBusy`` once
   another sender has taken the row; :meth:`HeldLock.fence` makes the same
-  check inside a caller's transaction (amendment A4). Released only by the holder that took
-  it (each acquisition stores a holder name with a random suffix).
+  check inside a caller's transaction (amendment A4). Released only by the
+  holder that took it (each acquisition stores a holder name with a random
+  suffix).
 
 Not acquired within ``wait_s`` → :class:`~sm_newsletter.core.errors.DispatchBusy`.
 
@@ -47,6 +48,7 @@ from sm_newsletter.core.clock import utcnow
 from sm_newsletter.core.errors import DispatchBusy
 from sm_newsletter.core.upsert import insert_ignore
 from sm_newsletter.models import DispatchLock
+from sm_newsletter.sending.ledger import SessionFactory
 
 __all__ = ["ADVISORY_KEY", "LOCK_NAME", "HeldLock", "dispatch_lock"]
 
@@ -57,7 +59,6 @@ ADVISORY_KEY = 0x6E6C5F6469737061
 """``"nl_dispa"`` as a signed 64-bit key; fixed, so every process agrees on it."""
 POLL_S = 0.1
 
-SessionFactory = Callable[[], AsyncSession]
 _TABLE = DispatchLock.__table__  # ty: ignore[unresolved-attribute]
 
 

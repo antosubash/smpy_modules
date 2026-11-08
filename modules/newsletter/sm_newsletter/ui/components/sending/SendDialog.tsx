@@ -11,7 +11,7 @@ import {
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@simple-module-py/ui/components/ui/radio-group';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api, errorMessage } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
@@ -43,13 +43,21 @@ interface Choice {
   scheduled: string | null;
 }
 
+/** The latest a send can be scheduled; mirrors `SCHEDULE_HORIZON` in
+ *  `campaigns/checks.py`, which stays the authority. */
+const HORIZON_MS = 366 * 86_400_000;
+
 const inFuture = (iso: string | null): iso is string =>
   iso !== null && Date.parse(iso) > Date.now();
 
-/** A future `datetime-local` value as ISO UTC, else null. */
+const tooFar = (iso: string | null): boolean =>
+  iso !== null && Date.parse(iso) > Date.now() + HORIZON_MS;
+
+/** A `datetime-local` value as ISO UTC when it is a time that can be scheduled
+ *  (in the future and within the horizon), else null. */
 function futureIso(local: string): string | null {
   const iso = toUtcIso(local);
-  return inFuture(iso) ? iso : null;
+  return inFuture(iso) && !tooFar(iso) ? iso : null;
 }
 
 /** "Send…": now or at a time, with the recipients and when it should finish.
@@ -71,10 +79,15 @@ export function SendDialog(props: Props) {
    *  render after it and sends only this, never a value recomputed since. */
   const [armed, setArmed] = useState<Choice | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Why the estimate for the current choice failed; it belongs to that choice only. */
+  const [estimateError, setEstimateError] = useState<string | null>(null);
+  /** Bumped on every open/close, so a flush that outlives its opening is ignored. */
+  const opening = useRef(0);
 
   const scheduledAt = when === 'later' ? futureIso(at) : null;
   const blocked = when === 'later' && scheduledAt === null;
-  const timePast = blocked && at !== '';
+  const timeFar = blocked && tooFar(toUtcIso(at));
+  const timePast = blocked && at !== '' && !timeFar;
 
   const refuse = useCallback(
     (key: string) => {
@@ -86,6 +99,7 @@ export function SendDialog(props: Props) {
 
   const change = async (next: boolean) => {
     if (pending) return;
+    const mine = ++opening.current;
     setOpen(next);
     setReady(false);
     setError(null);
@@ -95,21 +109,27 @@ export function SendDialog(props: Props) {
     // schedule since undone) would otherwise go out as a schedule nobody chose this time.
     setWhen('now');
     setAt('');
-    if (await flush()) setReady(true);
+    const saved = await flush();
+    if (mine !== opening.current) return;
+    if (saved) setReady(true);
     else refuse(copy.unsaved);
   };
 
   useEffect(() => {
-    if (!open || !ready || (when === 'later' && scheduledAt === null)) return;
+    // The figures, and a failure to get them, belong to the time they were asked
+    // for: never keep them under another.
+    setEstimateError(null);
+    if (!open || !ready || blocked) return;
     let live = true;
+    setEstimate(null);
     api.estimate(campaign.id, scheduledAt).then(
       (e) => live && setEstimate(e),
-      (e) => live && setError(errorMessage(e, t)),
+      (e) => live && setEstimateError(errorMessage(e, t)),
     );
     return () => {
       live = false;
     };
-  }, [open, ready, when, scheduledAt, campaign.id, t]);
+  }, [open, ready, blocked, scheduledAt, campaign.id, t]);
 
   const post = useCallback(
     async (revision: number, scheduled: string | null) => {
@@ -138,7 +158,7 @@ export function SendDialog(props: Props) {
     setArmed(null);
     if (dirty || incomplete) refuse(copy.unsaved);
     else if (armed.when === 'later' && !inFuture(armed.scheduled)) refuse(copy.time_past);
-    else void post(currentRevision(), armed.when === 'later' ? armed.scheduled : null);
+    else void post(currentRevision(), armed.scheduled);
   }, [armed, dirty, incomplete, refuse, post, currentRevision]);
 
   const confirm = async () => {
@@ -172,7 +192,14 @@ export function SendDialog(props: Props) {
         </DialogHeader>
 
         <div className="grid gap-3 py-2">
-          <RadioGroup value={when} onValueChange={(v) => setWhen(v as When)} disabled={pending}>
+          <RadioGroup
+            value={when}
+            onValueChange={(v) => {
+              setWhen(v as When);
+              setError(null);
+            }}
+            disabled={pending}
+          >
             {(['now', 'later'] as const).map((id) => (
               <div key={id} className="flex items-center gap-2">
                 <RadioGroupItem id={`newsletter-send-${id}`} value={id} />
@@ -188,9 +215,13 @@ export function SendDialog(props: Props) {
                 type="datetime-local"
                 value={at}
                 disabled={pending}
-                onChange={(e) => setAt(e.target.value)}
+                onChange={(e) => {
+                  setAt(e.target.value);
+                  setError(null);
+                }}
               />
               {timePast && <p className="text-sm text-destructive">{t(copy.time_past)}</p>}
+              {timeFar && <p className="text-sm text-destructive">{t(copy.time_far)}</p>}
             </div>
           )}
           {estimate && !blocked && (
@@ -202,9 +233,9 @@ export function SendDialog(props: Props) {
               {estimate.overlaps && <p className="text-amber-900">{t(copy.overlap)}</p>}
             </div>
           )}
-          {error && (
+          {(error ?? estimateError) && (
             <p role="alert" className="text-sm text-destructive">
-              {error}
+              {error ?? estimateError}
             </p>
           )}
         </div>

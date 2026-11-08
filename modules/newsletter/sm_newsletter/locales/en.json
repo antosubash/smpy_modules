@@ -140,13 +140,14 @@
       "saving": "Saving",
       "saved": "Saved",
       "stale": "Changed elsewhere",
-      "error": "Not saved"
+      "error": "Not saved",
+      "invalid": "Not saved: fix the marked field"
     },
     "reload": "Reload",
     "read_only": "You can view this campaign but not change it.",
     "not_draft": "This campaign is no longer a draft, so it cannot be changed.",
     "incomplete": "A block is missing a required field. The email is saved again once it is filled in.",
-    "leave_held": "Leave this campaign? A block is unfinished, so that change is not saved.",
+    "leave_held": "Leave this campaign? A block is unfinished or a field is invalid, so that change is not saved.",
     "select_a_block": "Select a block to edit it.",
     "integration_missing": "This content source is not available on this site.",
     "meta": {
@@ -158,7 +159,9 @@
       "from_name": "Sender name",
       "from_name_hint": "Leave empty to use the name from the newsletter settings.",
       "reply_to": "Reply-to address",
-      "reply_to_hint": "Leave empty to use the address from the newsletter settings."
+      "reply_to_hint": "Leave empty to use the address from the newsletter settings.",
+      "name_required": "Enter a campaign name. It is not saved while it is empty.",
+      "reply_to_invalid": "Enter a valid email address. It is not saved until you do."
     },
     "card": {
       "article": "Article",
@@ -204,7 +207,10 @@
     },
     "rich_text": {
       "label": "Text",
-      "html": "Text"
+      "html": "Text",
+      "link_title": "Link",
+      "link_prompt": "Link address. Leave empty to remove the link.",
+      "link_invalid": "That address cannot be used. Use https://, http://, mailto: or a site path like /about."
     },
     "image": {
       "label": "Image",
@@ -265,6 +271,10 @@
     "transport_unavailable": "The mail server is not available.",
     "unknown_list": "No such newsletter list."
   },
+  "errors_field": {
+    "subject_required": "Add a subject before sending.",
+    "schedule_out_of_range": "Choose a time within the next year."
+  },
   "preview": {
     "tab_edit": "Edit",
     "tab_preview": "Preview",
@@ -321,13 +331,14 @@
       "cancel": "Cancel",
       "unsaved": "The latest edits could not be saved, so nothing was sent.",
       "incomplete": "Finish or remove the unfinished blocks before sending.",
-      "time_past": "Choose a time in the future."
+      "time_past": "Choose a time in the future.",
+      "time_far": "Choose a time within the next year."
     },
     "panel": {
       "scheduled_for": "Scheduled for {date}",
       "progress": "{sent} of {total} sent",
-      "eta_one": "Estimated finish: {date} ({count} day at {rate} per day)",
-      "eta_other": "Estimated finish: {date} ({count} days at {rate} per day)",
+      "eta_one": "Estimated finish: {date}",
+      "eta_other": "Estimated finish: {date}",
       "finished": "Finished {date}",
       "paused": "Paused: {detail}",
       "counts": {

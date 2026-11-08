@@ -63,7 +63,7 @@ class NewsletterModule(ModuleBase):
             NewsletterSettings,
             lambda defaults: NewsletterServices(settings=self.settings or defaults),
             # The generic Settings screen links here and refuses writes: it
-            # would store ``smtp_password`` in plaintext. PR 3 adds the page.
+            # would store ``smtp_password`` in plaintext.
             manage_url=constants.SETTINGS_URL,
         )
 

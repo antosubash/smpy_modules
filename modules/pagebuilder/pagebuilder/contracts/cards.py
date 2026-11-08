@@ -3,9 +3,9 @@
 Small read-only snapshots: what an email block needs to show a page or an
 image, with the site-relative path the caller makes absolute itself. Built on
 the same rules as :mod:`pagebuilder.contracts.search` (#130): the caller names
-the tenant, it is pinned here as a ``WHERE`` *and* by a scope that refuses a
-different bound tenant (``TenantIsolationError``) and binds one when nothing is
-bound; the pattern is a ``LIKE`` pattern with ``\\`` as the escape; the limit is
+the tenant and it is pinned as a ``WHERE``. Unlike search, a scope here also
+refuses a different bound tenant (``TenantIsolationError``) and binds one when
+nothing is bound. The pattern is a ``LIKE`` pattern with ``\\`` as the escape; the limit is
 checked by :func:`pagebuilder.contracts.search._checked_limit`.
 
 Pages are published and not trashed only. Media are raster images only: SVG is

@@ -17,10 +17,12 @@ from sm_newsletter.core.errors import TransportUnavailable
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import DispatchLock
 from sm_newsletter.sending import deliver as delivering
+from sm_newsletter.sending.dispatch import tick
 from sqlalchemy import update
 
 from tests.pg_support import USING_POSTGRES
 from tests.support.campaign_world import campaign_row, send_rows
+from tests.support.deliver_world import SECRET
 from tests.support.dispatch_world import (
     DAY,
     busiest_day,
@@ -98,6 +100,50 @@ async def test_per_minute_limit(built):
     assert (again.spent, again.stopped) == (0, "budget")
     assert (await run_tick(app, state, smtp, at=NOW + timedelta(seconds=61))).spent == 3
     assert len(set(sent_to(smtp))) == 6
+
+
+class _Clock:
+    """A clock a send moves on by one second and a wait by what it waits."""
+
+    def __init__(self, at: datetime) -> None:
+        self.now = at
+
+    def __call__(self) -> datetime:
+        return self.now
+
+    async def sleep(self, seconds: float) -> None:
+        self.now += timedelta(seconds=seconds)
+
+    async def on_send(self, _message) -> None:
+        self.now += timedelta(seconds=1)
+
+
+async def test_a_full_minute_waits_instead_of_skipping_the_next_tick(built):
+    """Beat ticks every 60 s, but a tick's sends land just after it starts: the
+    next tick finds them still inside the minute and waits them out, rather
+    than stopping (which would send only every other minute)."""
+    app, state = await built(daily_limit=100, per_minute_limit=3)
+    await due(state, 7)
+    clock = _Clock(NOW)
+    smtp = FakeTransport(on_send=clock.on_send)
+    settings = app.state.sm_newsletter.settings
+
+    async def at(when):
+        clock.now = when
+        return await tick(
+            state.session_factory,
+            settings=settings,
+            secret=SECRET,
+            transport=smtp,
+            clock=clock,
+            sleep=clock.sleep,
+        )
+
+    first, second = await at(NOW), await at(NOW + timedelta(seconds=60))
+    assert (first.spent, first.stopped) == (3, "budget")
+    assert (second.spent, second.stopped) == (3, "budget")
+    times = await counted_times(state)
+    assert max(sum(1 for t in times if s <= t <= s + timedelta(seconds=60)) for s in times) == 3
 
 
 async def test_test_sends_share_the_budget(built):

@@ -119,6 +119,23 @@ describe('maps error codes to catalogue keys', () => {
     expect(http.errorMessage(new TypeError('x'), t)).toBe('T(newsletter.errors.generic)');
   });
 
+  it('names the known invalid_campaign fields, and is generic for any other detail', async () => {
+    const { http } = await load({});
+    const refusal = (detail: string) => new http.HttpError(detail, 422, 'invalid_campaign');
+    const field = 'newsletter.errors_field';
+    expect(http.errorMessage(refusal('subject: required'), t)).toBe(`T(${field}.subject_required)`);
+    for (const detail of ['scheduled_at: out of range', 'at: out of range']) {
+      expect(http.errorMessage(refusal(detail), t)).toBe(`T(${field}.schedule_out_of_range)`);
+    }
+    expect(http.errorMessage(refusal('name: too long'), t)).toBe(
+      'T(newsletter.errors.invalid_campaign)',
+    );
+    // The detail is only a lookup key for invalid_campaign, never for another code.
+    expect(http.errorMessage(new http.HttpError('subject: required', 409, 'stale'), t)).toBe(
+      'T(newsletter.errors.stale)',
+    );
+  });
+
   it('does not let a code name an inherited property', async () => {
     const { http } = await load({});
     const error = new http.HttpError('x', 400, 'constructor');

@@ -12,7 +12,7 @@ import type { CSSProperties } from 'react';
 
 /** Mirrors `content/render/styles.py` (and the email's default accent); keep them in step. */
 export const ACCENT = '#2563eb';
-export const TEXT = '#222222';
+const TEXT = '#222222';
 export const MUTED = '#71717a';
 export const RULE = '#e4e4e7';
 export const PAGE_BG = '#f4f4f5';

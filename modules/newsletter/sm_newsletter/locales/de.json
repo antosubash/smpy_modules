@@ -140,13 +140,14 @@
       "saving": "Wird gespeichert",
       "saved": "Gespeichert",
       "stale": "Anderswo geändert",
-      "error": "Nicht gespeichert"
+      "error": "Nicht gespeichert",
+      "invalid": "Nicht gespeichert: markiertes Feld korrigieren"
     },
     "reload": "Neu laden",
     "read_only": "Sie können diese Kampagne ansehen, aber nicht ändern.",
     "not_draft": "Diese Kampagne ist kein Entwurf mehr und kann nicht geändert werden.",
     "incomplete": "In einem Block fehlt ein Pflichtfeld. Die E-Mail wird wieder gespeichert, sobald es ausgefüllt ist.",
-    "leave_held": "Diese Kampagne verlassen? Ein Block ist unvollständig, daher ist diese Änderung nicht gespeichert.",
+    "leave_held": "Diese Kampagne verlassen? Ein Block ist unvollständig oder ein Feld ist ungültig, daher ist diese Änderung nicht gespeichert.",
     "select_a_block": "Wählen Sie einen Block aus, um ihn zu bearbeiten.",
     "integration_missing": "Diese Inhaltsquelle ist auf dieser Website nicht verfügbar.",
     "meta": {
@@ -158,7 +159,9 @@
       "from_name": "Absendername",
       "from_name_hint": "Leer lassen, um den Namen aus den Newsletter-Einstellungen zu verwenden.",
       "reply_to": "Antwortadresse",
-      "reply_to_hint": "Leer lassen, um die Adresse aus den Newsletter-Einstellungen zu verwenden."
+      "reply_to_hint": "Leer lassen, um die Adresse aus den Newsletter-Einstellungen zu verwenden.",
+      "name_required": "Gib einen Kampagnennamen ein. Er wird nicht gespeichert, solange er leer ist.",
+      "reply_to_invalid": "Gib eine gültige E-Mail-Adresse ein. Sie wird erst dann gespeichert."
     },
     "card": {
       "article": "Artikel",
@@ -204,7 +207,10 @@
     },
     "rich_text": {
       "label": "Text",
-      "html": "Text"
+      "html": "Text",
+      "link_title": "Link",
+      "link_prompt": "Link-Adresse. Leer lassen, um den Link zu entfernen.",
+      "link_invalid": "Diese Adresse kann nicht verwendet werden. Nutze https://, http://, mailto: oder einen Seitenpfad wie /about."
     },
     "image": {
       "label": "Bild",
@@ -265,6 +271,10 @@
     "transport_unavailable": "Der Mailserver ist nicht verfügbar.",
     "unknown_list": "Keine solche Newsletter-Liste."
   },
+  "errors_field": {
+    "subject_required": "Geben Sie vor dem Senden einen Betreff ein.",
+    "schedule_out_of_range": "Wählen Sie einen Zeitpunkt innerhalb des nächsten Jahres."
+  },
   "preview": {
     "tab_edit": "Bearbeiten",
     "tab_preview": "Vorschau",
@@ -321,13 +331,14 @@
       "cancel": "Abbrechen",
       "unsaved": "Die letzten Änderungen konnten nicht gespeichert werden, daher wurde nichts gesendet.",
       "incomplete": "Stellen Sie die unfertigen Blöcke fertig oder entfernen Sie sie, bevor Sie senden.",
-      "time_past": "Wählen Sie einen Zeitpunkt in der Zukunft."
+      "time_past": "Wählen Sie einen Zeitpunkt in der Zukunft.",
+      "time_far": "Wählen Sie einen Zeitpunkt innerhalb des nächsten Jahres."
     },
     "panel": {
       "scheduled_for": "Geplant für {date}",
       "progress": "{sent} von {total} gesendet",
-      "eta_one": "Voraussichtlich fertig: {date} ({count} Tag bei {rate} pro Tag)",
-      "eta_other": "Voraussichtlich fertig: {date} ({count} Tage bei {rate} pro Tag)",
+      "eta_one": "Voraussichtlich fertig: {date}",
+      "eta_other": "Voraussichtlich fertig: {date}",
       "finished": "Abgeschlossen am {date}",
       "paused": "Pausiert: {detail}",
       "counts": {

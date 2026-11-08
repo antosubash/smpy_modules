@@ -94,15 +94,13 @@ async def suppress_many(
     bounce is newer than an earlier confirmation; a row already as new as
     ``now`` is left alone. One upsert per chunk (on SQLite preceded by a DO
     NOTHING insert in the same write transaction;
-    :func:`~sm_newsletter.core.upsert.upsert_newest`): a row a confirmation
-    deletes concurrently is inserted again, never lost. Requires a
-    transactional (non-AUTOCOMMIT) SQLite connection, as the framework's
-    engine is. ``refresh=False`` is a
-    pure insert-ignore (the reconcile's, so its count is idempotent and it
-    never freshens a row). ``keep_source=True`` refreshes ``created_at`` only:
-    an existing row keeps its first writer's ``source`` (the records mirror's,
-    so a page opt-out stays ``unsubscribe_page``); a new row still gets
-    ``source``.
+    :func:`~sm_newsletter.core.upsert.upsert_newest`, which also states the
+    SQLite transaction requirement): a row a confirmation deletes concurrently
+    is inserted again, never lost. ``refresh=False`` is a pure insert-ignore
+    (the reconcile's, so its count is idempotent and it never freshens a row).
+    ``keep_source=True`` refreshes ``created_at`` only: an existing row keeps
+    its first writer's ``source`` (the records mirror's, so a page opt-out
+    stays ``unsubscribe_page``); a new row still gets ``source``.
     """
     tenant = _tenant(tenant_id)
     _check_row(reason, source, list_type_key)

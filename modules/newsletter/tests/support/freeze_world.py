@@ -25,10 +25,11 @@ from tests.support.sending import NOW, T, make_app
 DUE = NOW - timedelta(minutes=1)
 
 
-async def world(tmp_path: Path) -> tuple[Any, Any, int]:
-    """``make_app`` on a file database: the app, its state and a draft's id."""
+async def world(tmp_path: Path, **settings: Any) -> tuple[Any, Any, int]:
+    """``make_app`` on a file database with ``settings``: the app, its state
+    and a draft campaign's id (for test sends)."""
     with tenant_scope(T):
-        return await make_app(file=tmp_path / "freeze.db")
+        return await make_app(file=tmp_path / "freeze.db", **settings)
 
 
 async def due_campaign(state: Any, tenant: str = T, *, list_key: str = "news", due_at=DUE) -> int:

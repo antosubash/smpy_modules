@@ -7,6 +7,7 @@ from datetime import timedelta
 import pytest
 from simple_module_db import finalize_session
 from sm_newsletter.campaigns import lifecycle
+from sm_newsletter.campaigns.checks import SCHEDULE_GRACE, SCHEDULE_HORIZON, check_scheduled_at
 from sm_newsletter.content import context
 from sm_newsletter.core.errors import NewsletterError, NotFound
 from sm_newsletter.models import Campaign, Link
@@ -145,6 +146,24 @@ REFUSALS = {
         "invalid_campaign",
     ),
 }
+
+
+@pytest.mark.parametrize(
+    ("offset", "ok"),
+    [
+        (-SCHEDULE_GRACE, True),
+        (-SCHEDULE_GRACE - timedelta(microseconds=1), False),
+        (SCHEDULE_HORIZON, True),
+        (SCHEDULE_HORIZON + timedelta(microseconds=1), False),
+    ],
+)
+def test_schedule_window_is_closed_at_both_limits(offset, ok):
+    at = NOW + offset
+    if ok:
+        assert check_scheduled_at(at, NOW) == at
+    else:
+        with pytest.raises(NewsletterError):
+            check_scheduled_at(at, NOW)
 
 
 @pytest.mark.parametrize("case", list(REFUSALS))

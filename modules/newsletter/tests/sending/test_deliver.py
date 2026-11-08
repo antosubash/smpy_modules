@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-import pytest
 from sm_newsletter.campaigns.lifecycle import split_paused
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import CampaignRender, Send, SendAttempt
@@ -27,16 +26,8 @@ from tests.support.deliver_world import (
     sending_campaign,
 )
 from tests.support.fake_transport import FakeTransport
-from tests.support.freeze_world import world
 from tests.support.sending import NOW, T
 from tests.support.tracking_world import track_render
-
-
-@pytest.fixture
-async def state(tmp_path):
-    _, db_state, _ = await world(tmp_path)
-    yield db_state
-    await db_state.engine.dispose()
 
 
 async def test_accepted_marks_sent_and_counts(state):

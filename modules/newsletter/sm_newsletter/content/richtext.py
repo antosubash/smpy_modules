@@ -57,7 +57,11 @@ class _Cleaner(HTMLParser):
             return
         name = RENAME.get(tag, tag)
         if tag == "b" and any(_NORMAL_WEIGHT.search(v or "") for k, v in attrs if k == "style"):
-            return  # Google Docs wraps a paste in <b style="font-weight:normal">
+            # Google Docs wraps a paste in <b style="font-weight:normal">. Unwrapped, but
+            # tracked, so its </b> does not close an outer <strong> that is really open.
+            if len(self.stack) < MAX_OPEN:
+                self.stack.append(("strong", False))
+            return
         if name not in ALLOWED_TAGS:
             return
         if name == "br":

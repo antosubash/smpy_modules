@@ -71,16 +71,40 @@ describe('SendingPanel', () => {
   it('shows progress and the ETA while sending, and pauses', async () => {
     await render(campaign());
     expect(host.textContent).toContain('100 of 300 sent');
-    expect(host.textContent).toContain('2 days at 100 per day');
+    expect(host.textContent).toContain('Estimated finish: ');
+    expect(host.textContent).not.toContain('per day');
     await act(async () => button(copy.actions.pause)?.click());
     expect(api.pauseCampaign).toHaveBeenCalledWith(7);
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ status: 'paused' }));
   });
 
-  it('says "1 day", not "1 days", when one day is left', async () => {
+  it('gives the ETA without a days-at-rate parenthetical, even with one day left', async () => {
     vi.mocked(api.progress).mockResolvedValue(progress({ queued: 40, sending: 0 }));
     await render(campaign());
-    expect(host.textContent).toContain('(1 day at 100 per day)');
+    expect(host.textContent).toContain('Estimated finish: ');
+    expect(host.textContent).not.toContain('(');
+  });
+
+  it.each([
+    ['sent', {}],
+    ['cancelled', {}],
+    ['paused', { started_at: '2026-11-05T12:00:00Z' }],
+  ] as const)('shows how many were sent for a %s campaign', async (status, over) => {
+    vi.mocked(api.progress).mockResolvedValue(progress({ status }));
+    await render(campaign({ status, sent_count: 120, recipient_count: 300, ...over }));
+    expect(host.textContent).toContain('120 of 300 sent');
+  });
+
+  it('shows no sent count for a cancelled campaign that never had recipients', async () => {
+    vi.mocked(api.progress).mockResolvedValue(progress({ status: 'cancelled' }));
+    await render(campaign({ status: 'cancelled', sent_count: 0, recipient_count: 0 }));
+    expect(host.textContent).not.toContain(' sent');
+  });
+
+  it('shows no sent count for a paused campaign that never started', async () => {
+    vi.mocked(api.progress).mockResolvedValue(progress({ status: 'paused' }));
+    await render(campaign({ status: 'paused', sent_count: 0, started_at: null }));
+    expect(host.textContent).not.toContain(' sent');
   });
 
   it('offers Resume for a paused campaign, with the reason translated and the detail shown', async () => {

@@ -22,9 +22,10 @@ Never for a ``pending`` subscriber or one confirmed after the cutoff.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
+from simple_module_core.datetimes import aware
 from simple_module_db import finalize_session
 from sm_records.contracts.newsletter import (
     SubscriberFilterError,
@@ -47,7 +48,6 @@ logger = logging.getLogger(__name__)
 _SEND = Send.__table__  # ty: ignore[unresolved-attribute]
 _CAMPAIGN = Campaign.__table__  # ty: ignore[unresolved-attribute]
 _ATTEMPT = SendAttempt.__table__  # ty: ignore[unresolved-attribute]
-_GONE = frozenset({"unsubscribed"})
 _warned_no_secret = False
 
 
@@ -58,10 +58,6 @@ def _secret(app: Any) -> str:
         _warned_no_secret = True
         logger.error("newsletter: no host secret_key; every unsubscribe link is refused")
     return secret
-
-
-def _aware(value: datetime) -> datetime:
-    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
 
 
 async def unsubscribe_by_token(
@@ -147,12 +143,12 @@ async def _cutoff(
     ``sent_at``) the latest attempt opened for this send, since a campaign can
     run for days after its ``started_at``; else the start, else ``now``."""
     if sent_at is not None:
-        return _aware(sent_at)
+        return aware(sent_at)
     stmt = select(func.max(_ATTEMPT.c.attempted_at)).where(
         _ATTEMPT.c.tenant_id == tenant, _ATTEMPT.c.send_id == send_id
     )
     attempted = (await session.execute(stmt)).scalar_one_or_none()
-    return _aware(attempted or started_at or now)
+    return aware(attempted or started_at or now)
 
 
 async def _gone(session: AsyncSession, tenant: str, list_key: str, uuid: str) -> bool:
@@ -160,4 +156,4 @@ async def _gone(session: AsyncSession, tenant: str, list_key: str, uuid: str) ->
     hit = (
         await subscribers_by_uuid(session, tenant_id=tenant, type_key=list_key, uuids=[uuid])
     ).get(uuid)
-    return hit is None or hit.trashed or hit.status in _GONE
+    return hit is None or hit.trashed or hit.status == "unsubscribed"

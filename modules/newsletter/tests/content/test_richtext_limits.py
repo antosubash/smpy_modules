@@ -43,3 +43,22 @@ def test_pathological_nesting_is_fast():
     parse_body(body)
     clean("<b>" * 3000 + "</i>" * 3000)
     assert time.monotonic() - start < 2
+
+
+def _heading(text):
+    return [{"type": "Heading", "props": {"id": "h", "text": text, "level": "1", "align": "left"}}]
+
+
+def test_heading_length_limit():
+    assert parse_body(_heading("x" * 200))
+    with pytest.raises(InvalidBody):
+        parse_body(_heading("x" * 201))
+
+
+def test_rich_text_length_limit():
+    def body(html):
+        return [{"type": "RichText", "props": {"id": "a", "html": html}}]
+
+    assert parse_body(body("a" * 20000))
+    with pytest.raises(InvalidBody):
+        parse_body(body("a" * 20001))

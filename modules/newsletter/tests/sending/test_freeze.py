@@ -9,7 +9,7 @@ import pytest
 from simple_module_db import finalize_session
 from simple_module_db.listeners import TenantIsolationError
 from sm_newsletter.campaigns import lifecycle
-from sm_newsletter.core.constants import MAX_EMAIL_LEN
+from sm_newsletter.core.constants import MAX_EMAIL_LEN, MAX_FIRST_NAME_LEN
 from sm_newsletter.core.suppression import suppress
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.sending import freeze as freezing
@@ -93,6 +93,34 @@ async def test_freeze_clips_a_long_first_name_and_skips_a_too_long_email(built, 
     (row,) = await send_rows(state, T, cid)
     assert (row.email, row.first_name) == ("ada@example.org", "A" * 200)
     assert (await campaign_row(state, T, cid)).status == "sending"
+
+
+async def test_freeze_keeps_an_address_and_a_name_exactly_at_their_limits(built, monkeypatch):
+    """The send columns' own lengths fit: a 320-character address is frozen with
+    a 200-character name unclipped, and a 321-character one is left out."""
+    _, state, _ = built
+    ada = await seed_subscriber(state, T, "ada@example.org", "confirmed")
+    await seed_subscriber(state, T, "long@example.org", "confirmed")
+    domain = "@example.org"
+    at_limit = "x" * (MAX_EMAIL_LEN - len(domain)) + domain
+    name = "B" * MAX_FIRST_NAME_LEN
+    real = freezing.iter_subscribers
+
+    async def edge(session, **kw):
+        hits, nxt = await real(session, **kw)
+        return [
+            hit.model_copy(update={"email": at_limit, "first_name": name})
+            if hit.uuid == ada
+            else hit.model_copy(update={"email": "y" + at_limit})
+            for hit in hits
+        ], nxt
+
+    monkeypatch.setattr(freezing, "iter_subscribers", edge)
+    cid = await due_campaign(state)
+
+    assert await run_freeze(state, cid) == freezing.FreezeResult(True, 1, 0)
+    (row,) = await send_rows(state, T, cid)
+    assert (len(row.email), row.email, row.first_name) == (MAX_EMAIL_LEN, at_limit, name)
 
 
 async def test_freeze_marks_suppressed_rows(built):

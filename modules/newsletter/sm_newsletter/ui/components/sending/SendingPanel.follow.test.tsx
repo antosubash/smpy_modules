@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import en from '../../../locales/en.json';
+import { PROGRESS_POLL_MS } from '../../hooks/useCampaignProgress';
 import { api } from '../../utils/api';
 import type { CampaignDetail } from '../../utils/types';
 import { campaign, progress } from './panelFixture';
@@ -75,6 +76,26 @@ describe('SendingPanel follows the worker', () => {
     expect(document.body.textContent).toContain('554 policy');
     expect(labels()).toContain(copy.actions.resume);
     expect(labels()).not.toContain(copy.actions.pause);
+  });
+
+  it('retries a failed re-read: the poll that reported the change was the last one', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(api.progress).mockResolvedValue(progress({ status: 'paused' }));
+      vi.mocked(api.getCampaign)
+        .mockRejectedValueOnce(new Error('boom'))
+        .mockResolvedValue(campaign({ status: 'paused', paused_code: 'manual' }));
+      await render(campaign());
+      expect(api.getCampaign).toHaveBeenCalledTimes(1);
+      expect(labels()).toContain(copy.actions.pause);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(PROGRESS_POLL_MS);
+      });
+      expect(api.getCampaign).toHaveBeenCalledTimes(2);
+      expect(labels()).toContain(copy.actions.resume);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('re-reads nothing while the poll agrees with the page', async () => {

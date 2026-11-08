@@ -32,18 +32,12 @@ from tests.support.deliver_world import (
     sending_campaign,
     set_send_status,
 )
+from tests.support.dispatch_world import lifecycle_action
 from tests.support.fake_transport import FakeTransport
 from tests.support.freeze_world import world
 from tests.support.sending import NOW, T
 
 SKIP = Step(False, Verdict("skip", False))
-
-
-@pytest.fixture
-async def state(tmp_path):
-    _, db_state, _ = await world(tmp_path)
-    yield db_state
-    await db_state.engine.dispose()
 
 
 async def _nothing_happened(state, cid, smtp, status="queued") -> None:
@@ -148,16 +142,9 @@ async def test_fence_failure_rolls_back_the_reservation(state):
     assert (await one_row(state, cid)).lease_until is None
 
 
-async def _transition(state, cid, action) -> None:
-    async def write(db) -> None:
-        await action(db, tenant_id=T, campaign_id=cid, roles=[], now=NOW)
-
-    await in_other_session(state, write)
-
-
 async def test_pause_before_claim_sends_nothing(state, monkeypatch):
     cid, _ = await sending_campaign(state)
-    _after_eligibility(monkeypatch, lambda: _transition(state, cid, lifecycle.pause))
+    _after_eligibility(monkeypatch, lambda: lifecycle_action(state, lifecycle.pause, cid))
     smtp = FakeTransport()
 
     assert await deliver(state, cid, smtp) is None
@@ -167,7 +154,7 @@ async def test_pause_before_claim_sends_nothing(state, monkeypatch):
 
 async def test_cancel_before_claim_sends_nothing(state, monkeypatch):
     cid, _ = await sending_campaign(state)
-    _after_eligibility(monkeypatch, lambda: _transition(state, cid, lifecycle.cancel))
+    _after_eligibility(monkeypatch, lambda: lifecycle_action(state, lifecycle.cancel, cid))
     smtp = FakeTransport()
 
     assert await deliver(state, cid, smtp) is None

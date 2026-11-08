@@ -7,6 +7,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import en from '../../../locales/en.json';
+import { campaign as baseCampaign } from '../../hooks/campaignFixture';
 import { useCampaignEditor } from '../../hooks/useCampaignEditor';
 import type { CampaignDetail } from '../../utils/types';
 import { SendDialog } from './SendDialog';
@@ -20,29 +21,10 @@ const BASE = '/api/newsletter/campaigns/7';
 
 function campaign(revision: number, status = 'draft'): CampaignDetail {
   return {
-    id: 7,
-    name: 'Spring',
-    subject: 'Hello',
+    ...baseCampaign(revision, [
+      { type: 'Heading', props: { id: 'h1', text: 'A', level: '2', align: 'left' } },
+    ]),
     status,
-    list_type_key: 'news',
-    revision,
-    updated_at: null,
-    recipient_count: 0,
-    sent_count: 0,
-    preheader: '',
-    from_name: null,
-    reply_to: null,
-    audience: 'all',
-    body: [{ type: 'Heading', props: { id: 'h1', text: 'A', level: '2', align: 'left' } }],
-    scheduled_at: null,
-    started_at: null,
-    finished_at: null,
-    paused_code: null,
-    paused_detail: null,
-    failed_count: 0,
-    bounced_count: 0,
-    suppressed_count: 0,
-    unsubscribe_count: 0,
   };
 }
 

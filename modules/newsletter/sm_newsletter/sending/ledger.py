@@ -8,14 +8,17 @@ may have gone out. Every caller holds the dispatch lock
 (:mod:`sm_newsletter.sending.lock`) around both.
 
 :func:`attempts_since` is the budget's count: every tenant's rows, because the
-relay's quota is the deployment's, not a tenant's.
+relay's quota is the deployment's, not a tenant's. :func:`oldest_since` says
+when the oldest of them leaves a window.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime
+from typing import Any
 
+from simple_module_core.datetimes import aware
 from simple_module_db import finalize_session
 from simple_module_db.tenancy import all_tenants
 from sqlalchemy import func, select
@@ -25,7 +28,7 @@ from sm_newsletter.core import tenancy
 from sm_newsletter.models import SendAttempt
 from sm_newsletter.sending.transport import DeliveryResult
 
-__all__ = ["COUNTED_OUTCOMES", "attempts_since", "close_attempt", "open_attempt"]
+__all__ = ["COUNTED_OUTCOMES", "attempts_since", "close_attempt", "oldest_since", "open_attempt"]
 
 COUNTED_OUTCOMES = ("pending", "accepted", "unknown")
 """What uses the budget: sent, maybe sent, or not resolved yet. ``rejected``
@@ -78,13 +81,24 @@ async def attempts_since(session_factory: SessionFactory, *, since: datetime) ->
     for newsletter's guard): a deliberate cross-tenant count that returns a
     number, never a row.
     """
+    return int(await _since(session_factory, func.count(), since) or 0)
+
+
+async def oldest_since(session_factory: SessionFactory, *, since: datetime) -> datetime | None:
+    """The earliest counted attempt at or after ``since``, across every tenant
+    (as :func:`attempts_since`: a time, never a row), or ``None``."""
+    oldest = await _since(session_factory, func.min(_TABLE.c.attempted_at), since)
+    return None if oldest is None else aware(oldest)
+
+
+async def _since(session_factory: SessionFactory, column: Any, since: datetime) -> Any:
     stmt = (
-        select(func.count())
+        select(column)
         .select_from(_TABLE)
         .where(_TABLE.c.attempted_at >= since, _TABLE.c.outcome.in_(COUNTED_OUTCOMES))
     )
     with all_tenants():
         async with session_factory() as session:
-            count = (await session.execute(tenancy.all_tenants(stmt))).scalar_one()
+            value = (await session.execute(tenancy.all_tenants(stmt))).scalar_one()
             await finalize_session(session)
-    return int(count)
+    return value

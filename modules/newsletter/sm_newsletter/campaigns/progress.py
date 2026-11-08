@@ -7,7 +7,6 @@ returns a number, never a row.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from simple_module_db import finalize_session
@@ -21,15 +20,16 @@ from sm_newsletter.campaigns.lifecycle import SENDING, split_paused
 from sm_newsletter.core import tenancy
 from sm_newsletter.core.settings import NewsletterSettings
 from sm_newsletter.models import Campaign, Send
+from sm_newsletter.sending.budget import DAY, MINUTE
+from sm_newsletter.sending.ledger import SessionFactory
 from sm_newsletter.web.schemas.sending import EstimateOut, ProgressOut
 
 __all__ = ["daily_rate", "estimate", "estimate_finish", "progress", "queued_ahead"]
 
-SessionFactory = Callable[[], AsyncSession]
 _SEND = Send.__table__  # ty: ignore[unresolved-attribute]
 _CAMPAIGN = Campaign.__table__  # ty: ignore[unresolved-attribute]
-_DAY_SECONDS = 86400
-_MINUTES_PER_DAY = 1440
+_DAY_SECONDS = DAY.total_seconds()
+_MINUTES_PER_DAY = DAY // MINUTE
 
 
 def daily_rate(settings: NewsletterSettings) -> int:
@@ -45,16 +45,10 @@ def estimate_finish(*, start: datetime, ahead: int, own: int, rate: int) -> date
         return datetime.max.replace(tzinfo=start.tzinfo)
 
 
-async def queued_ahead(
-    factory: SessionFactory,
-    *,
-    started_before: datetime | None,
-    exclude_campaign_id: int | None,
-) -> int:
+async def queued_ahead(factory: SessionFactory, *, started_before: datetime | None) -> int:
     """``queued`` rows of ``sending`` campaigns, every tenant's, that started before
-    ``started_before`` (``None``: any). Ids are per tenant, so pass
-    ``exclude_campaign_id`` only when it cannot collide with another tenant's;
-    ``started_before`` already leaves a campaign out of its own queue.
+    ``started_before`` (``None``: any), which already leaves a campaign out of
+    its own queue.
     A number only, under the framework's ``all_tenants()``."""
     stmt = (
         select(func.count())
@@ -67,8 +61,6 @@ async def queued_ahead(
     )
     if started_before is not None:
         stmt = stmt.where(_CAMPAIGN.c.started_at < started_before)
-    if exclude_campaign_id is not None:
-        stmt = stmt.where(_CAMPAIGN.c.id != exclude_campaign_id)
     with all_tenants():
         async with factory() as session:
             count = (await session.execute(tenancy.all_tenants(stmt))).scalar_one()
@@ -100,9 +92,7 @@ async def progress(
     rate = daily_rate(settings)
     finish = None
     if campaign.status == SENDING and campaign.started_at is not None:
-        ahead = await queued_ahead(
-            factory, started_before=campaign.started_at, exclude_campaign_id=None
-        )
+        ahead = await queued_ahead(factory, started_before=campaign.started_at)
         own = by.get("queued", 0) + by.get("sending", 0)
         finish = estimate_finish(start=now, ahead=ahead, own=own, rate=rate)
     code, detail = split_paused(campaign.paused_reason)
@@ -144,7 +134,7 @@ async def estimate(
         type_key=campaign.list_type_key,
         filters=audience_filters(campaign.audience),
     )
-    ahead = await queued_ahead(factory, started_before=None, exclude_campaign_id=None)
+    ahead = await queued_ahead(factory, started_before=None)
     rate = daily_rate(settings)
     return EstimateOut(
         recipients=recipients,

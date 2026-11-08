@@ -58,6 +58,21 @@ def test_footer_always_present():
     )
 
 
+def test_images_shrink_with_the_cell():
+    """A bare width attribute is min-content in an auto table: 375 px viewports overflowed."""
+    blocks = body(
+        ("Image", {"src": "/media/x.png", "alt": "x", "width": 536}),
+        ("ArticleCard", CARD),
+    )
+    out = render(inp(blocks), ctx(branding=Branding("Acme", "#2563eb", "/logo.png")))
+    imgs = re.findall(r"<img [^>]*>", out.html)
+    assert len(imgs) == 3
+    for tag in imgs:
+        assert re.search(r'style="[^"]*display:block;width:100%;max-width:\d+px;height:auto', tag)
+        assert re.search(r' width="\d+"', tag)  # Outlook reads the attribute
+    assert "max-width:536px" in imgs[1]
+
+
 def test_no_script_ever():
     blocks = body(
         ("RichText", {"html": "<p>ok<script>alert(1)</script></p><style>p{}</style>"}),

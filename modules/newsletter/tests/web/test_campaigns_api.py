@@ -207,6 +207,17 @@ async def test_invalid_payloads_422(client):
     assert res.status_code == 422
 
 
+@pytest.mark.parametrize("name", [" ", "   ", "\t\n", "\u3000"])
+async def test_blank_name_422_on_create_and_patch(client, name):
+    res = await client.post(BASE, json={"name": name, "list_type_key": "news"}, headers=EDIT)
+    assert res.status_code == 422, res.text
+    cid = (await _create(client))["id"]
+    res = await client.patch(
+        f"{BASE}/{cid}", json={"expected_revision": 1, "name": name}, headers=EDIT
+    )
+    assert res.status_code == 422, res.text
+
+
 @pytest.mark.parametrize("field", ["subject", "preheader", "from_name", "reply_to"])
 @pytest.mark.parametrize("sep", ["\u2028", "\u2029", "\x85", "\x9b"])
 async def test_unicode_line_separators_422(client, field, sep):
