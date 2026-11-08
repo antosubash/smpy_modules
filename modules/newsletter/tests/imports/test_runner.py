@@ -7,7 +7,6 @@ import json
 import logging
 
 import pytest
-import pytest_asyncio
 from sm_newsletter.core.errors_import import ImportFailed
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.imports import apply, runner, tags_step
@@ -15,7 +14,6 @@ from sm_newsletter.imports.archive import sources
 from sm_newsletter.imports.staging import stage
 
 from tests.imports.world import FIELDS, upload
-from tests.support.app import build_app
 from tests.support.import_world import (
     CLEAN,
     NOW,
@@ -39,14 +37,6 @@ from tests.support.records_seed import seed_list, seed_subscriber
 pytestmark = pytest.mark.unbound_tenant
 
 SENTINEL = "sentinel-7f3a"
-
-
-@pytest_asyncio.fixture
-async def state(tmp_path):
-    _app, st = await build_app(file=tmp_path / "runner.db")
-    await seed_list(st, "default", fields=FIELDS)
-    yield st
-    await st.engine.dispose()
 
 
 async def test_run_to_done_deletes_staged_rows(state):

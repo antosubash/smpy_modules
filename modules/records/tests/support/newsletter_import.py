@@ -22,11 +22,10 @@ from sm_records.contracts.newsletter_import import (
 from sm_records.core import events
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope
-from sm_records.models import Record, RecordType
+from sm_records.models import Record
 from sm_records.public_submissions import subscribe
 from sm_records.records.services import records as record_service
 from sm_records.records.services import types as type_service
-from sqlalchemy import select
 
 from tests.support.app_harness import field
 from tests.support.newsletter_contract import TENANT, session, unbound
@@ -35,6 +34,7 @@ SETTINGS = RecordsSettings()
 KEY = "weekly"
 NOW = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
 T = NOW - timedelta(days=30)
+ADA = "ada@example.org"
 
 
 class Spy:
@@ -47,10 +47,6 @@ class Spy:
         self.seen.append(event)
 
 
-async def _rtype(db, key: str) -> RecordType:
-    return (await db.execute(select(RecordType).where(RecordType.key == key))).scalar_one()
-
-
 async def make_list(site, tenant: str = TENANT, key: str = KEY) -> None:
     async with session(site) as db:
         with unbound():
@@ -58,7 +54,7 @@ async def make_list(site, tenant: str = TENANT, key: str = KEY) -> None:
             await events.commit(db)
     with unbound(), tenant_scope(tenant):
         async with session(site) as db:
-            rtype = await _rtype(db, key)
+            rtype = await type_service.get_type(db, key)
             team = field("team", "select", choices=[{"value": "x", "label": "X"}])
             tags = field(
                 "tags",
@@ -100,7 +96,7 @@ async def seed(
 ) -> None:
     with unbound(), tenant_scope(tenant):
         async with session(site) as db:
-            rtype = await _rtype(db, key)
+            rtype = await type_service.get_type(db, key)
             record = await record_service.create_record(
                 db,
                 rtype,
@@ -117,7 +113,7 @@ async def stored(site, email: str, tenant: str = TENANT, key: str = KEY) -> Reco
     """The record holding ``email`` (trash included), read through the ORM."""
     with unbound(), tenant_scope(tenant):
         async with session(site) as db:
-            rtype = await _rtype(db, key)
+            rtype = await type_service.get_type(db, key)
             found = await subscribe.find(db, rtype, email)
             assert found is not None, email
             return found
@@ -140,6 +136,10 @@ async def run(
             )
         await events.commit(db)
     return results
+
+
+def row(email: str, status: str = "confirmed", **kw) -> ImportRow:
+    return ImportRow(email=email, status=status, **kw)
 
 
 def outcomes(results: Sequence[ImportResult]) -> dict[str, str]:

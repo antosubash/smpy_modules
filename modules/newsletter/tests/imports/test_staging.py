@@ -17,6 +17,7 @@ from sqlalchemy import func, select
 from tests.imports.fixtures import csv_bytes
 from tests.imports.world import FIELDS, HEAD, NOW, job_of, rows_of, staged, upload
 from tests.support.app import build_app
+from tests.support.import_world import CLEAN, SUB, UNSUB
 from tests.support.records_seed import seed_list
 
 pytestmark = pytest.mark.unbound_tenant
@@ -28,11 +29,6 @@ async def state():
     await seed_list(st, "default", fields=FIELDS)
     yield st
     await st.engine.dispose()
-
-
-SUB = "subscribed_members_export.csv"
-UNSUB = "unsubscribed_members_export.csv"
-CLEAN = "cleaned_members_export.csv"
 
 
 async def test_stage_counts_kinds_and_columns(state):

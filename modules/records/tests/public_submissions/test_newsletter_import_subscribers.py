@@ -32,6 +32,7 @@ from sqlalchemy import select
 from tests.support.app_harness import field
 from tests.support.newsletter_contract import TENANT, session, unbound
 from tests.support.newsletter_import import (
+    ADA,
     KEY,
     NOW,
     SETTINGS,
@@ -39,17 +40,12 @@ from tests.support.newsletter_import import (
     T,
     make_list,
     outcomes,
+    row,
     run,
     seed,
     stored,
     system,
 )
-
-ADA = "ada@example.org"
-
-
-def row(email: str, status: str = "confirmed", **kw) -> ImportRow:
-    return ImportRow(email=email, status=status, **kw)
 
 
 async def _hit(site, email: str):

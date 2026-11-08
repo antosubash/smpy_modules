@@ -10,7 +10,6 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
-import pytest_asyncio
 from simple_module_core.events import EventBus
 from sm_newsletter.core import suppression
 from sm_newsletter.core.suppression import mirror, store
@@ -19,7 +18,6 @@ from sm_records.contracts.events import SubscriptionChanged
 from sm_records.core import events
 
 from tests.imports.world import FIELDS, upload
-from tests.support.app import build_app
 from tests.support.import_world import (
     CLEAN,
     NOW,
@@ -38,14 +36,6 @@ from tests.support.records_seed import seed_list, seed_subscriber, signup
 pytestmark = pytest.mark.unbound_tenant
 
 ADA, BOB, EVE = (f"{n}@example.org" for n in ("ada", "bob", "eve"))
-
-
-@pytest_asyncio.fixture
-async def state(tmp_path):
-    _app, st = await build_app(file=tmp_path / "apply.db")
-    await seed_list(st, "default", fields=FIELDS)
-    yield st
-    await st.engine.dispose()
 
 
 async def test_import_clears_no_suppression(state):

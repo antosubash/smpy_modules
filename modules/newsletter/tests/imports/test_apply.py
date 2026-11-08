@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 
 import pytest
-import pytest_asyncio
 from sm_newsletter.core.suppression import email_hash
 
 from tests.imports.world import FIELDS, upload
@@ -33,14 +32,6 @@ pytestmark = pytest.mark.unbound_tenant
 
 ADA, BOB, CY, DEE = (f"{n}@example.org" for n in ("ada", "bob", "cy", "dee"))
 UNSUB_HEAD = ["Email Address", "First Name", "Last Name", "UNSUB_TIME"]
-
-
-@pytest_asyncio.fixture
-async def state(tmp_path):
-    _app, st = await build_app(file=tmp_path / "apply.db")
-    await seed_list(st, "default", fields=FIELDS)
-    yield st
-    await st.engine.dispose()
 
 
 async def test_apply_writes_records_and_suppressions(state):

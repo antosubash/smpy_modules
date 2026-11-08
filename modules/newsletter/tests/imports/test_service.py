@@ -15,11 +15,10 @@ from sqlalchemy import func, select
 
 from tests.imports.world import FIELDS, job_of, staged, upload
 from tests.support.app import build_app
+from tests.support.import_world import SUB, set_job
 from tests.support.records_seed import restrict_list, seed_list
 
 pytestmark = pytest.mark.unbound_tenant
-
-SUB = "subscribed_members_export.csv"
 
 
 @pytest_asyncio.fixture
@@ -32,14 +31,6 @@ async def world():
 
 async def _staged(state, tenant="default"):
     return await staged(state, upload(SUB, [["a@x.org", "Ada", "L", "VIP"]]), tenant=tenant)
-
-
-async def _set_status(state, jid, status):
-    with tenant_scope("default"):
-        async with state.session_factory() as s:
-            job = (await s.execute(select(ImportJob).where(ImportJob.id == jid))).scalar_one()
-            job.status = status
-            await s.commit()
 
 
 async def test_get_import_other_tenant_is_404(world):
@@ -100,7 +91,7 @@ async def test_set_mapping_only_while_staged(world):
                 )
             await s.commit()
     assert (await job_of(state, jid)).mapping == {"fields": {"0": "last_name"}, "tags": False}
-    await _set_status(state, jid, "queued")
+    await set_job(state, jid, status="queued")
     with tenant_scope("default"):
         async with state.session_factory() as s:
             with pytest.raises(errors_import.ImportNotStaged):
@@ -117,7 +108,7 @@ async def test_set_mapping_only_while_staged(world):
 async def test_queue_apply_only_from_staged_or_failed(world, status, ok):
     _, state = world
     jid = await _staged(state)
-    await _set_status(state, jid, status)
+    await set_job(state, jid, status=status)
     with tenant_scope("default"):
         async with state.session_factory() as s:
             job = await s.get(ImportJob, jid)
@@ -138,7 +129,7 @@ async def test_queue_apply_is_conditional_on_the_stored_status(world):
     with tenant_scope("default"):
         async with state.session_factory() as s:
             job = await s.get(ImportJob, jid)
-            await _set_status(state, jid, "running")
+            await set_job(state, jid, status="running")
             with pytest.raises(errors_import.ImportNotStaged):
                 await service.queue_apply(s, tenant_id="default", job=job)
 
@@ -155,7 +146,7 @@ async def _counts(state):
 async def test_discard_deletes_rows(world, status):
     _, state = world
     jid = await _staged(state)
-    await _set_status(state, jid, status)
+    await set_job(state, jid, status=status)
     assert await _counts(state) == (1, 1)
     with tenant_scope("default"):
         async with state.session_factory() as s:
@@ -168,7 +159,7 @@ async def test_discard_deletes_rows(world, status):
 async def test_discard_running_refused(world, status):
     _, state = world
     jid = await _staged(state)
-    await _set_status(state, jid, status)
+    await set_job(state, jid, status=status)
     with tenant_scope("default"):
         async with state.session_factory() as s:
             with pytest.raises(errors_import.ImportRunning):

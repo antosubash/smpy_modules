@@ -10,16 +10,19 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
-from sm_records.contracts.newsletter_import import ImportRow
 from sm_records.records.services import records as record_service
 
-from tests.support.newsletter_import import NOW, T, make_list, outcomes, run, seed, stored
-
-ADA = "ada@example.org"
-
-
-def row(email: str, status: str = "confirmed", **kw) -> ImportRow:
-    return ImportRow(email=email, status=status, **kw)
+from tests.support.newsletter_import import (
+    ADA,
+    NOW,
+    T,
+    make_list,
+    outcomes,
+    row,
+    run,
+    seed,
+    stored,
+)
 
 
 async def test_existing_confirmed_appends_tags_and_fills_empty_fields(site):

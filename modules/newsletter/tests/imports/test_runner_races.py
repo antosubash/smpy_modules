@@ -10,14 +10,12 @@ import asyncio
 from datetime import timedelta
 
 import pytest
-import pytest_asyncio
 from sm_newsletter.imports import runner
 from sm_newsletter.models import ImportJob
 from sqlalchemy import update
 
-from tests.imports.world import FIELDS, upload
+from tests.imports.world import upload
 from tests.pg_support import USING_POSTGRES
-from tests.support.app import build_app
 from tests.support.import_world import (
     CLEAN,
     NOW,
@@ -38,19 +36,10 @@ from tests.support.import_world import (
     staged_outcomes,
     suppression_rows,
 )
-from tests.support.records_seed import seed_list
 
 pytestmark = pytest.mark.unbound_tenant
 
 SENTINEL = "sentinel-7f3a"
-
-
-@pytest_asyncio.fixture
-async def state(tmp_path):
-    _app, st = await build_app(file=tmp_path / "runner.db")
-    await seed_list(st, "default", fields=FIELDS)
-    yield st
-    await st.engine.dispose()
 
 
 async def test_busy_when_leased(state):

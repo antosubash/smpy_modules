@@ -25,7 +25,9 @@ from sm_records.models import tables_for
 from sm_records.records.services import types as type_service
 from sqlalchemy import func, select, update
 
-from tests.imports.world import NOW, staged, upload
+from tests.imports.world import NOW, job_of, rows_of, staged, upload
+
+job_row = job_of
 
 SUB = "subscribed_members_export.csv"
 UNSUB = "unsubscribed_members_export.csv"
@@ -211,12 +213,6 @@ async def suppress_at(state, email, reason, key="", tenant="default", at=NOW) ->
             await finalize_session(s)
 
 
-async def job_row(state, jid, tenant="default") -> ImportJob:
-    with tenant_scope(tenant):
-        async with state.session_factory() as s:
-            return (await s.execute(select(ImportJob).where(ImportJob.id == jid))).scalar_one()
-
-
 async def tag_choices(state: Any) -> dict[str, str]:
     """Value -> label of list ``news``'s ``tags`` choices, indexed field or not."""
     return dict((await list_shape(state))[1])
@@ -243,10 +239,7 @@ async def staged_count(state, jid, tenant="default") -> int:
 
 
 async def staged_outcomes(state, jid) -> list[str | None]:
-    with tenant_scope("default"):
-        async with state.session_factory() as s:
-            stmt = select(ImportEntry.outcome).where(ImportEntry.import_id == jid)
-            return list((await s.execute(stmt.order_by(ImportEntry.seq))).scalars())
+    return [r.outcome for r in await rows_of(state, jid)]
 
 
 def counts(job: ImportJob) -> tuple[int, ...]:
