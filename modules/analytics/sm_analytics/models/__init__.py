@@ -33,7 +33,7 @@ class AnalyticsProperty(Base, MultiTenantMixin, table=True):
 class AnalyticsSession(Base, MultiTenantMixin, table=True):
     __tablename__ = "analytics_session"
     __table_args__ = (
-        Index("ix_analytics_session_visitor", "tenant_id", "property_id", "visitor", "last_seen"),
+        Index("ix_analytics_session_visitor", "property_id", "tenant_id", "visitor", "last_seen"),
         Index("ix_analytics_session_retention", "tenant_id", "last_seen", "id"),
     )
     id: str = Field(default_factory=new_id, primary_key=True, max_length=36)
@@ -47,7 +47,7 @@ class AnalyticsEvent(Base, MultiTenantMixin, table=True):
     __tablename__ = "analytics_event"
     __table_args__ = (
         UniqueConstraint("tenant_id", "property_id", "event_id", name="uq_analytics_event_id"),
-        Index("ix_analytics_event_time", "tenant_id", "property_id", "created_at"),
+        Index("ix_analytics_event_time", "property_id", "tenant_id", "created_at"),
         Index("ix_analytics_event_retention", "tenant_id", "created_at", "id"),
         *(
             Index(

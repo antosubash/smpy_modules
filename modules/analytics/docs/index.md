@@ -111,13 +111,19 @@ schema to match the module metadata.
 | Property lookup, collection lock/update, property deletion | Property primary key; tenant is checked on the selected row |
 | Property listing, enabled public configuration, scheduler tenant enumeration | Property `tenant_id` index; the small property list is sorted by name after filtering |
 | Duplicate event lookup | Unique `(tenant_id, property_id, event_id)` constraint |
-| Visitor's latest session and session deletion by property | `(tenant_id, property_id, visitor, last_seen)`; latest lookup scans backwards |
-| Unfiltered totals, daily and ranked breakdowns, active visitors, recent events | Event `(tenant_id, property_id, created_at)`; recent events scan backwards |
+| Visitor's latest session and session deletion by property | `(property_id, tenant_id, visitor, last_seen)`; latest lookup scans backwards |
+| Unfiltered totals, daily and ranked breakdowns, active visitors, recent events | Event `(property_id, tenant_id, created_at)`; recent events scan backwards |
 | Standalone country, region, city, path or event-name filters | One event `(tenant_id, property_id, <filter>, created_at)` index per supported equality filter |
 | Allowed JSON event-property breakdowns | Event-name/time index narrows the selected event; JSON extraction/grouping happens on those rows |
 | Expired event/session candidate IDs, across every property in a tenant | Covering `(tenant_id, created_at, id)` / `(tenant_id, last_seen, id)` |
-| Session orphan check | Event `session_id` index, with tenant checked on matching events |
-| Batched expiry deletion and property cascade deletion | Primary key for selected IDs; event/session tenant/property index prefixes for whole-property deletion |
+| Property foreign-key enforcement inside the database, without a tenant predicate | Existing event-time/session-visitor indexes now lead with `property_id`; no-match checks avoid unrelated histories |
+| Session orphan check and session foreign-key enforcement | Event `session_id` index; the orphan query also filters tenant |
+| Batched expiry deletion and property cascade deletion | Primary key for selected IDs; event/session property/tenant index prefixes for whole-property deletion |
+
+Property IDs are globally unique. Leading with the property on the existing time
+and visitor indexes supports both implicit foreign-key checks and explicit
+queries that constrain both property and tenant; tenant-only cleanup keeps its
+own time index.
 
 Combined filters use a selective indexed prefix and check remaining conditions;
 a separate index for every combination would multiply collection cost. The old
@@ -149,20 +155,21 @@ migration (seconds per complete service report):
 
 | Backend | 7 days before / after | 90 days before / after | C1 committed events/s before / after |
 | --- | --- | --- | --- |
-| SQLite | 7.14 / 7.23 | 102.39 / 103.12 | 117.75 / 111.91 |
-| Postgres | 3.93 / 4.25 | 55.62 / 55.99 | 120.72 / 126.44 |
+| SQLite | 7.14 / 6.97 | 102.39 / 98.85 | 117.75 / 110.14 |
+| Postgres | 3.93 / 4.33 | 55.62 / 55.94 | 120.72 / 123.02 |
 
 After measurements use one report per range and 1000 individually committed
 collector calls. Before report values are medians of three samples except the
-Postgres 90-day report (one). Histories also contain 3000–4000 prior synthetic
+Postgres 90-day report (one). Histories also contain 4000–5000 prior synthetic
 collector events; these remain in after reports. Timings are cache-influenced,
 local observations, not a statistically controlled throughput or capacity claim.
-The SQLite write sample was about 5% slower; deployments must remeasure ingestion.
+The SQLite write sample was about 6.5% slower; deployments must remeasure ingestion.
 
 All analytics indexes, including primary/unique indexes, grew from 1.91 to
-4.15 GB on SQLite and 1.42 to 2.24 GB on Postgres. Index builds took about
-104 / 149 seconds respectively on these owned fixtures. The fixture uses short
-paths and mostly empty location codes, so other traffic can have larger indexes.
+4.09 GB on SQLite and 1.42 to 2.24 GB on Postgres. Initial index additions took
+104 / 149 seconds on SQLite / Postgres; rebuilding the two property-leading
+indexes took another 20 / 18 seconds. Full migration time will vary. The fixture
+uses short paths and mostly empty location codes, so other traffic can have larger indexes.
 Selective filters and tenant-wide cleanup now have the intended range prefixes;
 broad reports still aggregate raw history and show no material latency gain.
 Daily rollups would be needed for consistently interactive long-range reports.

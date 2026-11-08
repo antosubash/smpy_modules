@@ -32,11 +32,12 @@ def test_migration_creates_and_removes_only_analytics_tables(tmp_path):
             )
             indexes = module_from_spec(index_spec)
             index_spec.loader.exec_module(indexes)
-            before = inspect(connection).get_indexes("analytics_event")
+            tables = ("analytics_event", "analytics_session")
+            before = {table: inspect(connection).get_indexes(table) for table in tables}
             indexes.upgrade()
             assert compare_metadata(context, Base.metadata) == []
             indexes.downgrade()
-            assert inspect(connection).get_indexes("analytics_event") == before
+            assert {table: inspect(connection).get_indexes(table) for table in tables} == before
             indexes.upgrade()
             assert compare_metadata(context, Base.metadata) == []
             migration.downgrade()
