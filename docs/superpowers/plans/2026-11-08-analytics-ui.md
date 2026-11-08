@@ -42,13 +42,14 @@
 
 ### Task 2: Compact dashboard and applied filters
 
-**Files:** Modify `pages/Dashboard.tsx`, `ui/components/ReportFilters.tsx`, its test and `tests/e2e/analytics.spec.ts`; create `DateRangeControl.tsx`, `FilterChips.tsx`, `PropertySettings.tsx` and focused tests as needed.
+**Files:** Modify `pages/Dashboard.tsx`, `ui/components/ReportFilters.tsx`, its test, `ui/utils/useAnalytics.ts` and its test, and `tests/e2e/analytics.spec.ts`; create `DateRangeControl.tsx`, `FilterChips.tsx`, `PropertySettings.tsx` and focused tests as needed.
 
 **Interfaces:** Preserve `ReportFilters({ value: Filters, onChange: (filters: Filters) => void, report: Report | null })`; controller inserts it in the toolbar. Preserve existing property callbacks/permission checks. ReportView's interface stays unchanged.
 
 - [ ] Write failing tests for draft/Apply behavior, preset/custom inclusive UTC ranges, cancel, chip removal/unknown labels/geo clearing and management permission gates.
 - [ ] Run focused Vitest to confirm failures.
 - [ ] Implement wrapping toolbar, compact date/filter controls, visible chips and secondary management using existing UI primitives; preserve destructive confirmation.
+- [ ] Retain the last successful report during same-property/filter refresh so local tabs stay mounted; hide it immediately for a different property/filter scope. Test both cases and preserve the slow-report in-flight guard.
 - [ ] Update the standalone E2E spec for menu/dialog/filter navigation while retaining real collection assertions.
 - [ ] Run focused checks and commit owned files; independent review/fix gate.
 
