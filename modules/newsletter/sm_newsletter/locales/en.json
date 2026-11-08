@@ -471,6 +471,8 @@
     "import_bad_mapping": "The column mapping is not valid.",
     "import_failed": "The import failed. Fix the cause and try again.",
     "import_not_staged": "This import is no longer waiting for a mapping.",
+    "import_changed": "This import changed in another tab or window. The screen now shows its current state.",
+    "import_no_rows": "The import has no rows to apply.",
     "import_running": "An import is already running.",
     "list_exists": "A list with that key already exists.",
     "invalid_list_key": "The list key is not valid."

@@ -471,6 +471,8 @@
     "import_bad_mapping": "Die Spaltenzuordnung ist ungültig.",
     "import_failed": "Der Import ist fehlgeschlagen. Beheben Sie die Ursache und versuchen Sie es erneut.",
     "import_not_staged": "Dieser Import wartet nicht mehr auf eine Zuordnung.",
+    "import_changed": "Dieser Import wurde in einem anderen Tab oder Fenster geändert. Die Ansicht zeigt jetzt seinen aktuellen Stand.",
+    "import_no_rows": "Der Import enthält keine Zeilen zum Übernehmen.",
     "import_running": "Ein Import läuft bereits.",
     "list_exists": "Eine Liste mit diesem Schlüssel gibt es bereits.",
     "invalid_list_key": "Der Listenschlüssel ist ungültig."

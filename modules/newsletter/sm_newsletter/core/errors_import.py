@@ -92,6 +92,20 @@ class ImportNotStaged(NewsletterError):  # noqa: N818 - the state it refuses
     detail = "This import is no longer waiting for a mapping"
 
 
+class ImportChanged(NewsletterError):  # noqa: N818 - the state it refuses
+    """The import moved on since the caller looked (another tab applied or discarded it)."""
+
+    status = 409
+    code = "import_changed"
+    detail = "This import changed in the meantime"
+
+
+class ImportNoRows(NewsletterError):  # noqa: N818 - the state it refuses
+    status = 422
+    code = "import_no_rows"
+    detail = "The import has no rows to apply"
+
+
 class ImportRunning(NewsletterError):  # noqa: N818 - the state it refuses
     status = 409
     code = "import_running"

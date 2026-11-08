@@ -13,7 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns.access import MAX_BIG_ID, Roles, readable_lists, require_list
 from sm_newsletter.core.errors import NotFound
-from sm_newsletter.core.errors_import import ImportNotStaged, ImportRunning
+from sm_newsletter.core.errors_import import (
+    ImportChanged,
+    ImportNoRows,
+    ImportNotStaged,
+    ImportRunning,
+)
 from sm_newsletter.imports import mapping, staging
 from sm_newsletter.imports.constants import DONE, FAILED, QUEUED, STAGED
 from sm_newsletter.models import ImportEntry, ImportJob
@@ -93,7 +98,9 @@ async def set_mapping(
 
 async def queue_apply(session: AsyncSession, *, tenant_id: str, job: ImportJob) -> ImportJob:
     """``staged`` or ``failed`` to ``queued``; :class:`ImportNotStaged` when the stored status is
-    anything else (the object may be stale)."""
+    anything else (the object may be stale), :class:`ImportNoRows` when nothing was staged."""
+    if job.total == 0:  # set once at staging, never changed
+        raise ImportNoRows()
     stmt = (
         update(ImportJob)
         .where(
@@ -117,7 +124,7 @@ async def discard(
     """Delete a ``staged``, ``done`` or ``failed`` import and its rows;
     :class:`ImportRunning` for a ``queued`` or ``running`` one. With ``expected_status`` (what
     the caller was looking at) the same ``DELETE`` also requires the stored status to equal it,
-    and :class:`ImportNotStaged` answers when it moved on (a stale tab never deletes a result)."""
+    and :class:`ImportChanged` answers when it moved on (a stale tab never deletes a result)."""
     stmt = delete(ImportJob).where(
         ImportJob.id == job.id,
         ImportJob.tenant_id == tenant_id,
@@ -127,7 +134,7 @@ async def discard(
         stmt = stmt.where(ImportJob.status == expected_status)
     gone = await session.execute(stmt.execution_options(synchronize_session=False))
     if gone.rowcount != 1:  # ty: ignore[unresolved-attribute]
-        raise ImportNotStaged() if expected_status is not None else ImportRunning()
+        raise ImportChanged() if expected_status is not None else ImportRunning()
     await session.execute(
         delete(ImportEntry)
         .where(ImportEntry.import_id == job.id, ImportEntry.tenant_id == tenant_id)

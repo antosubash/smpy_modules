@@ -69,7 +69,7 @@ describe('Import screen against a stale state', () => {
 
   it('sends the status it shows with a discard, and reloads on a 409', async () => {
     await render();
-    refuse = { method: 'DELETE', status: 409, code: 'import_not_staged' };
+    refuse = { method: 'DELETE', status: 409, code: 'import_changed' };
     await act(async () => button(en.import.discard)?.click());
     current = stagedJob({ status: 'done', processed: 12, created: 12 });
     await act(async () => button(en.import.discard_confirm.confirm)?.click());
@@ -78,7 +78,7 @@ describe('Import screen against a stale state', () => {
     expect(calls.filter((c) => c === 'GET /imports/7')).toHaveLength(2);
     expect(text()).toContain(en.import.done);
     expect(button(en.import.discard)).toBeUndefined();
-    expect(text()).toContain(en.errors.import_not_staged);
+    expect(text()).toContain(en.errors.import_changed);
   });
 
   it('returns to the start on a 404, keeping the message', async () => {

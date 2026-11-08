@@ -172,7 +172,7 @@ async def test_discard_expected_status_mismatch_keeps_import(world):
     await set_job(state, jid, status="done")
     with tenant_scope("default"):
         async with state.session_factory() as s:
-            with pytest.raises(errors_import.ImportNotStaged):
+            with pytest.raises(errors_import.ImportChanged):
                 await service.discard(
                     s,
                     tenant_id="default",
@@ -180,6 +180,18 @@ async def test_discard_expected_status_mismatch_keeps_import(world):
                     expected_status="staged",
                 )
     assert await _counts(state) == (1, 1)
+
+
+async def test_queue_apply_refuses_an_import_with_no_rows(world):
+    _, state = world
+    jid = await staged(state, upload(SUB, []))
+    with tenant_scope("default"):
+        async with state.session_factory() as s:
+            job = await s.get(ImportJob, jid)
+            assert job.total == 0
+            with pytest.raises(errors_import.ImportNoRows):
+                await service.queue_apply(s, tenant_id="default", job=job)
+    assert (await job_of(state, jid)).status == "staged"
 
 
 @pytest.mark.parametrize("status", ["queued", "running"])

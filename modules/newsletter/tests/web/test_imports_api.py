@@ -126,7 +126,7 @@ async def test_discard_with_stale_status_is_409_and_keeps_the_import(client):
     url = f"{IMPORTS}/{job['id']}"
     assert (await client.post(f"{url}/apply", json={}, headers=MANAGE)).status_code == 202
     stale = await client.delete(url, params={"status": "staged"}, headers=MANAGE)
-    assert (stale.status_code, stale.json()["code"]) == (409, "import_not_staged")
+    assert (stale.status_code, stale.json()["code"]) == (409, "import_changed")
     assert (await client.get(url, headers=MANAGE)).status_code == 200
     bad = await client.delete(url, params={"status": "bogus"}, headers=MANAGE)
     assert bad.status_code == 422
