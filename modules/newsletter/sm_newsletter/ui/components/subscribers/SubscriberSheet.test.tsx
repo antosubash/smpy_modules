@@ -192,7 +192,7 @@ describe('SubscriberSheet', () => {
     expect(text()).toContain(en.errors.not_subscribed);
   });
 
-  it('drops the last subscriber\'s error when another one opens', async () => {
+  it("drops the last subscriber's error when another one opens", async () => {
     unsubscribe = () => json({ detail: 'x', code: 'not_subscribed' }, 409);
     await render({ canEdit: false, canManage: true });
     act(() => button(en.subscribers.detail.unsubscribe)?.click());
