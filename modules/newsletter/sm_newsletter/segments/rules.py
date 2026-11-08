@@ -71,12 +71,8 @@ def segment_fields(fields: Sequence[ListField]) -> dict[str, ListField]:
     return out
 
 
-def _kind(field: ListField) -> str:
-    return field.type
-
-
 def ops_for(field: ListField) -> tuple[RuleOp, ...]:
-    return tuple(TABLE[_kind(field)])  # type: ignore[return-value]
+    return tuple(TABLE[field.type])  # type: ignore[return-value]
 
 
 def _text(index: int, v: object) -> str:
@@ -90,7 +86,7 @@ def _text(index: int, v: object) -> str:
 
 
 def _scalar(index: int, field: ListField, v: str) -> str:
-    kind = _kind(field)
+    kind = field.type
     if kind in ("number", "integer"):
         if not _NUMBER.fullmatch(v) or not math.isfinite(float(v)):
             raise RuleError(index, "value must be a number")
@@ -118,7 +114,7 @@ def _scalar(index: int, field: ListField, v: str) -> str:
 
 def _compile(index: int, rule: Rule, field: ListField) -> list[str]:
     op = rule.op
-    allowed = TABLE[_kind(field)]
+    allowed = TABLE[field.type]
     if op not in allowed:
         raise RuleError(index, "operator is not valid for this field")
     term_op, key = allowed[op], field.key

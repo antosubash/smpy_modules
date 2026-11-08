@@ -12,7 +12,7 @@ from __future__ import annotations
 from simple_module_db import mark_written
 from sm_records.contracts.newsletter import SubscriberFilterError, count_subscribers
 from sm_records.contracts.newsletter_admin import ListField, list_fields
-from sqlalchemy import and_, delete, or_, select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -197,10 +197,6 @@ async def update_segment(
 async def delete_segment(
     session: AsyncSession, *, tenant_id: str, segment_id: int, roles: Roles
 ) -> None:
-    # Refused while a campaign still resolves the segment: a draft, a scheduled
-    # one, or one paused before its audience was frozen (``started_at`` empty,
-    # which ``unschedule`` returns to draft). The audience is frozen at send
-    # time, so only a started campaign no longer needs it.
     # The row lock serialises this check-then-delete with a draft PATCH naming
     # the segment, which takes the same lock (``audience_filters(lock=True)``):
     # either the PATCH commits first and this sees the draft (409), or it waits
@@ -210,10 +206,7 @@ async def delete_segment(
         select(Campaign.id)
         .where(
             Campaign.tenant_id == tenant_id,
-            or_(
-                Campaign.status.in_((DRAFT, "scheduled")),
-                and_(Campaign.status == "paused", Campaign.started_at.is_(None)),
-            ),
+            Campaign.status == DRAFT,
             Campaign.audience == f"segment:{segment_id}",
         )
         .limit(1)

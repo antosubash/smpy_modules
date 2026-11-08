@@ -57,6 +57,7 @@ export function AudiencePicker({
   useEffect(() => {
     let live = true;
     setSegmentsError(null);
+    setSegments(null); // another list's segments must not judge this list's choice
     api
       .listSegments(listKey)
       .then((s) => live && setSegments(s))

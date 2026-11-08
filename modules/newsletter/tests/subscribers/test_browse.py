@@ -8,6 +8,7 @@ from sm_newsletter.core.errors import NotFound
 from sm_newsletter.core.errors_audience import InvalidSegment
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import Segment
+from sm_newsletter.segments.rules import MAX_TERMS
 from sm_newsletter.subscribers.browse import browse, detail
 
 from tests.support.lift_world import seed_row
@@ -70,6 +71,24 @@ async def test_search_tag_and_segment_combine(db_state):
     assert {r.hit.email for r in vip.rows} == {ADA, BOB}
     with pytest.raises(InvalidSegment):
         await _bad_segment(db_state)
+
+
+async def test_a_tag_on_a_segment_at_the_term_cap_is_a_clear_422(db_state):
+    await _world(db_state)
+    with tenant_scope("default"):
+        async with db_state.session_factory() as s:
+            seg = Segment(
+                name="full",
+                list_type_key="news",
+                filters=[f"sm_email:contains:{i}" for i in range(MAX_TERMS)],
+                rules=[],
+            )
+            s.add(seg)
+            await finalize_session(s)
+            sid = seg.id
+    assert (await _browse(db_state, segment_id=sid)).total == 0  # the cap alone is fine
+    with pytest.raises(InvalidSegment, match=f"exceed {MAX_TERMS} terms"):
+        await _browse(db_state, tag="vip", segment_id=sid)
 
 
 async def _bad_segment(db_state):

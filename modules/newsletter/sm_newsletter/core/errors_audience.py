@@ -22,7 +22,7 @@ class SegmentNameTaken(NewsletterError):  # noqa: N818 - the state it refuses
 class SegmentInUse(NewsletterError):  # noqa: N818 - the state it refuses
     status = 409
     code = "segment_in_use"
-    detail = "A campaign that has not started sending still uses this segment"
+    detail = "A draft campaign still uses this segment"
 
 
 class UnknownSegment(NewsletterError):  # noqa: N818 - names the field

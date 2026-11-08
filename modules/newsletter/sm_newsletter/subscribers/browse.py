@@ -29,6 +29,7 @@ from sm_newsletter.core import constants
 from sm_newsletter.core.errors import NotFound
 from sm_newsletter.core.errors_audience import InvalidSegment
 from sm_newsletter.core.suppression import normalise_email, suppressed
+from sm_newsletter.segments.rules import MAX_TERMS
 from sm_newsletter.subscribers.engagement import Engagement, engagement
 from sm_newsletter.subscribers.lift import subscriber_on_list
 from sm_newsletter.subscribers.suppressions import SuppressionRow, lift_block, rows_for_email
@@ -89,6 +90,8 @@ async def _filters(
                 audience=audience,
                 roles=roles,
             )
+    if len(out) > MAX_TERMS:  # a tag on top of a segment at the cap: records would refuse it
+        raise InvalidSegment(f"filter: a tag and this segment exceed {MAX_TERMS} terms together")
     return out
 
 

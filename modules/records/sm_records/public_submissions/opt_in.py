@@ -93,7 +93,10 @@ async def confirm(
             raise _expired()
         return {"sm_status": CONFIRMED, "sm_confirmed_at": utcnow()}, None
 
-    outcome = await transition(db, rtype, record, derive, settings=settings)
+    try:
+        outcome = await transition(db, rtype, record, derive, settings=settings)
+    except NotFound:  # purged since the lookup, like a trashed row
+        raise _expired() from None
     if not outcome.wrote:
         return "already_confirmed"
     events.emit(db, changed(rtype, outcome.record, PENDING, CONFIRMED))
