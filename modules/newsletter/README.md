@@ -74,7 +74,7 @@ Changing the SMTP host, port, security or username clears the stored password.
 | --- | --- |
 | `newsletter.view` | See campaigns and preview them, reports, segments; with `records.view`, the subscriber screen |
 | `newsletter.edit` | Create and edit campaigns and segments; tag and untag subscribers (with `records.view`) |
-| `newsletter.send` | Send a test; later, start, pause, resume and cancel a send |
+| `newsletter.send` | Send a test; schedule or send, unschedule, pause, resume and cancel a campaign; the send estimate |
 | `newsletter.manage` | The settings page (saving it and the SMTP password also need `settings.edit`), the suppressions screen and its lifts, and unsubscribing a subscriber (with `records.view`) |
 
 Every entry point binds a tenant: a single-tenant host uses `default`, a

@@ -72,7 +72,7 @@ def segment_fields(fields: Sequence[ListField]) -> dict[str, ListField]:
 
 
 def _kind(field: ListField) -> str:
-    return "multiselect" if field.many and field.type == "select" else field.type
+    return field.type
 
 
 def ops_for(field: ListField) -> tuple[RuleOp, ...]:

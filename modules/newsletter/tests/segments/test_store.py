@@ -100,7 +100,21 @@ async def test_update_recompiles_rules_and_filters_together(db_state, db):
         )
 
 
-async def test_delete_blocked_by_draft_not_by_scheduled(db_state, db):
+# A campaign resolves its segment until it starts sending (the audience is
+# frozen then): a draft, a scheduled one, or one paused before it started.
+DELETE_CASES = [
+    ("draft", False, True),
+    ("scheduled", False, True),
+    ("paused", False, True),
+    ("paused", True, False),
+    ("sending", True, False),
+    ("sent", True, False),
+    ("cancelled", False, False),
+]
+
+
+@pytest.mark.parametrize(("status", "started", "blocks"), DELETE_CASES)
+async def test_delete_blocked_until_the_campaign_started(db_state, db, status, started, blocks):
     await _world(db_state)
     seg = await _create(db)
     cid = await seed_campaign(db_state, T, status="draft")
@@ -108,17 +122,17 @@ async def test_delete_blocked_by_draft_not_by_scheduled(db_state, db):
         await s.execute(
             update(Campaign)
             .where(Campaign.id == cid, Campaign.tenant_id == T)
-            .values(audience=f"segment:{seg.id}")
+            .values(
+                audience=f"segment:{seg.id}",
+                status=status,
+                started_at=utcnow() if started else None,
+            )
         )
     with tenant_scope(T):
-        with pytest.raises(SegmentInUse):
-            await store.delete_segment(db, tenant_id=T, segment_id=seg.id, roles=NOBODY)
-        async with db_state.session_factory() as s, s.begin():
-            await s.execute(
-                update(Campaign)
-                .where(Campaign.id == cid, Campaign.tenant_id == T)
-                .values(status="scheduled")
-            )
+        if blocks:
+            with pytest.raises(SegmentInUse):
+                await store.delete_segment(db, tenant_id=T, segment_id=seg.id, roles=NOBODY)
+            return
         await store.delete_segment(db, tenant_id=T, segment_id=seg.id, roles=NOBODY)
         await finalize_session(db)
         with pytest.raises(NotFound):

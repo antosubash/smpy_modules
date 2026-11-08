@@ -89,6 +89,22 @@ async def _unsubscribe(db, uuid: str) -> bool:
     )
 
 
+async def test_unsubscribe_of_a_row_purged_before_the_lock(audience, monkeypatch):
+    """A purge landing between the contract's lookup and leave's lock answers
+    ``False`` (nothing written), not ``NoResultFound``."""
+    from sm_records.public_submissions import transition
+    from sm_records.public_submissions.row_lock import lock_record
+
+    async def purged(db, rtype, record):
+        return await lock_record(db, rtype, type(record)(id=-1, tenant_id=record.tenant_id))
+
+    monkeypatch.setattr(transition, "lock_record", purged)
+    uuid = await uuid_of(audience, ADA)
+    async with session(audience) as db:
+        assert await _unsubscribe(db, uuid) is False
+        await db.rollback()
+
+
 @pg_only
 async def test_unsubscribe_waits_for_a_held_lock(audience):
     uuid = await uuid_of(audience, ADA)

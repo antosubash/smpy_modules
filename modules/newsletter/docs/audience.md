@@ -58,7 +58,10 @@ create on a list the caller cannot read is 403 `list_forbidden`).
   The segments and editor pages pass `can_count` (`records.view`), and without
   it the screens ask for no tag, segment or preview count and say only people
   who may view subscribers see it. A read-only campaign asks for no count at all.
-- Deleting a segment that a **draft** campaign names is `409 segment_in_use`.
+- Deleting a segment that a campaign still names is `409 segment_in_use` while
+  that campaign is a **draft**, **scheduled**, or **paused** before it started
+  sending. Once a campaign has started, its audience is frozen and
+  the segment can go.
 
 ## Audiences
 
