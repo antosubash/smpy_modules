@@ -77,12 +77,43 @@ test('analytics opt-in, public and app tracking, events, unknown locations and d
       return response.status;
     }, publicId);
     expect(eventStatus).toBe(204);
+    const pageviewStatuses = await page.evaluate(async (propertyId) => {
+      const statuses = [];
+      for (let index = 0; index < 20; index++) {
+        const response = await fetch('/api/analytics/collect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            property_id: propertyId,
+            event_id: crypto.randomUUID(),
+            kind: 'pageview',
+            path: window.location.pathname,
+          }),
+        });
+        statuses.push(response.status);
+      }
+      return statuses;
+    }, publicId);
+    expect(pageviewStatuses).toHaveLength(20);
+    expect(new Set(pageviewStatuses)).toEqual(new Set([204]));
     await page.goto('/analytics/');
     await page.getByLabel('Property', { exact: true }).selectOption(publicId as string);
     await expect(
       page.getByRole('heading', { name: 'Visitor locations', exact: true }),
     ).toBeVisible();
     await expect(page.getByText('download', { exact: true }).first()).toBeVisible();
+    const activity = page.getByRole('region', { name: 'Recent activity', exact: true });
+    await expect(activity.locator('tbody tr')).toHaveCount(22);
+    expect(await activity.evaluate((element) => element.clientHeight)).toBeLessThanOrEqual(320);
+    expect(await activity.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
+      true,
+    );
+    await activity.scrollIntoViewIfNeeded();
+    await activity.focus();
+    await expect(activity).toBeFocused();
+    await activity.press('End');
+    await expect.poll(() => activity.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    await expect(activity.locator('tbody tr').last()).toBeInViewport();
     await page.getByRole('button', { name: 'Filters', exact: true }).click();
     await page.getByLabel('Country', { exact: true }).selectOption('__unknown__');
     await page.getByRole('button', { name: 'Apply', exact: true }).click();
@@ -160,4 +191,30 @@ test('analytics opt-in, public and app tracking, events, unknown locations and d
       await page.request.delete(`/api/analytics/properties/${id}`, { headers: csrf });
     await page.request.delete(`/api/pagebuilder/pages/${content.id}`, { headers: csrf });
   }
+});
+
+test('analytics theme follows system dark, light and live preference changes', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await login(page);
+  await page.goto('/analytics/');
+  await expect(page.getByRole('heading', { name: 'Analytics', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('sm.theme'))).toBeNull();
+  await expect(page.locator('html')).toHaveClass(/dark/);
+  const darkSurface = await page
+    .locator('body')
+    .evaluate((element) => getComputedStyle(element).backgroundColor);
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect(page.locator('html')).not.toHaveClass(/dark/);
+  await expect
+    .poll(() =>
+      page.locator('body').evaluate((element) => getComputedStyle(element).backgroundColor),
+    )
+    .not.toBe(darkSurface);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(page.locator('html')).toHaveClass(/dark/);
+  await expect
+    .poll(() =>
+      page.locator('body').evaluate((element) => getComputedStyle(element).backgroundColor),
+    )
+    .toBe(darkSurface);
 });

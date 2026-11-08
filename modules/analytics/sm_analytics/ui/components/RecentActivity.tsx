@@ -1,11 +1,15 @@
+import { useId } from 'react';
 import { keys, useT } from '../utils/i18n';
 import type { Report } from '../utils/types';
 
 export function RecentActivity({ recent }: { recent: Report['recent'] }) {
   const { t, locale } = useT();
+  const titleId = useId();
   return (
     <section className="min-w-0 rounded-lg border bg-card p-4 sm:p-5">
-      <h2 className="font-semibold">{t(keys.analytics.recent)}</h2>
+      <h2 id={titleId} className="font-semibold">
+        {t(keys.analytics.recent)}
+      </h2>
       <p className="mt-1 text-sm text-muted-foreground">{t(keys.analytics.recent_help)}</p>
       <p className="my-3 text-sm">
         {t(keys.analytics.recent_visitors)}:{' '}
@@ -14,7 +18,12 @@ export function RecentActivity({ recent }: { recent: Report['recent'] }) {
       {recent.events.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t(keys.analytics.no_data)}</p>
       ) : (
-        <div className="overflow-auto">
+        <section
+          aria-labelledby={titleId}
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: A scrollable region needs keyboard access to all activity rows.
+          tabIndex={0}
+          className="max-h-80 overflow-auto rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
           <table className="w-full table-fixed text-sm">
             <thead>
               <tr className="border-b text-left">
@@ -47,7 +56,7 @@ export function RecentActivity({ recent }: { recent: Report['recent'] }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </section>
       )}
     </section>
   );
