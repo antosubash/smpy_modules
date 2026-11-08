@@ -264,7 +264,7 @@
     "not_found": "That item no longer exists.",
     "public_base_url_required": "Set the site's public base URL in Settings before sending.",
     "send_budget_exhausted": "The sending limit has been reached. Try again later.",
-    "sender_not_configured": "Set the sender address in the newsletter settings first.",
+    "sender_not_configured": "Complete the sender settings first: the From address, the postal address and, for SMTP, the SMTP host.",
     "smtp_password_unreadable": "The stored SMTP password cannot be read. Enter it again.",
     "stale": "This campaign was changed elsewhere. Reload it to continue.",
     "tenant_required": "No organisation is active for this account.",

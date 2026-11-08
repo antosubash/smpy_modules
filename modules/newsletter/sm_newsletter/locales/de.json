@@ -264,7 +264,7 @@
     "not_found": "Dieser Eintrag existiert nicht mehr.",
     "public_base_url_required": "Legen Sie in den Einstellungen die öffentliche Basis-URL der Website fest, bevor Sie senden.",
     "send_budget_exhausted": "Das Sendelimit ist erreicht. Versuchen Sie es später erneut.",
-    "sender_not_configured": "Legen Sie zuerst die Absenderadresse in den Newsletter-Einstellungen fest.",
+    "sender_not_configured": "Vervollständigen Sie zuerst die Absender-Einstellungen: die Absenderadresse, die Postanschrift und bei SMTP den SMTP-Server.",
     "smtp_password_unreadable": "Das gespeicherte SMTP-Passwort kann nicht gelesen werden. Geben Sie es erneut ein.",
     "stale": "Diese Kampagne wurde anderswo geändert. Laden Sie sie neu, um fortzufahren.",
     "tenant_required": "Für dieses Konto ist keine Organisation aktiv.",

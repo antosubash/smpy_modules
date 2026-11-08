@@ -9,24 +9,16 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-import pytest
 from sm_newsletter.core.settings import NewsletterSettings
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import Campaign
 from sm_newsletter.tracking import report as report_mod
 
 from tests.support.campaign_world import set_columns
-from tests.support.sending import NOW, make_app
+from tests.support.sending import NOW
 from tests.support.tracking_world import accept, opened, sent_campaign, set_send
 
 T = "default"
-
-
-@pytest.fixture
-async def state(tmp_path):
-    _, db_state, _ = await make_app(file=tmp_path / "report.db")
-    yield db_state
-    await db_state.engine.dispose()
 
 
 async def test_acceptance_between_reads_keeps_rate_consistent(state, monkeypatch):

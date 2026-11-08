@@ -10,7 +10,7 @@ from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import Link
 from sm_newsletter.tracking.record import link_url
 
-from tests.support.sending import NOW, make_app
+from tests.support.sending import NOW
 from tests.support.tracking_world import (
     clicked,
     clicks,
@@ -23,13 +23,6 @@ from tests.support.tracking_world import (
 )
 
 T = "default"
-
-
-@pytest.fixture
-async def state():
-    _, db_state, _ = await make_app()
-    yield db_state
-    await db_state.engine.dispose()
 
 
 async def test_first_open_counts_unique_and_total(state):

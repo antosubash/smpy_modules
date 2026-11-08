@@ -242,6 +242,10 @@ approximate and says "about".
 - **One answer.** A real, `test`, forged, oversized, already-used or
   other-tenant token gets the same 200 page, so the route is no oracle for which
   tokens exist. `/newsletter/u/test` (previews and test sends) is one of them.
+  The exception is a POST that fails inside (a database error): nothing is
+  committed and the page comes back with its button as a `503`: the reader can
+  press it again, and a mailbox provider sending the one-click POST sees a
+  failure it retries rather than a success.
 - **No CSRF, on purpose.** The one-click POST comes from the mailbox provider
   with no session or cookie. The signed token is the capability.
 - **Rate limits:** 60 per minute per IP on GET, 300 on POST (one-click posts

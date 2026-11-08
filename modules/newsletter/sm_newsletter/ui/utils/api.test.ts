@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import de from '../../locales/de.json';
 import en from '../../locales/en.json';
 import type { Translate } from './i18n';
 
@@ -184,6 +185,13 @@ const SERVER_CODES = [
 describe('the error catalogue', () => {
   it.each(SERVER_CODES)('has an English line for %s', (code) => {
     expect((en.errors as Record<string, string>)[code]).toBeTruthy();
+  });
+
+  it('names every sender setting a send needs, not just the address (QA BUG-002)', () => {
+    // ``campaigns/checks.py`` raises the one code for the From address, the
+    // postal address and the SMTP host alike.
+    expect(en.errors.sender_not_configured).toMatch(/From address.*postal address.*SMTP host/);
+    expect(de.errors.sender_not_configured).toMatch(/Absenderadresse.*Postanschrift.*SMTP-Server/);
   });
 
   it('has a generic line', () => {

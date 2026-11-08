@@ -140,7 +140,7 @@ async def test_click_unknown_position_404(world):
     assert await counters(state, T, cid) == ZERO
 
 
-@pytest.mark.parametrize("position", ["0x1", "12345", "-1", "\uff11"])
+@pytest.mark.parametrize("position", ["0x1", "12345", "-1", "\uff11", "0", "01", "1000"])
 async def test_click_bad_position_404(world, position):
     app, state, cid, sid = world
     token = sign("c", T, cid, sid)
@@ -148,6 +148,13 @@ async def test_click_bad_position_404(world, position):
     res = await get(app, click_path(token, position))
     _not_found(res)
     assert answer(res) == unknown
+    assert await counters(state, T, cid) == ZERO
+
+
+@pytest.mark.parametrize("suffix", ["/", "", "/1/2"])
+async def test_click_without_one_link_number_gets_the_fixed_404(world, suffix):
+    app, state, cid, sid = world
+    _not_found(await get(app, f"{click_path(sign('c', T, cid, sid))[:-2]}{suffix}"))
     assert await counters(state, T, cid) == ZERO
 
 

@@ -4,20 +4,12 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
 from sm_newsletter.tracking.record import record_click, record_open
 
-from tests.support.sending import NOW, make_app
+from tests.support.sending import NOW
 from tests.support.tracking_world import clicks, committed, counters, link_ids, sent_campaign
 
 T = "default"
-
-
-@pytest.fixture
-async def state(tmp_path):
-    _, db_state, _ = await make_app(file=tmp_path / "track.db")
-    yield db_state
-    await db_state.engine.dispose()
 
 
 async def test_concurrent_first_opens_count_one_unique(state):

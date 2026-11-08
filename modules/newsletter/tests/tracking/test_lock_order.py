@@ -13,7 +13,6 @@ import asyncio
 import contextlib
 from typing import Any
 
-import pytest
 from sm_newsletter.campaigns import lifecycle
 from sm_newsletter.models import Link
 from sm_newsletter.tracking import record
@@ -21,7 +20,7 @@ from sqlalchemy import event
 
 from tests.pg_support import USING_POSTGRES
 from tests.support.campaign_world import campaign_row, seed_campaign, seed_sends, send_rows
-from tests.support.sending import NOW, T, make_app
+from tests.support.sending import NOW, T
 from tests.support.tracking_world import committed, counters, link_ids
 
 ROUNDS = 10
@@ -42,13 +41,6 @@ class _Gate:
         self.reached += 1
         if self.reached >= TRACKERS_AT_GATE:
             self.trackers_in.set()
-
-
-@pytest.fixture
-async def state(tmp_path):
-    _, db_state, _ = await make_app(file=tmp_path / "lock.db")
-    yield db_state
-    await db_state.engine.dispose()
 
 
 async def _round(state: Any, gate: _Gate) -> None:

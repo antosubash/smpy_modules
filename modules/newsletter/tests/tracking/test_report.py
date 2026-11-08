@@ -11,18 +11,11 @@ from sm_newsletter.models import Campaign
 from sm_newsletter.tracking.report import accepted_engagement, campaign_report, link_stats
 
 from tests.support.campaign_world import campaign_row, seed_campaign, seed_sends, set_columns
-from tests.support.sending import NOW, make_app
+from tests.support.sending import NOW
 from tests.support.tracking_world import accept, clicked, link_ids, opened, sent_campaign, set_send
 
 T = "default"
 SETTINGS = NewsletterSettings()
-
-
-@pytest.fixture
-async def state():
-    _, db_state, _ = await make_app()
-    yield db_state
-    await db_state.engine.dispose()
 
 
 async def _report(state, cid, tenant=T, settings=SETTINGS):

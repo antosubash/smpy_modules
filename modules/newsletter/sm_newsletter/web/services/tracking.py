@@ -37,7 +37,9 @@ __all__ = ["click_by_token", "open_by_token"]
 
 logger = logging.getLogger(__name__)
 
-_POSITION: Final = re.compile(r"[0-9]{1,4}")
+# A link number as ``prepare`` writes it: no leading zero, at most three
+# digits (``MAX_TRACKED_LINKS`` is 100), so ``01`` is not a second spelling of 1.
+_POSITION: Final = re.compile(r"[1-9][0-9]{0,2}")
 
 
 def _claims(
