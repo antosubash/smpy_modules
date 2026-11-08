@@ -139,7 +139,11 @@ export default function Import() {
               />
             </Step>
             <div className="flex gap-2">
-              <Button type="button" disabled={busy || starting} onClick={() => void start()}>
+              <Button
+                type="button"
+                disabled={busy || starting || job.total === 0}
+                onClick={() => void start()}
+              >
                 {busy || starting ? t(copy.applying) : t(copy.apply)}
               </Button>
               <Button
@@ -151,6 +155,7 @@ export default function Import() {
                 {t(copy.discard)}
               </Button>
             </div>
+            {job.total === 0 && <p className="text-sm text-muted-foreground">{t(copy.no_rows)}</p>}
           </>
         )}
 

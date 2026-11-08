@@ -121,6 +121,19 @@ async def test_discard_then_404(client):
     assert (await client.get(IMPORTS, headers=MANAGE)).json() == []
 
 
+async def test_discard_with_stale_status_is_409_and_keeps_the_import(client):
+    job = await upload_ok(client)
+    url = f"{IMPORTS}/{job['id']}"
+    assert (await client.post(f"{url}/apply", json={}, headers=MANAGE)).status_code == 202
+    stale = await client.delete(url, params={"status": "staged"}, headers=MANAGE)
+    assert (stale.status_code, stale.json()["code"]) == (409, "import_not_staged")
+    assert (await client.get(url, headers=MANAGE)).status_code == 200
+    bad = await client.delete(url, params={"status": "bogus"}, headers=MANAGE)
+    assert bad.status_code == 422
+    assert (await client.delete(url, params={"status": "done"}, headers=MANAGE)).status_code == 204
+    assert (await client.get(url, headers=MANAGE)).status_code == 404
+
+
 async def test_errors_csv_neutralises_formulas(client):
     name = "=cmd.csv"
     head = ["Email Address", "=HYPERLINK(1)"]

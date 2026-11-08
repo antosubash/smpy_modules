@@ -155,6 +155,22 @@ async def test_discard_deletes_rows(world, status):
     assert await _counts(state) == (0, 0)
 
 
+async def test_discard_expected_status_mismatch_keeps_import(world):
+    _, state = world
+    jid = await _staged(state)
+    await set_job(state, jid, status="done")
+    with tenant_scope("default"):
+        async with state.session_factory() as s:
+            with pytest.raises(errors_import.ImportNotStaged):
+                await service.discard(
+                    s,
+                    tenant_id="default",
+                    job=await s.get(ImportJob, jid),
+                    expected_status="staged",
+                )
+    assert await _counts(state) == (1, 1)
+
+
 @pytest.mark.parametrize("status", ["queued", "running"])
 async def test_discard_running_refused(world, status):
     _, state = world

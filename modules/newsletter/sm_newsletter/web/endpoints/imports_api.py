@@ -8,7 +8,7 @@ never by name, and never repeats a cell.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Body, Depends, Request, Response
 from simple_module_db import finalize_session
@@ -161,11 +161,12 @@ async def apply(
 async def discard(
     import_id: int,
     request: Request,
+    status: Literal["staged", "queued", "running", "done", "failed"] | None = None,
     tenant: str = Depends(bind_admin),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     job = await _job(request, db, tenant, import_id, orphan_ok=True)  # a deleted list's too
-    await service.discard(db, tenant_id=tenant, job=job)
+    await service.discard(db, tenant_id=tenant, job=job, expected_status=status)
     return Response(status_code=204)
 
 

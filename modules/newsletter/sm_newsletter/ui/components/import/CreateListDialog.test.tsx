@@ -83,6 +83,25 @@ describe('CreateListDialog', () => {
     expect(onCreated).not.toHaveBeenCalled();
   });
 
+  it('posts once when Create is clicked five times in one tick', async () => {
+    fetchMock.mockResolvedValue(reply(201, { key: 'spring' }));
+    type(byLabel(en.import.new_list_dialog.label), 'Spring');
+    await act(async () => {
+      for (let i = 0; i < 5; i++) create().click();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the server error once the name or key is edited', async () => {
+    fetchMock.mockResolvedValue(reply(409, { detail: 'exists', code: 'list_exists' }));
+    const dlg = en.import.new_list_dialog;
+    type(byLabel(dlg.label), 'Spring');
+    await act(async () => create().click());
+    expect(document.body.textContent).toContain(en.errors.list_exists);
+    type(byLabel(dlg.key), 'spring2');
+    expect(document.body.textContent).not.toContain(en.errors.list_exists);
+  });
+
   it('cannot be submitted without a valid key', () => {
     type(byLabel(en.import.new_list_dialog.label), '!!!');
     expect(create().disabled).toBe(true);

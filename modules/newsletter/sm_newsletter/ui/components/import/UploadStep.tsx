@@ -3,7 +3,7 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { keys, useT } from '../../utils/i18n';
 
@@ -20,6 +20,16 @@ interface Props {
 export function UploadStep({ disabled, busy, onUpload }: Props) {
   const { t } = useT();
   const [files, setFiles] = useState<File[]>([]);
+  // Set in the click itself: `busy` only follows on the next render.
+  const submitted = useRef(false);
+  useEffect(() => {
+    if (!busy) submitted.current = false;
+  }, [busy]);
+  const submit = () => {
+    if (submitted.current) return;
+    submitted.current = true;
+    onUpload(files);
+  };
   return (
     <div className="grid gap-2">
       <Label htmlFor={INPUT_ID}>{t(copy.upload_label)}</Label>
@@ -34,11 +44,7 @@ export function UploadStep({ disabled, busy, onUpload }: Props) {
           className="max-w-md"
           onChange={(e) => setFiles([...(e.target.files ?? [])])}
         />
-        <Button
-          type="button"
-          disabled={disabled || busy || files.length === 0}
-          onClick={() => onUpload(files)}
-        >
+        <Button type="button" disabled={disabled || busy || files.length === 0} onClick={submit}>
           {busy ? t(copy.uploading) : t(copy.upload)}
         </Button>
       </div>

@@ -2,7 +2,7 @@
 
 import { csrfHeaders } from './csrf';
 import { BASE, errorFrom, read, send, write } from './http';
-import type { ImportJob, ImportMapping, ImportSummary } from './importTypes';
+import type { ImportJob, ImportMapping, ImportStatus, ImportSummary } from './importTypes';
 
 const IMPORTS = '/imports';
 
@@ -35,8 +35,10 @@ export const setMapping = (id: number, mapping: ImportMapping): Promise<ImportJo
 export const applyImport = (id: number): Promise<ImportJob> =>
   send<ImportJob>(`${IMPORTS}/${id}/apply`, 'POST');
 
-export async function discardImport(id: number): Promise<void> {
-  await write<null>(`${IMPORTS}/${id}`, 'DELETE');
+/** `status` is the one the caller saw: the server refuses (409) when the import has moved on. */
+export async function discardImport(id: number, status?: ImportStatus): Promise<void> {
+  const query = status === undefined ? '' : `?status=${status}`;
+  await write<null>(`${IMPORTS}/${id}${query}`, 'DELETE');
 }
 
 export const errorsCsvUrl = (id: number): string => `${BASE}${IMPORTS}/${id}/errors.csv`;

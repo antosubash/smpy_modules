@@ -3,7 +3,7 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { keys, useT } from '../../utils/i18n';
 import { CreateListDialog } from './CreateListDialog';
@@ -23,6 +23,7 @@ interface Props {
 export function ListPicker({ lists, value, disabled, onChange, onCreated }: Props) {
   const { t } = useT();
   const [creating, setCreating] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
   return (
     <div className="flex flex-wrap items-end gap-2">
       <div className="grid gap-2">
@@ -41,10 +42,21 @@ export function ListPicker({ lists, value, disabled, onChange, onCreated }: Prop
           ))}
         </NativeSelect>
       </div>
-      <Button type="button" variant="outline" disabled={disabled} onClick={() => setCreating(true)}>
+      <Button
+        ref={trigger}
+        type="button"
+        variant="outline"
+        disabled={disabled}
+        onClick={() => setCreating(true)}
+      >
         {t(copy.new_list)}
       </Button>
-      {creating && <CreateListDialog open onOpenChange={setCreating} onCreated={onCreated} />}
+      <CreateListDialog
+        open={creating}
+        onOpenChange={setCreating}
+        onCreated={onCreated}
+        returnFocusTo={trigger}
+      />
     </div>
   );
 }

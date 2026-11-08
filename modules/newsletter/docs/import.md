@@ -270,6 +270,14 @@ longer a list) after the upload, `DELETE /imports/{id}` removes the import and i
 staged addresses anyway; every other route on it answers 404. A list that exists
 but is not readable to the caller is still a 404 there too.
 
+**Discard can name the status it saw.** `DELETE /imports/{id}?status=staged` (one of
+`staged`, `queued`, `running`, `done`, `failed`; anything else is a 422) deletes only
+if the stored status is still that one, in the same conditional `DELETE`; otherwise it
+answers 409 `import_not_staged` and the import stays. The Import screen always sends the
+status it is showing, so a stale tab cannot delete an import another tab has since applied.
+Without the parameter the behaviour is unchanged (history can discard a `done` or `failed`
+import; a `queued` or `running` one is 409 `import_running`).
+
 ## The end-to-end spec
 
 `tests/e2e/newsletter.spec.ts` covers list creation, an import, a suppressed

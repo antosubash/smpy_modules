@@ -649,6 +649,7 @@
     "tags_missing_hint": "This list has no tags field, so tags cannot be imported.",
     "tags_hint_segments": "Mailchimp segments are not exported as tags. Only each contact's own tags are imported.",
     "apply": "Start import",
+    "no_rows": "The files contain no rows to import, so the import cannot be started. Discard it and upload a file with data.",
     "applying": "Starting...",
     "discard": "Discard",
     "history": "Earlier imports",

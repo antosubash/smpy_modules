@@ -11,7 +11,7 @@ import {
 } from '@simple-module-py/ui/components/ui/dialog';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
-import { useState } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
 
 import { errorMessage } from '../../utils/http';
 import { keys, useT } from '../../utils/i18n';
@@ -38,18 +38,32 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   /** The new list's key; the caller selects it and adds it to its options. */
   onCreated: (key: string) => void;
+  /** Where focus goes when the dialog closes (the button that opened it). */
+  returnFocusTo?: RefObject<HTMLElement | null>;
 }
 
-export function CreateListDialog({ open, onOpenChange, onCreated }: Props) {
+export function CreateListDialog({ open, onOpenChange, onCreated, returnFocusTo }: Props) {
   const { t } = useT();
   const [label, setLabel] = useState('');
   const [key, setKey] = useState('');
   const [edited, setEdited] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submitting = useRef(false); // a second submit in the same tick sees `pending` unchanged
   const valid = KEY_PATTERN.test(key) && label.trim() !== '';
 
+  // Kept mounted so closing returns focus to the trigger; each opening starts empty.
+  useEffect(() => {
+    if (!open) return;
+    setLabel('');
+    setKey('');
+    setEdited(false);
+    setError(null);
+  }, [open]);
+
   const create = async () => {
+    if (submitting.current) return;
+    submitting.current = true;
     setPending(true);
     setError(null);
     try {
@@ -59,13 +73,20 @@ export function CreateListDialog({ open, onOpenChange, onCreated }: Props) {
     } catch (e) {
       setError(errorMessage(e, t));
     } finally {
+      submitting.current = false;
       setPending(false);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}>
-      <DialogContent>
+      <DialogContent
+        onCloseAutoFocus={(e) => {
+          if (!returnFocusTo?.current) return;
+          e.preventDefault();
+          returnFocusTo.current.focus();
+        }}
+      >
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -82,11 +103,11 @@ export function CreateListDialog({ open, onOpenChange, onCreated }: Props) {
               <Input
                 id={LABEL_ID}
                 value={label}
-                autoFocus
                 disabled={pending}
                 maxLength={200}
                 onChange={(e) => {
                   setLabel(e.target.value);
+                  setError(null);
                   if (!edited) setKey(slugify(e.target.value));
                 }}
               />
@@ -100,6 +121,7 @@ export function CreateListDialog({ open, onOpenChange, onCreated }: Props) {
                 maxLength={MAX_LEN}
                 onChange={(e) => {
                   setEdited(true);
+                  setError(null);
                   setKey(e.target.value);
                 }}
               />

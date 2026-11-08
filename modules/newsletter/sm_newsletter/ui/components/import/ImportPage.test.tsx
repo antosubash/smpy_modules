@@ -169,7 +169,9 @@ describe('Import page', () => {
     expect(text()).toContain(en.import.discard_confirm.title);
     expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
     await act(async () => button(en.import.discard_confirm.confirm)?.click());
-    expect(calls.some((c) => c.method === 'DELETE' && c.path === '/imports/7')).toBe(true);
+    expect(calls.some((c) => c.method === 'DELETE' && c.path === '/imports/7?status=staged')).toBe(
+      true,
+    );
     expect(text()).toContain(en.import.upload_label);
   });
 

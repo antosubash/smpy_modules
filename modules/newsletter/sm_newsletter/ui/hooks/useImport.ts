@@ -28,6 +28,9 @@ export function useImport(initialId: number | null) {
   const tRef = useRef(t);
   tRef.current = t;
   const jobId = job?.id ?? null;
+  const jobIdRef = useRef<number | null>(null);
+  jobIdRef.current = jobId;
+  const status = job?.status;
   const live = job !== null && LIVE.has(job.status);
 
   useEffect(() => {
@@ -36,8 +39,25 @@ export function useImport(initialId: number | null) {
     return () => abort.abort();
   }, []);
 
+  /** A refusal means this screen's state is stale: a 404 returns to the start (the message
+   *  stays), a 409 reloads the import being shown, so the tab never acts on old state. */
+  const resync = async (e: unknown, signal: AbortSignal, ticket: number) => {
+    if (!(e instanceof HttpError)) return;
+    if (e.status === 404) {
+      setJob(null);
+    } else if (e.status === 409 && jobIdRef.current !== null) {
+      try {
+        const fresh = await importApi.getImport(jobIdRef.current, signal);
+        if (!signal.aborted && ticket === latest.current) setJob(fresh);
+      } catch (again) {
+        if (again instanceof HttpError && again.status === 404 && !signal.aborted) setJob(null);
+      }
+    }
+  };
+
   /** Runs a call, adopting its job (null clears it); the failure becomes `error`.
    *  Resolves `true` only when the call succeeded and its answer was adopted. */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `resync` uses only refs and setters
   const run = useCallback(async (call: () => Promise<ImportJob | null>): Promise<boolean> => {
     const { signal } = mounted.current;
     const ticket = ++latest.current;
@@ -49,7 +69,10 @@ export function useImport(initialId: number | null) {
       setJob(next);
       return true;
     } catch (e) {
-      if (!signal.aborted && ticket === latest.current) setError(errorMessage(e, tRef.current));
+      if (!signal.aborted && ticket === latest.current) {
+        setError(errorMessage(e, tRef.current));
+        await resync(e, signal, ticket);
+      }
       return false;
     } finally {
       if (!signal.aborted && ticket === latest.current) setBusy(false);
@@ -114,10 +137,10 @@ export function useImport(initialId: number | null) {
       jobId === null
         ? Promise.resolve(false)
         : run(async () => {
-            await importApi.discardImport(jobId);
+            await importApi.discardImport(jobId, status);
             return null;
           }),
-    [run, jobId],
+    [run, jobId, status],
   );
   const reset = useCallback(() => {
     setJob(null);
