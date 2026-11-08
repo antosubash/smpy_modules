@@ -273,7 +273,8 @@ but is not readable to the caller is still a 404 there too.
 **Discard can name the status it saw.** `DELETE /imports/{id}?status=staged` (one of
 `staged`, `queued`, `running`, `done`, `failed`; anything else is a 422) deletes only
 if the stored status is still that one, in the same conditional `DELETE`; otherwise it
-answers 409 `import_changed` and the import stays. The Import screen always sends the
+answers 409 `import_changed` and the import stays (naming `queued` or `running`,
+which can never be discarded, is 409 `import_running`). The Import screen always sends the
 status it is showing, so a stale tab cannot delete an import another tab has since applied.
 Without the parameter the behaviour is unchanged (history can discard a `done` or `failed`
 import; a `queued` or `running` one is 409 `import_running`). Discard removes only the
