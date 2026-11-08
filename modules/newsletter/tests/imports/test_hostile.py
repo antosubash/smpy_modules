@@ -102,7 +102,7 @@ def _line_of(length: int) -> bytes:
     """A row line of exactly ``length`` bytes with its newline, from short cells."""
     cells = (length - len(b"a@example.com\n")) // 2
     line = b"a@example.com" + b",x" * cells + b"\n"
-    return line + b"" if len(line) == length else line[:-1] + b"x\n"
+    return line if len(line) == length else line[:-1] + b"x\n"
 
 
 def _parse(row: bytes) -> list:

@@ -126,6 +126,11 @@ def test_tag_rules():
     assert mc.parse_tags("t" * 100) == (["t" * 100], False)
 
 
+@pytest.mark.parametrize("label", ["a\u200bb", "\u202eevil", "a\ufeffb"])
+def test_tag_with_a_unicode_format_character_is_dropped(label):
+    assert mc.parse_tags(f"VIP,{label}") == (["VIP"], True)
+
+
 def test_tag_values_distinct_and_deterministic():
     labels = ["Customers, 2020", "Customers; 2020", "VIP"]
     values = mc.tag_values(labels, [])

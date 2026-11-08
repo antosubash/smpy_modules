@@ -92,7 +92,7 @@ time, so a segment's "Signed up" rule means "added" for imported people.
   (`import_no_email_column`). A second email-like column is not offered for
   mapping.
 - A header used by two columns (two `Phone` columns, a second `TAGS`, a second
-  `Email Address`; compared after trimming and case-folding, empty headers
+  `Email Address`; compared after trimming, dropping a BOM and case-folding; empty headers
   aside) refuses the file (`import_duplicate_column`, 422): the
   later cell would silently overwrite the earlier one. The error names the
   header, never a cell.

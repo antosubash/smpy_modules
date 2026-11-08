@@ -108,9 +108,11 @@ async def list_imports(
     return [ImportSummaryOut.model_validate(j) for j in jobs]
 
 
-async def _job(request: Request, db: AsyncSession, tenant: str, import_id: int) -> ImportJob:
+async def _job(
+    request: Request, db: AsyncSession, tenant: str, import_id: int, *, orphan_ok: bool = False
+) -> ImportJob:
     return await service.get_import(
-        db, tenant_id=tenant, import_id=import_id, roles=caller_roles(request)
+        db, tenant_id=tenant, import_id=import_id, roles=caller_roles(request), orphan_ok=orphan_ok
     )
 
 
@@ -162,7 +164,8 @@ async def discard(
     tenant: str = Depends(bind_admin),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    await service.discard(db, tenant_id=tenant, job=await _job(request, db, tenant, import_id))
+    job = await _job(request, db, tenant, import_id, orphan_ok=True)  # a deleted list's too
+    await service.discard(db, tenant_id=tenant, job=job)
     return Response(status_code=204)
 
 

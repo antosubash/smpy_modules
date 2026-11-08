@@ -53,8 +53,6 @@ def test_the_file_and_entry_caps_are_inclusive():
     entries.update({f"{i}.txt": b"hi" for i in range(MAX_ZIP_ENTRIES - MAX_FILES)})
     assert len(entries) == MAX_ZIP_ENTRIES
     assert len(sources([_upload("x.zip", zip_bytes(entries))])) == MAX_FILES
-    four = zip_bytes({f"{i}.csv": CSV for i in range(MAX_FILES)})
-    assert len(sources([_upload("x.zip", four)])) == MAX_FILES
 
 
 def test_a_zip_with_more_csvs_than_the_file_cap_is_refused():

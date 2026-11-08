@@ -244,3 +244,35 @@ async def test_bad_mapping_does_not_echo(client):
         headers=MANAGE,
     )
     assert res.status_code == 422 and SENTINEL not in res.text
+
+
+async def test_more_parts_than_max_files_is_import_too_many_files(client):
+    """Starlette gives no exception type for this, so the endpoint matches its message: a
+    reworded one answers ``import_not_csv`` here and fails this test."""
+    parts = [csv_part(f"f{i}.csv", [["a@example.org", "", "", ""]]) for i in range(5)]
+    res = await upload(client, *parts)
+    assert (res.status_code, res.json()["code"]) == (422, "import_too_many_files")
+
+
+async def test_discard_works_once_the_list_is_gone(client, monkeypatch):
+    from sm_newsletter.imports import service, staging
+    from sm_records.contracts.newsletter_admin import SubscriberFilterError
+
+    job = await upload_ok(client)
+    url = f"{IMPORTS}/{job['id']}"
+
+    async def gone(*_a, **_k):
+        raise SubscriberFilterError("not_a_list")
+
+    monkeypatch.setattr(staging, "importable_fields", gone)
+    monkeypatch.setattr(service, "require_list", _raise_not_found)
+    assert (await client.get(url, headers=MANAGE)).status_code == 404
+    assert (await client.delete(url, headers=MANAGE)).status_code == 204
+    monkeypatch.undo()
+    assert (await client.get(IMPORTS, headers=MANAGE)).json() == []
+
+
+async def _raise_not_found(*_a, **_k):
+    from sm_newsletter.core.errors import NotFound
+
+    raise NotFound()

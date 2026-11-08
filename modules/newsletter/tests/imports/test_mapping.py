@@ -92,3 +92,13 @@ def test_validate_canonicalises_column_indices():
         tags_found=[],
     )
     assert got["fields"] == {"7": "city", "0": "first_name"}
+
+
+@pytest.mark.parametrize("column", ["1" * 9, "1" * 10, "1" * 11])
+def test_validate_long_column_keys_refuse_not_crash(column):
+    """9 digits pass the length bound and fail ``< count``; 10+ fail the bound: both a bad
+    mapping, never an ``int()`` error."""
+    with pytest.raises(ImportBadMapping):
+        validate(
+            {"fields": {column: "city"}}, columns=_cols("A", "B"), targets=_targets(), tags_found=[]
+        )

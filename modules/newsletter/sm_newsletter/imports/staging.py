@@ -44,6 +44,7 @@ from sm_newsletter.imports.mailchimp import (
     Parsed,
     detect_kind,
     header_key,
+    kind_by_name,
     read_header,
     read_rows,
     text_stream,
@@ -152,7 +153,10 @@ def _text(source: Source) -> Iterator[TextIO]:
 
 
 def _peek(source: Source) -> _Peek:
-    """Header and kind of one file."""
+    """Header and kind of one file; an ignored one (by name) is never opened, so a header
+    nobody imports cannot refuse the upload."""
+    if kind_by_name(source.name) == IGNORED:
+        return _Peek(source, IGNORED, None)
     with _text(source) as stream:
         header = read_header(stream)
     return _Peek(source, detect_kind(source.name, header), header)
@@ -205,10 +209,13 @@ async def _stage_file(
 
     with _text(peek.source) as stream:
         header = read_header(stream)
-        for item in read_rows(stream, header, peek.kind):
+        for item in read_rows(stream, header, peek.kind, blanks=True):
             seen += 1
             if seen % STAGE_CHUNK == 0:
-                await asyncio.sleep(0)  # rows that never reach a flush must not starve the loop
+                # rows that never reach a flush (blank ones too) must not starve the loop
+                await asyncio.sleep(0)
+            if item is None:
+                continue
             if not isinstance(item, Parsed):
                 tally.error(peek.source.index, item.line, item.code, item.field)
                 if item.code == "invalid_email":

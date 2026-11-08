@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_newsletter.campaigns.access import MAX_BIG_ID, Roles, readable_lists, require_list
 from sm_newsletter.core.errors import NotFound
 from sm_newsletter.core.errors_import import ImportNotStaged, ImportRunning
-from sm_newsletter.imports import mapping
+from sm_newsletter.imports import mapping, staging
 from sm_newsletter.imports.constants import DONE, FAILED, QUEUED, STAGED
 from sm_newsletter.models import ImportEntry, ImportJob
 
@@ -22,11 +22,13 @@ __all__ = ["discard", "get_import", "list_imports", "queue_apply", "set_mapping"
 
 
 async def get_import(
-    session: AsyncSession, *, tenant_id: str, import_id: int, roles: Roles
+    session: AsyncSession, *, tenant_id: str, import_id: int, roles: Roles, orphan_ok: bool = False
 ) -> ImportJob:
     """The tenant's import, read fresh; :class:`NotFound` when there is none or its list is
     unreadable to this caller. An id outside the ``BIGINT`` key is a 404 before
-    the query, never a driver error."""
+    the query, never a driver error. With ``orphan_ok`` (discarding) an import whose list is
+    gone (deleted, or no longer a list) is returned too, so its staged addresses can go; a
+    list that exists but is unreadable to the caller is still a 404."""
     if not 0 < import_id <= MAX_BIG_ID:
         raise NotFound()
     stmt = (
@@ -37,7 +39,18 @@ async def get_import(
     job = (await session.execute(stmt)).scalars().first()
     if job is None:
         raise NotFound()
-    await require_list(session, tenant_id=tenant_id, list_type_key=job.list_type_key, roles=roles)
+    try:
+        await require_list(
+            session, tenant_id=tenant_id, list_type_key=job.list_type_key, roles=roles
+        )
+    except NotFound:
+        if not orphan_ok:
+            raise
+        try:
+            await staging.targets_for(session, tenant_id, job.list_type_key)
+        except NotFound:
+            return job  # the list is gone: nobody's grant is left to check
+        raise
     return job
 
 

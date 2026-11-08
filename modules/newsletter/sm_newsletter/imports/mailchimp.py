@@ -48,8 +48,8 @@ _PREFIXES = (
 
 
 __all__ = [
-    "Header", "Parsed", "RowError", "detect_kind", "header_key", "parse_tags", "parse_time",
-    "read_header", "read_rows", "tag_values", "text_stream", "valid_email",
+    "Header", "Parsed", "RowError", "detect_kind", "header_key", "kind_by_name", "parse_tags",
+    "parse_time", "read_header", "read_rows", "tag_values", "text_stream", "valid_email",
 ]  # fmt: skip
 
 
@@ -120,11 +120,16 @@ def text_stream(binary: BinaryIO) -> TextIO:
     )
 
 
-def detect_kind(name: str, header: Header) -> str:
+def kind_by_name(name: str) -> str | None:
+    """The kind a Mailchimp export file name says (``nonsubscribed_*`` is ``ignored``), else
+    ``None``."""
     lowered = name.casefold()
-    for prefix, kind in _PREFIXES:
-        if lowered.startswith(prefix):
-            return kind
+    return next((kind for prefix, kind in _PREFIXES if lowered.startswith(prefix)), None)
+
+
+def detect_kind(name: str, header: Header) -> str:
+    if (named := kind_by_name(name)) is not None:
+        return named
     if "unsub" in header.times:
         return "unsubscribed"
     if "clean" in header.times:
@@ -231,7 +236,11 @@ def _event_time(header: Header, row: Sequence[str], kind: str) -> datetime | Non
     return at("confirm") or at("optin")
 
 
-def read_rows(stream: TextIO, header: Header, kind: str) -> Iterator[Parsed | RowError]:
+def read_rows(
+    stream: TextIO, header: Header, kind: str, *, blanks: bool = False
+) -> Iterator[Parsed | RowError | None]:
+    """The rows of one file. A blank row is skipped; with ``blanks`` it is yielded as ``None``
+    instead, so a caller that must yield to its event loop can count every physical row."""
     if kind == IGNORED:
         return
     reader = csv.reader(_lines(stream, 2), delimiter=header.delimiter)
@@ -245,6 +254,8 @@ def read_rows(stream: TextIO, header: Header, kind: str) -> Iterator[Parsed | Ro
         if row is None:
             return
         if not any(cell.strip() for cell in row):
+            if blanks:
+                yield None
             continue
         yield from _row(header, row, kind, reader.line_num + 1)
 
