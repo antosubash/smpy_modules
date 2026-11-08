@@ -32,6 +32,9 @@ router = APIRouter(dependencies=[Depends(bind_admin)])
 
 _VIEW = [Depends(RequiresPermission(constants.PERM_VIEW))]
 _EDIT = [Depends(RequiresPermission(constants.PERM_EDIT))]
+# A rule can name ``sm_email`` or any other subscriber field, so a count answers
+# questions about subscribers: it needs ``records.view`` like the subscriber screen.
+_PREVIEW = [*_VIEW, Depends(RequiresPermission(constants.PERM_RECORDS_VIEW))]
 
 
 @router.get("/segments", response_model=list[SegmentOut], dependencies=_VIEW)
@@ -66,7 +69,7 @@ async def create_segment(
     return SegmentOut.model_validate(segment)
 
 
-@router.post("/segments/preview", response_model=CountOut, dependencies=_VIEW)
+@router.post("/segments/preview", response_model=CountOut, dependencies=_PREVIEW)
 async def preview_segment(
     request: Request,
     payload: Any = Body(...),

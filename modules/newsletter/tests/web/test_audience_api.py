@@ -10,7 +10,7 @@ from tests.support.app import build_app
 from tests.support.records_seed import TAGS, restrict_list, seed_list, seed_subscriber
 
 API = constants.ROUTE_PREFIX_API
-VIEW = {"x-perms": constants.PERM_VIEW}
+VIEW = {"x-perms": f"{constants.PERM_VIEW},{constants.PERM_RECORDS_VIEW}"}
 
 
 @pytest_asyncio.fixture

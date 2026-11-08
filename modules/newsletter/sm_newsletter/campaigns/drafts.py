@@ -112,6 +112,7 @@ async def update_draft(
             list_type_key=values.get("list_type_key") or current.list_type_key,
             audience=values.get("audience") or current.audience,
             roles=roles,
+            lock=True,
         )
     if "body" in values:
         values["body"] = dump_body(parse_body(values["body"]))

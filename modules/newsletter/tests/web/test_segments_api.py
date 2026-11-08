@@ -14,6 +14,7 @@ API = constants.ROUTE_PREFIX_API
 BASE = f"{API}/segments"
 VIEW = {"x-perms": constants.PERM_VIEW}
 EDIT = {"x-perms": f"{constants.PERM_VIEW},{constants.PERM_EDIT}"}
+READER = {"x-perms": f"{constants.PERM_VIEW},{constants.PERM_RECORDS_VIEW}"}
 RULES = [{"field": "tags", "op": "any", "value": ["vip"]}]
 
 
@@ -49,7 +50,7 @@ async def test_crud_round_trip(client):
     assert (await client.get(BASE, headers=VIEW)).json()[0]["id"] == sid
     assert (await client.get(f"{BASE}?list_type_key=other", headers=VIEW)).json() == []
     prev = await client.post(
-        f"{BASE}/preview", json={"list_type_key": "news", "rules": RULES}, headers=VIEW
+        f"{BASE}/preview", json={"list_type_key": "news", "rules": RULES}, headers=READER
     )
     assert prev.json() == {"count": 1}
     res = await client.patch(f"{BASE}/{sid}", json={"name": "Everyone", "rules": []}, headers=EDIT)
@@ -142,7 +143,7 @@ async def test_records_refusal_never_echoes_the_value(built, client):
     score = {"key": "score", "type": "number", "label": "Score", "indexed": True}
     await seed_list(state, "default", "scored", fields=[score])
     body = {"list_type_key": "scored", "rules": [{"field": "score", "op": "gt", "value": "1e30"}]}
-    res = await client.post(f"{BASE}/preview", json=body, headers=VIEW)
+    res = await client.post(f"{BASE}/preview", json=body, headers=READER)
     assert res.status_code == 422, res.text
     assert res.json()["code"] == "invalid_segment"
     assert "1e30" not in res.text

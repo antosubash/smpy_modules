@@ -352,6 +352,7 @@
     "count_one": "About {count} subscriber",
     "count_other": "About {count} subscribers",
     "count_loading": "Counting subscribers…",
+    "count_hidden": "Only people who may view subscribers see this count.",
     "no_tags": "This list has no tags yet.",
     "no_segments": "This list has no segments yet.",
     "segment_missing": "The saved segment no longer exists. Choose another audience before sending.",

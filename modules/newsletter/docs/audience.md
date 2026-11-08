@@ -43,6 +43,21 @@ create on a list the caller cannot read is 403 `list_forbidden`).
   confirmed, untrashed, matching. Suppressions are not subtracted, so the real
   number sent can be lower (see [`sending.md`](sending.md)). Incomplete rules
   are ignored by the preview.
+- **Counting needs `records.view`.** A rule can name `sm_email` or any other
+  subscriber field, so a count answers questions about subscribers (a run of
+  `starts_with` counts would spell out addresses). Counts follow the
+  subscriber screen:
+
+  | Count | Route | Permission |
+  | --- | --- | --- |
+  | segment editor preview | `POST /segments/preview` | `newsletter.view` + `records.view` |
+  | whole list | `GET /lists/{key}/audience-count?audience=all` | `newsletter.view` |
+  | tag or segment | `GET /lists/{key}/audience-count?audience=tag:…\|segment:…` | `newsletter.view` + `records.view` |
+  | send estimate | `GET /campaigns/{id}/estimate` | `newsletter.send`; `recipients` is `null` for a tag or segment audience without `records.view`, and the finish is computed on the whole list (an upper bound) |
+
+  The segments and editor pages pass `can_count` (`records.view`), and without
+  it the screens ask for no tag, segment or preview count and say only people
+  who may view subscribers see it. A read-only campaign asks for no count at all.
 - Deleting a segment that a **draft** campaign names is `409 segment_in_use`.
 
 ## Audiences

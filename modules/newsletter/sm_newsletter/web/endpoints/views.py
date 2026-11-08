@@ -31,6 +31,8 @@ async def _flags(request: Request) -> dict[str, bool]:
     return {
         "can_edit": grants(held, constants.PERM_EDIT),
         "can_send": grants(held, constants.PERM_SEND),
+        # A tag or segment count needs ``records.view`` (``audience_api``).
+        "can_count": grants(held, constants.PERM_RECORDS_VIEW),
     }
 
 
@@ -54,7 +56,11 @@ async def segments_page(request: Request, inertia: InertiaDep) -> InertiaRespons
     held = await ensure_resolved_permissions(request)
     return await inertia.render(
         constants._PAGE_SEGMENTS,
-        {**tenancy.view_props(request), "can_edit": grants(held, constants.PERM_EDIT)},
+        {
+            **tenancy.view_props(request),
+            "can_edit": grants(held, constants.PERM_EDIT),
+            "can_count": grants(held, constants.PERM_RECORDS_VIEW),
+        },
     )
 
 

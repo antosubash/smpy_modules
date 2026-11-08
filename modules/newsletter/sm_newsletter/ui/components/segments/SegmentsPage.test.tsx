@@ -7,7 +7,9 @@ import en from '../../../locales/en.json';
 import Segments from '../../../pages/Segments';
 import { COUNT_DEBOUNCE_MS } from '../../hooks/useAudienceCount';
 
-const page = vi.hoisted(() => ({ props: { can_edit: true } as Record<string, unknown> }));
+const page = vi.hoisted(() => ({
+  props: { can_edit: true, can_count: true } as Record<string, unknown>,
+}));
 vi.mock('@inertiajs/react', () => ({
   Head: () => null,
   usePage: () => ({ props: page.props }),
@@ -46,7 +48,7 @@ describe('Segments page', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    page.props = { can_edit: true };
+    page.props = { can_edit: true, can_count: true };
     fetchMock = vi.fn(async (url: string) => {
       if (url.endsWith('/lists')) return json(['news', 'events']);
       if (url.endsWith('/fields')) return json(fields);
@@ -92,6 +94,14 @@ describe('Segments page', () => {
     await act(async () => newButton()?.click());
     await wait(COUNT_DEBOUNCE_MS + 100);
     expect(previews()).toHaveLength(1);
+  });
+
+  it('asks nothing when the page says the caller may not count (no records.view)', async () => {
+    page.props = { can_edit: true, can_count: false };
+    await render();
+    await act(async () => newButton()?.click());
+    await wait(COUNT_DEBOUNCE_MS + 100);
+    expect(previews()).toHaveLength(0);
   });
 
   it("keeps list B's table when list A's response lands after B's", async () => {

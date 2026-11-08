@@ -33,7 +33,15 @@ from sm_newsletter.subscribers.engagement import Engagement, engagement
 from sm_newsletter.subscribers.lift import subscriber_on_list
 from sm_newsletter.subscribers.suppressions import SuppressionRow, lift_block, rows_for_email
 
-__all__ = ["BrowseResult", "SubscriberDetail", "SubscriberRow", "browse", "detail"]
+__all__ = [
+    "BrowseResult",
+    "SubscriberDetail",
+    "SubscriberRow",
+    "browse",
+    "detail",
+    "is_stopped",
+    "stopped_among",
+]
 
 
 @dataclass(frozen=True)
@@ -92,6 +100,22 @@ def is_stopped(email: str, stopped: set[str]) -> bool:
         return False
 
 
+def _normalises(email: str) -> bool:
+    try:
+        normalise_email(email)
+    except ValueError:
+        return False
+    return True
+
+
+async def stopped_among(session: AsyncSession, *, tenant_id: str, emails: list[str]) -> set[str]:
+    """``suppressed`` over the addresses that are addresses at all: a record with a
+    blank ``sm_email`` is never suppressed (``is_stopped``), and must not make
+    ``suppressed`` raise for the whole page."""
+    usable = [e for e in emails if _normalises(e)]
+    return await suppressed(session, tenant_id=tenant_id, emails=usable) if usable else set()
+
+
 async def browse(
     session: AsyncSession,
     *,
@@ -131,7 +155,9 @@ async def browse(
     except SubscriberFilterError:
         raise InvalidSegment("filter: refused") from None
     # Tenant-wide on purpose (TL1): a boolean only, no row detail; see subscribers/suppressions.py.
-    stopped = await suppressed(session, tenant_id=tenant_id, emails=[h.email for h in page.items])
+    stopped = await stopped_among(
+        session, tenant_id=tenant_id, emails=[h.email for h in page.items]
+    )
     rows = [SubscriberRow(hit=h, suppressed=is_stopped(h.email, stopped)) for h in page.items]
     return BrowseResult(rows=rows, total=page.total, counts=counts)
 
@@ -172,7 +198,7 @@ async def detail(
         engagement=await engagement(session, tenant_id=tenant_id, record_uuid=uuid),
         suppressions=suppressions,
         suppressed=is_stopped(
-            hit.email, await suppressed(session, tenant_id=tenant_id, emails=[hit.email])
+            hit.email, await stopped_among(session, tenant_id=tenant_id, emails=[hit.email])
         ),
         records_url=subscriber_admin_url(list_type_key, uuid),
     )

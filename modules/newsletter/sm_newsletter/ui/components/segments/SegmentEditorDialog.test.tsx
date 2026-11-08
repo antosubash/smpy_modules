@@ -62,7 +62,7 @@ describe('SegmentEditorDialog', () => {
     [...document.querySelectorAll('button')].find((b) => b.textContent === label) as
       | HTMLButtonElement
       | undefined;
-  const draw = (segment: Segment | null, isOpen: boolean) =>
+  const draw = (segment: Segment | null, isOpen: boolean, canCount = true) =>
     act(async () =>
       root.render(
         createElement(SegmentEditorDialog, {
@@ -72,6 +72,7 @@ describe('SegmentEditorDialog', () => {
           open: isOpen,
           onOpenChange: vi.fn(),
           onSaved,
+          canCount,
         }),
       ),
     );
@@ -91,6 +92,15 @@ describe('SegmentEditorDialog', () => {
   const rows = () => document.querySelectorAll('[data-rule-row]');
   const saveCalls = () =>
     fetchMock.mock.calls.filter(([u]) => !String(u).endsWith('/segments/preview'));
+
+  it('asks for no preview count without records.view', async () => {
+    root = createRoot(document.body.appendChild(document.createElement('div')));
+    await draw(null, true, false);
+    await wait(COUNT_DEBOUNCE_MS + 100);
+    expect(previews()).toEqual([]);
+    expect(document.body.textContent).toContain(en.audience.count_hidden);
+    expect(document.body.textContent).not.toContain(copy.count_loading);
+  });
 
   it('updates the preview count after an edit', async () => {
     await open();

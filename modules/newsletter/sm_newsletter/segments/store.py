@@ -65,7 +65,9 @@ async def _compile(
     return filters, count
 
 
-async def _find(session: AsyncSession, *, tenant_id: str, segment_id: int) -> Segment | None:
+async def _find(
+    session: AsyncSession, *, tenant_id: str, segment_id: int, lock: bool = False
+) -> Segment | None:
     if not 0 < segment_id <= MAX_ID:
         return None
     stmt = (
@@ -73,6 +75,8 @@ async def _find(session: AsyncSession, *, tenant_id: str, segment_id: int) -> Se
         .where(Segment.id == segment_id, Segment.tenant_id == tenant_id)
         .execution_options(populate_existing=True)
     )
+    if lock:
+        stmt = stmt.with_for_update()
     return (await session.execute(stmt)).scalars().first()
 
 
@@ -93,9 +97,10 @@ async def list_segments(
 
 
 async def get_segment(
-    session: AsyncSession, *, tenant_id: str, segment_id: int, roles: Roles
+    session: AsyncSession, *, tenant_id: str, segment_id: int, roles: Roles, lock: bool = False
 ) -> Segment:
-    segment = await _find(session, tenant_id=tenant_id, segment_id=segment_id)
+    """``lock``: ``SELECT … FOR UPDATE`` (Postgres; a no-op on SQLite)."""
+    segment = await _find(session, tenant_id=tenant_id, segment_id=segment_id, lock=lock)
     if segment is None:
         raise NotFound()
     await require_list(
@@ -188,7 +193,11 @@ async def update_segment(
 async def delete_segment(
     session: AsyncSession, *, tenant_id: str, segment_id: int, roles: Roles
 ) -> None:
-    await get_segment(session, tenant_id=tenant_id, segment_id=segment_id, roles=roles)
+    # The row lock serialises this check-then-delete with a draft PATCH naming
+    # the segment, which takes the same lock (``audience_filters(lock=True)``):
+    # either the PATCH commits first and this sees the draft (409), or it waits
+    # and then finds no segment (422 ``unknown_segment``).
+    await get_segment(session, tenant_id=tenant_id, segment_id=segment_id, roles=roles, lock=True)
     in_use = await session.execute(
         select(Campaign.id)
         .where(

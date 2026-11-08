@@ -163,3 +163,35 @@ async def test_unreadable_list_rows_disclose_only_a_boolean(db_state):
     for text in (repr(result), repr(got)):
         for needle in ("secretlist", "unsubscribe_page", "hard_bounce", "email_hash"):
             assert needle not in text, needle
+
+
+async def _blank_email(db_state, uuid: str) -> None:
+    """Records refuses a blank ``sm_email``; a legacy row can still hold one."""
+    from sm_records.models import tables_for
+    from sm_records.records.services import types as type_service
+    from sqlalchemy import select, update
+
+    with tenant_scope("default"):
+        async with db_state.session_factory() as db:
+            table = tables_for(await type_service.get_type(db, "news")).record
+            data = (await db.execute(select(table.data).where(table.uuid == uuid))).scalar_one()
+            await db.execute(
+                update(table).where(table.uuid == uuid).values(data={**data, "sm_email": ""})
+            )
+            await finalize_session(db)
+
+
+async def test_a_blank_email_is_not_suppressed_and_does_not_500(db_state):
+    """A record whose ``sm_email`` does not normalise (blank) used to make
+    ``suppressed()`` raise, failing the whole search and the detail."""
+    await _world(db_state)
+    await seed_row(db_state, "default", ADA, "hard_bounce")
+    blank = await seed_subscriber(db_state, "default", "eve@example.org", "confirmed")
+    await _blank_email(db_state, blank)
+    res = await _browse(db_state)
+    flags = {r.hit.uuid: r.suppressed for r in res.rows}
+    assert flags[blank] is False
+    assert [r.suppressed for r in res.rows if r.hit.email == ADA] == [True]
+    async with db_state.session_factory() as s:
+        one = await detail(s, tenant_id="default", list_type_key="news", uuid=blank, roles=None)
+    assert one.suppressed is False

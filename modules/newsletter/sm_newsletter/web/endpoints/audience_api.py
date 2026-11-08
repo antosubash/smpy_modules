@@ -1,5 +1,6 @@
 """``GET /lists/{list_type_key}/fields`` (what a segment rule may name) and
-``/audience-count`` (how many confirmed subscribers an audience reaches)."""
+``/audience-count`` (how many confirmed subscribers an audience reaches; a tag
+or segment also needs ``records.view``)."""
 
 from __future__ import annotations
 
@@ -10,7 +11,7 @@ from sm_records.contracts.newsletter import SubscriberFilterError, caller_roles
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns.access import require_list
-from sm_newsletter.campaigns.audience import audience_count
+from sm_newsletter.campaigns.audience import AUDIENCE_ALL, audience_count
 from sm_newsletter.core import constants
 from sm_newsletter.core.errors import NotFound
 from sm_newsletter.core.tenancy import bind_admin
@@ -54,6 +55,11 @@ async def count_audience(
     tenant: str = Depends(bind_admin),
     db: AsyncSession = Depends(get_db),
 ) -> CountOut:
+    if audience != AUDIENCE_ALL:
+        # A tag or segment count evaluates subscriber fields (a rule can name
+        # ``sm_email``), so it needs ``records.view``; the whole list does not,
+        # so the editor's estimate still works for a campaign author without it.
+        await RequiresPermission(constants.PERM_RECORDS_VIEW)(request)
     roles = caller_roles(request)
     await require_list(db, tenant_id=tenant, list_type_key=list_type_key, roles=roles)
     count = await audience_count(

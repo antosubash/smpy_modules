@@ -31,6 +31,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: (s: Segment) => void;
+  /** The page's `can_count` (`records.view`): without it no count is asked for. */
+  canCount?: boolean;
 }
 
 export function SegmentEditorDialog({
@@ -40,6 +42,7 @@ export function SegmentEditorDialog({
   open,
   onOpenChange,
   onSaved,
+  canCount = true,
 }: Props) {
   const { t } = useT();
   const [name, setName] = useState('');
@@ -47,7 +50,7 @@ export function SegmentEditorDialog({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [badRow, setBadRow] = useState<number | null>(null);
-  const preview = useSegmentPreview(listKey, rules, open);
+  const preview = useSegmentPreview(listKey, rules, open && canCount);
   const incomplete = rules.some((r) => !ruleComplete(r));
 
   useEffect(() => {
@@ -134,7 +137,11 @@ export function SegmentEditorDialog({
               </Button>
             </div>
 
-            {preview.error ? (
+            {!canCount ? (
+              <p className="text-sm text-muted-foreground">
+                {t(keys.newsletter.audience.count_hidden)}
+              </p>
+            ) : preview.error ? (
               <p role="alert" className="text-sm text-destructive">
                 {preview.error}
               </p>

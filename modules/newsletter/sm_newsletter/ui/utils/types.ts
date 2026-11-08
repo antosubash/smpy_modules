@@ -78,7 +78,8 @@ export interface Progress {
 
 /** `GET /campaigns/{id}/estimate`. */
 export interface Estimate {
-  recipients: number;
+  /** Null: a tag or segment audience and a caller without `records.view`. */
+  recipients: number | null;
   estimated_finish: string;
   overlaps: boolean;
   daily_rate: number;

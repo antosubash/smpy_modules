@@ -12,8 +12,9 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Query, Request
+from simple_module_core.permissions import grants
 from simple_module_db.deps import get_db
-from simple_module_hosting.permissions import RequiresPermission
+from simple_module_hosting.permissions import RequiresPermission, ensure_resolved_permissions
 from sm_records.contracts.newsletter import caller_roles
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -149,6 +150,9 @@ async def get_estimate(
         campaign=campaign,
         at=start,
         roles=roles,
+        reads_subscribers=grants(
+            await ensure_resolved_permissions(request), constants.PERM_RECORDS_VIEW
+        ),
     )
 
 

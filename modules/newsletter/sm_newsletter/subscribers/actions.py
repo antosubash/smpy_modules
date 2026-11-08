@@ -30,8 +30,8 @@ from sm_newsletter.campaigns.audience import MAX_TAG_LEN
 from sm_newsletter.core import constants
 from sm_newsletter.core.errors import NotFound
 from sm_newsletter.core.errors_audience import InvalidQuery, NotSubscribed, UnknownTag
-from sm_newsletter.core.suppression import suppress, suppressed
-from sm_newsletter.subscribers.browse import SubscriberRow, is_stopped
+from sm_newsletter.core.suppression import suppress
+from sm_newsletter.subscribers.browse import SubscriberRow, is_stopped, stopped_among
 
 __all__ = ["MAX_TAG_VALUES", "row_of", "set_subscriber_tags", "unsubscribe_subscriber"]
 
@@ -68,7 +68,7 @@ async def _read(session: AsyncSession, tenant_id: str, list_type_key: str, uuid:
 
 async def row_of(session: AsyncSession, *, tenant_id: str, hit: SubscriberHit) -> SubscriberRow:
     """``hit`` with its tenant-wide suppressed flag, as the browse answers it."""
-    stopped = await suppressed(session, tenant_id=tenant_id, emails=[hit.email])
+    stopped = await stopped_among(session, tenant_id=tenant_id, emails=[hit.email])
     return SubscriberRow(hit=hit, suppressed=is_stopped(hit.email, stopped))
 
 

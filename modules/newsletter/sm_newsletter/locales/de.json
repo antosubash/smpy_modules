@@ -352,6 +352,7 @@
     "count_one": "Etwa {count} Abonnent",
     "count_other": "Etwa {count} Abonnenten",
     "count_loading": "Abonnenten werden gezählt…",
+    "count_hidden": "Diese Anzahl sehen nur Personen, die Abonnenten ansehen dürfen.",
     "no_tags": "Diese Liste hat noch keine Tags.",
     "no_segments": "Diese Liste hat noch keine Segmente.",
     "segment_missing": "Das gespeicherte Segment existiert nicht mehr. Wählen Sie vor dem Versand eine andere Zielgruppe.",

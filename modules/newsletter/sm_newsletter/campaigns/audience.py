@@ -80,11 +80,19 @@ async def _tag_filters(
 
 
 async def _segment_filters(
-    session: AsyncSession, *, tenant_id: str, list_type_key: str, segment_id: int, roles: Roles
+    session: AsyncSession,
+    *,
+    tenant_id: str,
+    list_type_key: str,
+    segment_id: int,
+    roles: Roles,
+    lock: bool,
 ) -> list[str]:
     stmt = select(Segment.list_type_key, Segment.filters).where(
         Segment.id == segment_id, Segment.tenant_id == tenant_id
     )
+    if lock:
+        stmt = stmt.with_for_update()
     row = (await session.execute(stmt)).first()
     if row is None:
         raise UnknownSegment()
@@ -99,14 +107,21 @@ async def _segment_filters(
 
 
 async def audience_filters(
-    session: AsyncSession, *, tenant_id: str, list_type_key: str, audience: str, roles: Roles
+    session: AsyncSession,
+    *,
+    tenant_id: str,
+    list_type_key: str,
+    audience: str,
+    roles: Roles,
+    lock: bool = False,
 ) -> list[str]:
     """The records filter terms for ``audience`` on ``list_type_key``: none for
     the whole list. 422 ``unknown_tag``, ``unknown_segment`` or
     ``segment_list_mismatch`` when the list cannot answer it. ``roles`` is the
     caller (callers have already checked ``list_type_key`` is readable): a
     segment on another list it cannot read is ``unknown_segment``, like a
-    missing one."""
+    missing one. ``lock`` takes the segment's row lock (a draft PATCH, so a
+    concurrent ``delete_segment`` cannot miss the draft; a no-op on SQLite)."""
     parsed = parse_audience(audience)
     if parsed.kind == "all":
         return []
@@ -115,7 +130,9 @@ async def audience_filters(
         assert parsed.tag is not None
         return await _tag_filters(session, **key, tag=parsed.tag)
     assert parsed.segment_id is not None
-    return await _segment_filters(session, **key, segment_id=parsed.segment_id, roles=roles)
+    return await _segment_filters(
+        session, **key, segment_id=parsed.segment_id, roles=roles, lock=lock
+    )
 
 
 async def audience_count(

@@ -226,7 +226,11 @@ export function SendDialog(props: Props) {
           )}
           {estimate && !blocked && (
             <div className="space-y-1 text-sm">
-              <p>{t(copy.recipients, { count: estimate.recipients })}</p>
+              <p>
+                {estimate.recipients === null
+                  ? t(keys.newsletter.audience.count_hidden)
+                  : t(copy.recipients, { count: estimate.recipients })}
+              </p>
               <p>
                 {t(copy.estimate, { date: formatWhen(estimate.estimated_finish, locale ?? 'en') })}
               </p>

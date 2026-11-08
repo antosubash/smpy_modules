@@ -47,7 +47,8 @@ class ProgressOut(BaseModel):
 
 
 class EstimateOut(BaseModel):
-    recipients: int
+    # ``None``: a tag or segment audience and a caller without ``records.view``.
+    recipients: int | None
     estimated_finish: datetime
     overlaps: bool
     daily_rate: int

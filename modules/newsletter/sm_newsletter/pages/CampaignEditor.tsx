@@ -27,6 +27,7 @@ interface EditorProps {
   campaign_id: number;
   can_edit?: boolean;
   can_send?: boolean;
+  can_count?: boolean;
   capabilities?: Capabilities;
   public_base_url_set?: boolean;
   max_test_recipients?: number;
@@ -200,6 +201,7 @@ export default function CampaignEditor() {
             key={`audience-${editor.reloadKey}`}
             campaign={campaign}
             readOnly={readOnly}
+            canCount={props.can_count === true}
             onChange={editor.saveMeta}
             onUnfinished={editor.holdAudience}
           />
