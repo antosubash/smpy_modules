@@ -1,14 +1,5 @@
-/** The session's CSRF token, for the writes `api.ts` sends (#126).
- *
- * The API checks the framework's `RequiresCsrf`: every POST/PUT/PATCH/DELETE
- * needs the token in `X-CSRF-Token`. The settings screen shares it as the
- * `csrf_token` Inertia prop (`sm_ai/web/csrf.py`). The fetch helpers sit at module
- * level and no page passes them a prop, so this keeps the latest value: first
- * the page the server rendered, then every page Inertia navigates to.
- *
- * Pagebuilder, news and records ship the same file. All of them read the
- * framework's one token under the framework's one prop name, so none imports
- * another (a base module must not depend on an optional sibling).
+/** API helpers receive no page props, so remember the initial and later Inertia tokens.
+ * Each distributable module owns its copy to avoid depending on an optional sibling.
  */
 
 import { router } from '@inertiajs/react';
@@ -52,12 +43,4 @@ if (typeof document !== 'undefined') {
 export function csrfHeaders(method: string | undefined): Record<string, string> {
   if (!UNSAFE.has((method ?? 'GET').toUpperCase()) || !current) return {};
   return { [CSRF_HEADER]: current };
-}
-
-/** How the framework's `RequiresCsrf` 403 begins. Its English sentence is
- *  written for developers; a person is shown the module's own message. */
-const REFUSAL_PREFIX = 'CSRF token missing or invalid';
-
-export function isCsrfRefusal(status: number, detail: unknown): boolean {
-  return status === 403 && typeof detail === 'string' && detail.startsWith(REFUSAL_PREFIX);
 }
