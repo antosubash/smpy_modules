@@ -104,7 +104,7 @@ async def test_report_unknown_campaign_404(client):
     assert (await client.get(f"{VIEW}/campaigns/9999/report", headers=READ)).status_code == 404
 
 
-@pytest.mark.parametrize("cid", ["0", "-1", str(2**63), "9" * 20])
+@pytest.mark.parametrize("cid", ["0", "-1", str(2**63 - 1), str(2**63), "9" * 20])
 async def test_out_of_range_campaign_ids_404_not_500(client, cid):
     for path in (f"/campaigns/{cid}", f"/campaigns/{cid}/report"):
         assert (await client.get(f"{VIEW}{path}", headers=READ)).status_code == 404

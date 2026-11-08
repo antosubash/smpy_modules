@@ -35,8 +35,9 @@ The click path carries the link's position, never a URL: `/newsletter/c/{token}/
 redirects (302) only to that campaign's own stored `newsletter_link` URL, URI-encoded
 (the `Location` is the stored URL with any character not legal in a URI
 percent-encoded, so `ü` becomes `%C3%BC`). `N` is written as `prepare` writes
-it, 1 to 999 with no leading zero; any other path under `/newsletter/c/` gets
-the same fixed 404.
+it (1 to 100, `MAX_TRACKED_LINKS`), with no leading zero; the route accepts one
+to three digits and any other spelling, like any other path under
+`/newsletter/c/`, gets the same fixed 404.
 
 ## The token
 
