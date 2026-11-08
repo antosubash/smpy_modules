@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
@@ -131,6 +132,25 @@ test('analytics opt-in, public and app tracking, events, unknown locations and d
     expect(
       report.breakdowns.path.some((row: { value: string }) => row.value.includes('token=')),
     ).toBe(false);
+
+    const exportButton = page.getByRole('button', { name: 'Export CSV', exact: true });
+    await expect(exportButton).toBeEnabled();
+    const downloadReady = page.waitForEvent('download');
+    await exportButton.click();
+    const download = await downloadReady;
+    expect(download.suggestedFilename()).toContain(publicId as string);
+    expect(download.suggestedFilename()).toMatch(/\.csv$/);
+    const downloadPath = await download.path();
+    expect(downloadPath).not.toBeNull();
+    const csv = await readFile(downloadPath as string, 'utf8');
+    expect(csv).toContain(`"metadata","property_id","","${publicId}"`);
+    expect(csv).toContain(`"metadata","property_name","","${name}"`);
+    expect(csv).toContain('"filter","country","","","Unknown"');
+    expect(csv).toContain('"total","","","","","pageviews",21');
+    expect(csv).toContain('"total","","","","","events",1');
+    expect(csv).toContain(`"breakdown","path","","/p/${slug}"`);
+    expect(csv).toContain('top_50_per_dimension');
+    expect(csv).not.toContain('must-not-be-stored');
 
     const viewport = page.viewportSize();
     await page.setViewportSize({ width: 390, height: 844 });
