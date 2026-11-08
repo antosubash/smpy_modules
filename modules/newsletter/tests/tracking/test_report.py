@@ -5,20 +5,14 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
-from simple_module_db import finalize_session
 from sm_newsletter.core.settings import NewsletterSettings
 from sm_newsletter.core.tenancy import tenant_scope
-from sm_newsletter.models import Campaign, Send
-from sm_newsletter.sending import rows
-from sm_newsletter.sending.classify import Verdict
-from sm_newsletter.sending.transport import DeliveryResult
-from sm_newsletter.tracking.record import record_click, record_open
+from sm_newsletter.models import Campaign
 from sm_newsletter.tracking.report import accepted_engagement, campaign_report, link_stats
-from sqlalchemy import select
 
 from tests.support.campaign_world import campaign_row, seed_campaign, seed_sends, set_columns
 from tests.support.sending import NOW, make_app
-from tests.support.tracking_world import link_ids, sent_campaign, set_send
+from tests.support.tracking_world import accept, clicked, link_ids, opened, sent_campaign, set_send
 
 T = "default"
 SETTINGS = NewsletterSettings()
@@ -29,28 +23,6 @@ async def state():
     _, db_state, _ = await make_app()
     yield db_state
     await db_state.engine.dispose()
-
-
-async def _open(state, cid, sid, tenant=T, now=NOW):
-    with tenant_scope(tenant):
-        async with state.session_factory() as db:
-            await record_open(db, tenant_id=tenant, campaign_id=cid, send_id=sid, now=now)
-            await finalize_session(db)
-
-
-async def _click(state, cid, sid, lid, tenant=T, now=NOW):
-    with tenant_scope(tenant):
-        async with state.session_factory() as db:
-            await record_click(
-                db,
-                tenant_id=tenant,
-                campaign_id=cid,
-                send_id=sid,
-                link_id=lid,
-                now=now,
-                count_open=True,
-            )
-            await finalize_session(db)
 
 
 async def _report(state, cid, tenant=T, settings=SETTINGS):
@@ -78,10 +50,10 @@ async def test_report_counts(state):
         suppressed_count=4,
         unsubscribe_count=5,
     )
-    await _open(state, cid, s1)
-    await _open(state, cid, s1)
-    await _click(state, cid, s2, lid)
-    await _click(state, cid, s2, lid)
+    await opened(state, cid, s1)
+    await opened(state, cid, s1)
+    await clicked(state, cid, s2, lid)
+    await clicked(state, cid, s2, lid)
     report = await _report(state, cid)
     got = (
         report.recipients,
@@ -105,11 +77,11 @@ async def test_link_stats_order_and_zero_links(state):
     urls = ("https://e.org/a", "https://e.org/b", "https://e.org/c", "https://e.org/d")
     cid, (s1, s2) = await sent_campaign(state, links=urls, recipients=2)
     a, b, c, _d = await link_ids(state, T, cid)
-    await _click(state, cid, s1, b)
-    await _click(state, cid, s1, b)
-    await _click(state, cid, s1, c)
-    await _click(state, cid, s2, c)
-    await _click(state, cid, s2, a)
+    await clicked(state, cid, s1, b)
+    await clicked(state, cid, s1, b)
+    await clicked(state, cid, s1, c)
+    await clicked(state, cid, s2, c)
+    await clicked(state, cid, s2, a)
     with tenant_scope(T):
         async with state.session_factory() as db:
             stats = await link_stats(db, tenant_id=T, campaign_id=cid)
@@ -128,8 +100,8 @@ async def test_report_pins_tenant(state):
     a, _ = await sent_campaign(state, "A")
     b, (sb,) = await sent_campaign(state, "B")
     (lb,) = await link_ids(state, "B", b)
-    await _click(state, b, sb, lb, tenant="B")
-    await _click(state, b, sb, lb, tenant="B")
+    await clicked(state, b, sb, lb, tenant="B")
+    await clicked(state, b, sb, lb, tenant="B")
     with tenant_scope("A"):
         async with state.session_factory() as db:
             stats_a = await link_stats(db, tenant_id="A", campaign_id=a)
@@ -153,7 +125,7 @@ async def test_unknown_outcome_engagement_not_in_rate(state):
     await set_send(state, T, s2, status="failed", error_kind="outcome_unknown")
     await set_columns(state, T, cid, started_at=NOW, sent_count=1, failed_count=1)
     for sid in (s1, s2):
-        await _click(state, cid, sid, lid)
+        await clicked(state, cid, sid, lid)
     report = await _report(state, cid)
     assert (report.opens_unique, report.clicks_unique) == (2, 2)
     assert (report.opens_unique_accepted, report.clicks_unique_accepted) == (1, 1)
@@ -165,16 +137,10 @@ async def test_engagement_before_acceptance_joins_later(state):
     cid, (sid,) = await sent_campaign(state)
     await set_columns(state, T, cid, started_at=NOW, status="sending")
     await set_send(state, T, sid, status="sending")
-    await _open(state, cid, sid)
+    await opened(state, cid, sid)
     before = await _report(state, cid)
     assert before.opens_unique == 1 and before.opens_unique_accepted == 0
-    with tenant_scope(T):
-        async with state.session_factory() as db:
-            send = (await db.execute(select(Send).where(Send.id == sid))).scalars().one()
-            await rows.record(
-                db, send, Verdict("sent", False), DeliveryResult("accepted", 250, "ok"), now=NOW
-            )
-            await finalize_session(db)
+    await accept(state, T, sid, NOW)
     after = await _report(state, cid)
     assert after.sent == 1 and after.opens_unique_accepted == 1
     assert after.opens_unique_accepted <= after.sent
@@ -190,9 +156,9 @@ async def test_accepted_engagement_for_a_page(state):
     await set_columns(state, "A", one, sent_count=1)
     await set_columns(state, "A", two, sent_count=2)
     (l1,) = await link_ids(state, "A", one)
-    await _click(state, one, s1, l1, tenant="A")
-    await _open(state, two, s2, tenant="A")
-    await _open(state, other, so, tenant="B")
+    await clicked(state, one, s1, l1, tenant="A")
+    await opened(state, two, s2, tenant="A")
+    await opened(state, other, so, tenant="B")
     with tenant_scope("A"):
         async with state.session_factory() as db:
             got = await accepted_engagement(db, tenant_id="A", campaign_ids=[one, two, none, other])

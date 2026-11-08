@@ -10,16 +10,14 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
-from simple_module_db import finalize_session
 from sm_newsletter.core.settings import NewsletterSettings
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import Campaign
 from sm_newsletter.tracking import report as report_mod
-from sm_newsletter.tracking.record import record_open
 
 from tests.support.campaign_world import set_columns
 from tests.support.sending import NOW, make_app
-from tests.support.tracking_world import accept, sent_campaign, set_send
+from tests.support.tracking_world import accept, opened, sent_campaign, set_send
 
 T = "default"
 
@@ -35,10 +33,7 @@ async def test_acceptance_between_reads_keeps_rate_consistent(state, monkeypatch
     cid, (sid,) = await sent_campaign(state)
     await set_columns(state, T, cid, started_at=NOW, status="sending", sent_count=0)
     await set_send(state, T, sid, status="sending")
-    with tenant_scope(T):
-        async with state.session_factory() as db:
-            await record_open(db, tenant_id=T, campaign_id=cid, send_id=sid, now=NOW)
-            await finalize_session(db)
+    await opened(state, cid, sid)
     original = report_mod.accepted_engagement
 
     async def interleaved(*args, **kwargs):
