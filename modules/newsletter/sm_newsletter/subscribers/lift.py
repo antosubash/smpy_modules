@@ -33,7 +33,7 @@ from sm_records.contracts.newsletter_admin import lock_confirmation
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_newsletter.campaigns.access import Roles
+from sm_newsletter.campaigns.access import MAX_BIG_ID, Roles
 from sm_newsletter.core.constants import LIFTABLE, REASON_UNSUBSCRIBED
 from sm_newsletter.core.errors import NotFound
 from sm_newsletter.core.errors_audience import (
@@ -101,6 +101,8 @@ async def subscriber_on_list(
 async def _visible_row(
     session: AsyncSession, *, tenant_id: str, roles: Roles, suppression_id: int
 ) -> SuppressionRow:
+    if not 0 < suppression_id <= MAX_BIG_ID:
+        raise NotFound()
     stmt = select(_T).where(_T.c.id == suppression_id, _T.c.tenant_id == tenant_id)
     raw = (await session.execute(stmt)).first()
     if raw is None:

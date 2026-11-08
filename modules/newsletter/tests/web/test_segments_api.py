@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sm_newsletter.core import constants
@@ -64,6 +65,16 @@ async def test_crud_round_trip(client):
     assert (clash.status_code, clash.json()["code"]) == (409, "segment_name_taken")
     assert (await client.delete(f"{BASE}/{sid}", headers=EDIT)).status_code == 204
     assert (await client.get(f"{BASE}/{sid}", headers=VIEW)).status_code == 404
+
+
+@pytest.mark.parametrize("sid", [str(2**31 - 1), str(2**31), str(2**63)])
+async def test_out_of_range_segment_ids_404_not_500(client, sid):
+    """The id column is a 32-bit ``INTEGER`` on Postgres: a larger id answers
+    404 before the query instead of overflowing its parameter."""
+    url = f"{BASE}/{sid}"
+    assert (await client.get(url, headers=VIEW)).status_code == 404
+    assert (await client.patch(url, json={"name": "x"}, headers=EDIT)).status_code == 404
+    assert (await client.delete(url, headers=EDIT)).status_code == 404
 
 
 async def test_a_new_segment_reports_its_creation_as_last_change(client):

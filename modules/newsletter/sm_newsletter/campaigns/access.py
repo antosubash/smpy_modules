@@ -25,6 +25,10 @@ MAX_ID = 2**31 - 1
 32-bit on Postgres (SQLite takes 64 bits, but Postgres is the bound). A larger
 id in a URL would overflow the query parameter instead of matching nothing."""
 
+MAX_BIG_ID = 2**63 - 1
+"""The same bound for a :func:`~sm_newsletter.models._cols.big_pk` table
+(``BIGINT`` on Postgres), such as the suppressions."""
+
 Roles = Sequence[str] | CallerRoles | None
 """What records' ``can_read_list`` takes; ``None`` is no caller (a worker)."""
 

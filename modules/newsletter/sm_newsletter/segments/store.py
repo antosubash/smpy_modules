@@ -17,7 +17,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns._refusal import DRAFT
-from sm_newsletter.campaigns.access import Roles, check_list, readable_lists, require_list
+from sm_newsletter.campaigns.access import (
+    MAX_ID,
+    Roles,
+    check_list,
+    readable_lists,
+    require_list,
+)
 from sm_newsletter.core.errors import NotFound
 from sm_newsletter.core.errors_audience import InvalidSegment, SegmentInUse, SegmentNameTaken
 from sm_newsletter.models import Campaign, Segment
@@ -60,6 +66,8 @@ async def _compile(
 
 
 async def _find(session: AsyncSession, *, tenant_id: str, segment_id: int) -> Segment | None:
+    if not 0 < segment_id <= MAX_ID:
+        return None
     stmt = (
         select(Segment)
         .where(Segment.id == segment_id, Segment.tenant_id == tenant_id)
