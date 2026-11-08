@@ -22,6 +22,7 @@ import {
 import { useState } from 'react';
 
 import { api, errorMessage } from '../../utils/api';
+import { isHttpStatus } from '../../utils/http';
 import { keys, type Translate, useT } from '../../utils/i18n';
 import type { ListField, Rule, Segment } from '../../utils/types';
 import { OP_LABELS, SIGNUP_FIELD } from './RuleRow';
@@ -71,6 +72,7 @@ export function SegmentTable({ items, fields, canEdit, onEdit, onDeleted }: Prop
       onDeleted();
     } catch (e) {
       setError(errorMessage(e, t));
+      if (isHttpStatus(e, 404)) onDeleted(); // gone already (another tab): drop it from the list
     } finally {
       setPending(false);
     }

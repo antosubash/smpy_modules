@@ -7,7 +7,7 @@ import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { keys, useT } from '../../utils/i18n';
 import type { ListField, Segment } from '../../utils/types';
 
-/** The API's cap on the search text (`q` max_length, `MAX_SEARCH_LEN`); more is a 422. */
+/** The API's cap on the search text (`sm_records.contracts.newsletter_admin.MAX_SEARCH_LEN`); more is a 422. */
 export const MAX_SEARCH = 200;
 
 interface Props {

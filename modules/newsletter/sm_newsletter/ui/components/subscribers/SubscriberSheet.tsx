@@ -64,6 +64,9 @@ export function SubscriberSheet({ listKey, uuid, canEdit, canManage, onClose, on
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset when another subscriber opens
   useEffect(() => {
     setLiftDone(false);
+    setActionError(null);
+    setLifting(null);
+    setConfirming(false);
   }, [uuid]);
 
   const subscriber = detail?.subscriber ?? null;
