@@ -2,13 +2,6 @@
 
 export type ImportStatus = 'staged' | 'queued' | 'running' | 'done' | 'failed';
 export type ImportKind = 'subscribed' | 'unsubscribed' | 'cleaned' | 'ignored';
-export type RowErrorCode =
-  | 'invalid_email'
-  | 'cell_too_long'
-  | 'tag_invalid'
-  | 'invalid_value'
-  | 'record_refused'
-  | 'tags_unavailable';
 
 /** Whether the list's `tags` field exists, can be created by the import, or cannot be. */
 export type TagsTarget = 'present' | 'creatable' | 'missing';

@@ -101,3 +101,13 @@ export async function write<T>(
   if (!response.ok) throw await errorFrom(response);
   return response.status === 204 ? null : ((await response.json()) as T);
 }
+
+/** `write` for the endpoints that always answer with a body (never a 204). */
+export async function send<T>(
+  path: string,
+  method: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
+  return (await write<T>(path, method, body, signal)) as T;
+}

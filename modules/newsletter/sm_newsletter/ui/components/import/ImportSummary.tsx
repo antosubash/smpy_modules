@@ -15,7 +15,7 @@ import type { ImportJob, ImportKind } from '../../utils/importTypes';
 
 const copy = keys.newsletter.import;
 
-export const KIND_LABELS: Record<ImportKind, string> = {
+const KIND_LABELS: Record<ImportKind, string> = {
   subscribed: copy.kinds.subscribed,
   unsubscribed: copy.kinds.unsubscribed,
   cleaned: copy.kinds.cleaned,

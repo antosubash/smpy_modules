@@ -74,7 +74,7 @@ class _Values:
             else:
                 self.values[key] = _choice(spec, text) if spec.get("type") == "select" else text
         tags = list(dict.fromkeys(t for t in row.tags if isinstance(t, str)))
-        if tags and any(f.get("key") == TAGS for f in rtype.fields or [] if isinstance(f, dict)):
+        if tags and campaign_lists.tags_field(rtype) is not None:
             self.values[TAGS] = tags
         elif tags:
             self.dropped.append(TAGS)

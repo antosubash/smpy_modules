@@ -19,9 +19,9 @@ The HARD invariant, newsletter's half:
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
+from itertools import batched
 from typing import Any
 
 from simple_module_db import mark_written
@@ -47,7 +47,6 @@ __all__ = ["CLEANED", "SKIPPED_SUPPRESSED", "BatchResult", "apply_batch"]
 SKIPPED_SUPPRESSED = "skipped_suppressed"
 CLEANED = "cleaned"
 SOURCE = "import"
-_CREATED = frozenset({"created"})
 
 
 @dataclass
@@ -65,10 +64,6 @@ class BatchResult:
         return self.created + self.updated + self.skipped + self.suppressed + self.failed
 
 
-def _chunks(items: Sequence[Any]) -> list[Sequence[Any]]:
-    return [items[i : i + MAX_IMPORT_BATCH] for i in range(0, len(items), MAX_IMPORT_BATCH)]
-
-
 async def _refused(
     session: AsyncSession, tenant_id: str, job: ImportJob, rows: list[ImportEntry]
 ) -> set[str]:
@@ -80,7 +75,7 @@ async def _refused(
     if not emails:
         return set()
     refused = set(await suppressed(session, tenant_id=tenant_id, emails=emails))
-    for chunk in _chunks(emails):
+    for chunk in batched(emails, MAX_IMPORT_BATCH):
         refused |= await opted_out_anywhere(session, tenant_id=tenant_id, emails=list(chunk))
     return refused
 
@@ -125,12 +120,13 @@ async def _to_records(
     job: ImportJob,
     rows: list[ImportEntry],
     targets: ImportTargets,
+    tag_map: dict[str, str],
     records_settings: Any,
     now: datetime,
 ) -> list[ImportResult]:
-    columns, tag_map = _columns(job, targets), _tag_map(job)
+    columns = _columns(job, targets)
     results: list[ImportResult] = []
-    for chunk in _chunks(rows):
+    for chunk in batched(rows, MAX_IMPORT_BATCH):
         results.extend(
             await import_subscribers(
                 session,
@@ -157,7 +153,7 @@ def _error(row: ImportEntry, code: str, field_key: str | None) -> dict[str, Any]
 def _tally(result: BatchResult, row: ImportEntry, outcome: str) -> None:
     """R15: every row lands in exactly one count."""
     if row.kind == "subscribed":
-        if outcome in _CREATED:
+        if outcome == "created":
             result.created += 1
         elif outcome == "updated":
             result.updated += 1
@@ -202,6 +198,7 @@ async def apply_batch(
         job=job,
         rows=to_records,
         targets=targets,
+        tag_map=tag_map,
         records_settings=records_settings,
         now=now,
     )
@@ -230,28 +227,21 @@ async def _suppress(
     """Insert-ignore only: an existing row is never cleared, freshened or re-sourced."""
     left = [r.email for r in rows if r.kind == "unsubscribed" and outcome[r.id] != "kept_confirmed"]
     cleaned = [r.email for r in rows if r.kind == "cleaned"]
-    if left:
-        await suppress_many(
-            session,
-            tenant_id=tenant_id,
-            emails=left,
-            reason=REASON_UNSUBSCRIBED,
-            list_type_key=job.list_type_key,
-            source=SOURCE,
-            refresh=False,
-            now=now,
-        )
-    if cleaned:
-        await suppress_many(
-            session,
-            tenant_id=tenant_id,
-            emails=cleaned,
-            reason=REASON_IMPORTED_CLEANED,
-            list_type_key="",
-            source=SOURCE,
-            refresh=False,
-            now=now,
-        )
+    for emails, reason, list_type_key in (
+        (left, REASON_UNSUBSCRIBED, job.list_type_key),
+        (cleaned, REASON_IMPORTED_CLEANED, ""),
+    ):
+        if emails:
+            await suppress_many(
+                session,
+                tenant_id=tenant_id,
+                emails=emails,
+                reason=reason,
+                list_type_key=list_type_key,
+                source=SOURCE,
+                refresh=False,
+                now=now,
+            )
 
 
 async def _store(

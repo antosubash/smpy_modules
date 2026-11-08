@@ -90,12 +90,3 @@ BATCH_SIZE = 200
 SLICE_SECONDS = 45
 LEASE = timedelta(minutes=5)
 STAGE_CHUNK = 1000
-
-ROW_ERROR_CODES = (
-    "invalid_email",
-    "cell_too_long",
-    "tag_invalid",
-    "invalid_value",
-    "record_refused",
-    "tags_unavailable",
-)
