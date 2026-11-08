@@ -145,6 +145,7 @@ lint:
 	$(MAKE) typecheck
 	uv run python scripts/check_metadata.py
 	uv run python scripts/check_rules.py
+	uv run python scripts/moved_paths.py --check
 	uv run python scripts/check_readmes.py
 	uv run python scripts/check_hardcoded_strings.py
 	uv run python scripts/check_file_size.py

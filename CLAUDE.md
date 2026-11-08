@@ -258,6 +258,21 @@ frontend that is not a page. Tests mirror the areas under `tests/`.
 New code in any module follows it. All six modules follow it; structural changes keep the same moves-only
 review boundary.
 
+**The paths 0.0.14 moved stay importable until 0.0.17 (#319).** Each moved
+package's `core/moved_paths.py` hook, driven by `core/moved_paths.json`, aliases
+the old Python paths with a `DeprecationWarning`. Generated re-export stubs sit
+at the old TS paths (the `components/`, `hooks/` and `utils/` folders that hold only
+stubs). Never edit or import them: `scripts/moved_paths.py --check` (`make lint`,
+CI) fails on a stub that drifts from its table and on any repo import of an old
+path. `host/tests/test_moved_paths_tables.py` fails once the version reaches
+`remove_in`; then delete the stubs, both `core/moved_paths.*` files, the
+`install(__name__)` lines, the `__getattr__`/`__all__` lines (ai's `metering`,
+billing's `plans`) and the `__path__` lines (records' `index` and `seed`),
+`scripts/moved_paths*` with its test and the `--check` lines in the Makefile and
+`ci.yml`, `host/tests/test_moved_paths*.py` and `moved_paths_probe.py`, and the
+stub filter in the `test_layout.py` of ai, billing and news.
+A later move needs aliases the same way.
+
 **300-line cap** on every `.py` / `.ts` / `.tsx`, enforced by
 `scripts/check_file_size.py`. Nothing under `modules/` is exempt. The check
 also lists files at 280+ lines as a WARNING: when you touch one, split it by

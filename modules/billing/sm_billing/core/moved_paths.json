@@ -1,0 +1,167 @@
+{
+  "attributes": {
+    "sm_billing.plans": {
+      "PlanError": "sm_billing.plans.service",
+      "PlanService": "sm_billing.plans.service",
+      "logger": "sm_billing.plans.service",
+      "seed_default_plan": "sm_billing.plans.service"
+    }
+  },
+  "modules": {
+    "sm_billing.admin": [
+      "sm_billing.web.services.admin",
+      "sm_billing.web.services.subscription_list"
+    ],
+    "sm_billing.checkout": "sm_billing.web.services.checkout",
+    "sm_billing.constants": "sm_billing.core.constants",
+    "sm_billing.context": "sm_billing.core.context",
+    "sm_billing.crypto": "sm_billing.core.crypto",
+    "sm_billing.deps": "sm_billing.web.deps",
+    "sm_billing.endpoints": "sm_billing.web.endpoints",
+    "sm_billing.endpoints.admin_api": "sm_billing.web.endpoints.admin_api",
+    "sm_billing.endpoints.admin_usage_api": "sm_billing.web.endpoints.admin_usage_api",
+    "sm_billing.endpoints.admin_views": "sm_billing.web.endpoints.admin_views",
+    "sm_billing.endpoints.api": "sm_billing.web.endpoints.api",
+    "sm_billing.endpoints.routers": "sm_billing.web.endpoints.routers",
+    "sm_billing.endpoints.views": "sm_billing.web.endpoints.views",
+    "sm_billing.endpoints.webhooks": "sm_billing.web.endpoints.webhooks",
+    "sm_billing.entitlements": "sm_billing.plans.entitlements",
+    "sm_billing.errors": "sm_billing.core.errors",
+    "sm_billing.lifecycle": "sm_billing.subscriptions.lifecycle",
+    "sm_billing.live": "sm_billing.core.live",
+    "sm_billing.reconcile": "sm_billing.subscriptions.reconcile",
+    "sm_billing.resolve": "sm_billing.plans.resolve",
+    "sm_billing.scheduler": "sm_billing.subscriptions.scheduler",
+    "sm_billing.schemas": "sm_billing.web.schemas",
+    "sm_billing.seats": "sm_billing.subscriptions.seats",
+    "sm_billing.services": "sm_billing.core.services",
+    "sm_billing.settings": "sm_billing.core.settings",
+    "sm_billing.startup": "sm_billing.core.startup",
+    "sm_billing.sweep": "sm_billing.subscriptions.deletion.sweep",
+    "sm_billing.sync": "sm_billing.subscriptions.sync",
+    "sm_billing.teardown": [
+      "sm_billing.subscriptions.deletion.teardown",
+      "sm_billing.subscriptions.deletion.tenant_deleted"
+    ],
+    "sm_billing.teardown_claim": "sm_billing.subscriptions.deletion.teardown_claim",
+    "sm_billing.webhooks": "sm_billing.subscriptions.webhooks"
+  },
+  "names": {
+    "sm_billing.admin": [
+      "assign",
+      "connection_changes",
+      "connection_out",
+      "one_row",
+      "resync",
+      "save_connection",
+      "save_plan",
+      "subscription_rows",
+      "sync_health",
+      "verify_prices"
+    ],
+    "sm_billing.teardown": [
+      "cancel_for_deleted_tenant",
+      "logger",
+      "subscribe"
+    ]
+  },
+  "packages": {
+    "sm_billing.endpoints": "sm_billing.web.endpoints"
+  },
+  "remove_in": "0.0.17",
+  "ts": {
+    "components/AdjustDialog.tsx": {
+      "star": "ui/components/AdjustDialog.tsx"
+    },
+    "components/AdminNav.tsx": {
+      "star": "ui/components/AdminNav.tsx"
+    },
+    "components/AssignDialog.tsx": {
+      "star": "ui/components/AssignDialog.tsx"
+    },
+    "components/CurrentPlanCard.tsx": {
+      "star": "ui/components/CurrentPlanCard.tsx"
+    },
+    "components/LimitRows.tsx": {
+      "star": "ui/components/LimitRows.tsx"
+    },
+    "components/PlanCard.tsx": {
+      "star": "ui/components/PlanCard.tsx"
+    },
+    "components/PlanEditor.tsx": {
+      "star": "ui/components/PlanEditor.tsx"
+    },
+    "components/PlansTable.tsx": {
+      "star": "ui/components/PlansTable.tsx"
+    },
+    "components/ProviderFallbackBanner.tsx": {
+      "star": "ui/components/ProviderFallbackBanner.tsx"
+    },
+    "components/StatusBadge.tsx": {
+      "star": "ui/components/StatusBadge.tsx"
+    },
+    "components/SubscriptionsTable.tsx": {
+      "star": "ui/components/SubscriptionsTable.tsx"
+    },
+    "components/SyncHealthBar.tsx": {
+      "star": "ui/components/SyncHealthBar.tsx"
+    },
+    "components/UsageBar.tsx": {
+      "star": "ui/components/UsageBar.tsx"
+    },
+    "components/UsageCard.tsx": {
+      "star": "ui/components/UsageCard.tsx"
+    },
+    "components/UsageDetail.tsx": {
+      "star": "ui/components/UsageDetail.tsx"
+    },
+    "components/UsageFilters.tsx": {
+      "star": "ui/components/UsageFilters.tsx"
+    },
+    "components/UsageHolds.tsx": {
+      "star": "ui/components/UsageHolds.tsx"
+    },
+    "components/UsageLedger.tsx": {
+      "star": "ui/components/UsageLedger.tsx"
+    },
+    "components/UsageTable.tsx": {
+      "star": "ui/components/UsageTable.tsx"
+    },
+    "hooks/useCheckoutPolling.ts": {
+      "star": "ui/hooks/useCheckoutPolling.ts"
+    },
+    "hooks/useReturnFocus.ts": {
+      "star": "ui/hooks/useReturnFocus.ts"
+    },
+    "hooks/useUsageDetail.ts": {
+      "star": "ui/hooks/useUsageDetail.ts"
+    },
+    "utils/api.ts": {
+      "star": "ui/utils/api.ts"
+    },
+    "utils/format.ts": {
+      "star": "ui/utils/format.ts"
+    },
+    "utils/i18n.ts": {
+      "star": "ui/utils/i18n.ts"
+    },
+    "utils/locale.ts": {
+      "star": "ui/utils/locale.ts"
+    },
+    "utils/plan-form.ts": {
+      "star": "ui/utils/plan-form.ts"
+    },
+    "utils/quotaError.ts": {
+      "star": "ui/utils/quotaError.ts"
+    },
+    "utils/seats.ts": {
+      "star": "ui/utils/seats.ts"
+    },
+    "utils/types.ts": {
+      "star": "ui/utils/types.ts"
+    },
+    "utils/usage.ts": {
+      "star": "ui/utils/usage.ts"
+    }
+  }
+}

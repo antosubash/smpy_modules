@@ -1,0 +1,714 @@
+{
+  "all": [
+    "sm_records.endpoints.api",
+    "sm_records.services"
+  ],
+  "modules": {
+    "sm_records._body_limit": "sm_records.web._body_limit",
+    "sm_records._cross_tenant": "sm_records.core.tenancy._cross_tenant",
+    "sm_records._expand_grammar": "sm_records.records._expand_grammar",
+    "sm_records._grammar": "sm_records.records._grammar",
+    "sm_records._health_counts": "sm_records.core.health._health_counts",
+    "sm_records._html_lang": "sm_records.web._html_lang",
+    "sm_records._module_submissions": "sm_records.public_submissions._module_submissions",
+    "sm_records._pattern_worker": "sm_records.records._pattern_worker",
+    "sm_records._permission_sync": "sm_records.core._permission_sync",
+    "sm_records._tenancy_mode": "sm_records.core.tenancy._mode",
+    "sm_records._tenant_guard": "sm_records.core.tenancy._tenant_guard",
+    "sm_records._text": "sm_records.core._text",
+    "sm_records.boot": "sm_records.core.boot",
+    "sm_records.cli_common": "sm_records.records.cli.cli_common",
+    "sm_records.cli_host": "sm_records.records.cli.cli_host",
+    "sm_records.cli_io": "sm_records.records.cli.cli_io",
+    "sm_records.cli_reindex": "sm_records.records.cli.cli_reindex",
+    "sm_records.cli_verify": "sm_records.records.cli.cli_verify",
+    "sm_records.constants": "sm_records.core.constants",
+    "sm_records.csrf": "sm_records.web.csrf",
+    "sm_records.deferred": "sm_records.records.deferred",
+    "sm_records.deps": "sm_records.web.deps",
+    "sm_records.endpoints": [
+      "sm_records.web.endpoints"
+    ],
+    "sm_records.endpoints._list_view": "sm_records.web.endpoints._list_view",
+    "sm_records.endpoints.api": [
+      "sm_records.web.endpoints.api"
+    ],
+    "sm_records.endpoints.api._error_bodies": "sm_records.web.endpoints.api._error_bodies",
+    "sm_records.endpoints.api._error_table": "sm_records.web.endpoints.api._error_table",
+    "sm_records.endpoints.api._error_table_submissions": "sm_records.web.endpoints.api._error_table_submissions",
+    "sm_records.endpoints.api._errors": "sm_records.web.endpoints.api._errors",
+    "sm_records.endpoints.api._io_upload": "sm_records.web.endpoints.api._io_upload",
+    "sm_records.endpoints.api._public_cache": "sm_records.web.endpoints.api._public_cache",
+    "sm_records.endpoints.api._responses": "sm_records.web.endpoints.api._responses",
+    "sm_records.endpoints.api.aggregate": "sm_records.web.endpoints.api.aggregate",
+    "sm_records.endpoints.api.bulk": "sm_records.web.endpoints.api.bulk",
+    "sm_records.endpoints.api.io": "sm_records.web.endpoints.api.io",
+    "sm_records.endpoints.api.io_types": "sm_records.web.endpoints.api.io_types",
+    "sm_records.endpoints.api.lifecycle": "sm_records.web.endpoints.api.lifecycle",
+    "sm_records.endpoints.api.preview": "sm_records.web.endpoints.api.preview",
+    "sm_records.endpoints.api.public": "sm_records.web.endpoints.api.public",
+    "sm_records.endpoints.api.public_submissions_admin": "sm_records.web.endpoints.api.public_submissions_admin",
+    "sm_records.endpoints.api.public_submissions_links": "sm_records.web.endpoints.api.public_submissions_links",
+    "sm_records.endpoints.api.public_submissions_public": "sm_records.web.endpoints.api.public_submissions_public",
+    "sm_records.endpoints.api.records": "sm_records.web.endpoints.api.records",
+    "sm_records.endpoints.api.referrers": "sm_records.web.endpoints.api.referrers",
+    "sm_records.endpoints.api.revisions": "sm_records.web.endpoints.api.revisions",
+    "sm_records.endpoints.api.translations": "sm_records.web.endpoints.api.translations",
+    "sm_records.endpoints.api.types": [
+      "sm_records.web.endpoints.api.types",
+      "sm_records.web.endpoints.api._type_writes"
+    ],
+    "sm_records.endpoints.public_submissions_views": "sm_records.web.endpoints.public_submissions_views",
+    "sm_records.endpoints.views": "sm_records.web.endpoints.views",
+    "sm_records.endpoints.views_types": "sm_records.web.endpoints.views_types",
+    "sm_records.events": "sm_records.core.events",
+    "sm_records.health": "sm_records.core.health",
+    "sm_records.index._analyze": "sm_records.records.index._analyze",
+    "sm_records.index._batch": "sm_records.records.index._batch",
+    "sm_records.index._coerce": "sm_records.records.index._coerce",
+    "sm_records.index._cursor": "sm_records.records.index._cursor",
+    "sm_records.index._drift": "sm_records.records.index._drift",
+    "sm_records.index._fields": "sm_records.records.index._fields",
+    "sm_records.index._filters": "sm_records.records.index._filters",
+    "sm_records.index._fixed": "sm_records.records.index._fixed",
+    "sm_records.index._predicates": "sm_records.records.index._predicates",
+    "sm_records.index._prefix": "sm_records.records.index._prefix",
+    "sm_records.index._reduce_write": "sm_records.records.index._reduce_write",
+    "sm_records.index._registry": "sm_records.records.index._registry",
+    "sm_records.index._sorting": "sm_records.records.index._sorting",
+    "sm_records.index.aggregate": "sm_records.records.index.aggregate",
+    "sm_records.index.providers": "sm_records.records.index.providers",
+    "sm_records.index.query": "sm_records.records.index.query",
+    "sm_records.index.reduce": "sm_records.records.index.reduce",
+    "sm_records.index.reduce_rebuild": "sm_records.records.index.reduce_rebuild",
+    "sm_records.index.reindex": "sm_records.records.index.reindex",
+    "sm_records.index.writer": "sm_records.records.index.writer",
+    "sm_records.locales": "sm_records.core.locales",
+    "sm_records.media": "sm_records.web.media",
+    "sm_records.menu": "sm_records.web.menu",
+    "sm_records.seed._i18n": "sm_records.records.seed._i18n",
+    "sm_records.seed.data": "sm_records.records.seed.data",
+    "sm_records.seed.generate": "sm_records.records.seed.generate",
+    "sm_records.seed.log": "sm_records.records.seed.log",
+    "sm_records.seed.plan": "sm_records.records.seed.plan",
+    "sm_records.seed.runner": "sm_records.records.seed.runner",
+    "sm_records.seed.types": "sm_records.records.seed.types",
+    "sm_records.services": [
+      "sm_records.core.services"
+    ],
+    "sm_records.services._access": "sm_records.records.services._access",
+    "sm_records.services._bulk_turn": "sm_records.records.services._bulk_turn",
+    "sm_records.services._claims": "sm_records.records.services._claims",
+    "sm_records.services._common": "sm_records.records.services._common",
+    "sm_records.services._delete_locks": "sm_records.records.services._delete_locks",
+    "sm_records.services._delete_plan": "sm_records.records.services._delete_plan",
+    "sm_records.services._dry_run": "sm_records.records.services._dry_run",
+    "sm_records.services._duplicates": "sm_records.records.services._duplicates",
+    "sm_records.services._empty_trash": "sm_records.records.services._empty_trash",
+    "sm_records.services._expand_plan": "sm_records.records.services._expand_plan",
+    "sm_records.services._export_cells": "sm_records.records.services._export_cells",
+    "sm_records.services._forget_deliveries": "sm_records.records.services._forget_deliveries",
+    "sm_records.services._import_checks": "sm_records.records.services._import_checks",
+    "sm_records.services._import_csv": "sm_records.records.services._import_csv",
+    "sm_records.services._import_match": "sm_records.records.services._import_match",
+    "sm_records.services._import_parse": "sm_records.records.services._import_parse",
+    "sm_records.services._import_plan": "sm_records.records.services._import_plan",
+    "sm_records.services._import_report": "sm_records.records.services._import_report",
+    "sm_records.services._import_rows": "sm_records.records.services._import_rows",
+    "sm_records.services._invalid": "sm_records.records.services._invalid",
+    "sm_records.services._lifecycle": "sm_records.records.services._lifecycle",
+    "sm_records.services._listing": "sm_records.records.services._listing",
+    "sm_records.services._lock": "sm_records.records.services._lock",
+    "sm_records.services._orphaned": "sm_records.records.services._orphaned",
+    "sm_records.services._patterns": "sm_records.records.services._patterns",
+    "sm_records.services._payload": "sm_records.records.services._payload",
+    "sm_records.services._pending": "sm_records.records.services._pending",
+    "sm_records.services._prepare": "sm_records.records.services._prepare",
+    "sm_records.services._preview": "sm_records.records.services._preview",
+    "sm_records.services._referrer_page": "sm_records.records.services._referrer_page",
+    "sm_records.services._referrer_sets": "sm_records.records.services._referrer_sets",
+    "sm_records.services._referrers": "sm_records.records.services._referrers",
+    "sm_records.services._relations": "sm_records.records.services._relations",
+    "sm_records.services._rollback": "sm_records.records.services._rollback",
+    "sm_records.services._schema": "sm_records.records.services._schema",
+    "sm_records.services._schema_checked": "sm_records.records.services._schema_checked",
+    "sm_records.services._titles": "sm_records.records.services._titles",
+    "sm_records.services._translations": "sm_records.records.services._translations",
+    "sm_records.services._type_checks": "sm_records.records.services._type_checks",
+    "sm_records.services._type_move": "sm_records.records.services._type_move",
+    "sm_records.services._type_update": "sm_records.records.services._type_update",
+    "sm_records.services._uuids": "sm_records.records.services._uuids",
+    "sm_records.services.aggregate": "sm_records.records.services.aggregate",
+    "sm_records.services.bulk": "sm_records.records.services.bulk",
+    "sm_records.services.errors": "sm_records.records.services.errors",
+    "sm_records.services.expand": "sm_records.records.services.expand",
+    "sm_records.services.export": "sm_records.records.services.export",
+    "sm_records.services.import_": "sm_records.records.services.import_",
+    "sm_records.services.preview_jobs": "sm_records.records.services.preview_jobs",
+    "sm_records.services.preview_runner": "sm_records.records.services.preview_runner",
+    "sm_records.services.public": "sm_records.records.services.public",
+    "sm_records.services.records": "sm_records.records.services.records",
+    "sm_records.services.reindex_runner": "sm_records.records.services.reindex_runner",
+    "sm_records.services.revisions": "sm_records.records.services.revisions",
+    "sm_records.services.schema_change": "sm_records.records.services.schema_change",
+    "sm_records.services.types": "sm_records.records.services.types",
+    "sm_records.settings": "sm_records.core.settings",
+    "sm_records.settings_boot": "sm_records.core.settings.settings_boot",
+    "sm_records.settings_checks": "sm_records.core.settings.settings_checks",
+    "sm_records.settings_public_submissions": "sm_records.core.settings.settings_public_submissions",
+    "sm_records.tenancy": "sm_records.core.tenancy",
+    "sm_records.type_permissions": "sm_records.core.type_permissions"
+  },
+  "names": {
+    "sm_records.endpoints": [],
+    "sm_records.endpoints.api": [
+      "router"
+    ],
+    "sm_records.endpoints.api.types": [
+      "apply_update",
+      "create_from",
+      "create_type",
+      "delete_type",
+      "list_types",
+      "read_type",
+      "reindex_type",
+      "router",
+      "type_written",
+      "update_type",
+      "visible_types"
+    ],
+    "sm_records.services": [
+      "RecordsServices"
+    ]
+  },
+  "packages": {
+    "sm_records.endpoints": "sm_records.web.endpoints",
+    "sm_records.endpoints.api": "sm_records.web.endpoints.api",
+    "sm_records.services": "sm_records.records.services"
+  },
+  "remove_in": "0.0.17",
+  "ts": {
+    "components/BulkRefusalReport.tsx": {
+      "star": "ui/components/BulkRefusalReport.tsx"
+    },
+    "components/ColumnChooser.tsx": {
+      "star": "ui/components/ColumnChooser.tsx"
+    },
+    "components/ColumnChooserPanel.tsx": {
+      "star": "ui/components/ColumnChooserPanel.tsx"
+    },
+    "components/ColumnOptionRow.tsx": {
+      "star": "ui/components/ColumnOptionRow.tsx"
+    },
+    "components/ConfirmDialog.tsx": {
+      "star": "ui/components/ConfirmDialog.tsx"
+    },
+    "components/ConflictPanel.tsx": {
+      "star": "ui/components/ConflictPanel.tsx"
+    },
+    "components/EmptyTrashButton.tsx": {
+      "star": "ui/components/EmptyTrashButton.tsx"
+    },
+    "components/FilterBar.tsx": {
+      "star": "ui/components/FilterBar.tsx"
+    },
+    "components/FilterValueInput.tsx": {
+      "star": "ui/components/FilterValueInput.tsx"
+    },
+    "components/ImportReportSummary.tsx": {
+      "star": "ui/components/ImportReportSummary.tsx"
+    },
+    "components/InvalidNotice.tsx": {
+      "star": "ui/components/InvalidNotice.tsx"
+    },
+    "components/JsonField.tsx": {
+      "star": "ui/components/JsonField.tsx"
+    },
+    "components/PageSizeSelect.tsx": {
+      "star": "ui/components/PageSizeSelect.tsx"
+    },
+    "components/PagerButton.tsx": {
+      "star": "ui/components/PagerButton.tsx"
+    },
+    "components/RecordActions.tsx": {
+      "star": "ui/components/RecordActions.tsx"
+    },
+    "components/RecordBulkToolbar.tsx": {
+      "star": "ui/components/RecordBulkToolbar.tsx"
+    },
+    "components/RecordCardList.tsx": {
+      "star": "ui/components/RecordCardList.tsx"
+    },
+    "components/RecordCell.tsx": {
+      "star": "ui/components/RecordCell.tsx"
+    },
+    "components/RecordColumnCells.tsx": {
+      "star": "ui/components/RecordColumnCells.tsx"
+    },
+    "components/RecordCursorPager.tsx": {
+      "star": "ui/components/RecordCursorPager.tsx"
+    },
+    "components/RecordDeleteDialog.tsx": {
+      "star": "ui/components/RecordDeleteDialog.tsx"
+    },
+    "components/RecordEditorActionsRow.tsx": {
+      "star": "ui/components/RecordEditorActionsRow.tsx"
+    },
+    "components/RecordEditorTypeLink.tsx": {
+      "star": "ui/components/RecordEditorTypeLink.tsx"
+    },
+    "components/RecordEnvelopeFields.tsx": {
+      "star": "ui/components/RecordEnvelopeFields.tsx"
+    },
+    "components/RecordForm.tsx": {
+      "star": "ui/components/RecordForm.tsx"
+    },
+    "components/RecordImportOptions.tsx": {
+      "star": "ui/components/RecordImportOptions.tsx"
+    },
+    "components/RecordIoMenu.tsx": {
+      "star": "ui/components/RecordIoMenu.tsx"
+    },
+    "components/RecordListActions.tsx": {
+      "star": "ui/components/RecordListActions.tsx"
+    },
+    "components/RecordListBulk.tsx": {
+      "star": "ui/components/RecordListBulk.tsx"
+    },
+    "components/RecordListEmpty.tsx": {
+      "star": "ui/components/RecordListEmpty.tsx"
+    },
+    "components/RecordListFooter.tsx": {
+      "star": "ui/components/RecordListFooter.tsx"
+    },
+    "components/RecordListPublicUrl.tsx": {
+      "star": "ui/components/RecordListPublicUrl.tsx"
+    },
+    "components/RecordPagination.tsx": {
+      "star": "ui/components/RecordPagination.tsx"
+    },
+    "components/RecordReferrers.tsx": {
+      "star": "ui/components/RecordReferrers.tsx"
+    },
+    "components/RecordRevisions.tsx": {
+      "star": "ui/components/RecordRevisions.tsx"
+    },
+    "components/RecordRowAction.tsx": {
+      "star": "ui/components/RecordRowAction.tsx"
+    },
+    "components/RecordSelectCell.tsx": {
+      "star": "ui/components/RecordSelectCell.tsx"
+    },
+    "components/RecordStatusBadge.tsx": {
+      "star": "ui/components/RecordStatusBadge.tsx"
+    },
+    "components/RecordTable.tsx": {
+      "star": "ui/components/RecordTable.tsx"
+    },
+    "components/RecordTranslations.tsx": {
+      "star": "ui/components/RecordTranslations.tsx"
+    },
+    "components/RecordsLayout.tsx": {
+      "star": "ui/components/RecordsLayout.tsx"
+    },
+    "components/RelationChips.tsx": {
+      "star": "ui/components/RelationChips.tsx"
+    },
+    "components/RelationPicker.tsx": {
+      "star": "ui/components/RelationPicker.tsx"
+    },
+    "components/SortableHeader.tsx": {
+      "star": "ui/components/SortableHeader.tsx"
+    },
+    "components/TenantBadge.tsx": {
+      "star": "ui/components/TenantBadge.tsx"
+    },
+    "components/TypesCardList.tsx": {
+      "star": "ui/components/TypesCardList.tsx"
+    },
+    "components/fields/BooleanField.tsx": {
+      "star": "ui/components/fields/BooleanField.tsx"
+    },
+    "components/fields/ChoiceFields.tsx": {
+      "star": "ui/components/fields/ChoiceFields.tsx"
+    },
+    "components/fields/FieldShell.tsx": {
+      "star": "ui/components/fields/FieldShell.tsx"
+    },
+    "components/fields/MediaField.tsx": {
+      "star": "ui/components/fields/MediaField.tsx"
+    },
+    "components/fields/RelationField.tsx": {
+      "star": "ui/components/fields/RelationField.tsx"
+    },
+    "components/fields/StructuredFields.tsx": {
+      "star": "ui/components/fields/StructuredFields.tsx"
+    },
+    "components/fields/TextFields.tsx": {
+      "star": "ui/components/fields/TextFields.tsx"
+    },
+    "components/fields/index.ts": {
+      "star": "ui/components/fields/index.ts"
+    },
+    "components/filterBarFields.ts": {
+      "star": "ui/components/filterBarFields.ts"
+    },
+    "components/media/MediaApiContext.tsx": {
+      "star": "ui/components/media/MediaApiContext.tsx"
+    },
+    "components/media/MediaCell.tsx": {
+      "star": "ui/components/media/MediaCell.tsx"
+    },
+    "components/media/MediaGrid.tsx": {
+      "star": "ui/components/media/MediaGrid.tsx"
+    },
+    "components/media/MediaPickerDialog.tsx": {
+      "star": "ui/components/media/MediaPickerDialog.tsx"
+    },
+    "components/media/MediaPreview.tsx": {
+      "star": "ui/components/media/MediaPreview.tsx"
+    },
+    "components/media/MediaUpload.tsx": {
+      "star": "ui/components/media/MediaUpload.tsx"
+    },
+    "components/public_submissions/SubmissionActions.tsx": {
+      "star": "ui/components/public_submissions/SubmissionActions.tsx"
+    },
+    "components/public_submissions/SubmissionDetails.tsx": {
+      "star": "ui/components/public_submissions/SubmissionDetails.tsx"
+    },
+    "components/public_submissions/SubmissionPanel.tsx": {
+      "star": "ui/components/public_submissions/SubmissionPanel.tsx"
+    },
+    "components/public_submissions/SubscriberActions.tsx": {
+      "star": "ui/components/public_submissions/SubscriberActions.tsx"
+    },
+    "components/public_submissions/form/CaptchaWidget.tsx": {
+      "star": "ui/components/public_submissions/form/CaptchaWidget.tsx"
+    },
+    "components/public_submissions/form/RecordFormBlock.tsx": {
+      "star": "ui/components/public_submissions/form/RecordFormBlock.tsx"
+    },
+    "components/public_submissions/form/RecordFormFields.tsx": {
+      "star": "ui/components/public_submissions/form/RecordFormFields.tsx"
+    },
+    "components/public_submissions/form/RecordFormRender.tsx": {
+      "star": "ui/components/public_submissions/form/RecordFormRender.tsx"
+    },
+    "components/public_submissions/form/SubmissionInput.tsx": {
+      "star": "ui/components/public_submissions/form/SubmissionInput.tsx"
+    },
+    "components/public_submissions/form/types.ts": {
+      "star": "ui/components/public_submissions/form/types.ts"
+    },
+    "components/trashToast.tsx": {
+      "star": "ui/components/trashToast.tsx"
+    },
+    "components/typeeditor/ChoicesEditor.tsx": {
+      "star": "ui/components/typeeditor/ChoicesEditor.tsx"
+    },
+    "components/typeeditor/CollectionField.tsx": {
+      "star": "ui/components/typeeditor/CollectionField.tsx"
+    },
+    "components/typeeditor/DefaultInput.tsx": {
+      "star": "ui/components/typeeditor/DefaultInput.tsx"
+    },
+    "components/typeeditor/DeleteTypeSection.tsx": {
+      "star": "ui/components/typeeditor/DeleteTypeSection.tsx"
+    },
+    "components/typeeditor/DryRunReportView.tsx": {
+      "star": "ui/components/typeeditor/DryRunReportView.tsx"
+    },
+    "components/typeeditor/FieldList.tsx": {
+      "star": "ui/components/typeeditor/FieldList.tsx"
+    },
+    "components/typeeditor/FieldOptions.tsx": {
+      "star": "ui/components/typeeditor/FieldOptions.tsx"
+    },
+    "components/typeeditor/FieldRow.tsx": {
+      "star": "ui/components/typeeditor/FieldRow.tsx"
+    },
+    "components/typeeditor/FieldRowBody.tsx": {
+      "star": "ui/components/typeeditor/FieldRowBody.tsx"
+    },
+    "components/typeeditor/FieldRowSummary.tsx": {
+      "star": "ui/components/typeeditor/FieldRowSummary.tsx"
+    },
+    "components/typeeditor/FieldsCard.tsx": {
+      "star": "ui/components/typeeditor/FieldsCard.tsx"
+    },
+    "components/typeeditor/IconField.tsx": {
+      "star": "ui/components/typeeditor/IconField.tsx"
+    },
+    "components/typeeditor/LastAppliedReport.tsx": {
+      "star": "ui/components/typeeditor/LastAppliedReport.tsx"
+    },
+    "components/typeeditor/OrphanedConflictsList.tsx": {
+      "star": "ui/components/typeeditor/OrphanedConflictsList.tsx"
+    },
+    "components/typeeditor/PointerFields.tsx": {
+      "star": "ui/components/typeeditor/PointerFields.tsx"
+    },
+    "components/typeeditor/PublicField.tsx": {
+      "star": "ui/components/typeeditor/PublicField.tsx"
+    },
+    "components/typeeditor/PublicFieldsChecklist.tsx": {
+      "star": "ui/components/typeeditor/PublicFieldsChecklist.tsx"
+    },
+    "components/typeeditor/PublicSubmissionsCard.tsx": {
+      "star": "ui/components/typeeditor/PublicSubmissionsCard.tsx"
+    },
+    "components/typeeditor/PublicSubmissionsOptions.tsx": {
+      "star": "ui/components/typeeditor/PublicSubmissionsOptions.tsx"
+    },
+    "components/typeeditor/ReindexStatus.tsx": {
+      "star": "ui/components/typeeditor/ReindexStatus.tsx"
+    },
+    "components/typeeditor/RelationOptions.tsx": {
+      "star": "ui/components/typeeditor/RelationOptions.tsx"
+    },
+    "components/typeeditor/RolesMultiSelect.tsx": {
+      "star": "ui/components/typeeditor/RolesMultiSelect.tsx"
+    },
+    "components/typeeditor/SaveBar.tsx": {
+      "star": "ui/components/typeeditor/SaveBar.tsx"
+    },
+    "components/typeeditor/SchemaChangeList.tsx": {
+      "star": "ui/components/typeeditor/SchemaChangeList.tsx"
+    },
+    "components/typeeditor/SchemaConflictPanel.tsx": {
+      "star": "ui/components/typeeditor/SchemaConflictPanel.tsx"
+    },
+    "components/typeeditor/SchemaPreviewPanel.tsx": {
+      "star": "ui/components/typeeditor/SchemaPreviewPanel.tsx"
+    },
+    "components/typeeditor/SidebarField.tsx": {
+      "star": "ui/components/typeeditor/SidebarField.tsx"
+    },
+    "components/typeeditor/TypeConflictNotice.tsx": {
+      "star": "ui/components/typeeditor/TypeConflictNotice.tsx"
+    },
+    "components/typeeditor/TypeImportDialog.tsx": {
+      "star": "ui/components/typeeditor/TypeImportDialog.tsx"
+    },
+    "components/typeeditor/TypeIoMenu.tsx": {
+      "star": "ui/components/typeeditor/TypeIoMenu.tsx"
+    },
+    "components/typeeditor/TypeMetadataForm.tsx": {
+      "star": "ui/components/typeeditor/TypeMetadataForm.tsx"
+    },
+    "components/typeeditor/TypeRevisions.tsx": {
+      "star": "ui/components/typeeditor/TypeRevisions.tsx"
+    },
+    "components/typeeditor/changeLabels.ts": {
+      "star": "ui/components/typeeditor/changeLabels.ts"
+    },
+    "components/typeeditor/errors.ts": {
+      "star": "ui/components/typeeditor/errors.ts"
+    },
+    "components/typeeditor/focusInvalid.ts": {
+      "star": "ui/components/typeeditor/focusInvalid.ts"
+    },
+    "components/typeeditor/formHelpers.ts": {
+      "star": "ui/components/typeeditor/formHelpers.ts"
+    },
+    "components/typeeditor/navIcons.ts": {
+      "star": "ui/components/typeeditor/navIcons.ts"
+    },
+    "components/typeeditor/reindexPending.ts": {
+      "star": "ui/components/typeeditor/reindexPending.ts"
+    },
+    "components/typeeditor/rules.ts": {
+      "star": "ui/components/typeeditor/rules.ts"
+    },
+    "components/typeeditor/types.ts": {
+      "star": "ui/components/typeeditor/types.ts"
+    },
+    "components/widget/FieldValues.tsx": {
+      "star": "ui/components/widget/FieldValues.tsx"
+    },
+    "components/widget/FieldsPicker.tsx": {
+      "star": "ui/components/widget/FieldsPicker.tsx"
+    },
+    "components/widget/PublicMediaImage.tsx": {
+      "star": "ui/components/widget/PublicMediaImage.tsx"
+    },
+    "components/widget/RecordsListBlock.tsx": {
+      "star": "ui/components/widget/RecordsListBlock.tsx"
+    },
+    "components/widget/RecordsListRender.tsx": {
+      "star": "ui/components/widget/RecordsListRender.tsx"
+    },
+    "components/widget/format.ts": {
+      "star": "ui/components/widget/format.ts"
+    },
+    "components/widget/types.ts": {
+      "star": "ui/components/widget/types.ts"
+    },
+    "hooks/useBulkActions.ts": {
+      "star": "ui/hooks/useBulkActions.ts"
+    },
+    "hooks/useIsNarrow.ts": {
+      "star": "ui/hooks/useIsNarrow.ts"
+    },
+    "hooks/useListColumns.ts": {
+      "star": "ui/hooks/useListColumns.ts"
+    },
+    "hooks/useMediaFile.ts": {
+      "star": "ui/hooks/useMediaFile.ts"
+    },
+    "hooks/useRecordEditor.ts": {
+      "star": "ui/hooks/useRecordEditor.ts"
+    },
+    "hooks/useRecordForm.ts": {
+      "star": "ui/hooks/useRecordForm.ts"
+    },
+    "hooks/useRecordImport.ts": {
+      "star": "ui/hooks/useRecordImport.ts"
+    },
+    "hooks/useRecordListMutations.ts": {
+      "star": "ui/hooks/useRecordListMutations.ts"
+    },
+    "hooks/useRecordListNav.ts": {
+      "star": "ui/hooks/useRecordListNav.ts"
+    },
+    "hooks/useRecordSelection.ts": {
+      "star": "ui/hooks/useRecordSelection.ts"
+    },
+    "hooks/useRelationLabels.ts": {
+      "star": "ui/hooks/useRelationLabels.ts"
+    },
+    "hooks/useSchemaApply.ts": {
+      "star": "ui/hooks/useSchemaApply.ts"
+    },
+    "hooks/useSubmissionForm.ts": {
+      "star": "ui/hooks/useSubmissionForm.ts"
+    },
+    "hooks/useTypeEditorSave.ts": {
+      "star": "ui/hooks/useTypeEditorSave.ts"
+    },
+    "hooks/useTypeImport.ts": {
+      "star": "ui/hooks/useTypeImport.ts"
+    },
+    "hooks/useTypeSync.ts": {
+      "star": "ui/hooks/useTypeSync.ts"
+    },
+    "hooks/useUnsavedGuard.ts": {
+      "star": "ui/hooks/useUnsavedGuard.ts"
+    },
+    "utils/api-history.ts": {
+      "star": "ui/utils/api-history.ts"
+    },
+    "utils/api-net.ts": {
+      "star": "ui/utils/api-net.ts"
+    },
+    "utils/api-records.ts": {
+      "star": "ui/utils/api-records.ts"
+    },
+    "utils/api-submissions.ts": {
+      "star": "ui/utils/api-submissions.ts"
+    },
+    "utils/api.ts": {
+      "star": "ui/utils/api.ts"
+    },
+    "utils/bulk-copy.ts": {
+      "star": "ui/utils/bulk-copy.ts"
+    },
+    "utils/column-storage.ts": {
+      "star": "ui/utils/column-storage.ts"
+    },
+    "utils/conflicts.ts": {
+      "star": "ui/utils/conflicts.ts"
+    },
+    "utils/created-flag.ts": {
+      "star": "ui/utils/created-flag.ts"
+    },
+    "utils/csrf.ts": {
+      "star": "ui/utils/csrf.ts"
+    },
+    "utils/dry-run-messages.ts": {
+      "star": "ui/utils/dry-run-messages.ts"
+    },
+    "utils/duplicate.ts": {
+      "star": "ui/utils/duplicate.ts"
+    },
+    "utils/errors-display.ts": {
+      "star": "ui/utils/errors-display.ts"
+    },
+    "utils/export-scope.ts": {
+      "star": "ui/utils/export-scope.ts"
+    },
+    "utils/field-type-name.ts": {
+      "star": "ui/utils/field-type-name.ts"
+    },
+    "utils/filters.ts": {
+      "star": "ui/utils/filters.ts"
+    },
+    "utils/focus-invalid.ts": {
+      "star": "ui/utils/focus-invalid.ts"
+    },
+    "utils/format-bytes.ts": {
+      "star": "ui/utils/format-bytes.ts"
+    },
+    "utils/i18n.ts": {
+      "star": "ui/utils/i18n.ts"
+    },
+    "utils/io.ts": {
+      "star": "ui/utils/io.ts"
+    },
+    "utils/list-columns.ts": {
+      "star": "ui/utils/list-columns.ts"
+    },
+    "utils/list-errors.ts": {
+      "star": "ui/utils/list-errors.ts"
+    },
+    "utils/listing.ts": {
+      "star": "ui/utils/listing.ts"
+    },
+    "utils/locale.ts": {
+      "star": "ui/utils/locale.ts"
+    },
+    "utils/media-api.ts": {
+      "star": "ui/utils/media-api.ts"
+    },
+    "utils/public-api.ts": {
+      "star": "ui/utils/public-api.ts"
+    },
+    "utils/public-submissions.ts": {
+      "star": "ui/utils/public-submissions.ts"
+    },
+    "utils/record-form-helpers.ts": {
+      "star": "ui/utils/record-form-helpers.ts"
+    },
+    "utils/record-title.ts": {
+      "star": "ui/utils/record-title.ts"
+    },
+    "utils/record-types.ts": {
+      "star": "ui/utils/record-types.ts"
+    },
+    "utils/relation-search.ts": {
+      "star": "ui/utils/relation-search.ts"
+    },
+    "utils/selection.ts": {
+      "star": "ui/utils/selection.ts"
+    },
+    "utils/submission-values.ts": {
+      "star": "ui/utils/submission-values.ts"
+    },
+    "utils/submissions-form-api.ts": {
+      "star": "ui/utils/submissions-form-api.ts"
+    },
+    "utils/type-io.ts": {
+      "star": "ui/utils/type-io.ts"
+    },
+    "utils/types.ts": {
+      "star": "ui/utils/types.ts"
+    },
+    "utils/validation.ts": {
+      "star": "ui/utils/validation.ts"
+    },
+    "utils/values.ts": {
+      "star": "ui/utils/values.ts"
+    }
+  }
+}
