@@ -43,6 +43,7 @@ asyncio_default_fixture_loop_scope = "function"
 testpaths = [
     "host/tests",
     "modules/ai/tests",
+    "modules/analytics/tests",
     "modules/billing/tests",
     "modules/images/tests",
     "modules/news/tests",

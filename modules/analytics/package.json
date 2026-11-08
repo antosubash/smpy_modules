@@ -1,0 +1,15 @@
+{
+  "name": "@simple-module-py/analytics",
+  "version": "0.0.14",
+  "private": true,
+  "description": "Anonymous traffic and application analytics",
+  "exports": { ".": "./sm_analytics/index.ts" },
+  "peerDependencies": {
+    "@inertiajs/react": "^3.9.1",
+    "@simple-module-py/i18n": "*",
+    "@simple-module-py/ui": "*",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": { "@simple-module-py/tsconfig": "*" }
+}

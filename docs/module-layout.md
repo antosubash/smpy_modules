@@ -3,7 +3,7 @@
 How the files of a module in `modules/<name>/` are organised. `images`
 (`modules/images`) follows it in full and is the reference; its own map is
 [`modules/images/docs/code-layout.md`](../modules/images/docs/code-layout.md).
-All six modules follow this structure. The migration checklist below also
+All modules follow this structure. The migration checklist below also
 applies when reorganising a new area.
 
 The aim is that someone new finds a file by asking *which feature is this?*,
@@ -153,7 +153,7 @@ Do it in small PRs, one module at a time, each containing only moves:
 5. **No logic changes in the same PR**, so the review is just "is every move
    right".
 
-### Where each module stands (2026-11-03)
+### Where each module stands (2026-11-08)
 
 | Module | Root `.py` files | Root folders | Flat `tests/test_*.py` | State |
 | --- | --- | --- | --- | --- |
@@ -163,5 +163,6 @@ Do it in small PRs, one module at a time, each containing only moves:
 | news | 2 | 10 | 0 | follows this layout |
 | pagebuilder | 2 | 11 | 0 | follows this layout |
 | records | 6 | 10 | 0 | follows this layout |
+| analytics | 2 | 8 | 0 | follows this layout |
 
 Update this table when a module moves.
