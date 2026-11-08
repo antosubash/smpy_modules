@@ -48,7 +48,7 @@ test('analytics opt-in, public and app tracking, events, unknown locations and d
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
     await page.getByLabel('Enable tracking', { exact: true }).check();
     await page.getByRole('button', { name: 'Save property', exact: true }).click();
-    await expect(page.getByText('Tracking enabled', { exact: true })).toBeVisible();
+    await expect(page.getByText('Tracking enabled · Public pages', { exact: true })).toBeVisible();
     const pageview = page.waitForResponse(
       (response) =>
         response.url().endsWith('/api/analytics/collect') && response.request().method() === 'POST',
