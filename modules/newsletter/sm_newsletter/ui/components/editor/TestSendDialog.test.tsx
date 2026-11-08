@@ -69,6 +69,10 @@ describe('TestSendDialog', () => {
     expect(api.testSend).toHaveBeenCalledWith(7, ['a@x.io', 'b@x.io']);
     const rows = [...document.querySelectorAll('li')].map((li) => li.textContent);
     expect(rows).toEqual([`a@x.io${copy.outcome.accepted}`, `b@x.io${copy.outcome.rejected}`]);
+
+    // Editing the addresses drops the results, which belong to the ones sent.
+    await type('c@x.io');
+    expect(document.querySelectorAll('li')).toHaveLength(0);
   });
 
   it('does not send when the draft could not be saved', async () => {

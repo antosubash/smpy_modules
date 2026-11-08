@@ -37,12 +37,14 @@ re-serialised from an allow-list at save and at render. Details, the URL rules
 and the golden files: [`content.md`](content.md).
 
 - **Screens.** `/admin/newsletter/` (campaign list), `/admin/newsletter/campaigns/{id}`
-  (a newsletter-only Puck editor with a 600 px single column, a preview pane and a
-  test-send dialog) and `/admin/newsletter/settings`. The sidebar has Campaigns
+  (a newsletter-only Puck editor with a 600 px single column, a preview pane, a
+  test-send dialog, a send dialog for a draft and, once it is scheduled, a sending
+  panel with live progress) and `/admin/newsletter/settings`. The sidebar has Campaigns
   (`newsletter.view`) and Settings (`newsletter.manage`). The people screens
   (Segments, Subscribers, Suppressions) are in [`audience.md`](audience.md).
-- **Writes are revision-guarded.** PATCH and card Refresh carry `expected_revision`;
-  a stale one is `409 stale`, a campaign that left draft `409 not_a_draft`.
+- **Writes are revision-guarded.** PATCH, card Refresh, send and unschedule carry
+  `expected_revision`; a stale one is `409 stale`, a campaign that left draft
+  `409 not_a_draft`.
 - **List access is re-checked on every campaign request**, so a list restricted
   after a campaign was made hides the campaign (404) from callers who can no
   longer read it.
@@ -64,8 +66,8 @@ and the golden files: [`content.md`](content.md).
   Admission is all-or-nothing: over budget is `429 send_budget_exhausted`, nothing
   sent and no rows written. Per-recipient outcomes are `accepted`, `rejected`,
   `unknown` and `failed` (a known pre-acceptance failure; not counted). Its unsubscribe link
-  is `<public_base_url>/newsletter/u/test`, which PR 4's page treats like a forged
-  token. No campaign is sent yet: sending arrives in PR 4.
+  is `<public_base_url>/newsletter/u/test`, which the unsubscribe page answers like
+  a forged token. A test send never sends a campaign: see [`sending.md`](sending.md).
 - **Transports.** `smtp` (aiosmtplib; STARTTLS or implicit TLS; `List-Unsubscribe`,
   `List-Unsubscribe-Post` and `Precedence: bulk` headers) and `console`, which logs
   and keeps a per-tenant capture readable at `GET /api/newsletter/outbox`
@@ -97,6 +99,9 @@ writes (`manage_url`).
   harvest the credential at AUTH. The page warns before saving.
 - `from_name`, `from_address` and `reply_to` refuse CR, LF and control characters
   (422, no echo).
+- Input is bounded: `smtp_host` 253, `smtp_username` 320, `from_name` 200,
+  `physical_address` 500 characters (422 above that). A malformed body to the
+  password endpoint is `422 invalid_password` and never echoes the input.
 - `smtp_password` is stored encrypted and written only through
   `PUT /api/newsletter/settings/smtp-password` (needs `newsletter.manage` and
   `settings.edit`; `scripts/set_setting.py` would store it in plaintext, which

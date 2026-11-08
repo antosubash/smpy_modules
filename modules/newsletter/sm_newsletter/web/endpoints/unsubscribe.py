@@ -26,10 +26,15 @@ who clicks B's link on the apex is unsubscribed from B.
 **One answer.** A real, ``test``, forged, oversized, already-used or
 other-tenant token gets the same 200 page, so the route is no oracle and a
 second click sees what the first did. The language is the host's
-``i18n_default_locale``, the same as the email's footer.
+``i18n_default_locale``, the same as the email's footer. The one exception is a
+POST that fails inside (a database error): nothing is committed, and it answers
+the page with its button again as a 503, so the reader can retry and a mailbox
+provider's one-click retries instead of taking a 200 for an opt-out.
 """
 
 from __future__ import annotations
+
+import logging
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
@@ -48,11 +53,14 @@ PATH = f"{constants.UNSUBSCRIBE_PREFIX}{{token}}"
 
 router = APIRouter(tags=["newsletter-public"])
 
+logger = logging.getLogger(__name__)
 
-def _page(request: Request, *, done: bool) -> HTMLResponse:
+
+def _page(request: Request, *, done: bool, status_code: int = 200) -> HTMLResponse:
     locale, copy = server_copy(request.app, "unsubscribe_page", KEYS)
     return HTMLResponse(
         render_page(copy=copy, locale=locale, done=done),
+        status_code=status_code,
         headers={
             "Cache-Control": "no-store",
             "Referrer-Policy": "no-referrer",
@@ -71,8 +79,14 @@ async def unsubscribe_page(request: Request, token: str) -> HTMLResponse:
 async def unsubscribe_one_click(request: Request, token: str) -> HTMLResponse:
     # A visitor-derived tenant (a member's session) is still bound by the
     # middleware; the service binds the token's own, so leave it first.
-    with no_tenant():
-        await unsubscribe_by_token(
-            request.app, token, resolved_tenant=host_tenant(request), now=utcnow()
-        )
+    try:
+        with no_tenant():
+            await unsubscribe_by_token(
+                request.app, token, resolved_tenant=host_tenant(request), now=utcnow()
+            )
+    except Exception as exc:
+        # The session rolled back on the way out, so no half opt-out is left.
+        # Only the class is logged: the message may carry the address.
+        logger.error("newsletter: an unsubscribe failed (%s)", type(exc).__name__)
+        return _page(request, done=False, status_code=503)
     return _page(request, done=True)

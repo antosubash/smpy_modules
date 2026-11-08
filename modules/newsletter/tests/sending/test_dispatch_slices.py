@@ -1,28 +1,32 @@
 """The dispatcher tick (Task 7): how a slice and a tick end, besides the budget.
 
 A list that is gone pauses only its own campaign, a slice gives the lock back
-after :data:`MAX_SLICE_STEPS` recipients however many were skipped, and the
-deadline ends a tick before any recipient.
+after :data:`MAX_SLICE_STEPS` recipients however many were skipped, the
+deadline ends a tick before any recipient, and a tick with no row due yet
+never opens the relay.
 """
 
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from simple_module_db import finalize_session
 from sm_newsletter.campaigns.lifecycle import split_paused
+from sm_newsletter.core.errors import TransportUnavailable
 from sm_newsletter.core.suppression import suppress
 from sm_newsletter.core.tenancy import tenant_scope
+from sm_newsletter.models import Send
 from sm_newsletter.sending import dispatch as dispatching
 from sm_newsletter.sending.dispatch import MAX_SLICE_STEPS
+from sqlalchemy import update
 
 from tests.support.campaign_world import campaign_row, send_rows
 from tests.support.dispatch_world import due, run_tick, sent_to, started, world
 from tests.support.fake_transport import FakeTransport
 from tests.support.records_seed import set_list_kind
-from tests.support.sending import T
+from tests.support.sending import NOW, T
 
 pytestmark = pytest.mark.unbound_tenant
 
@@ -98,3 +102,26 @@ async def test_deadline_ends_the_tick(built):
     assert (summary.started, summary.spent, summary.stopped) == (1, 0, "deadline")
     assert smtp.sent == []
     assert {row.status for row in await send_rows(state, T, cid)} == {"queued"}
+
+
+async def test_a_tick_with_no_row_due_yet_never_logs_in(built):
+    """Every ``queued`` row waiting out its backoff: no relay login that minute,
+    so a refused login cannot pause the campaign; the row goes once it is due."""
+    app, state = built
+    cid, emails = await started(state, 1, at=NINE)
+    with tenant_scope(T):
+        async with state.session_factory() as db:
+            table = Send.__table__  # ty: ignore[unresolved-attribute]
+            stmt = update(table).where(table.c.campaign_id == cid, table.c.tenant_id == T)
+            await db.execute(stmt.values(retry_at=NOW + timedelta(minutes=5)))
+            await finalize_session(db)
+    refused = FakeTransport(open_error=TransportUnavailable("auth: 535", stage="auth"))
+
+    idle = await run_tick(app, state, refused)
+
+    assert (idle.spent, idle.paused, idle.stopped) == (0, 0, "idle")
+    assert (await campaign_row(state, T, cid)).status == "sending"
+    smtp = FakeTransport()
+    assert ((await run_tick(app, state, smtp)).stopped, smtp.opened) == ("idle", 0)
+    later = await run_tick(app, state, smtp, at=NOW + timedelta(minutes=5))
+    assert (later.spent, smtp.opened, sent_to(smtp)) == (1, 1, emails)

@@ -14,7 +14,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from sm_newsletter.content.urls import MAX_URL, is_http_link
+from sm_newsletter.content.urls import LINK_PREFIX, MAX_URL, PIXEL_TAG, is_http_link
 from sm_newsletter.core import tokens
 from sm_newsletter.core.constants import MAX_LINK_URL, MAX_TRACKED_LINKS, PUBLIC_PREFIX
 
@@ -22,8 +22,6 @@ __all__ = ["PIXEL_HTML", "PIXEL_TAG", "TRACKING_OFF", "Prepared", "Tracking", "f
 
 log = logging.getLogger(__name__)
 
-PIXEL_TAG = "{{open_pixel}}"
-_LINK_PREFIX = "{{link:"
 PIXEL_HTML = (
     '<img src="{src}" width="1" height="1" alt="" border="0" '
     'style="display:block;width:1px;height:1px;border:0;margin:0;padding:0">'
@@ -49,7 +47,7 @@ class Prepared:
 
 def prepare(html: str, *, own_base: str, campaign_id: int) -> Prepared:
     """``campaign_id`` only names the campaign in the one WARNING per call."""
-    if _LINK_PREFIX in html or PIXEL_TAG in html:
+    if LINK_PREFIX in html or PIXEL_TAG in html:
         raise ValueError("the body already holds a tracking placeholder")
     own = own_base.rstrip("/") + PUBLIC_PREFIX if own_base else ""
     positions: dict[str, int] = {}
@@ -72,7 +70,7 @@ def prepare(html: str, *, own_base: str, campaign_id: int) -> Prepared:
                 capped = True
                 return m.group(0)
             positions[value] = len(positions) + 1
-        return f'<a href="{_LINK_PREFIX}{positions[value]}}}}}"'
+        return f'<a href="{LINK_PREFIX}{positions[value]}}}}}"'
 
     out = _HREF.sub(repl, html)
     if capped:

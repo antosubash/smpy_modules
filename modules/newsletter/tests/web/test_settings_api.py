@@ -10,6 +10,12 @@ from settings.service import SettingService
 from settings.store import SettingsStore
 from sm_newsletter.core import constants, crypto
 from sm_newsletter.core.settings import NewsletterSettings
+from sm_newsletter.web.schemas.settings import (
+    MAX_FROM_NAME,
+    MAX_HOST,
+    MAX_PHYSICAL_ADDRESS,
+    MAX_USERNAME,
+)
 
 from tests.support.app import build_app as _build
 
@@ -115,6 +121,24 @@ async def test_invalid_port_422(client, built, port):
     res = await client.put(URL, json={"smtp_port": port}, headers=BOTH)
     assert res.status_code == 422
     assert await _overrides(state) == {}
+
+
+@pytest.mark.parametrize(
+    ("field", "limit"),
+    [
+        ("smtp_host", MAX_HOST),
+        ("smtp_username", MAX_USERNAME),
+        ("from_name", MAX_FROM_NAME),
+        ("physical_address", MAX_PHYSICAL_ADDRESS),
+    ],
+)
+async def test_text_fields_are_bounded(client, built, field, limit):
+    _, state = built
+    res = await client.put(URL, json={field: "a" * (limit + 1)}, headers=BOTH)
+    assert res.status_code == 422
+    assert await _overrides(state) == {}
+    res = await client.put(URL, json={field: "a" * limit}, headers=BOTH)
+    assert res.status_code == 200, res.text
 
 
 async def test_values_persist_and_hot_swap(client, built):

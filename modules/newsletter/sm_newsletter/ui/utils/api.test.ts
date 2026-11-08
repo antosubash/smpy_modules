@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import de from '../../locales/de.json';
 import en from '../../locales/en.json';
 import type { Translate } from './i18n';
 
@@ -119,6 +120,23 @@ describe('maps error codes to catalogue keys', () => {
     expect(http.errorMessage(new TypeError('x'), t)).toBe('T(newsletter.errors.generic)');
   });
 
+  it('names the known invalid_campaign fields, and is generic for any other detail', async () => {
+    const { http } = await load({});
+    const refusal = (detail: string) => new http.HttpError(detail, 422, 'invalid_campaign');
+    const field = 'newsletter.errors_field';
+    expect(http.errorMessage(refusal('subject: required'), t)).toBe(`T(${field}.subject_required)`);
+    for (const detail of ['scheduled_at: out of range', 'at: out of range']) {
+      expect(http.errorMessage(refusal(detail), t)).toBe(`T(${field}.schedule_out_of_range)`);
+    }
+    expect(http.errorMessage(refusal('name: too long'), t)).toBe(
+      'T(newsletter.errors.invalid_campaign)',
+    );
+    // The detail is only a lookup key for invalid_campaign, never for another code.
+    expect(http.errorMessage(new http.HttpError('subject: required', 409, 'stale'), t)).toBe(
+      'T(newsletter.errors.stale)',
+    );
+  });
+
   it('does not let a code name an inherited property', async () => {
     const { http } = await load({});
     const error = new http.HttpError('x', 400, 'constructor');
@@ -166,6 +184,13 @@ const SERVER_CODES = [
 describe('the error catalogue', () => {
   it.each(SERVER_CODES)('has an English line for %s', (code) => {
     expect((en.errors as Record<string, string>)[code]).toBeTruthy();
+  });
+
+  it('names every sender setting a send needs, not just the address (QA BUG-002)', () => {
+    // ``campaigns/checks.py`` raises the one code for the From address, the
+    // postal address and the SMTP host alike.
+    expect(en.errors.sender_not_configured).toMatch(/From address.*postal address.*SMTP host/);
+    expect(de.errors.sender_not_configured).toMatch(/Absenderadresse.*Postanschrift.*SMTP-Server/);
   });
 
   it('has a generic line', () => {

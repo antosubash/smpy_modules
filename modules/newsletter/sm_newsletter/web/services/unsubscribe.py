@@ -22,9 +22,10 @@ Never for a ``pending`` subscriber or one confirmed after the cutoff.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
+from simple_module_core.datetimes import aware
 from simple_module_db import finalize_session
 from sm_records.contracts.newsletter import (
     SubscriberFilterError,
@@ -47,21 +48,6 @@ logger = logging.getLogger(__name__)
 _SEND = Send.__table__  # ty: ignore[unresolved-attribute]
 _CAMPAIGN = Campaign.__table__  # ty: ignore[unresolved-attribute]
 _ATTEMPT = SendAttempt.__table__  # ty: ignore[unresolved-attribute]
-_GONE = frozenset({"unsubscribed"})
-_warned_no_secret = False
-
-
-def _secret(app: Any) -> str:
-    global _warned_no_secret
-    secret = tokens.host_secret(app)
-    if not secret and not _warned_no_secret:
-        _warned_no_secret = True
-        logger.error("newsletter: no host secret_key; every unsubscribe link is refused")
-    return secret
-
-
-def _aware(value: datetime) -> datetime:
-    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
 
 
 async def unsubscribe_by_token(
@@ -69,13 +55,14 @@ async def unsubscribe_by_token(
 ) -> bool:
     """``True`` only when records wrote. An invalid or foreign token is ``False``
     with no statement run."""
-    secret = _secret(app)
-    if not secret:
-        return False
-    claims = tokens.parse(secret, token, purpose="u")
+    claims = tokens.verify(
+        app,
+        token,
+        purpose="u",
+        resolved_tenant=resolved_tenant,
+        refused="every unsubscribe link is refused",
+    )
     if claims is None:
-        return False
-    if resolved_tenant is not None and resolved_tenant != claims.tenant_id:
         return False
     with tenant_scope(claims.tenant_id):
         async with app.state.sm.db.session_factory() as session:
@@ -147,12 +134,12 @@ async def _cutoff(
     ``sent_at``) the latest attempt opened for this send, since a campaign can
     run for days after its ``started_at``; else the start, else ``now``."""
     if sent_at is not None:
-        return _aware(sent_at)
+        return aware(sent_at)
     stmt = select(func.max(_ATTEMPT.c.attempted_at)).where(
         _ATTEMPT.c.tenant_id == tenant, _ATTEMPT.c.send_id == send_id
     )
     attempted = (await session.execute(stmt)).scalar_one_or_none()
-    return _aware(attempted or started_at or now)
+    return aware(attempted or started_at or now)
 
 
 async def _gone(session: AsyncSession, tenant: str, list_key: str, uuid: str) -> bool:
@@ -160,4 +147,4 @@ async def _gone(session: AsyncSession, tenant: str, list_key: str, uuid: str) ->
     hit = (
         await subscribers_by_uuid(session, tenant_id=tenant, type_key=list_key, uuids=[uuid])
     ).get(uuid)
-    return hit is None or hit.trashed or hit.status in _GONE
+    return hit is None or hit.trashed or hit.status == "unsubscribed"

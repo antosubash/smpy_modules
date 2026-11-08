@@ -14,19 +14,19 @@ from __future__ import annotations
 
 import logging
 import secrets
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from simple_module_db import finalize_session, mark_written
-from simple_module_db.tenancy import all_tenants
+from simple_module_db import mark_written
 from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns.lifecycle import PAUSED, SCHEDULED, paused_reason
-from sm_newsletter.core import constants, tenancy
+from sm_newsletter.core import constants
 from sm_newsletter.models import Campaign, CampaignRender
+from sm_newsletter.sending.ledger import SessionFactory
+from sm_newsletter.sending.upkeep import tenant_pairs
 
 __all__ = [
     "FREEZE_LEASE",
@@ -44,7 +44,6 @@ logger = logging.getLogger(__name__)
 
 FREEZE_LEASE = timedelta(minutes=5)
 
-SessionFactory = Callable[[], AsyncSession]
 _CAMPAIGN = Campaign.__table__  # ty: ignore[unresolved-attribute]
 
 
@@ -149,11 +148,7 @@ async def due_campaigns(factory: SessionFactory, *, now: datetime) -> list[tuple
         .where(_CAMPAIGN.c.status == SCHEDULED, _CAMPAIGN.c.scheduled_at <= now)
         .order_by(_CAMPAIGN.c.scheduled_at, _CAMPAIGN.c.id)
     )
-    with all_tenants():
-        async with factory() as session:
-            rows = (await session.execute(tenancy.all_tenants(stmt))).all()
-            await finalize_session(session)
-    return [(str(tenant), int(cid)) for tenant, cid in rows]
+    return await tenant_pairs(factory, stmt)
 
 
 async def pause_unavailable(

@@ -34,11 +34,15 @@ first appearance (a card's image, title and "Read more" share one).
 The click path carries the link's position, never a URL: `/newsletter/c/{token}/{N}`
 redirects (302) only to that campaign's own stored `newsletter_link` URL, URI-encoded
 (the `Location` is the stored URL with any character not legal in a URI
-percent-encoded, so `ü` becomes `%C3%BC`).
+percent-encoded, so `ü` becomes `%C3%BC`). `N` is written as `prepare` writes
+it (1 to 100, `MAX_TRACKED_LINKS`), with no leading zero; the route accepts one
+to three digits and any other spelling, like any other path under
+`/newsletter/c/`, gets the same fixed 404.
 
 ## The token
 
-Each message carries three tokens, `{tenant}.{campaign}.{send}.{mac}`, each an
+A message carries up to three tokens (an open or click token only while that
+kind of tracking is on), `{tenant}.{campaign}.{send}.{mac}`, each an
 HMAC under the host secret bound to a purpose: `u` (unsubscribe), `o` (open),
 `c` (click). A token minted for one purpose fails the other two routes, so a
 click URL leaked from a history or proxy log cannot unsubscribe anyone. Tokens
@@ -59,8 +63,12 @@ organisation on the apex never blocks a reader's click or pixel.
 | Verifies, tracking off for that kind | GIF, nothing written | 302, nothing written |
 
 A wrong-purpose token opens no database session. Recording failures roll back
-and still answer the GIF or the 302. Both routes send `no-store` and
-`Referrer-Policy: no-referrer`.
+and still answer the GIF or the 302. Both routes send `no-store`. They also
+ask for `Referrer-Policy: no-referrer`, but the framework's security-headers
+middleware (`simple_module_hosting`) replaces it with the host-wide
+`strict-origin-when-cross-origin`. The token is still safe: a cross-origin
+redirect target receives only this site's origin, never the path that holds
+the token.
 
 ## Switching tracking off
 

@@ -105,6 +105,18 @@ async def test_put_invalid_is_422(client, built, body):
     assert await _stored(state) is None
 
 
+async def test_put_lone_surrogate_is_422_not_a_500(client, built):
+    _, state = built
+    res = await client.put(
+        URL,
+        content=b'{"password": "ab\\ud800"}',
+        headers={**MANAGE, "content-type": "application/json"},
+    )
+    assert res.status_code == 422
+    assert res.json()["code"] == "invalid_password"
+    assert await _stored(state) is None
+
+
 @pytest.mark.parametrize("secret", ["   \n ", "x" * 1025, "p" * 2000])
 async def test_put_invalid_never_echoes_the_value(client, built, secret):
     res = await client.put(URL, json={"password": secret}, headers=MANAGE)
@@ -154,3 +166,15 @@ async def test_multi_tenant_without_a_tenant_is_403_even_with_both_permissions()
         assert await _stored(state) is None
     finally:
         await state.engine.dispose()
+
+
+@pytest.mark.parametrize(
+    "body", [{"password": ["hunter2-secret"]}, {"passwd": "hunter2-secret"}, ["hunter2-secret"]]
+)
+async def test_a_malformed_body_never_echoes_the_value(client, built, body):
+    _, state = built
+    res = await client.put(URL, json=body, headers=MANAGE)
+    assert res.status_code == 422
+    assert res.json()["code"] == "invalid_password"
+    assert "hunter2-secret" not in res.text
+    assert await _stored(state) is None

@@ -13,7 +13,7 @@ from simple_module_db.mixins import AuditMixin, MultiTenantMixin
 from sqlalchemy import Index
 from sqlmodel import Field
 
-from sm_newsletter.core.constants import MAX_EMAIL_LEN, MAX_TYPE_KEY_LEN
+from sm_newsletter.core.constants import MAX_EMAIL_LEN, MAX_PAUSED_REASON, MAX_TYPE_KEY_LEN
 from sm_newsletter.models._base import Base
 from sm_newsletter.models._cols import STATUS_LEN, counter, dt_col, json_col
 
@@ -41,7 +41,7 @@ class Campaign(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[un
     status: str = Field(default="draft", max_length=STATUS_LEN)
     revision: int = Field(default=1, sa_column_kwargs={"nullable": False, "server_default": "1"})
     """Bumped by every write; an editor's PATCH names the one it read."""
-    paused_reason: str | None = Field(default=None, max_length=1000)
+    paused_reason: str | None = Field(default=None, max_length=MAX_PAUSED_REASON)
     freeze_gen: int = Field(default=0, sa_column_kwargs={"nullable": False, "server_default": "0"})
     """Bumped by schedule, unschedule and cancel-from-scheduled; fences an
     interrupted freeze."""

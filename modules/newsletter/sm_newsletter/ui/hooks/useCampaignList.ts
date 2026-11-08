@@ -46,6 +46,12 @@ export function useCampaignList() {
       )
       .then((page) => {
         if (request !== latest.current) return;
+        if (offset > 0 && offset >= page.total) {
+          // The page emptied under us (its last row was deleted): step back
+          // to the last page that still has rows.
+          setOffset(Math.max(0, Math.floor((page.total - 1) / PAGE_SIZE) * PAGE_SIZE));
+          return;
+        }
         setError(null);
         setItems(page.items);
         setTotal(page.total);

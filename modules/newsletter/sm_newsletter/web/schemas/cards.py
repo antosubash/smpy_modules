@@ -7,9 +7,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
+from sm_newsletter.content.blocks import Id as BlockId
 from sm_newsletter.content.integrations.hits import MAX_SOURCE_ID
-
-BlockId = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
 
 
 class CardHitOut(BaseModel):

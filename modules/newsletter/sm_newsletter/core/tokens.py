@@ -15,6 +15,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import logging
 from dataclasses import dataclass
 from typing import Any, Final, Literal
 
@@ -32,7 +33,10 @@ __all__ = [
     "parse",
     "sign",
     "unsubscribe_url",
+    "verify",
 ]
+
+logger = logging.getLogger(__name__)
 
 Purpose = Literal["u", "o", "c"]
 PURPOSES: Final = ("u", "o", "c")
@@ -108,3 +112,27 @@ def host_secret(app: Any) -> str:
         return str(app.state.sm.settings.secret_key or "")
     except AttributeError:
         return ""
+
+
+_warned: set[str] = set()
+
+
+def verify(
+    app: Any, token: str, *, purpose: Purpose, resolved_tenant: str | None, refused: str
+) -> SendToken | None:
+    """The claims of a public link's token, or ``None``: no host secret (one
+    ERROR per ``refused`` text, saying what is refused), a bad MAC, or a host
+    that resolved another tenant than the token's (``resolved_tenant`` is only
+    ever host-derived). Runs no statement."""
+    secret = host_secret(app)
+    if not secret:
+        if refused not in _warned:
+            _warned.add(refused)
+            logger.error("newsletter: no host secret_key; %s", refused)
+        return None
+    claims = parse(secret, token, purpose=purpose)
+    if claims is None:
+        return None
+    if resolved_tenant is not None and resolved_tenant != claims.tenant_id:
+        return None
+    return claims

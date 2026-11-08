@@ -233,8 +233,9 @@ carries no CSRF on purpose (RFC 8058). `/newsletter/o/` and `/newsletter/c/` fol
 (tenant from the verified token, purpose-bound MACs, one answer for forged tokens); only a
 *host-derived* tenant (`subdomain`/`fixed`) can refuse a token, never a session or header one
 (`public_tenant.host_tenant`). The click route redirects only to the campaign's own stored
-`newsletter_link` URL, and tracking stores no IP or user agent. Only an RCPT-stage `5.1.x` bounces; any other 5xx pauses
-the campaign. Docs: `modules/newsletter/docs/sending.md` and `operations.md`.
+`newsletter_link` URL, and tracking stores no IP or user agent. Only an RCPT-stage `5.1.x`
+bounces; any other 5xx pauses the campaign. Docs: `modules/newsletter/docs/sending.md`,
+`tracking.md` and `operations.md`.
 
 **A plugin registers images steps and presets from `images_extensions.py`, never
 from `on_startup`.** Celery workers do not run module hooks, and a dependant's
@@ -331,7 +332,7 @@ Without that stack, one container matching CI's image is enough:
 docker run -d --name smpy-postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=smpy_modules postgres:16
 ```
 
-Redis and Celery are used by the **images** module (framework
+Redis and Celery are used by the **images** and **newsletter** modules (framework
 `background_tasks`, host pinned `==0.0.42`): `SM_REDIS_URL` points at dev-services'
 Redis, and `make worker` / `worker-imports` / `worker-heavy` / `worker-gpu` /
 `beat` run `host/worker.py` (`build_runner_celery`) with one queue set each.

@@ -26,7 +26,7 @@ from simple_module_db import finalize_session
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns.access import Roles, require_campaign
-from sm_newsletter.campaigns.checks import check_campaign_headers, check_sender
+from sm_newsletter.campaigns.checks import check_campaign_headers, check_headers, check_sender
 from sm_newsletter.content.blocks import parse_body
 from sm_newsletter.content.context import render_context, test_unsubscribe_url
 from sm_newsletter.content.render import WARN_RELATIVE, RenderInput, personalise, render
@@ -97,7 +97,8 @@ async def send_test(
     transport = transport_for(settings)
     await finalize_session(session)  # no read transaction held while waiting
     async with dispatch_lock(factory, holder=HOLDER) as lock:
-        _check_message(message)  # amendment 5: the exact values sent, before admission
+        # amendment 5: the exact values sent, before admission
+        check_headers(message, ("sender", "subject", "reply_to"))
         await admit(factory, settings, n=len(recipients), now=now or utcnow())
         results: list[TestSendResult] = []
         async with transport.session() as smtp:
@@ -125,17 +126,6 @@ async def send_test(
                     TestSendResult(recipient, result.outcome, result.code, result.detail)
                 )
     return results
-
-
-def _check_message(message: OutgoingMessage) -> None:
-    for field in ("sender", "subject", "reply_to"):
-        value = getattr(message, field)
-        if value is None:
-            continue
-        try:
-            check_header_text(value, field=field)
-        except ValueError as exc:
-            raise InvalidCampaign(str(exc)) from None
 
 
 async def _message(

@@ -19,7 +19,7 @@ export type MetaPatch = Partial<
   Pick<CampaignDetail, 'name' | 'subject' | 'preheader' | 'from_name' | 'reply_to' | 'audience'>
 >;
 
-export interface PendingEdits {
+interface PendingEdits {
   /** The next save's body: complete, and different from the saved one. */
   body: Block[] | null;
   /** The next save's campaign fields. */
@@ -29,6 +29,8 @@ export interface PendingEdits {
   /** A tag or segment audience is chosen but no value yet: the saved audience
    *  is still the old one, so nothing may be sent. */
   audienceUnfinished: boolean;
+  /** Details fields whose typed value the server would refuse, so it was never sent. */
+  invalid: Set<string>;
   inFlight: number;
   timer: ReturnType<typeof setTimeout> | null;
   hasPending(): boolean;
@@ -40,11 +42,14 @@ export interface PendingEdits {
   markAudienceUnfinished(value: boolean): void;
   /** What a real send must not go out with: an unfinished block or audience. */
   blocked(): boolean;
+  markInvalid(field: string, value: boolean): void;
+  clearInvalid(): void;
   /** A save takes what is pending and goes out: nothing is pending, one more in flight. */
   begin(): void;
   /** The save came back, either way. */
   end(): void;
-  /** A failed save's edits go back, under anything typed since. */
+  /** A failed save's edits go back, under anything typed since. A field that has
+   *  since become invalid is not put back: its old value is not what the form shows. */
   restore(meta: MetaPatch, body: Block[] | null): void;
   /** Forget everything pending (a reload from the server). */
   reset(): void;
@@ -54,16 +59,21 @@ export function usePendingEdits() {
   const [dirty, setDirty] = useState(false);
   const [incomplete, setIncomplete] = useState(false);
   const [audienceUnfinished, setAudienceUnfinished] = useState(false);
+  const [metaInvalid, setMetaInvalid] = useState(false);
   const [edits] = useState<PendingEdits>(() => {
     const e: PendingEdits = {
       body: null,
       meta: {},
       incomplete: false,
       audienceUnfinished: false,
+      invalid: new Set<string>(),
       inFlight: 0,
       timer: null,
       hasPending: () => e.body !== null || Object.keys(e.meta).length > 0,
-      sync: () => setDirty(e.timer !== null || e.inFlight > 0 || e.hasPending() || e.blocked()),
+      sync: () =>
+        setDirty(
+          e.timer !== null || e.inFlight > 0 || e.hasPending() || e.blocked() || e.invalid.size > 0,
+        ),
       clearTimer: () => {
         if (e.timer) clearTimeout(e.timer);
         e.timer = null;
@@ -78,6 +88,20 @@ export function usePendingEdits() {
         e.sync();
       },
       blocked: () => e.incomplete || e.audienceUnfinished,
+      markInvalid: (field, value) => {
+        if (value) {
+          e.invalid.add(field);
+          // An earlier, still-queued value of this field must not be saved under it.
+          delete (e.meta as Record<string, unknown>)[field];
+        } else e.invalid.delete(field);
+        setMetaInvalid(e.invalid.size > 0);
+        e.sync();
+      },
+      clearInvalid: () => {
+        e.invalid.clear();
+        setMetaInvalid(false);
+        e.sync();
+      },
       begin: () => {
         e.meta = {};
         e.body = null;
@@ -89,7 +113,8 @@ export function usePendingEdits() {
         e.sync();
       },
       restore: (meta, body) => {
-        e.meta = { ...meta, ...e.meta };
+        const kept = Object.fromEntries(Object.entries(meta).filter(([k]) => !e.invalid.has(k)));
+        e.meta = { ...kept, ...e.meta };
         if (body && e.body === null) e.body = body;
       },
       reset: () => {
@@ -98,9 +123,10 @@ export function usePendingEdits() {
         e.meta = {};
         e.markIncomplete(false);
         e.markAudienceUnfinished(false);
+        e.clearInvalid();
       },
     };
     return e;
   });
-  return { dirty, incomplete, audienceUnfinished, edits };
+  return { dirty, incomplete, audienceUnfinished, metaInvalid, edits };
 }

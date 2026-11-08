@@ -152,6 +152,7 @@ def test_tracking_routes_are_public_and_unguarded():
 
     routes = sorted((c.path, sorted(c.methods or ())) for c in iter_route_contexts(router.routes))
     assert routes == [
+        (f"{constants.CLICK_PREFIX}{{rest:path}}", ["GET"]),
         (f"{constants.CLICK_PREFIX}{{token}}/{{position}}", ["GET"]),
         (f"{constants.OPEN_PREFIX}{{token}}.gif", ["GET"]),
     ]

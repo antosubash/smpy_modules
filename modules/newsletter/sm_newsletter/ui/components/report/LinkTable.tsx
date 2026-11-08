@@ -22,9 +22,12 @@ export function LinkTable({ links, trackingOff }: { links: LinkStat[]; trackingO
         <p className="mb-2 text-sm text-muted-foreground">{t(copy.tracking_off.clicks)}</p>
       )}
       {links.length === 0 ? (
-        <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-          {t(copy.links.empty)}
-        </p>
+        // With click tracking off the note already explains the empty table.
+        !trackingOff && (
+          <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+            {t(copy.links.empty)}
+          </p>
+        )
       ) : (
         <Table>
           <TableHeader>

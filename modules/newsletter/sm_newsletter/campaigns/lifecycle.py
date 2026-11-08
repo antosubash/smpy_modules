@@ -49,7 +49,6 @@ from sm_newsletter.models import Campaign, Send
 from sm_newsletter.segments.store import filter_count
 
 SCHEDULED, SENDING, PAUSED, CANCELLED = "scheduled", "sending", "paused", "cancelled"
-MAX_PAUSED_REASON = 1000
 # Bumped generation, released claim: an old freezer's next write matches nothing.
 _FENCE: dict[str, Any] = {
     "freeze_gen": Campaign.freeze_gen + 1,
@@ -62,7 +61,7 @@ def paused_reason(code: str, detail: str = "") -> str:
     """``"<code>|<detail>"``, clipped to the column (ruling S13)."""
     if code not in constants.PAUSE_CODES:
         raise ValueError(f"unknown pause code: {code}")
-    return f"{code}|{detail}"[:MAX_PAUSED_REASON]
+    return f"{code}|{detail}"[: constants.MAX_PAUSED_REASON]
 
 
 def split_paused(reason: str | None) -> tuple[str | None, str | None]:

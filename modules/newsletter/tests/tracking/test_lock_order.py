@@ -13,18 +13,15 @@ import asyncio
 import contextlib
 from typing import Any
 
-import pytest
-from simple_module_db import finalize_session
 from sm_newsletter.campaigns import lifecycle
-from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import Link
 from sm_newsletter.tracking import record
 from sqlalchemy import event
 
 from tests.pg_support import USING_POSTGRES
 from tests.support.campaign_world import campaign_row, seed_campaign, seed_sends, send_rows
-from tests.support.sending import NOW, T, make_app
-from tests.support.tracking_world import counters, link_ids
+from tests.support.sending import NOW, T
+from tests.support.tracking_world import committed, counters, link_ids
 
 ROUNDS = 10
 WAIT_S = 5.0
@@ -46,24 +43,9 @@ class _Gate:
             self.trackers_in.set()
 
 
-@pytest.fixture
-async def state(tmp_path):
-    _, db_state, _ = await make_app(file=tmp_path / "lock.db")
-    yield db_state
-    await db_state.engine.dispose()
-
-
-async def _committed(state: Any, work: Any) -> Any:
-    with tenant_scope(T):
-        async with state.session_factory() as db:
-            out = await work(db)
-            await finalize_session(db)
-            return out
-
-
 async def _round(state: Any, gate: _Gate) -> None:
     cid = await seed_campaign(state, T, status="sending", started_at=NOW)
-    await _committed(state, lambda db: _add_link(db, cid))
+    await committed(state, lambda db: _add_link(db, cid))
     (lid,) = await link_ids(state, T, cid)
     clicked, opened, _sent = await seed_sends(state, T, cid, ["queued", "queued", "sent"])
 
@@ -77,13 +59,13 @@ async def _round(state: Any, gate: _Gate) -> None:
 
     async def cancel() -> Any:
         await asyncio.wait_for(gate.trackers_in.wait(), WAIT_S)
-        return await _committed(
+        return await committed(
             state,
             lambda db: lifecycle.cancel(db, tenant_id=T, campaign_id=cid, roles=[], now=NOW),
         )
 
     outcomes = await asyncio.gather(
-        _committed(state, click), _committed(state, open_), cancel(), return_exceptions=True
+        committed(state, click), committed(state, open_), cancel(), return_exceptions=True
     )
     errors = [o for o in outcomes if isinstance(o, BaseException)]
     assert not errors, f"a transaction failed: {errors!r}"

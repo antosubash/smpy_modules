@@ -34,11 +34,10 @@ def compose(
     when a personalised header would carry a line break or control character;
     a first name is flattened to one line first, so it never causes one. ``fill``
     raises the same ``ValueError`` for a tracking placeholder with no stored link
-    when click tracking is off (with clicks on the placeholder becomes the click
-    URL and no stored link is read).
-    Each purpose gets its own
-    token (T17). ``fill`` runs on the trusted snapshot before ``personalise`` (B2),
-    so recipient data never reaches it."""
+    when click tracking is off (with clicks on, the placeholder becomes the click
+    URL and no stored link is read). Each purpose gets its own token (T17).
+    ``fill`` runs on the trusted snapshot before ``personalise`` (B2), so
+    recipient data never reaches it."""
     assert send.id is not None
 
     def token(purpose: tokens.Purpose) -> str:

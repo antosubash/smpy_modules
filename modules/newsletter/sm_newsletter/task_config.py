@@ -2,9 +2,10 @@
 
 * ``newsletter`` - ``newsletter.reconcile_suppressions``, the hourly re-read of
   records' opt-outs into the suppression store, and ``newsletter.dispatch``,
-  the dispatcher tick every minute. A tick runs for at most 50 s, and a queued
-  one expires after 55 s, so a backlog (a stopped worker, a slow broker) is
-  dropped rather than run late on top of the next tick.
+  the dispatcher tick every minute. A tick stops starting new work after 50 s
+  (``sending.dispatch.TICK_SECONDS``), and a queued one expires after 55 s, so a
+  backlog (a stopped worker, a slow broker) is dropped rather than run late on
+  top of the next tick.
 
 ``QUEUES`` is what a worker started for a queue subset
 (``SM_BG_TASKS_WORKER_QUEUES``) checks before it imports ``sm_newsletter.tasks``;

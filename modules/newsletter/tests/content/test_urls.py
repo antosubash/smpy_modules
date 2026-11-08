@@ -1,5 +1,6 @@
 import pytest
 from sm_newsletter.content.urls import (
+    MAX_URL,
     UNSUBSCRIBE_TAG,
     absolute,
     check_image,
@@ -32,8 +33,10 @@ def test_check_link_accepts(ok):
 
 
 def test_check_link_length():
+    at_limit = "https://ex.org/" + "a" * (MAX_URL - len("https://ex.org/"))
+    assert check_link(at_limit) == at_limit
     with pytest.raises(ValueError):
-        check_link("https://ex.org/" + "a" * 2000)
+        check_link(at_limit + "a")
 
 
 def test_check_image():

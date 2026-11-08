@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
+from simple_module_core.datetimes import aware
+
 __all__ = ["HOURLY_WINDOW", "MAX_DAYS", "Bucket", "Point", "bucketize"]
 
 HOURLY_WINDOW = timedelta(hours=72)
@@ -31,7 +33,7 @@ class Point:
 
 
 def _utc(value: datetime) -> datetime:
-    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    return aware(value).astimezone(UTC)
 
 
 def _ceil_div(span: timedelta, unit: timedelta) -> int:
@@ -49,7 +51,7 @@ def bucketize(
     start, now = _utc(start), _utc(now)
     b0 = start.replace(minute=0, second=0, microsecond=0)
     bucket: Bucket = "hour"
-    step, cap = HOUR, 72
+    step, cap = HOUR, HOURLY_WINDOW // HOUR
     if now - b0 > HOURLY_WINDOW:
         bucket, step, cap = "day", DAY, MAX_DAYS
         b0 = b0.replace(hour=0)
