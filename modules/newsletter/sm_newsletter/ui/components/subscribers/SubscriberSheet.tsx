@@ -25,7 +25,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@simple-module-py/ui/components/ui/sheet';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useListFields } from '../../hooks/useListFields';
 import { useSubscriber } from '../../hooks/useSubscriber';
@@ -57,6 +57,10 @@ export function SubscriberSheet({ listKey, uuid, canEdit, canManage, onClose, on
   const [confirming, setConfirming] = useState(false);
   const [lifting, setLifting] = useState<Suppression | null>(null);
   const [liftDone, setLiftDone] = useState(false);
+  // One action at a time: a repeat click while a request is in flight is dropped, so a
+  // later 409 can never overwrite the first one's outcome.
+  const inFlight = useRef(false);
+  const [busy, setBusy] = useState(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset when another subscriber opens
   useEffect(() => {
     setLiftDone(false);
@@ -72,12 +76,17 @@ export function SubscriberSheet({ listKey, uuid, canEdit, canManage, onClose, on
     onChanged();
   };
   const run = async (action: () => Promise<unknown>) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
     setActionError(null);
     try {
       await action();
     } catch (e) {
       setActionError(errorMessage(e, t));
     } finally {
+      inFlight.current = false;
+      setBusy(false);
       changed();
     }
   };
@@ -142,7 +151,12 @@ export function SubscriberSheet({ listKey, uuid, canEdit, canManage, onClose, on
 
             {canManage && active && subscriber.status === 'confirmed' && (
               <div>
-                <Button type="button" variant="outline" onClick={() => setConfirming(true)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => setConfirming(true)}
+                >
                   {t(copy.detail.unsubscribe)}
                 </Button>
               </div>
@@ -211,7 +225,7 @@ export function SubscriberSheet({ listKey, uuid, canEdit, canManage, onClose, on
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t(copy.unsubscribe_confirm.keep)}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void unsubscribe()}>
+            <AlertDialogAction disabled={busy} onClick={() => void unsubscribe()}>
               {t(copy.unsubscribe_confirm.confirm)}
             </AlertDialogAction>
           </AlertDialogFooter>

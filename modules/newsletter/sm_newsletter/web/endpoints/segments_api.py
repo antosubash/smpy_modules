@@ -1,8 +1,8 @@
 """``/segments``: saved segments and their live count.
 
 ``bind_admin`` first on the router, each route's permission after it. Bodies
-arrive raw and go through ``parse_payload`` (error ``invalid_segment``), so a
-422 never echoes a rule value.
+arrive raw (a missing one as ``None``) and go through ``parse_payload`` (error
+``invalid_segment``), so a 422 never echoes a rule value.
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ async def list_segments(
 @router.post("/segments", response_model=SegmentOut, status_code=201, dependencies=_EDIT)
 async def create_segment(
     request: Request,
-    payload: Any = Body(...),
+    payload: Any = Body(None),
     tenant: str = Depends(bind_admin),
     db: AsyncSession = Depends(get_db),
 ) -> SegmentOut:
@@ -72,7 +72,7 @@ async def create_segment(
 @router.post("/segments/preview", response_model=CountOut, dependencies=_PREVIEW)
 async def preview_segment(
     request: Request,
-    payload: Any = Body(...),
+    payload: Any = Body(None),
     tenant: str = Depends(bind_admin),
     db: AsyncSession = Depends(get_db),
 ) -> CountOut:
@@ -104,7 +104,7 @@ async def get_segment(
 async def patch_segment(
     segment_id: int,
     request: Request,
-    payload: Any = Body(...),
+    payload: Any = Body(None),
     tenant: str = Depends(bind_admin),
     db: AsyncSession = Depends(get_db),
 ) -> SegmentOut:

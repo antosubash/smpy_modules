@@ -148,6 +148,29 @@ describe('SegmentEditorDialog', () => {
     for (let i = 0; i < 10; i++) await act(async () => button(copy.add_rule)?.click());
     expect(rows().length).toBe(10);
     expect(button(copy.add_rule)?.disabled).toBe(true);
+    expect(document.body.textContent).toContain(copy.max_rules);
+  });
+
+  it('clears the error banner when the name or a rule changes', async () => {
+    next = () => json({ detail: 'x', code: 'invalid_segment' }, 422);
+    await open();
+    const name = document.getElementById('newsletter-segment-name') as HTMLInputElement;
+    await type(name, 'S');
+    await act(async () => button(copy.save)?.click());
+    expect(document.body.textContent).toContain(en.errors.invalid_segment);
+    await type(name, 'S2');
+    expect(document.body.textContent).not.toContain(en.errors.invalid_segment);
+    await act(async () => button(copy.save)?.click());
+    expect(document.body.textContent).toContain(en.errors.invalid_segment);
+    await act(async () => button(copy.add_rule)?.click());
+    expect(document.body.textContent).not.toContain(en.errors.invalid_segment);
+  });
+
+  it('caps a rule value at the length the API accepts', async () => {
+    await open();
+    await act(async () => button(copy.add_rule)?.click());
+    const value = document.querySelector('input[aria-label="Value"]') as HTMLInputElement;
+    expect(value.maxLength).toBe(200);
   });
 
   it('asks nothing while closed', async () => {

@@ -168,6 +168,22 @@ describe('SubscriberSheet', () => {
     expect(onChanged).toHaveBeenCalled();
   });
 
+  it('sends one unsubscribe for repeated clicks and keeps the first outcome', async () => {
+    let calls = 0;
+    unsubscribe = () => {
+      calls += 1;
+      return calls === 1 ? json(subscriber) : json({ detail: 'x', code: 'not_subscribed' }, 409);
+    };
+    await render({ canEdit: false, canManage: true });
+    act(() => button(en.subscribers.detail.unsubscribe)?.click());
+    await act(async () => {
+      const confirm = lastButton(en.subscribers.unsubscribe_confirm.confirm);
+      for (let i = 0; i < 5; i++) confirm?.click();
+    });
+    expect(posts()).toHaveLength(1);
+    expect(text()).not.toContain(en.errors.not_subscribed);
+  });
+
   it('translates a 409 not_subscribed', async () => {
     unsubscribe = () => json({ detail: 'x', code: 'not_subscribed' }, 409);
     await render({ canEdit: false, canManage: true });

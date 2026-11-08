@@ -118,6 +118,18 @@ async def test_422_never_echoes_values(client):
     assert res.status_code == 422 and "SECRET-VALUE" not in res.text
 
 
+async def test_missing_body_answers_the_envelope(client):
+    """No body was FastAPI's raw 422 array, unlike every other refusal here."""
+    sid = (await _create(client))["id"]
+    for res in (
+        await client.post(BASE, headers=EDIT),
+        await client.post(f"{BASE}/preview", headers=READER),
+        await client.patch(f"{BASE}/{sid}", headers=EDIT),
+    ):
+        assert res.status_code == 422, res.text
+        assert res.json()["code"] == "invalid_segment"
+
+
 async def test_list_fields_includes_ops_and_signup(client):
     res = await client.get(f"{API}/lists/news/fields", headers=VIEW)
     assert res.status_code == 200, res.text

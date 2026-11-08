@@ -64,6 +64,7 @@ export function SegmentEditorDialog({
   const edit = (next: Rule[]) => {
     setRules(next);
     setBadRow(null);
+    setError(null);
   };
 
   const save = async () => {
@@ -105,7 +106,10 @@ export function SegmentEditorDialog({
               value={name}
               maxLength={200}
               disabled={pending}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                setError(null);
+              }}
             />
 
             <p className="text-sm font-medium">{t(copy.rules)}</p>
@@ -130,18 +134,20 @@ export function SegmentEditorDialog({
                 variant="outline"
                 size="sm"
                 disabled={pending || fields.length === 0 || rules.length >= MAX_RULES}
-                title={rules.length >= MAX_RULES ? t(copy.max_rules) : undefined}
                 onClick={() => edit([...rules, emptyRule(fields[0])])}
               >
                 {t(copy.add_rule)}
               </Button>
+              {rules.length >= MAX_RULES && (
+                <p className="mt-1 text-sm text-muted-foreground">{t(copy.max_rules)}</p>
+              )}
             </div>
 
             {!canCount ? (
               <p className="text-sm text-muted-foreground">
                 {t(keys.newsletter.audience.count_hidden)}
               </p>
-            ) : preview.error ? (
+            ) : preview.error && preview.error !== error ? (
               <p role="alert" className="text-sm text-destructive">
                 {preview.error}
               </p>

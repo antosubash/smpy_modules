@@ -92,8 +92,15 @@ export function SegmentTable({ items, fields, canEdit, onEdit, onDeleted }: Prop
         <TableBody>
           {items.map((s) => (
             <TableRow key={s.id}>
-              <TableCell className="font-medium">{s.name}</TableCell>
-              <TableCell className="text-muted-foreground">{summary(s.rules, fields, t)}</TableCell>
+              <TableCell
+                className="max-w-xs whitespace-normal break-all font-medium"
+                title={s.name}
+              >
+                {s.name}
+              </TableCell>
+              <TableCell className="whitespace-normal break-words text-muted-foreground">
+                {summary(s.rules, fields, t)}
+              </TableCell>
               <TableCell className="text-muted-foreground">
                 {s.updated_at ? date.format(new Date(s.updated_at)) : ''}
               </TableCell>

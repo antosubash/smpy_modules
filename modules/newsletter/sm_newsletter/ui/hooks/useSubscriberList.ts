@@ -92,6 +92,8 @@ export function useSubscriberList(listKey: string) {
       })
       .catch((e) => {
         if (request !== latest.current || controller.signal.aborted) return;
+        // Never leave the previous answer standing under an error banner.
+        setResult(null);
         setError(errorMessage(e, t));
       });
     return () => controller.abort();
