@@ -43,6 +43,7 @@ def test_parse_audience_forms():
     assert parse_audience("tag:vip") == Audience("tag", tag="vip")
     assert parse_audience("segment:12") == Audience("segment", segment_id=12)
     assert parse_audience(f"segment:{2**31 - 1}").segment_id == 2**31 - 1
+    assert parse_audience("tag:" + "x" * 100).tag == "x" * 100
     for raw in (
         "tag:",
         "tag:" + "x" * 101,

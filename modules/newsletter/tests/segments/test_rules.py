@@ -1,6 +1,9 @@
 import pytest
 from sm_newsletter.segments.rules import (
     MAX_RULES,
+    MAX_TERMS,
+    MAX_VALUE_LEN,
+    MAX_VALUES,
     Rule,
     RuleError,
     compile_rules,
@@ -122,6 +125,30 @@ def test_term_cap():
     rules = [Rule(field="tags", op="all", value=["a", "b", "c", "a", "b", "c"])] * 4
     with pytest.raises(RuleError):
         compile_rules(rules, FIELDS)
+
+
+def test_every_limit_holds_at_its_edge_and_refuses_one_past():
+    city = Rule(field="city", op="is", value="x")
+    assert len(compile_rules([city] * MAX_RULES, FIELDS)) == MAX_RULES
+    with pytest.raises(RuleError):
+        compile_rules([city] * (MAX_RULES + 1), FIELDS)
+
+    pair = Rule(field="tags", op="all", value=["a", "b"])  # two terms
+    terms = [pair] * (MAX_TERMS // 2)
+    assert len(compile_rules(terms, FIELDS)) == MAX_TERMS
+    with pytest.raises(RuleError):
+        compile_rules([*terms, city], FIELDS)
+
+    choices = tuple(f"c{i}" for i in range(MAX_VALUES + 1))
+    fields = {**FIELDS, **segment_fields([_f("pick", "select", choices=choices)])}
+    ok = Rule(field="pick", op="any", value=list(choices[:MAX_VALUES]))
+    assert compile_rules([ok], fields) == [f"pick:in:{','.join(choices[:MAX_VALUES])}"]
+    with pytest.raises(RuleError):
+        compile_rules([Rule(field="pick", op="any", value=list(choices))], fields)
+
+    assert _c("city", "is", "x" * MAX_VALUE_LEN) == [f"city:eq:{'x' * MAX_VALUE_LEN}"]
+    with pytest.raises(RuleError):
+        _c("city", "is", "x" * (MAX_VALUE_LEN + 1))
 
 
 def test_email_is_lowercased():

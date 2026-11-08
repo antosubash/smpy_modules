@@ -18,7 +18,8 @@ create on a list the caller cannot read is 403 `list_forbidden`).
 - **AND only.** Every rule must hold. "Any of several values" is the `any`
   operator on one field (it compiles to `in`); OR across fields is not offered.
   At most 10 rules and 20 compiled terms.
-- **Fields.** Every filterable field records reports for the list, except
+- **Fields.** Every filterable field records reports for the list, of a type in
+  the table below, except
   `sm_status` (there is no status rule: a campaign only mails `confirmed`
   subscribers), plus **Signed up**, records' `created_at`. For a person added by
   the Mailchimp import (PR 7) that is the import time, so "signed up since"

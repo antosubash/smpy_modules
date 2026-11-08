@@ -86,6 +86,7 @@ async def test_invalid_query_never_echoes(client):
     for body in (
         {"status": "SECRETSTATUS"},
         {"q": "SECRET" * 40},
+        {"q": "SECRET\x00"},  # records refuses a NUL with a ValueError: never a 500
         {"tag": "SECRET" * 40},
         {"segment": 0},
         {"limit": 0},

@@ -13,14 +13,12 @@ from sm_newsletter.campaigns.access import require_list
 from sm_newsletter.campaigns.audience import audience_count
 from sm_newsletter.core import constants
 from sm_newsletter.core.errors import NotFound
-from sm_newsletter.core.errors_audience import InvalidAudience
 from sm_newsletter.core.tenancy import bind_admin
 from sm_newsletter.segments import store
 from sm_newsletter.segments.rules import ops_for
 from sm_newsletter.web.schemas.segments import CountOut, ListFieldOut
 
 router = APIRouter(dependencies=[Depends(bind_admin)])
-MAX_AUDIENCE_LEN = 140  # newsletter_campaign.audience
 
 
 @router.get(
@@ -56,8 +54,6 @@ async def count_audience(
     tenant: str = Depends(bind_admin),
     db: AsyncSession = Depends(get_db),
 ) -> CountOut:
-    if len(audience) > MAX_AUDIENCE_LEN:  # here, not in the signature: a 422 never echoes it
-        raise InvalidAudience()
     roles = caller_roles(request)
     await require_list(db, tenant_id=tenant, list_type_key=list_type_key, roles=roles)
     count = await audience_count(

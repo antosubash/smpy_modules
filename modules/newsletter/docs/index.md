@@ -14,7 +14,7 @@ source repository, and the delivery order is
 | 1 | records `contracts.newsletter`, news `contracts.articles` | merged |
 | 2 | this package: scaffold, tenancy, settings, models, suppressions, hourly reconcile | merged |
 | 3 | campaigns, content blocks, renderer, preview, Puck editor, test send, settings page | merged |
-| 4 | sending, throttling, retries, unsubscribe page | in review (stacked below this PR) |
+| 4 | sending, throttling, retries, unsubscribe page | merged |
 | 5 | open and click tracking, reports | merged |
 | 6 | segments, audiences, the subscriber and suppression screens | this PR |
 | 7 | Mailchimp import, docs, e2e | planned |
@@ -40,8 +40,9 @@ and the golden files: [`content.md`](content.md).
   (a newsletter-only Puck editor with a 600 px single column, a preview pane, a
   test-send dialog, a send dialog for a draft and, once it is scheduled, a sending
   panel with live progress) and `/admin/newsletter/settings`. The sidebar has Campaigns
-  (`newsletter.view`) and Settings (`newsletter.manage`). The people screens
-  (Segments, Subscribers, Suppressions) are in [`audience.md`](audience.md).
+  (`newsletter.view`) and Settings (`newsletter.manage`) and, between them, the
+  people screens Segments, Subscribers and Suppressions
+  ([`audience.md`](audience.md)).
 - **Writes are revision-guarded.** PATCH, card Refresh, send and unschedule carry
   `expected_revision`; a stale one is `409 stale`, a campaign that left draft
   `409 not_a_draft`.
@@ -119,9 +120,10 @@ A suppression says "never mail this address". Suppressions are **tenant-wide**:
 - A double-opt-in confirmation on list L (the subscriber following records'
   confirm link) clears L's `unsubscribed` row and any `hard_bounce` or
   `imported_cleaned` row created at or before the confirmation. It never clears
-  a `complaint`, and never another list's opt-out. Nothing else clears a
-  suppression: a signup on a single-opt-in list is confirmed at once but proves
-  nothing about the mailbox (anyone can type the address), so it clears nothing.
+  a `complaint`, and never another list's opt-out. A signup on a single-opt-in
+  list is confirmed at once but proves nothing about the mailbox (anyone can
+  type the address), so it clears nothing. The one other way a row goes is an
+  admin's audited lift ([`audience.md`](audience.md)).
 - An hourly reconcile re-adds the opt-outs records holds, trashed subscribers
   included. It only adds; it never removes a suppression. It is the Celery task
   `newsletter.reconcile_suppressions` on the `newsletter` queue (`make worker`

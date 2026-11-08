@@ -84,7 +84,8 @@ async def _filters(
     return out
 
 
-def _is_in(email: str, stopped: set[str]) -> bool:
+def is_stopped(email: str, stopped: set[str]) -> bool:
+    """Whether ``email`` (any spelling) is in ``stopped``, the normalised suppressed set."""
     try:
         return normalise_email(email) in stopped
     except ValueError:
@@ -131,7 +132,7 @@ async def browse(
         raise InvalidSegment("filter: refused") from None
     # Tenant-wide on purpose (TL1): a boolean only, no row detail; see subscribers/suppressions.py.
     stopped = await suppressed(session, tenant_id=tenant_id, emails=[h.email for h in page.items])
-    rows = [SubscriberRow(hit=h, suppressed=_is_in(h.email, stopped)) for h in page.items]
+    rows = [SubscriberRow(hit=h, suppressed=is_stopped(h.email, stopped)) for h in page.items]
     return BrowseResult(rows=rows, total=page.total, counts=counts)
 
 
@@ -170,7 +171,7 @@ async def detail(
         hit=hit,
         engagement=await engagement(session, tenant_id=tenant_id, record_uuid=uuid),
         suppressions=suppressions,
-        suppressed=_is_in(
+        suppressed=is_stopped(
             hit.email, await suppressed(session, tenant_id=tenant_id, emails=[hit.email])
         ),
         records_url=subscriber_admin_url(list_type_key, uuid),

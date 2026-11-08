@@ -109,7 +109,6 @@ REASON_COMPLAINT = "complaint"
 REASON_IMPORTED_CLEANED = "imported_cleaned"
 REASON_UNSUBSCRIBED = "unsubscribed"
 REASONS = (REASON_HARD_BOUNCE, REASON_COMPLAINT, REASON_IMPORTED_CLEANED, REASON_UNSUBSCRIBED)
-SOURCE_ADMIN = "admin"
 SOURCES = ("records_event", "reconcile", "unsubscribe_page", "send", "import", "admin")
 
 # Reasons an admin may lift; a complaint is never lifted.
@@ -123,6 +122,7 @@ MAX_TYPE_KEY_LEN = 64  # records' ``MAX_KEY_LEN``
 MAX_EMAIL_LEN = 320
 MAX_FIRST_NAME_LEN = 200
 MAX_SENDER_LEN = 600  # an encoded "Name <address>" header
+MAX_AUDIENCE_LEN = 140  # ``newsletter_campaign.audience``: ``tag:<=100 chars>`` fits
 
 # Why a campaign is paused; ``paused_reason`` stores ``"<code>|<detail>"``,
 # clipped to ``MAX_PAUSED_REASON`` (the column's length).
@@ -134,7 +134,8 @@ PAUSE_LIST_UNAVAILABLE = "list_unavailable"
 PAUSE_HTTPS_REQUIRED = "https_required"
 """The snapshot's bases are not both ``https://`` and the transport is ``smtp``."""
 PAUSE_AUDIENCE_UNAVAILABLE = "audience_unavailable"
-"""The segment's audience could not be resolved (records unavailable or no view access)."""
+"""Records refused the audience's stored filter terms at freeze (a reason other
+than ``reindexing`` or ``not_a_list``)."""
 PAUSE_CODES = (
     PAUSE_MANUAL,
     PAUSE_SMTP_REJECTED,
@@ -150,6 +151,8 @@ ERROR_RETRIES_EXHAUSTED = "retries_exhausted"
 ERROR_INVALID_MESSAGE = "invalid_message"
 ERROR_HARD_BOUNCE = "hard_bounce"
 
-# Suppression sources the sending path writes (both are in ``SOURCES``).
+# Suppression sources written by the sending path, the unsubscribe page and an
+# admin's unsubscribe (all in ``SOURCES``).
 SOURCE_SEND = "send"
 SOURCE_UNSUBSCRIBE_PAGE = "unsubscribe_page"
+SOURCE_ADMIN = "admin"

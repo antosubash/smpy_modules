@@ -13,12 +13,10 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType, tables_for
-from sm_records.public_submissions.campaign_reads import SubscriberFilterError
+from sm_records.public_submissions.campaign_reads import SubscriberFilterError, parse_filters
 from sm_records.public_submissions.spec import INTERNAL
 from sm_records.public_submissions.subscribe import CONFIRMED, PENDING, UNSUBSCRIBED
-from sm_records.records._grammar import FilterTermError, parse_term
 from sm_records.records.index._filters import filtered
 from sm_records.records.index._predicates import QueryError
 from sm_records.records.index.query import Filter, FilterOp
@@ -43,17 +41,7 @@ def declared_fields(rtype: RecordType) -> list[dict[str, Any]]:
 
 
 def _terms(raw: Sequence[str], search: str | None) -> list[Filter]:
-    settings = RecordsSettings()
-    if isinstance(raw, str):
-        raise SubscriberFilterError(
-            "malformed", "filters must be a sequence of terms, not a string"
-        )
-    if len(raw) > settings.max_filter_terms:
-        raise SubscriberFilterError("malformed", "too many filter terms")
-    try:
-        terms = [parse_term(term, settings) for term in raw]
-    except FilterTermError as exc:
-        raise SubscriberFilterError("malformed", str(exc)) from exc
+    terms = parse_filters(raw)
     if search:
         terms.append(Filter("sm_email", FilterOp.CONTAINS, search.lower()))
     return terms

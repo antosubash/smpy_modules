@@ -21,6 +21,7 @@ import type { ListField, Rule, Segment } from '../../utils/types';
 import { RuleRow } from './RuleRow';
 
 const copy = keys.newsletter.segments;
+/** The API's cap (`segments.rules.MAX_RULES`); a row past it would be a 422. */
 export const MAX_RULES = 10;
 
 interface Props {

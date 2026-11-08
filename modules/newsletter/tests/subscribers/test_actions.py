@@ -109,6 +109,8 @@ async def test_tag_input_bounds(world):
     for add, remove in ((["vip"] * 21, []), ([], ["x"] * 21), ([""], []), ([], [""])):
         with pytest.raises(InvalidQuery):
             await _tags(world, uuid, add=add, remove=remove)
+    # Exactly MAX_TAG_VALUES per side is fine (21 above is not).
+    assert (await _tags(world, uuid, add=["vip"] * 20, remove=["x"] * 20)).tags == ["vip"]
 
 
 async def test_list_without_tags_field_refuses(world):

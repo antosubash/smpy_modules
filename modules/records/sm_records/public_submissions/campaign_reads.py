@@ -121,7 +121,9 @@ def stored_tags(value: Any) -> list[str]:
     return [t for t in value if isinstance(t, str)] if isinstance(value, list) else []
 
 
-def _filters(raw: Sequence[str], status: str) -> list[Filter]:
+def parse_filters(raw: Sequence[str]) -> list[Filter]:
+    """``raw`` filter terms parsed; ``SubscriberFilterError("malformed")`` for a
+    bare string, too many terms or a term the grammar refuses."""
     settings = RecordsSettings()
     if isinstance(raw, str):
         raise SubscriberFilterError(
@@ -130,10 +132,13 @@ def _filters(raw: Sequence[str], status: str) -> list[Filter]:
     if len(raw) > settings.max_filter_terms:
         raise SubscriberFilterError("malformed", "too many filter terms")
     try:
-        parsed = [parse_term(term, settings) for term in raw]
+        return [parse_term(term, settings) for term in raw]
     except FilterTermError as exc:
         raise SubscriberFilterError("malformed", str(exc)) from exc
-    return [Filter("sm_status", FilterOp.EQ, status), *parsed]
+
+
+def _filters(raw: Sequence[str], status: str) -> list[Filter]:
+    return [Filter("sm_status", FilterOp.EQ, status), *parse_filters(raw)]
 
 
 def _query(

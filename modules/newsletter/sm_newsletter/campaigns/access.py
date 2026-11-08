@@ -78,5 +78,8 @@ async def require_list(
 ) -> None:
     """:class:`NotFound` unless ``list_type_key`` is one of the tenant's lists
     this caller may read: a missing, unreadable or non-list key answers alike."""
-    if list_type_key not in await readable_lists(session, tenant_id=tenant_id, roles=roles):
+    # One list's check, not `readable_lists`' (a records lookup for every list of the tenant).
+    if list_type_key not in await subscription_lists(session, tenant_id=tenant_id):
+        raise NotFound()
+    if not await can_read_list(session, tenant_id=tenant_id, type_key=list_type_key, roles=roles):
         raise NotFound()

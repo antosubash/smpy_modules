@@ -3,9 +3,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, errorMessage } from '../utils/api';
 import { useT } from '../utils/i18n';
 import type { Suppression, SuppressionPage } from '../utils/types';
+import { PAGE_SIZE } from './useCampaignList';
 
-/** The API's default page size (`limit` on `GET /suppressions`). */
-export const PAGE_SIZE = 50;
+// Every list screen asks for the API's default page (50), as the campaigns do.
+export { PAGE_SIZE } from './useCampaignList';
 
 /** The suppressed addresses: a reason filter (with the per-reason counts the server
  *  returns) and offset paging. A new reason puts the list back on its first page;
@@ -30,6 +31,12 @@ export function useSuppressionList() {
       .listSuppressions({ reason: reason || undefined, offset }, controller.signal)
       .then((page) => {
         if (request !== latest.current) return;
+        if (offset > 0 && offset >= page.total) {
+          // The page emptied under us (its last row was lifted): step back to the
+          // last page that still has rows.
+          setOffset(Math.max(0, Math.floor((page.total - 1) / PAGE_SIZE) * PAGE_SIZE));
+          return;
+        }
         setError(null);
         setItems(page.items);
         setTotal(page.total);

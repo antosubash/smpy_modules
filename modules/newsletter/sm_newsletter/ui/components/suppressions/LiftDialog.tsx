@@ -26,6 +26,7 @@ import { keys, useT } from '../../utils/i18n';
 import type { Suppression } from '../../utils/types';
 
 const copy = keys.newsletter.suppressions.lift;
+/** The API's cap on a lift's note (`subscribers.lift.NOTE_MAX`). */
 const MAX_NOTE = 500;
 
 interface Props {

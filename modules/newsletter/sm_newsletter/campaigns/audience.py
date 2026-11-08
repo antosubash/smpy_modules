@@ -17,7 +17,7 @@ from sm_records.contracts.newsletter import SubscriberFilterError, can_read_list
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_newsletter.campaigns.access import Roles
+from sm_newsletter.campaigns.access import MAX_ID, Roles
 from sm_newsletter.core.constants import TAGS_FIELD
 from sm_newsletter.core.errors_audience import (
     InvalidAudience,
@@ -32,7 +32,6 @@ AUDIENCE_ALL = "all"
 TAG_PREFIX = "tag:"
 SEGMENT_PREFIX = "segment:"
 MAX_TAG_LEN = 100
-MAX_SEGMENT_ID = 2**31 - 1
 _CANONICAL_ID = re.compile(r"[1-9][0-9]*")
 
 
@@ -61,7 +60,7 @@ def parse_audience(raw: str) -> Audience:
         if not _CANONICAL_ID.fullmatch(digits) or len(digits) > 10:
             raise InvalidAudience()
         segment_id = int(digits)
-        if segment_id > MAX_SEGMENT_ID:
+        if segment_id > MAX_ID:
             raise InvalidAudience()
         return Audience("segment", segment_id=segment_id)
     raise InvalidAudience()

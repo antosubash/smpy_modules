@@ -3,10 +3,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, errorMessage } from '../utils/api';
 import { useT } from '../utils/i18n';
 import type { SubscriberPage, SubscriberStatus } from '../utils/types';
-import { SEARCH_DEBOUNCE_MS } from './useCampaignList';
+import { PAGE_SIZE, SEARCH_DEBOUNCE_MS } from './useCampaignList';
 
-/** The API's default page size (`limit` on `POST …/subscribers/search`). */
-export const PAGE_SIZE = 50;
+// Every list screen asks for the API's default page (50), as the campaigns do.
+export { PAGE_SIZE } from './useCampaignList';
 
 interface Filters {
   listKey: string;
@@ -77,6 +77,16 @@ export function useSubscriberList(listKey: string) {
       )
       .then((p) => {
         if (request !== latest.current) return;
+        if (offset > 0 && offset >= p.total) {
+          // The page emptied under us (its last row was unsubscribed under a status
+          // filter): step back to the last page that still has rows.
+          const last = Math.max(0, Math.floor((p.total - 1) / PAGE_SIZE) * PAGE_SIZE);
+          setStored((cur) => ({
+            ...(cur.listKey === listKey ? cur : initial(listKey)),
+            offset: last,
+          }));
+          return;
+        }
         setError(null);
         setResult({ listKey, ...p });
       })

@@ -13,7 +13,12 @@ from simple_module_db.mixins import AuditMixin, MultiTenantMixin
 from sqlalchemy import Index
 from sqlmodel import Field
 
-from sm_newsletter.core.constants import MAX_EMAIL_LEN, MAX_PAUSED_REASON, MAX_TYPE_KEY_LEN
+from sm_newsletter.core.constants import (
+    MAX_AUDIENCE_LEN,
+    MAX_EMAIL_LEN,
+    MAX_PAUSED_REASON,
+    MAX_TYPE_KEY_LEN,
+)
 from sm_newsletter.models._base import Base
 from sm_newsletter.models._cols import STATUS_LEN, counter, dt_col, json_col
 
@@ -36,7 +41,7 @@ class Campaign(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[un
     """The email's blocks."""
     list_type_key: str = Field(max_length=MAX_TYPE_KEY_LEN)
     """The records subscription list (a record type key) it goes to."""
-    audience: str = Field(default="all", max_length=140)
+    audience: str = Field(default="all", max_length=MAX_AUDIENCE_LEN)
     """``all`` or a segment of that list."""
     status: str = Field(default="draft", max_length=STATUS_LEN)
     revision: int = Field(default=1, sa_column_kwargs={"nullable": False, "server_default": "1"})
