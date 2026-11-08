@@ -51,7 +51,7 @@ from sm_newsletter.imports.mailchimp import (
 from sm_newsletter.imports.tags import tag_values
 from sm_newsletter.models import ImportEntry, ImportJob
 
-__all__ = ["stage"]
+__all__ = ["stage", "targets_for"]
 
 _CONFLICT = ("tenant_id", "import_id", "email_hash")
 
@@ -90,7 +90,7 @@ async def stage(
     """The ``staged`` import of ``sources`` into the list ``list_type_key``, flushed, not
     committed. :class:`NotFound` for no such list, ``ImportTooManyRows`` /
     ``ImportTooManyTags`` over the limits."""
-    targets = await _targets(session, tenant_id, list_type_key)
+    targets = await targets_for(session, tenant_id, list_type_key)
     existing = targets.tag_choices  # indexed or not (T6b): list_fields sees indexed only
     peeks = [_peek(s) for s in sources]
     columns, remaps = _columns(peeks)
@@ -127,7 +127,9 @@ async def stage(
     return job
 
 
-async def _targets(session: AsyncSession, tenant_id: str, key: str) -> ImportTargets:
+async def targets_for(session: AsyncSession, tenant_id: str, key: str) -> ImportTargets:
+    """What the list ``key`` can import into; :class:`NotFound` when it is gone or no longer a
+    list (the one place both the upload and the mapping routes read it)."""
     try:
         targets = await importable_fields(session, tenant_id=tenant_id, type_key=key)
     except SubscriberFilterError:

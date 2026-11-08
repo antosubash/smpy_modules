@@ -111,7 +111,7 @@ async def test_other_tenants_import_404(client):
     assert (await client.get(IMPORTS, headers=other)).json() == []
 
 
-@pytest.mark.parametrize("raw", ["0", "-1", str(2**31 - 1), str(2**31), str(2**63), "9" * 20])
+@pytest.mark.parametrize("raw", ["0", "-1", str(2**63 - 1), str(2**63), "9" * 20])
 async def test_out_of_range_import_ids_404_not_500(client, raw):
     url = f"{IMPORTS}/{raw}"
     for method, path in (
@@ -136,6 +136,66 @@ async def test_upload_over_limit_413(client, monkeypatch):
     monkeypatch.setattr(archive, "MAX_ENTRY_BYTES", 10)
     res = await upload(client, csv_part(SUB, [["a@example.org", "Ada", "", ""]]))
     assert (res.status_code, res.json()["code"]) == (413, "import_too_large")
+
+
+async def test_a_list_that_stopped_being_a_list_is_404_not_500(client, monkeypatch):
+    from sm_newsletter.imports import staging
+    from sm_records.contracts.newsletter_admin import SubscriberFilterError
+
+    job = await upload_ok(client)
+
+    async def refuse(*_a, **_k):
+        raise SubscriberFilterError("not_a_list")
+
+    monkeypatch.setattr(staging, "importable_fields", refuse)
+    url = f"{IMPORTS}/{job['id']}"
+    assert (await client.get(url, headers=MANAGE)).status_code == 404
+    res = await client.patch(url, json={"mapping": {"fields": {}, "tags": False}}, headers=MANAGE)
+    assert res.status_code == 404
+    assert (await upload(client, csv_part(SUB, [["a@example.org", "", "", ""]]))).status_code == 404
+
+
+async def test_duplicate_column_is_a_422_naming_the_header(client):
+    part = csv_part(
+        "dup.csv", [["a@example.org", "x", "y"]], headers=["Email Address", "Phone", "phone"]
+    )
+    res = await upload(client, part)
+    assert (res.status_code, res.json()["code"]) == (422, "import_duplicate_column")
+    assert res.json()["detail"] == 'The file has the column "phone" more than once'
+    assert (await client.get(IMPORTS, headers=MANAGE)).json() == []
+
+
+async def test_upload_body_limit_is_inclusive(built, monkeypatch):
+    """The registered ceiling (``MAX_UPLOAD_BYTES`` + framing) refuses one byte over, not at."""
+    from simple_module_core.body_limits import BodyLimitRegistry
+    from simple_module_hosting._body_limit import BodyLimitMiddleware
+    from sm_newsletter.imports import constants as limits
+    from sm_newsletter.module import NewsletterModule
+
+    app, _ = built
+
+    def request(client, name: str):
+        return client.build_request(
+            "POST",
+            IMPORTS,
+            data={"list": "news"},
+            files=[csv_part(name, [["a@example.org", "", "", ""]])],
+            headers={**MANAGE, "accept": "application/json"},
+        )
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as probe:
+        size = int(request(probe, "a.csv").headers["content-length"])
+    monkeypatch.setattr(limits, "MiB", 1)
+    monkeypatch.setattr(limits, "MAX_UPLOAD_BYTES", size - 1)  # ceiling = size
+    registry = BodyLimitRegistry()
+    NewsletterModule().register_body_limits(registry)
+    assert registry.limit_for("POST", IMPORTS) == size
+    app.add_middleware(BodyLimitMiddleware, max_bytes=10 * 1024 * 1024, registry=registry)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as client:
+        at = await client.send(request(client, "a.csv"))
+        assert at.status_code == 201, at.text
+        over = await client.send(request(client, "ab.csv"))  # one byte more
+        assert over.status_code == 413, over.text
 
 
 def test_body_limit_is_registered_for_the_upload_only():

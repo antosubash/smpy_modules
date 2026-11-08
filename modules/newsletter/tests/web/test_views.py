@@ -266,6 +266,18 @@ async def test_import_page_props(client):
     assert opened["initial_import"] == 7
 
 
+@pytest.mark.parametrize("raw", ["0", "-1", str(2**63), "9" * 20])
+async def test_import_page_out_of_range_id_is_refused_not_500(client, raw):
+    res = await client.get(f"{VIEW}/import?id={raw}", headers=MANAGE)
+    assert res.status_code == 422
+
+
+async def test_import_page_largest_id_is_accepted(client):
+    res = await client.get(f"{VIEW}/import?id={2**63 - 1}", headers=MANAGE)
+    assert res.status_code == 200
+    assert res.json()["props"]["initial_import"] == 2**63 - 1
+
+
 async def test_import_page_needs_manage(client):
     for headers in (READ, EDIT, {"x-perms": ""}):
         assert (await client.get(f"{VIEW}/import", headers=headers)).status_code == 403

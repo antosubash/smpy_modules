@@ -16,7 +16,7 @@ from simple_module_inertia import InertiaResponse
 from sm_records.contracts.newsletter import caller_roles
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_newsletter.campaigns.access import readable_lists, require_campaign
+from sm_newsletter.campaigns.access import MAX_BIG_ID, readable_lists, require_campaign
 from sm_newsletter.campaigns.test_send import MAX_TEST_RECIPIENTS
 from sm_newsletter.content.integrations import capabilities
 from sm_newsletter.core import constants, tenancy
@@ -112,7 +112,7 @@ async def import_page(
     inertia: InertiaDep,
     tenant: str = Depends(bind_admin),
     db: AsyncSession = Depends(get_db),
-    initial_import: int | None = Query(default=None, alias="id", ge=1),
+    initial_import: int | None = Query(default=None, alias="id", ge=1, le=MAX_BIG_ID),
 ) -> InertiaResponse:
     """The lists the caller may read; ``?id=`` reopens one import (fetched client-side)."""
     lists = await readable_lists(db, tenant_id=tenant, roles=caller_roles(request))

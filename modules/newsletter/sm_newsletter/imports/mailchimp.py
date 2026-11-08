@@ -15,6 +15,7 @@ from typing import BinaryIO, TextIO
 from email_validator import EmailNotValidError, validate_email
 
 from sm_newsletter.core.errors_import import (
+    ImportDuplicateColumn,
     ImportEmptyFile,
     ImportMalformedCsv,
     ImportNoEmailColumn,
@@ -170,6 +171,21 @@ def _delimiter(line: str) -> str:
         return ","
 
 
+def _refuse_duplicates(names: Sequence[str], keys: Sequence[str]) -> None:
+    """Two columns with one header would collapse into one field (the later cell overwriting
+    the earlier), offer a second TAGS column for mapping, or leave it open which address is
+    imported. Different email-like headers are not duplicates: the first in ``EMAIL_HEADERS``
+    order is the address. The header is named, never a cell."""
+    seen: set[str] = set()
+    for name, key in zip(names, keys, strict=True):
+        if not key:
+            continue
+        if key in seen:
+            shown = "".join(c for c in name.strip() if c.isprintable())
+            raise ImportDuplicateColumn(f'The file has the column "{shown}" more than once')
+        seen.add(key)
+
+
 def read_header(stream: TextIO) -> Header:
     line = next(_lines(stream, 1), "")
     if not line.strip():
@@ -183,6 +199,7 @@ def read_header(stream: TextIO) -> Header:
         raise ImportTooManyColumns
     names = [n[:MAX_HEADER_KEY] for n in names]
     keys = [header_key(n) for n in names]
+    _refuse_duplicates(names, keys)
     email = next((keys.index(h) for h in EMAIL_HEADERS if h in keys), None)
     if email is None:
         raise ImportNoEmailColumn

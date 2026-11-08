@@ -58,7 +58,7 @@ def _is_csv(name: str) -> bool:
 
 
 def sources(uploads: Sequence[tuple[str, BinaryIO]]) -> list[Source]:
-    """One ZIP alone, or 1..``MAX_FILES`` CSV parts."""
+    """One ZIP alone (holding 1..``MAX_FILES`` CSVs), or 1..``MAX_FILES`` CSV parts."""
     if not uploads:
         raise ImportNotCsv
     if len(uploads) > MAX_FILES or (len(uploads) > 1 and any(_is_zip(n) for n, _ in uploads)):
@@ -105,6 +105,8 @@ def _zip_sources(stream: BinaryIO) -> list[Source]:
     chosen = [i for i in files if _wanted(i.filename)]
     if not chosen:
         raise ImportNotCsv
+    if len(chosen) > MAX_FILES:  # the same cap as loose parts; other entries count toward 16 only
+        raise ImportTooManyFiles
     return [
         Source(n, clean_name(info.filename), _opener(archive, info), owned=True)
         for n, info in enumerate(chosen)

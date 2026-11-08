@@ -66,6 +66,14 @@ class ImportTooManyColumns(NewsletterError):  # noqa: N818 - the state it refuse
     detail = "The file has too many columns"
 
 
+class ImportDuplicateColumn(NewsletterError):  # noqa: N818 - the state it refuses
+    """Two columns with one header; the detail names the header (never a cell)."""
+
+    status = 422
+    code = "import_duplicate_column"
+    detail = "The file has the same column twice"
+
+
 class ImportTooManyTags(NewsletterError):  # noqa: N818 - the state it refuses
     status = 422
     code = "import_too_many_tags"

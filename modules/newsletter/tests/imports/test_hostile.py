@@ -96,3 +96,30 @@ def test_every_email_header_is_excluded_from_mappable():
     data = csv_bytes(["Email Address", "E-Mail", "First Name"], [])
     header = mc.read_header(mc.text_stream(io.BytesIO(data)))
     assert [header.names[i] for i in header.mappable] == ["First Name"]
+
+
+def _line_of(length: int) -> bytes:
+    """A row line of exactly ``length`` bytes with its newline, from short cells."""
+    cells = (length - len(b"a@example.com\n")) // 2
+    line = b"a@example.com" + b",x" * cells + b"\n"
+    return line + b"" if len(line) == length else line[:-1] + b"x\n"
+
+
+def _parse(row: bytes) -> list:
+    stream = mc.text_stream(io.BytesIO(b"Email Address\n" + row))
+    header = mc.read_header(stream)
+    return list(mc.read_rows(stream, header, "subscribed"))
+
+
+def test_a_line_of_exactly_max_line_bytes_is_accepted():
+    row = _line_of(MAX_LINE)
+    assert len(row) == MAX_LINE
+    assert [type(r) for r in _parse(row)] == [mc.Parsed]
+
+
+def test_a_line_one_byte_over_max_line_is_refused():
+    row = _line_of(MAX_LINE + 1)
+    assert len(row) == MAX_LINE + 1
+    with pytest.raises(ImportMalformedCsv) as caught:
+        _parse(row)
+    assert "line 2" in caught.value.detail

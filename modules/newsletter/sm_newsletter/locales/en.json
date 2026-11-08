@@ -466,6 +466,7 @@
     "import_too_many_files": "The upload has too many files.",
     "import_too_many_rows": "The upload has too many rows.",
     "import_too_many_columns": "The file has too many columns.",
+    "import_duplicate_column": "The file has the same column twice. Remove or rename one of them.",
     "import_too_many_tags": "The upload would add too many new tags.",
     "import_bad_mapping": "The column mapping is not valid.",
     "import_failed": "The import failed. Fix the cause and try again.",

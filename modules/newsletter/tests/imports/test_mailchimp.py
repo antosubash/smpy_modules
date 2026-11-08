@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 import pytest
 from sm_newsletter.core.errors_import import (
+    ImportDuplicateColumn,
     ImportEmptyFile,
     ImportMalformedCsv,
     ImportNoEmailColumn,
@@ -231,3 +232,23 @@ def test_parse_refusals(data, error):
     assert "secret" not in caught.value.detail
     if error in (ImportNotUtf8, ImportMalformedCsv):
         assert "line 3" in caught.value.detail
+
+
+def test_different_email_headers_take_the_first_in_order():
+    header, rows = _read(
+        csv_bytes(["Email", "Email Address"], [["b@example.com", "a@example.com"]])
+    )
+    assert header.email == 1  # "Email Address" comes first in EMAIL_HEADERS
+    assert rows[0].email == "a@example.com"
+
+
+@pytest.mark.parametrize("header", ["Phone", "TAGS", "Email Address"])
+def test_duplicate_header_is_refused_naming_it(header):
+    data = csv_bytes(
+        ["Email Address", header, "Other", header.lower()], [["a@example.com", "secret", "", "x"]]
+    )
+    with pytest.raises(ImportDuplicateColumn) as caught:
+        _read(data)
+    assert f'"{header.lower()}"' in caught.value.detail.lower()
+    assert "secret" not in caught.value.detail
+    assert caught.value.status == 422

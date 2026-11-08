@@ -466,6 +466,7 @@
     "import_too_many_files": "Der Upload enthält zu viele Dateien.",
     "import_too_many_rows": "Der Upload enthält zu viele Zeilen.",
     "import_too_many_columns": "Die Datei hat zu viele Spalten.",
+    "import_duplicate_column": "Die Datei enthält dieselbe Spalte zweimal. Entfernen Sie eine davon oder benennen Sie sie um.",
     "import_too_many_tags": "Der Upload würde zu viele neue Tags anlegen.",
     "import_bad_mapping": "Die Spaltenzuordnung ist ungültig.",
     "import_failed": "Der Import ist fehlgeschlagen. Beheben Sie die Ursache und versuchen Sie es erneut.",

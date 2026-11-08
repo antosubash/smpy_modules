@@ -14,7 +14,7 @@ __all__ = ["parse_tags", "tag_values"]
 
 
 def parse_tags(cell: str) -> tuple[list[str], bool]:
-    """``(labels, any dropped)``: 1-100 characters, no control characters, at most 50."""
+    """``(labels, any dropped)``: 1-100 printable characters (``str.isprintable``), at most 50."""
     if not cell.strip():
         return [], False
     try:

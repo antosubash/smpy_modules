@@ -91,6 +91,11 @@ time, so a segment's "Signed up" rule means "added" for imported people.
   `E-Mail-Adresse`, `email_address`; a file without one is refused
   (`import_no_email_column`). A second email-like column is not offered for
   mapping.
+- A header used by two columns (two `Phone` columns, a second `TAGS`, a second
+  `Email Address`; compared after trimming and case-folding, empty headers
+  aside) refuses the file (`import_duplicate_column`, 422): the
+  later cell would silently overwrite the earlier one. The error names the
+  header, never a cell.
 - `OPTIN_TIME`, `CONFIRM_TIME`, `UNSUB_TIME` and `CLEAN_TIME` are Mailchimp's
   `YYYY-MM-DD HH:MM:SS` in UTC; anything else reads as missing.
 - Mailchimp's own bookkeeping columns (rating, IPs, coordinates, campaign ids,
@@ -103,8 +108,8 @@ Constants in `sm_newsletter/imports/constants.py`, not settings.
 | Limit | Value |
 | --- | --- |
 | Upload | 50 MiB (the route's body ceiling is that plus 1 MiB of multipart framing) |
-| Files | 4 parts, or 1 ZIP |
-| ZIP entries | 16 |
+| Files | 4 parts, or 1 ZIP holding at most 4 CSV files |
+| ZIP entries | 16 (any kind; only the CSVs count toward the 4 files) |
 | One entry, declared uncompressed | 200 MiB |
 | All entries, declared | 400 MiB |
 | Compression ratio | 200 |
@@ -114,7 +119,7 @@ Constants in `sm_newsletter/imports/constants.py`, not settings.
 | One line | 4 MiB |
 | Header text kept in a field key or error | 200 characters |
 | Tags per row | 50 |
-| One tag | 1 to 100 characters, no control characters |
+| One tag | 1 to 100 characters, printable only (`str.isprintable()`: no control, format or separator characters other than a plain space) |
 | Distinct tag labels in one upload | 500 |
 
 An encrypted ZIP entry, a compression other than stored or deflate, a declared
@@ -205,9 +210,9 @@ cell into a formula.
 
 ## Workers, slices and the janitor
 
-Uploading parses and stages the rows in the request (about 5 to 15 seconds for
-60 000 rows), so the preview is exact. Applying hands the import to the Celery
-task `newsletter.run_import(tenant_id, import_id)` on the `newsletter` queue.
+Uploading parses and stages the rows in the request, so the preview is exact.
+Applying hands the import to the Celery task
+`newsletter.run_import(tenant_id, import_id)` on the `newsletter` queue.
 
 - The task binds the tenant (`tenant_scope`), claims a lease (5 minutes,
   renewed per batch) and works in slices of at most 45 seconds in batches of

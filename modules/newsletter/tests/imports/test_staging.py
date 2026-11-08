@@ -166,6 +166,35 @@ async def test_too_many_rows_refused(state, monkeypatch):
             ).scalar_one() == 0
 
 
+async def test_exactly_max_rows_is_accepted(state, monkeypatch):
+    monkeypatch.setattr(staging, "MAX_ROWS", 3)
+    jid = await staged(state, upload(SUB, [[f"u{i}@x.org", "", "", ""] for i in range(3)]))
+    assert (await job_of(state, jid)).total == 3
+
+
+async def test_error_list_keeps_exactly_keep_errors(state, monkeypatch):
+    monkeypatch.setattr(staging, "KEEP_ERRORS", 3)
+    bad = [[f"bad{i}", "", "", ""] for i in range(3)]
+    job = await job_of(state, await staged(state, upload(SUB, bad)))
+    assert (len(job.errors), job.errors_total, job.invalid) == (3, 3, 3)
+    job = await job_of(state, await staged(state, upload(SUB, [*bad, ["bad3", "", "", ""]])))
+    assert [e["line"] for e in job.errors] == [2, 3, 4]  # the fourth is counted, not kept
+    assert (job.errors_total, job.invalid) == (4, 4)
+
+
+async def test_unfilterable_list_is_not_found(state, monkeypatch):
+    from sm_newsletter.core.errors import NotFound
+    from sm_records.contracts.newsletter_admin import SubscriberFilterError
+
+    async def refuse(*_a, **_k):
+        raise SubscriberFilterError("not_a_list")
+
+    monkeypatch.setattr(staging, "importable_fields", refuse)
+    async with state.session_factory() as s:
+        with pytest.raises(NotFound):
+            await staging.targets_for(s, "default", "news")
+
+
 async def test_too_many_new_tags_refused(state, monkeypatch):
     monkeypatch.setattr(staging, "MAX_NEW_TAGS", 2)
     files = [upload(SUB, [["a@x.org", "", "", "t1,t2,t3"]])]

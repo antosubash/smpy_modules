@@ -16,7 +16,7 @@ from simple_module_db.deps import get_db
 from simple_module_db.listeners import current_user_id
 from simple_module_hosting.permissions import RequiresPermission
 from sm_records.contracts.newsletter import caller_roles
-from sm_records.contracts.newsletter_import import ImportTargets, importable_fields
+from sm_records.contracts.newsletter_import import ImportTargets
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException
@@ -49,10 +49,7 @@ MAX_FIELDS = 8
 
 
 async def _targets(db: AsyncSession, tenant: str, job: ImportJob) -> ImportTargets:
-    targets = await importable_fields(db, tenant_id=tenant, type_key=job.list_type_key)
-    if targets is None:
-        raise NotFound()
-    return targets
+    return await staging.targets_for(db, tenant, job.list_type_key)
 
 
 async def _out(db: AsyncSession, tenant: str, job: ImportJob) -> ImportOut:
