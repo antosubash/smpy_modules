@@ -1,6 +1,6 @@
 [project]
 name = "simple_module_newsletter"
-version = "0.0.13"
+version = "0.0.14"
 description = "Newsletters for SimpleModule hosts: subscriber lists live in records, campaigns are sent over SMTP with per-tenant suppressions"
 requires-python = ">=3.12"
 readme = "README.md"

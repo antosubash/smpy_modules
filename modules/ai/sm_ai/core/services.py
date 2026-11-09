@@ -3,7 +3,7 @@
 ``AiServices`` is stored as ``app.state.sm_ai`` by
 :meth:`AiModule.register_settings` (via ``register_module_settings``); the
 hosting lifespan hydrates ``settings`` from the DB before ``on_startup`` and
-``settings.reload.apply_changes_and_reload`` hot-swaps it on save — both by
+``settings.module_settings.reload.apply_changes_and_reload`` hot-swaps it on save — both by
 assigning ``services.settings`` on the *same instance*.
 
 ``install`` keeps a module-global reference to that instance so

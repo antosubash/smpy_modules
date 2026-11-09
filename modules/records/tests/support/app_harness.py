@@ -23,9 +23,9 @@ import pytest_asyncio
 from fastapi import APIRouter, FastAPI
 from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
-from settings.module_registry import ModuleSettingsRegistry
 from simple_module_core.events import EventBus
 from simple_module_core.menu import MenuRegistry
+from simple_module_core.module_settings import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_hosting.middleware import (
     TENANT_HEADER,

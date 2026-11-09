@@ -20,7 +20,7 @@ from pagebuilder.module import PagebuilderModule
 # makes: in-memory SQLite, or the Postgres database ``SM_TEST_DATABASE_URL``
 # names. See that module.
 from pg_support import make_db_state
-from settings.module_registry import ModuleSettingsRegistry
+from simple_module_core.module_settings import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_inertia import InertiaConfig, inertia_dependency_factory
 from starlette.middleware.sessions import SessionMiddleware

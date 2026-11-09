@@ -81,7 +81,7 @@ async def test_the_web_runtime_follows_the_frameworks_tenancy_mode():
 
 
 async def test_the_worker_runtime_follows_the_engine_policy(monkeypatch):
-    from background_tasks import sync_db
+    from background_tasks.core import sync_db
     from sm_images.pipeline import worker_runtime
 
     policy = SimpleNamespace(tenant_strict=True, default_tenant_id=None)

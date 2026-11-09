@@ -2,7 +2,9 @@
 import './blocks';
 import { createInertiaApp, router } from '@inertiajs/react';
 import { configureI18n, updateI18n } from '@simple-module-py/i18n';
+import { initTheme } from '@simple-module-py/ui/lib/theme';
 import { createRoot } from 'react-dom/client';
+import { startAnalytics } from './analytics';
 import { resolvePage } from './pages';
 
 type I18nBlock = {
@@ -32,6 +34,12 @@ createInertiaApp({
         updateI18n({ locale: block.locale, messages: block.messages });
       }
     });
+    const stopAnalytics = startAnalytics();
+    const stopTheme = initTheme();
+    if (import.meta.hot) {
+      import.meta.hot.dispose(stopAnalytics);
+      import.meta.hot.dispose(stopTheme);
+    }
     createRoot(el).render(<App {...props} />);
   },
   progress: {

@@ -9,7 +9,7 @@ from a worker:
 
 * ``run_as`` owns the collection;
 * with ``shares``, an active (unexpired) edit share names them - the same
-  ``EXISTS`` the access policy builds (``sharing.policy.share_exists_for``);
+  ``EXISTS`` the access policy builds (``sharing.core.policy.share_exists_for``);
 * the right came from ``images.manage`` (:data:`MANAGE`) and the user still
   exists, is active and (multi-tenant) still a member of the tenant
   (``imports.manage_right.manager_active``; the permission itself is not
@@ -24,7 +24,7 @@ from __future__ import annotations
 import uuid
 from typing import Any, Final
 
-from sharing.policy import share_exists_for
+from sharing.core.policy import share_exists_for
 from simple_module_core.resources import ACTION_EDIT, ResourcePrincipal
 from simple_module_db import finalize_session
 from sqlalchemy import select

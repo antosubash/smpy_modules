@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from tests.support.factories import make_article
 
-INERTIA = {"X-Inertia": "true"}
+INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
 
 
 async def _seed(client, slug: str, **kwargs):

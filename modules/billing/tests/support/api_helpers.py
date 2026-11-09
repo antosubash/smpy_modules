@@ -10,7 +10,7 @@ import time
 import httpx
 from simple_module_hosting.csrf import CSRF_HEADER
 
-INERTIA = {"X-Inertia": "true"}
+INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
 
 
 async def page_props(client: httpx.AsyncClient, url: str) -> dict:

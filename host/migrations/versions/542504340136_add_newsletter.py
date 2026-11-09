@@ -15,7 +15,7 @@ migration. ``branch_labels = ("newsletter",)`` names the revision only — see
 CLAUDE.md: ``newsletter@base`` walks the whole shared history beneath it.
 
 Revision ID: 542504340136
-Revises: c4e9b2a7d613
+Revises: b6d4e2a0c913
 Create Date: 2026-11-03 18:42:21.729889
 """
 
@@ -26,7 +26,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "542504340136"
-down_revision: str | None = "c4e9b2a7d613"
+down_revision: str | None = "b6d4e2a0c913"
 branch_labels: str | Sequence[str] | None = ("newsletter",)
 depends_on: str | Sequence[str] | None = None
 

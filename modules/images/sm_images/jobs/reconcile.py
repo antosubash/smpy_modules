@@ -131,7 +131,7 @@ async def _restarts(runtime: Runtime, tenant: str, now: datetime, cutoff: dateti
 
             await resume_restart(runtime, tenant, restart_id)
             continue
-        from background_tasks.tenant_context import TENANT_HEADER
+        from background_tasks.executions.tenant_context import TENANT_HEADER
 
         from sm_images.task_config import QUEUE_IMPORTS
         from sm_images.tasks import restart_collection

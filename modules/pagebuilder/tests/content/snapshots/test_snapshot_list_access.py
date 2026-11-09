@@ -20,7 +20,7 @@ pytestmark = pytest.mark.asyncio
 
 _SNAPSHOTS = "/api/pagebuilder/snapshots"
 _CONTENT = "/pagebuilder/content"
-_INERTIA = {"X-Inertia": "true"}
+_INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
 _ROLE = "someone"
 
 

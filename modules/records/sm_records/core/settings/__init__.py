@@ -113,7 +113,7 @@ class RecordsSettings(PublicSubmissionsSettings):
     whose "published" means "visible the instant it is saved".
 
     Nothing on the admin API takes this: those responses are per-caller and
-    ``InertiaCache`` already forces them private.
+    the Inertia adapter already forces them private.
     """
 
     max_import_bytes: int = 52428800
