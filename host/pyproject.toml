@@ -20,6 +20,7 @@ dependencies = [
     "simple_module_records",
     "simple_module_billing",
     "simple_module_images",
+    "simple_module_analytics[geoip]",
 ]
 
 # Host is an application, not a distributable package.
@@ -56,3 +57,6 @@ dev = [
     "alembic>=1.13",
     "psycopg2-binary>=2.9",
 ]
+
+[tool.uv.sources.simple_module_analytics]
+workspace = true
