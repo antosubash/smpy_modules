@@ -23,8 +23,8 @@ from typing import Any
 
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse
-from settings.endpoints.module_api import router as generic_settings_router
 from settings.models import Base as SettingsBase
+from settings.web.endpoints.module_api import router as generic_settings_router
 from simple_module_core.events import EventBus
 from simple_module_core.i18n import I18nRegistry
 from simple_module_hosting.csrf import get_csrf_token
