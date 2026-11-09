@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -3307,7 +3307,7 @@ provides-extras = ["dev", "pagebuilder"]
 
 [[package]]
 name = "simple-module-newsletter"
-version = "0.0.14"
+version = "0.0.15"
 source = { editable = "modules/newsletter" }
 dependencies = [
     { name = "cryptography" },
