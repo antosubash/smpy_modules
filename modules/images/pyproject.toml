@@ -1,6 +1,6 @@
 [project]
 name = "simple_module_images"
-version = "0.0.14"
+version = "0.0.15"
 description = "Image collections with a processing pipeline: EXIF, renditions, quality checks, optional anonymisation, geo-located imports and map tiles"
 requires-python = ">=3.12"
 readme = "README.md"
