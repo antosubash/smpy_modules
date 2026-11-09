@@ -172,7 +172,7 @@ def _schedule(
         register_on_commit(db, partial(submit, runtime, items))
         return
     from background_tasks import enqueue_after_commit
-    from background_tasks.tenant_context import TENANT_HEADER
+    from background_tasks.executions.tenant_context import TENANT_HEADER
 
     from sm_images.tasks import run_step
 

@@ -17,8 +17,16 @@ from starlette.requests import Request
 
 # This repo's modules, by the package that defines them — the framework's own
 # entries (Users, Settings, …) are its business, not this test's.
-_OUR_PACKAGES = {"pagebuilder", "news", "sm_records", "sm_ai", "sm_billing", "sm_images"}
-_OUR_NAMESPACES = ("pagebuilder.", "news.", "records.", "ai.", "billing.", "images.")
+_OUR_PACKAGES = {
+    "pagebuilder",
+    "news",
+    "sm_records",
+    "sm_ai",
+    "sm_billing",
+    "sm_images",
+    "sm_analytics",
+}
+_OUR_NAMESPACES = ("pagebuilder.", "news.", "records.", "ai.", "billing.", "images.", "analytics.")
 
 
 @pytest.fixture(scope="module")
@@ -59,7 +67,7 @@ async def _menu(app, locale: str) -> list[dict]:
 
 async def test_every_entry_has_a_label_key(app):
     items = await _ours(app)
-    assert len(items) == 13
+    assert len(items) == 14
     missing = [i.label for i in items if not i.label_key.startswith(_OUR_NAMESPACES)]
     assert not missing, f"menu items without a module label_key: {missing}"
     no_group_key = [i.label for i in items if i.group and not i.group_key]
@@ -81,6 +89,7 @@ async def test_german_sidebar(app):
     assert ("/pagebuilder/content", "Import / Export") in labels
     assert ("/admin/news/", "Artikel") in labels
     assert ("/ai/", "KI") in labels
+    assert ("/analytics/", "Analysen") in labels
     assert ("/admin/images/", "Bildersammlungen") in labels
     assert {"Website", "Datensätze", "Zugriff", "Bilder"} <= {e["group"] for e in menu}
 

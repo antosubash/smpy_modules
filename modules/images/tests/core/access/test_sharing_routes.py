@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sharing.endpoints.api import router as sharing_router
 from sharing.models import ResourceShare
+from sharing.web.endpoints.api import router as sharing_router
 from simple_module_core.resources import ResourceTypeRegistry
 from simple_module_core.user_directory import DirectoryUser
 from simple_module_db import tenant_context

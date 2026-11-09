@@ -18,6 +18,7 @@ and adds one dependency line, no registration code.
 | `modules/billing` | [`simple_module_billing`](https://pypi.org/project/simple_module_billing/) | Plans, Stripe subscriptions and entitlements for multi-tenant apps — plan editor, Checkout and Customer Portal, webhooks, per-seat sync, dunning suspension, and a manual provider for installs without Stripe ([docs](modules/billing/docs/index.md)) |
 | `modules/newsletter` | [`simple_module_newsletter`](https://pypi.org/project/simple_module_newsletter/) | Email campaigns to records' subscription lists — tenant-wide suppressions mirrored from unsubscribes, DB-backed SMTP settings with an encrypted password, Puck campaign editor, email renderer, preview and test send, throttled sending with retries, open and click tracking and reports, segments and audiences, subscriber and suppression screens, and a Mailchimp import |
 | `modules/images` | [`simple_module_images`](https://pypi.org/project/simple_module_images/) | Image collections with an immutable-original processing pipeline — EXIF and location, renditions, quality checks, optional anonymisation, geo-located imports and map tiles; private, shared, internal or public per collection |
+| `modules/analytics` | `simple_module_analytics` | Anonymous traffic and application events, with tenant reports and local country/region/city geolocation ([docs](modules/analytics/docs/index.md)) |
 
 ### Publishing in more than one language
 

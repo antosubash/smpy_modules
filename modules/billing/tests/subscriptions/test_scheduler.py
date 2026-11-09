@@ -13,7 +13,7 @@ from sm_billing.core import startup
 from sm_billing.models import Subscription
 from sm_billing.subscriptions import scheduler
 from sqlalchemy import select
-from tenants.constants import TenantStatus
+from tenants.core.constants import TenantStatus
 
 from tests.support.fake_provider import FakeProvider
 from tests.support.helpers import make_plan, make_sub, make_tenant, store_settings

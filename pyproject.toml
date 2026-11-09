@@ -1,6 +1,6 @@
 [project]
 name = "simple-module-python-modules"
-version = "0.0.13"
+version = "0.0.14"
 description = "Distributable modules for simple_module_python applications"
 requires-python = ">=3.12"
 dependencies = []
@@ -42,9 +42,11 @@ ignore = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 testpaths = [
     "host/tests",
     "modules/ai/tests",
+    "modules/analytics/tests",
     "modules/billing/tests",
     "modules/images/tests",
     "modules/news/tests",

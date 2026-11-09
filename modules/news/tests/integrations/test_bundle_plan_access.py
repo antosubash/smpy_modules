@@ -27,6 +27,8 @@ from tests.support.bundle_app import (
     update,
 )
 
+INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+
 pytestmark = pytest.mark.asyncio
 
 _PENDING = "/api/pagebuilder/imports/pending"
@@ -83,7 +85,9 @@ async def test_a_reader_without_news_edit_gets_counts_only(tmp_path, route):
         if route == "pending":
             plan = (await client.get(_PENDING, headers=reader)).json()["plan"]
         elif route == "review":
-            response = await client.get(_REVIEW, headers={**reader, "X-Inertia": "true"})
+            response = await client.get(
+                _REVIEW, headers={**reader, **INERTIA}
+            )
             plan = response.json()["props"]["pending"]["plan"]
         else:
             response = await client.post(
@@ -112,20 +116,21 @@ async def test_the_pending_import_needs_the_snapshot_permission(tmp_path):
         reader = as_role("news-only")
         assert (await client.get(_PENDING, headers=reader)).status_code == 403
         # The screens hold the same line as the API.
-        inertia = {**reader, "X-Inertia": "true"}
+        inertia = {**reader, **INERTIA}
         assert (await client.get(_REVIEW, headers=inertia)).status_code == 403
         # The list too: its notes and manifests are Import / Export's, not everyone's.
         listing = await client.get("/pagebuilder/content", headers=inertia)
         assert listing.status_code == 403
         # Someone who may only approve still reads what they would approve.
-        approver = {**as_role("approve-only"), "X-Inertia": "true"}
+        approver = {**as_role("approve-only"), **INERTIA}
         assert (await client.get(_PENDING, headers=approver)).status_code == 200
         assert (await client.get(_REVIEW, headers=approver)).status_code == 200
         listed = await client.get("/pagebuilder/content", headers=approver)
         assert listed.json()["props"]["pending"]["id"]
         # A publisher still sees it there.
         shown = await client.get(
-            "/pagebuilder/content", headers={**as_role("pb"), "X-Inertia": "true"}
+            "/pagebuilder/content",
+            headers={**as_role("pb"), **INERTIA},
         )
         assert shown.json()["props"]["pending"]["id"]
 

@@ -13,6 +13,7 @@ Skipped when ``uv`` is not on PATH.
 from __future__ import annotations
 
 import fcntl
+import json
 import os
 import re
 import shutil
@@ -109,3 +110,21 @@ def test_wheels_still_ship_frontend_source(wheels: list[Path]) -> None:
                 if rel.as_posix() not in shipped:
                     missing.append(f"{wheel.name}: {rel}")
     assert not missing, "source dropped from wheels:\n" + "\n".join(missing)
+
+
+def test_wheels_ship_the_moved_path_aliases(wheels: list[Path]) -> None:
+    """The 0.0.14 aliases work only if each wheel ships its hook, its table and
+    every stub the table names (#319)."""
+    packages = 0
+    for wheel in wheels:
+        with zipfile.ZipFile(wheel) as archive:
+            names = set(archive.namelist())
+            for table in (n for n in names if n.endswith("/core/moved_paths.json")):
+                root = table.removesuffix("core/moved_paths.json")
+                packages += 1
+                assert f"{root}core/moved_paths.py" in names, wheel.name
+                data = json.loads(archive.read(table))
+                stubs = {**data.get("ts", {}), **data.get("css", {})}
+                missing = sorted(rel for rel in stubs if f"{root}{rel}" not in names)
+                assert not missing, f"{wheel.name} lacks stubs: {missing[:5]}"
+    assert packages == 5, f"expected the five moved packages' tables, found {packages}"

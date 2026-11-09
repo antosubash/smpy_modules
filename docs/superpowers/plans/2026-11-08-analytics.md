@@ -1,0 +1,19 @@
+# Analytics Implementation Plan
+
+Approved scope: native tenant-owned traffic and anonymous application events, explicit property opt-in, approximate GeoLite2 country/region/city, SQL storage, English/German UI, 90-day retention. No cookies, raw IP storage, user profiles, GPS, external-site tracking or external geolocation calls.
+
+## Tasks
+1. Collection/domain: models, validated property/event schemas, scoped collection, daily visitor HMAC and 30-minute sessions, deduplication, GeoIP reader lifecycle and bounded retention. Test these against SQLite and optional Postgres.
+2. Web/reporting: tenant-bound property CRUD, collector/config, permissions/CSRF/origin/rate/body guards, SQL report queries with UTC dates and geographical filters, recent activity, module lifecycle.
+3. Frontend: property management, accessible reports and geo drill-down, translated UI, anonymous tracker and host Inertia adapter; unit and standalone browser tests.
+4. Integration: dependencies and lockfiles, portable host migration, docs/operator cleanup, packaging/discovery/locale checks, complete tests and representative benchmark, independent review.
+
+## Shared API contract
+Prefix /api/analytics. GET/POST /properties, PUT/DELETE /properties/{id}. Property JSON: id (server UUID string), name (1..100), kind ('public'|'application'), origins (exact http(s) origins), enabled (default false), route_patterns (path patterns using :name placeholders), event_allowlist (event name -> allowed scalar property names), utm_parameters (subset utm_source/medium/campaign/term/content; default []). PUT accepts the full editable property. DELETE permanently removes this property's sessions/events after UI confirmation.
+GET /config is anonymous, no-store: {properties:[{id,kind,route_patterns,utm_parameters,event_allowlist}]} enabled properties matching resolved tenant and request origin only. GET /status: {geo:{enabled,available,status,age_days}}.
+POST /collect JSON {property_id,event_id:UUID,kind:'pageview'|'event',path,referrer?,name?,properties?:{},utm?:{}}. 204 accepted/duplicate/privacy skip. Server determines tenant, time, browser/device from request, and location. Privacy signals are also checked server-side.
+GET /properties/{id}/report?start=YYYY-MM-DD&end=YYYY-MM-DD (both inclusive; default last 7 UTC days), optional path,event,country,region,city. Response {totals:{pageviews,visitors,sessions,events},series:[{date,pageviews,events}],breakdowns:{path,referrer,utm_source,utm_medium,utm_campaign,browser,os,device,country,region,city,event: [{value,label,count}]},recent:{visitors,events:[{kind,path,name,created_at,country,region,city}]}}. Geographic dimension values: country ISO code, region combined ISO code, city GeoNames ID string; empty string = unknown. Location report labels use stored display names, IDs remain filter values. All metrics honor filters, recent additionally restricts to last 5 minutes. Max report interval 366 days, top 50 breakdown values/recent rows.
+Frontend entry exports initAnalytics(config), track(name,properties), host adapter initializer. Automatic tracking only matches configured property routes; application paths are stored as the configured route pattern. Client normalizes URL paths and strips query/fragment; server repeats matching/normalization. No title or identity sent. Property enabled=false is default and route_patterns=[] collects nothing.
+
+## Verification
+Test collection boundary and isolation, malformed origins/routes/payloads, duplicate and concurrent events, midnight/inactivity, geo partial/missing/corrupt/replacement/IPv6, private and untrusted IPs, retention; SQL totals/filter accuracy; tracker navigation/privacy/failures; management and reporting browser flow. Use framework hooks for public routes/body/rate limits and request.client after trusted proxy middleware. No .env reads or credential reads.

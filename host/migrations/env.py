@@ -21,8 +21,9 @@ from logging.config import fileConfig
 
 from alembic import context
 from simple_module_db import build_module_metadata, make_include_object, render_item
+from simple_module_hosting.migrations import ALEMBIC_DATABASE_URL_ATTRIBUTE
 from simple_module_hosting.settings import Settings
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import Column, engine_from_config, pool
 
 logger = logging.getLogger("alembic.env")
 
@@ -39,12 +40,40 @@ if find_spec("records_collections") is not None:
     import records_collections  # noqa: F401
 
 target_metadata = build_module_metadata()
-include_object = make_include_object(target_metadata)
+_include_object = make_include_object(target_metadata)
+
+
+def _index_signature(index) -> tuple[bool, list[str]]:
+    """Uniqueness and column names, with ``created_at DESC`` read as ``created_at``."""
+    return bool(index.unique), [
+        element.name if isinstance(element, Column) else str(element).split()[0]
+        for element in index.expressions
+    ]
+
+
+def include_object(object_, name, type_, reflected, compare_to):
+    """Drop one false change: an index mixing columns and an expression.
+
+    SQLite reflects file_storage's ``tenant_browse`` (``created_at DESC``, framework
+    0.0.44) as plain columns, so autogenerate reports a change on every run and
+    ``make migration`` would write a drop and recreate of it. Only that comparison
+    is skipped, and only when the columns agree: one on other columns is still
+    reported. Postgres reflects it faithfully, so CI's check there sees the rest.
+    """
+    if (
+        type_ == "index"
+        and compare_to is not None
+        and context.get_context().dialect.name == "sqlite"
+        and any(not isinstance(element, Column) for element in object_.expressions)
+        and _index_signature(object_) == _index_signature(compare_to)
+    ):
+        return False
+    return _include_object(object_, name, type_, reflected, compare_to)
 
 
 def _get_url() -> str:
-    """Read database URL from settings, convert async to sync driver."""
-    url = Settings().database_url
+    """The URL the setup wizard hands over, else settings; async driver made sync."""
+    url = config.attributes.get(ALEMBIC_DATABASE_URL_ATTRIBUTE) or Settings().database_url
     return url.replace("+aiosqlite", "").replace("+asyncpg", "+psycopg2")
 
 

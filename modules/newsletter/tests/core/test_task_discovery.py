@@ -12,9 +12,13 @@ from __future__ import annotations
 
 import importlib
 
-from background_tasks.config_guards import WorkerScope
-from background_tasks.settings import BackgroundTasksSettings
-from background_tasks.task_routing import load_task_config, load_task_configs, select_packages
+from background_tasks.core.config_guards import WorkerScope
+from background_tasks.core.settings import BackgroundTasksSettings
+from background_tasks.worker.task_routing import (
+    load_task_config,
+    load_task_configs,
+    select_packages,
+)
 from sm_newsletter import task_config
 from sm_newsletter.task_config import (
     BEAT_SCHEDULE,

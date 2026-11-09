@@ -1,5 +1,5 @@
 .PHONY: install install-py install-js dev dev-api dev-ui build gen-pages sync-module-deps typecheck \
-        migrate migration downgrade test test-py test-js e2e e2e-bundle lint kill \
+        migrate migration downgrade test test-py test-js e2e e2e-bundle e2e-parallel lint kill \
         link-framework unlink-framework new-module env \
         worker worker-imports worker-heavy worker-gpu beat
 
@@ -122,6 +122,12 @@ e2e-bundle: gen-pages
 	npm run build
 	E2E_BUNDLE=1 npm run test:e2e
 
+# The same bundle run split across three local hosts, about a third of the
+# time. See scripts/e2e_shards.mjs. E2E_SHARDS changes the count.
+e2e-parallel: gen-pages
+	npm run build
+	node scripts/e2e_shards.mjs
+
 # Typecheck module TSX. `npm run build` only runs tsc over host/client_app, so
 # without this a module-level type error (a missing import, a dropped props
 # annotation) reaches the browser with every suite green.
@@ -140,6 +146,7 @@ lint:
 	$(MAKE) typecheck
 	uv run python scripts/check_metadata.py
 	uv run python scripts/check_rules.py
+	uv run python scripts/moved_paths.py --check
 	uv run python scripts/check_readmes.py
 	uv run python scripts/check_hardcoded_strings.py
 	uv run python scripts/check_file_size.py

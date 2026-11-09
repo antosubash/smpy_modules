@@ -29,7 +29,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from sharing.contracts import forget_resource
-from sharing.policy import canonical_id
+from sharing.core.policy import canonical_id
 from simple_module_db.independent import independent_session
 from sqlalchemy import and_, delete, or_, select, update
 
