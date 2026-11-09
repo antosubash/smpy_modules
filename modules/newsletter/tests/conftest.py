@@ -50,6 +50,18 @@ def _restore_secret_provider(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _empty_console_outbox():
+    """The console transport keeps sent mail in a module-global dict; empty it
+    around every test, or what one test sent shows up in another's outbox
+    under xdist, depending on which tests share a worker."""
+    from sm_newsletter.sending.transport import console
+
+    console._outbox.clear()
+    yield
+    console._outbox.clear()
+
+
+@pytest.fixture(autouse=True)
 def _arm_database_reset():
     """Every test starts from an empty database (a no-op on SQLite)."""
     arm_reset()

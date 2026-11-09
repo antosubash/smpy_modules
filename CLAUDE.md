@@ -180,6 +180,30 @@ path that unsubscribes must take it too. A campaign's audience is resolved when 
 is scheduled and stored on the render snapshot; freeze evaluates that snapshot,
 never the live segment.
 
+**The Mailchimp import never clears and never confirms a pending signup.**
+- Records' `contracts.newsletter_import.import_subscribers` creates `confirmed` (or
+  `unsubscribed`) records directly through `system=`. It never moves `pending` or
+  `unsubscribed` to `confirmed`, unsubscribes a confirmed record only under PR 6's row lock,
+  and publishes no events (`events.muted`). It holds records' type lock for the whole batch.
+- Newsletter then writes `unsubscribed` (list) and `imported_cleaned` suppressions with
+  `refresh=False`, in the same transaction, and never calls `clear_for_confirmation`.
+- A subscribed address newsletter already suppresses, or records holds `unsubscribed` on any
+  list of the tenant (`opted_out_anywhere`), is not created. Both are read after
+  `lock_import_batch`: records' per-address opt-out locks (`pg_advisory_xact_lock`, ascending
+  key, which every `opt_in.leave` takes first too), then the type lock. Order: address locks
+  → type → row → newsletter rows. On SQLite the type-lock `UPDATE` comes before the read.
+- Uploads are staged in `newsletter_import_row` (addresses, deleted when the import ends or
+  after 24 h) and applied by `newsletter.run_import` in leased 45 s slices under
+  `tenant_scope`. Eager hosts run it inline.
+- The import publishes no `SubscriptionChanged`, so no other consumer of records' events sees
+  imported changes.
+- `POST /api/newsletter/lists` creates a records list type with only `newsletter.manage`.
+- `POST /api/newsletter/outbox/dispatch` runs a dispatcher tick in-process only with the
+  console transport, under Celery eager, with `SM_ENVIRONMENT` `development` or `testing`
+  (it defaults to development, so the other two conditions carry the weight); the e2e spec
+  depends on it.
+- Docs: `modules/newsletter/docs/import.md`.
+
 **Never add a file under `modules/*/*/pages/` unless it is a real Inertia
 page.** The page name is derived from that path by `import.meta.glob`, so a
 stray `.tsx` there silently registers a new page. Extractions go to
@@ -348,7 +372,12 @@ itself; suite-wide settings belong in `tests/e2e/start-test-server.sh`. Locally,
 (`scripts/e2e_shards.mjs`: one template database copied per shard, each with its
 own host, port and upload directories); `make e2e-bundle` stays serial. The
 `E2E (Playwright)` job merges the shards' reports and is the one status that
-covers all of them.
+covers all of them. `newsletter.spec.ts` is opt-in with `E2E_NEWSLETTER=1`. It runs only in
+its own CI job, `E2E (newsletter)`, against a non-bundle host with
+`SM_ENVIRONMENT=development` (framework 0.0.42 serves `testing` pages from the Vite dev
+server under the strict production CSP, so the console is blank), because its dispatch hook
+is absent in production. The bundle shards ignore it. Run it locally with
+`E2E_NEWSLETTER=1 npx playwright test`.
 
 ## Local database
 
@@ -474,3 +503,7 @@ the target fails without it.
   Billing's `subject_mode = "user"` (#274) has its own opt-in spec,
   `billing-user`, run with `E2E_BILLING_USER=1` in the CI job
   `E2E (billing per user)`; `start-test-server.sh` sets the mode before boot.
+  `newsletter.spec.ts` is opt-in with `E2E_NEWSLETTER=1` and runs only in the CI job
+  `E2E (newsletter)`, on a non-bundle host with `SM_ENVIRONMENT=development` (`testing`
+  blanks the console under framework 0.0.42's CSP); its dispatch hook is absent in
+  production, and the bundle shards ignore it.

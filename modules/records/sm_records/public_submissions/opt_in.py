@@ -39,6 +39,8 @@ from sm_records.core import events
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType
 from sm_records.public_submissions import links
+from sm_records.public_submissions.address_lock import lock_addresses
+from sm_records.public_submissions.definition import EMAIL_KEY
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.subscribe import CONFIRMED, PENDING, UNSUBSCRIBED, changed
 from sm_records.public_submissions.transition import Change, Outcome, transition
@@ -146,6 +148,9 @@ async def leave(
         }
         return values, _cleared(rtype, row)
 
+    # The address's opt-out lock first (:mod:`.address_lock`), so an import
+    # admitting it on another list decides either before this commits or after.
+    await lock_addresses(db, rtype.tenant_id, [(record.data or {}).get(EMAIL_KEY) or ""])
     # Locked: the row is decided from under the lock ``lock_confirmation``
     # takes, so an unsubscribe and a suppression lift serialise (C2).
     outcome = await transition(db, rtype, record, derive, settings=settings, lock=True)

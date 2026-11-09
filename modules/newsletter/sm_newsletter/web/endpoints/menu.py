@@ -11,7 +11,7 @@ def menu_items() -> list[MenuItem]:
     """The rail entries.
 
     Campaigns and Segments need ``newsletter.view``, Subscribers that and
-    ``records.view``, Suppressions and Settings ``newsletter.manage``.
+    ``records.view``, Suppressions, Import and Settings ``newsletter.manage``.
     """
     return [
         MenuItem(
@@ -50,6 +50,16 @@ def menu_items() -> list[MenuItem]:
             url=constants.SUPPRESSIONS_URL,
             icon=constants.MENU_ICON_SUPPRESSIONS,
             order=330,
+            group=constants.MENU_GROUP,
+            group_key=constants.MENU_GROUP_KEY,
+            permissions=[constants.PERM_MANAGE],
+        ),
+        MenuItem(
+            label=constants.MENU_LABEL_IMPORT,
+            label_key=constants.MENU_LABEL_KEY_IMPORT,
+            url=constants.IMPORT_URL,
+            icon=constants.MENU_ICON_IMPORT,
+            order=360,
             group=constants.MENU_GROUP,
             group_key=constants.MENU_GROUP_KEY,
             permissions=[constants.PERM_MANAGE],

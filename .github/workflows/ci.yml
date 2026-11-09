@@ -555,6 +555,48 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  e2e-newsletter:
+    name: E2E (newsletter)
+    runs-on: ubuntu-latest
+    # newsletter.spec.ts sends its campaign through the e2e-only dispatch hook,
+    # which exists only on a development or testing host with Celery eager and
+    # the in-memory broker (start-test-server.sh) and the console transport
+    # (the spec sets it). The hook is a 404 in production, so this job runs the
+    # dev server (SM_ENVIRONMENT=development, playwright.config.ts) rather than
+    # the bundle: no E2E_BUNDLE. Same budget, and the same reason, as
+    # `e2e-multi-tenant`.
+    timeout-minutes: 30
+    env:
+      E2E_NEWSLETTER: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/e2e-setup
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          node-version: ${{ env.NODE_VERSION }}
+          uv-version: ${{ env.UV_VERSION }}
+
+      # With E2E_NEWSLETTER=1, playwright.config.ts matches newsletter.spec.ts
+      # only; every other run, the `e2e-shard` jobs included, ignores it.
+      - name: Run newsletter Playwright tests
+        run: npm run test:e2e
+
+      - name: Flaky and failed tests
+        if: ${{ !cancelled() }}
+        run: node scripts/e2e_report_summary.mjs
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-newsletter
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
   lint-js:
     name: Lint (biome)
     runs-on: ubuntu-latest

@@ -173,7 +173,9 @@ PR 6's people screens add two more paths, both taking **records' lock domain
 first** (its type lock, then the record row) and newsletter rows after: the
 suppression lift (`lock_confirmation`, then the conditional suppression delete,
 then the lift insert) and the admin unsubscribe (records' unsubscribe, then the
-suppression upsert). Neither touches campaign, send or click rows, so the two
+suppression upsert). Only an unsubscribe takes the address's opt-out lock, before
+its type and row locks; the lift takes none. PR 7's import takes the opt-out
+locks of a whole batch, ascending, before its type lock. Neither touches campaign, send or click rows, so the two
 orders above are unaffected. Audience changes and `schedule` touch only the
 campaign row (reading a segment takes no lock). See [`audience.md`](audience.md).
 

@@ -50,11 +50,39 @@ const CI = !!process.env.CI;
 // ignores the other's files (CI's `E2E (billing per user)` job).
 const BILLING_USER = process.env.E2E_BILLING_USER === '1';
 
+// E2E_NEWSLETTER=1 runs newsletter.spec.ts alone (CI's `E2E (newsletter)`
+// job). The spec sends its campaign through the e2e-only dispatch hook (R17),
+// which exists only on a `development` or `testing` host with Celery eager
+// and the console transport. It is a 404 on the production bundle by design,
+// which is why every other run ignores the spec, the bundle shards included.
+// The run stays on `development` (the dev server below), not `testing`: the
+// framework (0.0.42) serves `testing` pages from the Vite dev server but with
+// the strict CSP, which blocks every script, so the console renders blank.
+// The flag runs no other spec, so it is refused together with the bundle and
+// the other opt-in hosts rather than silently dropping what they were meant
+// to run.
+const NEWSLETTER = process.env.E2E_NEWSLETTER === '1';
+if (NEWSLETTER) {
+  // Each flag as the rest of this file reads it.
+  const clashing = [
+    BUNDLE && 'E2E_BUNDLE',
+    process.env.E2E_MULTI_TENANT && 'E2E_MULTI_TENANT',
+    BILLING_USER && 'E2E_BILLING_USER',
+  ].filter(Boolean);
+  if (clashing.length > 0) {
+    throw new Error(`E2E_NEWSLETTER=1 cannot be combined with ${clashing.join(', ')}`);
+  }
+}
+
+function specSelection() {
+  if (NEWSLETTER) return { testMatch: /newsletter\.spec\.ts$/ };
+  if (BILLING_USER) return { testMatch: /billing-user\.spec\.ts$/ };
+  return { testIgnore: /(billing-user|newsletter)\.spec\.ts$/ };
+}
+
 export default defineConfig({
   testDir: './tests/e2e',
-  ...(BILLING_USER
-    ? { testMatch: /billing-user\.spec\.ts$/ }
-    : { testIgnore: /billing-user\.spec\.ts$/ }),
+  ...specSelection(),
   // One worker against one host and one database: a second worker would be a
   // second writer to the same SQLite file. Parallelism comes from CI-level
   // `--shard=i/n` instead, each shard a separate job with its own host (#119).
@@ -107,8 +135,10 @@ export default defineConfig({
     // #473), and Playwright never counts a 404 as "up".
     url: `${APP_URL}/health/live`,
     // Never in bundle mode: a dev stack already on API_PORT would be reused
-    // and the run would pass without ever loading the bundle.
-    reuseExistingServer: !CI && !BUNDLE,
+    // and the run would pass without ever loading the bundle. Nor for the
+    // newsletter run: a `make dev` stack is not Celery-eager, so the dispatch
+    // hook the spec sends through would be a 404 there.
+    reuseExistingServer: !CI && !BUNDLE && !NEWSLETTER,
     timeout: 180_000,
     stdout: 'pipe',
     stderr: 'pipe',

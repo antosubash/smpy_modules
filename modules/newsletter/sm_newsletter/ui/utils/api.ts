@@ -1,7 +1,7 @@
 /** Typed client for `/api/newsletter`. Failures throw `HttpError` (see http.ts);
  *  screens show `errorMessage(e, t)`. */
 
-import { read, write } from './http';
+import { read, send, write } from './http';
 import type {
   Block,
   CampaignDetail,
@@ -41,15 +41,6 @@ function query(params: Record<string, string | number | undefined>): string {
   }
   const text = search.toString();
   return text ? `?${text}` : '';
-}
-
-async function send<T>(
-  path: string,
-  method: string,
-  body?: unknown,
-  signal?: AbortSignal,
-): Promise<T> {
-  return (await write<T>(path, method, body, signal)) as T;
 }
 
 export const api = {

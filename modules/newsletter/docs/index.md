@@ -16,14 +16,15 @@ source repository, and the delivery order is
 | 3 | campaigns, content blocks, renderer, preview, Puck editor, test send, settings page | merged |
 | 4 | sending, throttling, retries, unsubscribe page | merged |
 | 5 | open and click tracking, reports | merged |
-| 6 | segments, audiences, the subscriber and suppression screens | this PR |
-| 7 | Mailchimp import, docs, e2e | planned |
+| 6 | segments, audiences, the subscriber and suppression screens | merged |
+| 7 | Mailchimp import, docs, e2e | this PR |
 
 Sending is described in [`sending.md`](sending.md) (status machine, freeze, the
 dispatcher, verdicts, the unsubscribe route) and what has to run for it in
 [`operations.md`](operations.md) (worker and beat, the secret, the DKIM
 checklist, the relay). Segments, campaign audiences, the subscriber screen and
-suppression lifts are in [`audience.md`](audience.md).
+suppression lifts are in [`audience.md`](audience.md). Importing a Mailchimp
+audience is in [`import.md`](import.md).
 
 ## Campaigns and content
 
@@ -42,7 +43,8 @@ and the golden files: [`content.md`](content.md).
   panel with live progress) and `/admin/newsletter/settings`. The sidebar has Campaigns
   (`newsletter.view`) and Settings (`newsletter.manage`) and, between them, the
   people screens Segments, Subscribers and Suppressions
-  ([`audience.md`](audience.md)).
+  ([`audience.md`](audience.md)); Import (`/admin/newsletter/import`,
+  `newsletter.manage`) is in [`import.md`](import.md).
 - **Writes are revision-guarded.** PATCH, card Refresh, send and unschedule carry
   `expected_revision`; a stale one is `409 stale`, a campaign that left draft
   `409 not_a_draft`.
@@ -56,7 +58,8 @@ and the golden files: [`content.md`](content.md).
   `409 integration_unavailable`.
 - **Links** in content are absolute against the campaign tenant's public origin;
   the unsubscribe link and the logo (`/newsletter/brand/logo`, the system-scope
-  branding logo, anonymous) use `public_base_url`. A test send needs
+  branding logo, anonymous) use `public_base_url`, which newsletter reads from the host's live settings (a
+  change applies at once). A test send needs
   `public_base_url` set (`422 public_base_url_required`).
 - **Preview** is the server's render in a sandboxed iframe. Viewers
   (`newsletter.view`) preview the saved campaign; unsaved content is previewed
@@ -83,6 +86,25 @@ definitions are in [`tracking.md`](tracking.md).
 
 - **Screen.** `/admin/newsletter/campaigns/{id}/report` (`newsletter.view`); the
   campaign list shows open and click rates.
+
+## Lists
+
+A newsletter list is a records subscription list type; subscribers live there.
+`POST /api/newsletter/lists` (the *New list* action on the Import screen)
+creates one with `first_name` and `last_name` fields and records' preset
+defaults. **Creating a list needs only `newsletter.manage`**, so a newsletter
+manager can create a records list type (subscription kind only) without
+`records.manage_types`.
+
+## Import
+
+A one-time import of a Mailchimp export (the ZIP or its CSVs) into a list, with
+statuses and tags, is described in [`import.md`](import.md). It never confirms a
+pending signup, never clears a suppression and never resubscribes an opted-out
+person. **An import publishes no `SubscriptionChanged`** (nor `RecordCreated` or
+`RecordUpdated`): other consumers of records' events do not see imported people
+or the opt-outs an import writes; newsletter's own suppressions are written
+directly.
 
 ## Settings
 

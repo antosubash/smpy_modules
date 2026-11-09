@@ -61,12 +61,18 @@ const INVALID_CAMPAIGN: Record<string, string> = {
  *  `invalid_campaign`, the field's own line when the detail is a known one),
  *  else the generic line. Never the raw `detail`. */
 export function errorMessage(e: unknown, t: Translate): string {
-  const errors = keys.newsletter.errors as Record<string, string>;
   const code = e instanceof HttpError ? e.code : null;
   const detail = e instanceof HttpError ? e.message : '';
   if (code === 'invalid_campaign' && Object.hasOwn(INVALID_CAMPAIGN, detail)) {
     return t(INVALID_CAMPAIGN[detail]);
   }
+  return codeMessage(code, t);
+}
+
+/** The catalogue's text for a server error code (a job's stored `error_code`,
+ *  say), else the generic line. */
+export function codeMessage(code: string | null | undefined, t: Translate): string {
+  const errors = keys.newsletter.errors as Record<string, string>;
   if (code && Object.hasOwn(errors, code) && code !== 'generic') return t(errors[code]);
   return t(keys.newsletter.errors.generic);
 }
@@ -100,4 +106,14 @@ export async function write<T>(
   });
   if (!response.ok) throw await errorFrom(response);
   return response.status === 204 ? null : ((await response.json()) as T);
+}
+
+/** `write` for the endpoints that always answer with a body (never a 204). */
+export async function send<T>(
+  path: string,
+  method: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
+  return (await write<T>(path, method, body, signal)) as T;
 }

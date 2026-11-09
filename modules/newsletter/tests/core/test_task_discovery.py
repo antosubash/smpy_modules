@@ -20,13 +20,20 @@ from background_tasks.worker.task_routing import (
     select_packages,
 )
 from sm_newsletter import task_config
-from sm_newsletter.task_config import BEAT_SCHEDULE, DISPATCH, RECONCILE_SUPPRESSIONS, TASK_ROUTES
+from sm_newsletter.task_config import (
+    BEAT_SCHEDULE,
+    DISPATCH,
+    IMPORT_JANITOR,
+    RECONCILE_SUPPRESSIONS,
+    RUN_IMPORT,
+    TASK_ROUTES,
+)
 
 
 def test_the_task_module_sits_where_autodiscovery_imports_it():
     mod = importlib.import_module("sm_newsletter.tasks")
     names = {getattr(obj, "name", None) for obj in vars(mod).values()}
-    assert {RECONCILE_SUPPRESSIONS, DISPATCH} <= names
+    assert {RECONCILE_SUPPRESSIONS, DISPATCH, RUN_IMPORT, IMPORT_JANITOR} <= names
 
 
 def test_the_framework_loads_routes_and_beat_from_the_package():
@@ -52,7 +59,11 @@ def test_the_dispatcher_runs_every_minute_on_the_newsletter_queue():
     dropped rather than run late on top of the next one."""
     assert DISPATCH == "newsletter.dispatch"
     assert task_config.DISPATCH_INTERVAL_SECONDS == 60.0
-    assert set(BEAT_SCHEDULE) == {"newsletter-reconcile-suppressions", "newsletter-dispatch"}
+    assert set(BEAT_SCHEDULE) == {
+        "newsletter-reconcile-suppressions",
+        "newsletter-dispatch",
+        "newsletter-import-janitor",
+    }
     assert BEAT_SCHEDULE["newsletter-dispatch"] == {
         "task": DISPATCH,
         "schedule": 60.0,
@@ -61,6 +72,18 @@ def test_the_dispatcher_runs_every_minute_on_the_newsletter_queue():
     assert TASK_ROUTES == {
         RECONCILE_SUPPRESSIONS: {"queue": "newsletter"},
         DISPATCH: {"queue": "newsletter"},
+        RUN_IMPORT: {"queue": "newsletter"},
+        IMPORT_JANITOR: {"queue": "newsletter"},
+    }
+
+
+def test_the_import_janitor_runs_hourly_on_the_newsletter_queue():
+    assert (RUN_IMPORT, IMPORT_JANITOR) == ("newsletter.run_import", "newsletter.import_janitor")
+    assert task_config.JANITOR_INTERVAL_SECONDS == 3600.0
+    assert BEAT_SCHEDULE["newsletter-import-janitor"] == {
+        "task": IMPORT_JANITOR,
+        "schedule": 3600.0,
+        "options": {"queue": "newsletter"},
     }
 
 

@@ -17,6 +17,32 @@ eager mode runs a task inline when something calls it, and nothing calls this
 one. A campaign then sits in `scheduled` and never starts. `make dev` starts
 neither.
 
+## Imports and the janitor
+
+A Mailchimp import ([`import.md`](import.md)) is applied by the Celery task
+`newsletter.run_import` on the same `newsletter` queue (`make worker` serves it
+with `-c 4`, so a long import never starves the minute's dispatch tick). The
+hourly beat task `newsletter.import_janitor` relaunches an import whose message
+was lost and deletes staged imports older than 24 hours (from creation) and failed ones 24 hours after they failed (their staged
+addresses with them). With Celery eager and no beat, an import still runs: the
+request applies every slice inline; only the janitor does not run.
+
+## The dispatch hook (e2e only)
+
+`POST /api/newsletter/outbox/dispatch` (`newsletter.manage`, CSRF) runs one
+dispatcher tick inside the web process, because the e2e server has no beat. It
+answers 404, like `GET /outbox`, unless **all three** hold: the transport is
+`console`, Celery is eager, and `SM_ENVIRONMENT` is `development` or `testing`.
+`SM_ENVIRONMENT` defaults to `development`, so the hook also depends on the
+other two conditions: a dev host on the console transport with eager tasks has
+it. A production host is never eager, so it never has it, and the console
+transport cannot send real mail. The e2e spec `newsletter.spec.ts` depends on
+it; it is opt-in with `E2E_NEWSLETTER=1` and runs only in its own CI job,
+`E2E (newsletter)`, against a non-bundle host with `SM_ENVIRONMENT=development`
+(framework 0.0.42 serves `testing` pages under the production CSP, which blocks
+the Vite dev server). The bundle shards ignore it. Run it locally with
+`E2E_NEWSLETTER=1 npx playwright test`.
+
 ## The secret
 
 The worker has no app, so it finds the secret key itself: `SM_SECRET_KEY` in the

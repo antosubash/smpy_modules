@@ -17,7 +17,8 @@
     "settings": "Settings",
     "segments": "Segments",
     "subscribers": "Subscribers",
-    "suppressions": "Suppressions"
+    "suppressions": "Suppressions",
+    "import": "Import"
   },
   "campaigns": {
     "title": "Campaigns",
@@ -454,7 +455,27 @@
     "lift_not_allowed": "This suppression cannot be lifted.",
     "opt_out_stands": "The address has not confirmed on this list since it unsubscribed, so the opt-out stands.",
     "lift_email_mismatch": "The address does not match this suppression.",
-    "suppression_changed": "This suppression changed since you loaded it. Reload and try again."
+    "suppression_changed": "This suppression changed since you loaded it. Reload and try again.",
+    "import_not_csv": "The file is not a CSV file.",
+    "import_not_utf8": "The file is not UTF-8 text. Export it again as CSV (UTF-8).",
+    "import_malformed_csv": "The file is not valid CSV.",
+    "import_empty_file": "The file has no rows.",
+    "import_no_email_column": "The file has no email address column.",
+    "import_zip_unsafe": "The archive cannot be read safely.",
+    "import_too_large": "The upload is too large.",
+    "import_too_many_files": "The upload has too many files.",
+    "import_too_many_rows": "The upload has too many rows.",
+    "import_too_many_columns": "The file has too many columns.",
+    "import_duplicate_column": "The file has the same column twice. Remove or rename one of them.",
+    "import_too_many_tags": "The upload would add too many new tags.",
+    "import_bad_mapping": "The column mapping is not valid.",
+    "import_failed": "The import failed. Fix the cause and try again.",
+    "import_not_staged": "This import is no longer waiting for a mapping.",
+    "import_changed": "This import changed in another tab or window. The screen now shows its current state.",
+    "import_no_rows": "The import has no rows to apply.",
+    "import_running": "An import is already running.",
+    "list_exists": "A list with that key already exists.",
+    "invalid_list_key": "The list key is not valid."
   },
   "errors_field": {
     "subject_required": "Add a subject before sending.",
@@ -607,5 +628,97 @@
         "day": "day"
       }
     }
+  },
+  "import": {
+    "title": "Import subscribers",
+    "description": "Bring contacts in from a Mailchimp export: choose a list, upload the CSV files, check the column mapping, then import.",
+    "list_label": "Newsletter list",
+    "new_list": "New list",
+    "upload_label": "Mailchimp export",
+    "upload_hint": "CSV files, or a ZIP of the CSV files Mailchimp exports. Each file is read as one kind of contact.",
+    "upload": "Upload",
+    "files": "Files",
+    "kind": "Kind",
+    "rows": "Rows",
+    "duplicates": "Duplicates",
+    "invalid": "Invalid",
+    "columns": "Columns",
+    "column": "Column",
+    "target": "Imported as",
+    "not_imported": "Not imported",
+    "tags_switch": "Import tags",
+    "tags_found": "Tags found",
+    "tags_missing_hint": "This list has no tags field, so tags cannot be imported.",
+    "tags_hint_segments": "Mailchimp segments are not exported as tags. Only each contact's own tags are imported.",
+    "apply": "Start import",
+    "no_rows": "The files contain no rows to import, so the import cannot be started. Discard it and upload a file with data.",
+    "applying": "Starting...",
+    "discard": "Discard",
+    "history": "Earlier imports",
+    "history_empty": "No imports yet.",
+    "errors": "Rows that could not be imported",
+    "errors_download": "Download all as CSV",
+    "errors_more": "Showing the first {shown} of {total}.",
+    "done": "The import is finished.",
+    "failed": "The import failed.",
+    "progress": "{processed} of {total} rows processed",
+    "summary": "{total} rows in {files} files",
+    "suppression_note": "Unsubscribed and cleaned contacts are never mailed. Existing opt-outs and bounces stay.",
+    "kinds": {
+      "subscribed": "Subscribed",
+      "unsubscribed": "Unsubscribed",
+      "cleaned": "Cleaned",
+      "ignored": "Ignored"
+    },
+    "status": {
+      "staged": "Waiting for mapping",
+      "queued": "Queued",
+      "running": "Running",
+      "done": "Done",
+      "failed": "Failed"
+    },
+    "counts": {
+      "created": "Created",
+      "updated": "Updated",
+      "skipped": "Skipped",
+      "suppressed": "Suppressed",
+      "failed": "Failed"
+    },
+    "row_errors": {
+      "invalid_email": "Not a valid email address.",
+      "cell_too_long": "A value is too long.",
+      "tag_invalid": "A tag is not valid.",
+      "invalid_value": "A value is not valid for its field.",
+      "record_refused": "The record was refused.",
+      "tags_unavailable": "The list has no tags field."
+    },
+    "new_list_dialog": {
+      "title": "New list",
+      "key": "Key",
+      "key_hint": "Lowercase letters, digits and underscores, starting with a letter. It cannot be changed later.",
+      "label": "Name",
+      "create": "Create list",
+      "cancel": "Cancel",
+      "creating": "Creating..."
+    },
+    "choose_list": "Choose a list",
+    "no_lists": "There is no newsletter list yet. Create one to import into.",
+    "uploading": "Uploading...",
+    "apply_again": "Start import again",
+    "another": "Import another export",
+    "open": "Open",
+    "open_import": "Open import {id}",
+    "mapping_title": "Column mapping",
+    "error_file": "File",
+    "error_line": "Line",
+    "error_problem": "Problem",
+    "error_field": "Field",
+    "discard_confirm": {
+      "title": "Discard this import?",
+      "description": "The uploaded files are deleted and nothing is imported.",
+      "keep": "Keep it",
+      "confirm": "Yes, discard"
+    },
+    "status_label": "Status"
   }
 }

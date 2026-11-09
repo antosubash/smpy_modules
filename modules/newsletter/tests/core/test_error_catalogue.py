@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from sm_newsletter.core import errors, errors_audience  # noqa: F401 - registers its codes
+from sm_newsletter.core import errors, errors_audience, errors_import  # noqa: F401 - registers its codes
 
 CATALOGUE = Path(errors.__file__).parents[1] / "locales" / "en.json"
 

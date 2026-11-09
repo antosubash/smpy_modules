@@ -6,6 +6,9 @@
   (``sending.dispatch.TICK_SECONDS``), and a queued one expires after 55 s, so a
   backlog (a stopped worker, a slow broker) is dropped rather than run late on
   top of the next tick.
+* ``newsletter.run_import`` (one slice of a Mailchimp import, re-enqueued until
+  done) and ``newsletter.import_janitor``, the hourly expiry of unapplied
+  imports and relaunch of lost ones.
 
 ``QUEUES`` is what a worker started for a queue subset
 (``SM_BG_TASKS_WORKER_QUEUES``) checks before it imports ``sm_newsletter.tasks``;
@@ -18,6 +21,8 @@ from __future__ import annotations
 
 RECONCILE_SUPPRESSIONS = "newsletter.reconcile_suppressions"
 DISPATCH = "newsletter.dispatch"
+RUN_IMPORT = "newsletter.run_import"
+IMPORT_JANITOR = "newsletter.import_janitor"
 
 QUEUE_DEFAULT = "newsletter"
 QUEUES = {QUEUE_DEFAULT}
@@ -25,10 +30,13 @@ QUEUES = {QUEUE_DEFAULT}
 TASK_ROUTES = {
     RECONCILE_SUPPRESSIONS: {"queue": QUEUE_DEFAULT},
     DISPATCH: {"queue": QUEUE_DEFAULT},
+    RUN_IMPORT: {"queue": QUEUE_DEFAULT},
+    IMPORT_JANITOR: {"queue": QUEUE_DEFAULT},
 }
 
 RECONCILE_INTERVAL_SECONDS = 3600.0
 DISPATCH_INTERVAL_SECONDS = 60.0
+JANITOR_INTERVAL_SECONDS = 3600.0
 
 BEAT_SCHEDULE = {
     "newsletter-reconcile-suppressions": {
@@ -40,5 +48,10 @@ BEAT_SCHEDULE = {
         "task": DISPATCH,
         "schedule": DISPATCH_INTERVAL_SECONDS,
         "options": {"queue": QUEUE_DEFAULT, "expires": 55},
+    },
+    "newsletter-import-janitor": {
+        "task": IMPORT_JANITOR,
+        "schedule": JANITOR_INTERVAL_SECONDS,
+        "options": {"queue": QUEUE_DEFAULT},
     },
 }
