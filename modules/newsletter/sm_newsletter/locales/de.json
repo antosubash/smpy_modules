@@ -1,1 +1,298 @@
-{"permission_group": "Newsletter"}
+{
+  "permission_group": "Newsletter",
+  "email": {
+    "footer_reason": "Sie erhalten diese E-Mail, weil Sie Neuigkeiten von {app_name} abonniert haben.",
+    "unsubscribe": "Abmelden",
+    "read_more": "Weiterlesen"
+  },
+  "menu": {
+    "group": "Newsletter",
+    "campaigns": "Kampagnen",
+    "settings": "Einstellungen"
+  },
+  "campaigns": {
+    "title": "Kampagnen",
+    "description": "Schreiben Sie eine E-Mail, sehen Sie sie in der Vorschau an und senden Sie sie an eine Newsletter-Liste.",
+    "search_label": "Kampagnen durchsuchen",
+    "search_placeholder": "Nach Name oder Betreff suchen",
+    "status_label": "Status",
+    "status_all": "Alle Status",
+    "status": {
+      "draft": "Entwurf",
+      "scheduled": "Geplant",
+      "sending": "Wird gesendet",
+      "paused": "Pausiert",
+      "sent": "Gesendet",
+      "cancelled": "Abgebrochen"
+    },
+    "loading": "Kampagnen werden geladen",
+    "empty_title": "Noch keine Kampagnen",
+    "empty_description": "Legen Sie eine Kampagne an, um Ihre erste E-Mail zu schreiben.",
+    "no_match": "Keine Kampagne entspricht Ihrer Suche.",
+    "clear": "Filter zurücksetzen",
+    "columns": {
+      "name": "Name",
+      "subject": "Betreff",
+      "status": "Status",
+      "list": "Liste",
+      "updated": "Aktualisiert",
+      "actions": "Aktionen"
+    },
+    "no_subject": "(kein Betreff)",
+    "never": "Nie",
+    "showing": "{from}-{to} von {total}",
+    "previous": "Zurück",
+    "next": "Weiter",
+    "new": {
+      "trigger": "Neue Kampagne",
+      "title": "Neue Kampagne",
+      "description": "Benennen Sie die Kampagne und wählen Sie die Liste, an die sie geht. Die E-Mail schreiben Sie als Nächstes.",
+      "name_label": "Name",
+      "name_placeholder": "Frühjahrsangebote",
+      "list_label": "Newsletter-Liste",
+      "list_placeholder": "Liste wählen",
+      "loading_lists": "Listen werden geladen",
+      "no_lists": "Es gibt noch keine Newsletter-Listen. Legen Sie zuerst in Datensätze eine Newsletter-Liste an und kommen Sie dann zurück.",
+      "cancel": "Abbrechen",
+      "create": "Anlegen",
+      "creating": "Wird angelegt"
+    },
+    "delete": {
+      "label": "{name} löschen",
+      "title": "Diese Kampagne löschen?",
+      "description": "Der Entwurf „{name}“ wird gelöscht. Das lässt sich nicht rückgängig machen.",
+      "cancel": "Abbrechen",
+      "confirm": "Löschen",
+      "working": "Wird gelöscht"
+    }
+  },
+  "settings": {
+    "title": "Newsletter-Einstellungen",
+    "description": "Wie Newsletter versendet werden, von wem sie kommen und wie viele rausgehen.",
+    "loading": "Einstellungen werden geladen",
+    "read_only_note": "Sie können diese Einstellungen ansehen, aber nicht ändern. Dafür ist die Berechtigung settings.edit nötig.",
+    "transport": {
+      "title": "Versand",
+      "label": "Versandart",
+      "smtp": "SMTP-Server",
+      "console": "Konsole (nur Protokoll, es wird nichts gesendet)",
+      "host": "SMTP-Host",
+      "port": "Port",
+      "security": "Verschlüsselung",
+      "starttls": "STARTTLS",
+      "tls": "TLS (implizit)",
+      "username": "Benutzername"
+    },
+    "password": {
+      "label": "Passwort",
+      "saved": "Ein Passwort ist gespeichert.",
+      "not_saved": "Kein Passwort gespeichert.",
+      "placeholder": "Neues Passwort eingeben",
+      "save": "Passwort speichern",
+      "saving": "Passwort wird gespeichert",
+      "replace_hint": "Das Passwort ist nur beschreibbar. Ein neues ersetzt das gespeicherte."
+    },
+    "sender": {
+      "title": "Absender",
+      "from_address": "Absenderadresse",
+      "from_name": "Absendername",
+      "reply_to": "Antwortadresse",
+      "physical_address": "Postanschrift",
+      "physical_address_hint": "Wird in jeder E-Mail-Fußzeile angezeigt."
+    },
+    "limits": {
+      "title": "Limits",
+      "daily": "E-Mails pro Tag",
+      "per_minute": "E-Mails pro Minute"
+    },
+    "tracking": {
+      "title": "Tracking",
+      "opens": "Öffnungen erfassen",
+      "clicks": "Klicks erfassen"
+    },
+    "tracking_note": "Tracking gilt ab PR 5. Diese Schalter werden gespeichert, haben aber noch keine Wirkung.",
+    "server_change_clears_password": "Wenn Sie Host, Port, Verschlüsselung oder Benutzernamen ändern, wird das gespeicherte Passwort entfernt. Geben Sie es danach erneut ein.",
+    "password_cleared_notice": "Das gespeicherte Passwort wurde entfernt, weil sich der Server geändert hat. Geben Sie es erneut ein.",
+    "saved_notice": "Einstellungen gespeichert.",
+    "password_saved_notice": "Passwort gespeichert.",
+    "save": "Einstellungen speichern",
+    "saving": "Einstellungen werden gespeichert"
+  },
+  "editor": {
+    "fallback_title": "Kampagne",
+    "loading": "Kampagne wird geladen",
+    "back": "Kampagnen",
+    "untitled": "Unbenannte Kampagne",
+    "list": "Liste: {list}",
+    "status": {
+      "saving": "Wird gespeichert",
+      "saved": "Gespeichert",
+      "stale": "Anderswo geändert",
+      "error": "Nicht gespeichert",
+      "invalid": "Nicht gespeichert: markiertes Feld korrigieren"
+    },
+    "reload": "Neu laden",
+    "read_only": "Sie können diese Kampagne ansehen, aber nicht ändern.",
+    "not_draft": "Diese Kampagne ist kein Entwurf mehr und kann nicht geändert werden.",
+    "incomplete": "In einem Block fehlt ein Pflichtfeld. Die E-Mail wird wieder gespeichert, sobald es ausgefüllt ist.",
+    "leave_held": "Diese Kampagne verlassen? Ein Block ist unvollständig oder ein Feld ist ungültig, daher ist diese Änderung nicht gespeichert.",
+    "select_a_block": "Wählen Sie einen Block aus, um ihn zu bearbeiten.",
+    "integration_missing": "Diese Inhaltsquelle ist auf dieser Website nicht verfügbar.",
+    "meta": {
+      "title": "E-Mail-Angaben",
+      "name": "Name der Kampagne",
+      "subject": "Betreff",
+      "preheader": "Vorschautext",
+      "preheader_hint": "Wird in den meisten Postfächern nach dem Betreff angezeigt.",
+      "from_name": "Absendername",
+      "from_name_hint": "Leer lassen, um den Namen aus den Newsletter-Einstellungen zu verwenden.",
+      "reply_to": "Antwortadresse",
+      "reply_to_hint": "Leer lassen, um die Adresse aus den Newsletter-Einstellungen zu verwenden.",
+      "name_required": "Gib einen Kampagnennamen ein. Er wird nicht gespeichert, solange er leer ist.",
+      "reply_to_invalid": "Gib eine gültige E-Mail-Adresse ein. Sie wird erst dann gespeichert."
+    },
+    "card": {
+      "article": "Artikel",
+      "page": "Seite",
+      "current": "In der E-Mail angezeigt",
+      "none": "Noch nichts ausgewählt.",
+      "search_label": "Suchen",
+      "search_article": "Veröffentlichte Artikel durchsuchen",
+      "search_page": "Veröffentlichte Seiten durchsuchen",
+      "searching": "Suche läuft",
+      "no_results": "Keine Treffer.",
+      "refresh": "Aus der Quelle aktualisieren",
+      "refreshing": "Wird aktualisiert",
+      "copied_at": "Übernommen am {date}"
+    },
+    "media": {
+      "choose": "Aus Medien auswählen",
+      "close": "Schließen",
+      "search": "Medien durchsuchen",
+      "searching": "Suche läuft",
+      "no_results": "Keine Bilder gefunden."
+    }
+  },
+  "blocks": {
+    "categories": {
+      "content": "Inhalt",
+      "layout": "Layout",
+      "cards": "Karten"
+    },
+    "common": {
+      "align": "Ausrichtung",
+      "align_left": "Links",
+      "align_center": "Zentriert",
+      "align_right": "Rechts",
+      "link": "Link"
+    },
+    "heading": {
+      "label": "Überschrift",
+      "text": "Text",
+      "level": "Größe",
+      "level_1": "Groß",
+      "level_2": "Mittel"
+    },
+    "rich_text": {
+      "label": "Text",
+      "html": "Text",
+      "link_title": "Link",
+      "link_prompt": "Link-Adresse. Leer lassen, um den Link zu entfernen.",
+      "link_invalid": "Diese Adresse kann nicht verwendet werden. Nutze https://, http://, mailto: oder einen Seitenpfad wie /about."
+    },
+    "image": {
+      "label": "Bild",
+      "src": "Bildadresse",
+      "alt": "Alternativtext",
+      "href": "Link (optional)",
+      "width": "Breite in Pixeln",
+      "empty": "Bild auswählen"
+    },
+    "button": {
+      "label": "Schaltfläche",
+      "text": "Beschriftung"
+    },
+    "divider": {
+      "label": "Trennlinie"
+    },
+    "spacer": {
+      "label": "Abstand",
+      "size": "Größe",
+      "size_sm": "Klein",
+      "size_md": "Mittel",
+      "size_lg": "Groß"
+    },
+    "article_card": {
+      "label": "Artikelkarte"
+    },
+    "page_card": {
+      "label": "Seitenkarte"
+    },
+    "card_empty": "Wählen Sie in den Blockeinstellungen einen Eintrag aus."
+  },
+  "errors": {
+    "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
+    "csrf_failed": "Ihre Sitzung ist abgelaufen. Laden Sie die Seite neu und versuchen Sie es erneut.",
+    "audience_unsupported": "Vorerst kann nur die gesamte Liste die Zielgruppe sein.",
+    "block_not_found": "Diese Karte ist nicht mehr in der Kampagne.",
+    "campaign_cancelled": "Eine abgebrochene Kampagne kann nicht als Test gesendet werden.",
+    "card_source_gone": "Die Quelle der Karte ist nicht mehr veröffentlicht. Die gespeicherte Kopie wurde beibehalten.",
+    "dispatch_busy": "Ein anderer Versand läuft gerade. Versuchen Sie es gleich noch einmal.",
+    "forbidden": "Dazu fehlt Ihnen die Berechtigung.",
+    "integration_unavailable": "Diese Inhaltsquelle ist auf dieser Website nicht verfügbar.",
+    "invalid_body": "Der E-Mail-Inhalt ist ungültig.",
+    "invalid_campaign": "Die Kampagne ist ungültig.",
+    "invalid_password": "Das Passwort muss 1 bis 1024 Zeichen lang und darf nicht leer sein.",
+    "invalid_settings": "Die Einstellungen sind ungültig.",
+    "list_forbidden": "Sie dürfen diese Newsletter-Liste nicht verwenden.",
+    "not_a_draft": "Nur ein Entwurf kann geändert oder gelöscht werden.",
+    "not_found": "Dieser Eintrag existiert nicht mehr.",
+    "public_base_url_required": "Legen Sie in den Einstellungen die öffentliche Basis-URL der Website fest, bevor Sie einen Test senden.",
+    "send_budget_exhausted": "Das Sendelimit ist erreicht. Versuchen Sie es später erneut.",
+    "sender_not_configured": "Legen Sie zuerst die Absenderadresse in den Newsletter-Einstellungen fest.",
+    "smtp_password_unreadable": "Das gespeicherte SMTP-Passwort kann nicht gelesen werden. Geben Sie es erneut ein.",
+    "stale": "Diese Kampagne wurde anderswo geändert. Laden Sie sie neu, um fortzufahren.",
+    "tenant_required": "Für dieses Konto ist keine Organisation aktiv.",
+    "transport_unavailable": "Der Mailserver ist nicht verfügbar.",
+    "unknown_list": "Keine solche Newsletter-Liste."
+  },
+  "preview": {
+    "tab_edit": "Bearbeiten",
+    "tab_preview": "Vorschau",
+    "tab_html": "HTML",
+    "tab_text": "Nur Text",
+    "desktop": "Desktop",
+    "mobile": "Mobil",
+    "loading": "Vorschau wird aktualisiert",
+    "subject": "Betreff:",
+    "frame_title": "E-Mail-Vorschau",
+    "warning": {
+      "relative_urls": "Einige Links oder Bilder sind relativ und funktionieren im Posteingang nicht. Verwenden Sie vollständige Adressen.",
+      "physical_address_missing": "In den Newsletter-Einstellungen ist keine Postadresse hinterlegt, daher fehlt sie in der Fußzeile.",
+      "empty_body": "Die E-Mail hat noch keinen Inhalt."
+    }
+  },
+  "test_send": {
+    "trigger": "Test senden",
+    "title": "Test-E-Mail senden",
+    "description": "Sendet den gespeicherten Entwurf an bis zu {max} Adressen. Niemand wird zur Liste hinzugefügt.",
+    "recipients": "Empfänger",
+    "placeholder": "name@example.com, eine pro Zeile oder durch Kommas getrennt",
+    "too_many": "Geben Sie höchstens {max} Adressen ein.",
+    "invalid_address": "„{address}“ ist keine gültige E-Mail-Adresse.",
+    "invalid_recipients": "Eine der Adressen wurde als ungültig abgelehnt.",
+    "unsaved": "Die letzten Änderungen konnten noch nicht gespeichert werden, daher wurde kein Test gesendet.",
+    "results": "Testergebnisse",
+    "send": "Senden",
+    "sending": "Wird gesendet",
+    "close": "Schließen",
+    "outcome": {
+      "accepted": "Angenommen",
+      "rejected": "Abgelehnt",
+      "unknown": "Unbekannt",
+      "failed": "Fehlgeschlagen"
+    },
+    "incomplete": "Unfertige Blöcke sind nicht im gespeicherten Entwurf und fehlen daher im Test.",
+    "no_base_url": "Die öffentliche Basis-URL der Website ist nicht gesetzt (Host-Einstellungen), daher werden Testsendungen abgelehnt."
+  }
+}

@@ -9,8 +9,10 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
 from simple_module_core.events import EventBus
+from simple_module_core.menu import MenuRegistry
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
+from simple_module_core.public_routes import PublicRouteRegistry
 
 from sm_newsletter.core import constants
 
@@ -51,7 +53,7 @@ class NewsletterModule(ModuleBase):
             NewsletterSettings,
             lambda defaults: NewsletterServices(settings=self.settings or defaults),
             # The generic Settings screen links here and refuses writes: it
-            # would store ``smtp_password`` in plaintext. PR 3 adds the page.
+            # would store ``smtp_password`` in plaintext.
             manage_url=constants.SETTINGS_URL,
         )
 
@@ -78,11 +80,33 @@ class NewsletterModule(ModuleBase):
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
         from simple_module_hosting.csrf import RequiresCsrf
 
-        from sm_newsletter.web.endpoints.api import router as api
+        from sm_newsletter.web.endpoints import build_api_router
+        from sm_newsletter.web.endpoints.views import router as views
 
-        # The framework's CSRF check on every write; reads pass. No view routes
-        # until PR 3.
-        api_router.include_router(api, dependencies=[Depends(RequiresCsrf())])
+        # The framework's CSRF check on every write; reads pass.
+        api_router.include_router(build_api_router(), dependencies=[Depends(RequiresCsrf())])
+        view_router.include_router(views)
+
+    def register_menu_items(self, registry: MenuRegistry) -> None:
+        from sm_newsletter.web.endpoints.menu import menu_items
+
+        registry.add_many(menu_items())
+
+    def register_public_routes(self, registry: PublicRouteRegistry) -> None:
+        """The email logo (C8): anonymous, ``GET`` only, at a fixed path."""
+        registry.add_exact(constants.BRAND_LOGO_PATH, methods={"GET"})
+
+    @staticmethod
+    def mount_public_routes(app: FastAPI) -> None:
+        """Newsletter's public routes at the app root (``register_routes`` hands
+        out only prefixed routers). Once per app: ``on_startup`` runs again on a
+        lifespan restart."""
+        from fastapi.routing import iter_route_contexts
+
+        from sm_newsletter.web.endpoints.brand import router
+
+        if not any(r.path == constants.BRAND_LOGO_PATH for r in iter_route_contexts(app.routes)):
+            app.include_router(router)
 
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
         """Mirror records' ``SubscriptionChanged`` into the suppression store.
@@ -96,11 +120,13 @@ class NewsletterModule(ModuleBase):
         mirror.subscribe(bus, app)
 
     async def on_startup(self, app: FastAPI) -> None:
-        """The tenancy mode, read off the built middleware stack, and the
-        fail-closed guard on the framework's session class - as images does."""
+        """The tenancy mode, read off the built middleware stack, the public
+        routes, and the fail-closed guard on the framework's session class - as
+        images does."""
         from sm_newsletter.core import tenancy
 
         tenancy.configure(app)
+        self.mount_public_routes(app)
         db = getattr(getattr(app.state, "sm", None), "db", None)
         if (session_class := getattr(db, "sync_session_class", None)) is not None:
             tenancy.install_guard(session_class)

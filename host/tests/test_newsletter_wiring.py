@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from fastapi.routing import iter_route_contexts
 from simple_module_db import build_module_metadata
 from simple_module_hosting import Settings, create_app
 
@@ -26,3 +27,19 @@ def test_host_loads_the_module():
     app = create_app(Settings())
     names = {m.meta.name for m in app.state.sm.modules}
     assert "Newsletter" in names
+
+
+VIEW_PATHS = {
+    "/admin/newsletter/",
+    "/admin/newsletter/settings",
+    "/admin/newsletter/campaigns/{campaign_id}",
+}
+MENU_URLS = {"/admin/newsletter/", "/admin/newsletter/settings"}
+
+
+def test_views_and_menu_mounted():
+    app = create_app(Settings())
+    paths = {ctx.path for ctx in iter_route_contexts(app.routes)}
+    assert paths >= VIEW_PATHS
+    urls = {i.url for i in app.state.sm.menu_registry.all_items if i.group == "Newsletter"}
+    assert urls == MENU_URLS

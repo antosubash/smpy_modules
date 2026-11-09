@@ -67,6 +67,7 @@ __all__ = [
     "SubscriberFilterError",
     "SubscriberHit",
     "SubscriberNotFound",
+    "caller_roles",
     "can_read_list",
     "count_subscribers",
     "iter_subscribers",
@@ -262,3 +263,15 @@ async def can_read_list(
         except SubscriberFilterError:
             return False
         return rtype is not None and not role_blocked(rtype, roles)
+
+
+def caller_roles(request: Any) -> CallerRoles:
+    """The request's caller as :class:`CallerRoles`: their roles plus the
+    ``records.type.<key>`` grants, with records' wildcard rule applied (an
+    admin holds no per-type grants). Anonymous is ``CallerRoles([])``.
+
+    What :func:`can_read_list` needs and another module cannot build itself.
+    Reads the permission set the framework resolved for the request."""
+    from sm_records.web.deps import caller_roles as _caller_roles
+
+    return _caller_roles(request)

@@ -40,6 +40,9 @@ async def test_on_startup_configures_tenancy_and_installs_the_guard(monkeypatch)
     calls: list[tuple[str, object]] = []
     monkeypatch.setattr(tenancy, "configure", lambda app: calls.append(("configure", app)))
     monkeypatch.setattr(tenancy, "install_guard", lambda cls: calls.append(("guard", cls)))
+    monkeypatch.setattr(
+        NewsletterModule, "mount_public_routes", staticmethod(lambda a: calls.append(("mount", a)))
+    )
     session_class = object()
     app = SimpleNamespace(
         state=SimpleNamespace(
@@ -47,9 +50,9 @@ async def test_on_startup_configures_tenancy_and_installs_the_guard(monkeypatch)
         )
     )
     await NewsletterModule().on_startup(app)
-    assert calls == [("configure", app), ("guard", session_class)]
+    assert calls == [("configure", app), ("mount", app), ("guard", session_class)]
 
     calls.clear()
     bare = SimpleNamespace(state=SimpleNamespace())
     await NewsletterModule().on_startup(bare)
-    assert calls == [("configure", bare)]
+    assert calls == [("configure", bare), ("mount", bare)]

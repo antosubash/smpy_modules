@@ -1,0 +1,9 @@
+/* Puck's stylesheet without its external font.
+ *
+ * `@puckeditor/core/puck.css` opens with `@import "https://rsms.me/inter/inter.css"`,
+ * which the console's CSP blocks (news #188 has the details). `no-external.css`
+ * is the same stylesheet without that import. News and pagebuilder add Inter
+ * from `@fontsource-variable/inter`; newsletter does not depend on it, so the
+ * editor chrome uses Puck's fallback font stack.
+ */
+@import "@puckeditor/core/no-external.css";

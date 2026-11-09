@@ -2,12 +2,13 @@
 
 :class:`~simple_module_core.settings_base.DbBackedSettings` drops every source
 pydantic-settings would consult, so there is no ``SM_NEWSLETTER_*`` variable.
-Until PR 3's page exists they are configured headlessly with
-``scripts/set_setting.py``. The module registers a ``manage_url``, so the
-generic Settings screen refuses newsletter writes (409): ``smtp_password`` must
-never be written there in plaintext. It is stored ``enc:v1:...`` and written
-through ``PUT /api/newsletter/settings/smtp-password``; a plaintext value found
-at read time (an operator wrote the DB directly) is accepted with a one-time
+Configure them on the module's Settings page (or headlessly with
+``scripts/set_setting.py``, except the password). The module registers a
+``manage_url``, so the generic Settings screen refuses newsletter writes (409):
+``smtp_password`` must never be written there in plaintext. It is stored
+``enc:v1:...`` and written through
+``PUT /api/newsletter/settings/smtp-password``; a plaintext value found at
+read time (an operator wrote the DB directly) is accepted with a one-time
 warning. SYSTEM scope: one configuration for the whole deployment.
 """
 
@@ -15,9 +16,11 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import SettingsConfigDict
 from simple_module_core.settings_base import DbBackedSettings
+
+from sm_newsletter.core.headers import check_header_text
 
 __all__ = ["NewsletterSettings"]
 
@@ -69,3 +72,9 @@ class NewsletterSettings(DbBackedSettings):
 
     physical_address: str = ""
     """Postal address printed in every campaign footer."""
+
+    @field_validator("from_name", "from_address", "reply_to")
+    @classmethod
+    def _no_header_injection(cls, value: str, info) -> str:
+        """These end up in mail headers: no line breaks or control characters."""
+        return check_header_text(value, field=info.field_name)

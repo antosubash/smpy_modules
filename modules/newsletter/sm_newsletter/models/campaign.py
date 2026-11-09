@@ -39,6 +39,8 @@ class Campaign(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[un
     audience: str = Field(default="all", max_length=140)
     """``all`` or a segment of that list."""
     status: str = Field(default="draft", max_length=STATUS_LEN)
+    revision: int = Field(default=1, sa_column_kwargs={"nullable": False, "server_default": "1"})
+    """Bumped by every write; an editor's PATCH names the one it read."""
     paused_reason: str | None = Field(default=None, max_length=1000)
     scheduled_at: datetime | None = dt_col()
     started_at: datetime | None = dt_col()

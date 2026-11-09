@@ -27,10 +27,16 @@ LIST = "news"
 
 
 async def seed_list(
-    db_state: Any, tenant: str, key: str = LIST, *, double_opt_in: bool | None = None
+    db_state: Any,
+    tenant: str,
+    key: str = LIST,
+    *,
+    double_opt_in: bool | None = None,
+    allowed_roles: list[str] | None = None,
 ) -> None:
     """In ``tenant``, the newsletter list ``key`` (a subscription-kind type);
-    records' default is double opt-in. Without it records requires consent."""
+    records' default is double opt-in. Without it records requires consent.
+    ``allowed_roles`` narrows who may read it (records' design §10)."""
     config: dict[str, Any] = {"kind": "subscription", "enabled": True}
     if double_opt_in is not None:
         config["double_opt_in"] = double_opt_in
@@ -45,7 +51,18 @@ async def seed_list(
                 fields_raw=[],
                 public_submissions=config,
                 settings=RecordsSettings(),
+                allowed_roles=allowed_roles,
             )
+            await events.commit(db)
+
+
+async def restrict_list(db_state: Any, tenant: str, key: str, allowed_roles: list[str]) -> None:
+    """Narrow list ``key`` in ``tenant`` to ``allowed_roles`` after the fact, as
+    an admin editing the type would."""
+    with tenant_scope(tenant):
+        async with db_state.session_factory() as db:
+            rtype = await type_service.get_type(db, key)
+            rtype.allowed_roles = list(allowed_roles)
             await events.commit(db)
 
 

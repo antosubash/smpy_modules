@@ -65,6 +65,145 @@ class InvalidPassword(NewsletterError):  # noqa: N818 - names the field
     detail = "The password must be 1 to 1024 characters and not blank"
 
 
+class InvalidBody(NewsletterError):  # noqa: N818 - names the field
+    """A campaign body that is not a valid list of email blocks. The detail
+    names the path (``body[3].props.href: ...``) and never repeats the input."""
+
+    status = 422
+    code = "invalid_body"
+    detail = "The body is not valid"
+
+
+class InvalidSettings(NewsletterError):  # noqa: N818 - names the payload
+    """A settings payload that fails its schema. Names the field, never the value."""
+
+    status = 422
+    code = "invalid_settings"
+    detail = "The settings are not valid"
+
+
+class OutboxUnavailable(NotFound):
+    """The capture outbox exists only on the console transport."""
+
+
+class InvalidCampaign(NewsletterError):  # noqa: N818 - names the payload
+    """A campaign payload that fails its schema. The detail names the field and
+    the error type, never the submitted value (it may be a header injection)."""
+
+    status = 422
+    code = "invalid_campaign"
+    detail = "The campaign is not valid"
+
+
+class NotADraft(NewsletterError):  # noqa: N818 - the state it refuses
+    status = 409
+    code = "not_a_draft"
+    detail = "Only a draft campaign can be changed or deleted"
+
+
+class StaleCampaign(NewsletterError):  # noqa: N818 - the state it refuses
+    """The campaign moved on since the editor read it (``expected_revision``)."""
+
+    status = 409
+    code = "stale"
+    detail = "The campaign was changed elsewhere; reload it"
+
+
+class UnknownList(NewsletterError):  # noqa: N818 - names the field
+    status = 422
+    code = "unknown_list"
+    detail = "No such newsletter list"
+
+
+class ListForbidden(Forbidden):
+    """The list exists, but records' ``allowed_roles`` shut this caller out."""
+
+    code = "list_forbidden"
+    detail = "You may not use this newsletter list"
+
+
+class AudienceUnsupported(NewsletterError):  # noqa: N818 - names the field
+    """Only ``all`` until segments (PR 6) and tags (PR 4) exist."""
+
+    status = 422
+    code = "audience_unsupported"
+    detail = "Only the whole list can be the audience for now"
+
+
+class IntegrationUnavailable(NewsletterError):  # noqa: N818 - the state it refuses
+    """The content source a card or the media picker reads (news, pagebuilder)
+    is not installed or not mounted on this host."""
+
+    status = 409
+    code = "integration_unavailable"
+    detail = "This content source is not available on this site"
+
+
+class CardSourceGone(NewsletterError):  # noqa: N818 - the state it refuses
+    """A card's article or page is no longer published (unpublished, trashed or
+    deleted); the stored snapshot is kept."""
+
+    status = 409
+    code = "card_source_gone"
+    detail = "The card's source is no longer published; its snapshot was kept"
+
+
+class BlockNotFound(NewsletterError):  # noqa: N818 - HTTP vocabulary, deliberately
+    """No card block with that id in the campaign's body."""
+
+    status = 404
+    code = "block_not_found"
+    detail = "No such card in this campaign"
+
+
+class TransportUnavailable(NewsletterError):  # noqa: N818 - the state it reports
+    """The mail relay could not be reached, secured or logged in to. The detail
+    names the stage (``connect``, ``tls``, ``auth``) and never holds the
+    username, the password or the server's AUTH reply."""
+
+    status = 502
+    code = "transport_unavailable"
+    detail = "The mail server is not available"
+
+
+class CampaignCancelled(NewsletterError):  # noqa: N818 - the state it refuses
+    status = 409
+    code = "campaign_cancelled"
+    detail = "A cancelled campaign cannot be test sent"
+
+
+class SenderNotConfigured(NewsletterError):  # noqa: N818 - names the setting
+    """A newsletter setting a send needs is blank or unusable; the detail names it."""
+
+    status = 422
+    code = "sender_not_configured"
+    detail = "The sender is not configured"
+
+
+class PublicBaseUrlRequired(NewsletterError):  # noqa: N818 - names the setting
+    """The host has no ``public_base_url``, so the email's links would be relative."""
+
+    status = 422
+    code = "public_base_url_required"
+    detail = "Set the site's public address (public_base_url) before sending"
+
+
+class SendBudgetExhausted(NewsletterError):  # noqa: N818 - the state it refuses
+    """The rolling daily or per-minute sending limit has no room for this send."""
+
+    status = 429
+    code = "send_budget_exhausted"
+    detail = "The sending limit is reached; try again later"
+
+
+class DispatchBusy(NewsletterError):  # noqa: N818 - the state it refuses
+    """Another send held the install-wide dispatch lock for the whole wait."""
+
+    status = 409
+    code = "dispatch_busy"
+    detail = "Another send is in progress; try again shortly"
+
+
 async def render(request: Request, exc: NewsletterError) -> JSONResponse:
     return JSONResponse({"detail": exc.detail, "code": exc.code}, status_code=exc.status)
 

@@ -5,6 +5,13 @@ major version bump.
 """
 
 from pagebuilder.contracts import bundle, public
+from pagebuilder.contracts.cards import (
+    MediaCard,
+    PageCard,
+    get_page_card,
+    search_media_cards,
+    search_page_cards,
+)
 from pagebuilder.contracts.schemas import (
     BlockChange,
     LayoutDetail,
@@ -54,8 +61,10 @@ __all__ = [
     "MediaAssetListResponse",
     "MediaAssetRead",
     "MediaAssetVariant",
+    "MediaCard",
     "MediaSearchHit",
     "MetadataChange",
+    "PageCard",
     "PageCreate",
     "PageDetail",
     "PageListResponse",
@@ -72,7 +81,10 @@ __all__ = [
     "PageUpdate",
     "RevisionDiffResponse",
     "bundle",
+    "get_page_card",
     "public",
     "search_media",
+    "search_media_cards",
+    "search_page_cards",
     "search_pages",
 ]
