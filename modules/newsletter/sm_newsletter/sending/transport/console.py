@@ -1,9 +1,10 @@
-"""The development transport: log the recipient and subject, keep the message.
+"""The development transport: log the message ref and recipient domain, keep the message.
 
 Nothing leaves the server. Each message is kept in an in-process ring of the
 last 50 per tenant (the bound tenant at send time), newest first through
 :func:`captured`, and handed to every hook :func:`add_capture_hook`
-registered. The log line holds only ``to`` and ``subject``, never the body.
+registered. The log line holds only ``msg.ref`` and the recipient's domain: no
+address, subject, link or body (a personalised subject can carry a name).
 """
 
 from __future__ import annotations
@@ -18,7 +19,11 @@ from datetime import datetime
 from sm_newsletter.core.clock import utcnow
 from sm_newsletter.core.tenancy import bound_tenant
 from sm_newsletter.sending.transport.base import DeliveryResult, TransportSession
-from sm_newsletter.sending.transport.message import OutgoingMessage, build_mime
+from sm_newsletter.sending.transport.message import (
+    OutgoingMessage,
+    build_mime,
+    envelope_address,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +80,8 @@ class _ConsoleSession:
             at=utcnow(),
         )
         _outbox.setdefault(item.tenant_id, deque(maxlen=RING_SIZE)).append(item)
-        logger.info("Newsletter console transport: to=%s subject=%s", msg.to, msg.subject)
+        domain = envelope_address(msg.to).rpartition("@")[2]
+        logger.info("Newsletter console transport: %s to domain %s", msg.ref, domain)
         for hook in list(_hooks):
             try:
                 hook(item)

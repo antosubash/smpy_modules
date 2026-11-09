@@ -20,15 +20,14 @@ from simple_module_db.listeners import current_user_id
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_newsletter.campaigns._refusal import DRAFT, refusal
 from sm_newsletter.campaigns.access import Roles, check_list, readable_lists, require_campaign
+from sm_newsletter.campaigns.audience import audience_filters
 from sm_newsletter.content.blocks import dump_body, parse_body
 from sm_newsletter.core.clock import utcnow
-from sm_newsletter.core.errors import AudienceUnsupported, NotADraft, NotFound, StaleCampaign
 from sm_newsletter.models import Campaign
 from sm_newsletter.web.schemas.campaigns import CampaignCreate, CampaignPatch
 
-DRAFT = "draft"
-AUDIENCE_ALL = "all"
 MAX_PAGE = 100
 
 
@@ -91,17 +90,6 @@ async def list_campaigns(
     return list((await session.execute(stmt)).scalars()), int(total or 0)
 
 
-async def _refusal(session: AsyncSession, *, tenant_id: str, campaign_id: int) -> Exception:
-    """Why a conditional write matched nothing, read after the fact."""
-    stmt = select(Campaign.status).where(
-        Campaign.id == campaign_id, Campaign.tenant_id == tenant_id
-    )
-    status = (await session.execute(stmt)).scalars().first()
-    if status is None:
-        return NotFound()
-    return NotADraft() if status != DRAFT else StaleCampaign()
-
-
 async def update_draft(
     session: AsyncSession,
     *,
@@ -117,8 +105,8 @@ async def update_draft(
     key = values.get("list_type_key")
     if key is not None and key != current.list_type_key:
         await check_list(session, tenant_id=tenant_id, type_key=key, roles=roles)
-    if values.get("audience", AUDIENCE_ALL) != AUDIENCE_ALL:
-        raise AudienceUnsupported()
+    if "audience" in values:
+        audience_filters(values["audience"])
     if "body" in values:
         values["body"] = dump_body(parse_body(values["body"]))
     return await write_draft(
@@ -163,7 +151,7 @@ async def write_draft(
     result = await session.execute(stmt)
     mark_written(session)
     if result.rowcount != 1:  # ty: ignore[unresolved-attribute]
-        raise await _refusal(session, tenant_id=tenant_id, campaign_id=campaign_id)
+        raise await refusal(session, tenant_id=tenant_id, campaign_id=campaign_id)
     return await require_campaign(
         session, tenant_id=tenant_id, campaign_id=campaign_id, roles=roles
     )
@@ -185,4 +173,4 @@ async def delete_draft(
     result = await session.execute(stmt)
     mark_written(session)
     if result.rowcount != 1:  # ty: ignore[unresolved-attribute]
-        raise await _refusal(session, tenant_id=tenant_id, campaign_id=campaign_id)
+        raise await refusal(session, tenant_id=tenant_id, campaign_id=campaign_id)

@@ -1,8 +1,8 @@
 """The install-wide dispatch lock: one sender spends the SMTP budget at a time.
 
 Admission (count the windows, then send) is only safe when nobody else can
-count or send in between, so every sender - a test send now, PR 4's dispatcher
-later - runs its admission *and* its SMTP calls inside :func:`dispatch_lock`.
+count or send in between, so every sender - a test send, the dispatcher's
+slice - runs its admission *and* its SMTP calls inside :func:`dispatch_lock`.
 
 - **Postgres**: the session-level advisory lock :data:`ADVISORY_KEY`, polled
   with ``pg_try_advisory_lock`` on one dedicated connection (``AUTOCOMMIT``,
@@ -15,8 +15,10 @@ later - runs its admission *and* its SMTP calls inside :func:`dispatch_lock`.
   block that outlives it may lose the lock to the next taker, so callers keep
   their blocks shorter than the lease, or call :meth:`HeldLock.renew` before
   each SMTP call: it extends the lease, and raises ``DispatchBusy`` once
-  another sender has taken the row. Released only by the holder that took
-  it (each acquisition stores a holder name with a random suffix).
+  another sender has taken the row; :meth:`HeldLock.fence` makes the same
+  check inside a caller's transaction (amendment A4). Released only by the
+  holder that took it (each acquisition stores a holder name with a random
+  suffix).
 
 Not acquired within ``wait_s`` → :class:`~sm_newsletter.core.errors.DispatchBusy`.
 
@@ -38,7 +40,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import timedelta
 
-from simple_module_db import finalize_session
+from simple_module_db import finalize_session, mark_written
 from sqlalchemy import or_, text, update
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
@@ -46,6 +48,7 @@ from sm_newsletter.core.clock import utcnow
 from sm_newsletter.core.errors import DispatchBusy
 from sm_newsletter.core.upsert import insert_ignore
 from sm_newsletter.models import DispatchLock
+from sm_newsletter.sending.ledger import SessionFactory
 
 __all__ = ["ADVISORY_KEY", "LOCK_NAME", "HeldLock", "dispatch_lock"]
 
@@ -56,7 +59,6 @@ ADVISORY_KEY = 0x6E6C5F6469737061
 """``"nl_dispa"`` as a signed 64-bit key; fixed, so every process agrees on it."""
 POLL_S = 0.1
 
-SessionFactory = Callable[[], AsyncSession]
 _TABLE = DispatchLock.__table__  # ty: ignore[unresolved-attribute]
 
 
@@ -67,13 +69,28 @@ _UNLOCK = text("SELECT pg_advisory_unlock(:k)")
 class HeldLock:
     """What the block receives. :meth:`renew` before each SMTP call: a no-op on
     Postgres (the lock lasts until released), a lease extension on SQLite that
-    raises :class:`DispatchBusy` when the lease was lost to another sender."""
+    raises :class:`DispatchBusy` when the lease was lost to another sender.
 
-    def __init__(self, renew: Callable[[], Awaitable[None]]) -> None:
+    :meth:`fence` (amendment A4) checks the lease *inside the caller's
+    transaction*, so a reservation commits only while the lock is still held."""
+
+    def __init__(
+        self,
+        renew: Callable[[], Awaitable[None]],
+        fence: Callable[[AsyncSession], Awaitable[None]] | None = None,
+    ) -> None:
         self._renew = renew
+        self._fence = fence
 
     async def renew(self) -> None:
         await self._renew()
+
+    async def fence(self, session: AsyncSession) -> None:
+        """SQLite: extend the lease in ``session``'s transaction, or raise
+        :class:`DispatchBusy` (the caller rolls back) when it expired or was
+        taken over. Postgres: a no-op, the advisory lock is held until released."""
+        if self._fence is not None:
+            await self._fence(session)
 
 
 async def _held_forever() -> None:
@@ -169,8 +186,19 @@ async def _lock_row(
         if not await _set_holder(session_factory, me, lease_s, take=False):
             raise DispatchBusy("The dispatch lock was taken over; the rest was not sent")
 
+    async def fence(session: AsyncSession) -> None:
+        now = utcnow()
+        result = await session.execute(
+            update(_TABLE)
+            .where(_TABLE.c.name == LOCK_NAME, _TABLE.c.holder == me, _TABLE.c.locked_until > now)
+            .values(locked_until=now + timedelta(seconds=lease_s), updated_at=now)
+        )
+        mark_written(session)
+        if result.rowcount != 1:  # ty: ignore[unresolved-attribute]
+            raise DispatchBusy("The dispatch lock's lease was lost; nothing was reserved")
+
     try:
-        yield HeldLock(renew)
+        yield HeldLock(renew, fence)
     finally:
         await asyncio.shield(_release(session_factory, me))
 

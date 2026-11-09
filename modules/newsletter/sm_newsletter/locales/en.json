@@ -5,6 +5,12 @@
     "unsubscribe": "Unsubscribe",
     "read_more": "Read more"
   },
+  "unsubscribe_page": {
+    "title": "Unsubscribe",
+    "intro": "Press the button to stop receiving these emails.",
+    "button": "Unsubscribe",
+    "done": "Done. You will not receive these emails any more."
+  },
   "menu": {
     "group": "Newsletter",
     "campaigns": "Campaigns",
@@ -238,16 +244,19 @@
     "campaign_cancelled": "A cancelled campaign cannot be test sent.",
     "card_source_gone": "The card's source is no longer published. Its saved copy was kept.",
     "dispatch_busy": "Another send is in progress. Try again in a moment.",
+    "empty_campaign": "Add content to the campaign before sending it.",
     "forbidden": "You do not have permission to do that.",
+    "https_required": "The site's public address must use https before a campaign can be sent.",
     "integration_unavailable": "This content source is not available on this site.",
     "invalid_body": "The email content is not valid.",
     "invalid_campaign": "The campaign is not valid.",
     "invalid_password": "The password must be 1 to 1024 characters and not blank.",
     "invalid_settings": "The settings are not valid.",
+    "invalid_transition": "This action does not apply to the campaign in its current state. Reload it to see where it stands.",
     "list_forbidden": "You may not use this newsletter list.",
     "not_a_draft": "Only a draft campaign can be changed or deleted.",
     "not_found": "That item no longer exists.",
-    "public_base_url_required": "Set the site's public base URL in Settings before sending a test.",
+    "public_base_url_required": "Set the site's public base URL in Settings before sending.",
     "send_budget_exhausted": "The sending limit has been reached. Try again later.",
     "sender_not_configured": "Set the sender address in the newsletter settings first.",
     "smtp_password_unreadable": "The stored SMTP password cannot be read. Enter it again.",
@@ -255,6 +264,10 @@
     "tenant_required": "No organisation is active for this account.",
     "transport_unavailable": "The mail server is not available.",
     "unknown_list": "No such newsletter list."
+  },
+  "errors_field": {
+    "subject_required": "Add a subject before sending.",
+    "schedule_out_of_range": "Choose a time within the next year."
   },
   "preview": {
     "tab_edit": "Edit",
@@ -294,5 +307,60 @@
     },
     "incomplete": "Unfinished blocks are not in the saved draft, so they are left out of the test.",
     "no_base_url": "The site's public base URL is not set (host settings), so test sends will be refused."
+  },
+  "sending": {
+    "send_button": "Send…",
+    "dialog": {
+      "title": "Send campaign",
+      "description": "Send \"{name}\" to the whole list. Once sending starts, the content can no longer be changed.",
+      "now": "Send now",
+      "later": "Schedule for later",
+      "at_label": "Send at",
+      "recipients_one": "{count} recipient",
+      "recipients_other": "{count} recipients",
+      "estimate": "Sending should finish around {date}.",
+      "overlap": "This overlaps with another campaign that is still sending, so it may finish later.",
+      "confirm": "Send",
+      "sending": "Sending…",
+      "cancel": "Cancel",
+      "unsaved": "The latest edits could not be saved, so nothing was sent.",
+      "incomplete": "Finish or remove the unfinished blocks before sending.",
+      "time_past": "Choose a time in the future.",
+      "time_far": "Choose a time within the next year."
+    },
+    "panel": {
+      "scheduled_for": "Scheduled for {date}",
+      "progress": "{sent} of {total} sent",
+      "eta_one": "Estimated finish: {date}",
+      "eta_other": "Estimated finish: {date}",
+      "finished": "Finished {date}",
+      "paused": "Paused: {detail}",
+      "counts": {
+        "failed": "{count} failed",
+        "bounced": "{count} bounced",
+        "suppressed": "{count} suppressed",
+        "skipped": "{count} skipped",
+        "unsubscribed": "{count} unsubscribed"
+      }
+    },
+    "actions": {
+      "pause": "Pause",
+      "resume": "Resume",
+      "cancel": "Cancel sending",
+      "unschedule": "Unschedule"
+    },
+    "cancel_confirm": {
+      "title": "Cancel this campaign?",
+      "description": "Messages not yet sent will not be sent. This cannot be undone.",
+      "confirm": "Cancel sending",
+      "keep": "Keep sending"
+    },
+    "paused_code": {
+      "manual": "Paused by you",
+      "smtp_rejected": "The mail server rejected the messages",
+      "smtp_auth": "The mail server refused the login",
+      "list_unavailable": "The newsletter list is not available",
+      "https_required": "Real mail needs https, but this campaign was rendered with an http address"
+    }
   }
 }

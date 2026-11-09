@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api } from '../utils/api';
 import type { Block, CampaignDetail } from '../utils/types';
+import { campaign } from './campaignFixture';
 import { AUTOSAVE_DELAY_MS, useCampaignEditor } from './useCampaignEditor';
 
 vi.mock('../utils/api', async (importOriginal) => ({
@@ -20,25 +21,6 @@ const patchCampaign = vi.mocked(api.patchCampaign);
 
 function block(text: string): Block {
   return { type: 'Heading', props: { id: 'h1', text, level: '2', align: 'left' } };
-}
-
-function campaign(revision: number, body: Block[]): CampaignDetail {
-  return {
-    id: 7,
-    name: 'Spring',
-    subject: 'Hello',
-    status: 'draft',
-    list_type_key: 'news',
-    revision,
-    updated_at: null,
-    recipient_count: 0,
-    sent_count: 0,
-    preheader: '',
-    from_name: null,
-    reply_to: null,
-    audience: 'all',
-    body,
-  };
 }
 
 function data(text: string): Data {

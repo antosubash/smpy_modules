@@ -12,11 +12,15 @@ be mailed again: unsubscribes, hard bounces, complaints). Design:
 `docs/superpowers/specs/2026-11-03-newsletter-module-design.md` in the source
 repo; the guide is [`docs/index.md`](docs/index.md).
 
-**Status: campaigns and content.** You can write a campaign in a Puck editor,
-preview it as the server renders it, and send a test to up to five addresses.
-Sending to a list, tracking and the unsubscribe page arrive in later pull
-requests. See [`docs/content.md`](docs/content.md) for blocks, merge fields and
-the URL rules.
+**Status: sending.** You can write a campaign in a Puck editor, preview it as the
+server renders it, send a test to up to five addresses, and send it to a list:
+a beat task (`newsletter.dispatch`) freezes the audience and sends within a
+daily cap and a per-minute rate, with retries, pause, resume and cancel, and an
+unsubscribe page with RFC 8058 one-click. Tracking and reports arrive in a later
+pull request. See [`docs/content.md`](docs/content.md) for blocks, merge fields
+and the URL rules, [`docs/sending.md`](docs/sending.md) for how sending works and
+[`docs/operations.md`](docs/operations.md) for what must run (worker and beat,
+the secret, the DKIM checklist).
 
 ## Install
 
@@ -47,7 +51,8 @@ variables. Configure them on the Settings screen or with
 encrypted under the host's secret key and written only through
 `PUT /api/newsletter/settings/smtp-password` (needs `newsletter.manage`
 and `settings.edit`; `scripts/set_setting.py` would
-store it in plaintext, accepted with a warning; use the endpoint). The generic Settings screen
+store it in plaintext, which workers refuse: the dispatcher does not run until it is
+re-saved through the endpoint, so always use the endpoint). The generic Settings screen
 refuses newsletter writes: use the module's own page, `/admin/newsletter/settings`.
 Changing the SMTP host, port, security or username clears the stored password.
 

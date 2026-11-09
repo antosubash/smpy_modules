@@ -24,6 +24,7 @@ def _msg(to: str, subject: str = "Hello") -> OutgoingMessage:
         text="secret body",
         reply_to=None,
         headers={"Precedence": "bulk"},
+        ref="campaign=c1 send=s1",
     )
 
 
@@ -46,7 +47,6 @@ async def test_capture_is_per_tenant(caplog):
     assert acme[0].text == "secret body"
     assert [m.to for m in console.captured("globex")] == ["c@example.com"]
     assert console.captured("nobody") == []
-    assert "a@example.com" in caplog.text and "First" in caplog.text
     assert "secret body" not in caplog.text
 
 
@@ -97,4 +97,21 @@ async def test_bad_header_is_rejected_not_raised(subject):
         result = await session.send(_msg("a@example.com", subject))
     assert (result.outcome, result.code) == ("rejected", None)
     assert result.detail == "a header value is not valid"
+    assert console.captured("default") == []
+
+
+async def test_console_logs_ref_and_domain_only(caplog):
+    caplog.set_level(logging.DEBUG, logger="sm_newsletter")
+    async with ConsoleTransport().session() as session:
+        await session.send(_msg("jane.doe@example.org", "Dear Jane https://x.test/u/tok"))
+    assert "campaign=c1 send=s1" in caplog.text
+    assert "example.org" in caplog.text
+    for leaked in ("jane.doe", "Dear Jane", "https://", "x.test", "secret body"):
+        assert leaked not in caplog.text
+
+
+async def test_console_bad_header_rejected():
+    async with ConsoleTransport().session() as session:
+        result = await session.send(_msg("a@example.com\r\nBcc: x@evil.test"))
+    assert (result.outcome, result.code) == ("rejected", None)
     assert console.captured("default") == []

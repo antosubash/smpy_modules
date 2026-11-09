@@ -97,3 +97,24 @@ def test_budget_left_is_the_tighter_window():
     assert (got.left, got.fits(1), got.fits(2)) == (1, True, False)
     over = budget.Budget(day_used=101, minute_used=0, daily_limit=100, per_minute_limit=30)
     assert (over.left, over.fits(0)) == (0, False)
+
+
+async def test_minute_wait_is_the_time_until_the_oldest_attempt_leaves_the_minute(db_state):
+    settings = NewsletterSettings(daily_limit=100, per_minute_limit=2)
+    factory = db_state.session_factory
+    assert await budget.minute_wait(factory, settings, now=NOW) == 0.0
+    await _attempt(db_state, "default", at=NOW - timedelta(seconds=40))
+    await _attempt(db_state, "default", at=NOW - timedelta(seconds=10))
+    wait = await budget.minute_wait(factory, settings, now=NOW)
+    assert wait == pytest.approx(20 + budget._PAST_EDGE)
+    # at the edge the oldest attempt still counts, so the wait is only the margin
+    edge = await budget.minute_wait(factory, settings, now=NOW + timedelta(seconds=20))
+    assert edge == pytest.approx(budget._PAST_EDGE)
+    assert await budget.minute_wait(factory, settings, now=NOW + timedelta(seconds=21)) == 0.0
+
+
+async def test_minute_wait_is_none_when_the_day_is_full(db_state):
+    settings = NewsletterSettings(daily_limit=2, per_minute_limit=2)
+    for _ in range(2):
+        await _attempt(db_state, "default", at=NOW - timedelta(seconds=10))
+    assert await budget.minute_wait(db_state.session_factory, settings, now=NOW) is None

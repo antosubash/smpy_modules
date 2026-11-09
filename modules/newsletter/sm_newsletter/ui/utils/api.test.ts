@@ -119,6 +119,23 @@ describe('maps error codes to catalogue keys', () => {
     expect(http.errorMessage(new TypeError('x'), t)).toBe('T(newsletter.errors.generic)');
   });
 
+  it('names the known invalid_campaign fields, and is generic for any other detail', async () => {
+    const { http } = await load({});
+    const refusal = (detail: string) => new http.HttpError(detail, 422, 'invalid_campaign');
+    const field = 'newsletter.errors_field';
+    expect(http.errorMessage(refusal('subject: required'), t)).toBe(`T(${field}.subject_required)`);
+    for (const detail of ['scheduled_at: out of range', 'at: out of range']) {
+      expect(http.errorMessage(refusal(detail), t)).toBe(`T(${field}.schedule_out_of_range)`);
+    }
+    expect(http.errorMessage(refusal('name: too long'), t)).toBe(
+      'T(newsletter.errors.invalid_campaign)',
+    );
+    // The detail is only a lookup key for invalid_campaign, never for another code.
+    expect(http.errorMessage(new http.HttpError('subject: required', 409, 'stale'), t)).toBe(
+      'T(newsletter.errors.stale)',
+    );
+  });
+
   it('does not let a code name an inherited property', async () => {
     const { http } = await load({});
     const error = new http.HttpError('x', 400, 'constructor');
@@ -171,5 +188,45 @@ describe('the error catalogue', () => {
 
   it('has a generic line', () => {
     expect(en.errors.generic).toBeTruthy();
+  });
+});
+
+describe('sending calls', () => {
+  it('hit the right path, method and body', async () => {
+    const { api } = await load({ csrf_token: 'tok' });
+    const fetchMock = stubFetch(ok);
+    const signal = new AbortController().signal;
+    await api.sendCampaign(4, { expected_revision: 3, scheduled_at: null });
+    await api.sendCampaign(4, { expected_revision: 3, scheduled_at: '2030-01-01T10:00:00Z' });
+    await api.unscheduleCampaign(4, 5);
+    await api.pauseCampaign(4);
+    await api.resumeCampaign(4);
+    await api.cancelCampaign(4);
+    await api.progress(4, signal);
+    await api.estimate(4, null);
+    await api.estimate(4, '2030-01-01T10:00:00Z');
+    const sent = fetchMock.mock.calls.map((c) => ({
+      call: `${(c[1] as RequestInit).method ?? 'GET'} ${c[0] as string}`,
+      body: (c[1] as RequestInit).body,
+    }));
+    const base = '/api/newsletter/campaigns/4';
+    expect(sent.map((s) => s.call)).toEqual([
+      `POST ${base}/send`,
+      `POST ${base}/send`,
+      `POST ${base}/unschedule`,
+      `POST ${base}/pause`,
+      `POST ${base}/resume`,
+      `POST ${base}/cancel`,
+      `GET ${base}/progress`,
+      `GET ${base}/estimate`,
+      `GET ${base}/estimate?at=2030-01-01T10%3A00%3A00Z`,
+    ]);
+    expect(sent[0].body).toBe(JSON.stringify({ expected_revision: 3, scheduled_at: null }));
+    expect(sent[1].body).toBe(
+      JSON.stringify({ expected_revision: 3, scheduled_at: '2030-01-01T10:00:00Z' }),
+    );
+    expect(sent[2].body).toBe(JSON.stringify({ expected_revision: 5 }));
+    expect(sent.slice(3, 6).map((s) => s.body)).toEqual([undefined, undefined, undefined]);
+    expect((fetchMock.mock.calls[6][1] as RequestInit).signal).toBe(signal);
   });
 });

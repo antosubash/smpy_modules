@@ -130,3 +130,13 @@ async def test_tenants_get_their_own_content_origin(tenants_db):
     assert (await render_context(app, tenant_id="nope")).content_base == "http://example.org:8000"
     single = make_app(base="https://example.org", mode=TenancyMode.MULTI, db=tenants_db)
     assert (await render_context(single, tenant_id="t1")).content_base == "https://example.org"
+
+
+async def test_a_malformed_port_falls_back_to_the_host_origin(tenants_db):
+    app = make_app(
+        base="https://example.org:abc",
+        mode=TenancyMode.MULTI,
+        subdomain_base="example.org",
+        db=tenants_db,
+    )
+    assert (await render_context(app, tenant_id="t1")).content_base == "https://example.org:abc"

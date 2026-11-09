@@ -38,6 +38,15 @@ interface PendingEdits {
   markIncomplete(value: boolean): void;
   markInvalid(field: string, value: boolean): void;
   clearInvalid(): void;
+  /** A save takes what is pending and goes out: nothing is pending, one more in flight. */
+  begin(): void;
+  /** The save came back, either way. */
+  end(): void;
+  /** A failed save's edits go back, under anything typed since. A field that has
+   *  since become invalid is not put back: its old value is not what the form shows. */
+  restore(meta: MetaPatch, body: Block[] | null): void;
+  /** Forget everything pending (a reload from the server). */
+  reset(): void;
 }
 
 export function usePendingEdits() {
@@ -81,6 +90,29 @@ export function usePendingEdits() {
       clearInvalid: () => {
         e.invalid.clear();
         setMetaInvalid(false);
+        e.sync();
+      },
+      begin: () => {
+        e.meta = {};
+        e.body = null;
+        e.inFlight += 1;
+        e.sync();
+      },
+      end: () => {
+        e.inFlight -= 1;
+        e.sync();
+      },
+      restore: (meta, body) => {
+        const kept = Object.fromEntries(Object.entries(meta).filter(([k]) => !e.invalid.has(k)));
+        e.meta = { ...kept, ...e.meta };
+        if (body && e.body === null) e.body = body;
+      },
+      reset: () => {
+        e.clearTimer();
+        e.body = null;
+        e.meta = {};
+        e.markIncomplete(false);
+        e.clearInvalid();
         e.sync();
       },
     };

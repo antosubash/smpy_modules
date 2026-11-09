@@ -13,11 +13,16 @@ source repository, and the delivery order is
 | --- | --- | --- |
 | 1 | records `contracts.newsletter`, news `contracts.articles` | merged |
 | 2 | this package: scaffold, tenancy, settings, models, suppressions, hourly reconcile | merged |
-| 3 | campaigns, content blocks, renderer, preview, Puck editor, test send, settings page | this PR |
-| 4 | sending, throttling, retries, unsubscribe page | planned |
+| 3 | campaigns, content blocks, renderer, preview, Puck editor, test send, settings page | merged |
+| 4 | sending, throttling, retries, unsubscribe page | this PR |
 | 5 | open and click tracking, reports | planned |
 | 6 | segments and the subscriber screen | planned |
 | 7 | Mailchimp import, docs, e2e | planned |
+
+Sending is described in [`sending.md`](sending.md) (status machine, freeze, the
+dispatcher, verdicts, the unsubscribe route) and what has to run for it in
+[`operations.md`](operations.md) (worker and beat, the secret, the DKIM
+checklist, the relay).
 
 ## Campaigns and content
 
@@ -31,11 +36,13 @@ re-serialised from an allow-list at save and at render. Details, the URL rules
 and the golden files: [`content.md`](content.md).
 
 - **Screens.** `/admin/newsletter/` (campaign list), `/admin/newsletter/campaigns/{id}`
-  (a newsletter-only Puck editor with a 600 px single column, a preview pane and a
-  test-send dialog) and `/admin/newsletter/settings`. The sidebar has Campaigns
+  (a newsletter-only Puck editor with a 600 px single column, a preview pane, a
+  test-send dialog, a send dialog for a draft and, once it is scheduled, a sending
+  panel with live progress) and `/admin/newsletter/settings`. The sidebar has Campaigns
   (`newsletter.view`) and Settings (`newsletter.manage`).
-- **Writes are revision-guarded.** PATCH and card Refresh carry `expected_revision`;
-  a stale one is `409 stale`, a campaign that left draft `409 not_a_draft`.
+- **Writes are revision-guarded.** PATCH, card Refresh, send and unschedule carry
+  `expected_revision`; a stale one is `409 stale`, a campaign that left draft
+  `409 not_a_draft`.
 - **List access is re-checked on every campaign request**, so a list restricted
   after a campaign was made hides the campaign (404) from callers who can no
   longer read it.
@@ -57,8 +64,8 @@ and the golden files: [`content.md`](content.md).
   Admission is all-or-nothing: over budget is `429 send_budget_exhausted`, nothing
   sent and no rows written. Per-recipient outcomes are `accepted`, `rejected`,
   `unknown` and `failed` (a known pre-acceptance failure; not counted). Its unsubscribe link
-  is `<public_base_url>/newsletter/u/test`, which PR 4's page treats like a forged
-  token. No campaign is sent yet: sending arrives in PR 4.
+  is `<public_base_url>/newsletter/u/test`, which the unsubscribe page answers like
+  a forged token. A test send never sends a campaign: see [`sending.md`](sending.md).
 - **Transports.** `smtp` (aiosmtplib; STARTTLS or implicit TLS; `List-Unsubscribe`,
   `List-Unsubscribe-Post` and `Precedence: bulk` headers) and `console`, which logs
   and keeps a per-tenant capture readable at `GET /api/newsletter/outbox`
@@ -85,8 +92,8 @@ writes (`manage_url`).
   password endpoint is `422 invalid_password` and never echoes the input.
 - `smtp_password` is stored encrypted and written only through
   `PUT /api/newsletter/settings/smtp-password` (needs `newsletter.manage` and
-  `settings.edit`; `scripts/set_setting.py` would store it in plaintext, accepted
-  with a warning; use the endpoint).
+  `settings.edit`; `scripts/set_setting.py` would store it in plaintext, which
+  the workers refuse: the dispatcher does not run until it is re-saved through the endpoint).
 
 ## Suppressions
 

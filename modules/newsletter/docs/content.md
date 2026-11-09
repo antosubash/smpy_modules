@@ -102,7 +102,7 @@ the tags in; `personalise` fills them per recipient.
 A **preview** and a **test send** have no send row and no MAC, so
 `{{unsubscribe_url}}`, the footer link and the `List-Unsubscribe` header all point
 at `<public_base_url>/newsletter/u/test`
-(`constants.TEST_UNSUBSCRIBE_TOKEN`). The unsubscribe page (PR 4) must answer
+(`constants.TEST_UNSUBSCRIBE_TOKEN`). The unsubscribe page answers
 that token like a forged one. Tracking is never added to a preview or test send.
 
 ## Footer and branding
@@ -111,11 +111,12 @@ The footer states why the recipient got the message (`newsletter.email.footer_re
 with the app name), prints the `physical_address` setting, and links to
 unsubscribe. Its strings come from the `newsletter.email.*` catalogue keys in the
 host's `i18n_default_locale`, falling back to the package's `en.json`; a
-per-campaign or per-subscriber language is PR 4's call.
+per-campaign or per-subscriber language is not supported: the footer and the
+unsubscribe page speak the host's language.
 
 Branding is the **system** theme (`app_name`, `primary_color`, `logo_file_id` from
 the framework's branding module), never a tenant's override: the sender identity
-is install-wide, and PR 4's worker has no request. Without branding the name is
+is install-wide, and the worker has no request. Without branding the name is
 `from_name` (or "Newsletter") and the accent is `#2563eb`. The logo is
 `<public_base_url>/newsletter/brand/logo?v=<logo_file_id>`, an anonymous route
 that serves the system-scope logo explicitly (404 when there is none).

@@ -84,6 +84,7 @@ async def suppress_many(
     source: str,
     list_type_key: str = "",
     refresh: bool = True,
+    keep_source: bool = False,
     now: datetime | None = None,
 ) -> int:
     """Suppress every address in ``emails``; returns how many rows were *inserted*.
@@ -97,6 +98,9 @@ async def suppress_many(
     SQLite transaction requirement): a row a confirmation deletes concurrently
     is inserted again, never lost. ``refresh=False`` is a pure insert-ignore
     (the reconcile's, so its count is idempotent and it never freshens a row).
+    ``keep_source=True`` refreshes ``created_at`` only: an existing row keeps
+    its first writer's ``source`` (the records mirror's, so a page opt-out
+    stays ``unsubscribe_page``); a new row still gets ``source``.
     """
     tenant = _tenant(tenant_id)
     _check_row(reason, source, list_type_key)
@@ -119,7 +123,12 @@ async def suppress_many(
         if not refresh:
             return await insert_ignore(session, _T, rows, conflict=_CONFLICT)
         return await upsert_newest(
-            session, _T, rows, conflict=_CONFLICT, time_column="created_at", follow=("source",)
+            session,
+            _T,
+            rows,
+            conflict=_CONFLICT,
+            time_column="created_at",
+            follow=() if keep_source else ("source",),
         )
 
 
@@ -132,6 +141,7 @@ async def suppress(
     source: str,
     list_type_key: str = "",
     refresh: bool = True,
+    keep_source: bool = False,
     now: datetime | None = None,
 ) -> bool:
     """Suppress one address; ``True`` if this call inserted its row."""
@@ -143,6 +153,7 @@ async def suppress(
         source=source,
         list_type_key=list_type_key,
         refresh=refresh,
+        keep_source=keep_source,
         now=now,
     )
     return count == 1

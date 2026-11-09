@@ -8,6 +8,7 @@ from simple_module_hosting import Settings, create_app
 
 NEWSLETTER_TABLES = {
     "newsletter_campaign",
+    "newsletter_campaign_render",
     "newsletter_segment",
     "newsletter_send",
     "newsletter_send_attempt",
@@ -43,3 +44,17 @@ def test_views_and_menu_mounted():
     assert paths >= VIEW_PATHS
     urls = {i.url for i in app.state.sm.menu_registry.all_items if i.group == "Newsletter"}
     assert urls == MENU_URLS
+
+
+def test_unsubscribe_route_is_public():
+    # The route is mounted at lifespan start (`on_startup`, which needs a migrated
+    # database), so mount it the way `on_startup` does and drive the built stack:
+    # an anonymous GET passes the host's auth and guards.
+    from fastapi.testclient import TestClient
+    from sm_newsletter.module import NewsletterModule
+
+    app = create_app(Settings())
+    NewsletterModule.mount_public_routes(app)
+    response = TestClient(app).get("/newsletter/u/test", follow_redirects=False)
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")

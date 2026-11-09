@@ -26,6 +26,7 @@ from simple_module_db import finalize_session
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns.access import Roles, require_campaign
+from sm_newsletter.campaigns.checks import check_campaign_headers, check_headers, check_sender
 from sm_newsletter.content.blocks import parse_body
 from sm_newsletter.content.context import render_context, test_unsubscribe_url
 from sm_newsletter.content.render import WARN_RELATIVE, RenderInput, personalise, render
@@ -36,7 +37,6 @@ from sm_newsletter.core.errors import (
     DispatchBusy,
     InvalidCampaign,
     PublicBaseUrlRequired,
-    SenderNotConfigured,
 )
 from sm_newsletter.core.headers import check_header_text
 from sm_newsletter.core.settings import NewsletterSettings
@@ -91,13 +91,14 @@ async def send_test(
     )
     if campaign.status == "cancelled":
         raise CampaignCancelled()
-    _check_sender(settings)
-    _check_headers(campaign)
+    check_sender(settings)
+    check_campaign_headers(campaign)
     message = await _message(app, tenant_id, campaign, settings)
     transport = transport_for(settings)
     await finalize_session(session)  # no read transaction held while waiting
     async with dispatch_lock(factory, holder=HOLDER) as lock:
-        _check_message(message)  # amendment 5: the exact values sent, before admission
+        # amendment 5: the exact values sent, before admission
+        check_headers(message, ("sender", "subject", "reply_to"))
         await admit(factory, settings, n=len(recipients), now=now or utcnow())
         results: list[TestSendResult] = []
         async with transport.session() as smtp:
@@ -127,42 +128,6 @@ async def send_test(
     return results
 
 
-def _check_message(message: OutgoingMessage) -> None:
-    for field in ("sender", "subject", "reply_to"):
-        value = getattr(message, field)
-        if value is None:
-            continue
-        try:
-            check_header_text(value, field=field)
-        except ValueError as exc:
-            raise InvalidCampaign(str(exc)) from None
-
-
-def _check_sender(settings: NewsletterSettings) -> None:
-    required = ["from_address", "physical_address"]
-    if settings.transport == "smtp":
-        required.append("smtp_host")
-    for field in required:
-        if not (getattr(settings, field) or "").strip():
-            raise SenderNotConfigured(f"{field} is not set")
-    for field in ("from_name", "from_address", "reply_to"):
-        try:
-            check_header_text(getattr(settings, field) or "", field=field)
-        except ValueError as exc:
-            raise SenderNotConfigured(str(exc)) from None
-
-
-def _check_headers(campaign: Campaign) -> None:
-    for field in ("subject", "from_name", "reply_to"):
-        value = getattr(campaign, field)
-        if value is None:
-            continue
-        try:
-            check_header_text(value, field=field)
-        except ValueError as exc:
-            raise InvalidCampaign(str(exc)) from None
-
-
 async def _message(
     app: Any, tenant_id: str, campaign: Campaign, settings: NewsletterSettings
 ) -> OutgoingMessage:
@@ -176,6 +141,7 @@ async def _message(
     email = personalise(template, first_name=None, unsubscribe_url=unsubscribe)
     name = campaign.from_name or settings.from_name
     return OutgoingMessage(
+        ref=f"test campaign={campaign.id}",
         sender=formataddr((name, settings.from_address.strip())),
         to="",
         subject=check_header_text(TEST_SUBJECT_PREFIX + email.subject, field="subject"),

@@ -117,10 +117,7 @@ export function useCampaignEditor(id: number) {
         edits.sync();
         return true;
       }
-      edits.meta = {};
-      edits.body = null;
-      edits.inFlight += 1;
-      edits.sync();
+      edits.begin();
       setStatus('saving');
       try {
         const detail = await api.patchCampaign(id, {
@@ -144,19 +141,11 @@ export function useCampaignEditor(id: number) {
         }
         return true;
       } catch (e) {
-        // Kept for the next try, under anything typed since.
-        // A field that has since become invalid is not put back: its old value is not
-        // what the form shows.
-        const kept = Object.fromEntries(
-          Object.entries(meta).filter(([k]) => !edits.invalid.has(k)),
-        );
-        edits.meta = { ...kept, ...edits.meta };
-        if (withBody && edits.body === null) edits.body = body;
+        edits.restore(meta, withBody ? body : null); // kept for the next try
         fail(e);
         return false;
       } finally {
-        edits.inFlight -= 1;
-        edits.sync();
+        edits.end();
       }
     },
     [adopt, fail, id, edits, pendingBody],
@@ -168,21 +157,25 @@ export function useCampaignEditor(id: number) {
     return run;
   }, []);
 
-  const flush = useCallback(() => {
+  const save = useCallback(() => {
     edits.clearTimer();
     edits.sync();
     return enqueue(send);
   }, [edits, enqueue, send]);
+
+  /** `save`, but false while a block is unfinished: a real send must not leave one out (A8). */
+  const flush = useCallback(async () => (await save()) && !edits.incomplete, [edits, save]);
+  const currentRevision = useCallback(() => revisionRef.current, []);
 
   const schedule = useCallback(() => {
     if (staleRef.current) return;
     edits.clearTimer();
     edits.timer = setTimeout(() => {
       edits.timer = null;
-      void flush();
+      void save();
     }, AUTOSAVE_DELAY_MS);
     edits.sync();
-  }, [edits, flush]);
+  }, [edits, save]);
 
   /** Take `next` as what is on screen and work out what the next save carries. */
   const track = useCallback(
@@ -223,7 +216,7 @@ export function useCampaignEditor(id: number) {
    *  saved, nothing is refreshed (adopting the server's body would drop it). */
   const refresh = useCallback(
     async (blockId: string): Promise<void> => {
-      if (!(await flush())) return;
+      if (!(await save())) return;
       await enqueue(async () => {
         if (staleRef.current) return;
         setStatus('saving');
@@ -253,17 +246,13 @@ export function useCampaignEditor(id: number) {
         }
       });
     },
-    [adopt, enqueue, fail, flush, id, track],
+    [adopt, enqueue, fail, id, save, track],
   );
 
   /** Drop what is on screen for the server's copy: the way out of `stale`. */
   const reload = useCallback(async () => {
-    edits.clearTimer();
+    edits.reset();
     staleRef.current = false;
-    edits.body = null;
-    edits.meta = {};
-    edits.markIncomplete(false);
-    edits.clearInvalid();
     setError(null);
     setStatus('idle');
     await load();
@@ -274,9 +263,9 @@ export function useCampaignEditor(id: number) {
    *  debounce window, or left over after a failed one. */
   useEffect(
     () => () => {
-      if (edits.timer || edits.hasPending()) void flush();
+      if (edits.timer || edits.hasPending()) void save();
     },
-    [edits, flush],
+    [edits, save],
   );
 
   return {
@@ -293,7 +282,10 @@ export function useCampaignEditor(id: number) {
     reload,
     reloadKey,
     dirty,
-    /** Save what is pending now; false when something stayed unsaved. */
+    /** Save what is pending now; false when something stayed unsaved (the test send). */
+    save,
     flush,
+    /** The revision the last save produced: read after `flush` for a send's `expected_revision`. */
+    currentRevision,
   };
 }
