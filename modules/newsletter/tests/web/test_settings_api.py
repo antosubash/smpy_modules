@@ -6,8 +6,8 @@ from __future__ import annotations
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from settings.service import SettingService
-from settings.store import SettingsStore
+from settings.core.service import SettingService
+from settings.module_settings.store import SettingsStore
 from sm_newsletter.core import constants, crypto
 from sm_newsletter.core.settings import NewsletterSettings
 from sm_newsletter.web.schemas.settings import (
@@ -195,7 +195,7 @@ async def test_password_write_cannot_slip_in_between_relay_read_and_write(
     write's read-decide-write window, or the old password reaches the new host."""
     import asyncio
 
-    import settings.reload as reload_mod
+    import settings.module_settings.reload as reload_mod
 
     app, state = built
     seen: dict = {}
@@ -236,7 +236,7 @@ async def test_relay_change_clears_a_password_the_live_copy_lacks(client, built)
 async def test_password_committed_by_another_process_is_cleared_too(client, built, monkeypatch):
     """Another process (no shared asyncio lock) commits a password after the relay
     write decided and applied: the relay change still ends with no password."""
-    import settings.reload as reload_mod
+    import settings.module_settings.reload as reload_mod
 
     app, state = built
     real = reload_mod.apply_changes_and_reload

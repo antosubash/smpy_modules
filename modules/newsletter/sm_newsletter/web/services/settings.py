@@ -49,9 +49,9 @@ async def _serialized_writes(app: FastAPI, db: AsyncSession) -> AsyncIterator[No
 async def set_smtp_password(app: FastAPI, db: AsyncSession, password: str) -> None:
     """Persist ``password`` encrypted and hot-swap the live settings."""
     # Plugin imports (settings is a declared dependency), local as ai's are.
-    from settings.reload import apply_changes_and_reload
-    from settings.service import SettingService
-    from settings.store import SettingsStore
+    from settings.core.service import SettingService
+    from settings.module_settings.reload import apply_changes_and_reload
+    from settings.module_settings.store import SettingsStore
     from simple_module_db import finalize_session
 
     store = SettingsStore(SettingService(db))
@@ -83,9 +83,9 @@ async def update_settings(app: FastAPI, db: AsyncSession, changes: dict[str, Any
     the credential is never presented to a server it was not saved for. The
     comparison is against the *stored* settings, read under the write lock, not
     the live copy, and the clear is unconditional on a relay change."""
-    from settings.reload import apply_changes_and_reload
-    from settings.service import SettingService
-    from settings.store import SettingsStore
+    from settings.core.service import SettingService
+    from settings.module_settings.reload import apply_changes_and_reload
+    from settings.module_settings.store import SettingsStore
     from simple_module_db import finalize_session
 
     store = SettingsStore(SettingService(db))

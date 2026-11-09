@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from background_tasks import sync_db
+from background_tasks.core import sync_db
 from simple_module_db.stored_settings import Setting
 from sm_newsletter import tasks
 from sm_newsletter.core import tokens, worker

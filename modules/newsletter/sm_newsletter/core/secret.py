@@ -22,7 +22,7 @@ class SecretMissing(RuntimeError):  # noqa: N818 - reads as the condition it is
 def _stored_secret() -> str:
     """The ``host.secret_key`` row; any failure to read it is "no row"."""
     try:
-        from background_tasks import sync_db
+        from background_tasks.core import sync_db
         from simple_module_db.stored_settings import get_overrides_sync
 
         with sync_db.sync_session() as session:

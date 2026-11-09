@@ -10,8 +10,8 @@ from __future__ import annotations
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from settings.service import SettingService
-from settings.store import SettingsStore
+from settings.core.service import SettingService
+from settings.module_settings.store import SettingsStore
 from simple_module_hosting.csrf import CSRF_HEADER
 from sm_newsletter.core import constants, crypto
 
@@ -90,7 +90,7 @@ async def test_settings_edit_without_manage_is_403(client, built):
 
 
 def test_settings_edit_constant_matches_the_framework():
-    from settings.constants import PERM_EDIT
+    from settings.core.constants import PERM_EDIT
 
     assert constants.PERM_SETTINGS_EDIT == PERM_EDIT
 
