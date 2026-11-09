@@ -1,0 +1,75 @@
+[project]
+name = "simple_module_newsletter"
+version = "0.0.15"
+description = "Newsletters for SimpleModule hosts: subscriber lists live in records, campaigns are sent over SMTP with per-tenant suppressions"
+requires-python = ">=3.12"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Anto Subash", email = "antosubash@live.com" }]
+keywords = ["simple-module", "newsletter", "email"]
+# Ranges, never `==`: an exact framework pin makes a published module
+# uninstallable in any host running a newer framework build.
+dependencies = [
+    "simple_module_core>=0.0.42,<0.1",
+    "simple_module_db>=0.0.42,<0.1",
+    "simple_module_hosting>=0.0.42,<0.1",
+    "simple_module_settings>=0.0.44,<0.1",  # floor: settings.core and settings.module_settings paths first shipped in 0.0.44
+    "simple_module_background_tasks>=0.0.44,<0.1",  # floor: background_tasks.core and .worker paths first shipped in 0.0.44
+    # floor: 0.0.13 — raise to the records release that first ships contracts.newsletter's subscription_lists / subscription_list_tenants / include_trashed (newsletter PR 2; contracts.newsletter itself is #306)
+    "simple_module_records>=0.0.13,<0.1",
+    "cryptography>=42",
+    "pydantic-settings>=2.0",
+]
+
+[project.urls]
+Repository = "https://github.com/antosubash/simple_module_python_modules"
+
+[project.entry-points.simple_module]
+newsletter = "sm_newsletter.module:NewsletterModule"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "simple_module_test>=0.0.42,<0.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sm_newsletter"]
+# Frontend test files and their helpers sit beside the source they test, so
+# `packages` would ship them. A host's Vite scans installed module source and
+# skips dependency pre-bundling when it meets an import it cannot resolve
+# (`vitest`), so none of them may reach the wheel (#63).
+exclude = [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/__tests__/**",
+    "**/test-dom.tsx",
+    "**/*-test-support.ts",
+    "**/*-test-support.tsx",
+    "**/page-tests/**",
+]
+artifacts = ["sm_newsletter/static/dist/**"]
+
+# package.json lives at the module root so npm workspaces see it; copying it
+# into the package lets the host discover JS deps after a pip install.
+[tool.hatch.build.targets.wheel.force-include]
+"package.json" = "sm_newsletter/package.json"
+
+[tool.hatch.build.targets.sdist]
+artifacts = ["sm_newsletter/static/dist/**"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "unbound_tenant: run with no newsletter tenant bound (tests/conftest.py binds 'default' otherwise)",
+]
+
+# Resolve the sibling module from the workspace during development. This is
+# tool config, so the published wheel still carries the ranges above.
+[tool.uv.sources]
+simple_module_records = { workspace = true }

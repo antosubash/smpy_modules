@@ -19,6 +19,11 @@ reason, instead of returning everyone.
 anything else raise ``ValueError`` before a query runs. ``after`` is a
 non-negative ``int`` the same way.
 
+**Trash and tenants.** ``include_trashed=True`` (``status="unsubscribed"``
+only) walks the trash too, for newsletter's reconcile. :func:`subscription_lists`
+names a tenant's lists; :func:`subscription_list_tenants` is the one
+cross-tenant read, for a worker with no tenant bound.
+
 **Writes** (:func:`unsubscribe`, :func:`set_tags`) run in the caller's
 transaction and never commit; the caller finishes it with
 ``simple_module_db.finalize_session`` (or records' ``events.commit``), and only
@@ -31,22 +36,28 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
-from simple_module_db import is_valid_tenant_id
+from simple_module_db.listeners import TenantIsolationError, current_tenant_id
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import SQLModel
 
+from sm_records.contracts._newsletter_args import (
+    MAX_SUBSCRIBER_BATCH,
+    Status,
+    SubscriberHit,
+    _checked_after,
+    _checked_limit,
+    _checked_status,
+    _checked_tags,
+    _checked_tenant,
+    _checked_trash,
+    _hit,
+)
 from sm_records.core import events
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope
-from sm_records.models import Record, RecordType
 from sm_records.public_submissions import campaign_reads, campaign_writes
-from sm_records.public_submissions.campaign_reads import (
-    SubscriberFilterError,
-    moment,
-    stored_tags,
-)
+from sm_records.public_submissions.campaign_reads import SubscriberFilterError
 from sm_records.public_submissions.campaign_writes import SubscriberNotFound
 from sm_records.records.services._access import CallerRoles, role_blocked
 
@@ -61,80 +72,33 @@ __all__ = [
     "iter_subscribers",
     "set_tags",
     "subscribers_by_uuid",
+    "subscription_list_tenants",
+    "subscription_lists",
     "unsubscribe",
 ]
 
-Status = Literal["confirmed", "unsubscribed"]
 
-MAX_SUBSCRIBER_BATCH = 1000
-"""The most subscribers one call returns or looks up."""
+async def subscription_list_tenants(session: AsyncSession) -> list[str]:
+    """Every valid tenant id that owns at least one newsletter list, sorted —
+    which tenants the newsletter reconcile walks.
 
-
-class SubscriberHit(SQLModel):
-    uuid: str
-    email: str
-    locale: str
-    status: str  # "pending" | "confirmed" | "unsubscribed"
-    confirmed_at: datetime | None
-    first_name: str | None = None
-    last_name: str | None = None
-    tags: list[str] = []
-    trashed: bool = False
+    The contract's one cross-tenant read, for a worker: it runs with no tenant
+    bound (or inside ``no_tenant()``/``all_tenants()``) and enters the
+    framework's ``all_tenants()`` itself. Under a bound tenant it raises
+    ``TenantIsolationError``, as ``tenant_scope`` does for a second tenant: a
+    request never enumerates other tenants. Use a fresh session."""
+    bound = current_tenant_id.get()
+    if bound is not None:
+        raise TenantIsolationError(f"cannot enumerate tenants inside a scope bound to {bound!r}")
+    return await campaign_reads.list_tenants(session)
 
 
-def _checked_limit(limit: object) -> int:
-    # `bool` is an `int`; `True` as a limit is a caller bug, not "one row".
-    if not isinstance(limit, int) or isinstance(limit, bool):
-        raise ValueError(f"limit must be an int, got {type(limit).__name__}")
-    if not 1 <= limit <= MAX_SUBSCRIBER_BATCH:
-        raise ValueError(f"limit must be between 1 and {MAX_SUBSCRIBER_BATCH}, got {limit}")
-    return limit
-
-
-def _checked_after(after: object) -> int:
-    if not isinstance(after, int) or isinstance(after, bool) or after < 0:
-        raise ValueError(f"after must be a non-negative int, got {after!r}")
-    return after
-
-
-def _checked_status(status: object) -> str:
-    if status not in campaign_reads.WALKABLE:
-        raise ValueError(f"status must be one of {campaign_reads.WALKABLE}, got {status!r}")
-    return str(status)
-
-
-def _checked_tags(tags: Sequence[str], name: str) -> list[str]:
-    # A bare string is a sequence of one-letter tags: a caller bug.
-    if isinstance(tags, str) or not all(isinstance(t, str) for t in tags):
-        raise ValueError(f"{name} must be a sequence of tag strings, not {tags!r}")
-    return list(tags)
-
-
-def _checked_tenant(tenant_id: object) -> str:
-    if not is_valid_tenant_id(tenant_id):
-        raise ValueError(f"not a valid tenant id: {tenant_id!r}")
-    return tenant_id
-
-
-def _text(value: Any) -> str | None:
-    return value if isinstance(value, str) else None
-
-
-def _hit(rtype: RecordType, record: Record) -> SubscriberHit:
-    declared = {f.get("key") for f in rtype.fields or []}
-    data = record.data or {}
-    tags = data.get(campaign_writes.TAGS) if campaign_writes.TAGS in declared else None
-    return SubscriberHit(
-        uuid=record.uuid,
-        email=str(data.get("sm_email") or ""),
-        locale=str(data.get("sm_locale") or ""),
-        status=str(data.get("sm_status") or ""),
-        confirmed_at=moment(data.get("sm_confirmed_at")),
-        first_name=_text(data.get("first_name")) if "first_name" in declared else None,
-        last_name=_text(data.get("last_name")) if "last_name" in declared else None,
-        tags=stored_tags(tags),
-        trashed=bool(record.is_deleted),
-    )
+async def subscription_lists(session: AsyncSession, *, tenant_id: str) -> list[str]:
+    """The keys of the tenant's newsletter lists (record types of kind
+    ``subscription``), sorted; ``[]`` for a tenant with none."""
+    tenant = _checked_tenant(tenant_id)
+    with tenant_scope(tenant):
+        return await campaign_reads.list_keys(session, tenant)
 
 
 async def iter_subscribers(
@@ -146,20 +110,33 @@ async def iter_subscribers(
     after: int = 0,
     limit: int = 500,
     status: Status = "confirmed",
+    include_trashed: bool = False,
 ) -> tuple[list[SubscriberHit], int | None]:
     """Untrashed subscribers in ``status`` (``confirmed``, the default, or
     ``unsubscribed``) matching every term, by record id.
+
+    ``include_trashed=True`` (only with ``status="unsubscribed"``) walks the
+    trash as well, each such hit ``trashed=True``: an opt-out still counts
+    while its record waits in the trash to be purged.
 
     Returns ``(hits, next_after)``; pass ``next_after`` back as ``after`` for
     the next page. It is ``None`` once nothing follows."""
     tenant = _checked_tenant(tenant_id)
     limit, after, status = _checked_limit(limit), _checked_after(after), _checked_status(status)
+    trash = _checked_trash(include_trashed, status)
     with tenant_scope(tenant):
         rtype = await campaign_reads.list_type(session, tenant, type_key)
         if rtype is None:
             return [], None
         rows, nxt = await campaign_reads.page(
-            session, rtype, tenant, filters=filters, after=after, limit=limit, status=status
+            session,
+            rtype,
+            tenant,
+            filters=filters,
+            after=after,
+            limit=limit,
+            status=status,
+            include_trashed=trash,
         )
         return [_hit(rtype, row) for row in rows], nxt
 
@@ -171,14 +148,17 @@ async def count_subscribers(
     type_key: str,
     filters: Sequence[str] = (),
     status: Status = "confirmed",
+    include_trashed: bool = False,
 ) -> int:
-    """How many subscribers :func:`iter_subscribers` would walk."""
+    """How many subscribers :func:`iter_subscribers` would walk, with the
+    same ``include_trashed`` rule."""
     tenant, status = _checked_tenant(tenant_id), _checked_status(status)
+    trash = _checked_trash(include_trashed, status)
     with tenant_scope(tenant):
         rtype = await campaign_reads.list_type(session, tenant, type_key)
         if rtype is None:
             return 0
-        return await campaign_reads.count(session, rtype, tenant, filters, status)
+        return await campaign_reads.count(session, rtype, tenant, filters, status, trash)
 
 
 async def subscribers_by_uuid(

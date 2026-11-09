@@ -81,11 +81,35 @@ def test_wheels_ship_no_frontend_test_code(wheels: list[Path]) -> None:
     assert not offenders, "test code in wheels:\n" + "\n".join(offenders)
 
 
+def _is_test_support(rel: Path) -> bool:
+    """What every module's wheel ``exclude`` legitimately drops (#63)."""
+    return (
+        rel.name.endswith((".test.ts", ".test.tsx", "-test-support.ts", "-test-support.tsx"))
+        or rel.name == "test-dom.tsx"
+        or "__tests__" in rel.parts
+        or "page-tests" in rel.parts
+    )
+
+
 def test_wheels_still_ship_frontend_source(wheels: list[Path]) -> None:
-    # Guards the exclude list against a pattern broad enough to drop real pages.
-    for wheel in wheels:
+    # Guards the exclude list against a pattern broad enough to drop real
+    # source: every non-test .ts/.tsx in a module's package must be in its wheel.
+    missing: list[str] = []
+    for module in sorted((REPO / "modules").glob("*/pyproject.toml")):
+        root = module.parent
+        wheel = next(w for w in wheels if w.name.startswith(f"simple_module_{root.name}-"))
         with zipfile.ZipFile(wheel) as archive:
-            assert any(n.endswith(".tsx") for n in archive.namelist()), wheel.name
+            shipped = set(archive.namelist())
+        for pkg in (d for d in root.iterdir() if (d / "__init__.py").is_file()):
+            for src in pkg.rglob("*"):
+                if src.suffix not in (".ts", ".tsx") or not src.is_file():
+                    continue
+                rel = src.relative_to(root)
+                if "node_modules" in rel.parts or _is_test_support(rel):
+                    continue
+                if rel.as_posix() not in shipped:
+                    missing.append(f"{wheel.name}: {rel}")
+    assert not missing, "source dropped from wheels:\n" + "\n".join(missing)
 
 
 def test_wheels_ship_the_moved_path_aliases(wheels: list[Path]) -> None:

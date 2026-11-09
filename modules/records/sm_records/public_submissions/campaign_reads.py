@@ -14,11 +14,13 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any, Final
 
+from simple_module_db import is_valid_tenant_id
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.public_submissions import KIND_SUBSCRIPTION
 from sm_records.core.settings import RecordsSettings
+from sm_records.core.tenancy._cross_tenant import read_all
 from sm_records.models import Record, RecordType, tables_for
 from sm_records.public_submissions.subscribe import CONFIRMED, UNSUBSCRIBED
 from sm_records.records._grammar import FilterTermError, parse_term
@@ -29,6 +31,8 @@ __all__ = [
     "WALKABLE",
     "SubscriberFilterError",
     "count",
+    "list_keys",
+    "list_tenants",
     "list_type",
     "lookup",
     "moment",
@@ -63,9 +67,38 @@ async def list_type(db: AsyncSession, tenant_id: str, type_key: str) -> RecordTy
     rtype = (await db.execute(stmt)).scalars().first()
     if rtype is None:
         return None
-    if (rtype.public_submissions or {}).get("kind") != KIND_SUBSCRIPTION:
+    if not _is_list(rtype.public_submissions):
         raise SubscriberFilterError("not_a_list", f"{type_key!r} is not a newsletter list")
     return rtype
+
+
+def _is_list(config: Any) -> bool:
+    """Whether a type's ``public_submissions`` makes it a newsletter list."""
+    return isinstance(config, dict) and config.get("kind") == KIND_SUBSCRIPTION
+
+
+async def list_keys(db: AsyncSession, tenant_id: str) -> list[str]:
+    """The keys of the tenant's newsletter lists, sorted. Types are few, so
+    the kind is checked here rather than in JSON SQL both backends agree on.
+    A deleted type is gone (types are hard-deleted), so every row is live."""
+    stmt = select(RecordType.key, RecordType.public_submissions).where(
+        RecordType.tenant_id == tenant_id
+    )
+    return sorted(str(key) for key, config in (await db.execute(stmt)).all() if _is_list(config))
+
+
+async def list_tenants(db: AsyncSession) -> list[str]:
+    """Every valid tenant id owning at least one newsletter list, sorted.
+
+    The one cross-tenant read here: :func:`read_all` runs it inside the
+    framework's ``all_tenants()`` and tags it past records' guard. The caller
+    refuses to run it under a bound tenant. An id is kept only if the
+    framework's ``is_valid_tenant_id`` accepts it — the check the per-tenant
+    contract calls make — so each result can be passed straight back to them
+    (records' ``valid_tenant`` would keep ``"platform"`` and ``"a\\n"``)."""
+    stmt = select(RecordType.tenant_id, RecordType.public_submissions)
+    rows = (await read_all(db, stmt)).all()
+    return sorted({str(t) for t, config in rows if _is_list(config) and is_valid_tenant_id(t)})
 
 
 def moment(value: Any) -> datetime | None:
@@ -103,17 +136,27 @@ def _filters(raw: Sequence[str], status: str) -> list[Filter]:
     return [Filter("sm_status", FilterOp.EQ, status), *parsed]
 
 
-def _query(rtype: RecordType, tenant_id: str, filters: Sequence[str], status: str, builder):
+def _query(
+    rtype: RecordType,
+    tenant_id: str,
+    filters: Sequence[str],
+    status: str,
+    builder,
+    include_trashed: bool = False,
+):
     """``builder``'s statement (``build_query``/``count_query``) for the terms,
     pinned to the tenant (the framework's soft-delete filter keeps the trash
-    out); with the type's record table."""
+    out unless ``include_trashed`` lifts it); with the type's record table."""
     terms = _filters(filters, status)
     record = tables_for(rtype).record
     try:
         stmt = builder(rtype, list(rtype.fields or []), terms)
     except QueryError as exc:
         raise SubscriberFilterError(exc.reason, str(exc)) from exc
-    return stmt.where(record.tenant_id == tenant_id), record
+    stmt = stmt.where(record.tenant_id == tenant_id)
+    if include_trashed:
+        stmt = stmt.execution_options(include_deleted=True)
+    return stmt, record
 
 
 async def page(
@@ -125,12 +168,14 @@ async def page(
     after: int,
     limit: int,
     status: str,
+    include_trashed: bool = False,
 ) -> tuple[list[Record], int | None]:
-    """Untrashed records in ``status`` matching every term, ``Record.id`` order.
+    """Records in ``status`` matching every term, ``Record.id`` order; the
+    trash only with ``include_trashed``.
 
     One row more than ``limit`` is read to know whether anything follows, so
     ``next_after`` is ``None`` exactly when the walk is over."""
-    stmt, record = _query(rtype, tenant_id, filters, status, build_query)
+    stmt, record = _query(rtype, tenant_id, filters, status, build_query, include_trashed)
     stmt = stmt.where(record.id > after).limit(limit + 1)
     rows = list((await db.execute(stmt)).scalars().all())
     if len(rows) <= limit:
@@ -140,9 +185,14 @@ async def page(
 
 
 async def count(
-    db: AsyncSession, rtype: RecordType, tenant_id: str, filters: Sequence[str], status: str
+    db: AsyncSession,
+    rtype: RecordType,
+    tenant_id: str,
+    filters: Sequence[str],
+    status: str,
+    include_trashed: bool = False,
 ) -> int:
-    stmt, _ = _query(rtype, tenant_id, filters, status, count_query)
+    stmt, _ = _query(rtype, tenant_id, filters, status, count_query, include_trashed)
     return int((await db.execute(stmt)).scalar_one())
 
 

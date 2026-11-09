@@ -124,14 +124,18 @@ def booted_host(tmp_path, monkeypatch):
         sys.modules.pop("main", None)
 
 
-def test_no_module_subscribes_to_record_events(booted_host):
+def test_only_the_newsletter_mirror_subscribes_to_record_events(booted_host):
     """The evidence behind GH #157's "leave publishing inline" call.
 
     Record events publish at commit, inside the request, so whatever subscribes
-    adds its time to every record write's response. Today nothing does, and a
-    publish with no listener returns before gathering anything. When this
-    fails, a module started listening: check that its handler is cheap, or
-    hands its work off, before updating the expectation.
+    adds its time to every record write's response. Today only
+    ``SubscriptionChanged`` has a listener: the newsletter suppression mirror,
+    which hears subscriber status transitions (signup, confirm, unsubscribe),
+    not every record write. It does one indexed read and one upsert in its own
+    session after records' commit and swallows its own failures, which is the
+    "cheap" this asks for. A publish with no listener returns before gathering
+    anything. When this fails, a module started listening: check that its
+    handler is cheap, or hands its work off, before updating the expectation.
 
     Read inside the host's lifespan, since a module may subscribe from
     ``on_startup`` as well as from ``register_event_handlers``. ``_emitter`` is
@@ -152,7 +156,7 @@ def test_no_module_subscribes_to_record_events(booted_host):
                 if bus._emitter.listeners(bus._event_key(getattr(events, name)))
             }
 
-    assert asyncio.run(listening_inside_lifespan()) == set()
+    assert asyncio.run(listening_inside_lifespan()) == {"SubscriptionChanged"}
 
 
 def test_images_object_intents_work_in_the_real_app(booted_host):

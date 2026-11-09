@@ -19,6 +19,7 @@ PB = "modules/pagebuilder/pagebuilder"
 NEWS = "modules/news/news"
 RECORDS = "modules/records/sm_records"
 IMAGES = "modules/images/sm_images"
+NEWSLETTER = "modules/newsletter/sm_newsletter"
 
 _RECORDS_ADMIN = (
     "Records' admin rule (#112): on a multi-tenant host an anonymous request is "
@@ -43,6 +44,7 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
                 {"logger": "_log"},
             ),
             Copy(f"{IMAGES}/core/tenancy/_mode.py", {"logger": "_log"}),
+            Copy(f"{NEWSLETTER}/core/tenancy/_mode.py", {"logger": "_log"}),
         ),
         shared=(
             "TenancyMode",
@@ -98,13 +100,14 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
             Copy(f"{PB}/core/tenancy/__init__.py"),
             Copy(f"{RECORDS}/core/tenancy/__init__.py", {"_resolved": "upstream_tenant"}),
             Copy(f"{IMAGES}/core/tenancy/__init__.py", {"_resolved": "upstream_tenant"}),
+            Copy(f"{NEWSLETTER}/core/tenancy/__init__.py", {"_resolved": "upstream_tenant"}),
         ),
         shared=("resolve_public",),
         differ={
             "resolve_admin": _RECORDS_ADMIN,
             "bind_admin": "Records binds through its own tenant_scope, which refuses to "
             "rebind a different tenant inside a bound scope (TenantIsolationError).",
-            "bind_public": "Records' and images' public 404 is their NotFound error, "
+            "bind_public": "Records', images' and newsletter's public 404 is their NotFound error, "
             "rendered by their own error handlers.",
         },
     ),

@@ -1,0 +1,52 @@
+# Newsletter documentation
+
+`simple_module_newsletter` sends campaigns to the subscriber lists that
+`simple_module_records` holds. Records owns the subscribers and their opt-in
+state; newsletter owns the campaigns, the sends and the suppression list. The
+design is `docs/superpowers/specs/2026-11-03-newsletter-module-design.md` in the
+source repository, and the delivery order is
+`docs/superpowers/plans/2026-11-03-newsletter-roadmap.md`.
+
+## Status
+
+| PR | Delivers | State |
+| --- | --- | --- |
+| 1 | records `contracts.newsletter`, news `contracts.articles` | merged |
+| 2 | this package: scaffold, tenancy, settings, models, suppressions, hourly reconcile | in progress |
+| 3 | campaigns, content blocks, renderer, test send | planned |
+| 4 | sending, throttling, retries, unsubscribe page | planned |
+| 5 | open and click tracking, reports | planned |
+| 6 | segments and the subscriber screen | planned |
+| 7 | Mailchimp import, docs, e2e | planned |
+
+## Settings
+
+DB-backed through the framework's settings module; no environment variables.
+`smtp_password` is stored encrypted and written only through
+`PUT /api/newsletter/settings/smtp-password` (needs `newsletter.manage`
+and `settings.edit`; `scripts/set_setting.py` would
+store it in plaintext, accepted with a warning; use the endpoint). The
+generic Settings screen refuses newsletter writes: a dedicated settings page
+arrives in PR 3.
+
+## Suppressions
+
+A suppression says "never mail this address". Suppressions are **tenant-wide**:
+
+- An `unsubscribed` row suppresses the address for **every list in the tenant**.
+  The row records the list it came from as provenance, and there is one row per
+  list.
+- `hard_bounce`, `complaint` and `imported_cleaned` rows are **address-wide**.
+- The address is stored as `email_hash = sha256(email.strip().lower())`, unkeyed.
+- A double-opt-in confirmation on list L (the subscriber following records'
+  confirm link) clears L's `unsubscribed` row and any `hard_bounce` or
+  `imported_cleaned` row created at or before the confirmation. It never clears
+  a `complaint`, and never another list's opt-out. Nothing else clears a
+  suppression: a signup on a single-opt-in list is confirmed at once but proves
+  nothing about the mailbox (anyone can type the address), so it clears nothing.
+- An hourly reconcile re-adds the opt-outs records holds, trashed subscribers
+  included. It only adds; it never removes a suppression. It is the Celery task
+  `newsletter.reconcile_suppressions` on the `newsletter` queue (`make worker`
+  serves it; beat schedules it).
+
+Suppression wins over every other rule at send time.
