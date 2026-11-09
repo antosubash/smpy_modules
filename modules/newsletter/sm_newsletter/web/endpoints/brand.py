@@ -26,7 +26,7 @@ from sm_newsletter.core.errors import NotFound
 logger = logging.getLogger(__name__)
 
 try:  # file_storage comes with branding; without either there is no logo to serve
-    from file_storage.deps import get_file_storage_service as _storage
+    from file_storage.web.deps import get_file_storage_service as _storage
 except ImportError:  # pragma: no cover - exercised only on a host without file_storage
 
     async def _storage() -> None:
@@ -52,7 +52,7 @@ def _system_logo_id(request: Request) -> uuid.UUID:
 
 def _image_types() -> frozenset[str]:
     try:
-        from branding.images import ALLOWED_IMAGE_TYPES
+        from branding.assets.images import ALLOWED_IMAGE_TYPES
     except ImportError:  # pragma: no cover
         return _IMAGE_TYPES
     return frozenset(ALLOWED_IMAGE_TYPES)
@@ -63,8 +63,8 @@ async def brand_logo(request: Request, storage: Any = Depends(_storage)) -> Resp
     file_id = _system_logo_id(request)
     if storage is None:
         raise NotFound()
-    from file_storage.downloads import RedirectDownload
-    from file_storage.service import StoredFileNotFoundError
+    from file_storage.files.downloads import RedirectDownload
+    from file_storage.files.service import StoredFileNotFoundError
 
     try:
         download = await storage.download(file_id, platform=True)
