@@ -11,15 +11,15 @@ import uuid
 from types import SimpleNamespace
 
 import pytest
-from branding.endpoints.assets import router as branding_assets
-from branding.services import BrandingServices
-from branding.settings import BrandingSettings
-from branding.tenant_branding import merge
+from branding.core.services import BrandingServices
+from branding.core.settings import BrandingSettings
+from branding.core.tenant_branding import merge
+from branding.web.endpoints.assets import router as branding_assets
 from fastapi import FastAPI
 from fastapi.routing import iter_route_contexts
-from file_storage.deps import get_file_storage_service
-from file_storage.downloads import StreamDownload
-from file_storage.service import StoredFileNotFoundError
+from file_storage.files.downloads import StreamDownload
+from file_storage.files.service import StoredFileNotFoundError
+from file_storage.web.deps import get_file_storage_service
 from httpx import ASGITransport, AsyncClient
 from simple_module_core.public_routes import PublicRouteRegistry
 from simple_module_db.listeners import current_tenant_id
