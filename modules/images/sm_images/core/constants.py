@@ -54,7 +54,7 @@ MENU_GROUP_KEY: Final = "images.menu.group_images"
 #: ``register_settings`` runs - the host topo-sorts modules on this field.
 _MODULE_SETTINGS: Final = "Settings"
 #: The framework modules images builds on, by ``ModuleMeta.name``: shares
-#: (``sharing.policy`` in the access policy), the storage backend, and the
+#: (``sharing.core.policy`` in the access policy), the storage backend, and the
 #: background workers the pipeline runs on.
 _MODULE_SHARING: Final = "Sharing"
 _MODULE_FILE_STORAGE: Final = "FileStorage"
@@ -273,5 +273,5 @@ PAGE_IMAGE: Final = f"{MODULE_NAME}/Image"
 PAGE_REVIEW: Final = f"{MODULE_NAME}/Review"
 PAGE_PUBLIC_COLLECTION: Final = f"{MODULE_NAME}/PublicCollection"
 PERM_SHARE: Final = "sharing.share"
-"""The framework's share permission (``sharing.constants.PERM_SHARE``): the
+"""The framework's share permission (``sharing.core.constants.PERM_SHARE``): the
 share dialog is offered only to a holder who also owns the collection."""

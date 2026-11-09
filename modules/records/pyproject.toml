@@ -1,6 +1,6 @@
 [project]
 name = "simple_module_records"
-version = "0.0.13"
+version = "0.0.14"
 description = "Generic structured content: admin-defined record types stored as JSON documents with typed SQL indexes (YesSql-style document/index split)"
 requires-python = ">=3.12"
 readme = "README.md"
@@ -14,7 +14,7 @@ dependencies = [
     "simple_module_db>=0.0.38,<0.1",
     "simple_module_hosting>=0.0.42,<0.1",  # public render_error_page first shipped in 0.0.42
     "simple_module_inertia>=0.0.38,<0.1",
-    "simple_module_settings>=0.0.38,<0.1",
+    "simple_module_settings>=0.0.44,<0.1",  # floor: settings.core and settings.module_settings paths first shipped in 0.0.44
     "pydantic-settings>=2.0",
     # The optional CAPTCHA's server-side verification (#101).
     "httpx>=0.27",
@@ -68,6 +68,7 @@ artifacts = ["sm_records/static/dist/**"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 # The perf suite (``tests/perf``) seeds a file-backed SQLite database and
 # measures; it is minutes, not seconds, and it is not a correctness gate. It
 # is excluded here so ``pytest`` and CI keep running only the normal suite —

@@ -126,7 +126,7 @@ def test_startup_supersedes_the_pre_hydration_publish() -> None:
 
     from fastapi import FastAPI
     from pagebuilder.module import PagebuilderModule
-    from settings.module_registry import ModuleSettingsRegistry
+    from simple_module_core.module_settings import ModuleSettingsRegistry
 
     app = FastAPI()
     app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())

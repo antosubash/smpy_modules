@@ -6,7 +6,7 @@ import pytest
 from sm_billing.contracts.provider import PriceInfo, SubscriptionSnapshot
 from sm_billing.core import crypto
 from sm_billing.providers.stripe import StripeProvider
-from tenants.constants import TenantStatus
+from tenants.core.constants import TenantStatus
 from tenants.models import Tenant
 
 from tests.support.api_helpers import arm_csrf, create_tenant, page_props

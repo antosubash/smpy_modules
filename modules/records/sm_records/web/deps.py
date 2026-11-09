@@ -44,7 +44,7 @@ from sm_records.records.services.types import get_type
 
 # Since framework 0.0.36 (#337) the hosting checker honours roles *and* every
 # registered grant source, so a direct per-user ``records.view`` grant from the
-# ``permissions`` module counts here too; ``permissions.deps`` re-exports this
+# ``permissions`` module counts here too; ``permissions.web.deps`` re-exports this
 # same class. Records used to import that module's checker to get the grants.
 
 
@@ -163,7 +163,7 @@ def caller_roles(request: Request) -> CallerRoles:
 def actor(request: Request) -> str | None:
     """The value every ``created_by``/``updated_by`` in this module carries.
 
-    ``UserContext.id`` — the same value ``auth.middleware`` hands to
+    ``UserContext.id`` — the same value ``auth.web.middleware`` hands to
     ``current_user_id.set(user_ctx.id)`` (``simple_module_db.listeners``),
     which is what stamps ``AuditMixin`` columns automatically. Passed
     explicitly here because ``RecordRevision`` and ``RecordTypeRevision`` are

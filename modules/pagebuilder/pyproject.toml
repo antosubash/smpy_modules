@@ -1,6 +1,6 @@
 [project]
 name = "simple_module_pagebuilder"
-version = "0.0.13"
+version = "0.0.14"
 description = "Drag-and-drop visual page builder for simple_module apps"
 readme = "README.md"
 license = "MIT"
@@ -67,6 +67,7 @@ artifacts = ["pagebuilder/static/dist/**"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 # `db_fixture` holds the bare-session fixture, `locale_fixture` the
 # multilingual app, and `snapshot_fixture` the session + settings pair the
 # snapshot layer's tests use, and `tenant_fixture` the autouse default-tenant

@@ -28,7 +28,7 @@ WHSEC = "whsec_workers"
 async def _boot(settings):
     from simple_module_hosting.app_builder import create_app
     from simple_module_test._schema import _create_all_tables
-    from users.bootstrap import create_admin
+    from users.core.bootstrap import create_admin
 
     application = create_app(settings)
     await _create_all_tables(application.state.sm.db.engine)
@@ -55,9 +55,9 @@ async def workers(settings, tmp_path):
 
 async def _save(app, **changes) -> None:
     """The framework's save path on one worker: persist, hot-swap, publish."""
-    from settings.reload import apply_changes_and_reload
-    from settings.service import SettingService
-    from settings.store import SettingsStore
+    from settings.core.service import SettingService
+    from settings.module_settings.reload import apply_changes_and_reload
+    from settings.module_settings.store import SettingsStore
 
     async with app.state.sm.db.session_factory() as session:
         store = SettingsStore(SettingService(session))

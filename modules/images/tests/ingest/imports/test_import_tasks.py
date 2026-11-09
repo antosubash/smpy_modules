@@ -10,7 +10,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from background_tasks.tenant_context import TENANT_HEADER
+from background_tasks.executions.tenant_context import TENANT_HEADER
 from sm_images import task_config
 from sm_images.core.errors import ServiceUnavailable
 from sm_images.core.tenancy import DEFAULT_TENANT

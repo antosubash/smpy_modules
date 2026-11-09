@@ -7,11 +7,20 @@ from pathlib import Path
 import news
 from news.module import NewsModule
 
+# Until 0.0.17 the old directories hold nothing but moved-path stubs (#319).
+_STUB = ("/** @deprecated Moved to ", "/* @deprecated Moved to ")
+
+
+def _only_stubs(path: Path) -> bool:
+    files = [f for f in path.rglob("*") if f.is_file() and "__pycache__" not in f.parts]
+    return bool(files) and all(f.read_text(encoding="utf-8").startswith(_STUB) for f in files)
+
 
 def test_package_root_contains_only_discovery_paths():
     root = Path(news.__file__).parent
     assert {p.name for p in root.glob("*.py")} == {"__init__.py", "module.py"}
-    assert {p.name for p in root.iterdir() if p.is_dir() and p.name != "__pycache__"} == {
+    dirs = [p for p in root.iterdir() if p.is_dir() and p.name != "__pycache__"]
+    assert {p.name for p in dirs if not _only_stubs(p)} == {
         "content", "contracts", "core", "integrations", "locales", "models", "pages",
         "scheduling", "ui", "web",
     }

@@ -1,7 +1,7 @@
 """The pipeline's runtime in a Celery worker, which never builds the app.
 
 * **Database** - the URL, tenancy policy and timeouts the framework's runner
-  pinned on ``background_tasks.sync_db`` (from ``merge_host_settings``), spelled
+  pinned on ``background_tasks.core.sync_db`` (from ``merge_host_settings``), spelled
   for the async driver. A per-process async engine on ``NullPool``: every task
   body runs on its own ``asyncio.run`` loop, and a pooled asyncpg connection
   belongs to the loop that opened it. Its session class gets the framework's
@@ -48,7 +48,7 @@ _engine: tuple[int, tuple[Any, ...], Any] | None = None  # (pid, config key, Dat
 
 
 def _config() -> tuple[str, Any, dict[str, int]]:
-    from background_tasks import sync_db
+    from background_tasks.core import sync_db
 
     return sync_db.async_database_url(), sync_db.engine_tenancy(), sync_db.database_options()
 
@@ -114,7 +114,7 @@ def worker_settings() -> Any:
 
 
 def _bus() -> Any:
-    from background_tasks.outbox_worker import worker_bus
+    from background_tasks.outbox.worker import worker_bus
 
     return worker_bus()
 
@@ -140,7 +140,7 @@ def worker_runtime() -> Runtime:
 def task_tenant() -> str:
     """The tenant a task body runs in: the message's (restored by
     ``task_prerun``), else - single-tenant hosts only - the default."""
-    from background_tasks import sync_db
+    from background_tasks.core import sync_db
     from simple_module_db.listeners import current_tenant_id
 
     from sm_images.core.tenancy import TenantUnbound

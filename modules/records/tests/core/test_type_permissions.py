@@ -15,7 +15,7 @@ from typing import Any
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from permissions.group_labels import localized_groups
+from permissions.core.group_labels import localized_groups
 from simple_module_core.permissions import PermissionRegistry
 from sm_records.core import constants, type_permissions
 from sm_records.core._permission_sync import PermissionSyncMiddleware

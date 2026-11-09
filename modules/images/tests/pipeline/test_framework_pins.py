@@ -24,7 +24,7 @@ _DRAIN = "sm_images/pipeline/eager_drain.py (drain_durable)"
 
 
 def test_the_outbox_transport_still_offers_drain():
-    from background_tasks.outbox_transport import OutboxTransport
+    from background_tasks.outbox.transport import OutboxTransport
 
     assert inspect.iscoroutinefunction(OutboxTransport.drain), f"{_DRAIN}: drain gone or sync"
     try:

@@ -9,8 +9,8 @@ resource type's rows with the same id stay.
 from __future__ import annotations
 
 import pytest
+from sharing.core.policy import canonical_id
 from sharing.models import ResourceShare
-from sharing.policy import canonical_id
 from simple_module_db import all_tenants, tenant_context
 from sm_images.core.tenancy import DEFAULT_TENANT
 from sm_images.models import Collection

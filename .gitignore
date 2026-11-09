@@ -43,6 +43,7 @@ uploads/
 # Playwright
 playwright-report/
 test-results/
+.e2e-shards/
 blob-report/
 .playwright-mcp/
 .playwright-cli/

@@ -1,0 +1,283 @@
+{
+  "all": [
+    "news.endpoints.api"
+  ],
+  "css": {
+    "components/body/puck-editor.css": "ui/components/body/puck-editor.css"
+  },
+  "modules": {
+    "news._tenancy_mode": "news.core.tenancy._mode",
+    "news.authors": "news.content.authors",
+    "news.boot": "news.core.boot",
+    "news.card": "news.content.card",
+    "news.category_service": "news.content.taxonomy.category_service",
+    "news.constants": "news.core.constants",
+    "news.counts": "news.content.counts",
+    "news.csrf": "news.web.csrf",
+    "news.dev_csp": "news.web.dev_csp",
+    "news.display_date": "news.content.display_date",
+    "news.endpoints": [
+      "news.web.endpoints"
+    ],
+    "news.endpoints.api": [
+      "news.web.endpoints.api"
+    ],
+    "news.endpoints.api._deps": "news.web.endpoints.api._deps",
+    "news.endpoints.api.article_tags": "news.web.endpoints.api.article_tags",
+    "news.endpoints.api.articles": [
+      "news.web.endpoints.api.articles",
+      "news.web.endpoints.api._article_listing"
+    ],
+    "news.endpoints.api.body": "news.web.endpoints.api.body",
+    "news.endpoints.api.categories": "news.web.endpoints.api.categories",
+    "news.endpoints.api.search": "news.web.endpoints.api.search",
+    "news.endpoints.api.tags": "news.web.endpoints.api.tags",
+    "news.endpoints.api.translations": "news.web.endpoints.api.translations",
+    "news.endpoints.api.workflow": "news.web.endpoints.api.workflow",
+    "news.endpoints.public": "news.web.endpoints.public",
+    "news.endpoints.public._archive": "news.web.endpoints.public._archive",
+    "news.endpoints.public._article": "news.web.endpoints.public._article",
+    "news.endpoints.public._feeds": "news.web.endpoints.public._feeds",
+    "news.endpoints.public._head": "news.web.endpoints.public._head",
+    "news.endpoints.public._index": "news.web.endpoints.public._index",
+    "news.endpoints.public._lang": "news.web.endpoints.public._lang",
+    "news.endpoints.public._not_found": "news.web.endpoints.public._not_found",
+    "news.endpoints.public._paging": "news.web.endpoints.public._paging",
+    "news.endpoints.public._render": "news.web.endpoints.public._render",
+    "news.endpoints.public._sitemap": "news.web.endpoints.public._sitemap",
+    "news.endpoints.public._urls": "news.web.endpoints.public._urls",
+    "news.endpoints.views": "news.web.endpoints.views",
+    "news.like": "news.content.like",
+    "news.locales": "news.core.locales",
+    "news.menu": "news.web.menu",
+    "news.naive_utc": "news.core.naive_utc",
+    "news.query_filters": "news.content.query_filters",
+    "news.redirects": "news.content.redirects",
+    "news.safe_url": "news.core.safe_url",
+    "news.scheduler": "news.scheduling.scheduler",
+    "news.search_service": "news.web.services.search_service",
+    "news.service": "news.content.service",
+    "news.settings": "news.core.settings",
+    "news.slugify": "news.content.slugify",
+    "news.tag_redirects": "news.content.taxonomy.tag_redirects",
+    "news.tag_service": "news.content.taxonomy.tag_service",
+    "news.tenancy": "news.core.tenancy"
+  },
+  "names": {
+    "news.endpoints": [],
+    "news.endpoints.api": [
+      "router"
+    ],
+    "news.endpoints.api.articles": [
+      "create_article",
+      "delete_article",
+      "list_articles",
+      "list_categories",
+      "router",
+      "update_article"
+    ]
+  },
+  "packages": {
+    "news.endpoints": null,
+    "news.endpoints.api": null,
+    "news.endpoints.public": "news.web.endpoints.public"
+  },
+  "remove_in": "0.0.17",
+  "ts": {
+    "components/ArchiveSearch.tsx": {
+      "star": "ui/components/ArchiveSearch.tsx"
+    },
+    "components/ArticleFilters.tsx": {
+      "star": "ui/components/ArticleFilters.tsx"
+    },
+    "components/ArticleRow.tsx": {
+      "star": "ui/components/ArticleRow.tsx"
+    },
+    "components/ArticleRowDelete.tsx": {
+      "star": "ui/components/ArticleRowDelete.tsx"
+    },
+    "components/Byline.tsx": {
+      "star": "ui/components/Byline.tsx"
+    },
+    "components/ConfirmDialog.tsx": {
+      "star": "ui/components/ConfirmDialog.tsx"
+    },
+    "components/LanguageSwitch.tsx": {
+      "star": "ui/components/LanguageSwitch.tsx"
+    },
+    "components/NewArticleDialog.tsx": {
+      "star": "ui/components/NewArticleDialog.tsx"
+    },
+    "components/NewsFeed.tsx": {
+      "star": "ui/components/NewsFeed.tsx"
+    },
+    "components/PreviewBanner.tsx": {
+      "star": "ui/components/PreviewBanner.tsx"
+    },
+    "components/articleStatus.ts": {
+      "star": "ui/components/articleStatus.ts"
+    },
+    "components/body/articlePuckConfig.tsx": {
+      "star": "ui/components/body/articlePuckConfig.tsx"
+    },
+    "components/body/blockIds.ts": {
+      "star": "ui/components/body/blockIds.ts"
+    },
+    "components/body/blocks/asides.tsx": {
+      "star": "ui/components/body/blocks/asides.tsx"
+    },
+    "components/body/blocks/av.tsx": {
+      "star": "ui/components/body/blocks/av.tsx"
+    },
+    "components/body/blocks/chart.tsx": {
+      "star": "ui/components/body/blocks/chart.tsx"
+    },
+    "components/body/blocks/chartScale.ts": {
+      "star": "ui/components/body/blocks/chartScale.ts"
+    },
+    "components/body/blocks/contents.tsx": {
+      "star": "ui/components/body/blocks/contents.tsx"
+    },
+    "components/body/blocks/data.tsx": {
+      "star": "ui/components/body/blocks/data.tsx"
+    },
+    "components/body/blocks/imageUrlField.tsx": {
+      "star": "ui/components/body/blocks/imageUrlField.tsx"
+    },
+    "components/body/blocks/index.ts": {
+      "star": "ui/components/body/blocks/index.ts"
+    },
+    "components/body/blocks/layout.tsx": {
+      "star": "ui/components/body/blocks/layout.tsx"
+    },
+    "components/body/blocks/lines.ts": {
+      "star": "ui/components/body/blocks/lines.ts"
+    },
+    "components/body/blocks/media.tsx": {
+      "star": "ui/components/body/blocks/media.tsx"
+    },
+    "components/body/blocks/outline.ts": {
+      "star": "ui/components/body/blocks/outline.ts"
+    },
+    "components/body/blocks/related.tsx": {
+      "star": "ui/components/body/blocks/related.tsx"
+    },
+    "components/body/blocks/renderBlock.tsx": {
+      "star": "ui/components/body/blocks/renderBlock.tsx"
+    },
+    "components/body/blocks/text.tsx": {
+      "star": "ui/components/body/blocks/text.tsx"
+    },
+    "components/body/localizeConfig.ts": {
+      "star": "ui/components/body/localizeConfig.ts"
+    },
+    "components/categories/CategoryDeleteDialog.tsx": {
+      "star": "ui/components/categories/CategoryDeleteDialog.tsx"
+    },
+    "components/categories/CategoryRow.tsx": {
+      "star": "ui/components/categories/CategoryRow.tsx"
+    },
+    "components/categories/TagActions.tsx": {
+      "star": "ui/components/categories/TagActions.tsx"
+    },
+    "components/categories/TagPanel.tsx": {
+      "star": "ui/components/categories/TagPanel.tsx"
+    },
+    "components/editor/ArticleDangerZone.tsx": {
+      "star": "ui/components/editor/ArticleDangerZone.tsx"
+    },
+    "components/editor/ArticleInspector.tsx": {
+      "star": "ui/components/editor/ArticleInspector.tsx"
+    },
+    "components/editor/ArticleTranslations.tsx": {
+      "star": "ui/components/editor/ArticleTranslations.tsx"
+    },
+    "components/editor/HistoryCard.tsx": {
+      "star": "ui/components/editor/HistoryCard.tsx"
+    },
+    "components/editor/ReviewCard.tsx": {
+      "star": "ui/components/editor/ReviewCard.tsx"
+    },
+    "components/editor/ScheduleCard.tsx": {
+      "star": "ui/components/editor/ScheduleCard.tsx"
+    },
+    "components/editor/SeoCard.tsx": {
+      "star": "ui/components/editor/SeoCard.tsx"
+    },
+    "components/editor/TagInput.tsx": {
+      "star": "ui/components/editor/TagInput.tsx"
+    },
+    "components/search/SearchSection.tsx": {
+      "star": "ui/components/search/SearchSection.tsx"
+    },
+    "hooks/useAdminSearch.ts": {
+      "star": "ui/hooks/useAdminSearch.ts"
+    },
+    "hooks/useArticleBody.ts": {
+      "star": "ui/hooks/useArticleBody.ts"
+    },
+    "hooks/useArticleEditor.ts": {
+      "star": "ui/hooks/useArticleEditor.ts"
+    },
+    "hooks/useArticleList.ts": {
+      "star": "ui/hooks/useArticleList.ts"
+    },
+    "hooks/useArticleOutline.ts": {
+      "star": "ui/hooks/useArticleOutline.ts"
+    },
+    "hooks/useContentLocale.ts": {
+      "star": "ui/hooks/useContentLocale.ts"
+    },
+    "hooks/useDocumentLang.ts": {
+      "star": "ui/hooks/useDocumentLang.ts"
+    },
+    "hooks/useInFlight.ts": {
+      "star": "ui/hooks/useInFlight.ts"
+    },
+    "hooks/usePendingDialog.ts": {
+      "star": "ui/hooks/usePendingDialog.ts"
+    },
+    "hooks/useTaxonomy.ts": {
+      "star": "ui/hooks/useTaxonomy.ts"
+    },
+    "hooks/useUrlFilters.ts": {
+      "star": "ui/hooks/useUrlFilters.ts"
+    },
+    "utils/api.ts": {
+      "star": "ui/utils/api.ts"
+    },
+    "utils/archiveUrl.ts": {
+      "star": "ui/utils/archiveUrl.ts"
+    },
+    "utils/csrf.ts": {
+      "star": "ui/utils/csrf.ts"
+    },
+    "utils/feedProps.ts": {
+      "star": "ui/utils/feedProps.ts"
+    },
+    "utils/http.ts": {
+      "star": "ui/utils/http.ts"
+    },
+    "utils/i18n.ts": {
+      "star": "ui/utils/i18n.ts"
+    },
+    "utils/inFlight.ts": {
+      "star": "ui/utils/inFlight.ts"
+    },
+    "utils/locale.ts": {
+      "star": "ui/utils/locale.ts"
+    },
+    "utils/searchApi.ts": {
+      "star": "ui/utils/searchApi.ts"
+    },
+    "utils/slugify.ts": {
+      "star": "ui/utils/slugify.ts"
+    },
+    "utils/taxonomyApi.ts": {
+      "star": "ui/utils/taxonomyApi.ts"
+    },
+    "utils/types.ts": {
+      "star": "ui/utils/types.ts"
+    }
+  }
+}

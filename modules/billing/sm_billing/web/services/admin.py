@@ -193,9 +193,9 @@ def connection_changes(data: ConnectionIn) -> dict[str, Any]:
 
 
 async def save_connection(db: AsyncSession, app: FastAPI, data: ConnectionIn) -> ConnectionOut:
-    from settings.reload import apply_changes_and_reload
-    from settings.service import SettingService
-    from settings.store import SettingsStore
+    from settings.core.service import SettingService
+    from settings.module_settings.reload import apply_changes_and_reload
+    from settings.module_settings.store import SettingsStore
 
     store = SettingsStore(SettingService(db))
     await apply_changes_and_reload(

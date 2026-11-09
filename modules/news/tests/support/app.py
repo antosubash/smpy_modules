@@ -18,7 +18,7 @@ from news.module import NewsModule
 # SQLite, or the Postgres database ``SM_TEST_DATABASE_URL`` names. It is also
 # where "news' tables, plus pagebuilder's where installed" is spelled out.
 from pg_support import make_db_state
-from settings.module_registry import ModuleSettingsRegistry
+from simple_module_core.module_settings import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_inertia import InertiaConfig, inertia_dependency_factory
 from starlette.middleware.sessions import SessionMiddleware

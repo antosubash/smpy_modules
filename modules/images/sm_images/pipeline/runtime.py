@@ -82,12 +82,12 @@ class Runtime:
 
 def worker_multi_tenant() -> bool:
     """The worker's host tenancy, from the framework's
-    ``background_tasks.sync_db.worker_tenancy()`` (it mirrors the host's
+    ``background_tasks.core.sync_db.worker_tenancy()`` (it mirrors the host's
     ``multi_tenant``) - or ``True`` when there is nothing to read: the engine
     was never configured (``set_database_url`` not called, so it answers
     ``None``), reading it fails, or it does not say."""
     try:
-        from background_tasks.sync_db import worker_tenancy
+        from background_tasks.core.sync_db import worker_tenancy
 
         multi = getattr(worker_tenancy(), "multi_tenant", None)
     except Exception:
