@@ -7,6 +7,7 @@ import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
 import { useMemo, useState } from 'react';
 
 import { campaignsUrl } from '../ui/components/campaigns/urls';
+import { AudiencePicker } from '../ui/components/editor/AudiencePicker';
 import { CampaignMeta } from '../ui/components/editor/CampaignMeta';
 import { type EditorTab, EditorTabs } from '../ui/components/editor/EditorTabs';
 import { EditorActionsContext } from '../ui/components/editor/editorActions';
@@ -26,6 +27,7 @@ interface EditorProps {
   campaign_id: number;
   can_edit?: boolean;
   can_send?: boolean;
+  can_count?: boolean;
   capabilities?: Capabilities;
   public_base_url_set?: boolean;
   max_test_recipients?: number;
@@ -101,7 +103,7 @@ export default function CampaignEditor() {
 
   useLeaveGuard({
     dirty: editor.dirty,
-    held: !readOnly && (editor.incomplete || editor.metaInvalid),
+    held: !readOnly && (editor.incomplete || editor.audienceUnfinished || editor.metaInvalid),
   });
 
   const statusKey =
@@ -149,6 +151,7 @@ export default function CampaignEditor() {
               flush={() => (editor.metaInvalid ? Promise.resolve(false) : editor.flush())}
               dirty={editor.dirty}
               incomplete={editor.incomplete}
+              audienceUnfinished={editor.audienceUnfinished}
               currentRevision={editor.currentRevision}
             />
           </>
@@ -193,6 +196,14 @@ export default function CampaignEditor() {
             readOnly={readOnly}
             onChange={editor.saveMeta}
             onInvalid={editor.markMetaInvalid}
+          />
+          <AudiencePicker
+            key={`audience-${editor.reloadKey}`}
+            campaign={campaign}
+            readOnly={readOnly}
+            canCount={props.can_count === true}
+            onChange={editor.saveMeta}
+            onUnfinished={editor.holdAudience}
           />
           {tab === 'preview' && (
             <PreviewPane

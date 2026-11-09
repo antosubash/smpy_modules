@@ -14,7 +14,10 @@
   "menu": {
     "group": "Newsletter",
     "campaigns": "Kampagnen",
-    "settings": "Einstellungen"
+    "settings": "Einstellungen",
+    "segments": "Segmente",
+    "subscribers": "Abonnenten",
+    "suppressions": "Sperrliste"
   },
   "campaigns": {
     "title": "Kampagnen",
@@ -77,6 +80,160 @@
     "no_rate": "—",
     "report_link": "Bericht",
     "report_label": "Bericht für {name}"
+  },
+  "segments": {
+    "title": "Segmente",
+    "description": "Speichern Sie Regeln, um eine Kampagne an einen Teil einer Liste zu senden.",
+    "list_label": "Liste",
+    "new": "Neues Segment",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "empty": "Noch keine Segmente in dieser Liste.",
+    "name": "Name",
+    "rules": "Regeln",
+    "add_rule": "Regel hinzufügen",
+    "remove_rule": "Regel entfernen",
+    "field": "Feld",
+    "op": "Bedingung",
+    "value": "Wert",
+    "count_one": "Etwa {count} Abonnent passt",
+    "count_other": "Etwa {count} Abonnenten passen",
+    "count_incomplete": "Unvollständige Regeln werden nicht mitgezählt.",
+    "saved": "Segment gespeichert.",
+    "delete_confirm": {
+      "title": "Dieses Segment löschen?",
+      "description": "„{name}“ wird entfernt. Das kann nicht rückgängig gemacht werden.",
+      "confirm": "Löschen",
+      "keep": "Behalten"
+    },
+    "ops": {
+      "is": "ist",
+      "is_not": "ist nicht",
+      "any": "ist eines von",
+      "all": "hat alle von",
+      "none": "hat keines von",
+      "contains": "enthält",
+      "starts_with": "beginnt mit",
+      "gt": "ist größer als",
+      "gte": "ist mindestens",
+      "lt": "ist kleiner als",
+      "lte": "ist höchstens",
+      "before": "liegt vor",
+      "since": "liegt am oder nach"
+    },
+    "signup_field": "Angemeldet am",
+    "bool": {
+      "true": "Ja",
+      "false": "Nein"
+    },
+    "updated": "Aktualisiert",
+    "summary_none": "Alle in der Liste",
+    "pick": "Auswählen…",
+    "count_loading": "Abonnenten werden gezählt…",
+    "name_label": "Segmentname",
+    "title_new": "Neues Segment",
+    "title_edit": "Segment bearbeiten",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "saving": "Wird gespeichert…",
+    "max_rules": "Höchstens 10 Regeln."
+  },
+  "subscribers": {
+    "title": "Abonnenten",
+    "description": "Abonnenten einer Liste suchen, verschlagworten und ihr Engagement ansehen.",
+    "list_label": "Liste",
+    "search_label": "Abonnenten suchen",
+    "search_placeholder": "E-Mail-Adresse",
+    "tag_label": "Tag",
+    "tag_all": "Alle Tags",
+    "segment_label": "Segment",
+    "segment_all": "Alle Abonnenten",
+    "empty": "Keine passenden Abonnenten.",
+    "email": "E-Mail",
+    "name": "Name",
+    "status": {
+      "label": "Status",
+      "all": "Alle",
+      "pending": "Ausstehend",
+      "confirmed": "Bestätigt",
+      "unsubscribed": "Abgemeldet"
+    },
+    "tags": "Tags",
+    "suppressed": "Erhält keine Newsletter",
+    "confirmed_at": "Bestätigt",
+    "open_in_records": "In Datensätzen öffnen",
+    "edit_in_records": "In Datensätzen bearbeiten",
+    "trashed": "Im Papierkorb",
+    "detail": {
+      "title": "Abonnent",
+      "engagement": "Engagement",
+      "campaigns_sent": "Gesendete Kampagnen",
+      "last_sent": "Letzte Kampagne",
+      "never_sent": "Noch keine Kampagne gesendet",
+      "opened": "Geöffnet",
+      "clicked": "Angeklickt",
+      "suppressions": "Sperren",
+      "suppressions_empty": "Keine Sperreinträge auf den Listen, die Sie lesen dürfen.",
+      "tags_save": "Tags speichern",
+      "unsubscribe": "Abmelden"
+    },
+    "unsubscribe_confirm": {
+      "title": "Diese Adresse abmelden?",
+      "description": "{email} erhält von keiner Liste mehr Newsletter. Der Widerspruch wird vermerkt; nur eine Aufhebung durch eine Administratorin oder einen Administrator oder eine bestätigte Double-Opt-in-Anmeldung hebt ihn auf.",
+      "confirm": "Abmelden",
+      "keep": "Behalten"
+    }
+  },
+  "suppressions": {
+    "title": "Sperrliste",
+    "description": "Adressen, an die kein Newsletter gesendet wird, und die protokollierten Aufhebungen.",
+    "tab_active": "Gesperrt",
+    "tab_lifted": "Aufgehoben",
+    "reason_label": "Grund",
+    "reason_all": "Alle Gründe",
+    "lookup_label": "E-Mail-Adresse nachschlagen",
+    "lookup_submit": "Nachschlagen",
+    "lookup_clear": "Suche zurücksetzen",
+    "all_lists": "Alle Listen",
+    "empty": "Nichts ist gesperrt.",
+    "fingerprint": "Fingerabdruck",
+    "reason": "Grund",
+    "list": "Liste",
+    "source": "Quelle",
+    "created": "Gesperrt am",
+    "reasons": {
+      "hard_bounce": "Harter Bounce",
+      "complaint": "Beschwerde",
+      "imported_cleaned": "Als bereinigt importiert",
+      "unsubscribed": "Abgemeldet"
+    },
+    "sources": {
+      "records_event": "Records-Ereignis",
+      "reconcile": "Abgleich",
+      "unsubscribe_page": "Abmeldeseite",
+      "send": "Versand",
+      "import": "Import",
+      "admin": "Admin"
+    },
+    "lift": {
+      "action": "Aufheben",
+      "title": "Sperre aufheben",
+      "email_label": "E-Mail-Adresse",
+      "note_label": "Warum ist die Aufhebung unbedenklich?",
+      "confirm": "Sperre aufheben",
+      "cancel": "Abbrechen",
+      "hard_bounce_warning": "Diese Adresse ist als Bounce zurückgekommen. Heben Sie die Sperre erst auf, wenn das Postfach wieder funktioniert. Geben Sie die Adresse zur Bestätigung ein.",
+      "opt_out_warning": "Diese Person hat sich abgemeldet. Die Aufhebung ist nur erlaubt, weil Records sie danach wieder als bestätigt zeigt. Bei einer Liste ohne Double-Opt-in kann jeder eine Adresse in das Formular eintippen. Prüfen Sie also, ob die Inhaberin oder der Inhaber wirklich zurückkehren wollte.",
+      "cleaned_hint": "Diese Adresse wurde als bereinigt importiert. Prüfen Sie vor dem Aufheben, ob sie zustellbar ist.",
+      "done": "Sperre aufgehoben."
+    },
+    "log": {
+      "empty": "Nichts wurde aufgehoben.",
+      "suppressed_at": "Gesperrt am",
+      "lifted_at": "Aufgehoben am",
+      "lifted_by": "Aufgehoben von",
+      "note": "Notiz"
+    }
   },
   "settings": {
     "title": "Newsletter-Einstellungen",
@@ -147,7 +304,7 @@
     "read_only": "Sie können diese Kampagne ansehen, aber nicht ändern.",
     "not_draft": "Diese Kampagne ist kein Entwurf mehr und kann nicht geändert werden.",
     "incomplete": "In einem Block fehlt ein Pflichtfeld. Die E-Mail wird wieder gespeichert, sobald es ausgefüllt ist.",
-    "leave_held": "Diese Kampagne verlassen? Ein Block ist unvollständig oder ein Feld ist ungültig, daher ist diese Änderung nicht gespeichert.",
+    "leave_held": "Diese Kampagne verlassen? Ein Block ist unvollständig, eine Zielgruppe ist nicht gewählt oder ein Feld ist ungültig, daher ist diese Änderung nicht gespeichert.",
     "select_a_block": "Wählen Sie einen Block aus, um ihn zu bearbeiten.",
     "integration_missing": "Diese Inhaltsquelle ist auf dieser Website nicht verfügbar.",
     "meta": {
@@ -184,6 +341,22 @@
       "searching": "Suche läuft",
       "no_results": "Keine Bilder gefunden."
     }
+  },
+  "audience": {
+    "title": "Zielgruppe",
+    "all": "Gesamte Liste",
+    "tag": "Ein Tag",
+    "segment": "Ein Segment",
+    "tag_label": "Tag",
+    "segment_label": "Segment",
+    "count_one": "Etwa {count} Abonnent",
+    "count_other": "Etwa {count} Abonnenten",
+    "count_loading": "Abonnenten werden gezählt…",
+    "count_hidden": "Diese Anzahl sehen nur Personen, die Abonnenten ansehen dürfen.",
+    "no_tags": "Diese Liste hat noch keine Tags.",
+    "no_segments": "Diese Liste hat noch keine Segmente.",
+    "segment_missing": "Das gespeicherte Segment existiert nicht mehr. Wählen Sie vor dem Versand eine andere Zielgruppe.",
+    "tag_missing": "Das gespeicherte Tag ist in dieser Liste nicht mehr verfügbar. Wählen Sie vor dem Versand eine andere Zielgruppe."
   },
   "blocks": {
     "categories": {
@@ -245,7 +418,6 @@
   "errors": {
     "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
     "csrf_failed": "Ihre Sitzung ist abgelaufen. Laden Sie die Seite neu und versuchen Sie es erneut.",
-    "audience_unsupported": "Vorerst kann nur die gesamte Liste die Zielgruppe sein.",
     "block_not_found": "Diese Karte ist nicht mehr in der Kampagne.",
     "campaign_cancelled": "Eine abgebrochene Kampagne kann nicht als Test gesendet werden.",
     "card_source_gone": "Die Quelle der Karte ist nicht mehr veröffentlicht. Die gespeicherte Kopie wurde beibehalten.",
@@ -269,7 +441,20 @@
     "stale": "Diese Kampagne wurde anderswo geändert. Laden Sie sie neu, um fortzufahren.",
     "tenant_required": "Für dieses Konto ist keine Organisation aktiv.",
     "transport_unavailable": "Der Mailserver ist nicht verfügbar.",
-    "unknown_list": "Keine solche Newsletter-Liste."
+    "unknown_list": "Keine solche Newsletter-Liste.",
+    "invalid_segment": "Das Segment ist ungültig.",
+    "segment_name_taken": "Auf dieser Liste gibt es bereits ein Segment mit diesem Namen.",
+    "segment_in_use": "Ein Kampagnenentwurf verwendet dieses Segment noch.",
+    "unknown_segment": "Kein solches Segment.",
+    "segment_list_mismatch": "Das Segment gehört zu einer anderen Liste.",
+    "unknown_tag": "Dieses Tag gibt es auf dieser Liste nicht.",
+    "not_subscribed": "Diese Adresse ist auf dieser Liste nicht angemeldet.",
+    "invalid_audience": "Die Zielgruppe ist ungültig.",
+    "invalid_query": "Ein Abfrageparameter ist ungültig.",
+    "lift_not_allowed": "Diese Sperre kann nicht aufgehoben werden.",
+    "opt_out_stands": "Die Adresse hat sich seit der Abmeldung nicht erneut für diese Liste bestätigt; die Abmeldung bleibt bestehen.",
+    "lift_email_mismatch": "Die Adresse passt nicht zu dieser Sperre.",
+    "suppression_changed": "Diese Sperre hat sich seit dem Laden geändert. Neu laden und erneut versuchen."
   },
   "errors_field": {
     "subject_required": "Geben Sie vor dem Senden einen Betreff ein.",
@@ -318,7 +503,7 @@
     "send_button": "Senden…",
     "dialog": {
       "title": "Kampagne senden",
-      "description": "\"{name}\" an die gesamte Liste senden. Sobald der Versand beginnt, kann der Inhalt nicht mehr geändert werden.",
+      "description": "\"{name}\" senden. Sobald der Versand beginnt, kann der Inhalt nicht mehr geändert werden.",
       "now": "Jetzt senden",
       "later": "Für später planen",
       "at_label": "Senden am",
@@ -331,8 +516,10 @@
       "cancel": "Abbrechen",
       "unsaved": "Die letzten Änderungen konnten nicht gespeichert werden, daher wurde nichts gesendet.",
       "incomplete": "Stellen Sie die unfertigen Blöcke fertig oder entfernen Sie sie, bevor Sie senden.",
+      "audience_unfinished": "Wählen Sie vor dem Versand ein Tag oder ein Segment oder kehren Sie zur gesamten Liste zurück.",
       "time_past": "Wählen Sie einen Zeitpunkt in der Zukunft.",
-      "time_far": "Wählen Sie einen Zeitpunkt innerhalb des nächsten Jahres."
+      "time_far": "Wählen Sie einen Zeitpunkt innerhalb des nächsten Jahres.",
+      "audience_frozen": "Die Zielgruppe steht fest, sobald die Kampagne geplant ist."
     },
     "panel": {
       "scheduled_for": "Geplant für {date}",
@@ -367,7 +554,8 @@
       "smtp_rejected": "Der Mailserver hat die Nachrichten abgelehnt",
       "smtp_auth": "Der Mailserver hat die Anmeldung verweigert",
       "list_unavailable": "Die Newsletter-Liste ist nicht verfügbar",
-      "https_required": "Echte E-Mails brauchen https, aber diese Kampagne wurde mit einer http-Adresse erstellt"
+      "https_required": "Echte E-Mails brauchen https, aber diese Kampagne wurde mit einer http-Adresse erstellt",
+      "audience_unavailable": "Die Zielgruppe ist nicht mehr verfügbar"
     }
   },
   "report": {

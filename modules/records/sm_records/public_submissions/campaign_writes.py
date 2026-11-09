@@ -32,7 +32,7 @@ from sm_records.public_submissions.campaign_reads import list_type, moment, stor
 from sm_records.public_submissions.subscribe import CONFIRMED
 from sm_records.public_submissions.system import _ordinary, _reload
 from sm_records.records.services import records as record_service
-from sm_records.records.services.errors import Conflict
+from sm_records.records.services.errors import Conflict, NotFound
 
 __all__ = ["TAGS", "SubscriberNotFound", "set_tags", "unsubscribe"]
 
@@ -82,7 +82,10 @@ async def unsubscribe(
     record = await _record(db, rtype, tenant_id, uuid)
     if record is None:
         return False
-    outcome = await opt_in.leave(db, rtype, record, settings, still=_holds(cutoff))
+    try:
+        outcome = await opt_in.leave(db, rtype, record, settings, still=_holds(cutoff))
+    except NotFound:  # purged since the lookup
+        return False
     return outcome.wrote
 
 

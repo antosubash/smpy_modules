@@ -197,7 +197,6 @@ async def test_invalid_payloads_422(client):
         {"expected_revision": 1, "name": ""},
         {"expected_revision": 1, "name": None},
         {"expected_revision": 1, "reply_to": "not-an-address"},
-        {"expected_revision": 1, "audience": "segment:1"},
         {"expected_revision": 1, "body": "nope"},
         [],
     ):
@@ -205,6 +204,10 @@ async def test_invalid_payloads_422(client):
         assert res.status_code == 422, (body, res.text)
     res = await client.get(BASE, params={"limit": 101}, headers=VIEW)
     assert res.status_code == 422
+    res = await client.patch(
+        url, json={"expected_revision": 1, "audience": "segment:1"}, headers=EDIT
+    )
+    assert (res.status_code, res.json()["code"]) == (422, "unknown_segment")
 
 
 @pytest.mark.parametrize("name", [" ", "   ", "\t\n", "\u3000"])

@@ -86,6 +86,14 @@ describe('SendDialog', () => {
     });
   }
 
+  it('does not claim the whole list for a tag audience, and says the audience is fixed', async () => {
+    await open({ campaign: campaign({ audience: 'tag:vip' }) });
+    const text = document.querySelector('[role="dialog"]')?.textContent ?? '';
+    expect(text).not.toMatch(/whole list/i);
+    expect(text).toContain('Send "Spring".');
+    expect(text).toContain(copy.dialog.audience_frozen);
+  });
+
   it('is hidden without can_send, and for a campaign that is not a draft', async () => {
     await render({ canSend: false });
     expect(button(copy.send_button)).toBeUndefined();

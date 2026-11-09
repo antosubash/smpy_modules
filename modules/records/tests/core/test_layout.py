@@ -58,3 +58,13 @@ def test_newsletter_contract_imports_cleanly_first():
         "assert n.MAX_SUBSCRIBER_BATCH == 1000"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_newsletter_admin_contract_imports_cleanly_first():
+    """In a fresh interpreter, with nothing imported before it, the admin reads
+    contract loads without an import cycle."""
+    code = (
+        "import sm_records.contracts.newsletter_admin as n; "
+        "assert n.MAX_BROWSE_LIMIT == 100 and n.BROWSE_STATUSES[0] == 'pending'"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)

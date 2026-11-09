@@ -26,7 +26,7 @@ from pydantic import (
 
 from sm_newsletter.campaigns.lifecycle import split_paused
 from sm_newsletter.content.merge import check_merge, check_no_capability
-from sm_newsletter.core.constants import MAX_TYPE_KEY_LEN
+from sm_newsletter.core.constants import MAX_AUDIENCE_LEN, MAX_TYPE_KEY_LEN
 from sm_newsletter.core.errors import InvalidCampaign, NewsletterError
 from sm_newsletter.core.headers import check_header_text
 
@@ -108,7 +108,7 @@ class CampaignPatch(BaseModel):
     from_name: FromName = None
     reply_to: ReplyTo = None
     list_type_key: ListKey | None = None
-    audience: Annotated[str, Field(min_length=1, max_length=140)] | None = None
+    audience: Annotated[str, Field(min_length=1, max_length=MAX_AUDIENCE_LEN)] | None = None
     body: Any = None
     """Validated by the service with ``parse_body`` (422 ``invalid_body``)."""
 

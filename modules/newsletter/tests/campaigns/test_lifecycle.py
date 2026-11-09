@@ -132,7 +132,7 @@ REFUSALS = {
     "in_the_past": (None, NOW - timedelta(minutes=2), "invalid_campaign"),
     "too_far_ahead": (None, NOW + timedelta(days=400), "invalid_campaign"),
     "naive_time": (None, NOW.replace(tzinfo=None), "invalid_campaign"),
-    "tag_audience": (_columns(audience="tag:x"), None, "audience_unsupported"),
+    "tag_audience": (_columns(audience="tag:x"), None, "unknown_tag"),
     "smtp_http_public_base": (_base("http://news.example.org"), None, "https_required"),
     "smtp_http_content_origin": (_http_content_origin, None, "https_required"),
     "capability_in_subject": (

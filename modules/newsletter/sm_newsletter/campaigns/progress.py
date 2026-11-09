@@ -11,11 +11,11 @@ from datetime import datetime, timedelta
 
 from simple_module_db import finalize_session
 from simple_module_db.tenancy import all_tenants
-from sm_records.contracts.newsletter import count_subscribers
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_newsletter.campaigns.audience import audience_filters
+from sm_newsletter.campaigns.access import Roles
+from sm_newsletter.campaigns.audience import AUDIENCE_ALL, audience_count
 from sm_newsletter.campaigns.lifecycle import SENDING, split_paused
 from sm_newsletter.core import tenancy
 from sm_newsletter.core.settings import NewsletterSettings
@@ -125,19 +125,26 @@ async def estimate(
     tenant_id: str,
     campaign: Campaign,
     at: datetime,
+    roles: Roles,
+    reads_subscribers: bool = True,
 ) -> EstimateOut:
     """When a send starting at ``at`` would end. The recipient count is approximate:
-    suppressions are not subtracted."""
-    recipients = await count_subscribers(
+    suppressions are not subtracted. A caller without ``records.view``
+    (``reads_subscribers`` false) gets no count for a tag or segment audience,
+    which would answer questions about subscriber fields, and a finish computed
+    on the whole list: an upper bound."""
+    hidden = not reads_subscribers and campaign.audience != AUDIENCE_ALL
+    recipients = await audience_count(
         session,
         tenant_id=tenant_id,
-        type_key=campaign.list_type_key,
-        filters=audience_filters(campaign.audience),
+        list_type_key=campaign.list_type_key,
+        audience=AUDIENCE_ALL if hidden else campaign.audience,
+        roles=roles,
     )
     ahead = await queued_ahead(factory, started_before=None)
     rate = daily_rate(settings)
     return EstimateOut(
-        recipients=recipients,
+        recipients=None if hidden else recipients,
         estimated_finish=estimate_finish(start=at, ahead=ahead, own=recipients, rate=rate),
         overlaps=ahead > 0,
         daily_rate=rate,

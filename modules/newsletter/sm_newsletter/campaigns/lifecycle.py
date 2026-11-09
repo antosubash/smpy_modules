@@ -46,6 +46,7 @@ from sm_newsletter.core.errors import (
 )
 from sm_newsletter.core.settings import NewsletterSettings
 from sm_newsletter.models import Campaign, Send
+from sm_newsletter.segments.store import filter_count
 
 SCHEDULED, SENDING, PAUSED, CANCELLED = "scheduled", "sending", "paused", "cancelled"
 # Bumped generation, released claim: an old freezer's next write matches nothing.
@@ -93,7 +94,9 @@ async def schedule(
     if campaign.revision != expected_revision:
         raise StaleCampaign()
     await check_list(session, tenant_id=tenant_id, type_key=campaign.list_type_key, roles=roles)
-    audience_filters(campaign.audience)
+    key = {"tenant_id": tenant_id, "list_type_key": campaign.list_type_key}
+    filters = await audience_filters(session, **key, audience=campaign.audience, roles=roles)
+    await filter_count(session, **key, filters=filters)  # G6: what records cannot answer, now
     check_sender(settings)
     check_campaign_headers(campaign)
     if not campaign.subject.strip():
@@ -102,6 +105,7 @@ async def schedule(
         raise EmptyCampaign()
     ctx = await render_context(app, tenant_id=tenant_id)
     snap = build_render(settings, campaign, ctx, tenant_id=tenant_id, now=now)
+    snap.render.audience_filters = filters
     when = check_scheduled_at(scheduled_at, now)
     check_https(settings, ctx)
     check_no_capability_fields(campaign)

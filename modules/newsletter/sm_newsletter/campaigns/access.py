@@ -25,6 +25,10 @@ MAX_ID = 2**31 - 1
 32-bit on Postgres (SQLite takes 64 bits, but Postgres is the bound). A larger
 id in a URL would overflow the query parameter instead of matching nothing."""
 
+MAX_BIG_ID = 2**63 - 1
+"""The same bound for a :func:`~sm_newsletter.models._cols.big_pk` table
+(``BIGINT`` on Postgres), such as the suppressions."""
+
 Roles = Sequence[str] | CallerRoles | None
 """What records' ``can_read_list`` takes; ``None`` is no caller (a worker)."""
 
@@ -67,3 +71,15 @@ async def require_campaign(
     ):
         raise NotFound()
     return campaign
+
+
+async def require_list(
+    session: AsyncSession, *, tenant_id: str, list_type_key: str, roles: Roles
+) -> None:
+    """:class:`NotFound` unless ``list_type_key`` is one of the tenant's lists
+    this caller may read: a missing, unreadable or non-list key answers alike."""
+    # One list's check, not `readable_lists`' (a records lookup for every list of the tenant).
+    if list_type_key not in await subscription_lists(session, tenant_id=tenant_id):
+        raise NotFound()
+    if not await can_read_list(session, tenant_id=tenant_id, type_key=list_type_key, roles=roles):
+        raise NotFound()

@@ -52,6 +52,9 @@ NOT_FOUND_DETAIL = "Not found"
 
 # Inertia page names (``sm_newsletter/pages/<name>.tsx``).
 _PAGE_CAMPAIGNS = "Newsletter/Campaigns"
+_PAGE_SEGMENTS = "Newsletter/Segments"
+_PAGE_SUBSCRIBERS = "Newsletter/Subscribers"
+_PAGE_SUPPRESSIONS = "Newsletter/Suppressions"
 _PAGE_EDITOR = "Newsletter/CampaignEditor"
 _PAGE_REPORT = "Newsletter/CampaignReport"
 _PAGE_SETTINGS = "Newsletter/Settings"
@@ -63,10 +66,22 @@ MENU_URL = f"{VIEW_PREFIX}/"
 MENU_LABEL_CAMPAIGNS = "Campaigns"
 MENU_LABEL_KEY_CAMPAIGNS = "newsletter.menu.campaigns"
 MENU_ICON_CAMPAIGNS = "mail"
+MENU_LABEL_SEGMENTS = "Segments"
+MENU_LABEL_KEY_SEGMENTS = "newsletter.menu.segments"
+MENU_ICON_SEGMENTS = "filter"
+MENU_LABEL_SUBSCRIBERS = "Subscribers"
+MENU_LABEL_KEY_SUBSCRIBERS = "newsletter.menu.subscribers"
+MENU_ICON_SUBSCRIBERS = "users"
+MENU_LABEL_SUPPRESSIONS = "Suppressions"
+MENU_LABEL_KEY_SUPPRESSIONS = "newsletter.menu.suppressions"
+MENU_ICON_SUPPRESSIONS = "shield"
 MENU_LABEL_SETTINGS = "Settings"
 MENU_LABEL_KEY_SETTINGS = "newsletter.menu.settings"
 MENU_ICON_SETTINGS = "settings"
 
+SEGMENTS_URL = f"{VIEW_PREFIX}/segments"
+SUBSCRIBERS_URL = f"{VIEW_PREFIX}/subscribers"
+SUPPRESSIONS_URL = f"{VIEW_PREFIX}/suppressions"
 # The newsletter settings page; also the settings' ``manage_url``, so the
 # generic Settings screen refuses newsletter writes.
 SETTINGS_URL = f"{VIEW_PREFIX}/settings"
@@ -96,10 +111,18 @@ REASON_UNSUBSCRIBED = "unsubscribed"
 REASONS = (REASON_HARD_BOUNCE, REASON_COMPLAINT, REASON_IMPORTED_CLEANED, REASON_UNSUBSCRIBED)
 SOURCES = ("records_event", "reconcile", "unsubscribe_page", "send", "import", "admin")
 
+# Reasons an admin may lift; a complaint is never lifted.
+LIFTABLE = (REASON_HARD_BOUNCE, REASON_IMPORTED_CLEANED, REASON_UNSUBSCRIBED)
+
+PERM_RECORDS_VIEW = "records.view"
+TAGS_FIELD = "tags"
+"""The subscription list's tags multiselect field."""
+
 MAX_TYPE_KEY_LEN = 64  # records' ``MAX_KEY_LEN``
 MAX_EMAIL_LEN = 320
 MAX_FIRST_NAME_LEN = 200
 MAX_SENDER_LEN = 600  # an encoded "Name <address>" header
+MAX_AUDIENCE_LEN = 140  # ``newsletter_campaign.audience``: ``tag:<=100 chars>`` fits
 
 # Why a campaign is paused; ``paused_reason`` stores ``"<code>|<detail>"``,
 # clipped to ``MAX_PAUSED_REASON`` (the column's length).
@@ -110,12 +133,16 @@ PAUSE_SMTP_AUTH = "smtp_auth"
 PAUSE_LIST_UNAVAILABLE = "list_unavailable"
 PAUSE_HTTPS_REQUIRED = "https_required"
 """The snapshot's bases are not both ``https://`` and the transport is ``smtp``."""
+PAUSE_AUDIENCE_UNAVAILABLE = "audience_unavailable"
+"""Records refused the audience's stored filter terms at freeze (a reason other
+than ``reindexing`` or ``not_a_list``)."""
 PAUSE_CODES = (
     PAUSE_MANUAL,
     PAUSE_SMTP_REJECTED,
     PAUSE_SMTP_AUTH,
     PAUSE_LIST_UNAVAILABLE,
     PAUSE_HTTPS_REQUIRED,
+    PAUSE_AUDIENCE_UNAVAILABLE,
 )
 
 # ``newsletter_send.error_kind`` of a row that ended ``failed`` or ``bounced``.
@@ -124,6 +151,8 @@ ERROR_RETRIES_EXHAUSTED = "retries_exhausted"
 ERROR_INVALID_MESSAGE = "invalid_message"
 ERROR_HARD_BOUNCE = "hard_bounce"
 
-# Suppression sources the sending path writes (both are in ``SOURCES``).
+# Suppression sources written by the sending path, the unsubscribe page and an
+# admin's unsubscribe (all in ``SOURCES``).
 SOURCE_SEND = "send"
 SOURCE_UNSUBSCRIBE_PAGE = "unsubscribe_page"
+SOURCE_ADMIN = "admin"

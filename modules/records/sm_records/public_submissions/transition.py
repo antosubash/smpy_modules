@@ -29,15 +29,17 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Final
 
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.core import events
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType
+from sm_records.public_submissions.row_lock import lock_record
 from sm_records.public_submissions.system import _merge_marks, _ordinary, _reload
 from sm_records.records.services import records as record_service
 from sm_records.records.services._payload import field_defs
-from sm_records.records.services.errors import Conflict, ValidationFailed
+from sm_records.records.services.errors import Conflict, NotFound, ValidationFailed
 
 __all__ = ["ATTEMPTS", "Change", "Outcome", "transition"]
 
@@ -79,12 +81,19 @@ async def transition(
     derive: Callable[[Record], Change | None],
     *,
     settings: RecordsSettings,
+    lock: bool = False,
 ) -> Outcome:
     """Apply ``derive(row)`` to ``record`` as a compare-and-set, re-deciding it
     from the reloaded row on every attempt. ``Conflict`` if the row never
-    held still."""
+    held still; ``NotFound`` if the row was purged since the caller loaded it.
+
+    ``lock=True`` reloads through :func:`.row_lock.lock_record` instead: the
+    row is decided from under a lock held to the end of the transaction."""
     for _ in range(ATTEMPTS):
-        record = await _reload(db, record)
+        try:
+            record = await (lock_record(db, rtype, record) if lock else _reload(db, record))
+        except NoResultFound:  # purged between the caller's lookup and this reload
+            raise NotFound(f"{rtype.key} record {record.uuid} no longer exists") from None
         before = dict(record.data or {})
         change = derive(record)
         if change is None:

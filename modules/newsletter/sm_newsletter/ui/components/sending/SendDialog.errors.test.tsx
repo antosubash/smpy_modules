@@ -143,4 +143,12 @@ describe('SendDialog refusals', () => {
     expect(alertText()).toBe(en.errors_field.subject_required);
     expect(de.errors_field.subject_required).toBeTruthy();
   });
+
+  it('says the count is hidden when the estimate leaves it out (no records.view)', async () => {
+    estimate.mockResolvedValue({ ...figures, recipients: null });
+    await open();
+    expect(document.body.textContent).toContain(en.audience.count_hidden);
+    expect(document.body.textContent).not.toContain('recipients');
+    expect(button(copy.dialog.confirm)?.disabled).toBe(false);
+  });
 });

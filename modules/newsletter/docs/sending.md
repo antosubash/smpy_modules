@@ -14,7 +14,7 @@ tenant and the allowed *from* statuses, with `revision = revision + 1`.
 | send or schedule (`newsletter.send`) | `draft`, at `expected_revision` | `scheduled` | render snapshot written; `scheduled_at` |
 | unschedule (`newsletter.send`) | `scheduled`, or `paused` with `started_at` empty (never frozen), at `expected_revision` | `draft` | snapshot and send rows deleted; `scheduled_at` and the paused reason cleared; a `paused` campaign that started is `409 invalid_transition` |
 | freeze (worker) | `scheduled` | `sending` | `started_at`, `recipient_count`, `suppressed_count` |
-| freeze, list gone or snapshot not https on `smtp` (worker) | `scheduled` | `paused` (`list_unavailable`, `https_required`) | `started_at` stays empty; nothing frozen |
+| freeze, list gone, audience refused by records or snapshot not https on `smtp` (worker) | `scheduled` | `paused` (`list_unavailable`, `audience_unavailable`, `https_required`) | `started_at` stays empty; nothing frozen |
 | pause (`newsletter.send`) or auto-pause | `sending` | `paused` | reason |
 | resume (`newsletter.send`) | `paused` | `sending` if `started_at` is set, else `scheduled` at now | reason cleared |
 | cancel (`newsletter.send`) | `scheduled`, `sending`, `paused` | `cancelled` | `finished_at`; remaining `queued` rows become `cancelled` |
@@ -24,7 +24,7 @@ When no row matches, the campaign is re-read: missing is 404, a stale revision
 on send or unschedule is `409 stale`, sending a non-draft is `409
 not_a_draft`, anything else `409 invalid_transition`. The paused reason is
 stored as `"<code>|<detail>"`; the codes are `manual`, `smtp_rejected`,
-`smtp_auth`, `list_unavailable` and `https_required`, and the API returns them
+`smtp_auth`, `list_unavailable`, `https_required` and `audience_unavailable`, and the API returns them
 split as
 `paused_code` and `paused_detail`.
 
@@ -36,9 +36,11 @@ days]`; anything else is `422 invalid_campaign`. `/estimate` applies the same
 window to its `at`. The send dialog refuses a "Later" time that is already past
 when Confirm is pressed, and never turns it into "now".
 
-Scheduling checks, in order: draft and revision, list access, audience (only
-`all` is supported until PR 6; `tag:` and `segment:` are `422
-audience_unsupported`), the sender, the headers, a subject, at least one block
+Scheduling checks, in order: draft and revision, list access, audience (`all`,
+`tag:<choice>` or `segment:<id>`, resolved to records filter terms and
+dry-run counted: `422 unknown_tag`, `unknown_segment`,
+`segment_list_mismatch` or `invalid_segment`; the terms are stored on the
+render and freeze reads them from there), the sender, the headers, a subject, at least one block
 (`422 empty_campaign`), absolute links (`422 public_base_url_required`), the
 schedule window, HTTPS for both bases on the `smtp` transport (`422
 https_required`; the console transport allows `http://`), and no
@@ -89,6 +91,16 @@ dispatcher tick: its audience becomes `newsletter_send` rows.
   so does a snapshot that is not `https://` (`https_required`). Nothing is
   frozen, so the campaign can be resumed (back to `scheduled`) or unscheduled
   to draft.
+- **The audience is the snapshot.** The freeze reads the terms scheduling
+  stored on the render (`audience_filters`; `[]`, as on a render written
+  before audiences existed, is the whole list), never the segment: editing or
+  deleting a segment after scheduling changes nothing until the campaign is
+  unscheduled and scheduled again. When records refuses a stored term while
+  freezing, `reindexing` leaves the campaign `scheduled` (a WARNING; the claim
+  expires and a later tick retries), `not_a_list` pauses with
+  `list_unavailable`, and any other reason pauses with `audience_unavailable`,
+  records' reason as the detail. The refused page is rolled back; both pauses
+  are conditional on the claim, like the one above.
 
 ## The dispatcher
 
@@ -156,6 +168,14 @@ the campaign row first. No transaction mixes the two, because a never-started
 campaign has sent nothing to record or track. A cancel that finds the campaign
 started meanwhile rolls back to a savepoint, releasing the campaign row, before
 it takes the started order.
+
+PR 6's people screens add two more paths, both taking **records' lock domain
+first** (its type lock, then the record row) and newsletter rows after: the
+suppression lift (`lock_confirmation`, then the conditional suppression delete,
+then the lift insert) and the admin unsubscribe (records' unsubscribe, then the
+suppression upsert). Neither touches campaign, send or click rows, so the two
+orders above are unaffected. Audience changes and `schedule` touch only the
+campaign row (reading a segment takes no lock). See [`audience.md`](audience.md).
 
 On SQLite the lock is a lease row (120 s) and the reservation is fenced on it,
 so a taken-over lease can never spend budget another holder counted. On

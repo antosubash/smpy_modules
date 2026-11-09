@@ -168,7 +168,17 @@ tenant-wide: an opt-out on any list suppresses every list in the tenant. Only a
 double-opt-in confirmation (records' confirm link, the one `pending → confirmed`
 event) clears anything: that list's opt-out and the bounce/import rows created at
 or before it, never `complaint`, never another list's opt-out. A single-opt-in
-signup (`None → confirmed`, anyone can type the address) clears nothing.
+signup (`None → confirmed`, anyone can type the address) clears nothing. An admin
+lift (`POST /api/newsletter/suppressions/{id}/lift`) is the only other way a
+row is deleted. It needs `newsletter.manage`, the typed address (hash match) and a
+note, and writes `newsletter_suppression_lift`; it is never allowed for a
+`complaint`. An `unsubscribed` row lifts only while records shows that address
+confirmed on that list after the opt-out. That check and the delete run under
+records' lock (`lock_confirmation`: type lock, then row), which every unsubscribe
+also takes (`opt_in.leave` → `transition(lock=True)` → `lock_record`). A new records
+path that unsubscribes must take it too. A campaign's audience is resolved when it
+is scheduled and stored on the render snapshot; freeze evaluates that snapshot,
+never the live segment.
 
 **Never add a file under `modules/*/*/pages/` unless it is a real Inertia
 page.** The page name is derived from that path by `import.meta.glob`, so a

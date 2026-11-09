@@ -52,7 +52,8 @@ export type PausedCode =
   | 'smtp_rejected'
   | 'smtp_auth'
   | 'list_unavailable'
-  | 'https_required';
+  | 'https_required'
+  | 'audience_unavailable';
 
 /** `GET /campaigns/{id}/progress`. */
 export interface Progress {
@@ -77,7 +78,8 @@ export interface Progress {
 
 /** `GET /campaigns/{id}/estimate`. */
 export interface Estimate {
-  recipients: number;
+  /** Null: a tag or segment audience and a caller without `records.view`. */
+  recipients: number | null;
   estimated_finish: string;
   overlaps: boolean;
   daily_rate: number;
@@ -190,3 +192,5 @@ export interface SettingsOut {
 
 export type SettingsUpdate = Partial<Omit<SettingsOut, 'has_password'>>;
 export type SettingsSaved = SettingsOut & { password_cleared: boolean };
+
+export * from './subscriberTypes';
