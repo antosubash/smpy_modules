@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -2888,7 +2888,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-ai"
-version = "0.0.14"
+version = "0.0.15"
 source = { editable = "modules/ai" }
 dependencies = [
     { name = "cryptography" },
@@ -2926,7 +2926,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "simple-module-analytics"
-version = "0.0.14"
+version = "0.0.15"
 source = { editable = "modules/analytics" }
 dependencies = [
     { name = "pydantic-settings" },
@@ -2999,7 +2999,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-billing"
-version = "0.0.14"
+version = "0.0.15"
 source = { editable = "modules/billing" }
 dependencies = [
     { name = "cryptography" },
@@ -3165,7 +3165,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-images"
-version = "0.0.14"
+version = "0.0.15"
 source = { editable = "modules/images" }
 dependencies = [
     { name = "httpx" },
@@ -3267,7 +3267,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-news"
-version = "0.0.14"
+version = "0.0.15"
 source = { editable = "modules/news" }
 dependencies = [
     { name = "pydantic-settings" },
@@ -3345,7 +3345,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "simple-module-pagebuilder"
-version = "0.0.14"
+version = "0.0.15"
 source = { editable = "modules/pagebuilder" }
 dependencies = [
     { name = "pillow" },
@@ -3401,7 +3401,7 @@ wheels = [
 
 [[package]]
 name = "simple-module-python-modules"
-version = "0.0.14"
+version = "0.0.15"
 source = { virtual = "." }
 
 [package.dev-dependencies]
@@ -3430,7 +3430,7 @@ dev = [
 
 [[package]]
 name = "simple-module-records"
-version = "0.0.14"
+version = "0.0.15"
 source = { editable = "modules/records" }
 dependencies = [
     { name = "httpx" },
