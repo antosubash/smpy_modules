@@ -15,6 +15,8 @@ def test_collector_has_method_scoped_body_and_rate_guards():
     assert body.limit_for("POST", "/api/analytics/collect") == 8192
     assert body.limit_for("POST", "/api/analytics/properties") is None
     assert rates.match("POST", "/api/analytics/collect").key == "ip"
+    assert rates.match("POST", "/api/analytics/collect").rate == "120/minute"
+    assert rates.match("GET", "/api/analytics/config").rate == "1200/minute"
     assert rates.match("POST", "/api/analytics/properties") is None
     assert public.matches("POST", "/api/analytics/collect")
     assert public.matches("GET", "/api/analytics/config")

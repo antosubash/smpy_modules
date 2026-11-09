@@ -82,10 +82,10 @@ class AnalyticsModule(ModuleBase):
 
     def register_rate_limits(self, registry: RateLimitRegistry) -> None:
         registry.add_exact(
-            c.COLLECT_PATH, RateLimitRule("120/minute", key="ip", methods=frozenset({"POST"}))
+            c.COLLECT_PATH, RateLimitRule(c.COLLECT_RATE, key="ip", methods=frozenset({"POST"}))
         )
         registry.add_exact(
-            c.CONFIG_PATH, RateLimitRule("120/minute", key="ip", methods=frozenset({"GET"}))
+            c.CONFIG_PATH, RateLimitRule(c.CONFIG_RATE, key="ip", methods=frozenset({"GET"}))
         )
 
     def locale_dirs(self) -> dict[str, Path]:
