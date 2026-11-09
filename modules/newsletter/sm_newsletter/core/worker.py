@@ -31,7 +31,7 @@ _engine: tuple[int, tuple[Any, ...], Any] | None = None  # (pid, config key, Dat
 
 
 def _config() -> tuple[str, Any, dict[str, int]]:
-    from background_tasks import sync_db
+    from background_tasks.core import sync_db
 
     return sync_db.async_database_url(), sync_db.engine_tenancy(), sync_db.database_options()
 

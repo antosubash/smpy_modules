@@ -14,10 +14,10 @@ import pytest
 import pytest_asyncio
 from fastapi import APIRouter, FastAPI, Request
 from httpx import ASGITransport, AsyncClient
-from settings.endpoints.module_api import router as generic_settings_router
+from settings.core.service import SettingService
 from settings.models import Base as SettingsBase
-from settings.service import SettingService
-from settings.store import SettingsStore
+from settings.module_settings.store import SettingsStore
+from settings.web.endpoints.module_api import router as generic_settings_router
 from simple_module_core.events import EventBus
 from simple_module_core.i18n import I18nRegistry
 from simple_module_hosting.csrf import CSRF_HEADER, get_csrf_token
@@ -145,7 +145,7 @@ async def test_settings_edit_without_manage_is_403(client, built):
 
 
 def test_settings_edit_constant_matches_the_framework():
-    from settings.constants import PERM_EDIT
+    from settings.core.constants import PERM_EDIT
 
     assert constants.PERM_SETTINGS_EDIT == PERM_EDIT
 

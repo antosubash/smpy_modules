@@ -16,9 +16,9 @@ from sm_newsletter.core import constants, crypto
 async def set_smtp_password(app: FastAPI, db: AsyncSession, password: str) -> None:
     """Persist ``password`` encrypted and hot-swap the live settings."""
     # Plugin imports (settings is a declared dependency), local as ai's are.
-    from settings.reload import apply_changes_and_reload
-    from settings.service import SettingService
-    from settings.store import SettingsStore
+    from settings.core.service import SettingService
+    from settings.module_settings.reload import apply_changes_and_reload
+    from settings.module_settings.store import SettingsStore
     from simple_module_db import finalize_session
 
     store = SettingsStore(SettingService(db))

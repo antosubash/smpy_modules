@@ -13,8 +13,8 @@ dependencies = [
     "simple_module_core>=0.0.42,<0.1",
     "simple_module_db>=0.0.42,<0.1",
     "simple_module_hosting>=0.0.42,<0.1",
-    "simple_module_settings>=0.0.42,<0.1",
-    "simple_module_background_tasks>=0.0.42,<0.1",
+    "simple_module_settings>=0.0.44,<0.1",  # floor: settings.core and settings.module_settings paths first shipped in 0.0.44
+    "simple_module_background_tasks>=0.0.44,<0.1",  # floor: background_tasks.core and .worker paths first shipped in 0.0.44
     # floor: 0.0.13 — raise to the records release that first ships contracts.newsletter's subscription_lists / subscription_list_tenants / include_trashed (newsletter PR 2; contracts.newsletter itself is #306)
     "simple_module_records>=0.0.13,<0.1",
     "cryptography>=42",
