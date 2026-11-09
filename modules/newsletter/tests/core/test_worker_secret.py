@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from background_tasks import sync_db
+from background_tasks.core import sync_db
 from simple_module_db.stored_settings import Setting
 from sm_newsletter.core import crypto, secret, tokens
 from sm_newsletter.core.errors import SmtpPasswordUnreadable

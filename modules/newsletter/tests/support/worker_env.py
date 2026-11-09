@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from background_tasks.worker_settings import clear_settings_cache
+from background_tasks.worker.settings import clear_settings_cache
 from sm_newsletter.core import crypto
 
 
