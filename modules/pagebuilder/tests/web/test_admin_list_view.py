@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from httpx import AsyncClient
 
+INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+
 VIEW = "/pagebuilder/"
 API = "/api/pagebuilder/pages"
 
@@ -43,7 +45,9 @@ async def test_filters_round_trip_into_the_props(authed_client: AsyncClient) -> 
     await _create(authed_client, "Beta", "beta")
 
     response = await authed_client.get(
-        VIEW, params={"search": "Beta", "status": ""}, headers={"X-Inertia": "true"}
+        VIEW,
+        params={"search": "Beta", "status": ""},
+        headers=INERTIA,
     )
     assert response.status_code == 200, response.text
     props = response.json()["props"]
@@ -61,7 +65,9 @@ async def test_status_filter_round_trips(authed_client: AsyncClient) -> None:
     await authed_client.post(f"{API}/{published}/publish", json={})
 
     response = await authed_client.get(
-        VIEW, params={"status": "published"}, headers={"X-Inertia": "true"}
+        VIEW,
+        params={"status": "published"},
+        headers=INERTIA,
     )
     props = response.json()["props"]
     assert [p["slug"] for p in props["pages"]["items"]] == ["live-one"]
@@ -75,7 +81,7 @@ async def test_an_offset_past_the_end_steps_back_to_the_last_page(
     await _create(authed_client, "Only page", "only-page")
 
     response = await authed_client.get(
-        VIEW, params={"offset": 100}, headers={"X-Inertia": "true"}
+        VIEW, params={"offset": 100}, headers=INERTIA
     )
     props = response.json()["props"]
     assert props["filters"]["offset"] == 0
@@ -102,11 +108,9 @@ async def test_the_language_filter_narrows_the_board_too(
 
     props = (
         await bilingual_client.get(
-            VIEW, params={"locale": "de"}, headers={"X-Inertia": "true"}
+            VIEW, params={"locale": "de"}, headers=INERTIA
         )
     ).json()["props"]
 
-    board_slugs = {
-        item["slug"] for stage in props["board"] for item in stage["items"]
-    }
+    board_slugs = {item["slug"] for stage in props["board"] for item in stage["items"]}
     assert board_slugs == {"ueber"}

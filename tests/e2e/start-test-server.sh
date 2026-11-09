@@ -28,6 +28,10 @@ export SM_BG_TASKS_RESULT_BACKEND=cache+memory://
 export SM_BG_TASKS_BROADCAST_INVALIDATIONS=false
 export SM_BG_TASKS_TASK_EAGER_PROPAGATES=true
 
+# Everything a host's database needs before it boots. A local parallel run
+# (scripts/e2e_shards.mjs) does this once, with E2E_PREPARE_ONLY=1, and then
+# starts each shard's host on a copy of the result through E2E_DB_TEMPLATE.
+prepare_database() {
 # Start from an empty database. How that is done depends on the backend, and
 # the parameter expansion below is only meaningful for one of them: on a
 # Postgres URL `${SM_DATABASE_URL#sqlite+aiosqlite:///}` matches nothing, so
@@ -121,21 +125,6 @@ uv run python scripts/set_setting.py sm_records \
 # meters an organisation of its own.
 uv run python scripts/seed_usage.py
 
-# The host limits anonymous traffic to public routes per client IP
-# (`rate_limit_public`, 120/minute). Every test signs in from scratch — an
-# anonymous GET /users/login and POST /api/users/auth/login — and all of them
-# come from 127.0.0.1, so a fast shard spends that budget on logins alone and
-# the next sign-in page is a 429 (#245). Raised rather than switched off, so
-# the limiter stays in the request path; a rule with its own `rate=` (records'
-# public forms) is unaffected.
-#
-# Exported rather than written with set_setting.py: a `host.rate_limit_public`
-# row is read at boot too since #260, but the environment wins over it, so an
-# export cannot be shadowed by a row a developer's own database already holds.
-# Set here, before both `exec`s below, it reaches the bundle server,
-# `make dev` and the multi-tenant run alike.
-export SM_RATE_LIMIT_PUBLIC=100000/minute
-
 # Multi-tenant runs only (E2E_MULTI_TENANT=1 → SM_MULTI_TENANT=true): resolve
 # the tenant from the host, so `<slug>.localhost` addresses an organisation's
 # public site the way an anonymous visitor would reach it. A spec names the
@@ -152,6 +141,42 @@ fi
 if [[ "${E2E_BILLING_USER:-}" == "1" ]]; then
   uv run python scripts/set_setting.py sm_billing subject_mode user
 fi
+
+}
+
+if [[ -n "${E2E_DB_TEMPLATE:-}" ]]; then
+  # A copy, plus this host's own upload directories: the database is not the
+  # only state two hosts would otherwise share, and these settings are absolute
+  # paths, so they cannot live in the template.
+  db_path="${SM_DATABASE_URL#sqlite+aiosqlite:///}"
+  cp "${E2E_DB_TEMPLATE}" "${db_path}"
+  storage="${E2E_STORAGE_DIR:?E2E_DB_TEMPLATE needs E2E_STORAGE_DIR}"
+  uv run python scripts/set_setting.py pagebuilder \
+    media_root "${storage}/media" \
+    snapshot_root "${storage}/snapshots"
+  uv run python scripts/set_setting.py file_storage fs_root_path "${storage}/files"
+else
+  prepare_database
+fi
+
+if [[ "${E2E_PREPARE_ONLY:-}" == "1" ]]; then
+  exit 0
+fi
+
+# The host limits anonymous traffic to public routes per client IP
+# (`rate_limit_public`, 120/minute). Every test signs in from scratch — an
+# anonymous GET /users/login and POST /api/users/auth/login — and all of them
+# come from 127.0.0.1, so a fast shard spends that budget on logins alone and
+# the next sign-in page is a 429 (#245). Raised rather than switched off, so
+# the limiter stays in the request path; a rule with its own `rate=` (records'
+# public forms) is unaffected.
+#
+# Exported rather than written with set_setting.py: a `host.rate_limit_public`
+# row is read at boot too since #260, but the environment wins over it, so an
+# export cannot be shadowed by a row a developer's own database already holds.
+# Set here, before both `exec`s below, it reaches the bundle server,
+# `make dev` and the multi-tenant run alike.
+export SM_RATE_LIMIT_PUBLIC=100000/minute
 
 # E2E_BUNDLE=1: the build users get (#119). No Vite dev server and no
 # --reload — playwright.config.ts sets SM_ENVIRONMENT=production for this

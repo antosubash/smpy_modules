@@ -29,7 +29,7 @@ from pagebuilder.core.permissions import ALL_PERMISSIONS as PB_PERMISSIONS
 from pagebuilder.core.settings import PagebuilderSettings
 from pagebuilder.module import PagebuilderModule
 from pg_support import make_db_state
-from settings.module_registry import ModuleSettingsRegistry
+from simple_module_core.module_settings import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_db import tenant_context
 from simple_module_inertia import InertiaConfig, inertia_dependency_factory

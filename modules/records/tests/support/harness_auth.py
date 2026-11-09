@@ -103,7 +103,7 @@ class _HeaderAuthMiddleware(BaseHTTPMiddleware):
             )
             # Mirrors ``AuthMiddleware`` (``simple_module_hosting/middleware.py``),
             # which runs ahead of every dependency in production. Without it,
-            # ``permissions.deps.RequiresPermission`` (unlike the framework's
+            # ``permissions.web.deps.RequiresPermission`` (unlike the framework's
             # own, roles-only checker) has no role-map fallback of its own and
             # treats every caller as holding nothing but direct grants.
             registry = request.app.state.sm.permissions

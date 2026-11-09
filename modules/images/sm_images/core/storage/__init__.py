@@ -128,7 +128,7 @@ def worker_store() -> ImageStore:
     global _worker_store
     from background_tasks import settings_for
     from file_storage import backends
-    from file_storage.settings import FileStorageSettings
+    from file_storage.core.settings import FileStorageSettings
 
     settings = settings_for(FileStorageSettings, "file_storage")
     key = (os.getpid(), _fingerprint(settings))

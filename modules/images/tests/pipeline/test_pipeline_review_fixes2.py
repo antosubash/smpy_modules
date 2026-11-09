@@ -8,10 +8,10 @@ import time
 import uuid
 from types import SimpleNamespace
 
+from background_tasks.core.settings import BackgroundTasksSettings
 from background_tasks.models import Base as BackgroundBase
 from background_tasks.models import OutboxMessage
-from background_tasks.outbox_transport import OutboxTransport
-from background_tasks.settings import BackgroundTasksSettings
+from background_tasks.outbox.transport import OutboxTransport
 from simple_module_db import all_tenants
 from sm_images.contracts import ImageProcessed
 from sm_images.core.tenancy import DEFAULT_TENANT

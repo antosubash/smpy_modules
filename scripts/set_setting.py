@@ -28,8 +28,8 @@ import json
 import sys
 
 from headless_settings import headless_settings
-from settings.service import SettingService
-from settings.store import SettingsStore
+from settings.core.service import SettingService
+from settings.module_settings.store import SettingsStore
 from simple_module_core.settings_hydrate import value_type_for_field
 from simple_module_hosting.app_builder import create_app
 

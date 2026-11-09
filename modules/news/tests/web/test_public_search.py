@@ -23,7 +23,7 @@ from tests.support.public_search import _props, _seed
 pytestmark = pytest.mark.asyncio
 
 NEWS = "/news"
-INERTIA = {"X-Inertia": "true"}
+INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
 
 
 

@@ -80,8 +80,8 @@ async def load_settings(db_state: Any) -> RecordsSettings:
     refusing to reindex.
     """
     try:
-        from settings.service import SettingService
-        from settings.store import SettingsStore
+        from settings.core.service import SettingService
+        from settings.module_settings.store import SettingsStore
         from simple_module_core.settings_hydrate import hydrate_settings
 
         async with db_state.session_factory() as session:

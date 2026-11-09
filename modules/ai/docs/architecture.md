@@ -28,7 +28,7 @@ provides:
   `.env` fallback, which let a worker started from another directory see a
   different provider than the web host. Nothing is read while booting, so no
   field needs a restart;
-- hot reload on save through `settings.reload.apply_changes_and_reload`,
+- hot reload on save through `settings.module_settings.reload.apply_changes_and_reload`,
   which validates, writes the changed fields, swaps `.settings` and publishes
   `SettingsReloaded`.
 

@@ -13,8 +13,8 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI
+from sharing.core.policy import canonical_id
 from sharing.models import ResourceShare
-from sharing.policy import canonical_id
 from simple_module_core.resources import ACTION_VIEW, ResourcePrincipal
 from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal

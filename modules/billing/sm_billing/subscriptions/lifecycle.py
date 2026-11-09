@@ -20,10 +20,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from simple_module_db.tenancy import DEFAULT_TENANT_ID
-from tenants.constants import TenantStatus
+from tenants.core.constants import TenantStatus
+from tenants.core.service import TenantService
 from tenants.models import Tenant
-from tenants.resolver import make_invalidator
-from tenants.service import TenantService
+from tenants.resolution.resolver import make_invalidator
 from users.models import User
 
 from sm_billing.core import constants as c
@@ -82,7 +82,7 @@ async def tenant_gone(db: AsyncSession, app: FastAPI, tenant_id: str) -> bool:
 
 
 def tenant_service(db: AsyncSession, app: FastAPI) -> TenantService:
-    """A ``TenantService`` wired like ``tenants.deps.get_tenant_service``."""
+    """A ``TenantService`` wired like ``tenants.web.deps.get_tenant_service``."""
     return TenantService(
         db,
         bus=app.state.sm.event_bus,

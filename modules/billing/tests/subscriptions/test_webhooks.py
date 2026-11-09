@@ -13,7 +13,7 @@ from sm_billing.models import Customer, Plan, Subscription
 from sm_billing.models import WebhookEvent as EventRow
 from sm_billing.module import BillingModule
 from sqlalchemy import select
-from tenants.constants import TenantStatus
+from tenants.core.constants import TenantStatus
 from tenants.models import Tenant
 
 from tests.support.fake_provider import GOOD_SIGNATURE, SIGNATURE_HEADER, FakeProvider

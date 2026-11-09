@@ -78,7 +78,7 @@ async def test_read_missing_raises(images_app, storage):
 def worker_settings(monkeypatch):
     import background_tasks
     from file_storage import backends
-    from file_storage.settings import FileStorageSettings
+    from file_storage.core.settings import FileStorageSettings
 
     current = {"value": FileStorageSettings(backend="filesystem", fs_root_path="/tmp/a")}
     built: list[str] = []
@@ -105,7 +105,7 @@ def test_worker_store_is_cached_while_settings_are_unchanged(worker_settings):
 
 
 def test_worker_store_rebuilds_when_backend_settings_change(worker_settings):
-    from file_storage.settings import FileStorageSettings
+    from file_storage.core.settings import FileStorageSettings
 
     current, built = worker_settings
     first = worker_store()

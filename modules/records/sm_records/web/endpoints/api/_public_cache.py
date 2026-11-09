@@ -42,7 +42,7 @@ applies it to every error the public router produces, the host-rendered ones
 (a 400 for a refused filter, a 422 for a bad parameter) included.
 
 Nothing here is used on the admin API: those responses are per-caller and the
-framework's ``InertiaCache`` already forces them private.
+framework's Inertia adapter already forces them private.
 
 **Note for the upstream issue, not a thing to work around here.** Every
 anonymous response from a host running the framework also carries
