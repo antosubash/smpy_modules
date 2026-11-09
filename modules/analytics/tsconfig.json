@@ -1,0 +1,5 @@
+{
+  "extends": "@simple-module-py/tsconfig/base.json",
+  "compilerOptions": { "resolveJsonModule": true },
+  "include": ["sm_analytics/**/*.ts", "sm_analytics/**/*.tsx"]
+}

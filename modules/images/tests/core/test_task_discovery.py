@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import importlib
 
-from background_tasks.task_routing import load_task_config
+from background_tasks.worker.task_routing import load_task_config
 from sm_images.task_config import BEAT_SCHEDULE, JANITOR, RUN_STEP, TASK_ROUTES
 
 

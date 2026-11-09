@@ -40,6 +40,8 @@ def test_a_session_is_not_reused_in_another_process(tmp_path, ort, monkeypatch):
     assert ort.created == 4
 
 
+# Forking a multi-threaded parent is the case under test: Celery's prefork pool does it.
+@pytest.mark.filterwarnings("ignore:This process .* is multi-threaded:DeprecationWarning")
 def test_a_forked_child_gets_fresh_detectors_and_unheld_locks(tmp_path, ort):
     cfg = weights_dir(tmp_path)
     parent_det = detectors.shared_detector(cfg)

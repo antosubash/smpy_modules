@@ -29,7 +29,7 @@ import uuid
 from typing import Annotated, Any
 
 from fastapi import Depends, Request
-from sharing.policy import share_exists_for
+from sharing.core.policy import share_exists_for
 from simple_module_core.permission_denied import PermissionDenied
 from simple_module_core.resources import (
     ACTION_DELETE,

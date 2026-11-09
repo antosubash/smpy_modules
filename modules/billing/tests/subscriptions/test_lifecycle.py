@@ -4,8 +4,8 @@ import pytest
 from simple_module_db import finalize_session
 from sm_billing.core.constants import SubscriptionStatus as S
 from sm_billing.subscriptions.lifecycle import Actions, apply_lifecycle, decide
-from tenants.constants import TenantStatus as T
 from tenants.contracts.events import TenantStatusChanged
+from tenants.core.constants import TenantStatus as T
 from tenants.models import Tenant
 
 from tests.support.helpers import make_plan, make_sub, make_tenant

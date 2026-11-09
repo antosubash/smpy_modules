@@ -7,9 +7,9 @@ import httpx
 from sm_billing.contracts.provider import SubscriptionSnapshot, WebhookEvent
 from sm_billing.core import constants as c
 from sm_billing.models import Customer, Subscription
-from tenants.constants import TenantStatus
+from tenants.core.constants import TenantStatus
 from tenants.models import Tenant
-from tenants.resolver import forget
+from tenants.resolution.resolver import forget
 
 from tests.support.fake_provider import GOOD_SIGNATURE, SIGNATURE_HEADER, FakeProvider
 from tests.support.helpers import make_plan

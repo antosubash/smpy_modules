@@ -11,8 +11,8 @@ from sm_billing.models import Subscription
 from sm_billing.subscriptions.reconcile import reconcile
 from sm_billing.subscriptions.seats import push_quantity
 from sqlalchemy import select
-from tenants.constants import TenantStatus
 from tenants.contracts.events import MembershipAdded, MembershipRemoved
+from tenants.core.constants import TenantStatus
 from tenants.models import Membership, Tenant
 from typer.testing import CliRunner
 

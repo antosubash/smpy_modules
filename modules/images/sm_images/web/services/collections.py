@@ -5,7 +5,7 @@ from __future__ import annotations
 import secrets
 from typing import Any
 
-from sharing.policy import share_exists_for
+from sharing.core.policy import share_exists_for
 from simple_module_core.resources import ACTION_VIEW, ResourcePrincipal
 from sqlalchemy import false, func, select
 from sqlalchemy.exc import IntegrityError

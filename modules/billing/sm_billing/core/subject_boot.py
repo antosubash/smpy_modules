@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from simple_module_db.tenancy import DEFAULT_TENANT_ID
 from sqlalchemy import select
-from users.constants import USER_ROLE_NAME
+from users.core.constants import USER_ROLE_NAME
 
 from sm_billing.core import constants as c
 from sm_billing.models import Customer, Subscription, UsageGauge, UsageHold, UsagePeriod

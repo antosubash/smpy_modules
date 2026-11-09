@@ -6,7 +6,7 @@ from tests.support.page_helpers import create_draft
 
 pytestmark = pytest.mark.asyncio
 
-_INERTIA = {"X-Inertia": "true"}
+_INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
 
 
 async def test_content_view_renders_the_snapshot_list(authed_client):

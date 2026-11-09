@@ -9,6 +9,6 @@ configuration (Redis URL, database, tenancy mode).
 
 from pathlib import Path
 
-from background_tasks.runner import build_runner_celery
+from background_tasks.worker.runner import build_runner_celery
 
 celery = build_runner_celery(Path(__file__).resolve().parent.parent / ".env")

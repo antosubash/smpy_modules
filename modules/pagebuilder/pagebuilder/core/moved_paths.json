@@ -1,0 +1,681 @@
+{
+  "all": [
+    "pagebuilder.service"
+  ],
+  "css": {
+    "components/editor/puck-editor.css": "ui/components/editor/puck-editor.css",
+    "components/public/print.css": "ui/components/public/print.css"
+  },
+  "modules": {
+    "pagebuilder._tenancy_mode": "pagebuilder.core.tenancy._mode",
+    "pagebuilder.access": "pagebuilder.web.access",
+    "pagebuilder.board": "pagebuilder.content.board",
+    "pagebuilder.boot": "pagebuilder.core.boot",
+    "pagebuilder.csrf": "pagebuilder.web.csrf",
+    "pagebuilder.deps": "pagebuilder.web.deps",
+    "pagebuilder.dev_csp": "pagebuilder.web.dev_csp",
+    "pagebuilder.diff": "pagebuilder.content.diff",
+    "pagebuilder.endpoints": "pagebuilder.web.endpoints",
+    "pagebuilder.endpoints.api": "pagebuilder.web.endpoints.api",
+    "pagebuilder.endpoints.api._deps": "pagebuilder.web.endpoints.api._deps",
+    "pagebuilder.endpoints.api.layout": "pagebuilder.web.endpoints.api.layout",
+    "pagebuilder.endpoints.api.media_detail": "pagebuilder.web.endpoints.api.media_detail",
+    "pagebuilder.endpoints.api.pages": "pagebuilder.web.endpoints.api.pages",
+    "pagebuilder.endpoints.api.revisions": "pagebuilder.web.endpoints.api.revisions",
+    "pagebuilder.endpoints.api.snapshots": "pagebuilder.web.endpoints.api.snapshots",
+    "pagebuilder.endpoints.api.uploads": "pagebuilder.web.endpoints.api.uploads",
+    "pagebuilder.endpoints.api.workflow": "pagebuilder.web.endpoints.api.workflow",
+    "pagebuilder.endpoints.content_views": "pagebuilder.web.endpoints.content_views",
+    "pagebuilder.endpoints.preview_view": "pagebuilder.web.endpoints.preview_view",
+    "pagebuilder.endpoints.public_not_found": "pagebuilder.web.endpoints.public_not_found",
+    "pagebuilder.endpoints.public_views": "pagebuilder.web.endpoints.public_views",
+    "pagebuilder.endpoints.seo": "pagebuilder.web.endpoints.seo",
+    "pagebuilder.endpoints.views": "pagebuilder.web.endpoints.views",
+    "pagebuilder.html_lang": "pagebuilder.web.html_lang",
+    "pagebuilder.layout_service": "pagebuilder.content.layout_service",
+    "pagebuilder.locales": "pagebuilder.core.locales",
+    "pagebuilder.media_files": "pagebuilder.media.media_files",
+    "pagebuilder.media_gif": "pagebuilder.media.media_gif",
+    "pagebuilder.media_images": "pagebuilder.media.media_images",
+    "pagebuilder.media_queries": "pagebuilder.media.media_queries",
+    "pagebuilder.media_service": "pagebuilder.media.media_service",
+    "pagebuilder.media_usage": "pagebuilder.media.media_usage",
+    "pagebuilder.menu": "pagebuilder.web.menu",
+    "pagebuilder.og_image": "pagebuilder.media.og_image",
+    "pagebuilder.permissions": "pagebuilder.core.permissions",
+    "pagebuilder.public_cache": "pagebuilder.web.public_cache",
+    "pagebuilder.public_copy": "pagebuilder.web.public_copy",
+    "pagebuilder.redirects": "pagebuilder.content.redirects",
+    "pagebuilder.scheduler": "pagebuilder.scheduling.scheduler",
+    "pagebuilder.service": [
+      "pagebuilder.content.service.pages"
+    ],
+    "pagebuilder.service._claims": "pagebuilder.content.service._claims",
+    "pagebuilder.service._common": "pagebuilder.content.service._common",
+    "pagebuilder.service._host": "pagebuilder.content.service._host",
+    "pagebuilder.service._revisions": "pagebuilder.content.service._revisions",
+    "pagebuilder.service._translations": "pagebuilder.content.service._translations",
+    "pagebuilder.service._trash": "pagebuilder.content.service._trash",
+    "pagebuilder.service._workflow": "pagebuilder.content.service._workflow",
+    "pagebuilder.services": "pagebuilder.core.services",
+    "pagebuilder.settings": "pagebuilder.core.settings",
+    "pagebuilder.site_nav": "pagebuilder.content.site_nav",
+    "pagebuilder.snapshots": "pagebuilder.content.snapshots",
+    "pagebuilder.snapshots._host": "pagebuilder.content.snapshots._host",
+    "pagebuilder.snapshots.access": "pagebuilder.content.snapshots.access",
+    "pagebuilder.snapshots.apply": "pagebuilder.content.snapshots.apply",
+    "pagebuilder.snapshots.apply_media": "pagebuilder.content.snapshots.apply_media",
+    "pagebuilder.snapshots.archive": "pagebuilder.content.snapshots.archive",
+    "pagebuilder.snapshots.assets": "pagebuilder.content.snapshots.assets",
+    "pagebuilder.snapshots.blobs": "pagebuilder.content.snapshots.blobs",
+    "pagebuilder.snapshots.capture": "pagebuilder.content.snapshots.capture",
+    "pagebuilder.snapshots.files": "pagebuilder.content.snapshots.files",
+    "pagebuilder.snapshots.format": "pagebuilder.content.snapshots.format",
+    "pagebuilder.snapshots.history": "pagebuilder.content.snapshots.history",
+    "pagebuilder.snapshots.manifest": "pagebuilder.content.snapshots.manifest",
+    "pagebuilder.snapshots.match": "pagebuilder.content.snapshots.match",
+    "pagebuilder.snapshots.media_match": "pagebuilder.content.snapshots.media_match",
+    "pagebuilder.snapshots.pages": "pagebuilder.content.snapshots.pages",
+    "pagebuilder.snapshots.plan": "pagebuilder.content.snapshots.plan",
+    "pagebuilder.snapshots.plan_views": "pagebuilder.content.snapshots.plan_views",
+    "pagebuilder.snapshots.registry": "pagebuilder.content.snapshots.registry",
+    "pagebuilder.snapshots.restore": "pagebuilder.content.snapshots.restore",
+    "pagebuilder.snapshots.section_restore": "pagebuilder.content.snapshots.section_restore",
+    "pagebuilder.snapshots.sections": "pagebuilder.content.snapshots.sections",
+    "pagebuilder.snapshots.service": "pagebuilder.content.snapshots.service",
+    "pagebuilder.snapshots.validate": "pagebuilder.content.snapshots.validate",
+    "pagebuilder.snapshots.written": "pagebuilder.content.snapshots.written",
+    "pagebuilder.tenancy": "pagebuilder.core.tenancy"
+  },
+  "names": {
+    "pagebuilder.service": [
+      "PagesService",
+      "SitemapEntry",
+      "_UNSET"
+    ]
+  },
+  "packages": {
+    "pagebuilder.endpoints": "pagebuilder.web.endpoints",
+    "pagebuilder.endpoints.api": "pagebuilder.web.endpoints.api",
+    "pagebuilder.service": "pagebuilder.content.service",
+    "pagebuilder.snapshots": "pagebuilder.content.snapshots"
+  },
+  "remove_in": "0.0.17",
+  "ts": {
+    "components/ConfirmDialog.tsx": {
+      "star": "ui/components/ConfirmDialog.tsx"
+    },
+    "components/DiffSummary.tsx": {
+      "star": "ui/components/DiffSummary.tsx"
+    },
+    "components/NewPageDialog.tsx": {
+      "star": "ui/components/NewPageDialog.tsx"
+    },
+    "components/NoteDialog.tsx": {
+      "star": "ui/components/NoteDialog.tsx"
+    },
+    "components/PageBoard.tsx": {
+      "star": "ui/components/PageBoard.tsx"
+    },
+    "components/PageBoardCard.tsx": {
+      "star": "ui/components/PageBoardCard.tsx"
+    },
+    "components/PageListFilters.tsx": {
+      "star": "ui/components/PageListFilters.tsx"
+    },
+    "components/PageListRow.tsx": {
+      "star": "ui/components/PageListRow.tsx"
+    },
+    "components/ScheduledBadge.tsx": {
+      "star": "ui/components/ScheduledBadge.tsx"
+    },
+    "components/StatusBadge.tsx": {
+      "star": "ui/components/StatusBadge.tsx"
+    },
+    "components/TranslatePageDialog.tsx": {
+      "star": "ui/components/TranslatePageDialog.tsx"
+    },
+    "components/blockRegistry.ts": {
+      "star": "ui/components/blockRegistry.ts"
+    },
+    "components/blocks/Button.tsx": {
+      "star": "ui/components/blocks/Button.tsx"
+    },
+    "components/blocks/Columns.tsx": {
+      "star": "ui/components/blocks/Columns.tsx"
+    },
+    "components/blocks/Heading.tsx": {
+      "star": "ui/components/blocks/Heading.tsx"
+    },
+    "components/blocks/Image.tsx": {
+      "star": "ui/components/blocks/Image.tsx"
+    },
+    "components/blocks/MediaPicker.tsx": {
+      "star": "ui/components/blocks/MediaPicker.tsx"
+    },
+    "components/blocks/Spacer.tsx": {
+      "star": "ui/components/blocks/Spacer.tsx"
+    },
+    "components/blocks/Text.tsx": {
+      "star": "ui/components/blocks/Text.tsx"
+    },
+    "components/editor/BlockOutline.tsx": {
+      "star": "ui/components/editor/BlockOutline.tsx"
+    },
+    "components/editor/NarrowCanvas.tsx": {
+      "star": "ui/components/editor/NarrowCanvas.tsx"
+    },
+    "components/editor/PageActions.tsx": {
+      "star": "ui/components/editor/PageActions.tsx"
+    },
+    "components/editor/PageEditorToolbar.tsx": {
+      "star": "ui/components/editor/PageEditorToolbar.tsx"
+    },
+    "components/editor/PageInspectorDrawer.tsx": {
+      "star": "ui/components/editor/PageInspectorDrawer.tsx"
+    },
+    "components/editor/PageSettingsPanel.tsx": {
+      "star": "ui/components/editor/PageSettingsPanel.tsx"
+    },
+    "components/editor/RevisionHistoryPanel.tsx": {
+      "star": "ui/components/editor/RevisionHistoryPanel.tsx"
+    },
+    "components/editor/SchedulePanel.tsx": {
+      "star": "ui/components/editor/SchedulePanel.tsx"
+    },
+    "components/editor/SeoPreview.tsx": {
+      "star": "ui/components/editor/SeoPreview.tsx"
+    },
+    "components/editor/SeoSettingsPanel.tsx": {
+      "star": "ui/components/editor/SeoSettingsPanel.tsx"
+    },
+    "components/editor/TranslationsPanel.tsx": {
+      "star": "ui/components/editor/TranslationsPanel.tsx"
+    },
+    "components/editor/noHeaderActions.tsx": {
+      "star": "ui/components/editor/noHeaderActions.tsx"
+    },
+    "components/layoutPuckConfig.tsx": {
+      "star": "ui/components/layoutPuckConfig.tsx"
+    },
+    "components/lazyBlock.tsx": {
+      "star": "ui/components/lazyBlock.tsx"
+    },
+    "components/localizeConfig.ts": {
+      "star": "ui/components/localizeConfig.ts"
+    },
+    "components/media/MediaFilters.tsx": {
+      "star": "ui/components/media/MediaFilters.tsx"
+    },
+    "components/media/MediaFolderSidebar.tsx": {
+      "star": "ui/components/media/MediaFolderSidebar.tsx"
+    },
+    "components/media/MediaGrid.tsx": {
+      "star": "ui/components/media/MediaGrid.tsx"
+    },
+    "components/media/MediaHeader.tsx": {
+      "star": "ui/components/media/MediaHeader.tsx"
+    },
+    "components/media/MediaUploadQueue.tsx": {
+      "star": "ui/components/media/MediaUploadQueue.tsx"
+    },
+    "components/media/MediaUsageList.tsx": {
+      "star": "ui/components/media/MediaUsageList.tsx"
+    },
+    "components/media/types.ts": {
+      "star": "ui/components/media/types.ts"
+    },
+    "components/migrateContent.ts": {
+      "star": "ui/components/migrateContent.ts"
+    },
+    "components/public/PreviewBar.tsx": {
+      "star": "ui/components/public/PreviewBar.tsx"
+    },
+    "components/public/PublicShell.tsx": {
+      "star": "ui/components/public/PublicShell.tsx"
+    },
+    "components/puckConfig.tsx": {
+      "star": "ui/components/puckConfig.tsx"
+    },
+    "components/snapshots/ImportPlanSummary.tsx": {
+      "star": "ui/components/snapshots/ImportPlanSummary.tsx"
+    },
+    "components/snapshots/PlanGroup.tsx": {
+      "star": "ui/components/snapshots/PlanGroup.tsx"
+    },
+    "components/snapshots/SectionPlan.tsx": {
+      "star": "ui/components/snapshots/SectionPlan.tsx"
+    },
+    "components/snapshots/SnapshotList.tsx": {
+      "star": "ui/components/snapshots/SnapshotList.tsx"
+    },
+    "components/snapshots/UploadBundleDialog.tsx": {
+      "star": "ui/components/snapshots/UploadBundleDialog.tsx"
+    },
+    "components/snapshots/planSummary.ts": {
+      "star": "ui/components/snapshots/planSummary.ts"
+    },
+    "components/snapshots/sectionSummary.ts": {
+      "star": "ui/components/snapshots/sectionSummary.ts"
+    },
+    "components/widgetCatalog.ts": {
+      "star": "ui/components/widgetCatalog.ts"
+    },
+    "components/widgets/_internal/accent-text.tsx": {
+      "star": "ui/components/widgets/_internal/accent-text.tsx"
+    },
+    "components/widgets/_internal/disclosure-chevron.tsx": {
+      "star": "ui/components/widgets/_internal/disclosure-chevron.tsx"
+    },
+    "components/widgets/_internal/eyebrow-split-section.tsx": {
+      "star": "ui/components/widgets/_internal/eyebrow-split-section.tsx"
+    },
+    "components/widgets/_internal/inline-image.tsx": {
+      "star": "ui/components/widgets/_internal/inline-image.tsx"
+    },
+    "components/widgets/_internal/link-arrow.tsx": {
+      "star": "ui/components/widgets/_internal/link-arrow.tsx"
+    },
+    "components/widgets/_internal/markdown-list.tsx": {
+      "star": "ui/components/widgets/_internal/markdown-list.tsx"
+    },
+    "components/widgets/_internal/rich-text.tsx": {
+      "star": "ui/components/widgets/_internal/rich-text.tsx"
+    },
+    "components/widgets/_internal/site-nav-context.tsx": {
+      "star": "ui/components/widgets/_internal/site-nav-context.tsx"
+    },
+    "components/widgets/_internal/solid-icons.tsx": {
+      "star": "ui/components/widgets/_internal/solid-icons.tsx"
+    },
+    "components/widgets/_shared/background-media.tsx": {
+      "star": "ui/components/widgets/_shared/background-media.tsx"
+    },
+    "components/widgets/_shared/content-media.tsx": {
+      "star": "ui/components/widgets/_shared/content-media.tsx"
+    },
+    "components/widgets/_shared/cta-button.tsx": {
+      "star": "ui/components/widgets/_shared/cta-button.tsx"
+    },
+    "components/widgets/_shared/empty-placeholder.tsx": {
+      "star": "ui/components/widgets/_shared/empty-placeholder.tsx"
+    },
+    "components/widgets/_shared/eyebrow-text.tsx": {
+      "star": "ui/components/widgets/_shared/eyebrow-text.tsx"
+    },
+    "components/widgets/_shared/heading.tsx": {
+      "star": "ui/components/widgets/_shared/heading.tsx"
+    },
+    "components/widgets/_shared/image-srcset.ts": {
+      "star": "ui/components/widgets/_shared/image-srcset.ts"
+    },
+    "components/widgets/_shared/index.ts": {
+      "star": "ui/components/widgets/_shared/index.ts"
+    },
+    "components/widgets/_shared/mask.ts": {
+      "star": "ui/components/widgets/_shared/mask.ts"
+    },
+    "components/widgets/_shared/section.tsx": {
+      "star": "ui/components/widgets/_shared/section.tsx"
+    },
+    "components/widgets/_shared/social-icon.tsx": {
+      "star": "ui/components/widgets/_shared/social-icon.tsx"
+    },
+    "components/widgets/_shared/text-link.tsx": {
+      "star": "ui/components/widgets/_shared/text-link.tsx"
+    },
+    "components/widgets/accordion-widget.tsx": {
+      "star": "ui/components/widgets/accordion-widget.tsx"
+    },
+    "components/widgets/alert-widget.tsx": {
+      "star": "ui/components/widgets/alert-widget.tsx"
+    },
+    "components/widgets/app-store-badges-widget.tsx": {
+      "star": "ui/components/widgets/app-store-badges-widget.tsx"
+    },
+    "components/widgets/article-cards-render.tsx": {
+      "star": "ui/components/widgets/article-cards-render.tsx"
+    },
+    "components/widgets/article-cards-widget.tsx": {
+      "star": "ui/components/widgets/article-cards-widget.tsx"
+    },
+    "components/widgets/call-to-action-render.tsx": {
+      "star": "ui/components/widgets/call-to-action-render.tsx"
+    },
+    "components/widgets/call-to-action-styles.ts": {
+      "star": "ui/components/widgets/call-to-action-styles.ts"
+    },
+    "components/widgets/call-to-action-widget.tsx": {
+      "star": "ui/components/widgets/call-to-action-widget.tsx"
+    },
+    "components/widgets/carousel-widget.tsx": {
+      "star": "ui/components/widgets/carousel-widget.tsx"
+    },
+    "components/widgets/centered-hero-widget.tsx": {
+      "star": "ui/components/widgets/centered-hero-widget.tsx"
+    },
+    "components/widgets/colored-action-list-widget.tsx": {
+      "star": "ui/components/widgets/colored-action-list-widget.tsx"
+    },
+    "components/widgets/column-widget.tsx": {
+      "star": "ui/components/widgets/column-widget.tsx"
+    },
+    "components/widgets/contact-cards-widget.tsx": {
+      "star": "ui/components/widgets/contact-cards-widget.tsx"
+    },
+    "components/widgets/contact-form-render.tsx": {
+      "star": "ui/components/widgets/contact-form-render.tsx"
+    },
+    "components/widgets/contact-form-widget.tsx": {
+      "star": "ui/components/widgets/contact-form-widget.tsx"
+    },
+    "components/widgets/container-widget.tsx": {
+      "star": "ui/components/widgets/container-widget.tsx"
+    },
+    "components/widgets/definition-list-widget.tsx": {
+      "star": "ui/components/widgets/definition-list-widget.tsx"
+    },
+    "components/widgets/divider-widget.tsx": {
+      "star": "ui/components/widgets/divider-widget.tsx"
+    },
+    "components/widgets/eyebrow-section-widget.tsx": {
+      "star": "ui/components/widgets/eyebrow-section-widget.tsx"
+    },
+    "components/widgets/faq-render.tsx": {
+      "star": "ui/components/widgets/faq-render.tsx"
+    },
+    "components/widgets/faq-widget.tsx": {
+      "star": "ui/components/widgets/faq-widget.tsx"
+    },
+    "components/widgets/feature-card-widget.tsx": {
+      "star": "ui/components/widgets/feature-card-widget.tsx"
+    },
+    "components/widgets/feature-cards-render.tsx": {
+      "star": "ui/components/widgets/feature-cards-render.tsx"
+    },
+    "components/widgets/feature-cards-styles.ts": {
+      "star": "ui/components/widgets/feature-cards-styles.ts"
+    },
+    "components/widgets/feature-cards-widget.tsx": {
+      "star": "ui/components/widgets/feature-cards-widget.tsx"
+    },
+    "components/widgets/feature-grid-widget.tsx": {
+      "star": "ui/components/widgets/feature-grid-widget.tsx"
+    },
+    "components/widgets/feature-showcase-widget.tsx": {
+      "star": "ui/components/widgets/feature-showcase-widget.tsx"
+    },
+    "components/widgets/gallery-widget.tsx": {
+      "star": "ui/components/widgets/gallery-widget.tsx"
+    },
+    "components/widgets/grid-widget.tsx": {
+      "star": "ui/components/widgets/grid-widget.tsx"
+    },
+    "components/widgets/hero-widget-props.ts": {
+      "star": "ui/components/widgets/hero-widget-props.ts"
+    },
+    "components/widgets/hero-widget.tsx": {
+      "star": "ui/components/widgets/hero-render.tsx",
+      "values": {
+        "ui/components/widgets/hero-widget.tsx": [
+          "HeroWidget"
+        ]
+      }
+    },
+    "components/widgets/html-widget.tsx": {
+      "star": "ui/components/widgets/html-widget.tsx"
+    },
+    "components/widgets/iframe-widget.tsx": {
+      "star": "ui/components/widgets/iframe-widget.tsx"
+    },
+    "components/widgets/leaderboard-widget.tsx": {
+      "star": "ui/components/widgets/leaderboard-widget.tsx"
+    },
+    "components/widgets/list-widget.tsx": {
+      "star": "ui/components/widgets/list-widget.tsx"
+    },
+    "components/widgets/logo-cloud-widget.tsx": {
+      "star": "ui/components/widgets/logo-cloud-widget.tsx"
+    },
+    "components/widgets/markdown-widget.tsx": {
+      "star": "ui/components/widgets/markdown-widget.tsx"
+    },
+    "components/widgets/media-object-layout.ts": {
+      "star": "ui/components/widgets/media-object-layout.ts"
+    },
+    "components/widgets/media-object-render.tsx": {
+      "star": "ui/components/widgets/media-object-render.tsx"
+    },
+    "components/widgets/media-object-text.tsx": {
+      "star": "ui/components/widgets/media-object-text.tsx"
+    },
+    "components/widgets/media-object-widget.tsx": {
+      "star": "ui/components/widgets/media-object-widget.tsx"
+    },
+    "components/widgets/newsletter-widget.tsx": {
+      "star": "ui/components/widgets/newsletter-widget.tsx"
+    },
+    "components/widgets/page-header-widget.tsx": {
+      "star": "ui/components/widgets/page-header-widget.tsx"
+    },
+    "components/widgets/prose-section-widget.tsx": {
+      "star": "ui/components/widgets/prose-section-widget.tsx"
+    },
+    "components/widgets/quote-widget.tsx": {
+      "star": "ui/components/widgets/quote-widget.tsx"
+    },
+    "components/widgets/row-widget.tsx": {
+      "star": "ui/components/widgets/row-widget.tsx"
+    },
+    "components/widgets/section-intro-widget.tsx": {
+      "star": "ui/components/widgets/section-intro-widget.tsx"
+    },
+    "components/widgets/signup-banner-widget.tsx": {
+      "star": "ui/components/widgets/signup-banner-widget.tsx"
+    },
+    "components/widgets/simple-action-list-widget.tsx": {
+      "star": "ui/components/widgets/simple-action-list-widget.tsx"
+    },
+    "components/widgets/site-footer-widget.tsx": {
+      "star": "ui/components/widgets/site-footer-widget.tsx"
+    },
+    "components/widgets/site-header-account.tsx": {
+      "star": "ui/components/widgets/site-header-account.tsx"
+    },
+    "components/widgets/site-header-nav.tsx": {
+      "star": "ui/components/widgets/site-header-nav.tsx"
+    },
+    "components/widgets/site-header-widget.tsx": {
+      "star": "ui/components/widgets/site-header-widget.tsx"
+    },
+    "components/widgets/social-banner-widget.tsx": {
+      "star": "ui/components/widgets/social-banner-widget.tsx"
+    },
+    "components/widgets/stats-widget.tsx": {
+      "star": "ui/components/widgets/stats-widget.tsx"
+    },
+    "components/widgets/steps-widget.tsx": {
+      "star": "ui/components/widgets/steps-widget.tsx"
+    },
+    "components/widgets/story-cards-widget.tsx": {
+      "star": "ui/components/widgets/story-cards-widget.tsx"
+    },
+    "components/widgets/table-widget.tsx": {
+      "star": "ui/components/widgets/table-widget.tsx"
+    },
+    "components/widgets/tabs-widget.tsx": {
+      "star": "ui/components/widgets/tabs-widget.tsx"
+    },
+    "components/widgets/tags-widget.tsx": {
+      "star": "ui/components/widgets/tags-widget.tsx"
+    },
+    "components/widgets/testimonial-widget.tsx": {
+      "star": "ui/components/widgets/testimonial-widget.tsx"
+    },
+    "components/widgets/timeline-layout.ts": {
+      "star": "ui/components/widgets/timeline-layout.ts"
+    },
+    "components/widgets/timeline-render.tsx": {
+      "star": "ui/components/widgets/timeline-render.tsx"
+    },
+    "components/widgets/timeline-widget.tsx": {
+      "star": "ui/components/widgets/timeline-widget.tsx"
+    },
+    "components/widgets/under-construction-widget.tsx": {
+      "star": "ui/components/widgets/under-construction-widget.tsx"
+    },
+    "components/widgets/video-widget.tsx": {
+      "star": "ui/components/widgets/video-widget.tsx"
+    },
+    "components/widgets/welcome-widget.tsx": {
+      "star": "ui/components/widgets/welcome-widget.tsx"
+    },
+    "conversion/blocks-to-html.ts": {
+      "star": "ui/conversion/blocks-to-html.ts"
+    },
+    "conversion/index.ts": {
+      "star": "ui/conversion/index.ts"
+    },
+    "conversion/types.ts": {
+      "star": "ui/conversion/types.ts"
+    },
+    "fields/checkbox-field.tsx": {
+      "star": "ui/fields/checkbox-field.tsx"
+    },
+    "fields/file-picker/file-gallery.tsx": {
+      "star": "ui/fields/file-picker/file-gallery.tsx"
+    },
+    "fields/file-picker/image-picker-field.tsx": {
+      "star": "ui/fields/file-picker/image-picker-field.tsx"
+    },
+    "fields/file-picker/index.ts": {
+      "star": "ui/fields/file-picker/index.ts"
+    },
+    "fields/file-picker/types.ts": {
+      "star": "ui/fields/file-picker/types.ts"
+    },
+    "fields/index.ts": {
+      "star": "ui/fields/index.ts"
+    },
+    "fields/media-adapter.ts": {
+      "star": "ui/fields/media-adapter.ts"
+    },
+    "hooks/useAutosave.ts": {
+      "star": "ui/hooks/useAutosave.ts"
+    },
+    "hooks/useDocumentLang.ts": {
+      "star": "ui/hooks/useDocumentLang.ts"
+    },
+    "hooks/useEditorForm.ts": {
+      "star": "ui/hooks/useEditorForm.ts"
+    },
+    "hooks/useIsNarrow.ts": {
+      "star": "ui/hooks/useIsNarrow.ts"
+    },
+    "hooks/useMediaDetail.ts": {
+      "star": "ui/hooks/useMediaDetail.ts"
+    },
+    "hooks/useMediaUploads.ts": {
+      "star": "ui/hooks/useMediaUploads.ts"
+    },
+    "hooks/usePageRevisions.ts": {
+      "star": "ui/hooks/usePageRevisions.ts"
+    },
+    "hooks/usePageSchedule.ts": {
+      "star": "ui/hooks/usePageSchedule.ts"
+    },
+    "hooks/usePageWorkflow.ts": {
+      "star": "ui/hooks/usePageWorkflow.ts"
+    },
+    "hooks/usePendingDialog.ts": {
+      "star": "ui/hooks/usePendingDialog.ts"
+    },
+    "hooks/useSnapshots.ts": {
+      "star": "ui/hooks/useSnapshots.ts"
+    },
+    "translation/apply.ts": {
+      "star": "ui/translation/apply.ts"
+    },
+    "translation/extract.ts": {
+      "star": "ui/translation/extract.ts"
+    },
+    "translation/index.ts": {
+      "star": "ui/translation/index.ts"
+    },
+    "translation/translatable-fields.ts": {
+      "star": "ui/translation/translatable-fields.ts"
+    },
+    "utils/api.ts": {
+      "star": "ui/utils/api.ts"
+    },
+    "utils/blockOutline.ts": {
+      "star": "ui/utils/blockOutline.ts"
+    },
+    "utils/csrf.ts": {
+      "star": "ui/utils/csrf.ts"
+    },
+    "utils/dates.ts": {
+      "star": "ui/utils/dates.ts"
+    },
+    "utils/datetime.ts": {
+      "star": "ui/utils/datetime.ts"
+    },
+    "utils/decorative-image.ts": {
+      "star": "ui/utils/decorative-image.ts"
+    },
+    "utils/editorSnapshot.ts": {
+      "star": "ui/utils/editorSnapshot.ts"
+    },
+    "utils/historyTimeline.ts": {
+      "star": "ui/utils/historyTimeline.ts"
+    },
+    "utils/i18n.ts": {
+      "star": "ui/utils/i18n.ts"
+    },
+    "utils/locale.ts": {
+      "star": "ui/utils/locale.ts"
+    },
+    "utils/markdown-links.ts": {
+      "star": "ui/utils/markdown-links.ts"
+    },
+    "utils/markdown.ts": {
+      "star": "ui/utils/markdown.ts"
+    },
+    "utils/measure.ts": {
+      "star": "ui/utils/measure.ts"
+    },
+    "utils/mediaApi.ts": {
+      "star": "ui/utils/mediaApi.ts"
+    },
+    "utils/mediaFormat.ts": {
+      "star": "ui/utils/mediaFormat.ts"
+    },
+    "utils/pagesApi.ts": {
+      "star": "ui/utils/pagesApi.ts"
+    },
+    "utils/parse-list.ts": {
+      "star": "ui/utils/parse-list.ts"
+    },
+    "utils/request.ts": {
+      "star": "ui/utils/request.ts"
+    },
+    "utils/slugRule.ts": {
+      "star": "ui/utils/slugRule.ts"
+    },
+    "utils/slugify.ts": {
+      "star": "ui/utils/slugify.ts"
+    },
+    "utils/snapshotsApi.ts": {
+      "star": "ui/utils/snapshotsApi.ts"
+    },
+    "utils/types.ts": {
+      "star": "ui/utils/types.ts"
+    },
+    "utils/uploadError.ts": {
+      "star": "ui/utils/uploadError.ts"
+    },
+    "utils/widgetUtils.ts": {
+      "star": "ui/utils/widgetUtils.ts"
+    }
+  }
+}

@@ -13,8 +13,8 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
-from background_tasks import sync_db
-from background_tasks.worker_settings import clear_settings_cache
+from background_tasks.core import sync_db
+from background_tasks.worker.settings import clear_settings_cache
 from simple_module_db import tenant_context
 from simple_module_db.stored_settings import Base as SettingsBase
 from simple_module_db.stored_settings import Setting

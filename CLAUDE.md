@@ -13,7 +13,7 @@ development app that mounts them; it is never published.
 
 **Pin policy differs by role.** Published modules depend on the framework with
 *ranges* (`simple_module_core>=0.0.36,<0.1`). The host pins *exactly*
-(`simple_module_hosting==0.0.38`). Never give a published module an `==` pin —
+(`simple_module_hosting==0.0.44`). Never give a published module an `==` pin —
 it becomes uninstallable in any host running a newer framework build.
 `scripts/check_rules.py` (in `make lint` and CI) rejects one, and also any
 requirement on another module of this repo (news' `pagebuilder` extra) without
@@ -64,6 +64,28 @@ a raw token must keep the plaintext itself (the table holds only a digest).
 `f5b1c3e8a207` is ported **without** its upstream `("file_storage",)` branch
 label, because `ca297bbf33bf` already carries it here and Alembic refuses a
 label used twice — keep dropping a duplicate label when porting.
+0.0.43's `a738c2e4f601` and `e731a1b2c3d4` and 0.0.44's `e805a1b2c3d4`,
+`c5d8e2f1a903` and `f6c2d4e8b109` follow `c4e9b2a7d613`. Upstream's
+`b8d4f2a6c901` (audit_log) and `c9d2e4f6a810` (oidc) are not ported: neither
+module is installed here, so their tables do not exist. `e731a1b2c3d4` refuses
+to run while two accounts' emails differ only by letter case, and prints them masked
+(`a***@host`) with the query that lists them.
+`host/migrations/env.py` ignores the false change autogenerate reports on SQLite
+for a mixed column-and-expression index (it reflects `created_at DESC` as a plain
+column, so `tenant_browse` would be dropped and recreated on every run). One on
+other columns is still reported; a missing one only by the Postgres check, because
+Alembic skips expression indexes on SQLite.
+**Since 0.0.44 most framework modules follow the module layout**, and the old
+flat paths (`tenants.resolver`, `settings.service`, …) warn and go in 0.0.46
+(a few in 0.1.0). Import the new path, and raise that dependency's floor to the
+release that first shipped it; `host/tests/test_host_boots.py` fails on any
+import of a path the installed framework marks `deprecated_module`.
+**Since 0.0.43 the production CSP is nonce-based** (`'nonce-…' 'strict-dynamic'`,
+no `unsafe-inline` or `unsafe-eval`): an executable `<script>` in a template needs
+`nonce="{{ request.state.csp_nonce }}"`, and `eval`/`new Function` no longer run.
+An Inertia GET without `X-Inertia-Version` gets a 409, so a test client sends it;
+the adapter strips `ETag` from every Inertia payload and marks it `private,
+no-store`; and the page JSON lives only in `<script data-page="app">`.
 SQLModel is unpinned since 0.0.38
 (framework 0.0.37+ imports its `UTCDateTime`): a bare `datetime` field is
 `timestamptz` now, which is why `9d83e789a5b4` retypes the framework's
@@ -292,8 +314,23 @@ Everything else goes in one of a few areas: `core/` (what every feature
 builds on), `web/` (endpoints, schemas, services, serving), one folder per
 domain (images: `ingest/`, `pipeline/`, `jobs/`, `map/`) and `ui/` for the
 frontend that is not a page. Tests mirror the areas under `tests/`.
-New code in any module follows it. All seven modules follow it; structural changes keep the same moves-only
+New code in any module follows it. Every module follows it; structural changes keep the same moves-only
 review boundary.
+
+**The paths 0.0.14 moved stay importable until 0.0.17 (#319).** Each moved
+package's `core/moved_paths.py` hook, driven by `core/moved_paths.json`, aliases
+the old Python paths with a `DeprecationWarning`. Generated re-export stubs sit
+at the old TS paths (the `components/`, `hooks/` and `utils/` folders that hold only
+stubs). Never edit or import them: `scripts/moved_paths.py --check` (`make lint`,
+CI) fails on a stub that drifts from its table and on any repo import of an old
+path. `host/tests/test_moved_paths_tables.py` fails once the version reaches
+`remove_in`; then delete the stubs, both `core/moved_paths.*` files, the
+`install(__name__)` lines, the `__getattr__`/`__all__` lines (ai's `metering`,
+billing's `plans`) and the `__path__` lines (records' `index` and `seed`),
+`scripts/moved_paths*` with its test and the `--check` lines in the Makefile and
+`ci.yml`, `host/tests/test_moved_paths*.py` and `moved_paths_probe.py`, and the
+stub filter in the `test_layout.py` of ai, billing and news.
+A later move needs aliases the same way.
 
 **300-line cap** on every `.py` / `.ts` / `.tsx`, enforced by
 `scripts/check_file_size.py`. Nothing under `modules/` is exempt. The check
@@ -306,7 +343,10 @@ member there before a mixin uses it; the `test_*_host.py` tests enforce it.
 **Every e2e spec file stands alone.** CI shards the suite by file
 (`--shard=i/3`, one host and database per shard, #119), so a spec cannot rely
 on data or settings another file created. Seed what you need in the file
-itself; suite-wide settings belong in `tests/e2e/start-test-server.sh`. The
+itself; suite-wide settings belong in `tests/e2e/start-test-server.sh`. Locally,
+`make e2e-parallel` runs the same bundle suite in three shards on one machine
+(`scripts/e2e_shards.mjs`: one template database copied per shard, each with its
+own host, port and upload directories); `make e2e-bundle` stays serial. The
 `E2E (Playwright)` job merges the shards' reports and is the one status that
 covers all of them.
 
@@ -333,7 +373,7 @@ docker run -d --name smpy-postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e
 ```
 
 Redis and Celery are used by the **images** and **newsletter** modules (framework
-`background_tasks`, host pinned `==0.0.42`): `SM_REDIS_URL` points at dev-services'
+`background_tasks`, host pinned `==0.0.44`): `SM_REDIS_URL` points at dev-services'
 Redis, and `make worker` / `worker-imports` / `worker-heavy` / `worker-gpu` /
 `beat` run `host/worker.py` (`build_runner_celery`) with one queue set each.
 `make dev` starts none of them. With no worker, set

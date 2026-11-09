@@ -1,6 +1,6 @@
 [project]
 name = "simple_module_ai"
-version = "0.0.13"
+version = "0.0.14"
 description = "AI base module: provider-configurable Pydantic AI service layer, encrypted key storage, admin settings UI"
 requires-python = ">=3.12"
 readme = "README.md"
@@ -14,7 +14,7 @@ dependencies = [
     "simple_module_db>=0.0.36,<0.1",
     "simple_module_hosting>=0.0.36,<0.1",
     "simple_module_inertia>=0.0.36,<0.1",
-    "simple_module_settings>=0.0.36,<0.1",
+    "simple_module_settings>=0.0.44,<0.1",  # floor: settings.core and settings.module_settings paths first shipped in 0.0.44
     "pydantic-ai-slim[anthropic,openai,google]>=2.0,<3",
     "pydantic-settings>=2.0",
     "cryptography>=42.0",
@@ -55,3 +55,4 @@ exclude = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
