@@ -135,4 +135,4 @@ async def unsubscribe(
 ) -> Record:
     """An admin's unsubscribe: what the subscriber's own link does."""
     require_subscription(rtype)
-    return await opt_in.leave(db, rtype, record, settings)
+    return (await opt_in.leave(db, rtype, record, settings)).record

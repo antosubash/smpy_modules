@@ -41,7 +41,7 @@ from sm_records.models import Record, RecordType
 from sm_records.public_submissions import links
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.subscribe import CONFIRMED, PENDING, UNSUBSCRIBED, changed
-from sm_records.public_submissions.transition import Change, transition
+from sm_records.public_submissions.transition import Change, Outcome, transition
 from sm_records.records.services import records as record_service
 from sm_records.records.services._common import utcnow
 from sm_records.records.services._payload import field_defs
@@ -118,11 +118,15 @@ async def leave(
     settings: RecordsSettings,
     *,
     still: Callable[[Record], bool] | None = None,
-) -> Record:
+) -> Outcome:
     """Unsubscribe ``record``: the suppression record, consent and ordinary
     values cleared, the nonce rotated. Nothing to do for one already
     unsubscribed — or, with ``still``, for a row it no longer holds for (the
-    link's nonce moved on)."""
+    link's nonce moved on, a re-signup since a campaign's cutoff).
+
+    The transition's :class:`~.transition.Outcome`: ``wrote`` says whether
+    *this* call unsubscribed — of two concurrent ones, exactly one — which
+    re-reading the status afterwards cannot tell."""
 
     def derive(row: Record) -> Change | None:
         if (row.data or {}).get("sm_status") == UNSUBSCRIBED or (still and not still(row)):
@@ -142,7 +146,7 @@ async def leave(
     if outcome.wrote:
         before = outcome.before.get("sm_status")
         events.emit(db, changed(rtype, outcome.record, before, UNSUBSCRIBED))
-    return outcome.record
+    return outcome
 
 
 async def unsubscribe(

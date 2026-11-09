@@ -1649,6 +1649,76 @@ On a list, *Resend* sends a `pending` subscriber the confirmation again
 *Mark as spam* and *Not spam* are contact-form actions (`409 wrong_kind`
 here), and *Unsubscribe* a list's.
 
+### Newsletter contract
+
+`sm_records.contracts.newsletter` is the one import path the newsletter module
+(or any other) uses to read and update a list's subscribers; it never imports
+records' tables. Everything is `async`, takes the `AsyncSession` first and the
+rest as keywords, and returns plain objects.
+
+| Function | Returns |
+|---|---|
+| `iter_subscribers(session, *, tenant_id, type_key, filters=(), after=0, limit=500, status="confirmed")` | `(list[SubscriberHit], next_after \| None)`: untrashed subscribers in `status` (`confirmed` or `unsubscribed`), ANDed `"field:op:value"` filters, ordered by record id; pass `next_after` back as `after` |
+| `count_subscribers(session, *, tenant_id, type_key, filters=(), status="confirmed")` | how many `iter_subscribers` would walk |
+| `subscribers_by_uuid(session, *, tenant_id, type_key, uuids)` | `dict[uuid, SubscriberHit]`, any status, trashed included (`trashed=True`); unknown uuids absent; `ValueError` for a bare string, too many uuids or a non-`str` element |
+| `unsubscribe(session, *, tenant_id, type_key, uuid, unless_confirmed_after, settings, bus=None)` | `True` only if this call wrote |
+| `set_tags(session, *, tenant_id, type_key, uuid, add=(), remove=(), settings, bus=None)` | the `SubscriberHit` as written |
+| `can_read_list(session, *, tenant_id, type_key, roles)` | `bool` |
+
+`SubscriberHit` holds `uuid`, `email`, `locale`, `status`, `confirmed_at`,
+`first_name`, `last_name`, `tags` and `trashed`. **It never carries
+`sm_nonce`**, the consent snapshot or an IP hash, so nothing in it can mint or
+replay a link. `first_name`, `last_name` and `tags` are read only when the
+list declares those fields.
+
+**Tenant.** The caller names `tenant_id`; an invalid one raises `ValueError`
+before any SQL. The function binds it with records' `tenant_scope`:
+re-entering the tenant already bound is a no-op, naming another raises
+`TenantIsolationError`, and a binding is never silently replaced. Every query
+also pins `tenant_id` as a `WHERE`, since on a single-tenant host nothing is
+bound and the framework's filter then does nothing. A tenant with no such list
+reads as empty (`[]`, `0`, `{}`) and as `False` for `unsubscribe` and
+`can_read_list`, exactly like an unknown address.
+
+**Arguments.** `limit` is an `int` from 1 to `MAX_SUBSCRIBER_BATCH` (1000);
+`after` a non-negative `int`; `uuids` at most 1000 and not a bare string;
+`status` one of the two walkable values. `bool` and anything else raise
+`ValueError`. A filter term the index cannot answer raises
+`SubscriberFilterError` with records' reason (`unknown`, `not_indexed`,
+`reindexing`, `bad_value`, `unsupported_op`), `malformed` for one that does not parse, or `not_a_list` when
+`type_key` is an existing type that is not a newsletter list.
+`can_read_list` answers `False` for that last case.
+
+**Writes run in the caller's transaction and never commit.** The caller
+finishes the session with `simple_module_db.finalize_session` (records'
+`events.commit`); `SubscriptionChanged` and `RecordUpdated` are published only
+after that, to `bus` when one is given (`events.attach`). With `bus=None`
+**nothing is published**: a caller in a web process must pass
+`app.state.sm.event_bus`. A rolled-back session publishes nothing.
+
+- **`unsubscribe`** is the subscriber's own link: it writes the same
+  suppression record (see *Unsubscribe* above), for a live subscriber who is
+  `confirmed` with `sm_confirmed_at` at or before `unless_confirmed_after`
+  (aware; `None` means unconditionally). A `pending` subscriber (a re-signup
+  awaiting confirmation), an `unsubscribed`, trashed or unknown one, or one
+  confirmed after the cutoff is left alone and the answer is `False`. A
+  confirmed subscriber whose `sm_confirmed_at` is missing or unparseable is
+  unsubscribed (a re-signup after the cutoff cannot be shown, and not honouring
+  an unsubscribe is the worse error). The
+  answer is the transition's `Outcome.wrote`, so two concurrent calls report
+  the unsubscribe once.
+- **`set_tags`** merges into the `tags` field with one `update_record` at the
+  version read, retried once if the row moved (then `Conflict` is re-raised).
+  Stored order is kept, new tags are appended, duplicates dropped, and a tag in
+  both `add` and `remove` is removed. A merge equal to the stored list writes
+  nothing: no version bump, no event. A tag outside the field's choices raises
+  `ValidationFailed` with nothing written; an unknown or trashed subscriber
+  raises `SubscriberNotFound`.
+- **`can_read_list`** is records' own per-type narrowing (`allowed_roles`,
+  widened by a `records.type.<key>` grant when `roles` is a `CallerRoles`).
+  `roles=None` means no caller (a worker, the CLI) and is not blocked. The
+  newsletter module's screens pass the signed-in caller's `CallerRoles`.
+
 ---
 
 ## Error table

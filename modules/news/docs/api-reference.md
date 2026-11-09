@@ -236,6 +236,10 @@ article page sends an `ETag`, `Cache-Control` from the settings,
 with `<title>`, description, `og:*`, `twitter:*`, canonical, `hreflang`,
 `robots` and JSON-LD written into the server-rendered `<head>`.
 
+## Article contract
+
+`news.contracts.articles` is how another module (the newsletter's article picker) finds and snapshots articles: `search_articles(session, *, tenant_id, pattern, limit=20, locale=None)` and `get_article_card(session, *, tenant_id, article_id)`, both returning `ArticleCard` (`id`, `title`, `excerpt`, `image_url`, `path`, `locale`, `published_at`). Only published, not trashed articles are found. The caller names the tenant and the contract pins it itself, as a `WHERE` and a `tenant_scope` binding: naming a different tenant than the one bound raises `TenantIsolationError`, and an invalid id raises `ValueError`: `get_article_card` raises `ValueError` when `article_id` is not an `int` (a `bool` counts as not one), and returns `None` for a non-positive or out-of-range (past INTEGER, 2**31 - 1, the type of `NewsArticle.id`) id, as for an unknown, draft, trashed or other-tenant one. `path` is site-relative and locale-prefixed except for the default language, and `image_url` may be site-relative too; the caller makes both absolute (prefixing `public_base_url`) before they go into an email. Results are newest `published_at` first, undated last. `pattern` is a `LIKE` pattern with `\` as the escape character, and `limit` is 1 to 50.
+
 ## Tenancy
 
 | Surface | Single-tenant host | Multi-tenant host, no tenant resolved |
