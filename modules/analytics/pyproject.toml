@@ -1,6 +1,6 @@
 [project]
 name = "simple_module_analytics"
-version = "0.0.14"
+version = "0.0.15"
 description = "Anonymous tenant-scoped web and application analytics with local GeoIP"
 requires-python = ">=3.12"
 readme = "README.md"
