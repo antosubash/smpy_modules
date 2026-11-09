@@ -1,7 +1,7 @@
 """AI settings service — reads current settings and applies admin changes.
 
 No AI table: values live in the shared settings store. Writes go through
-``settings.reload.apply_changes_and_reload`` which validates against
+``settings.module_settings.reload.apply_changes_and_reload`` which validates against
 ``AiSettings``, persists (SYSTEM scope), hot-swaps ``app.state.sm_ai`` (the
 same instance the module-global holder references) and publishes
 ``SettingsReloaded``. Key material is encrypted before it ever reaches the
@@ -103,9 +103,9 @@ class AiService:
         """Persist and hot-swap the given field changes, then return current."""
         # Plugin→plugin imports (settings is a declared dependency); kept local
         # so import order during discovery stays tolerant.
-        from settings.reload import apply_changes_and_reload
-        from settings.service import SettingService
-        from settings.store import SettingsStore
+        from settings.core.service import SettingService
+        from settings.module_settings.reload import apply_changes_and_reload
+        from settings.module_settings.store import SettingsStore
         from simple_module_db import finalize_session
 
         store = SettingsStore(SettingService(self.db))

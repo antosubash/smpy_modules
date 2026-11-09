@@ -68,7 +68,7 @@ class TestStoredEmbeddingDim:
         assert "embedding_dim" in caplog.text
 
     def test_hydration_keeps_other_fields(self):
-        from settings.hydrate import build_settings
+        from simple_module_core.settings_hydrate import build_settings
 
         s = build_settings(
             AiSettings,

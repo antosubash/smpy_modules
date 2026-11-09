@@ -1,6 +1,6 @@
 [project]
 name = "simple_module_news"
-version = "0.0.13"
+version = "0.0.14"
 description = "A self-contained news archive — articles, categories, tags and a public viewer"
 requires-python = ">=3.12"
 readme = "README.md"
@@ -93,6 +93,7 @@ exclude = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 # Support imports and the default-tenant plugin registered by conftest.py.
 pythonpath = ["tests"]
 

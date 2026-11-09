@@ -43,7 +43,7 @@ def test_the_documented_401_is_the_body_the_framework_sends():
 def test_the_framework_still_sends_that_wording():
     """The other half of the pair: the doc is only right while this is."""
     try:
-        from auth import middleware
+        from auth.web import middleware
     except ImportError:  # pragma: no cover - a venv without an auth provider
         pytest.skip("no auth provider installed to read the wording from")
     source = inspect.getsource(middleware)

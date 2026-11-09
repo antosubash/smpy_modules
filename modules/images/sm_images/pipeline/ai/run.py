@@ -180,7 +180,7 @@ async def launch(
     starter = {"run_as": run_as, "access_basis": access_basis}
     if image_ids is not None or group_ids is not None or runtime.is_eager():
         return await run_prompt(runtime, tenant, prompt_id, scope, image_ids, group_ids, **starter)
-    from background_tasks.tenant_context import TENANT_HEADER
+    from background_tasks.executions.tenant_context import TENANT_HEADER
 
     from sm_images.task_config import QUEUE_IMPORTS
     from sm_images.tasks import run_prompt_task

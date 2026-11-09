@@ -87,8 +87,8 @@ async def _rebuild(app: FastAPI, services: Any, changed: set[str]) -> None:
 
 async def _stored(app: FastAPI) -> dict[str, Any]:
     """The ``FOLLOWED_FIELDS`` values the database holds now (defaults where unset)."""
-    from settings.constants import SYSTEM_SCOPE_ID
     from settings.contracts.schemas import SettingScope
+    from settings.core.constants import SYSTEM_SCOPE_ID
     from settings.models import Setting
     from simple_module_core.settings_hydrate import build_settings
     from sqlalchemy import select

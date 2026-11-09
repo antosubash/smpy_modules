@@ -17,6 +17,7 @@ and adds one dependency line, no registration code.
 | `modules/records` | [`simple_module_records`](https://pypi.org/project/simple_module_records/) | Admin-defined record types stored as JSON documents with typed SQL indexes — schema editor, generic CRUD screens, relations, revisions, import/export, and an anonymous read API |
 | `modules/billing` | [`simple_module_billing`](https://pypi.org/project/simple_module_billing/) | Plans, Stripe subscriptions and entitlements for multi-tenant apps — plan editor, Checkout and Customer Portal, webhooks, per-seat sync, dunning suspension, and a manual provider for installs without Stripe ([docs](modules/billing/docs/index.md)) |
 | `modules/images` | [`simple_module_images`](https://pypi.org/project/simple_module_images/) | Image collections with an immutable-original processing pipeline — EXIF and location, renditions, quality checks, optional anonymisation, geo-located imports and map tiles; private, shared, internal or public per collection |
+| `modules/analytics` | `simple_module_analytics` | Anonymous traffic and application events, with tenant reports and local country/region/city geolocation ([docs](modules/analytics/docs/index.md)) |
 
 ### Publishing in more than one language
 

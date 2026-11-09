@@ -25,3 +25,7 @@ from sm_records.records.index import (
 from sm_records.records.index import (
     virtual_fields as virtual_fields,
 )
+
+# This path was a package before 0.0.14: its old submodules resolve through
+# core/moved_paths until 0.0.17 (#319), and a submodule import needs a __path__.
+__path__: list[str] = []
