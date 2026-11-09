@@ -1,9 +1,9 @@
 """A campaign's status machine (ruling S14): schedule, unschedule, pause, resume, cancel.
 
-Every transition is one conditional Core ``UPDATE`` (:func:`transition`) pinned
-to the campaign's id, its tenant and the statuses it may leave, bumping
-``revision``. When it changes no row, the campaign is read again to say why
-(:mod:`~sm_newsletter.campaigns._refusal`). The functions here never commit:
+Every transition is one conditional Core ``UPDATE``
+(:mod:`~sm_newsletter.campaigns.transition`) pinned to the campaign's id, its
+tenant and the statuses it may leave, bumping ``revision``. When it changes no
+row, the campaign is read again to say why. The functions here never commit:
 the caller does, so a refusal leaves nothing behind.
 
 The freeze fence (amendment A1): ``schedule``, ``unschedule`` and a cancel from
@@ -19,12 +19,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from simple_module_db import mark_written
-from simple_module_db.listeners import current_user_id
-from sqlalchemy import case, delete, or_, update
+from sqlalchemy import case, delete, exists, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_newsletter.campaigns._refusal import DRAFT, refusal
+from sm_newsletter.campaigns._refusal import DRAFT
 from sm_newsletter.campaigns.access import Roles, check_list, require_campaign
 from sm_newsletter.campaigns.audience import audience_filters
 from sm_newsletter.campaigns.checks import (
@@ -35,10 +33,10 @@ from sm_newsletter.campaigns.checks import (
     check_sender,
 )
 from sm_newsletter.campaigns.snapshot import build_render, drop_render, store_render
+from sm_newsletter.campaigns.transition import apply_transition, transition
 from sm_newsletter.content.blocks import parse_body
 from sm_newsletter.content.context import render_context
 from sm_newsletter.core import constants
-from sm_newsletter.core.clock import utcnow
 from sm_newsletter.core.errors import (
     EmptyCampaign,
     InvalidCampaign,
@@ -73,67 +71,6 @@ def split_paused(reason: str | None) -> tuple[str | None, str | None]:
     return code, detail or None
 
 
-async def transition(
-    session: AsyncSession,
-    *,
-    tenant_id: str,
-    campaign_id: int,
-    from_statuses: tuple[str, ...],
-    values: dict[str, Any],
-    expected_revision: int | None = None,
-    where: list[Any] | None = None,
-) -> bool:
-    """Write ``values`` onto the campaign if its status is one of
-    ``from_statuses`` (and its revision ``expected_revision``, and ``where``),
-    bumping the revision. Whether a row changed; never commits."""
-    where = [
-        Campaign.id == campaign_id,
-        Campaign.tenant_id == tenant_id,
-        Campaign.status.in_(from_statuses),
-        *(where or []),
-    ]
-    if expected_revision is not None:
-        where.append(Campaign.revision == expected_revision)
-    # A Core-style UPDATE skips the audit listener: stamp what it would.
-    stamped = {"updated_at": utcnow(), "updated_by": current_user_id.get(), **values}
-    stmt = (
-        update(Campaign)
-        .where(*where)
-        .values(**stamped, revision=Campaign.revision + 1)
-        .execution_options(synchronize_session=False)
-    )
-    result = await session.execute(stmt)
-    mark_written(session)
-    return result.rowcount == 1  # ty: ignore[unresolved-attribute]
-
-
-async def _apply(
-    session: AsyncSession,
-    tenant_id: str,
-    campaign_id: int,
-    roles: Roles,
-    from_statuses: tuple[str, ...],
-    values: dict[str, Any],
-    *,
-    revision: int | None = None,
-    stale_on_revision: bool = True,
-    where: list[Any] | None = None,
-) -> Campaign:
-    """:func:`transition`, its refusal when nothing changed, and the campaign re-read."""
-    key = {"tenant_id": tenant_id, "campaign_id": campaign_id}
-    if not await transition(
-        session,
-        **key,
-        from_statuses=from_statuses,
-        values=values,
-        expected_revision=revision,
-        where=where,
-    ):
-        pinned = stale_on_revision and revision is not None
-        raise await refusal(session, **key, from_statuses=from_statuses, pinned_revision=pinned)
-    return await require_campaign(session, **key, roles=roles)
-
-
 async def schedule(
     app: Any,
     session: AsyncSession,
@@ -164,15 +101,15 @@ async def schedule(
     if not parse_body(campaign.body):
         raise EmptyCampaign()
     ctx = await render_context(app, tenant_id=tenant_id)
-    row = build_render(settings, campaign, ctx, tenant_id=tenant_id, now=now)
+    snap = build_render(settings, campaign, ctx, tenant_id=tenant_id, now=now)
     when = check_scheduled_at(scheduled_at, now)
     check_https(settings, ctx)
     check_no_capability_fields(campaign)
     values = {"status": SCHEDULED, "scheduled_at": when, "updated_at": now, **_FENCE}
-    scheduled = await _apply(
+    scheduled = await apply_transition(
         session, tenant_id, campaign_id, roles, (DRAFT,), values, revision=expected_revision
     )
-    await store_render(session, row)
+    await store_render(session, snap)
     return scheduled
 
 
@@ -190,7 +127,7 @@ async def unschedule(
         raise InvalidTransition()
     values = {"status": DRAFT, "scheduled_at": None, "paused_reason": None, **_FENCE}
     never_started = or_(Campaign.status == SCHEDULED, Campaign.started_at.is_(None))
-    draft = await _apply(
+    draft = await apply_transition(
         session,
         tenant_id,
         campaign_id,
@@ -216,7 +153,7 @@ async def pause(
     await require_campaign(session, tenant_id=tenant_id, campaign_id=campaign_id, roles=roles)
     reason = paused_reason(constants.PAUSE_MANUAL)
     values = {"status": PAUSED, "paused_reason": reason, "updated_at": now}
-    return await _apply(session, tenant_id, campaign_id, roles, (SENDING,), values)
+    return await apply_transition(session, tenant_id, campaign_id, roles, (SENDING,), values)
 
 
 async def resume(
@@ -231,7 +168,7 @@ async def resume(
         values |= {"status": SCHEDULED, "scheduled_at": now}
     # Pinned to the revision read, so the target matches ``started_at`` as read;
     # a race answers ``invalid_transition``, not ``stale``.
-    return await _apply(
+    return await apply_transition(
         session,
         tenant_id,
         campaign_id,
@@ -246,8 +183,17 @@ async def resume(
 async def cancel(
     session: AsyncSession, *, tenant_id: str, campaign_id: int, roles: Roles, now: datetime
 ) -> Campaign:
-    """``scheduled``/``sending``/``paused -> cancelled``; the ``queued`` rows too."""
-    await require_campaign(session, tenant_id=tenant_id, campaign_id=campaign_id, roles=roles)
+    """``scheduled``/``sending``/``paused -> cancelled``; the ``queued`` rows too.
+
+    Lock order (M4): a started campaign's rows are what tracking and
+    ``rows.record`` lock, send row then campaign row, so its cancel takes the
+    send rows first. A never-started campaign sent nothing; only
+    ``unschedule``, freeze pages and this lock its rows, all campaign row
+    first, which also makes this wait for a freeze page in flight.
+    """
+    campaign = await require_campaign(
+        session, tenant_id=tenant_id, campaign_id=campaign_id, roles=roles
+    )
     from_scheduled = Campaign.status == SCHEDULED
     values = {
         "status": CANCELLED,
@@ -258,16 +204,36 @@ async def cancel(
         "freeze_owner": None,
         "freeze_until": None,
     }
+    key = {"tenant_id": tenant_id, "campaign_id": campaign_id}
     from_statuses = (SCHEDULED, SENDING, PAUSED)
-    cancelled = await _apply(session, tenant_id, campaign_id, roles, from_statuses, values)
-    await session.execute(
+    queued = (
         update(Send)
         .where(
-            Send.tenant_id == tenant_id,
-            Send.campaign_id == campaign_id,
-            Send.status == "queued",
+            Send.tenant_id == tenant_id, Send.campaign_id == campaign_id, Send.status == "queued"
         )
         .values(status=CANCELLED)
         .execution_options(synchronize_session=False)
     )
-    return cancelled
+    if campaign.started_at is None:
+        # In a savepoint: a refusal after waiting (Postgres's re-check) keeps
+        # the row lock, and rolling back to here releases it.
+        savepoint = await session.begin_nested()
+        never_started = [Campaign.started_at.is_(None)]
+        if await transition(
+            session, **key, from_statuses=from_statuses, values=values, where=never_started
+        ):
+            await savepoint.commit()
+            await session.execute(queued)
+            return await require_campaign(session, **key, roles=roles)
+        await savepoint.rollback()
+        # Refused: it started meanwhile (cancel it as started) or cannot be
+        # cancelled (the transition below raises, the guard wrote nothing).
+    # Started: send rows first. The guard is a plain read, not a lock; the
+    # transition still decides, and a refusal rolls this back with it.
+    cancellable = exists().where(
+        Campaign.id == campaign_id,
+        Campaign.tenant_id == tenant_id,
+        Campaign.status.in_(from_statuses),
+    )
+    await session.execute(queued.where(cancellable))
+    return await apply_transition(session, tenant_id, campaign_id, roles, from_statuses, values)

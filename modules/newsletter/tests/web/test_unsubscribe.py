@@ -59,6 +59,22 @@ async def test_get_page_has_button_and_changes_nothing(world):
     assert events == []
 
 
+async def test_failed_post_answers_503_with_the_button_and_commits_nothing(world, monkeypatch):
+    app, state, events, s = world
+
+    async def boom(*_a, **_k):  # after records wrote and the suppression was added
+        raise RuntimeError("ada@example.org")
+
+    monkeypatch.setattr("sm_newsletter.web.services.unsubscribe.bump", boom)
+    res = await call(app, "POST", s.token, data=ONE_CLICK)
+    assert res.status_code == 503
+    assert '<form method="post"' in res.text and ADA not in res.text
+    assert await status_of(state, s) == "confirmed"
+    assert await suppressions(state, T) == []
+    assert (await counters(state, s))["unsubscribe_count"] == 0
+    assert events == []
+
+
 async def test_get_is_identical_for_real_test_and_forged(world):
     app, _, _, s = world
     bodies = {
@@ -130,10 +146,14 @@ async def test_forged_and_test_tokens_change_nothing(world):
     real_tenant, real_campaign, real_send, mac = s.token.rsplit(".", 3)
     tampered = f"{real_tenant}.{real_campaign}.{real_send}.{'A' * len(mac)}"
     other_secret = tokens.sign(
-        "another-secret", tenant_id=T, campaign_id=s.campaign_id, send_id=s.send_id
+        "another-secret", purpose="u", tenant_id=T, campaign_id=s.campaign_id, send_id=s.send_id
     )
     unknown_send = tokens.sign(
-        app.state.sm.settings.secret_key, tenant_id=T, campaign_id=s.campaign_id, send_id=987654
+        app.state.sm.settings.secret_key,
+        purpose="u",
+        tenant_id=T,
+        campaign_id=s.campaign_id,
+        send_id=987654,
     )
     too_long = "a" * (tokens.MAX_TOKEN + 1)
     before = await snapshot(state, s)
@@ -225,4 +245,22 @@ async def test_no_host_secret_changes_nothing(world):
     before = await snapshot(state, s)
     assert (await call(app, "POST", s.token, data=ONE_CLICK)).content == page
     assert await snapshot(state, s) == before
+    assert events == []
+
+
+async def test_open_and_click_tokens_cannot_unsubscribe(world):
+    app, state, events, s = world
+    secret = app.state.sm.settings.secret_key
+    any_post_page = (
+        await call(app, "POST", constants.TEST_UNSUBSCRIBE_TOKEN, data=ONE_CLICK)
+    ).content
+    for purpose in ("o", "c"):
+        token = tokens.sign(
+            secret, purpose=purpose, tenant_id=T, campaign_id=s.campaign_id, send_id=s.send_id
+        )
+        res = await call(app, "POST", token, data=ONE_CLICK)
+        assert res.content == any_post_page
+    assert await status_of(state, s) == "confirmed"
+    assert await suppressions(state, T) == []
+    assert (await counters(state, s))["unsubscribe_count"] == 0
     assert events == []

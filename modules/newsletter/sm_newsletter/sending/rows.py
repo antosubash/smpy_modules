@@ -16,7 +16,8 @@ from simple_module_db import mark_written
 from sqlalchemy import exists, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_newsletter.campaigns.lifecycle import PAUSED, SENDING, paused_reason, transition
+from sm_newsletter.campaigns.lifecycle import PAUSED, SENDING, paused_reason
+from sm_newsletter.campaigns.transition import transition
 from sm_newsletter.core import constants
 from sm_newsletter.core.suppression import suppress
 from sm_newsletter.models import Campaign, Send

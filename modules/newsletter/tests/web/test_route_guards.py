@@ -9,8 +9,8 @@ Order, as PR 2's routers have it: the API tree is included under
 lists ``bind_admin`` first, then its permission. So ``bind_admin`` must precede
 every ``RequiresPermission`` (``get_db``'s commit has to run while the tenant
 is still bound), and an unsafe API method must sit under ``RequiresCsrf``. The
-one anonymous route, the email logo, carries none of these and is asserted
-public.
+anonymous routes (the email logo, the open pixel and the click redirect) carry
+none of these and are asserted public.
 """
 
 from __future__ import annotations
@@ -50,6 +50,7 @@ EXPECTED = {
     ("POST", f"{API}/campaigns/{{campaign_id}}/cancel"),
     ("GET", f"{API}/campaigns/{{campaign_id}}/progress"),
     ("GET", f"{API}/campaigns/{{campaign_id}}/estimate"),
+    ("GET", f"{API}/campaigns/{{campaign_id}}/report"),
     ("GET", f"{API}/cards/articles"),
     ("GET", f"{API}/cards/pages"),
     ("POST", f"{API}/cards/snapshot"),
@@ -59,6 +60,7 @@ EXPECTED = {
     ("GET", f"{VIEW}/"),
     ("GET", f"{VIEW}/settings"),
     ("GET", f"{VIEW}/campaigns/{{campaign_id}}"),
+    ("GET", f"{VIEW}/campaigns/{{campaign_id}}/report"),
 }
 
 
@@ -124,3 +126,19 @@ def test_the_logo_route_is_public_and_unguarded():
         calls = [d.call for d in ctx.dependant.dependencies]
         assert bind_admin not in calls
         assert not any(isinstance(c, RequiresPermission) for c in calls)
+
+
+def test_tracking_routes_are_public_and_unguarded():
+    from sm_newsletter.web.endpoints.tracking import router
+
+    routes = sorted((c.path, sorted(c.methods or ())) for c in iter_route_contexts(router.routes))
+    assert routes == [
+        (f"{constants.CLICK_PREFIX}{{rest:path}}", ["GET"]),
+        (f"{constants.CLICK_PREFIX}{{token}}/{{position}}", ["GET"]),
+        (f"{constants.OPEN_PREFIX}{{token}}.gif", ["GET"]),
+    ]
+    for ctx in iter_route_contexts(router.routes):
+        calls = [d.call for d in ctx.dependant.dependencies]
+        assert bind_admin not in calls
+        assert not any(isinstance(c, RequiresPermission) for c in calls)
+        assert not any(isinstance(c, RequiresCsrf) for c in calls)

@@ -10,12 +10,13 @@ scheduling again renders afresh.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from email.utils import formataddr
 from typing import Any
 
 from simple_module_db import mark_written
-from sqlalchemy import delete
+from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.content.blocks import parse_body
@@ -25,7 +26,16 @@ from sm_newsletter.core import constants
 from sm_newsletter.core.errors import InvalidCampaign, PublicBaseUrlRequired
 from sm_newsletter.core.headers import check_header_text
 from sm_newsletter.core.settings import NewsletterSettings
-from sm_newsletter.models import Campaign, CampaignRender
+from sm_newsletter.models import Campaign, CampaignRender, Click, Link
+from sm_newsletter.tracking.rewrite import prepare
+
+
+@dataclass(frozen=True)
+class Snapshot:
+    """The render row and the tracked links (position ``i + 1``) it holds placeholders for."""
+
+    render: CampaignRender
+    links: tuple[str, ...]
 
 
 def build_render(
@@ -35,8 +45,8 @@ def build_render(
     *,
     tenant_id: str,
     now: datetime,
-) -> CampaignRender:
-    """The snapshot row, not yet stored. 422 ``public_base_url_required`` when
+) -> Snapshot:
+    """The snapshot, not yet stored. 422 ``public_base_url_required`` when
     the links would be relative; 422 ``invalid_campaign`` when a header value
     as stored (sender, subject, reply-to) would carry a line break."""
     template = render(
@@ -44,11 +54,15 @@ def build_render(
     )
     if WARN_RELATIVE in template.warnings:
         raise PublicBaseUrlRequired()
+    try:
+        prepared = prepare(template.html, own_base=ctx.public_base, campaign_id=campaign.id)
+    except ValueError:  # author content spelled a tracking placeholder; names none of it
+        raise InvalidCampaign("body: a tracking placeholder is not allowed") from None
     row = CampaignRender(
         tenant_id=tenant_id,
         campaign_id=campaign.id,
         subject=template.subject,
-        html=template.html,
+        html=prepared.html,
         text=template.text,
         sender=formataddr(
             (campaign.from_name or settings.from_name, settings.from_address.strip())
@@ -69,15 +83,29 @@ def build_render(
     # past the column Postgres would answer 500 here, so refuse it as a 422.
     if len(row.sender) > constants.MAX_SENDER_LEN:
         raise InvalidCampaign("sender: too long")
-    return row
+    return Snapshot(row, prepared.links)
 
 
-async def store_render(session: AsyncSession, row: CampaignRender) -> CampaignRender:
-    """Write ``row``, replacing the campaign's previous snapshot if any."""
+async def store_render(session: AsyncSession, snap: Snapshot) -> CampaignRender:
+    """Write the snapshot and its links, replacing the campaign's previous ones."""
+    row = snap.render
     assert row.campaign_id is not None
     await drop_render(session, tenant_id=row.tenant_id, campaign_id=row.campaign_id)
     session.add(row)
     await session.flush()
+    if snap.links:
+        await session.execute(
+            insert(Link),
+            [
+                {
+                    "tenant_id": row.tenant_id,
+                    "campaign_id": row.campaign_id,
+                    "position": i,
+                    "url": url,
+                }
+                for i, url in enumerate(snap.links, start=1)
+            ],
+        )
     return row
 
 
@@ -87,12 +115,19 @@ async def snapshot_render(
     """Render ``campaign`` for ``tenant_id`` and store it; the caller commits."""
     settings: NewsletterSettings = getattr(app.state, constants.PACKAGE).settings
     ctx = await render_context(app, tenant_id=tenant_id)
-    row = build_render(settings, campaign, ctx, tenant_id=tenant_id, now=now)
-    return await store_render(session, row)
+    snap = build_render(settings, campaign, ctx, tenant_id=tenant_id, now=now)
+    return await store_render(session, snap)
 
 
 async def drop_render(session: AsyncSession, *, tenant_id: str, campaign_id: int) -> None:
-    """Delete the campaign's snapshot, if any; the caller commits."""
+    """Delete the campaign's snapshot and its links (clicks first), if any; the caller commits."""
+    link_ids = select(Link.id).where(Link.tenant_id == tenant_id, Link.campaign_id == campaign_id)
+    await session.execute(
+        delete(Click).where(Click.tenant_id == tenant_id, Click.link_id.in_(link_ids))
+    )
+    await session.execute(
+        delete(Link).where(Link.tenant_id == tenant_id, Link.campaign_id == campaign_id)
+    )
     stmt = delete(CampaignRender).where(
         CampaignRender.tenant_id == tenant_id, CampaignRender.campaign_id == campaign_id
     )

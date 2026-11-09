@@ -10,7 +10,8 @@ from sm_newsletter.campaigns import lifecycle
 from sm_newsletter.campaigns.checks import SCHEDULE_GRACE, SCHEDULE_HORIZON, check_scheduled_at
 from sm_newsletter.content import context
 from sm_newsletter.core.errors import NewsletterError, NotFound
-from sm_newsletter.models import Campaign
+from sm_newsletter.models import Campaign, Link
+from sqlalchemy import func, select
 
 from tests.support.campaign_world import (
     campaign_row,
@@ -260,3 +261,33 @@ async def test_schedule_replaces_a_leftover_render(built):
     current = await campaign_row(state, T, cid)
     await _schedule(app, state, cid, revision=current.revision)
     assert (await render_row(state, T, cid)).subject == "Second"
+
+
+_LINKED = [{"type": "Button", "props": {"id": "b", "label": "Go", "href": "https://e.org/a"}}]
+
+
+async def _link_count(state):
+    async with state.session_factory() as db:
+        return await db.scalar(select(func.count()).select_from(Link))
+
+
+async def test_unschedule_drops_links(built):
+    app, state, cid = built
+    await set_columns(state, T, cid, body=_LINKED)
+    scheduled = await _schedule(app, state, cid)
+    assert await _link_count(state) == 1
+    await _unschedule(state, cid, revision=scheduled.revision)
+    assert await _link_count(state) == 0
+
+
+async def test_schedule_writes_links_in_same_transaction(built, monkeypatch):
+    app, state, cid = built
+    await set_columns(state, T, cid, body=_LINKED)
+    _settings(**SMTP)(app, state, cid, monkeypatch)
+    _base("http://news.example.org")(app, state, cid, monkeypatch)
+    before = await campaign_row(state, T, cid)
+    with pytest.raises(NewsletterError) as err:  # refused after the snapshot was built
+        await _schedule(app, state, cid, revision=before.revision)
+    assert err.value.code == "https_required"
+    assert await _link_count(state) == 0
+    assert await render_row(state, T, cid) is None

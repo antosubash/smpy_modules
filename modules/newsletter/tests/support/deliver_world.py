@@ -18,6 +18,7 @@ from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import Send, SendAttempt
 from sm_newsletter.sending.deliver import Step, deliver_one
 from sm_newsletter.sending.lock import HeldLock
+from sm_newsletter.tracking.rewrite import TRACKING_OFF, Tracking
 from sqlalchemy import select, update
 
 from tests.support.campaign_world import campaign_row, send_rows
@@ -58,6 +59,7 @@ async def deliver(
     lock: HeldLock = FREE,
     now: datetime = NOW,
     tenant: str = T,
+    tracking: Tracking = TRACKING_OFF,
 ) -> Step | None:
     return await deliver_one(
         state.session_factory,
@@ -68,6 +70,7 @@ async def deliver(
         secret=SECRET,
         list_unsubscribe=True,
         clock=lambda: now,
+        tracking=tracking,
     )
 
 

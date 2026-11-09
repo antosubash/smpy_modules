@@ -6,6 +6,9 @@ import unicodedata
 from urllib.parse import urlsplit
 
 UNSUBSCRIBE_TAG = "{{unsubscribe_url}}"
+# The tracking placeholders in a snapshot (``tracking.rewrite`` writes them).
+PIXEL_TAG = "{{open_pixel}}"
+LINK_PREFIX = "{{link:"
 MAX_URL = 2000
 
 
@@ -24,6 +27,11 @@ def _http(value: str) -> bool:
         return bool(urlsplit(value).hostname)
     except ValueError:
         return False
+
+
+def is_http_link(value: str) -> bool:
+    """A plain ``http(s)://`` URL with a host: what click tracking may rewrite."""
+    return _plain(value) and _http(value)
 
 
 def check_link(value: str) -> str:

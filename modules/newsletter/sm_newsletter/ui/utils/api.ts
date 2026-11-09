@@ -13,6 +13,7 @@ import type {
   MediaHit,
   Preview,
   Progress,
+  Report,
   SettingsOut,
   SettingsSaved,
   SettingsUpdate,
@@ -68,6 +69,7 @@ export const api = {
   cancelCampaign: (id: number) => send<CampaignDetail>(`/campaigns/${id}/cancel`, 'POST'),
   progress: (id: number, signal?: AbortSignal) =>
     read<Progress>(`/campaigns/${id}/progress`, signal),
+  report: (id: number, signal?: AbortSignal) => read<Report>(`/campaigns/${id}/report`, signal),
   estimate: (id: number, at: string | null) =>
     read<Estimate>(`/campaigns/${id}/estimate${query({ at: at ?? undefined })}`),
   getSettings: () => read<SettingsOut>('/settings'),

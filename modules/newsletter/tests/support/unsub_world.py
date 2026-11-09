@@ -36,7 +36,11 @@ class Sent:
     @property
     def token(self) -> str:
         return tokens.sign(
-            SECRET, tenant_id=self.tenant, campaign_id=self.campaign_id, send_id=self.send_id
+            SECRET,
+            purpose="u",
+            tenant_id=self.tenant,
+            campaign_id=self.campaign_id,
+            send_id=self.send_id,
         )
 
 

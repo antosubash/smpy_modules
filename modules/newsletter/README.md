@@ -16,9 +16,10 @@ repo; the guide is [`docs/index.md`](docs/index.md).
 server renders it, send a test to up to five addresses, and send it to a list:
 a beat task (`newsletter.dispatch`) freezes the audience and sends within a
 daily cap and a per-minute rate, with retries, pause, resume and cancel, and an
-unsubscribe page with RFC 8058 one-click. Tracking and reports arrive in a later
-pull request. See [`docs/content.md`](docs/content.md) for blocks, merge fields
-and the URL rules, [`docs/sending.md`](docs/sending.md) for how sending works and
+unsubscribe page with RFC 8058 one-click. Open and click tracking and a
+campaign report are described in [`docs/tracking.md`](docs/tracking.md). See
+[`docs/content.md`](docs/content.md) for blocks, merge fields and the URL rules,
+[`docs/sending.md`](docs/sending.md) for how sending works and
 [`docs/operations.md`](docs/operations.md) for what must run (worker and beat,
 the secret, the DKIM checklist).
 

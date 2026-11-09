@@ -10,7 +10,8 @@ and settings' tables. Only auth and the host's ``app.state.sm`` are stubbed:
   narrowing reads;
 * ``x-tenant`` is the tenant the framework resolved (``request.state.tenant_id``).
 
-The public routes (logo, unsubscribe) are mounted at the root, as ``on_startup`` does.
+The public routes (logo, unsubscribe, open pixel, click redirect) are mounted
+at the root, as ``on_startup`` does.
 
 ``GET /token`` hands out the session's CSRF token when ``session=True``.
 """

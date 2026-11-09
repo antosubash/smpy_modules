@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api, errorMessage } from '../utils/api';
 import { useT } from '../utils/i18n';
-import type { CampaignSummary } from '../utils/types';
+import type { CampaignListItem } from '../utils/types';
 
 /** The API's default page size (`limit` on `GET /campaigns`). */
 export const PAGE_SIZE = 50;
@@ -23,7 +23,7 @@ export function useCampaignList() {
   const [debouncedQ, setDebouncedQ] = useState('');
   const [status, setStatusState] = useState('');
   const [offset, setOffset] = useState(0);
-  const [items, setItems] = useState<CampaignSummary[] | null>(null);
+  const [items, setItems] = useState<CampaignListItem[] | null>(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);

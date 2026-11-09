@@ -14,8 +14,8 @@ source repository, and the delivery order is
 | 1 | records `contracts.newsletter`, news `contracts.articles` | merged |
 | 2 | this package: scaffold, tenancy, settings, models, suppressions, hourly reconcile | merged |
 | 3 | campaigns, content blocks, renderer, preview, Puck editor, test send, settings page | merged |
-| 4 | sending, throttling, retries, unsubscribe page | this PR |
-| 5 | open and click tracking, reports | planned |
+| 4 | sending, throttling, retries, unsubscribe page | in review (stacked below this PR) |
+| 5 | open and click tracking, reports | this PR |
 | 6 | segments and the subscriber screen | planned |
 | 7 | Mailchimp import, docs, e2e | planned |
 
@@ -70,6 +70,16 @@ and the golden files: [`content.md`](content.md).
   `List-Unsubscribe-Post` and `Precedence: bulk` headers) and `console`, which logs
   and keeps a per-tenant capture readable at `GET /api/newsletter/outbox`
   (`newsletter.manage`). On SQLite the dispatch lock is a lease row held for 120 s.
+
+## Tracking and reports
+
+Opens (a pixel) and clicks (rewritten links) are counted per recipient and per
+link, with no IP or user agent stored, and a report screen shows them. What is
+stored, the token rules, what switching tracking off does and the report's
+definitions are in [`tracking.md`](tracking.md).
+
+- **Screen.** `/admin/newsletter/campaigns/{id}/report` (`newsletter.view`); the
+  campaign list shows open and click rates.
 
 ## Settings
 

@@ -87,6 +87,24 @@ def test_unsubscribe_rate_rules_per_method():
     assert registry.match("GET", "/newsletter/brand/logo") is None
 
 
+def test_tracking_prefixes_are_public_for_get_with_their_own_rates():
+    """T11: the pixel's 600/minute and the click's 300/minute, not the host's
+    ``rate_limit_public``; ``GET`` only."""
+    from simple_module_core.public_routes import PublicRouteRegistry
+    from simple_module_core.rate_limit import RateLimitRegistry
+
+    public, rates = PublicRouteRegistry(), RateLimitRegistry()
+    NewsletterModule().register_public_routes(public)
+    NewsletterModule().register_rate_limits(rates)
+    pixel, click = f"{constants.OPEN_PREFIX}x.gif", f"{constants.CLICK_PREFIX}x/1"
+    for url, rate in ((pixel, "600/minute"), (click, "300/minute")):
+        assert public.matches("GET", url) and not public.matches("POST", url)
+        assert public.match("GET", url).rate == rate
+        rule = rates.match("GET", url)
+        assert (rule.rate, rule.key, rule.methods) == (rate, "ip", frozenset({"GET"}))
+        assert rates.match("POST", url) is None
+
+
 def test_mount_public_routes_mounts_each_router_once():
     from fastapi import FastAPI
     from fastapi.routing import iter_route_contexts
@@ -97,3 +115,5 @@ def test_mount_public_routes_mounts_each_router_once():
     paths = [r.path for r in iter_route_contexts(app.routes)]
     assert paths.count(constants.BRAND_LOGO_PATH) == 1
     assert paths.count(f"{constants.UNSUBSCRIBE_PREFIX}{{token}}") == 2  # GET and POST
+    assert paths.count(f"{constants.OPEN_PREFIX}{{token}}.gif") == 1
+    assert paths.count(f"{constants.CLICK_PREFIX}{{token}}/{{position}}") == 1

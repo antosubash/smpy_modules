@@ -38,11 +38,14 @@
     "clear": "Filter zurücksetzen",
     "columns": {
       "name": "Name",
-      "subject": "Betreff",
       "status": "Status",
       "list": "Liste",
       "updated": "Aktualisiert",
-      "actions": "Aktionen"
+      "actions": "Aktionen",
+      "sent": "Gesendet",
+      "recipients": "Empfänger",
+      "opens": "Öffnungen",
+      "clicks": "Klicks"
     },
     "no_subject": "(kein Betreff)",
     "never": "Nie",
@@ -70,7 +73,10 @@
       "cancel": "Abbrechen",
       "confirm": "Löschen",
       "working": "Wird gelöscht"
-    }
+    },
+    "no_rate": "—",
+    "report_link": "Bericht",
+    "report_label": "Bericht für {name}"
   },
   "settings": {
     "title": "Newsletter-Einstellungen",
@@ -116,7 +122,7 @@
       "opens": "Öffnungen erfassen",
       "clicks": "Klicks erfassen"
     },
-    "tracking_note": "Tracking gilt ab PR 5. Diese Schalter werden gespeichert, haben aber noch keine Wirkung.",
+    "tracking_note": "Gilt für E-Mails, die ab jetzt versendet werden. Wer die Messung ausschaltet, stoppt auch das Zählen von Öffnungen und Klicks bereits versendeter E-Mails. Es wird nichts über das Gerät oder die Adresse der Leserin oder des Lesers gespeichert.",
     "server_change_clears_password": "Wenn Sie Host, Port, Verschlüsselung oder Benutzernamen ändern, wird das gespeicherte Passwort entfernt. Geben Sie es danach erneut ein.",
     "password_cleared_notice": "Das gespeicherte Passwort wurde entfernt, weil sich der Server geändert hat. Geben Sie es erneut ein.",
     "saved_notice": "Einstellungen gespeichert.",
@@ -258,7 +264,7 @@
     "not_found": "Dieser Eintrag existiert nicht mehr.",
     "public_base_url_required": "Legen Sie in den Einstellungen die öffentliche Basis-URL der Website fest, bevor Sie senden.",
     "send_budget_exhausted": "Das Sendelimit ist erreicht. Versuchen Sie es später erneut.",
-    "sender_not_configured": "Legen Sie zuerst die Absenderadresse in den Newsletter-Einstellungen fest.",
+    "sender_not_configured": "Vervollständigen Sie zuerst die Absender-Einstellungen: die Absenderadresse, die Postanschrift und bei SMTP den SMTP-Server.",
     "smtp_password_unreadable": "Das gespeicherte SMTP-Passwort kann nicht gelesen werden. Geben Sie es erneut ein.",
     "stale": "Diese Kampagne wurde anderswo geändert. Laden Sie sie neu, um fortzufahren.",
     "tenant_required": "Für dieses Konto ist keine Organisation aktiv.",
@@ -341,7 +347,8 @@
         "suppressed": "{count} unterdrückt",
         "skipped": "{count} übersprungen",
         "unsubscribed": "{count} abgemeldet"
-      }
+      },
+      "report": "Bericht ansehen"
     },
     "actions": {
       "pause": "Pausieren",
@@ -361,6 +368,56 @@
       "smtp_auth": "Der Mailserver hat die Anmeldung verweigert",
       "list_unavailable": "Die Newsletter-Liste ist nicht verfügbar",
       "https_required": "Echte E-Mails brauchen https, aber diese Kampagne wurde mit einer http-Adresse erstellt"
+    }
+  },
+  "report": {
+    "title": "Bericht: {name}",
+    "back": "Zurück zu den Kampagnen",
+    "loading": "Bericht wird geladen",
+    "refresh": "Aktualisieren",
+    "not_started": "Der Versand dieser Kampagne hat noch nicht begonnen.",
+    "open_editor": "Im Editor öffnen",
+    "stats": {
+      "recipients": "Empfänger",
+      "accepted": "Angenommen",
+      "accepted_hint": "Vom Mailserver angenommen. Bounces, die später per E-Mail eintreffen, werden nicht gezählt.",
+      "failed": "Fehlgeschlagen",
+      "bounced": "Zurückgewiesen",
+      "suppressed": "Unterdrückt",
+      "skipped": "Übersprungen",
+      "unsubscribed": "Abgemeldet",
+      "opens": "Öffnungen",
+      "clicks": "Klicks",
+      "rate_hint": "Eindeutig, bezogen auf die vom Mailserver angenommenen Nachrichten",
+      "all_messages": "Alle Nachrichten, auch solche mit unbekanntem Ausgang: {unique} eindeutig, {total} gesamt"
+    },
+    "approx": {
+      "opens": "Ungefähre Werte. Datenschutzfunktionen wie der Mail-Datenschutz von Apple Mail laden Bilder automatisch, daher können Öffnungen zu hoch ausfallen.",
+      "clicks": "Kann automatische Link-Scanner enthalten."
+    },
+    "tracking_off": {
+      "opens": "Die Öffnungsmessung ist ausgeschaltet.",
+      "clicks": "Die Klickmessung ist ausgeschaltet."
+    },
+    "links": {
+      "title": "Links",
+      "url": "Link",
+      "unique": "Eindeutige Klicks",
+      "total": "Klicks gesamt",
+      "empty": "Diese Kampagne enthält keine gemessenen Links."
+    },
+    "timeline": {
+      "title": "Verlauf",
+      "opens": "Öffnungen",
+      "clicks": "Klicks",
+      "empty": "Noch keine Öffnungen oder Klicks.",
+      "window_hour": "Die ersten 72 Stunden",
+      "window_day": "Die ersten 90 Tage",
+      "caption": "Erste Öffnungen und erste Klicks pro {bucket}, in UTC",
+      "bucket": {
+        "hour": "Stunde",
+        "day": "Tag"
+      }
     }
   }
 }

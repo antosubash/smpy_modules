@@ -20,6 +20,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_newsletter.core.errors import ListForbidden, NotFound, UnknownList
 from sm_newsletter.models import Campaign
 
+MAX_ID = 2**31 - 1
+"""The largest id a row can have: the id column is a plain ``INTEGER``, signed
+32-bit on Postgres (SQLite takes 64 bits, but Postgres is the bound). A larger
+id in a URL would overflow the query parameter instead of matching nothing."""
+
 Roles = Sequence[str] | CallerRoles | None
 """What records' ``can_read_list`` takes; ``None`` is no caller (a worker)."""
 
@@ -49,6 +54,8 @@ async def require_campaign(
 ) -> Campaign:
     """The tenant's campaign ``campaign_id``, read fresh; :class:`NotFound` when
     there is none *or* its list is unreadable to this caller."""
+    if not 0 < campaign_id <= MAX_ID:
+        raise NotFound()
     stmt = (
         select(Campaign)
         .where(Campaign.id == campaign_id, Campaign.tenant_id == tenant_id)

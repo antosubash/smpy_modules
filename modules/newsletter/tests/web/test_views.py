@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sm_newsletter.campaigns.test_send import MAX_TEST_RECIPIENTS
@@ -89,9 +90,36 @@ async def test_editor_unreadable_list_404(client, built):
     assert res.status_code == 404
 
 
+async def test_report_view_renders(client):
+    cid = await _campaign(client)
+    res = await client.get(f"{VIEW}/campaigns/{cid}/report", headers=READ)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["component"] == constants._PAGE_REPORT == "Newsletter/CampaignReport"
+    assert body["props"]["campaign_id"] == cid
+    assert body["props"]["name"]
+
+
+async def test_report_unknown_campaign_404(client):
+    assert (await client.get(f"{VIEW}/campaigns/9999/report", headers=READ)).status_code == 404
+
+
+@pytest.mark.parametrize("cid", ["0", "-1", str(2**31 - 1), str(2**31), str(2**63), "9" * 20])
+async def test_out_of_range_campaign_ids_404_not_500(client, cid):
+    for path in (f"/campaigns/{cid}", f"/campaigns/{cid}/report"):
+        assert (await client.get(f"{VIEW}{path}", headers=READ)).status_code == 404
+
+
+async def test_report_unreadable_list_404(client, built):
+    _, state = built
+    cid = await _campaign(client)
+    await restrict_list(state, "default", "news", ["nobody"])
+    assert (await client.get(f"{VIEW}/campaigns/{cid}/report", headers=READ)).status_code == 404
+
+
 async def test_views_need_view_permission(client):
     cid = await _campaign(client)
-    for path in ("/", f"/campaigns/{cid}"):
+    for path in ("/", f"/campaigns/{cid}", f"/campaigns/{cid}/report"):
         assert (await client.get(f"{VIEW}{path}", headers={"x-perms": ""})).status_code == 403
 
 

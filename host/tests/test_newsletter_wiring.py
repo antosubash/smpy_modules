@@ -58,3 +58,19 @@ def test_unsubscribe_route_is_public():
     response = TestClient(app).get("/newsletter/u/test", follow_redirects=False)
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
+
+
+def test_tracking_routes_are_public():
+    # An anonymous GET passes the host's auth and guards: the pixel answers the
+    # GIF and an unknown click token is the 404, not a 401 or a login redirect.
+    from fastapi.testclient import TestClient
+    from sm_newsletter.module import NewsletterModule
+
+    app = create_app(Settings())
+    NewsletterModule.mount_public_routes(app)
+    client = TestClient(app)
+    pixel = client.get("/newsletter/o/x.1.1.AAAA.gif", follow_redirects=False)
+    assert pixel.status_code == 200
+    assert pixel.headers["content-type"] == "image/gif"
+    click = client.get("/newsletter/c/test/1", follow_redirects=False)
+    assert click.status_code == 404

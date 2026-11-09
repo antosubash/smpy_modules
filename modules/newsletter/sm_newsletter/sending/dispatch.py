@@ -55,6 +55,7 @@ from sm_newsletter.sending.upkeep import (
     recover_expired,
     sending_campaigns,
 )
+from sm_newsletter.tracking.rewrite import Tracking
 
 __all__ = ["HOLDER", "MAX_SLICE_STEPS", "SLICE", "TICK_SECONDS", "TickSummary", "tick"]
 
@@ -92,6 +93,8 @@ class _Run:
     clock: Clock
     deadline: float
     summary: TickSummary
+    tracking: Tracking
+    """Read from the settings once, when the tick starts (B7)."""
     sleep: Sleep
 
     def late(self) -> bool:
@@ -146,6 +149,7 @@ async def tick(
             clock,
             deadline,
             summary,
+            Tracking(opens=settings.tracking_opens, clicks=settings.tracking_clicks),
             sleep,
         )
         summary.stopped = await _slices(run, lock_wait_s)
@@ -229,6 +233,7 @@ async def _next(run: _Run, lock: HeldLock, campaigns: list[tuple[str, int]]) -> 
             list_unsubscribe=run.list_unsubscribe,
             clock=run.clock,
             require_https=run.settings.transport == "smtp",
+            tracking=run.tracking,
         )
         if step is not None:
             return step

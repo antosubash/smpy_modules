@@ -22,6 +22,14 @@ export interface CampaignSummary {
   updated_at: string | null;
   recipient_count: number;
   sent_count: number;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+/** A list row: unique opens and clicks of `sent` rows (B5); the detail has no such field. */
+export interface CampaignListItem extends CampaignSummary {
+  opens_unique_accepted: number;
+  clicks_unique_accepted: number;
 }
 
 export interface CampaignDetail extends CampaignSummary {
@@ -31,8 +39,6 @@ export interface CampaignDetail extends CampaignSummary {
   audience: string;
   body: Block[];
   scheduled_at: string | null;
-  started_at: string | null;
-  finished_at: string | null;
   paused_code: PausedCode | null;
   paused_detail: string | null;
   failed_count: number;
@@ -77,8 +83,47 @@ export interface Estimate {
   daily_rate: number;
 }
 
+export interface LinkStat {
+  position: number;
+  url: string;
+  unique: number;
+  total: number;
+}
+
+export interface ReportPoint {
+  at: string;
+  opens: number;
+  clicks: number;
+}
+
+/** `GET /campaigns/{id}/report`: raw counts, rates are computed in the UI (T14). */
+export interface Report {
+  campaign_id: number;
+  status: string;
+  started_at: string | null;
+  finished_at: string | null;
+  recipients: number;
+  sent: number;
+  failed: number;
+  bounced: number;
+  suppressed: number;
+  skipped: number;
+  unsubscribed: number;
+  opens_unique: number;
+  opens_total: number;
+  clicks_unique: number;
+  clicks_total: number;
+  opens_unique_accepted: number;
+  clicks_unique_accepted: number;
+  tracking_opens: boolean;
+  tracking_clicks: boolean;
+  links: LinkStat[];
+  bucket: 'hour' | 'day';
+  timeline: ReportPoint[];
+}
+
 export interface CampaignPage {
-  items: CampaignSummary[];
+  items: CampaignListItem[];
   total: number;
 }
 

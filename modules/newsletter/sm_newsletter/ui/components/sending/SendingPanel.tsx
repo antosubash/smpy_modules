@@ -1,3 +1,4 @@
+import { Link } from '@inertiajs/react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,8 +18,10 @@ import { PROGRESS_POLL_MS, useCampaignProgress } from '../../hooks/useCampaignPr
 import { api, errorMessage } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 import { daysLeft, formatWhen } from '../../utils/progress';
+import { hasStarted } from '../../utils/report';
 import type { CampaignDetail, Progress } from '../../utils/types';
 import { STATUS_LABELS } from '../campaigns/CampaignTable';
+import { reportUrl } from '../campaigns/urls';
 
 const copy = keys.newsletter.sending;
 const pausedKeys = copy.paused_code as Record<string, string>;
@@ -138,6 +141,11 @@ export function SendingPanel({ campaign, canSend, onChange }: Props) {
           </p>
         )}
       </div>
+      {hasStarted(campaign) && (
+        <Button asChild size="sm" variant="outline">
+          <Link href={reportUrl(campaign.id)}>{t(copy.panel.report)}</Link>
+        </Button>
+      )}
       {actions.map((action) =>
         action === 'cancel' ? (
           <CancelButton key={action} busy={busy} error={error} onConfirm={() => run('cancel')} />

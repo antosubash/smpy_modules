@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import de from '../../locales/de.json';
 import en from '../../locales/en.json';
 import type { Translate } from './i18n';
 
@@ -186,6 +187,13 @@ describe('the error catalogue', () => {
     expect((en.errors as Record<string, string>)[code]).toBeTruthy();
   });
 
+  it('names every sender setting a send needs, not just the address (QA BUG-002)', () => {
+    // ``campaigns/checks.py`` raises the one code for the From address, the
+    // postal address and the SMTP host alike.
+    expect(en.errors.sender_not_configured).toMatch(/From address.*postal address.*SMTP host/);
+    expect(de.errors.sender_not_configured).toMatch(/Absenderadresse.*Postanschrift.*SMTP-Server/);
+  });
+
   it('has a generic line', () => {
     expect(en.errors.generic).toBeTruthy();
   });
@@ -228,5 +236,15 @@ describe('sending calls', () => {
     expect(sent[2].body).toBe(JSON.stringify({ expected_revision: 5 }));
     expect(sent.slice(3, 6).map((s) => s.body)).toEqual([undefined, undefined, undefined]);
     expect((fetchMock.mock.calls[6][1] as RequestInit).signal).toBe(signal);
+  });
+
+  it('reads the campaign report', async () => {
+    const { api } = await load({ csrf_token: 'tok' });
+    const fetchMock = stubFetch(ok);
+    const signal = new AbortController().signal;
+    await api.report(7, signal);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(`${init.method ?? 'GET'} ${url}`).toBe('GET /api/newsletter/campaigns/7/report');
+    expect(init.signal).toBe(signal);
   });
 });

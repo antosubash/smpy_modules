@@ -5,13 +5,13 @@ from __future__ import annotations
 import html
 import re
 
-from sm_newsletter.content.urls import UNSUBSCRIBE_TAG
+from sm_newsletter.content.urls import LINK_PREFIX, PIXEL_TAG, UNSUBSCRIBE_TAG
 
 MAX_FALLBACK = 100
-CAPABILITY_TAGS = (UNSUBSCRIBE_TAG,)
+CAPABILITY_TAGS = (UNSUBSCRIBE_TAG, PIXEL_TAG, LINK_PREFIX)
 """Merge fields whose value carries a send token (amendment A7). They may sit in
 the body, never in a header or the preheader: a subject is logged and indexed
-by mailbox providers. PR 5 adds its own."""
+by mailbox providers. The tracking placeholders are filled before merge fields."""
 _UNSUB = r"\{\{unsubscribe_url\}\}"
 # Validation caps the raw fallback; substitution sees it HTML-escaped (up to 6x
 # longer), so it is uncapped.

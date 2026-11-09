@@ -46,6 +46,7 @@ test-results/
 .e2e-shards/
 blob-report/
 .playwright-mcp/
+.playwright-cli/
 
 # macOS
 .DS_Store
