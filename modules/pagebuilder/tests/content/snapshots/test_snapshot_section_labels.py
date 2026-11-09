@@ -17,7 +17,7 @@ from tests.support.page_helpers import create_draft
 pytestmark = pytest.mark.asyncio
 
 _SNAPSHOTS = "/api/pagebuilder/snapshots"
-_INERTIA = {"X-Inertia": "true"}
+_INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
 _NOTES_LABELS = {
     "section": "notes",
     "label_key": "notes.bundle.title",

@@ -23,7 +23,7 @@ async def get_current_user_or_401(request: Request) -> Any:
     """Return the authenticated user or raise 401.
 
     Reads ``request.state.user`` (set by the host's auth middleware).
-    We don't import ``auth.deps.get_current_user`` because it depends on
+    We don't import ``auth.web.deps.get_current_user`` because it depends on
     the i18n TranslatorDep — the failure mode we care about is "no auth
     middleware mounted at all", which would leave ``request.state.user``
     unset regardless of which dep we use.

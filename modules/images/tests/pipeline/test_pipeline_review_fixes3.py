@@ -7,9 +7,9 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
+from background_tasks.core.settings import BackgroundTasksSettings
 from background_tasks.models import Base as BackgroundBase
-from background_tasks.outbox_transport import OutboxTransport
-from background_tasks.settings import BackgroundTasksSettings
+from background_tasks.outbox.transport import OutboxTransport
 from simple_module_core.durable_events import in_delivery
 from simple_module_db import finalize_session
 from sm_images.contracts import ImageProcessed
