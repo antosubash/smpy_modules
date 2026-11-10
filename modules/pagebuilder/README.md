@@ -133,9 +133,11 @@ off the current head, so the command walks everything beneath it. Upstream
 | `pagebuilder.publish` | Publish and unpublish directly |
 | `pagebuilder.approve` | Approve or reject a submitted page |
 
-`DEFAULT_ROLE_MAP` in `pagebuilder.permissions` suggests three roles —
+`DEFAULT_ROLE_MAP` in `pagebuilder.core.permissions` suggests three roles —
 `pagebuilder_editor`, `pagebuilder_publisher`, `pagebuilder_approver` —
-cumulatively mapped to those permissions.
+cumulatively mapped to those permissions. The users admin can assign them once
+the host's migrations create their rows; see "Roles" in
+[`docs/operations.md`](docs/operations.md#roles).
 
 ## Settings
 

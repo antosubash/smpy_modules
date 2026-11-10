@@ -32,6 +32,13 @@ name the module they affect.
   production the nonce'd scripts and any `register_csp_sources` allowance. A
   browser that already merged the old header keeps it until it next fetches
   the page in full.
+- pagebuilder's roles `pagebuilder_editor`, `pagebuilder_publisher` and
+  `pagebuilder_approver` can be assigned in the users admin (#320). They were
+  mapped to permissions in code, but no `users_role` row existed for them, so
+  they never appeared in the role list. The demo host's revision `541bfbe29a28`
+  creates the missing rows. **Upgrading:** migrations belong to the host, so a
+  consuming host copies that revision into its own history; see "Roles" in
+  `modules/pagebuilder/docs/operations.md`.
 
 ## 0.0.14
 
