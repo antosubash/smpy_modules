@@ -54,9 +54,9 @@ Pagebuilder maps three roles to its permissions:
 | `pagebuilder_approver` | `pagebuilder.edit`, `pagebuilder.publish`, `pagebuilder.approve` |
 
 The mapping lives in code, but the users admin can assign a role only once its
-`users_role` row exists, and pagebuilder does not create rows at boot: the users
-module never re-creates a role at startup, so a role an admin deleted stays
-deleted. Until the rows exist, grant the permissions to each user directly.
+`users_role` row exists, and nothing creates these rows at boot (the users
+module's startup ensures only the standard `user` role). Until the rows exist,
+grant the permissions to each user directly.
 
 The rows are created by a migration, which belongs to the host. The demo host's
 is `host/migrations/versions/541bfbe29a28_pagebuilder_seed_roles.py`: copy it

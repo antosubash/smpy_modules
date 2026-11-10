@@ -20,8 +20,10 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 
-# The head before the role rows.
+# The role rows' revision and the one before it. Tests stop at ``REVISION`` rather
+# than ``heads`` so a later revision cannot change what they exercise.
 BEFORE = "4381e1c2ac7e"
+REVISION = "541bfbe29a28"
 
 # GUID() stores a UUID as its dashed string on SQLite.
 EXPECTED = {
@@ -76,7 +78,7 @@ def test_upgrade_creates_the_three_roles(tmp_path) -> None:
     db = tmp_path / "host.db"
     _ok(db, "upgrade", BEFORE)
     assert _roles(db) == {}
-    _ok(db, "upgrade", "heads")
+    _ok(db, "upgrade", REVISION)
     assert _roles(db) == EXPECTED
 
 
@@ -85,13 +87,16 @@ def test_a_role_the_host_created_is_kept(tmp_path) -> None:
     _ok(db, "upgrade", BEFORE)
     own_id = "00000000-0000-0000-0000-000000000009"
     _execute(db, OWN_EDITOR.format(id=own_id))
-    _ok(db, "upgrade", "heads")
+    _ok(db, "upgrade", REVISION)
     assert _roles(db) == {**EXPECTED, "pagebuilder_editor": (own_id, "Ours")}
+    # Downgrade removes only the rows this revision created, by id.
+    _ok(db, "downgrade", BEFORE)
+    assert _roles(db) == {"pagebuilder_editor": (own_id, "Ours")}
 
 
 def test_downgrade_keeps_an_assigned_role(tmp_path) -> None:
     db = tmp_path / "host.db"
-    _ok(db, "upgrade", "heads")
+    _ok(db, "upgrade", REVISION)
     publisher_id = EXPECTED["pagebuilder_publisher"][0]
     user_id = "11111111-1111-1111-1111-111111111111"
     _execute(
@@ -104,7 +109,7 @@ def test_downgrade_keeps_an_assigned_role(tmp_path) -> None:
     _ok(db, "downgrade", BEFORE)
     assert _roles(db) == {"pagebuilder_publisher": EXPECTED["pagebuilder_publisher"]}
     # Up again: the kept row is not duplicated, the other two come back.
-    _ok(db, "upgrade", "heads")
+    _ok(db, "upgrade", REVISION)
     assert _roles(db) == EXPECTED
 
 

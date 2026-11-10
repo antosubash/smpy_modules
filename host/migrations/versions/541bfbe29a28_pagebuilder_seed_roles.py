@@ -64,11 +64,13 @@ _user_role = sa.table("users_user_role", sa.column("role_id", GUID()))
 
 def upgrade() -> None:
     bind = op.get_bind()
+    present = set(
+        bind.execute(
+            sa.select(_role.c.name).where(_role.c.name.in_([name for _id, name, _d in _ROLES]))
+        ).scalars()
+    )
     for role_id, name, description in _ROLES:
-        existing = bind.execute(
-            sa.select(sa.func.count()).select_from(_role).where(_role.c.name == name)
-        ).scalar_one()
-        if not existing:
+        if name not in present:
             bind.execute(_role.insert().values(id=role_id, name=name, description=description))
 
 
