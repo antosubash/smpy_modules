@@ -232,8 +232,8 @@ and `/{locale}/news` for each other content language.
 Archives and the feed list only published articles with `show_in_feed` on. A
 page past the end is 404; a search result page is `noindex,follow`. The
 article page sends an `ETag`, `Cache-Control` from the settings,
-`Content-Language`, and `Content-Security-Policy` when `public_csp` is set (not on a 304),
-with `<title>`, description, `og:*`, `twitter:*`, canonical, `hreflang`,
+`Content-Language`, and `Content-Security-Policy` when `public_csp` is set (not
+on a 304), with `<title>`, description, `og:*`, `twitter:*`, canonical, `hreflang`,
 `robots` and JSON-LD written into the server-rendered `<head>`.
 
 ## Article contract

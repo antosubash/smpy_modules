@@ -136,7 +136,7 @@ async def test_a_304_carries_no_content_security_policy(authed_client: AsyncClie
     """
     await _publish(authed_client)
     first = await authed_client.get("/p/hello", headers=_ANON)
-    assert first.headers["Content-Security-Policy"]
+    assert first.headers["Content-Security-Policy"] == PagebuilderSettings().public_csp
     again = await authed_client.get(
         "/p/hello", headers={**_ANON, "If-None-Match": first.headers["ETag"]}
     )

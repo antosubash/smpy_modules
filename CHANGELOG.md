@@ -28,7 +28,10 @@ name the module they affect.
 - pagebuilder and news no longer send `public_csp` on a `304 Not Modified`
   (#322). The browser merges a 304's headers into the cached page, so the
   module's strict policy replaced the page's nonce-based one, and after
-  revalidation every script was blocked (a blank page in development).
+  revalidation every script was blocked: a blank page in development, and in
+  production the nonce'd scripts and any `register_csp_sources` allowance. A
+  browser that already merged the old header keeps it until it next fetches
+  the page in full.
 
 ## 0.0.14
 
