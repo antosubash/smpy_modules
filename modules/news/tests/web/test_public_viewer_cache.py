@@ -11,6 +11,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from news.core import settings as news_settings
+from news.core.settings import NewsSettings
 from news.web.endpoints.public._urls import etag_for, viewer_key
 
 from tests.support.factories import make_article
@@ -75,3 +77,21 @@ async def test_an_anonymous_reader_still_gets_public_pages(anon_client) -> None:
         response = await anon_client.get(path)
         assert response.status_code == 200, (path, response.text)
         assert response.headers["cache-control"].startswith("public, max-age="), path
+
+
+async def test_a_304_carries_no_content_security_policy(anon_client) -> None:
+    """A browser merges a 304's headers into the stored response (#322): a
+    ``public_csp`` here would replace the policy the cached body's nonce'd
+    scripts were served with."""
+    news_settings.use(NewsSettings(public_csp="default-src 'self'"))
+    try:
+        await _seed(anon_client)
+        first = await anon_client.get(f"{NEWS}/hello")
+        assert first.headers["content-security-policy"] == "default-src 'self'"
+        again = await anon_client.get(
+            f"{NEWS}/hello", headers={"If-None-Match": first.headers["etag"]}
+        )
+        assert again.status_code == 304
+        assert "content-security-policy" not in again.headers
+    finally:
+        news_settings.reset()

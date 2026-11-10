@@ -146,7 +146,7 @@ A published page response carries:
 | `Cache-Control` | `public, max-age=<public_cache_max_age>, stale-while-revalidate=<public_cache_swr>` |
 | `Vary` | `X-Inertia`, plus the tenant headers on a multi-tenant host |
 | `Content-Language` | the page's locale |
-| `Content-Security-Policy` | `public_csp`, unless empty |
+| `Content-Security-Policy` | `public_csp`, unless empty; never on a 304, which the browser merges into the cached page (#322) |
 
 Because the nav list is in the ETag, publishing or renaming a page flagged for
 the header changes every other page's tag too. Media is served
