@@ -25,6 +25,10 @@ name the module they affect.
   the real `core.locales` module again. In 0.0.14 it imported the data-only
   `locales/` directory as an empty namespace package, and the failure only showed
   later, as an `AttributeError` on `locales.is_default`.
+- pagebuilder and news no longer send `public_csp` on a `304 Not Modified`
+  (#322). The browser merges a 304's headers into the cached page, so the
+  module's strict policy replaced the page's nonce-based one, and after
+  revalidation every script was blocked (a blank page in development).
 
 ## 0.0.14
 

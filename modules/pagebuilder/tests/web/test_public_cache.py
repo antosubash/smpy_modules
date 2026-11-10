@@ -125,3 +125,20 @@ async def test_an_anonymous_304_keeps_the_public_policy(authed_client: AsyncClie
     assert again.status_code == 304
     assert again.headers["Cache-Control"].startswith("public, max-age=")
     assert again.headers["ETag"] == first.headers["ETag"]
+
+
+@pytest.mark.asyncio
+async def test_a_304_carries_no_content_security_policy(authed_client: AsyncClient) -> None:
+    """A browser merges a 304's headers into the stored response (#322).
+
+    The cached body's scripts carry the nonce of the policy it was served with;
+    ``public_csp`` here would replace that policy and block them all.
+    """
+    await _publish(authed_client)
+    first = await authed_client.get("/p/hello", headers=_ANON)
+    assert first.headers["Content-Security-Policy"]
+    again = await authed_client.get(
+        "/p/hello", headers={**_ANON, "If-None-Match": first.headers["ETag"]}
+    )
+    assert again.status_code == 304
+    assert "content-security-policy" not in again.headers

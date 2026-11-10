@@ -424,7 +424,8 @@ Anonymous listings carry `Cache-Control: public, max-age=60`, because the feed
 block runs on every public page that holds one. An editor's listing includes
 drafts and so is `private, no-store`. The article viewer sends an `ETag`,
 `Cache-Control: public, max-age=300, stale-while-revalidate=60`, and
-`Content-Security-Policy` when `public_csp` is set.
+`Content-Security-Policy` when `public_csp` is set (never on a 304: the browser
+merges its headers into the cached page, #322).
 
 ## The console's language
 
