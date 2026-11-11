@@ -12,7 +12,7 @@ package (tests excluded) and requires that the floor release ships it: the
 module file at tag ``v<floor>``, and every name imported from it defined at
 top level there (or a submodule of that name). ``from sm_ai import
 contracts`` counts, and so does the string passed to
-``importlib.import_module`` (directly or through a module-level constant),
+``importlib.import_module`` (directly or through a constant of the package),
 which is how an optional extra is loaded. Names bound only under
 ``if TYPE_CHECKING:`` do not count as defined. A floor above the newest tag is
 the release being prepared, so it is checked against the working tree. A floor
@@ -28,7 +28,6 @@ Needs the release tags (``git fetch --tags``; CI checks out with
 from __future__ import annotations
 
 import argparse
-import ast
 import subprocess
 import sys
 from collections.abc import Iterator
@@ -36,6 +35,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import tomlkit
+from contract_imports import imports, top_level_names
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
@@ -89,63 +89,6 @@ def _tags(root: Path) -> set[Version]:
     return tags
 
 
-def _is_contract(module: str, prefix: str) -> bool:
-    return module == prefix or module.startswith(prefix + ".")
-
-
-def _import_module_targets(tree: ast.Module) -> Iterator[str]:
-    """String targets of ``import_module(...)`` / ``__import__(...)`` calls.
-
-    A literal argument, or a module-level name bound to one (``_CONTRACT =
-    "news.contracts.articles"``): how an optional extra is loaded. Other
-    strings are not imports, however much they look like a module path.
-    """
-    constants = {
-        target.id: node.value.value
-        for node in tree.body
-        if isinstance(node, ast.Assign)
-        and isinstance(node.value, ast.Constant)
-        and isinstance(node.value.value, str)
-        for target in node.targets
-        if isinstance(target, ast.Name)
-    }
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call) or not node.args:
-            continue
-        func = node.func
-        name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
-        if name not in ("import_module", "__import__"):
-            continue
-        arg = node.args[0]
-        if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-            yield arg.value
-        elif isinstance(arg, ast.Name) and arg.id in constants:
-            yield constants[arg.id]
-
-
-def _imports(package_dir: Path, prefix: str) -> Iterator[tuple[Path, str, tuple[str, ...]]]:
-    """Yield (file, module, names) for each absolute import of *prefix* or below it."""
-    parent, _, leaf = prefix.rpartition(".")
-    for path in sorted(package_dir.rglob("*.py")):
-        rel = path.relative_to(package_dir)
-        if "tests" in rel.parts or path.name.startswith("test_"):
-            continue
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-                if _is_contract(node.module, prefix):
-                    yield path, node.module, tuple(a.name for a in node.names)
-                elif node.module == parent and any(a.name == leaf for a in node.names):
-                    yield path, prefix, ()  # from sm_ai import contracts
-            elif isinstance(node, ast.Import):
-                for alias in node.names:
-                    if _is_contract(alias.name, prefix):
-                        yield path, alias.name, ()
-        for target in _import_module_targets(tree):
-            if _is_contract(target, prefix):
-                yield path, target, ()
-
-
 def _read(root: Path, ref: str, rel: str) -> str | None:
     if ref == WORKTREE:
         path = root / rel
@@ -160,39 +103,6 @@ def _module_source(root: Path, ref: str, base: str, module: str) -> str | None:
     rel = f"{base}/{module.replace('.', '/')}"
     source = _read(root, ref, f"{rel}.py")
     return source if source is not None else _read(root, ref, f"{rel}/__init__.py")
-
-
-def _is_type_checking(test: ast.expr) -> bool:
-    return (isinstance(test, ast.Name) and test.id == "TYPE_CHECKING") or (
-        isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING"
-    )
-
-
-def _top_level_names(source: str) -> set[str] | None:
-    """Names a module defines at top level, or None when ``__getattr__`` makes any name valid."""
-    names: set[str] = set()
-
-    def visit(body: list[ast.stmt]) -> None:
-        for node in body:
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                names.add(node.name)
-            elif isinstance(node, ast.Assign):
-                names.update(t.id for t in node.targets if isinstance(t, ast.Name))
-            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-                names.add(node.target.id)
-            elif isinstance(node, (ast.Import, ast.ImportFrom)):
-                names.update((a.asname or a.name).split(".", 1)[0] for a in node.names)
-            elif isinstance(node, ast.If):
-                if not _is_type_checking(node.test):
-                    visit(node.body)  # names bound only for type checkers do not import
-                visit(node.orelse)
-            elif isinstance(node, ast.Try):
-                visit(node.body)
-                for handler in node.handlers:
-                    visit(handler.body)
-
-    visit(ast.parse(source).body)
-    return None if "__getattr__" in names else names
 
 
 def _floor(req: Requirement) -> Version | None:
@@ -213,7 +123,7 @@ def _missing(root: Path, ref: str, base: str, module: str, names: tuple[str, ...
     source = _module_source(root, ref, base, module)
     if source is None:
         return [module]
-    defined = _top_level_names(source)
+    defined = top_level_names(source)
     return [
         f"{module}.{name}"
         for name in names
@@ -244,7 +154,7 @@ def check(root: Path) -> list[str]:
                 continue
             base = sibling.root.relative_to(root).as_posix()
             missing: dict[str, list[str]] = {}
-            for path, module, names in _imports(package_dir, f"{sibling.package}.contracts"):
+            for path, module, names in imports(package_dir, f"{sibling.package}.contracts"):
                 importer = path.relative_to(root).as_posix()
                 for target in _missing(root, ref, base, module, names):
                     missing.setdefault(target, []).append(importer)

@@ -126,6 +126,18 @@ def test_type_checking_names_are_not_exports(tmp_path):
     assert "does not ship sm_lists.contracts.basic.Model" in _errors(root)
 
 
+def test_an_import_module_constant_from_another_file_counts(tmp_path):
+    root, _, mail = _repo(tmp_path)
+    (mail / "constants.py").write_text(
+        'from typing import Final\nTARGET: Final = "sm_lists.contracts.later"\n'
+    )
+    (mail / "use.py").write_text(
+        "import importlib\nfrom sm_mail import constants\n"
+        "importlib.import_module(constants.TARGET)\n"
+    )
+    assert "does not ship sm_lists.contracts.later" in _errors(root)
+
+
 def test_a_string_that_is_not_imported_is_ignored(tmp_path):
     root, _, mail = _repo(tmp_path)
     (mail / "use.py").write_text('MESSAGE = "sm_lists.contracts.removed"\nprint(MESSAGE)\n')
