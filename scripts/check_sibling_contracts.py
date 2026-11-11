@@ -14,10 +14,10 @@ top level there (or a submodule of that name). ``from sm_ai import
 contracts`` counts, and so does the string passed to
 ``importlib.import_module`` (directly or through a constant of the package),
 which is how an optional extra is loaded. Names bound only under
-``if TYPE_CHECKING:`` do not count as defined. A floor that is the next patch, minor or
-major after the newest tag is the release being prepared, so it is checked
-against the working tree. A floor
-below the newest tag with no tag of its own names no release and fails.
+``if TYPE_CHECKING:`` do not count as defined. A floor that is the next patch,
+minor or major after the newest tag is the release being prepared, so it is
+checked against the working tree. Any other floor with no tag of its own names
+no release and fails.
 
 Only ``contracts`` imports are checked: another module's internals are not an
 interface (CLAUDE.md), and a name that moved there is a different problem.
@@ -37,7 +37,7 @@ from pathlib import Path
 
 import tomlkit
 from check_rules import _parse, _requirements
-from contract_imports import forget_scan, imports, top_level_names
+from contract_imports import imports, scan, top_level_names
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
@@ -138,7 +138,6 @@ def _missing(root: Path, ref: str, base: str, module: str, names: tuple[str, ...
 
 
 def check(root: Path) -> list[str]:
-    forget_scan()
     _read.cache_clear()  # one run reads each file once; a later run may see new tags or edits
     modules = _modules(root)
     tags = _tags(root)
@@ -146,7 +145,7 @@ def check(root: Path) -> list[str]:
         return ["no v* release tags in this clone; run `git fetch --tags` (CI: fetch-depth: 0)"]
     errors = []
     for dependant in modules.values():
-        package_dir = dependant.root / dependant.package
+        scanned = scan(dependant.root / dependant.package)  # once, however many siblings
         pyproject = dependant.root / "pyproject.toml"
         project = tomlkit.parse(pyproject.read_text(encoding="utf-8")).get("project", {})
         for req in filter(None, map(_parse, _requirements(project, {}))):
@@ -161,7 +160,7 @@ def check(root: Path) -> list[str]:
                 continue
             base = sibling.root.relative_to(root).as_posix()
             missing: dict[str, list[str]] = {}
-            for path, module, names in imports(package_dir, f"{sibling.package}.contracts"):
+            for path, module, names in imports(scanned, f"{sibling.package}.contracts"):
                 importer = path.relative_to(root).as_posix()
                 for target in _missing(root, ref, base, module, names):
                     missing.setdefault(target, []).append(importer)

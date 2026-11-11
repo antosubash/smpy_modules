@@ -7,7 +7,6 @@ itself reads as the rule: which floor, which ref, what is missing.
 from __future__ import annotations
 
 import ast
-import functools
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -57,12 +56,8 @@ def _import_module_targets(tree: ast.Module, constants: dict[str, set[str]]) -> 
 _Record = tuple[Path, str, tuple[str, ...], bool]
 
 
-@functools.cache
-def _scan(package_dir: Path) -> tuple[_Record, ...]:
+def scan(package_dir: Path) -> tuple[_Record, ...]:
     """Every absolute import and ``import_module`` string in a package's non-test modules.
-
-    Independent of the prefix asked about, so ``check`` walks each tree once however
-    many siblings the package requires.
     """
     trees = {
         path: ast.parse(path.read_text(encoding="utf-8"))
@@ -85,15 +80,12 @@ def _scan(package_dir: Path) -> tuple[_Record, ...]:
     return tuple(found)
 
 
-def forget_scan() -> None:
-    """Drop the scan cache (``check`` reads each package once per run)."""
-    _scan.cache_clear()
-
-
-def imports(package_dir: Path, prefix: str) -> Iterator[tuple[Path, str, tuple[str, ...]]]:
-    """Yield (file, module, names) for each absolute import of *prefix* or below it."""
+def imports(
+    scanned: tuple[_Record, ...], prefix: str
+) -> Iterator[tuple[Path, str, tuple[str, ...]]]:
+    """Yield (file, module, names) for each import in *scanned* of *prefix* or below it."""
     parent, _, leaf = prefix.rpartition(".")
-    for path, module, names, from_import in _scan(package_dir):
+    for path, module, names, from_import in scanned:
         if _is_contract(module, prefix):
             yield path, module, names
         elif from_import and module == parent and leaf in names:

@@ -199,11 +199,12 @@ def test_names_bound_by_unpacking_with_and_star_import_count(tmp_path):
     root, lists, mail = _repo(tmp_path)
     (lists / "contracts" / "basic.py").write_text(
         "A, (B, *C) = 1, (2, 3)\ntry:\n    pass\nfinally:\n    D = 1\n"
+        "with open(__file__):\n    E = 1\n"
         "def subscribers(): ...\n"
     )
     _git(root, "commit", "-qam", "unpacked")
     _git(root, "tag", "-f", "v0.0.1")
-    (mail / "use.py").write_text("from sm_lists.contracts.basic import A, B, C, D\n")
+    (mail / "use.py").write_text("from sm_lists.contracts.basic import A, B, C, D, E\n")
     assert check.check(root) == []
     (lists / "contracts" / "basic.py").write_text("from .more import *\n")
     _git(root, "commit", "-qam", "star")
@@ -217,8 +218,12 @@ def test_a_floor_past_the_next_release_is_a_typo(tmp_path):
     pyproject = mail.parent / "pyproject.toml"
     pyproject.write_text(pyproject.read_text().replace(">=0.0.1", ">=0.0.10"))
     assert "no release v0.0.10 exists" in _errors(root)
-    pyproject.write_text(pyproject.read_text().replace(">=0.0.10", ">=0.1.0"))
-    assert check.check(root) == []
+    current = ">=0.0.10"
+    for next_release in ("0.0.2", "0.1.0", "1.0.0", "0.2.0"):  # next patch/minor/major, a typo
+        pyproject.write_text(pyproject.read_text().replace(current, f">={next_release}"))
+        current = f">={next_release}"
+        errors = _errors(root)
+        assert ("no release v0.2.0 exists" in errors) == (next_release == "0.2.0"), next_release
 
 
 def test_outside_a_clone_is_the_fetch_hint_not_a_traceback(tmp_path):

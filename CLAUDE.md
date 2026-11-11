@@ -23,8 +23,9 @@ the floor and its comment together when a module starts using something newer.
 `scripts/check_sibling_contracts.py` (also in `make lint` and CI) catches the
 contract case: every `<sibling>.contracts` module and name a module imports
 (an `import_module("…contracts…")` string included) must exist at tag
-`v<floor>`, or in the working tree for a floor above the newest tag (the
-release being prepared). It needs the tags (`git fetch --tags`).
+`v<floor>`, or in the working tree for a floor that is the next patch, minor
+or major after the newest tag (the release being prepared; any other floor
+without a tag is an error). It needs the tags (`git fetch --tags`).
 
 **Migrations live in `host/migrations/versions/`, never in a module.** Modules
 ship SQLModel tables; each consuming host autogenerates its own revisions
