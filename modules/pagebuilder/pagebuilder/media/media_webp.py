@@ -12,11 +12,11 @@ Cleaning copies the chunks that draw the picture (:data:`KEPT`, the ICC profile
 and anything unknown. An ``ANMF`` frame is a 16-byte frame header followed by
 chunks of its own, where a metadata chunk could hide too: only its
 :data:`FRAME_KEPT` chunks are copied, and its size is rewritten. No other kept
-chunk nests any (``VP8X`` and ``ANIM`` are fixed-size headers, the rest are a
-bitstream or a colour profile). The ``VP8X`` EXIF and XMP flags are cleared and
-the RIFF size rewritten. A lossy WebP loses nothing, static or animated.
-Anything that does not parse as a RIFF WebP, frames included, is refused
-(:class:`WebpStructureError`).
+chunk nests any (``VP8X`` and ``ANIM`` are fixed-size headers, refused at any
+other size, and the rest are a bitstream or a colour profile). The ``VP8X``
+EXIF and XMP flags are cleared and the RIFF size rewritten. A lossy WebP loses
+nothing, static or animated. Anything that does not parse as a RIFF WebP,
+frames included, is refused (:class:`WebpStructureError`).
 """
 
 from __future__ import annotations
@@ -28,6 +28,8 @@ KEPT = frozenset({b"VP8X", b"ICCP", b"ANIM", b"ANMF", b"ALPH", b"VP8 ", b"VP8L"}
 FRAME_KEPT = frozenset({b"ALPH", b"VP8 ", b"VP8L"})
 _IMAGE = frozenset({b"VP8 ", b"VP8L"})
 _FRAME_HEADER = 16  # X, Y, width, height, duration (3 bytes each), flags
+# Fixed-size headers: a longer payload is room to hide data a decoder ignores.
+_FIXED_SIZE = {b"VP8X": 10, b"ANIM": 6}
 # VP8X flags byte: Rsv(2) ICC Alpha EXIF XMP Animation Rsv(1).
 _EXIF_FLAG = 0x08
 _XMP_FLAG = 0x04
@@ -96,11 +98,11 @@ def strip_chunks(data: bytes) -> bytes | None:
     kept: list[bytes] = []
     dropped = False
     for kind, chunk in _chunks(data):
+        if kind in _FIXED_SIZE and struct.unpack("<I", chunk[4:8])[0] != _FIXED_SIZE[kind]:
+            raise WebpStructureError(f"{kind!r} chunk is not {_FIXED_SIZE[kind]} bytes")
         if kind not in KEPT:
             dropped = True
         elif kind == b"VP8X":
-            if len(chunk) < 18:
-                raise WebpStructureError("truncated VP8X chunk")
             flags = chunk[8] & ~(_EXIF_FLAG | _XMP_FLAG)
             dropped = dropped or flags != chunk[8]
             kept.append(chunk[:8] + bytes([flags]) + chunk[9:])

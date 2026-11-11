@@ -151,23 +151,23 @@ def test_bytes_after_the_riff_are_dropped():
     assert len(cleaned) == 8 + struct.unpack("<I", cleaned[4:8])[0]
 
 
-def _with_frame_chunk(data: bytes, extra: bytes) -> bytes:
-    """*data* with *extra* appended inside its first ANMF frame, sizes fixed."""
+def _resized(data: bytes, kind: bytes, extra: bytes) -> bytes:
+    """*data* with *extra* appended to its *kind* chunk's payload, sizes fixed."""
     offset = 12
-    while data[offset : offset + 4] != b"ANMF":
+    while data[offset : offset + 4] != kind:
         (length,) = struct.unpack("<I", data[offset + 4 : offset + 8])
         offset += 8 + length + (length & 1)
     (length,) = struct.unpack("<I", data[offset + 4 : offset + 8])
     stop = offset + 8 + length
-    frame = b"ANMF" + struct.pack("<I", length + len(extra)) + data[offset + 8 : stop] + extra
-    out = data[:offset] + frame + data[stop:]
+    grown = kind + struct.pack("<I", length + len(extra)) + data[offset + 8 : stop] + extra
+    out = data[:offset] + grown + data[stop:]
     return out[:4] + struct.pack("<I", len(out) - 8) + out[8:]
 
 
 async def test_metadata_hidden_inside_an_animation_frame_is_removed(db, tmp_path):
     plain = _webp(animated=True)
     hidden = b"EXIF" + struct.pack("<I", 10) + b"GPSSecret!"
-    original = _with_frame_chunk(plain, hidden)
+    original = _resized(plain, b"ANMF", hidden)
     with Image.open(io.BytesIO(original)) as probe:
         assert probe.n_frames == 2  # the decoder skips it, so it would be published
     _asset, path = await _stored(_service(db, tmp_path), original, "image/webp", "loop.webp")
@@ -179,6 +179,19 @@ async def test_metadata_hidden_inside_an_animation_frame_is_removed(db, tmp_path
 
 
 def test_a_frame_whose_chunks_do_not_parse_is_refused():
-    broken = _with_frame_chunk(_webp(animated=True), b"EXIF" + struct.pack("<I", 99) + b"xx")
+    broken = _resized(_webp(animated=True), b"ANMF", b"EXIF" + struct.pack("<I", 99) + b"xx")
     with pytest.raises(media_webp.WebpStructureError):
         media_webp.strip_chunks(broken)
+
+
+@pytest.mark.parametrize("kind", [b"ANIM", b"VP8X"])
+async def test_a_fixed_size_header_with_room_to_spare_is_refused(db, tmp_path, kind):
+    """Bytes appended inside ANIM or VP8X are ignored by the decoder, so kept."""
+    original = _resized(_webp(animated=True), kind, b"GPSSecret!")
+    with pytest.raises(media_webp.WebpStructureError):
+        media_webp.strip_chunks(original)
+    service = _service(db, tmp_path)
+    with pytest.raises(HTTPException) as refused:
+        await service.upload(_upload(original, "image/webp", "loop.webp"))
+    assert refused.value.detail["code"] == "image_metadata_not_removed"
+    assert list(service.tenant_dir().iterdir()) == []
