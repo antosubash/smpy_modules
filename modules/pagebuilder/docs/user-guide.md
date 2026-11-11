@@ -13,7 +13,9 @@ can *do* depends on three permissions:
 | `pagebuilder.approve` | **Approve** or **Reject** a submitted page, see **Pending review**; open **Import / Export** to see the snapshots and the staged restore, and apply or reject it |
 
 The suggested roles are `pagebuilder_editor` (edit), `pagebuilder_publisher`
-(edit + publish) and `pagebuilder_approver` (all three). The editor shows the
+(edit + publish) and `pagebuilder_approver` (all three); an administrator
+assigns them on the users screen (if they are missing there, see "Roles" in
+[operations](operations.md#roles)). The editor shows the
 buttons a page's *status* allows; a button your role does not cover answers with
 an error rather than being hidden.
 
