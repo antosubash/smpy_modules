@@ -170,3 +170,23 @@ async def test_a_page_save_refuses_an_unsafe_iframe(authed_client):
     )
     assert response.status_code == 422
     assert "Iframe (Iframe-1), field src" in response.text
+
+
+async def test_a_block_shaped_document_is_still_walked_whole():
+    """``type``/``props`` beside ``content`` must not end the walk (review P2)."""
+    doc = {**_doc(_button("javascript:alert(1)")), "type": "ignored", "props": {}}
+    with pytest.raises(UnsafeLinkError, match=r"Button \(Button-1\), field href"):
+        check_links(doc)
+    # Keys beside a real block's props are visited too.
+    stray = _doc({"type": "Button", "props": {"id": "b"}, "href": "javascript:x"})
+    with pytest.raises(UnsafeLinkError):
+        check_links(stray)
+
+
+async def test_the_block_shaped_bypass_is_refused_on_save(authed_client):
+    doc = {**_doc(_button("javascript:alert(1)")), "type": "ignored", "props": {}}
+    response = await authed_client.post(
+        PAGES, json={"title": "x", "slug": "x", "draft_data": doc}
+    )
+    assert response.status_code == 422
+    assert "Button (Button-1), field href" in response.text

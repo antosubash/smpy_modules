@@ -64,3 +64,9 @@ def test_the_asset_sentinel_is_admitted_only_for_a_bundle():
     check_links(_doc("asset://brochure.pdf"), extra_schemes=("asset",))
     with pytest.raises(UnsafeLinkError):
         check_links(_doc("asset://brochure.pdf"))
+
+
+def test_the_block_shaped_bypass_is_refused_in_a_bundle(tmp_path):
+    doc = {**_doc("javascript:alert(1)"), "type": "ignored", "props": {}}
+    with pytest.raises(BundleError, match=r"Block Button \(B-1\)"):
+        _read(tmp_path, {"pages/home.json": _page(draft_data=doc)})

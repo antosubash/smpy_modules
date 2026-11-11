@@ -79,17 +79,24 @@ _Found = tuple[str, str, str, frozenset[str]]
 
 
 def _walk(node: Any, block: str, path: str) -> Iterator[_Found]:
-    """Yield ``(block, field path, link, allowed schemes)`` for every link in *node*."""
+    """Yield ``(block, field path, link, allowed schemes)`` for every link in *node*.
+
+    Every key of every dict is visited. Recognising a block (a string ``type``
+    beside a dict ``props``) only names it in the message: a block-shaped dict
+    planted next to a document's ``content`` must not end the walk there.
+    """
     if isinstance(node, dict):
         props = node.get("props")
-        if isinstance(node.get("type"), str) and isinstance(props, dict):
+        is_block = isinstance(node.get("type"), str) and isinstance(props, dict)
+        if is_block:
             name = f"{node['type']} ({props.get('id') or 'no id'})"
             for key in FRAME_SOURCES.get(node["type"], ()):
                 if isinstance(props.get(key), str):
                     yield name, key, props[key], FRAME_SCHEMES
             yield from _walk(props, name, "")
-            return
         for key, value in node.items():
+            if is_block and key == "props":
+                continue
             field = f"{path}.{key}" if path else str(key)
             if isinstance(value, str) and _is_link_key(str(key)):
                 yield block, field, value, SAFE_SCHEMES
