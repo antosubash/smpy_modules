@@ -35,6 +35,7 @@ def _import_module_targets(tree: ast.Module, constants: dict[str, set[str]]) -> 
     optional extra is loaded. Other strings are not imports, however much they
     look like a module path.
     """
+    local = dict(_string_constants(tree))
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call) or not node.args:
             continue
@@ -45,6 +46,8 @@ def _import_module_targets(tree: ast.Module, constants: dict[str, set[str]]) -> 
         arg = node.args[0]
         if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
             yield arg.value
+        elif isinstance(arg, ast.Name) and arg.id in local:
+            yield local[arg.id]  # a bare name is this file's constant when it has one
         elif isinstance(arg, (ast.Name, ast.Attribute)):
             yield from constants.get(arg.id if isinstance(arg, ast.Name) else arg.attr, ())
 

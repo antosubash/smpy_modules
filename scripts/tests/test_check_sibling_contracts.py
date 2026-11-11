@@ -138,6 +138,15 @@ def test_an_import_module_constant_from_another_file_counts(tmp_path):
     assert "does not ship sm_lists.contracts.later" in _errors(root)
 
 
+def test_a_bare_name_resolves_to_its_own_files_constant(tmp_path):
+    root, _, mail = _repo(tmp_path)
+    (mail / "a.py").write_text(
+        'import importlib\n_C = "sm_lists.contracts.basic"\nimportlib.import_module(_C)\n'
+    )
+    (mail / "b.py").write_text('_C = "sm_lists.contracts.removed"\n')
+    assert check.check(root) == []
+
+
 def test_a_string_that_is_not_imported_is_ignored(tmp_path):
     root, _, mail = _repo(tmp_path)
     (mail / "use.py").write_text('MESSAGE = "sm_lists.contracts.removed"\nprint(MESSAGE)\n')
