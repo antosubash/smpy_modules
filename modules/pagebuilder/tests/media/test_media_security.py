@@ -12,6 +12,9 @@ from pagebuilder.media.media_service import MediaService
 from pagebuilder.models import Base, MediaAsset  # noqa: F401 — register metadata
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# Decodable: since #356 an image the metadata step cannot read is refused.
+from tests.support.media_bytes import PNG
+
 # Real PNG header (8-byte signature) followed by an IHDR-ish chunk.
 _PNG_HEADER = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + b"\x00" * 16
 _JPEG_HEADER = b"\xff\xd8\xff\xe0\x00\x10JFIF" + b"\x00" * 16
@@ -89,7 +92,7 @@ async def test_upload_rejects_mime_mismatch(media_service: MediaService) -> None
 
 
 async def test_upload_accepts_real_png(media_service: MediaService) -> None:
-    upload = _make_upload(_PNG_HEADER, filename="real.png", content_type="image/png")
+    upload = _make_upload(PNG, filename="real.png", content_type="image/png")
     asset = await media_service.upload(upload)
     assert asset.content_type == "image/png"
     assert asset.filename.endswith(".png")
@@ -100,7 +103,7 @@ async def test_upload_pins_extension_to_sniffed_type(
 ) -> None:
     # PNG bytes uploaded under a .jpg filename should be stored as .png.
     upload = _make_upload(
-        _PNG_HEADER, filename="real-but-renamed.jpg", content_type="image/png"
+        PNG, filename="real-but-renamed.jpg", content_type="image/png"
     )
     asset = await media_service.upload(upload)
     assert asset.filename.endswith(".png")

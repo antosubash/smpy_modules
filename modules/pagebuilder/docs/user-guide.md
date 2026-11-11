@@ -243,7 +243,9 @@ wide, never wider than the original) used for responsive images.
 Uploads are cleaned of camera metadata (#356): a JPEG, PNG or WebP is stored
 without its EXIF (GPS position, camera and serial number, capture time), XMP,
 IPTC or comments, turned upright if the camera recorded it sideways, with its
-colour profile kept. Animated images are stored as uploaded. An administrator
+colour profile kept; a phone's multi-picture JPEG keeps only its main picture.
+Animated images are stored as uploaded. A file whose metadata cannot be removed
+is not uploaded at all, with a message saying so. An administrator
 can turn this off (`media_strip_metadata`) on a site that wants its photographs'
 copyright fields kept. It applies to new uploads only: files uploaded earlier
 keep whatever they carried until they are uploaded again.

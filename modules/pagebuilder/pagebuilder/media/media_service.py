@@ -14,7 +14,6 @@ Filename sanitising, content sniffing, and thumbnail generation live in
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from pathlib import Path
 
@@ -32,17 +31,14 @@ from pagebuilder.media.media_files import (
     resolve_media_root,
     tenant_media_dir,
 )
-from pagebuilder.media.media_gif import AmbiguousGifError
 from pagebuilder.media.media_images import (
     CONTENT_TYPE_EXTENSIONS,
     SNIFF_BYTES,
-    TooManyPixelsError,
     normalize_folder,
-    process_image,
     safe_extension,
     sniff_content_type,
 )
-from pagebuilder.media.media_metadata import strip_metadata
+from pagebuilder.media.media_processing import process_stored
 from pagebuilder.models import MediaAsset
 
 _DEFAULT_PAGE_SIZE = 60
@@ -207,45 +203,9 @@ class MediaService:
                     )
                 fh.write(chunk)
 
-        # Pillow's decode + webp encode are sync and CPU-bound — running
-        # them on the event loop blocks other concurrent uploads. The
-        # thread offload is essentially free for a single request and
-        # turns parallel uploads back into parallel work.
-        try:
-            # Before the thumbnails, so they are cut from the upright, clean file (#356).
-            if self.settings.media_strip_metadata and await asyncio.to_thread(
-                strip_metadata, target, content_type
-            ):
-                size = target.stat().st_size
-            width, height, variants = await asyncio.to_thread(
-                process_image,
-                target,
-                thumbnail_widths=self.settings.media_thumbnail_widths,
-                webp_quality=self.settings.media_webp_quality,
-            )
-        except TooManyPixelsError:
-            # Raised before any thumbnail is written, so the original is the
-            # only file to remove. The code lets the console say "too many
-            # pixels" rather than the byte-size sentence a plain 413 gets.
-            target.unlink(missing_ok=True)
-            raise HTTPException(
-                status_code=413,
-                detail={
-                    "code": "image_too_many_pixels",
-                    "message": "Image dimensions exceed the pixel limit",
-                },
-            ) from None
-        except AmbiguousGifError:
-            # A GIF whose frames cannot be counted the way Pillow counts them
-            # is refused like any file that is not a valid image.
-            target.unlink(missing_ok=True)
-            raise HTTPException(
-                status_code=415, detail="GIF structure could not be verified"
-            ) from None
-        except BaseException:
-            # Anything unexpected must not leave an unlisted file behind.
-            target.unlink(missing_ok=True)
-            raise
+        size, width, height, variants = await process_stored(
+            target, content_type, size, self.settings
+        )
 
         asset = MediaAsset(
             filename=filename,

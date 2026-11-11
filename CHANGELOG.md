@@ -31,8 +31,12 @@ name the module they affect.
 - **pagebuilder strips camera metadata from uploads** (#356). A JPEG, PNG or
   WebP original is re-saved without EXIF (GPS, device, serial, capture time),
   XMP, IPTC or comments, with its EXIF orientation applied first and its ICC
-  profile kept; `size_bytes` is the cleaned file's. Animated images are stored
-  untouched. The new setting `media_strip_metadata` (on by default) turns it
+  profile kept; `size_bytes` is the cleaned file's. A multi-picture JPEG (MPO,
+  as phones save photos) keeps only its primary picture, as a plain JPEG.
+  Animated GIF, WebP and PNG are stored untouched, and so is a file with nothing
+  to remove. It fails closed: a JPEG, PNG or WebP that cannot be read or
+  re-saved is refused with `415` `image_metadata_not_removed` (the console says
+  why), never stored with its metadata. The new setting `media_strip_metadata` (on by default) turns it
   off. Not retroactive: files already in the library keep their metadata. The
   media and snapshot settings moved to `pagebuilder.core.settings_media`
   (`PagebuilderSettings` inherits them, so nothing changes for a caller), which

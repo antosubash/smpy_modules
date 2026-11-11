@@ -7,23 +7,20 @@ or WebP without any of it, behind the ``media_strip_metadata`` setting.
 
 What is kept: the pixels, upright (EXIF orientation is applied first, since the
 tag that said how to turn them is going), the ICC colour profile, and a
-palette image's transparency. What is left alone entirely: animated images, a
-file Pillow cannot read, and one above the pixel limit, which
-:func:`~pagebuilder.media.media_images.process_image` then refuses.
+palette image's transparency. What is left alone entirely: animated GIF, WebP
+and PNG, and a file with nothing to remove. It fails closed: a file it should
+clean but cannot is refused, never stored with its metadata.
 """
 
 from __future__ import annotations
 
-import logging
 import struct
 from pathlib import Path
 from typing import Any
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from pagebuilder.media.media_images import is_animated
-
-logger = logging.getLogger(__name__)
+from pagebuilder.media.media_images import TooManyPixelsError, is_animated
 
 _FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP"}
 # Kept from ``Image.info``; everything else there (exif, xmp, comment, text
@@ -62,6 +59,34 @@ def _save_options(image: Image.Image, fmt: str, source: Path) -> dict[str, Any]:
     return options
 
 
+class MetadataNotRemovedError(Exception):
+    """A JPEG, PNG or WebP whose metadata could not be removed; the upload is refused.
+
+    Fails closed: with ``media_strip_metadata`` on, an original is either
+    cleaned or not stored, never published with its GPS position by accident.
+    """
+
+
+# JPEG APP segments that are not metadata: JFIF (APP0), ICC (APP2), Adobe (APP14).
+_JPEG_HARMLESS_APP = {"APP0", "APP2", "APP14"}
+_INFO_METADATA = ("exif", "xmp", "XML:com.adobe.xmp", "comment", "photoshop")
+
+
+def _has_metadata(image: Image.Image) -> bool:
+    """Whether there is anything to remove: a clean file is left byte for byte.
+
+    That keeps the step idempotent — a restored bundle's already-clean JPEG is
+    not re-encoded, so its digest still matches on the next restore.
+    """
+    if len(image.getexif()) or any(key in image.info for key in _INFO_METADATA):
+        return True
+    if image.format == "MPO":
+        return True  # its other pictures go too
+    if image.format == "JPEG" and any(m not in _JPEG_HARMLESS_APP for m, _ in image.applist):
+        return True
+    return bool(getattr(image, "text", None))  # PNG tEXt/iTXt/zTXt chunks
+
+
 def _exceeds_pixel_limit(image: Image.Image) -> bool:
     limit = Image.MAX_IMAGE_PIXELS
     return limit is not None and image.size[0] * image.size[1] > limit
@@ -71,8 +96,13 @@ def strip_metadata(source: Path, content_type: str) -> bool:
     """Re-save *source* in place without its metadata; ``True`` if it was rewritten.
 
     ``False`` — the file untouched — for a type this does not handle, an
-    animated image, a file Pillow cannot read and one above the pixel limit
-    (never decoded here; the caller's own check refuses it).
+    animated GIF/WebP/PNG, and a file with no metadata to remove. A
+    multi-picture JPEG (MPO, how many phones save a photo) is not animated: its
+    primary picture is kept, as a plain JPEG, and the rest dropped.
+
+    Raises :class:`~pagebuilder.media.media_images.TooManyPixelsError` above the
+    pixel limit, before decoding anything, and :class:`MetadataNotRemovedError`
+    when the file cannot be read or re-saved. Both are refusals of the upload.
     """
     fmt = _FORMATS.get(content_type)
     if fmt is None:
@@ -80,7 +110,13 @@ def strip_metadata(source: Path, content_type: str) -> bool:
     scratch = source.with_name(f"{source.name}.strip")
     try:
         with Image.open(source) as image:
-            if _exceeds_pixel_limit(image) or is_animated(image):
+            if _exceeds_pixel_limit(image):
+                raise TooManyPixelsError(f"{image.size} exceeds Image.MAX_IMAGE_PIXELS")
+            if image.format == "MPO":
+                image.seek(0)
+            elif is_animated(image):
+                return False
+            if not _has_metadata(image):
                 return False
             options = _save_options(image, fmt, source)
             image.load()
@@ -95,10 +131,10 @@ def strip_metadata(source: Path, content_type: str) -> bool:
                 options.update(quality=_FALLBACK_QUALITY, subsampling=-1)
                 image.save(scratch, **options)
         scratch.replace(source)
-    except (UnidentifiedImageError, OSError, ValueError, struct.error, IndexError,
-            Image.DecompressionBombError) as exc:
-        logger.warning("Kept metadata on %s: it could not be re-saved (%s)", source.name, exc)
-        return False
+    except Image.DecompressionBombError as exc:
+        raise TooManyPixelsError(str(exc)) from exc
+    except (UnidentifiedImageError, OSError, ValueError, struct.error, IndexError) as exc:
+        raise MetadataNotRemovedError(f"{source.name}: {exc}") from exc
     finally:
         scratch.unlink(missing_ok=True)  # gone already once it replaced the source
     return True

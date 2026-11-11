@@ -52,6 +52,14 @@ describe('UploadError factories', () => {
     expect(err.message).not.toContain('Image dimensions');
   });
 
+  it('says the metadata could not be removed for a 415 carrying that code (#356)', () => {
+    const body = JSON.stringify({
+      detail: { code: 'image_metadata_not_removed', message: 'x' },
+    });
+    expect(uploadRejected(415, body).message).toBe(en.errors.upload_metadata_not_removed);
+    expect(uploadRejected(415, '{"detail":"nope"}').message).toBe(en.errors.upload_unsupported);
+  });
+
   it('keeps the byte-size message for a plain 413 or an unreadable body', () => {
     expect(uploadRejected(413, '{"detail":"File exceeds 10 bytes"}').message).toBe(
       en.errors.upload_too_large,

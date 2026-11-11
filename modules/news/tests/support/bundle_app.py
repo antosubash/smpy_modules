@@ -40,7 +40,14 @@ from tests.support.stub_auth import stub_user
 
 SNAPSHOTS = "/api/pagebuilder/snapshots"
 PAGES = "/api/pagebuilder/pages"
-PNG_BYTES = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + b"\x00" * 16
+# A real 1x1 PNG with no metadata. Real bytes matter since #356: with
+# ``media_strip_metadata`` on, a file Pillow cannot read is refused rather than
+# stored, and a clean one is stored byte for byte.
+PNG_BYTES = bytes.fromhex(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
+    "890000000d49444154789c6360606060000000050001a5f64540000000004945"
+    "4e44ae426082"
+)
 
 
 ROLES = {

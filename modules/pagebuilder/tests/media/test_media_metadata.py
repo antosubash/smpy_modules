@@ -11,7 +11,7 @@ from __future__ import annotations
 import io
 
 import pytest
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 from pagebuilder.core.settings import PagebuilderSettings
 from pagebuilder.media.media_metadata import _webp_is_lossless
 from pagebuilder.media.media_service import MediaService
@@ -140,9 +140,61 @@ async def test_the_setting_off_keeps_the_upload_byte_for_byte(db, tmp_path):
     assert asset.size_bytes == len(original)
 
 
-async def test_an_undecodable_file_is_kept_and_still_uploads(db, tmp_path):
-    """Not refused here: the upload's own checks decide, as before."""
+async def test_a_multi_picture_jpeg_keeps_only_its_primary_picture(db, tmp_path):
+    """MPO, as phones save photos: Pillow calls it animated, but it is a photo."""
+    buf = io.BytesIO()
+    second = Image.new("RGB", (40, 20), (0, 255, 0))
+    _two_tone().save(buf, format="MPO", save_all=True, append_images=[second],
+                     exif=_exif(orientation=6), icc_profile=ICC)
+    content = buf.getvalue()
+    with Image.open(io.BytesIO(content)) as probe:
+        assert probe.format == "MPO" and probe.n_frames == 2
+    asset, path = await _stored(_service(db, tmp_path), content, "image/jpeg", "phone.jpg")
+
+    assert b"SecretCam" not in path.read_bytes()
+    assert asset.content_type == "image/jpeg" and path.suffix == ".jpg"
+    with Image.open(path) as image:
+        assert image.format == "JPEG"
+        assert getattr(image, "n_frames", 1) == 1
+        assert len(image.getexif()) == 0
+        assert image.info["icc_profile"] == ICC
+        assert image.size == (20, 40)
+    assert asset.size_bytes == path.stat().st_size
+
+
+async def test_a_clean_file_is_left_byte_for_byte(db, tmp_path):
+    """Idempotent: a restored bundle's clean JPEG keeps its digest."""
+    buf = io.BytesIO()
+    _two_tone().save(buf, format="JPEG", icc_profile=ICC)
+    original = buf.getvalue()
+    _asset, path = await _stored(_service(db, tmp_path), original, "image/jpeg", "a.jpg")
+    assert path.read_bytes() == original
+
+
+async def test_a_file_that_cannot_be_cleaned_is_refused(db, tmp_path):
+    """Fails closed: an original is cleaned or not stored at all."""
+    service = _service(db, tmp_path)
     bogus = b"\x89PNG\r\n\x1a\n" + b"\x00" * 40
-    asset, path = await _stored(_service(db, tmp_path), bogus, "image/png", "x.png")
+    with pytest.raises(HTTPException) as refused:
+        await service.upload(_upload(bogus, "image/png", "x.png"))
+    assert refused.value.status_code == 415
+    assert refused.value.detail["code"] == "image_metadata_not_removed"
+    assert list(service.tenant_dir().iterdir()) == []
+
+
+async def test_an_image_over_the_pixel_limit_is_refused_not_stored(db, tmp_path, monkeypatch):
+    """Never decoded to strip it, and never stored unstripped either."""
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 100)
+    service = _service(db, tmp_path)
+    with pytest.raises(HTTPException) as refused:
+        await service.upload(_upload(_jpeg(), "image/jpeg", "big.jpg"))
+    assert refused.value.status_code == 413
+    assert list(service.tenant_dir().iterdir()) == []
+
+
+async def test_with_the_setting_off_an_undecodable_file_still_uploads(db, tmp_path):
+    bogus = b"\x89PNG\r\n\x1a\n" + b"\x00" * 40
+    service = _service(db, tmp_path, media_strip_metadata=False)
+    asset, path = await _stored(service, bogus, "image/png", "x.png")
     assert path.read_bytes() == bogus
     assert asset.width is None
