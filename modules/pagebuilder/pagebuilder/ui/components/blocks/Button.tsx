@@ -1,6 +1,7 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import type { CSSProperties } from 'react';
 import { keys } from '../../utils/i18n';
+import { safeHref } from '../../utils/markdown-links';
 import { cn } from '../../utils/widgetUtils';
 import { renderRichText } from '../widgets/_internal/rich-text';
 
@@ -113,7 +114,7 @@ export const ButtonBlock: ComponentConfig<ButtonProps> = {
     return (
       <div className={cn(indent === '4' && 'lg:grid lg:grid-cols-12 lg:gap-6')}>
         <a
-          href={href}
+          href={safeHref(href)}
           target={target}
           rel={target === '_blank' ? 'noopener noreferrer' : undefined}
           className={cn(

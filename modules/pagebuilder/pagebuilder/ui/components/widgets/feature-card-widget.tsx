@@ -2,6 +2,7 @@ import type { ComponentConfig } from '@puckeditor/core';
 import type { CSSProperties } from 'react';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
 import { keys } from '../../utils/i18n';
+import { safeHref } from '../../utils/markdown-links';
 import { AccentText } from './_internal/accent-text';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 
@@ -76,7 +77,7 @@ export const FeatureCardWidget: ComponentConfig<FeatureCardWidgetProps> = {
           {linkLabel && (
             <div className="flex items-center">
               <a
-                href={linkHref || '#'}
+                href={safeHref(linkHref)}
                 className="inline-flex items-center font-semibold transition-colors duration-200 text-primary-700 hover:text-primary-900"
               >
                 {renderRichText(linkLabel, { allowLinks: false })}

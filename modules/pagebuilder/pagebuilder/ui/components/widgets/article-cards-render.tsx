@@ -3,6 +3,7 @@
  *  The config lives in article-cards-widget.tsx. */
 
 import type { CSSProperties } from 'react';
+import { safeHref } from '../../utils/markdown-links';
 import { cn } from '../../utils/widgetUtils';
 import { renderRichText } from './_internal/rich-text';
 import { TextLink } from './_shared/text-link';
@@ -89,7 +90,7 @@ export function ArticleCardsGrid({
           <a
             // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
             key={idx}
-            href={item.href || '#'}
+            href={safeHref(item.href)}
             className="group block"
           >
             <div className="relative aspect-[16/10] overflow-hidden rounded-xl bg-[var(--pb-surface-muted)]">

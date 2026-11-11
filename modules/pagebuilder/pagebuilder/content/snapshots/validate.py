@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from pagebuilder.content.links import UnsafeLinkError, check_links
 from pagebuilder.content.snapshots.assets import collect_sentinels
 from pagebuilder.content.snapshots.format import (
     LAYOUT_NAME,
@@ -32,6 +33,20 @@ from pagebuilder.models import Page, PageStatus, SnapshotMedia
 
 class BundleError(Exception):
     """A bundle that cannot be trusted, with a reason fit to show a user."""
+
+
+def _check_block_links(label: str, document: dict[str, Any], fields: tuple[str, ...]) -> None:
+    """Refuse a block link the editor's save would refuse (#354).
+
+    A bundle is content from outside this site, so it meets the rule an API save
+    does. ``asset:`` is admitted: capture writes a media URL as that sentinel,
+    and apply resolves it back before anything renders.
+    """
+    for field in fields:
+        try:
+            check_links(document.get(field), label=f"{label} {field}: ", extra_schemes=("asset",))
+        except UnsafeLinkError as exc:
+            raise BundleError(str(exc)) from exc
 
 
 def load_document(path: Path, label: str) -> Any:
@@ -171,6 +186,7 @@ def check_documents(dest: Path, index: dict[str, Any]) -> None:
         label = f"{PAGES_DIR}/{document.name}"
         payload = load_document(document, label)
         _check_page(label, payload)
+        _check_block_links(label, payload, ("draft_data", "published_data"))
         # Two files claiming one page would otherwise resolve as "last file
         # wins" in `read_documents`, dropping a page with nothing in the plan
         # to say it happened. Rejected here for the same reason repeated
@@ -196,7 +212,10 @@ def check_documents(dest: Path, index: dict[str, Any]) -> None:
         referenced |= collect_sentinels(payload)
     layout = dest / LAYOUT_NAME
     if layout.is_file():
-        referenced |= collect_sentinels(load_document(layout, LAYOUT_NAME))
+        document = load_document(layout, LAYOUT_NAME)
+        if isinstance(document, dict):
+            _check_block_links(LAYOUT_NAME, document, ("header_data", "footer_data"))
+        referenced |= collect_sentinels(document)
     _check_redirects(dest)
 
     missing = sorted(referenced - set(index))

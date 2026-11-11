@@ -1,6 +1,7 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import type { CSSProperties } from 'react';
 import { keys } from '../../utils/i18n';
+import { safeHref } from '../../utils/markdown-links';
 import { cn } from '../../utils/widgetUtils';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 import { eyebrowTextStyle } from './_shared';
@@ -83,7 +84,7 @@ export const SectionIntroWidget: ComponentConfig<SectionIntroWidgetProps> = {
         )}
         {ctaLabel && (
           <a
-            href={ctaHref || '#'}
+            href={safeHref(ctaHref)}
             className="inline-flex items-center rounded-full bg-[var(--primary,#000000)] px-7 py-4 font-medium text-[var(--primary-foreground,#ffffff)] transition-opacity hover:opacity-90"
           >
             {renderRichText(ctaLabel, { allowLinks: false })}

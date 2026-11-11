@@ -3,20 +3,24 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import AfterValidator, BaseModel, ConfigDict
 
+from pagebuilder.content.links import checked
 from pagebuilder.contracts.schemas._fields import OptionalNote
 
 PuckData = dict[str, Any]
+# Checked on the way in, like a page's draft (#354): a header or footer link
+# outside the allow-list is a 422 naming the block and the field.
+CheckedPuckData = Annotated[PuckData, AfterValidator(checked)]
 
 
 class LayoutUpdate(BaseModel):
     """``None`` leaves a slot alone; an empty Puck doc clears it."""
 
-    header_data: PuckData | None = None
-    footer_data: PuckData | None = None
+    header_data: CheckedPuckData | None = None
+    footer_data: CheckedPuckData | None = None
     note: OptionalNote = None
 
 

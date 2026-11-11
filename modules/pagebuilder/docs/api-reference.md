@@ -78,6 +78,22 @@ All three return `{"items": [PageRead], "total": n}`.
 
 Only `title` (1–300) and `slug` (`^[a-z0-9][a-z0-9-]*$`, ≤200) are required.
 `locale` omitted means the default content locale; an unconfigured one is 422.
+
+**Block links** (#354, `pagebuilder.content.links`). `draft_data` here and in
+`PUT /pages/{id}`, and `header_data`/`footer_data` in `PUT /layout`, are refused
+with 422 when a block carries a link outside the allow-list: every prop named
+`href` or ending in `Href`, at any depth (`links[2].href`, `primaryHref`), and the
+target of every Markdown link `[label](target)` in any string prop. Allowed: no
+scheme (`/about`, `#top`, `?q=1`, `./x`, `contact`, `//cdn.example/x`) or `http`,
+`https`, `mailto`, `tel`; never a control character. The error's `msg` names
+the block type, its id and the field: `Value error, Block Button (Button-3),
+field href: 'javascript:alert(1)' is not an allowed link. …`. An uploaded bundle
+(`POST /snapshots/upload`) is checked the same way and refused as an invalid
+bundle, `asset://` sentinels allowed. Paths that copy content already stored on
+this site are not re-checked: `copy_from_page_id`, a translation's
+`copy_content`, a revision or layout-revision restore, and restoring a snapshot
+taken here. They cannot bring in a link the site did not already hold, and the
+renderer's `safeHref` shows any older one as `#`.
 `copy_from_page_id` seeds `draft_data` from that page's draft and is not stored.
 The page starts as a `draft` in a translation group of its own. Returns
 `PageDetail`. Slug taken in that language → `409 Slug already in use in <locale>`.
@@ -359,4 +375,4 @@ release; omit it.
 | 409 | `An import is already awaiting approval` / `Import already decided` | imports |
 | 413 | `File exceeds N bytes` / `Bundle exceeds N bytes` | uploads |
 | 415 | content-type not allowed, or sniffed type mismatch | media upload |
-| 422 | validation; unconfigured locale; schedule order; unsupported bundle format | various |
+| 422 | validation (a refused block link included); unconfigured locale; schedule order; unsupported bundle format | various |

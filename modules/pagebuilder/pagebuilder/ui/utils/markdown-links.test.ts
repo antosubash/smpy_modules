@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isSafeHref, isSafeImageSrc, splitLinks } from './markdown-links';
+import { isSafeHref, isSafeImageSrc, safeHref, splitLinks } from './markdown-links';
 
 describe('splitLinks', () => {
   it('returns plain text as a single text segment', () => {
@@ -53,5 +53,47 @@ describe('isSafeHref / isSafeImageSrc', () => {
     expect(isSafeHref('\u0001javascript:alert(1)')).toBe(false);
     expect(isSafeHref('/x\u007f')).toBe(false);
     expect(isSafeImageSrc('\u001fjavascript:x')).toBe(false);
+  });
+});
+
+describe('safeHref', () => {
+  it('passes an allowed link through unchanged', () => {
+    for (const href of [
+      '/about',
+      '#top',
+      '?q=1',
+      './x',
+      'contact',
+      'https://x.example',
+      'mailto:a@b',
+      'tel:+431',
+    ]) {
+      expect(safeHref(href)).toBe(href);
+    }
+  });
+
+  it('turns an unsafe, empty or missing one into the fallback', () => {
+    for (const href of [
+      'javascript:alert(1)',
+      'JAVASCRIPT:x',
+      'data:text/html,x',
+      'vbscript:x',
+      ' javascript:x',
+      '\u0001javascript:x',
+      '',
+      '   ',
+      undefined,
+      null,
+      42,
+    ]) {
+      expect(safeHref(href)).toBe('#');
+    }
+    expect(safeHref('javascript:x', '')).toBe('');
+    expect(safeHref(undefined, '/')).toBe('/');
+  });
+
+  it('sees a scheme behind leading spaces, as a browser does', () => {
+    expect(isSafeHref('  javascript:alert(1)')).toBe(false);
+    expect(isSafeHref('  /fine')).toBe(true);
   });
 });

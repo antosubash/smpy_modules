@@ -2,6 +2,7 @@ import type { ComponentConfig } from '@puckeditor/core';
 
 import { createImageField, mediaLibraryAdapter } from '../../fields';
 import { keys } from '../../utils/i18n';
+import { safeHref } from '../../utils/markdown-links';
 import { EyebrowSplitSection } from './_internal/eyebrow-split-section';
 import { renderRichText } from './_internal/rich-text';
 
@@ -118,8 +119,9 @@ function LogoCloudItem({ logo }: { logo: LogoCloudItem }) {
   ) : (
     <div className="h-10 w-32 rounded bg-gray-100" aria-hidden="true" />
   );
-  return logo.href ? (
-    <a href={logo.href} className="block" aria-label={logo.alt}>
+  const href = safeHref(logo.href, '');
+  return href ? (
+    <a href={href} className="block" aria-label={logo.alt}>
       {img}
     </a>
   ) : (

@@ -1,6 +1,7 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
 import { keys } from '../../utils/i18n';
+import { safeHref } from '../../utils/markdown-links';
 import { renderRichText } from './_internal/rich-text';
 
 export type SocialBannerLink = {
@@ -70,7 +71,7 @@ export const SocialBannerWidget: ComponentConfig<SocialBannerWidgetProps> = {
               <a
                 // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; content repeats, so a content key collides
                 key={idx}
-                href={link.href || '#'}
+                href={safeHref(link.href)}
                 className="inline-flex items-center gap-2 text-xl font-semibold transition-opacity hover:opacity-80"
               >
                 {link.iconUrl && (

@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { safeHref } from '../../../utils/markdown-links';
 import { cn } from '../../../utils/widgetUtils';
 import { LinkArrow } from '../_internal/link-arrow';
 import { renderRichText } from '../_internal/rich-text';
@@ -31,7 +32,7 @@ export function TextLink({
   if (!label || !href) return null;
   return (
     <a
-      href={href}
+      href={safeHref(href)}
       className={cn(
         'inline-flex shrink-0 items-center gap-2 whitespace-nowrap text-[color:var(--pb-link-color,var(--pb-accent))] underline-offset-4 hover:text-[color:var(--pb-link-hover-color,var(--pb-link-color,var(--pb-accent)))] hover:[text-decoration-line:var(--pb-link-hover-decoration,underline)]',
         className,

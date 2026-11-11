@@ -1,6 +1,7 @@
 /** CallToActionWidget types, helpers and render — split from call-to-action-widget.tsx,
  *  which keeps the field definitions, so both stay under the 300-line cap. */
 
+import { safeHref } from '../../utils/markdown-links';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 import { CTAButton, Heading, Section } from './_shared';
 import type { CallToActionWidgetProps } from './call-to-action-props';
@@ -68,7 +69,7 @@ export const CallToActionWidgetRender = ({
                 <a
                   // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
                   key={idx}
-                  href={link.href || '#'}
+                  href={safeHref(link.href)}
                   className="text-sm font-semibold underline-offset-4 hover:underline"
                   style={{ color: 'var(--pb-surface-contrast, #ffffff)' }}
                 >
@@ -79,7 +80,7 @@ export const CallToActionWidgetRender = ({
           )}
           {primaryLabel && (
             <a
-              href={primaryHref || '#'}
+              href={safeHref(primaryHref)}
               className="mt-6 inline-flex items-center justify-center rounded-full border px-6 py-2.5 text-sm font-semibold transition-colors hover:bg-white/10"
               style={{
                 color: 'var(--pb-surface-contrast, #ffffff)',
@@ -126,7 +127,7 @@ export const CallToActionWidgetRender = ({
                   className="border-t border-[#1a353e]/15 last:border-b"
                 >
                   <a
-                    href={link.href || '#'}
+                    href={safeHref(link.href)}
                     className="flex items-center justify-between gap-4 py-4 text-[#1a353e] transition-opacity hover:opacity-70"
                   >
                     <span className="font-medium">
@@ -172,7 +173,7 @@ export const CallToActionWidgetRender = ({
                 <a
                   // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
                   key={idx}
-                  href={link.href || '#'}
+                  href={safeHref(link.href)}
                   className="text-[17px] font-semibold text-[#1a353e] transition-colors hover:text-[#468f8c]"
                 >
                   {renderRichText(link.label || '', { allowLinks: false })}
@@ -207,7 +208,7 @@ export const CallToActionWidgetRender = ({
             )}
             {primaryLabel && (
               <a
-                href={primaryHref || '#'}
+                href={safeHref(primaryHref)}
                 className="mt-8 inline-flex items-center justify-center rounded-full bg-white px-7 py-3 text-[17px] font-semibold text-[#1a353e] transition-colors hover:bg-[#1a353e] hover:text-white"
               >
                 {renderRichText(primaryLabel, { allowLinks: false })}

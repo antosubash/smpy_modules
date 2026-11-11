@@ -2,6 +2,7 @@ import type { ComponentConfig } from '@puckeditor/core';
 import type { CSSProperties } from 'react';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
 import { keys } from '../../utils/i18n';
+import { safeHref } from '../../utils/markdown-links';
 import { cn } from '../../utils/widgetUtils';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 import { TextLink } from './_shared/text-link';
@@ -142,7 +143,7 @@ export const StoryCardsWidget: ComponentConfig<StoryCardsWidgetProps> = {
           <a
             // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; content repeats, so a content key collides
             key={idx}
-            href={item.href || '#'}
+            href={safeHref(item.href)}
             className="group relative block aspect-[4/5] overflow-hidden rounded-xl"
           >
             {item.imageUrl ? (

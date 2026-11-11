@@ -49,10 +49,26 @@ export function isSafeImageSrc(src: string): boolean {
   return hasAllowedScheme(src, ['http', 'https']);
 }
 
+/**
+ * A block's link prop as it may be written into `<a href>` (#354): the value
+ * itself when `isSafeHref` allows it, otherwise `fallback` — `'#'` by default,
+ * so the element still renders but goes nowhere. Empty and non-string values
+ * get the fallback too, which is what every block's `href || '#'` used to do.
+ *
+ * Every block routes its hrefs through this one helper. The server refuses an
+ * unsafe link on save (`pagebuilder.content.links`), so this is for a value
+ * stored before that check, or by a path that does not go through it.
+ */
+export function safeHref(href: unknown, fallback = '#'): string {
+  if (typeof href !== 'string' || !href.trim()) return fallback;
+  return isSafeHref(href) ? href : fallback;
+}
+
 /** Scheme-less, or one of `schemes`; never a URL with a control character. */
 function hasAllowedScheme(url: string, schemes: string[]): boolean {
   if (CONTROL_CHAR.test(url)) return false;
-  const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(url);
+  // A browser strips leading spaces too, so " javascript:…" has a scheme.
+  const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(url.trimStart());
   return !scheme || schemes.includes(scheme[1].toLowerCase());
 }
 

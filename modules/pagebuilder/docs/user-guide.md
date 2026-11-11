@@ -366,6 +366,13 @@ scheme-less (relative or `#anchor`) address; an image loads only from `http`,
 control character) stays visible as literal text. External links open in a new
 tab with `noopener`. No raw HTML is interpreted.
 
+Saving checks the same rule (#354): a page or a site layout whose text holds such
+a link, or any block whose link field (a button's, a menu entry's, a card's) holds
+one, is refused with an error naming the block and the field, for example *Block
+Button (Button-3), field href: 'javascript:…' is not an allowed link*. Use an
+`http(s)`, `mailto` or `tel` address, or a relative one (`/about`, `#top`). A link
+saved before this check renders as `#` (going nowhere) until the block is fixed.
+
 Many other blocks' multi-line text fields accept the same inline syntax and
 lists; there, `#` headings render as bold paragraphs so the page's heading order
 is not broken, and a single line break is kept as a line break.

@@ -1,3 +1,4 @@
+import { safeHref } from '../../../utils/markdown-links';
 import { cn } from '../../../utils/widgetUtils';
 import { renderRichText } from '../_internal/rich-text';
 
@@ -50,7 +51,7 @@ const VARIANT_CLASSES: Record<CTAButtonVariant, string> = {
 export function CTAButton({ label, href, variant, size = 'lg' }: CTAButtonProps) {
   if (!label || label.trim() === '') return null;
   return (
-    <a href={href || '#'} className={cn(BASE, SIZE_CLASSES[size], VARIANT_CLASSES[variant])}>
+    <a href={safeHref(href)} className={cn(BASE, SIZE_CLASSES[size], VARIANT_CLASSES[variant])}>
       {/* The label is already inside this <a>, so links stay markup-free —
 			    a nested anchor is invalid HTML and browsers split it. */}
       {renderRichText(label, { allowLinks: false })}

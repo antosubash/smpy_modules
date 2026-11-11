@@ -2,6 +2,7 @@
  *  bullets, footnote and link. Split out so the render file stays under
  *  the 300-line cap. */
 
+import { safeHref } from '../../utils/markdown-links';
 import { cn } from '../../utils/widgetUtils';
 import { AccentText } from './_internal/accent-text';
 import { LinkArrow } from './_internal/link-arrow';
@@ -151,7 +152,7 @@ export function MediaObjectText({
         <div className="pt-2">
           <CTAButton
             label={linkLabel}
-            href={linkHref || '#'}
+            href={safeHref(linkHref)}
             variant={isDark ? 'inverse-outline' : 'secondary'}
           />
         </div>
@@ -160,7 +161,7 @@ export function MediaObjectText({
         linkVariant === 'link' &&
         (isDark ? (
           <a
-            href={linkHref || '#'}
+            href={safeHref(linkHref)}
             className="inline-flex items-center gap-1 font-medium hover:opacity-80"
             style={{ color: 'var(--pb-surface-contrast, #ffffff)' }}
           >
@@ -169,7 +170,7 @@ export function MediaObjectText({
           </a>
         ) : (
           <a
-            href={linkHref || '#'}
+            href={safeHref(linkHref)}
             className="inline-flex items-center gap-1 font-medium text-[color:var(--pb-link-color,var(--pb-accent,#2f7d32))] hover:text-[color:var(--pb-link-hover-color,var(--pb-link-color,var(--pb-accent,#2f7d32)))] hover:[text-decoration-line:var(--pb-link-hover-decoration,underline)]"
           >
             {renderRichText(linkLabel, { allowLinks: false })}

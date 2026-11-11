@@ -5,6 +5,7 @@ import { Menu, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { createCheckboxField, createImageField, mediaLibraryAdapter } from '../../fields';
 import { keys, translate, useT } from '../../utils/i18n';
+import { safeHref } from '../../utils/markdown-links';
 import { appendPages, useSiteNavPages } from './_internal/site-nav-context';
 import { SOCIAL_ICON_OPTIONS, SocialIcon, type SocialIconName } from './_shared';
 import { HeaderLocaleSwitcher, resolveCta, useIsSignedIn } from './site-header-account';
@@ -41,7 +42,7 @@ function UtilityBar({ links }: { links: UtilityLink[] }) {
           <a
             // biome-ignore lint/suspicious/noArrayIndexKey: author rows are not uniquely identified until filled in
             key={index}
-            href={link.href || '#'}
+            href={safeHref(link.href)}
             aria-label={link.icon ? link.label : undefined}
             className="opacity-90 transition-opacity hover:opacity-100"
           >
@@ -106,7 +107,7 @@ export function SiteHeaderRender({
       <div className="border-b border-[color:var(--border,#e4e6e7)] bg-[var(--pb-surface,#fff)]">
         <div className="mx-auto flex min-h-[72px] max-w-[1440px] items-center justify-between px-4 sm:px-6 lg:min-h-[112px] lg:px-12 lg:py-4">
           <a
-            href={homeHref || '/'}
+            href={safeHref(homeHref, '/')}
             aria-label={logoAlt || t(keys.pagebuilder.blocks.site_header.home)}
             className="shrink-0"
           >
@@ -128,7 +129,7 @@ export function SiteHeaderRender({
 
             {ctaLabel && (
               <a
-                href={ctaHref || '#'}
+                href={safeHref(ctaHref)}
                 className="hidden shrink-0 whitespace-nowrap rounded-[var(--pb-button-radius,9999px)] bg-primary-800 px-6 py-2.5 text-[17px] font-semibold text-white transition-colors hover:bg-primary-900 lg:inline-block"
               >
                 {ctaLabel}

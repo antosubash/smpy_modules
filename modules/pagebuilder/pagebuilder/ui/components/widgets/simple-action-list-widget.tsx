@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { keys } from '../../utils/i18n';
+import { safeHref } from '../../utils/markdown-links';
 import { renderRichText } from './_internal/rich-text';
 
 export type SimpleActionItem = {
@@ -61,7 +62,7 @@ export const SimpleActionListWidget: ComponentConfig<SimpleActionListWidgetProps
           <a
             // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; content repeats, so a content key collides
             key={idx}
-            href={item.href || '#'}
+            href={safeHref(item.href)}
             className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             <div>
