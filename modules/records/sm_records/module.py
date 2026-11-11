@@ -82,22 +82,13 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         tables that no migration wrote and no ``create_all`` reached, and
         every write to them would be a ``no such table`` found at runtime
         rather than a ``RuntimeError`` found at boot.
+
+        The body is :func:`sm_records.core.boot.register_settings`, which also
+        installs the CAPTCHA secret's encryption key (#350).
         """
-        from simple_module_core.module_settings import register_module_settings
+        from sm_records.core import boot
 
-        from sm_records.models._tables import seal
-
-        seal()
-
-        from sm_records.core.services import RecordsServices
-        from sm_records.core.settings import RecordsSettings
-
-        register_module_settings(
-            app,
-            constants.PACKAGE,
-            RecordsSettings,
-            lambda defaults: RecordsServices(settings=self.settings or defaults),
-        )
+        boot.register_settings(self, app)
 
     def register_permissions(self, registry: PermissionRegistry) -> None:
         """Three static permissions, plus one per type from a runtime source.

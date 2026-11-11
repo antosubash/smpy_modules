@@ -134,6 +134,31 @@ def mount_submission_views(app: FastAPI) -> None:
     app.include_router(router, prefix=prefix)
 
 
+def register_settings(module: Any, app: FastAPI) -> None:
+    """:meth:`RecordsModule.register_settings`'s body — here for the 300-line cap.
+
+    Seals the collection registry, registers the settings class, and installs
+    the secret the CAPTCHA secret is encrypted under (#350). The provider goes
+    in here, not at startup, because ``scripts/set_setting.py`` and
+    ``scripts/reencrypt_secrets.py`` build the app without starting it, and the
+    settings' sealed dump needs the key.
+    """
+    from simple_module_core.module_settings import register_module_settings
+
+    from sm_records.core.services import RecordsServices
+    from sm_records.models._tables import seal
+    from sm_records.public_submissions import captcha_secret
+
+    seal()
+    register_module_settings(
+        app,
+        constants.PACKAGE,
+        RecordsSettings,
+        lambda defaults: RecordsServices(settings=module.settings or defaults),
+    )
+    captcha_secret.install_secret_provider(app)
+
+
 async def startup(module: Any, app: FastAPI) -> None:
     """:meth:`RecordsModule.on_startup`'s body — moved here for the 300-line cap.
 
@@ -157,6 +182,11 @@ async def startup(module: Any, app: FastAPI) -> None:
     module.tenancy_mode = tenancy.configure(app)
     if (session_class := getattr(module.db, "sync_session_class", None)) is not None:
         tenancy.install_guard(session_class)  # before any read below (tenancy §A.4)
+    # A CAPTCHA secret stored in the clear before 0.0.16 is encrypted now,
+    # before anything reads the settings below (#350).
+    from sm_records.public_submissions import captcha_secret
+
+    await captcha_secret.seal_at_startup(app, module)
     services = getattr(app.state, constants.PACKAGE, None)
     if services is not None and getattr(services, "settings", None) is not None:
         module.settings = services.settings

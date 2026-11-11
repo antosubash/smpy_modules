@@ -16,6 +16,12 @@ hydrator at the next boot, and validated by pydantic then — so a typo here
 surfaces as a startup error naming the field rather than a silently ignored
 line, which is what the environment variables this replaced used to do.
 
+A ``json`` field is stored as its type *dumps* it, as the Settings screen
+stores it (framework GH #487): the value is validated against the field's own
+annotation and that dump is written. That is what keeps a sealed secret sealed
+here too — records' CAPTCHA secret (#350) dumps as ``enc:v2:…``, so it is never
+stored in the clear. A value the settings screen would mask is not echoed.
+
 The app is constructed (not started) purely to collect the registry every
 module fills in during ``register_settings``: that is what knows which fields
 a package has and how each is typed, so this script needs no list of its own.
@@ -26,14 +32,43 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+from typing import Annotated, Any
 
 from headless_settings import headless_settings
+from pydantic import TypeAdapter, ValidationError
 from settings.core.service import SettingService
 from settings.module_settings.store import SettingsStore
+from simple_module_core.secret_fields import conceals_secret
 from simple_module_core.settings_hydrate import value_type_for_field
 from simple_module_hosting.app_builder import create_app
 
 _USAGE = "usage: set_setting.py <package> <field> <value> [<field> <value> ...]"
+
+
+def _stored_json(cls: Any, package: str, field: str, raw: str) -> str:
+    """``raw`` as the field's annotation validates and dumps it, as JSON text."""
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        # Fail here rather than at the next boot: a malformed value written now
+        # is a startup crash later, at a distance from the command that caused
+        # it. Optional strings land here too — the store types anything that
+        # isn't a plain str/int/bool/float as JSON — so say what the quoted
+        # form looks like rather than only that the parse failed.
+        raise SystemExit(
+            f"{package}.{field} is stored as JSON and the value is not valid JSON "
+            f"({exc.msg}). A string value is quoted: '\"<value>\"'"
+        ) from None
+    info = cls.model_fields[field]
+    annotation = Annotated[info.annotation, *info.metadata] if info.metadata else info.annotation
+    adapter: TypeAdapter[Any] = TypeAdapter(annotation)
+    try:
+        value = adapter.validate_python(parsed)
+    except ValidationError as exc:
+        # The messages only: an error's ``input`` would echo the value.
+        reasons = "; ".join(error["msg"] for error in exc.errors(include_input=False))
+        raise SystemExit(f"{package}.{field}: {reasons}") from None
+    return json.dumps(adapter.dump_python(value, mode="json"))
 
 
 async def _write(package: str, pairs: list[tuple[str, str]]) -> None:
@@ -51,22 +86,10 @@ async def _write(package: str, pairs: list[tuple[str, str]]) -> None:
                 fields = ", ".join(sorted(cls.model_fields))
                 raise SystemExit(f"{package} has no field {field!r}; try: {fields}")
             value_type = value_type_for_field(cls, field)
-            if value_type == "json":
-                # Fail here rather than at the next boot: a malformed value
-                # written now is a startup crash later, at a distance from the
-                # command that caused it. Optional strings land in this branch
-                # too — the store types anything that isn't a plain str/int/
-                # bool/float as JSON — so say what the quoted form looks like
-                # rather than only that the parse failed.
-                try:
-                    json.loads(raw)
-                except json.JSONDecodeError as exc:
-                    raise SystemExit(
-                        f"{package}.{field} is stored as JSON and {raw!r} is not "
-                        f"valid JSON ({exc}). A string value is quoted: '\"{raw}\"'"
-                    ) from exc
-            await store.set_override(package, field, raw, value_type)
-            print(f"{package}.{field} = {raw} ({value_type})")
+            stored = _stored_json(cls, package, field, raw) if value_type == "json" else raw
+            await store.set_override(package, field, stored, value_type)
+            shown = "<hidden>" if conceals_secret(field, raw, value_type) else stored
+            print(f"{package}.{field} = {shown} ({value_type})")
         await session.commit()
     await app.state.sm.db.engine.dispose()
 
