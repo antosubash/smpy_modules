@@ -3,20 +3,18 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
 from pagebuilder.contracts.schemas._fields import OptionalNote
-
-PuckData = dict[str, Any]
+from pagebuilder.contracts.schemas._pages import CheckedPuckData, PuckData
 
 
 class LayoutUpdate(BaseModel):
     """``None`` leaves a slot alone; an empty Puck doc clears it."""
 
-    header_data: PuckData | None = None
-    footer_data: PuckData | None = None
+    header_data: CheckedPuckData | None = None
+    footer_data: CheckedPuckData | None = None
     note: OptionalNote = None
 
 

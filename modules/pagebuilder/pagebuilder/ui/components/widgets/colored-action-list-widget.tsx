@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { keys } from '../../utils/i18n';
+import { safeHref } from '../../utils/markdown-links';
 import { cn } from '../../utils/widgetUtils';
 import { renderRichText } from './_internal/rich-text';
 
@@ -85,7 +86,7 @@ export const ColoredActionListWidget: ComponentConfig<ColoredActionListWidgetPro
               // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; content repeats, so a content key collides
               <li key={idx}>
                 <a
-                  href={item.href || '#'}
+                  href={safeHref(item.href)}
                   className={cn(
                     'flex items-center justify-between px-4 py-3 text-base font-medium transition-colors',
                     tone === 'green' ? 'hover:bg-white/10' : 'hover:bg-black/5',

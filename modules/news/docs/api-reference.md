@@ -191,6 +191,8 @@ never deletes an article. `TagRead` is `{"id", "name", "slug",
 ## Admin search — `news.edit`
 
 `GET /api/news/search?q=…&per_section=5` (1–50). Empty `q` returns nothing.
+The `pages` and `media` sections and their `*_more_url` are empty unless
+pagebuilder is installed and the caller holds one of its permissions.
 
 ```json
 {"query": "canopy",

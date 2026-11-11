@@ -1,6 +1,7 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { createCheckboxField } from '../../fields';
 import { keys, translate } from '../../utils/i18n';
+import { safeFrameSrc } from '../../utils/markdown-links';
 import { EmptyPlaceholder } from './_shared';
 
 export type IframeWidgetProps = {
@@ -24,8 +25,10 @@ export const IframeWidget: ComponentConfig<IframeWidgetProps> = {
     height: '600px',
     sandboxed: true,
   },
-  render: ({ src, title, height, sandboxed }) =>
-    src ? (
+  // A source outside http(s)/relative renders as the empty placeholder (#354).
+  render: ({ src: raw, title, height, sandboxed }) => {
+    const src = safeFrameSrc(raw);
+    return src ? (
       <div className="container mx-auto py-6">
         <iframe
           src={src}
@@ -41,5 +44,6 @@ export const IframeWidget: ComponentConfig<IframeWidgetProps> = {
       </div>
     ) : (
       <EmptyPlaceholder label={translate(keys.pagebuilder.blocks.iframe.empty)} />
-    ),
+    );
+  },
 };

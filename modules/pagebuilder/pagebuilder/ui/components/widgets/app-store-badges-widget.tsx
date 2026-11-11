@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { keys, translate } from '../../utils/i18n';
+import { safeHref } from '../../utils/markdown-links';
 import { cn } from '../../utils/widgetUtils';
 
 export type AppStoreBadgesWidgetProps = {
@@ -83,7 +84,7 @@ export const AppStoreBadgesWidget: ComponentConfig<AppStoreBadgesWidgetProps> = 
         )}
       >
         {googlePlaySrc && (
-          <a href={googlePlayHref} target="_blank" rel="noopener noreferrer">
+          <a href={safeHref(googlePlayHref)} target="_blank" rel="noopener noreferrer">
             <img
               src={googlePlaySrc}
               alt={translate(keys.pagebuilder.blocks.common.google_play_alt)}
@@ -92,7 +93,7 @@ export const AppStoreBadgesWidget: ComponentConfig<AppStoreBadgesWidgetProps> = 
           </a>
         )}
         {appStoreSrc && (
-          <a href={appStoreHref} target="_blank" rel="noopener noreferrer">
+          <a href={safeHref(appStoreHref)} target="_blank" rel="noopener noreferrer">
             <img
               src={appStoreSrc}
               alt={translate(keys.pagebuilder.blocks.common.app_store_alt)}

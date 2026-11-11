@@ -89,15 +89,26 @@ class TestMenu:
             # form the route table records — accept either.
             assert url in paths or url.rstrip("/") in paths, f"{url} is not a registered route"
 
-    async def test_visible_without_a_pagebuilder_role(self):
-        """Menu role filtering is a plain intersection with no admin bypass.
+    @pytest.mark.parametrize(
+        ("held", "shown"),
+        [
+            (set(), False),
+            ({"news.edit"}, False),
+            ({PERM_EDIT}, True),
+            ({PERM_PUBLISH}, True),
+            ({PERM_APPROVE}, True),
+        ],
+    )
+    async def test_the_screens_need_a_pagebuilder_permission(self, held, shown):
+        """Shown on the rule the routes apply (#346), whatever the roles are.
 
-        Gating these on the pagebuilder roles would hide them from an admin,
-        and would overstate the gating — those views require auth only.
-        Import / Export is the exception and is checked on permissions.
+        Not role-gated: menu role filtering is a plain intersection with no
+        admin bypass, so gating on the pagebuilder roles would hide them from
+        an admin. The provider asks the resolved permissions instead.
         """
-        labels = [i["label"] for i in await self._sidebar(roles=[], held=set())]
-        assert labels == ["Pages", "Site layout", "Media library"]
+        labels = [i["label"] for i in await self._sidebar(roles=[], held=held)]
+        for label in ("Pages", "Site layout", "Media library"):
+            assert (label in labels) is shown
 
     @pytest.mark.parametrize(
         ("held", "shown"),

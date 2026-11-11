@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { keys } from '../../utils/i18n';
+import { safeHref } from '../../utils/markdown-links';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 
 export type SignupBannerWidgetProps = {
@@ -39,7 +40,7 @@ export const SignupBannerWidget: ComponentConfig<SignupBannerWidgetProps> = {
         )}
         {primaryLabel && (
           <a
-            href={primaryHref || '#'}
+            href={safeHref(primaryHref)}
             className="mt-8 inline-flex items-center justify-center px-6 py-3 rounded-md bg-primary-700 hover:bg-primary-800 text-white font-medium transition-colors"
           >
             {renderRichText(primaryLabel, { allowLinks: false })}

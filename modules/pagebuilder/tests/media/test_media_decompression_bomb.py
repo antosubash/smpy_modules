@@ -248,7 +248,7 @@ async def test_an_unexpected_processing_error_leaves_no_file(
     def boom(*_args: object, **_kwargs: object) -> None:
         raise RuntimeError("boom")
 
-    monkeypatch.setattr("pagebuilder.media.media_service.process_image", boom)
+    monkeypatch.setattr("pagebuilder.media.media_processing.process_image", boom)
 
     with pytest.raises(RuntimeError):
         await _upload(authed_client, _png(4, 4))

@@ -17,6 +17,7 @@ import { TextLink } from './_shared/text-link';
 
 export type { FeatureCardItem, FeatureCardsWidgetProps } from './feature-cards-styles';
 
+import { safeHref } from '../../utils/markdown-links';
 import {
   CARD_BODY_STYLE,
   CARD_TAG_STYLE,
@@ -104,7 +105,7 @@ export const FeatureCardsWidgetRender = ({
                 <a
                   // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
                   key={idx}
-                  href={item.href || '#'}
+                  href={safeHref(item.href)}
                   className={
                     colored
                       ? 'group flex min-h-[var(--pb-card-min-h,0)] flex-col rounded-xl p-6 transition-shadow hover:shadow-lg'

@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { keys, translate } from '../../utils/i18n';
+import { safeHref } from '../../utils/markdown-links';
 import { cn } from '../../utils/widgetUtils';
 import { AccentText } from './_internal/accent-text';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
@@ -193,7 +194,7 @@ export const StepsWidget: ComponentConfig<StepsWidgetProps> = {
                       <a
                         // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; content repeats, so a content key collides
                         key={i}
-                        href={l.href}
+                        href={safeHref(l.href)}
                         className="flex items-center justify-between gap-4 border-b border-[var(--border,#dcdcdf)] py-4 text-lg font-medium text-[color:var(--pb-heading-color,#161728)] transition-colors hover:text-[color:var(--pb-link-hover-color,var(--pb-heading-color,#161728))]"
                       >
                         {renderRichText(l.label, { allowLinks: false })}

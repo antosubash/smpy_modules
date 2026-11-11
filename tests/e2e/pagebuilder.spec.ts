@@ -223,4 +223,27 @@ test.describe('PageBuilder admin', () => {
 
     await page.request.delete(`/api/pagebuilder/pages/${id}`, { headers });
   });
+  test('saving a block link with an unsafe scheme is refused with a 422 naming the field (#354)', async ({
+    page,
+  }) => {
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
+    const slug = uniqueSlug('unsafe-link');
+    const block = (href: string) => ({
+      content: [{ type: 'Button', props: { id: 'Button-e2e', label: 'Go', href } }],
+      root: { props: {} },
+    });
+    const refused = await page.request.post('/api/pagebuilder/pages', {
+      headers,
+      data: { title: `Unsafe ${slug}`, slug, draft_data: block('javascript:alert(1)') },
+    });
+    expect(refused.status()).toBe(422);
+    expect(await refused.text()).toContain('field href');
+
+    const saved = await page.request.post('/api/pagebuilder/pages', {
+      headers,
+      data: { title: `Safe ${slug}`, slug, draft_data: block('https://example.com/') },
+    });
+    expect(saved.status(), await saved.text()).toBe(201);
+    await page.request.delete(`/api/pagebuilder/pages/${(await saved.json()).id}`, { headers });
+  });
 });

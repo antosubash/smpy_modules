@@ -12,15 +12,9 @@ from pagebuilder.models import Layout, MediaAsset, Page, PageRedirect, PageStatu
 from sqlalchemy import delete
 from sqlmodel import select
 
-pytestmark = pytest.mark.asyncio
+from tests.support.media_bytes import PNG
 
-# A 1x1 PNG. Real bytes matter: MediaService sniffs content and rejects
-# anything that is not actually an allowed image.
-PNG = bytes.fromhex(
-    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
-    "890000000a49444154789c6360000002000100ffff03000006000557bfabd400"
-    "00000049454e44ae426082"
-)
+pytestmark = pytest.mark.asyncio
 
 
 def _tree(root: Path) -> dict[str, object]:

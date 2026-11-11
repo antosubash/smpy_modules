@@ -2,6 +2,7 @@ import type { ComponentConfig } from '@puckeditor/core';
 import { type CSSProperties, useId } from 'react';
 import { createImageField, mediaLibraryAdapter } from '../../fields';
 import { keys, translate } from '../../utils/i18n';
+import { safeHref } from '../../utils/markdown-links';
 import { AccentText } from './_internal/accent-text';
 import { RichTextBlock, renderRichText } from './_internal/rich-text';
 
@@ -198,7 +199,7 @@ function NewsletterRender({
                       <a
                         // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; content repeats, so a content key collides
                         key={i}
-                        href={privacyHref || '#'}
+                        href={safeHref(privacyHref)}
                         className="cursor-pointer font-semibold underline"
                       >
                         {part.slice(1, -1)}

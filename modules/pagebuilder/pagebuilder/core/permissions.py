@@ -28,6 +28,7 @@ __all__ = [
     "ROLE_EDITOR",
     "ROLE_PUBLISHER",
     "RequiresPermission",
+    "may_read",
     "may_use_import_export",
 ]
 
@@ -55,3 +56,15 @@ def may_use_import_export(held: Collection[str]) -> bool:
     (``require_publish_or_approve``) and the sidebar entry (``pagebuilder.web.menu``).
     """
     return grants(held, PERM_PUBLISH) or grants(held, PERM_APPROVE)
+
+
+def may_read(held: Collection[str]) -> bool:
+    """Whether *held* opens the admin reads: drafts, revisions, layout, media (#346).
+
+    Any one of the three permissions — there is no separate read permission. An
+    approver who cannot edit still has to read what they approve, and every
+    role in :data:`DEFAULT_ROLE_MAP` holds edit anyway. Shared by the router
+    gate (``pagebuilder.web.access.require_reader``) and the sidebar entries
+    (``pagebuilder.web.menu``), so the menu never offers a screen that 403s.
+    """
+    return any(grants(held, permission) for permission in ALL_PERMISSIONS)

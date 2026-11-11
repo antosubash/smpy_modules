@@ -1,6 +1,6 @@
 # PageBuilder API reference
 
-All admin routes are JSON under `/api/pagebuilder`. Every one of them runs three
+All admin routes are JSON under `/api/pagebuilder`. Every one of them runs four
 router-level dependencies, in this order:
 
 1. **Authentication** — `401 Not authenticated` without a signed-in user, unless
@@ -17,13 +17,18 @@ router-level dependencies, in this order:
    sends it from there. There is no CSRF cookie. Reads need no token. It runs
    before any permission check, so a write without a token is refused as CSRF
    even for a user who also lacks the permission.
+4. **Read gate** (`access.require_reader`, #346) — a signed-in user holding none
+   of `pagebuilder.edit`, `pagebuilder.publish` and `pagebuilder.approve` gets
+   `403 Permission required: pagebuilder.edit` on every route, reads included.
+   A request with no user is left to step 1. The Inertia screens under
+   `/pagebuilder/` (the draft preview included) run the same gate.
 
-"Permission" below is the extra `RequiresPermission` check on top; **auth** means
-any signed-in user. Errors are `{"detail": "<message>"}`; the table is at the end.
+"Permission" below is the extra `RequiresPermission` check on top; **read** means
+any one of the three pagebuilder permissions (step 4) and nothing more. Errors are `{"detail": "<message>"}`; the table is at the end.
 
 ## Pages
 
-### `GET /api/pagebuilder/pages` — auth
+### `GET /api/pagebuilder/pages` — read
 
 Query: `search` (title or slug, case-insensitive, wildcards literal), `status`
 (`draft` | `submitted_for_review` | `published`; empty = no filter), `locale`,
@@ -51,12 +56,12 @@ excluded.
 | Route | Permission | Returns |
 |---|---|---|
 | `GET /pages/trash` | `pagebuilder.edit` | trashed pages, most recently binned first |
-| `GET /pages/templates` | auth | pages with `is_template`, by title |
+| `GET /pages/templates` | read | pages with `is_template`, by title |
 | `GET /pages/pending` | `pagebuilder.approve` | pages in `submitted_for_review` |
 
 All three return `{"items": [PageRead], "total": n}`.
 
-### `GET /api/pagebuilder/locales` — auth
+### `GET /api/pagebuilder/locales` — read
 
 `{"locales": ["en", "de"], "default": "en"}` — the configured content languages.
 
@@ -73,11 +78,29 @@ All three return `{"items": [PageRead], "total": n}`.
 
 Only `title` (1–300) and `slug` (`^[a-z0-9][a-z0-9-]*$`, ≤200) are required.
 `locale` omitted means the default content locale; an unconfigured one is 422.
+
+**Block links** (#354, `pagebuilder.content.links`). `draft_data` here and in
+`PUT /pages/{id}`, and `header_data`/`footer_data` in `PUT /layout`, are refused
+with 422 when a block carries a link outside the allow-list: every prop named
+`href` or ending in `Href`, at any depth (`links[2].href`, `primaryHref`), and the
+target of every Markdown link `[label](target)` in any string prop. Allowed: no
+scheme (`/about`, `#top`, `?q=1`, `./x`, `contact`, `//cdn.example/x`) or `http`,
+`https`, `mailto`, `tel`; never a control character. The `src` of an `Iframe` or `Video` block
+loads into the page, so it is stricter: `http`, `https` or no scheme only (the
+Iframe block restricts no host). The error's `msg` names
+the block type, its id and the field: `Value error, Block Button (Button-3),
+field href: 'javascript:alert(1)' is not an allowed link. …`. An uploaded bundle
+(`POST /snapshots/upload`) is checked the same way and refused as an invalid
+bundle, `asset://` sentinels allowed. Paths that copy content already stored on
+this site are not re-checked: `copy_from_page_id`, a translation's
+`copy_content`, a revision or layout-revision restore, and restoring a snapshot
+taken here. They cannot bring in a link the site did not already hold, and the
+renderer's `safeHref` shows any older one as `#`.
 `copy_from_page_id` seeds `draft_data` from that page's draft and is not stored.
 The page starts as a `draft` in a translation group of its own. Returns
 `PageDetail`. Slug taken in that language → `409 Slug already in use in <locale>`.
 
-### `GET /api/pagebuilder/pages/{id}` — auth
+### `GET /api/pagebuilder/pages/{id}` — read
 
 `PageDetail` = `PageRead` plus:
 
@@ -144,9 +167,9 @@ set with `publish_at >= unpublish_at` is
 
 | Route | Permission | Returns |
 |---|---|---|
-| `GET /pages/{id}/revisions` | auth | `{"items": [PageRevisionRead], "restores": [PageRestoreMarker]}`, both newest first |
-| `GET /pages/{id}/revisions/{rev}` | auth | `PageRevisionRead` + `data` |
-| `GET /pages/{id}/revisions/{before}/diff/{after}` | auth | `RevisionDiffResponse` |
+| `GET /pages/{id}/revisions` | read | `{"items": [PageRevisionRead], "restores": [PageRestoreMarker]}`, both newest first |
+| `GET /pages/{id}/revisions/{rev}` | read | `PageRevisionRead` + `data` |
+| `GET /pages/{id}/revisions/{before}/diff/{after}` | read | `RevisionDiffResponse` |
 | `POST /pages/{id}/revisions/{rev}/restore` | `pagebuilder.edit` | `PageDetail`; copies title, meta description, social image and blocks into the draft |
 
 `PageRevisionRead`: `id`, `page_id`, `title`, `meta_description`, `og_image`,
@@ -167,15 +190,15 @@ A revision that belongs to another page is 404.
 
 | Route | Permission | Body / returns |
 |---|---|---|
-| `GET /layout` | auth | `LayoutDetail` (`id`, `header_data`, `footer_data`, timestamps); created empty on first read |
+| `GET /layout` | read | `LayoutDetail` (`id`, `header_data`, `footer_data`, timestamps); created empty on first read |
 | `PUT /layout` | `pagebuilder.edit` | `{"header_data"?, "footer_data"?, "note"?}`; `null`/absent leaves a slot alone. An unchanged save writes no revision. |
-| `GET /layout/revisions` | auth | `{"items": [{"id", "layout_id", "note", "created_at", "created_by"}]}` |
-| `GET /layout/revisions/{id}` | auth | revision + `header_data`, `footer_data` |
+| `GET /layout/revisions` | read | `{"items": [{"id", "layout_id", "note", "created_at", "created_by"}]}` |
+| `GET /layout/revisions/{id}` | read | revision + `header_data`, `footer_data` |
 | `POST /layout/revisions/{id}/restore` | `pagebuilder.edit` | `LayoutDetail` |
 
 ## Media
 
-### `GET /api/pagebuilder/uploads` — auth
+### `GET /api/pagebuilder/uploads` — read
 
 Query: `search`, `content_type`, `folder` (absent = all, empty = unfiled, else
 exact path), `min_size_bytes`, `max_size_bytes`, `cursor`, `offset`, `limit`
@@ -200,7 +223,16 @@ Multipart: `file`, optional `folder`. Returns `MediaAssetRead`. The declared typ
 must be in `media_allowed_content_types` and match the sniffed magic bytes (415
 otherwise); over `media_max_bytes` is 413. Stored under a random name with the
 sniffed extension; WebP variants generated for each configured width below the
-original's.
+original's. With `media_strip_metadata` on (the default) a JPEG, PNG or WebP,
+animated PNG and WebP included, is first cleaned of its EXIF, XMP and IPTC data
+(`size_bytes` is the cleaned file's): PNG and WebP by a chunk copy that keeps
+the compressed picture byte for byte, a JPEG (or a still WebP or 8-bit PNG
+with an EXIF orientation to apply) by re-saving it. One that cannot be cleaned,
+including a malformed PNG chunk stream or WebP RIFF container, is refused with
+`415` and
+`{"detail": {"code": "image_metadata_not_removed", "message": …}}`. An image
+(or an animation whose frames together exceed ten times the limit) over
+`Image.MAX_IMAGE_PIXELS` is `413` `image_too_many_pixels`.
 
 ### One asset — all `pagebuilder.edit`
 
@@ -353,5 +385,5 @@ release; omit it.
 | 409 | `Still used on …` | checked media delete |
 | 409 | `An import is already awaiting approval` / `Import already decided` | imports |
 | 413 | `File exceeds N bytes` / `Bundle exceeds N bytes` | uploads |
-| 415 | content-type not allowed, or sniffed type mismatch | media upload |
-| 422 | validation; unconfigured locale; schedule order; unsupported bundle format | various |
+| 415 | content-type not allowed, sniffed type mismatch, or `image_metadata_not_removed` | media upload |
+| 422 | validation (a refused block link included); unconfigured locale; schedule order; unsupported bundle format | various |

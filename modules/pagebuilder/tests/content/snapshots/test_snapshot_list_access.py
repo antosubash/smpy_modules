@@ -9,12 +9,10 @@ being offered Restore, Delete, Upload or Take.
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 from pagebuilder.core.permissions import PERM_APPROVE, PERM_EDIT, PERM_PUBLISH
 
-from tests.support.app import _build_app, _client_for
+from tests.support.app import _build_app, _client_for, _regrant
 
 pytestmark = pytest.mark.asyncio
 
@@ -46,16 +44,10 @@ async def _client(tmp_path, grants: list[str], *, seed: bool = False):
                 assert taken.status_code == 201, taken.text
                 staged = await client.post(f"{_SNAPSHOTS}/{taken.json()['id']}/restore")
                 assert staged.status_code == 201, staged.text
-                _regrant(app, grants)
+                _regrant(app, _ROLE, grants)
             yield client
     finally:
         await cleanup()
-
-
-def _regrant(app: Any, grants: list[str]) -> None:
-    registry = app.state.sm.permissions
-    registry._role_map[_ROLE] = set(grants)
-    registry._invalidate()
 
 
 @pytest.mark.parametrize("grants", [[], [PERM_EDIT]])
@@ -63,7 +55,10 @@ async def test_a_reader_without_publish_or_approve_is_refused(tmp_path, grants):
     async for client in _client(tmp_path, grants):
         api = await client.get(_SNAPSHOTS)
         assert api.status_code == 403
-        assert api.json()["detail"] == "Permission required: pagebuilder.publish"
+        # With no pagebuilder permission at all, the router-wide read gate
+        # (#346) answers first and names the least of the three.
+        needed = PERM_PUBLISH if grants else PERM_EDIT
+        assert api.json()["detail"] == f"Permission required: {needed}"
 
         view = await client.get(_CONTENT, headers=_INERTIA)
         assert view.status_code == 403

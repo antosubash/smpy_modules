@@ -56,6 +56,10 @@ function rejectionMessage(status: number, body: string): string {
   if (status === 413 && rejectionCode(body) === 'image_too_many_pixels') {
     return translate(keys.pagebuilder.errors.upload_too_many_pixels);
   }
+  // Not "unsupported type": the file is fine, its metadata could not be removed (#356).
+  if (status === 415 && rejectionCode(body) === 'image_metadata_not_removed') {
+    return translate(keys.pagebuilder.errors.upload_metadata_not_removed);
+  }
   return uploadErrorMessage(status);
 }
 

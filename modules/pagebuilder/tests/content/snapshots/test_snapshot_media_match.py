@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 
 import pytest
+from pagebuilder.content.snapshots.blobs import BlobStore
 from pagebuilder.content.snapshots.media_match import match_existing
 from pagebuilder.media.media_files import resolve_media_root
 from pagebuilder.models import MediaAsset
@@ -30,6 +31,11 @@ async def _add(snapshot_db, *, filename: str, original: str, data: bytes | None)
     return asset
 
 
+def _blobs(snapshot_db) -> BlobStore:
+    """An empty store: no blob to clean, so only the bundle digest can match."""
+    return BlobStore(resolve_media_root(snapshot_db.settings.media_root).parent / "blobs")
+
+
 def _index(sha: str, original: str = "hero.jpg", bundle_name: str = "hero.jpg"):
     return {bundle_name: {"sha256": sha, "original_filename": original}}
 
@@ -38,7 +44,7 @@ async def test_same_name_and_same_bytes_matches(snapshot_db):
     """Re-running a restore must not duplicate an asset it already has."""
     asset = await _add(snapshot_db, filename="u1.jpg", original="hero.jpg", data=_OURS)
     matched = await match_existing(
-        snapshot_db.session, snapshot_db.settings, _index(_sha(_OURS))
+        snapshot_db.session, snapshot_db.settings, _index(_sha(_OURS)), _blobs(snapshot_db)
     )
     assert matched["hero.jpg"].id == asset.id
 
@@ -52,7 +58,7 @@ async def test_same_name_but_different_bytes_does_not_match(snapshot_db):
     """
     await _add(snapshot_db, filename="u1.jpg", original="hero.jpg", data=_OURS)
     matched = await match_existing(
-        snapshot_db.session, snapshot_db.settings, _index(_sha(_THEIRS))
+        snapshot_db.session, snapshot_db.settings, _index(_sha(_THEIRS)), _blobs(snapshot_db)
     )
     assert matched == {}
 
@@ -64,7 +70,7 @@ async def test_matches_the_right_one_when_a_name_is_ambiguous(snapshot_db):
         snapshot_db, filename="u2.jpg", original="hero.jpg", data=_THEIRS
     )
     matched = await match_existing(
-        snapshot_db.session, snapshot_db.settings, _index(_sha(_THEIRS))
+        snapshot_db.session, snapshot_db.settings, _index(_sha(_THEIRS)), _blobs(snapshot_db)
     )
     assert matched["hero.jpg"].id == wanted.id
 
@@ -73,14 +79,17 @@ async def test_a_row_whose_file_is_missing_does_not_match(snapshot_db):
     """Issue #14's divergence reads as 'no match', so the restore repairs it."""
     await _add(snapshot_db, filename="gone.jpg", original="hero.jpg", data=None)
     matched = await match_existing(
-        snapshot_db.session, snapshot_db.settings, _index(_sha(_OURS))
+        snapshot_db.session, snapshot_db.settings, _index(_sha(_OURS)), _blobs(snapshot_db)
     )
     assert matched == {}
 
 
 async def test_a_name_this_host_has_never_seen_does_not_match(snapshot_db):
     matched = await match_existing(
-        snapshot_db.session, snapshot_db.settings, _index(_sha(_OURS), "unseen.jpg")
+        snapshot_db.session,
+        snapshot_db.settings,
+        _index(_sha(_OURS), "unseen.jpg"),
+        _blobs(snapshot_db),
     )
     assert matched == {}
 
@@ -92,5 +101,6 @@ async def test_a_disambiguated_bundle_name_still_matches_by_original(snapshot_db
         snapshot_db.session,
         snapshot_db.settings,
         _index(_sha(_OURS), original="hero.jpg", bundle_name="hero~2.jpg"),
+        _blobs(snapshot_db),
     )
     assert matched["hero~2.jpg"].id == asset.id

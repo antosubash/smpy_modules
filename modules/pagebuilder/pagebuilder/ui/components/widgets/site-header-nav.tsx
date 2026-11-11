@@ -3,6 +3,7 @@
 import { ChevronDown } from 'lucide-react';
 
 import { keys, useT } from '../../utils/i18n';
+import { safeHref } from '../../utils/markdown-links';
 
 export interface SiteNavChild {
   label: string;
@@ -46,7 +47,7 @@ function Dropdown({ item }: { item: SiteNavItem }) {
           {item.children?.map((child) => (
             <li key={child.href || child.label}>
               <a
-                href={child.href || '#'}
+                href={safeHref(child.href)}
                 // Blur on click: a click-focused link would otherwise hold
                 // :focus-within and pin the panel open over the destination.
                 onClick={(e) => e.currentTarget.blur()}
@@ -83,7 +84,7 @@ export function DesktopNav({ items }: { items: SiteNavItem[] }) {
           <a
             // biome-ignore lint/suspicious/noArrayIndexKey: author rows are not uniquely identified until filled in
             key={index}
-            href={item.href || '#'}
+            href={safeHref(item.href)}
             title={item.label}
             className={`max-w-[16rem] truncate py-3 ${LINK_CLASS}`}
           >
@@ -128,7 +129,7 @@ export function MobileNav({
                   // biome-ignore lint/suspicious/noArrayIndexKey: author rows are not uniquely identified until filled in
                   <li key={childIndex}>
                     <a
-                      href={child.href || '#'}
+                      href={safeHref(child.href)}
                       onClick={onNavigate}
                       className="block rounded-md px-3 py-2.5 text-[15px] text-primary-800 transition-colors hover:bg-[var(--pb-surface-muted,#f3f3f4)]"
                     >
@@ -142,7 +143,7 @@ export function MobileNav({
             // biome-ignore lint/suspicious/noArrayIndexKey: author rows are not uniquely identified until filled in
             <li key={index} className="py-1">
               <a
-                href={item.href || '#'}
+                href={safeHref(item.href)}
                 onClick={onNavigate}
                 className="block rounded-md px-3 py-3 text-[15px] font-medium text-primary-800 transition-colors hover:bg-[var(--pb-surface-muted,#f3f3f4)]"
               >
@@ -154,7 +155,7 @@ export function MobileNav({
         {ctaLabel && (
           <li className="py-4">
             <a
-              href={ctaHref || '#'}
+              href={safeHref(ctaHref)}
               onClick={onNavigate}
               className="block rounded-[var(--pb-button-radius,9999px)] bg-primary-800 px-6 py-3 text-center text-[15px] font-semibold text-white transition-colors hover:bg-primary-900"
             >

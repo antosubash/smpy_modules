@@ -1,10 +1,12 @@
 # PageBuilder user guide
 
 PageBuilder's screens sit under **Site** in the app sidebar: **Pages**, **Site
-layout**, **Media library** and **Import / Export**. Every signed-in user can open
-the first three; **Import / Export** is listed for, and opens to, only a holder of
-`pagebuilder.publish` or `pagebuilder.approve` (anyone else gets a 403). What you
-can *do* depends on three permissions:
+layout**, **Media library** and **Import / Export**. The first three are listed
+for, and open to, anyone holding at least one of the three permissions below:
+reading a draft, its revisions, the site layout or the media library needs one,
+and a signed-in user with none of them gets a 403 (#346). **Import / Export** is
+listed for, and opens to, only a holder of `pagebuilder.publish` or
+`pagebuilder.approve`. What you can *do* depends on the three permissions:
 
 | Permission | Lets you |
 |---|---|
@@ -238,6 +240,19 @@ JPEG, PNG, GIF and WebP up to 10 MB are accepted by default; the file's contents
 must match its type. Each upload gets WebP thumbnails (320, 640, 1280 and 1920 px
 wide, never wider than the original) used for responsive images.
 
+Uploads are cleaned of camera metadata (#356): a JPEG, PNG or WebP is stored
+without its EXIF (GPS position, camera and serial number, capture time), XMP,
+IPTC or comments, turned upright if the camera recorded it sideways, with its
+colour profile kept; a phone's multi-picture JPEG keeps only its main picture.
+PNG and WebP files, animated ones included, lose only the metadata: the picture
+itself is kept exactly as uploaded, so nothing is lost in quality (a still WebP
+or 8-bit PNG that must be turned upright is the exception, re-saved once). Animated
+images are never turned, and GIFs are stored as uploaded. A file whose metadata
+cannot be removed is not uploaded at all, with a message saying so. An
+administrator can turn this off (`media_strip_metadata`) on a site that wants
+its photographs' copyright fields kept. It applies to new uploads only: files
+uploaded earlier keep whatever they carried until they are uploaded again.
+
 Browse by **Folders**, filter by **Search** (filename), **Type**, **Min KB** and
 **Max KB**. **Copy URL** copies an image's address (useful for **Social image**).
 **Details** opens the asset (`/pagebuilder/media/{id}`), where you set **Alt
@@ -363,6 +378,15 @@ scheme-less (relative or `#anchor`) address; an image loads only from `http`,
 `https` or a relative path. Anything else (`javascript:`, `data:`, a URL with a
 control character) stays visible as literal text. External links open in a new
 tab with `noopener`. No raw HTML is interpreted.
+
+Saving checks the same rule (#354): a page or a site layout whose text holds such
+a link, or any block whose link field (a button's, a menu entry's, a card's) holds
+one, is refused with an error naming the block and the field, for example *Block
+Button (Button-3), field href: 'javascript:…' is not an allowed link*. Use an
+`http(s)`, `mailto` or `tel` address, or a relative one (`/about`, `#top`). A link
+saved before this check renders as `#` (going nowhere) until the block is fixed.
+An **Iframe** or **Video** block's source must be an `http(s)` or relative
+address; any other renders as the empty block.
 
 Many other blocks' multi-line text fields accept the same inline syntax and
 lists; there, `#` headings render as bold paragraphs so the page's heading order

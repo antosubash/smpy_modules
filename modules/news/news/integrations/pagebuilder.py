@@ -32,16 +32,19 @@ unaffected — which is the whole point of the split.
 from __future__ import annotations
 
 import logging
+from collections.abc import Collection
 from functools import cache
 from typing import Any
 from urllib.parse import quote
 
+from simple_module_core.permissions import grants
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.core.constants import (
     PAGEBUILDER_EDITOR_PATH,
     PAGEBUILDER_MEDIA_PATH,
     PAGEBUILDER_PAGES_PATH,
+    PAGEBUILDER_READ_PERMISSIONS,
 )
 from news.core.tenancy import search_tenant
 
@@ -49,6 +52,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "available",
+    "may_read",
     "media_library_path",
     "page_editor_path",
     "page_search_path",
@@ -119,6 +123,16 @@ def page_search_path(query: str) -> str:
 
 
 # ── The two optional search sections ──────────────────────────────────
+
+
+def may_read(held: Collection[str]) -> bool:
+    """Whether a caller holding *held* may see pagebuilder's drafts and media.
+
+    Pagebuilder's own rule (#346): any one of its three permissions. A news
+    editor without one would otherwise find draft pages and the media library
+    here, behind links into screens that answer 403.
+    """
+    return any(grants(held, permission) for permission in PAGEBUILDER_READ_PERMISSIONS)
 
 
 async def search_pages(

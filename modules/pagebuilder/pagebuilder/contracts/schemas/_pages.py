@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field
 
+from pagebuilder.content.links import checked
 from pagebuilder.contracts.schemas._fields import (
     AwareInstant,
     OptionalNote,
@@ -16,6 +17,9 @@ from pagebuilder.core.locales import MAX_LOCALE_LEN
 from pagebuilder.models import PageStatus
 
 PuckData = dict[str, Any]
+# A document on its way in: every block link is on the allow-list, or a 422
+# naming the block and the field (#354, ``pagebuilder.content.links``).
+CheckedPuckData = Annotated[PuckData, AfterValidator(checked)]
 
 
 def _blank_to_none(value: Any) -> Any:
@@ -50,7 +54,7 @@ class PageCreate(BaseModel):
     canonical_url: str | None = Field(default=None, max_length=500)
     index_in_search: bool = True
     json_ld: dict[str, Any] | None = None
-    draft_data: PuckData = Field(default_factory=dict)
+    draft_data: CheckedPuckData = Field(default_factory=dict)
     publish_at: AwareInstant | None = None
     unpublish_at: AwareInstant | None = None
     parent_id: int | None = None
@@ -79,7 +83,7 @@ class PageUpdate(BaseModel):
     canonical_url: str | None = Field(default=None, max_length=500)
     index_in_search: bool | None = None
     json_ld: dict[str, Any] | None = None
-    draft_data: PuckData | None = None
+    draft_data: CheckedPuckData | None = None
     parent_id: int | None = None
     is_template: bool | None = None
 

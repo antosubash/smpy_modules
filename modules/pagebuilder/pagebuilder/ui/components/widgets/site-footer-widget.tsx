@@ -9,6 +9,7 @@ import type { ComponentConfig } from '@puckeditor/core';
 
 import { createImageField, mediaLibraryAdapter } from '../../fields';
 import { keys, translate, useT } from '../../utils/i18n';
+import { safeHref } from '../../utils/markdown-links';
 import { appendPages, useSiteNavPages } from './_internal/site-nav-context';
 
 export interface SiteFooterLink {
@@ -43,7 +44,7 @@ export function SiteFooterRender({
     <div className="gca-display bg-primary-800 px-6 py-16 text-white lg:py-20">
       <div className="mx-auto flex max-w-[1440px] flex-col items-center gap-10 lg:gap-16">
         <a
-          href={homeHref || '/'}
+          href={safeHref(homeHref, '/')}
           aria-label={logoAlt || t(keys.pagebuilder.blocks.site_footer.home)}
         >
           {logoUrl ? (
@@ -64,7 +65,7 @@ export function SiteFooterRender({
               <a
                 // biome-ignore lint/suspicious/noArrayIndexKey: author rows are not uniquely identified until filled in
                 key={index}
-                href={link.href || '#'}
+                href={safeHref(link.href)}
                 // The hover tint is a design-pack detail, not the brand action
                 // colour — it has to read against the dark block, which the
                 // configured brand colour is not guaranteed to do.

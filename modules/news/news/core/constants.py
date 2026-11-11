@@ -131,6 +131,14 @@ PUBLIC_STATS_MAX_COUNT: Final = 10_000
 PAGEBUILDER_EDITOR_PATH: Final = "/pagebuilder/{page_id}/edit"
 PAGEBUILDER_MEDIA_PATH: Final = "/pagebuilder/media"
 PAGEBUILDER_PAGES_PATH: Final = "/pagebuilder/?view=list&search={query}"
+# Holding any one of these opens pagebuilder's admin reads (pagebuilder #346),
+# so the search screen shows its Pages and Media sections only to such a caller.
+# Spelled as strings: news imports nothing of pagebuilder's outside its contracts.
+PAGEBUILDER_READ_PERMISSIONS: Final = (
+    "pagebuilder.edit",
+    "pagebuilder.publish",
+    "pagebuilder.approve",
+)
 
 MAX_CATEGORY_LEN: Final = 80
 # Bound on ``NewsArticle.locale``. Comfortably fits ``zh-Hant-HK``, and the same

@@ -136,19 +136,27 @@ async def _search_articles(
 
 
 async def search(
-    db: AsyncSession, q: str, *, include_drafts: bool = True, per_section: int = PER_SECTION
+    db: AsyncSession,
+    q: str,
+    *,
+    include_drafts: bool = True,
+    include_pagebuilder: bool = True,
+    per_section: int = PER_SECTION,
 ) -> SearchResults:
     """Search every section available. Empty ``q`` returns empty results.
 
     ``include_drafts`` follows the same rule as the article listing: only an
-    editor sees work that is not published yet.
+    editor sees work that is not published yet. ``include_pagebuilder`` is
+    ``False`` for a caller pagebuilder would refuse (#346): no Pages or Media
+    section, and no "see all" into its screens.
     """
     results = SearchResults(query=q)
     # Where each section's "see all" goes. Set here rather than at the end so
     # the shape is the same on the empty-query path. Both are "" without
     # pagebuilder, and the screen renders no link for an empty one.
-    results.pages_more_url = pagebuilder.page_search_path(q.strip())
-    results.media_more_url = pagebuilder.media_library_path()
+    if include_pagebuilder:
+        results.pages_more_url = pagebuilder.page_search_path(q.strip())
+        results.media_more_url = pagebuilder.media_library_path()
     if not q.strip():
         return results
 
@@ -156,7 +164,20 @@ async def search(
     await _search_articles(
         db, results, q, pattern, include_drafts=include_drafts, per_section=per_section
     )
+    if include_pagebuilder:
+        await _search_pagebuilder(db, results, q, pattern, include_drafts, per_section)
+    return results
 
+
+async def _search_pagebuilder(
+    db: AsyncSession,
+    results: SearchResults,
+    q: str,
+    pattern: str,
+    include_drafts: bool,
+    per_section: int,
+) -> None:
+    """The Pages and Media sections, where pagebuilder is installed."""
     # ── Pages (only where pagebuilder is installed) ───────────────────
     pages, results.page_total = await pagebuilder.search_pages(
         db, pattern, include_drafts=include_drafts, limit=per_section
@@ -186,5 +207,3 @@ async def search(
                 excerpt="",
             )
         )
-
-    return results

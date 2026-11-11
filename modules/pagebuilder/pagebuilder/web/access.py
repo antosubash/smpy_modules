@@ -15,7 +15,9 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import Depends, HTTPException, Request
+from simple_module_hosting.permissions import PermissionDenied, ensure_resolved_permissions
 
+from pagebuilder.core.permissions import PERM_EDIT, may_read
 from pagebuilder.web.csrf import share_csrf_token, verify_csrf_if_configured
 
 
@@ -48,6 +50,31 @@ async def require_user_if_configured(request: Request) -> Any:
     return await get_current_user_or_401(request)
 
 
+async def require_reader(request: Request) -> None:
+    """Refuse a signed-in user who holds no pagebuilder permission (#346).
+
+    Every admin read — the page list, a draft, its revisions, the site layout,
+    the media library, the draft preview — is gated here, once, for the whole
+    API and view routers, rather than per endpoint: a read added later is
+    covered without anyone remembering to. Any one of ``pagebuilder.edit``,
+    ``.publish`` or ``.approve`` is enough (:func:`may_read`); the writes keep
+    their own, stricter checks.
+
+    A request without a user is left to :func:`require_user_if_configured`,
+    which has already answered 401 when ``requires_auth`` is on. With it off
+    (an authenticating proxy in front) an anonymous request reads as before.
+
+    Deliberately not marked as a token permission gate: API tokens could not
+    reach these reads before, and this does not open them.
+    """
+    if getattr(request.state, "user", None) is None:
+        return
+    held = await ensure_resolved_permissions(request)
+    if not may_read(held):
+        # Named after the least of the three, the one an editor role grants.
+        raise PermissionDenied(PERM_EDIT)
+
+
 def build_admin_dependencies() -> list[Any]:
     """Dependencies applied to the API router.
 
@@ -58,8 +85,9 @@ def build_admin_dependencies() -> list[Any]:
     then the framework's CSRF check (403). The binding has to precede
     ``get_db``, which every router-level dependency does: the endpoint's own
     dependencies are resolved after these, so ``get_db`` commits inside the
-    tenant scope. The CSRF check also runs before any permission check, which
-    is an endpoint dependency.
+    tenant scope. The CSRF check also runs before any permission check: the
+    router-wide read gate (:func:`require_reader`) comes last, and the
+    per-endpoint permissions after it.
     """
     from pagebuilder.core.tenancy import bind_admin
 
@@ -67,6 +95,7 @@ def build_admin_dependencies() -> list[Any]:
         Depends(require_user_if_configured),
         Depends(bind_admin),
         Depends(verify_csrf_if_configured),
+        Depends(require_reader),
     ]
 
 
@@ -83,4 +112,5 @@ def build_view_dependencies() -> list[Any]:
         Depends(require_user_if_configured),
         Depends(bind_admin),
         Depends(share_csrf_token),
+        Depends(require_reader),
     ]

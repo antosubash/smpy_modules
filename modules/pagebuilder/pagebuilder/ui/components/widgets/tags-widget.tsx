@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '@puckeditor/core';
 import { keys, translate } from '../../utils/i18n';
+import { safeHref } from '../../utils/markdown-links';
 import { cn } from '../../utils/widgetUtils';
 import { renderRichText } from './_internal/rich-text';
 
@@ -58,7 +59,7 @@ export const TagsWidget: ComponentConfig<TagsWidgetProps> = {
             // biome-ignore lint/suspicious/noArrayIndexKey: author-ordered array with no stable id; card content repeats, so a content key collides
             <li key={idx}>
               <a
-                href={tag.href || '#'}
+                href={safeHref(tag.href)}
                 aria-current={tag.active ? 'page' : undefined}
                 className={cn(
                   'inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors',

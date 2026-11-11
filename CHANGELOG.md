@@ -5,6 +5,57 @@ name the module they affect.
 
 ## 0.0.16 (unreleased)
 
+### Security
+
+- **pagebuilder's admin reads need a pagebuilder permission** (#346). Signing in
+  used to be enough to read every draft, its revision history, the unpublished
+  site layout and the media library, over the API and on the screens (the
+  draft preview included), which on a host with self-registration or customer
+  accounts meant every customer. Now a signed-in user needs one of
+  `pagebuilder.edit`, `pagebuilder.publish` or `pagebuilder.approve`, and gets
+  `403 Permission required: pagebuilder.edit` otherwise. Pages, Site layout and
+  Media library leave the sidebar on the same condition. A signed-out request
+  answers as before. news' admin search shows its Pages and Media sections only
+  to such a reader too. **Upgrading:** give every account that edits the site
+  one of the pagebuilder roles (see "Roles" in
+  `modules/pagebuilder/docs/operations.md`); no migration is needed.
+- **pagebuilder refuses an unsafe block link on save** (#354). A page draft or
+  the site layout whose blocks carry a link outside `http`, `https`, `mailto`,
+  `tel` or a relative address (`javascript:`, `data:`, `vbscript:`, …), in any
+  `href`/`…Href` prop or a Markdown link in text, is a 422 naming the block and
+  the field. An `Iframe` or `Video` block's `src` may only be `http(s)` or
+  relative. An uploaded bundle is refused the same way. Every block now renders
+  its links through one helper, `safeHref` (frames through `safeFrameSrc`), so
+  a value stored earlier shows as `#` (a frame as the empty block). React and
+  the public CSP already kept such a link from running; this keeps it out of
+  the data other consumers read. A leading space no longer hides a scheme from
+  `isSafeHref`.
+- **pagebuilder strips camera metadata from uploads** (#356). A JPEG, PNG or
+  WebP original is stored without EXIF (GPS, device, serial, capture time), XMP,
+  IPTC or comments, its ICC profile kept; `size_bytes` is the cleaned file's. A
+  JPEG is re-saved with its own quantisation tables and its EXIF orientation
+  applied; a multi-picture JPEG (MPO, as phones save photos) keeps only its
+  primary picture, as a plain JPEG. A JPEG's segments are all checked, between
+  progressive scans too, and a JFIF or JFXX thumbnail counts as metadata.
+  Whatever follows a JPEG's end (a motion photo's video and trailer) goes too: a
+  JPEG with nothing else to remove is cut losslessly at its true end, found by
+  walking its markers, or re-saved when they do not lead to one (a truncated
+  file from a camera or scanner). A PNG or WebP is not re-encoded: its metadata
+  chunks are dropped and the compressed picture copied byte for byte, so a
+  16-bit PNG keeps its depth and a lossy WebP loses no quality. Only a still
+  WebP or 8-bit PNG with an EXIF orientation is turned and re-saved. Animated
+  PNG (APNG) and WebP are cleaned the same way, every frame kept and none
+  turned. GIF is stored untouched, and so is a file with nothing to remove. It
+  fails closed: a file that cannot be read, parsed or re-saved, or an animation
+  with a frame that does not decode, is refused with `415`
+  `image_metadata_not_removed` (the console says why), never stored with its
+  metadata; an animation whose frames total over ten times the pixel limit is a
+  `413`. The new setting `media_strip_metadata` (on by default) turns it off.
+  Not retroactive: files already in the library keep their metadata. The media
+  and snapshot settings moved to `pagebuilder.core.settings_media`
+  (`PagebuilderSettings` inherits them, so nothing changes for a caller), which
+  lists them first on the Settings screen.
+
 ### Fixed
 
 - **newsletter requires records, news and pagebuilder 0.0.16** (#333). Its
