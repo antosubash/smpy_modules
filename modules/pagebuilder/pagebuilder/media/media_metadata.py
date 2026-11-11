@@ -9,8 +9,10 @@ lossless, the compressed picture copied byte for byte), behind the
 ``media_strip_metadata`` setting. Whatever a JPEG carries after its image ends
 (a motion photo's video and trailer) goes too: a re-saved JPEG has none, and
 one with nothing else to remove is cut at its end
-(:mod:`~pagebuilder.media.media_jpeg`), losslessly. :func:`clean_bytes` is the same in memory,
-which is how a bundle's media is matched by the digest it would be stored with.
+(:mod:`~pagebuilder.media.media_jpeg`), losslessly, or re-saved when its
+markers do not lead to one (a truncated file Pillow still decodes).
+:func:`clean_bytes` is the same in memory, which is how a bundle's media is
+matched by the digest it would be stored with.
 
 An EXIF orientation other than 1 is applied by re-encoding: a JPEG, a static
 WebP (lossless stays lossless, lossy is re-encoded at quality 92) and an 8-bit
@@ -173,9 +175,14 @@ def clean_bytes(data: bytes, content_type: str) -> bytes | None:
                 image.load()  # fail closed on a PNG whose pixels do not decode
                 return _verified(media_png.strip_chunks(data))
             if not _has_metadata(image):
+                if fmt != "JPEG":
+                    return None
                 # Bytes after a JPEG's end (a motion photo's video and trailer)
                 # are metadata too: cut there, losslessly.
-                return _verified(media_jpeg.strip_trailer(data)) if fmt == "JPEG" else None
+                try:
+                    return _verified(media_jpeg.strip_trailer(data))
+                except media_jpeg.JpegStructureError:
+                    pass  # no proper end (a truncated camera file): re-saved below
             options = _save_options(image, fmt, data)
             quarter_turn = image.getexif().get(_EXIF_ORIENTATION, 1) in (5, 6, 7, 8)
             image.load()

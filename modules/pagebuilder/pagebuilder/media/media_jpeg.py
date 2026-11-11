@@ -10,7 +10,8 @@ length is skipped whole, so an ``FFD9`` inside one (an EXIF thumbnail in
 entropy-coded data is scanned, where ``FF00`` is a stuffed byte, ``FFD0`` to
 ``FFD7`` a restart marker and ``FFFF`` fill, and any other marker resumes the
 segment walk (a progressive JPEG has several scans). A file that does not walk
-cleanly to ``EOI`` is refused (:class:`JpegStructureError`).
+cleanly to ``EOI`` raises :class:`JpegStructureError`; the caller re-saves it
+instead (truncated files from cameras and scanners are common).
 """
 
 from __future__ import annotations

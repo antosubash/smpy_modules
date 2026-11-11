@@ -89,11 +89,20 @@ async def test_a_multi_picture_jpeg_with_a_trailer_keeps_only_its_first_picture(
         assert image.format == "JPEG"
 
 
-async def test_a_jpeg_whose_markers_do_not_walk_is_refused(db, tmp_path):
-    """No EOI before the junk: Pillow decodes it, but its end cannot be found."""
+async def test_a_jpeg_without_a_proper_end_is_re_saved(db, tmp_path):
+    """No EOI before the padding: its end cannot be found, but Pillow decodes it."""
     data = _clean_jpeg()[:-2] + b"\x00" * 512
     with Image.open(io.BytesIO(data)) as probe:
         probe.load()
+    asset, path = await _stored(_service(db, tmp_path), data, "image/jpeg", "old.jpg")
+    raw = path.read_bytes()
+    assert raw != data and not raw.endswith(b"\x00" * 16)
+    assert media_jpeg.image_end(raw) == len(raw)  # a fresh encode, ending at EOI
+    assert asset.size_bytes == len(raw)
+
+
+async def test_a_jpeg_neither_walk_nor_pillow_can_read_is_refused(db, tmp_path):
+    data = _clean_jpeg()[:-120]  # cut short inside the scan: Pillow refuses it
     service = _service(db, tmp_path)
     with pytest.raises(HTTPException) as refused:
         await service.upload(_upload(data, "image/jpeg", "bad.jpg"))
