@@ -74,14 +74,13 @@ def _stored_digest(blobs: BlobStore, sha256: str, content_type: str) -> str | No
 async def _wanted(
     entry: dict[str, Any], settings: PagebuilderSettings, blobs: BlobStore | None
 ) -> set[str]:
-    wanted = {entry.get("sha256")}
-    if settings.media_strip_metadata and blobs is not None and entry.get("sha256"):
-        stored = await asyncio.to_thread(
-            _stored_digest, blobs, entry["sha256"], entry.get("content_type", "")
-        )
-        wanted.add(stored)
-    wanted.discard(None)
-    return wanted  # type: ignore[return-value]
+    sha = entry.get("sha256")
+    wanted = {sha} if sha else set()
+    if sha and settings.media_strip_metadata and blobs is not None:
+        stored = await asyncio.to_thread(_stored_digest, blobs, sha, entry.get("content_type", ""))
+        if stored:
+            wanted.add(stored)
+    return wanted
 
 
 async def match_existing(

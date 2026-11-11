@@ -92,6 +92,7 @@ _BEFORE_PLTE = frozenset(
     {b"cHRM", b"gAMA", b"iCCP", b"sBIT", b"sRGB", b"cICP", b"mDCV", b"cLLI", b"pHYs", b"sPLT"}
 )
 _AFTER_PLTE = frozenset({b"tRNS", b"bKGD", b"hIST"})
+_CARRIED = _BEFORE_PLTE | _AFTER_PLTE
 
 
 def _chunk(kind: bytes, body: bytes) -> bytes:
@@ -117,7 +118,7 @@ def carry_chunks(original: bytes, rendered: bytes, *, swap_axes: bool) -> bytes:
     carried = {
         kind: chunk
         for kind, chunk in _chunks(original)
-        if kind in KEPT_ANCILLARY and kind in (_BEFORE_PLTE | _AFTER_PLTE)
+        if kind in _CARRIED
     }
     if swap_axes and b"pHYs" in carried:
         carried[b"pHYs"] = _swapped_phys(carried[b"pHYs"])

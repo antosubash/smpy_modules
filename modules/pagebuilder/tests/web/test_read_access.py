@@ -9,13 +9,11 @@ every screen, and a signed-out one still gets the 401 it always got.
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 from pagebuilder.core.permissions import PERM_APPROVE, PERM_EDIT, PERM_PUBLISH
 from simple_module_hosting.permissions import PERMISSION_DENIED_PREFIX
 
-from tests.support.app import _build_app, _client_for
+from tests.support.app import _build_app, _client_for, _regrant
 from tests.support.media_bytes import PNG
 
 pytestmark = pytest.mark.asyncio
@@ -74,16 +72,10 @@ async def _client(tmp_path, grants: list[str]):
                 "/api/pagebuilder/uploads", files={"file": ("a.png", PNG, "image/png")}
             )
             assert asset.status_code == 201, asset.text
-            _regrant(app, grants)
+            _regrant(app, _ROLE, grants)
             yield client, page.json()["id"], asset.json()["id"]
     finally:
         await cleanup()
-
-
-def _regrant(app: Any, grants: list[str]) -> None:
-    registry = app.state.sm.permissions
-    registry._role_map[_ROLE] = set(grants)
-    registry._invalidate()
 
 
 @pytest.mark.parametrize("grants", [[], ["news.edit"]])

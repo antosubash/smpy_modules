@@ -9,12 +9,10 @@ being offered Restore, Delete, Upload or Take.
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 from pagebuilder.core.permissions import PERM_APPROVE, PERM_EDIT, PERM_PUBLISH
 
-from tests.support.app import _build_app, _client_for
+from tests.support.app import _build_app, _client_for, _regrant
 
 pytestmark = pytest.mark.asyncio
 
@@ -46,16 +44,10 @@ async def _client(tmp_path, grants: list[str], *, seed: bool = False):
                 assert taken.status_code == 201, taken.text
                 staged = await client.post(f"{_SNAPSHOTS}/{taken.json()['id']}/restore")
                 assert staged.status_code == 201, staged.text
-                _regrant(app, grants)
+                _regrant(app, _ROLE, grants)
             yield client
     finally:
         await cleanup()
-
-
-def _regrant(app: Any, grants: list[str]) -> None:
-    registry = app.state.sm.permissions
-    registry._role_map[_ROLE] = set(grants)
-    registry._invalidate()
 
 
 @pytest.mark.parametrize("grants", [[], [PERM_EDIT]])

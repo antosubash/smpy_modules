@@ -76,7 +76,7 @@ async def test_a_webp_loses_exif_and_xmp_and_keeps_its_compression(db, tmp_path,
 
     raw = path.read_bytes()
     assert b"SecretCam" not in raw and b"GPSLatitude" not in raw
-    assert _webp_is_lossless(path) is lossless
+    assert _webp_is_lossless(path.read_bytes()) is lossless
     assert asset.size_bytes == path.stat().st_size
 
 

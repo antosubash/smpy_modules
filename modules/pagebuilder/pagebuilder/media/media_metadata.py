@@ -30,7 +30,11 @@ from typing import Any
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from pagebuilder.media import media_png
-from pagebuilder.media.media_images import TooManyPixelsError, is_animated
+from pagebuilder.media.media_images import (
+    TooManyPixelsError,
+    _exceeds_pixel_limit,
+    is_animated,
+)
 
 _FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP"}
 # Kept from ``Image.info``; everything else there (exif, xmp, comment, text
@@ -38,11 +42,11 @@ _FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP"}
 _KEPT_INFO = ("transparency",)
 # A lossy WebP, or a JPEG Pillow cannot re-encode with its own tables.
 _FALLBACK_QUALITY = 92
+_EXIF_ORIENTATION = 0x0112
 
 
-def _webp_is_lossless(source: bytes | Path) -> bool:
+def _webp_is_lossless(data: bytes) -> bool:
     """Whether the WebP's image chunk is ``VP8L``, walking the RIFF chunks."""
-    data = source.read_bytes() if isinstance(source, Path) else source
     offset = 12
     while offset + 8 <= len(data):
         tag = data[offset : offset + 4]
@@ -97,14 +101,9 @@ def _has_metadata(image: Image.Image) -> bool:
     return bool(getattr(image, "text", None))  # PNG tEXt/iTXt/zTXt chunks
 
 
-def _exceeds_pixel_limit(image: Image.Image) -> bool:
-    limit = Image.MAX_IMAGE_PIXELS
-    return limit is not None and image.size[0] * image.size[1] > limit
-
-
 def _png_turns(image: Image.Image, data: bytes) -> bool:
     """Whether an 8-bit PNG carries an orientation to apply by re-saving it."""
-    return image.getexif().get(0x0112, 1) != 1 and media_png.bit_depth(data) <= 8
+    return image.getexif().get(_EXIF_ORIENTATION, 1) != 1 and media_png.bit_depth(data) <= 8
 
 
 def _verified(cleaned: bytes | None) -> bytes | None:
@@ -132,7 +131,7 @@ def clean_bytes(data: bytes, content_type: str) -> bytes | None:
         return None
     try:
         with Image.open(io.BytesIO(data)) as image:
-            if _exceeds_pixel_limit(image):
+            if _exceeds_pixel_limit(*image.size):
                 raise TooManyPixelsError(f"{image.size} exceeds Image.MAX_IMAGE_PIXELS")
             if image.format == "MPO":
                 image.seek(0)
@@ -144,7 +143,7 @@ def clean_bytes(data: bytes, content_type: str) -> bytes | None:
             if not _has_metadata(image):
                 return None
             options = _save_options(image, fmt, data)
-            quarter_turn = image.getexif().get(0x0112, 1) in (5, 6, 7, 8)
+            quarter_turn = image.getexif().get(_EXIF_ORIENTATION, 1) in (5, 6, 7, 8)
             image.load()
             # In place, so a JPEG stays a JPEG image and "keep" can read its tables.
             ImageOps.exif_transpose(image, in_place=True)

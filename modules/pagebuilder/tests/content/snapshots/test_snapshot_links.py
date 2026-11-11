@@ -7,38 +7,22 @@ page's draft or published data, or in the layout, is refused at upload. The
 
 from __future__ import annotations
 
-import io
 import json
-import zipfile
 
 import pytest
 from pagebuilder.content.links import UnsafeLinkError, check_links
 from pagebuilder.content.snapshots.archive import BundleError, read_zip
 from pagebuilder.content.snapshots.blobs import BlobStore
 
-
-def _bundle(files: dict[str, bytes]) -> bytes:
-    base = {
-        "manifest.json": json.dumps({"format_version": 1}).encode(),
-        "media/index.json": b"{}",
-    }
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w") as archive:
-        for name, data in (base | files).items():
-            archive.writestr(name, data)
-    return buffer.getvalue()
+from tests.support.archive import _minimal, _page, _zip
 
 
 def _doc(href: str) -> dict:
     return {"content": [{"type": "Button", "props": {"id": "B-1", "href": href}}]}
 
 
-def _page(**data: dict) -> bytes:
-    return json.dumps({"slug": "home", "status": "draft", **data}).encode()
-
-
 def _read(tmp_path, files: dict[str, bytes]) -> None:
-    read_zip(_bundle(files), tmp_path / "out", BlobStore(tmp_path / "blobs"))
+    read_zip(_zip(_minimal() | files), tmp_path / "out", BlobStore(tmp_path / "blobs"))
 
 
 @pytest.mark.parametrize("field", ["draft_data", "published_data"])

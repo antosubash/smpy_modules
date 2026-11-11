@@ -152,7 +152,7 @@ export function MediaObjectText({
         <div className="pt-2">
           <CTAButton
             label={linkLabel}
-            href={safeHref(linkHref)}
+            href={linkHref}
             variant={isDark ? 'inverse-outline' : 'secondary'}
           />
         </div>

@@ -25,6 +25,7 @@ from simple_module_core.permissions import PermissionRegistry
 from simple_module_inertia import InertiaConfig, inertia_dependency_factory
 from starlette.middleware.sessions import SessionMiddleware
 
+from tests.support.media_bytes import PNG
 from tests.support.stub_auth import _stub_user, _StubAuthMiddleware
 
 _SESSION_SECRET = "pagebuilder-tests-secret"
@@ -33,11 +34,7 @@ _SESSION_SECRET = "pagebuilder-tests-secret"
 # A real 1x1 PNG with no metadata. Real bytes matter since #356: with
 # ``media_strip_metadata`` on, a file Pillow cannot read is refused rather than
 # stored, and a clean one is stored byte for byte.
-PNG_BYTES = bytes.fromhex(
-    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
-    "890000000d49444154789c6360606060000000050001a5f64540000000004945"
-    "4e44ae426082"
-)
+PNG_BYTES = PNG
 
 
 async def _build_app(
@@ -175,3 +172,10 @@ async def _client_fixture(
             yield c
     finally:
         await cleanup()
+
+
+def _regrant(app: Any, role: str, grants: list[str]) -> None:
+    """Replace what *role* holds, live, on an app built by :func:`_build_app`."""
+    registry = app.state.sm.permissions
+    registry._role_map[role] = set(grants)
+    registry._invalidate()

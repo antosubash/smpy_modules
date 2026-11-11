@@ -135,7 +135,6 @@ def may_read(held: Collection[str]) -> bool:
     return any(grants(held, permission) for permission in PAGEBUILDER_READ_PERMISSIONS)
 
 
-
 async def search_pages(
     db: AsyncSession, pattern: str, *, include_drafts: bool, limit: int
 ) -> tuple[list[Any], int]:

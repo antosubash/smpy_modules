@@ -51,9 +51,7 @@ class UnsafeLinkError(ValueError):
     """A block carries a link outside the allow-list; the message names where."""
 
 
-def is_safe_href(
-    value: str, *, extra_schemes: Collection[str] = (), schemes: Collection[str] = SAFE_SCHEMES
-) -> bool:
+def is_safe_href(value: str, *, schemes: Collection[str] = SAFE_SCHEMES) -> bool:
     """Whether *value* may be written into ``<a href>`` (or, with *schemes*, a frame)."""
     if _CONTROL.search(value):
         return False
@@ -61,7 +59,7 @@ def is_safe_href(
     if scheme is None:
         return True
     name = scheme.group(1).lower()
-    return name in schemes or name in extra_schemes
+    return name in schemes
 
 
 def _is_link_key(key: str) -> bool:
@@ -119,8 +117,12 @@ def check_links(
     one; *label* prefixes the message (``"header_data: "``). *extra_schemes*
     admits a scheme only a caller knows about — a bundle's ``asset:`` sentinel.
     """
+    allowed = {
+        SAFE_SCHEMES: SAFE_SCHEMES | frozenset(extra_schemes),
+        FRAME_SCHEMES: FRAME_SCHEMES | frozenset(extra_schemes),
+    }
     for block, field, link, schemes in _walk(data, "root", ""):
-        if is_safe_href(link, extra_schemes=extra_schemes, schemes=schemes):
+        if is_safe_href(link, schemes=allowed[schemes]):
             continue
         shown = link if len(link) <= _SHOWN else f"{link[:_SHOWN]}…"
         raise UnsafeLinkError(
@@ -132,6 +134,5 @@ def check_links(
 
 def checked(data: Any) -> Any:
     """:func:`check_links` as a pydantic ``AfterValidator``: *data*, or a 422."""
-    if data is not None:
-        check_links(data)
+    check_links(data)
     return data
