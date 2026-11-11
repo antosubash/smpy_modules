@@ -93,3 +93,27 @@ async def test_without_the_blob_only_the_bundle_digest_matches(snapshot_db, tmp_
     index = _index(bundle)
     assert set(await match_existing(session, settings, index, blobs)) == set(index)
     assert await match_existing(session, settings, index, BlobStore(tmp_path / "empty")) == {}
+
+
+async def test_the_cleaned_digest_follows_the_sniffed_type_not_the_declared_one(
+    snapshot_db, tmp_path
+):
+    """The upload cleans what the bytes are; an index saying octet-stream must not hide it."""
+    from pagebuilder.media.media_metadata import clean_bytes
+
+    session, settings = snapshot_db.session, snapshot_db.settings
+    blobs = BlobStore(tmp_path / "blobs")
+    data = _geotagged_jpeg()
+    sha = blobs.put(data)
+    cleaned = clean_bytes(data, "image/jpeg")
+    assert cleaned is not None
+    root = resolve_media_root(settings.media_root) / "default"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "restored.jpg").write_bytes(cleaned)
+    session.add(MediaAsset(filename="restored.jpg", original_filename="photo.jpg",
+                           content_type="image/jpeg", size_bytes=len(cleaned)))
+    await session.flush()
+
+    index = {"photo.jpg": {"sha256": sha, "original_filename": "photo.jpg",
+                           "content_type": "application/octet-stream"}}
+    assert set(await match_existing(session, settings, index, blobs)) == {"photo.jpg"}

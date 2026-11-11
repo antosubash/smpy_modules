@@ -38,7 +38,11 @@ from sqlmodel import select
 from pagebuilder.content.snapshots.blobs import BlobStore
 from pagebuilder.core.settings import PagebuilderSettings
 from pagebuilder.media.media_files import resolve_media_root, tenant_media_dir
-from pagebuilder.media.media_images import TooManyPixelsError
+from pagebuilder.media.media_images import (
+    SNIFF_BYTES,
+    TooManyPixelsError,
+    sniff_content_type,
+)
 from pagebuilder.media.media_metadata import MetadataNotRemovedError, clean_bytes
 from pagebuilder.models import MediaAsset
 
@@ -62,10 +66,15 @@ def _digest_file(path: Path) -> str | None:
         return None
 
 
-def _stored_digest(blobs: BlobStore, sha256: str, content_type: str) -> str | None:
-    """sha256 of the bundle file as an upload would store it, if that differs."""
+def _stored_digest(blobs: BlobStore, sha256: str) -> str | None:
+    """sha256 of the bundle file as an upload would store it, if that differs.
+
+    Cleaned as the type its bytes sniff as, as the upload does, never the type
+    the bundle's index declares for it.
+    """
     try:
-        cleaned = clean_bytes(blobs.get(sha256), content_type)
+        data = blobs.get(sha256)
+        cleaned = clean_bytes(data, sniff_content_type(data[:SNIFF_BYTES]) or "")
     except (OSError, ValueError, MetadataNotRemovedError, TooManyPixelsError):
         return None  # the upload refuses it, or the blob is gone: nothing to match
     return hashlib.sha256(cleaned).hexdigest() if cleaned is not None else None
@@ -77,7 +86,7 @@ async def _wanted(
     sha = entry.get("sha256")
     wanted = {sha} if sha else set()
     if sha and settings.media_strip_metadata:
-        stored = await asyncio.to_thread(_stored_digest, blobs, sha, entry.get("content_type", ""))
+        stored = await asyncio.to_thread(_stored_digest, blobs, sha)
         if stored:
             wanted.add(stored)
     return wanted
