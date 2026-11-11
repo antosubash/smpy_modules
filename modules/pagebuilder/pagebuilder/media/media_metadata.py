@@ -110,10 +110,32 @@ def _png_turns(image: Image.Image, data: bytes) -> bool:
 _CHUNK_COPY = {"PNG": media_png.strip_chunks, "WEBP": media_webp.strip_chunks}
 
 
+# Pixels decoded across every frame of an animation, as a multiple of
+# ``Image.MAX_IMAGE_PIXELS`` (the per-frame limit uploads already enforce).
+_FRAME_PIXEL_BUDGET = 10
+
+
 def _verified(cleaned: bytes | None) -> bytes | None:
-    """*cleaned*, once Pillow has decoded it whole: never store an unreadable original."""
-    if cleaned is not None:
-        with Image.open(io.BytesIO(cleaned)) as image:
+    """*cleaned*, once Pillow has decoded every frame: never store an unreadable original.
+
+    An animation's frames are decoded one by one, so a broken later frame is
+    refused too. Raises :class:`TooManyPixelsError` once the frames together
+    exceed :data:`_FRAME_PIXEL_BUDGET` times the pixel limit, before decoding
+    the frame that would cross it.
+    """
+    if cleaned is None:
+        return None
+    limit = Image.MAX_IMAGE_PIXELS
+    budget = None if limit is None else limit * _FRAME_PIXEL_BUDGET
+    total = 0
+    with Image.open(io.BytesIO(cleaned)) as image:
+        # Every frame it claims, not until the first EOFError: a frame that
+        # ends early is refused (``clean_bytes`` catches it), not the end.
+        for index in range(getattr(image, "n_frames", 1)):
+            image.seek(index)
+            total += image.size[0] * image.size[1]
+            if budget is not None and total > budget:
+                raise TooManyPixelsError(f"frames exceed {budget} pixels in total")
             image.load()
     return cleaned
 
@@ -173,9 +195,10 @@ def clean_bytes(data: bytes, content_type: str) -> bytes | None:
             return _verified(out.getvalue())
     except Image.DecompressionBombError as exc:
         raise TooManyPixelsError(str(exc)) from exc
-    # Pillow reports some broken PNG chunks as ``SyntaxError``.
+    # Pillow reports some broken PNG chunks as ``SyntaxError``, and an
+    # animation frame that ends early as ``EOFError``.
     except (UnidentifiedImageError, OSError, ValueError, SyntaxError, struct.error,
-            IndexError) as exc:
+            IndexError, EOFError) as exc:
         raise MetadataNotRemovedError(str(exc)) from exc
 
 

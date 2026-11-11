@@ -41,9 +41,11 @@ name the module they affect.
   Only a still WebP or 8-bit PNG with an EXIF orientation is turned and
   re-saved. Animated PNG (APNG) and WebP are cleaned the same way, every frame
   kept and none turned. GIF is stored untouched, and so is a file with nothing
-  to remove. It fails closed: a file that cannot be read, parsed or re-saved
-  is refused with `415` `image_metadata_not_removed` (the console says why),
-  never stored with its metadata. The new setting `media_strip_metadata` (on
+  to remove. It fails closed: a file that cannot be read, parsed or re-saved,
+  or an animation with a frame that does not decode, is refused with `415`
+  `image_metadata_not_removed` (the console says why), never stored with its
+  metadata; an animation whose frames total over ten times the pixel limit is
+  a `413`. The new setting `media_strip_metadata` (on
   by default) turns it off. Not retroactive: files already in the library keep
   their metadata. The media and snapshot settings moved to
   `pagebuilder.core.settings_media` (`PagebuilderSettings` inherits them, so
