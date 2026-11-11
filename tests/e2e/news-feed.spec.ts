@@ -183,16 +183,30 @@ test.describe('News feed block', () => {
       viewAllLabel: 'All news',
       viewAllHref: './news',
     });
-    const unsafe = await publishFeedPage(page, '', {
-      viewAllLabel: 'All news',
-      viewAllHref: 'javascript:alert(1)',
-    });
-
     await page.goto(`/p/${safe}`);
     await expect(page.getByRole('link', { name: 'All news' })).toHaveAttribute('href', './news');
 
-    await page.goto(`/p/${unsafe}`);
-    await expect(page.getByRole('heading', { name: 'Latest' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'All news' })).toHaveCount(0);
+    // An unsafe target never reaches the page: saving it is refused (#354). The
+    // renderer's own check for content stored before that is feedProps.test.ts.
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
+    const refused = await page.request.post('/api/pagebuilder/pages', {
+      headers,
+      data: {
+        title: 'Newsroom',
+        slug: uniqueSlug('e2e-feed'),
+        draft_data: {
+          root: { props: { title: 'Newsroom', width: 'full' } },
+          content: [
+            {
+              type: 'NewsFeed',
+              props: { id: 'feed', viewAllLabel: 'All news', viewAllHref: 'javascript:alert(1)' },
+            },
+          ],
+          zones: {},
+        },
+      },
+    });
+    expect(refused.status()).toBe(422);
+    expect(await refused.text()).toContain('viewAllHref');
   });
 });
