@@ -27,7 +27,9 @@ def _string_constants(tree: ast.Module) -> Iterator[tuple[str, str]]:
                 yield target.id, value.value
 
 
-def _import_module_targets(tree: ast.Module, constants: dict[str, set[str]]) -> Iterator[str]:
+def _import_module_targets(
+    tree: ast.Module, constants: dict[str, set[str]], skip: set[int]
+) -> Iterator[str]:
     """String targets of ``import_module(...)`` / ``__import__(...)`` calls.
 
     A literal argument, or a constant bound to one anywhere in the package,
@@ -37,7 +39,7 @@ def _import_module_targets(tree: ast.Module, constants: dict[str, set[str]]) -> 
     """
     local = dict(_string_constants(tree))
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Call) or not node.args:
+        if id(node) in skip or not isinstance(node, ast.Call) or not node.args:
             continue
         func = node.func
         name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
@@ -87,7 +89,8 @@ def scan(package_dir: Path) -> tuple[_Record, ...]:
                 found.append((path, node.module, tuple(a.name for a in node.names), True))
             elif isinstance(node, ast.Import):
                 found.extend((path, alias.name, (), False) for alias in node.names)
-        found.extend((path, t, (), False) for t in _import_module_targets(tree, constants))
+        targets = _import_module_targets(tree, constants, type_only)
+        found.extend((path, target, (), False) for target in targets)
     return tuple(found)
 
 

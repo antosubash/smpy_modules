@@ -112,14 +112,17 @@ def _next_releases(newest: Version) -> set[Version]:
 def _ref(floor: Version, tags: set[Version]) -> str | None:
     """The tag a floor names, the working tree for the release being prepared, else None.
 
-    Only the next patch, minor or major counts as "being prepared": a floor of
-    0.0.60 while 0.0.15 is the newest tag is a typo that would make the module
-    uninstallable, not a release the working tree stands for.
+    Only the next patch, minor or major after the newest stable tag counts as
+    "being prepared", a prerelease of one included (``0.0.16rc1``, and ``0.0.16``
+    once that rc is tagged): a floor of 0.0.60 while 0.0.15 is the newest tag is
+    a typo that would make the module uninstallable, not a release the working
+    tree stands for.
     """
     if floor in tags:
         return f"v{floor}"
-    if floor in _next_releases(max(tags)):  # check() refuses an empty tag set first
-        return WORKTREE
+    stable = [t for t in tags if not t.is_prerelease] or list(tags)
+    if Version(floor.base_version) in _next_releases(max(stable)):
+        return WORKTREE  # check() refuses an empty tag set first
     return None
 
 

@@ -246,6 +246,25 @@ def test_a_floor_past_the_next_release_is_a_typo(tmp_path):
         assert (f"no release v{next_release} exists" in errors) == (next_release == "0.2.0")
 
 
+def test_a_prerelease_of_the_next_release_is_being_prepared(tmp_path):
+    root, _, mail = _repo(tmp_path)
+    pyproject = mail.parent / "pyproject.toml"
+    pyproject.write_text(pyproject.read_text().replace(">=0.0.1", ">=0.0.2rc1"))
+    assert check.check(root) == []
+    _git(root, "tag", "v0.0.2rc1")
+    pyproject.write_text(pyproject.read_text().replace(">=0.0.2rc1", ">=0.0.2"))
+    assert check.check(root) == []
+
+
+def test_a_type_only_import_module_is_not_checked(tmp_path):
+    root, _, mail = _repo(tmp_path)
+    (mail / "use.py").write_text(
+        "import importlib\nfrom typing import TYPE_CHECKING\nif TYPE_CHECKING:\n"
+        '    importlib.import_module("sm_lists.contracts.later")\n'
+    )
+    assert check.check(root) == []
+
+
 def test_outside_a_clone_is_the_fetch_hint_not_a_traceback(tmp_path):
     assert "no v* release tags" in _errors(tmp_path)
 
