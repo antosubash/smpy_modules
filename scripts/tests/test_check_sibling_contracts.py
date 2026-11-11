@@ -91,6 +91,47 @@ def test_an_import_module_string_counts_as_an_import(tmp_path):
     assert "does not ship sm_lists.contracts.later" in _errors(root)
 
 
+def test_parent_package_and_exact_imports_count(tmp_path):
+    root, _, mail = _repo(tmp_path)
+    (mail / "use.py").write_text("from sm_lists import contracts\nimport sm_lists.contracts\n")
+    assert check.check(root) == []
+    (mail / "use.py").write_text("from sm_lists import contracts\ncontracts.basic\n")
+    assert check.check(root) == []
+
+
+def test_parent_package_import_of_an_unshipped_contracts_fails(tmp_path):
+    root, _, _ = _repo(tmp_path)
+    late = _module(root, "late", "sm_late")
+    (late / "contracts" / "__init__.py").unlink()
+    (late / "contracts").rmdir()
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "late without contracts")
+    _git(root, "tag", "v0.0.2")
+    (late / "contracts").mkdir()
+    (late / "contracts" / "__init__.py").write_text("")
+    user = _module(root, "user", "sm_user", deps='"simple_module_late>=0.0.2"')
+    (user / "use.py").write_text("from sm_late import contracts\n")
+    assert "v0.0.2 does not ship sm_late.contracts," in _errors(root)
+
+
+def test_type_checking_names_are_not_exports(tmp_path):
+    root, lists, mail = _repo(tmp_path)
+    (lists / "contracts" / "basic.py").write_text(
+        "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    from x import Model\n"
+        "def subscribers(): ...\n"
+    )
+    _git(root, "commit", "-qam", "typed")
+    _git(root, "tag", "-f", "v0.0.1")
+    (mail / "use.py").write_text("from sm_lists.contracts.basic import Model\n")
+    assert "does not ship sm_lists.contracts.basic.Model" in _errors(root)
+
+
+def test_a_string_that_is_not_imported_is_ignored(tmp_path):
+    root, _, mail = _repo(tmp_path)
+    (mail / "use.py").write_text('MESSAGE = "sm_lists.contracts.removed"\nprint(MESSAGE)\n')
+    assert check.check(root) == []
+
+
 def test_a_floor_above_the_newest_tag_is_checked_against_the_working_tree(tmp_path):
     root, lists, mail = _repo(tmp_path)
     (lists / "contracts" / "extra.py").write_text("X = 1\n")
