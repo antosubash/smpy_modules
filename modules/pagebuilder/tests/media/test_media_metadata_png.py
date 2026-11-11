@@ -176,3 +176,40 @@ def test_carrying_chunks_keeps_every_suggested_palette():
     kinds = [kind for kind, _ in media_png._chunks(carried)]
     assert kinds.count(b"sPLT") == 2
     assert carried.index(splt[0]) < carried.index(splt[1]) < carried.index(b"IDAT")
+
+
+async def test_a_bad_crc_on_a_dropped_chunk_only_drops_it(db, tmp_path):
+    """A corrupt tEXt is left out like any tEXt; only kept chunks must be sound."""
+    data = _rgb_png(after_idat=_bad_crc(b"tEXt", b"Comment\x00GPS 48.2N"))
+    with Image.open(io.BytesIO(data)) as probe:
+        probe.load()  # Pillow does not check a chunk after the image data
+    _asset, path = await _stored(_service(db, tmp_path), data, "image/png", "t.png")
+    cleaned = path.read_bytes()
+    assert b"GPS 48.2N" not in cleaned and b"Jane Example" not in cleaned
+    assert b"tEXt" not in [kind for kind, _ in media_png._chunks(cleaned)]
+
+
+async def test_a_re_saved_png_at_a_new_depth_drops_its_sample_scaled_chunks(db, tmp_path):
+    """4-bit grey comes back 8-bit: a 4-bit bKGD would be the wrong grey."""
+    exif = Image.Exif()
+    exif[ORIENTATION] = 6
+    gama = _chunk(b"gAMA", struct.pack(">I", 45455))
+    rows = b"".join(b"\x00" + b"\xf0\x0f" for _ in range(2))  # 4 px of 4 bits a row
+    original = (
+        media_png.PNG_SIGNATURE
+        + _chunk(b"IHDR", struct.pack(">IIBBBBB", 4, 2, 4, 0, 0, 0, 0))
+        + gama
+        + _chunk(b"sBIT", b"\x04")
+        + _chunk(b"eXIf", exif.tobytes().removeprefix(b"Exif\x00\x00"))
+        + _chunk(b"bKGD", struct.pack(">H", 15))
+        + _chunk(b"IDAT", zlib.compress(rows))
+        + _chunk(b"IEND", b"")
+    )
+    _asset, path = await _stored(_service(db, tmp_path), original, "image/png", "grey.png")
+    cleaned = path.read_bytes()
+    chunks = dict(media_png._chunks(cleaned))
+    assert chunks[b"IHDR"][16] == 8  # Pillow wrote it at 8 bits
+    assert b"bKGD" not in chunks and b"sBIT" not in chunks and b"eXIf" not in chunks
+    assert gama in cleaned  # not on the sample scale: still carried
+    with Image.open(path) as image:
+        assert image.size == (2, 4)

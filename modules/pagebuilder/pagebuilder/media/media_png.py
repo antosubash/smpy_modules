@@ -26,6 +26,9 @@ _BEFORE_PLTE = frozenset(
     {b"cHRM", b"gAMA", b"iCCP", b"sBIT", b"sRGB", b"cICP", b"mDCV", b"cLLI", b"pHYs", b"sPLT"}
 )
 _AFTER_PLTE = frozenset({b"tRNS", b"bKGD", b"hIST"})
+# Values on the scale of the IHDR bit depth and colour type: carried only when
+# Pillow wrote the same ones (a 4-bit grey PNG comes back 8-bit).
+_SAMPLE_SCALED = frozenset({b"tRNS", b"bKGD", b"sBIT", b"hIST"})
 _CARRIED = _BEFORE_PLTE | _AFTER_PLTE
 # APNG frame control and data: an animated PNG is cleaned by copying them as
 # they are (no orientation is applied to one).
@@ -36,7 +39,16 @@ class PngStructureError(ValueError):
     """The chunk stream is truncated or not a PNG."""
 
 
+def _kept(kind: bytes) -> bool:
+    return kind[:1].isupper() or kind in KEPT_ANCILLARY
+
+
 def _chunks(data: bytes):
+    """``(type, chunk)`` up to ``IEND``; a kept chunk with a bad CRC is refused.
+
+    A chunk that is dropped anyway is not checked: leaving it out cleans the
+    file whatever it holds, and the cleaned bytes are decoded whole after.
+    """
     if not data.startswith(PNG_SIGNATURE):
         raise PngStructureError("not a PNG")
     offset = len(PNG_SIGNATURE)
@@ -49,7 +61,7 @@ def _chunks(data: bytes):
         if end > len(data):
             raise PngStructureError(f"truncated {kind!r} chunk")
         (crc,) = struct.unpack(">I", data[end - 4 : end])
-        if zlib.crc32(data[offset + 4 : end - 4]) != crc:
+        if _kept(kind) and zlib.crc32(data[offset + 4 : end - 4]) != crc:
             raise PngStructureError(f"bad CRC in {kind!r} chunk")
         yield kind, data[offset:end]
         offset = end
@@ -77,8 +89,7 @@ def strip_chunks(data: bytes) -> bytes | None:
     dropped = False
     total = len(PNG_SIGNATURE)
     for kind, chunk in _chunks(data):
-        critical = kind[:1].isupper()
-        if critical or kind in KEPT_ANCILLARY:
+        if _kept(kind):
             kept.append(chunk)
             total += len(chunk)
         else:
@@ -98,6 +109,14 @@ def _swapped_phys(chunk: bytes) -> bytes:
     return _chunk(b"pHYs", struct.pack(">IIB", y, x, unit))
 
 
+def _format(chunks: list[tuple[bytes, bytes]]) -> bytes:
+    """IHDR's bit depth and colour type bytes."""
+    kind, chunk = chunks[0]
+    if kind != b"IHDR":
+        raise PngStructureError("IHDR is not the first chunk")
+    return chunk[16:18]
+
+
 def carry_chunks(original: bytes, rendered: bytes, *, swap_axes: bool) -> bytes:
     """*rendered* (a PNG Pillow wrote) with *original*'s kept ancillary chunks.
 
@@ -106,15 +125,21 @@ def carry_chunks(original: bytes, rendered: bytes, *, swap_axes: bool) -> bytes:
     rest. Every carried chunk of *original* replaces the rendered file's chunks
     of that type, every instance in its original order (``sPLT`` may repeat),
     placed where the spec requires; ``tRNS`` is the rendered one when Pillow
-    wrote it. *swap_axes* is a quarter turn: ``pHYs``' densities are exchanged
-    with the dimensions.
+    wrote it. When Pillow changed the bit depth or colour type, ``bKGD``,
+    ``sBIT``, ``hIST`` and the original ``tRNS`` are left out: their values
+    are on the old scale. *swap_axes* is a quarter turn: ``pHYs``' densities
+    are exchanged with the dimensions.
     """
     out = list(_chunks(rendered))
+    source = list(_chunks(original))
     rendered_trns = any(kind == b"tRNS" for kind, _ in out)
+    same_format = _format(source) == _format(out)
     carried = [
         (kind, _swapped_phys(chunk) if swap_axes and kind == b"pHYs" else chunk)
-        for kind, chunk in _chunks(original)
-        if kind in _CARRIED and not (kind == b"tRNS" and rendered_trns)
+        for kind, chunk in source
+        if kind in _CARRIED
+        and not (kind == b"tRNS" and rendered_trns)
+        and (same_format or kind not in _SAMPLE_SCALED)
     ]
     replaced = {kind for kind, _ in carried}
     before = [chunk for kind, chunk in carried if kind in _BEFORE_PLTE]
