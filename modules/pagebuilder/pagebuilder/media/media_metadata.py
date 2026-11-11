@@ -136,6 +136,7 @@ def clean_bytes(data: bytes, content_type: str) -> bytes | None:
             if not _has_metadata(image):
                 return None
             options = _save_options(image, fmt, data)
+            quarter_turn = image.getexif().get(0x0112, 1) in (5, 6, 7, 8)
             image.load()
             # In place, so a JPEG stays a JPEG image and "keep" can read its tables.
             ImageOps.exif_transpose(image, in_place=True)
@@ -149,6 +150,10 @@ def clean_bytes(data: bytes, content_type: str) -> bytes | None:
                 options.update(quality=_FALLBACK_QUALITY, subsampling=-1)
                 out = io.BytesIO()
                 image.save(out, **options)
+            if fmt == "PNG":
+                # Pillow kept only ICC and transparency: put the gamma,
+                # chromaticities, sRGB intent and the rest back.
+                return media_png.carry_chunks(data, out.getvalue(), swap_axes=quarter_turn)
             return out.getvalue()
     except Image.DecompressionBombError as exc:
         raise TooManyPixelsError(str(exc)) from exc

@@ -16,6 +16,7 @@ provenance manifest.
 from __future__ import annotations
 
 import struct
+import zlib
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
@@ -80,3 +81,59 @@ def strip_chunks(data: bytes) -> bytes | None:
     if not dropped and total == len(data):
         return None
     return b"".join(kept)
+
+
+# Where a carried chunk goes (PNG spec, chunk ordering): before PLTE and IDAT,
+# or after PLTE and before IDAT.
+_BEFORE_PLTE = frozenset(
+    {b"cHRM", b"gAMA", b"iCCP", b"sBIT", b"sRGB", b"cICP", b"mDCV", b"cLLI", b"pHYs", b"sPLT"}
+)
+_AFTER_PLTE = frozenset({b"tRNS", b"bKGD", b"hIST"})
+
+
+def _chunk(kind: bytes, body: bytes) -> bytes:
+    return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
+
+
+def _swapped_phys(chunk: bytes) -> bytes:
+    """``pHYs`` with its x and y pixel densities exchanged, for a quarter turn."""
+    x, y, unit = struct.unpack(">IIB", chunk[8:17])
+    return _chunk(b"pHYs", struct.pack(">IIB", y, x, unit))
+
+
+def carry_chunks(original: bytes, rendered: bytes, *, swap_axes: bool) -> bytes:
+    """*rendered* (a PNG Pillow wrote) with *original*'s kept ancillary chunks.
+
+    Pillow keeps only the ICC profile and transparency of what it was given, so
+    a re-saved PNG would lose its gamma, chromaticities, sRGB intent and the
+    rest. Every :data:`KEPT_ANCILLARY` chunk of *original* replaces the
+    rendered file's chunk of the same type, placed where the spec requires;
+    ``tRNS`` is the rendered one when Pillow wrote it. *swap_axes* is a quarter
+    turn: ``pHYs``' densities are exchanged with the dimensions.
+    """
+    carried = {
+        kind: chunk
+        for kind, chunk in _chunks(original)
+        if kind in KEPT_ANCILLARY and kind in (_BEFORE_PLTE | _AFTER_PLTE)
+    }
+    if swap_axes and b"pHYs" in carried:
+        carried[b"pHYs"] = _swapped_phys(carried[b"pHYs"])
+    out = list(_chunks(rendered))
+    if any(kind == b"tRNS" for kind, _ in out):
+        carried.pop(b"tRNS", None)
+    out = [(kind, chunk) for kind, chunk in out if kind not in carried]
+    before = [chunk for kind, chunk in carried.items() if kind in _BEFORE_PLTE]
+    after = [chunk for kind, chunk in carried.items() if kind in _AFTER_PLTE]
+    result = [PNG_SIGNATURE]
+    for kind, chunk in out:
+        if kind == b"IDAT" and before is not None:
+            result += before + after
+            before = after = None  # type: ignore[assignment]
+        elif kind == b"PLTE" and before is not None:
+            result += before
+            before = []
+        result.append(chunk)
+        if kind == b"PLTE":
+            result += after
+            after = []
+    return b"".join(result)

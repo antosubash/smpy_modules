@@ -241,3 +241,41 @@ async def test_a_png_without_metadata_chunks_is_left_byte_for_byte(db, tmp_path)
     original = buf.getvalue()
     _asset, path = await _stored(_service(db, tmp_path), original, "image/png", "p.png")
     assert path.read_bytes() == original
+
+
+async def test_a_turned_8_bit_png_keeps_its_colour_chunks(db, tmp_path):
+    """Orientation 6 is applied, and gAMA, cHRM, sRGB and pHYs survive the re-save."""
+    exif = Image.Exif()
+    exif[ORIENTATION] = 6
+    exif_body = exif.tobytes().removeprefix(b"Exif\x00\x00")
+    gama = _chunk(b"gAMA", struct.pack(">I", 45455))
+    chrm = _chunk(b"cHRM", struct.pack(">8I", 31270, 32900, 64000, 33000, 30000, 60000,
+                                       15000, 6000))
+    srgb = _chunk(b"sRGB", b"\x00")
+    rows = b"".join(b"\x00" + (b"\xff\x00\x00" * 2 + b"\x00\x00\xff" * 2) for _ in range(2))
+    original = (
+        media_png.PNG_SIGNATURE
+        + _chunk(b"IHDR", struct.pack(">IIBBBBB", 4, 2, 8, 2, 0, 0, 0))
+        + chrm + gama + srgb
+        + _chunk(b"pHYs", struct.pack(">IIB", 100, 200, 1))
+        + _chunk(b"eXIf", exif_body)
+        + _chunk(b"tEXt", b"Author\x00Jane Example")
+        + _chunk(b"IDAT", zlib.compress(rows))
+        + _chunk(b"IEND", b"")
+    )
+    with Image.open(io.BytesIO(original)) as probe:
+        assert probe.getexif()[ORIENTATION] == 6
+
+    _asset, path = await _stored(_service(db, tmp_path), original, "image/png", "turn.png")
+    cleaned = path.read_bytes()
+    kinds = [kind for kind, _ in media_png._chunks(cleaned)]
+    assert b"eXIf" not in kinds and b"tEXt" not in kinds
+    for chunk in (gama, chrm, srgb):
+        assert chunk in cleaned
+    # Densities swap with the axes; colour chunks come before the image data.
+    assert _chunk(b"pHYs", struct.pack(">IIB", 200, 100, 1)) in cleaned
+    assert kinds.index(b"gAMA") < kinds.index(b"IDAT")
+    with Image.open(path) as image:
+        assert image.size == (2, 4)
+        assert image.convert("RGB").getpixel((0, 0)) == (255, 0, 0)  # left half now on top
+        assert image.convert("RGB").getpixel((0, 3)) == (0, 0, 255)
