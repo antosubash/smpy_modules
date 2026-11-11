@@ -244,11 +244,14 @@ Uploads are cleaned of camera metadata (#356): a JPEG, PNG or WebP is stored
 without its EXIF (GPS position, camera and serial number, capture time), XMP,
 IPTC or comments, turned upright if the camera recorded it sideways, with its
 colour profile kept; a phone's multi-picture JPEG keeps only its main picture.
-Animated images are stored as uploaded. A file whose metadata cannot be removed
-is not uploaded at all, with a message saying so. An administrator
-can turn this off (`media_strip_metadata`) on a site that wants its photographs'
-copyright fields kept. It applies to new uploads only: files uploaded earlier
-keep whatever they carried until they are uploaded again.
+PNG and WebP files, animated ones included, lose only the metadata: the picture
+itself is kept exactly as uploaded, so nothing is lost in quality (a still WebP
+or PNG that must be turned upright is the exception, re-saved once). Animated
+images are never turned, and GIFs are stored as uploaded. A file whose metadata
+cannot be removed is not uploaded at all, with a message saying so. An
+administrator can turn this off (`media_strip_metadata`) on a site that wants
+its photographs' copyright fields kept. It applies to new uploads only: files
+uploaded earlier keep whatever they carried until they are uploaded again.
 
 Browse by **Folders**, filter by **Search** (filename), **Type**, **Min KB** and
 **Max KB**. **Copy URL** copies an image's address (useful for **Social image**).

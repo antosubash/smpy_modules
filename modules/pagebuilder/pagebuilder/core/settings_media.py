@@ -121,10 +121,12 @@ class MediaSettings(BaseSettings):
 
     A photo from a phone or camera carries GPS coordinates, the device and its
     serial number, the capture time and sometimes the owner's name, and the
-    original is published as uploaded. With this on, the upload is re-saved
-    without that metadata: its EXIF orientation is applied first, so the
-    picture does not turn sideways, and its ICC colour profile is kept.
-    Animated images (GIF, animated WebP or PNG) are stored untouched.
+    original is published as uploaded. With this on, the upload is stored
+    without that metadata: a PNG or WebP by copying its chunks without the
+    metadata ones (no re-encode, nothing lost), a JPEG by re-saving it. An
+    EXIF orientation is applied first, so the picture does not turn sideways,
+    and the ICC colour profile is kept. An animated PNG or WebP is cleaned the
+    same way but never turned; a GIF is stored untouched.
 
     Turn it off for a site that publishes photography and wants its copyright
     and camera fields kept. Applies to uploads made after the change; files

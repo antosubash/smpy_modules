@@ -223,9 +223,13 @@ Multipart: `file`, optional `folder`. Returns `MediaAssetRead`. The declared typ
 must be in `media_allowed_content_types` and match the sniffed magic bytes (415
 otherwise); over `media_max_bytes` is 413. Stored under a random name with the
 sniffed extension; WebP variants generated for each configured width below the
-original's. With `media_strip_metadata` on (the default) a JPEG, PNG or WebP is
-first cleaned of its EXIF, XMP and IPTC data (`size_bytes` is the cleaned file's),
-and one that cannot be cleaned is refused with `415` and
+original's. With `media_strip_metadata` on (the default) a JPEG, PNG or WebP,
+animated PNG and WebP included, is first cleaned of its EXIF, XMP and IPTC data
+(`size_bytes` is the cleaned file's): PNG and WebP by a chunk copy that keeps
+the compressed picture byte for byte, a JPEG (or a still WebP or 8-bit PNG
+with an EXIF orientation to apply) by re-saving it. One that cannot be cleaned,
+including a malformed PNG chunk stream or WebP RIFF container, is refused with
+`415` and
 `{"detail": {"code": "image_metadata_not_removed", "message": …}}`.
 
 ### One asset — all `pagebuilder.edit`
