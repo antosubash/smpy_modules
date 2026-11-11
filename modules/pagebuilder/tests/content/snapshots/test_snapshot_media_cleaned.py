@@ -79,8 +79,8 @@ async def test_restoring_a_metadata_bearing_bundle_twice_keeps_one_asset(snapsho
     assert await _src(session) == url
 
 
-async def test_without_the_blob_store_only_the_bundle_digest_matches(snapshot_db, tmp_path):
-    """The plan passes the store too; a caller that cannot is the old, strict match."""
+async def test_without_the_blob_only_the_bundle_digest_matches(snapshot_db, tmp_path):
+    """A store that lacks the blob cannot say how it would be stored: strict match."""
     session, settings = snapshot_db.session, snapshot_db.settings
     blobs = BlobStore(tmp_path / "blobs")
     await _seed(session, settings)
@@ -92,4 +92,4 @@ async def test_without_the_blob_store_only_the_bundle_digest_matches(snapshot_db
 
     index = _index(bundle)
     assert set(await match_existing(session, settings, index, blobs)) == set(index)
-    assert await match_existing(session, settings, index) == {}
+    assert await match_existing(session, settings, index, BlobStore(tmp_path / "empty")) == {}

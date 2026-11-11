@@ -72,11 +72,11 @@ def _stored_digest(blobs: BlobStore, sha256: str, content_type: str) -> str | No
 
 
 async def _wanted(
-    entry: dict[str, Any], settings: PagebuilderSettings, blobs: BlobStore | None
+    entry: dict[str, Any], settings: PagebuilderSettings, blobs: BlobStore
 ) -> set[str]:
     sha = entry.get("sha256")
     wanted = {sha} if sha else set()
-    if sha and settings.media_strip_metadata and blobs is not None:
+    if sha and settings.media_strip_metadata:
         stored = await asyncio.to_thread(_stored_digest, blobs, sha, entry.get("content_type", ""))
         if stored:
             wanted.add(stored)
@@ -87,7 +87,7 @@ async def match_existing(
     db: AsyncSession,
     settings: PagebuilderSettings,
     index: dict[str, Any],
-    blobs: BlobStore | None = None,
+    blobs: BlobStore,
 ) -> dict[str, MediaAsset]:
     """Map each bundle name to the live asset that genuinely holds its bytes.
 
@@ -127,7 +127,7 @@ async def preview_urls(
     db: AsyncSession,
     settings: PagebuilderSettings,
     rows: list[Any],
-    blobs: BlobStore | None = None,
+    blobs: BlobStore,
 ) -> dict[str, str]:
     """Bundle name → the URL it would resolve to on this host, for the plan.
 
