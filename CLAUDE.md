@@ -20,6 +20,12 @@ requirement on another module of this repo (news' `pagebuilder` extra) without
 a `>=` floor and a `# floor: <reason>` comment saying which change that version
 first shipped. It never compares the floor with the lockstep version, so raise
 the floor and its comment together when a module starts using something newer.
+`scripts/check_sibling_contracts.py` (also in `make lint` and CI) catches the
+contract case: every `<sibling>.contracts` module and name a module imports
+(an `import_module("…contracts…")` string included) must exist at tag
+`v<floor>`, or in the working tree for a floor that is the next patch, minor
+or major after the newest tag (the release being prepared; any other floor
+without a tag is an error). It needs the tags (`git fetch --tags`).
 
 **Migrations live in `host/migrations/versions/`, never in a module.** Modules
 ship SQLModel tables; each consuming host autogenerates its own revisions

@@ -81,7 +81,7 @@ pre-built UI, no Vite, no database service:
 ```bash
 make env                       # once: .env with generated secrets
 echo 'SM_USERS_BOOTSTRAP_EMAIL=admin@example.com' >> .env
-echo 'SM_USERS_BOOTSTRAP_PASSWORD=choose-one' >> .env
+echo "SM_USERS_BOOTSTRAP_PASSWORD=$(python3 -c 'import secrets; print(secrets.token_urlsafe(16))')" >> .env  # note it down
 docker compose up -d --build   # http://localhost:8090, first build ~2 min
 curl -fsS http://localhost:8090/health
 docker compose down            # -v also drops the data volumes
@@ -100,8 +100,9 @@ docker compose down            # -v also drops the data volumes
   `docker compose run --rm -e SMPY_MIGRATE_ON_START=1 host true`.
 - **Secrets** come from the env file, never the image: `SM_SECRET_KEY` and the
   two `SM_USERS_*_TOKEN_SECRET` keys, which production refuses to boot without.
-  A `.env` from before those keys were added to `.env.example` needs them added
-  (or regenerate it with `make env` after moving the old one aside).
+  `.env.example` carries no values for them; `make env` generates all three. A
+  `.env` written by hand needs them added (or regenerate it with `make env` after
+  moving the old one aside).
   `SMPY_ENV_FILE=path` picks a different file.
 - **Admin.** `SM_USERS_BOOTSTRAP_EMAIL` / `_PASSWORD` in the env file seed the
   first admin, on first start against an empty users table only.

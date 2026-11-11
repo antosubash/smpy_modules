@@ -10,7 +10,7 @@ root `.env` is the single source of truth (see CLAUDE.md).
 
 ## Prerequisites (once per checkout / worktree)
 - `uv`, Node + npm. A worktree needs its own installs — nothing is shared.
-- `make env` — creates `.env` from `.env.example` with a generated `SM_SECRET_KEY`
+- `make env` — creates `.env` from `.env.example` and appends generated `SM_SECRET_KEY` and `SM_USERS_*_TOKEN_SECRET` values (the example ships none)
   (SQLite at `host/app.db`; no Postgres needed).
 - `uv sync --all-packages --all-extras` (= `make install-py`), `npm ci`,
   `make sync-module-deps`, `make gen-pages`.

@@ -86,6 +86,13 @@ FAMILIES: tuple[Family, ...] = (
         ),
     ),
     Family(
+        "inline JSON-LD serialiser (TypeScript)",
+        (
+            Copy(f"{NEWS}/ui/utils/jsonLd.ts"),
+            Copy(f"{PB}/ui/utils/jsonLd.ts"),
+        ),
+    ),
+    Family(
         "CSRF token sharing (Python)",
         (
             Copy(f"{NEWS}/web/csrf.py"),

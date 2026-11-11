@@ -6,6 +6,7 @@ import type { PreviewInfo } from '../ui/components/public/PreviewBar';
 import { type PublicCopy, PublicShell } from '../ui/components/public/PublicShell';
 import { getPuckConfig } from '../ui/components/puckConfig';
 import type { SiteNav } from '../ui/components/widgets/_internal/site-nav-context';
+import { safeJsonLd } from '../ui/utils/jsonLd';
 
 /** One language this document also exists in, as the server resolved it. */
 interface Alternate {
@@ -36,18 +37,6 @@ interface Props {
   preview?: PreviewInfo | null;
   /** The frame's own strings, in this page's language. */
   copy?: PublicCopy | null;
-}
-
-// Inline JSON-LD as a string requires the document to be safe to embed
-// inside ``<script>...</script>``. ``JSON.stringify`` does not escape
-// the literal sequence ``</`` (or HTML comment openers), so a value like
-// ``"</script><script>alert(1)</script>"`` would break out. The replace
-// runs over keys and string values alike; ``<\/`` parses identically to
-// ``</`` in JSON, so the document round-trips through any consumer.
-function safeJsonLd(doc: Record<string, unknown>): string {
-  return JSON.stringify(doc)
-    .replace(/<\/(script)/gi, '<\\/$1')
-    .replace(/<!--/g, '<\\!--');
 }
 
 export default function PublicPage({
