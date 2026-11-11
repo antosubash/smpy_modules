@@ -8,8 +8,9 @@ and colour type: ``IDAT`` is copied byte for byte.
 Kept: every critical chunk (``IHDR``, ``PLTE``, ``IDAT``, ``IEND`` and any
 other whose type starts upper-case, which a decoder must understand) and the
 ancillary chunks listed in :data:`KEPT_ANCILLARY` (colour, transparency,
-physical size). Dropped: every other ancillary chunk — ``tEXt``, ``zTXt``,
-``iTXt``, ``eXIf``, ``tIME`` and anything private, such as an embedded
+physical size, and an animated PNG's ``acTL``, ``fcTL`` and ``fdAT``).
+Dropped: every other ancillary chunk — ``tEXt``, ``zTXt``, ``iTXt``,
+``eXIf``, ``tIME`` and anything private, such as an embedded
 provenance manifest.
 """
 

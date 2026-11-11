@@ -14,8 +14,8 @@ chunks of its own, where a metadata chunk could hide too: only its
 :data:`FRAME_KEPT` chunks are copied, and its size is rewritten. No other kept
 chunk nests any (``VP8X`` and ``ANIM`` are fixed-size headers, refused at any
 other size, and the rest are a bitstream or a colour profile). The ``VP8X``
-EXIF and XMP flags are cleared and the RIFF size rewritten. A lossy WebP loses
-nothing, static or animated. Anything that does not parse as a RIFF WebP,
+EXIF and XMP flags are cleared and the RIFF size rewritten. Nothing is re-encoded, so a
+lossy WebP loses nothing, static or animated. Anything that does not parse as a RIFF WebP,
 frames included, is refused (:class:`WebpStructureError`).
 """
 

@@ -153,7 +153,6 @@ async def preview_urls(
         row.bundle_name: {
             "sha256": row.sha256,
             "original_filename": row.original_filename,
-            "content_type": row.content_type,
         }
         for row in rows
     }

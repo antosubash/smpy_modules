@@ -230,7 +230,9 @@ the compressed picture byte for byte, a JPEG (or a still WebP or 8-bit PNG
 with an EXIF orientation to apply) by re-saving it. One that cannot be cleaned,
 including a malformed PNG chunk stream or WebP RIFF container, is refused with
 `415` and
-`{"detail": {"code": "image_metadata_not_removed", "message": …}}`.
+`{"detail": {"code": "image_metadata_not_removed", "message": …}}`. An image
+(or an animation whose frames together exceed ten times the limit) over
+`Image.MAX_IMAGE_PIXELS` is `413` `image_too_many_pixels`.
 
 ### One asset — all `pagebuilder.edit`
 

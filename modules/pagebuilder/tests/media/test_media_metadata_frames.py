@@ -90,6 +90,15 @@ async def test_frames_over_the_total_pixel_budget_are_refused(db, tmp_path, monk
     assert list(service.tenant_dir().iterdir()) == []
 
 
+async def test_frames_exactly_at_the_total_pixel_budget_are_stored(db, tmp_path, monkeypatch):
+    """Ten 100-pixel frames are the budget itself (ten times 100), not over it."""
+    data = _with_comment("PNG", _animation("PNG", frames=10))
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 100)
+    _asset, path = await _stored(_service(db, tmp_path), data, "image/png", "loop.png")
+    with Image.open(path) as image:
+        assert image.n_frames == 10
+
+
 def test_the_broken_frame_fixture_breaks_only_that_frame():
     """Guards the fixture: the CRC is valid, so only decoding can tell."""
     data = _broken_second_frame("PNG")

@@ -18,8 +18,8 @@ is never re-encoded: its chunks are copied and an orientation tag just goes.
 What is kept: the pixels, upright (EXIF orientation is applied first, since the
 tag that said how to turn them is going), the ICC colour profile, and a
 palette image's transparency. What is left alone entirely: GIF, and a file
-with nothing to remove. It fails closed: a file it should
-clean but cannot is refused, never stored with its metadata.
+with nothing to remove. It fails closed: a file it should clean but cannot is
+refused, never stored with its metadata.
 """
 
 from __future__ import annotations

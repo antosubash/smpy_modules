@@ -65,7 +65,9 @@ async def sidebar_items(request: Request) -> Iterable[MenuItem]:
     or approve (``require_publish_or_approve``).
     """
     if getattr(request.state, "user", None) is None:
-        return []
+        # No user: ``require_reader`` lets the request through (an authenticating
+        # proxy in front, ``requires_auth`` off), so the screens are offered as before.
+        return [PAGES, LAYOUT, MEDIA]
     held = await ensure_resolved_permissions(request)
     items = [PAGES, LAYOUT, MEDIA] if may_read(held) else []
     if may_use_import_export(held):

@@ -246,7 +246,7 @@ IPTC or comments, turned upright if the camera recorded it sideways, with its
 colour profile kept; a phone's multi-picture JPEG keeps only its main picture.
 PNG and WebP files, animated ones included, lose only the metadata: the picture
 itself is kept exactly as uploaded, so nothing is lost in quality (a still WebP
-or PNG that must be turned upright is the exception, re-saved once). Animated
+or 8-bit PNG that must be turned upright is the exception, re-saved once). Animated
 images are never turned, and GIFs are stored as uploaded. A file whose metadata
 cannot be removed is not uploaded at all, with a message saying so. An
 administrator can turn this off (`media_strip_metadata`) on a site that wants
