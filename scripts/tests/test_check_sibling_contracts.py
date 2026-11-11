@@ -256,6 +256,18 @@ def test_a_prerelease_of_the_next_release_is_being_prepared(tmp_path):
     assert check.check(root) == []
 
 
+def test_a_hyphenated_prerelease_tag_is_read_by_its_own_name(tmp_path):
+    root, lists, mail = _repo(tmp_path)
+    (lists / "contracts" / "extra.py").write_text("X = 1\n")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "rc")
+    _git(root, "tag", "v0.0.2-rc1")
+    (mail / "use.py").write_text("from sm_lists.contracts.extra import X\n")
+    pyproject = mail.parent / "pyproject.toml"
+    pyproject.write_text(pyproject.read_text().replace(">=0.0.1", ">=0.0.2rc1"))
+    assert check.check(root) == []
+
+
 def test_a_type_only_import_module_is_not_checked(tmp_path):
     root, _, mail = _repo(tmp_path)
     (mail / "use.py").write_text(

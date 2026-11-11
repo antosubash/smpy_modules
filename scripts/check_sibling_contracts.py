@@ -67,15 +67,16 @@ def _modules(root: Path) -> dict[str, Module]:
     return found
 
 
-def _tags(root: Path) -> set[Version]:
+def _tags(root: Path) -> dict[Version, str]:
+    """Release versions and the tag that spells each (``v0.0.16-rc1`` parses as 0.0.16rc1)."""
     listed = subprocess.run(
         ["git", "-C", str(root), "tag", "--list", "v*"], capture_output=True, text=True
     )
     out = listed.stdout.split() if listed.returncode == 0 else []  # not a clone: no tags
-    tags = set()
+    tags = {}
     for tag in out:
         try:
-            tags.add(Version(tag[1:]))
+            tags[Version(tag[1:])] = tag
         except InvalidVersion:
             continue
     return tags
@@ -109,7 +110,7 @@ def _next_releases(newest: Version) -> set[Version]:
             Version(f"{major + 1}.0.0")}
 
 
-def _ref(floor: Version, tags: set[Version]) -> str | None:
+def _ref(floor: Version, tags: dict[Version, str]) -> str | None:
     """The tag a floor names, the working tree for the release being prepared, else None.
 
     Only the next patch, minor or major after the newest stable tag counts as
@@ -119,7 +120,7 @@ def _ref(floor: Version, tags: set[Version]) -> str | None:
     tree stands for.
     """
     if floor in tags:
-        return f"v{floor}"
+        return tags[floor]
     stable = [t for t in tags if not t.is_prerelease] or list(tags)
     if Version(floor.base_version) in _next_releases(max(stable)):
         return WORKTREE  # check() refuses an empty tag set first
