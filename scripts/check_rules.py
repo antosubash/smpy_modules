@@ -22,6 +22,8 @@
    specifiers, so any lag rule would fail lint on an ordinary release. What it
    does is make nobody add or keep a floor without writing down why — news'
    ``>=0.0.8`` sat unexamined while the repo released up to 0.0.11.
+   ``check_sibling_contracts.py`` checks the floor itself for ``contracts``
+   imports (#333).
 
 The single-migration-head rule lives in ``check_migration_heads.py`` (#107).
 

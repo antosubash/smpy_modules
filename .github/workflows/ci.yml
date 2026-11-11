@@ -619,7 +619,11 @@ jobs:
     name: Repo checks (metadata, readmes, strings, file size)
     runs-on: ubuntu-latest
     steps:
+      # Full history and tags: check_sibling_contracts.py reads each sibling
+      # floor's release tag.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v10.3.3
@@ -653,6 +657,11 @@ jobs:
       # extra floors that carry a `# floor: <reason>` comment.
       - name: CLAUDE.md rules
         run: uv run python scripts/check_rules.py
+
+      # A sibling floor ships every <sibling>.contracts module and name its
+      # dependant imports (#333): checked at tag v<floor>.
+      - name: Sibling floors ship the contracts used
+        run: uv run python scripts/check_sibling_contracts.py
 
       # The 0.0.14 module-layout moves stay importable under their old paths
       # until 0.0.17 (#319). Stubs and tables match the generator, every

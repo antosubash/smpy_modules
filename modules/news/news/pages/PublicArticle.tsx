@@ -11,6 +11,7 @@ import { type ArticlePreviewState, PreviewBanner } from '../ui/components/Previe
 import { useDocumentLang } from '../ui/hooks/useDocumentLang';
 import { formatArticleDate } from '../ui/utils/api';
 import { useT } from '../ui/utils/i18n';
+import { safeJsonLd } from '../ui/utils/jsonLd';
 
 /** What a reader gets at `{public_route_prefix}/{slug}`.
  *
@@ -60,18 +61,6 @@ interface Props {
    *  handling. The banner is the only thing that differs, and the server
    *  omits this prop entirely on the public route. */
   preview?: ArticlePreviewState | null;
-}
-
-// Inline JSON-LD as a string requires the document to be safe to embed inside
-// ``<script>...</script>``. ``JSON.stringify`` does not escape the literal
-// sequence ``</`` (or HTML comment openers), so a value like
-// ``"</script><script>alert(1)</script>"`` would break out. The replace runs
-// over keys and string values alike; ``<\/`` parses identically to ``</`` in
-// JSON, so the document round-trips through any consumer.
-function safeJsonLd(doc: Record<string, unknown>): string {
-  return JSON.stringify(doc)
-    .replace(/<\/(script)/gi, '<\\/$1')
-    .replace(/<!--/g, '<\\!--');
 }
 
 /**

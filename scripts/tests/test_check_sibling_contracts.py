@@ -1,0 +1,135 @@
+"""A sibling floor must ship the contracts its dependant imports (#333)."""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import check_sibling_contracts as check
+
+REPO = Path(__file__).resolve().parents[2]
+
+
+def _git(root: Path, *args: str) -> None:
+    subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+        cwd=root, check=True, capture_output=True,
+    )
+
+
+def _module(root: Path, name: str, package: str, deps: str = "", extras: str = "") -> Path:
+    """A module whose package has an empty ``contracts``; *extras* is TOML under the table."""
+    d = root / "modules" / name
+    (d / package / "contracts").mkdir(parents=True, exist_ok=True)
+    (d / package / "__init__.py").write_text("")
+    (d / package / "contracts" / "__init__.py").write_text("")
+    (d / "pyproject.toml").write_text(
+        f'[project]\nname = "simple_module_{name}"\nversion = "0.0.2"\n'
+        f"dependencies = [{deps}]\n"
+        + (f"[project.optional-dependencies]\n{extras}\n" if extras else "")
+        + f'[project.entry-points.simple_module]\n{name} = "{package}.module:M"\n'
+    )
+    return d / package
+
+
+def _repo(tmp_path: Path) -> tuple[Path, Path, Path]:
+    """`lists` 0.0.1 ships contracts.basic; `contracts.extra` and `added` come after."""
+    root = tmp_path
+    _git(root, "init", "-q")
+    lists = _module(root, "lists", "sm_lists")
+    (lists / "contracts" / "basic.py").write_text("def subscribers():\n    pass\n")
+    mail = _module(root, "mail", "sm_mail", deps='"simple_module_lists>=0.0.1,<0.1"')
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "0.0.1")
+    _git(root, "tag", "v0.0.1")
+    return root, lists, mail
+
+
+def _errors(root: Path) -> str:
+    return "\n".join(check.check(root))
+
+
+def test_an_import_the_floor_release_ships_passes(tmp_path):
+    root, _, mail = _repo(tmp_path)
+    (mail / "use.py").write_text("from sm_lists.contracts.basic import subscribers\n")
+    assert check.check(root) == []
+
+
+def test_a_contract_module_newer_than_the_floor_fails(tmp_path):
+    root, lists, mail = _repo(tmp_path)
+    (lists / "contracts" / "extra.py").write_text("X = 1\n")
+    (mail / "use.py").write_text("from sm_lists.contracts.extra import X\n")
+    (mail / "more.py").write_text("import sm_lists.contracts.extra\n")
+    errors = _errors(root)
+    assert "v0.0.1 does not ship sm_lists.contracts.extra" in errors
+    assert "(and 1 more)" in errors
+
+
+def test_a_name_added_to_a_shipped_module_fails(tmp_path):
+    root, lists, mail = _repo(tmp_path)
+    (lists / "contracts" / "basic.py").write_text("def subscribers(): ...\ndef added(): ...\n")
+    (mail / "use.py").write_text("from sm_lists.contracts.basic import added, subscribers\n")
+    errors = check.check(root)
+    assert len(errors) == 1
+    assert "does not ship sm_lists.contracts.basic.added" in errors[0]
+
+
+def test_a_submodule_imported_from_its_package_is_found(tmp_path):
+    root, _, mail = _repo(tmp_path)
+    (mail / "use.py").write_text("from sm_lists.contracts import basic\n")
+    assert check.check(root) == []
+
+
+def test_an_import_module_string_counts_as_an_import(tmp_path):
+    root, _, mail = _repo(tmp_path)
+    (mail / "use.py").write_text(
+        'import importlib\n_C = "sm_lists.contracts.later"\nimportlib.import_module(_C)\n'
+    )
+    assert "does not ship sm_lists.contracts.later" in _errors(root)
+
+
+def test_a_floor_above_the_newest_tag_is_checked_against_the_working_tree(tmp_path):
+    root, lists, mail = _repo(tmp_path)
+    (lists / "contracts" / "extra.py").write_text("X = 1\n")
+    (mail / "use.py").write_text("from sm_lists.contracts.extra import X\n")
+    pyproject = mail.parent / "pyproject.toml"
+    pyproject.write_text(pyproject.read_text().replace(">=0.0.1", ">=0.0.2"))
+    assert check.check(root) == []
+    (mail / "use.py").write_text("from sm_lists.contracts.extra import Y\n")
+    assert "working tree does not ship sm_lists.contracts.extra.Y" in _errors(root)
+
+
+def test_an_untagged_floor_below_the_newest_tag_names_no_release(tmp_path):
+    root, _, mail = _repo(tmp_path)
+    _git(root, "tag", "v0.0.3")
+    pyproject = mail.parent / "pyproject.toml"
+    pyproject.write_text(pyproject.read_text().replace(">=0.0.1", ">=0.0.2"))
+    assert "no release v0.0.2 exists" in _errors(root)
+
+
+def test_an_extras_floor_is_checked(tmp_path):
+    root, _, _ = _repo(tmp_path)
+    opt = _module(root, "opt", "sm_opt", extras='x = ["simple_module_lists>=0.0.1"]')
+    (opt / "use.py").write_text("from sm_lists.contracts.later import X\n")
+    assert "'simple_module_lists>=0.0.1': v0.0.1 does not ship" in _errors(root)
+
+
+def test_tests_and_internals_are_not_checked(tmp_path):
+    root, _, mail = _repo(tmp_path)
+    (mail / "tests").mkdir()
+    (mail / "tests" / "test_x.py").write_text("from sm_lists.contracts.later import X\n")
+    (mail / "internal.py").write_text("from sm_lists.web import thing\n")
+    assert check.check(root) == []
+
+
+def test_no_tags_is_an_error_not_a_pass(tmp_path):
+    _git(tmp_path, "init", "-q")
+    _module(tmp_path, "lists", "sm_lists")
+    assert "no v* release tags" in _errors(tmp_path)
+
+
+def test_the_repo_passes():
+    assert check.check(REPO) == []

@@ -146,6 +146,7 @@ lint:
 	$(MAKE) typecheck
 	uv run python scripts/check_metadata.py
 	uv run python scripts/check_rules.py
+	uv run python scripts/check_sibling_contracts.py
 	uv run python scripts/moved_paths.py --check
 	uv run python scripts/check_readmes.py
 	uv run python scripts/check_hardcoded_strings.py
@@ -157,7 +158,7 @@ lint:
 env:
 	@test -f .env || (cp .env.example .env && \
 	  python3 -c "import pathlib, re, secrets; p=pathlib.Path('.env'); \
-	  p.write_text(re.sub('replace-me-with-a-generated-secret', lambda _: secrets.token_urlsafe(32), p.read_text()))" && \
+	  p.write_text(re.sub('change-me-in-production|dev-(reset|verify)-token-secret-change-me', lambda _: secrets.token_urlsafe(32), p.read_text()))" && \
 	  echo ".env created with generated secrets (SM_SECRET_KEY, SM_USERS_*_TOKEN_SECRET)")
 
 # First-party modules the host installs from PyPI that also live in the

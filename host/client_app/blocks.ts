@@ -16,7 +16,9 @@
  * NewsFeed) are built only when pagebuilder is. Nothing here needs excluding.
  *
  * A glob that matches nothing is not an error, so this is harmless in a host
- * whose modules contribute no blocks.
+ * whose modules contribute no blocks. The same silence is why the interpreter
+ * directory is `python3.*`: a fixed minor version would drop every installed
+ * module's blocks, without a word, on any other Python.
  */
 import.meta.glob('../../modules/*/*/puck-blocks.ts', { eager: true });
-import.meta.glob('../../.venv/lib/python3.12/site-packages/*/puck-blocks.ts', { eager: true });
+import.meta.glob('../../.venv/lib/python3.*/site-packages/*/puck-blocks.ts', { eager: true });

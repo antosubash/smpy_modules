@@ -3,7 +3,46 @@
 One version covers every package in this repo (releases are lockstep). Entries
 name the module they affect.
 
-## 0.0.15 (unreleased)
+## 0.0.16 (unreleased)
+
+### Fixed
+
+- **newsletter requires records, news and pagebuilder 0.0.16** (#333). Its
+  floors said 0.0.13, but the `contracts` modules it imports
+  (`sm_records.contracts.newsletter`, `.newsletter_admin`, `.newsletter_import`,
+  `news.contracts.articles`, `pagebuilder.contracts.cards`) are in no release
+  before this one, so a host with an older sibling installed kept it and
+  newsletter failed at boot with `ImportError`. `scripts/check_sibling_contracts.py`
+  (in `make lint` and CI) now fails when a sibling floor's release tag lacks a
+  contract module or name its dependant imports.
+- pagebuilder and news no longer send `public_csp` on a `304 Not Modified`
+  (#322). The browser merges a 304's headers into the cached page, so the
+  module's strict policy replaced the page's nonce-based one, and after
+  revalidation every script was blocked: a blank page in development, and in
+  production the nonce'd scripts and any `register_csp_sources` allowance. A
+  browser that already merged the old header keeps it until it next fetches
+  the page in full.
+- pagebuilder's roles `pagebuilder_editor`, `pagebuilder_publisher` and
+  `pagebuilder_approver` can be assigned in the users admin (#320). They were
+  mapped to permissions in code, but no `users_role` row existed for them, so
+  they never appeared in the role list. The demo host's revision `541bfbe29a28`
+  creates the missing rows. **Upgrading:** migrations belong to the host, so a
+  consuming host copies that revision into its own history; see "Roles" in
+  `modules/pagebuilder/docs/operations.md`.
+- pagebuilder and news emit valid JSON-LD for a document containing `<!--`
+  (#353). The escape was `<\!--`, and `\!` is not a JSON escape, so a strict
+  parser rejected the whole block. Every `<` is now written as `\u003c`.
+- The demo host's editor finds wheel-installed modules' blocks on any Python 3
+  version (#341). `host/client_app/blocks.ts` globbed `python3.12` only, and a
+  glob that matches nothing is silent. A host copied from this one should make
+  the same change.
+- `.env.example` ships the framework's own placeholder secrets (#352), so a
+  hand-copied file that keeps them refuses to boot outside development and
+  testing. Its own wording passed both framework checks, which would have run
+  production with a session key and token-signing keys published here.
+  `make env` still fills all three in.
+
+## 0.0.15
 
 ### Deprecated
 
@@ -25,20 +64,6 @@ name the module they affect.
   the real `core.locales` module again. In 0.0.14 it imported the data-only
   `locales/` directory as an empty namespace package, and the failure only showed
   later, as an `AttributeError` on `locales.is_default`.
-- pagebuilder and news no longer send `public_csp` on a `304 Not Modified`
-  (#322). The browser merges a 304's headers into the cached page, so the
-  module's strict policy replaced the page's nonce-based one, and after
-  revalidation every script was blocked: a blank page in development, and in
-  production the nonce'd scripts and any `register_csp_sources` allowance. A
-  browser that already merged the old header keeps it until it next fetches
-  the page in full.
-- pagebuilder's roles `pagebuilder_editor`, `pagebuilder_publisher` and
-  `pagebuilder_approver` can be assigned in the users admin (#320). They were
-  mapped to permissions in code, but no `users_role` row existed for them, so
-  they never appeared in the role list. The demo host's revision `541bfbe29a28`
-  creates the missing rows. **Upgrading:** migrations belong to the host, so a
-  consuming host copies that revision into its own history; see "Roles" in
-  `modules/pagebuilder/docs/operations.md`.
 
 ## 0.0.14
 
