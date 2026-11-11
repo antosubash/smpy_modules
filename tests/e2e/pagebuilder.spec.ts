@@ -192,4 +192,35 @@ test.describe('PageBuilder admin', () => {
       await page.request.delete(`/api/pagebuilder/pages/${id}`, { headers });
     }
   });
+
+  test('public JSON-LD escapes every "<" and still parses to the stored document (#353)', async ({
+    page,
+  }) => {
+    const slug = uniqueSlug('jsonld');
+    const doc = {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      name: '</script><script>window.__xss=1</script>',
+      comment: 'a <!-- b </SCRIPT> <b>bold</b> 中文 🎉',
+    };
+    const headers = await moduleCsrfHeader(page, '/pagebuilder/');
+    const res = await page.request.post('/api/pagebuilder/pages', {
+      headers,
+      data: { title: `JSON-LD ${slug}`, slug, draft_data: { content: [] }, json_ld: doc },
+    });
+    expect(res.status(), await res.text()).toBe(201);
+    const id = (await res.json()).id as number;
+    await page.request.post(`/api/pagebuilder/pages/${id}/publish`, { headers, data: {} });
+
+    await page.goto(`/p/${slug}`);
+    const script = page.locator('script[type="application/ld+json"]');
+    await expect(script).toHaveCount(1);
+    const text = (await script.textContent()) ?? '';
+    // "<\!--" was not valid JSON, so a strict parser dropped the whole block.
+    expect(text).not.toContain('<');
+    expect(JSON.parse(text)).toEqual(doc);
+    expect(await page.evaluate(() => (window as { __xss?: number }).__xss)).toBeUndefined();
+
+    await page.request.delete(`/api/pagebuilder/pages/${id}`, { headers });
+  });
 });
