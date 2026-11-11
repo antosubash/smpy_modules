@@ -14,8 +14,9 @@ top level there (or a submodule of that name). ``from sm_ai import
 contracts`` counts, and so does the string passed to
 ``importlib.import_module`` (directly or through a constant of the package),
 which is how an optional extra is loaded. Names bound only under
-``if TYPE_CHECKING:`` do not count as defined. A floor above the newest tag is
-the release being prepared, so it is checked against the working tree. A floor
+``if TYPE_CHECKING:`` do not count as defined. A floor that is the next patch, minor or
+major after the newest tag is the release being prepared, so it is checked
+against the working tree. A floor
 below the newest tag with no tag of its own names no release and fails.
 
 Only ``contracts`` imports are checked: another module's internals are not an
@@ -28,6 +29,7 @@ Needs the release tags (``git fetch --tags``; CI checks out with
 from __future__ import annotations
 
 import argparse
+import functools
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -35,7 +37,7 @@ from pathlib import Path
 
 import tomlkit
 from check_rules import _parse, _requirements
-from contract_imports import imports, top_level_names
+from contract_imports import forget_scan, imports, top_level_names
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
@@ -63,10 +65,10 @@ def _modules(root: Path) -> dict[str, Module]:
 
 
 def _tags(root: Path) -> set[Version]:
-    out = subprocess.run(
-        ["git", "-C", str(root), "tag", "--list", "v*"],
-        capture_output=True, text=True, check=True,
-    ).stdout.split()
+    listed = subprocess.run(
+        ["git", "-C", str(root), "tag", "--list", "v*"], capture_output=True, text=True
+    )
+    out = listed.stdout.split() if listed.returncode == 0 else []  # not a clone: no tags
     tags = set()
     for tag in out:
         try:
@@ -76,6 +78,7 @@ def _tags(root: Path) -> set[Version]:
     return tags
 
 
+@functools.cache
 def _read(root: Path, ref: str, rel: str) -> str | None:
     if ref == WORKTREE:
         path = root / rel
@@ -97,10 +100,22 @@ def _floor(req: Requirement) -> Version | None:
     return max(floors) if floors else None
 
 
+def _next_releases(newest: Version) -> set[Version]:
+    major, minor, patch = (*newest.release, 0, 0)[:3]
+    return {Version(f"{major}.{minor}.{patch + 1}"), Version(f"{major}.{minor + 1}.0"),
+            Version(f"{major + 1}.0.0")}
+
+
 def _ref(floor: Version, tags: set[Version]) -> str | None:
+    """The tag a floor names, the working tree for the release being prepared, else None.
+
+    Only the next patch, minor or major counts as "being prepared": a floor of
+    0.0.60 while 0.0.15 is the newest tag is a typo that would make the module
+    uninstallable, not a release the working tree stands for.
+    """
     if floor in tags:
         return f"v{floor}"
-    if floor > max(tags):  # check() refuses an empty tag set first
+    if floor in _next_releases(max(tags)):  # check() refuses an empty tag set first
         return WORKTREE
     return None
 
@@ -123,6 +138,8 @@ def _missing(root: Path, ref: str, base: str, module: str, names: tuple[str, ...
 
 
 def check(root: Path) -> list[str]:
+    forget_scan()
+    _read.cache_clear()  # one run reads each file once; a later run may see new tags or edits
     modules = _modules(root)
     tags = _tags(root)
     if not tags:
@@ -140,7 +157,7 @@ def check(root: Path) -> list[str]:
             where = f"{dependant.root.relative_to(root).as_posix()}: '{req}'"
             ref = _ref(floor, tags)
             if ref is None:
-                errors.append(f"{where}: no release v{floor} exists (no tag)")
+                errors.append(f"{where}: no release v{floor} exists (no tag, and not the next one)")
                 continue
             base = sibling.root.relative_to(root).as_posix()
             missing: dict[str, list[str]] = {}

@@ -658,7 +658,7 @@ jobs:
       - name: CLAUDE.md rules
         run: uv run python scripts/check_rules.py
 
-      # A sibling floor ships every <sibling>.contracts module and name its
+      # A sibling floor must ship every <sibling>.contracts module and name its
       # dependant imports (#333): checked at tag v<floor>.
       - name: Sibling floors ship the contracts used
         run: uv run python scripts/check_sibling_contracts.py

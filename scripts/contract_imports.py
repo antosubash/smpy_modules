@@ -7,6 +7,7 @@ itself reads as the rule: which floor, which ref, what is missing.
 from __future__ import annotations
 
 import ast
+import functools
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -52,9 +53,17 @@ def _import_module_targets(tree: ast.Module, constants: dict[str, set[str]]) -> 
             yield from constants.get(arg.id if isinstance(arg, ast.Name) else arg.attr, ())
 
 
-def imports(package_dir: Path, prefix: str) -> Iterator[tuple[Path, str, tuple[str, ...]]]:
-    """Yield (file, module, names) for each absolute import of *prefix* or below it."""
-    parent, _, leaf = prefix.rpartition(".")
+# (file, module, names, is "from module import names")
+_Record = tuple[Path, str, tuple[str, ...], bool]
+
+
+@functools.cache
+def _scan(package_dir: Path) -> tuple[_Record, ...]:
+    """Every absolute import and ``import_module`` string in a package's non-test modules.
+
+    Independent of the prefix asked about, so ``check`` walks each tree once however
+    many siblings the package requires.
+    """
     trees = {
         path: ast.parse(path.read_text(encoding="utf-8"))
         for path in sorted(package_dir.rglob("*.py"))
@@ -65,20 +74,30 @@ def imports(package_dir: Path, prefix: str) -> Iterator[tuple[Path, str, tuple[s
     for tree in trees.values():
         for name, value in _string_constants(tree):
             constants.setdefault(name, set()).add(value)
+    found: list[_Record] = []
     for path, tree in trees.items():
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-                if _is_contract(node.module, prefix):
-                    yield path, node.module, tuple(a.name for a in node.names)
-                elif node.module == parent and any(a.name == leaf for a in node.names):
-                    yield path, prefix, ()  # from sm_ai import contracts
+                found.append((path, node.module, tuple(a.name for a in node.names), True))
             elif isinstance(node, ast.Import):
-                for alias in node.names:
-                    if _is_contract(alias.name, prefix):
-                        yield path, alias.name, ()
-        for target in _import_module_targets(tree, constants):
-            if _is_contract(target, prefix):
-                yield path, target, ()
+                found.extend((path, alias.name, (), False) for alias in node.names)
+        found.extend((path, t, (), False) for t in _import_module_targets(tree, constants))
+    return tuple(found)
+
+
+def forget_scan() -> None:
+    """Drop the scan cache (``check`` reads each package once per run)."""
+    _scan.cache_clear()
+
+
+def imports(package_dir: Path, prefix: str) -> Iterator[tuple[Path, str, tuple[str, ...]]]:
+    """Yield (file, module, names) for each absolute import of *prefix* or below it."""
+    parent, _, leaf = prefix.rpartition(".")
+    for path, module, names, from_import in _scan(package_dir):
+        if _is_contract(module, prefix):
+            yield path, module, names
+        elif from_import and module == parent and leaf in names:
+            yield path, prefix, ()  # from sm_ai import contracts
 
 
 def _is_type_checking(test: ast.expr) -> bool:
@@ -87,8 +106,23 @@ def _is_type_checking(test: ast.expr) -> bool:
     )
 
 
+def _target_names(target: ast.expr) -> Iterator[str]:
+    """Names bound by an assignment target, tuple and starred unpacking included."""
+    if isinstance(target, ast.Name):
+        yield target.id
+    elif isinstance(target, (ast.Tuple, ast.List)):
+        for element in target.elts:
+            yield from _target_names(element)
+    elif isinstance(target, ast.Starred):
+        yield from _target_names(target.value)
+
+
 def top_level_names(source: str) -> set[str] | None:
-    """Names a module defines at top level, or None when ``__getattr__`` makes any name valid."""
+    """Names a module defines at top level, or None when any name may resolve.
+
+    That is a module ``__getattr__`` or a ``from x import *``, whose names this
+    scan cannot see.
+    """
     names: set[str] = set()
 
     def visit(body: list[ast.stmt]) -> None:
@@ -96,19 +130,24 @@ def top_level_names(source: str) -> set[str] | None:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 names.add(node.name)
             elif isinstance(node, ast.Assign):
-                names.update(t.id for t in node.targets if isinstance(t, ast.Name))
-            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-                names.add(node.target.id)
+                for target in node.targets:
+                    names.update(_target_names(target))
+            elif isinstance(node, ast.AnnAssign):
+                names.update(_target_names(node.target))
             elif isinstance(node, (ast.Import, ast.ImportFrom)):
                 names.update((a.asname or a.name).split(".", 1)[0] for a in node.names)
             elif isinstance(node, ast.If):
                 if not _is_type_checking(node.test):
                     visit(node.body)  # names bound only for type checkers do not import
                 visit(node.orelse)
-            elif isinstance(node, ast.Try):
+            elif isinstance(node, (ast.Try, ast.TryStar)):
                 visit(node.body)
                 for handler in node.handlers:
                     visit(handler.body)
+                visit(node.orelse)
+                visit(node.finalbody)
+            elif isinstance(node, (ast.With, ast.AsyncWith)):
+                visit(node.body)
 
     visit(ast.parse(source).body)
-    return None if "__getattr__" in names else names
+    return None if names & {"__getattr__", "*"} else names

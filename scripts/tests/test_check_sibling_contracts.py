@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import check_sibling_contracts as check
@@ -193,5 +195,37 @@ def test_no_tags_is_an_error_not_a_pass(tmp_path):
     assert "no v* release tags" in _errors(tmp_path)
 
 
+def test_names_bound_by_unpacking_with_and_star_import_count(tmp_path):
+    root, lists, mail = _repo(tmp_path)
+    (lists / "contracts" / "basic.py").write_text(
+        "A, (B, *C) = 1, (2, 3)\ntry:\n    pass\nfinally:\n    D = 1\n"
+        "def subscribers(): ...\n"
+    )
+    _git(root, "commit", "-qam", "unpacked")
+    _git(root, "tag", "-f", "v0.0.1")
+    (mail / "use.py").write_text("from sm_lists.contracts.basic import A, B, C, D\n")
+    assert check.check(root) == []
+    (lists / "contracts" / "basic.py").write_text("from .more import *\n")
+    _git(root, "commit", "-qam", "star")
+    _git(root, "tag", "-f", "v0.0.1")
+    (mail / "use.py").write_text("from sm_lists.contracts.basic import Anything\n")
+    assert check.check(root) == []
+
+
+def test_a_floor_past_the_next_release_is_a_typo(tmp_path):
+    root, _, mail = _repo(tmp_path)
+    pyproject = mail.parent / "pyproject.toml"
+    pyproject.write_text(pyproject.read_text().replace(">=0.0.1", ">=0.0.10"))
+    assert "no release v0.0.10 exists" in _errors(root)
+    pyproject.write_text(pyproject.read_text().replace(">=0.0.10", ">=0.1.0"))
+    assert check.check(root) == []
+
+
+def test_outside_a_clone_is_the_fetch_hint_not_a_traceback(tmp_path):
+    assert "no v* release tags" in _errors(tmp_path)
+
+
 def test_the_repo_passes():
+    if not check._tags(REPO):
+        pytest.skip("no release tags in this clone (a shallow checkout); CI's checks job has them")
     assert check.check(REPO) == []

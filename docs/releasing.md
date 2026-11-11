@@ -67,21 +67,20 @@ A version that is fully on PyPI but whose `finalize` cannot complete (say
 `main` refuses pushes from Actions) is still tagged once the tag step has run;
 bumping `main` by hand to that version is then the only step left.
 
-## First newsletter release
+## Sibling floors
 
-Before publishing `simple_module_newsletter` for the first time, raise its three
-floors in `modules/newsletter/pyproject.toml` from `0.0.13` to the release that
-first ships what it needs:
+A module that imports another module's `contracts` requires it with a floor
+(`simple_module_records>=0.0.16,<0.1`). The floor must be a release that ships
+everything imported: `scripts/check_sibling_contracts.py` (in `make lint` and the
+`checks` CI job) reads each sibling floor's tag and fails when a contract module
+or name the dependant imports is missing there. A floor that is the next patch,
+minor or major after the newest tag is the release being prepared, and is checked
+against the working tree. So when a module starts using a contract that is new
+since the last release, raise its floor to the next version in the same change,
+with its `# floor:` comment.
 
-- `simple_module_records>=` the release with `contracts.newsletter`,
-  `contracts.newsletter_admin` and `contracts.newsletter_import`;
-- the `news` extra's `simple_module_news>=` the release with `contracts.articles`;
-- the `pagebuilder` extra's `simple_module_pagebuilder>=` the release with
-  `contracts.cards`.
-
-Update each `# floor:` comment with the new floor. `scripts/check_rules.py`
-checks that the comment exists, not the value, and never compares it with the
-lockstep version.
+Newsletter's first release is 0.0.16: its records, news and pagebuilder floors
+are already 0.0.16, the first release with the contracts it imports (#333).
 
 ## Supply chain
 
