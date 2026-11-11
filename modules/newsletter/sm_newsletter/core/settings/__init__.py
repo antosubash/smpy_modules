@@ -6,7 +6,7 @@ Configure them on the module's Settings page (or headlessly with
 ``scripts/set_setting.py``, except the password). The module registers a
 ``manage_url``, so the generic Settings screen refuses newsletter writes (409):
 ``smtp_password`` must never be written there in plaintext. It is stored
-``enc:v1:...`` and written through
+``enc:v2:...`` and written through
 ``PUT /api/newsletter/settings/smtp-password``; a plaintext value found at
 read time (an operator wrote the DB directly) is accepted with a one-time
 warning. SYSTEM scope: one configuration for the whole deployment.
@@ -46,7 +46,7 @@ class NewsletterSettings(DbBackedSettings):
     """SMTP login. Empty sends without authenticating (an IP-allowlisted relay)."""
 
     smtp_password: str = Field(default="", repr=False)
-    """SMTP password, stored encrypted (``enc:v1:...``). Written through the
+    """SMTP password, stored encrypted (``enc:v2:...``). Written through the
     password endpoint, never shown."""
 
     from_address: str = ""

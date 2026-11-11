@@ -185,7 +185,7 @@ async def test_connection_encrypts_and_masks(app, admin):
     assert (body["has_secret_key"], body["has_webhook_secret"]) == (True, True)
     assert "sk_test_1" not in saved.text
     stored = app.state.sm_billing.settings
-    assert stored.stripe_secret_key.startswith(crypto.ENC_PREFIX)
+    assert stored.stripe_secret_key.startswith(crypto.ENC_V2)
     assert crypto.decrypt_value(stored.stripe_secret_key, "x") == "sk_test_1"
     assert stored.return_base_url == "https://app.example.com"
     keep = await admin.put(f"{ADMIN}/connection", json={})

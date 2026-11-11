@@ -52,7 +52,7 @@ async def test_get_never_returns_password(client):
     assert body["has_password"] is True
     assert "smtp_password" not in body
     assert "s3cret-pw" not in res.text
-    assert "enc:v1" not in res.text
+    assert "enc:" not in res.text
 
 
 async def test_get_requires_manage(client):

@@ -179,7 +179,7 @@ def test_dispatch_refuses_without_a_secret(world, caplog):
 
 @pytest.mark.unbound_tenant
 def test_dispatch_refuses_unreadable_password(world, listener, caplog):
-    """S11's fifth case: an ``enc:v1:`` password under another secret is
+    """S11's fifth case: an ``enc:v2:`` password under another secret is
     refused before any connection, never sent as ciphertext."""
     world.put("host.secret_key", SECRET)
     world.smtp_to(listener.getsockname()[1], encrypted("pw", "another-secret"))
@@ -194,7 +194,7 @@ def test_dispatch_refuses_unreadable_password(world, listener, caplog):
 
 @pytest.mark.unbound_tenant
 def test_dispatch_refuses_a_plaintext_password(world, listener, caplog):
-    """A5: a password stored without ``enc:v1:`` is never sent to a relay."""
+    """A5: a password stored without an ``enc:`` prefix is never sent to a relay."""
     world.put("host.secret_key", SECRET)
     world.smtp_to(listener.getsockname()[1], "hunter2")
 

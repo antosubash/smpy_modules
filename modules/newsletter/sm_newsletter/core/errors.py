@@ -50,11 +50,16 @@ class TenantRequired(Forbidden):
 
 
 class SmtpPasswordUnreadable(NewsletterError):  # noqa: N818 - names the failure, not an *Error
-    """The stored SMTP password cannot be decrypted (the key changed)."""
+    """The stored SMTP password cannot be decrypted with ``SM_SECRET_KEY`` or any
+    key in ``SM_SECRET_KEY_PREVIOUS`` (the key was rotated without keeping the
+    old one; see ``docs/secret-key-rotation.md``)."""
 
     status = 500
     code = "smtp_password_unreadable"
-    detail = "The stored SMTP password cannot be read; enter it again"
+    detail = (
+        "The stored SMTP password cannot be read with SM_SECRET_KEY or any key in "
+        "SM_SECRET_KEY_PREVIOUS; add the old key there, or enter the password again"
+    )
 
 
 class InvalidPassword(NewsletterError):  # noqa: N818 - names the field

@@ -20,15 +20,17 @@ def isolate_worker_env(monkeypatch: Any, root: Path) -> None:
     plus :func:`reset_worker_caches` at teardown."""
     monkeypatch.setenv("SM_PROJECT_ROOT", str(root))
     monkeypatch.delenv("SM_SECRET_KEY", raising=False)
+    monkeypatch.delenv("SM_SECRET_KEY_PREVIOUS", raising=False)
     monkeypatch.setattr(crypto, "_secret_provider", None)
     reset_worker_caches()
 
 
 def reset_worker_caches() -> None:
     crypto._dotenv_secret.cache_clear()
+    crypto._dotenv_previous.cache_clear()
     clear_settings_cache()
 
 
 def encrypted(plain: str, under: str) -> str:
     """``plain`` as a stored secret encrypted under the key ``under``."""
-    return crypto.ENC_PREFIX + crypto._fernet_for(under).encrypt(plain.encode()).decode()
+    return crypto.ENC_V2 + crypto._keys((under,), crypto.ENC_V2).encrypt(plain.encode()).decode()

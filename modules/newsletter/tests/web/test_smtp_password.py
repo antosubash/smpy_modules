@@ -49,7 +49,7 @@ async def test_put_stores_ciphertext(client, built):
     assert "s3cret" not in res.text
     stored = await _stored(state)
     assert stored is not None
-    assert stored.startswith("enc:v1:")
+    assert stored.startswith("enc:v2:")
     assert "s3cret" not in stored
     assert crypto.decrypt_value(stored, "smtp_password") == "s3cret"
     assert app.state.sm_newsletter.settings.smtp_password == stored
