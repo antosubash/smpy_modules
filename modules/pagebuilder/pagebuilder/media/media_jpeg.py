@@ -80,10 +80,25 @@ def _is_metadata(marker: int, payload: bytes) -> bool:
     return True
 
 
+_ICC_HEADER = 128
+
+
+def sound_icc(profile: bytes | None) -> bytes | None:
+    """*profile* if it is exactly as long as its header says, else ``None``.
+
+    Bytes after the declared size are no part of the profile, and a place to
+    carry anything else through a re-save.
+    """
+    if profile is None or len(profile) < _ICC_HEADER:
+        return None
+    return profile if int.from_bytes(profile[:4], "big") == len(profile) else None
+
+
 def _icc_profile(fragments: list[bytes]) -> bytes | None:
     """The profile, from ``ICC_PROFILE\\0``, sequence number, count, data.
 
-    ``None`` when the fragments are not exactly numbers 1 to count, once each.
+    ``None`` when the fragments are not exactly numbers 1 to count, once each,
+    or the profile they make is not :func:`sound_icc`.
     """
     if not fragments:
         return None
@@ -95,7 +110,7 @@ def _icc_profile(fragments: list[bytes]) -> bytes | None:
         numbered[fragment[12]] = fragment[14:]
     if sorted(numbered) != list(range(1, count + 1)):
         return None
-    return b"".join(numbered[number] for number in sorted(numbered))
+    return sound_icc(b"".join(numbered[number] for number in sorted(numbered)))
 
 
 def scan(data: bytes) -> JpegScan:

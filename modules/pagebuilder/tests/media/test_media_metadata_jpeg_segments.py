@@ -85,3 +85,30 @@ def test_icc_fragments_that_do_not_assemble_are_metadata():
     data = plain[:2] + _icc_fragment(1, 2, ICC) + plain[2:]  # fragment 2 of 2 missing
     walked = media_jpeg.scan(data)
     assert walked.icc is None and walked.metadata is True
+
+
+@pytest.mark.parametrize(
+    "fragment",
+    [_icc_fragment(1, 1, ICC + _HIDDEN), _icc_fragment(0, 1, ICC)],
+    ids=["bytes-after-the-profile", "sequence-0-of-1"],
+)
+@pytest.mark.parametrize("exif", [True, False], ids=["with-exif", "icc-only"])
+async def test_an_unsound_icc_profile_is_not_kept(db, tmp_path, fragment, exif):
+    """The walk's verdict stands, even where Pillow would accept the profile."""
+    plain = _jpeg(exif=_exif()) if exif else _jpeg()
+    data = plain[:2] + fragment + plain[2:]
+    walked = media_jpeg.scan(data)
+    assert walked.icc is None and walked.metadata is True
+
+    _asset, path = await _stored(_service(db, tmp_path), data, "image/jpeg", "a.jpg")
+    raw = path.read_bytes()
+    assert _HIDDEN not in raw and b"SecretCam" not in raw
+    with Image.open(path) as image:
+        assert "icc_profile" not in image.info
+
+
+def test_a_profile_must_be_as_long_as_its_header_says():
+    assert media_jpeg.sound_icc(ICC) == ICC
+    assert media_jpeg.sound_icc(ICC + b"\x00") is None
+    assert media_jpeg.sound_icc(ICC[:100]) is None
+    assert media_jpeg.sound_icc(None) is None

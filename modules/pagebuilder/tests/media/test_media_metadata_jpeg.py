@@ -43,7 +43,8 @@ async def test_a_trailer_after_a_clean_jpeg_is_cut_off(db, tmp_path, options):
 
 async def test_an_end_marker_inside_a_segment_is_not_the_end(db, tmp_path):
     """An ICC profile (APP2, kept) holding ``FFD9`` is skipped by its length."""
-    clean = _clean_jpeg(icc_profile=b"\xff\xd9" * 64)
+    # As long as its header says (a sound profile), and full of end markers.
+    clean = _clean_jpeg(icc_profile=(132).to_bytes(4, "big") + b"\xff\xd9" * 64)
     _asset, path = await _stored(_service(db, tmp_path), clean + _TRAILER, "image/jpeg", "a.jpg")
     assert path.read_bytes() == clean
 

@@ -53,12 +53,24 @@ _FALLBACK_QUALITY = 92
 _EXIF_ORIENTATION = 0x0112
 
 
+def _profile(image: Image.Image, walked: media_jpeg.JpegScan | None) -> bytes | None:
+    """The ICC profile a re-save keeps.
+
+    A JPEG walk's is authoritative, ``None`` included: Pillow misses fragments
+    after ``SOF`` and accepts sets the walk refuses. Pillow's is used only
+    without a walk, and only when it is as long as its header says.
+    """
+    if walked is not None:
+        return walked.icc
+    return media_jpeg.sound_icc(image.info.get("icc_profile"))
+
+
 def _save_options(
     image: Image.Image, fmt: str, source: bytes, icc: bytes | None
 ) -> dict[str, Any]:
-    """*icc* is the JPEG walk's profile: Pillow's misses fragments after ``SOF``."""
+    """*icc* is the profile to keep, already checked (see :func:`_profile`)."""
     options: dict[str, Any] = {"format": fmt}
-    if icc := icc or image.info.get("icc_profile"):
+    if icc:
         options["icc_profile"] = icc
     if fmt == "JPEG":
         # The original's own quantisation tables: no second round of loss
@@ -169,7 +181,7 @@ def clean_bytes(data: bytes, content_type: str) -> bytes | None:
                     end = walked.end
                     return _verified(data[:end] if end < len(data) else None, data)
             # A JPEG with metadata, an MPO, or a turned PNG or WebP: re-saved.
-            options = _save_options(image, fmt, data, walked.icc if walked else None)
+            options = _save_options(image, fmt, data, _profile(image, walked))
             quarter_turn = image.getexif().get(_EXIF_ORIENTATION, 1) in (5, 6, 7, 8)
             image.load()
             # In place, so a JPEG stays a JPEG image and "keep" can read its tables.
