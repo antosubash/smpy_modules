@@ -36,11 +36,12 @@ name the module they affect.
   version (#341). `host/client_app/blocks.ts` globbed `python3.12` only, and a
   glob that matches nothing is silent. A host copied from this one should make
   the same change.
-- `.env.example` ships the framework's own placeholder secrets (#352), so a
-  hand-copied file that keeps them refuses to boot outside development and
-  testing. Its own wording passed both framework checks, which would have run
-  production with a session key and token-signing keys published here.
-  `make env` still fills all three in.
+- `.env.example` ships no secret values (#352). It held placeholders whose
+  wording neither framework check refuses, so a hand-copied file would have run
+  production with a session key and token-signing keys published here. Now
+  there is nothing to keep by mistake: production refuses to boot without the
+  two users token secrets, and the host generates `SM_SECRET_KEY` itself.
+  `make env` appends a generated value for all three.
 
 ## 0.0.15
 
