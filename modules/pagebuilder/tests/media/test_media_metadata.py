@@ -2,8 +2,8 @@
 
 A phone photo's EXIF holds GPS coordinates and the device, and the media
 library publishes the original. With ``media_strip_metadata`` on (the default)
-a JPEG, PNG or WebP is re-saved without EXIF, XMP, IPTC or comments, turned
-upright first, its ICC profile kept. Animated images are left as they came.
+a JPEG, PNG or WebP is stored without EXIF, XMP, IPTC or comments, turned
+upright first, its ICC profile kept. WebP and animated PNG: see their own files.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import io
 
 import pytest
 from fastapi import HTTPException
-from pagebuilder.media.media_metadata import _webp_is_lossless
+from pagebuilder.media.media_webp import is_lossless
 from PIL import Image, PngImagePlugin
 
 from tests.support.metadata_images import (
@@ -76,17 +76,17 @@ async def test_a_webp_loses_exif_and_xmp_and_keeps_its_compression(db, tmp_path,
 
     raw = path.read_bytes()
     assert b"SecretCam" not in raw and b"GPSLatitude" not in raw
-    assert _webp_is_lossless(path.read_bytes()) is lossless
+    assert is_lossless(path.read_bytes()) is lossless
     assert asset.size_bytes == path.stat().st_size
 
 
-async def test_an_animated_image_is_left_as_uploaded(db, tmp_path):
+async def test_an_animated_gif_is_left_as_uploaded(db, tmp_path):
     buf = io.BytesIO()
     frames = [Image.new("RGB", (10, 10), c) for c in ((255, 0, 0), (0, 255, 0))]
-    frames[0].save(buf, format="WEBP", save_all=True, append_images=frames[1:], duration=100,
-                   exif=_exif())
+    frames[0].save(buf, format="GIF", save_all=True, append_images=frames[1:], duration=100,
+                   comment=b"Jane Example")
     original = buf.getvalue()
-    asset, path = await _stored(_service(db, tmp_path), original, "image/webp", "loop.webp")
+    asset, path = await _stored(_service(db, tmp_path), original, "image/gif", "loop.gif")
     assert path.read_bytes() == original
     assert asset.size_bytes == len(original)
 

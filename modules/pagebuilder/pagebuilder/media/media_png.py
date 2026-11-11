@@ -27,7 +27,8 @@ _BEFORE_PLTE = frozenset(
 )
 _AFTER_PLTE = frozenset({b"tRNS", b"bKGD", b"hIST"})
 _CARRIED = _BEFORE_PLTE | _AFTER_PLTE
-# APNG. An animated PNG never reaches here, but its chunks are pixels.
+# APNG frame control and data: an animated PNG is cleaned by copying them as
+# they are (no orientation is applied to one).
 KEPT_ANCILLARY = _CARRIED | {b"acTL", b"fcTL", b"fdAT"}
 
 
@@ -102,26 +103,26 @@ def carry_chunks(original: bytes, rendered: bytes, *, swap_axes: bool) -> bytes:
 
     Pillow keeps only the ICC profile and transparency of what it was given, so
     a re-saved PNG would lose its gamma, chromaticities, sRGB intent and the
-    rest. Every :data:`KEPT_ANCILLARY` chunk of *original* replaces the
-    rendered file's chunk of the same type, placed where the spec requires;
-    ``tRNS`` is the rendered one when Pillow wrote it. *swap_axes* is a quarter
-    turn: ``pHYs``' densities are exchanged with the dimensions.
+    rest. Every carried chunk of *original* replaces the rendered file's chunks
+    of that type, every instance in its original order (``sPLT`` may repeat),
+    placed where the spec requires; ``tRNS`` is the rendered one when Pillow
+    wrote it. *swap_axes* is a quarter turn: ``pHYs``' densities are exchanged
+    with the dimensions.
     """
-    carried = {
-        kind: chunk
-        for kind, chunk in _chunks(original)
-        if kind in _CARRIED
-    }
-    if swap_axes and b"pHYs" in carried:
-        carried[b"pHYs"] = _swapped_phys(carried[b"pHYs"])
     out = list(_chunks(rendered))
-    if any(kind == b"tRNS" for kind, _ in out):
-        carried.pop(b"tRNS", None)
-    out = [(kind, chunk) for kind, chunk in out if kind not in carried]
-    before = [chunk for kind, chunk in carried.items() if kind in _BEFORE_PLTE]
-    after = [chunk for kind, chunk in carried.items() if kind in _AFTER_PLTE]
+    rendered_trns = any(kind == b"tRNS" for kind, _ in out)
+    carried = [
+        (kind, _swapped_phys(chunk) if swap_axes and kind == b"pHYs" else chunk)
+        for kind, chunk in _chunks(original)
+        if kind in _CARRIED and not (kind == b"tRNS" and rendered_trns)
+    ]
+    replaced = {kind for kind, _ in carried}
+    before = [chunk for kind, chunk in carried if kind in _BEFORE_PLTE]
+    after = [chunk for kind, chunk in carried if kind in _AFTER_PLTE]
     result = [PNG_SIGNATURE]
     for kind, chunk in out:
+        if kind in replaced:
+            continue
         if kind in (b"PLTE", b"IDAT") and before:
             result += before
             before = []

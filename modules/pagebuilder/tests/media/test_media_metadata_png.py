@@ -23,8 +23,6 @@ from tests.support.metadata_images import (
     _upload,
 )
 
-pytestmark = pytest.mark.asyncio
-
 
 def _png16_with_text() -> bytes:
     """A 2x1 16-bit RGB PNG (Pillow cannot write one) with a tEXt and a tIME chunk."""
@@ -144,3 +142,37 @@ async def test_a_cleaned_png_that_will_not_decode_is_refused(db, tmp_path, monke
         await service.upload(_upload(_rgb_png(), "image/png", "x.png"))
     assert refused.value.detail["code"] == "image_metadata_not_removed"
     assert list(service.tenant_dir().iterdir()) == []
+
+
+async def test_an_animated_png_loses_its_metadata_and_keeps_every_frame(db, tmp_path):
+    """APNG: copied chunk by chunk, never re-encoded and never turned."""
+    frames = [Image.new("RGB", (6, 4), c) for c in ((255, 0, 0), (0, 255, 0))]
+    buf = io.BytesIO()
+    frames[0].save(buf, format="PNG", save_all=True, append_images=frames[1:], duration=100)
+    plain = buf.getvalue()
+    text = _chunk(b"tEXt", b"Author\x00Jane Example")
+    exif = Image.Exif()
+    exif[ORIENTATION] = 6
+    exif_chunk = _chunk(b"eXIf", exif.tobytes().removeprefix(b"Exif\x00\x00"))
+    ihdr_end = len(media_png.PNG_SIGNATURE) + 25
+    original = plain[:ihdr_end] + text + exif_chunk + plain[ihdr_end:]
+    with Image.open(io.BytesIO(original)) as probe:
+        assert probe.n_frames == 2
+
+    asset, path = await _stored(_service(db, tmp_path), original, "image/png", "loop.png")
+    assert path.read_bytes() == plain
+    with Image.open(path) as image:
+        assert image.n_frames == 2 and image.size == (6, 4)
+    assert asset.size_bytes == len(plain)
+
+
+def test_carrying_chunks_keeps_every_suggested_palette():
+    """sPLT may repeat: each one survives, in order, not just the last."""
+    splt = [_chunk(b"sPLT", name + b"\x00\x08" + b"\x10\x20\x30\xff\x00\x01") for name in
+            (b"first", b"second")]
+    original = _rgb_png(*splt)
+    rendered = _rgb_png()
+    carried = media_png.carry_chunks(original, rendered, swap_axes=False)
+    kinds = [kind for kind, _ in media_png._chunks(carried)]
+    assert kinds.count(b"sPLT") == 2
+    assert carried.index(splt[0]) < carried.index(splt[1]) < carried.index(b"IDAT")

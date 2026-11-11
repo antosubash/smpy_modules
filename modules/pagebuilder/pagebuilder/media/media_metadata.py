@@ -2,21 +2,23 @@
 
 A photo from a phone carries EXIF (GPS coordinates, device and serial number,
 capture time, sometimes the owner's name), XMP and IPTC, and the media library
-publishes the original as uploaded. :func:`strip_metadata` re-saves a JPEG or
-WebP without any of it, and copies a PNG's chunks without its metadata chunks
-(:mod:`pagebuilder.media.media_png`, lossless at any bit depth), behind the
+publishes the original as uploaded. :func:`strip_metadata` re-saves a JPEG
+without any of it, and copies a PNG's or WebP's chunks without its metadata
+chunks (:mod:`~pagebuilder.media.media_png`, :mod:`~pagebuilder.media.media_webp`:
+lossless, the compressed picture copied byte for byte), behind the
 ``media_strip_metadata`` setting. :func:`clean_bytes` is the same in memory,
 which is how a bundle's media is matched by the digest it would be stored with.
 
-A PNG's EXIF orientation (rare: cameras do not write PNG) is applied by turning
-the pixels only for an 8-bit PNG, which Pillow re-saves losslessly. A 16-bit
-one keeps its pixels as stored and loses the tag: no re-encode would keep
-its depth.
+An EXIF orientation other than 1 is applied by re-encoding: a JPEG, a static
+WebP (lossless stays lossless, lossy is re-encoded at quality 92) and an 8-bit
+PNG, which Pillow re-saves losslessly. A 16-bit PNG keeps its pixels as stored
+and loses the tag: no re-encode would keep its depth. An animated PNG or WebP
+is never re-encoded: its chunks are copied and an orientation tag just goes.
 
 What is kept: the pixels, upright (EXIF orientation is applied first, since the
 tag that said how to turn them is going), the ICC colour profile, and a
-palette image's transparency. What is left alone entirely: animated GIF, WebP
-and PNG, and a file with nothing to remove. It fails closed: a file it should
+palette image's transparency. What is left alone entirely: GIF, and a file
+with nothing to remove. It fails closed: a file it should
 clean but cannot is refused, never stored with its metadata.
 """
 
@@ -29,7 +31,7 @@ from typing import Any
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from pagebuilder.media import media_png
+from pagebuilder.media import media_png, media_webp
 from pagebuilder.media.media_images import (
     TooManyPixelsError,
     _exceeds_pixel_limit,
@@ -43,18 +45,6 @@ _KEPT_INFO = ("transparency",)
 # A lossy WebP, or a JPEG Pillow cannot re-encode with its own tables.
 _FALLBACK_QUALITY = 92
 _EXIF_ORIENTATION = 0x0112
-
-
-def _webp_is_lossless(data: bytes) -> bool:
-    """Whether the WebP's image chunk is ``VP8L``, walking the RIFF chunks."""
-    offset = 12
-    while offset + 8 <= len(data):
-        tag = data[offset : offset + 4]
-        (length,) = struct.unpack("<I", data[offset + 4 : offset + 8])
-        if tag in (b"VP8 ", b"VP8L"):
-            return tag == b"VP8L"
-        offset += 8 + length + (length & 1)
-    return False
 
 
 def _save_options(image: Image.Image, fmt: str, source: bytes) -> dict[str, Any]:
@@ -72,7 +62,7 @@ def _save_options(image: Image.Image, fmt: str, source: bytes) -> dict[str, Any]
         if image.info.get("progressive") or image.info.get("progression"):
             options["progressive"] = True
     elif fmt == "WEBP":
-        if _webp_is_lossless(source):
+        if media_webp.is_lossless(source):
             options["lossless"] = True
         else:
             options["quality"] = _FALLBACK_QUALITY
@@ -107,9 +97,17 @@ def _has_metadata(image: Image.Image) -> bool:
     return bool(getattr(image, "text", None))  # PNG tEXt/iTXt/zTXt chunks
 
 
+def _turns(image: Image.Image) -> bool:
+    return image.getexif().get(_EXIF_ORIENTATION, 1) != 1
+
+
 def _png_turns(image: Image.Image, data: bytes) -> bool:
     """Whether an 8-bit PNG carries an orientation to apply by re-saving it."""
-    return image.getexif().get(_EXIF_ORIENTATION, 1) != 1 and media_png.bit_depth(data) <= 8
+    return _turns(image) and media_png.bit_depth(data) <= 8
+
+
+# Lossless cleaning by copying the container's chunks without the metadata ones.
+_CHUNK_COPY = {"PNG": media_png.strip_chunks, "WEBP": media_webp.strip_chunks}
 
 
 def _verified(cleaned: bytes | None) -> bytes | None:
@@ -123,10 +121,11 @@ def _verified(cleaned: bytes | None) -> bytes | None:
 def clean_bytes(data: bytes, content_type: str) -> bytes | None:
     """*data* without its metadata, or ``None`` when it is to be stored as it is.
 
-    ``None`` for a type this does not handle, an animated GIF/WebP/PNG, and a
-    file with no metadata to remove. A multi-picture JPEG (MPO, how many phones
-    save a photo) is not animated: its primary picture is kept, as a plain
-    JPEG, and the rest dropped.
+    ``None`` for a type this does not handle and a file with no metadata to
+    remove. A WebP, and an animated PNG, has its chunks copied without the
+    metadata ones, unless an orientation must be applied to a static WebP. A
+    multi-picture JPEG (MPO, how many phones save a photo) is not animated:
+    its primary picture is kept, as a plain JPEG, and the rest dropped.
 
     Raises :class:`~pagebuilder.media.media_images.TooManyPixelsError` above the
     pixel limit, before decoding anything, and :class:`MetadataNotRemovedError`
@@ -141,8 +140,10 @@ def clean_bytes(data: bytes, content_type: str) -> bytes | None:
                 raise TooManyPixelsError(f"{image.size} exceeds Image.MAX_IMAGE_PIXELS")
             if image.format == "MPO":
                 image.seek(0)
-            elif is_animated(image):
-                return None
+            elif is_animated(image) or (fmt == "WEBP" and not _turns(image)):
+                # An animated file keeps its frames as they are, turned or not.
+                strip = _CHUNK_COPY.get(fmt)
+                return _verified(strip(data)) if strip else None
             if fmt == "PNG" and not _png_turns(image, data):
                 image.load()  # fail closed on a PNG whose pixels do not decode
                 return _verified(media_png.strip_chunks(data))
