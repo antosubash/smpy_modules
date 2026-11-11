@@ -63,7 +63,10 @@ async def test_a_reader_without_publish_or_approve_is_refused(tmp_path, grants):
     async for client in _client(tmp_path, grants):
         api = await client.get(_SNAPSHOTS)
         assert api.status_code == 403
-        assert api.json()["detail"] == "Permission required: pagebuilder.publish"
+        # With no pagebuilder permission at all, the router-wide read gate
+        # (#346) answers first and names the least of the three.
+        needed = PERM_PUBLISH if grants else PERM_EDIT
+        assert api.json()["detail"] == f"Permission required: {needed}"
 
         view = await client.get(_CONTENT, headers=_INERTIA)
         assert view.status_code == 403

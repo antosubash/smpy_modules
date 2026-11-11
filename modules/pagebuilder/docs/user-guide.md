@@ -1,10 +1,12 @@
 # PageBuilder user guide
 
 PageBuilder's screens sit under **Site** in the app sidebar: **Pages**, **Site
-layout**, **Media library** and **Import / Export**. Every signed-in user can open
-the first three; **Import / Export** is listed for, and opens to, only a holder of
-`pagebuilder.publish` or `pagebuilder.approve` (anyone else gets a 403). What you
-can *do* depends on three permissions:
+layout**, **Media library** and **Import / Export**. The first three are listed
+for, and open to, anyone holding at least one of the three permissions below:
+reading a draft, its revisions, the site layout or the media library needs one,
+and a signed-in user with none of them gets a 403 (#346). **Import / Export** is
+listed for, and opens to, only a holder of `pagebuilder.publish` or
+`pagebuilder.approve`. What you can *do* depends on the three permissions:
 
 | Permission | Lets you |
 |---|---|

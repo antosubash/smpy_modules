@@ -1,6 +1,6 @@
 # PageBuilder API reference
 
-All admin routes are JSON under `/api/pagebuilder`. Every one of them runs three
+All admin routes are JSON under `/api/pagebuilder`. Every one of them runs four
 router-level dependencies, in this order:
 
 1. **Authentication** — `401 Not authenticated` without a signed-in user, unless
@@ -17,13 +17,18 @@ router-level dependencies, in this order:
    sends it from there. There is no CSRF cookie. Reads need no token. It runs
    before any permission check, so a write without a token is refused as CSRF
    even for a user who also lacks the permission.
+4. **Read gate** (`access.require_reader`, #346) — a signed-in user holding none
+   of `pagebuilder.edit`, `pagebuilder.publish` and `pagebuilder.approve` gets
+   `403 Permission required: pagebuilder.edit` on every route, reads included.
+   A request with no user is left to step 1. The Inertia screens under
+   `/pagebuilder/` (the draft preview included) run the same gate.
 
-"Permission" below is the extra `RequiresPermission` check on top; **auth** means
-any signed-in user. Errors are `{"detail": "<message>"}`; the table is at the end.
+"Permission" below is the extra `RequiresPermission` check on top; **read** means
+any one of the three pagebuilder permissions (step 4) and nothing more. Errors are `{"detail": "<message>"}`; the table is at the end.
 
 ## Pages
 
-### `GET /api/pagebuilder/pages` — auth
+### `GET /api/pagebuilder/pages` — read
 
 Query: `search` (title or slug, case-insensitive, wildcards literal), `status`
 (`draft` | `submitted_for_review` | `published`; empty = no filter), `locale`,
@@ -51,12 +56,12 @@ excluded.
 | Route | Permission | Returns |
 |---|---|---|
 | `GET /pages/trash` | `pagebuilder.edit` | trashed pages, most recently binned first |
-| `GET /pages/templates` | auth | pages with `is_template`, by title |
+| `GET /pages/templates` | read | pages with `is_template`, by title |
 | `GET /pages/pending` | `pagebuilder.approve` | pages in `submitted_for_review` |
 
 All three return `{"items": [PageRead], "total": n}`.
 
-### `GET /api/pagebuilder/locales` — auth
+### `GET /api/pagebuilder/locales` — read
 
 `{"locales": ["en", "de"], "default": "en"}` — the configured content languages.
 
@@ -77,7 +82,7 @@ Only `title` (1–300) and `slug` (`^[a-z0-9][a-z0-9-]*$`, ≤200) are required.
 The page starts as a `draft` in a translation group of its own. Returns
 `PageDetail`. Slug taken in that language → `409 Slug already in use in <locale>`.
 
-### `GET /api/pagebuilder/pages/{id}` — auth
+### `GET /api/pagebuilder/pages/{id}` — read
 
 `PageDetail` = `PageRead` plus:
 
@@ -144,9 +149,9 @@ set with `publish_at >= unpublish_at` is
 
 | Route | Permission | Returns |
 |---|---|---|
-| `GET /pages/{id}/revisions` | auth | `{"items": [PageRevisionRead], "restores": [PageRestoreMarker]}`, both newest first |
-| `GET /pages/{id}/revisions/{rev}` | auth | `PageRevisionRead` + `data` |
-| `GET /pages/{id}/revisions/{before}/diff/{after}` | auth | `RevisionDiffResponse` |
+| `GET /pages/{id}/revisions` | read | `{"items": [PageRevisionRead], "restores": [PageRestoreMarker]}`, both newest first |
+| `GET /pages/{id}/revisions/{rev}` | read | `PageRevisionRead` + `data` |
+| `GET /pages/{id}/revisions/{before}/diff/{after}` | read | `RevisionDiffResponse` |
 | `POST /pages/{id}/revisions/{rev}/restore` | `pagebuilder.edit` | `PageDetail`; copies title, meta description, social image and blocks into the draft |
 
 `PageRevisionRead`: `id`, `page_id`, `title`, `meta_description`, `og_image`,
@@ -167,15 +172,15 @@ A revision that belongs to another page is 404.
 
 | Route | Permission | Body / returns |
 |---|---|---|
-| `GET /layout` | auth | `LayoutDetail` (`id`, `header_data`, `footer_data`, timestamps); created empty on first read |
+| `GET /layout` | read | `LayoutDetail` (`id`, `header_data`, `footer_data`, timestamps); created empty on first read |
 | `PUT /layout` | `pagebuilder.edit` | `{"header_data"?, "footer_data"?, "note"?}`; `null`/absent leaves a slot alone. An unchanged save writes no revision. |
-| `GET /layout/revisions` | auth | `{"items": [{"id", "layout_id", "note", "created_at", "created_by"}]}` |
-| `GET /layout/revisions/{id}` | auth | revision + `header_data`, `footer_data` |
+| `GET /layout/revisions` | read | `{"items": [{"id", "layout_id", "note", "created_at", "created_by"}]}` |
+| `GET /layout/revisions/{id}` | read | revision + `header_data`, `footer_data` |
 | `POST /layout/revisions/{id}/restore` | `pagebuilder.edit` | `LayoutDetail` |
 
 ## Media
 
-### `GET /api/pagebuilder/uploads` — auth
+### `GET /api/pagebuilder/uploads` — read
 
 Query: `search`, `content_type`, `folder` (absent = all, empty = unfiled, else
 exact path), `min_size_bytes`, `max_size_bytes`, `cursor`, `offset`, `limit`

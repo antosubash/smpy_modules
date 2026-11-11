@@ -5,6 +5,21 @@ name the module they affect.
 
 ## 0.0.16 (unreleased)
 
+### Security
+
+- **pagebuilder's admin reads need a pagebuilder permission** (#346). Signing in
+  used to be enough to read every draft, its revision history, the unpublished
+  site layout and the media library, over the API and on the screens (the
+  draft preview included), which on a host with self-registration or customer
+  accounts meant every customer. Now a signed-in user needs one of
+  `pagebuilder.edit`, `pagebuilder.publish` or `pagebuilder.approve`, and gets
+  `403 Permission required: pagebuilder.edit` otherwise. Pages, Site layout and
+  Media library leave the sidebar on the same condition. A signed-out request
+  answers as before. news' admin search shows its Pages and Media sections only
+  to such a reader too. **Upgrading:** give every account that edits the site
+  one of the pagebuilder roles (see "Roles" in
+  `modules/pagebuilder/docs/operations.md`); no migration is needed.
+
 ### Fixed
 
 - **newsletter requires records, news and pagebuilder 0.0.16** (#333). Its

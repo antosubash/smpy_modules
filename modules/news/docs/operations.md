@@ -52,7 +52,8 @@ This pulls in `simple_module_pagebuilder>=0.0.12,<0.1`. Where both modules run:
   sits on;
 - **Search everything** gains **Pages** and **Media** sections, read through
   `pagebuilder.contracts.search_pages`/`search_media` (never its tables) in the
-  request's tenant;
+  request's tenant, for a caller holding one of `pagebuilder.edit`, `.publish`
+  or `.approve` (pagebuilder's own read rule, #346);
 - the site's article languages become pagebuilder's `content_locales` (see
   below).
 
@@ -174,7 +175,7 @@ Slugs, categories, tags and redirects are unique per tenant.
 | Saving says "This article was changed somewhere else" | another tab or person saved first | Reload and redo the change. |
 | News feed block labels show as `news.feed.…` keys | pagebuilder older than 0.0.8 | Upgrade pagebuilder. |
 | Frontend build fails resolving `@simple-module-py/pagebuilder` | a hand-written import of news' `pagebuilder-blocks.ts` on a host without pagebuilder | Do not import it; pagebuilder's `puck-blocks.ts` loads it only when pagebuilder is installed. |
-| Search everything shows no Pages / Media | pagebuilder not installed | Expected. |
+| Search everything shows no Pages / Media | pagebuilder not installed, or the user holds no pagebuilder permission | Expected. |
 
 ## Data and deletion
 

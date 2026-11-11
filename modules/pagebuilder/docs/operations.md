@@ -226,6 +226,7 @@ the other leaves pages pointing at missing images.
 | `/de/p/…` 404 although the page is published | `de` not in `content_locales`, or not restarted since adding it | Set it and restart |
 | Boot fails: `default_content_locale … is not in content_locales` | inconsistent settings | Fix with `scripts/set_setting.py` |
 | Boot fails: `pins every request to default_tenant=…` | host fixed to another tenant | Unset `default_tenant`, set it to `default`, or turn multi-tenancy on |
+| Pagebuilder missing from the sidebar, screens 403 `Permission required: pagebuilder.edit` | the user holds none of `pagebuilder.edit`, `.publish`, `.approve`; signing in alone no longer opens the drafts, layout or media library (#346) | Assign one of the pagebuilder roles (see [Roles](#roles)) or grant a permission |
 | Admin API 403 `tenant_required` | multi-tenant host, no organisation selected | Select an organisation / use its subdomain |
 | Every POST 403 `CSRF token missing or invalid` | client not sending `X-CSRF-Token`, or the session changed | Reload the screen; scripted clients read the token from the `csrf_token` prop of any pagebuilder screen |
 | Images 404 on public pages | `media_root` differs between processes, or files not deployed | Compare the logged `pagebuilder.media_root`; set an absolute path or `SM_PROJECT_ROOT` |
