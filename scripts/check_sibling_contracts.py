@@ -50,6 +50,7 @@ WORKTREE = "working tree"
 class Module:
     root: Path  # modules/<dir>
     package: str  # top-level import package, from the simple_module entry point
+    requirements: tuple[str, ...] = ()  # every dependency, extras included
 
 
 def _modules(root: Path) -> dict[str, Module]:
@@ -60,7 +61,9 @@ def _modules(root: Path) -> dict[str, Module]:
         if entry is None:
             continue
         dist = canonicalize_name(str(project["name"]))
-        found[dist] = Module(pyproject.parent, str(entry).split(".", 1)[0])
+        found[dist] = Module(
+            pyproject.parent, str(entry).split(".", 1)[0], tuple(_requirements(project, {}))
+        )
     return found
 
 
@@ -146,9 +149,7 @@ def check(root: Path) -> list[str]:
     errors = []
     for dependant in modules.values():
         scanned = scan(dependant.root / dependant.package)  # once, however many siblings
-        pyproject = dependant.root / "pyproject.toml"
-        project = tomlkit.parse(pyproject.read_text(encoding="utf-8")).get("project", {})
-        for req in filter(None, map(_parse, _requirements(project, {}))):
+        for req in filter(None, map(_parse, dependant.requirements)):
             sibling = modules.get(canonicalize_name(req.name))
             floor = _floor(req)
             if sibling is None or sibling is dependant or floor is None:
@@ -182,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
     if errors:
         for e in errors:
             print(e, file=sys.stderr)
-        print(f"\nFAIL: {len(errors)} sibling floor(s) below what is imported.", file=sys.stderr)
+        print(f"\nFAIL: {len(errors)} sibling floor problem(s).", file=sys.stderr)
         return 1
     print("Sibling floors ship every contract their dependants import.")
     return 0

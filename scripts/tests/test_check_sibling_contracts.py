@@ -149,6 +149,26 @@ def test_a_bare_name_resolves_to_its_own_files_constant(tmp_path):
     assert check.check(root) == []
 
 
+def test_a_type_only_import_is_not_checked(tmp_path):
+    root, _, mail = _repo(tmp_path)
+    (mail / "use.py").write_text(
+        "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n"
+        "    from sm_lists.contracts.later import X\n"
+    )
+    assert check.check(root) == []
+
+
+def test_names_bound_in_a_top_level_loop_count(tmp_path):
+    root, lists, mail = _repo(tmp_path)
+    (lists / "contracts" / "basic.py").write_text(
+        "for KIND in ('a',):\n    LOOPED = KIND\ndef subscribers(): ...\n"
+    )
+    _git(root, "commit", "-qam", "loop")
+    _git(root, "tag", "-f", "v0.0.1")
+    (mail / "use.py").write_text("from sm_lists.contracts.basic import KIND, LOOPED\n")
+    assert check.check(root) == []
+
+
 def test_a_string_that_is_not_imported_is_ignored(tmp_path):
     root, _, mail = _repo(tmp_path)
     (mail / "use.py").write_text('MESSAGE = "sm_lists.contracts.removed"\nprint(MESSAGE)\n')
@@ -223,7 +243,7 @@ def test_a_floor_past_the_next_release_is_a_typo(tmp_path):
         pyproject.write_text(pyproject.read_text().replace(current, f">={next_release}"))
         current = f">={next_release}"
         errors = _errors(root)
-        assert ("no release v0.2.0 exists" in errors) == (next_release == "0.2.0"), next_release
+        assert (f"no release v{next_release} exists" in errors) == (next_release == "0.2.0")
 
 
 def test_outside_a_clone_is_the_fetch_hint_not_a_traceback(tmp_path):

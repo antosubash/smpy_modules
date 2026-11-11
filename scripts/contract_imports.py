@@ -58,6 +58,8 @@ _Record = tuple[Path, str, tuple[str, ...], bool]
 
 def scan(package_dir: Path) -> tuple[_Record, ...]:
     """Every absolute import and ``import_module`` string in a package's non-test modules.
+
+    One record per import, parsed once; ``imports`` filters them per sibling.
     """
     trees = {
         path: ast.parse(path.read_text(encoding="utf-8"))
@@ -71,7 +73,16 @@ def scan(package_dir: Path) -> tuple[_Record, ...]:
             constants.setdefault(name, set()).add(value)
     found: list[_Record] = []
     for path, tree in trees.items():
+        type_only = {  # imports a type checker sees and the interpreter never runs
+            id(inner)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.If) and _is_type_checking(node.test)
+            for stmt in node.body
+            for inner in ast.walk(stmt)
+        }
         for node in ast.walk(tree):
+            if id(node) in type_only:
+                continue
             if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
                 found.append((path, node.module, tuple(a.name for a in node.names), True))
             elif isinstance(node, ast.Import):
@@ -140,6 +151,11 @@ def top_level_names(source: str) -> set[str] | None:
                 visit(node.finalbody)
             elif isinstance(node, (ast.With, ast.AsyncWith)):
                 visit(node.body)
+            elif isinstance(node, (ast.For, ast.AsyncFor, ast.While)):
+                if not isinstance(node, ast.While):
+                    names.update(_target_names(node.target))
+                visit(node.body)
+                visit(node.orelse)
 
     visit(ast.parse(source).body)
     return None if names & {"__getattr__", "*"} else names
