@@ -30,13 +30,13 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
-from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
 import tomlkit
+from check_rules import _parse, _requirements
 from contract_imports import imports, top_level_names
-from packaging.requirements import InvalidRequirement, Requirement
+from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
 
@@ -46,7 +46,6 @@ WORKTREE = "working tree"
 
 @dataclass(frozen=True)
 class Module:
-    dist: str  # canonical distribution name
     root: Path  # modules/<dir>
     package: str  # top-level import package, from the simple_module entry point
 
@@ -59,20 +58,8 @@ def _modules(root: Path) -> dict[str, Module]:
         if entry is None:
             continue
         dist = canonicalize_name(str(project["name"]))
-        found[dist] = Module(dist, pyproject.parent, str(entry).split(".", 1)[0])
+        found[dist] = Module(pyproject.parent, str(entry).split(".", 1)[0])
     return found
-
-
-def _requirements(pyproject: Path) -> Iterator[Requirement]:
-    project = tomlkit.parse(pyproject.read_text(encoding="utf-8")).get("project", {})
-    raws = list(project.get("dependencies", []))
-    for reqs in project.get("optional-dependencies", {}).values():
-        raws += list(reqs)
-    for raw in raws:
-        try:
-            yield Requirement(str(raw))
-        except InvalidRequirement:
-            continue
 
 
 def _tags(root: Path) -> set[Version]:
@@ -113,7 +100,7 @@ def _floor(req: Requirement) -> Version | None:
 def _ref(floor: Version, tags: set[Version]) -> str | None:
     if floor in tags:
         return f"v{floor}"
-    if not tags or floor > max(tags):
+    if floor > max(tags):  # check() refuses an empty tag set first
         return WORKTREE
     return None
 
@@ -124,11 +111,12 @@ def _missing(root: Path, ref: str, base: str, module: str, names: tuple[str, ...
     if source is None:
         return [module]
     defined = top_level_names(source)
+    if defined is None:  # a module __getattr__: any name may resolve
+        return []
     return [
         f"{module}.{name}"
         for name in names
-        if defined is not None
-        and name != "*"
+        if name != "*"
         and name not in defined
         and _module_source(root, ref, base, f"{module}.{name}") is None
     ]
@@ -142,7 +130,9 @@ def check(root: Path) -> list[str]:
     errors = []
     for dependant in modules.values():
         package_dir = dependant.root / dependant.package
-        for req in _requirements(dependant.root / "pyproject.toml"):
+        pyproject = dependant.root / "pyproject.toml"
+        project = tomlkit.parse(pyproject.read_text(encoding="utf-8")).get("project", {})
+        for req in filter(None, map(_parse, _requirements(project, {}))):
             sibling = modules.get(canonicalize_name(req.name))
             floor = _floor(req)
             if sibling is None or sibling is dependant or floor is None:
