@@ -22,15 +22,14 @@ from pagebuilder.models import MediaAsset, Page
 from PIL import Image
 from sqlalchemy import delete, func, select
 
+from tests.support.metadata_images import _exif
+
 pytestmark = pytest.mark.asyncio
 
 
 def _geotagged_jpeg() -> bytes:
-    exif = Image.Exif()
-    exif[0x010F] = "SecretCam"
-    exif[0x8825] = {1: "N", 2: (48.0, 12.0, 30.0)}
     buf = io.BytesIO()
-    Image.new("RGB", (8, 8), (200, 10, 10)).save(buf, format="JPEG", exif=exif)
+    Image.new("RGB", (8, 8), (200, 10, 10)).save(buf, format="JPEG", exif=_exif())
     return buf.getvalue()
 
 

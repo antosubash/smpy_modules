@@ -3,17 +3,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Any
 
-from pydantic import AfterValidator, BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict
 
-from pagebuilder.content.links import checked
 from pagebuilder.contracts.schemas._fields import OptionalNote
-
-PuckData = dict[str, Any]
-# Checked on the way in, like a page's draft (#354): a header or footer link
-# outside the allow-list is a 422 naming the block and the field.
-CheckedPuckData = Annotated[PuckData, AfterValidator(checked)]
+from pagebuilder.contracts.schemas._pages import CheckedPuckData, PuckData
 
 
 class LayoutUpdate(BaseModel):

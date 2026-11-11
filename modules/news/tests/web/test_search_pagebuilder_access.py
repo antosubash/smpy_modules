@@ -54,3 +54,11 @@ async def test_a_pagebuilder_reader_still_sees_them(admin_client):
 )
 async def test_may_read_is_pagebuilders_rule(held, expected):
     assert pb.may_read(held) is expected
+
+
+async def test_the_read_permissions_are_the_ones_pagebuilder_defines():
+    """News spells them as strings (it imports nothing of pagebuilder's outside its contracts)."""
+    from news.core.constants import PAGEBUILDER_READ_PERMISSIONS
+    from pagebuilder.core.permissions import ALL_PERMISSIONS
+
+    assert set(PAGEBUILDER_READ_PERMISSIONS) == set(ALL_PERMISSIONS)

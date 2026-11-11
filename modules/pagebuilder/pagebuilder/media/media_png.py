@@ -20,14 +20,15 @@ import zlib
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
-KEPT_ANCILLARY = frozenset(
-    {
-        b"tRNS", b"cHRM", b"gAMA", b"iCCP", b"sBIT", b"sRGB", b"cICP", b"mDCV",
-        b"cLLI", b"bKGD", b"hIST", b"pHYs", b"sPLT",
-        # APNG. An animated PNG never reaches here, but its chunks are pixels.
-        b"acTL", b"fcTL", b"fdAT",
-    }
+# Where a kept chunk goes (PNG spec, chunk ordering): before PLTE and IDAT, or
+# after PLTE and before IDAT.
+_BEFORE_PLTE = frozenset(
+    {b"cHRM", b"gAMA", b"iCCP", b"sBIT", b"sRGB", b"cICP", b"mDCV", b"cLLI", b"pHYs", b"sPLT"}
 )
+_AFTER_PLTE = frozenset({b"tRNS", b"bKGD", b"hIST"})
+_CARRIED = _BEFORE_PLTE | _AFTER_PLTE
+# APNG. An animated PNG never reaches here, but its chunks are pixels.
+KEPT_ANCILLARY = _CARRIED | {b"acTL", b"fcTL", b"fdAT"}
 
 
 class PngStructureError(ValueError):
@@ -86,15 +87,6 @@ def strip_chunks(data: bytes) -> bytes | None:
     return b"".join(kept)
 
 
-# Where a carried chunk goes (PNG spec, chunk ordering): before PLTE and IDAT,
-# or after PLTE and before IDAT.
-_BEFORE_PLTE = frozenset(
-    {b"cHRM", b"gAMA", b"iCCP", b"sBIT", b"sRGB", b"cICP", b"mDCV", b"cLLI", b"pHYs", b"sPLT"}
-)
-_AFTER_PLTE = frozenset({b"tRNS", b"bKGD", b"hIST"})
-_CARRIED = _BEFORE_PLTE | _AFTER_PLTE
-
-
 def _chunk(kind: bytes, body: bytes) -> bytes:
     return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
 
@@ -130,12 +122,12 @@ def carry_chunks(original: bytes, rendered: bytes, *, swap_axes: bool) -> bytes:
     after = [chunk for kind, chunk in carried.items() if kind in _AFTER_PLTE]
     result = [PNG_SIGNATURE]
     for kind, chunk in out:
-        if kind == b"IDAT" and before is not None:
-            result += before + after
-            before = after = None  # type: ignore[assignment]
-        elif kind == b"PLTE" and before is not None:
+        if kind in (b"PLTE", b"IDAT") and before:
             result += before
             before = []
+        if kind == b"IDAT" and after:
+            result += after
+            after = []
         result.append(chunk)
         if kind == b"PLTE":
             result += after

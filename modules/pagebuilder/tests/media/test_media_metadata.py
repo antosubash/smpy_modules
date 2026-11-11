@@ -157,3 +157,21 @@ async def test_with_the_setting_off_an_undecodable_file_still_uploads(db, tmp_pa
     asset, path = await _stored(service, bogus, "image/png", "x.png")
     assert path.read_bytes() == bogus
     assert asset.width is None
+
+
+def test_a_jpeg_keeps_its_resolution_and_progressive_encoding():
+    from pagebuilder.media.media_metadata import clean_bytes
+
+    exif = Image.Exif()
+    exif[0x010F] = "SecretCam"
+    out = io.BytesIO()
+    Image.new("RGB", (32, 32), (200, 10, 10)).save(
+        out, "JPEG", exif=exif, dpi=(300, 300), progressive=True
+    )
+
+    cleaned = clean_bytes(out.getvalue(), "image/jpeg")
+
+    assert cleaned is not None and b"SecretCam" not in cleaned
+    with Image.open(io.BytesIO(cleaned)) as image:
+        assert image.info["dpi"] == (300, 300)
+        assert image.info.get("progressive")

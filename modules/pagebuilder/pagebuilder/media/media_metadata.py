@@ -65,6 +65,12 @@ def _save_options(image: Image.Image, fmt: str, source: bytes) -> dict[str, Any]
         # The original's own quantisation tables: no second round of loss
         # beyond the re-encode itself, and no file growing for nothing.
         options.update(quality="keep", subsampling="keep")
+        # Not metadata: how the picture is meant to be sized and streamed. The
+        # caller drops ``Image.info``, which is where Pillow reads both from.
+        if dpi := image.info.get("dpi"):
+            options["dpi"] = dpi
+        if image.info.get("progressive") or image.info.get("progression"):
+            options["progressive"] = True
     elif fmt == "WEBP":
         if _webp_is_lossless(source):
             options["lossless"] = True
@@ -177,6 +183,8 @@ def strip_metadata(source: Path, content_type: str) -> bool:
 
     Both refusals are the caller's to turn into an answer; the file is untouched.
     """
+    if content_type not in _FORMATS:
+        return False  # a GIF, SVG, PDF…: not worth reading into memory to say so
     cleaned = clean_bytes(source.read_bytes(), content_type)
     if cleaned is None:
         return False

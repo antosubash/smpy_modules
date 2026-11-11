@@ -21,39 +21,16 @@ request and takes effect on save.
 from __future__ import annotations
 
 from pydantic import Field, model_validator
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 from pagebuilder.core.settings_media import _RESTART, MediaSettings
 
 
 class PagebuilderSettings(MediaSettings):
-    """Every pagebuilder setting; the media and snapshot ones are :class:`MediaSettings`'."""
+    """Every pagebuilder setting; the media and snapshot ones are :class:`MediaSettings`'.
 
-    # ``use_attribute_docstrings`` is what puts the prose under each field on
-    # the Settings screen: the admin UI renders ``FieldInfo.description``, and
-    # without this every field would arrive there unexplained while the
-    # explanation sat in the source three lines below it.
-    model_config = SettingsConfigDict(extra="ignore", use_attribute_docstrings=True)
-
-    @classmethod
-    def settings_customise_sources(
-        cls,
-        settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
-    ) -> tuple[PydanticBaseSettingsSource, ...]:
-        """Init kwargs only — no env, no ``.env``, no secrets directory.
-
-        The hydrator passes stored overrides as keyword arguments, so this
-        leaves exactly two answers for any field: what the database says, or
-        the default declared here. Dropping the env sources rather than merely
-        not documenting them is deliberate — a stray ``SM_PAGEBUILDER_*`` left
-        in a shell or a deploy manifest would otherwise quietly outrank the
-        value an operator can see and edit on the Settings screen.
-        """
-        return (init_settings,)
+    The model config and :meth:`settings_customise_sources` (database and
+    defaults only, never the environment) are inherited from there too.
+    """
 
     public_route_prefix: str = Field(default="/p", json_schema_extra=_RESTART)
     """URL prefix used for public published pages: ``{prefix}/{slug}``."""

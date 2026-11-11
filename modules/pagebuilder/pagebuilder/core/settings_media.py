@@ -19,8 +19,10 @@ _RESTART: Final[dict[str, Any]] = {"requires_restart": True}
 
 
 class MediaSettings(BaseSettings):
-    # Repeated rather than inherited: ``use_attribute_docstrings`` reads the
-    # docstrings of the class that declares the fields.
+    # ``use_attribute_docstrings`` is what puts the prose under each field on
+    # the Settings screen: the admin UI renders ``FieldInfo.description``, and
+    # without this every field would arrive there unexplained. Subclasses
+    # inherit it.
     model_config = SettingsConfigDict(extra="ignore", use_attribute_docstrings=True)
 
     @classmethod
@@ -32,7 +34,15 @@ class MediaSettings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        """Init kwargs only, as ``PagebuilderSettings`` — no env, ``.env`` or secrets."""
+        """Init kwargs only — no env, no ``.env``, no secrets directory.
+
+        The hydrator passes stored overrides as keyword arguments, so this
+        leaves exactly two answers for any field: what the database says, or
+        the default declared here. Dropping the env sources rather than merely
+        not documenting them is deliberate — a stray ``SM_PAGEBUILDER_*`` left
+        in a shell or a deploy manifest would otherwise quietly outrank the
+        value an operator can see and edit on the Settings screen.
+        """
         return (init_settings,)
 
     media_root: Path = Field(
