@@ -11,8 +11,8 @@ import struct
 
 import pytest
 from fastapi import HTTPException
-from pagebuilder.media.media_metadata import clean_bytes
 from pagebuilder.media import media_webp
+from pagebuilder.media.media_metadata import clean_bytes
 from pagebuilder.media.media_webp import is_lossless
 from PIL import Image
 
@@ -149,3 +149,36 @@ def test_bytes_after_the_riff_are_dropped():
     cleaned = media_webp.strip_chunks(good + b"EXIF" + struct.pack("<I", 4) + b"Jane")
     assert cleaned is not None and b"Jane" not in cleaned
     assert len(cleaned) == 8 + struct.unpack("<I", cleaned[4:8])[0]
+
+
+def _with_frame_chunk(data: bytes, extra: bytes) -> bytes:
+    """*data* with *extra* appended inside its first ANMF frame, sizes fixed."""
+    offset = 12
+    while data[offset : offset + 4] != b"ANMF":
+        (length,) = struct.unpack("<I", data[offset + 4 : offset + 8])
+        offset += 8 + length + (length & 1)
+    (length,) = struct.unpack("<I", data[offset + 4 : offset + 8])
+    stop = offset + 8 + length
+    frame = b"ANMF" + struct.pack("<I", length + len(extra)) + data[offset + 8 : stop] + extra
+    out = data[:offset] + frame + data[stop:]
+    return out[:4] + struct.pack("<I", len(out) - 8) + out[8:]
+
+
+async def test_metadata_hidden_inside_an_animation_frame_is_removed(db, tmp_path):
+    plain = _webp(animated=True)
+    hidden = b"EXIF" + struct.pack("<I", 10) + b"GPSSecret!"
+    original = _with_frame_chunk(plain, hidden)
+    with Image.open(io.BytesIO(original)) as probe:
+        assert probe.n_frames == 2  # the decoder skips it, so it would be published
+    _asset, path = await _stored(_service(db, tmp_path), original, "image/webp", "loop.webp")
+
+    cleaned = path.read_bytes()
+    assert b"GPSSecret" not in cleaned
+    assert media_webp.strip_chunks(plain) is not None  # top-level EXIF/XMP go too
+    assert cleaned == media_webp.strip_chunks(plain)  # frames exactly as without it
+
+
+def test_a_frame_whose_chunks_do_not_parse_is_refused():
+    broken = _with_frame_chunk(_webp(animated=True), b"EXIF" + struct.pack("<I", 99) + b"xx")
+    with pytest.raises(media_webp.WebpStructureError):
+        media_webp.strip_chunks(broken)
