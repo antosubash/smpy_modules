@@ -240,6 +240,14 @@ JPEG, PNG, GIF and WebP up to 10 MB are accepted by default; the file's contents
 must match its type. Each upload gets WebP thumbnails (320, 640, 1280 and 1920 px
 wide, never wider than the original) used for responsive images.
 
+Uploads are cleaned of camera metadata (#356): a JPEG, PNG or WebP is stored
+without its EXIF (GPS position, camera and serial number, capture time), XMP,
+IPTC or comments, turned upright if the camera recorded it sideways, with its
+colour profile kept. Animated images are stored as uploaded. An administrator
+can turn this off (`media_strip_metadata`) on a site that wants its photographs'
+copyright fields kept. It applies to new uploads only: files uploaded earlier
+keep whatever they carried until they are uploaded again.
+
 Browse by **Folders**, filter by **Search** (filename), **Type**, **Min KB** and
 **Max KB**. **Copy URL** copies an image's address (useful for **Social image**).
 **Details** opens the asset (`/pagebuilder/media/{id}`), where you set **Alt

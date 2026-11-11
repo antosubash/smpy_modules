@@ -97,6 +97,7 @@ Settings screen says so. Everything else is read per request and applies on save
 | `media_allowed_content_types` | jpeg, png, gif, webp | SVG is excluded on purpose (stored XSS); add it only with your own sanitiser |
 | `media_thumbnail_widths` | `320, 640, 1280, 1920` | WebP widths; empty disables thumbnails |
 | `media_webp_quality` | `82` | 0–100 |
+| `media_strip_metadata` | `true` | Re-save uploaded JPEG/PNG/WebP originals without EXIF, XMP, IPTC or comments, orientation applied and ICC profile kept; animated images untouched. **Not retroactive**: files already in the library keep their metadata; re-upload one to clean it. Off keeps uploads byte for byte (#356). |
 | `snapshot_root` | `var/pagebuilder/snapshots` | Snapshots and their shared blob store; anchored like `media_root` |
 | `snapshot_max_upload_bytes` | `209715200` | 200 MB per uploaded bundle |
 | `snapshot_max_extracted_bytes` | `1073741824` | 1 GB expanded; guards against zip bombs |

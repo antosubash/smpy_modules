@@ -28,6 +28,15 @@ name the module they affect.
   `#`. React and the public CSP already kept such a link from running; this
   keeps it out of the data other consumers read. A leading space no longer
   hides a scheme from `isSafeHref`.
+- **pagebuilder strips camera metadata from uploads** (#356). A JPEG, PNG or
+  WebP original is re-saved without EXIF (GPS, device, serial, capture time),
+  XMP, IPTC or comments, with its EXIF orientation applied first and its ICC
+  profile kept; `size_bytes` is the cleaned file's. Animated images are stored
+  untouched. The new setting `media_strip_metadata` (on by default) turns it
+  off. Not retroactive: files already in the library keep their metadata. The
+  media and snapshot settings moved to `pagebuilder.core.settings_media`
+  (`PagebuilderSettings` inherits them, so nothing changes for a caller), which
+  lists them first on the Settings screen.
 
 ### Fixed
 

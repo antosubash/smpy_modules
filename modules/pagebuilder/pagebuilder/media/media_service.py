@@ -42,6 +42,7 @@ from pagebuilder.media.media_images import (
     safe_extension,
     sniff_content_type,
 )
+from pagebuilder.media.media_metadata import strip_metadata
 from pagebuilder.models import MediaAsset
 
 _DEFAULT_PAGE_SIZE = 60
@@ -211,6 +212,11 @@ class MediaService:
         # thread offload is essentially free for a single request and
         # turns parallel uploads back into parallel work.
         try:
+            # Before the thumbnails, so they are cut from the upright, clean file (#356).
+            if self.settings.media_strip_metadata and await asyncio.to_thread(
+                strip_metadata, target, content_type
+            ):
+                size = target.stat().st_size
             width, height, variants = await asyncio.to_thread(
                 process_image,
                 target,
