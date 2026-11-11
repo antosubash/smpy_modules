@@ -6,7 +6,10 @@ publishes the original as uploaded. :func:`strip_metadata` re-saves a JPEG
 without any of it, and copies a PNG's or WebP's chunks without its metadata
 chunks (:mod:`~pagebuilder.media.media_png`, :mod:`~pagebuilder.media.media_webp`:
 lossless, the compressed picture copied byte for byte), behind the
-``media_strip_metadata`` setting. :func:`clean_bytes` is the same in memory,
+``media_strip_metadata`` setting. Whatever a JPEG carries after its image ends
+(a motion photo's video and trailer) goes too: a re-saved JPEG has none, and
+one with nothing else to remove is cut at its end
+(:mod:`~pagebuilder.media.media_jpeg`), losslessly. :func:`clean_bytes` is the same in memory,
 which is how a bundle's media is matched by the digest it would be stored with.
 
 An EXIF orientation other than 1 is applied by re-encoding: a JPEG, a static
@@ -31,7 +34,7 @@ from typing import Any
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from pagebuilder.media import media_png, media_webp
+from pagebuilder.media import media_jpeg, media_png, media_webp
 from pagebuilder.media.media_images import (
     TooManyPixelsError,
     _exceeds_pixel_limit,
@@ -170,7 +173,9 @@ def clean_bytes(data: bytes, content_type: str) -> bytes | None:
                 image.load()  # fail closed on a PNG whose pixels do not decode
                 return _verified(media_png.strip_chunks(data))
             if not _has_metadata(image):
-                return None
+                # Bytes after a JPEG's end (a motion photo's video and trailer)
+                # are metadata too: cut there, losslessly.
+                return _verified(media_jpeg.strip_trailer(data)) if fmt == "JPEG" else None
             options = _save_options(image, fmt, data)
             quarter_turn = image.getexif().get(_EXIF_ORIENTATION, 1) in (5, 6, 7, 8)
             image.load()
