@@ -131,7 +131,7 @@ async def test_metadata_between_the_scans_of_a_progressive_jpeg_is_removed(db, t
     _asset, path = await _stored(_service(db, tmp_path), data, "image/jpeg", "p.jpg")
     raw = path.read_bytes()
     assert b"GPS 48.2N" not in raw and b"Jane Example" not in raw
-    assert media_jpeg.scan(raw) == (len(raw), False)
+    assert media_jpeg.scan(raw)[:2] == (len(raw), False)
 
 
 def _jfif(thumbnail: tuple[int, int]) -> bytes:
@@ -149,10 +149,10 @@ def _jfif(thumbnail: tuple[int, int]) -> bytes:
 )
 async def test_an_app0_thumbnail_counts_as_metadata(db, tmp_path, segment):
     clean = _clean_jpeg()
-    assert media_jpeg.scan(clean) == (len(clean), False)  # Pillow's own JFIF header
+    assert media_jpeg.scan(clean)[:2] == (len(clean), False)  # Pillow's own JFIF header
     data = clean[:2] + segment + clean[2:]
-    assert media_jpeg.scan(data)[1] is True
+    assert media_jpeg.scan(data).metadata is True
     _asset, path = await _stored(_service(db, tmp_path), data, "image/jpeg", "t.jpg")
     raw = path.read_bytes()
     assert segment not in raw and b"JFXX" not in raw
-    assert media_jpeg.scan(raw) == (len(raw), False)
+    assert media_jpeg.scan(raw)[:2] == (len(raw), False)

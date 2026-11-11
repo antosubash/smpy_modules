@@ -23,6 +23,7 @@ every comment are.
 from __future__ import annotations
 
 import struct
+from typing import NamedTuple
 
 _SOI, _EOI, _SOS, _COM = 0xD8, 0xD9, 0xDA, 0xFE
 _APP0, _APP2, _APP14, _APP15 = 0xE0, 0xE2, 0xEE, 0xEF
@@ -32,6 +33,20 @@ _STANDALONE = frozenset({0x01, *range(0xD0, 0xD8)})
 
 class JpegStructureError(ValueError):
     """The marker stream is truncated or not a JPEG."""
+
+
+class JpegScan(NamedTuple):
+    end: int
+    """The offset just past the primary image's ``EOI``."""
+    metadata: bool
+    """Whether any segment before it is metadata."""
+    icc: bytes | None
+    """The ICC profile from every ``APP2`` fragment, wherever it sits."""
+
+
+_ICC = b"ICC_PROFILE\x00"
+_JFIF_SIZE = 14  # "JFIF\0", version, units, densities, thumbnail width and height
+_ADOBE_SIZE = 12  # "Adobe", version, two flag words, colour transform
 
 
 def _after_scan(data: bytes, pos: int) -> int:
@@ -54,21 +69,42 @@ def _is_metadata(marker: int, payload: bytes) -> bool:
         return True
     if not _APP0 <= marker <= _APP15:
         return False  # tables, frame and scan headers: the picture itself
-    if marker == _APP0:
-        # "JFIF\0", version, units, densities, then the thumbnail's width and height.
-        return not (payload.startswith(b"JFIF\x00") and len(payload) >= 14
+    # Exactly the defined size: a decoder ignores bytes appended inside one.
+    if marker == _APP0:  # no thumbnail: its width and height are the last two bytes
+        return not (payload.startswith(b"JFIF\x00") and len(payload) == _JFIF_SIZE
                     and payload[12] == payload[13] == 0)
     if marker == _APP2:
-        return not payload.startswith(b"ICC_PROFILE\x00")
+        return not payload.startswith(_ICC)
     if marker == _APP14:
-        return not payload.startswith(b"Adobe")
+        return not (payload.startswith(b"Adobe") and len(payload) == _ADOBE_SIZE)
     return True
 
 
-def scan(data: bytes) -> tuple[int, bool]:
-    """``(end, metadata)``: the offset just past the primary image's ``EOI``, and
-    whether any segment before it is metadata."""
+def _icc_profile(fragments: list[bytes]) -> bytes | None:
+    """The profile, from ``ICC_PROFILE\\0``, sequence number, count, data.
+
+    ``None`` when the fragments are not exactly numbers 1 to count, once each.
+    """
+    if not fragments:
+        return None
+    count = fragments[0][13] if len(fragments[0]) > 13 else 0
+    numbered = {}
+    for fragment in fragments:
+        if len(fragment) < 14 or fragment[13] != count or fragment[12] in numbered:
+            return None
+        numbered[fragment[12]] = fragment[14:]
+    if sorted(numbered) != list(range(1, count + 1)):
+        return None
+    return b"".join(numbered[number] for number in sorted(numbered))
+
+
+def scan(data: bytes) -> JpegScan:
+    """Walk the primary image to its ``EOI``; see :class:`JpegScan`.
+
+    ICC fragments that do not assemble count as metadata (and give no profile).
+    """
     metadata = False
+    fragments: list[bytes] = []
     if not data.startswith(b"\xff\xd8"):
         raise JpegStructureError("not a JPEG")
     pos = 2
@@ -81,7 +117,8 @@ def scan(data: bytes) -> tuple[int, bool]:
             raise JpegStructureError("truncated marker")
         marker = data[pos + 1]
         if marker == _EOI:
-            return pos + 2, metadata
+            icc = _icc_profile(fragments)
+            return JpegScan(pos + 2, metadata or (bool(fragments) and icc is None), icc)
         if marker in _STANDALONE:
             pos += 2
             continue
@@ -90,7 +127,10 @@ def scan(data: bytes) -> tuple[int, bool]:
         (length,) = struct.unpack(">H", data[pos + 2 : pos + 4])
         if length < 2 or pos + 2 + length > len(data):
             raise JpegStructureError(f"truncated segment {marker:#04x} at offset {pos}")
-        metadata = metadata or _is_metadata(marker, data[pos + 4 : pos + 2 + length])
+        payload = data[pos + 4 : pos + 2 + length]
+        metadata = metadata or _is_metadata(marker, payload)
+        if marker == _APP2 and payload.startswith(_ICC):
+            fragments.append(payload)
         pos += 2 + length
         if marker == _SOS:
             pos = _after_scan(data, pos)
@@ -98,4 +138,4 @@ def scan(data: bytes) -> tuple[int, bool]:
 
 def image_end(data: bytes) -> int:
     """The offset just past the primary image's ``EOI``."""
-    return scan(data)[0]
+    return scan(data).end

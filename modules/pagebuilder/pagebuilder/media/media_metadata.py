@@ -29,6 +29,7 @@ refused, never stored with its metadata.
 
 from __future__ import annotations
 
+import contextlib
 import io
 import struct
 from pathlib import Path
@@ -52,9 +53,12 @@ _FALLBACK_QUALITY = 92
 _EXIF_ORIENTATION = 0x0112
 
 
-def _save_options(image: Image.Image, fmt: str, source: bytes) -> dict[str, Any]:
+def _save_options(
+    image: Image.Image, fmt: str, source: bytes, icc: bytes | None
+) -> dict[str, Any]:
+    """*icc* is the JPEG walk's profile: Pillow's misses fragments after ``SOF``."""
     options: dict[str, Any] = {"format": fmt}
-    if icc := image.info.get("icc_profile"):
+    if icc := icc or image.info.get("icc_profile"):
         options["icc_profile"] = icc
     if fmt == "JPEG":
         # The original's own quantisation tables: no second round of loss
@@ -153,18 +157,19 @@ def clean_bytes(data: bytes, content_type: str) -> bytes | None:
                 return _verified(strip(data), data) if strip else None
             if fmt == "PNG" and not _png_turns(image, data):
                 return _verified(media_png.strip_chunks(data), data)
-            if image.format == "JPEG":
+            walked = None
+            if fmt == "JPEG":  # an MPO's walk is its primary picture's
                 # The marker walk, not Pillow's inventory, which stops at the
                 # first scan. Bytes after the end (a motion photo's video and
                 # trailer) are metadata too: with nothing else, cut there.
-                try:
-                    end, metadata = media_jpeg.scan(data)
-                except media_jpeg.JpegStructureError:
-                    metadata = True  # no proper end (a truncated camera file): re-save
-                if not metadata:
+                # No proper end (a truncated camera file): re-saved.
+                with contextlib.suppress(media_jpeg.JpegStructureError):
+                    walked = media_jpeg.scan(data)
+                if image.format == "JPEG" and walked and not walked.metadata:
+                    end = walked.end
                     return _verified(data[:end] if end < len(data) else None, data)
             # A JPEG with metadata, an MPO, or a turned PNG or WebP: re-saved.
-            options = _save_options(image, fmt, data)
+            options = _save_options(image, fmt, data, walked.icc if walked else None)
             quarter_turn = image.getexif().get(_EXIF_ORIENTATION, 1) in (5, 6, 7, 8)
             image.load()
             # In place, so a JPEG stays a JPEG image and "keep" can read its tables.
