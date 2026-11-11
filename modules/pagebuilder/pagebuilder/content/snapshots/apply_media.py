@@ -54,7 +54,7 @@ async def restore_media(
     rows. A matched asset is reused, never rewritten, so nothing of it is.
     """
     service = MediaService(db, settings)
-    existing = await match_existing(db, settings, index)
+    existing = await match_existing(db, settings, index, blobs)
     uploaded: dict[str, MediaAsset] = {}
 
     name_to_url: dict[str, str] = {}

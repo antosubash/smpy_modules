@@ -79,7 +79,7 @@ class RestoreMixin(HostBase):
         # loosely here would resolve a sentinel to a URL the apply then
         # declines to reuse, telling an approver a page is unchanged while
         # its image is about to change underneath them.
-        name_to_url = await preview_urls(self.db, self.settings, rows)
+        name_to_url = await preview_urls(self.db, self.settings, rows, self.blobs)
         manifest = snapshot.manifest or {}
         try:
             await self._revalidate(snapshot)
@@ -155,7 +155,7 @@ class RestoreMixin(HostBase):
             await match_live(self.db, documents.pages)
             if present(manifest, self.sections):
                 rows = await self.media_rows(snapshot.id)
-                urls = await preview_urls(self.db, self.settings, rows)
+                urls = await preview_urls(self.db, self.settings, rows, self.blobs)
                 await plan_sections(
                     self.db, self.sections, manifest, bundle, urls, self.access, denied
                 )
