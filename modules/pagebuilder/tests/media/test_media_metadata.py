@@ -9,66 +9,22 @@ upright first, its ICC profile kept. Animated images are left as they came.
 from __future__ import annotations
 
 import io
-import struct
-import zlib
 
 import pytest
-from fastapi import HTTPException, UploadFile
-from pagebuilder.core.settings import PagebuilderSettings
-from pagebuilder.media import media_png
+from fastapi import HTTPException
 from pagebuilder.media.media_metadata import _webp_is_lossless
-from pagebuilder.media.media_service import MediaService
-from PIL import Image, ImageCms, PngImagePlugin
-from sqlalchemy.ext.asyncio import AsyncSession
+from PIL import Image, PngImagePlugin
 
-ORIENTATION, MAKE, GPS = 0x0112, 0x010F, 0x8825
-ICC = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
-XMP = b'<x:xmpmeta xmlns:x="adobe:ns:meta/"><exif:GPSLatitude>48,12N</exif:GPSLatitude></x:xmpmeta>'
-
-
-def _exif(orientation: int | None = None) -> Image.Exif:
-    exif = Image.Exif()
-    exif[MAKE] = "SecretCam"
-    exif[GPS] = {1: "N", 2: (48.0, 12.0, 30.0), 3: "E", 4: (16.0, 22.0, 5.0)}
-    if orientation is not None:
-        exif[ORIENTATION] = orientation
-    return exif
-
-
-def _two_tone(size: tuple[int, int] = (40, 20)) -> Image.Image:
-    """Red on the left half, blue on the right, so a turn is visible."""
-    image = Image.new("RGB", size, (0, 0, 255))
-    image.paste((255, 0, 0), (0, 0, size[0] // 2, size[1]))
-    return image
-
-
-def _jpeg() -> bytes:
-    buf = io.BytesIO()
-    _two_tone().save(
-        buf, format="JPEG", quality=90, exif=_exif(orientation=6), icc_profile=ICC,
-        xmp=XMP, comment=b"Owner: Jane Example",
-    )
-    return buf.getvalue()
-
-
-def _upload(content: bytes, content_type: str, name: str) -> UploadFile:
-    return UploadFile(
-        file=io.BytesIO(content), filename=name,
-        headers={"content-type": content_type},  # type: ignore[arg-type]
-    )
-
-
-def _service(db: AsyncSession, tmp_path, **settings) -> MediaService:
-    return MediaService(
-        db, PagebuilderSettings(media_root=tmp_path / "media", media_thumbnail_widths=(16,),
-                                **settings)
-    )
-
-
-async def _stored(service: MediaService, content: bytes, content_type: str, name: str):
-    asset = await service.upload(_upload(content, content_type, name))
-    path = service.tenant_dir() / asset.filename
-    return asset, path
+from tests.support.metadata_images import (
+    ICC,
+    XMP,
+    _exif,
+    _jpeg,
+    _service,
+    _stored,
+    _two_tone,
+    _upload,
+)
 
 
 async def test_a_phone_jpeg_loses_gps_and_device_but_stays_upright(db, tmp_path):
@@ -201,81 +157,3 @@ async def test_with_the_setting_off_an_undecodable_file_still_uploads(db, tmp_pa
     asset, path = await _stored(service, bogus, "image/png", "x.png")
     assert path.read_bytes() == bogus
     assert asset.width is None
-
-
-def _chunk(kind: bytes, body: bytes) -> bytes:
-    return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
-
-
-def _png16_with_text() -> bytes:
-    """A 2x1 16-bit RGB PNG (Pillow cannot write one) with a tEXt and a tIME chunk."""
-    ihdr = struct.pack(">IIBBBBB", 2, 1, 16, 2, 0, 0, 0)
-    row = b"\x00" + struct.pack(">6H", 0x1234, 0xABCD, 0x0001, 0xFFFE, 0x8000, 0x7FFF)
-    return (
-        media_png.PNG_SIGNATURE
-        + _chunk(b"IHDR", ihdr)
-        + _chunk(b"tEXt", b"Author\x00Jane Example")
-        + _chunk(b"tIME", b"\x07\xea\x0b\x0b\x0c\x00\x00")
-        + _chunk(b"IDAT", zlib.compress(row))
-        + _chunk(b"IEND", b"")
-    )
-
-
-async def test_a_16_bit_png_keeps_its_depth_and_pixels_exactly(db, tmp_path):
-    original = _png16_with_text()
-    asset, path = await _stored(_service(db, tmp_path), original, "image/png", "deep.png")
-
-    cleaned = path.read_bytes()
-    assert b"Jane Example" not in cleaned and b"tIME" not in cleaned
-    assert media_png.bit_depth(cleaned) == 16
-    # Every chunk that draws the picture is byte for byte the original's.
-    assert cleaned == original.replace(_chunk(b"tEXt", b"Author\x00Jane Example"), b"").replace(
-        _chunk(b"tIME", b"\x07\xea\x0b\x0b\x0c\x00\x00"), b""
-    )
-    assert asset.size_bytes == len(cleaned)
-
-
-async def test_a_png_without_metadata_chunks_is_left_byte_for_byte(db, tmp_path):
-    buf = io.BytesIO()
-    _two_tone().convert("P").save(buf, format="PNG", transparency=0)
-    original = buf.getvalue()
-    _asset, path = await _stored(_service(db, tmp_path), original, "image/png", "p.png")
-    assert path.read_bytes() == original
-
-
-async def test_a_turned_8_bit_png_keeps_its_colour_chunks(db, tmp_path):
-    """Orientation 6 is applied, and gAMA, cHRM, sRGB and pHYs survive the re-save."""
-    exif = Image.Exif()
-    exif[ORIENTATION] = 6
-    exif_body = exif.tobytes().removeprefix(b"Exif\x00\x00")
-    gama = _chunk(b"gAMA", struct.pack(">I", 45455))
-    chrm = _chunk(b"cHRM", struct.pack(">8I", 31270, 32900, 64000, 33000, 30000, 60000,
-                                       15000, 6000))
-    srgb = _chunk(b"sRGB", b"\x00")
-    rows = b"".join(b"\x00" + (b"\xff\x00\x00" * 2 + b"\x00\x00\xff" * 2) for _ in range(2))
-    original = (
-        media_png.PNG_SIGNATURE
-        + _chunk(b"IHDR", struct.pack(">IIBBBBB", 4, 2, 8, 2, 0, 0, 0))
-        + chrm + gama + srgb
-        + _chunk(b"pHYs", struct.pack(">IIB", 100, 200, 1))
-        + _chunk(b"eXIf", exif_body)
-        + _chunk(b"tEXt", b"Author\x00Jane Example")
-        + _chunk(b"IDAT", zlib.compress(rows))
-        + _chunk(b"IEND", b"")
-    )
-    with Image.open(io.BytesIO(original)) as probe:
-        assert probe.getexif()[ORIENTATION] == 6
-
-    _asset, path = await _stored(_service(db, tmp_path), original, "image/png", "turn.png")
-    cleaned = path.read_bytes()
-    kinds = [kind for kind, _ in media_png._chunks(cleaned)]
-    assert b"eXIf" not in kinds and b"tEXt" not in kinds
-    for chunk in (gama, chrm, srgb):
-        assert chunk in cleaned
-    # Densities swap with the axes; colour chunks come before the image data.
-    assert _chunk(b"pHYs", struct.pack(">IIB", 200, 100, 1)) in cleaned
-    assert kinds.index(b"gAMA") < kinds.index(b"IDAT")
-    with Image.open(path) as image:
-        assert image.size == (2, 4)
-        assert image.convert("RGB").getpixel((0, 0)) == (255, 0, 0)  # left half now on top
-        assert image.convert("RGB").getpixel((0, 3)) == (0, 0, 255)

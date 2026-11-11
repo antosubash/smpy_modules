@@ -46,6 +46,9 @@ def _chunks(data: bytes):
         end = offset + 12 + length
         if end > len(data):
             raise PngStructureError(f"truncated {kind!r} chunk")
+        (crc,) = struct.unpack(">I", data[end - 4 : end])
+        if zlib.crc32(data[offset + 4 : end - 4]) != crc:
+            raise PngStructureError(f"bad CRC in {kind!r} chunk")
         yield kind, data[offset:end]
         offset = end
         if kind == b"IEND":

@@ -107,6 +107,14 @@ def _png_turns(image: Image.Image, data: bytes) -> bool:
     return image.getexif().get(0x0112, 1) != 1 and media_png.bit_depth(data) <= 8
 
 
+def _verified(cleaned: bytes | None) -> bytes | None:
+    """*cleaned*, once Pillow has decoded it whole: never store an unreadable original."""
+    if cleaned is not None:
+        with Image.open(io.BytesIO(cleaned)) as image:
+            image.load()
+    return cleaned
+
+
 def clean_bytes(data: bytes, content_type: str) -> bytes | None:
     """*data* without its metadata, or ``None`` when it is to be stored as it is.
 
@@ -132,7 +140,7 @@ def clean_bytes(data: bytes, content_type: str) -> bytes | None:
                 return None
             if fmt == "PNG" and not _png_turns(image, data):
                 image.load()  # fail closed on a PNG whose pixels do not decode
-                return media_png.strip_chunks(data)
+                return _verified(media_png.strip_chunks(data))
             if not _has_metadata(image):
                 return None
             options = _save_options(image, fmt, data)
@@ -153,11 +161,15 @@ def clean_bytes(data: bytes, content_type: str) -> bytes | None:
             if fmt == "PNG":
                 # Pillow kept only ICC and transparency: put the gamma,
                 # chromaticities, sRGB intent and the rest back.
-                return media_png.carry_chunks(data, out.getvalue(), swap_axes=quarter_turn)
-            return out.getvalue()
+                return _verified(
+                    media_png.carry_chunks(data, out.getvalue(), swap_axes=quarter_turn)
+                )
+            return _verified(out.getvalue())
     except Image.DecompressionBombError as exc:
         raise TooManyPixelsError(str(exc)) from exc
-    except (UnidentifiedImageError, OSError, ValueError, struct.error, IndexError) as exc:
+    # Pillow reports some broken PNG chunks as ``SyntaxError``.
+    except (UnidentifiedImageError, OSError, ValueError, SyntaxError, struct.error,
+            IndexError) as exc:
         raise MetadataNotRemovedError(str(exc)) from exc
 
 
