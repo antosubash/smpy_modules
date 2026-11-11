@@ -9,10 +9,13 @@ upright first, its ICC profile kept. Animated images are left as they came.
 from __future__ import annotations
 
 import io
+import struct
+import zlib
 
 import pytest
 from fastapi import HTTPException, UploadFile
 from pagebuilder.core.settings import PagebuilderSettings
+from pagebuilder.media import media_png
 from pagebuilder.media.media_metadata import _webp_is_lossless
 from pagebuilder.media.media_service import MediaService
 from PIL import Image, ImageCms, PngImagePlugin
@@ -198,3 +201,43 @@ async def test_with_the_setting_off_an_undecodable_file_still_uploads(db, tmp_pa
     asset, path = await _stored(service, bogus, "image/png", "x.png")
     assert path.read_bytes() == bogus
     assert asset.width is None
+
+
+def _chunk(kind: bytes, body: bytes) -> bytes:
+    return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
+
+
+def _png16_with_text() -> bytes:
+    """A 2x1 16-bit RGB PNG (Pillow cannot write one) with a tEXt and a tIME chunk."""
+    ihdr = struct.pack(">IIBBBBB", 2, 1, 16, 2, 0, 0, 0)
+    row = b"\x00" + struct.pack(">6H", 0x1234, 0xABCD, 0x0001, 0xFFFE, 0x8000, 0x7FFF)
+    return (
+        media_png.PNG_SIGNATURE
+        + _chunk(b"IHDR", ihdr)
+        + _chunk(b"tEXt", b"Author\x00Jane Example")
+        + _chunk(b"tIME", b"\x07\xea\x0b\x0b\x0c\x00\x00")
+        + _chunk(b"IDAT", zlib.compress(row))
+        + _chunk(b"IEND", b"")
+    )
+
+
+async def test_a_16_bit_png_keeps_its_depth_and_pixels_exactly(db, tmp_path):
+    original = _png16_with_text()
+    asset, path = await _stored(_service(db, tmp_path), original, "image/png", "deep.png")
+
+    cleaned = path.read_bytes()
+    assert b"Jane Example" not in cleaned and b"tIME" not in cleaned
+    assert media_png.bit_depth(cleaned) == 16
+    # Every chunk that draws the picture is byte for byte the original's.
+    assert cleaned == original.replace(_chunk(b"tEXt", b"Author\x00Jane Example"), b"").replace(
+        _chunk(b"tIME", b"\x07\xea\x0b\x0b\x0c\x00\x00"), b""
+    )
+    assert asset.size_bytes == len(cleaned)
+
+
+async def test_a_png_without_metadata_chunks_is_left_byte_for_byte(db, tmp_path):
+    buf = io.BytesIO()
+    _two_tone().convert("P").save(buf, format="PNG", transparency=0)
+    original = buf.getvalue()
+    _asset, path = await _stored(_service(db, tmp_path), original, "image/png", "p.png")
+    assert path.read_bytes() == original
