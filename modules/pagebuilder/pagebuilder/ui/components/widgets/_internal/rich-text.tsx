@@ -4,7 +4,7 @@ import {
   parseInlineTokens,
   parseMarkdownBlocks,
 } from '../../../utils/markdown';
-import { splitLinks } from '../../../utils/markdown-links';
+import { safeHref, splitLinks } from '../../../utils/markdown-links';
 import { cn } from '../../../utils/widgetUtils';
 import { renderInlineImage } from './inline-image';
 import { MarkdownList } from './markdown-list';
@@ -127,7 +127,10 @@ function renderRichTextNodes(text: string, opts?: RichTextOptions): ReactNode[] 
   });
 }
 
-function anchor(href: string, children: ReactNode, key: string): ReactNode {
+function anchor(raw: string, children: ReactNode, key: string): ReactNode {
+  // `splitLinks` already keeps an unsafe link as text; this is the same rule
+  // every block's hrefs go through (#354), so the renderer never relies on it.
+  const href = safeHref(raw);
   // Scheme-relative `//host/...` is off-site too — it must get the
   // same new-tab + noopener treatment as absolute http(s) links.
   const external = /^(?:https?:)?\/\//.test(href);
