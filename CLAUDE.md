@@ -256,10 +256,11 @@ or with `scripts/set_setting.py`. Anything the module reads while booting
 hydration happens at lifespan start, so a value read earlier is the pydantic
 default no matter what the database says. Mark such fields
 `json_schema_extra=_RESTART` so the Settings screen says a restart is needed.
-Newsletter's `smtp_password` is stored `enc:v1:` under `SM_SECRET_KEY` and written only
+Newsletter's `smtp_password` is stored `enc:v2:` under `SM_SECRET_KEY` (0.0.15's `enc:v1:` is still
+read until 0.1.0) and written only
 through `PUT /api/newsletter/settings/smtp-password` (needs `newsletter.manage` and
-`settings.edit`; on the `smtp` transport workers **refuse** a non-empty SMTP password stored without `enc:v1:`
-(as `scripts/set_setting.py` would store it), and the dispatcher does not run until it is re-saved
+`settings.edit`; on the `smtp` transport workers **refuse** a non-empty SMTP password stored without an `enc:` prefix
+(as `scripts/set_setting.py` would store it; the check is `crypto.is_encrypted`, never one version's prefix), and the dispatcher does not run until it is re-saved
 through that endpoint, so always use the endpoint); the generic Settings screen
 refuses newsletter writes (`manage_url`).
 These settings are SYSTEM-scope: ai has one provider configuration and one
@@ -270,7 +271,24 @@ project root) — never a cwd-relative file (#124): `SM_SECRET_KEY`, for its key
 encryption, and `SM_DATABASE_URL`, only when `sm_ai.contracts.consume_requests`
 is called without a `session_factory` while billing is installed (it then opens
 its own NullPool engine on the host database, `metering._own_factory`). Images
-always passes its factory, so that fallback is for other callers. Images' workers never build the app, so they read
+always passes its factory, so that fallback is for other callers.
+**Stored secrets rotate with `SM_SECRET_KEY_PREVIOUS` (#351).** ai, billing, newsletter and records
+each keep a copy of one `core/crypto.py` (parity family "stored-secret crypto",
+`scripts/tests/parity_crypto.py`; byte vectors in `scripts/tests/test_secret_crypto_formats.py`):
+writes are `enc:v2:` (HKDF-SHA256 of the secret, info `<package>:settings`), `enc:v1:` is read until
+0.1.0, any other `enc:` is unreadable (never plaintext), and every copy decrypts with
+`SM_SECRET_KEY_PREVIOUS` too — one key or a JSON list, from the process env else the located `.env`.
+That variable is the one environment read billing and records make. Change the four copies
+together; `scripts/reencrypt_secrets.py` lists their fields in `reencrypt_support.TARGETS`. Signed
+things (sessions, newsletter and records links, form tokens, image tickets) are not covered:
+`docs/secret-key-rotation.md`.
+**Records' `public_submissions_captcha_secret` is never stored in the clear (#350).** It is a
+`SealedSecret` (`str | None` with an encrypting serializer), so the framework treats it as a json
+field and the Settings screen stores its validated dump — `enc:v2:` — and `scripts/set_setting.py`
+stores a json field's dump the same way; records' secret provider is installed in
+`register_settings` (`core/boot.register_settings`) for the headless scripts. Startup seals a legacy
+plaintext row (compare-and-set); `captcha.verify` decrypts per check and fails closed (503). A new
+records secret field uses `SealedSecret` too; never a plain `str`. Images' workers never build the app, so they read
 the same class with `background_tasks.settings_for(ImagesSettings, "sm_images")`
 (DB-backed, cached about 30 s).
 

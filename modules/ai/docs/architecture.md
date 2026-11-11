@@ -90,10 +90,14 @@ traceback.
 
 ## Keys
 
-`crypto.py`: `Fernet(urlsafe_b64encode(sha256(secret)))`, stored as
-`enc:v1:<token>`. The prefix makes the state unambiguous: it decrypts (the
-key), it fails (`AiKeyUnreadableError`, never a fallback), or it is absent
-(plaintext, warned once per field). Only `AiService.build_changes`
+`crypto.py`: `Fernet(urlsafe_b64encode(HKDF-SHA256(secret, info="sm_ai:settings")))`,
+stored as `enc:v2:<token>`; the 0.0.15 `enc:v1:` (`sha256(secret)`) is still
+read until 0.1.0. Both open under `SM_SECRET_KEY` and every key in
+`SM_SECRET_KEY_PREVIOUS` (a `MultiFernet`). The prefix makes the state
+unambiguous: it decrypts (the key), it fails or names an unknown version
+(`AiKeyUnreadableError`, never a fallback), or it is absent (plaintext, warned
+once per field). The file is one of four copies (billing, newsletter, records)
+pinned by the "stored-secret crypto" parity family. Only `AiService.build_changes`
 (`service.py`) encrypts, and it trims the value first. Blank means keep the
 stored key, and `clear_*` empties it.
 
@@ -200,7 +204,7 @@ async def index(chunks: list[str]) -> None:
 | `services.py` | `AiServices` and the module-global holder |
 | `worker_settings.py` | lazy, TTL-cached hydration where no host registered the module (workers) |
 | `resolve.py` | slot validation and model / embedder construction |
-| `crypto.py` | `enc:v1:` Fernet layer |
+| `crypto.py` | `enc:v2:` Fernet layer (reads `enc:v1:`), key rotation |
 | `service.py`, `deps.py` | read with secrets masked; build and apply changes |
 | `csrf.py` | shares the framework CSRF token with the settings page |
 | `metering.py` | `ai.requests`: registers the meter with an installed billing, and `RequiresAiRequest` (billing's `RequiresQuota`, or a no-op without billing) |

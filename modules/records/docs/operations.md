@@ -632,13 +632,23 @@ restart.
 - **The CAPTCHA.** `public_submissions_captcha_provider` is `none` by
   default. To turn on `turnstile` or `hcaptcha`, set
   `public_submissions_captcha_site_key` and `public_submissions_captcha_secret`
-  (masked on the Settings screen) **and** add the provider to pagebuilder's
+  (masked on the Settings screen, and stored encrypted — see below) **and** add the provider to pagebuilder's
   `public_csp`: `https://challenges.cloudflare.com` (Turnstile) or
   `https://hcaptcha.com https://*.hcaptcha.com` (hCaptcha), in `script-src`,
   `frame-src` and `connect-src`. Records logs a warning at startup when the
   provider's host is missing from it. The server verifies with a 5-second
   timeout and fails closed: while the provider is unreachable, submissions
   are refused with `503 captcha_unavailable`, never accepted unchecked.
+- **The CAPTCHA secret at rest** (#350). It is stored `enc:v2:…`, encrypted
+  under the host's `secret_key`, whichever way it is saved: the Settings screen
+  and `scripts/set_setting.py sm_records public_submissions_captcha_secret
+  '"<secret>"'` (a JSON string — the field is `str | None`) both store the
+  encrypted value, never the text typed. A secret stored in the clear by
+  0.0.15 or earlier still verifies, and is encrypted in place at the next
+  startup (a log line says so). It is decrypted per submission; one that no key
+  opens (the `secret_key` was rotated without `SM_SECRET_KEY_PREVIOUS`) refuses
+  submissions with `503 captcha_unavailable` and logs the field name, never the
+  value — re-enter it, or follow `docs/secret-key-rotation.md` at the repo root.
 - **Retention.** Every process runs a loop that, every
   `public_submissions_retention_interval_seconds` (3600), deletes contact-form
   submissions past their type's retention, newsletter signups never confirmed

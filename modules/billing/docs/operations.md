@@ -54,7 +54,7 @@ environment variables — an `SM_BILLING_*` line does nothing.
 | Field | Default | Notes |
 |---|---|---|
 | `provider` | `manual` | `manual` or `stripe`. Takes effect on save, no restart (see [Switching provider](#switching-provider)). |
-| `stripe_secret_key` | — | `sk_live_…` / `sk_test_…`. Enter it on the connection screen, which encrypts it (`enc:v1:…`, Fernet keyed on the app's `secret_key`). A plaintext value still works and logs a one-time warning. |
+| `stripe_secret_key` | — | `sk_live_…` / `sk_test_…`. Enter it on the connection screen, which encrypts it (`enc:v2:…`, Fernet keyed on the app's `secret_key`; a 0.0.15 `enc:v1:…` value is still read until 0.1.0). A plaintext value still works and logs a one-time warning. To rotate `secret_key` without re-entering it, see `docs/secret-key-rotation.md` at the repo root (`SM_SECRET_KEY_PREVIOUS`, the one thing billing reads from the environment). |
 | `stripe_webhook_secret` | — | `whsec_…`, same storage. |
 | `return_base_url` | — | `https://app.example.com`. Origin for Checkout/portal return links. Blank uses the request's host — set it behind a proxy. |
 | `reconcile_interval_minutes` | `0` | Run [reconcile](#reconcile) inside the app every N minutes over subscriptions not synced for N minutes. `0` is off. Takes effect on save: the loop starts, stops or re-times itself. `60` suits most deployments. |

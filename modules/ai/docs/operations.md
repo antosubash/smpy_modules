@@ -29,7 +29,7 @@
 | `chat_provider` | `anthropic` | `anthropic`, `openai`, `google`, `openai_compatible` |
 | `chat_model` | `claude-opus-5` | bare model name, no provider prefix |
 | `chat_base_url` | `""` | required for `openai_compatible` (a save without one is a `422`); an optional proxy/gateway override otherwise |
-| `chat_api_key` | `""` | stored `enc:v1:…` when saved through the AI page |
+| `chat_api_key` | `""` | stored `enc:v2:…` when saved through the AI page |
 | `embedding_provider` | `""` | `""` = not configured; `openai`, `google`, `openai_compatible` |
 | `embedding_model` | `""` | |
 | `embedding_base_url` | `""` | as for chat |
@@ -85,8 +85,10 @@ already saved on the AI page are unaffected: their row always won.
 ## Keys at rest
 
 Keys saved through the AI page or `PUT /api/ai/settings` are stored as
-`enc:v1:<Fernet token>`. The Fernet key is the SHA-256 of the app's secret,
-URL-safe base64-encoded. The secret is the running app's `secret_key` (which a
+`enc:v2:<Fernet token>`. The Fernet key is HKDF-SHA256 of the app's secret with
+the info string `sm_ai:settings` (so no other module's key opens it), URL-safe
+base64-encoded. 0.0.15 wrote `enc:v1:` (the SHA-256 of the secret); that is
+still read, with one warning per field, until 0.1.0. The secret is the running app's `secret_key` (which a
 host may set in code via `create_app(settings=...)`), falling back to
 `SM_SECRET_KEY` from the environment, then from the project `.env` as the
 framework's `BootstrapSettings` locates it: `$SM_PROJECT_ROOT/.env` when that
@@ -101,17 +103,22 @@ When a key is read:
 
 | Stored value | Result |
 |---|---|
-| `enc:v1:…` that decrypts | the key |
-| `enc:v1:…` that doesn't decrypt | `AiKeyUnreadableError` — never a silent fallback |
+| `enc:v2:…` that `SM_SECRET_KEY` or a key in `SM_SECRET_KEY_PREVIOUS` opens | the key |
+| `enc:v1:…` that one of them opens | the key; a warning is logged once per field |
+| `enc:…` that none opens, or another version | `AiKeyUnreadableError` — never a silent fallback |
 | no prefix | used as plaintext; a warning is logged once per field |
 
 ### Secret key rotation
 
-Changing `SM_SECRET_KEY` makes every stored `enc:v1:` key unreadable. Nothing
-breaks at boot. Each consumer's `resolve_*` call and each **Test connection**
-fails with "The stored key '…' cannot be decrypted — SM_SECRET_KEY has
-changed." Re-enter the chat and embedding keys on the AI page after a
-rotation. The module doesn't re-encrypt old keys.
+Rotate with `SM_SECRET_KEY_PREVIOUS` and `scripts/reencrypt_secrets.py`, as
+[docs/secret-key-rotation.md](../../../docs/secret-key-rotation.md) describes:
+with the old key in `SM_SECRET_KEY_PREVIOUS` the stored keys keep working, and
+the script re-encrypts them under the new one. Changing `SM_SECRET_KEY`
+*without* keeping the old key makes every stored key unreadable. Nothing breaks
+at boot, but each consumer's `resolve_*` call and each **Test connection**
+fails with "The stored key '…' cannot be decrypted with SM_SECRET_KEY or any
+key in SM_SECRET_KEY_PREVIOUS …"; add the old key back, or re-enter the chat
+and embedding keys on the AI page.
 
 ## Multiple workers
 
