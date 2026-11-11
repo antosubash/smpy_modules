@@ -1,4 +1,4 @@
-"""Where a JPEG's primary image ends, so a trailer after it can go (#356).
+"""Where a JPEG's primary image ends, and whether it carries metadata (#356).
 
 Phones append data after a JPEG's end-of-image marker (``FFD9``): a Samsung
 motion photo carries a video and an ``SEFT`` trailer that can hold metadata,
@@ -12,13 +12,20 @@ entropy-coded data is scanned, where ``FF00`` is a stuffed byte, ``FFD0`` to
 segment walk (a progressive JPEG has several scans). A file that does not walk
 cleanly to ``EOI`` raises :class:`JpegStructureError`; the caller re-saves it
 instead (truncated files from cameras and scanners are common).
+
+The same walk classifies every segment in the file, between scans too (Pillow's
+own inventory stops at the first ``SOS``). Only the JFIF header without a
+thumbnail, the ICC profile and the Adobe colour-transform segment are not
+metadata; any other ``APPn`` (EXIF, XMP, IPTC, MPF, a ``JFXX`` thumbnail…) and
+every comment are.
 """
 
 from __future__ import annotations
 
 import struct
 
-_SOI, _EOI, _SOS = 0xD8, 0xD9, 0xDA
+_SOI, _EOI, _SOS, _COM = 0xD8, 0xD9, 0xDA, 0xFE
+_APP0, _APP2, _APP14, _APP15 = 0xE0, 0xE2, 0xEE, 0xEF
 # Markers with no length field: TEM and the restart markers.
 _STANDALONE = frozenset({0x01, *range(0xD0, 0xD8)})
 
@@ -42,8 +49,26 @@ def _after_scan(data: bytes, pos: int) -> int:
             return pos
 
 
-def image_end(data: bytes) -> int:
-    """The offset just past the primary image's ``EOI``."""
+def _is_metadata(marker: int, payload: bytes) -> bool:
+    if marker == _COM:
+        return True
+    if not _APP0 <= marker <= _APP15:
+        return False  # tables, frame and scan headers: the picture itself
+    if marker == _APP0:
+        # "JFIF\0", version, units, densities, then the thumbnail's width and height.
+        return not (payload.startswith(b"JFIF\x00") and len(payload) >= 14
+                    and payload[12] == payload[13] == 0)
+    if marker == _APP2:
+        return not payload.startswith(b"ICC_PROFILE\x00")
+    if marker == _APP14:
+        return not payload.startswith(b"Adobe")
+    return True
+
+
+def scan(data: bytes) -> tuple[int, bool]:
+    """``(end, metadata)``: the offset just past the primary image's ``EOI``, and
+    whether any segment before it is metadata."""
+    metadata = False
     if not data.startswith(b"\xff\xd8"):
         raise JpegStructureError("not a JPEG")
     pos = 2
@@ -56,7 +81,7 @@ def image_end(data: bytes) -> int:
             raise JpegStructureError("truncated marker")
         marker = data[pos + 1]
         if marker == _EOI:
-            return pos + 2
+            return pos + 2, metadata
         if marker in _STANDALONE:
             pos += 2
             continue
@@ -65,12 +90,12 @@ def image_end(data: bytes) -> int:
         (length,) = struct.unpack(">H", data[pos + 2 : pos + 4])
         if length < 2 or pos + 2 + length > len(data):
             raise JpegStructureError(f"truncated segment {marker:#04x} at offset {pos}")
+        metadata = metadata or _is_metadata(marker, data[pos + 4 : pos + 2 + length])
         pos += 2 + length
         if marker == _SOS:
             pos = _after_scan(data, pos)
 
 
-def strip_trailer(data: bytes) -> bytes | None:
-    """*data* cut at its primary image's end, or ``None`` when nothing follows it."""
-    end = image_end(data)
-    return data[:end] if end < len(data) else None
+def image_end(data: bytes) -> int:
+    """The offset just past the primary image's ``EOI``."""
+    return scan(data)[0]

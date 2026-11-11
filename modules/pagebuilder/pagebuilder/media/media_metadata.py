@@ -82,26 +82,6 @@ class MetadataNotRemovedError(Exception):
     """
 
 
-# JPEG APP segments that are not metadata: JFIF (APP0), ICC (APP2), Adobe (APP14).
-_JPEG_HARMLESS_APP = {"APP0", "APP2", "APP14"}
-_INFO_METADATA = ("exif", "xmp", "XML:com.adobe.xmp", "comment", "photoshop")
-
-
-def _has_metadata(image: Image.Image) -> bool:
-    """Whether there is anything to remove: a clean file is left byte for byte.
-
-    That keeps the step idempotent — a restored bundle's already-clean JPEG is
-    not re-encoded, so its digest still matches on the next restore.
-    """
-    if len(image.getexif()) or any(key in image.info for key in _INFO_METADATA):
-        return True
-    if image.format == "MPO":
-        return True  # its other pictures go too
-    if image.format == "JPEG" and any(m not in _JPEG_HARMLESS_APP for m, _ in image.applist):
-        return True
-    return bool(getattr(image, "text", None))  # PNG tEXt/iTXt/zTXt chunks
-
-
 def _turns(image: Image.Image) -> bool:
     return image.getexif().get(_EXIF_ORIENTATION, 1) != 1
 
@@ -120,20 +100,20 @@ _CHUNK_COPY = {"PNG": media_png.strip_chunks, "WEBP": media_webp.strip_chunks}
 _FRAME_PIXEL_BUDGET = 10
 
 
-def _verified(cleaned: bytes | None) -> bytes | None:
+def _verified(cleaned: bytes | None, source: bytes) -> bytes | None:
     """*cleaned*, once Pillow has decoded every frame: never store an unreadable original.
 
-    An animation's frames are decoded one by one, so a broken later frame is
-    refused too. Raises :class:`TooManyPixelsError` once the frames together
-    exceed :data:`_FRAME_PIXEL_BUDGET` times the pixel limit, before decoding
-    the frame that would cross it.
+    With nothing removed (``None``) *source* is decoded instead, since it is
+    stored as it is and the thumbnails skip an animation. An animation's
+    frames are decoded one by one, so a broken later frame is refused too.
+    Raises :class:`TooManyPixelsError` once the frames together exceed
+    :data:`_FRAME_PIXEL_BUDGET` times the pixel limit, before decoding the
+    frame that would cross it.
     """
-    if cleaned is None:
-        return None
     limit = Image.MAX_IMAGE_PIXELS
     budget = None if limit is None else limit * _FRAME_PIXEL_BUDGET
     total = 0
-    with Image.open(io.BytesIO(cleaned)) as image:
+    with Image.open(io.BytesIO(source if cleaned is None else cleaned)) as image:
         # Every frame it claims, not until the first EOFError: a frame that
         # ends early is refused (``clean_bytes`` catches it), not the end.
         for index in range(getattr(image, "n_frames", 1)):
@@ -170,19 +150,20 @@ def clean_bytes(data: bytes, content_type: str) -> bytes | None:
             elif is_animated(image) or (fmt == "WEBP" and not _turns(image)):
                 # An animated file keeps its frames as they are, turned or not.
                 strip = _CHUNK_COPY.get(fmt)
-                return _verified(strip(data)) if strip else None
+                return _verified(strip(data), data) if strip else None
             if fmt == "PNG" and not _png_turns(image, data):
-                image.load()  # fail closed on a PNG whose pixels do not decode
-                return _verified(media_png.strip_chunks(data))
-            if not _has_metadata(image):
-                if fmt != "JPEG":
-                    return None
-                # Bytes after a JPEG's end (a motion photo's video and trailer)
-                # are metadata too: cut there, losslessly.
+                return _verified(media_png.strip_chunks(data), data)
+            if image.format == "JPEG":
+                # The marker walk, not Pillow's inventory, which stops at the
+                # first scan. Bytes after the end (a motion photo's video and
+                # trailer) are metadata too: with nothing else, cut there.
                 try:
-                    return _verified(media_jpeg.strip_trailer(data))
+                    end, metadata = media_jpeg.scan(data)
                 except media_jpeg.JpegStructureError:
-                    pass  # no proper end (a truncated camera file): re-saved below
+                    metadata = True  # no proper end (a truncated camera file): re-save
+                if not metadata:
+                    return _verified(data[:end] if end < len(data) else None, data)
+            # A JPEG with metadata, an MPO, or a turned PNG or WebP: re-saved.
             options = _save_options(image, fmt, data)
             quarter_turn = image.getexif().get(_EXIF_ORIENTATION, 1) in (5, 6, 7, 8)
             image.load()
@@ -202,9 +183,9 @@ def clean_bytes(data: bytes, content_type: str) -> bytes | None:
                 # Pillow kept only ICC and transparency: put the gamma,
                 # chromaticities, sRGB intent and the rest back.
                 return _verified(
-                    media_png.carry_chunks(data, out.getvalue(), swap_axes=quarter_turn)
+                    media_png.carry_chunks(data, out.getvalue(), swap_axes=quarter_turn), data
                 )
-            return _verified(out.getvalue())
+            return _verified(out.getvalue(), data)
     except Image.DecompressionBombError as exc:
         raise TooManyPixelsError(str(exc)) from exc
     # Pillow reports some broken PNG chunks as ``SyntaxError``, and an

@@ -35,22 +35,24 @@ name the module they affect.
   IPTC or comments, its ICC profile kept; `size_bytes` is the cleaned file's. A
   JPEG is re-saved with its own quantisation tables and its EXIF orientation
   applied; a multi-picture JPEG (MPO, as phones save photos) keeps only its
-  primary picture, as a plain JPEG. Whatever follows a JPEG's end (a motion
-  photo's video and trailer) goes too: a JPEG with nothing else to remove is cut
-  losslessly at its true end, found by walking its markers, or re-saved when
-  they do not lead to one (a truncated file from a camera or scanner). A PNG or
-  WebP is not re-encoded: its metadata chunks are dropped and the compressed
-  picture copied byte for byte, so a 16-bit PNG keeps its depth and a lossy WebP
-  loses no quality. Only a still WebP or 8-bit PNG with an EXIF orientation is
-  turned and re-saved. Animated PNG (APNG) and WebP are cleaned the same way,
-  every frame kept and none turned. GIF is stored untouched, and so is a file
-  with nothing to remove. It fails closed: a file that cannot be read, parsed or
-  re-saved, or an animation with a frame that does not decode, is refused with
-  `415` `image_metadata_not_removed` (the console says why), never stored with
-  its metadata; an animation whose frames total over ten times the pixel limit
-  is a `413`. The new setting `media_strip_metadata` (on by default) turns it
-  off. Not retroactive: files already in the library keep their metadata. The
-  media and snapshot settings moved to `pagebuilder.core.settings_media`
+  primary picture, as a plain JPEG. A JPEG's segments are all checked, between
+  progressive scans too, and a JFIF or JFXX thumbnail counts as metadata.
+  Whatever follows a JPEG's end (a motion photo's video and trailer) goes too: a
+  JPEG with nothing else to remove is cut losslessly at its true end, found by
+  walking its markers, or re-saved when they do not lead to one (a truncated
+  file from a camera or scanner). A PNG or WebP is not re-encoded: its metadata
+  chunks are dropped and the compressed picture copied byte for byte, so a
+  16-bit PNG keeps its depth and a lossy WebP loses no quality. Only a still
+  WebP or 8-bit PNG with an EXIF orientation is turned and re-saved. Animated
+  PNG (APNG) and WebP are cleaned the same way, every frame kept and none
+  turned. GIF is stored untouched, and so is a file with nothing to remove. It
+  fails closed: a file that cannot be read, parsed or re-saved, or an animation
+  with a frame that does not decode, is refused with `415`
+  `image_metadata_not_removed` (the console says why), never stored with its
+  metadata; an animation whose frames total over ten times the pixel limit is a
+  `413`. The new setting `media_strip_metadata` (on by default) turns it off.
+  Not retroactive: files already in the library keep their metadata. The media
+  and snapshot settings moved to `pagebuilder.core.settings_media`
   (`PagebuilderSettings` inherits them, so nothing changes for a caller), which
   lists them first on the Settings screen.
 

@@ -109,3 +109,50 @@ async def test_a_jpeg_neither_walk_nor_pillow_can_read_is_refused(db, tmp_path):
     assert refused.value.status_code == 415
     assert refused.value.detail["code"] == "image_metadata_not_removed"
     assert list(service.tenant_dir().iterdir()) == []
+
+
+def _segment(marker: int, payload: bytes) -> bytes:
+    return bytes([0xFF, marker]) + (len(payload) + 2).to_bytes(2, "big") + payload
+
+
+def _insert_before_second_scan(data: bytes, *segments: bytes) -> bytes:
+    at = data.index(b"\xff\xda", data.index(b"\xff\xda") + 2)
+    return data[:at] + b"".join(segments) + data[at:]
+
+
+async def test_metadata_between_the_scans_of_a_progressive_jpeg_is_removed(db, tmp_path):
+    """Pillow's inventory stops at the first scan; the marker walk does not."""
+    xmp = _segment(0xE1, b"http://ns.adobe.com/xap/1.0/\x00<x:xmpmeta>GPS 48.2N</x:xmpmeta>")
+    com = _segment(0xFE, b"Owner: Jane Example")
+    data = _insert_before_second_scan(_clean_jpeg(progressive=True), xmp, com)
+    with Image.open(io.BytesIO(data)) as probe:
+        probe.load()
+        assert "comment" not in probe.info and "xmp" not in probe.info  # Pillow missed them
+    _asset, path = await _stored(_service(db, tmp_path), data, "image/jpeg", "p.jpg")
+    raw = path.read_bytes()
+    assert b"GPS 48.2N" not in raw and b"Jane Example" not in raw
+    assert media_jpeg.scan(raw) == (len(raw), False)
+
+
+def _jfif(thumbnail: tuple[int, int]) -> bytes:
+    return _segment(0xE0, b"JFIF\x00\x01\x02\x00\x00\x01\x00\x01" + bytes(thumbnail)
+                    + b"\x00" * (3 * thumbnail[0] * thumbnail[1]))
+
+
+@pytest.mark.parametrize(
+    "segment",
+    [
+        _segment(0xE0, b"JFXX\x00\x10" + b"\xff\xd8 thumbnail GPS 48.2N \xff\xd9"),
+        _jfif((2, 1)),
+    ],
+    ids=["jfxx-extension", "jfif-thumbnail"],
+)
+async def test_an_app0_thumbnail_counts_as_metadata(db, tmp_path, segment):
+    clean = _clean_jpeg()
+    assert media_jpeg.scan(clean) == (len(clean), False)  # Pillow's own JFIF header
+    data = clean[:2] + segment + clean[2:]
+    assert media_jpeg.scan(data)[1] is True
+    _asset, path = await _stored(_service(db, tmp_path), data, "image/jpeg", "t.jpg")
+    raw = path.read_bytes()
+    assert segment not in raw and b"JFXX" not in raw
+    assert media_jpeg.scan(raw) == (len(raw), False)

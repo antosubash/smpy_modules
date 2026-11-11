@@ -55,9 +55,19 @@ def _broken_second_frame(fmt: str) -> bytes:
     return data[:at] + bytes(b ^ 0xFF for b in data[at : at + 8]) + data[at + 8 :]
 
 
+# With metadata the cleaned bytes are checked; without, the original is stored
+# as it is, and checked itself (the thumbnails skip an animation).
+_METADATA = pytest.mark.parametrize("metadata", [True, False], ids=["cleaned", "as-is"])
+
+
+def _maybe_comment(fmt: str, data: bytes, metadata: bool) -> bytes:
+    return _with_comment(fmt, data) if metadata else data
+
+
+@_METADATA
 @pytest.mark.parametrize("fmt", ["PNG", "WEBP"])
-async def test_an_animation_with_a_broken_later_frame_is_refused(db, tmp_path, fmt):
-    data = _with_comment(fmt, _broken_second_frame(fmt))
+async def test_an_animation_with_a_broken_later_frame_is_refused(db, tmp_path, fmt, metadata):
+    data = _maybe_comment(fmt, _broken_second_frame(fmt), metadata)
     with Image.open(io.BytesIO(data)) as probe:
         probe.load()  # the first frame alone decodes fine
     service = _service(db, tmp_path)
@@ -78,13 +88,17 @@ async def test_a_sound_two_frame_animation_is_stored(db, tmp_path, fmt):
         assert image.n_frames == 2
 
 
-async def test_frames_over_the_total_pixel_budget_are_refused(db, tmp_path, monkeypatch):
+@_METADATA
+@pytest.mark.parametrize("fmt", ["PNG", "WEBP"])
+async def test_frames_over_the_total_pixel_budget_are_refused(
+    db, tmp_path, monkeypatch, fmt, metadata
+):
     """Each frame is within the limit; twelve of them are over ten times it."""
-    data = _with_comment("PNG", _animation("PNG", frames=12))
+    data = _maybe_comment(fmt, _animation(fmt, frames=12), metadata)
     monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 100)
     service = _service(db, tmp_path)
     with pytest.raises(HTTPException) as refused:
-        await service.upload(_upload(data, "image/png", "loop.png"))
+        await service.upload(_upload(data, f"image/{fmt.lower()}", "loop"))
     assert refused.value.status_code == 413
     assert refused.value.detail["code"] == "image_too_many_pixels"
     assert list(service.tenant_dir().iterdir()) == []
