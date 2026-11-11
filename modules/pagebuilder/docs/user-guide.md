@@ -380,6 +380,8 @@ one, is refused with an error naming the block and the field, for example *Block
 Button (Button-3), field href: 'javascript:…' is not an allowed link*. Use an
 `http(s)`, `mailto` or `tel` address, or a relative one (`/about`, `#top`). A link
 saved before this check renders as `#` (going nowhere) until the block is fixed.
+An **Iframe** or **Video** block's source must be an `http(s)` or relative
+address; any other renders as the empty block.
 
 Many other blocks' multi-line text fields accept the same inline syntax and
 lists; there, `#` headings render as bold paragraphs so the page's heading order

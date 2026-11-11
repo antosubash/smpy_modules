@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isSafeHref, isSafeImageSrc, safeHref, splitLinks } from './markdown-links';
+import { isSafeHref, isSafeImageSrc, safeFrameSrc, safeHref, splitLinks } from './markdown-links';
 
 describe('splitLinks', () => {
   it('returns plain text as a single text segment', () => {
@@ -95,5 +95,16 @@ describe('safeHref', () => {
   it('sees a scheme behind leading spaces, as a browser does', () => {
     expect(isSafeHref('  javascript:alert(1)')).toBe(false);
     expect(isSafeHref('  /fine')).toBe(true);
+  });
+});
+
+describe('safeFrameSrc', () => {
+  it('loads http(s) and relative sources only', () => {
+    for (const src of ['https://x.example/e', 'http://x', '/media/a.mp4', '//cdn.example/v']) {
+      expect(safeFrameSrc(src)).toBe(src);
+    }
+    for (const src of ['javascript:x', 'data:text/html,x', 'mailto:a@b', ' vbscript:x', '', null]) {
+      expect(safeFrameSrc(src)).toBe('');
+    }
   });
 });

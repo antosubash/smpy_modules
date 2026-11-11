@@ -64,6 +64,17 @@ export function safeHref(href: unknown, fallback = '#'): string {
   return isSafeHref(href) ? href : fallback;
 }
 
+/**
+ * An `Iframe` or `Video` block's source, as it may load into the page: http(s)
+ * or scheme-less, otherwise `''` (no frame). Stricter than `safeHref`, since a
+ * frame has no use for `mailto:` or `tel:`. The server's rule is the same
+ * (`pagebuilder.content.links.FRAME_SOURCES`).
+ */
+export function safeFrameSrc(src: unknown): string {
+  if (typeof src !== 'string' || !src.trim()) return '';
+  return hasAllowedScheme(src, ['http', 'https']) ? src : '';
+}
+
 /** Scheme-less, or one of `schemes`; never a URL with a control character. */
 function hasAllowedScheme(url: string, schemes: string[]): boolean {
   if (CONTROL_CHAR.test(url)) return false;

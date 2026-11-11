@@ -18,7 +18,12 @@ one ``safeHref`` applies at render to anything stored before this check:
 What is checked is found generically, not per block: every prop named ``href``
 or ending in ``Href`` (``ctaHref``, ``links[2].href``, …), at any depth, and the
 target of every Markdown link ``[label](target)`` in any string prop — rich text
-renders those as anchors. Image sources are not links and are not checked here.
+renders those as anchors.
+
+A frame or player source is stricter: the ``src`` of an ``Iframe`` or ``Video``
+block (:data:`FRAME_SOURCES`) loads into the page, so it must be http(s) or
+scheme-less — no ``mailto:``/``tel:`` either. The Iframe block restricts no host;
+this does not add one. Image sources are not links and are not checked here.
 """
 
 from __future__ import annotations
@@ -28,6 +33,9 @@ from collections.abc import Collection, Iterator
 from typing import Any
 
 SAFE_SCHEMES: frozenset[str] = frozenset({"http", "https", "mailto", "tel"})
+FRAME_SCHEMES: frozenset[str] = frozenset({"http", "https"})
+#: Block type → props that load into a frame or player (client: ``safeFrameSrc``).
+FRAME_SOURCES: dict[str, tuple[str, ...]] = {"Iframe": ("src",), "Video": ("src",)}
 
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _SCHEME = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*):")
@@ -43,15 +51,17 @@ class UnsafeLinkError(ValueError):
     """A block carries a link outside the allow-list; the message names where."""
 
 
-def is_safe_href(value: str, *, extra_schemes: Collection[str] = ()) -> bool:
-    """Whether *value* may be written into ``<a href>``."""
+def is_safe_href(
+    value: str, *, extra_schemes: Collection[str] = (), schemes: Collection[str] = SAFE_SCHEMES
+) -> bool:
+    """Whether *value* may be written into ``<a href>`` (or, with *schemes*, a frame)."""
     if _CONTROL.search(value):
         return False
     scheme = _SCHEME.match(value.lstrip())
     if scheme is None:
         return True
     name = scheme.group(1).lower()
-    return name in SAFE_SCHEMES or name in extra_schemes
+    return name in schemes or name in extra_schemes
 
 
 def _is_link_key(key: str) -> bool:
@@ -65,18 +75,24 @@ def _markdown_targets(text: str) -> Iterator[str]:
     yield from _MD_LINK.findall(_MD_IMAGE.sub("img", text))
 
 
-def _walk(node: Any, block: str, path: str) -> Iterator[tuple[str, str, str]]:
-    """Yield ``(block, field path, link)`` for every link-carrying string in *node*."""
+_Found = tuple[str, str, str, frozenset[str]]
+
+
+def _walk(node: Any, block: str, path: str) -> Iterator[_Found]:
+    """Yield ``(block, field path, link, allowed schemes)`` for every link in *node*."""
     if isinstance(node, dict):
         props = node.get("props")
         if isinstance(node.get("type"), str) and isinstance(props, dict):
             name = f"{node['type']} ({props.get('id') or 'no id'})"
+            for key in FRAME_SOURCES.get(node["type"], ()):
+                if isinstance(props.get(key), str):
+                    yield name, key, props[key], FRAME_SCHEMES
             yield from _walk(props, name, "")
             return
         for key, value in node.items():
             field = f"{path}.{key}" if path else str(key)
             if isinstance(value, str) and _is_link_key(str(key)):
-                yield block, field, value
+                yield block, field, value, SAFE_SCHEMES
             else:
                 yield from _walk(value, block, field)
     elif isinstance(node, list):
@@ -84,7 +100,7 @@ def _walk(node: Any, block: str, path: str) -> Iterator[tuple[str, str, str]]:
             yield from _walk(value, block, f"{path}[{index}]")
     elif isinstance(node, str):
         for target in _markdown_targets(node):
-            yield block, path, target
+            yield block, path, target, SAFE_SCHEMES
 
 
 def check_links(
@@ -96,14 +112,14 @@ def check_links(
     one; *label* prefixes the message (``"header_data: "``). *extra_schemes*
     admits a scheme only a caller knows about — a bundle's ``asset:`` sentinel.
     """
-    for block, field, link in _walk(data, "root", ""):
-        if is_safe_href(link, extra_schemes=extra_schemes):
+    for block, field, link, schemes in _walk(data, "root", ""):
+        if is_safe_href(link, extra_schemes=extra_schemes, schemes=schemes):
             continue
         shown = link if len(link) <= _SHOWN else f"{link[:_SHOWN]}…"
         raise UnsafeLinkError(
             f"{label}Block {block}, field {field or 'text'}: {shown!r} is not an allowed "
-            "link. Use an http(s), mailto or tel address, or a relative one "
-            "(/page, #anchor)."
+            f"link. Use an {'http(s)' if schemes == FRAME_SCHEMES else 'http(s), mailto or tel'} "
+            "address, or a relative one (/page, #anchor)."
         )
 
 

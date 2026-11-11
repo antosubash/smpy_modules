@@ -85,7 +85,9 @@ with 422 when a block carries a link outside the allow-list: every prop named
 `href` or ending in `Href`, at any depth (`links[2].href`, `primaryHref`), and the
 target of every Markdown link `[label](target)` in any string prop. Allowed: no
 scheme (`/about`, `#top`, `?q=1`, `./x`, `contact`, `//cdn.example/x`) or `http`,
-`https`, `mailto`, `tel`; never a control character. The error's `msg` names
+`https`, `mailto`, `tel`; never a control character. The `src` of an `Iframe` or `Video` block
+loads into the page, so it is stricter: `http`, `https` or no scheme only (the
+Iframe block restricts no host). The error's `msg` names
 the block type, its id and the field: `Value error, Block Button (Button-3),
 field href: 'javascript:alert(1)' is not an allowed link. …`. An uploaded bundle
 (`POST /snapshots/upload`) is checked the same way and refused as an invalid

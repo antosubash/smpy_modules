@@ -143,3 +143,30 @@ async def test_a_layout_save_refuses_an_unsafe_link(authed_client):
 
     fine = await authed_client.put(LAYOUT, json={"footer_data": _doc(_button("mailto:a@b.org"))})
     assert fine.status_code == 200, fine.text
+
+
+@pytest.mark.parametrize("block", ["Iframe", "Video"])
+@pytest.mark.parametrize("src", ["javascript:alert(1)", "data:text/html,x", "mailto:a@b.org"])
+async def test_a_frame_source_is_http_or_relative_only(block, src):
+    doc = _doc({"type": block, "props": {"id": "f-1", "src": src}})
+    with pytest.raises(UnsafeLinkError, match=rf"{block} \(f-1\), field src.*http\(s\) address"):
+        check_links(doc)
+
+
+@pytest.mark.parametrize("src", ["https://maps.example/embed", "/media/clip.mp4", ""])
+async def test_an_http_or_relative_frame_source_passes(src):
+    check_links(_doc({"type": "Iframe", "props": {"id": "f", "src": src}}))
+
+
+async def test_an_image_src_keeps_its_own_rules():
+    """Only frame blocks' ``src`` is checked: an image source is not a link."""
+    check_links(_doc({"type": "Image", "props": {"id": "i", "src": "data:image/png,x"}}))
+
+
+async def test_a_page_save_refuses_an_unsafe_iframe(authed_client):
+    iframe = {"type": "Iframe", "props": {"id": "Iframe-1", "src": "javascript:alert(1)"}}
+    response = await authed_client.post(
+        PAGES, json={"title": "x", "slug": "x", "draft_data": _doc(iframe)}
+    )
+    assert response.status_code == 422
+    assert "Iframe (Iframe-1), field src" in response.text

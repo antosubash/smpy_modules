@@ -23,9 +23,9 @@ name the module they affect.
   the site layout whose blocks carry a link outside `http`, `https`, `mailto`,
   `tel` or a relative address (`javascript:`, `data:`, `vbscript:`, …), in any
   `href`/`…Href` prop or a Markdown link in text, is a 422 naming the block and
-  the field; an uploaded bundle is refused the same way. Every block now renders
-  its links through one helper, `safeHref`, so a value stored earlier shows as
-  `#`. React and the public CSP already kept such a link from running; this
+  the field (an `Iframe` or `Video` block's `src`: `http(s)` or relative only); an uploaded bundle is refused the same way. Every block now renders
+  its links through one helper, `safeHref` (frames through `safeFrameSrc`), so a
+  value stored earlier shows as `#` (a frame as the empty block). React and the public CSP already kept such a link from running; this
   keeps it out of the data other consumers read. A leading space no longer
   hides a scheme from `isSafeHref`.
 - **pagebuilder strips camera metadata from uploads** (#356). A JPEG, PNG or
