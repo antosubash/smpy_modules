@@ -20,9 +20,12 @@ any other answers ``recipient_not_allowed``. Of the allowed, an address with a
 ``complaint`` or ``unsubscribed`` suppression in the tenant (any list: they are
 tenant-wide, matched by the suppression table's address hash) answers
 ``suppressed``, whichever reason it is (both sides hash the canonical form,
-``normalise_email``, so a spelling variant matches). Both are decided before the lock, write
-no ledger row and use no budget; admission is all-or-nothing over what is
-actually sent, and when nothing is left the lock is not taken at all.
+``normalise_email``, so a spelling variant matches). ``submitted`` adds the
+raw forms each recipient was typed in, so a row a pre-#348 build wrote under
+the legacy key of such a spelling is found too (``lookup_hashes``). Both are
+decided before the lock, write no ledger row and use no budget; admission is
+all-or-nothing over what is actually sent, and when nothing is left the lock
+is not taken at all.
 
 A result carries the outcome and a stable ``code`` only (``smtp_<reply>``,
 ``dispatch_busy``); the relay's reply text stays in the ledger row and the
@@ -32,7 +35,7 @@ server log.
 from __future__ import annotations
 
 import logging
-from collections.abc import Collection
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 from email.utils import formataddr
@@ -110,6 +113,7 @@ async def send_test(
     allowed: Collection[str],
     roles: Roles,
     now: datetime | None = None,
+    submitted: Mapping[str, Sequence[str]] | None = None,
 ) -> list[TestSendResult]:
     """Send campaign ``campaign_id`` to ``recipients`` (already normalised, 1 to 5),
     each of them only if it is in ``allowed`` and not suppressed.
@@ -133,7 +137,7 @@ async def send_test(
     check_campaign_headers(campaign)
     message = await _message(app, tenant_id, campaign, settings)
     transport = transport_for(settings)
-    refused = await _refusals(session, tenant_id, recipients, allowed)
+    refused = await _refusals(session, tenant_id, recipients, allowed, submitted or {})
     to_send = [r for r in recipients if r not in refused]
     await finalize_session(session)  # no read transaction held while waiting
     sent = await _deliver(
@@ -143,14 +147,20 @@ async def send_test(
 
 
 async def _refusals(
-    session: AsyncSession, tenant_id: str, recipients: list[str], allowed: Collection[str]
+    session: AsyncSession,
+    tenant_id: str,
+    recipients: list[str],
+    allowed: Collection[str],
+    submitted: Mapping[str, Sequence[str]],
 ) -> dict[str, TestSendResult]:
     """The recipients that are not sent, each with its result."""
     out = {r: TestSendResult(r, NOT_ALLOWED) for r in recipients if r not in allowed}
     vouched = [r for r in recipients if r not in out]
     if vouched:
+        # Every spelling a row may be keyed by; all of them fold to normalise_email(r).
+        emails = sorted({e for r in vouched for e in (r, *submitted.get(r, ()))})
         blocked = await suppressed(
-            session, tenant_id=tenant_id, emails=vouched, reasons=REFUSING_REASONS
+            session, tenant_id=tenant_id, emails=emails, reasons=REFUSING_REASONS
         )
         out.update(
             {r: TestSendResult(r, SUPPRESSED) for r in vouched if normalise_email(r) in blocked}

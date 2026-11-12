@@ -43,7 +43,7 @@ from sm_newsletter.core.errors_audience import (
     OptOutStands,
     SuppressionChanged,
 )
-from sm_newsletter.core.suppression import email_hash, records_form
+from sm_newsletter.core.suppression import lookup_hashes, records_form
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.core.upsert import affected_rows
 from sm_newsletter.models import Suppression, SuppressionLift
@@ -136,7 +136,7 @@ async def lift(
         if row.created_at != seen:
             raise SuppressionChanged()
         try:
-            same = email_hash(email) == row.email_hash
+            same = row.email_hash in lookup_hashes(email)
         except ValueError:
             same = False
         if not same:

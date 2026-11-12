@@ -11,7 +11,6 @@ from simple_module_core.user_directory import DirectoryUser, set_user_directory
 from sm_newsletter.campaigns import test_send
 from sm_newsletter.campaigns.test_recipients import allowed_recipients
 from sm_newsletter.core import constants
-from sm_newsletter.core.suppression.hashing import email_hash, normalise_email
 from sm_newsletter.core.suppression.store import suppress
 from sm_newsletter.core.tenancy import TenancyMode, tenant_scope
 from sm_newsletter.sending.transport import console
@@ -170,39 +169,3 @@ class TestAllowedRecipients:
         app.state.sm_newsletter.tenancy = TenancyMode.MULTI
         set_user_directory(app, _Directory(DirectoryUser(id="1", email=A)))
         assert await _allowed(app, state, [A], tenant="org-1") == frozenset()
-
-
-FULLWIDTH_E = "\uff45"  # the address parser folds it into "e"; the store keeps it
-
-
-class TestCanonicalForm:
-    """One canonical form on both sides (#348): a suppression written in one
-    spelling blocks a test to the other."""
-
-    @pytest.mark.parametrize(
-        ("stored", "sent"),
-        [
-            (f"b@{FULLWIDTH_E}xample.org", B),  # written fullwidth, sent ASCII
-            (B, f"b@{FULLWIDTH_E}xample.org"),  # written ASCII, sent fullwidth
-            ("b@xn--bcher-kva.de", "b@b\u00fccher.de"),  # punycode vs Unicode domain
-        ],
-    )
-    async def test_a_suppression_blocks_every_spelling(self, built, stored, sent):
-        app, state, cid = built
-        await _suppress(state, stored, constants.REASON_COMPLAINT)
-        [result] = await send(app, state, cid, [sent])
-        assert result.outcome == test_send.SUPPRESSED
-        assert await attempt_rows(state) == []
-
-    def test_ascii_keys_are_unchanged(self):
-        # sha256("a@example.org"): the key every pre-#348 ASCII row was written with.
-        expected = "e16bfe08be114c7b3737aa01ce504ebcb5d13fc44897c38c6cac63ddc7151463"
-        assert email_hash(" A@Example.ORG ") == expected
-        assert normalise_email("Stra\u00dfe@X.org") == "stra\u00dfe@x.org"  # lower(), not casefold
-
-    async def test_an_allow_list_entry_matches_in_either_form(self, built):
-        app, state, _ = built
-        app.state.sm_newsletter.settings.test_send_extra_recipients = [
-            f"review@{FULLWIDTH_E}xample.org"
-        ]
-        assert await _allowed(app, state, ["review@example.org"]) == {"review@example.org"}

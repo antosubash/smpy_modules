@@ -212,13 +212,23 @@ may go to (#348):
   tenant-wide), matched by the table's hash of the normalised address,
   answers `suppressed`, without saying which. A bounce or a cleaned import row
   does not refuse a test.
-- **One canonical form.** Every suppression hash and every address comparison
-  uses `normalise_email` (`core/suppression/hashing.py`): strip, Unicode NFKC,
-  `lower()`, and `xn--` domain labels decoded to Unicode, as the address parser
-  does. A suppression written under one spelling (a fullwidth letter, upper
-  case, punycode) therefore refuses a test to any other. An ASCII address
-  keeps its old key. Searches of records' data use records' own form
-  (`records_form`, strip and lower-case).
+- **One canonical form.** Every suppression hash and every address comparison,
+  the allow rule above included, uses `normalise_email`
+  (`core/suppression/hashing.py`): the local part stripped, NFC-normalised and
+  `lower()`-cased (never NFKC-folded: a fullwidth letter or a ligature there is
+  another mailbox, so it is not vouched for), the domain normalised exactly as
+  the address parser does it (email-validator: UTS-46, IDNA 2008, so
+  `xn--fa-hia.de` is `faß.de` and a fullwidth letter is ASCII). A suppression
+  written under one spelling of the domain refuses a test to any other. An
+  ASCII address keeps its old key. Searches of records' data use records' own
+  form (`records_form`, strip and lower-case).
+- **Legacy keys.** A row an earlier build wrote under a non-ASCII spelling is
+  keyed `sha256(strip().lower())`, and only the hash is stored, so every lookup
+  that refuses a send, clears or shows a row also tries that key
+  (`lookup_hashes`); the test send looks it up for each raw spelling the
+  request carried. Writes use only the canonical key. The legacy lookup can be
+  removed at newsletter's first published release: no published build wrote
+  such a row.
 - A refused address is never sent, writes no `newsletter_send_attempt` row and
   uses no budget: the refusals are decided before the dispatch lock, admission
   counts only the addresses actually sent, and when every address is refused

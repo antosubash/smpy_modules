@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_newsletter.campaigns.access import Roles, readable_lists
 from sm_newsletter.core.constants import LIFTABLE, REASON_UNSUBSCRIBED, REASONS
 from sm_newsletter.core.errors_audience import InvalidQuery
-from sm_newsletter.core.suppression import email_hash
+from sm_newsletter.core.suppression import lookup_hashes
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import Suppression
 
@@ -125,14 +125,14 @@ async def rows_for_email(
     """The visible rows of one address (any spelling), newest first; ``[]``
     for an address that is not one."""
     try:
-        digest = email_hash(email)
+        digests = list(lookup_hashes(email))  # legacy-keyed rows too
     except ValueError:
         return []
     with tenant_scope(tenant_id):
         keys = await visible_lists(session, tenant_id=tenant_id, roles=roles)
         stmt = (
             select(_T)
-            .where(_T.c.tenant_id == tenant_id, _T.c.email_hash == digest, visible(keys))
+            .where(_T.c.tenant_id == tenant_id, _T.c.email_hash.in_(digests), visible(keys))
             .order_by(_T.c.created_at.desc(), _T.c.id.desc())
         )
         return [as_row(r) for r in (await session.execute(stmt)).all()]

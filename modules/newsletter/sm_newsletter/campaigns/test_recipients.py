@@ -19,10 +19,13 @@ goes only to people the caller can vouch for:
 Anything else answers ``recipient_not_allowed`` for that address and is not
 sent.
 
-**One form.** Every comparison is on
+**Matching.** Addresses are compared on
 :func:`~sm_newsletter.core.suppression.hashing.normalise_email`, the form
-suppression hashes use too, so a spelling variant (case, a fullwidth letter,
-punycode) of an allowed address is allowed.
+suppression keys use too: the domain is normalised as the address parser does
+it (a domain spelt two ways is one DNS name), the local part only NFC and
+lower-cased, so a fullwidth letter or a ligature there is another mailbox and
+is not vouched for. The recipient compared is the parsed address that is then
+sent.
 
 The suppression check (``complaint`` and ``unsubscribed`` in the tenant) is
 :func:`~sm_newsletter.campaigns.test_send.send_test`'s, because it runs on the
@@ -52,7 +55,7 @@ address can share its text with a few longer ones; the exact match is kept."""
 
 
 def _key(address: object) -> str:
-    """``address`` in the canonical form, or "" for something that is not one."""
+    """``normalise_email(address)``, or "" for something that is not an address."""
     try:
         return normalise_email(address)
     except ValueError:

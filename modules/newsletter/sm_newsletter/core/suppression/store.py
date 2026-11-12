@@ -24,7 +24,7 @@ from sm_newsletter.core.constants import (
     REASONS,
     SOURCES,
 )
-from sm_newsletter.core.suppression.hashing import email_hash, normalise_email
+from sm_newsletter.core.suppression.hashing import email_hash, lookup_hashes, normalise_email
 from sm_newsletter.core.tenancy import tenant_scope, valid_tenant
 from sm_newsletter.core.upsert import affected_rows, insert_ignore, upsert_newest
 from sm_newsletter.models import Suppression
@@ -176,12 +176,12 @@ async def clear_for_confirmation(
     tenant = _tenant(tenant_id)
     key = _list_key(list_type_key)
     cutoff = _aware(confirmed_at, "confirmed_at")
-    digest = email_hash(email)
+    digests = list(lookup_hashes(email))  # a legacy-keyed row is cleared too
     stmt = (
         delete(_T)
         .where(
             _T.c.tenant_id == tenant,
-            _T.c.email_hash == digest,
+            _T.c.email_hash.in_(digests),
             _T.c.created_at <= cutoff,
             or_(
                 and_(_T.c.reason == REASON_UNSUBSCRIBED, _T.c.list_type_key == key),
@@ -208,7 +208,10 @@ async def suppressed(
     tenant = _tenant(tenant_id)
     if reasons is not None and any(r not in REASONS for r in reasons):
         raise ValueError(f"unknown suppression reason in {reasons!r}")
-    by_hash = {h: addr for addr, h in _hashes(emails).items()}
+    # Every key a row may sit under, legacy ones included (fail closed).
+    # (computed from each address as given: the legacy key is its raw spelling's)
+    _hashes(emails)  # validates
+    by_hash = {h: normalise_email(e) for e in emails for h in lookup_hashes(e)}
     if not by_hash:
         return set()
     hashes = sorted(by_hash)

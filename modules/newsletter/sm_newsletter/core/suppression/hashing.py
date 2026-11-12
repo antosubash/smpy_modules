@@ -3,20 +3,29 @@
 :func:`normalise_email` is the module's one canonical form of an address, used
 for every suppression hash and every address comparison (writes from the
 ``SubscriptionChanged`` handler, the reconcile, imports, lifts, test sends,
-freeze and the subscriber browser), so two spellings of one address are one key
-whichever side wrote it (#348):
+freeze, the subscriber browser and the test-send allow rule), so two spellings
+of one mailbox are one key whichever side wrote it (#348):
 
-* the whole address is stripped and Unicode-NFKC-normalised (a fullwidth
-  letter becomes its ASCII one), then lower-cased with :meth:`str.lower`, as before (not
-  ``casefold``, which would turn ``ß`` into ``ss`` and change existing keys);
-* the domain's ``xn--`` labels are decoded to Unicode, which is what the
-  address parser (``email-validator``, behind ``EmailStr``) does, so
-  ``a@xn--bcher-kva.de`` and ``a@bücher.de`` are one key.
+* the **local part** is stripped, NFC-normalised and lower-cased with
+  :meth:`str.lower`, as before. It is never NFKC-folded: ``ﬀ@x`` and ``ff@x``
+  (or a fullwidth letter and its ASCII one) are different mailboxes, and
+  ``casefold`` would turn ``ß`` into ``ss`` and change existing keys;
+* the **domain** is normalised exactly as the address parser does it
+  (``email-validator``'s own ``validate_email_domain_name``: UTS-46 with
+  IDNA 2008), so a fullwidth letter, upper case and punycode spell one domain:
+  ``xn--fa-hia.de`` is ``faß.de``. A domain it refuses is NFC-normalised and
+  lower-cased instead.
 
-A pure-ASCII address without ``xn--`` labels keeps exactly the key it had
-(``strip().lower()``). :func:`records_form` is records' own normalisation
-(strip and lower-case only): the form to *search records by* or hand records,
-whose rows keep the spelling they were written with.
+A pure-ASCII address keeps exactly the key it had (``strip().lower()``).
+
+Rows a pre-#348 build wrote under a non-ASCII spelling carry the **legacy key**
+(``sha256(strip().lower())``), and only the hash is stored, so every lookup that
+refuses a send, clears or shows a row also tries it (:func:`lookup_hashes`);
+writes use only :func:`email_hash`.
+
+:func:`records_form` is records' own normalisation (strip and lower-case only):
+the form to *search records by* or hand records, whose rows keep the spelling
+they were written with.
 """
 
 from __future__ import annotations
@@ -24,9 +33,16 @@ from __future__ import annotations
 import hashlib
 import unicodedata
 
-__all__ = ["email_hash", "normalise_email", "records_form"]
+from email_validator import EmailSyntaxError
+from email_validator.syntax import validate_email_domain_name
 
-_ACE_PREFIX = "xn--"
+__all__ = [
+    "email_hash",
+    "legacy_hash",
+    "lookup_hashes",
+    "normalise_email",
+    "records_form",
+]
 
 
 def records_form(address: object) -> str:
@@ -40,25 +56,44 @@ def records_form(address: object) -> str:
     return normalised
 
 
-def _label(label: str) -> str:
-    if not label.startswith(_ACE_PREFIX):
-        return label
+def _domain(domain: str) -> str:
+    """The domain as ``email-validator`` normalises it (Unicode form)."""
     try:
-        return label.encode("ascii").decode("idna").lower()
-    except UnicodeError:
-        return label  # not valid punycode: compared as written
+        result = validate_email_domain_name(
+            domain, test_environment=True, globally_deliverable=False
+        )
+    except (EmailSyntaxError, UnicodeError, ValueError):
+        return unicodedata.normalize("NFC", domain).lower()
+    return str(result["domain"])
 
 
 def normalise_email(address: object) -> str:
     """The canonical form of ``address`` (see the module docstring); ``ValueError``
     for an empty or non-string one."""
-    folded = unicodedata.normalize("NFKC", records_form(address)).lower()
-    local, at, domain = folded.rpartition("@")
+    stripped = records_form(address)
+    local, at, domain = stripped.rpartition("@")
     if not at:
-        return folded
-    return f"{local}@{'.'.join(_label(part) for part in domain.split('.'))}"
+        return unicodedata.normalize("NFC", stripped).lower()
+    return f"{unicodedata.normalize('NFC', local).lower()}@{_domain(domain)}"
 
 
 def email_hash(address: object) -> str:
     """The hex SHA-256 of the canonical address: what a suppression row stores."""
     return hashlib.sha256(normalise_email(address).encode()).hexdigest()
+
+
+def legacy_hash(address: object) -> str:
+    """The key a pre-#348 build wrote: SHA-256 of ``strip().lower()`` only."""
+    return hashlib.sha256(records_form(address).encode()).hexdigest()
+
+
+def lookup_hashes(address: object) -> tuple[str, ...]:
+    """Every key a row for ``address`` may be stored under: the canonical one,
+    then the legacy one when it differs (a non-ASCII or punycode spelling).
+
+    The legacy key can go once no such row can exist: newsletter's first
+    published release, since no published build ever wrote one (CHANGELOG).
+    """
+    canonical = email_hash(address)
+    legacy = legacy_hash(address)
+    return (canonical,) if legacy == canonical else (canonical, legacy)

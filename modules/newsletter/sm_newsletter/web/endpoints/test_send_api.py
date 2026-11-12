@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_newsletter.campaigns.test_recipients import allowed_recipients
 from sm_newsletter.campaigns.test_send import send_test
 from sm_newsletter.core import constants
+from sm_newsletter.core.suppression.hashing import normalise_email
 from sm_newsletter.core.tenancy import bind_admin
 from sm_newsletter.web.schemas.campaigns import parse_payload
 from sm_newsletter.web.schemas.test_send import TestSendIn, TestSendOut, TestSendResultOut
@@ -27,6 +28,20 @@ from sm_newsletter.web.schemas.test_send import TestSendIn, TestSendOut, TestSen
 __test__ = False  # a module named test_*, not a pytest test module
 
 router = APIRouter(dependencies=[Depends(bind_admin)])
+
+
+def submitted_forms(recipients: list[str], payload: Any) -> dict[str, list[str]]:
+    """Each parsed recipient -> the raw forms of it in the request (same mailbox).
+
+    The parser folds a Unicode domain, and a suppression row written before
+    #348 is keyed by the raw spelling; the suppression check looks those up."""
+    by_box = {normalise_email(r): r for r in recipients}  # parsed: always valid
+    raw = payload.get("recipients") if isinstance(payload, dict) else None
+    out: dict[str, list[str]] = {}
+    for item in raw if isinstance(raw, list) else []:
+        if isinstance(item, str) and item.strip() and (r := by_box.get(normalise_email(item))):
+            out.setdefault(r, []).append(item.strip())
+    return out
 
 
 @router.post(
@@ -43,6 +58,7 @@ async def post_test_send(
 ) -> TestSendOut:
     data = parse_payload(TestSendIn, payload)
     recipients = [str(r) for r in data.recipients]
+    submitted = submitted_forms(recipients, payload)
     settings = getattr(request.app.state, constants.PACKAGE).settings
     allowed = await allowed_recipients(
         request,
@@ -59,5 +75,6 @@ async def post_test_send(
         recipients=recipients,
         allowed=allowed,
         roles=caller_roles(request),
+        submitted=submitted,
     )
     return TestSendOut(results=[TestSendResultOut.model_validate(r) for r in results])

@@ -111,13 +111,16 @@ name the module they affect.
   attempt row or uses budget. A result is now `{recipient, outcome, code}` with
   a stable `code` (`smtp_250`, `smtp_550`, `dispatch_busy`); `detail` is gone
   from the response and kept in the attempt ledger and the server log. The
-  test-send dialog names each refusal. Suppression keys now use one canonical
-  form of the address everywhere (strip, Unicode NFKC, lower-case, `xn--`
-  domain labels decoded), so a suppression written under one spelling covers
-  every spelling; ASCII addresses keep their keys. The table stores only the
-  hash, so rows a pre-release build wrote under a non-NFKC or punycode spelling
-  keep their old key and match only that spelling; newsletter is not yet
-  published, so no migration or other upgrade step applies. Details:
+  test-send dialog names each refusal. Suppression keys and address
+  comparisons now use one canonical form everywhere: the local part NFC and lower-cased, the domain as
+  email-validator normalises it (IDNA 2008, so `xn--fa-hia.de` is `faß.de`). A
+  suppression written under one spelling of a domain covers every spelling, a
+  fullwidth or ligature local part is a different mailbox (and is not vouched
+  for), and ASCII addresses keep their keys. The table stores only the hash, so
+  every lookup also tries the old `strip().lower()` key of the spelling it has,
+  until newsletter's first published release, when that legacy lookup can go;
+  newsletter is not yet published, so no migration or other upgrade step
+  applies. Details:
   `modules/newsletter/docs/sending.md`.
 
 ### Deprecated

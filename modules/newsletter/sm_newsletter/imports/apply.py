@@ -38,7 +38,7 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.core.constants import REASON_IMPORTED_CLEANED, REASON_UNSUBSCRIBED
-from sm_newsletter.core.suppression import suppress_many, suppressed
+from sm_newsletter.core.suppression import normalise_email, suppress_many, suppressed
 from sm_newsletter.imports.constants import KINDS
 from sm_newsletter.models import ImportEntry, ImportJob
 
@@ -186,7 +186,10 @@ async def apply_batch(
     for row in rows:
         if row.kind not in KINDS:  # never a tenant-wide suppression for a kind not known here
             raise ValueError("unknown staged row kind")
-        if row.kind == "subscribed" and row.email in refused:
+        # ``suppressed`` answers canonical forms, records' check its own: try both.
+        if row.kind == "subscribed" and (
+            row.email in refused or normalise_email(row.email) in refused
+        ):
             outcome[row.id] = SKIPPED_SUPPRESSED
         elif row.kind == "cleaned":
             outcome[row.id] = CLEANED

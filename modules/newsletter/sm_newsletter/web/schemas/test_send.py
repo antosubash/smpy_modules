@@ -7,9 +7,9 @@ before the address parser sees it; the route validates through
 ``parse_payload``, whose 422 never echoes the input.
 
 The address parser then folds the domain (a fullwidth letter, punycode), so
-the list is deduplicated again after it, on the canonical form suppression
-hashes use (``normalise_email``): two spellings of one address are one
-recipient (#348).
+the list is deduplicated again after it on the canonical form
+(``normalise_email``: the domain as the parser has it, the local part NFC and
+lower-cased), so two spellings of one mailbox are one recipient (#348).
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ def _normalise(value: Any) -> Any:
 
 
 def _dedup(value: list[str]) -> list[str]:
-    """First spelling of each canonical address wins."""
+    """First spelling of each mailbox wins."""
     seen: dict[str, str] = {}
     for item in value:
         seen.setdefault(normalise_email(item), item)

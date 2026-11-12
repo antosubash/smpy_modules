@@ -155,3 +155,16 @@ async def test_a_suppression_under_a_unicode_spelling_is_honoured(client, built,
         {"recipient": "b@example.org", "outcome": "suppressed", "code": None}
     ]
     assert console.captured("default") == []
+
+
+async def test_a_folded_local_part_is_not_the_vouched_mailbox(client, cid):
+    # "\uff55@example.com" folds to the caller's "u@example.com" under NFKC but is
+    # another mailbox: refused. A fullwidth letter in the domain is the same
+    # mailbox and is sent to the parsed (ASCII) address.
+    body = {"recipients": ["\uff55@example.com", "u@\uff45xample.com"]}
+    res = await client.post(_url(cid), json=body, headers=SEND)
+    assert res.json()["results"] == [
+        {"recipient": "\uff55@example.com", "outcome": "recipient_not_allowed", "code": None},
+        {"recipient": "u@example.com", "outcome": "accepted", "code": "smtp_250"},
+    ]
+    assert [m.to for m in console.captured("default")] == ["u@example.com"]

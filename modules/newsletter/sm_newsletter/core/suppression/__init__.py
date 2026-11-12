@@ -1,10 +1,11 @@
 """Who the module must not mail, per tenant, keyed by a hash of the address.
 
 **Hashing.** A row stores ``sha256(normalise_email(address))``, never the
-address: :func:`email_hash`. ``normalise_email`` strips, NFKC-normalises and
-lower-cases the address and decodes ``xn--`` domain labels, so spelling
-variants of one address (case, a fullwidth letter, punycode) are one key; an
-ASCII address keeps its ``strip().lower()`` key.
+address: :func:`email_hash`. ``normalise_email`` NFC-normalises and lower-cases
+the local part and normalises the domain as email-validator does, so spellings
+of one mailbox's domain (case, a fullwidth letter, punycode) are one key; an
+ASCII address keeps its ``strip().lower()`` key. Reads also try the legacy key
+(``lookup_hashes``) so a row a pre-#348 build wrote still counts.
 
 **Tenant-wide suppression.** :func:`suppressed` answers per tenant, whatever
 the list: an address with *any* row in the tenant - any reason, any
@@ -38,7 +39,12 @@ commits.
 
 from __future__ import annotations
 
-from sm_newsletter.core.suppression.hashing import email_hash, normalise_email, records_form
+from sm_newsletter.core.suppression.hashing import (
+    email_hash,
+    lookup_hashes,
+    normalise_email,
+    records_form,
+)
 from sm_newsletter.core.suppression.store import (
     clear_for_confirmation,
     suppress,
@@ -49,6 +55,7 @@ from sm_newsletter.core.suppression.store import (
 __all__ = [
     "clear_for_confirmation",
     "email_hash",
+    "lookup_hashes",
     "normalise_email",
     "records_form",
     "suppress",
