@@ -226,11 +226,13 @@ async def count_missing_media_files(session: AsyncSession, media_root: Path) -> 
     """Rows in the media library whose file (or a variant) is gone from disk."""
     from sqlmodel import select
 
+    from pagebuilder.core.tenancy import all_tenants
     from pagebuilder.models import MediaAsset
 
-    result = await session.execute(
-        select(MediaAsset.tenant_id, MediaAsset.filename, MediaAsset.variants)
-    )
+    # Tagged past the guard (#335): with a tenant bound the framework still
+    # filters this to that tenant; unbound, it is the boot scan over all of them.
+    stmt = select(MediaAsset.tenant_id, MediaAsset.filename, MediaAsset.variants)
+    result = await session.execute(all_tenants(stmt))
     missing = 0
     for tenant_id, filename, variants in result.all():
         names = [filename] + [

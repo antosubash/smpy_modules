@@ -44,13 +44,14 @@ async def _due_tenants(factory: Any, now: datetime) -> list[str]:
     from sqlalchemy import select
 
     from news.content._claims import any_due
+    from news.core import tenancy
     from news.models import NewsArticle
 
+    # The one deliberate cross-tenant read: tenant ids only, tagged past the guard.
+    stmt = tenancy.all_tenants(select(NewsArticle.tenant_id).where(any_due(now)).distinct())
     with all_tenants():
         async with factory() as session:
-            rows = await session.execute(
-                select(NewsArticle.tenant_id).where(any_due(now)).distinct()
-            )
+            rows = await session.execute(stmt)
             return sorted(rows.scalars().all())
 
 

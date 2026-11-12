@@ -185,6 +185,11 @@ class NewsModule(ModuleBase):
         # before anything below can touch a news table. Also refuses a host
         # pinned to a tenant other than the one the migration backfilled.
         mode = tenancy.configure(app)
+        # The fail-closed guard (#335): an unbound statement on a news table
+        # raises instead of reading every tenant's rows.
+        db = getattr(getattr(app.state, "sm", None), "db", None)
+        if (session_class := getattr(db, "sync_session_class", None)) is not None:
+            tenancy.install_guard(session_class)
 
         # Which languages this site publishes in, before anything reads them.
         boot.publish_locales(app)

@@ -26,11 +26,16 @@ until a restart.
 The framework filters ORM statements and Core statements over
 ``Model.__table__``; a ``text()`` statement on a news table would need
 its own ``tenant_id`` predicate (there are none today).
+
+**The guard** (:func:`install_guard`, #335) is what makes "bound" an
+invariant: an ORM statement or flush on a news table with no tenant bound
+raises :class:`TenantUnbound` instead of reading every tenant's rows. It is
+the guard records, images and newsletter install, file for file; a
+deliberate cross-tenant read is tagged with :func:`all_tenants`.
 """
 
 from __future__ import annotations
 
-import logging
 from collections.abc import AsyncIterator, Mapping
 from typing import Any, Final
 
@@ -38,6 +43,7 @@ from fastapi import HTTPException, Request
 from simple_module_db import current_tenant_id, is_valid_tenant_id, tenant_context
 from simple_module_hosting.tenancy import tenant_vary as recorded_vary
 
+from news.core.tenancy._configure import configure
 from news.core.tenancy._mode import (  # noqa: F401 - tests read the private names here
     _KNOWN_KWARGS,
     _PACKAGE,
@@ -53,18 +59,29 @@ from news.core.tenancy._mode import (  # noqa: F401 - tests read the private nam
     stray_pins,
     upstream_tenant,
 )
-from news.core.tenancy._scope import TenantIsolationError, tenant_scope
+from news.core.tenancy._scope import (
+    ALL_TENANTS,
+    TenantIsolationError,
+    TenantUnbound,
+    all_tenants,
+    install_guard,
+    tenant_scope,
+)
 
 __all__ = [
+    "ALL_TENANTS",
     "DEFAULT_TENANT",
     "TENANT_REQUIRED",
     "TenancyMode",
     "TenantIsolationError",
+    "TenantUnbound",
+    "all_tenants",
     "bind_admin",
     "bind_public",
     "bind_public_viewer",
     "configure",
     "detect_mode",
+    "install_guard",
     "mode_of",
     "request_vary",
     "resolve_admin",
@@ -75,55 +92,12 @@ __all__ = [
     "vary_on_tenant",
 ]
 
-_log = logging.getLogger("simple_module.news")
-
 TENANT_REQUIRED: Final = "tenant_required"
 """The 403 detail for an admin request that resolved no tenant."""
 
 _NOT_FOUND: Final = "Article not found"
 """What the public viewer answers for an unknown slug — and, word for word, for
 a request that resolved no tenant."""
-
-
-def configure(app: Any) -> TenancyMode:
-    """Detect the mode once and store it on ``app.state.news``.
-
-    Called from ``NewsModule.on_startup`` before anything touches the
-    database. A host pinned to a ``default_tenant`` other than
-    :data:`DEFAULT_TENANT` is refused: the migration filed every existing row
-    under :data:`DEFAULT_TENANT`, so the framework would bind one tenant and
-    news's data would sit in another.
-    """
-    stray = stray_pins(app)
-    if stray is not None:
-        raise RuntimeError(
-            f"news: the host pins every request to {stray}, but "
-            f"news runs a single-tenant host in {DEFAULT_TENANT!r}. Unset "
-            f"default_tenant and any TenantMiddleware(fixed=...), set them to "
-            f"{DEFAULT_TENANT!r}, or turn multi_tenant on"
-        )
-    mode = detect_mode(app)
-    _warn_if_unrecognised(app)
-    services = getattr(app.state, _PACKAGE, None)
-    if services is not None:
-        services.tenancy = mode
-    else:
-        app.state.news_tenancy = mode
-    host = getattr(getattr(app.state, "host", None), "settings", None)
-    if getattr(host, "multi_tenant", False) is True and mode is TenancyMode.SINGLE:
-        _log.warning(
-            "news: the host setting multi_tenant is on but the middleware stack has "
-            "no TenantMiddleware, so news runs single-tenant. Restart to apply it"
-        )
-    settings = getattr(getattr(app.state, _PACKAGE, None), "settings", None)
-    if mode is TenancyMode.MULTI and getattr(settings, "public_base_url", ""):
-        _log.warning(
-            "news: public_base_url is set on a multi-tenant host, so every "
-            "tenant's canonical, feed and sitemap links point at %s. Leave it "
-            "blank to build them from each request's host",
-            settings.public_base_url,
-        )
-    return mode
 
 
 def tenant_vary(app: Any) -> tuple[str, ...]:
