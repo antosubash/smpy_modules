@@ -455,7 +455,9 @@ Redis, and `make worker` / `worker-imports` / `worker-heavy` / `worker-gpu` /
 `beat` run `host/worker.py` (`build_runner_celery`) with one queue set each.
 `make dev` starts none of them. With no worker, set
 `SM_BG_TASKS_TASK_ALWAYS_EAGER=true` (`.env.example`; the e2e server exports it,
-plus `..._TASK_EAGER_PROPAGATES=true`) and tasks run inline. CI installs
+plus `..._TASK_EAGER_PROPAGATES=true`) and tasks run inline. The one CI job that runs
+them non-eager is `Background tasks (Redis + Celery worker)` (`scripts/bg_tasks_smoke.py`,
+#339); new background work goes through `background_tasks` (`docs/module-layout.md`). CI installs
 `tippecanoe` with apt in the Python-tests and Postgres jobs. **The images
 `[anonymize]` extra (onnxruntime) is never installed by default.** `make install`,
 the Python-tests, Python lint, repo-checks, e2e (`.github/actions/e2e-setup`) and `release`

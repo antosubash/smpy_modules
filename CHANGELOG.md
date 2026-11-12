@@ -264,6 +264,18 @@ name the module they affect.
   `S101` for type-narrowing asserts) are on too;
   pagebuilder's and news' ETag hashes say `usedforsecurity=False`, and each
   deliberate production case carries a `# noqa: Sxxx` with its reason.
+- **CI runs images and newsletter through a real broker** (#339). Every e2e
+  spec runs Celery eager, which has its own code path, so the one production
+  uses had unit tests only. The new job `Background tasks (Redis + Celery
+  worker)` starts the host non-eager on Postgres with a Redis service, one
+  worker (`images`, `newsletter`, `celery` queues) and one beat, and
+  `scripts/bg_tasks_smoke.py` uploads an image and waits for its pipeline to
+  settle, then imports a subscriber and sends a campaign on the console
+  transport until the `newsletter.dispatch` beat marks it sent. The host,
+  worker and beat logs are printed when it fails. `docs/module-layout.md` now
+  says new background work goes through `background_tasks`, and lists the
+  in-process loops, post-response jobs and `on_commit` tasks as legacy, to move
+  when next touched.
 
 ## 0.0.15
 

@@ -87,6 +87,30 @@ Rules for a package:
 - **The 300-line cap still applies** (`scripts/check_file_size.py`). Split a
   file by responsibility, inside its package.
 
+## Background work
+
+**New background work goes through the framework's `background_tasks`**
+(decided 2026-11-12, #339): a task in the module's `tasks.py`, routed in
+`task_config.py`, published through the durable outbox in the request's own
+transaction, and scheduled by beat when it recurs. That is what images and
+newsletter do, and the one path every deployment runs the same way: a worker
+pool sized on its own, retries with backoff, one scheduler however many web
+replicas there are. CI's `Background tasks (Redis + Celery worker)` job runs
+it against a real broker, worker and beat (`scripts/bg_tasks_smoke.py`).
+
+The other ways the repo still does background work are **legacy**. Each is
+sound where it is, but every web replica runs every in-process loop. Move one
+to `background_tasks` when its code is next touched, and do not add another:
+
+| Kind | Where |
+| --- | --- |
+| In-process asyncio loop in the web process | pagebuilder's and news' schedulers (`scheduling/scheduler.py`), billing's scheduler (`subscriptions/scheduler.py`) and sweeper (`metering/sweeper.py`), records' retention loop (`public_submissions/retention_loop.py`) and reindex runner (`records/services/reindex_runner.py`), analytics' loop (`core/runtime.py`) |
+| Post-response job | records' `records/deferred.py` |
+| `on_commit`-spawned task | records' mail fallback (`public_submissions/mail_runner.py`, when the host has no outbox) |
+
+Eager mode (`SM_BG_TASKS_TASK_ALWAYS_EAGER=true`) is for a host without a
+worker (local dev, the e2e suite), not a fifth way: code must not depend on it.
+
 ## Frontend
 
 The TS/TSX lives inside the package, next to the Python:
