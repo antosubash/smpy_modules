@@ -119,7 +119,7 @@ def _parse_previous(raw: str) -> tuple[str, ...]:
     if not isinstance(values, list) or not all(isinstance(v, str) for v in values):
         raise RuntimeError(
             f"{PREVIOUS_ENV} must be one key or a JSON list of keys (its value is not shown)"
-        ) from None
+        )
     return tuple(v for v in values if v.strip())
 
 
@@ -141,7 +141,7 @@ def _keys(secrets: tuple[str, ...], version: str) -> MultiFernet:
 
 
 def _all_secrets() -> tuple[str, ...]:
-    return tuple(dict.fromkeys(s for s in (_current_secret(), *previous_secrets()) if s))
+    return tuple(dict.fromkeys(s for s in (_current_secret(), *previous_secrets())))
 
 
 def _unreadable(field: str) -> Exception:

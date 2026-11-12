@@ -119,7 +119,7 @@ async def test_the_settings_screen_write_stores_it_encrypted(site, settings_db):
     assert crypto.decrypt_value(stored, captcha_secret.FIELD) == SECRET
 
 
-async def test_startup_seals_a_legacy_plaintext_row(site, settings_db):
+async def test_startup_seals_a_legacy_plaintext_row(settings_db):
     await _put_row(settings_db, SECRET)
     sealed = await captcha_secret.seal_stored(settings_db.session_factory)
     value, value_type = await _row(settings_db)
@@ -129,7 +129,7 @@ async def test_startup_seals_a_legacy_plaintext_row(site, settings_db):
     assert await captcha_secret.seal_stored(settings_db.session_factory) is None, "a no-op"
 
 
-async def test_startup_seals_a_plaintext_json_row(site, settings_db):
+async def test_startup_seals_a_plaintext_json_row(settings_db):
     await _put_row(settings_db, json.dumps(SECRET), "json")
     await captcha_secret.seal_stored(settings_db.session_factory)
     value, _ = await _row(settings_db)
@@ -146,7 +146,7 @@ async def test_startup_updates_the_live_settings(site, settings_db):
     assert captcha_secret.secret(live) == SECRET
 
 
-async def test_the_seal_never_overwrites_a_concurrent_change(site, settings_db):
+async def test_the_seal_never_overwrites_a_concurrent_change(settings_db):
     """Compare-and-set: the row changes between the read and the write, so the
     write matches nothing and the newer value stays."""
     await _put_row(settings_db, SECRET)

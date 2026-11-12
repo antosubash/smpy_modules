@@ -6,8 +6,9 @@ crypto owns each, and what each row needs.
 
 The targets are listed here rather than read from the installed modules, so a
 row left behind by a module that is no longer installed is still found (and
-reported, since nothing can decrypt it). ``scripts/tests`` checks the lists
-against each module's own constants.
+reported, since nothing can decrypt it). ``scripts/tests`` checks ai's,
+billing's and records' lists against their modules' own constants; newsletter
+has no such constant (its one field is ``smtp_password``).
 """
 
 from __future__ import annotations

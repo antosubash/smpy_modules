@@ -36,13 +36,6 @@ from simple_module_db.stored_settings import settings_table_clause
 from simple_module_hosting.app_builder import create_app
 from sqlalchemy import and_, or_, select
 
-_RESTART = "Restart the web process, every worker and beat so they read the new values."
-
-
-def _app_secret(app) -> str:
-    secret = getattr(app.state.sm.settings, "secret_key", "")
-    return secret.get_secret_value() if hasattr(secret, "get_secret_value") else secret
-
 
 async def _rows(session) -> tuple[list[rs.Row], list[rs.Row]]:
     """The target rows, and every other row that looks encrypted."""
@@ -61,7 +54,7 @@ async def _rows(session) -> tuple[list[rs.Row], list[rs.Row]]:
     )
     rows = [rs.Row(*row) for row in found.all()]
     targets = [row for row in rows if row.key in keys]
-    others = [row for row in rows if row.key not in keys and rs.looks_encrypted(row.value or "")]
+    others = [row for row in rows if row.key not in keys and rs.looks_encrypted(row.value)]
     return targets, others
 
 
@@ -92,7 +85,7 @@ async def _apply(session, plans: list[rs.Plan]) -> bool:
 async def run(*, dry_run: bool, seal_plaintext: bool) -> int:
     app = create_app(headless_settings())
     try:
-        secret = _app_secret(app)
+        secret = getattr(app.state.sm.settings, "secret_key", "") or ""
         if not secret:
             print("no secret key: set SM_SECRET_KEY", file=sys.stderr)
             return 1
@@ -130,7 +123,10 @@ async def run(*, dry_run: bool, seal_plaintext: bool) -> int:
                     file=sys.stderr,
                 )
                 return 1
-        print(f"\nRe-encrypted {len(todo)} secret(s). {_RESTART}")
+        print(
+            f"\nRe-encrypted {len(todo)} secret(s). "
+            "Restart the web process, every worker and beat so they read the new values."
+        )
         return 0
     finally:
         await app.state.sm.db.engine.dispose()

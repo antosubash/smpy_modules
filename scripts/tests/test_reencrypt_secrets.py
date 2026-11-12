@@ -119,9 +119,11 @@ def _decrypt(key: str, stored: tuple[str, str], secret: str) -> str:
 def test_targets_match_each_modules_constants():
     from sm_ai.core.constants import SECRET_FIELDS as AI
     from sm_billing.core.constants import SECRET_FIELDS as BILLING
+    from sm_records.public_submissions.captcha_secret import FIELD as CAPTCHA_FIELD
 
     assert set(rs.TARGETS["sm_ai"]) == AI
     assert set(rs.TARGETS["sm_billing"]) == BILLING
+    assert rs.TARGETS["sm_records"] == (CAPTCHA_FIELD,)
 
 
 def test_dry_run_writes_nothing_and_prints_no_value(db, tmp_path):
