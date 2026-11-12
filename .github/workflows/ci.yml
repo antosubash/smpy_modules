@@ -216,6 +216,7 @@ jobs:
       # tests/pg_support.py reads first), and every one even after an earlier
       # one failed. A new module runs here without editing this file (#360).
       - name: Run pytest (each module, Postgres)
+        if: ${{ !cancelled() }}
         env:
           PGHOST: localhost
           PGUSER: postgres
@@ -335,7 +336,7 @@ jobs:
       - name: Wait for /health/live
         run: |
           deadline=$((SECONDS + 120))
-          until curl -fsS http://127.0.0.1:8000/health/live; do
+          until curl -fsS --connect-timeout 2 --max-time 5 http://127.0.0.1:8000/health/live; do
             if [ "$(docker inspect -f '{{.State.Running}}' smpy-host)" != true ]; then
               echo "::error::the container exited before /health/live answered"
               exit 1

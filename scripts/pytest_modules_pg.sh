@@ -34,6 +34,12 @@ else
   for d in modules/*/; do names+=("$(basename "$d")"); done
 fi
 
+# libpq takes the credentials raw; a URL needs them percent-encoded (a
+# password with `@` or `/` would otherwise split in the wrong place).
+quote() { python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"; }
+user_q=$(quote "$PGUSER")
+password_q=$(quote "$PGPASSWORD")
+
 failed=()
 for name in "${names[@]}"; do
   db="${prefix}${name}"
@@ -44,7 +50,7 @@ for name in "${names[@]}"; do
   fi
   addopts="${PYTEST_ADDOPTS:-}"
   if [ "$name" = records ]; then addopts="$addopts -q -p no:cacheprovider"; fi
-  url="postgresql+asyncpg://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${db}"
+  url="postgresql+asyncpg://${user_q}:${password_q}@${PGHOST}:${PGPORT}/${db}"
   if ! SM_TEST_DATABASE_URL="$url" PYTEST_ADDOPTS="$addopts" scripts/pytest_modules.sh "$name"; then
     failed+=("$name")
   fi
