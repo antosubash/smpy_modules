@@ -195,7 +195,7 @@ async def _reserve(
 ) -> SendAttempt | None:
     """Fence, claim and open the attempt in one committed transaction; the
     attempt, or ``None`` (rolled back) when the claim lost."""
-    assert row.id is not None  # noqa: S101 - narrows the type; a flushed row has its id
+    assert row.id is not None
     try:
         await lock.fence(session)
         if not await rows.claim(session, tenant_id=tenant_id, send_id=row.id, now=clock()):

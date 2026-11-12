@@ -201,7 +201,7 @@ async def _decide(
             )
             right, counted, under = orphan.quantity == int(row[1]), True, own
         if row is not None and not right and (counted or orphan is None):
-            assert under is not None  # noqa: S101 - narrows the type; an invariant, not input validation
+            assert under is not None
             await billing_ops.add_swap(db, image_id, int(row[1]), subject=under, factory=factory)
         await _stamp(db, op_id, now)
         await finalize_session(db)

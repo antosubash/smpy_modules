@@ -51,7 +51,7 @@ class LayoutService:
             layout.footer_data = footer_data  # type: ignore[assignment]
         self.db.add(layout)
 
-        assert layout.id is not None  # noqa: S101 - narrows the type; a flushed row has its id
+        assert layout.id is not None
         revision = LayoutRevision(
             layout_id=layout.id,
             header_data=layout.header_data,

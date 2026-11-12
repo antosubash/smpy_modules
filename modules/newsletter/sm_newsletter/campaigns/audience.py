@@ -128,9 +128,9 @@ async def audience_filters(
         return []
     key = {"tenant_id": tenant_id, "list_type_key": list_type_key}
     if parsed.kind == "tag":
-        assert parsed.tag is not None  # noqa: S101 - narrows the type; an invariant, not input validation
+        assert parsed.tag is not None
         return await _tag_filters(session, **key, tag=parsed.tag)
-    assert parsed.segment_id is not None  # noqa: S101 - narrows the type; an invariant, not input validation
+    assert parsed.segment_id is not None
     return await _segment_filters(
         session, **key, segment_id=parsed.segment_id, roles=roles, lock=lock
     )

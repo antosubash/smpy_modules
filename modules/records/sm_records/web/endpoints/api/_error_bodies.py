@@ -141,7 +141,7 @@ async def response_for(request: Request, exc: Exception) -> JSONResponse:
         return JSONResponse(
             {"detail": str(exc), "field": exc.field, "reason": exc.reason}, status_code=status
         )
-    assert isinstance(exc, RecordsError)  # noqa: S101 - narrows the type; checked by the caller
+    assert isinstance(exc, RecordsError)
     body: dict[str, Any] = {"detail": exc.detail}
     code = getattr(exc, "code", None)
     if code is not None:

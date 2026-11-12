@@ -89,7 +89,7 @@ class ClassifyStep:
         from sm_images.pipeline.ai.runner import ai_call
 
         params = ctx.params
-        assert isinstance(params, ClassifyParams)  # noqa: S101 - narrows the type; checked by the caller
+        assert isinstance(params, ClassifyParams)
         result = await ai_call(
             ctx,
             _instruction(params),

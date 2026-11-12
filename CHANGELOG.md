@@ -260,7 +260,8 @@ name the module they affect.
   `ClassVar[Mapping]` (news' section did not match it), images' `user_subject`
   returns `None` for a missing owner before calling billing instead of relying
   on `ValueError` from `str(None)`, and newsletter's import upload error reads
-  `detail` only where it exists. Ruff's flake8-bandit rules (`S`) are on too;
+  `detail` only where it exists. Ruff's flake8-bandit rules (`S`, except
+  `S101` for type-narrowing asserts) are on too;
   pagebuilder's and news' ETag hashes say `usedforsecurity=False`, and each
   deliberate production case carries a `# noqa: Sxxx` with its reason.
 

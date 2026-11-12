@@ -96,7 +96,7 @@ class Seen:
         self, db: Any, collection_id: uuid.UUID, meta: Any, sha: str, settings: Any
     ) -> uuid.UUID | None:
         if meta.external_id is not None:
-            assert meta.external_source is not None  # noqa: S101 - narrows the type; an invariant, not input validation
+            assert meta.external_source is not None
             ident = (collection_id, meta.external_source, meta.external_id)
             if ident in self.external:
                 return self.external[ident]

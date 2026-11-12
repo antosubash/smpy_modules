@@ -150,7 +150,7 @@ async def campaign_report(
     campaign: Campaign,
     now: datetime,
 ) -> Report:
-    assert campaign.id is not None  # noqa: S101 - narrows the type; a flushed row has its id
+    assert campaign.id is not None
     cid = campaign.id
     # ``sent`` and both accepted numerators from one statement (B5), not off
     # the row loaded earlier: an acceptance in between would break the pair.

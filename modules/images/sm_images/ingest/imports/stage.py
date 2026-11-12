@@ -33,7 +33,7 @@ async def stage_source(
         if not await jobs.heartbeat(runtime, tenant, job.id, job.generation):
             raise chunk.Stopped()
 
-    assert job.source_url is not None  # noqa: S101 - narrows the type; an invariant, not input validation
+    assert job.source_url is not None
     source = await staging.fetch_source(
         job.source_url, max_bytes=settings.geojson_max_bytes, beat=beat
     )

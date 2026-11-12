@@ -191,7 +191,7 @@ async def _run(runtime: Runtime, tenant: str, job_id: uuid.UUID, generation: int
         if job.kind is ImportKind.GEOJSON_URL:
             await _hand_out_pending(runtime, tenant, job, start)
         if start < job.total_count:
-            assert job.source_key is not None  # noqa: S101 - narrows the type; an invariant, not input validation
+            assert job.source_key is not None
             if source is None:
                 async with beating(runtime, tenant, job.id, job.generation) as beat:
                     source = await staging.open_source(runtime, job.source_key)

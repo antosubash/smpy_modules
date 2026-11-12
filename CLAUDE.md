@@ -407,8 +407,9 @@ basedpyright (basic mode) over `[tool.pyright] include` in the root
 `pyproject.toml`: every `contracts/` package and the cross-module code that
 calls one. Widen it module by module. In those files a SQLModel column in a
 query goes through `sqlmodel.col()`, and a suppression is
-`# pyright: ignore[rule]` with its reason. Ruff's `S` (bandit) rules are on;
-tests and `scripts/` have per-file ignores, production code takes a line-level
+`# pyright: ignore[rule]` with its reason. Ruff's `S` (bandit) rules are on
+(except `S101`: an `assert` only narrows a type after a check); tests and
+`scripts/` have per-file ignores, production code takes a line-level
 `# noqa: Sxxx - <reason>`.
 
 **Every e2e spec file stands alone.** CI shards the suite by file

@@ -129,7 +129,7 @@ class PinnedTransport(httpx.AsyncBaseTransport):
                     extra={"host": host, "ip": ip},
                 )
                 last_error = error
-        assert last_error is not None  # noqa: S101 - resolve_public never returns no addresses
+        assert last_error is not None  # resolve_public never returns no addresses
         raise last_error
 
     async def aclose(self) -> None:

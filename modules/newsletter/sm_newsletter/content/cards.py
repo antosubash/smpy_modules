@@ -105,7 +105,7 @@ async def refresh_block(
     if index is None or blocks[index].type not in _KIND_OF_BLOCK:
         raise BlockNotFound()
     block = blocks[index]
-    assert isinstance(block.props, CardProps)  # noqa: S101 - both card blocks carry CardProps
+    assert isinstance(block.props, CardProps)  # both card blocks carry CardProps
     kind = _KIND_OF_BLOCK[block.type]
     hit = await _read(app, session, tenant_id=tenant_id, kind=kind, source_id=block.props.source_id)
     if hit is None:

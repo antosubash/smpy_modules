@@ -113,7 +113,7 @@ class IngestService(HoldsMixin):
             raise TypeError("a staged key needs the image_id it was minted for")
         if staged_key is not None:
             data = await read_staged(self.store, staged_key, self.settings.max_image_bytes)
-        assert data is not None  # noqa: S101 - narrows the type; an invariant, not input validation
+        assert data is not None
         try:  # until the insert takes the op over, a failure hands this file's back
             info = inspected or self.inspect(data)
             sha = hashlib.sha256(data).hexdigest()
@@ -127,7 +127,7 @@ class IngestService(HoldsMixin):
                 return Duplicate(found)
 
             if staged_key is not None:
-                assert image_id is not None  # noqa: S101 - narrows the type; an invariant, not input validation
+                assert image_id is not None
                 key, new_id = staged_key, image_id
                 slot = await self._hold(collection, Slot(new_id, key), len(data))
                 if slot.refused:  # the caller removes its staged object

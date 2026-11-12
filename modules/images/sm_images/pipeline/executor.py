@@ -129,7 +129,7 @@ async def _run(runtime: Runtime, loaded: Loaded, impl: Any, staging: Staging) ->
     async def write_display(data: bytes, content_type: str) -> None:
         staging.display = (bytes(data), content_type)
 
-    assert loaded.config is not None and loaded.config.params is not None  # noqa: S101 - narrows the type; an invariant, not input validation
+    assert loaded.config is not None and loaded.config.params is not None
     ctx = StepContext(
         step=impl,
         image=loaded.image,
