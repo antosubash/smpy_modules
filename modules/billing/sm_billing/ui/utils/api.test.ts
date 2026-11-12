@@ -1,6 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, api, describeError } from './api';
 
+const ORIGIN = 'http://billing.test';
+
+// `apiFetch` resolves a path against the page's location, which a node test lacks.
+beforeEach(() => vi.stubGlobal('location', { href: `${ORIGIN}/billing/`, origin: ORIGIN }));
 afterEach(() => vi.unstubAllGlobals());
 
 describe('describeError', () => {
@@ -25,11 +29,15 @@ describe('api', () => {
     vi.stubGlobal('fetch', fetchMock);
     await api('/a', 'tok', { body: { plan_id: 1 } });
     await api('/b', 'tok');
-    const [, write] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    const [, read] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
-    expect((write.headers as Record<string, string>)['X-CSRF-Token']).toBe('tok');
+    // `apiFetch` hands `fetch` one `Request`.
+    const [write] = fetchMock.mock.calls[0] as unknown as [Request];
+    const [read] = fetchMock.mock.calls[1] as unknown as [Request];
+    expect(write.headers.get('X-CSRF-Token')).toBe('tok');
     expect(write.method).toBe('POST');
-    expect((read.headers as Record<string, string>)['X-CSRF-Token']).toBeUndefined();
+    expect(write.headers.get('Content-Type')).toBe('application/json');
+    expect(await write.json()).toEqual({ plan_id: 1 });
+    expect(read.headers.get('X-CSRF-Token')).toBeNull();
+    expect(read.url).toBe(`${ORIGIN}/b`);
   });
 
   it('throws ApiError with the server detail', async () => {
@@ -58,5 +66,15 @@ describe('api', () => {
       detail: 'validation_error',
       message: 'trial_days: Input should be less than or equal to 730.',
     });
+  });
+
+  it('reads an unreachable server as status 0', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      }),
+    );
+    await expect(api('/a', 't')).rejects.toMatchObject({ status: 0, detail: 'http_0' });
   });
 });

@@ -44,7 +44,8 @@ describe('useUsageDetail', () => {
   async function mount(fetcher: (url: string) => Promise<Response>) {
     vi.stubGlobal(
       'fetch',
-      vi.fn((url: string) => fetcher(url)),
+      // `api()` goes through `apiFetch`, which hands `fetch` a `Request`.
+      vi.fn((input: Request) => fetcher(input.url)),
     );
     root = createRoot(document.createElement('div'));
     await act(async () => root?.render(<Harness />));
