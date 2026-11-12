@@ -226,6 +226,31 @@ name the module they affect.
   the budget.
 - The repo has a `SECURITY.md` (#358): report a vulnerability privately through
   GitHub, not in a public issue.
+- **CI tests the Python and Node the image ships** (#359). The Dockerfile's
+  runtime stage runs Python 3.14, but every test job ran 3.12, so the
+  interpreter the demo image runs had never executed the suite and nothing
+  backed the modules' `requires-python = ">=3.12"` above the floor. The
+  Python-tests job is now a matrix of 3.12 and 3.14 (its checks are
+  `Python tests (pytest, 3.12)` and `Python tests (pytest, 3.14)`), and the
+  Docker job loads the image it builds, starts it in production mode and waits
+  for `/health/live` (`Docker image (build + boot)`), printing the container's
+  logs. CI and the release workflow run Node 26, the `ui` stage's major, instead
+  of 24.
+- **Every module's suite runs on Postgres, ai's included** (#360). The Postgres
+  job named each module and its `ci_<module>` database by hand, so ai never ran
+  there and a new module would have been skipped until someone edited the
+  workflow. `scripts/pytest_modules_pg.sh` now walks `modules/*/` as
+  `pytest_modules.sh` does, creates each module's database and reports every
+  module even after one fails (one step, `Run pytest (each module, Postgres)`).
+- **The nightly framework-latest run can fail** (#360). It was
+  `continue-on-error`, so a framework release in the modules' range that broke a
+  module showed up only to someone who opened the run; its nightly runs had been
+  green.
+- **ci.yml pins its actions by commit SHA** (#360), with the release in a
+  comment, as `release.yml` and the e2e setup action already did, and so do
+  `framework-latest.yml` and `images-models.yml`: a tag can be moved by whoever
+  controls the action's repository. ci.yml also states `permissions: contents:
+  read` instead of relying on the repository's default token setting.
 
 ## 0.0.15
 
