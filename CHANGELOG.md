@@ -193,8 +193,10 @@ name the module they affect.
   plain and from-imports, and `import_module`/`find_spec` strings. Its
   allow-list is empty. The reads that broke the rule go through contracts now:
   - ai's `RequiresAiRequest` imports `sm_billing.contracts.RequiresQuota`
-    (new), and ai has a `billing` extra (`simple_module_billing>=0.0.16`). With
-    a billing older than 0.0.16 installed, ai meters nothing.
+    (new), and ai has a `billing` extra (`simple_module_billing>=0.0.16`).
+    **Upgrade billing with ai:** ai 0.0.16 next to billing 0.0.15 refuses to
+    start (`RuntimeError` naming the fix) rather than serve AI requests
+    unmetered. Without billing nothing changes.
   - news reads its content languages through the new
     `pagebuilder.contracts.site` (`content_locales(app)`, `supported()`,
     `default()`, `resolve()`, …), not `pagebuilder.core.locales` and

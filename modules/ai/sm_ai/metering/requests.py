@@ -63,7 +63,10 @@ def register_meter(app: FastAPI) -> bool:
 
     Called from ``AiModule.on_startup``. Billing creates the registry while the
     app is constructed, so it exists here whatever order the modules start in.
+    An installed billing too old to meter fails the boot here
+    (:func:`billing_metering_installed`), before any route is served unmetered.
     """
+    billing_metering_installed()
     registry = getattr(app.state, constants.BILLING_METERS_ATTR, None)
     if registry is None:
         return False
@@ -77,18 +80,21 @@ def register_meter(app: FastAPI) -> bool:
 
 
 def billing_metering_installed() -> bool:
-    """Whether a billing that meters is installed (it is optional, and a
-    billing older than 0.0.16 exports no ``RequiresQuota`` from its contracts).
+    """Whether billing is installed (it is optional); if it is, it must meter.
 
     ``find_spec`` of a dotted name imports its parents (``sm_billing``) when
     they exist — only an *installed* billing is ever imported. Only a missing
     module means "absent": any other import error in an installed billing
-    propagates, rather than quietly turning metering off.
+    propagates, rather than quietly turning metering off. So does a billing
+    older than 0.0.16, whose contracts export no ``RequiresQuota``: it raises
+    :class:`RuntimeError` instead of leaving every AI request unmetered.
     """
     if not _installed(constants.BILLING_CONTRACTS):
         return False  # no sm_billing
     contracts = importlib.import_module(constants.BILLING_CONTRACTS)
-    return hasattr(contracts, constants.BILLING_QUOTA_NAME)  # False: one older than 0.0.16
+    if not hasattr(contracts, constants.BILLING_QUOTA_NAME):
+        raise RuntimeError(constants.BILLING_TOO_OLD)
+    return True
 
 
 async def _unmetered() -> None:
@@ -102,8 +108,8 @@ def RequiresAiRequest(qty: int = 1) -> Any:  # noqa: N802 - reads like RequiresQ
     — its 402 envelope, its refund on a raised handler, its
     ``Idempotency-Key`` replay rules, its tenant rule (single-tenant host:
     ``default``) — and with billing installed but not running it yields
-    ``None``, as ``RequiresQuota`` does. Without billing (or with a billing
-    older than metering) it is a no-op.
+    ``None``, as ``RequiresQuota`` does. Without billing it is a no-op; with a
+    billing older than 0.0.16 it raises ``RuntimeError``.
     """
     _check_qty(qty)
     if not billing_metering_installed():

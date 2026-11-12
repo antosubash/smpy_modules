@@ -117,7 +117,8 @@ async def summarise(...): ...
 |---|---|
 | billing installed and running (the `billing` extra) | `sm_billing.contracts.RequiresQuota("ai.requests", qty)`, unchanged: its tenant rule (single-tenant host: `default`; multi-tenant: the resolved tenant, else 403 `tenant_required`), 402 `quota_exceeded` past the limit, its `Idempotency-Key` rules |
 | billing installed, not running | yields `None`; nothing is limited |
-| no billing (or one older than 0.0.16, whose `sm_billing.contracts` has no `RequiresQuota`) | a no-op yielding `None`; nothing past `sm_billing.contracts` is imported |
+| no billing | a no-op yielding `None`; billing is never imported |
+| billing older than 0.0.16 (its `sm_billing.contracts` has no `RequiresQuota`) | `RuntimeError` at startup and at route definition: upgrade billing or uninstall it; never silently unmetered |
 
 `AiModule.on_startup` registers the meter (`counter`, unit `count`, label
 `ai.meters.requests`) when `app.state.billing_meters` exists, so the plan

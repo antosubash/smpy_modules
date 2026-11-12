@@ -86,13 +86,19 @@ def test_a_billing_without_metering_counts_as_absent(monkeypatch):
     assert metering.billing_metering_installed() is False
 
 
-def test_a_billing_whose_contracts_lack_requires_quota_counts_as_absent(monkeypatch):
-    # Billing before 0.0.16 exported no RequiresQuota from its contracts (#336).
+def test_a_billing_whose_contracts_lack_requires_quota_fails_loudly(monkeypatch):
+    # Billing 0.0.15 meters but exported no RequiresQuota from its contracts (#336):
+    # never fall back to unmetered, at boot or at route definition.
     import types
 
     monkeypatch.setitem(sys.modules, "sm_billing.contracts", types.ModuleType("old"))
     monkeypatch.setattr(metering, "find_spec", lambda name: object())
-    assert metering.billing_metering_installed() is False
+    with pytest.raises(RuntimeError, match=r"needs simple_module_billing>=0\.0\.16"):
+        metering.billing_metering_installed()
+    with pytest.raises(RuntimeError, match="upgrade billing"):
+        RequiresAiRequest()
+    with pytest.raises(RuntimeError, match="uninstall it"):
+        metering.register_meter(FastAPI())
 
 
 def test_billing_metering_is_found_through_its_contracts():
