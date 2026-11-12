@@ -637,6 +637,126 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  # The one job that runs background work the way production does (#339):
+  # every e2e spec runs Celery eager, which has its own code path
+  # (images' eager_drain, the eager branches in newsletter), so task
+  # serialisation over a real broker, queue routing, a worker that never
+  # builds the app and reads its settings from the database, and beat's
+  # schedule are otherwise covered by unit tests only. The host runs
+  # non-eager against a Redis service, beside one worker on the queues
+  # `make worker` serves and one beat; scripts/bg_tasks_smoke.py then uploads
+  # an image and waits for its pipeline to settle, and sends one campaign on
+  # the console transport and waits for the `newsletter.dispatch` beat (every
+  # minute) to mark it sent.
+  #
+  # Postgres rather than SQLite: three processes (web, the worker's pool,
+  # beat) write the same database, as they do in production, and on Postgres
+  # newsletter's dispatch lock is the session advisory lock production takes
+  # (modules/newsletter/docs/operations.md), not the SQLite lease row.
+  # SM_ENVIRONMENT=development because background_tasks refuses a localhost
+  # broker anywhere else, and the service containers are on localhost.
+  bg-tasks:
+    name: Background tasks (Redis + Celery worker)
+    runs-on: ubuntu-latest
+    # Setup is ~1 min, the smoke under 2 (the campaign waits for the next
+    # minute's beat tick); 20 caps a hung worker well short of the default.
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      SM_ENVIRONMENT: development
+      SM_PROJECT_ROOT: ${{ github.workspace }}
+      SM_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci
+      # Seeds both the broker and the result backend.
+      SM_REDIS_URL: redis://localhost:6379/0
+      SM_BG_TASKS_TASK_ALWAYS_EAGER: "false"
+      SM_SECRET_KEY: bg-smoke-secret-key-not-for-production-use
+      SM_USERS_BOOTSTRAP_EMAIL: admin@example.com
+      SM_USERS_BOOTSTRAP_PASSWORD: changeme1
+      # The unsubscribe link a campaign carries is built from it; a campaign
+      # without one is refused at scheduling.
+      SM_PUBLIC_BASE_URL: http://127.0.0.1:8000
+      # host/worker.py is imported as `worker` (the Makefile's CELERY line).
+      PYTHONPATH: host
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      # No extras: a new collection runs `exif` and `renditions` only, which
+      # are core.
+      - name: Sync workspace (all packages)
+        run: uv sync --locked --all-packages
+
+      - name: Migrate (heads)
+        run: uv run --no-sync --project host alembic -c host/alembic.ini upgrade heads
+
+      # Before the worker starts: it reads these through settings_for and
+      # caches them, and newsletter's default transport is smtp. The uploads go
+      # to the runner's temp directory, which web and worker share.
+      - name: Newsletter and storage settings
+        run: |
+          uv run --no-sync python scripts/set_setting.py sm_newsletter \
+            transport console \
+            from_address news@example.org \
+            from_name "BG smoke" \
+            physical_address "1 Test Street, 12345 Testville"
+          uv run --no-sync python scripts/set_setting.py file_storage \
+            fs_root_path "$RUNNER_TEMP/files"
+
+      # One worker on the queues `make worker` serves (images, newsletter,
+      # celery) and one beat: never two schedulers.
+      - name: Start host, worker and beat
+        run: |
+          nohup uv run --no-sync --project host uvicorn main:app --app-dir host \
+            --host 127.0.0.1 --port 8000 > "$RUNNER_TEMP/host.log" 2>&1 &
+          nohup uv run --no-sync --project host celery -A worker:celery worker -l info \
+            -Q images,newsletter,celery -c 2 > "$RUNNER_TEMP/worker.log" 2>&1 &
+          nohup uv run --no-sync --project host celery -A worker:celery beat -l info \
+            -s "$RUNNER_TEMP/celerybeat-schedule" > "$RUNNER_TEMP/beat.log" 2>&1 &
+
+      # Waits for /health/live itself, then 3 min for the image and 4 for the
+      # campaign.
+      - name: Smoke (image pipeline, campaign dispatch)
+        run: uv run --no-sync python scripts/bg_tasks_smoke.py --base-url http://127.0.0.1:8000
+
+      - name: Host, worker and beat logs
+        if: ${{ failure() }}
+        run: |
+          for name in host worker beat; do
+            echo "::group::$name.log"
+            cat "$RUNNER_TEMP/$name.log" || true
+            echo "::endgroup::"
+          done
+
   lint-js:
     name: Lint (biome)
     runs-on: ubuntu-latest
