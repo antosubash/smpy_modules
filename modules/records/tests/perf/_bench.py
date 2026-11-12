@@ -33,6 +33,10 @@ from typing import Any, ClassVar
 from sqlalchemy import event
 
 
+def _is_setting(statement: str) -> bool:
+    return statement.lstrip().upper().startswith("SET LOCAL ")
+
+
 @dataclass
 class Capture:
     """Statements seen while a :func:`capture` block was open."""
@@ -41,7 +45,10 @@ class Capture:
 
     @property
     def count(self) -> int:
-        return len(self.statements)
+        """Queries, not session settings: the public read's ``SET LOCAL
+        statement_timeout`` (#349) is a parameter for the statements that
+        follow, not a round trip the read path is paying for."""
+        return sum(1 for statement, _ in self.statements if not _is_setting(statement))
 
     def matching(self, needle: str) -> list[tuple[str, Any]]:
         return [row for row in self.statements if needle in row[0]]
