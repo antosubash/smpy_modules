@@ -226,8 +226,12 @@ may go to (#348):
   keyed `sha256(strip().lower())`, and only the hash is stored, so every lookup
   that refuses a send, clears or shows a row also tries that key
   (`lookup_hashes`); the test send looks it up for each raw spelling the
-  request carried. Writes use only the canonical key. The legacy lookup can be
-  removed at newsletter's first published release: no published build wrote
+  request carried. Writes use only the canonical key. Such a row still matches
+  only the spelling it was written under: a legacy key cannot be derived from
+  another spelling, and the table holds no address to rehash. Records-sourced
+  unsubscribes are re-added under the canonical key by the hourly reconcile;
+  a pre-release complaint, bounce or import row is not. The legacy lookup can
+  be removed at newsletter's first published release: no published build wrote
   such a row.
 - A refused address is never sent, writes no `newsletter_send_attempt` row and
   uses no budget: the refusals are decided before the dispatch lock, admission
