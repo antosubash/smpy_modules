@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import Depends, Request
+from simple_module_core.environments import NON_PROD_ENVIRONMENTS
 from simple_module_db.deps import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from tenants.web.deps import ActiveTenantContext, require_active_tenant, require_user_id
@@ -52,9 +53,23 @@ BillingServiceDep = Annotated[BillingService, Depends(get_billing_service)]
 
 
 def base_url(request: Request) -> str:
-    """Origin for provider return URLs: the setting, else this request's origin."""
-    configured = getattr(request.app.state, c.PACKAGE).settings.return_base_url
-    return (configured or str(request.base_url)).rstrip("/")
+    """Origin for provider return URLs (Checkout's success/cancel, the portal's
+    return): ``return_base_url``.
+
+    Only in development or testing does a blank setting fall back to this
+    request's origin (#355). Anywhere else the ``Host`` header is the client's
+    choice, and behind a proxy without ``trusted_proxy`` it is the internal host
+    name the customer cannot reach, so the session is refused with 409
+    ``return_base_url_missing`` before the provider is called. A host that
+    reports no environment counts as production.
+    """
+    configured = (getattr(request.app.state, c.PACKAGE).settings.return_base_url or "").strip()
+    if configured:
+        return configured.rstrip("/")
+    host = getattr(getattr(request.app.state, "sm", None), "settings", None)
+    if getattr(host, "environment", None) not in NON_PROD_ENVIRONMENTS:
+        raise BillingError("return_base_url_missing", 409)
+    return str(request.base_url).rstrip("/")
 
 
 def user_email(request: Request) -> str | None:

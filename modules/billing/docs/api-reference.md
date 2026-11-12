@@ -281,7 +281,9 @@ Errors: `checkout_unavailable` 409 (manual provider), `plan_not_found` 404
 exists locally or at Stripe: trialing, active, past_due or unpaid. Use
 change-plan. An `incomplete` one, a first payment that failed, does not block,
 so the owner can check out again; Stripe expires the abandoned one on its own), `too_many_members` 409,
-`tenant_owner_required` 403, `provider_error` 502.
+`tenant_owner_required` 403, `provider_error` 502, `return_base_url_missing`
+409 (`return_base_url` blank outside development and testing, #355; Stripe is
+not called).
 
 ### `POST /api/billing/portal`
 
@@ -289,7 +291,7 @@ Permission: tenant role `owner` (with `billing.manage`, or restore mode for a
 billing-suspended organisation). No body. Returns `{"url": "https://billing.stripe.com/…"}`.
 
 Errors: `checkout_unavailable` 409, `no_customer` 409 (never checked out),
-`tenant_owner_required` 403.
+`tenant_owner_required` 403, `return_base_url_missing` 409 (as for checkout).
 
 ### `POST /api/billing/change-plan`
 

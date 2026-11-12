@@ -139,6 +139,23 @@ name the module they affect.
   and address with an empty or one-letter query. The share dialog says "Type at
   least 3 characters to search." until then. Details: "Sharing" in
   `modules/images/docs/access.md`.
+- **Absolute URLs built from the client's `Host` header are caught** (#355).
+  pagebuilder and news build canonical, `og:url`, `hreflang`, feed and sitemap
+  links from the request when `public_base_url` is blank; billing did the same
+  for Stripe's Checkout and portal return URLs when `return_base_url` was. Now:
+  while `public_base_url` is blank, every such pagebuilder and news response
+  (pages and their 304s, archives, the feed, the sitemaps, the generated
+  `robots.txt`) adds `Host` to `Vary`, so a shared cache cannot hand one host's
+  links to another; and a single-tenant host outside `development`/`testing`
+  logs a startup warning naming the setting. A multi-tenant host, where blank
+  is right, gets the `Vary` and no warning. billing refuses Checkout and the
+  portal with 409 `return_base_url_missing` when `return_base_url` is blank
+  outside `development`/`testing` (before Stripe is called), and the billing
+  screens say so; the Connection page says the field is required in
+  production. **Upgrading:** set billing's `return_base_url`, and pagebuilder's
+  and news' `public_base_url` on a single-tenant host, in production. Details:
+  the `public_base_url` / `return_base_url` rows in each module's
+  `docs/operations.md`.
 
 ### Deprecated
 

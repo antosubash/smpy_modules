@@ -9,6 +9,11 @@ describe('describeError', () => {
       'That plan allows 2 seats and you use 5 — remove 3 first.',
     );
   });
+  it('says the return URL origin is missing (#355)', () => {
+    expect(describeError('return_base_url_missing')).toBe(
+      'Online payment is not fully set up: the site administrator has to set the return URL origin first.',
+    );
+  });
   it('falls back for unknown codes', () => {
     expect(describeError('weird')).toBe('Something went wrong. Please try again.');
   });

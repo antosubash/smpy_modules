@@ -85,7 +85,7 @@ secrets source, so an `SM_NEWS_*` line does nothing.
 | Field | Default | Notes |
 |---|---|---|
 | `public_route_prefix` | `/news` | Where articles serve. **Restart required.** |
-| `public_base_url` | — | Origin for canonical URLs, `og:url`, the feed and the sitemap. Blank derives it from the request — set it behind a proxy that rewrites `Host`. Leave blank on a multi-tenant host (startup warns otherwise). |
+| `public_base_url` | — | Origin for canonical URLs, `og:url`, the feed and the sitemap. **Required in production on a single-tenant host**: blank derives it from the request's `Host` header, which the client chooses, so every public response then varies on `Host` and startup logs a warning outside `development`/`testing` (#355). Leave blank on a multi-tenant host (startup warns otherwise). |
 | `site_name` | — | `og:site_name`, and the archive heading / feed title (falls back to "News"). |
 | `twitter_handle` | — | `twitter:site`. |
 | `public_cache_max_age` | `300` | Seconds an article may sit in a shared cache. Archive pages use the smaller of this and 60. |

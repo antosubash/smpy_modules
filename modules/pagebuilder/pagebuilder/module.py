@@ -127,6 +127,10 @@ class PagebuilderModule(ModuleBase):
         # the mode every request binds by, before anything touches the DB.
         tenancy.configure(app)
         settings = self._live_settings(app)
+        # Absolute URLs from the client's Host header in production (#355).
+        from pagebuilder.web.public_origin import warn_if_unset
+
+        warn_if_unset(app, settings)
         boot.exempt_public_routes(app, settings)
         boot.mount_public_routers(app, settings)
         await boot.mount_media(app, settings)

@@ -104,7 +104,7 @@ Settings screen says so. Everything else is read per request and applies on save
 | `public_csp` | see below | `Content-Security-Policy` on public pages; empty disables |
 | `public_cache_max_age` | `60` | `max-age` on public pages |
 | `public_cache_swr` | `600` | `stale-while-revalidate`; `0` omits it |
-| `public_base_url` | — | e.g. `https://example.com`, no trailing slash. Base for canonical, `og:url`, `hreflang` and the sitemap. **Set it behind a proxy.** |
+| `public_base_url` | — | e.g. `https://example.com`, no trailing slash. Base for canonical, `og:url`, `og:image`, `hreflang`, the sitemap and `robots.txt`'s `Sitemap:` line. **Required in production on a single-tenant host** (see [Public origin](#public-origin)); leave blank on a multi-tenant host, where each organisation's site is its own host. |
 | `site_name` | — | `og:site_name` |
 | `twitter_handle` | — | `twitter:site`, with the `@` |
 | `sitemap_enabled` ● | `true` | Serve `/sitemap.xml`; turn off when the host aggregates its own |
@@ -170,7 +170,7 @@ A published page response carries:
 |---|---|
 | `ETag` | weak, from the page's id and `updated_at`, the layout's `updated_at`, the representation (HTML or Inertia JSON) and the nav list. An `If-None-Match` hit is a 304. On a real host the framework's Inertia adapter removes it from an Inertia JSON response and sets `private, no-store` instead; a full page keeps both. |
 | `Cache-Control` | `public, max-age=<public_cache_max_age>, stale-while-revalidate=<public_cache_swr>` |
-| `Vary` | `X-Inertia`, plus the tenant headers on a multi-tenant host |
+| `Vary` | `X-Inertia`, `Cookie`, `Accept-Language`, plus the tenant headers on a multi-tenant host, plus `Host` while `public_base_url` is blank |
 | `Content-Language` | the page's locale |
 | `Content-Security-Policy` | `public_csp`, unless empty; never on a 304, which the browser merges into the cached page (#322) |
 
@@ -178,6 +178,25 @@ Because the nav list is in the ETag, publishing or renaming a page flagged for
 the header changes every other page's tag too. Media is served
 `public, max-age=31536000, immutable` (names are random per upload) and a
 missing file is a plain-text 404, never the app shell.
+
+### Public origin
+
+With `public_base_url` blank, every absolute URL a public response carries
+(canonical, `og:url`, `og:image`, `hreflang`, the sitemap's `<loc>`s, the
+generated `robots.txt`'s `Sitemap:` line) is built from the request's `Host`
+header, which the client chooses (#355). Behind a proxy that forwards only
+known hosts (`trusted_proxy` and `forwarded_host_allowlist` set) that is
+harmless; behind one that does not, a shared cache that keys without `Host`
+could store a page whose links name a host of the requester's choosing and
+serve it to everyone. So:
+
+- **Set `public_base_url` in production** on a single-tenant host. With
+  `SM_ENVIRONMENT` other than `development` or `testing` and the setting blank,
+  pagebuilder logs a warning at startup.
+- While it is blank, those responses (pages, their 304s, `/sitemap.xml`, and
+  `/robots.txt` unless `robots_body` replaces it) add `Host` to `Vary`.
+- On a multi-tenant host leave it blank: each organisation's site is its own
+  host, and no warning is logged.
 
 ## The scheduler
 

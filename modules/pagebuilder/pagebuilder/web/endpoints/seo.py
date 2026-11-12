@@ -20,15 +20,14 @@ from pagebuilder.core import locales
 from pagebuilder.core.settings import PagebuilderSettings
 from pagebuilder.core.tenancy import bind_public, vary_on_tenant
 from pagebuilder.web.deps import get_settings
+from pagebuilder.web.public_origin import public_origin, vary_on_host
 
 seo_router = APIRouter()
 
 
 def _public_origin(request: Request, settings: PagebuilderSettings) -> str:
-    """Same fallback as the public viewer: explicit setting wins, else inferred."""
-    if settings.public_base_url:
-        return settings.public_base_url.rstrip("/")
-    return f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
+    """Same origin as the public viewer: explicit setting wins, else inferred."""
+    return public_origin(request, settings)
 
 
 def _sitemap_url_for(origin: str, prefix: str, slug: str, locale: str) -> str:
@@ -130,7 +129,8 @@ async def sitemap(
         headers={"Cache-Control": f"public, max-age={settings.seo_cache_max_age}"},
     )
     # Tenant-bound: on a multi-tenant host the session can pick the tenant.
-    return vary_on_tenant(response, request)
+    # Every <loc> names the origin; a guessed one is the Host (#355).
+    return vary_on_host(vary_on_tenant(response, request), settings)
 
 
 @seo_router.api_route("/robots.txt", methods=["GET", "HEAD"], response_class=Response)
@@ -150,8 +150,11 @@ async def robots(
             lines.append(f"Sitemap: {origin}/sitemap.xml")
         body = "\n".join(lines) + "\n"
 
-    return Response(
+    response = Response(
         content=body,
         media_type="text/plain",
         headers={"Cache-Control": f"public, max-age={settings.seo_cache_max_age}"},
     )
+    # Only the generated body names the origin (its ``Sitemap:`` line).
+    derived = settings.robots_body is None and settings.sitemap_enabled
+    return vary_on_host(response, settings) if derived else response

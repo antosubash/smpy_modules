@@ -190,15 +190,19 @@ function Connection() {
                     maxLength={RETURN_URL_MAX}
                     value={returnUrl}
                     aria-invalid={returnUrlMsg ? true : undefined}
-                    aria-describedby={returnUrlMsg ? 'return-url-error' : undefined}
+                    aria-describedby={returnUrlMsg ? 'return-url-error' : 'return-url-hint'}
                     onChange={(e) => {
                       setReturnUrl(e.target.value);
                       setReturnUrlMsg('');
                     }}
                   />
-                  {returnUrlMsg && (
+                  {returnUrlMsg ? (
                     <p id="return-url-error" role="alert" className="text-xs text-destructive">
                       {returnUrlMsg}
+                    </p>
+                  ) : (
+                    <p id="return-url-hint" className="text-xs text-muted-foreground">
+                      {t(c.return_url_hint)}
                     </p>
                   )}
                 </div>
