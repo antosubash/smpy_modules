@@ -21,7 +21,7 @@ source repository, and the delivery order is
 
 Sending is described in [`sending.md`](sending.md) (status machine, freeze, the
 dispatcher, verdicts, the unsubscribe route) and what has to run for it in
-[`operations.md`](operations.md) (worker and beat, the secret, the DKIM
+[`operations.md`](operations.md) (worker and beat, Postgres poolers, the secret, the DKIM
 checklist, the relay). Segments, campaign audiences, the subscriber screen and
 suppression lifts are in [`audience.md`](audience.md). Importing a Mailchimp
 audience is in [`import.md`](import.md).

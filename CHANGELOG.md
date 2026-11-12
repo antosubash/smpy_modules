@@ -219,6 +219,12 @@ name the module they affect.
   there is nothing to keep by mistake: production refuses to boot without the
   two users token secrets, and the host generates `SM_SECRET_KEY` itself.
   `make env` appends a generated value for all three.
+- newsletter's operations guide says the web process and its workers must
+  reach Postgres directly or through a session-mode pooler (#344). The dispatch
+  lock is a session-level advisory lock, which PgBouncer in transaction mode
+  breaks: every send answers `dispatch_busy`, or two senders overrun the budget.
+- The repo has a `SECURITY.md` (#358): report a vulnerability privately through
+  GitHub, not in a public issue.
 
 ## 0.0.15
 

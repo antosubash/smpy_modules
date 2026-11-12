@@ -17,6 +17,31 @@ eager mode runs a task inline when something calls it, and nothing calls this
 one. A campaign then sits in `scheduled` and never starts. `make dev` starts
 neither.
 
+## Postgres connections: direct or session pooling
+
+On Postgres the install-wide dispatch lock (`sending/lock.py`) is a
+**session-level** advisory lock: `pg_try_advisory_lock` on one dedicated
+connection, held for the whole send and released with `pg_advisory_unlock` on
+the same connection. A session lock belongs to the server connection that took
+it.
+
+So every process that sends — the web process (test sends) and the workers that
+run `newsletter.dispatch` — must reach Postgres **directly, or through a pooler
+in session mode**. Behind a pooler in **transaction** mode (PgBouncer's
+`pool_mode = transaction`, and most managed "transaction pooler" endpoints)
+consecutive statements can run on different server connections, so the lock can
+be taken on one and released on another. The symptoms:
+
+- every send, test sends included, answers `dispatch_busy`, because a lock is
+  held by a server connection that nothing will ever unlock; or
+- two senders hold the lock at once, and the rolling budget is overrun.
+
+Point `SM_DATABASE_URL` for these processes at the database itself or at a
+session-mode pool. The transaction-level locks taken elsewhere
+(`pg_advisory_xact_lock`: the settings write lock, and records' per-address
+locks during an import) are released at commit and are safe under either mode.
+`modules/images/docs/worker.md` gives the same advice for images' workers.
+
 ## Imports and the janitor
 
 A Mailchimp import ([`import.md`](import.md)) is applied by the Celery task
