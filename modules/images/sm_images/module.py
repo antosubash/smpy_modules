@@ -20,6 +20,7 @@ from simple_module_core.menu import MenuRegistry
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
+from simple_module_core.rate_limit import RateLimitRegistry, RateLimitRule
 from simple_module_core.resources import ResourceTypeRegistry
 
 from sm_images.core import constants
@@ -124,6 +125,17 @@ class ImagesModule(ModuleBase):
         """
         for prefix in constants.PUBLIC_PREFIXES:
             registry.add_prefix(prefix, methods=set(constants.PUBLIC_METHODS))
+
+    def register_rate_limits(self, registry: RateLimitRegistry) -> None:
+        """The share dialog's user picker, per signed-in user (#357): it is a
+        search of the user directory, so it gets a budget of its own rather
+        than the host's general ``rate_limit_authenticated``."""
+        from sm_images.web.endpoints.api import shares
+
+        registry.add_regex(
+            shares.PATH_PATTERN,
+            RateLimitRule(shares.RATE, key="user", methods=frozenset({"GET"})),
+        )
 
     def register_body_limits(self, registry: BodyLimitRegistry) -> None:
         """Raise the global body ceiling on the upload routes to

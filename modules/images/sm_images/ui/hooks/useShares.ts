@@ -5,11 +5,22 @@ import type { Share, ShareCandidate, ShareRole } from '../utils/types';
 
 const SEARCH_DELAY_MS = 250;
 
+/** The server answers nobody below this many characters (#357), so the
+ *  picker does not ask; `shares.MIN_QUERY` in the API. */
+export const MIN_QUERY = 3;
+
+/** Code points, as the server counts `len(q.strip())`. */
+export function searchable(query: string): boolean {
+  return [...query.trim()].length >= MIN_QUERY;
+}
+
 export type Shares = {
   shares: Share[];
   candidates: ShareCandidate[];
   query: string;
   setQuery: (q: string) => void;
+  /** The query is too short to search; the dialog says how many to type. */
+  tooShort: boolean;
   loading: boolean;
   error: string | null;
   grant: (candidate: ShareCandidate, role: ShareRole) => Promise<void>;
@@ -41,6 +52,10 @@ export function useShares(collectionId: string, open: boolean): Shares {
 
   useEffect(() => {
     if (!open) return;
+    if (!searchable(query)) {
+      setFound([]);
+      return;
+    }
     let current = true;
     const timer = window.setTimeout(() => {
       shareCandidates(collectionId, query.trim())
@@ -75,6 +90,7 @@ export function useShares(collectionId: string, open: boolean): Shares {
     candidates: found.filter((c) => !held.has(c.id)),
     query,
     setQuery,
+    tooShort: !searchable(query),
     loading,
     error,
     grant,

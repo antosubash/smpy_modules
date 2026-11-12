@@ -131,6 +131,14 @@ name the module they affect.
   a `503` with `code` `query_timeout` instead of a 500. The admin API keeps
   `max_filter_terms`, and the records list and stats blocks send one term each.
   Details: "Public read API" in `modules/records/docs/api-reference.md`.
+- **images' share picker no longer lists the user directory** (#357).
+  `GET /api/images/collections/{id}/share-candidates` answers `[]` for a `q`
+  shorter than three characters (an empty one included) without searching, and
+  is rate-limited to 30 requests a minute per user. On a single-tenant host an
+  account that could create a collection could page through every user's name
+  and address with an empty or one-letter query. The share dialog says "Type at
+  least 3 characters to search." until then. Details: "Sharing" in
+  `modules/images/docs/access.md`.
 
 ### Deprecated
 

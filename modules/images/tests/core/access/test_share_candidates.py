@@ -1,4 +1,5 @@
-"""The share dialog's user picker: owner-or-manager only, members only, capped."""
+"""The share dialog's user picker: owner-or-manager only, members only, capped,
+and never a listing of the whole directory (#357)."""
 
 from __future__ import annotations
 
@@ -13,6 +14,8 @@ from tests.support.stub_auth import as_user, user_uuid
 
 BASE = "/api/images/collections"
 WRITER = ("images.view", "images.create")
+EVERYONE = {"q": "example"}
+"""Matches every fake address; three characters or more, as the route needs."""
 
 
 class FakeDirectory:
@@ -70,7 +73,9 @@ async def test_lists_everyone_but_the_owner_and_inactive_on_a_single_tenant_host
 async def test_is_limited_to_twenty(client):
     client.app.state.user_directory = FakeDirectory([person(f"u{n:02d}") for n in range(40)])
     cid = await make(client, as_user("olga", WRITER))
-    r = await client.get(f"{BASE}/{cid}/share-candidates", headers=as_user("olga", WRITER))
+    r = await client.get(
+        f"{BASE}/{cid}/share-candidates", params=EVERYONE, headers=as_user("olga", WRITER)
+    )
     assert len(r.json()) == 20
 
 
@@ -85,8 +90,36 @@ async def test_an_edit_share_gets_403_and_a_stranger_404(client):
     assert (await client.get(url, headers=as_user("eddie", WRITER))).status_code == 403
     assert (await client.get(url, headers=as_user("sam", WRITER))).status_code == 404
     mgr = as_user("max", (*WRITER, "images.manage"))
-    assert (await client.get(url, headers=mgr)).status_code == 200
+    assert (await client.get(url, params=EVERYONE, headers=mgr)).status_code == 200
     assert (await client.get(url)).status_code == 401
+
+
+@pytest.mark.parametrize("q", ["", "  ", "a", "ed", " ed  "])
+async def test_a_query_under_three_characters_lists_nobody(client, q):
+    """Not even the first page of the directory: an empty or one-letter query
+    used to walk every account, ``CANDIDATES_MAX`` at a time."""
+    directory = FakeDirectory([person("olga"), person("eddie"), person("edna")])
+    client.app.state.user_directory = directory
+    cid = await make(client, as_user("olga", WRITER))
+    r = await client.get(
+        f"{BASE}/{cid}/share-candidates", params={"q": q}, headers=as_user("olga", WRITER)
+    )
+    assert r.status_code == 200
+    assert r.json() == []
+    assert directory.asked == [], "the directory is not searched at all"
+
+
+def test_the_picker_has_its_own_per_user_rate():
+    from simple_module_core.rate_limit import RateLimitRegistry
+    from sm_images.module import ImagesModule
+    from sm_images.web.endpoints.api import shares
+
+    rates = RateLimitRegistry()
+    ImagesModule().register_rate_limits(rates)
+    rule = rates.match("GET", f"{BASE}/abc/share-candidates")
+    assert rule is not None and rule.key == "user" and rule.rate == shares.RATE
+    assert rates.match("GET", f"{BASE}/abc") is None
+    assert rates.match("GET", f"{BASE}/abc/share-candidates/x") is None
 
 
 async def test_no_user_directory_is_503_with_a_code(client):
@@ -109,7 +142,7 @@ async def test_a_multi_tenant_host_offers_only_members_of_the_bound_tenant(two_t
     client.app.state.tenant_members = tenant_members
     owner = as_(ACME, "olga", WRITER)
     cid = await make(client, owner)
-    r = await client.get(f"{BASE}/{cid}/share-candidates", headers=owner)
+    r = await client.get(f"{BASE}/{cid}/share-candidates", params=EVERYONE, headers=owner)
     assert [c["email"] for c in r.json()] == ["amy@example.com"]  # not bob (nobody's), gus (globex)
 
 
@@ -119,7 +152,7 @@ async def test_a_multi_tenant_host_with_no_membership_store_offers_nobody(two_te
     client.app.state.user_directory = FakeDirectory([person("olga"), person("amy")])
     owner = as_(ACME, "olga", WRITER)
     cid = await make(client, owner)
-    r = await client.get(f"{BASE}/{cid}/share-candidates", headers=owner)
+    r = await client.get(f"{BASE}/{cid}/share-candidates", params=EVERYONE, headers=owner)
     assert r.status_code == 200
     assert r.json() == []
 
@@ -145,9 +178,9 @@ async def test_a_single_detected_app_with_an_upstream_tenant_still_filters(clien
     client.app.state.tenant_members = tenant_members
     owner = {**as_user("olga", WRITER), "X-Up": ACME}
     cid = await make(client, owner)
-    r = await client.get(f"{BASE}/{cid}/share-candidates", headers=owner)
+    r = await client.get(f"{BASE}/{cid}/share-candidates", params=EVERYONE, headers=owner)
     assert [c["email"] for c in r.json()] == ["amy@example.com"]
 
     del client.app.state.tenant_members  # no store: fail closed, not "everyone"
-    r = await client.get(f"{BASE}/{cid}/share-candidates", headers=owner)
+    r = await client.get(f"{BASE}/{cid}/share-candidates", params=EVERYONE, headers=owner)
     assert r.json() == []

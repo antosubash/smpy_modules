@@ -137,6 +137,7 @@
     "search_label": "Find a person",
     "search_placeholder": "Name or email",
     "no_candidates": "No one found.",
+    "search_min": "Type at least {min} characters to search.",
     "grant": "Share",
     "revoke": "Remove access",
     "revoke_for": "Remove access for {name}",
