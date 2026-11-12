@@ -110,12 +110,15 @@ async def _due_tenants(factory: Any, now: datetime) -> list[str]:
 
     from pagebuilder.content.service._claims import any_due
     from pagebuilder.content.service._trash import trash_expired
+    from pagebuilder.core import tenancy
     from pagebuilder.models import Page
 
     due = or_(any_due(now), trash_expired(now))
+    # The one deliberate cross-tenant read: tenant ids only, tagged past the guard.
+    stmt = tenancy.all_tenants(select(Page.tenant_id).where(due).distinct())
     with all_tenants():
         async with factory() as session:
-            rows = await session.execute(select(Page.tenant_id).where(due).distinct())
+            rows = await session.execute(stmt)
             return sorted(rows.scalars().all())
 
 

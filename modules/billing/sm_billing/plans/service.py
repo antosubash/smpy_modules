@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
+from simple_module_db import finalize_session
 from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -219,9 +220,9 @@ async def seed_default_plan(session_factory: async_sessionmaker) -> None:
                 )
             )
         try:
-            await session.commit()
+            await finalize_session(session)
         except IntegrityError:
-            # Another worker seeded it between our check and commit.
-            await session.rollback()
+            # Another worker seeded it between our check and commit;
+            # ``finalize_session`` has already rolled the session back.
             return
         logger.info("billing: seeded the free default plan")

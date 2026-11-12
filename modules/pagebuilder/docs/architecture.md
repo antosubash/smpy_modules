@@ -50,6 +50,8 @@ never relies on one happening to be set (`pagebuilder/core/tenancy/__init__.py`)
 | Public viewer, sitemap | `bind_public`: `"default"`, or resolved tenant, or the same 404 an unknown slug gets |
 | Media files | `MediaFiles` maps the request to `<media_root>/<tenant>/` |
 | Scheduler | scans due tenants under `all_tenants()`, then one session per tenant under `tenant_context` |
+| Boot media scan | one read of every tenant's media rows under `all_tenants()`, tagged `tenancy.all_tenants(stmt)` |
+| `pagebuilder.contracts` | search and cards read inside `tenant_scope(tenant_id)`: bind the named tenant, refuse another bound one |
 
 `bind_admin`/`bind_public` must precede `get_db` so the commit runs while the
 tenant is still bound; router-level dependencies guarantee that. The mode is
@@ -57,6 +59,14 @@ detected once, in `on_startup`, from the built middleware stack
 (`tenancy.configure`), and a host fixed to a non-`default` tenant is refused. A
 `text()` statement on a pagebuilder table would need its own `tenant_id`
 predicate (there are none).
+
+**The guard (#335).** `on_startup` installs the fail-closed ORM guard records,
+images and newsletter use (`core/tenancy/_guard.py`, parity-checked): an ORM
+statement or flush on a pagebuilder table with no tenant bound raises
+`TenantUnbound` instead of reading every tenant's rows. A deliberate
+cross-tenant read is tagged `tenancy.all_tenants(stmt)` (the scheduler's
+tenant scan, the boot media scan). Core statements over `__table__` and
+`text()` are invisible to it.
 
 ## Boot order and settings
 
@@ -265,7 +275,7 @@ one — ignoring trashed pages.
 - **Every slug lookup, redirect and claim takes a locale.** One that does not is
   how `/de/p/x` starts serving the English page.
 - **Every new entry point binds a tenant** (`bind_admin`, `bind_public`, or
-  `tenant_context` outside a request). Another module reads these
+  `tenant_scope` outside a request); the guard raises `TenantUnbound` otherwise. Another module reads these
   tables only through `pagebuilder.contracts` (e.g. `search_pages`), which pins
   the `tenant_id` the caller names.
 - **No env vars.** New settings go on `PagebuilderSettings`; boot-time ones are

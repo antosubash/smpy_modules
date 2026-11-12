@@ -13,8 +13,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from simple_module_db import finalize_session
+
 from sm_billing.core import constants as c
 from sm_billing.core import subjects
+from sm_billing.models import Subscription
 from sm_billing.plans.resolve import effective_plan
 from sm_billing.subscriptions.lifecycle import tenant_gone, tenant_service
 
@@ -36,6 +39,9 @@ async def push_quantity(app: FastAPI, tenant_id: str) -> bool:
     provider = getattr(app.state, c.PACKAGE).provider
     if provider is None or not provider.supports_checkout:
         return False
+    # The provider call runs between two short transactions, never inside one:
+    # the first only reads, and ends before the network call so no connection
+    # or row lock is held while the provider answers.
     async with app.state.sm.db.session_factory() as session:
         if await tenant_gone(session, app, tenant_id):
             # ``delete_tenant`` publishes a ``MembershipRemoved`` per member
@@ -53,9 +59,14 @@ async def push_quantity(app: FastAPI, tenant_id: str) -> bool:
         members = max(1, counts.get(tenant_id, 0))
         if members == sub.quantity:
             return False
-        await provider.set_quantity(sub.provider_subscription_id, members)
-        sub.quantity = members
-        await session.commit()
+        sub_id, provider_sub_id = sub.id, sub.provider_subscription_id
+        await finalize_session(session)  # read-only: ends the transaction
+    await provider.set_quantity(provider_sub_id, members)
+    async with app.state.sm.db.session_factory() as session:
+        sub = await session.get(Subscription, sub_id)
+        if sub is not None:
+            sub.quantity = members
+        await finalize_session(session)
     return True
 
 

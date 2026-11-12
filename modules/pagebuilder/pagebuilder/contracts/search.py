@@ -12,9 +12,13 @@ hit, not an ORM row bound to this module's session.
 **Tenant.** The caller names it and it is pinned *here*, as a ``WHERE``, not
 left to the framework's filter. On a single-tenant host nothing is bound and
 that filter does nothing, so an unpinned read would list every tenant's rows.
-A strict session with no tenant bound raises before any SQL runs; that is
-answered as "nothing found", the same as an unknown query, rather than as an
-error on a screen that only wanted to add a section.
+The read also runs inside ``tenant_scope(tenant_id)`` (#335), as the cards
+contract does: with nothing bound it binds the named tenant, so pagebuilder's
+fail-closed guard lets it through, and a caller bound to a *different* tenant
+gets ``TenantIsolationError``. A strict session with no tenant bound raises
+before any SQL runs; that is answered as "nothing found", the same as an
+unknown query, rather than as an error on a screen that only wanted to add a
+section.
 
 **Pattern.** A SQL ``LIKE`` pattern with ``\\`` as the escape character — the
 caller owns escaping and wildcards, so both modules' sections match on the
@@ -35,6 +39,7 @@ from sqlalchemy import Text, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
+from pagebuilder.core.tenancy import tenant_scope
 from pagebuilder.models import NOT_TRASHED, MediaAsset, Page, PageStatus
 
 __all__ = [
@@ -85,15 +90,17 @@ class MediaSearchHit(BaseModel):
 
 
 async def _newest_first(
-    db: AsyncSession, stmt: Any, order: Any, limit: int
+    db: AsyncSession, stmt: Any, order: Any, limit: int, tenant_id: str
 ) -> tuple[list[Any], int]:
-    """The first ``limit`` rows of ``stmt`` by ``order``, and the full count."""
+    """The first ``limit`` rows of ``stmt`` by ``order``, and the full count,
+    read inside :func:`~pagebuilder.core.tenancy.tenant_scope` of ``tenant_id``."""
     try:
-        total = int(await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
-        rows = (await db.execute(stmt.order_by(order).limit(limit))).scalars()
+        with tenant_scope(tenant_id):
+            total = int(await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
+            rows = list((await db.execute(stmt.order_by(order).limit(limit))).scalars())
     except MissingTenantError:
         return [], 0
-    return list(rows), total
+    return rows, total
 
 
 async def search_pages(
@@ -128,7 +135,7 @@ async def search_pages(
         stmt = stmt.where(col(Page.status) == PageStatus.PUBLISHED)
     if locale is not None:
         stmt = stmt.where(col(Page.locale) == locale)
-    rows, total = await _newest_first(db, stmt, col(Page.id).desc(), limit)
+    rows, total = await _newest_first(db, stmt, col(Page.id).desc(), limit, tenant_id)
     return [PageSearchHit.model_validate(row) for row in rows], total
 
 
@@ -146,5 +153,7 @@ async def search_media(
             col(MediaAsset.filename).ilike(pattern, escape="\\"),
         ),
     )
-    rows, total = await _newest_first(db, stmt, col(MediaAsset.id).desc(), limit)
+    rows, total = await _newest_first(
+        db, stmt, col(MediaAsset.id).desc(), limit, tenant_id
+    )
     return [MediaSearchHit.model_validate(row) for row in rows], total

@@ -21,12 +21,8 @@ import sm_billing
 PACKAGE = Path(sm_billing.__file__).parent
 
 #: (path under sm_billing, qualified scope) → why a plain commit is fine.
-ALLOWED = {
-    ("subscriptions/webhooks.py", "_claim"): "inserts the dedup row only",
-    ("subscriptions/webhooks.py", "_finish"): "records the event outcome only",
-    ("subscriptions/seats.py", "push_quantity"): "writes Subscription.quantity only",
-    ("plans/service.py", "seed_default_plan"): "startup seed of the free plan",
-}
+#: Empty since #340: every billing session ends with ``finalize_session``.
+ALLOWED: dict[tuple[str, str], str] = {}
 
 
 class _Scopes(ast.NodeVisitor):

@@ -160,6 +160,16 @@ name the module they affect.
   `public_base_url` (or each module's own setting). Details:
   the `public_base_url` / `return_base_url` rows in each module's
   `docs/operations.md`.
+- **pagebuilder and news refuse a read with no tenant bound** (#335). They now
+  install the fail-closed ORM guard records, images and newsletter already had:
+  an ORM statement or flush on one of their tables with nothing bound raises
+  `TenantUnbound` instead of returning every tenant's rows, so a future entry
+  point that forgets to bind fails loudly. The schedulers' tenant scan and
+  pagebuilder's boot-time media scan are tagged as deliberate cross-tenant
+  reads, and `pagebuilder.contracts.search` now binds the tenant its caller
+  names (a caller bound to another tenant gets `TenantIsolationError`), as the
+  cards contract already did. The five guard copies are parity-checked. Billing
+  has no `MultiTenantMixin` table, so it has no guard. No migration is needed.
 
 ### Deprecated
 
@@ -183,6 +193,15 @@ name the module they affect.
   the probe routes that read `error` should read `code`.
 
 ### Fixed
+
+- **billing's last four bare `commit()` calls are `finalize_session`** (#340):
+  the webhook claim and finish, the seat-quantity push and the default-plan
+  seed. None queued `on_commit` work, so nothing changed today, but a later
+  `set_status` inside one would have suspended a tenant while every member's
+  cached view said active. billing's `test_commit_sites.py` allowed those four;
+  its allow-list is now empty, so any `.commit()` in `sm_billing` fails it. The
+  seat push also calls the provider
+  between two short transactions instead of inside an open one.
 
 - **newsletter requires records, news and pagebuilder 0.0.16** (#333). Its
   floors said 0.0.13, but the `contracts` modules it imports

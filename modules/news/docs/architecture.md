@@ -134,6 +134,14 @@ checked first and still win. Without pagebuilder (or with one older than
 Public responses add `Vary: Cookie` (plus the tenant header) in MULTI mode
 via `vary_on_tenant`, since the same URL can serve different tenants.
 
+**The guard (#335).** `on_startup` installs the fail-closed ORM guard records,
+images and newsletter use (`core/tenancy/_guard.py`, parity-checked): an ORM
+statement or flush on a news table with no tenant bound raises `TenantUnbound`
+instead of reading every tenant's rows. The scheduler's tenant scan is the one
+deliberate cross-tenant read, tagged `tenancy.all_tenants(stmt)`;
+`news.contracts.articles` binds the tenant its caller names (`tenant_scope`).
+Core statements over `__table__` and `text()` are invisible to it.
+
 ## Public surface (`endpoints/public/`)
 
 `boot.mount_public_routers` mounts one router per content locale at

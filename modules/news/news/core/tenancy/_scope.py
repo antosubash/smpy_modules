@@ -1,14 +1,43 @@
-"""Binding a tenant for a cross-module read, without ever replacing one."""
+"""Binding a tenant outside a request, without ever replacing one, and the guard
+that makes "bound" an invariant (#335).
+
+:func:`install_guard` puts the fail-closed guard of records, images and
+newsletter (:mod:`news.core.tenancy._guard`, the same file) on the host's
+session class: an ORM statement or flush on a news table with no tenant bound
+raises :class:`TenantUnbound` instead of reading or writing every tenant's
+rows. A deliberate cross-tenant read — the scheduler's tenant enumeration —
+is tagged with :func:`all_tenants`. The guard sees ORM statements only: a Core
+statement over ``__table__`` or ``text()`` still needs its own ``tenant_id``
+predicate.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Any, Final
 
 from simple_module_db import current_tenant_id, is_valid_tenant_id, tenant_context
 from simple_module_db.listeners import TenantIsolationError
 
-__all__ = ["TenantIsolationError", "tenant_scope"]
+__all__ = [
+    "ALL_TENANTS",
+    "TenantIsolationError",
+    "TenantUnbound",
+    "all_tenants",
+    "install_guard",
+    "tenant_scope",
+]
+
+ALL_TENANTS: Final = "news_all_tenants"
+"""Execution option marking an **explicit** cross-tenant read. Only lets a
+statement past the guard; with a tenant bound, the framework's filter still
+applies."""
+
+
+class TenantUnbound(RuntimeError):  # noqa: N818 - records' name for it
+    """A news statement ran with no tenant bound. Always a bug, never a user
+    error: the entry point that reached it forgot to bind one."""
 
 
 @contextmanager
@@ -29,3 +58,15 @@ def tenant_scope(tenant_id: str) -> Iterator[str]:
         )
     with tenant_context(tenant_id):
         yield tenant_id
+
+
+def all_tenants(stmt: Any) -> Any:
+    """Tag ``stmt`` as a deliberate cross-tenant read, past :func:`install_guard`."""
+    return stmt.execution_options(**{ALL_TENANTS: True})
+
+
+def install_guard(sync_session_class: Any) -> None:
+    """Refuse news ORM work with no tenant bound. Idempotent."""
+    from news.core.tenancy._guard import install
+
+    install(sync_session_class)

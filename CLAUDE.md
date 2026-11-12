@@ -111,7 +111,11 @@ that does not is how `/de/p/x` starts serving the English page.
 **Every pagebuilder, news, records, images and newsletter entry point binds a tenant (#38, #112).**
 Their tables carry `MultiTenantMixin`, and the framework filters them only
 while a tenant is bound — on a host with `multi_tenant` off nothing is bound
-and a read is *unfiltered*. Routers get `tenancy.bind_admin`/`bind_public`,
+and a read is *unfiltered*. So all five install one fail-closed ORM guard
+(`core/tenancy/_guard.py`, records' `_tenant_guard.py`, parity-checked, #335):
+an unbound statement on their tables raises `TenantUnbound`, and a deliberate
+cross-tenant read is tagged `tenancy.all_tenants(stmt)`; Core and `text()`
+still need their own `tenant_id` predicate. Routers get `tenancy.bind_admin`/`bind_public`,
 and all modules follow one rule: single-tenant host → `"default"`; multi →
 the tenant the framework resolved (`request.state.tenant_id`, the active
 membership — never `user.tenant_id`, never a header a module reads itself);
@@ -238,7 +242,9 @@ would pin the framework to a version that doesn't exist. `scripts/tests/`
 guards this and CI runs `--check-current`.
 
 **`billing` commits outside a request with `finalize_session`, never
-`commit()`.** Every `session_factory()` session is a `RequestSession`;
+`commit()`.** `tests/core/test_commit_sites.py` fails on any `.commit()` in
+`sm_billing` (its allow-list is empty since #340).
+Every `session_factory()` session is a `RequestSession`;
 `TenantService.set_status` queues `TenantStatusChanged` and the membership-cache
 invalidation on `on_commit`, which only `simple_module_db.finalize_session`
 runs. A bare `commit()` in a webhook, reconcile or event handler suspends the

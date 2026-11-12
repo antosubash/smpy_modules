@@ -5,9 +5,9 @@ An entry in a ``differ`` or ``own`` map is a decision, so each one says why.
 Adding one to get a red build green is the drift this file exists to catch —
 the fix is usually to change the lagging copy instead.
 
-The tenancy families (``{pagebuilder,news,records}/tenancy.py`` and
-``_tenancy_mode.py``) live in ``parity_tenancy.py``, the stored-secret crypto
-families in ``parity_crypto.py``; both are appended below.
+The tenancy families (the ``core/tenancy/`` copies: mode detection, binding
+and the fail-closed guard) live in ``parity_tenancy.py``, the stored-secret
+crypto families in ``parity_crypto.py``; both are appended below.
 """
 
 from __future__ import annotations

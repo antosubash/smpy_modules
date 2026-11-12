@@ -126,6 +126,12 @@ class PagebuilderModule(ModuleBase):
         # First: refuses a host pinned to another default tenant, and fixes
         # the mode every request binds by, before anything touches the DB.
         tenancy.configure(app)
+        # Then the fail-closed guard (#335), before the media scan below reads a
+        # pagebuilder table: an unbound statement raises instead of reading
+        # every tenant's rows.
+        db = getattr(getattr(app.state, "sm", None), "db", None)
+        if (session_class := getattr(db, "sync_session_class", None)) is not None:
+            tenancy.install_guard(session_class)
         settings = self._live_settings(app)
         # Absolute URLs from the client's Host header in production (#355).
         from pagebuilder.web.public_origin import warn_if_unset
