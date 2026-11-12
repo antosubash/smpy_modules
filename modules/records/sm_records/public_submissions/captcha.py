@@ -33,7 +33,6 @@ from typing import Any, Final
 
 import httpx
 
-from sm_records.core.crypto import CaptchaSecretUnreadableError
 from sm_records.core.settings import RecordsSettings
 from sm_records.public_submissions import captcha_secret
 from sm_records.public_submissions.errors import SubmissionRefused
@@ -102,14 +101,17 @@ async def verify(settings: RecordsSettings, response: str | None, remote_ip: str
         return
     try:
         secret = captcha_secret.secret(settings)
-    except (CaptchaSecretUnreadableError, RuntimeError) as exc:
-        # The field name and the error's type only: never the stored value.
+    except Exception as exc:
+        # Unreadable, no secret key, a malformed SM_SECRET_KEY_PREVIOUS, or an
+        # OS/import error reading it: all fail closed as 503, never a 500. The
+        # field name and the error's type only — never a message, which might
+        # echo the stored value — and no chained cause for the same reason.
         logger.error(
             "records: the stored %s cannot be decrypted (%s); refusing",
             captcha_secret.FIELD,
             type(exc).__name__,
         )
-        raise SubmissionRefused("captcha_unavailable", "the CAPTCHA could not be checked") from exc
+        raise SubmissionRefused("captcha_unavailable", "the CAPTCHA could not be checked") from None
     if not secret or not settings.public_submissions_captcha_site_key.strip():
         logger.error("records: the %s CAPTCHA has no site key or secret; refusing", provider)
         raise SubmissionRefused("captcha_unavailable", "the CAPTCHA could not be checked")

@@ -50,8 +50,8 @@ not open with the current key — `SM_SECRET_KEY` is always tried first. A value
 starting with `[` that is not a JSON list of strings is an error naming the
 variable, never its value: it does not affect values the current key opens, but
 every value that needs a previous key fails with it until the variable is
-fixed, and `scripts/reencrypt_secrets.py` refuses to run (writing nothing). Unlike `SM_SECRET_KEY` there is no database
-fallback: previous keys exist only where you put them, and a host that injects
+fixed, and `scripts/reencrypt_secrets.py` refuses to run (writing nothing).
+Unlike `SM_SECRET_KEY` there is no database fallback: previous keys exist only where you put them, and a host that injects
 `secret_key` in code still gives previous keys through this variable.
 
 ## Procedure

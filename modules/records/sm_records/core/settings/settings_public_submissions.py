@@ -32,11 +32,20 @@ def seal_secret(value: str | None) -> str:
 
     Empty stays empty and a value that is already ``enc:`` passes through, so a
     hydrated row is never encrypted twice; anything else is encrypted under the
-    app's secret. Raises ``RuntimeError`` when there is none, so nothing is
+    app's secret. Raises ``RuntimeError`` when the app has none, so nothing is
     ever written in the clear instead.
+
+    In a process with no app — no provider installed, e.g. newsletter's worker
+    hydrating ``RecordsSettings`` through ``settings_for`` — the value is
+    dumped as it is held, never raising: such a process never writes settings,
+    and every write path (the Settings screen, ``set_setting.py``, the startup
+    seal, ``reencrypt_secrets.py``) runs in an app that installed one. Dumping
+    is the only place this runs: hydration, ``model_copy`` and the framework's
+    reload comparison (``getattr``) never call it, so a legacy plaintext value
+    in memory is stable and never reported as changed.
     """
     text = (value or "").strip()
-    if not text or crypto.is_encrypted(text):
+    if not text or crypto.is_encrypted(text) or not crypto.has_secret_provider():
         return text
     return crypto.encrypt_value(text)
 

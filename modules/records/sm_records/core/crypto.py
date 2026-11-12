@@ -5,7 +5,8 @@ import a sibling optional module ("stored-secret crypto" parity family). The
 secret is the running app's ``secret_key``, installed by
 ``RecordsModule.register_settings``; there is no ``SM_SECRET_KEY`` fallback.
 The one thing read from the environment is ``SM_SECRET_KEY_PREVIOUS`` (the
-process env, else the located ``.env``).
+process env, else the located ``.env``), and only for a value the current
+secret does not open, so a malformed one never breaks what is current.
 
 Stored formats:
 
@@ -71,6 +72,12 @@ def set_secret_provider(provider: Callable[[], str]) -> None:
     """Install the live-secret source."""
     global _secret_provider
     _secret_provider = provider
+
+
+def has_secret_provider() -> bool:
+    """Whether an app installed its secret (records only: ``SealedSecret``
+    dumps unsealed in a process with no app, such as newsletter's worker)."""
+    return _secret_provider is not None
 
 
 def _current_secret() -> str:

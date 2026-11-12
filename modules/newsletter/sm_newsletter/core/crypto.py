@@ -18,7 +18,9 @@ Stored formats:
   database directly; workers refuse it, ``sending.runtime``).
 
 Both versions decrypt under ``SM_SECRET_KEY`` and every key in
-``SM_SECRET_KEY_PREVIOUS`` (``docs/secret-key-rotation.md``).
+``SM_SECRET_KEY_PREVIOUS`` (``docs/secret-key-rotation.md``). The current secret
+is tried first and the variable is read only for a value it does not open, so a
+malformed one never breaks what the current key opens.
 """
 
 from __future__ import annotations

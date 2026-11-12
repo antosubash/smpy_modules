@@ -208,3 +208,15 @@ def test_set_setting_stores_the_captcha_secret_encrypted(db, tmp_path):
     stored = _stored(db)[CAPTCHA_KEY]
     assert PLAIN[CAPTCHA_KEY] not in stored[0]
     assert _decrypt(CAPTCHA_KEY, stored, NEW) == PLAIN[CAPTCHA_KEY]
+
+
+def test_a_missing_secret_is_one_check_before_planning():
+    """``run`` checks the current secret once, not per row: ``check_secret``
+    raises before ``plan_row`` is ever reached."""
+    rs.install_secret("")
+    try:
+        with pytest.raises(RuntimeError, match=r"(?i)secret"):
+            rs.check_secret()
+    finally:
+        rs.install_secret(NEW)
+    rs.check_secret()

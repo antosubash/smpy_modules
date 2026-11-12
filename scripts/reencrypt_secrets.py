@@ -90,6 +90,8 @@ async def run(*, dry_run: bool, seal_plaintext: bool) -> int:
         async with app.state.sm.db.session_factory() as session:
             targets, others = await _rows(session)
             try:
+                # Once, before planning: one "cannot run" line, not a per-row raise.
+                rs.check_secret()
                 rs.check_previous()
                 plans = [rs.plan_row(row, seal_plaintext=seal_plaintext) for row in targets]
             except RuntimeError as exc:

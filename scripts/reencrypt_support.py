@@ -95,6 +95,18 @@ def install_secret(secret: str) -> None:
             crypto.set_secret_provider(lambda: secret)
 
 
+def check_secret() -> None:
+    """Fail once, before any row is planned, when a copy has no current secret.
+
+    Raises that copy's ``RuntimeError`` (it names the setting, not a value),
+    rather than letting the first row's plan raise it.
+    """
+    for package in TARGETS:
+        crypto = crypto_for(package)
+        if crypto is not None:
+            crypto._current_secret()
+
+
 def check_previous() -> None:
     """Parse ``SM_SECRET_KEY_PREVIOUS`` as every installed copy will.
 

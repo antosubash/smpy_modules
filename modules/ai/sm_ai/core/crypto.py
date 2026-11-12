@@ -25,7 +25,9 @@ Both versions decrypt under ``SM_SECRET_KEY`` and every key in
 ``SM_SECRET_KEY_PREVIOUS`` (process env, else the located ``.env``): one bare
 key, or a JSON list of keys. That is what lets an operator rotate the secret
 without losing what is stored (``docs/secret-key-rotation.md``). A value no
-key opens raises AiKeyUnreadableError.
+key opens raises AiKeyUnreadableError. The current secret is tried first and
+``SM_SECRET_KEY_PREVIOUS`` is read only for a value it does not open, so a
+malformed variable never breaks what the current key opens.
 """
 
 from __future__ import annotations

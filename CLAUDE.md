@@ -245,7 +245,7 @@ one place provider state becomes local state), and response models
 (`PlanOut`) must not inherit input bounds — a stored row that predates a bound
 would 500 every screen listing plans. Its docs are in `modules/billing/docs/`.
 
-**`pagebuilder`, `news`, `billing`, `ai`, `images` and `newsletter` read no environment variables** (but for the stored-secret crypto's `SM_SECRET_KEY_PREVIOUS`, below, and the `SM_SECRET_KEY` fallback in ai and newsletter). Their settings are
+**`pagebuilder`, `news`, `billing`, `ai`, `images`, `newsletter` and `records` read no environment variables for their settings.** The exceptions are the stored-secret crypto's: ai, billing, newsletter and records read `SM_SECRET_KEY_PREVIOUS` (below), and ai and newsletter also fall back to `SM_SECRET_KEY`. Their settings are
 DB-backed through the framework's settings module (`register_module_settings`),
 and each class drops pydantic-settings' env, `.env` and secrets sources — so
 adding a field means adding it to the class, not to `.env.example`, and an
