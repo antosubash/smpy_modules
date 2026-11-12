@@ -11,7 +11,7 @@ import { keys, useT } from '../../utils/i18n';
 import type { SettingsOut, SettingsUpdate } from '../../utils/types';
 import { Field, Section } from './FormParts';
 import { PasswordField } from './PasswordField';
-import { TestRecipientsSection } from './TestRecipientsSection';
+import { MAX_EXTRA_TEST_RECIPIENTS, TestRecipientsSection } from './TestRecipientsSection';
 
 // The server's input bounds (`web/schemas/settings.py`).
 const MAX = { host: 253, username: 320, from_name: 200, physical_address: 500 } as const;
@@ -55,6 +55,8 @@ export function SettingsForm({ initial, canWrite }: Props) {
   const readOnly = !canWrite;
   const busy = pending || readOnly;
   const smtp = draft.transport === 'smtp';
+  // Over the server's bound: the section says so, and Save waits (the 422 stays a backstop).
+  const tooMany = draft.test_send_extra_recipients.length > MAX_EXTRA_TEST_RECIPIENTS;
 
   const save = async () => {
     setPending(true);
@@ -263,7 +265,7 @@ export function SettingsForm({ initial, canWrite }: Props) {
 
       {canWrite && (
         <div>
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" disabled={pending || tooMany}>
             {pending ? t(copy.saving) : t(copy.save)}
           </Button>
         </div>

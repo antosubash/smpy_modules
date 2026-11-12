@@ -6,7 +6,7 @@ import { keys, useT } from '../../utils/i18n';
 import { Field, Section } from './FormParts';
 
 /** The server's bound (`MAX_EXTRA_TEST_RECIPIENTS` in `web/schemas/settings.py`). */
-const MAX_EXTRA_TEST_RECIPIENTS = 20;
+export const MAX_EXTRA_TEST_RECIPIENTS = 20;
 
 /** `test_send_extra_recipients` (#348): the addresses a test may go to besides
  *  the sender's own and the organisation's members'. The text is kept as typed

@@ -113,7 +113,7 @@ class AiService:
     async def base_url_errors(changes: dict[str, Any]) -> list[dict[str, Any]]:
         """422 items for base URLs that may not be saved (#347): resolved here,
         judged on the merged result like ``slot_errors``, for the URLs the update
-        touches (or all of them when it flips the switch)."""
+        changes (turning the switch off re-checks none: see ``save_errors``)."""
         from sm_ai.connections.base_url import save_errors
 
         current = services.current_settings().model_dump()

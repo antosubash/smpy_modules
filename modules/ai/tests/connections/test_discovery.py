@@ -19,15 +19,9 @@ from sm_ai.web import probe_errors
 
 from tests.support.ai_test_stubs import GrantAll
 
-SECRET = "test-secret-key-for-discovery"
 LOGGER = "sm_ai.web.probe_errors"
 
 
-@pytest.fixture(autouse=True)
-def _env(monkeypatch):
-    monkeypatch.setenv("SM_SECRET_KEY", SECRET)
-    yield
-    services.reset()
 
 
 def _install(**fields) -> AiSettings:
@@ -260,3 +254,27 @@ class TestProbeLogging:
             await client.post("/api/ai/models", json={"slot": "chat"})
         [record] = caplog.records
         assert record.exc_info is not None
+
+
+async def test_discovery_closes_the_client_it_opens(monkeypatch):
+    from sm_ai.connections import clients
+
+    opened = []
+
+    async def fake(key, base_url, http):
+        opened.append(http)
+        return ["m"]
+
+    monkeypatch.setattr(discovery, "_openai", fake)
+    loop = asyncio.get_running_loop()
+    before = clients.cached(loop)
+    settings = AiSettings(
+        chat_provider=constants.PROVIDER_OPENAI_COMPATIBLE,
+        chat_model="m",
+        chat_base_url="http://127.0.0.1:9/v1",
+        allow_private_base_url=True,
+    )
+    await discovery.list_models(settings, constants.SLOT_CHAT)
+    [http] = opened
+    assert http.is_closed
+    assert clients.cached(loop) == before  # unshared: not in the loop's cache

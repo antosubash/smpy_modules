@@ -60,7 +60,7 @@
     "title": "Netzwerk",
     "description": "Wohin eine Basis-URL zeigen darf. Sie erhält den API-Schlüssel des Slots.",
     "allow_private": "Private Basis-URLs erlauben",
-    "allow_private_hint": "Für einen lokalen Endpunkt wie Ollama oder ein Gateway im eigenen Netz. Aus: Eine Basis-URL muss ausschließlich auf öffentliche Adressen auflösen.",
+    "allow_private_hint": "Für einen lokalen Endpunkt wie Ollama oder ein Gateway im eigenen Netz. Aus: Eine Basis-URL muss ausschließlich auf öffentliche Adressen auflösen; eine bereits gespeicherte private bleibt stehen, jeder Aufruf an sie wird aber abgelehnt, bis Sie sie ändern.",
     "needs_settings_edit": "Zum Ändern ist die Berechtigung settings.edit nötig."
   },
   "api": {

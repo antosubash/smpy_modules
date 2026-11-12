@@ -140,4 +140,21 @@ describe('SettingsForm', () => {
       test_send_extra_recipients: ['review@example.org', 'qa@example.org'],
     });
   });
+
+  it('keeps Save disabled while the extra recipients are over the limit', async () => {
+    await render({ canWrite: true });
+    const area = document.getElementById(
+      'newsletter-settings-test-recipients',
+    ) as HTMLTextAreaElement;
+    const fill = async (text: string) =>
+      act(async () => {
+        const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+        set?.call(area, text);
+        area.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    await fill(Array.from({ length: 21 }, (_, i) => `r${i}@example.org`).join('\n'));
+    expect((button(copy.save) as HTMLButtonElement).disabled).toBe(true);
+    await fill('r1@example.org');
+    expect((button(copy.save) as HTMLButtonElement).disabled).toBe(false);
+  });
 });

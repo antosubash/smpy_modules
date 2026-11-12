@@ -100,10 +100,11 @@ async def save_errors(
 ) -> list[dict[str, Any]]:
     """422 items for the base URLs of ``merged`` (stored settings plus the update).
 
-    ``changed`` names the fields the update writes: a URL is checked only when it
-    or ``allow_private_base_url`` is among them, so a save that touches neither
-    (a new model name, a rotated key) is not refused, and made to resolve DNS,
-    over a stored URL it did not change; connect time still guards that one.
+    ``changed`` names the fields whose value the update changes: a URL is checked
+    only when it is among them. A save that leaves it alone (a new model name, a
+    rotated key, or turning ``allow_private_base_url`` off while a private URL
+    is stored) is not refused over it; connect time still guards that URL, so
+    a private one left in place is refused at use (``base_url_refused``).
     ``None`` checks every slot.
 
     Shaped like FastAPI's own validation items, as ``AiService.slot_errors`` is.
@@ -112,7 +113,7 @@ async def save_errors(
     errors: list[dict[str, Any]] = []
     for slot in constants.TEST_SLOTS:
         field = f"{slot}_base_url"
-        if changed is not None and not {field, "allow_private_base_url"} & set(changed):
+        if changed is not None and field not in changed:
             continue
         url = str(merged.get(field) or "").strip()
         if not url:

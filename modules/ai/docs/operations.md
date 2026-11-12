@@ -156,8 +156,8 @@ What remains:
 - Neither client a base URL gets follows redirects (the SDKs' default clients
   do, and a followed hop would carry the key's header to another host): a base
   URL that answers `301`/`307`, such as `http://` to `https://` or a missing
-  trailing slash, fails with the `other` code (a 3xx is not an `http_error`) until the URL is
-  the final one. That holds with `allow_private_base_url` on too.
+  trailing slash, fails with the `http_error` code and that status until the
+  URL is the final one. That holds with `allow_private_base_url` on too.
 - One client is kept per event loop and base-URL origin
   (`sm_ai.connections.clients`, at most 8 origins per loop; a finished loop's
   clients go with it), shared by every model built on that loop. The pinned
@@ -172,6 +172,10 @@ What remains:
   server reaches. That is why turning it on needs `settings.edit`.
 - `scripts/set_setting.py` writes a base URL without the save check; the
   connect-time check still applies to it.
+- A save checks only the base URLs it changes. Turning `allow_private_base_url`
+  off while a private URL is saved is therefore allowed: the URL stays, and
+  every call to it, **Test connection** included, is refused
+  (`base_url_refused`) until it is changed.
 
 **Upgrading from 0.0.15:** a slot whose base URL is private (a local Ollama or
 vLLM, `http://vllm:8000/v1` on a container network) stops working: calls fail

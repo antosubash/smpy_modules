@@ -15,7 +15,8 @@ for each running event loop and handed to every model built on that loop:
 Per loop, not per process: a connection pool and its locks belong to the loop
 that used them, and a Celery task runs each call on a loop of its own. The
 cache holds loops weakly, so a finished loop's clients go with it, and keeps at
-most :data:`MAX_PER_LOOP` origins per loop (the oldest is closed). Built with
+most :data:`MAX_PER_LOOP` origins per loop (the oldest is dropped, not closed:
+a model may still be using it, and neither kind keeps idle connections). Built with
 no running loop (plain sync code), a client is not cached; discovery asks for
 an unshared one and closes it itself.
 """
@@ -23,7 +24,6 @@ an unshared one and closes it itself.
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import weakref
 from collections.abc import Callable
 from typing import Final
@@ -47,9 +47,14 @@ def _private_transport() -> httpx2.AsyncBaseTransport | None:
 
 
 def private_client() -> httpx2.AsyncClient:
-    """A client for a private base URL: no redirects, environment proxies kept."""
+    """A client for a private base URL: no redirects, environment proxies kept,
+    and no idle connections - an idle one would keep its loop alive, and with it
+    this cache's entry for a finished Celery loop."""
     return httpx2.AsyncClient(
-        transport=_private_transport(), timeout=TIMEOUT, follow_redirects=False
+        transport=_private_transport(),
+        timeout=TIMEOUT,
+        follow_redirects=False,
+        limits=httpx2.Limits(max_keepalive_connections=0),
     )
 
 
@@ -57,16 +62,6 @@ _FACTORIES: Final[dict[str, Callable[[], httpx2.AsyncClient]]] = {
     "pinned": lambda: pinned_client(),
     "private": lambda: private_client(),
 }
-
-
-_CLOSING: set[asyncio.Task[None]] = set()  # the loop keeps tasks only weakly
-
-
-def _close_later(loop: asyncio.AbstractEventLoop, client: httpx2.AsyncClient) -> None:
-    with contextlib.suppress(RuntimeError):  # the loop is closing
-        task = loop.create_task(client.aclose())
-        _CLOSING.add(task)
-        task.add_done_callback(_CLOSING.discard)
 
 
 def client_for(kind: str, base_url: str, *, shared: bool = True) -> httpx2.AsyncClient:
@@ -82,10 +77,14 @@ def client_for(kind: str, base_url: str, *, shared: bool = True) -> httpx2.Async
     key: Key = (kind, url.scheme, url.host, url.port)
     clients = _CACHE.setdefault(loop, {})
     client = clients.get(key)
-    if client is None or client.is_closed:
-        while len(clients) >= MAX_PER_LOOP:
-            _close_later(loop, clients.pop(next(iter(clients))))
-        client = clients[key] = factory()
+    if client is not None and not client.is_closed:
+        return client
+    clients.pop(key, None)  # a closed entry never counts against the bound
+    while len(clients) >= MAX_PER_LOOP:
+        # Dropped, not closed: a model built earlier may be mid-request on it,
+        # and neither kind holds idle connections, so nothing is left open.
+        clients.pop(next(iter(clients)))
+    client = clients[key] = factory()
     return client
 
 

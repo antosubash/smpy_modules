@@ -270,7 +270,7 @@ translates by `code`:
 | `connection_refused` | nothing listens at that address and port |
 | `timeout` | no answer in time (the 30-second probe deadline, or the SDK's or pinned client's own timeout) |
 | `unauthorised` | HTTP 401 or 403 (`status` says which) |
-| `http_error` | another error status (`status`) |
+| `http_error` | another status the call did not succeed with (`status`), a `3xx` included: redirects are not followed |
 | `other` | anything else |
 
 The server logs the failure with its class and the exception text: a

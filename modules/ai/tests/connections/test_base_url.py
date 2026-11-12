@@ -12,20 +12,11 @@ import pytest
 from pydantic_ai import Agent
 from sm_ai.connections import base_url, discovery, pinned, resolve
 from sm_ai.contracts.errors import AiBaseUrlRefusedError
-from sm_ai.core import constants, crypto, services
+from sm_ai.core import constants, crypto
 from sm_ai.core.settings import AiSettings
 from sm_ai.web import probe_errors
 
 from tests.support.ai_test_stubs import fake_dns
-
-SECRET = "test-secret-key-for-base-url"
-
-
-@pytest.fixture(autouse=True)
-def _env(monkeypatch):
-    monkeypatch.setenv("SM_SECRET_KEY", SECRET)
-    yield
-    services.reset()
 
 
 @pytest.fixture

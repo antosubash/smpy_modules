@@ -89,11 +89,11 @@ def _status(exc: BaseException) -> int:
     """The HTTP status an SDK or pydantic-ai error carries, or 0."""
     for attr in ("status_code", "code"):
         value = getattr(exc, attr, None)
-        if isinstance(value, int) and 400 <= value <= 599:
+        if isinstance(value, int) and 300 <= value <= 599:
             return value
     response = getattr(exc, "response", None)
     value = getattr(response, "status_code", None)
-    return value if isinstance(value, int) and 400 <= value <= 599 else 0
+    return value if isinstance(value, int) and 300 <= value <= 599 else 0
 
 
 def classify(exc: BaseException) -> Classified:

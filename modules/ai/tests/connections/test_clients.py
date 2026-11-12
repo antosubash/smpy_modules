@@ -3,22 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import gc
+import weakref
 
 import httpx2
 import pytest
 from pydantic_ai import Agent
-from sm_ai.connections import clients, discovery, resolve
-from sm_ai.core import constants, crypto, services
+from sm_ai.connections import clients, resolve
+from sm_ai.core import constants, crypto
 from sm_ai.core.settings import AiSettings
-
-SECRET = "test-secret-key-for-clients"
-
-
-@pytest.fixture(autouse=True)
-def _env(monkeypatch):
-    monkeypatch.setenv("SM_SECRET_KEY", SECRET)
-    yield
-    services.reset()
 
 
 def _chat(url: str, **kw) -> AiSettings:
@@ -80,17 +73,68 @@ async def test_with_private_urls_allowed_a_redirect_is_not_followed(monkeypatch)
     assert [r.url.host for r in seen] == ["127.0.0.1"]
 
 
-async def test_discovery_closes_the_client_it_opens(monkeypatch):
-    opened = []
+async def _ok_server():
+    """A local HTTP/1.1 server that keeps each connection open until the client
+    closes it (so a pooled idle connection would stay alive)."""
 
-    async def fake(key, base_url, http):
-        opened.append(http)
-        return ["m"]
+    async def handle(reader, writer):
+        while await reader.readuntil(b"\r\n\r\n"):
+            writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+            await writer.drain()
 
-    monkeypatch.setattr(discovery, "_openai", fake)
+    async def guarded(reader, writer):
+        try:
+            await handle(reader, writer)
+        except (asyncio.IncompleteReadError, ConnectionError):
+            writer.close()
+
+    server = await asyncio.start_server(guarded, "127.0.0.1", 0)
+    return server, server.sockets[0].getsockname()[1]
+
+
+def test_a_finished_loop_is_freed_in_private_mode(monkeypatch):
+    for var in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy"):
+        monkeypatch.delenv(var, raising=False)
+    refs = []
+
+    async def run():
+        server, port = await _ok_server()
+        url = f"http://127.0.0.1:{port}/v1"
+        client = clients.client_for("private", url)
+        assert (await client.get(f"{url}/models")).status_code == 200
+        refs.append(weakref.ref(asyncio.get_running_loop()))
+        server.close()
+
+    asyncio.run(run())
+    gc.collect()
+    assert refs[0]() is None  # no idle connection kept the loop, or its entry, alive
+
+
+async def test_a_closed_entry_does_not_evict_a_live_one():
     loop = asyncio.get_running_loop()
-    before = clients.cached(loop)
-    await discovery.list_models(_chat("http://127.0.0.1:9/v1", allow_private_base_url=True), "chat")
-    [http] = opened
-    assert http.is_closed
-    assert clients.cached(loop) == before  # unshared: not in the loop's cache
+    urls = [f"http://gw{i}.example/v1" for i in range(clients.MAX_PER_LOOP)]
+    first = [clients.client_for("pinned", u) for u in urls]
+    await first[3].aclose()
+    again = clients.client_for("pinned", urls[3])
+    assert again is not first[3] and not again.is_closed
+    assert clients.cached(loop) == clients.MAX_PER_LOOP
+    assert clients.client_for("pinned", urls[0]) is first[0]  # still cached
+
+
+async def test_evicting_a_client_mid_request_does_not_fail_it(monkeypatch):
+    release = asyncio.Event()
+
+    async def handler(request):
+        await release.wait()
+        return httpx2.Response(200, json={"ok": True})
+
+    monkeypatch.setattr(clients, "_private_transport", lambda: httpx2.MockTransport(handler))
+    busy = clients.client_for("private", "http://10.0.0.1/v1")
+    pending = asyncio.create_task(busy.get("http://10.0.0.1/v1/models"))
+    await asyncio.sleep(0)
+    for i in range(clients.MAX_PER_LOOP):  # pushes the busy client out
+        clients.client_for("private", f"http://10.0.1.{i}/v1")
+    assert clients.client_for("private", "http://10.0.0.1/v1") is not busy
+    release.set()
+    assert (await pending).status_code == 200
+    assert not busy.is_closed

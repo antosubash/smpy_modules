@@ -36,6 +36,24 @@ PRIVATE = {"chat_provider": "openai_compatible", "chat_base_url": "http://ollama
 
 
 class TestSave:
+    async def test_the_switch_can_be_turned_off_over_a_saved_private_url(
+        self, admin, monkeypatch
+    ):
+        # The stored private URL is not re-checked; it is refused at use instead.
+        services.current_settings().allow_private_base_url = True
+        services.current_settings().chat_provider = "openai_compatible"
+        services.current_settings().chat_base_url = "http://ollama:11434/v1"
+        fake_dns(monkeypatch, {"ollama": ["172.17.0.3"]})
+        res = await admin.put(
+            "/api/ai/settings",
+            json={**PRIVATE, "allow_private_base_url": False},  # the page resends the URL
+        )
+        assert res.status_code == 200, res.text
+        [applied] = admin.applied
+        assert applied["allow_private_base_url"] is False
+        body = (await admin.post("/api/ai/test", json={"slot": "chat"})).json()
+        assert body["code"] == probe_errors.BASE_URL_REFUSED
+
     async def test_a_private_base_url_is_refused_naming_the_setting(self, manager, monkeypatch):
         fake_dns(monkeypatch, {"ollama": ["172.17.0.3"]})
         res = await manager.put("/api/ai/settings", json=PRIVATE)
@@ -154,3 +172,10 @@ class TestUnchangedUrls:
         )
         assert res.status_code == 200
         assert asked == []
+
+
+def test_an_unfollowed_redirect_is_an_http_error_with_its_status():
+    from pydantic_ai.exceptions import ModelHTTPError
+
+    exc = ModelHTTPError(status_code=302, model_name="m", body=None)
+    assert probe_errors.classify(exc) == (probe_errors.HTTP_ERROR, 302)
