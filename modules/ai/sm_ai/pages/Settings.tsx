@@ -105,7 +105,9 @@ function Settings({ can_allow_private = false }: { can_allow_private?: boolean }
       return;
     }
     return run(async () => {
-      hydrate(await saveSettings(chat, embedding, allowPrivate));
+      hydrate(
+        await saveSettings(chat, embedding, can_allow_private ? allowPrivate : undefined),
+      );
       // Results describe the previous configuration — drop them.
       setChatTest(null);
       setEmbeddingTest(null);

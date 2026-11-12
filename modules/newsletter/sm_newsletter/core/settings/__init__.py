@@ -82,9 +82,10 @@ class NewsletterSettings(DbBackedSettings):
     @field_validator("test_send_extra_recipients", mode="before")
     @classmethod
     def _normalised_recipients(cls, value: object) -> object:
-        """Stripped, lower-cased and deduplicated, as a test send compares them.
-        Tolerant: hydration replaces a class that will not construct with all
-        defaults, so a stray entry is dropped rather than refused."""
+        """Stripped, lower-cased and deduplicated (a test send then compares them
+        with the recipient on ``normalise_email``). Tolerant: hydration replaces
+        a class that will not construct with all defaults, so a stray entry is
+        dropped rather than refused."""
         if not isinstance(value, list):
             return value
         out: list[str] = []

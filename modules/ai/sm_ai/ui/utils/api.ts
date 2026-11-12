@@ -109,10 +109,11 @@ export async function loadSettings(): Promise<AiSettingsOut> {
 export async function saveSettings(
   chat: SlotValues,
   embedding: SlotValues,
-  allowPrivateBaseUrl: boolean,
+  allowPrivateBaseUrl?: boolean,
 ): Promise<AiSettingsOut> {
   const payload: Record<string, unknown> = {
-    // Sent every time: the API asks for settings.edit only when it changes.
+    // Left out (undefined is dropped from the JSON) when the viewer cannot change
+    // it; otherwise sent every time: the API asks for settings.edit only on a change.
     allow_private_base_url: allowPrivateBaseUrl,
     chat_provider: chat.provider,
     chat_model: chat.model,

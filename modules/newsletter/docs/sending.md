@@ -205,7 +205,8 @@ may go to (#348):
   single-tenant host every active account belongs to the one organisation); and
   the addresses in the setting `test_send_extra_recipients` (SYSTEM scope, up to
   20, for a shared review inbox). With no user directory, or on a multi-tenant
-  host no membership store, only the caller and the list are vouched for.
+  host no membership store, only the caller and the extra recipients are vouched
+  for.
 - **Anything else** answers `recipient_not_allowed` for that address alone.
 - **Suppressed.** A vouched-for address with a `complaint` or `unsubscribed`
   row in the tenant's `newsletter_suppression` (any list: opt-outs are

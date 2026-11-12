@@ -30,6 +30,7 @@ they were written with.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import unicodedata
 
@@ -56,8 +57,12 @@ def records_form(address: object) -> str:
     return normalised
 
 
+@functools.lru_cache(maxsize=8192)
 def _domain(domain: str) -> str:
-    """The domain as ``email-validator`` normalises it (Unicode form)."""
+    """The domain as ``email-validator`` normalises it (Unicode form).
+
+    Cached: the IDNA pass costs ~100 us, a freeze or import hashes the same few
+    domains for every address, and the result depends on the domain alone."""
     try:
         result = validate_email_domain_name(
             domain, test_environment=True, globally_deliverable=False

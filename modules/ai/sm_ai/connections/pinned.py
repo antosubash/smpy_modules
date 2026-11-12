@@ -2,8 +2,8 @@
 
 The provider SDKs (OpenAI, Anthropic, google-genai) all accept a caller's
 ``httpx2.AsyncClient``, so a slot with a base URL gets one whose transport is
-:class:`PinnedTransport`: for every request it sends - the first and every
-redirect hop - it resolves the host, refuses it unless every address is public
+:class:`PinnedTransport`: for every request it sends it resolves the host,
+refuses it unless every address is public
 (:func:`sm_ai.core.url_safety.resolve_public`), and rewrites only the URL's
 *host* to one of those addresses before handing the request to a real
 transport. The ``Host`` header still names the host, and on https the
@@ -20,6 +20,12 @@ connections (``max_keepalive_connections=0``). Each model call builds its own
 client and the SDKs never close one they did not create, so a pooled
 connection would outlive its call; with no keep-alive each connection closes
 when its response does, on whichever event loop made it.
+
+The client does not follow redirects (the SDKs' own default clients do, but a
+followed hop would carry the key's header, ``x-api-key`` included, to another
+host): a 3xx answer reaches the SDK as an error, so a base URL must be the final
+one. Were redirects ever enabled, each hop passes through this transport and is
+validated like the first request.
 
 ``trust_env=False``: a proxy taken from ``HTTPS_PROXY`` would resolve the name
 itself, so a pinned client never uses one (see the module's operations docs).

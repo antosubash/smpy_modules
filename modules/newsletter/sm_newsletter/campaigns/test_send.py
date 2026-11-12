@@ -19,7 +19,7 @@ page treats as forged.
 any other answers ``recipient_not_allowed``. Of the allowed, an address with a
 ``complaint`` or ``unsubscribed`` suppression in the tenant (any list: they are
 tenant-wide, matched by the suppression table's address hash) answers
-``suppressed``, whichever reason it is (both sides hash the canonical form,
+``suppressed``, saying nothing of which of the two it is (both sides hash the canonical form,
 ``normalise_email``, so a spelling variant matches). ``submitted`` adds the
 raw forms each recipient was typed in, so a row a pre-#348 build wrote under
 the legacy key of such a spelling is found too (``lookup_hashes``). Both are

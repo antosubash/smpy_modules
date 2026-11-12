@@ -47,9 +47,7 @@ def fake_dns(monkeypatch, answers: dict[str, list[str]]) -> list[str]:
         if host not in answers:
             raise socket.gaierror(socket.EAI_NONAME, "Name or service not known")
         family = {True: socket.AF_INET6, False: socket.AF_INET}
-        return [
-            (family[":" in ip], socket.SOCK_STREAM, 6, "", (ip, port)) for ip in answers[host]
-        ]
+        return [(family[":" in ip], socket.SOCK_STREAM, 6, "", (ip, port)) for ip in answers[host]]
 
     monkeypatch.setattr(url_safety.socket, "getaddrinfo", getaddrinfo)
     return asked

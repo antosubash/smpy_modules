@@ -36,6 +36,8 @@ from sm_ai.core.url_safety import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Collection
+
     import httpx2
 
     from sm_ai.core.settings import AiSettings
@@ -85,8 +87,16 @@ _SAVE_MESSAGES = {
 }
 
 
-async def save_errors(merged: dict[str, Any]) -> list[dict[str, Any]]:
+async def save_errors(
+    merged: dict[str, Any], changed: Collection[str] | None = None
+) -> list[dict[str, Any]]:
     """422 items for the base URLs of ``merged`` (stored settings plus the update).
+
+    ``changed`` names the fields the update writes: a URL is checked only when it
+    or ``allow_private_base_url`` is among them, so a save that touches neither
+    (a new model name, a rotated key) is not refused, and made to resolve DNS,
+    over a stored URL it did not change; connect time still guards that one.
+    ``None`` checks every slot.
 
     Shaped like FastAPI's own validation items, as ``AiService.slot_errors`` is.
     """
@@ -94,6 +104,8 @@ async def save_errors(merged: dict[str, Any]) -> list[dict[str, Any]]:
     errors: list[dict[str, Any]] = []
     for slot in constants.TEST_SLOTS:
         field = f"{slot}_base_url"
+        if changed is not None and not {field, "allow_private_base_url"} & set(changed):
+            continue
         url = str(merged.get(field) or "").strip()
         if not url:
             continue

@@ -170,3 +170,21 @@ def test_classify_reads_the_chain(exc, code):
 
 def test_every_code_has_a_message():
     assert set(probe_errors.CODES) == set(probe_errors.MESSAGES)
+
+
+class TestUnchangedUrls:
+    async def test_a_save_that_leaves_a_stored_private_url_alone_is_not_refused(
+        self, manager, monkeypatch
+    ):
+        # A URL stored before the guard existed: an unrelated save (the page
+        # resends it unchanged) neither fails on it nor resolves its host.
+        settings = services.current_settings()
+        settings.chat_provider = "openai_compatible"
+        settings.chat_base_url = "http://ollama:11434/v1"
+        asked = fake_dns(monkeypatch, {"ollama": ["172.17.0.3"]})
+        res = await manager.put(
+            "/api/ai/settings",
+            json={"chat_base_url": "http://ollama:11434/v1", "chat_model": "other"},
+        )
+        assert res.status_code == 200
+        assert asked == []

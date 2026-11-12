@@ -137,7 +137,7 @@ where it points (#347). With `allow_private_base_url` off (the default):
   scheme is checked again and a private IP literal is refused, without DNS:
   the build is synchronous and runs inside async code.
 - **At connect** the SDK's HTTP client is the module's pinned client
-  (`sm_ai.connections.pinned`): each request, redirects included, resolves the
+  (`sm_ai.connections.pinned`): each request resolves the
   host again, refuses it unless every address is public, and connects to the
   validated address while sending the name as `Host` and TLS SNI (the
   certificate is verified against the name). A DNS answer that changes after
@@ -153,6 +153,10 @@ endpoint and the SDK's own client; it is not checked.
 
 What remains:
 
+- The pinned client does not follow redirects (the SDKs' default clients do): a
+  base URL that answers `301`/`307`, such as `http://` to `https://` or a
+  missing trailing slash, fails with the `other` code until the URL is the final
+  one.
 - The pinned client keeps no idle connections (each call builds its own and
   the SDKs do not close one they did not create), so every call to a custom
   base URL opens a new connection.

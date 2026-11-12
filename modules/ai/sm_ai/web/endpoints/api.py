@@ -43,7 +43,7 @@ async def update_settings(
     AiService.drop_unchanged_policy(changes)
     if not changes:
         return service.current()
-    if AiService.changes_network_policy(changes) and not await can_edit_settings(request):
+    if "allow_private_base_url" in changes and not await can_edit_settings(request):
         raise HTTPException(
             status_code=403, detail=f"Permission required: {constants.PERM_SETTINGS_EDIT}"
         )
