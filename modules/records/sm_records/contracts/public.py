@@ -51,7 +51,7 @@ class PublicRecordRead(SQLModel):
     dropped from ``content_locales``: advertising any of the three would point
     a reader — and a crawler — at a 404, because none of them is served here.
     Resolved in one batched query per page, keyed by ``translation_group`` and
-    never per row (``services._translations.published_siblings``).
+    never per row (``services.translations._translations.published_siblings``).
 
     ``translation_group`` itself is *not* published: it is an internal
     grouping key, and a reader needs the addresses, not the join column."""
@@ -126,7 +126,7 @@ def public_records_read(
     """A page, with the type's field definitions validated once, not per row.
 
     ``siblings`` is the whole page's translation groups, already resolved —
-    what ``services._translations.published_siblings`` returns. *Looked up*
+    what ``services.translations._translations.published_siblings`` returns. *Looked up*
     here rather than queried, for the reason §9 gives about expansion: one
     batched query per page is the rule, and a per-row query hiding behind this
     signature would be exactly the regression it exists to prevent.

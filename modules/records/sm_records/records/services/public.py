@@ -56,9 +56,9 @@ from sm_records.records.index.query import (
     Sort,
 )
 from sm_records.records.services._listing import RecordListPage, page_of
-from sm_records.records.services._translations import published_siblings
 from sm_records.records.services.errors import NotFound
 from sm_records.records.services.public_bounds import check_public_filters, statement_timeout
+from sm_records.records.services.translations._translations import published_siblings
 
 __all__ = [
     "NOT_FOUND",

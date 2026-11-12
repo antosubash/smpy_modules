@@ -40,7 +40,6 @@ from sm_records.records.services._common import (
     type_id_map,
 )
 from sm_records.records.services._lock import lock_type
-from sm_records.records.services._referrer_sets import _declares_a_relation_to
 from sm_records.records.services._schema import (
     check_pointers,
     check_targets,
@@ -48,8 +47,6 @@ from sm_records.records.services._schema import (
     snapshot,
 )
 from sm_records.records.services._schema_checked import normalise_checked
-from sm_records.records.services._type_checks import check_collection
-from sm_records.records.services._type_update import update_type
 from sm_records.records.services.errors import (
     Conflict,
     NotFound,
@@ -57,6 +54,9 @@ from sm_records.records.services.errors import (
     ValidationFailed,
 )
 from sm_records.records.services.records import purge_type_records
+from sm_records.records.services.referrers._referrer_sets import _declares_a_relation_to
+from sm_records.records.services.type_writes._type_checks import check_collection
+from sm_records.records.services.type_writes._type_update import update_type
 
 __all__ = [
     "create_type",

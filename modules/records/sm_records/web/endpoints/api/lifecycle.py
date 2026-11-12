@@ -52,7 +52,7 @@ async def delete_record(
     record = await record_service.get_record(db, rtype, uuid)
     # ``roles`` and not only ``check_type_roles``: the delete may cascade into
     # — or rewrite — records of types this URL never names, and design §10's
-    # narrowing has to reach those too. See ``services._lifecycle``.
+    # narrowing has to reach those too. See ``services.delete._lifecycle``.
     await record_service.soft_delete_record(
         db, rtype, record, actor=who, settings=settings, roles=caller_roles(request)
     )

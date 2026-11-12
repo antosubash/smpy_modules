@@ -11,6 +11,7 @@ from tests.perf.conftest import REPS, load_type, type_counts
 
 pytestmark = pytest.mark.perf
 
+
 async def test_count_query_alone(perf_db, perf_session):
     """The ``total`` half of a list page, measured without the page read."""
     from sm_records.records.index.query import count_query

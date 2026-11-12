@@ -64,7 +64,7 @@ FIXED_COLUMNS: frozenset[str] = frozenset(
 and no ``indexed: true`` anywhere.
 
 ``invalid`` is the odd one: the grammar name is not the column name. The row
-stores ``invalid_since``, a nullable timestamp (§8.3, ``services/_invalid.py``),
+stores ``invalid_since``, a nullable timestamp (§8.3, ``services/schema_changes/_invalid.py``),
 and nobody filtering a list wants to compare timestamps — the question is
 "show me the records something is wrong with". So ``invalid`` is a *boolean
 view* of that column, ``eq:true`` meaning ``invalid_since IS NOT NULL``, and

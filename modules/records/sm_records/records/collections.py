@@ -22,7 +22,7 @@ migration for the new tables, exactly as it did for the module itself.
 
 **Assignment is per type** (§6.2). ``POST /types`` takes ``collection``;
 ``PUT /types/{key}`` with a changed one moves the type and its rows, in one
-transaction (#82, :mod:`sm_records.records.services._type_move`).
+transaction (#82, :mod:`sm_records.records.services.type_writes._type_move`).
 
 **What stays global** (§6.4): ``records_type``, ``records_type_revision``, the
 reduce table (keyed by ``type_id``, with no ``record_id`` to partition on),

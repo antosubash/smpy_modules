@@ -16,9 +16,9 @@ from typing import Any
 
 import pytest
 from sm_records.models import RecordType
-from sm_records.records.services._type_update import update_type
 from sm_records.records.services.errors import Conflict
 from sm_records.records.services.records import create_record
+from sm_records.records.services.type_writes._type_update import update_type
 from sqlalchemy import text
 
 from tests.pg_support import USING_POSTGRES

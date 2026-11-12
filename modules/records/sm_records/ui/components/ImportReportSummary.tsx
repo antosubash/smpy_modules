@@ -3,13 +3,13 @@ import { keys, type Translate, useT } from '../utils/i18n';
 import type { ImportReport, ImportRowError } from '../utils/io';
 import { EMPTY_CELL } from '../utils/values';
 
-/** A version refusal is worded by `services/_import_rows.py` and always
+/** A version refusal is worded by `services/imports/_import_rows.py` and always
  *  names the escape hatch by its wire name, since that is the one thing a
  *  file-editing operator cannot see in `RecordIoMenu` otherwise. */
 const FORCE_HINT_PATTERN = /force=true/;
 
 /** Whether any row error is the "no version" refusal `force` answers
- *  (`services/_import_rows.py`) — FAIL-1's UI half points the operator at the
+ *  (`services/imports/_import_rows.py`) — FAIL-1's UI half points the operator at the
  *  one option in `RecordImportOptions` that gets them past it. */
 function hasForceableError(errors: ImportRowError[]): boolean {
   return errors.some((error) => FORCE_HINT_PATTERN.test(error.message));

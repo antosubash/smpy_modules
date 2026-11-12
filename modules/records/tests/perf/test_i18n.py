@@ -24,8 +24,11 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sm_records.core.settings import RecordsSettings, settings_checks
 from sm_records.models import RecordStatus
-from sm_records.records.services import _claims
-from sm_records.records.services._translations import create_translation, published_siblings
+from sm_records.records.services.claims import _claims
+from sm_records.records.services.translations._translations import (
+    create_translation,
+    published_siblings,
+)
 
 from tests.perf._bench import Results, Timing, capture, explain, repeat
 from tests.perf._http import API, get_ok, measure, plan_label

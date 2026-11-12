@@ -137,7 +137,7 @@ async def delete_type(
     Deleting a type purges every record it holds, trash included — the widest
     write in the module. A caller the list excludes is refused a single record
     write and has a cascade into this type downgraded to ``restrict``
-    (``services._lifecycle._role_blocked``); letting the same caller destroy all
+    (``services.delete._lifecycle._role_blocked``); letting the same caller destroy all
     of it was the one gap in that rule, not a deliberate exception.
     """
     check_type_roles(request, rtype)

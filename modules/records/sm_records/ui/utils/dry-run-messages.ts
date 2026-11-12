@@ -1,5 +1,5 @@
 /**
- * Humanizes a pydantic validation message (U13a) — `services/_dry_run.py`
+ * Humanizes a pydantic validation message (U13a) — `services/schema_changes/_dry_run.py`
  * runs each record's stored `data` back through pydantic against a
  * *proposed* schema and forwards whatever pydantic says verbatim; the same
  * wording reaches the client on an ordinary record read too, in

@@ -15,7 +15,7 @@ export type ImportOptionsValue = {
   mode: 'upsert' | 'create' | 'update';
   onError: 'abort' | 'skip';
   /** `'uuid'`, `'slug'`, or one of `fields`' unique keys — see
-   *  `services/_import_match.py::match_field`. */
+   *  `services/imports/_import_match.py::match_field`. */
   matchBy: string;
   force: boolean;
 };

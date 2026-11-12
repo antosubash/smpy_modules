@@ -25,7 +25,7 @@ actually offers:
   complete answer.
 
 SQLite has no row locks — ``FOR UPDATE`` compiles there to a plain ``SELECT``,
-the trap :func:`sm_records.records.services._claims.lock_type` documents at length —
+the trap :func:`sm_records.records.services.claims._claims.lock_type` documents at length —
 so it gets the version comparison alone. The residual window between the
 re-read and the first write of the batch is the one SQLite closes itself: a
 write issued from a transaction whose read snapshot has since been superseded

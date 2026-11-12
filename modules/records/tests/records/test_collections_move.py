@@ -211,7 +211,7 @@ async def test_a_pending_reindex_is_a_409(client):
 async def test_a_failure_part_way_rolls_the_whole_move_back(client, monkeypatch):
     """One transaction is the rollback story: the copies are written, the
     sources deleted, and then the request fails — and none of it happened."""
-    from sm_records.records.services import _type_move
+    from sm_records.records.services.type_writes import _type_move
 
     await _graph(client)
     before = await _rows(client, None)

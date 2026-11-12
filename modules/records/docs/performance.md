@@ -154,7 +154,7 @@ statistics pass lost a race for the write lock. Nothing on a request path runs
 
 ### F2 — `ensure_unique` was O(rows in the type)
 
-`services/_payload.ensure_unique` (now `services/_claims.py`) asked
+`services/_payload.ensure_unique` (now `services/claims/_claims.py`) asked
 `count_query` — the list page's `COUNT`, with no `LIMIT`, over every record of
 the type — to answer "is this value taken". It now builds the same filter with
 the same `_term` and asks `exists_query`: `SELECT records_record.id … LIMIT 1`.
@@ -848,7 +848,7 @@ on every `restrict` delete and every referrers panel even when both collections
 were empty. That is linear in declarations, and a host's declarations are its
 Alembic history, which only ever grows.
 
-`services/_referrer_sets.referring_sets` now asks `records_type` once which sets
+`services/referrers/_referrer_sets.referring_sets` now asks `records_type` once which sets
 hold a type declaring a relation to this record's type, and the loop runs over
 those. Three ways out return every set unchanged: a host with **no** collection
 declared (one set — the narrowing could only add a query, and the default host

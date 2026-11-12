@@ -123,7 +123,7 @@ def relation(old: FieldDefinition, new: FieldDefinition) -> list[SchemaChange]:
     ``records_index_ref.target_type_id`` is resolved from the declared target
     when the row is written (``index.providers._ref_entry``), so a retarget
     leaves every ref row naming the type the field no longer points at — and
-    ``services._referrers`` then refuses a delete, or cascades one, through a
+    ``services.referrers._referrers`` then refuses a delete, or cascades one, through a
     field that does not target that type any more. A ``many`` flip changes the
     projection the other way: one row where there were several, or several
     where there was one. Neither rewrites the payload, so nothing but the

@@ -102,7 +102,7 @@ class RecordTrashed(Event):
 
     ``cascaded_from`` is the uuid of the record whose delete this one followed
     from, and ``None`` when the caller asked for this record by name.
-    ``services._lifecycle.soft_delete_record`` trashes records of types the URL
+    ``services.delete._lifecycle.soft_delete_record`` trashes records of types the URL
     never mentions (design §9's ``cascade``), and a search indexer or a cache
     purger has to be able to tell that apart from an explicit trash — not
     least because the cascaded record's own referrers were never shown to

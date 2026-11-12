@@ -78,7 +78,7 @@ async def test_a_restrict_refusal_counts_hidden_blockers_and_names_visible_ones(
 async def test_the_blocker_list_is_capped_and_says_how_many_more(client):
     """``BLOCKER_CAP`` uuids and a ``more`` count, for the same reason
     ``ImportReport`` caps its errors: the graph can be built in bulk."""
-    from sm_records.records.services._delete_plan import BLOCKER_CAP
+    from sm_records.records.services.delete._delete_plan import BLOCKER_CAP
 
     await api_type(client, "target", [text_field("name")], display_title=None, display_field="name")
     await api_type(

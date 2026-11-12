@@ -56,8 +56,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.contracts.relations import ExpandedRef, expanded_ref
 from sm_records.models import Record, RecordType, tables_for
 from sm_records.records.index.query import QueryError
-from sm_records.records.services._expand_plan import Hop, plan
-from sm_records.records.services._expand_refs import _live, _refs, relation_field_keys
+from sm_records.records.services.expansion._expand_plan import Hop, plan
+from sm_records.records.services.expansion._expand_refs import _live, _refs, relation_field_keys
 
 __all__ = ["ExpandedMap", "expand", "relation_field_keys"]
 

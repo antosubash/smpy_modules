@@ -52,11 +52,11 @@ from sm_records.records.index.reindex import (
     pending_map,
     reindex_type,
 )
-from sm_records.records.services._claims import lock_type
 from sm_records.records.services._common import mark_written, reload, type_resolver
-from sm_records.records.services._reindex_markers import _clear_rebuilt, pending_type_ids
-from sm_records.records.services._titles import recompute_titles
+from sm_records.records.services.claims._claims import lock_type
 from sm_records.records.services.errors import Conflict
+from sm_records.records.services.reindex._reindex_markers import _clear_rebuilt, pending_type_ids
+from sm_records.records.services.reindex._titles import recompute_titles
 
 __all__ = ["pending_type_ids", "run_pending", "schedule"]
 

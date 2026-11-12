@@ -25,10 +25,10 @@ from sm_records.core import constants
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordStatus, RecordType
 from sm_records.records.index.query import CursorError, Filter, Sort
-from sm_records.records.services import _duplicates
 from sm_records.records.services import expand as expand_service
 from sm_records.records.services import records as record_service
 from sm_records.records.services.errors import ValidationFailed
+from sm_records.records.services.schema_changes import _duplicates
 from sm_records.web.deps import (
     MAX_PAGE,
     PageCursor,
@@ -192,7 +192,7 @@ async def get_record(
     one query per row for a panel only the editor shows.
 
     ``invalid`` is topped up with the duplicate check
-    (``services._duplicates.conflicts_for``) for the same reason the validator
+    (``services.schema_changes._duplicates.conflicts_for``) for the same reason the validator
     runs here and not on the list: a ``unique`` field forced on over existing
     duplicates leaves a record whose payload validates and which no write is
     accepted for, and the editor is where an operator finds that out. One

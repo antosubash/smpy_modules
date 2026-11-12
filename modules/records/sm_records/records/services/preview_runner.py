@@ -9,7 +9,7 @@ something that only *read*.
 
 It is here now because a ``rescan`` writes. "Check records" scans the schema
 the records are stored against and records what it finds on each record's
-``invalid_since`` (:mod:`sm_records.records.services._invalid`), so the deferred path
+``invalid_since`` (:mod:`sm_records.records.services.schema_changes._invalid`), so the deferred path
 has the same problem :mod:`sm_records.records.services.reindex_runner` has and the
 same answer: **this module commits**. Nothing else would — there is no request
 and no ``get_db`` — and the marks would roll back silently at the end of the

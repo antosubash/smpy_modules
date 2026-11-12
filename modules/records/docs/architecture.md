@@ -153,7 +153,7 @@ the record being edited and it costs a validator pass, which is why
 is `[]`.
 
 *Stored.* `Record.invalid_since`, a nullable timestamp, written and cleared by
-`services/_invalid.py`. Three rules, all stated there:
+`services/schema_changes/_invalid.py`. Three rules, all stated there:
 
 - **written only by a scan of the schema records are stored against** — the
   inline pass of a forced `apply`, and the `rescan` behind "Check records".
@@ -184,7 +184,7 @@ and a sample rather than ids. It is surfaced the way it always was, by
 
 **Newly unique is the one restrictive class a payload scan cannot see.** The dry
 run validates one record at a time; duplication is a property of a *pair*. So
-`services/_duplicates.py` runs alongside it — one `GROUP BY … HAVING` per key
+`services/schema_changes/_duplicates.py` runs alongside it — one `GROUP BY … HAVING` per key
 against the index table for a field that is already indexed, and a collector
 riding on the dry run's own walk for one gaining `unique` and `indexed`
 together — and folds its count into `DryRunReport.failing` plus a per-key
@@ -259,7 +259,7 @@ an event: the service cannot publish (rule 1), so it hands the endpoint the
 record, the cascade and the previous status, and the endpoint picks the
 `events` builder from the action it asked for.
 
-`services/_empty_trash.py` is the opposite shape and re-exported from the same
+`services/delete/_empty_trash.py` is the opposite shape and re-exported from the same
 module: it names no records, so it is one statement per table over an id set —
 `purge_type_records`'s shape narrowed to the trash and to a filter, identities
 read first because a `RecordPurged` is the one event nobody can reconstruct

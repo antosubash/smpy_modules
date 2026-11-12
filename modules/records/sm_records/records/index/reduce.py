@@ -16,7 +16,7 @@ Three properties are the whole design, and none of them survives on its own:
 * **Delta, never read-modify-write.** The increment is
   ``UPDATE … SET count = count + :dc`` — arithmetic the database does — so two
   writers cannot both read ``7`` and both store ``8``. On SQLite the type-row
-  lock (``services._claims.lock_type``) already serialises writers; on
+  lock (``services.claims._claims.lock_type``) already serialises writers; on
   Postgres the row ``UPDATE`` does, because the second writer blocks on the
   first's uncommitted row until it commits and then re-reads it.
 * **Derivable.** :func:`sm_records.records.index.reduce_rebuild.rebuild_type` throws

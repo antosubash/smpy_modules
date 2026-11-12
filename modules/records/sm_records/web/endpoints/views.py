@@ -115,8 +115,8 @@ async def record_edit(
     The panel is rendered only when ``content_locales`` has more than one entry
     (``pages/RecordEditor.tsx``), so on a monolingual install the query fills a
     prop nothing reads — the same "inert when unused" rule
-    :func:`~sm_records.records.services._translations.published_siblings` applies to the
-    public read. The explicit routes (``?translations=true`` and
+    :func:`~sm_records.records.services.translations._translations.published_siblings` applies to
+    the public read. The explicit routes (``?translations=true`` and
     ``GET …/translations``) are untouched: a caller that asked for the group
     gets it whatever the install publishes in.
 

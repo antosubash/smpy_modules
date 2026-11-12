@@ -153,7 +153,7 @@ async def test_apply_reuses_a_matching_job_report(client, monkeypatch):
 async def test_a_forced_apply_scans_rather_than_reusing_a_report(client):
     """A forced change's scan is not only how the refusal is decided — it is
     what writes ``invalid_since`` on the records it leaves behind
-    (``services._invalid``). A report recorded nothing, so an apply that took
+    (``services.schema_changes._invalid``). A report recorded nothing, so an apply that took
     its answer from one would leave the marks — and the worklist the whole
     feature is for — unwritten. Asserted on the records rather than on whether
     ``change_report`` was called: what matters is the outcome, and a future

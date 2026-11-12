@@ -1,6 +1,6 @@
 """Serialising the writers of one record type — the lock, and only the lock.
 
-Split from :mod:`sm_records.records.services._claims` for the 300-line cap, and the
+Split from :mod:`sm_records.records.services.claims._claims` for the 300-line cap, and the
 seam is a real one: that module is *what a write claims about the rest of the
 type* (a slug nobody else holds, a ``unique`` value nobody else holds), and
 this is the dialect-specific primitive that makes a check-then-act claim hold

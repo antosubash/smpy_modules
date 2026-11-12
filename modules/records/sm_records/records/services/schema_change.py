@@ -26,17 +26,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordType
 from sm_records.public_submissions.config import kind_of
-from sm_records.records.services import _orphaned
-from sm_records.records.services._claims import lock_type
 from sm_records.records.services._common import bump_or_conflict, reload
-from sm_records.records.services._dry_run import change_report, refusal
 from sm_records.records.services._payload import field_defs
-from sm_records.records.services._pending import mark_pending
-from sm_records.records.services._preview import MISSING, pointer_preview_changes, reused_report
-
-# Re-exported: an undo is an ``apply`` of an earlier revision, so it belongs to
-# this module's surface; it lives in ``_rollback`` for the 300-line cap.
-from sm_records.records.services._rollback import rollback
 from sm_records.records.services._schema import (
     check_pointers,
     check_targets,
@@ -44,6 +35,7 @@ from sm_records.records.services._schema import (
     write_type_row,
 )
 from sm_records.records.services._schema_checked import normalise_checked
+from sm_records.records.services.claims._claims import lock_type
 from sm_records.records.services.errors import (
     Conflict,
     NotFound,
@@ -51,6 +43,18 @@ from sm_records.records.services.errors import (
     SchemaChangeRefused,
     ValidationFailed,
 )
+from sm_records.records.services.schema_changes import _orphaned
+from sm_records.records.services.schema_changes._dry_run import change_report, refusal
+from sm_records.records.services.schema_changes._pending import mark_pending
+from sm_records.records.services.schema_changes._preview import (
+    MISSING,
+    pointer_preview_changes,
+    reused_report,
+)
+
+# Re-exported: an undo is an ``apply`` of an earlier revision, so it belongs to
+# this module's surface; it lives in ``_rollback`` for the 300-line cap.
+from sm_records.records.services.schema_changes._rollback import rollback
 from sm_records.schema.changes import DryRunReport, SchemaDiff
 from sm_records.schema.diff import diff_fields
 from sm_records.schema.types import ChangeClass
@@ -91,7 +95,7 @@ async def preview(
     so the answer outlives the report the operator is reading.
 
     **Which is why ``rescan`` takes the stored fields and nothing else.** Rule
-    1 of the mark (``services._invalid``) is that the column is written only
+    1 of the mark (``services.schema_changes._invalid``) is that the column is written only
     by a scan of the schema records are *actually stored against*, and a
     request body's ``fields`` are a proposal. Trusting the caller to resend the
     stored ones is a hope, not a rule: the shipped type editor does, and a
@@ -127,7 +131,7 @@ async def preview(
         rescan=rescan,
         # A rescan is a scan of the schema the records are *stored* against,
         # so what it finds is true of the install and is written down
-        # (``services._invalid``). A draft preview scans a proposal that may
+        # (``services.schema_changes._invalid``). A draft preview scans a proposal that may
         # never be saved, and marking from one would flag records against a
         # schema nobody applied — which is also what keeps "Preview changes"
         # a button that writes nothing.
@@ -225,7 +229,7 @@ async def apply(
     #
     # **A forced change never reuses one.** Its scan does not only decide the
     # refusal, it writes ``invalid_since`` on the records it leaves behind
-    # (``services._invalid``), and a preview's report is a report: it recorded
+    # (``services.schema_changes._invalid``), and a preview's report is a report: it recorded
     # nothing. So a force pays for its own pass, which is the pass that
     # produces the worklist. An unforced apply scans with ``mark=True`` too —
     # the change is about to be stored, so a record the new schema accepts is

@@ -19,7 +19,7 @@ from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope
 from sm_records.models import RecordType, SubmissionDelivery, tables_for
 from sm_records.public_submissions import delivery, sending
-from sm_records.records.services._forget_deliveries import forget_deliveries
+from sm_records.records.services.delete._forget_deliveries import forget_deliveries
 from sm_records.records.services.records import get_record
 from sqlalchemy import delete, select, text
 

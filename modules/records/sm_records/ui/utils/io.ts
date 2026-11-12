@@ -89,10 +89,10 @@ export type ImportOptions = {
   mode?: 'upsert' | 'create' | 'update';
   onError?: 'abort' | 'skip';
   /** `'uuid'` | `'slug'` | a unique field's key — mirrors the API's
-   *  `match_by` (`services/_import_match.py`). */
+   *  `match_by` (`services/imports/_import_match.py`). */
   matchBy?: string;
   /** Overwrite a record whose stored version the file does not carry
-   *  (`services/_import_rows.py`'s "no version" refusal). */
+   *  (`services/imports/_import_rows.py`'s "no version" refusal). */
   force?: boolean;
 };
 

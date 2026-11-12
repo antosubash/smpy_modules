@@ -8,9 +8,9 @@ from typing import Any
 
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType
-from sm_records.records.services._type_update import update_type
 from sm_records.records.services.errors import Conflict, RecordsError
 from sm_records.records.services.records import create_record
+from sm_records.records.services.type_writes._type_update import update_type
 from sm_records.schema.types import FieldType
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -48,7 +48,7 @@ async def _one_create(state: Any, type_id: int, data: dict[str, Any]) -> str:
     not run with ``return_exceptions`` and hide an unexpected failure among
     the expected ones. ``IntegrityError`` is caught separately because "the
     database refused it and nothing turned that into a 409" is the exact
-    regression :func:`sm_records.records.services._claims.flush_write` prevents, and a
+    regression :func:`sm_records.records.services.claims._claims.flush_write` prevents, and a
     test lumping it in with ``Conflict`` could not see it.
     """
     async with state.session_factory() as session:

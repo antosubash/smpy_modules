@@ -200,7 +200,7 @@ def make_record_tables(prefix: str, *, class_suffix: str = "") -> RecordTables:
         badges, so the list turns the check off — and nothing could then show,
         count or filter what a forced change had left behind.
 
-        Written and cleared by :mod:`sm_records.records.services._invalid`, which
+        Written and cleared by :mod:`sm_records.records.services.schema_changes._invalid`, which
         documents when. A *timestamp* rather than a flag because "since when"
         is the only extra fact the marking knows; the filter grammar reads it
         as the boolean ``invalid`` (:mod:`sm_records.records.index._fixed`), and the

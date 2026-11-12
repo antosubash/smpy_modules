@@ -162,7 +162,7 @@ async def test_an_edit_that_starts_mid_batch_waits_and_wins(seeded):
 async def test_the_title_pass_does_not_write_over_an_edit_committed_since_it_was_read(
     racing_db,
 ):
-    """``services._titles.recompute_titles`` has the same read-then-write
+    """``services.reindex._titles.recompute_titles`` has the same read-then-write
     shape and the same commit-per-batch, so it had the same hole.
 
     The setup is the one that puts the pass to work in the first place: the
@@ -174,7 +174,7 @@ async def test_the_title_pass_does_not_write_over_an_edit_committed_since_it_was
     read, leaving ``display_title`` disagreeing with ``data`` on the one
     column the list view and every ``REF`` label read.
     """
-    from sm_records.records.services._titles import recompute_titles
+    from sm_records.records.services.reindex._titles import recompute_titles
 
     db_state = racing_db
     async with db_state.session_factory() as session:

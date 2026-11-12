@@ -77,7 +77,7 @@ class RecordType(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[
 
     **Set on create, changed only by a move.** ``PUT /types/{key}`` with a
     different value copies the type's records, revisions and index rows into
-    the target set in one transaction (:mod:`sm_records.records.services._type_move`).
+    the target set in one transaction (:mod:`sm_records.records.services.type_writes._type_move`).
     References need no re-pointing: they name a target by uuid and type.
 
     Nullable with no backfill on purpose: that is what makes the migration
@@ -115,7 +115,7 @@ class RecordType(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[
     to the hub — see :mod:`sm_records.menu`.
 
     Not a schema field: it changes no record, bumps no ``schema_version`` and
-    writes no revision, which is why ``services._type_update`` treats it like
+    writes no revision, which is why ``services.type_writes._type_update`` treats it like
     ``is_public`` rather than like anything in ``fields``.
 
     ``server_default`` is declared here as well as in revision
@@ -139,7 +139,7 @@ class RecordType(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[
 
     Flipping it **on** is additive — existing records already carry the default
     locale. Flipping it **off** while records in another locale exist is
-    refused with a 409 (``services._type_update``), because those records would
+    refused with a 409 (``services.type_writes._type_update``), because those records would
     otherwise become unreachable through a UI that no longer offers their
     language."""
 
