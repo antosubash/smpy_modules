@@ -4,7 +4,7 @@ import { conflictField, humanizeCollisionDetail } from './conflicts';
 
 /**
  * The strings under test are the literal `f"..."` payloads of
- * `services/_claims.py` — copied verbatim, so a server reword breaks this
+ * `services/claims/_claims.py` — copied verbatim, so a server reword breaks this
  * test rather than silently un-marking the field in the editor.
  */
 describe('conflictField', () => {

@@ -9,7 +9,7 @@ and that everything resolving a record by uuid then acted on the wrong row.
 So there are two layers, and this file tests both:
 
 * **The data**: the importer refuses to create a record whose uuid another
-  table set holds (``services._uuids``). That is the half the importer can
+  table set holds (``services.claims._uuids``). That is the half the importer can
   enforce, and ``test_import_uuid_across_sets.py`` covers it.
 * **The behaviour, regardless of the data**: every lookup keys on
   ``(target_type_id, target_uuid)`` and takes its table set from the declared

@@ -220,7 +220,7 @@ async def _load_pairs(
     (``ReferrerRead.is_deleted``), unlike the delete path — see
     :func:`referrers`. A pair whose record or type has gone missing is
     dropped rather than rendered half-resolved; index rows are deleted with
-    the record they describe (``services._lifecycle.hard_delete_record``), so
+    the record they describe (``services.delete._lifecycle.hard_delete_record``), so
     this is the defensive branch it always was.
     """
     records = await _by_id(db, tables.record, {rid for rid, _ in pairs}, include_deleted=True)

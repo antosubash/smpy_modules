@@ -104,7 +104,7 @@ async def soft_delete_record(
     is treated as ``restrict`` however its field is declared: see
     :func:`~sm_records.records.services._access.role_blocked`.
     """
-    # Locks first, then the walk: see ``services._delete_locks``.
+    # Locks first, then the walk: see ``services.delete._delete_locks``.
     graph = await lock_delete_graph(db, rtype)
     await still_there(
         db, rtype, record, trashed=False, refusal=f"record {record.uuid} is in the trash"
@@ -164,7 +164,7 @@ async def restore_record(
     # representations of one fact disagreeing on the very next read: the
     # derived ``invalid`` list still names the failing fields while the column
     # says the record is fine, and the worklist, the per-type count and the
-    # health check all lose it. Rule 1 in ``services._invalid`` is that only a
+    # health check all lose it. Rule 1 in ``services.schema_changes._invalid`` is that only a
     # scan of the stored schema writes this column, and "Check records" is
     # that scan.
     db.add(record)

@@ -109,7 +109,7 @@ async def create_record(
     importer pass one, and the first only ever the source's.
 
     The uuid is generated here; the importer is the one writer that keeps an
-    identifier from outside, and it claims it first (``services._uuids``).
+    identifier from outside, and it claims it first (``services.claims._uuids``).
     """
     resolved_locale = resolve_locale(rtype, settings, locale)
     # Both identifiers decided here rather than by two ``default_factory``
@@ -244,7 +244,7 @@ async def update_record(
     # The payload above was validated against the type's *current* schema, so
     # whatever a forced change once found wrong with this row is no longer
     # true — §8.3's "each one's next ordinary write brings it up to the new
-    # shape", applied to the stored mark (``services._invalid``).
+    # shape", applied to the stored mark (``services.schema_changes._invalid``).
     _invalid.clear_on_write(record)
     db.add(record)
     await _claims.flush_write(db, rtype, resolved_slug, record.locale)

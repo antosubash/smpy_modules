@@ -59,7 +59,7 @@ class TypeRead(SQLModel):
     would destroy. ``DELETE /types/{key}`` confirms against the *sum*."""
     invalid_record_count: int
     """Live records carrying a stored ``invalid_since`` mark — records a
-    forced schema change left behind (§8.3, ``services/_invalid.py``).
+    forced schema change left behind (§8.3, ``services/schema_changes/_invalid.py``).
 
     Live only, and a subset of ``record_count``: it is the number the hub row
     shows next to a link that filters the list by ``invalid:eq:true``, and
@@ -133,7 +133,7 @@ class TypeUpdate(SQLModel):
     a client sends back the whole type it read, and silently ignoring a changed
     ``collection`` would report a move that never happened. An echo of the
     current value is accepted; anything else is a 409 from ``PUT``
-    (``services._type_update``)."""
+    (``services.type_writes._type_update``)."""
     force: bool = False
     orphaned: str | None = None
 

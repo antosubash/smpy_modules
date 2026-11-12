@@ -135,7 +135,7 @@ export type RecordRead = {
    *  longer fits. */
   invalid: { field: string; message: string }[];
   /** When a scan last found this record wanting, or `null` — the *stored*
-   *  mark (`services/_invalid.py`), and unlike `invalid` it is filled on a
+   *  mark (`services/schema_changes/_invalid.py`), and unlike `invalid` it is filled on a
    *  list row too. The list is where it matters: `invalid` is empty there by
    *  construction, because filling it would cost a validator pass per row.
    *  Written by a forced schema change or a rescan, cleared by the record's

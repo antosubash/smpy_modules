@@ -237,7 +237,7 @@ async def record_counts(db: AsyncSession, rtype: RecordType) -> tuple[int, int, 
 class PurgedRecord(Protocol):
     """What a purged record leaves behind: the three columns its event needs.
 
-    ``services._lifecycle.purge_type_records`` deletes a whole type set-based
+    ``services.delete._lifecycle.purge_type_records`` deletes a whole type set-based
     — one statement per table rather than ten per record — so there is no ORM
     instance afterwards to read a payload from, and there does not need to be:
     a ``RecordPurged`` addresses a record by ``(type_key, uuid)`` exactly as

@@ -82,7 +82,7 @@ async def preview_schema(
     """Classifies and dry-runs; it changes no schema and no payload (§8.9).
 
     Under ``rescan`` it does write one thing: the ``invalid_since`` mark the
-    scan found (``services._invalid``). That needs no ``try``/``except`` here
+    scan found (``services.schema_changes._invalid``). That needs no ``try``/``except`` here
     — ``RecordsErrorRoute`` rolls the request's session back on every error
     path, which is the rule its module docstring states.
 

@@ -97,7 +97,7 @@ class RecordRead(SQLModel):
     reads one record. :attr:`invalid_since` is what a list reads instead."""
     invalid_since: datetime | None
     """When a scan last found this record wanting, or ``null`` — the *stored*
-    mark (``services/_invalid.py``), filled on every read including a list.
+    mark (``services/schema_changes/_invalid.py``), filled on every read including a list.
 
     The two are the same fact at different resolutions and neither replaces
     the other: ``invalid`` says which fields are wrong *now* and costs a
@@ -199,7 +199,7 @@ def record_read(
 
     ``expanded`` and ``translations`` are passed through untouched: resolving
     either is the service's job (``services/expand.py``,
-    ``services/_translations.py``), this only carries them.
+    ``services/translations/_translations.py``), this only carries them.
 
     ``extra_invalid`` is appended to the badge. ``read_view``'s own ``invalid``
     is whatever the compiled validator says about *this* payload, which cannot
@@ -207,7 +207,7 @@ def record_read(
     existing duplicates leaves a record whose payload validates perfectly and
     which no write is accepted for. The caller that is willing to pay a query
     per ``unique`` field — the single-record read, never a list — passes
-    ``services._duplicates.conflicts_for`` here, so §8.3's "marked, not
+    ``services.schema_changes._duplicates.conflicts_for`` here, so §8.3's "marked, not
     hidden" holds for that class too.
     """
     view = read_view(rtype, record, with_invalid=with_invalid, defs=defs)

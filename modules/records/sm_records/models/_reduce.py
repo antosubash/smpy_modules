@@ -58,7 +58,7 @@ class IndexReduce(Base, table=True):  # ty: ignore[unsupported-base]
     There is no ``record_id`` and no foreign key. A row here is a fold over
     records, not a projection of one, so nothing cascades into it: the writer
     maintains it by delta and a type delete removes its rows explicitly
-    (``services._lifecycle.purge_type_records``).
+    (``services.delete._lifecycle.purge_type_records``).
     """
 
     __tablename__ = INDEX_REDUCE_TABLE

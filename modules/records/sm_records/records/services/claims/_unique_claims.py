@@ -123,7 +123,7 @@ async def taken_by(
     opinion about what "already taken" means.
     """
     # ``False`` and not a refusal: this is the read-only question the record
-    # editor asks for its duplicate badge (``services._duplicates``), and a
+    # editor asks for its duplicate badge (``services.schema_changes._duplicates``), and a
     # value the index cannot hold is a value no other record can be holding.
     # The write path refuses it a few lines up, where a refusal is useful.
     if has_nul(value):

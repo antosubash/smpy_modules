@@ -108,7 +108,7 @@ def parse_term(raw: str, settings: RecordsSettings) -> Filter:
         # ``Expression tree is too large`` from SQLite — a 500 on the
         # anonymous surface — and a scan on anything that survives it. The
         # importer bounds the same clause for the same reason
-        # (``services._import_match``).
+        # (``services.imports._import_match``).
         if len(parsed_value) > settings.max_in_values:
             raise FilterTermError(
                 (

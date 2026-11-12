@@ -25,7 +25,7 @@ sentence above true at all.** The semantic reason comes first: a write over
 many records of a type should serialise against schema changes and against
 other writers exactly as every single-record write does, and those take the
 lock inside ``_prepare``. A trash locks every type its cascades can write,
-up front (``services._delete_locks``): locks are taken in ascending id order
+up front (``services.delete._delete_locks``): locks are taken in ascending id order
 (``services._lock.lock_types``), so a turn may not discover a new one later.
 The mechanical reason is pysqlite's legacy transaction control, which emits
 ``BEGIN`` only before the first DML statement it recognises. With no write
