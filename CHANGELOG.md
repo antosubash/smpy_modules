@@ -235,6 +235,20 @@ name the module they affect.
   ai, news and pagebuilder, and `@simple-module-py/ui>=0.0.38` as every module's
   peer. The four `ConfirmDialog` copies stay: `ConfirmActionDialog` has no
   trigger or async `onConfirm`, so it cannot show the refusal in the dialog.
+- **records' services are grouped by feature** (#343). The private helpers of
+  `sm_records.records.services` moved, unchanged, into one subpackage per
+  feature: `imports/` (`_import_*`), `delete/` (`_lifecycle`, `_delete_locks`,
+  `_delete_plan`, `_empty_trash`, `_forget_deliveries`), `expansion/`
+  (`_expand_*`), `referrers/` (`_referrer*`), `translations/`
+  (`_translation*`), `type_writes/` (`_type_*`), `claims/` (`_claims`,
+  `_unique_claims`, `_uuids`), `reindex/` (`_reindex_markers`, `_titles`) and
+  `schema_changes/` (`_dry_run`, `_duplicates`, `_invalid`, `_orphaned`,
+  `_pending`, `_preview`, `_rollback`). The public services (`records`,
+  `types`, `errors`, `import_`, `expand`, `public_stats`, …) and the helpers
+  several features share (`_common`, `_payload`, `_lock`, …) stay in
+  `services/`. Nothing outside records imported a moved module, so the new
+  paths get no alias; the 0.0.13 aliases (`sm_records.services._claims`, …)
+  now point at the new locations and still go in 0.0.17.
 
 ### Deprecated
 
