@@ -6,7 +6,8 @@ goes only to people the caller can vouch for:
 * the caller's own address (``request.state.user.email``, the signed-in user);
 * active users who belong to the campaign's tenant: found through the
   framework's :class:`~simple_module_core.user_directory.UserDirectory` (an
-  exact, case-insensitive address match on an active account) and, on a
+  exact, case-insensitive address match on an active account whose email is
+  not reported unverified, see ``_verified``) and, on a
   multi-tenant host, kept only when
   :func:`~simple_module_core.tenancy.tenant_member_ids` says they are members
   of the tenant newsletter bound (the resolved one, never ``user.tenant_id``).
