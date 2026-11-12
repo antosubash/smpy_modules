@@ -251,6 +251,18 @@ name the module they affect.
   `framework-latest.yml` and `images-models.yml`: a tag can be moved by whoever
   controls the action's repository. ci.yml also states `permissions: contents:
   read` instead of relying on the repository's default token setting.
+- **A Python type checker runs in `make lint` and CI** (#338): basedpyright in
+  pyright's basic mode over every `contracts/` package and the code in other
+  modules that calls one (the `[tool.pyright]` include list in the root
+  `pyproject.toml`, to be widened module by module). What it found is fixed
+  without changing behaviour: SQLModel column expressions in those files go
+  through `col()`, the bundle protocol's `count_label_keys` is a
+  `ClassVar[Mapping]` (news' section did not match it), images' `user_subject`
+  returns `None` for a missing owner before calling billing instead of relying
+  on `ValueError` from `str(None)`, and newsletter's import upload error reads
+  `detail` only where it exists. Ruff's flake8-bandit rules (`S`) are on too;
+  pagebuilder's and news' ETag hashes say `usedforsecurity=False`, and each
+  deliberate production case carries a `# noqa: Sxxx` with its reason.
 
 ## 0.0.15
 
