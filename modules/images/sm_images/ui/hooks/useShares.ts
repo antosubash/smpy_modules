@@ -10,7 +10,7 @@ const SEARCH_DELAY_MS = 250;
 export const MIN_QUERY = 3;
 
 /** Code points, as the server counts `len(q.strip())`. */
-export function searchable(query: string): boolean {
+function searchable(query: string): boolean {
   return [...query.trim()].length >= MIN_QUERY;
 }
 

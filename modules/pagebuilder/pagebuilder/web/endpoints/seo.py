@@ -25,11 +25,6 @@ from pagebuilder.web.public_origin import public_origin, vary_on_host
 seo_router = APIRouter()
 
 
-def _public_origin(request: Request, settings: PagebuilderSettings) -> str:
-    """Same origin as the public viewer: explicit setting wins, else inferred."""
-    return public_origin(request, settings)
-
-
 def _sitemap_url_for(origin: str, prefix: str, slug: str, locale: str) -> str:
     return f"{origin}{locales.public_path(prefix, slug, locale)}"
 
@@ -91,7 +86,7 @@ async def sitemap(
     # (with both block-JSON columns) made every crawl a multi-second,
     # tens-of-MB request (issue #11).
     pages = await PagesService(db).list_sitemap_entries()
-    origin = _public_origin(request, settings)
+    origin = public_origin(request, settings)
     prefix = settings.public_route_prefix
 
     def absolute(page) -> str:
@@ -146,7 +141,7 @@ async def robots(
     else:
         lines = ["User-agent: *", "Allow: /"]
         if settings.sitemap_enabled:
-            origin = _public_origin(request, settings)
+            origin = public_origin(request, settings)
             lines.append(f"Sitemap: {origin}/sitemap.xml")
         body = "\n".join(lines) + "\n"
 

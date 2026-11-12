@@ -40,16 +40,10 @@ from pagebuilder.web.public_origin import public_origin, vary_on_host
 _PAGE_PUBLIC = "PageBuilder/PublicPage"
 
 
-def _public_base_url(request: Request, settings: PagebuilderSettings) -> str:
-    """The origin for absolute URLs: ``public_base_url``, else the request's own
-    (``web.public_origin``, which also says what a guessed origin costs)."""
-    return public_origin(request, settings)
-
-
 def _absolute_page_url(
     request: Request, settings: PagebuilderSettings, slug: str, prefix: str, locale: str
 ) -> str:
-    base = _public_base_url(request, settings)
+    base = public_origin(request, settings)
     return f"{base}{locales.public_path(prefix, slug, locale)}"
 
 
@@ -182,7 +176,7 @@ async def render_public_page(
             "data": page.published_data,
             "meta_description": page.meta_description,
             "og_image": og_image(
-                page.og_image, page.published_data, _public_base_url(request, settings)
+                page.og_image, page.published_data, public_origin(request, settings)
             ),
             "canonical_url": canonical,
             "og_url": canonical,
