@@ -35,6 +35,7 @@
 | `embedding_base_url` | `""` | as for chat |
 | `embedding_api_key` | `""` | as for chat |
 | `embedding_dim` | `0` | vector width; `0` = not set. A negative stored value (only `set_setting.py` can write one) is read as `0` with a warning |
+| `allow_private_base_url` | `false` | allow a base URL on a private or local address (Ollama, an in-network gateway); see [Base URLs and the network](#base-urls-and-the-network). Changing it on the AI page needs `settings.edit` |
 
 Out of scope by design: temperature, max tokens, prompts, retries, timeouts
 and streaming. Each consuming module sets those on its own `Agent` or call.
@@ -120,6 +121,68 @@ fails with "The stored key '…' cannot be decrypted with SM_SECRET_KEY or any
 key in SM_SECRET_KEY_PREVIOUS …"; add the old key back, or re-enter the chat
 and embedding keys on the AI page.
 
+## Base URLs and the network
+
+A base URL receives the slot's API key in every request, so the module checks
+where it points (#347). With `allow_private_base_url` off (the default):
+
+- **On save** (`PUT /api/ai/settings`) the URL must be `http(s)` without
+  userinfo, and its host is resolved: every address must be public. Loopback,
+  private (RFC 1918, IPv6 ULA), link-local (including `169.254.169.254`),
+  CGNAT, multicast, unspecified and reserved addresses are refused, and so is
+  an IPv4-mapped, NAT64, 6to4 or Teredo form of one. Any port is allowed. The
+  rules are images' URL guard, copied to `sm_ai.core.url_safety` (a parity
+  test keeps the copies equal).
+- **At client build** (`resolve_model`, `resolve_embedder`, the probes) the
+  scheme is checked again and a private IP literal is refused, without DNS:
+  the build is synchronous and runs inside async code.
+- **At connect** the SDK's HTTP client is the module's pinned client
+  (`sm_ai.connections.pinned`): each request resolves the
+  host again, refuses it unless every address is public, and connects to the
+  validated address while sending the name as `Host` and TLS SNI (the
+  certificate is verified against the name). A DNS answer that changes after
+  the check (rebinding) cannot redirect the key.
+
+Every SDK the module uses accepts that client, so all of them are pinned:
+OpenAI and `openai_compatible` (`AsyncOpenAI(http_client=…)`, through
+pydantic-ai's `OpenAIProvider`), Anthropic (`AsyncAnthropic(http_client=…)`,
+`AnthropicProvider`) and Google (`google-genai`'s
+`HttpOptions(httpx_async_client=…)`, `GoogleProvider`), for chat, embeddings
+and model listing alike. A slot without a base URL uses the provider's own
+endpoint and the SDK's own client; it is not checked.
+
+What remains:
+
+- Neither client a base URL gets follows redirects (the SDKs' default clients
+  do, and a followed hop would carry the key's header to another host): a base
+  URL that answers `301`/`307`, such as `http://` to `https://` or a missing
+  trailing slash, fails with the `http_error` code and that status until the
+  URL is the final one. That holds with `allow_private_base_url` on too.
+- One client is kept per event loop and base-URL origin
+  (`sm_ai.connections.clients`, at most 8 origins per loop; a finished loop's
+  clients go with it), shared by every model built on that loop. The pinned
+  client keeps no idle connections, so each call to a custom base URL opens a
+  new connection; model listing uses a client of its own and closes it.
+- The pinned client ignores `HTTPS_PROXY`/`HTTP_PROXY`: a proxy would resolve
+  the name itself. A deployment that must reach a public gateway through an
+  egress proxy turns on `allow_private_base_url`: its client honours the proxy
+  variables and checks no address.
+- With `allow_private_base_url` on, only the scheme rule applies: whoever
+  holds `ai.manage` can then point a slot, and its key, at any address the
+  server reaches. That is why turning it on needs `settings.edit`.
+- `scripts/set_setting.py` writes a base URL without the save check; the
+  connect-time check still applies to it.
+- A save checks only the base URLs it changes. Turning `allow_private_base_url`
+  off while a private URL is saved is therefore allowed: the URL stays, and
+  every call to it, **Test connection** included, is refused
+  (`base_url_refused`) until it is changed.
+
+**Upgrading from 0.0.15:** a slot whose base URL is private (a local Ollama or
+vLLM, `http://vllm:8000/v1` on a container network) stops working: calls fail
+and **Test connection** says the base URL was refused. Turn on **Allow private
+base URLs** on the AI page (needs `settings.edit`), or
+`python scripts/set_setting.py sm_ai allow_private_base_url true`.
+
 ## Multiple workers
 
 A save hot-reloads the settings of the worker process that handled the
@@ -153,6 +216,8 @@ never opened, so a worker can't create an empty one.
 | "'chat_api_key' is missing or invalid" | no key for a provider that needs one | Enter the key on the AI page. For a keyless local server, use `openai_compatible`. |
 | "'chat_base_url' … needs the server's /v1 URL" | `openai_compatible` without a base URL | Set the base URL, ending in `/v1`. |
 | "'embedding_provider' … not configured" | the embedding slot is empty | Configure **Embeddings**. |
+| Save fails with "this URL points at a private or local address", or calls fail with `AiBaseUrlRefusedError` / **Test connection** says the base URL was refused | a base URL on a local or private network while `allow_private_base_url` is off (#347) | Turn on **Allow private base URLs** (needs `settings.edit`); see [Base URLs and the network](#base-urls-and-the-network). |
+| Save fails with "the host of this URL could not be resolved" | a typo, or a name only another network resolves | Fix the name; a name that resolves only to private addresses also needs **Allow private base URLs**. |
 | Every save fails with `chat_base_url: a base URL is required …` | a slot is stored as `openai_compatible` with no URL (possible before #164) | Enter the server's base URL on that card. |
 | "'embedding_dim' … Set the vector width" | `embedding_dim` is `0` | Set **Vector dimension** to the model's output width. |
 | "cannot be decrypted with SM_SECRET_KEY or any key in SM_SECRET_KEY_PREVIOUS" | secret rotated without keeping the old one, or the host's in-code `secret_key` differs from the one used to save | Add the old key to `SM_SECRET_KEY_PREVIOUS`, or re-enter the keys. |

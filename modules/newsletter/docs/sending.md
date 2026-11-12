@@ -189,6 +189,68 @@ that campaign with `list_unavailable`; the tick continues with the others. Only
 relay-wide signals stop a tick: a `421` or `4.7.x` reply, an `smtp_rejected`
 pause, a connect or auth failure, a lost lock, the budget, or the deadline.
 
+## Test sends
+
+`POST /api/newsletter/campaigns/{id}/test-send` (`newsletter.send`, and read
+access to the campaign's list) sends the saved campaign, `[TEST] ` before the
+subject, to up to five addresses. The mechanics (the lock, the all-or-nothing
+budget, the ledger rows) are in [`content.md`](content.md#test-send). Who it
+may go to (#348):
+
+- **Who is vouched for.** The caller's own address (the signed-in user's
+  email); an active account of the campaign's organisation, found through the
+  framework's user directory by exact address (its substring search is widened
+  20, 100, then 500 rows until the exact match shows or the results run out),
+  with a proven email (`DirectoryUser.email_verified`, re-read through
+  `get_many`; `False` is refused, `None` from a provider that does not track it
+  is accepted) and, on a multi-tenant host, kept
+  only when the tenants module says it is a member of the tenant newsletter
+  bound for the request (the resolved one, never `user.tenant_id`; on a
+  single-tenant host every active account belongs to the one organisation); and
+  the addresses in the setting `test_send_extra_recipients` (SYSTEM scope, up to
+  20, for a shared review inbox). With no user directory, or on a multi-tenant
+  host no membership store, only the caller and the extra recipients are vouched
+  for.
+- **Anything else** answers `recipient_not_allowed` for that address alone.
+- **Suppressed.** A vouched-for address with a `complaint` or `unsubscribed`
+  row in the tenant's `newsletter_suppression` (any list: opt-outs are
+  tenant-wide), matched by the table's hash of the normalised address,
+  answers `suppressed`, without saying which. A bounce or a cleaned import row
+  does not refuse a test.
+- **One canonical form.** Every suppression hash and every address comparison,
+  the allow rule above included, uses `normalise_email`
+  (`core/suppression/hashing.py`): the local part stripped, NFC-normalised and
+  `lower()`-cased (never NFKC-folded: a fullwidth letter or a ligature there is
+  another mailbox, so it is not vouched for), the domain normalised exactly as
+  the address parser does it (email-validator: UTS-46, IDNA 2008, so
+  `xn--fa-hia.de` is `faß.de` and a fullwidth letter is ASCII). A suppression
+  written under one spelling of the domain refuses a test to any other. An
+  ASCII address keeps its old key. Searches of records' data use records' own
+  form (`records_form`, strip and lower-case).
+- **Legacy keys.** A row an earlier build wrote under a non-ASCII spelling is
+  keyed `sha256(strip().lower())`, and only the hash is stored, so every lookup
+  that refuses a send, clears or shows a row also tries that key
+  (`lookup_hashes`); the test send looks it up for each raw spelling the
+  request carried. Writes use only the canonical key. Such a row still matches
+  only the spelling it was written under: a legacy key cannot be derived from
+  another spelling, and the table holds no address to rehash. Records-sourced
+  unsubscribes are re-added under the canonical key by the hourly reconcile;
+  a pre-release complaint, bounce or import row is not. The legacy lookup can
+  be removed at newsletter's first published release: no published build wrote
+  such a row.
+- A refused address is never sent, writes no `newsletter_send_attempt` row and
+  uses no budget: the refusals are decided before the dispatch lock, admission
+  counts only the addresses actually sent, and when every address is refused
+  the lock is not taken at all.
+
+Each result carries the `outcome` (`accepted`, `rejected`, `unknown`, `failed`,
+`recipient_not_allowed`, `suppressed`) and a stable `code`: `smtp_<reply>` for a
+relay answer (`smtp_250`, `smtp_550`), `dispatch_busy` when the lock's lease was
+lost before that address, otherwise `null`. The relay's reply text is not
+returned: it is in the attempt row's `detail` and, for an answer other than
+`accepted`, in the server log (`newsletter.test_send.not_accepted`, with the
+campaign and attempt ids).
+
 ## Verdicts
 
 One pure function (`sending/classify.py`) maps each transport result:

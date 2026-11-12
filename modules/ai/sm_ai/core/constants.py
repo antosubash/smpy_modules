@@ -46,6 +46,9 @@ _MODULE_SETTINGS: Final = "Settings"
 _PAGE_SETTINGS: Final = f"{MODULE_NAME}/Settings"
 
 PERM_MANAGE: Final = "ai.manage"
+# Also needed to change ``allow_private_base_url`` (#347): the framework's
+# settings permission, since that switch widens what the server may reach.
+PERM_SETTINGS_EDIT: Final = "settings.edit"
 
 # Provider identifiers (stored values — changing them breaks existing rows).
 PROVIDER_ANTHROPIC: Final = "anthropic"

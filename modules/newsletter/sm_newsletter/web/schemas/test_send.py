@@ -5,34 +5,32 @@ Addresses are stripped, lowercased and deduped (first one wins the order)
 An address holding a line break or another control character is refused
 before the address parser sees it; the route validates through
 ``parse_payload``, whose 422 never echoes the input.
+
+The address parser then folds the domain (a fullwidth letter, punycode), so
+the list is deduplicated again after it on the canonical form
+(``normalise_email``: the domain as the parser has it, the local part NFC and
+lower-cased), so two spellings of one mailbox are one recipient (#348).
 """
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, EmailStr, Field
+from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field
 
 from sm_newsletter.campaigns.test_send import MAX_TEST_RECIPIENTS
-from sm_newsletter.core.constants import MAX_EMAIL_LEN
-from sm_newsletter.core.headers import check_header_text
+from sm_newsletter.core.suppression.hashing import normalise_email
+from sm_newsletter.web.schemas.addresses import Address, normaliser
 
 __test__ = False  # a module named test_*, not a pytest test module
 
 
-def _normalise(value: Any) -> Any:
-    if not isinstance(value, list):
-        return value  # the list validator refuses it
-    out: list[Any] = []
+def _dedup(value: list[str]) -> list[str]:
+    """First spelling of each mailbox wins."""
+    seen: dict[str, str] = {}
     for item in value:
-        if isinstance(item, str):
-            item = check_header_text(item.strip(), field="recipients").lower()
-        if item not in out:
-            out.append(item)
-    return out
-
-
-Address = Annotated[EmailStr, Field(max_length=MAX_EMAIL_LEN)]
+        seen.setdefault(normalise_email(item), item)
+    return list(seen.values())
 
 
 class TestSendIn(BaseModel):
@@ -41,17 +39,22 @@ class TestSendIn(BaseModel):
     recipients: Annotated[
         list[Address],
         Field(min_length=1, max_length=MAX_TEST_RECIPIENTS),
-        BeforeValidator(_normalise),
+        BeforeValidator(normaliser("recipients")),
+        AfterValidator(_dedup),
     ]
 
 
 class TestSendResultOut(BaseModel):
+    """One recipient's answer: the outcome (``accepted``, ``rejected``,
+    ``unknown``, ``failed``, ``recipient_not_allowed``, ``suppressed``) and a
+    stable code (``smtp_<reply>``, ``dispatch_busy`` or ``None``). The relay's
+    reply text is never returned (#348); it is in the ledger and the log."""
+
     model_config = ConfigDict(from_attributes=True)
 
     recipient: str
     outcome: str
-    code: int | None
-    detail: str
+    code: str | None
 
 
 class TestSendOut(BaseModel):

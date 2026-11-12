@@ -12,6 +12,9 @@ then dials, so the check and the connection cannot disagree (DNS rebinding).
 
 The URL is parsed with httpx, the parser that later builds the request, so the
 host that is validated is the host that would be dialled.
+
+ai keeps a copy for its base URLs (``sm_ai.core.url_safety``, #347);
+``scripts/tests/parity_families.py`` keeps the address rules of the two equal.
 """
 
 from __future__ import annotations

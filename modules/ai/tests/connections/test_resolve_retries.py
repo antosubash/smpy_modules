@@ -12,15 +12,6 @@ from sm_ai.connections import resolve
 from sm_ai.contracts import resolve_model
 from sm_ai.core import constants, crypto, services
 
-SECRET = "test-secret-key-for-retries"
-
-
-@pytest.fixture(autouse=True)
-def _env(monkeypatch):
-    monkeypatch.setenv("SM_SECRET_KEY", SECRET)
-    yield
-    services.reset()
-
 
 def _settings(provider: str, **kw):
     from sm_ai.core.settings import AiSettings

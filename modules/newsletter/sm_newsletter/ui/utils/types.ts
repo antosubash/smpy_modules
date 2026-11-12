@@ -166,11 +166,13 @@ export interface Preview {
   warnings: string[];
 }
 
+/** One recipient's answer. `outcome` is `accepted`, `rejected`, `unknown`,
+ *  `failed`, `recipient_not_allowed` or `suppressed`; `code` is `smtp_<reply>`,
+ *  `dispatch_busy` or null. The relay's reply text is never sent (#348). */
 export interface TestSendResult {
   recipient: string;
   outcome: string;
-  code: number | null;
-  detail: string;
+  code: string | null;
 }
 
 export interface SettingsOut {
@@ -188,6 +190,7 @@ export interface SettingsOut {
   tracking_opens: boolean;
   tracking_clicks: boolean;
   physical_address: string;
+  test_send_extra_recipients: string[];
 }
 
 export type SettingsUpdate = Partial<Omit<SettingsOut, 'has_password'>>;

@@ -29,6 +29,7 @@ class AiSettingsOut(SQLModel):
     embedding_base_url: str
     has_embedding_api_key: bool
     embedding_dim: int
+    allow_private_base_url: bool = False
 
     @field_validator("chat_provider", "embedding_provider")
     @classmethod
@@ -54,6 +55,8 @@ class AiSettingsUpdate(SQLModel):
     embedding_api_key: str | None = None
     clear_embedding_api_key: bool = False
     embedding_dim: int | None = None
+    allow_private_base_url: bool | None = None
+    """Needs ``settings.edit`` as well as ``ai.manage`` to change (#347)."""
 
     @field_validator("chat_provider")
     @classmethod
@@ -119,6 +122,11 @@ class AiModelsResult(SQLModel):
     truncated: bool = False
     """More models were served than ``discovery.MAX_MODELS``; the rest are cut."""
     error: str = ""
+    """A fixed message for ``code``; never the provider's own text (#347)."""
+    code: str = ""
+    """Why it failed: one of ``sm_ai.web.probe_errors.CODES``; empty on success."""
+    status: int = 0
+    """The endpoint's HTTP status for ``unauthorised`` and ``http_error``, else 0."""
 
 
 class AiTestResult(SQLModel):
@@ -128,3 +136,8 @@ class AiTestResult(SQLModel):
     model: str = ""
     latency_ms: int = 0
     error: str = ""
+    """A fixed message for ``code``; never the provider's own text (#347)."""
+    code: str = ""
+    """Why it failed: one of ``sm_ai.web.probe_errors.CODES``; empty on success."""
+    status: int = 0
+    """The endpoint's HTTP status for ``unauthorised`` and ``http_error``, else 0."""

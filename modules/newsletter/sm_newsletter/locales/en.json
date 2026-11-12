@@ -275,6 +275,12 @@
       "daily": "Emails per day",
       "per_minute": "Emails per minute"
     },
+    "test_sends": {
+      "title": "Test sends",
+      "extra_recipients": "Extra test recipients",
+      "extra_recipients_hint": "One address per line, for a shared review inbox. A test may always go to the sender's own address and to members of the organisation.",
+      "too_many": "Enter at most {max} addresses."
+    },
     "tracking": {
       "title": "Tracking",
       "opens": "Track opens",
@@ -500,7 +506,7 @@
   "test_send": {
     "trigger": "Send test",
     "title": "Send a test email",
-    "description": "Sends the saved draft to up to {max} addresses. Nobody is added to the list.",
+    "description": "Sends the saved draft to up to {max} addresses: your own, members of this organisation, or the extra test recipients in Settings. Nobody is added to the list.",
     "recipients": "Recipients",
     "placeholder": "name@example.com, one per line or separated by commas",
     "too_many": "Enter at most {max} addresses.",
@@ -515,10 +521,15 @@
       "accepted": "Accepted",
       "rejected": "Rejected",
       "unknown": "Unknown",
-      "failed": "Failed"
+      "failed": "Failed",
+      "recipient_not_allowed": "Not allowed",
+      "suppressed": "Suppressed — not sent",
+      "dispatch_busy": "Not sent — another send was in progress"
     },
     "incomplete": "Unfinished blocks are not in the saved draft, so they are left out of the test.",
-    "no_base_url": "The site's public base URL is not set (host settings), so test sends will be refused."
+    "no_base_url": "The site's public base URL is not set (host settings), so test sends will be refused.",
+    "refused_hint": "A test goes only to your own address, to members of this organisation and to the extra test recipients in Settings. An address that unsubscribed or complained is never sent a test.",
+    "smtp_code": "(reply {code})"
   },
   "sending": {
     "send_button": "Send…",

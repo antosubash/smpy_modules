@@ -12,9 +12,10 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { useState } from 'react';
 
+import { parseAddresses } from '../../utils/addresses';
 import { api, errorMessage } from '../../utils/api';
 import { HttpError, isHttpStatus } from '../../utils/http';
-import { keys, useT } from '../../utils/i18n';
+import { keys, type Translate, useT } from '../../utils/i18n';
 import type { TestSendResult } from '../../utils/types';
 
 const copy = keys.newsletter.test_send;
@@ -27,15 +28,18 @@ const OUTCOMES: Record<string, string> = {
   rejected: copy.outcome.rejected,
   unknown: copy.outcome.unknown,
   failed: copy.outcome.failed,
+  recipient_not_allowed: copy.outcome.recipient_not_allowed,
+  suppressed: copy.outcome.suppressed,
 };
+const REFUSED = new Set(['recipient_not_allowed', 'suppressed']);
+const SMTP_CODE = /^smtp_(\d{3})$/;
 
-/** Addresses separated by commas or line breaks, trimmed, lower-cased, deduplicated. */
-function parseRecipients(text: string): string[] {
-  const found = text
-    .split(/[\n,;]+/)
-    .map((a) => a.trim().toLowerCase())
-    .filter(Boolean);
-  return [...new Set(found)];
+/** The outcome in words, with the relay's reply code when there is one. */
+function outcomeLabel(r: TestSendResult, t: Translate) {
+  if (r.code === 'dispatch_busy') return t(copy.outcome.dispatch_busy);
+  const label = Object.hasOwn(OUTCOMES, r.outcome) ? t(OUTCOMES[r.outcome]) : r.outcome;
+  const smtp = r.outcome !== 'accepted' && r.code ? SMTP_CODE.exec(r.code) : null;
+  return smtp ? `${label} ${t(copy.smtp_code, { code: smtp[1] })}` : label;
 }
 
 interface Props {
@@ -59,7 +63,7 @@ export function TestSendDialog({ campaignId, max, beforeSend, incomplete, baseUr
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<TestSendResult[] | null>(null);
 
-  const recipients = parseRecipients(text);
+  const recipients = parseAddresses(text);
   const invalid = recipients.find((a) => !ADDRESS.test(a));
   const tooMany = recipients.length > max;
   const problem = tooMany
@@ -144,12 +148,13 @@ export function TestSendDialog({ campaignId, max, beforeSend, incomplete, baseUr
                 {results.map((r) => (
                   <li key={r.recipient} className="flex justify-between gap-3">
                     <span className="truncate">{r.recipient}</span>
-                    <span>
-                      {Object.hasOwn(OUTCOMES, r.outcome) ? t(OUTCOMES[r.outcome]) : r.outcome}
-                    </span>
+                    <span>{outcomeLabel(r, t)}</span>
                   </li>
                 ))}
               </ul>
+            )}
+            {results?.some((r) => REFUSED.has(r.outcome)) && (
+              <p className="text-sm text-muted-foreground">{t(copy.refused_hint)}</p>
             )}
           </div>
 

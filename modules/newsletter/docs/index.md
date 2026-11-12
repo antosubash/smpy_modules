@@ -64,12 +64,16 @@ and the golden files: [`content.md`](content.md).
 - **Preview** is the server's render in a sandboxed iframe. Viewers
   (`newsletter.view`) preview the saved campaign; unsaved content is previewed
   only by `newsletter.edit` holders on a draft.
-- **Test send** (`newsletter.send`): up to 5 addresses, `[TEST] ` subject. It runs
+- **Test send** (`newsletter.send`): up to 5 addresses, `[TEST] ` subject, only to
+  the caller's own address, active members of the organisation and
+  `test_send_extra_recipients` (others answer `recipient_not_allowed`), never to
+  an address with a `complaint` or `unsubscribed` suppression (`suppressed`). It runs
   under the install-wide dispatch lock (`sending/lock.py`) and counts against the
   rolling daily and per-minute budget through `newsletter_send_attempt`.
   Admission is all-or-nothing: over budget is `429 send_budget_exhausted`, nothing
   sent and no rows written. Per-recipient outcomes are `accepted`, `rejected`,
-  `unknown` and `failed` (a known pre-acceptance failure; not counted). Its unsubscribe link
+  `unknown` and `failed` (a known pre-acceptance failure; not counted), each with a
+  stable code and never the relay's reply text. Its unsubscribe link
   is `<public_base_url>/newsletter/u/test`, which the unsubscribe page answers like
   a forged token. A test send never sends a campaign: see [`sending.md`](sending.md).
 - **Transports.** `smtp` (aiosmtplib; STARTTLS or implicit TLS; `List-Unsubscribe`,
@@ -123,7 +127,8 @@ writes (`manage_url`).
 - `from_name`, `from_address` and `reply_to` refuse CR, LF and control characters
   (422, no echo).
 - Input is bounded: `smtp_host` 253, `smtp_username` 320, `from_name` 200,
-  `physical_address` 500 characters (422 above that). A malformed body to the
+  `physical_address` 500 characters, `test_send_extra_recipients` 20 valid
+  addresses (stored lower-cased and deduplicated; 422 above that). A malformed body to the
   password endpoint is `422 invalid_password` and never echoes the input.
 - `smtp_password` is stored encrypted and written only through
   `PUT /api/newsletter/settings/smtp-password` (needs `newsletter.manage` and

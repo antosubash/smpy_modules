@@ -45,6 +45,24 @@
     "models_truncated": "Showing the first {count} models, alphabetically — type any other model name in the Model field",
     "models_none": "The endpoint lists no models for this slot."
   },
+  "probe": {
+    "base_url_refused": "The base URL points at a private or local address, or is not an http(s) URL. To use a local endpoint, turn on “Allow private base URLs” below.",
+    "not_configured": "This slot is not fully configured — check the provider, model and API key.",
+    "key_unreadable": "The stored API key cannot be decrypted with the current secret key. Re-enter it, or restore the previous key.",
+    "unreachable": "The endpoint could not be reached — check the base URL and the host name.",
+    "connection_refused": "The endpoint refused the connection — is the server running?",
+    "timeout": "The endpoint did not answer in time.",
+    "unauthorised": "The endpoint refused the API key (HTTP {status}).",
+    "http_error": "The endpoint answered with an error (HTTP {status}).",
+    "other": "The call failed. The server log has the details."
+  },
+  "network": {
+    "title": "Network",
+    "description": "Where a base URL may point. It receives the slot's API key.",
+    "allow_private": "Allow private base URLs",
+    "allow_private_hint": "For a local endpoint such as Ollama or an in-network gateway. Off: a base URL must resolve to public addresses only; a private one already saved stays, but every call to it is refused until you change it.",
+    "needs_settings_edit": "Changing this needs the settings.edit permission."
+  },
   "api": {
     "csrf_failed": "This page's security token is out of date. Reload the page and try again — your changes are still on this page until you leave it.",
     "request_failed": "Request failed ({status} {statusText})"

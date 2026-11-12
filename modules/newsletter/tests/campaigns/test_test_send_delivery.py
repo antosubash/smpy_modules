@@ -35,10 +35,14 @@ async def test_smtp_path_via_aiosmtpd(relay, make_transport, monkeypatch):
     try:
         results = await send(app, state, cid, ["ok@example.org", "bounce@example.org"])
         assert [(r.recipient, r.outcome, r.code) for r in results] == [
-            ("ok@example.org", "accepted", 250),
-            ("bounce@example.org", "rejected", 550),
+            ("ok@example.org", "accepted", "smtp_250"),
+            ("bounce@example.org", "rejected", "smtp_550"),
         ]
-        assert [r.outcome for r in await attempt_rows(state)] == ["accepted", "rejected"]
+        rows = await attempt_rows(state)
+        assert [r.outcome for r in rows] == ["accepted", "rejected"]
+        # The relay's reply text is kept in the ledger, never in the result (#348).
+        assert rows[1].smtp_code == 550 and rows[1].detail
+        assert not hasattr(results[1], "detail")
         (delivered,) = recorder.delivered
         assert b"Subject: [TEST] Hello" in delivered.original_content
         assert b"List-Unsubscribe: <https://news.example.org/newsletter/u/test>" in (
@@ -69,8 +73,15 @@ async def test_rows_stamped_at_their_own_send_without_a_clock(built):
     app, state, cid = built
     start = datetime.now(UTC)
     async with state.session_factory() as db:
+        recipients = ["a@x.org", "b@x.org"]
         await test_send.send_test(
-            app, db, tenant_id=T, campaign_id=cid, recipients=["a@x.org", "b@x.org"], roles=[]
+            app,
+            db,
+            tenant_id=T,
+            campaign_id=cid,
+            recipients=recipients,
+            allowed=recipients,
+            roles=[],
         )
     stamps = [r.attempted_at for r in await attempt_rows(state)]
     assert start <= stamps[0] <= stamps[1] <= datetime.now(UTC)
@@ -94,7 +105,7 @@ async def test_lost_lease_stops_the_rest(built, monkeypatch):
 
     monkeypatch.setattr(test_send, "dispatch_lock", losing)
     results = await send(app, state, cid, ["a@x.org", "b@x.org", "c@x.org"])
-    assert [(r.recipient, r.outcome, r.detail) for r in results][1:] == [
+    assert [(r.recipient, r.outcome, r.code) for r in results][1:] == [
         ("b@x.org", "failed", "dispatch_busy"),
         ("c@x.org", "failed", "dispatch_busy"),
     ]

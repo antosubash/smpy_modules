@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, EmailStr, Field, field_validator
 
 from sm_newsletter.core.constants import MAX_EMAIL_LEN
 from sm_newsletter.core.headers import check_header_text
+from sm_newsletter.web.schemas.addresses import Address, normaliser
 
 # Changing where the relay is, or who logs in to it, clears the stored password:
 # otherwise the credential could be sent to a server of the caller's choosing.
@@ -18,6 +19,7 @@ MAX_HOST = 253
 MAX_USERNAME = MAX_EMAIL_LEN  # a login is often the address
 MAX_FROM_NAME = 200
 MAX_PHYSICAL_ADDRESS = 500
+MAX_EXTRA_TEST_RECIPIENTS = 20
 
 
 class SmtpPasswordUpdate(BaseModel):
@@ -50,6 +52,7 @@ class SettingsOut(BaseModel):
     tracking_opens: bool
     tracking_clicks: bool
     physical_address: str
+    test_send_extra_recipients: list[str]
 
 
 class SettingsSaved(SettingsOut):
@@ -76,6 +79,11 @@ class SettingsUpdate(BaseModel):
     tracking_opens: bool | None = None
     tracking_clicks: bool | None = None
     physical_address: str | None = Field(default=None, max_length=MAX_PHYSICAL_ADDRESS)
+    test_send_extra_recipients: Annotated[
+        list[Address] | None,
+        Field(max_length=MAX_EXTRA_TEST_RECIPIENTS),
+        BeforeValidator(normaliser("test_send_extra_recipients")),
+    ] = None
 
     @field_validator("from_address", "from_name", "reply_to")
     @classmethod

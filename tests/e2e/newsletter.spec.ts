@@ -13,8 +13,8 @@
 import { expect, test } from '@playwright/test';
 
 import { paragraphBody, seedArticle } from './article-helpers';
-import { login } from './helpers';
-import { articleCard, setBody, reportTile as tile } from './newsletter-campaign';
+import { ADMIN_EMAIL, login } from './helpers';
+import { articleCard, sendTest, setBody, reportTile as tile } from './newsletter-campaign';
 import {
   type Cleanup,
   configureNewsletter,
@@ -209,16 +209,17 @@ test.describe('Newsletter', () => {
     });
 
     await test.step('test send', async () => {
-      const tester = address('tester');
-      await page.getByRole('button', { name: 'Send test' }).click();
-      const dialog = page.getByRole('dialog', { name: 'Send a test email' });
-      await dialog.getByLabel('Recipients').fill(tester);
-      await dialog.getByRole('button', { name: 'Send', exact: true }).click();
-      await expect(dialog.getByRole('list', { name: 'Test results' })).toContainText('Accepted');
-      await dialog.getByRole('button', { name: 'Close', exact: true }).first().click();
-      const sent = (await outbox(page)).filter((m) => m.to === tester);
-      expect(sent).toHaveLength(1);
-      expect(sent[0].subject.startsWith('[TEST]')).toBeTruthy();
+      // A test goes to the sender's own address; a stranger is refused (#348).
+      const stranger = address('stranger');
+      const [own, refused] = await sendTest(page, [ADMIN_EMAIL, stranger]);
+      expect([own, refused]).toEqual([
+        expect.stringContaining('Accepted'),
+        expect.stringContaining('Not allowed'),
+      ]);
+      const mail = await outbox(page);
+      const mine = mail.filter((m) => m.to === ADMIN_EMAIL.toLowerCase());
+      expect(mine.filter((m) => m.subject === `[TEST] ${subject}`)).toHaveLength(1);
+      expect(mail.filter((m) => m.to === stranger)).toHaveLength(0);
     });
 
     await test.step('send to the vip tag', async () => {

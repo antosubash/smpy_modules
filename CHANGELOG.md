@@ -81,6 +81,47 @@ name the module they affect.
   `'"<secret>"'`). `scripts/set_setting.py` now stores any JSON field as its
   type dumps it, as the Settings screen does, and no longer echoes a value the
   screen would mask.
+- **ai checks where a base URL points before sending the key there** (#347).
+  `chat_base_url` and `embedding_base_url` must be `http(s)`, and their host
+  must resolve only to public addresses: loopback, private, link-local (the
+  cloud metadata address included), CGNAT, multicast, reserved and mapped or
+  tunnelled forms of those are refused on save (a `422` naming the setting to
+  turn on) and again at every request. The SDK clients for OpenAI,
+  `openai_compatible`, Anthropic and Google all get an HTTP client pinned to the
+  validated address (the name stays the `Host` and TLS name), so a DNS answer
+  that changes after the check cannot redirect the key. A local endpoint such
+  as Ollama or an in-network gateway needs the new SYSTEM setting
+  `allow_private_base_url`, off by default, which only a holder of
+  `settings.edit` can change (a **Network** card on the AI page). `POST
+  /api/ai/test` and `/api/ai/models` now answer a stable `code`
+  (`base_url_refused`, `unreachable`, `connection_refused`, `timeout`,
+  `unauthorised`, `http_error`, …) with a fixed message, translated in the
+  console, instead of the provider's error text, which is logged server-side
+  only. ai now depends on `httpx2` directly (already installed through the
+  SDKs). Details: "Base URLs and the network" in `modules/ai/docs/operations.md`.
+- **newsletter test sends go only to vouched-for addresses** (#348). A test used
+  to go to any five addresses, suppressed ones included, and returned the
+  relay's reply text. Now each recipient must be the caller's own address, an
+  active account of the campaign's organisation (the framework's user
+  directory, plus membership of the bound tenant on a multi-tenant host), or one
+  of the new SYSTEM setting `test_send_extra_recipients` (up to 20, for a shared
+  review inbox; on the Settings page); any other answers
+  `recipient_not_allowed`. An address with a `complaint` or `unsubscribed`
+  suppression in the tenant answers `suppressed`. Neither is sent, writes an
+  attempt row or uses budget. A result is now `{recipient, outcome, code}` with
+  a stable `code` (`smtp_250`, `smtp_550`, `dispatch_busy`); `detail` is gone
+  from the response and kept in the attempt ledger and the server log. The
+  test-send dialog names each refusal. Suppression keys and address
+  comparisons now use one canonical form everywhere: the local part NFC and lower-cased, the domain as
+  email-validator normalises it (IDNA 2008, so `xn--fa-hia.de` is `faß.de`). A
+  suppression written under one spelling of a domain covers every spelling, a
+  fullwidth or ligature local part is a different mailbox (and is not vouched
+  for), and ASCII addresses keep their keys. The table stores only the hash, so
+  every lookup also tries the old `strip().lower()` key of the spelling it has,
+  until newsletter's first published release, when that legacy lookup can go;
+  newsletter is not yet published, so no migration or other upgrade step
+  applies. Details:
+  `modules/newsletter/docs/sending.md`.
 
 ### Deprecated
 
@@ -90,11 +131,18 @@ name the module they affect.
 
 ### Upgrading
 
-- Nothing is required. Existing `enc:v1:` values keep working, and records
+- Stored secrets: nothing is required. Existing `enc:v1:` values keep working, and records
   encrypts a plaintext CAPTCHA secret in place at the first startup (a warning
   says so). Downgrading to 0.0.15 after a secret was saved again (or
   re-encrypted) leaves it unreadable there (`enc:v2:`); re-enter it after a
   downgrade. records now depends on `cryptography>=42`.
+- **ai: a private base URL needs `allow_private_base_url`** (#347). A slot
+  pointing at a local or in-network endpoint (Ollama, vLLM on
+  `http://vllm:8000/v1`, `http://127.0.0.1:…`) stops working on upgrade: calls
+  fail and **Test connection** says the base URL was refused. Turn on **Allow
+  private base URLs** on the AI page (needs `settings.edit`), or run
+  `python scripts/set_setting.py sm_ai allow_private_base_url true`. A client of
+  the probe routes that read `error` should read `code`.
 
 ### Fixed
 

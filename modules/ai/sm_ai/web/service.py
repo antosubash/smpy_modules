@@ -99,6 +99,28 @@ class AiService:
                 )
         return errors
 
+    @staticmethod
+    def drop_unchanged_policy(changes: dict[str, Any]) -> None:
+        """Remove ``allow_private_base_url`` from ``changes`` when it equals the
+        live value: only a request that changes it (and so holds
+        ``settings.edit``) may ever write it. What is left of the field after
+        this call is a change."""
+        field = "allow_private_base_url"
+        if field in changes and bool(changes[field]) == getattr(services.current_settings(), field):
+            del changes[field]
+
+    @staticmethod
+    async def base_url_errors(changes: dict[str, Any]) -> list[dict[str, Any]]:
+        """422 items for base URLs that may not be saved (#347): resolved here,
+        judged on the merged result like ``slot_errors``, for the URLs the update
+        changes (turning the switch off re-checks none: see ``save_errors``)."""
+        from sm_ai.connections.base_url import save_errors
+
+        current = services.current_settings().model_dump()
+        # The page resends every field: only a value that differs is a change.
+        touched = {field for field, value in changes.items() if value != current.get(field)}
+        return await save_errors({**current, **changes}, touched)
+
     async def apply(self, changes: dict[str, Any]) -> AiSettingsOut:
         """Persist and hot-swap the given field changes, then return current."""
         # Plugin→plugin imports (settings is a declared dependency); kept local

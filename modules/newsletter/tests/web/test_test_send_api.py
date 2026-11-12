@@ -10,14 +10,19 @@ from sm_newsletter.sending.transport import console
 
 from tests.support.app import build_app
 from tests.support.records_seed import restrict_list, seed_list
+from tests.support.sending import FULLWIDTH_E, suppress_in
 
 API = constants.ROUTE_PREFIX_API
 EDIT = {"x-perms": f"{constants.PERM_VIEW},{constants.PERM_EDIT}"}
 SEND = {"x-perms": f"{constants.PERM_VIEW},{constants.PERM_SEND}"}
+# The addresses these tests send to are vouched for by the allow-list; the
+# recipient rule itself is test_test_send_recipients'.
+VOUCHED = ["a@example.org", "b@example.org", *(f"{c}@x.org" for c in "abcde")]
 SENDER = {
     "transport": "console",
     "from_address": "news@example.org",
     "physical_address": "1 Main Street",
+    "test_send_extra_recipients": VOUCHED,
 }
 
 
@@ -59,8 +64,7 @@ async def test_sends_and_answers_per_recipient(client, cid):
             {
                 "recipient": "a@example.org",
                 "outcome": "accepted",
-                "code": 250,
-                "detail": "captured by the console transport",
+                "code": "smtp_250",
             }
         ]
     }
@@ -118,3 +122,44 @@ async def test_budget_exhausted_is_429(built, client, cid):
     body = {"recipients": ["a@example.org", "b@example.org"]}
     res = await client.post(_url(cid), json=body, headers=SEND)
     assert (res.status_code, res.json()["code"]) == (429, "send_budget_exhausted")
+
+
+async def test_only_vouched_recipients_are_sent(client, cid):
+    # The caller's own address (the auth stub's user) and the allow-list pass;
+    # anyone else is refused for that address alone (#348).
+    body = {"recipients": ["U@example.com", "stranger@example.net", "a@example.org"]}
+    res = await client.post(_url(cid), json=body, headers=SEND)
+    assert res.status_code == 200, res.text
+    assert res.json()["results"] == [
+        {"recipient": "u@example.com", "outcome": "accepted", "code": "smtp_250"},
+        {"recipient": "stranger@example.net", "outcome": "recipient_not_allowed", "code": None},
+        {"recipient": "a@example.org", "outcome": "accepted", "code": "smtp_250"},
+    ]
+    assert sorted(m.to for m in console.captured("default")) == ["a@example.org", "u@example.com"]
+
+
+async def test_a_suppression_under_a_unicode_spelling_is_honoured(client, built, cid):
+    # The parser folds a fullwidth "e" in the domain; the suppression row hashes
+    # the address as imported, so both forms are looked up (#348).
+    _, state = built
+    raw = f"b@{FULLWIDTH_E}xample.org"
+    await suppress_in(state, raw, constants.REASON_COMPLAINT)
+    body = {"recipients": [raw, "b@example.org"]}  # one recipient after parsing
+    res = await client.post(_url(cid), json=body, headers=SEND)
+    assert res.json()["results"] == [
+        {"recipient": "b@example.org", "outcome": "suppressed", "code": None}
+    ]
+    assert console.captured("default") == []
+
+
+async def test_a_folded_local_part_is_not_the_vouched_mailbox(client, cid):
+    # "\uff55@example.com" folds to the caller's "u@example.com" under NFKC but is
+    # another mailbox: refused. A fullwidth letter in the domain is the same
+    # mailbox and is sent to the parsed (ASCII) address.
+    body = {"recipients": ["\uff55@example.com", "u@\uff45xample.com"]}
+    res = await client.post(_url(cid), json=body, headers=SEND)
+    assert res.json()["results"] == [
+        {"recipient": "\uff55@example.com", "outcome": "recipient_not_allowed", "code": None},
+        {"recipient": "u@example.com", "outcome": "accepted", "code": "smtp_250"},
+    ]
+    assert [m.to for m in console.captured("default")] == ["u@example.com"]

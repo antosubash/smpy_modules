@@ -6,11 +6,10 @@ Pure: no database. Errors and row errors never repeat a cell value (R16).
 from __future__ import annotations
 
 import csv
-import io
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import BinaryIO, TextIO
+from typing import TextIO
 
 from email_validator import EmailNotValidError, validate_email
 
@@ -21,10 +20,8 @@ from sm_newsletter.core.errors_import import (
     ImportNoEmailColumn,
     ImportNotUtf8,
     ImportTooManyColumns,
-    ImportZipUnsafe,
 )
-from sm_newsletter.core.suppression import normalise_email
-from sm_newsletter.imports.archive import ARCHIVE_ERRORS
+from sm_newsletter.core.suppression import records_form
 from sm_newsletter.imports.constants import (
     EMAIL_HEADERS,
     IGNORED,
@@ -32,9 +29,9 @@ from sm_newsletter.imports.constants import (
     MAX_CELL,
     MAX_COLUMNS,
     MAX_HEADER_KEY,
-    MAX_LINE,
     TAGS_HEADER,
 )
+from sm_newsletter.imports.stream import text_stream
 from sm_newsletter.imports.tags import parse_tags, tag_values
 
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -85,41 +82,6 @@ def header_key(text: str) -> str:
     return text.replace("﻿", "").strip().casefold()
 
 
-class _OneLine(io.RawIOBase):
-    """Hands the decoder one physical line per read, so a bad byte is pinned to its line."""
-
-    def __init__(self, binary: BinaryIO) -> None:
-        self._binary = binary
-        self._rest = b""
-        self._line = 0
-
-    def readable(self) -> bool:
-        return True
-
-    def readinto(self, buffer) -> int:  # type: ignore[no-untyped-def]
-        if not self._rest:
-            self._line += 1
-            try:
-                self._rest = self._binary.readline(MAX_LINE + 1)
-            except ARCHIVE_ERRORS as exc:
-                raise ImportZipUnsafe from exc
-            if len(self._rest) > MAX_LINE:
-                raise ImportMalformedCsv(f"The file is not valid CSV (line {self._line})")
-        chunk, self._rest = self._rest[: len(buffer)], self._rest[len(buffer) :]
-        buffer[: len(chunk)] = chunk
-        return len(chunk)
-
-
-def text_stream(binary: BinaryIO) -> TextIO:
-    """UTF-8 (BOM allowed), strict; one line is read at a time."""
-    return io.TextIOWrapper(
-        io.BufferedReader(_OneLine(binary), buffer_size=1),
-        encoding="utf-8-sig",
-        errors="strict",
-        newline="",
-    )
-
-
 def kind_by_name(name: str) -> str | None:
     """The kind a Mailchimp export file name says (``nonsubscribed_*`` is ``ignored``), else
     ``None``."""
@@ -138,8 +100,10 @@ def detect_kind(name: str, header: Header) -> str:
 
 
 def valid_email(raw: str) -> str | None:
+    """The address as records will store it (its own normalisation); suppression
+    hashes take the canonical form from it (``email_hash``)."""
     try:
-        normalised = normalise_email(raw)
+        normalised = records_form(raw)
         validate_email(normalised, check_deliverability=False)
     except (ValueError, EmailNotValidError):
         return None

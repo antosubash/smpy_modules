@@ -15,17 +15,13 @@ from sm_ai.connections import discovery
 from sm_ai.contracts.errors import AiNotConfiguredError
 from sm_ai.core import constants, crypto, services
 from sm_ai.core.settings import AiSettings
+from sm_ai.web import probe_errors
 
 from tests.support.ai_test_stubs import GrantAll
 
-SECRET = "test-secret-key-for-discovery"
+LOGGER = "sm_ai.web.probe_errors"
 
 
-@pytest.fixture(autouse=True)
-def _env(monkeypatch):
-    monkeypatch.setenv("SM_SECRET_KEY", SECRET)
-    yield
-    services.reset()
 
 
 def _install(**fields) -> AiSettings:
@@ -58,8 +54,8 @@ class TestListModels:
     async def test_openai_compatible_needs_no_key_and_sorts(self, monkeypatch):
         seen = {}
 
-        async def fake(key, base_url):
-            seen.update(key=key, base_url=base_url)
+        async def fake(key, base_url, http):
+            seen.update(key=key, base_url=base_url, pinned=http is not None)
             return ["b", "a", "b", ""]
 
         monkeypatch.setattr(discovery, "_openai", fake)
@@ -68,7 +64,12 @@ class TestListModels:
         )
 
         assert await discovery.list_models(settings, constants.SLOT_CHAT) == ["a", "b"]
-        assert seen == {"key": constants.PLACEHOLDER_API_KEY, "base_url": "http://v/v1"}
+        # A base URL is listed through the pinned client (#347).
+        assert seen == {
+            "key": constants.PLACEHOLDER_API_KEY,
+            "base_url": "http://v/v1",
+            "pinned": True,
+        }
 
     async def test_missing_base_url_is_not_configured(self):
         settings = _install(chat_provider="openai_compatible", chat_base_url="")
@@ -81,8 +82,8 @@ class TestListModels:
         made = {}
 
         class FakeClient:
-            def __init__(self, api_key, base_url):
-                made.update(api_key=api_key, base_url=base_url)
+            def __init__(self, api_key, base_url, http_client):
+                made.update(api_key=api_key, base_url=base_url, http_client=http_client)
                 self.models = SimpleNamespace(list=lambda: _aiter([SimpleNamespace(id="gpt-x")]))
 
             async def close(self):
@@ -92,7 +93,8 @@ class TestListModels:
         settings = _install(chat_provider="openai", chat_api_key=crypto.encrypt_value("sk-o"))
 
         assert await discovery.list_models(settings, constants.SLOT_CHAT) == ["gpt-x"]
-        assert made == {"api_key": "sk-o", "base_url": None, "closed": True}
+        # No base URL: the provider's own endpoint, through the SDK's own client.
+        assert made == {"api_key": "sk-o", "base_url": None, "http_client": None, "closed": True}
 
     @pytest.mark.parametrize(
         ("slot", "expected"),
@@ -137,10 +139,17 @@ class TestModelsEndpoint:
         _install()
         res = await client.post("/api/ai/models", json={"slot": constants.SLOT_CHAT})
         assert res.status_code == 200
-        assert res.json() == {"ok": True, "models": ["one", "two"], "truncated": False, "error": ""}
+        assert res.json() == {
+            "ok": True,
+            "models": ["one", "two"],
+            "truncated": False,
+            "error": "",
+            "code": "",
+            "status": 0,
+        }
 
     async def test_capped_and_says_so(self, client, monkeypatch):
-        async def fake(key, base_url):
+        async def fake(key, base_url, http):
             return [f"m{i:04}" for i in range(discovery.MAX_MODELS + 50)]
 
         monkeypatch.setattr(discovery, "_anthropic", fake)
@@ -155,7 +164,7 @@ class TestModelsEndpoint:
         body = res.json()
         assert res.status_code == 200
         assert body["ok"] is False
-        assert "embedding_provider" in body["error"]
+        assert body["code"] == "not_configured"
 
     async def test_timeout_is_a_result(self, client, monkeypatch):
         async def slow(settings, slot):
@@ -166,7 +175,7 @@ class TestModelsEndpoint:
         _install()
         body = (await client.post("/api/ai/models", json={"slot": "chat"})).json()
         assert body["ok"] is False
-        assert "Timed out" in body["error"]
+        assert body["code"] == "timeout"
 
     async def test_unknown_slot_rejected(self, client):
         _install()
@@ -177,7 +186,7 @@ class TestModelsEndpoint:
 class TestProbeLogging:
     async def test_config_problem_logs_one_line(self, client, caplog):
         _install()
-        with caplog.at_level(logging.WARNING, logger="sm_ai.web.endpoints.api"):
+        with caplog.at_level(logging.WARNING, logger=LOGGER):
             await client.post("/api/ai/test", json={"slot": constants.SLOT_EMBEDDING})
         [record] = caplog.records
         assert record.exc_info is None
@@ -190,13 +199,16 @@ class TestProbeLogging:
 
         monkeypatch.setattr(discovery, "list_models", refused)
         _install()
-        with caplog.at_level(logging.WARNING, logger="sm_ai.web.endpoints.api"):
+        with caplog.at_level(logging.WARNING, logger=LOGGER):
             body = (await client.post("/api/ai/models", json={"slot": "chat"})).json()
+        # A fixed message for the class, never the exception's own text (#347).
         assert body == {
             "ok": False,
             "models": [],
             "truncated": False,
-            "error": "connection refused",
+            "error": probe_errors.MESSAGES["unreachable"],
+            "code": "unreachable",
+            "status": 0,
         }
         [record] = caplog.records
         assert record.exc_info is None
@@ -214,7 +226,7 @@ class TestProbeLogging:
             resolve, "build_chat_model", lambda s, model_name=None: FunctionModel(refused)
         )
         _install()
-        with caplog.at_level(logging.WARNING, logger="sm_ai.web.endpoints.api"):
+        with caplog.at_level(logging.WARNING, logger=LOGGER):
             body = (await client.post("/api/ai/test", json={"slot": "chat"})).json()
         assert body["ok"] is False
         assert all(record.exc_info is None for record in caplog.records)
@@ -227,7 +239,7 @@ class TestProbeLogging:
 
         monkeypatch.setattr(discovery, "list_models", unreadable)
         _install()
-        with caplog.at_level(logging.WARNING, logger="sm_ai.web.endpoints.api"):
+        with caplog.at_level(logging.WARNING, logger=LOGGER):
             await client.post("/api/ai/models", json={"slot": "chat"})
         [record] = caplog.records
         assert record.exc_info is None
@@ -238,7 +250,31 @@ class TestProbeLogging:
 
         monkeypatch.setattr(discovery, "list_models", broken)
         _install()
-        with caplog.at_level(logging.WARNING, logger="sm_ai.web.endpoints.api"):
+        with caplog.at_level(logging.WARNING, logger=LOGGER):
             await client.post("/api/ai/models", json={"slot": "chat"})
         [record] = caplog.records
         assert record.exc_info is not None
+
+
+async def test_discovery_closes_the_client_it_opens(monkeypatch):
+    from sm_ai.connections import clients
+
+    opened = []
+
+    async def fake(key, base_url, http):
+        opened.append(http)
+        return ["m"]
+
+    monkeypatch.setattr(discovery, "_openai", fake)
+    loop = asyncio.get_running_loop()
+    before = clients.cached(loop)
+    settings = AiSettings(
+        chat_provider=constants.PROVIDER_OPENAI_COMPATIBLE,
+        chat_model="m",
+        chat_base_url="http://127.0.0.1:9/v1",
+        allow_private_base_url=True,
+    )
+    await discovery.list_models(settings, constants.SLOT_CHAT)
+    [http] = opened
+    assert http.is_closed
+    assert clients.cached(loop) == before  # unshared: not in the loop's cache

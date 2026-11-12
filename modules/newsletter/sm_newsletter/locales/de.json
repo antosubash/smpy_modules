@@ -275,6 +275,12 @@
       "daily": "E-Mails pro Tag",
       "per_minute": "E-Mails pro Minute"
     },
+    "test_sends": {
+      "title": "Testsendungen",
+      "extra_recipients": "Zusätzliche Testempfänger",
+      "extra_recipients_hint": "Eine Adresse pro Zeile, etwa für ein gemeinsames Prüfpostfach. Ein Test darf immer an die eigene Adresse und an Mitglieder der Organisation gehen.",
+      "too_many": "Geben Sie höchstens {max} Adressen ein."
+    },
     "tracking": {
       "title": "Tracking",
       "opens": "Öffnungen erfassen",
@@ -500,7 +506,7 @@
   "test_send": {
     "trigger": "Test senden",
     "title": "Test-E-Mail senden",
-    "description": "Sendet den gespeicherten Entwurf an bis zu {max} Adressen. Niemand wird zur Liste hinzugefügt.",
+    "description": "Sendet den gespeicherten Entwurf an bis zu {max} Adressen: Ihre eigene, Mitglieder dieser Organisation oder die zusätzlichen Testempfänger aus den Einstellungen. Niemand wird zur Liste hinzugefügt.",
     "recipients": "Empfänger",
     "placeholder": "name@example.com, eine pro Zeile oder durch Kommas getrennt",
     "too_many": "Geben Sie höchstens {max} Adressen ein.",
@@ -515,10 +521,15 @@
       "accepted": "Angenommen",
       "rejected": "Abgelehnt",
       "unknown": "Unbekannt",
-      "failed": "Fehlgeschlagen"
+      "failed": "Fehlgeschlagen",
+      "recipient_not_allowed": "Nicht erlaubt",
+      "suppressed": "Gesperrt – nicht gesendet",
+      "dispatch_busy": "Nicht gesendet – ein anderer Versand lief gerade"
     },
     "incomplete": "Unfertige Blöcke sind nicht im gespeicherten Entwurf und fehlen daher im Test.",
-    "no_base_url": "Die öffentliche Basis-URL der Website ist nicht gesetzt (Host-Einstellungen), daher werden Testsendungen abgelehnt."
+    "no_base_url": "Die öffentliche Basis-URL der Website ist nicht gesetzt (Host-Einstellungen), daher werden Testsendungen abgelehnt.",
+    "refused_hint": "Ein Test geht nur an Ihre eigene Adresse, an Mitglieder dieser Organisation und an die zusätzlichen Testempfänger aus den Einstellungen. Eine Adresse, die sich abgemeldet oder beschwert hat, erhält nie einen Test.",
+    "smtp_code": "(Antwort {code})"
   },
   "sending": {
     "send_button": "Senden…",

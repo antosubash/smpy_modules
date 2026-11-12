@@ -203,6 +203,34 @@ FAMILIES: tuple[Family, ...] = (
         ),
         shared=("_shared", "_pg", "arm_reset", "USING_POSTGRES"),
     ),
+    Family(
+        "SSRF address guard",
+        (
+            Copy("modules/images/sm_images/ingest/imports/url_safety.py"),
+            Copy(f"{AI}/core/url_safety.py", {"httpx2": "httpx"}),
+        ),
+        # The address rules are the guard; `check_url` and `resolve_public`
+        # are allowed to differ below.
+        shared=(
+            "IPAddress",
+            "ALLOWED_SCHEMES",
+            "_DEFAULT_PORTS",
+            "_BLOCKED_NETWORKS",
+            "_METADATA",
+            "_NAT64",
+            "_V4_COMPATIBLE",
+            "UnsafeURLError",
+            "UnsafeURLError.__init__",
+            "_embedded_ipv4",
+            "is_public_address",
+            "_parse_ip",
+        ),
+        differ={
+            "check_url": "A provider endpoint may listen on any port (vLLM on 8000), so ai's "
+            "copy has no port allow-list; images fetches arbitrary URLs and keeps 80/443.",
+            "resolve_public": "See check_url: images passes its port allow-list through.",
+        },
+    ),
     *CRYPTO_FAMILIES,
     *TENANCY_FAMILIES,
 )

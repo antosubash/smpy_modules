@@ -13,15 +13,6 @@ from sm_ai.contracts.errors import AiNotConfiguredError
 from sm_ai.core import constants, crypto, services
 from sm_ai.core.settings import AiSettings
 
-SECRET = "test-secret-key-for-resolve"
-
-
-@pytest.fixture(autouse=True)
-def _env(monkeypatch):
-    monkeypatch.setenv("SM_SECRET_KEY", SECRET)
-    yield
-    services.reset()
-
 
 def _chat(**kw) -> AiSettings:
     base = {

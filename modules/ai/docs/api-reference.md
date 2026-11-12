@@ -13,6 +13,7 @@ another PyPI project.
 ```python
 from sm_ai.contracts import (
     METER_REQUESTS,
+    AiBaseUrlRefusedError,
     AiError,
     AiKeyUnreadableError,
     AiNotConfiguredError,
@@ -85,6 +86,12 @@ Each slot is checked in this order. The first failure raises
 4. **Base URL / key.** `openai_compatible` needs a base URL
    (`*_base_url`), and an empty key is replaced by the placeholder
    `not-needed`. Every other provider needs a key (`*_api_key`).
+5. **Base URL address.** A base URL must be `http(s)`; unless
+   `allow_private_base_url` is on, a private IP literal raises
+   `AiBaseUrlRefusedError`, and the model's HTTP client resolves the host at
+   each request and refuses a non-public address (the SDK then raises its
+   connection error, caused by `sm_ai.core.url_safety.UnsafeURLError`). See
+   "Base URLs and the network" in [operations.md](operations.md).
 
 ### Errors
 
@@ -92,6 +99,7 @@ Each slot is checked in this order. The first failure raises
 |---|---|---|
 | `AiError` | base class; catch this to handle every AI module error | |
 | `AiNotConfiguredError(AiError)` | a required setting is missing or invalid | `field`; the message names it and may add a hint |
+| `AiBaseUrlRefusedError(AiError)` | a base URL is not `http(s)`, or is a private IP literal while `allow_private_base_url` is off (#347); the message names the setting to turn on and never the URL | `field`, `reason` |
 | `AiKeyUnreadableError(AiError)` | a stored key has an `enc:` prefix but neither `SM_SECRET_KEY` nor a key in `SM_SECRET_KEY_PREVIOUS` decrypts it (the secret was rotated without keeping the old one), or names an unknown format | `field` |
 
 ### Usage metering: `RequiresAiRequest`
@@ -214,11 +222,17 @@ the same shape as `GET`.
 | `embedding_model`, `embedding_base_url` | string | trimmed |
 | `embedding_api_key`, `clear_embedding_api_key` | string, bool | as for chat |
 | `embedding_dim` | int | `>= 0` |
+| `allow_private_base_url` | bool | changing it needs `settings.edit` as well (`403 Permission required: settings.edit`); sending the current value needs nothing |
 
 `null` is treated as omitted. A slot whose provider is `openai_compatible`
 must end up with a non-blank base URL — judged on the stored values merged
 with the update, so sending only the provider, or blanking the URL, is a `422`
-whose error `loc` names `chat_base_url` or `embedding_base_url`. Only values that differ from the current ones
+whose error `loc` names `chat_base_url` or `embedding_base_url`. A non-blank
+base URL must be an `http(s)` URL, and unless `allow_private_base_url` is on
+its host is resolved and every address must be public (#347); otherwise it is
+a `422` on that field with `ctx.reason` `non_public_address` (the message says
+to turn on `allow_private_base_url`), `unresolvable_host`, `invalid_scheme`,
+`userinfo_not_allowed`, `missing_host` or `invalid_url`. Only values that differ from the current ones
 are written. The handling worker's settings are replaced immediately and a
 `SettingsReloaded` event is published.
 
@@ -237,17 +251,32 @@ Request `{"slot": "chat"}` or `{"slot": "embedding"}`; any other slot is a
 30-second limit.
 
 ```json
-{"ok": true,  "model": "claude-opus-5", "latency_ms": 812, "error": ""}
-{"ok": false, "model": "claude-opus-5", "latency_ms": 0,
- "error": "AI is not configured: 'chat_api_key' is missing or invalid."}
+{"ok": true,  "model": "claude-opus-5", "latency_ms": 812, "error": "", "code": "", "status": 0}
+{"ok": false, "model": "claude-opus-5", "latency_ms": 0, "code": "unauthorised", "status": 401,
+ "error": "The endpoint refused the API key (HTTP 401 or 403)."}
 ```
 
-Every failure returns `200` with `ok: false`: missing configuration, an
-unreadable key, a refused connection, an authentication error, or
-`"Timed out after 30s."`. The server logs a configuration or provider
-failure (an `AiError`, a refused connection, a provider error status) as one
-warning line, and anything else with its traceback, so a code defect stays
-distinguishable from a configuration problem.
+Every failure returns `200` with `ok: false`, a stable `code` and a fixed
+English `error` for it; the provider's own message is never returned (#347),
+since it can describe whatever answered at the base URL. The console
+translates by `code`:
+
+| `code` | Meaning |
+|---|---|
+| `base_url_refused` | the base URL is not `http(s)`, or resolves to a private or local address while `allow_private_base_url` is off |
+| `not_configured` | provider, model, key or required base URL missing |
+| `key_unreadable` | the stored key cannot be decrypted |
+| `unreachable` | the host does not resolve, or the connection failed |
+| `connection_refused` | nothing listens at that address and port |
+| `timeout` | no answer in time (the 30-second probe deadline, or the SDK's or pinned client's own timeout) |
+| `unauthorised` | HTTP 401 or 403 (`status` says which) |
+| `http_error` | another status the call did not succeed with (`status`), a `3xx` included: redirects are not followed |
+| `other` | anything else |
+
+The server logs the failure with its class and the exception text: a
+configuration or provider failure as one warning line, anything else with
+its traceback, so a code defect stays distinguishable from a configuration
+problem.
 
 The probe is not metered as `ai.requests`. It is the operator checking the
 deployment-wide (SYSTEM-scope) connection, not an organisation's use, and an
@@ -265,8 +294,9 @@ prefix. The slot needs a provider, its key (or a base URL for
 `openai_compatible`) — but no model name, since finding one is the point.
 
 ```json
-{"ok": true,  "models": ["llama-3-8b", "mistral-7b", "qwen-7b"], "truncated": false, "error": ""}
-{"ok": false, "models": [], "truncated": false, "error": "Connection error."}
+{"ok": true,  "models": ["llama-3-8b", "mistral-7b", "qwen-7b"], "truncated": false, "error": "", "code": "", "status": 0}
+{"ok": false, "models": [], "truncated": false, "code": "connection_refused", "status": 0,
+ "error": "The endpoint refused the connection: is the server running?"}
 ```
 
 Ids are sorted and de-duplicated. At most 500 are returned; `truncated` is

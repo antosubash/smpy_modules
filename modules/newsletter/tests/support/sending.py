@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 
 from simple_module_db import finalize_session
 from sm_newsletter.campaigns import test_send
+from sm_newsletter.core.suppression.store import suppress
+from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import Campaign, SendAttempt
 from sqlalchemy import select
 
@@ -24,6 +26,7 @@ SENDER = {
     "daily_limit": 100,
     "per_minute_limit": 100,
 }
+FULLWIDTH_E = "\uff45"  # the address parser folds it into "e" in a domain
 BODY = [{"type": "Divider", "props": {"id": "a"}}]
 
 
@@ -38,10 +41,19 @@ async def make_app(*, base_url: str = BASE_URL, file=None, **settings):
     return app, state, campaign.id
 
 
-async def send(app, state, cid, recipients, now=NOW):
+async def send(app, state, cid, recipients, now=NOW, allowed=None, submitted=None):
+    """``send_test`` with every recipient vouched for unless ``allowed`` says otherwise."""
     async with state.session_factory() as db:
         return await test_send.send_test(
-            app, db, tenant_id=T, campaign_id=cid, recipients=recipients, roles=[], now=now
+            app,
+            db,
+            tenant_id=T,
+            campaign_id=cid,
+            recipients=recipients,
+            allowed=recipients if allowed is None else allowed,
+            roles=[],
+            now=now,
+            submitted=submitted,
         )
 
 
@@ -59,3 +71,19 @@ async def used(state, *, at: datetime, count: int, outcome: str = "accepted") ->
                 )
             )
         await finalize_session(db)
+
+
+async def suppress_in(state, email: str, reason: str, list_type_key: str = "") -> None:
+    """A suppression row for ``email`` in the default tenant."""
+    async with state.session_factory() as db:
+        with tenant_scope(T):
+            await suppress(
+                db,
+                tenant_id=T,
+                email=email,
+                reason=reason,
+                source="admin",
+                list_type_key=list_type_key,
+                now=NOW,
+            )
+            await db.commit()

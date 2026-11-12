@@ -3,16 +3,22 @@
 Through the SDK each provider's pydantic-ai extra already installs, so this
 adds no dependency. Reads the *saved* slot — the same rule as the test probe:
 an unsaved key never leaves the browser for an endpoint nobody has saved.
+
+A base URL goes through the same guard as a model call (#347): each SDK client
+gets an unshared client from ``base_url.http_client_for``, closed after the listing.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from sm_ai.connections import base_url as guard
 from sm_ai.connections import resolve
 from sm_ai.core import constants
 
 if TYPE_CHECKING:
+    import httpx2
+
     from sm_ai.core.settings import AiSettings
 
 MAX_MODELS = 500
@@ -43,42 +49,49 @@ async def list_models(settings: AiSettings, slot: str) -> list[str]:
     provider_id, _, key, base_url = resolve.slot_inputs(
         settings, slot, allowed, require_model=False
     )
-    if provider_id in (constants.PROVIDER_OPENAI, constants.PROVIDER_OPENAI_COMPATIBLE):
-        names = await _openai(key, base_url)
-    elif provider_id == constants.PROVIDER_ANTHROPIC:
-        names = await _anthropic(key, base_url)
-    elif provider_id == constants.PROVIDER_GOOGLE:
-        names = await _google(key, base_url, _GOOGLE_ACTION[slot])
-    else:  # slot_inputs admits only the providers above; a new one must say how it lists
-        raise NotImplementedError(f"Model listing is not implemented for {provider_id!r}.")
+    http = guard.http_client_for(settings, slot, base_url, shared=False)
+    try:
+        if provider_id in (constants.PROVIDER_OPENAI, constants.PROVIDER_OPENAI_COMPATIBLE):
+            names = await _openai(key, base_url, http)
+        elif provider_id == constants.PROVIDER_ANTHROPIC:
+            names = await _anthropic(key, base_url, http)
+        elif provider_id == constants.PROVIDER_GOOGLE:
+            names = await _google(key, base_url, _GOOGLE_ACTION[slot], http)
+        else:  # slot_inputs admits only the providers above; a new one must say how it lists
+            raise NotImplementedError(f"Model listing is not implemented for {provider_id!r}.")
+    finally:
+        if http is not None:
+            await http.aclose()
     return sorted({name for name in names if name})
 
 
-async def _openai(key: str, base_url: str) -> list[str]:
+async def _openai(key: str, base_url: str, http: httpx2.AsyncClient | None) -> list[str]:
     from openai import AsyncOpenAI
 
-    client = AsyncOpenAI(api_key=key, base_url=base_url or None)
+    client = AsyncOpenAI(api_key=key, base_url=base_url or None, http_client=http)
     try:
         return [model.id async for model in client.models.list()]
     finally:
         await client.close()
 
 
-async def _anthropic(key: str, base_url: str) -> list[str]:
+async def _anthropic(key: str, base_url: str, http: httpx2.AsyncClient | None) -> list[str]:
     from anthropic import AsyncAnthropic
 
-    client = AsyncAnthropic(api_key=key, base_url=base_url or None)
+    client = AsyncAnthropic(api_key=key, base_url=base_url or None, http_client=http)
     try:
         return [model.id async for model in client.models.list(limit=1000)]
     finally:
         await client.close()
 
 
-async def _google(key: str, base_url: str, action: str) -> list[str]:
+async def _google(
+    key: str, base_url: str, action: str, http: httpx2.AsyncClient | None
+) -> list[str]:
     from google import genai
     from google.genai import types
 
-    options = types.HttpOptions(base_url=base_url) if base_url else None
+    options = types.HttpOptions(base_url=base_url, httpx_async_client=http) if base_url else None
     client = genai.Client(api_key=key, http_options=options)
     names: list[str] = []
     try:
