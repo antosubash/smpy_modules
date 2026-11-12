@@ -194,7 +194,7 @@ serve it to everyone. So:
   `SM_ENVIRONMENT` other than `development` or `testing` and the setting blank,
   pagebuilder logs a warning at startup.
 - While it is blank, those responses (pages, their 304s, `/sitemap.xml`, and
-  `/robots.txt` unless `robots_body` replaces it) add `Host` to `Vary`.
+  `/robots.txt` unless `robots_body` replaces it or the sitemap is off) add `Host` to `Vary`.
 - On a multi-tenant host leave it blank: each organisation's site is its own
   host, and no warning is logged.
 

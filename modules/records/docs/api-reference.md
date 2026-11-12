@@ -2087,7 +2087,7 @@ All are settings; see [operations.md § Settings](operations.md#settings).
 | `default_page_size` | 25 | `page_size` when the caller sends none |
 | `max_page_size` | 200 | `page_size` — clamped, not refused |
 | `max_count` | 10,000 | How far `total` is counted exactly |
-| `max_filter_terms` | 20 | `?filter=` terms per request — `400` over it |
+| `max_filter_terms` | 20 | `?filter=` terms per request — `400` over it (the public API's fixed cap is 3, see above) |
 | `max_sort_terms` | 5 | Distinct `?sort=` fields — `400` over it |
 | `max_in_values` | 200 | Values in one `in:` list — `400` over it |
 | `max_expand_depth` | 3 (at most 5) | Levels one `?expand=` path reaches — `400` over it |

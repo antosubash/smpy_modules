@@ -172,7 +172,10 @@ naming the parameter, on the admin listing, the export and the anonymous API
 alike: every term is another `EXISTS` or another `LEFT JOIN`, and unbounded
 they were a `500` rather than a slow page. `?page=` is bounded at 1,000,000 —
 an `OFFSET` past `max_count` has nothing left to find, and `?after=` is what
-walks a type that large.
+walks a type that large. The anonymous listing and stats take fewer still: 3
+`filter` terms, one of them at most `contains`, under a 5 s Postgres statement
+timeout (`400` `too_many_filters` / `too_many_contains`, `503` `query_timeout`;
+#349).
 
 **The count is bounded.** A page can stop after `page_size` matches; the
 `COUNT` behind `total` never can, so a filter matching most of a large type
