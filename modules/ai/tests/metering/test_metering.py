@@ -86,6 +86,21 @@ def test_a_billing_without_metering_counts_as_absent(monkeypatch):
     assert metering.billing_metering_installed() is False
 
 
+def test_a_billing_whose_contracts_lack_requires_quota_counts_as_absent(monkeypatch):
+    # Billing before 0.0.16 exported no RequiresQuota from its contracts (#336).
+    import types
+
+    monkeypatch.setitem(sys.modules, "sm_billing.contracts", types.ModuleType("old"))
+    monkeypatch.setattr(metering, "find_spec", lambda name: object())
+    assert metering.billing_metering_installed() is False
+
+
+def test_billing_metering_is_found_through_its_contracts():
+    pytest.importorskip("sm_billing.contracts")
+    assert constants.BILLING_CONTRACTS == "sm_billing.contracts"
+    assert metering.billing_metering_installed() is True
+
+
 async def test_installed_but_not_running_billing_limits_nothing():
     # The workspace installs billing; an app that does not run it has no
     # app.state.billing_usage, and RequiresQuota then yields None.

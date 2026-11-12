@@ -97,7 +97,7 @@ async def set_subscriber_tags(
             uuid=uuid,
             add=add,
             remove=remove,
-            settings=app.state.sm_records.settings,
+            app=app,
             bus=app.state.sm.event_bus,
         )
     except (SubscriberNotFound, SubscriberFilterError):
@@ -128,7 +128,7 @@ async def unsubscribe_subscriber(
             type_key=list_type_key,
             uuid=uuid,
             unless_confirmed_after=None,
-            settings=app.state.sm_records.settings,
+            app=app,
             bus=app.state.sm.event_bus,
         )
     except SubscriberFilterError:

@@ -10,7 +10,7 @@ checked by :func:`pagebuilder.contracts.search._checked_limit`.
 
 Pages are published and not trashed only. Media are raster images only: SVG is
 not rendered by most mail clients. Where pagebuilder is not mounted
-(``app.state.pagebuilder`` absent) every function answers nothing.
+(:func:`mounted` is false) every function answers nothing.
 """
 
 from __future__ import annotations
@@ -37,7 +37,14 @@ from pagebuilder.core.settings import PagebuilderSettings
 from pagebuilder.media.media_files import media_url
 from pagebuilder.models import NOT_TRASHED, MediaAsset, Page, PageStatus
 
-__all__ = ["MediaCard", "PageCard", "get_page_card", "search_media_cards", "search_page_cards"]
+__all__ = [
+    "MediaCard",
+    "PageCard",
+    "get_page_card",
+    "mounted",
+    "search_media_cards",
+    "search_page_cards",
+]
 
 # Any case, with or without parameters (``image/svg+xml; charset=utf-8``).
 _SVG_PREFIX = "image/svg%"
@@ -65,8 +72,18 @@ class MediaCard(BaseModel, frozen=True):
     """Site-relative URL the file is served at."""
 
 
+def _services(app: Any) -> Any | None:
+    return getattr(getattr(app, "state", None), "pagebuilder", None)
+
+
+def mounted(app: Any) -> bool:
+    """Whether pagebuilder is mounted on ``app`` (installed is not enough), so a
+    caller never reads ``app.state.pagebuilder`` itself (#336)."""
+    return _services(app) is not None
+
+
 def _settings(app: Any) -> PagebuilderSettings | None:
-    services = getattr(getattr(app, "state", None), "pagebuilder", None)
+    services = _services(app)
     settings = getattr(services, "settings", None)
     return settings if isinstance(settings, PagebuilderSettings) else None
 

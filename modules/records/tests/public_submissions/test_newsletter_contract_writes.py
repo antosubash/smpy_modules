@@ -31,6 +31,7 @@ from sqlalchemy import select
 from sqlalchemy import update as sa_update
 
 from tests.support.app_harness import ADMIN, roles
+from tests.support.contract_app import contract_app
 from tests.support.newsletter_contract import (
     TENANT,
     join,
@@ -57,7 +58,7 @@ async def _hit(client, uuid: str, tenant: str = TENANT):
 async def _set_tags(client, uuid: str, **kw):
     async with session(client) as db:
         hit = await set_tags(
-            db, tenant_id=TENANT, type_key=LIST, uuid=uuid, settings=SETTINGS, **kw
+            db, tenant_id=TENANT, type_key=LIST, uuid=uuid, app=contract_app(SETTINGS), **kw
         )
         await events.commit(db)
     return hit
@@ -140,7 +141,12 @@ async def test_writes_naming_another_bound_tenant_are_refused(audience):
     async with session(audience) as db:
         with pytest.raises(TenantIsolationError):
             await set_tags(
-                db, tenant_id="other", type_key=LIST, uuid=uuid, add=["b"], settings=SETTINGS
+                db,
+                tenant_id="other",
+                type_key=LIST,
+                uuid=uuid,
+                add=["b"],
+                app=contract_app(SETTINGS),
             )
         with pytest.raises(TenantIsolationError):
             await can_read_list(db, tenant_id="other", type_key=LIST, roles=None)
@@ -166,7 +172,12 @@ async def test_set_tags_unknown_choice_refused(audience):
     async with session(audience) as db:
         with pytest.raises(ValidationFailed):
             await set_tags(
-                db, tenant_id=TENANT, type_key=LIST, uuid=uuid, add=["zzz"], settings=SETTINGS
+                db,
+                tenant_id=TENANT,
+                type_key=LIST,
+                uuid=uuid,
+                add=["zzz"],
+                app=contract_app(SETTINGS),
             )
         await events.commit(db)  # whatever the refusal left in the session
     assert (await _hit(audience, uuid)).tags == ["a"]
@@ -221,12 +232,17 @@ async def test_writes_on_a_form_type_raise_not_a_list(audience):
                 type_key="contact",
                 uuid="x",
                 unless_confirmed_after=None,
-                settings=SETTINGS,
+                app=contract_app(SETTINGS),
             )
         assert err.value.reason == "not_a_list"
         with pytest.raises(SubscriberFilterError) as err:
             await set_tags(
-                db, tenant_id=TENANT, type_key="contact", uuid="x", add=["a"], settings=SETTINGS
+                db,
+                tenant_id=TENANT,
+                type_key="contact",
+                uuid="x",
+                add=["a"],
+                app=contract_app(SETTINGS),
             )
         assert err.value.reason == "not_a_list"
 

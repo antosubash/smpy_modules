@@ -149,7 +149,7 @@ after `tenants.seats`.
 ### Guarding a route: `RequiresQuota`
 
 ```python
-from sm_billing.metering.deps import RequiresQuota
+from sm_billing.contracts import RequiresQuota
 
 @router.post("/chat", dependencies=[RequiresQuota("ai.requests")])
 async def chat(...): ...

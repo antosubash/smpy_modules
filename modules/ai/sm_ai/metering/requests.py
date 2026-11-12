@@ -3,10 +3,10 @@
 Billing is optional for this module. Without it nothing is metered and
 nothing is limited; with it, ``ai.requests`` is a per-period counter an
 administrator limits per plan, and a request past the limit answers billing's
-402 ``quota_exceeded``. The module never depends on billing in its
-``pyproject``: the meter is registered through ``app.state.billing_meters``
-(no import), and the dependency imports billing's ``RequiresQuota`` only when
-the package is installed.
+402 ``quota_exceeded``. Billing is only the optional ``billing`` extra: the
+meter is registered through ``app.state.billing_meters`` (no import), and the
+dependency imports ``sm_billing.contracts.RequiresQuota`` only when the
+package is installed.
 
 The base module serves no chat of its own (consumers own agents, prompts and
 routes), so the consumer puts the dependency on the route that calls the
@@ -78,15 +78,17 @@ def register_meter(app: FastAPI) -> bool:
 
 def billing_metering_installed() -> bool:
     """Whether a billing that meters is installed (it is optional, and a
-    billing older than usage metering has no ``RequiresQuota``).
+    billing older than 0.0.16 exports no ``RequiresQuota`` from its contracts).
 
-    ``find_spec`` of a dotted name imports its parents (``sm_billing``,
-    ``sm_billing.metering``) when they exist — only an *installed* billing is
-    ever imported. Only a missing module means "absent": any other import
-    error in an installed billing propagates, rather than quietly turning
-    metering off.
+    ``find_spec`` of a dotted name imports its parents (``sm_billing``) when
+    they exist — only an *installed* billing is ever imported. Only a missing
+    module means "absent": any other import error in an installed billing
+    propagates, rather than quietly turning metering off.
     """
-    return _installed(constants.BILLING_QUOTA_MODULE)  # no sm_billing, or one without metering
+    if not _installed(constants.BILLING_CONTRACTS):
+        return False  # no sm_billing
+    contracts = importlib.import_module(constants.BILLING_CONTRACTS)
+    return hasattr(contracts, constants.BILLING_QUOTA_NAME)  # False: one older than 0.0.16
 
 
 async def _unmetered() -> None:
@@ -106,7 +108,7 @@ def RequiresAiRequest(qty: int = 1) -> Any:  # noqa: N802 - reads like RequiresQ
     _check_qty(qty)
     if not billing_metering_installed():
         return Depends(_unmetered)
-    from sm_billing.metering.deps import RequiresQuota
+    from sm_billing.contracts import RequiresQuota
 
     return RequiresQuota(constants.METER_REQUESTS, qty)
 

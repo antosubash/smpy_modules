@@ -105,3 +105,14 @@ async def test_search_orders_undated_last(db):
     )
     hits = await search_articles(db, tenant_id="default", pattern="%Spring%", limit=1)
     assert [h.id for h in hits] == [dated.id]
+
+
+def test_mounted_is_whether_news_runs_on_the_app():
+    """What newsletter asks instead of reading ``app.state.news`` (#336)."""
+    from types import SimpleNamespace
+
+    from news.contracts.articles import mounted
+
+    assert mounted(SimpleNamespace(state=SimpleNamespace(news=object()))) is True
+    assert mounted(SimpleNamespace(state=SimpleNamespace())) is False
+    assert mounted(object()) is False

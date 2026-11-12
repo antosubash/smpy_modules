@@ -30,6 +30,7 @@ from sm_records.records.services import types as type_service
 from sqlalchemy import select
 
 from tests.support.app_harness import field
+from tests.support.contract_app import contract_app
 from tests.support.newsletter_contract import TENANT, session, unbound
 from tests.support.newsletter_import import (
     ADA,
@@ -250,7 +251,12 @@ async def test_import_runs_under_its_own_tenant_only(site):
     with unbound(), tenant_scope("other"), pytest.raises(TenantIsolationError):
         async with session(site) as db:
             await import_subscribers(
-                db, tenant_id=TENANT, type_key=KEY, rows=[row(ADA)], settings=SETTINGS, now=NOW
+                db,
+                tenant_id=TENANT,
+                type_key=KEY,
+                rows=[row(ADA)],
+                app=contract_app(SETTINGS),
+                now=NOW,
             )
 
 

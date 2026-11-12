@@ -14,9 +14,9 @@ import hashlib
 
 import pytest
 from sm_records.core import events
-from sm_records.core.settings import RecordsSettings
 
 from tests.pg_support import USING_POSTGRES
+from tests.support.contract_app import contract_app
 from tests.support.newsletter_contract import TENANT, session, unbound, uuid_of
 from tests.support.newsletter_http import LIST
 from tests.support.newsletter_import import KEY, make_list
@@ -46,7 +46,7 @@ async def _unsubscribe(db, uuid: str) -> bool:
         type_key=LIST,
         uuid=uuid,
         unless_confirmed_after=None,
-        settings=RecordsSettings(),
+        app=contract_app(),
     )
 
 

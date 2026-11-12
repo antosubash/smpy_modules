@@ -139,6 +139,21 @@ def test_the_csp_warning_names_the_missing_host():
     assert captcha.csp_warning(app("script-src 'self'"), RecordsSettings()) is None
 
 
+def test_the_csp_is_asked_through_pagebuilders_contract(monkeypatch):
+    """Through ``pagebuilder.contracts.site.public_csp``, never ``app.state`` (#336);
+    without pagebuilder installed there is nothing to check."""
+    site = pytest.importorskip("pagebuilder.contracts.site")
+    on = RecordsSettings(**ON)
+    asked: list[object] = []
+    monkeypatch.setattr(site, "public_csp", lambda app: asked.append(app) or "script-src 'self'")
+    marker = SimpleNamespace(state=SimpleNamespace())
+    warning = captcha.csp_warning(marker, on)
+    assert warning is not None and "challenges.cloudflare.com" in warning
+    assert asked == [marker]
+    monkeypatch.setattr(captcha, "_PAGEBUILDER_SITE", "pagebuilder.contracts.not_there")
+    assert captcha.csp_warning(marker, on) is None
+
+
 def test_the_secret_is_masked_on_the_settings_screen():
     from simple_module_core.secret_fields import conceals_secret
 

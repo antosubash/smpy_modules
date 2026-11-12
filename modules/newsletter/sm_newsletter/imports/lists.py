@@ -26,7 +26,7 @@ async def create_list(
             tenant_id=tenant_id,
             key=key,
             label=label,
-            settings=app.state.sm_records.settings,
+            app=app,
             actor=current_user_id.get(),
         )
     except records.ListExists:

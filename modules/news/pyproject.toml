@@ -64,8 +64,12 @@ dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.36,<0.1"]
 # 0.0.13 is also the first with ``pagebuilder.contracts.public`` (#248), the
 # site's branded 404 news' reader pages render; on an older neighbour they
 # fall back to the host's error page.
-# floor: 0.0.13 — contracts.bundle (#80) and contracts.public (#248).
-pagebuilder = ["simple_module_pagebuilder>=0.0.13,<0.1"]
+#
+# Raised again to 0.0.16 (#336): the content locales are read through
+# ``pagebuilder.contracts.site``, first released in 0.0.16, instead of
+# ``pagebuilder.core.locales`` and ``app.state.pagebuilder``.
+# floor: 0.0.16 — contracts.site (#336); contracts.bundle (#80) and contracts.public (#248) since 0.0.13.
+pagebuilder = ["simple_module_pagebuilder>=0.0.16,<0.1"]
 
 [build-system]
 requires = ["hatchling"]

@@ -24,6 +24,7 @@ from sm_records.records.services import types as type_service
 from sm_records.records.services._common import utcnow
 
 from tests.support.app_harness import field
+from tests.support.contract_app import contract_app
 from tests.support.newsletter_http import LIST, follow, links_in, list_config, list_fields, signup
 from tests.support.public_submissions_support import create
 
@@ -145,7 +146,7 @@ async def unsubscribe_committed(
             type_key=LIST,
             uuid=uuid,
             unless_confirmed_after=cutoff,
-            settings=RecordsSettings(),
+            app=contract_app(),
             bus=client.app.state.sm.event_bus,
         )
         await events.commit(db)

@@ -21,11 +21,13 @@ opens is ``503 captcha_unavailable`` too.
 
 The widget's script comes from the provider's host, so the public pages'
 ``Content-Security-Policy`` (pagebuilder's ``public_csp``) has to allow it;
-:func:`csp_warning` says so once at startup when it does not.
+:func:`csp_warning` says so once at startup when it does not, asking
+``pagebuilder.contracts.site`` (#336).
 """
 
 from __future__ import annotations
 
+import importlib
 import json
 import logging
 from collections.abc import Callable
@@ -48,6 +50,7 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 TIMEOUT_SECONDS: Final = 5.0
+_PAGEBUILDER_SITE: Final = "pagebuilder.contracts.site"
 
 PROVIDERS: Final[dict[str, dict[str, str]]] = {
     "turnstile": {
@@ -153,17 +156,25 @@ async def verify(settings: RecordsSettings, response: str | None, remote_ip: str
         raise SubmissionRefused("captcha_failed", "complete the CAPTCHA and send the form again")
 
 
+def _pagebuilder_csp(app: Any) -> str | None:
+    """Pagebuilder's public CSP through its contract (the optional ``pagebuilder``
+    extra); ``None`` without pagebuilder, mounted or installed, or without a policy."""
+    try:
+        site = importlib.import_module(_PAGEBUILDER_SITE)
+    except ImportError:
+        return None
+    return site.public_csp(app)
+
+
 def csp_warning(app: Any, settings: RecordsSettings) -> str | None:
     """A warning when a CAPTCHA is on and pagebuilder's public CSP does not
     name the provider's host — the widget would be blocked on every page.
-    Read through ``app.state.pagebuilder`` with ``getattr``: records never
-    imports pagebuilder, and without it there is no CSP of its to check."""
+    Without pagebuilder there is no CSP of its to check."""
     provider = _provider(settings)
     if provider is None:
         return None
-    services = getattr(getattr(app, "state", None), "pagebuilder", None)
-    csp = getattr(getattr(services, "settings", None), "public_csp", None)
-    if not isinstance(csp, str) or not csp.strip():
+    csp = _pagebuilder_csp(app)
+    if csp is None:
         return None
     host = PROVIDERS[provider]["host"]
     if host in csp:

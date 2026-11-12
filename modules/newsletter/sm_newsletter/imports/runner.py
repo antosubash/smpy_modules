@@ -62,10 +62,10 @@ class _Slice:
     """One call's owner, tenant, job and clock."""
 
     def __init__(
-        self, factory: SessionFactory, tenant_id: str, import_id: int, settings: Any, clock: Any
+        self, factory: SessionFactory, tenant_id: str, import_id: int, app: Any | None, clock: Any
     ) -> None:
         self.factory, self.tenant_id, self.import_id = factory, tenant_id, import_id
-        self.settings, self.clock = settings, clock
+        self.app, self.clock = app, clock
         self.owner = str(uuid.uuid4())
 
     async def fence(self, session: AsyncSession, values: dict[str, Any]) -> None:
@@ -106,7 +106,7 @@ class _Slice:
                     tenant_id=self.tenant_id,
                     job=job,
                     owner=self.owner,
-                    records_settings=self.settings,
+                    app=self.app,
                 )
             await finalize_session(session)
 
@@ -141,7 +141,7 @@ class _Slice:
                 job=job,
                 rows=rows,
                 targets=targets,
-                records_settings=self.settings,
+                app=self.app,
                 now=now,
             )
             await self.fence(session, _counters(job, result, now))
@@ -219,7 +219,7 @@ async def run_import_async(
     *,
     tenant_id: str,
     import_id: int,
-    records_settings: Any,
+    app: Any | None,
     clock: Callable[[], datetime] | None = None,
     slice_seconds: float | None = None,
 ) -> SliceResult:
@@ -229,7 +229,7 @@ async def run_import_async(
     if slice_seconds is None:
         slice_seconds = SLICE_SECONDS
     with tenant_scope(tenant_id):
-        step = _Slice(factory, tenant_id, import_id, records_settings, clock)
+        step = _Slice(factory, tenant_id, import_id, app, clock)
         failure: str | None = None
         try:
             return await _work(step, slice_seconds)

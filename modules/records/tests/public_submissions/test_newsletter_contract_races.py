@@ -24,6 +24,7 @@ from sm_records.records.services.errors import Conflict
 from sqlalchemy import update
 
 from tests.pg_support import USING_POSTGRES
+from tests.support.contract_app import contract_app
 from tests.support.newsletter_contract import (
     TENANT,
     session,
@@ -44,7 +45,7 @@ async def _call(client, db, uuid: str) -> bool:
         type_key=LIST,
         uuid=uuid,
         unless_confirmed_after=None,
-        settings=SETTINGS,
+        app=contract_app(SETTINGS),
         bus=client.app.state.sm.event_bus,
     )
 
@@ -120,7 +121,7 @@ async def test_set_tags_retries_once_when_the_row_moved(audience, monkeypatch):
     monkeypatch.setattr(campaign_writes.record_service, "update_record", bumped)
     async with session(audience) as db:
         hit = await set_tags(
-            db, tenant_id=TENANT, type_key=LIST, uuid=uuid, add=["b"], settings=SETTINGS
+            db, tenant_id=TENANT, type_key=LIST, uuid=uuid, add=["b"], app=contract_app(SETTINGS)
         )
         await events.commit(db)
     assert hit.tags == ["a", "b"] and calls == [calls[0], calls[0] + 1]
@@ -132,5 +133,10 @@ async def test_set_tags_retries_once_when_the_row_moved(audience, monkeypatch):
     async with session(audience) as db:
         with pytest.raises(Conflict):
             await set_tags(
-                db, tenant_id=TENANT, type_key=LIST, uuid=uuid, remove=["a"], settings=SETTINGS
+                db,
+                tenant_id=TENANT,
+                type_key=LIST,
+                uuid=uuid,
+                remove=["a"],
+                app=contract_app(SETTINGS),
             )
