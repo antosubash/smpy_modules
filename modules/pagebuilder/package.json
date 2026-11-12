@@ -2,6 +2,10 @@
   "name": "@simple-module-py/pagebuilder",
   "version": "0.0.15",
   "private": true,
+  "exports": {
+    ".": "./pagebuilder/index.ts",
+    "./widgets-base.css": "./pagebuilder/static/widgets-base.css"
+  },
   "description": "Frontend assets for the PageBuilder module",
   "peerDependencies": {
     "@inertiajs/react": "^3.9.1",

@@ -26,7 +26,7 @@
  * not demand it of a host that never installs it.
  */
 
-import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/ui/components/blockRegistry';
+import { registerPuckBlocks } from '@simple-module-py/pagebuilder';
 
 import { NewsFeedBlock } from './ui/components/NewsFeed';
 import { NewsStatsBlock } from './ui/components/NewsStats';

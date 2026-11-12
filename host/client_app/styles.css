@@ -10,7 +10,7 @@
  * Imported by package specifier: the npm workspace symlinks modules/* into
  * node_modules. gen-pages only emits @source entries, not @import, so a
  * wheel-installed host writes these lines by hand too. */
-@import "@simple-module-py/pagebuilder/pagebuilder/static/widgets-base.css";
+@import "@simple-module-py/pagebuilder/widgets-base.css";
 
 /* App-level source scanning — host code + workspace modules.
  * Wheel-installed modules are covered by modules.generated.css.

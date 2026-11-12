@@ -199,9 +199,7 @@ describe('ImageStatsRender', () => {
 
 describe('registration', () => {
   it('registers ImageStats in the images group, page-only', async () => {
-    const { registeredBlocks } = await import(
-      '@simple-module-py/pagebuilder/pagebuilder/ui/components/blockRegistry'
-    );
+    const { registeredBlocks } = await import('@simple-module-py/pagebuilder');
     await import('../../../pagebuilder-blocks');
     const mine = registeredBlocks().find((r) => 'ImageStats' in r.blocks);
     expect(mine?.category?.key).toBe('images');

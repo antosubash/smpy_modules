@@ -20,7 +20,8 @@ const types = [
 ];
 
 vi.mock('../../../utils/api', () => ({ listTypes: async () => ({ items: types }) }));
-vi.mock('@simple-module-py/pagebuilder/pagebuilder/ui/components/widgets/_shared', () => ({
+vi.mock('@simple-module-py/pagebuilder', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   Section: () => null,
 }));
 

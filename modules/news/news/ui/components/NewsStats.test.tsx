@@ -169,9 +169,7 @@ describe('NewsStatsRender', () => {
 
 describe('registration', () => {
   it('offers NewsStats in feeds, page-only', async () => {
-    const { registeredBlocks } = await import(
-      '@simple-module-py/pagebuilder/pagebuilder/ui/components/blockRegistry'
-    );
+    const { registeredBlocks } = await import('@simple-module-py/pagebuilder');
     await import('../../pagebuilder-blocks');
     const mine = registeredBlocks().find((r) => 'NewsStats' in r.blocks);
     expect(mine?.category?.key).toBe('feeds');

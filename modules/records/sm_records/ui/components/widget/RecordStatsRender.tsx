@@ -6,10 +6,7 @@
  * and a `+`, and a capped sum (no value) as the dash.
  */
 
-import {
-  StatsView,
-  type StatsWidgetProps,
-} from '@simple-module-py/pagebuilder/pagebuilder/ui/components/widgets/stats-widget';
+import { StatsView, type StatsWidgetProps } from '@simple-module-py/pagebuilder';
 import { useEffect, useMemo, useState } from 'react';
 
 import { formatNumber } from '../../utils/locale';
