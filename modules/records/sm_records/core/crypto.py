@@ -140,10 +140,6 @@ def _keys(secrets: tuple[str, ...], version: str) -> MultiFernet:
     return MultiFernet([Fernet(derive(secret)) for secret in secrets])
 
 
-def _all_secrets() -> tuple[str, ...]:
-    return tuple(dict.fromkeys(s for s in (_current_secret(), *previous_secrets())))
-
-
 def _unreadable(field: str) -> Exception:
     return CaptchaSecretUnreadableError(field)
 
@@ -159,8 +155,18 @@ def encrypt_value(plain: str) -> str:
 
 
 def _open(token: str, version: str, field: str) -> str:
+    current = _current_secret()
     try:
-        return _keys(_all_secrets(), version).decrypt(token.encode()).decode()
+        return _keys((current,), version).decrypt(token.encode()).decode()
+    except InvalidToken:
+        pass
+    # Only a value the current key cannot open reads SM_SECRET_KEY_PREVIOUS, so
+    # a malformed variable (its RuntimeError) never breaks what is current.
+    previous = tuple(s for s in dict.fromkeys(previous_secrets()) if s != current)
+    if not previous:
+        raise _unreadable(field)
+    try:
+        return _keys(previous, version).decrypt(token.encode()).decode()
     except InvalidToken as exc:
         raise _unreadable(field) from exc
 

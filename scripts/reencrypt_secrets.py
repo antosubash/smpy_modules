@@ -90,6 +90,7 @@ async def run(*, dry_run: bool, seal_plaintext: bool) -> int:
         async with app.state.sm.db.session_factory() as session:
             targets, others = await _rows(session)
             try:
+                rs.check_previous()
                 plans = [rs.plan_row(row, seal_plaintext=seal_plaintext) for row in targets]
             except RuntimeError as exc:
                 print(f"cannot run: {exc}", file=sys.stderr)

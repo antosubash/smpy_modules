@@ -59,7 +59,9 @@ name the module they affect.
   newsletter, records). Each module now encrypts under its own key (HKDF-SHA256
   of the secret, info `<package>:settings`) and writes `enc:v2:…`; every module
   also decrypts with the keys in the new `SM_SECRET_KEY_PREVIOUS` (one key or a
-  JSON list, from the environment or `.env`), and the new
+  JSON list, from the environment or `.env`; read only for a value the current
+  key does not open, so a malformed value — an error naming the variable, never
+  its value — never breaks what the current key opens), and the new
   `scripts/reencrypt_secrets.py` re-encrypts every stored secret under the
   current key, all or nothing, never printing a value. A stored value with an
   unknown `enc:` version is refused instead of being used as plaintext. The

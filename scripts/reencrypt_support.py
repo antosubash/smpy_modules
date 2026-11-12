@@ -95,6 +95,20 @@ def install_secret(secret: str) -> None:
             crypto.set_secret_provider(lambda: secret)
 
 
+def check_previous() -> None:
+    """Parse ``SM_SECRET_KEY_PREVIOUS`` as every installed copy will.
+
+    The copies read it only for a value the current key cannot open, so a run
+    whose rows are all current would never notice a malformed variable; the
+    script checks it first, before anything is decided or written. Raises the
+    copy's ``RuntimeError``, which names the variable and never its value.
+    """
+    for package in TARGETS:
+        crypto = crypto_for(package)
+        if crypto is not None:
+            crypto.previous_secrets()
+
+
 def _decode(row: Row) -> str | None:
     """The stored string (``""`` for a json ``null``), or ``None`` for a json row
     that holds something else."""

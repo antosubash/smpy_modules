@@ -87,3 +87,29 @@ def test_a_whitespace_padded_old_key_still_opens(module, monkeypatch, as_json):
     monkeypatch.setattr(module, "_secret_provider", lambda: SECRET)
     monkeypatch.setenv("SM_SECRET_KEY_PREVIOUS", json.dumps([old]) if as_json else old)
     assert module.decrypt_value(stored, "field") == "pw"
+
+
+MALFORMED = '["leaky-old-key"'
+
+
+@pytest.mark.parametrize("module", MODULES, ids=IDS)
+def test_a_malformed_previous_never_breaks_what_the_current_key_opens(module, monkeypatch):
+    v2 = module.encrypt_value("pw")
+    legacy = Fernet(urlsafe_b64encode(sha256(SECRET.encode()).digest()))
+    v1 = "enc:v1:" + legacy.encrypt(b"pw1").decode()
+    monkeypatch.setenv("SM_SECRET_KEY_PREVIOUS", MALFORMED)
+    assert module.decrypt_value(v2, "field") == "pw"
+    assert module.decrypt_value(v1, "field") == "pw1"
+    assert module.reencrypt_value(v2, "field") is None
+
+
+@pytest.mark.parametrize("module", MODULES, ids=IDS)
+def test_a_malformed_previous_fails_a_value_that_needs_it(module, monkeypatch):
+    monkeypatch.setattr(module, "_secret_provider", lambda: "an-old-key")
+    old = module.encrypt_value("pw")
+    monkeypatch.setattr(module, "_secret_provider", lambda: SECRET)
+    monkeypatch.setenv("SM_SECRET_KEY_PREVIOUS", MALFORMED)
+    with pytest.raises(RuntimeError) as exc:
+        module.decrypt_value(old, "field")
+    assert "SM_SECRET_KEY_PREVIOUS" in str(exc.value)
+    assert "leaky-old-key" not in str(exc.value)

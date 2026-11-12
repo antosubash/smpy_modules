@@ -87,7 +87,6 @@ CRYPTO_FAMILIES: tuple[Family, ...] = (
             "_v1_key",
             "_v2_key",
             "_keys",
-            "_all_secrets",
             "is_encrypted",
             "encrypt_value",
             "_open",

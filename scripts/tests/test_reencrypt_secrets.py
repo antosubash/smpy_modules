@@ -161,6 +161,17 @@ def test_no_seal_plaintext_keeps_plaintext(db, tmp_path):
     assert _stored(db)[SMTP_KEY][0] == PLAIN[SMTP_KEY]
 
 
+def test_a_malformed_previous_refuses_before_writing(db, tmp_path):
+    """Even when every row opens with the current key, so none would need it."""
+    _put(db, SMTP_KEY, PLAIN[SMTP_KEY])
+    before = _stored(db)
+    result = _reencrypt(db, tmp_path, previous='["leaky-old-key"')
+    assert result.returncode == 1
+    assert "SM_SECRET_KEY_PREVIOUS" in result.stderr
+    assert "leaky-old-key" not in result.stdout + result.stderr
+    assert _stored(db) == before
+
+
 def test_refuses_without_a_provisioned_key(db, tmp_path):
     _seed(db)
     before = _stored(db)
