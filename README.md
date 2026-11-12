@@ -137,7 +137,7 @@ docker compose down            # -v also drops the data volumes
 ```bash
 make test-py     # module suites + host smoke tests + release-script tests
 make e2e         # Playwright against a real browser
-make lint        # ruff, biome, and the repo checks
+make lint        # ruff, pyright (contracts and their callers), biome, repo checks
 ```
 
 The Python suites run on pytest-xdist, one suite after another, each with

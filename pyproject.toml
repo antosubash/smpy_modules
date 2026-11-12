@@ -24,6 +24,7 @@ dev = [
     # The newsletter tests run a local SMTP server; the Postgres job syncs
     # no extras, so a module's `dev` extra alone does not reach it.
     "aiosmtpd>=1.4.6",
+    "basedpyright>=1.40.2",
 ]
 
 [tool.ruff]
@@ -34,10 +35,91 @@ target-version = "py312"
 extend-exclude = ["host/migrations/versions"]
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "I", "N", "UP", "B", "SIM", "C4", "RET", "PTH", "PIE", "RUF"]
+select = ["E", "W", "F", "I", "N", "UP", "B", "SIM", "C4", "RET", "PTH", "PIE", "RUF", "S"]
 ignore = [
     "B008",   # Depends() in default args is idiomatic FastAPI
     "B027",   # Empty methods in ABC without @abstractmethod — optional hooks
+    "S101",   # assert: used only to narrow a type after a check, never to validate input
+]
+
+# flake8-bandit (S, #338) covers production code; a deliberate case there
+# takes a line-level `# noqa: Sxxx - <reason>`. Tests are exempt from the
+# rules that only flag fixtures: fake credentials, /tmp paths in
+# assertions, subprocess calls with fixed argv, SQL built from test-owned
+# table names, pickling a value the test made, and seeded randomness.
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S104", "S105", "S106", "S107", "S108", "S301", "S311", "S324", "S603", "S607", "S608"]
+"**/conftest.py" = ["S105", "S106"]
+# Repo tooling: it runs git/npx/uv with argv the script builds itself.
+"scripts/**" = ["S603", "S607"]
+
+# Type checking (#338): basedpyright in pyright's basic mode, run by `make lint`
+# and CI's lint job. This include list is the whole scope, and it widens
+# module by module: today every `contracts/` package plus the code in *other*
+# modules that calls one, so a contract signature change fails at its callers.
+# Add a module's remaining packages here once they check clean.
+[tool.pyright]
+typeCheckingMode = "basic"
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+include = [
+    # The contracts packages.
+    "modules/ai/sm_ai/contracts",
+    "modules/billing/sm_billing/contracts",
+    "modules/images/sm_images/contracts",
+    "modules/news/news/contracts",
+    "modules/pagebuilder/pagebuilder/contracts",
+    "modules/records/sm_records/contracts",
+    # Their callers in other modules.
+    "modules/ai/sm_ai/core/constants.py",
+    "modules/images/sm_images/core/billing/install.py",
+    "modules/images/sm_images/core/billing/subject.py",
+    "modules/images/sm_images/core/constants.py",
+    "modules/images/sm_images/pipeline/ai/__init__.py",
+    "modules/images/sm_images/pipeline/ai/group_run.py",
+    "modules/images/sm_images/pipeline/ai/runner.py",
+    "modules/images/sm_images/pipeline/steps/classify.py",
+    "modules/news/news/integrations/bundle",
+    "modules/news/news/integrations/pagebuilder.py",
+    "modules/newsletter/sm_newsletter/campaigns/access.py",
+    "modules/newsletter/sm_newsletter/campaigns/audience.py",
+    "modules/newsletter/sm_newsletter/content/integrations",
+    "modules/newsletter/sm_newsletter/core/suppression/mirror.py",
+    "modules/newsletter/sm_newsletter/core/suppression/reconcile.py",
+    "modules/newsletter/sm_newsletter/imports/apply.py",
+    "modules/newsletter/sm_newsletter/imports/launch.py",
+    "modules/newsletter/sm_newsletter/imports/lists.py",
+    "modules/newsletter/sm_newsletter/imports/mapping.py",
+    "modules/newsletter/sm_newsletter/imports/runner.py",
+    "modules/newsletter/sm_newsletter/imports/service.py",
+    "modules/newsletter/sm_newsletter/imports/staging.py",
+    "modules/newsletter/sm_newsletter/imports/tags.py",
+    "modules/newsletter/sm_newsletter/imports/tags_step.py",
+    "modules/newsletter/sm_newsletter/segments/rules.py",
+    "modules/newsletter/sm_newsletter/segments/store.py",
+    "modules/newsletter/sm_newsletter/sending/deliver.py",
+    "modules/newsletter/sm_newsletter/sending/freeze.py",
+    "modules/newsletter/sm_newsletter/sending/freeze_pages.py",
+    "modules/newsletter/sm_newsletter/subscribers/actions.py",
+    "modules/newsletter/sm_newsletter/subscribers/browse.py",
+    "modules/newsletter/sm_newsletter/subscribers/lift.py",
+    "modules/newsletter/sm_newsletter/web/endpoints/audience_api.py",
+    "modules/newsletter/sm_newsletter/web/endpoints/campaigns_api.py",
+    "modules/newsletter/sm_newsletter/web/endpoints/cards_api.py",
+    "modules/newsletter/sm_newsletter/web/endpoints/imports_api.py",
+    "modules/newsletter/sm_newsletter/web/endpoints/preview_api.py",
+    "modules/newsletter/sm_newsletter/web/endpoints/report_api.py",
+    "modules/newsletter/sm_newsletter/web/endpoints/segments_api.py",
+    "modules/newsletter/sm_newsletter/web/endpoints/sending_api.py",
+    "modules/newsletter/sm_newsletter/web/endpoints/subscribers_api.py",
+    "modules/newsletter/sm_newsletter/web/endpoints/suppressions_api.py",
+    "modules/newsletter/sm_newsletter/web/endpoints/test_send_api.py",
+    "modules/newsletter/sm_newsletter/web/endpoints/views.py",
+    "modules/newsletter/sm_newsletter/web/schemas/imports.py",
+    "modules/newsletter/sm_newsletter/web/schemas/segments.py",
+    "modules/newsletter/sm_newsletter/web/schemas/subscribers.py",
+    "modules/newsletter/sm_newsletter/web/services/unsubscribe.py",
 ]
 
 [tool.pytest.ini_options]

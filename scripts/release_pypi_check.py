@@ -60,7 +60,7 @@ def fetch_released(distribution: str, version: str) -> list[dict]:
     url = f"{INDEX}/{distribution}/{version}/json"
     for attempt in range(1, ATTEMPTS + 1):
         try:
-            with urllib.request.urlopen(url, timeout=30) as response:
+            with urllib.request.urlopen(url, timeout=30) as response:  # noqa: S310 - url is INDEX (https)
                 return json.load(response).get("urls", [])
         except urllib.error.HTTPError as exc:
             if exc.code == 404:

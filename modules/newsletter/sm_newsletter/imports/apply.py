@@ -36,6 +36,7 @@ from sm_records.contracts.newsletter_import import (
 )
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from sm_newsletter.core.constants import REASON_IMPORTED_CLEANED, REASON_UNSUBSCRIBED
 from sm_newsletter.core.suppression import normalise_email, suppress_many, suppressed
@@ -258,9 +259,9 @@ async def _store(
         await session.execute(
             update(ImportEntry)
             .where(
-                ImportEntry.tenant_id == tenant_id,
-                ImportEntry.import_id == job.id,
-                ImportEntry.id.in_(ids),  # ty: ignore[unresolved-attribute]
+                col(ImportEntry.tenant_id) == tenant_id,
+                col(ImportEntry.import_id) == job.id,
+                col(ImportEntry.id).in_(ids),
             )
             .values(outcome=value)
             .execution_options(synchronize_session=False)

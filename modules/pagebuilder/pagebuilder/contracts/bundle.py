@@ -70,7 +70,7 @@ import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import Any, ClassVar, Literal, Protocol, runtime_checkable
 
 from simple_module_db import current_tenant_id
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -221,7 +221,7 @@ class BundleSection(Protocol):
     """Written into the manifest entry: a host without this section refuses a
     required one and skips an optional one."""
     label_key: str
-    count_label_keys: Mapping[str, str]
+    count_label_keys: ClassVar[Mapping[str, str]]
     capture_permissions: frozenset[str]
     """Needed to capture or download the section; empty (the default when
     absent) means anyone who may take a snapshot."""

@@ -23,7 +23,7 @@ from simple_module_hosting import Settings, merge_host_settings
 from simple_module_hosting._preapp_config import load_host_overrides
 from simple_module_hosting.bootstrap_settings import BootstrapSettings
 
-SECRET_KEY_FIELD = "secret_key"
+SECRET_KEY_FIELD = "secret_key"  # noqa: S105 - a settings field name, not a secret
 NO_KEY_MESSAGE = (
     "no secret key provisioned: set SM_SECRET_KEY or boot the app once, so this "
     "command does not create the deployment's session key as a side effect"

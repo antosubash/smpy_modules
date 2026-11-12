@@ -33,6 +33,7 @@ from pydantic import BaseModel, ConfigDict
 from simple_module_db import MissingTenantError
 from sqlalchemy import Text, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from pagebuilder.models import NOT_TRASHED, MediaAsset, Page, PageStatus
 
@@ -113,10 +114,10 @@ async def search_pages(
     limit = _checked_limit(limit)
     stmt = select(Page).where(
         NOT_TRASHED,
-        Page.tenant_id == tenant_id,
+        col(Page.tenant_id) == tenant_id,
         or_(
-            Page.title.ilike(pattern, escape="\\"),
-            Page.slug.ilike(pattern, escape="\\"),
+            col(Page.title).ilike(pattern, escape="\\"),
+            col(Page.slug).ilike(pattern, escape="\\"),
             # The body, as a LIKE against the JSON cast to text, evaluated in
             # the database. The cast target is explicit: an untyped
             # `func.cast` compiles to NullType and the statement fails.
@@ -124,10 +125,10 @@ async def search_pages(
         ),
     )
     if not include_drafts:
-        stmt = stmt.where(Page.status == PageStatus.PUBLISHED)
+        stmt = stmt.where(col(Page.status) == PageStatus.PUBLISHED)
     if locale is not None:
-        stmt = stmt.where(Page.locale == locale)
-    rows, total = await _newest_first(db, stmt, Page.id.desc(), limit)
+        stmt = stmt.where(col(Page.locale) == locale)
+    rows, total = await _newest_first(db, stmt, col(Page.id).desc(), limit)
     return [PageSearchHit.model_validate(row) for row in rows], total
 
 
@@ -139,11 +140,11 @@ async def search_media(
     ``limit`` must be 1..:data:`MAX_SEARCH_LIMIT`."""
     limit = _checked_limit(limit)
     stmt = select(MediaAsset).where(
-        MediaAsset.tenant_id == tenant_id,
+        col(MediaAsset.tenant_id) == tenant_id,
         or_(
-            MediaAsset.original_filename.ilike(pattern, escape="\\"),
-            MediaAsset.filename.ilike(pattern, escape="\\"),
+            col(MediaAsset.original_filename).ilike(pattern, escape="\\"),
+            col(MediaAsset.filename).ilike(pattern, escape="\\"),
         ),
     )
-    rows, total = await _newest_first(db, stmt, MediaAsset.id.desc(), limit)
+    rows, total = await _newest_first(db, stmt, col(MediaAsset.id).desc(), limit)
     return [MediaSearchHit.model_validate(row) for row in rows], total

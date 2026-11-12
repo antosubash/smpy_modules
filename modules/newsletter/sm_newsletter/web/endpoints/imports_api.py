@@ -64,7 +64,8 @@ async def _read_upload(request: Request) -> tuple[str, list[UploadFile]]:
         )
     except (MultiPartException, HTTPException) as exc:
         # Starlette words these itself and never quotes the upload; ours are fixed, too.
-        too_many = "Too many files" in str(getattr(exc, "message", None) or exc.detail)
+        reason = getattr(exc, "message", None) or getattr(exc, "detail", "")
+        too_many = "Too many files" in str(reason)
         raise (ImportTooManyFiles if too_many else ImportNotCsv) from None
     key = form.get("list")
     files = [f for f in form.getlist("files") if isinstance(f, UploadFile)]

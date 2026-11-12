@@ -75,7 +75,8 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-_SEND = Send.__table__  # ty: ignore[unresolved-attribute]
+# SQLModel types a table class without `__table__`, which SQLAlchemy sets on it.
+_SEND = Send.__table__  # ty: ignore[unresolved-attribute]  # pyright: ignore[reportAttributeAccessIssue]
 
 Clock = Callable[[], datetime]
 """The wall clock the fence reads: every claim and renewal asks it afresh, so a
@@ -149,9 +150,10 @@ async def freeze(
             claim = await claim_freeze(
                 session, tenant_id=tenant_id, campaign_id=campaign_id, now=clock(), due_by=now
             )
-            insecure = claim is not None and require_https
-            insecure = insecure and not bases_https(claim.content_base, claim.public_base)
-            if insecure:
+            insecure = False
+            if claim is not None and require_https:
+                insecure = not bases_https(claim.content_base, claim.public_base)
+            if claim is not None and insecure:
                 logger.warning("newsletter: campaign %s of %s needs https", campaign_id, tenant_id)
                 await pause_unavailable(
                     session, tenant_id, campaign_id, claim, now, constants.PAUSE_HTTPS_REQUIRED

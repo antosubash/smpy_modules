@@ -402,6 +402,16 @@ split out of a service declares what it needs from the composing class as a
 `Protocol` (`pagebuilder/content/service/_host.py`, `news/content/_host.py`) — add a
 member there before a mixin uses it; the `test_*_host.py` tests enforce it.
 
+**Pyright checks only its include list (#338).** `make lint` and CI run
+basedpyright (basic mode) over `[tool.pyright] include` in the root
+`pyproject.toml`: every `contracts/` package and the cross-module code that
+calls one. Widen it module by module. In those files a SQLModel column in a
+query goes through `sqlmodel.col()`, and a suppression is
+`# pyright: ignore[rule]` with its reason. Ruff's `S` (bandit) rules are on
+(except `S101`: an `assert` only narrows a type after a check); tests and
+`scripts/` have per-file ignores, production code takes a line-level
+`# noqa: Sxxx - <reason>`.
+
 **Every e2e spec file stands alone.** CI shards the suite by file
 (`--shard=i/3`, one host and database per shard, #119), so a spec cannot rely
 on data or settings another file created. Seed what you need in the file
@@ -445,10 +455,12 @@ Redis, and `make worker` / `worker-imports` / `worker-heavy` / `worker-gpu` /
 `beat` run `host/worker.py` (`build_runner_celery`) with one queue set each.
 `make dev` starts none of them. With no worker, set
 `SM_BG_TASKS_TASK_ALWAYS_EAGER=true` (`.env.example`; the e2e server exports it,
-plus `..._TASK_EAGER_PROPAGATES=true`) and tasks run inline. CI installs
+plus `..._TASK_EAGER_PROPAGATES=true`) and tasks run inline. The one CI job that runs
+them non-eager is `Background tasks (Redis + Celery worker)` (`scripts/bg_tasks_smoke.py`,
+#339); new background work goes through `background_tasks` (`docs/module-layout.md`). CI installs
 `tippecanoe` with apt in the Python-tests and Postgres jobs. **The images
 `[anonymize]` extra (onnxruntime) is never installed by default.** `make install`,
-the Python-tests, repo-checks, e2e (`.github/actions/e2e-setup`) and `release`
+the Python-tests, Python lint, repo-checks, e2e (`.github/actions/e2e-setup`) and `release`
 jobs and `framework-latest` sync with `--all-extras --no-extra anonymize` (the
 `quality`, `ai`, `billing` and `pagebuilder` extras are installed, `anonymize`
 is not); the Postgres and frontend jobs sync no extras. The anonymize step's

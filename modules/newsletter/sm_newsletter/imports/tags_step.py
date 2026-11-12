@@ -11,7 +11,7 @@ and one ``tags_unavailable`` error is recorded.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from sm_records.contracts.newsletter_import import TagsFieldMissing, add_tag_choices
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -55,4 +55,5 @@ async def tags_once(
     else:
         found = [{**t, "value": values[t["label"]]} for t in job.tags_found]
         update = {"tags_found": found, "tags_added": True}
-    await fenced(session, tenant_id=tenant_id, import_id=job.id, owner=owner, values=update)  # ty: ignore[invalid-argument-type]
+    job_id = cast(int, job.id)  # a stored job always has its id
+    await fenced(session, tenant_id=tenant_id, import_id=job_id, owner=owner, values=update)

@@ -139,6 +139,6 @@ def backoff(response: httpx.Response | None, attempt: int) -> float | None:
     if asked is not None:
         if asked > MAX_BACKOFF_SECONDS:
             return None
-        return min(asked * (1 + random.uniform(0, _JITTER)), MAX_BACKOFF_SECONDS)
+        return min(asked * (1 + random.uniform(0, _JITTER)), MAX_BACKOFF_SECONDS)  # noqa: S311 - retry jitter, not a secret
     delay = _BASE_SECONDS * 2 ** min(max(attempt, 0), _MAX_EXPONENT)
-    return min(delay * (1 + random.uniform(0, _JITTER)), MAX_BACKOFF_SECONDS)
+    return min(delay * (1 + random.uniform(0, _JITTER)), MAX_BACKOFF_SECONDS)  # noqa: S311 - retry jitter, not a secret

@@ -48,7 +48,8 @@ class ConsentConfig(SQLModel):
     """A checkbox the visitor must tick when ``required``. ``text`` is keyed by
     content locale; the visitor's is snapshotted into ``sm_consent_text``."""
 
-    model_config = ConfigDict(extra="forbid")
+    # SQLModel declares `model_config` as its own TypedDict, a ConfigDict superset.
+    model_config = ConfigDict(extra="forbid")  # pyright: ignore[reportAssignmentType]
 
     required: bool = False
     text: dict[str, str] = Field(default_factory=dict)
@@ -62,7 +63,8 @@ class PublicSubmissionsConfig(SQLModel):
     type editor labels "Accept submissions from the website".
     """
 
-    model_config = ConfigDict(extra="forbid")
+    # SQLModel declares `model_config` as its own TypedDict, a ConfigDict superset.
+    model_config = ConfigDict(extra="forbid")  # pyright: ignore[reportAssignmentType]
 
     kind: SubmissionKind
     enabled: bool = False

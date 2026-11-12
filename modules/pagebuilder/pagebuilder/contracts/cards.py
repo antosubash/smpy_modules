@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel
 from simple_module_db import (
@@ -29,6 +29,7 @@ from simple_module_db import (
 )
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from pagebuilder.contracts.search import _checked_limit
 from pagebuilder.core import locales
@@ -90,7 +91,7 @@ def _scope(tenant_id: str) -> Iterator[None]:
 
 def _page_card(page: Page, settings: PagebuilderSettings) -> PageCard:
     return PageCard(
-        id=page.id,
+        id=cast(int, page.id),  # a stored row always has its id
         title=page.title,
         excerpt=page.meta_description or "",
         image_url=page.og_image or "",
@@ -120,13 +121,17 @@ async def search_page_cards(
         return []
     stmt = select(Page).where(
         *_published(tenant_id),
-        or_(Page.title.ilike(pattern, escape="\\"), Page.slug.ilike(pattern, escape="\\")),
+        or_(
+            col(Page.title).ilike(pattern, escape="\\"), col(Page.slug).ilike(pattern, escape="\\")
+        ),
     )
     if locale is not None:
-        stmt = stmt.where(Page.locale == locale)
+        stmt = stmt.where(col(Page.locale) == locale)
     try:
         with _scope(tenant_id):
-            rows = (await session.execute(stmt.order_by(Page.id.desc()).limit(limit))).scalars()
+            rows = (
+                await session.execute(stmt.order_by(col(Page.id).desc()).limit(limit))
+            ).scalars()
             return [_page_card(row, settings) for row in rows]
     except MissingTenantError:
         return []
@@ -139,7 +144,7 @@ async def get_page_card(
     settings = _settings(app)
     if settings is None:
         return None
-    stmt = select(Page).where(*_published(tenant_id), Page.id == page_id)
+    stmt = select(Page).where(*_published(tenant_id), col(Page.id) == page_id)
     try:
         with _scope(tenant_id):
             page = (await session.execute(stmt)).scalars().first()
@@ -157,22 +162,22 @@ async def search_media_cards(
     if settings is None:
         return []
     stmt = select(MediaAsset).where(
-        MediaAsset.tenant_id == tenant_id,
+        col(MediaAsset.tenant_id) == tenant_id,
         MediaAsset.content_type.ilike("image/%"),  # type: ignore[attr-defined]
         ~func.lower(MediaAsset.content_type).like(_SVG_PREFIX),
         or_(
-            MediaAsset.original_filename.ilike(pattern, escape="\\"),
-            MediaAsset.filename.ilike(pattern, escape="\\"),
+            col(MediaAsset.original_filename).ilike(pattern, escape="\\"),
+            col(MediaAsset.filename).ilike(pattern, escape="\\"),
         ),
     )
     try:
         with _scope(tenant_id):
             rows = (
-                await session.execute(stmt.order_by(MediaAsset.id.desc()).limit(limit))
+                await session.execute(stmt.order_by(col(MediaAsset.id).desc()).limit(limit))
             ).scalars()
             return [
                 MediaCard(
-                    id=r.id,
+                    id=cast(int, r.id),  # a stored row always has its id
                     filename=r.original_filename,
                     content_type=r.content_type,
                     path=media_url(settings.media_url_prefix, r.filename, tenant_id),

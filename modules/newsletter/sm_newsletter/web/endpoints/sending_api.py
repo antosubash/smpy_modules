@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Query, Request
-from simple_module_core.permissions import grants
+from simple_module_core.permissions import grants  # pyright: ignore[reportPrivateImportUsage]
 from simple_module_db.deps import get_db
 from simple_module_hosting.permissions import RequiresPermission, ensure_resolved_permissions
 from sm_records.contracts.newsletter import caller_roles

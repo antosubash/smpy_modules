@@ -72,7 +72,7 @@ def etag_for(
     stamp = updated_at.isoformat() if updated_at is not None else ""
     layout_stamp = layout_updated_at.isoformat() if layout_updated_at is not None else ""
     key = f"{page_id}:{stamp}:{layout_stamp}:{variant}:{nav}:{viewer}"
-    digest = hashlib.sha1(key.encode()).hexdigest()[:16]
+    digest = hashlib.sha1(key.encode(), usedforsecurity=False).hexdigest()[:16]
     return f'W/"{digest}"'
 
 
@@ -87,7 +87,7 @@ def _user_key(user: object) -> str:
         None,
     )
     raw = str(ident) if ident is not None else repr(user)
-    return "u:" + hashlib.sha1(raw.encode()).hexdigest()[:12]
+    return "u:" + hashlib.sha1(raw.encode(), usedforsecurity=False).hexdigest()[:12]
 
 
 def viewer_key(request: Request) -> str:

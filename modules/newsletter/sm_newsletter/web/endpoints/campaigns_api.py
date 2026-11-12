@@ -9,7 +9,7 @@ narrowing) come from ``sm_records.contracts.newsletter.caller_roles``.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Body, Depends, Query, Request, Response
 from simple_module_db.deps import get_db
@@ -65,7 +65,8 @@ async def list_campaigns(
     summaries = []
     for campaign in items:
         # ``sent_count`` from the same statement as the numerators (B5).
-        sent, opens, clicks = accepted.get(campaign.id, (campaign.sent_count, 0, 0))
+        key = cast(int, campaign.id)  # a listed campaign always has its id
+        sent, opens, clicks = accepted.get(key, (campaign.sent_count, 0, 0))
         summaries.append(
             CampaignListItem.model_validate(campaign).model_copy(
                 update={

@@ -34,7 +34,8 @@ __all__ = ["PAGE", "QUEUED", "SUPPRESSED", "FilterRefused", "write_pages"]
 PAGE = MAX_SUBSCRIBER_BATCH
 QUEUED, SUPPRESSED = "queued", "suppressed"
 
-_SEND = Send.__table__  # ty: ignore[unresolved-attribute]
+# SQLModel types a table class without `__table__`, which SQLAlchemy sets on it.
+_SEND = Send.__table__  # ty: ignore[unresolved-attribute]  # pyright: ignore[reportAttributeAccessIssue]
 
 
 class FilterRefused(Exception):  # noqa: N818 - an outcome freeze handles, not an API error

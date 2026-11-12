@@ -32,6 +32,7 @@ from sm_records.contracts.newsletter import (
 from sm_records.contracts.newsletter_admin import lock_confirmation
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from sm_newsletter.campaigns.access import MAX_BIG_ID, Roles
 from sm_newsletter.core.constants import LIFTABLE, REASON_UNSUBSCRIBED
@@ -58,7 +59,8 @@ from sm_newsletter.subscribers.suppressions import (
 __all__ = ["NOTE_MAX", "lift", "list_lifts", "subscriber_on_list"]
 
 NOTE_MAX = 500
-_T = Suppression.__table__
+# SQLModel types a table class without `__table__`, which SQLAlchemy sets on it.
+_T = Suppression.__table__  # pyright: ignore[reportAttributeAccessIssue]
 _L = SuppressionLift
 
 
@@ -180,13 +182,13 @@ async def list_lifts(
     with tenant_scope(tenant_id):
         keys = await visible_lists(session, tenant_id=tenant_id, roles=roles)
         where = [
-            _L.tenant_id == tenant_id,
-            visible(keys, column=_L.__table__.c.list_type_key),
+            col(_L.tenant_id) == tenant_id,
+            visible(keys, column=_L.__table__.c.list_type_key),  # pyright: ignore[reportAttributeAccessIssue]
         ]
         stmt = (
             select(_L)
             .where(*where)
-            .order_by(_L.lifted_at.desc(), _L.id.desc())
+            .order_by(col(_L.lifted_at).desc(), col(_L.id).desc())
             .offset(offset)
             .limit(limit)
         )

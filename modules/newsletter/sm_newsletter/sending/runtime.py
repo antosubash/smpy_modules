@@ -45,7 +45,7 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-PASSWORD_ENDPOINT = "PUT /api/newsletter/settings/smtp-password"
+PASSWORD_ENDPOINT = "PUT /api/newsletter/settings/smtp-password"  # noqa: S105 - an endpoint named in an error message
 
 
 class PlaintextPassword(RuntimeError):  # noqa: N818 - reads as the condition it is

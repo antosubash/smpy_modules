@@ -26,6 +26,7 @@ pagebuilder bound — it never resolves one (``news.core.tenancy`` is not consul
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import ClassVar
 
 from pagebuilder.contracts.bundle import (
@@ -54,7 +55,7 @@ class NewsBundleSection:
     carries drafts and bylines. A system snapshot (``pre_restore``) always does."""
     apply_permissions = frozenset({PERM_EDIT, PERM_PUBLISH})
     """Restoring overwrites and publishes articles, so it takes what publishing does."""
-    count_label_keys: ClassVar[dict[str, str]] = {
+    count_label_keys: ClassVar[Mapping[str, str]] = {
         "articles": "news.bundle.counts.articles",
         "categories": "news.bundle.counts.categories",
         "tags": "news.bundle.counts.tags",

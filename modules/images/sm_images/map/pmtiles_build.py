@@ -125,7 +125,7 @@ def convert(binary: str, source: Path, output: Path, count: int) -> None:
     tail in the log, never in the message) on failure or timeout."""
     timeout = timeout_for(count)
     try:
-        subprocess.run(
+        subprocess.run(  # noqa: S603 - fixed tippecanoe argv, no shell
             tippecanoe_args(binary, source, output, count),
             capture_output=True,
             text=True,

@@ -24,6 +24,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 from simple_module_db import MissingTenantError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from news.content import card, query_filters
 from news.core.tenancy import tenant_scope
@@ -94,12 +95,12 @@ async def search_articles(
     limit = _checked_limit(limit)
     with tenant_scope(tenant_id):
         stmt = card.base(include_drafts=False, category=None).where(
-            NewsArticle.tenant_id == tenant_id,
-            NewsArticle.title.ilike(pattern, escape="\\"),
+            col(NewsArticle.tenant_id) == tenant_id,
+            col(NewsArticle.title).ilike(pattern, escape="\\"),
         )
         stmt = query_filters.locale(stmt, locale)
         stmt = stmt.order_by(
-            NewsArticle.published_at.desc().nullslast(), NewsArticle.id.desc()
+            col(NewsArticle.published_at).desc().nullslast(), col(NewsArticle.id).desc()
         ).limit(limit)
         try:
             rows = (await session.execute(stmt)).all()
@@ -120,7 +121,7 @@ async def get_article_card(
         if not 0 < article_id <= _MAX_ID:
             return None
         stmt = card.base(include_drafts=False, category=None).where(
-            NewsArticle.tenant_id == tenant_id, NewsArticle.id == article_id
+            col(NewsArticle.tenant_id) == tenant_id, col(NewsArticle.id) == article_id
         )
         try:
             row = (await session.execute(stmt)).first()

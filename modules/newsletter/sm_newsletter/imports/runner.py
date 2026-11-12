@@ -32,6 +32,7 @@ from simple_module_db import finalize_session
 from sm_records.contracts.newsletter_import import importable_fields
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from sm_newsletter.core.clock import utcnow
 from sm_newsletter.core.errors_import import ImportFailed
@@ -79,7 +80,7 @@ class _Slice:
     async def job(self, session: AsyncSession) -> ImportJob:
         stmt = (
             select(ImportJob)
-            .where(ImportJob.id == self.import_id, ImportJob.tenant_id == self.tenant_id)
+            .where(col(ImportJob.id) == self.import_id, col(ImportJob.tenant_id) == self.tenant_id)
             .execution_options(populate_existing=True)
         )
         return (await session.execute(stmt)).scalar_one()
@@ -115,11 +116,11 @@ class _Slice:
             stmt = (
                 select(ImportEntry)
                 .where(
-                    ImportEntry.tenant_id == self.tenant_id,
-                    ImportEntry.import_id == self.import_id,
-                    ImportEntry.outcome.is_(None),  # ty: ignore[unresolved-attribute]
+                    col(ImportEntry.tenant_id) == self.tenant_id,
+                    col(ImportEntry.import_id) == self.import_id,
+                    col(ImportEntry.outcome).is_(None),
                 )
-                .order_by(ImportEntry.seq)
+                .order_by(col(ImportEntry.seq))
                 .limit(BATCH_SIZE)
             )
             rows = list((await session.execute(stmt)).scalars())
@@ -154,7 +155,10 @@ class _Slice:
         )
         await session.execute(
             delete(ImportEntry)
-            .where(ImportEntry.tenant_id == self.tenant_id, ImportEntry.import_id == self.import_id)
+            .where(
+                col(ImportEntry.tenant_id) == self.tenant_id,
+                col(ImportEntry.import_id) == self.import_id,
+            )
             .execution_options(synchronize_session=False)
         )
 

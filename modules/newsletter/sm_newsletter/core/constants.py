@@ -15,7 +15,7 @@ PUBLIC_PREFIX = "/newsletter/"
 BRAND_LOGO_PATH = f"{PUBLIC_PREFIX}brand/logo"
 # Previews and test sends have no send row, so no MAC: their unsubscribe links
 # carry this token, which the unsubscribe page treats like a forged one (R1).
-TEST_UNSUBSCRIBE_TOKEN = "test"
+TEST_UNSUBSCRIBE_TOKEN = "test"  # noqa: S105 - a placeholder the unsubscribe page treats as forged
 # One unsubscribe link per send: ``{UNSUBSCRIBE_PREFIX}<token>``.
 UNSUBSCRIBE_PREFIX = f"{PUBLIC_PREFIX}u/"
 # The open pixel ``{OPEN_PREFIX}<token>.gif`` and the click redirect

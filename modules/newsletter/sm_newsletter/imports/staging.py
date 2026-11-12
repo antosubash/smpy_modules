@@ -22,6 +22,7 @@ from sm_records.contracts.newsletter_admin import FieldChoice, SubscriberFilterE
 from sm_records.contracts.newsletter_import import ImportTargets, importable_fields
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from sm_newsletter.core.errors import NotFound
 from sm_newsletter.core.errors_import import ImportTooManyRows, ImportTooManyTags
@@ -252,10 +253,10 @@ async def _tags_found(
     first; ``ImportTooManyTags`` when there are more than ``MAX_NEW_TAGS`` distinct labels
     (T6a), so every label of every row is here and none is dropped at apply. ``value`` is a
     preview: the tags step decides the final one (D8)."""
-    stmt = select(ImportEntry.tags).where(
-        ImportEntry.tenant_id == tenant_id,
-        ImportEntry.import_id == job_id,
-        ImportEntry.kind == "subscribed",
+    stmt = select(col(ImportEntry.tags)).where(
+        col(ImportEntry.tenant_id) == tenant_id,
+        col(ImportEntry.import_id) == job_id,
+        col(ImportEntry.kind) == "subscribed",
     )
     counts: Counter[str] = Counter()
     async for batch in (

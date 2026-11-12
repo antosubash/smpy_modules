@@ -69,7 +69,8 @@ class SubmitBody(SQLModel):
     """What a form sends. Unknown top-level keys are ignored, so a newer form
     sending a field this server does not know yet is not refused for it."""
 
-    model_config = ConfigDict(extra="ignore")
+    # SQLModel declares `model_config` as its own TypedDict, a ConfigDict superset.
+    model_config = ConfigDict(extra="ignore")  # pyright: ignore[reportAssignmentType]
 
     data: dict[str, Any] = Field(default_factory=dict)
     """The public fields' values; on a newsletter list also ``sm_email``, the

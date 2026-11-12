@@ -15,6 +15,7 @@ from sm_records.contracts.newsletter_admin import ListField, list_fields
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from sm_newsletter.campaigns._refusal import DRAFT
 from sm_newsletter.campaigns.access import (
@@ -72,7 +73,7 @@ async def _find(
         return None
     stmt = (
         select(Segment)
-        .where(Segment.id == segment_id, Segment.tenant_id == tenant_id)
+        .where(col(Segment.id) == segment_id, col(Segment.tenant_id) == tenant_id)
         .execution_options(populate_existing=True)
     )
     if lock:
@@ -90,7 +91,7 @@ async def list_segments(
         return []
     stmt = (
         select(Segment)
-        .where(Segment.tenant_id == tenant_id, Segment.list_type_key.in_(readable))
+        .where(col(Segment.tenant_id) == tenant_id, col(Segment.list_type_key).in_(readable))
         .order_by(Segment.name, Segment.id)
     )
     return list((await session.execute(stmt)).scalars())
@@ -112,13 +113,13 @@ async def get_segment(
 async def _name_taken(
     session: AsyncSession, *, tenant_id: str, list_type_key: str, name: str, except_id: int | None
 ) -> bool:
-    stmt = select(Segment.id).where(
-        Segment.tenant_id == tenant_id,
-        Segment.list_type_key == list_type_key,
-        Segment.name == name,
+    stmt = select(col(Segment.id)).where(
+        col(Segment.tenant_id) == tenant_id,
+        col(Segment.list_type_key) == list_type_key,
+        col(Segment.name) == name,
     )
     if except_id is not None:
-        stmt = stmt.where(Segment.id != except_id)
+        stmt = stmt.where(col(Segment.id) != except_id)
     return (await session.execute(stmt)).first() is not None
 
 
@@ -203,11 +204,11 @@ async def delete_segment(
     # and then finds no segment (422 ``unknown_segment``).
     await get_segment(session, tenant_id=tenant_id, segment_id=segment_id, roles=roles, lock=True)
     in_use = await session.execute(
-        select(Campaign.id)
+        select(col(Campaign.id))
         .where(
-            Campaign.tenant_id == tenant_id,
-            Campaign.status == DRAFT,
-            Campaign.audience == f"segment:{segment_id}",
+            col(Campaign.tenant_id) == tenant_id,
+            col(Campaign.status) == DRAFT,
+            col(Campaign.audience) == f"segment:{segment_id}",
         )
         .limit(1)
     )
@@ -215,7 +216,7 @@ async def delete_segment(
         raise SegmentInUse()
     await session.execute(
         delete(Segment)
-        .where(Segment.id == segment_id, Segment.tenant_id == tenant_id)
+        .where(col(Segment.id) == segment_id, col(Segment.tenant_id) == tenant_id)
         .execution_options(synchronize_session=False)
     )
     mark_written(session)

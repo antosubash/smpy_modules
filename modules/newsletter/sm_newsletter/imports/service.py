@@ -10,6 +10,7 @@ from simple_module_db import mark_written
 from sm_records.contracts.newsletter_import import ImportTargets
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from sm_newsletter.campaigns.access import MAX_BIG_ID, Roles, readable_lists, require_list
 from sm_newsletter.core.errors import NotFound
@@ -38,7 +39,7 @@ async def get_import(
         raise NotFound()
     stmt = (
         select(ImportJob)
-        .where(ImportJob.id == import_id, ImportJob.tenant_id == tenant_id)
+        .where(col(ImportJob.id) == import_id, col(ImportJob.tenant_id) == tenant_id)
         .execution_options(populate_existing=True)
     )
     job = (await session.execute(stmt)).scalars().first()
@@ -68,8 +69,8 @@ async def list_imports(
         return []
     stmt = (
         select(ImportJob)
-        .where(ImportJob.tenant_id == tenant_id, ImportJob.list_type_key.in_(keys))
-        .order_by(ImportJob.created_at.desc(), ImportJob.id.desc())
+        .where(col(ImportJob.tenant_id) == tenant_id, col(ImportJob.list_type_key).in_(keys))
+        .order_by(col(ImportJob.created_at).desc(), col(ImportJob.id).desc())
         .limit(limit)
         .execution_options(populate_existing=True)
     )
@@ -85,11 +86,15 @@ async def set_mapping(
     checked = mapping.validate(raw, columns=job.columns, targets=targets, tags_found=job.tags_found)
     stmt = (
         update(ImportJob)
-        .where(ImportJob.id == job.id, ImportJob.tenant_id == tenant_id, ImportJob.status == STAGED)
+        .where(
+            col(ImportJob.id) == job.id,
+            col(ImportJob.tenant_id) == tenant_id,
+            col(ImportJob.status) == STAGED,
+        )
         .values(mapping=checked)
         .execution_options(synchronize_session=False)
     )
-    if (await session.execute(stmt)).rowcount != 1:  # ty: ignore[unresolved-attribute]
+    if (await session.execute(stmt)).rowcount != 1:  # ty: ignore[unresolved-attribute]  # pyright: ignore[reportAttributeAccessIssue]
         raise ImportNotStaged()
     mark_written(session)
     await session.refresh(job)
@@ -104,14 +109,14 @@ async def queue_apply(session: AsyncSession, *, tenant_id: str, job: ImportJob) 
     stmt = (
         update(ImportJob)
         .where(
-            ImportJob.id == job.id,
-            ImportJob.tenant_id == tenant_id,
-            ImportJob.status.in_((STAGED, FAILED)),
+            col(ImportJob.id) == job.id,
+            col(ImportJob.tenant_id) == tenant_id,
+            col(ImportJob.status).in_((STAGED, FAILED)),
         )
         .values(status=QUEUED, error_code=None, lease_owner=None, lease_until=None)
         .execution_options(synchronize_session=False)
     )
-    if (await session.execute(stmt)).rowcount != 1:  # ty: ignore[unresolved-attribute]
+    if (await session.execute(stmt)).rowcount != 1:  # ty: ignore[unresolved-attribute]  # pyright: ignore[reportAttributeAccessIssue]
         raise ImportNotStaged()
     mark_written(session)
     await session.refresh(job)
@@ -126,20 +131,20 @@ async def discard(
     the caller was looking at) the same ``DELETE`` also requires the stored status to equal it,
     and :class:`ImportChanged` answers when it moved on (a stale tab never deletes a result)."""
     stmt = delete(ImportJob).where(
-        ImportJob.id == job.id,
-        ImportJob.tenant_id == tenant_id,
-        ImportJob.status.in_((STAGED, DONE, FAILED)),
+        col(ImportJob.id) == job.id,
+        col(ImportJob.tenant_id) == tenant_id,
+        col(ImportJob.status).in_((STAGED, DONE, FAILED)),
     )
     if expected_status is not None:
-        stmt = stmt.where(ImportJob.status == expected_status)
+        stmt = stmt.where(col(ImportJob.status) == expected_status)
     gone = await session.execute(stmt.execution_options(synchronize_session=False))
-    if gone.rowcount != 1:  # ty: ignore[unresolved-attribute]
+    if gone.rowcount != 1:  # ty: ignore[unresolved-attribute]  # pyright: ignore[reportAttributeAccessIssue]
         # Naming a status that can never be discarded is the plain refusal, not a race.
         stale = expected_status is not None and expected_status not in (QUEUED, RUNNING)
         raise ImportChanged() if stale else ImportRunning()
     await session.execute(
         delete(ImportEntry)
-        .where(ImportEntry.import_id == job.id, ImportEntry.tenant_id == tenant_id)
+        .where(col(ImportEntry.import_id) == job.id, col(ImportEntry.tenant_id) == tenant_id)
         .execution_options(synchronize_session=False)
     )
     mark_written(session)

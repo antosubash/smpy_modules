@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Literal
+from typing import Literal, cast
 from urllib.parse import quote
 
 from sqlalchemy.exc import NoResultFound
@@ -91,10 +91,10 @@ def _int(value: object, name: str, low: int, high: int) -> int:
     return value
 
 
-def _checked_browse_status(status: object) -> str | None:
+def _checked_browse_status(status: object) -> BrowseStatus | None:
     if status is not None and status not in BROWSE_STATUSES:
         raise ValueError(f"status must be one of {BROWSE_STATUSES}")
-    return status  # type: ignore[return-value]
+    return cast("BrowseStatus | None", status)
 
 
 def _checked_search(search: object) -> str | None:
@@ -109,7 +109,8 @@ def _checked_search(search: object) -> str | None:
 
 def _field(raw: dict) -> ListField:
     ftype = str(raw.get("type") or "")
-    options = raw.get("options") if isinstance(raw.get("options"), dict) else {}
+    raw_options = raw.get("options")
+    options = raw_options if isinstance(raw_options, dict) else {}
     choices = [
         FieldChoice(value=str(c["value"]), label=str(c.get("label", c["value"])))
         for c in (options.get("choices") or [])

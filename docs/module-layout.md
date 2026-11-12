@@ -87,6 +87,34 @@ Rules for a package:
 - **The 300-line cap still applies** (`scripts/check_file_size.py`). Split a
   file by responsibility, inside its package.
 
+## Background work
+
+**New background work goes through the framework's `background_tasks`**
+(decided 2026-11-12, #339): a task in the module's `tasks.py`, routed in
+`task_config.py`, sent once the request's transaction commits
+(`background_tasks.enqueue_after_commit`, or `apply_async` after an explicit
+commit), and scheduled by beat when it recurs. The send itself is not durable,
+so work that must not be lost keeps its state in its own rows and a beat task
+that picks up what a lost message left behind (images' `images.reconcile`,
+newsletter's `newsletter.import_janitor`). That is what images and newsletter
+do, and the one path every deployment runs the same way: a worker
+pool sized on its own, retries with backoff, one scheduler however many web
+replicas there are. CI's `Background tasks (Redis + Celery worker)` job runs
+it against a real broker, worker and beat (`scripts/bg_tasks_smoke.py`).
+
+The other ways the repo still does background work are **legacy**. Each is
+sound where it is, but every web replica runs every in-process loop. Move one
+to `background_tasks` when its code is next touched, and do not add another:
+
+| Kind | Where |
+| --- | --- |
+| In-process asyncio loop in the web process | pagebuilder's and news' schedulers (`scheduling/scheduler.py`), billing's scheduler (`subscriptions/scheduler.py`) and sweeper (`metering/sweeper.py`), records' retention loop (`public_submissions/retention_loop.py`), analytics' loop (`core/runtime.py`) |
+| Post-response job | records' `records/deferred.py`, which runs the reindex runner (`records/services/reindex_runner.py`) after a type write |
+| `on_commit`-spawned task | records' mail fallback (`public_submissions/mail_runner.py`, when the host has no outbox) |
+
+Eager mode (`SM_BG_TASKS_TASK_ALWAYS_EAGER=true`) is for a host without a
+worker (local dev, the e2e suite), not a fifth way: code must not depend on it.
+
 ## Frontend
 
 The TS/TSX lives inside the package, next to the Python:

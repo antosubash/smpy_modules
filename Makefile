@@ -142,6 +142,8 @@ typecheck:
 
 lint:
 	uv run ruff check .
+	# Scope: [tool.pyright] include in pyproject.toml (contracts and their callers, #338).
+	uv run basedpyright
 	npx biome check .
 	$(MAKE) typecheck
 	uv run python scripts/check_metadata.py
