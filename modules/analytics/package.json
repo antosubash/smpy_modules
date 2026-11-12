@@ -7,7 +7,7 @@
     ".": "./sm_analytics/index.ts"
   },
   "peerDependencies": {
-    "@inertiajs/react": "^3.9.1",
+    "@inertiajs/react": "^3.11.0",
     "@simple-module-py/i18n": "*",
     "@simple-module-py/ui": ">=0.0.38",
     "lucide-react": "^1.43.0",
