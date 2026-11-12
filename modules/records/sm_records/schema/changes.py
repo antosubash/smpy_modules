@@ -76,7 +76,7 @@ class DryRunReport:
     ``restore`` or ``discard``."""
     duplicates: dict[str, int] = field(default_factory=dict)
     """Keys gaining ``unique`` that records already hold duplicates of, with
-    how many records hold one — :mod:`sm_records.records.services._duplicates`.
+    how many records hold one — :mod:`sm_records.records.services.schema_changes._duplicates`.
 
     Counted inside ``failing`` as well, which is what makes the change
     refusable without ``force`` like any other restrictive failure. It is

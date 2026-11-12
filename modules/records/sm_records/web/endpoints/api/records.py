@@ -25,10 +25,10 @@ from sm_records.core import constants
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordStatus, RecordType
 from sm_records.records.index.query import CursorError, Filter, Sort
-from sm_records.records.services import _duplicates
 from sm_records.records.services import expand as expand_service
 from sm_records.records.services import records as record_service
 from sm_records.records.services.errors import ValidationFailed
+from sm_records.records.services.schema_changes import _duplicates
 from sm_records.web.deps import (
     MAX_PAGE,
     PageCursor,

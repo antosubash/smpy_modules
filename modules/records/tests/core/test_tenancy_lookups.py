@@ -20,13 +20,13 @@ from simple_module_db.listeners import TenantIsolationError
 from sm_records.core.tenancy import TenantUnbound
 from sm_records.core.tenancy._tenant_guard import is_guarded
 from sm_records.models import RecordStatus
-from sm_records.records.services import _claims
 from sm_records.records.services import public as public_service
 from sm_records.records.services import records as record_service
 from sm_records.records.services import types as type_service
-from sm_records.records.services._import_match import MATCH_UUID, resolve_matches
-from sm_records.records.services._import_parse import ImportRow
+from sm_records.records.services.claims import _claims
 from sm_records.records.services.errors import Conflict, NotFound
+from sm_records.records.services.imports._import_match import MATCH_UUID, resolve_matches
+from sm_records.records.services.imports._import_parse import ImportRow
 
 from tests.support.tenancy_support import SAME_UUID, SETTINGS, Tenant, seed_tenant, session_in
 

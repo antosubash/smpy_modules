@@ -24,7 +24,7 @@ from sm_records.core.tenancy import tenant_scope
 from sm_records.models import Record, RecordType
 from sm_records.records.services import records as record_service
 from sm_records.records.services import types as type_service
-from sm_records.records.services._claims import flush_write
+from sm_records.records.services.claims._claims import flush_write
 from sm_records.records.services.errors import Conflict
 from sm_records.records.services.import_ import ImportOptions, import_records
 from sqlalchemy import select, text

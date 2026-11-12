@@ -15,9 +15,10 @@ from sqlalchemy.orm.base import NO_VALUE
 
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordType
-from sm_records.records.services import _claims, _payload, _relations
+from sm_records.records.services import _payload, _relations
 from sm_records.records.services._common import type_id_map
 from sm_records.records.services._patterns import precheck
+from sm_records.records.services.claims import _claims
 from sm_records.schema._text_checks import checked
 from sm_records.schema.compile import from_stored
 from sm_records.schema.fields import FieldDefinition
@@ -69,7 +70,7 @@ async def prepare(
 
     ``group`` is the write's translation group, known by both write paths
     before they call: siblings are exempt from each other's ``unique`` claims
-    (:func:`sm_records.records.services._claims.ensure_unique`).
+    (:func:`sm_records.records.services.claims._claims.ensure_unique`).
 
     ``previous`` is the row's payload as it is stored *now* — ``None`` on a
     create, which has no before. It is read through ``from_stored`` with the

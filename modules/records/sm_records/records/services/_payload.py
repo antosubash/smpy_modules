@@ -7,7 +7,7 @@ rather than as a wall of checks.
 
 The two claims a write makes about the *rest of the type* — the ``unique``
 rule of §7.8 and the slug rule of §5, plus the lock that makes them hold —
-live next door in :mod:`sm_records.records.services._claims`.
+live next door in :mod:`sm_records.records.services.claims._claims`.
 """
 
 from __future__ import annotations

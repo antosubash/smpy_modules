@@ -227,7 +227,7 @@ async def record_counts(db: AsyncSession, rtype: RecordType) -> tuple[int, int, 
     """
     # Imported here and not at module scope: ``_invalid`` needs this module's
     # ``mark_written`` and ``utcnow``, so the two would import each other.
-    from sm_records.records.services import _invalid
+    from sm_records.records.services.schema_changes import _invalid
 
     live = await record_count(db, rtype)
     total = await record_count(db, rtype, include_deleted=True)

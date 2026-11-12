@@ -77,7 +77,7 @@ class RecordType(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[
 
     **Set on create, changed only by a move.** ``PUT /types/{key}`` with a
     different value copies the type's records, revisions and index rows into
-    the target set in one transaction (:mod:`sm_records.records.services._type_move`).
+    the target set in one transaction (:mod:`sm_records.records.services.type_writes._type_move`).
     References need no re-pointing: they name a target by uuid and type.
 
     Nullable with no backfill on purpose: that is what makes the migration

@@ -22,9 +22,9 @@ from typing import Any
 
 import pytest
 from sm_records.models import RecordType
-from sm_records.records.services import _lifecycle
-from sm_records.records.services._empty_trash import empty_trash
 from sm_records.records.services._lock import lock_types
+from sm_records.records.services.delete import _lifecycle
+from sm_records.records.services.delete._empty_trash import empty_trash
 from sm_records.records.services.errors import Conflict
 from sm_records.records.services.records import create_record, get_deleted_record, get_record
 from sqlalchemy import text

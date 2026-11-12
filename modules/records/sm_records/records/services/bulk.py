@@ -42,7 +42,7 @@ what happens inside one iteration of it is there, and :class:`Change` is
 re-exported so callers still import one module.
 
 :func:`empty_trash` does the opposite and is re-exported from
-:mod:`sm_records.records.services._empty_trash`: it names no records, so it is one
+:mod:`sm_records.records.services.delete._empty_trash`: it names no records, so it is one
 statement per table over a set of them rather than a pass over each.
 
 Nothing here commits, like everything else in this layer.
@@ -63,14 +63,14 @@ from sm_records.models import RecordType
 # Re-exported: one record's turn is the same single-record call the endpoint
 # would have made, and lives next door for the file cap — see that module.
 from sm_records.records.services._bulk_turn import Change, apply_one
-from sm_records.records.services._claims import lock_type
-from sm_records.records.services._delete_locks import lock_delete_graph
+from sm_records.records.services.claims._claims import lock_type
+from sm_records.records.services.delete._delete_locks import lock_delete_graph
 
 # Re-exported: emptying the trash is one statement per table over a set of
 # records rather than a pass over them one at a time, and lives in
 # ``_empty_trash`` for that reason and for the file cap. Callers still import
 # one module.
-from sm_records.records.services._empty_trash import Identity, empty_trash
+from sm_records.records.services.delete._empty_trash import Identity, empty_trash
 from sm_records.records.services.errors import BulkRefused, RecordsError, ReferencedByOthers
 
 __all__ = ["Change", "Identity", "apply_bulk", "empty_trash"]

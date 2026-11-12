@@ -21,12 +21,12 @@ import asyncio
 
 import pytest
 from sm_records.models import RecordType
-from sm_records.records.services import _lifecycle
-from sm_records.records.services._delete_locks import DeleteGraph, check_delete_plan
-from sm_records.records.services._empty_trash import _purge_ids, empty_trash
-from sm_records.records.services._type_update import update_type
+from sm_records.records.services.delete import _lifecycle
+from sm_records.records.services.delete._delete_locks import DeleteGraph, check_delete_plan
+from sm_records.records.services.delete._empty_trash import _purge_ids, empty_trash
 from sm_records.records.services.errors import Conflict, NotFound
 from sm_records.records.services.records import create_record, get_deleted_record, get_record
+from sm_records.records.services.type_writes._type_update import update_type
 
 from tests.support.collections_harness import EVENTS  # noqa: F401 - declares the collections
 from tests.support.move_race_support import SETTINGS, count, move, seed

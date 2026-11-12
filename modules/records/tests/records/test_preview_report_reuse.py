@@ -8,7 +8,7 @@ import pytest
 from sm_records.core.tenancy import DEFAULT_TENANT
 from sm_records.records.services import preview_jobs
 from sm_records.records.services import types as type_service
-from sm_records.records.services._preview import reused_report
+from sm_records.records.services.schema_changes._preview import reused_report
 from sm_records.schema.changes import DryRunReport, SchemaDiff
 
 from tests.support.field_builders import text

@@ -1,6 +1,6 @@
 """The per-type lock, on the database whose branch of it has never been run.
 
-:func:`sm_records.records.services._claims.lock_type` has two implementations — a
+:func:`sm_records.records.services.claims._claims.lock_type` has two implementations — a
 no-op ``UPDATE records_type SET version = version`` that takes SQLite's
 ``RESERVED`` lock, and ``SELECT … FOR UPDATE`` everywhere else. Until this
 file, only the first was ever executed: ``tests/test_unique_concurrency.py``

@@ -16,7 +16,7 @@ A draft preview writes nothing, which is what makes the 404 on an unknown job
 harmless: the client's answer to it is to preview again. A ``rescan`` is the
 exception — it scans the schema the records are stored against and records
 what it finds on each record's ``invalid_since``
-(:mod:`sm_records.records.services._invalid`) — and re-running one is idempotent, so
+(:mod:`sm_records.records.services.schema_changes._invalid`) — and re-running one is idempotent, so
 the answer to a 404 does not change.
 """
 

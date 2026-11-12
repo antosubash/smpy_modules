@@ -27,7 +27,8 @@ from typing import Any
 import pytest
 from httpx import AsyncClient
 from sm_records.models import Record
-from sm_records.records.services import _claims, _lock
+from sm_records.records.services import _lock
+from sm_records.records.services.claims import _claims
 from sqlalchemy import func, select
 
 from tests.support.app_harness import seed_type
@@ -70,7 +71,7 @@ async def test_concurrent_creates_of_one_unique_value_store_exactly_one(file_cli
 
     ``email`` is unique and is *not* the type's ``slug_field``, so no database
     constraint covers it — the only thing standing between these eight writers
-    and eight rows is :func:`sm_records.records.services._claims.lock_type` taking a
+    and eight rows is :func:`sm_records.records.services.claims._claims.lock_type` taking a
     real write lock before the check rather than a ``FOR UPDATE`` that compiles
     to nothing here.
     """
@@ -139,7 +140,7 @@ async def test_writes_to_a_type_without_a_collision_all_succeed(file_client, fil
 async def test_the_slug_index_itself_refuses_as_a_409(file_client, file_db, monkeypatch):
     """The database-level half of the slug claim, on its own.
 
-    :func:`~sm_records.records.services._claims.ensure_slug_free` is the check and
+    :func:`~sm_records.records.services.claims._claims.ensure_slug_free` is the check and
     normally gets there first, so the constraint only ever fires when a writer
     slipped between the check and the flush. Neutralising the check is how that
     window is reproduced on demand — and what must come back is the *same* 409

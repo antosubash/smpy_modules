@@ -17,7 +17,7 @@ verifies run by *this* process; a CLI verify runs in another one and reports on
 its own stdout instead, which the README says.
 
 The third is ``invalid_records``: records carrying a stored ``invalid_since``
-mark (§8.3, :mod:`sm_records.records.services._invalid`) — content a forced schema
+mark (§8.3, :mod:`sm_records.records.services.schema_changes._invalid`) — content a forced schema
 change left behind, which is still served, still editable and satisfies
 nobody's schema. Counted from the column on every check rather than scanned:
 both backends answer ``invalid_since IS NOT NULL`` from that column's own

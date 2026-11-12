@@ -14,8 +14,9 @@ from sm_records.core import events
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordType
 from sm_records.records.deferred import defer
-from sm_records.records.services import _orphaned, reindex_runner
+from sm_records.records.services import reindex_runner
 from sm_records.records.services import types as type_service
+from sm_records.records.services.schema_changes import _orphaned
 from sm_records.web.deps import check_type_roles
 from sm_records.web.menu import affects_menu, mark_dirty
 

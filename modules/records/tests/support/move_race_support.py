@@ -11,9 +11,9 @@ from typing import Any
 
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordType, table_set
-from sm_records.records.services._lifecycle import soft_delete_record
-from sm_records.records.services._type_update import update_type
+from sm_records.records.services.delete._lifecycle import soft_delete_record
 from sm_records.records.services.records import create_record
+from sm_records.records.services.type_writes._type_update import update_type
 from sqlalchemy import func, select
 
 SETTINGS = RecordsSettings()

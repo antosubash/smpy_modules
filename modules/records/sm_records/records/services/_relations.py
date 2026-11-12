@@ -4,7 +4,7 @@ There is no foreign key behind a ``relation`` field — the target is named by
 ``{"type": ..., "uuid": ...}`` inside a JSON payload — so both halves of what a
 foreign key would give you are enforced in this package (design §9). This
 module is the **write** half. The other half, "what references this record",
-is :mod:`sm_records.records.services._referrers`, split out for the 300-line cap and
+is :mod:`sm_records.records.services.referrers._referrers`, split out for the 300-line cap and
 re-exported here so callers still import one module; it is only cheap because
 ``records_index_ref`` exists, which makes that question one indexed query
 rather than a scan of every payload in the install.
@@ -13,7 +13,7 @@ Both halves key a target on ``(target_type_id, target_uuid)`` and resolve the
 table set from the declared type (Phase 5 §6.4). A uuid alone is not an
 identity: it is unique inside each record table and nothing in the database
 spans them, so every lookup that used one acted on the wrong row the moment two
-sets held the same value — see :mod:`sm_records.records.services._uuids`.
+sets held the same value — see :mod:`sm_records.records.services.claims._uuids`.
 """
 
 from __future__ import annotations
@@ -24,17 +24,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.models import table_sets
+from sm_records.records.services.errors import ValidationFailed
 
 # Re-exported: the referrer half of §9 lives in its own module for the file
 # cap, and every caller still imports ``_relations``.
-from sm_records.records.services._referrers import (
+from sm_records.records.services.referrers._referrers import (
     Referrer,
     field_label,
     paged_referrers,
     referrer_count,
     referrers,
 )
-from sm_records.records.services.errors import ValidationFailed
 from sm_records.schema.fields import FieldDefinition
 from sm_records.schema.types import FieldType
 

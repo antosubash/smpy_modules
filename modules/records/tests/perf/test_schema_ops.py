@@ -14,12 +14,13 @@ import time
 import tracemalloc
 
 import pytest
-from sm_records.records.services import _orphaned, schema_change
-from sm_records.records.services._dry_run import dry_run
+from sm_records.records.services import schema_change
 from sm_records.records.services._payload import field_defs
 from sm_records.records.services._schema import normalise
 from sm_records.records.services.reindex_runner import run_pending
 from sm_records.records.services.revisions import list_type_revisions
+from sm_records.records.services.schema_changes import _orphaned
+from sm_records.records.services.schema_changes._dry_run import dry_run
 from sm_records.schema.diff import diff_fields
 
 from tests.perf._bench import Results, capture, repeat
@@ -27,10 +28,6 @@ from tests.perf._schema_ops import _fields, _one, _set_indexed, _settings
 from tests.perf.conftest import REPS, load_type
 
 pytestmark = pytest.mark.perf
-
-
-
-
 
 
 async def test_dry_run_restrictive(perf_db_copy):
@@ -69,8 +66,6 @@ async def test_dry_run_restrictive(perf_db_copy):
     )
 
 
-
-
 async def test_apply_restrictive_with_force(perf_db_copy):
     """The apply path re-runs the dry run inline before writing (§8.9), so a
     forced restrictive change costs one more full pass plus one row write."""
@@ -94,8 +89,6 @@ async def test_apply_restrictive_with_force(perf_db_copy):
         elapsed = (time.perf_counter() - started) * 1000.0
     Results.add("schema apply(force, restrictive)", 0, _one(elapsed), statements="batched")
     assert diff.changes
-
-
 
 
 async def test_toggle_indexed_and_reindex_batches(perf_db_copy):

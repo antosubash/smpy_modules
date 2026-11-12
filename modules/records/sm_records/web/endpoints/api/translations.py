@@ -3,7 +3,7 @@
 Split from :mod:`sm_records.web.endpoints.api.records` for the 300-line cap, along
 the seam the services layer already draws: that module is CRUD on one document,
 this one is the relationship between several
-(:mod:`sm_records.records.services._translations`).
+(:mod:`sm_records.records.services.translations._translations`).
 
 Both routes carry the same gates a record read and a record write carry: the
 static permission at the router, and ``check_type_roles`` — design §10's

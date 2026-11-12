@@ -32,17 +32,8 @@ from sm_records.models import Record, RecordStatus, RecordType, RevisionEvent, n
 from sm_records.records.index.providers import TypeIndex
 from sm_records.records.index.reduce import snapshot
 from sm_records.records.index.writer import write_index
-from sm_records.records.services import _claims, _invalid, _payload
+from sm_records.records.services import _payload
 from sm_records.records.services._common import bump_or_conflict, utcnow
-
-# Re-exported so the delete lifecycle is importable from the one module
-# endpoints already use; it lives in ``_lifecycle`` only for the file cap.
-from sm_records.records.services._lifecycle import (
-    hard_delete_record,
-    purge_type_records,
-    restore_record,
-    soft_delete_record,
-)
 
 # Re-exported: listing a page is a different job from the lifecycle of one
 # document, and lives in ``_listing`` for that reason and for the file cap.
@@ -55,12 +46,26 @@ from sm_records.records.services._payload import read_view
 # (validate, lock, check) lives in ``_prepare`` for the file cap.
 from sm_records.records.services._prepare import prepare as _prepare
 from sm_records.records.services._record_reads import get_deleted_record, get_record
+from sm_records.records.services.claims import _claims
+
+# Re-exported so the delete lifecycle is importable from the one module
+# endpoints already use; it lives in ``_lifecycle`` only for the file cap.
+from sm_records.records.services.delete._lifecycle import (
+    hard_delete_record,
+    purge_type_records,
+    restore_record,
+    soft_delete_record,
+)
+from sm_records.records.services.revisions import write_revision
+from sm_records.records.services.schema_changes import _invalid
 
 # Re-exported: a translation is an ordinary record, so the two functions that
 # make one and list one live beside the lifecycle they are part of — in
 # ``_translations`` only for the file cap.
-from sm_records.records.services._translations import create_translation, list_translations
-from sm_records.records.services.revisions import write_revision
+from sm_records.records.services.translations._translations import (
+    create_translation,
+    list_translations,
+)
 
 __all__ = [
     "RecordListPage",
@@ -100,7 +105,7 @@ async def create_record(
     from here on — there is no ``locale`` on the update path (§4.3).
     ``translation_group`` defaults to the record's **own uuid**, which is what
     makes a record with no siblings alone in a group named after itself; only
-    :func:`sm_records.records.services._translations.create_translation` and the
+    :func:`sm_records.records.services.translations._translations.create_translation` and the
     importer pass one, and the first only ever the source's.
 
     The uuid is generated here; the importer is the one writer that keeps an

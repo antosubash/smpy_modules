@@ -127,7 +127,7 @@ the whole answer to the objection this module used to record here — that the
 prefix is lossy because an importer cannot tell it from a value that genuinely
 starts with one. It can, if the exporter doubles it: exactly one apostrophe is
 added on the way out and exactly one taken off on the way in
-(:func:`sm_records.records.services._import_parse.parse_csv`), for every cell, and the
+(:func:`sm_records.records.services.imports._import_parse.parse_csv`), for every cell, and the
 pair is lossless. The cost is a *hand-written* CSV, which has no doubling and
 loses a leading apostrophe on import; the README says so.
 """

@@ -26,17 +26,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordType
 from sm_records.public_submissions.config import kind_of
-from sm_records.records.services import _orphaned
-from sm_records.records.services._claims import lock_type
 from sm_records.records.services._common import bump_or_conflict, reload
-from sm_records.records.services._dry_run import change_report, refusal
 from sm_records.records.services._payload import field_defs
-from sm_records.records.services._pending import mark_pending
-from sm_records.records.services._preview import MISSING, pointer_preview_changes, reused_report
-
-# Re-exported: an undo is an ``apply`` of an earlier revision, so it belongs to
-# this module's surface; it lives in ``_rollback`` for the 300-line cap.
-from sm_records.records.services._rollback import rollback
 from sm_records.records.services._schema import (
     check_pointers,
     check_targets,
@@ -44,6 +35,7 @@ from sm_records.records.services._schema import (
     write_type_row,
 )
 from sm_records.records.services._schema_checked import normalise_checked
+from sm_records.records.services.claims._claims import lock_type
 from sm_records.records.services.errors import (
     Conflict,
     NotFound,
@@ -51,6 +43,18 @@ from sm_records.records.services.errors import (
     SchemaChangeRefused,
     ValidationFailed,
 )
+from sm_records.records.services.schema_changes import _orphaned
+from sm_records.records.services.schema_changes._dry_run import change_report, refusal
+from sm_records.records.services.schema_changes._pending import mark_pending
+from sm_records.records.services.schema_changes._preview import (
+    MISSING,
+    pointer_preview_changes,
+    reused_report,
+)
+
+# Re-exported: an undo is an ``apply`` of an earlier revision, so it belongs to
+# this module's surface; it lives in ``_rollback`` for the 300-line cap.
+from sm_records.records.services.schema_changes._rollback import rollback
 from sm_records.schema.changes import DryRunReport, SchemaDiff
 from sm_records.schema.diff import diff_fields
 from sm_records.schema.types import ChangeClass
