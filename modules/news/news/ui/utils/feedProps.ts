@@ -5,7 +5,7 @@
  * deliberately strict, so a bad value must be fixed on the way out.
  */
 
-import { isSafeHref } from '@simple-module-py/pagebuilder/pagebuilder/ui/utils/markdown-links';
+import { isSafeHref } from '@simple-module-py/pagebuilder';
 
 export const FEED_LIMIT_MIN = 1;
 export const FEED_LIMIT_MAX = 12;

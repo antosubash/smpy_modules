@@ -15,10 +15,10 @@ import pytest
 from sm_records.contracts.newsletter import iter_subscribers
 from sm_records.contracts.newsletter_admin import ConfirmProof, lock_confirmation
 from sm_records.core import events
-from sm_records.core.settings import RecordsSettings
 
 from tests.pg_support import USING_POSTGRES
 from tests.support.app_harness import ADMIN, roles
+from tests.support.contract_app import contract_app
 from tests.support.newsletter_contract import TENANT, seed_list, session, unbound, uuid_of
 from tests.support.newsletter_http import LIST
 
@@ -85,7 +85,7 @@ async def _unsubscribe(db, uuid: str) -> bool:
         type_key=LIST,
         uuid=uuid,
         unless_confirmed_after=None,
-        settings=RecordsSettings(),
+        app=contract_app(),
     )
 
 

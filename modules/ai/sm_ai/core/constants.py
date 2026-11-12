@@ -95,9 +95,14 @@ METER_REQUESTS: Final = "ai.requests"
 METER_REQUESTS_LABEL_KEY: Final = "ai.meters.requests"
 METER_KIND_COUNTER: Final = "counter"
 METER_UNIT_COUNT: Final = "count"
-# The optional billing module's RequiresQuota, and the registry it puts on
-# app.state.
-BILLING_QUOTA_MODULE: Final = "sm_billing.metering.deps"
+# The optional billing module's contracts, whose RequiresQuota every metered
+# route charges through (#336), and the registry billing puts on app.state.
+BILLING_CONTRACTS: Final = "sm_billing.contracts"
+BILLING_QUOTA_NAME: Final = "RequiresQuota"
+BILLING_TOO_OLD: Final = (
+    "simple_module_ai 0.0.16 needs simple_module_billing>=0.0.16 for request metering "
+    "(sm_billing.contracts.RequiresQuota); upgrade billing (the `billing` extra) or uninstall it"
+)
 BILLING_METERS_ATTR: Final = "billing_meters"
 BILLING_PACKAGE: Final = "sm_billing"
 BILLING_USAGE_MODULE: Final = "sm_billing.contracts.metering"

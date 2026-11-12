@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { startHostAnalytics } from '../../modules/analytics/sm_analytics';
+import { startHostAnalytics } from '@simple-module-py/analytics';
 
 export function startAnalytics(): () => void {
   return startHostAnalytics((navigate) =>

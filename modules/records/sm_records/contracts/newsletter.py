@@ -29,7 +29,8 @@ transaction and never commit; the caller finishes it with
 ``simple_module_db.finalize_session`` (or records' ``events.commit``), and only
 then are ``SubscriptionChanged``/``RecordUpdated`` published, to ``bus`` when
 one is given. With ``bus=None`` nothing is published: a caller in a web process
-must pass ``app.state.sm.event_bus``.
+must pass ``app.state.sm.event_bus``. They also take the caller's ``app``
+(``None`` in a worker), from which records fetches its own settings (#336).
 """
 
 from __future__ import annotations
@@ -41,6 +42,7 @@ from typing import Any
 from simple_module_db.listeners import TenantIsolationError, current_tenant_id
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.contracts._newsletter_access import caller_roles, can_read_list
 from sm_records.contracts._newsletter_args import (
     MAX_SUBSCRIBER_BATCH,
     Status,
@@ -53,13 +55,13 @@ from sm_records.contracts._newsletter_args import (
     _checked_trash,
     _hit,
 )
+from sm_records.contracts._newsletter_settings import records_settings
 from sm_records.core import events
-from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope
 from sm_records.public_submissions import campaign_reads, campaign_writes
 from sm_records.public_submissions.campaign_reads import SubscriberFilterError
 from sm_records.public_submissions.campaign_writes import SubscriberNotFound
-from sm_records.records.services._access import CallerRoles, role_blocked
+from sm_records.records.services._access import CallerRoles
 from sm_records.records.services.errors import ValidationFailed
 
 __all__ = [
@@ -191,7 +193,7 @@ async def unsubscribe(
     type_key: str,
     uuid: str,
     unless_confirmed_after: datetime | None,
-    settings: RecordsSettings,
+    app: Any | None,
     bus: Any | None = None,
 ) -> bool:
     """Unsubscribe ``uuid``, as the subscriber's own link would.
@@ -212,6 +214,7 @@ async def unsubscribe(
         raise ValueError(f"unless_confirmed_after must be an aware datetime, got {cutoff!r}")
     with tenant_scope(tenant):
         events.attach(session, bus)
+        settings = records_settings(app)
         return await campaign_writes.unsubscribe(session, tenant, type_key, uuid, cutoff, settings)
 
 
@@ -223,7 +226,7 @@ async def set_tags(
     uuid: str,
     add: Sequence[str] = (),
     remove: Sequence[str] = (),
-    settings: RecordsSettings,
+    app: Any | None,
     bus: Any | None = None,
 ) -> SubscriberHit:
     """Add and remove tags on a live subscriber; the subscriber as written.
@@ -242,38 +245,6 @@ async def set_tags(
     with tenant_scope(tenant):
         events.attach(session, bus)
         rtype, record = await campaign_writes.set_tags(
-            session, tenant, type_key, uuid, add, remove, settings
+            session, tenant, type_key, uuid, add, remove, records_settings(app)
         )
         return _hit(rtype, record)
-
-
-async def can_read_list(
-    session: AsyncSession,
-    *,
-    tenant_id: str,
-    type_key: str,
-    roles: Sequence[str] | CallerRoles | None,
-) -> bool:
-    """Whether a caller holding ``roles`` may read list ``type_key`` — records'
-    own ``allowed_roles`` narrowing, widened by a ``records.type.<key>`` grant
-    (pass :class:`CallerRoles` for that). ``roles=None`` is no caller (a
-    worker, the CLI). ``False`` when the tenant has no such list."""
-    tenant = _checked_tenant(tenant_id)
-    with tenant_scope(tenant):
-        try:
-            rtype = await campaign_reads.list_type(session, tenant, type_key)
-        except SubscriberFilterError:
-            return False
-        return rtype is not None and not role_blocked(rtype, roles)
-
-
-def caller_roles(request: Any) -> CallerRoles:
-    """The request's caller as :class:`CallerRoles`: their roles plus the
-    ``records.type.<key>`` grants, with records' wildcard rule applied (an
-    admin holds no per-type grants). Anonymous is ``CallerRoles([])``.
-
-    What :func:`can_read_list` needs and another module cannot build itself.
-    Reads the permission set the framework resolved for the request."""
-    from sm_records.web.deps import caller_roles as _caller_roles
-
-    return _caller_roles(request)

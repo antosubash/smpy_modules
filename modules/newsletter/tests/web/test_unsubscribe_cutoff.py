@@ -18,11 +18,10 @@ from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import Send, SendAttempt
 from sm_records.contracts.newsletter import unsubscribe
 from sm_records.core import events as records_events
-from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope as records_scope
 from sqlalchemy import update
 
-from tests.support.records_seed import LIST, confirm_link, signup
+from tests.support.records_seed import LIST, RECORDS_APP, confirm_link, signup
 from tests.support.unsub_world import (
     ONE_CLICK,
     Sent,
@@ -59,7 +58,7 @@ async def _reconfirm(app, state, s: Sent) -> None:
                 type_key=LIST,
                 uuid=s.uuid,
                 unless_confirmed_after=None,
-                settings=RecordsSettings(),
+                app=RECORDS_APP,
             )
             await records_events.commit(db)
     assert await signup(state, T, ADA, app.state.sm.event_bus) == s.uuid

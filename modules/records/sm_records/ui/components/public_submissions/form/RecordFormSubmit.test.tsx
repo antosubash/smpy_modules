@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, mount, settle, setValue } from '../../../page-tests/test-dom';
 import { definition, field, fill, input, send, server } from './record-form-test-support';
 
-vi.mock('@simple-module-py/pagebuilder/pagebuilder/ui/components/widgets/_shared', () => ({
+vi.mock('@simple-module-py/pagebuilder', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   Section: ({ children }: { children: unknown }) => <section>{children as never}</section>,
 }));
 

@@ -143,3 +143,12 @@ async def test_limit_validated(db, limit) -> None:
         await search_page_cards(_app(), db, tenant_id="default", pattern="%", limit=limit)
     with pytest.raises(ValueError):
         await search_media_cards(_app(), db, tenant_id="default", pattern="%", limit=limit)
+
+
+def test_mounted_is_whether_pagebuilder_runs_on_the_app():
+    """What newsletter asks instead of reading ``app.state.pagebuilder`` (#336)."""
+    from pagebuilder.contracts.cards import mounted
+
+    assert mounted(SimpleNamespace(state=SimpleNamespace(pagebuilder=object()))) is True
+    assert mounted(SimpleNamespace(state=SimpleNamespace())) is False
+    assert mounted(object()) is False

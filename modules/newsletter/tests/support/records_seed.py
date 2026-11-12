@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import secrets
 import time
+from types import SimpleNamespace
 from typing import Any
 
 from sm_records.contracts.public_submissions_api import SubmitBody
@@ -24,6 +25,11 @@ from sm_records.records.services._common import utcnow
 from starlette.requests import Request
 
 LIST = "news"
+# What records' newsletter contract writes take: the app they read records'
+# settings off (#336), here holding the defaults.
+RECORDS_APP = SimpleNamespace(
+    state=SimpleNamespace(sm_records=SimpleNamespace(settings=RecordsSettings()))
+)
 TAGS = {
     "key": "tags",
     "type": "multiselect",

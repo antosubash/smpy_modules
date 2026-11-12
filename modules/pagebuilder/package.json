@@ -2,6 +2,8 @@
   "name": "@simple-module-py/pagebuilder",
   "version": "0.0.15",
   "private": true,
+  "main": "./pagebuilder/index.ts",
+  "types": "./pagebuilder/index.ts",
   "description": "Frontend assets for the PageBuilder module",
   "peerDependencies": {
     "@inertiajs/react": "^3.9.1",

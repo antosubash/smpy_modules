@@ -1,8 +1,5 @@
 import type { ComponentConfig } from '@puckeditor/core';
-import {
-  type ArticleCardItem,
-  ArticleCardsGrid,
-} from '@simple-module-py/pagebuilder/pagebuilder/ui/components/widgets/article-cards-render';
+import { type ArticleCardItem, ArticleCardsGrid } from '@simple-module-py/pagebuilder';
 import { useEffect, useMemo, useState } from 'react';
 
 import { useContentLocale, useDateLocale } from '../hooks/useContentLocale';

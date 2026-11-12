@@ -73,6 +73,7 @@ include = [
     "modules/records/sm_records/contracts",
     # Their callers in other modules.
     "modules/ai/sm_ai/core/constants.py",
+    "modules/ai/sm_ai/metering/requests.py",
     "modules/images/sm_images/core/billing/install.py",
     "modules/images/sm_images/core/billing/subject.py",
     "modules/images/sm_images/core/constants.py",
@@ -81,6 +82,7 @@ include = [
     "modules/images/sm_images/pipeline/ai/runner.py",
     "modules/images/sm_images/pipeline/steps/classify.py",
     "modules/news/news/integrations/bundle",
+    "modules/news/news/integrations/locales.py",
     "modules/news/news/integrations/pagebuilder.py",
     "modules/newsletter/sm_newsletter/campaigns/access.py",
     "modules/newsletter/sm_newsletter/campaigns/audience.py",
@@ -120,6 +122,7 @@ include = [
     "modules/newsletter/sm_newsletter/web/schemas/segments.py",
     "modules/newsletter/sm_newsletter/web/schemas/subscribers.py",
     "modules/newsletter/sm_newsletter/web/services/unsubscribe.py",
+    "modules/records/sm_records/public_submissions/captcha.py",
 ]
 
 [tool.pytest.ini_options]

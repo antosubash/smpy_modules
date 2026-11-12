@@ -22,11 +22,10 @@ from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.subscribers.lift import lift
 from sm_newsletter.subscribers.suppressions import rows_for_email
 from sm_records.contracts.newsletter import unsubscribe
-from sm_records.core.settings import RecordsSettings
 
 from tests.pg_support import USING_POSTGRES, make_db_state
 from tests.support.lift_world import lifts, purge, rows, seed_row, status_of
-from tests.support.records_seed import seed_list, seed_subscriber
+from tests.support.records_seed import RECORDS_APP, seed_list, seed_subscriber
 
 pytestmark = pytest.mark.unbound_tenant
 
@@ -58,7 +57,7 @@ async def _unsubscribe(session, uuid: str) -> bool:
         type_key="news",
         uuid=uuid,
         unless_confirmed_after=None,
-        settings=RecordsSettings(),
+        app=RECORDS_APP,
     )
 
 

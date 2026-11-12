@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from types import SimpleNamespace
 
 import pytest
 import pytest_asyncio
@@ -44,7 +45,14 @@ def bridge(monkeypatch, st) -> asyncio.AbstractEventLoop:
         "run_platform",
         lambda body: asyncio.run_coroutine_threadsafe(body(st.session_factory), loop).result(),
     )
-    monkeypatch.setattr(launch_mod, "records_worker_settings", lambda: SETTINGS)
+    import background_tasks
+
+    real = background_tasks.settings_for
+    monkeypatch.setattr(  # a worker's records settings (records reads them itself, #336)
+        background_tasks,
+        "settings_for",
+        lambda cls, pkg, **kw: SETTINGS if pkg == "sm_records" else real(cls, pkg, **kw),
+    )
     return loop
 
 
@@ -127,17 +135,34 @@ async def test_task_result_is_sanitised(world, monkeypatch, caplog):
     assert SENTINEL not in repr(job.errors)
 
 
-def test_records_worker_settings_reads_settings_for(monkeypatch):
-    import background_tasks
-    from sm_records.contracts.newsletter_import import RECORDS_PACKAGE, RecordsSettings
+def test_the_task_lets_records_read_its_own_settings(monkeypatch):
+    """A worker has no app: it passes ``app=None`` and records reads its settings with
+    ``settings_for`` itself (#336); the eager path passes the app."""
+    seen: list[dict] = []
 
-    seen = []
-    sentinel = object()
-    monkeypatch.setattr(
-        background_tasks, "settings_for", lambda cls, pkg: seen.append((cls, pkg)) or sentinel
-    )
-    assert launch_mod.records_worker_settings() is sentinel
-    assert seen == [(RecordsSettings, RECORDS_PACKAGE)]
+    async def fake(factory, **kw):
+        seen.append(kw)
+        return "done"
+
+    monkeypatch.setattr(runner, "run_import_async", fake)
+    monkeypatch.setattr(worker, "run_platform", lambda body: asyncio.run(body(None)))
+    assert tasks.run_import.apply(args=("default", 7)).result == "done"
+    assert seen == [{"tenant_id": "default", "import_id": 7, "app": None}]
+
+
+async def test_the_eager_launch_passes_its_app(monkeypatch):
+    seen: list[dict] = []
+
+    async def fake(factory, **kw):
+        seen.append(kw)
+        return "done"
+
+    app = SimpleNamespace(state=SimpleNamespace(sm=SimpleNamespace(db=SimpleNamespace())))
+    app.state.sm.db.session_factory = object()
+    monkeypatch.setattr(launch_mod, "celery_eager", lambda: True)
+    monkeypatch.setattr(launch_mod, "run_import_async", fake)
+    await launch_mod.launch(app, tenant_id="default", import_id=3)
+    assert seen == [{"tenant_id": "default", "import_id": 3, "app": app}]
 
 
 def test_celery_eager_reads_the_app_conf(monkeypatch):

@@ -11,7 +11,6 @@ from sm_newsletter.sending import deliver as delivering
 from sm_newsletter.sending.classify import Verdict
 from sm_newsletter.sending.deliver import Step
 from sm_records.contracts.newsletter import unsubscribe
-from sm_records.core.settings import RecordsSettings
 
 from tests.support.campaign_world import (
     campaign_row,
@@ -35,6 +34,7 @@ from tests.support.deliver_world import (
 from tests.support.dispatch_world import lifecycle_action
 from tests.support.fake_transport import FakeTransport
 from tests.support.freeze_world import world
+from tests.support.records_seed import RECORDS_APP
 from tests.support.sending import NOW, T
 
 SKIP = Step(False, Verdict("skip", False))
@@ -69,7 +69,7 @@ async def test_unsubscribed_since_freeze_is_skipped(state):
             type_key="news",
             uuid=row.record_uuid,
             unless_confirmed_after=None,
-            settings=RecordsSettings(),
+            app=RECORDS_APP,
         )
 
     await in_other_session(state, leave)

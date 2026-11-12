@@ -15,11 +15,15 @@ both absolute (prefixing the public base URL) before they go into an email.
 
 ``pattern`` is a SQL ``LIKE`` pattern with ``\\`` as the escape character; the
 caller owns escaping, as in ``pagebuilder.contracts.search``.
+
+:func:`mounted` says whether news runs on an app at all, so a caller never
+reads ``app.state.news`` itself (#336).
 """
 
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 from simple_module_db import MissingTenantError
@@ -30,13 +34,24 @@ from news.content import card, query_filters
 from news.core.tenancy import tenant_scope
 from news.models import NewsArticle
 
-__all__ = ["MAX_ARTICLE_SEARCH_LIMIT", "ArticleCard", "get_article_card", "search_articles"]
+__all__ = [
+    "MAX_ARTICLE_SEARCH_LIMIT",
+    "ArticleCard",
+    "get_article_card",
+    "mounted",
+    "search_articles",
+]
 
 MAX_ARTICLE_SEARCH_LIMIT = 50
 """The most cards one search returns."""
 
 # `news_article.id` is a 32-bit INTEGER, so a larger id would overflow asyncpg, not miss.
 _MAX_ID = 2**31 - 1
+
+
+def mounted(app: Any) -> bool:
+    """Whether the news module is mounted on ``app`` (installed is not enough)."""
+    return getattr(getattr(app, "state", None), "news", None) is not None
 
 
 def _checked_limit(limit: object) -> int:

@@ -79,7 +79,7 @@ def run_import(tenant_id: str, import_id: int) -> str:
     string ``"failed"``, never an exception that could carry an address (D6)."""
     from sm_newsletter.core.errors_import import ImportFailed
     from sm_newsletter.core.worker import run_platform
-    from sm_newsletter.imports.launch import enqueue, records_worker_settings
+    from sm_newsletter.imports.launch import enqueue
     from sm_newsletter.imports.runner import run_import_async
 
     try:
@@ -88,7 +88,7 @@ def run_import(tenant_id: str, import_id: int) -> str:
                 factory,
                 tenant_id=tenant_id,
                 import_id=import_id,
-                records_settings=records_worker_settings(),
+                app=None,  # a worker: records reads its settings with settings_for (#336)
             )
         )
     except ImportFailed:

@@ -6,10 +6,7 @@
  */
 
 import type { ComponentConfig } from '@puckeditor/core';
-import {
-  createImageField,
-  mediaLibraryAdapter,
-} from '@simple-module-py/pagebuilder/pagebuilder/ui/fields';
+import { createImageField, mediaLibraryAdapter } from '@simple-module-py/pagebuilder';
 
 import { keys, type Translate, translate } from '../../utils/i18n';
 import { publicCollections } from './ImageGalleryBlock';

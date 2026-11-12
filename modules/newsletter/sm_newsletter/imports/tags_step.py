@@ -30,7 +30,7 @@ def needs_tags(job: ImportJob) -> bool:
 
 
 async def tags_once(
-    session: AsyncSession, *, tenant_id: str, job: ImportJob, owner: str, records_settings: Any
+    session: AsyncSession, *, tenant_id: str, job: ImportJob, owner: str, app: Any | None
 ) -> None:
     """Decide the final values, add the new choices, mark the step done; fenced."""
     try:
@@ -40,7 +40,7 @@ async def tags_once(
                 tenant_id=tenant_id,
                 type_key=job.list_type_key,
                 labels=[t["label"] for t in job.tags_found],
-                settings=records_settings,
+                app=app,
                 actor=job.created_by,
             )
     except TagsFieldMissing:

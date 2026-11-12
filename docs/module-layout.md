@@ -37,7 +37,7 @@ file has).
 | `tasks.py`, `task_config.py` | `background_tasks`: Celery autodiscovery and the routes/beat loader |
 | `pages/` | the host's page glob; real Inertia pages only (`scripts/check_rules.py`) |
 | `locales/` | the framework's i18n registry |
-| `index.ts` | `package.json` `exports`; the module's public TS surface |
+| `index.ts` | `package.json` `exports` (pagebuilder's `main` until 0.0.17, so its moved-path stubs stay reachable); the module's public TS surface. A sibling imports `@simple-module-py/<module>`, never a file inside the package; `scripts/check_ts_imports.py` refuses a deep or cross-module relative import (#337) |
 | `pagebuilder-blocks.ts` | pagebuilder's `puck-blocks.ts` glob (`*/*/pagebuilder-blocks.ts`) |
 | `images_extensions.py`, `images-steps.ts` | a plugin's file that another module imports or globs by name |
 | `contracts/` | other modules: the only import path they may use |

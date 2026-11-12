@@ -15,7 +15,7 @@ from sm_newsletter.core.errors_import import ImportFailed
 from sm_newsletter.imports.runner import run_import_async
 from sm_newsletter.task_config import QUEUE_DEFAULT
 
-__all__ = ["celery_eager", "enqueue", "launch", "records_worker_settings"]
+__all__ = ["celery_eager", "enqueue", "launch"]
 
 logger = logging.getLogger(__name__)
 
@@ -28,14 +28,6 @@ def celery_eager() -> bool:
         return True
     # Celery ships no type information; its proxies infer as nonsense.
     return bool(current_app.conf.task_always_eager)  # pyright: ignore[reportAttributeAccessIssue]
-
-
-def records_worker_settings() -> Any:
-    """Records' settings as a worker reads them: DB-backed, cached about 30 s."""
-    from background_tasks import settings_for
-    from sm_records.contracts.newsletter_import import RECORDS_PACKAGE, RecordsSettings
-
-    return settings_for(RecordsSettings, RECORDS_PACKAGE)
 
 
 def enqueue(tenant_id: str, import_id: int) -> None:
@@ -52,12 +44,10 @@ async def launch(app: Any, *, tenant_id: str, import_id: int) -> None:
         enqueue(tenant_id, import_id)
         return
     factory = app.state.sm.db.session_factory
-    settings = app.state.sm_records.settings
     try:
+        # Records reads its own settings from ``app`` (#336).
         while (
-            await run_import_async(
-                factory, tenant_id=tenant_id, import_id=import_id, records_settings=settings
-            )
+            await run_import_async(factory, tenant_id=tenant_id, import_id=import_id, app=app)
             == "more"
         ):
             pass

@@ -90,8 +90,7 @@ front of visitors who never saw that block. Register heavy blocks with
 component the first time a page actually renders the block:
 
 ```tsx
-import { lazyBlock } from '@simple-module-py/pagebuilder/pagebuilder/ui/components/lazyBlock';
-import { registerPuckBlocks } from '@simple-module-py/pagebuilder/pagebuilder/ui/components/blockRegistry';
+import { lazyBlock, registerPuckBlocks } from '@simple-module-py/pagebuilder';
 
 registerPuckBlocks({
   blocks: {

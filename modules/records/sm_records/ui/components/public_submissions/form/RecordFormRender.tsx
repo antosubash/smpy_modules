@@ -16,7 +16,7 @@
  * technology.
  */
 
-import { Section } from '@simple-module-py/pagebuilder/pagebuilder/ui/components/widgets/_shared';
+import { Section } from '@simple-module-py/pagebuilder';
 import { type CSSProperties, type ReactNode, useCallback, useId, useState } from 'react';
 import { type FocusTarget, useSubmissionForm } from '../../../hooks/useSubmissionForm';
 import { keys, useT } from '../../../utils/i18n';

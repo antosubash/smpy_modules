@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Any
 
 from simple_module_db import finalize_session
@@ -33,6 +34,8 @@ SUB = "subscribed_members_export.csv"
 UNSUB = "unsubscribed_members_export.csv"
 CLEAN = "cleaned_members_export.csv"
 SETTINGS = RecordsSettings()
+# Records' contracts read their settings off the caller's app (#336).
+SETTINGS_APP = SimpleNamespace(state=SimpleNamespace(sm_records=SimpleNamespace(settings=SETTINGS)))
 
 __all__ = [
     "CLEAN",
@@ -125,7 +128,7 @@ async def run(
         factory,
         tenant_id=tenant,
         import_id=job_id,
-        records_settings=SETTINGS,
+        app=SETTINGS_APP,
         clock=clock or pinned(),
         slice_seconds=slice_seconds,
     )
@@ -178,7 +181,7 @@ async def apply_now(state: Any, job_id: int, tenant: str = "default") -> BatchRe
                 job=job,
                 rows=rows,
                 targets=targets,
-                records_settings=SETTINGS,
+                app=SETTINGS_APP,
                 now=NOW,
             )
             await finalize_session(s)

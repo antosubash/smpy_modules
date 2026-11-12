@@ -7,10 +7,7 @@
  */
 
 import { usePage } from '@inertiajs/react';
-import {
-  StatsView,
-  type StatsWidgetProps,
-} from '@simple-module-py/pagebuilder/pagebuilder/ui/components/widgets/stats-widget';
+import { StatsView, type StatsWidgetProps } from '@simple-module-py/pagebuilder';
 import { useEffect, useMemo, useState } from 'react';
 
 import { fetchPublicStat, type PublicStat, type StatMetric } from '../../utils/api-public';

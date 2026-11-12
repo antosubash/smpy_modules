@@ -5,6 +5,8 @@ the same tenant rule: the caller names the tenant, it is validated, bound with
 ``tenant_scope`` (another one while a tenant is bound raises
 ``TenantIsolationError``) and pinned in every query. Nothing here commits; the
 caller finishes its transaction with ``simple_module_db.finalize_session``.
+The writes run under records' own settings, fetched from the ``app`` the
+caller passes (``None`` in a worker, #336).
 
 Part 1: :func:`create_list`, :func:`importable_fields`, :func:`add_tag_choices`
 (and its pure value rule, :func:`tag_choice_values`).
@@ -16,14 +18,14 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
 from sm_records.contracts._newsletter_args import _checked_tenant
+from sm_records.contracts._newsletter_settings import records_settings
 from sm_records.contracts.newsletter_admin import FieldChoice, _field
-from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope
 from sm_records.public_submissions import campaign_import, campaign_lists, campaign_reads
 from sm_records.public_submissions.address_lock import address_key as address_lock_key
@@ -67,7 +69,6 @@ __all__ = [
     "ImportTargets",
     "InvalidListKey",
     "ListExists",
-    "RecordsSettings",
     "SubscriberFilterError",
     "TagsFieldMissing",
     "add_tag_choices",
@@ -81,7 +82,7 @@ __all__ = [
     "tag_choice_values",
 ]
 
-RECORDS_PACKAGE = "sm_records"  # the `settings_for` key (R13)
+RECORDS_PACKAGE = "sm_records"  # the `settings_for` key a worker's settings come from (R13)
 
 
 class ImportField(SQLModel):
@@ -105,7 +106,7 @@ async def create_list(
     tenant_id: str,
     key: str,
     label: str,
-    settings: RecordsSettings,
+    app: Any | None,
     actor: str | None = None,
 ) -> str:
     """A new subscription list (``first_name``, ``last_name``; double opt-in,
@@ -114,6 +115,7 @@ async def create_list(
     ``ListExists`` when the key is taken, ``InvalidListKey`` when records
     refuses the key or label."""
     tenant = _checked_tenant(tenant_id)
+    settings = records_settings(app)
     with tenant_scope(tenant):
         return await campaign_lists.create(
             session, key=key, label=label, settings=settings, actor=actor
@@ -158,7 +160,7 @@ async def add_tag_choices(
     tenant_id: str,
     type_key: str,
     labels: Sequence[str],
-    settings: RecordsSettings,
+    app: Any | None,
     actor: str | None = None,
 ) -> dict[str, str]:
     """Each label's ``tags`` choice value (:func:`tag_choice_values`), decided
@@ -173,6 +175,7 @@ async def add_tag_choices(
     with records, or is not a multiselect. No such list raises
     ``TagsFieldMissing`` too."""
     tenant = _checked_tenant(tenant_id)
+    settings = records_settings(app)
     with tenant_scope(tenant):
         rtype = await campaign_reads.list_type(session, tenant, type_key)
         if rtype is None:
@@ -195,7 +198,7 @@ async def import_subscribers(
     tenant_id: str,
     type_key: str,
     rows: Sequence[ImportRow],
-    settings: RecordsSettings,
+    app: Any | None,
     now: datetime,
     source: str = "Mailchimp",
 ) -> list[ImportResult]:
@@ -219,6 +222,7 @@ async def import_subscribers(
     ``LookupError`` for no such list in the tenant."""
     tenant = _checked_tenant(tenant_id)
     checked = campaign_import.checked_rows(rows, now, source)
+    settings = records_settings(app)
     with tenant_scope(tenant):
         return await campaign_import.run(
             session, tenant, type_key, checked, settings=settings, now=now, source=source

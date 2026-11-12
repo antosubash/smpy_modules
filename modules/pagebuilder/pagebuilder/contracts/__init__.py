@@ -4,7 +4,7 @@ Everything outside this package is internal and may change without a
 major version bump.
 """
 
-from pagebuilder.contracts import bundle, public
+from pagebuilder.contracts import bundle, public, site
 from pagebuilder.contracts.cards import (
     MediaCard,
     PageCard,
@@ -87,4 +87,5 @@ __all__ = [
     "search_media_cards",
     "search_page_cards",
     "search_pages",
+    "site",
 ]

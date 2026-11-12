@@ -122,7 +122,7 @@ async def _to_records(
     rows: list[ImportEntry],
     targets: ImportTargets,
     tag_map: dict[str, str],
-    records_settings: Any,
+    app: Any | None,
     now: datetime,
 ) -> list[ImportResult]:
     columns = _columns(job, targets)
@@ -134,7 +134,7 @@ async def _to_records(
                 tenant_id=tenant_id,
                 type_key=job.list_type_key,
                 rows=[_record_row(r, columns, tag_map) for r in chunk],
-                settings=records_settings,
+                app=app,
                 now=now,
             )
         )
@@ -175,7 +175,7 @@ async def apply_batch(
     job: ImportJob,
     rows: list[ImportEntry],
     targets: ImportTargets,
-    records_settings: Any,
+    app: Any | None,
     now: datetime,
 ) -> BatchResult:
     """Apply ``rows`` of ``job``: records, then suppressions, then each row's outcome."""
@@ -203,7 +203,7 @@ async def apply_batch(
         rows=to_records,
         targets=targets,
         tag_map=tag_map,
-        records_settings=records_settings,
+        app=app,
         now=now,
     )
     for row, answer in zip(to_records, answers, strict=True):

@@ -2,8 +2,8 @@
 
 Both are optional extras, so every import of theirs is deferred and guarded, and
 reads go only through their ``contracts``. A source is available when its
-contract imports *and* its module is mounted on this app
-(``app.state.news`` / ``app.state.pagebuilder``); otherwise its routes answer
+contract imports *and* its module is mounted on this app (the contract's
+``mounted(app)``, #336); otherwise its routes answer
 409 ``integration_unavailable`` and the editor hides its card from the palette.
 """
 

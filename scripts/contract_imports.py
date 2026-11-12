@@ -27,25 +27,51 @@ def _string_constants(tree: ast.Module) -> Iterator[tuple[str, str]]:
                 yield target.id, value.value
 
 
+_LOADERS = frozenset({"import_module", "__import__", "find_spec"})
+
+
+def _loader_aliases(tree: ast.Module) -> set[str]:
+    """The bare names a loader is called by here: ``from importlib import
+    import_module as im`` adds ``im``. An aliased module (``import importlib as
+    il``) needs nothing: ``il.import_module`` is still matched by attribute."""
+    names = set(_LOADERS)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module in ("importlib", "importlib.util"):
+            names.update(a.asname for a in node.names if a.asname and a.name in _LOADERS)
+    return names
+
+
+def _module_argument(call: ast.Call) -> ast.expr | None:
+    """The module-name argument: the first positional one, or ``name=``."""
+    if call.args:
+        return call.args[0]
+    return next((k.value for k in call.keywords if k.arg == "name"), None)
+
+
 def _import_module_targets(
     tree: ast.Module, constants: dict[str, set[str]], skip: set[int]
 ) -> Iterator[str]:
-    """String targets of ``import_module(...)`` / ``__import__(...)`` calls.
+    """String targets of ``import_module(...)`` / ``__import__(...)`` / ``find_spec(...)`` calls.
 
-    A literal argument, or a constant bound to one anywhere in the package,
-    named bare (``_CONTRACT``) or through its module (``constants.X``): how an
-    optional extra is loaded. Other strings are not imports, however much they
-    look like a module path.
+    A literal argument (positional or ``name=``), or a constant bound to one
+    anywhere in the package, named bare (``_CONTRACT``) or through its module
+    (``constants.X``): how an optional extra is loaded. A loader imported under
+    another name counts too. Other strings are not imports, however much they
+    look like a module path. ``find_spec`` counts because it imports every
+    parent of a dotted name (``find_spec("a.b.c")`` runs ``a.b``).
     """
     local = dict(_string_constants(tree))
+    bare = _loader_aliases(tree)
     for node in ast.walk(tree):
-        if id(node) in skip or not isinstance(node, ast.Call) or not node.args:
+        if id(node) in skip or not isinstance(node, ast.Call):
             continue
         func = node.func
-        name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
-        if name not in ("import_module", "__import__"):
+        if isinstance(func, ast.Attribute):
+            if func.attr not in _LOADERS:
+                continue
+        elif not (isinstance(func, ast.Name) and func.id in bare):
             continue
-        arg = node.args[0]
+        arg = _module_argument(node)
         if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
             yield arg.value
         elif isinstance(arg, ast.Name) and arg.id in local:
@@ -59,15 +85,14 @@ _Record = tuple[Path, str, tuple[str, ...], bool]
 
 
 def scan(package_dir: Path) -> tuple[_Record, ...]:
-    """Every absolute import and ``import_module`` string in a package's non-test modules.
+    """Every absolute import and ``import_module``/``find_spec`` string in non-test code.
 
     One record per import, parsed once; ``imports`` filters them per sibling.
     """
     trees = {
         path: ast.parse(path.read_text(encoding="utf-8"))
         for path in sorted(package_dir.rglob("*.py"))
-        if "tests" not in path.relative_to(package_dir).parts
-        and not path.name.startswith("test_")
+        if "tests" not in path.relative_to(package_dir).parts and not path.name.startswith("test_")
     }
     constants: dict[str, set[str]] = {}
     for tree in trees.values():

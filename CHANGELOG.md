@@ -171,6 +171,47 @@ name the module they affect.
   cards contract already did. The five guard copies are parity-checked. Billing
   has no `MultiTenantMixin` table, so it has no guard. No migration is needed.
 
+### Changed
+
+- **pagebuilder has a TypeScript entry point** (#337).
+  `@simple-module-py/pagebuilder` (`pagebuilder/index.ts`, the package's
+  `main`) exports what other modules use to contribute blocks:
+  `registerPuckBlocks`, `registeredBlocks`, `lazyBlock`, `StatsView`,
+  `ArticleCardsGrid`, `Section`, `createImageField`, `mediaLibraryAdapter`,
+  `isSafeHref` and `safeHref`. news, records and images import only these now,
+  and `scripts/check_ts_imports.py` (`make lint`, CI) refuses a deep import
+  into another module's package (`@simple-module-py/<module>/<file>`, or a
+  relative path into `modules/<other>/`). Nothing breaks: deep paths into
+  pagebuilder, the 0.0.14 moved-path stubs included, still resolve until
+  0.0.17, when pagebuilder gets an `exports` map. A host or module that
+  imports pagebuilder's files by path should import from the package root
+  instead; the widget stylesheet will then be
+  `@simple-module-py/pagebuilder/widgets-base.css`.
+- **A module reaches a sibling's Python only through its `contracts`** (#336).
+  `scripts/check_sibling_contracts.py` (`make lint`, CI) now also fails on any
+  import of `<sibling>.<anything but contracts>` in a module's non-test code:
+  plain and from-imports, and `import_module`/`find_spec` strings. Its
+  allow-list is empty. The reads that broke the rule go through contracts now:
+  - ai's `RequiresAiRequest` imports `sm_billing.contracts.RequiresQuota`
+    (new), and ai has a `billing` extra (`simple_module_billing>=0.0.16`).
+    **Upgrade billing with ai:** ai 0.0.16 next to billing 0.0.15 refuses to
+    start (`RuntimeError` naming the fix) rather than serve AI requests
+    unmetered. Without billing nothing changes.
+  - news reads its content languages through the new
+    `pagebuilder.contracts.site` (`content_locales(app)`, `supported()`,
+    `default()`, `resolve()`, …), not `pagebuilder.core.locales` and
+    `app.state.pagebuilder`. Its `pagebuilder` extra's floor is now 0.0.16.
+  - records' CAPTCHA startup check reads `site.public_csp(app)`. Its
+    `pagebuilder` extra's floor is now 0.0.16.
+  - newsletter asks `news.contracts.articles.mounted(app)` and
+    `pagebuilder.contracts.cards.mounted(app)` (new), not `app.state`.
+  - records' newsletter contract writes (`unsubscribe`, `set_tags`,
+    `create_list`, `add_tag_choices`, `import_subscribers`) take the caller's
+    `app` (`None` in a worker), not a `settings: RecordsSettings` argument.
+    Records reads its own settings from that app, or with `settings_for` in a
+    worker. `newsletter_import` no longer exports `RecordsSettings`. These
+    contracts first ship in 0.0.16, so no released caller breaks.
+
 ### Deprecated
 
 - **`enc:v1:` stored secrets** (ai, billing, newsletter). Still read, with one

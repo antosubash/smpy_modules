@@ -19,7 +19,6 @@ from sm_newsletter.content.integrations.hits import (
 from sm_newsletter.core.errors import IntegrationUnavailable
 
 _CONTRACT = "news.contracts.articles"
-_STATE = "news"
 
 
 def _contract() -> Any | None:
@@ -33,13 +32,13 @@ def _contract() -> Any | None:
 
 def available(app: Any) -> bool:
     """The contract imports and news is mounted on ``app``."""
-    mounted = getattr(getattr(app, "state", None), _STATE, None) is not None
-    return mounted and _contract() is not None
+    contract = _contract()
+    return contract is not None and contract.mounted(app)
 
 
 def _require(app: Any) -> Any:
     contract = _contract()
-    if contract is None or getattr(getattr(app, "state", None), _STATE, None) is None:
+    if contract is None or not contract.mounted(app):
         raise IntegrationUnavailable()
     return contract
 

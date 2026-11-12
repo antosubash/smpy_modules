@@ -30,6 +30,17 @@ ai = "sm_ai.module:AiModule"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.36,<0.1"]
+# Optional: with billing installed, every route behind RequiresAiRequest charges
+# ``ai.requests`` through billing's RequiresQuota. Must stay a 0.0.x range: the
+# repo publishes at 0.0.x.
+# floor: 0.0.16 - the first billing release exporting RequiresQuota from
+# sm_billing.contracts (#336); an older one meters nothing here.
+billing = ["simple_module_billing>=0.0.16,<0.1"]
+
+# Resolve the sibling module from the workspace during development. This is
+# tool config, so the published wheel still carries the range above.
+[tool.uv.sources]
+simple_module_billing = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

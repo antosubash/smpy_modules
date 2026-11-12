@@ -101,7 +101,7 @@ async def _apply(app: Any, session: AsyncSession, claims: tokens.SendToken, now:
             type_key=list_key,
             uuid=send.record_uuid,
             unless_confirmed_after=cutoff,
-            settings=app.state.sm_records.settings,
+            app=app,
             bus=app.state.sm.event_bus,
         )
         gone = wrote or await _gone(session, tenant, list_key, send.record_uuid)

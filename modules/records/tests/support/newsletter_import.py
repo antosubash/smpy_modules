@@ -28,6 +28,7 @@ from sm_records.records.services import records as record_service
 from sm_records.records.services import types as type_service
 
 from tests.support.app_harness import field
+from tests.support.contract_app import contract_app
 from tests.support.newsletter_contract import TENANT, session, unbound
 from tests.support.retention_support import Bus
 
@@ -43,7 +44,7 @@ async def new_list(site, tenant: str = TENANT, key: str = KEY) -> str:
     async with session(site) as db:
         with unbound():
             made = await create_list(
-                db, tenant_id=tenant, key=key, label="Weekly", settings=SETTINGS
+                db, tenant_id=tenant, key=key, label="Weekly", app=contract_app(SETTINGS)
             )
             await events.commit(db)
     return made
@@ -131,7 +132,7 @@ async def run(
         events.attach(db, spy or Bus())
         with unbound():
             results = await import_subscribers(
-                db, tenant_id=tenant, type_key=key, rows=rows, settings=SETTINGS, now=now
+                db, tenant_id=tenant, type_key=key, rows=rows, app=contract_app(SETTINGS), now=now
             )
         await events.commit(db)
     return results

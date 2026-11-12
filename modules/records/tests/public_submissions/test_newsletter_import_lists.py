@@ -27,6 +27,7 @@ from sm_records.records.services import types as type_service
 from sqlalchemy import select
 
 from tests.support.app_harness import field
+from tests.support.contract_app import contract_app
 from tests.support.newsletter_contract import TENANT, seed_list, session, unbound
 from tests.support.newsletter_http import LIST
 from tests.support.newsletter_import import SETTINGS, new_list
@@ -60,7 +61,7 @@ async def _add(site, labels, key: str = "weekly", tenant: str = TENANT) -> dict[
                 tenant_id=tenant,
                 type_key=key,
                 labels=labels,
-                settings=SETTINGS,
+                app=contract_app(SETTINGS),
             )
             await events.commit(db)
     return added
@@ -266,4 +267,4 @@ async def test_bound_other_tenant_raises(site):
         with tenant_scope(TENANT), pytest.raises(TenantIsolationError):
             await importable_fields(db, tenant_id="other", type_key="weekly")
         with tenant_scope(TENANT), pytest.raises(TenantIsolationError):
-            await create_list(db, tenant_id="other", key="k", label="K", settings=SETTINGS)
+            await create_list(db, tenant_id="other", key="k", label="K", app=contract_app(SETTINGS))

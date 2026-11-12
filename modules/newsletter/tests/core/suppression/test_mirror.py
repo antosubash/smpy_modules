@@ -19,7 +19,7 @@ from sm_records.contracts.newsletter import subscribers_by_uuid, unsubscribe
 from sm_records.core.settings import RecordsSettings
 from sqlalchemy import select
 
-from tests.support.records_seed import LIST, seed_list, seed_subscriber
+from tests.support.records_seed import LIST, RECORDS_APP, seed_list, seed_subscriber
 
 ADA = "ada@example.org"
 
@@ -74,7 +74,7 @@ async def _unsubscribe(db_state, bus, uuid: str) -> bool:
             type_key=LIST,
             uuid=uuid,
             unless_confirmed_after=None,
-            settings=RecordsSettings(),
+            app=RECORDS_APP,
             bus=bus,
         )
         await finalize_session(s)

@@ -113,7 +113,7 @@ if reg is not None:
     reg.define(key="ai.requests", kind="counter", label_key="ai.meters.requests")
 
 # On a route: charge 1 per request, answer 402 quota_exceeded when used up.
-from sm_billing.metering.deps import RequiresQuota
+from sm_billing.contracts import RequiresQuota
 
 @router.post("/chat", dependencies=[RequiresQuota("ai.requests")])
 async def chat(...): ...

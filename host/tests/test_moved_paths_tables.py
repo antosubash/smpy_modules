@@ -182,5 +182,7 @@ def test_the_aliases_go_in_their_removal_release():
         f"version {version} reached remove_in: delete the 0.0.14 moved-path aliases (the "
         "TS/CSS stubs, core/moved_paths.*, the install() lines and the "
         "__getattr__/__all__/__path__ lines that name #319; an __all__ left behind lists "
-        "names nothing supplies, so a star import raises)"
+        "names nothing supplies, so a star import raises), and replace pagebuilder's "
+        "package.json main/types with exports {'.': ./pagebuilder/index.ts, "
+        "'./widgets-base.css': ./pagebuilder/static/widgets-base.css} (#337)"
     )
