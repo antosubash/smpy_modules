@@ -74,16 +74,33 @@ def set_secret_provider(provider: Callable[[], str]) -> None:
     _secret_provider = provider
 
 
-def has_secret_provider() -> bool:
-    """Whether a live app supplies a secret (records only: ``SealedSecret``
-    dumps unsealed in a process with no app, such as newsletter's worker).
+# Records only: the provider an app installed, paired with "is that app still
+# alive?" (``public_submissions.captcha_secret.install_secret_provider``).
+_attached: tuple[Callable[[], str], Callable[[], bool]] | None = None
 
-    Asks the provider rather than whether one is installed: it holds its app
-    weakly and answers ``""`` once that app is gone (a test suite builds many),
-    and a dump then must not raise. A host app always has a ``secret_key``
-    (``merge_host_settings`` generates one), so a write path never sees ``""``.
+
+def attach_app(provider: Callable[[], str], alive: Callable[[], bool]) -> None:
+    """Install ``provider`` as the secret source of the app ``alive`` watches."""
+    global _attached
+    set_secret_provider(provider)
+    _attached = (provider, alive)
+
+
+def has_secret_provider() -> bool:
+    """Whether an app (or a script) is attached to supply the secret.
+
+    Records only: ``SealedSecret`` dumps unsealed when nothing is attached — no
+    provider, as in newsletter's worker, or the provider's app was garbage
+    collected (a test suite builds many). An attached app whose ``secret_key``
+    is empty still counts, so the dump raises there instead of writing the
+    secret in the clear. A provider installed with plain ``set_secret_provider``
+    (``scripts/reencrypt_secrets.py``) counts while it is the current one.
     """
-    return _secret_provider is not None and bool(_secret_provider())
+    if _secret_provider is None:
+        return False
+    if _attached is not None and _attached[0] is _secret_provider:
+        return _attached[1]()
+    return True
 
 
 def _current_secret() -> str:

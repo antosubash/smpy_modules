@@ -73,12 +73,14 @@ async def test_any_decrypt_failure_is_a_503_and_logs_only_the_type(
 
 
 def test_a_provider_whose_app_is_gone_dumps_without_raising(monkeypatch):
-    """The provider holds its app weakly and answers "" once it is collected."""
+    """The provider holds its app weakly; once the app is collected nothing is
+    attached, so the dump keeps the value rather than raising."""
     import gc
 
     from fastapi import FastAPI
 
     monkeypatch.setattr(crypto, "_secret_provider", None)
+    monkeypatch.setattr(crypto, "_attached", None)
     app = FastAPI()
     captcha_secret.install_secret_provider(app)
     del app

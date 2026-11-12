@@ -64,7 +64,9 @@ def install_secret_provider(app: FastAPI) -> None:
         sm = getattr(live_app.state, "sm", None)
         return getattr(getattr(sm, "settings", None), "secret_key", "") or ""
 
-    crypto.set_secret_provider(_live_secret)
+    # Paired with the weakref, so "the app is gone" (dump as held) is never
+    # confused with "the app has no key" (refuse to dump in the clear).
+    crypto.attach_app(_live_secret, lambda: app_ref() is not None)
 
 
 def secret(settings: RecordsSettings) -> str:

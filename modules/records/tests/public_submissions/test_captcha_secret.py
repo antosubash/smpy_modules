@@ -13,6 +13,7 @@ from settings.module_settings.reload import apply_changes_and_reload
 from settings.module_settings.store import SettingsStore
 from simple_module_db.stored_settings import Setting, settings_table_clause
 from sm_records.core import constants, crypto
+from sm_records.core.settings import RecordsSettings
 from sm_records.public_submissions import captcha_secret
 from sqlalchemy import insert, select
 
@@ -164,3 +165,25 @@ async def test_the_seal_never_overwrites_a_concurrent_change(settings_db):
     assert await captcha_secret.seal_stored(_Racing) is None
     value, _ = await _row(settings_db)
     assert value == newer
+
+
+async def test_a_live_app_without_a_key_refuses_to_store_it_in_the_clear(site, settings_db):
+    """Fail closed: an attached app whose secret_key is empty makes the dump
+    raise, so the Settings write path stores nothing rather than plaintext."""
+    app = site.app
+    app.state.sm.settings.secret_key = ""
+    assert crypto.has_secret_provider()
+    with pytest.raises(Exception, match="secret_key"):
+        RecordsSettings(**{captcha_secret.FIELD: SECRET}).model_dump()
+    async with settings_db.session_factory() as session:
+        store = SettingsStore(SettingService(session))
+        with pytest.raises(Exception, match="secret_key"):
+            await apply_changes_and_reload(
+                app,
+                app.state.sm.event_bus,
+                store,
+                package=constants.PACKAGE,
+                changes={captcha_secret.FIELD: SECRET},
+            )
+        await session.rollback()
+    assert await _row(settings_db) is None
