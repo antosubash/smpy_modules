@@ -1,10 +1,11 @@
 # Pull-request gate. All jobs must pass before merging.
 # Mark them as required checks in the branch-protection rules for `main`.
 #
-# `astral-sh/setup-uv` is pinned to a full `x.y.z` tag, unlike the `actions/*`
-# steps which float on their major. That is deliberate: setup-uv stopped
-# publishing major/minor tags at v8 (as a supply-chain hardening measure), so
-# `@v9` does not resolve. Dependabot proposes new releases.
+# Every action is pinned by commit SHA, with its release in a trailing comment,
+# as in release.yml and .github/actions/e2e-setup (#360): a tag can be moved by
+# whoever controls the action's repository, a commit cannot. Dependabot's
+# `github-actions` entry updates the SHA and the comment together. (setup-uv
+# publishes no major/minor tags since v8 anyway, so it could not float.)
 #
 # uv itself is pinned through `UV_VERSION` below rather than `latest`, so a uv
 # release cannot change resolution or lockfile behaviour under an unchanged
@@ -36,9 +37,17 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+# Stated rather than left to the repository's default token setting (#360).
+permissions:
+  contents: read
+
+# PYTHON_VERSION is what every job but `python-tests` runs; that one is a
+# matrix of 3.12 (the floor every module declares) and 3.14 (what the
+# Dockerfile's runtime stage ships), #359. NODE_VERSION is the Dockerfile's
+# `ui` stage major (node:26.x); keep the two, and release.yml's copy, together.
 env:
   PYTHON_VERSION: "3.12"
-  NODE_VERSION: "24"
+  NODE_VERSION: "26"
   UV_VERSION: "0.13.4"
 
 jobs:
@@ -46,10 +55,10 @@ jobs:
     name: Lint (ruff)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.3
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
@@ -66,21 +75,32 @@ jobs:
       - name: Ruff check
         run: uv run --no-sync ruff check .
 
+  # 3.12 is the `requires-python` floor; 3.14 is the interpreter the demo
+  # image runs (#359). UV_PYTHON makes every uv command below, the ones
+  # scripts/pytest_modules.sh runs included, use the leg's interpreter instead
+  # of .python-version's.
   python-tests:
-    name: Python tests (pytest)
+    name: Python tests (pytest, ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      # One version failing must not hide whether the other passes.
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.14"]
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.3
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
+          cache-suffix: py${{ matrix.python-version }}
 
       - name: Set up Python
-        run: uv python install ${{ env.PYTHON_VERSION }}
-
+        run: uv python install ${{ matrix.python-version }}
 
       # The images module shells out to tippecanoe to build vector tiles.
       - name: Install tippecanoe
@@ -109,9 +129,9 @@ jobs:
     services:
       # `postgres:16` is what postgres-2026-09-21.md verified against
       # (16.13). POSTGRES_DB pre-creates the database the migration round
-      # trip runs against; the records unit and perf databases are created
-      # by a later step because pg_support.py and the perf suite each want
-      # their own (TRUNCATE-per-test and CREATE DATABASE … TEMPLATE would
+      # trip runs against; each module's database and the records perf one
+      # are created by the test steps because pg_support.py and the perf
+      # suite each want their own (TRUNCATE-per-test and CREATE DATABASE … TEMPLATE would
       # otherwise collide with the migrated schema).
       postgres:
         image: postgres:16
@@ -127,10 +147,10 @@ jobs:
           --health-timeout=5s
           --health-retries=5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.3
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
@@ -144,23 +164,6 @@ jobs:
 
       - name: Sync workspace (all packages)
         run: uv sync --locked --all-packages
-
-      # `ubuntu-latest` ships the postgresql-client tools, so `createdb`
-      # needs no extra install. One database per suite, kept apart from `ci`
-      # and from each other, because each resets its database its own way:
-      # records, pagebuilder and news through pg_support.py's TRUNCATE …
-      # RESTART IDENTITY, billing (simple_module_test's fixtures) by dropping
-      # and recreating the `public` schema, and the records perf smoke with
-      # CREATE DATABASE … TEMPLATE copies of its own. The suites run on
-      # pytest-xdist workers, and simple_module_test points each worker at a
-      # database of its own (`ci_records_gw0`, `ci_records_gw1`, …), created
-      # on first use, so two workers never truncate each other's rows. The
-      # perf smoke stays serial: it measures.
-      - name: Create test databases
-        run: |
-          for db in ci_records ci_records_perf ci_pagebuilder ci_news ci_billing ci_images ci_analytics ci_newsletter; do
-            PGPASSWORD=postgres createdb -h localhost -U postgres "$db"
-          done
 
       # Migration round trip against a real Postgres database — this is what
       # caught the four Postgres-only migration bugs in
@@ -194,51 +197,31 @@ jobs:
           SM_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci
         run: uv run --project host alembic -c host/alembic.ini check
 
-      # SM_TEST_DATABASE_URL is the name tests/pg_support.py reads first.
-      - name: Run pytest (records, Postgres)
-        env:
-          SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_records
-        run: cd modules/records && uv run pytest -q -p no:cacheprovider -n "${PYTEST_WORKERS:-auto}"
-
-      # The other suites whose tenant-filtered queries, scheduler claims and
-      # row locks behave differently on Postgres (#117). The full suites, not
-      # a subset: each runs clean against Postgres. `!cancelled()` so every
-      # suite reports even after an earlier one failed.
-      - name: Run pytest (pagebuilder, Postgres)
+      # `ubuntu-latest` ships the postgresql-client tools, so `createdb`
+      # needs no extra install. One database per suite, kept apart from `ci`
+      # and from each other, because each resets its database its own way:
+      # records, pagebuilder and news through pg_support.py's TRUNCATE …
+      # RESTART IDENTITY, billing (simple_module_test's fixtures) by dropping
+      # and recreating the `public` schema, and the records perf smoke with
+      # CREATE DATABASE … TEMPLATE copies of its own. The suites run on
+      # pytest-xdist workers, and simple_module_test points each worker at a
+      # database of its own (`ci_records_gw0`, `ci_records_gw1`, …), created
+      # on first use, so two workers never truncate each other's rows. The
+      # perf smoke stays serial: it measures.
+      #
+      # scripts/pytest_modules_pg.sh runs every modules/*/ — the full suites,
+      # not a subset, whose tenant-filtered queries, scheduler claims and row
+      # locks behave differently on Postgres (#117) — each on its own
+      # `ci_<module>` database (SM_TEST_DATABASE_URL, the name
+      # tests/pg_support.py reads first), and every one even after an earlier
+      # one failed. A new module runs here without editing this file (#360).
+      - name: Run pytest (each module, Postgres)
         if: ${{ !cancelled() }}
         env:
-          SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_pagebuilder
-        run: scripts/pytest_modules.sh pagebuilder
-
-      - name: Run pytest (news, Postgres)
-        if: ${{ !cancelled() }}
-        env:
-          SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_news
-        run: scripts/pytest_modules.sh news
-
-      - name: Run pytest (billing, Postgres)
-        if: ${{ !cancelled() }}
-        env:
-          SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_billing
-        run: scripts/pytest_modules.sh billing
-
-      - name: Run pytest (images, Postgres)
-        if: ${{ !cancelled() }}
-        env:
-          SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_images
-        run: scripts/pytest_modules.sh images
-
-      - name: Run pytest (analytics, Postgres)
-        if: ${{ !cancelled() }}
-        env:
-          SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_analytics
-        run: scripts/pytest_modules.sh analytics
-
-      - name: Run pytest (newsletter, Postgres)
-        if: ${{ !cancelled() }}
-        env:
-          SM_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_newsletter
-        run: scripts/pytest_modules.sh newsletter
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: scripts/pytest_modules_pg.sh
 
       # A short smoke, not the full study (which runs at N=20000): enough to
       # exercise the write, read, aggregate and i18n statement-count
@@ -252,16 +235,18 @@ jobs:
         env:
           RECORDS_PERF_N: 500
           RECORDS_PERF_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ci_records_perf
-        run: cd modules/records && uv run pytest -q -m perf tests/perf
+        run: |
+          PGPASSWORD=postgres createdb -h localhost -U postgres ci_records_perf
+          cd modules/records && uv run pytest -q -m perf tests/perf
 
   frontend-build:
     name: Frontend build (tsc + vite)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.3
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
@@ -270,7 +255,7 @@ jobs:
         run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -297,38 +282,84 @@ jobs:
       - name: Build frontend (typecheck + vite build)
         run: npm run build
 
-  # The demo host's Dockerfile (#91) still builds. Build only — nothing is
-  # pushed; the image is never published. The GitHub Actions cache keeps a
-  # rebuild to the layers a change actually touched.
+  # The demo host's Dockerfile (#91) still builds, and the image it builds
+  # boots (#359): the container applies the migrations and serves
+  # `/health/live` under SM_ENVIRONMENT=production on Python 3.14, the
+  # interpreter its runtime stage ships. Nothing is pushed; the image is never
+  # published. The GitHub Actions cache keeps a rebuild to the layers a change
+  # actually touched.
   docker-image:
-    name: Docker image (build only)
+    name: Docker image (build + boot)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Build image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           push: false
+          # Into the runner's image store, so the next step can run it.
+          load: true
           tags: smpy-modules-host:ci
           # An explicit scope keeps this cache apart from any other image
           # built with the gha backend in this repo.
           cache-from: type=gha,scope=ci-demo-host
           cache-to: type=gha,mode=max,scope=ci-demo-host
 
+      # What compose.yaml hands the container, minus the env file: production
+      # refuses to boot without SM_SECRET_KEY and the two users token secrets
+      # (`make env` generates the same three), and background_tasks rejects
+      # its default localhost broker there, so the in-process transports
+      # compose.yaml names. Throwaway values, generated per run. The image's
+      # own ENV sets SM_ENVIRONMENT=production, the SQLite database in
+      # /app/var and SMPY_MIGRATE_ON_START=1.
+      - name: Start the image
+        run: |
+          docker run -d --name smpy-host -p 127.0.0.1:8000:8000 \
+            -e SM_SECRET_KEY="$(openssl rand -hex 32)" \
+            -e SM_USERS_RESET_PASSWORD_TOKEN_SECRET="$(openssl rand -hex 32)" \
+            -e SM_USERS_VERIFICATION_TOKEN_SECRET="$(openssl rand -hex 32)" \
+            -e SM_BG_TASKS_TASK_ALWAYS_EAGER=true \
+            -e SM_BG_TASKS_BROKER_URL=memory:// \
+            -e SM_BG_TASKS_RESULT_BACKEND=cache+memory:// \
+            -e SM_BG_TASKS_BROADCAST_INVALIDATIONS=false \
+            smpy-modules-host:ci
+
+      # Two minutes for the migrations and the boot. Stops early once the
+      # container has exited, since nothing will answer then.
+      - name: Wait for /health/live
+        run: |
+          deadline=$((SECONDS + 120))
+          until curl -fsS --connect-timeout 2 --max-time 5 http://127.0.0.1:8000/health/live; do
+            if [ "$(docker inspect -f '{{.State.Running}}' smpy-host)" != true ]; then
+              echo "::error::the container exited before /health/live answered"
+              exit 1
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::/health/live did not answer within 120 s"
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Container logs
+        if: ${{ !cancelled() }}
+        run: docker logs smpy-host
+
   frontend-unit:
     name: Frontend unit tests (vitest)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -370,7 +401,7 @@ jobs:
       # The production bundle, served by uvicorn without --reload (#119).
       E2E_BUNDLE: "1"
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/e2e-setup
         with:
@@ -389,7 +420,7 @@ jobs:
       # This shard's results, for the `e2e` job to merge into one report.
       - name: Upload blob report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: blob-report-${{ matrix.shard }}
           path: blob-report/
@@ -399,7 +430,7 @@ jobs:
       # Traces, screenshots and videos of this shard's failures.
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results-${{ matrix.shard }}
           path: test-results/
@@ -418,10 +449,10 @@ jobs:
     if: ${{ !cancelled() }}
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -431,7 +462,7 @@ jobs:
         run: npm ci
 
       - name: Download blob reports
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: blob-report-*
           path: all-blob-reports
@@ -468,7 +499,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report
           path: playwright-report/
@@ -487,7 +518,7 @@ jobs:
       E2E_MULTI_TENANT: "1"
       E2E_BUNDLE: "1"
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/e2e-setup
         with:
@@ -507,7 +538,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-multi-tenant
           path: |
@@ -527,7 +558,7 @@ jobs:
       E2E_BILLING_USER: "1"
       E2E_BUNDLE: "1"
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/e2e-setup
         with:
@@ -546,7 +577,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-billing-user
           path: |
@@ -569,7 +600,7 @@ jobs:
     env:
       E2E_NEWSLETTER: "1"
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/e2e-setup
         with:
@@ -588,7 +619,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-newsletter
           path: |
@@ -601,10 +632,10 @@ jobs:
     name: Lint (biome)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -621,12 +652,12 @@ jobs:
     steps:
       # Full history and tags: check_sibling_contracts.py reads each sibling
       # floor's release tag.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.3
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
@@ -641,7 +672,7 @@ jobs:
       # scripts/tests/test_nav_icons.py reads the framework's NavIcon.tsx out
       # of node_modules and skips itself when it is absent.
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm

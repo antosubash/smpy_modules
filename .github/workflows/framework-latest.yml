@@ -8,9 +8,11 @@
 # host's pins to the modules' own ceiling, re-resolves the workspace to the
 # newest versions allowed, and runs each module's pytest.
 #
-# Allowed to fail for now (`continue-on-error`): a red run is a warning that
-# the next framework bump needs work, not a broken main. Tighten it once a few
-# runs have been green. The resolved versions are in the job summary.
+# A red run fails the workflow (#360): it was `continue-on-error` until its
+# nightly runs had been green for a while, and a run that cannot fail is only
+# seen by whoever opens it. Red means a framework release in the modules'
+# range breaks a module, so the next framework bump needs work; it does not
+# block main. The resolved versions are in the job summary.
 #
 # Keep `UV_VERSION` equal to ci.yml's (#120).
 
@@ -32,13 +34,12 @@ jobs:
   pytest-newest-framework:
     name: Python tests (newest framework in range)
     runs-on: ubuntu-latest
-    continue-on-error: true
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.3
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: ${{ env.UV_VERSION }}
           # Never cache: this job resolves versions no lockfile vetted, and

@@ -25,6 +25,8 @@ ARG UV_VERSION=0.13.4
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
 
 # ---------------------------------------------------------------------------
+# Node's major is CI's (NODE_VERSION in .github/workflows/ci.yml); bump them
+# together.
 FROM node:26.13.0-bookworm-slim@sha256:bc0a2afd3b74ce12222fc8bab99271e66257f021078f5f4a5d687a77d280c1d9 AS ui
 ARG PYTHON_VERSION
 COPY --from=uv /uv /usr/local/bin/uv
@@ -50,6 +52,8 @@ RUN uv run --no-sync --project host python -m simple_module_hosting sync-js-deps
  && npm run build
 
 # ---------------------------------------------------------------------------
+# CI's python-tests job has a leg on this minor (3.14), and its docker-image
+# job boots this image; move that leg along with a minor bump here.
 FROM python:3.14.10-slim-bookworm@sha256:516b51cb9db2ef061e465c803e50f64361b82cefd91e525b889b967b83e83527 AS runtime
 COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_LINK_MODE=copy \

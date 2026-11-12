@@ -60,9 +60,10 @@ concurrency:
   group: release
   cancel-in-progress: false
 
+# NODE_VERSION is ci.yml's, the Dockerfile `ui` stage's major (#359).
 env:
   PYTHON_VERSION: "3.12"
-  NODE_VERSION: "24"
+  NODE_VERSION: "26"
   UV_VERSION: "0.13.4"
 
 jobs:
