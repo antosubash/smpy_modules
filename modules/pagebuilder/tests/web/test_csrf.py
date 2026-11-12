@@ -1,9 +1,10 @@
 """The admin API refuses a write without the session's CSRF token (#10, #126).
 
 The check is the framework's ``RequiresCsrf``, the one billing, news and
-records use. The token reaches the console as the ``csrf_token`` Inertia prop
-on every pagebuilder screen, and these tests take it from there, the way the
-console's own client does. No cookie is set any more.
+records use. The console gets the token as the framework's ``csrfToken``
+shared prop on every signed-in page (#342); pagebuilder shares none of its
+own. These tests take it from there, the way the console's own client does.
+No cookie is set any more.
 """
 
 from __future__ import annotations
@@ -123,3 +124,4 @@ async def test_the_switch_is_read_per_request(csrf_client) -> None:
         PAGES, json={"title": "after save", "slug": "after-save", "draft_data": {}}
     )
     assert response.status_code == 201, response.text
+

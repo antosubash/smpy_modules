@@ -2,9 +2,10 @@
 
 The check is the framework's ``RequiresCsrf``, the one billing, news, records
 and pagebuilder use. The app here mounts SessionMiddleware and wires the
-routers through ``AiModule.register_routes``, so the token travels the real
-way: the settings screen shares it as the ``csrf_token`` Inertia prop, and the
-test sends it back. The bare app in ``test_ai_api.py`` has no session, which
+routers through ``AiModule.register_routes``. The token reaches the screen as
+the framework's ``csrfToken`` shared prop (#342), which ``LayoutCsrfProp``
+stands in for, the way ``InertiaLayoutDataMiddleware`` sets it on a signed-in
+page; the module shares none of its own. The bare app in ``test_ai_api.py`` has no session, which
 exercises the framework's documented no-session exemption.
 """
 
@@ -17,7 +18,7 @@ import pytest_asyncio
 from fastapi import APIRouter, FastAPI
 from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
-from simple_module_hosting.csrf import CSRF_HEADER
+from simple_module_hosting.csrf import CSRF_HEADER, get_csrf_token
 from simple_module_hosting.permissions import PERMISSION_DENIED_PREFIX
 from simple_module_inertia import InertiaConfig, inertia_dependency_factory
 from sm_ai.core import constants, services
@@ -50,11 +51,23 @@ class DenyWrites(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+class LayoutCsrfProp(BaseHTTPMiddleware):
+    """The framework layout's ``csrfToken`` shared prop, and nothing else."""
+
+    async def dispatch(self, request, call_next):
+        async def shared() -> dict:
+            return {CSRF_PROP: get_csrf_token(request)}
+
+        request.state.inertia_shared_factory = shared
+        return await call_next(request)
+
+
 def _app(tmp_path, auth: type[BaseHTTPMiddleware]) -> FastAPI:
     from simple_module_db.deps import get_db
 
     services.install(services.AiServices(settings=AiSettings()))
     app = FastAPI()
+    app.add_middleware(LayoutCsrfProp)
     app.add_middleware(auth)
     app.add_middleware(SessionMiddleware, secret_key=SECRET)
     app.dependency_overrides[get_db] = lambda: None
@@ -151,6 +164,10 @@ class TestCsrf:
     async def test_safe_methods_are_not_checked(self, csrf_client, method):
         res = await csrf_client.request(method, SETTINGS)
         assert res.status_code != 403
+
+    async def test_the_view_shares_no_token_of_its_own(self, csrf_client):
+        res = await csrf_client.get(constants.MENU_URL, headers=INERTIA)
+        assert "csrf_token" not in res.json()["props"]
 
     async def test_no_cookie_mirrors_the_token(self, csrf_client):
         res = await csrf_client.get(constants.MENU_URL, headers=INERTIA)

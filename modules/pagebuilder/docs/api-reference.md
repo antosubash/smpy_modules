@@ -12,9 +12,8 @@ router-level dependencies, in this order:
    needs the session's CSRF token in an `X-CSRF-Token` header, else `403`
    (when `csrf_protect` is on). The check is the framework's `RequiresCsrf`,
    the one billing, news and records use, so one token serves every module.
-   Every pagebuilder screen shares it as the `csrf_token` Inertia prop
-   (`simple_module_hosting.csrf.get_csrf_token`), and the console's own client
-   sends it from there. There is no CSRF cookie. Reads need no token. It runs
+   Every signed-in page carries it as the framework's `csrfToken` Inertia prop,
+   and the console's own client sends it from there. There is no CSRF cookie. Reads need no token. It runs
    before any permission check, so a write without a token is refused as CSRF
    even for a user who also lacks the permission.
 4. **Read gate** (`access.require_reader`, #346) — a signed-in user holding none

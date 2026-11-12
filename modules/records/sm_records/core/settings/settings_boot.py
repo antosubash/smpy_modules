@@ -20,12 +20,12 @@ from __future__ import annotations
 from typing import Any, Final
 
 from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import SettingsConfigDict
+from simple_module_core.settings_base import DbBackedSettings
 
 from sm_records.core import constants
 from sm_records.core.settings.settings_checks import (
     DEFAULT_PUBLIC_ROUTE_PREFIX,
-    StoredSourcesOnly,
     check_content_locales,
     check_media_api_prefix,
     check_public_route_prefix,
@@ -35,7 +35,7 @@ _RESTART: Final[dict[str, Any]] = {"requires_restart": True}
 """Marks a field the module reads once, while booting. See the module docstring."""
 
 
-class BootSettings(StoredSourcesOnly, BaseSettings):
+class BootSettings(DbBackedSettings):
     model_config = SettingsConfigDict(extra="ignore", use_attribute_docstrings=True)
 
     public_route_prefix: str = Field(

@@ -30,7 +30,6 @@ from sm_images.core.access import (
 )
 from sm_images.core.access import redaction as redaction_state
 from sm_images.core.tenancy import bind_admin
-from sm_images.web.endpoints.csrf import share_csrf_token
 from sm_images.web.endpoints.deps import get_settings, require_view
 from sm_images.web.schemas.collection import CollectionOut, CollectionPageOut
 from sm_images.web.services import collections as collection_service
@@ -39,7 +38,7 @@ from sm_images.web.services.neighbors import neighbors
 from sm_images.web.services.viewer_stats import collection_outs, viewer_only
 
 # ``bind_admin`` first, for the reason ``endpoints.api``'s router gives.
-router = APIRouter(dependencies=[Depends(bind_admin), require_view, Depends(share_csrf_token)])
+router = APIRouter(dependencies=[Depends(bind_admin), require_view])
 
 Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
 

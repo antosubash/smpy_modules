@@ -26,7 +26,6 @@ from sm_records.records.index.query import Filter, Sort
 from sm_records.records.services import _relations
 from sm_records.records.services import expand as expand_service
 from sm_records.records.services import types as type_service
-from sm_records.web.csrf import share_csrf_token
 from sm_records.web.deps import (
     MAX_PAGE,
     caller_roles,
@@ -46,11 +45,11 @@ from sm_records.web.endpoints.api.translations import translations_of
 from sm_records.web.media import media_props
 
 # ``bind_admin`` first, for the reason ``endpoints.api``'s router gives; it
-# covers ``views_types`` too, which is included below. ``share_csrf_token``
-# puts the token the API's CSRF check wants (#111) in every screen's props.
+# covers ``views_types`` too, which is included below. The token the API's
+# CSRF check wants (#111) is the framework's ``csrfToken`` shared prop (#342).
 router = APIRouter(
     route_class=RecordsViewErrorRoute,
-    dependencies=[Depends(tenancy.bind_admin), require_view, Depends(share_csrf_token)],
+    dependencies=[Depends(tenancy.bind_admin), require_view],
 )
 # First, and that is not cosmetic: ``/types/new`` and ``/types/{key}`` must be
 # matched before the generic ``/{key}`` record list below, and Starlette

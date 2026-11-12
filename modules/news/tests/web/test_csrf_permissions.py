@@ -27,7 +27,7 @@ ARTICLES = f"{ROUTE_PREFIX_API}/articles"
 
 
 async def _session(role: str) -> AsyncIterator[AsyncClient]:
-    app, state = await _build_app(stub_user((role,)))
+    app, state = await _build_app(stub_user((role,)), layout=True)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
     await state.engine.dispose()

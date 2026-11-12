@@ -13,6 +13,11 @@ import { type ReactNode, useState } from 'react';
 import { errorText } from '../utils/api-net';
 import { keys, useT } from '../utils/i18n';
 
+/*
+ * Not the framework's `ConfirmActionDialog` (#342), which is controlled (it
+ * has no trigger), runs no async `onConfirm`, and so cannot keep itself open
+ * and show the server's refusal while the request runs or after it fails.
+ */
 /**
  * Confirm a destructive action without `window.confirm()`, which cannot show
  * the server's reason when the confirmed action fails. A rejected `onConfirm`

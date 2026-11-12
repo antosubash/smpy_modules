@@ -16,8 +16,6 @@ import re
 from collections.abc import Sequence
 from typing import Final
 
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
-
 from sm_records.core import constants
 
 __all__ = [
@@ -147,31 +145,3 @@ def check_content_locales(locales: Sequence[str], default_locale: str) -> None:
         raise ValueError(
             f"default_content_locale {default_locale!r} is not in content_locales {list(locales)}"
         )
-
-
-class StoredSourcesOnly:
-    """A mixin that leaves a settings class with exactly one source.
-
-    The hydrator passes stored overrides as keyword arguments, so any field has
-    exactly two answers: what the database says, or the default the class
-    declares. Dropping the env sources rather than merely not documenting them
-    is deliberate — a stray ``SM_RECORDS_*`` in a shell or a deploy manifest
-    would otherwise quietly outrank the value an operator can see and edit on
-    the Settings screen.
-
-    A mixin here rather than a method on ``RecordsSettings`` for that module's
-    file cap. It is behaviour, not a rule about a value, which makes it the one
-    thing in this module that is not a plain function.
-    """
-
-    @classmethod
-    def settings_customise_sources(
-        cls,
-        settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
-    ) -> tuple[PydanticBaseSettingsSource, ...]:
-        """Init kwargs only — no env, no ``.env``, no secrets directory."""
-        return (init_settings,)

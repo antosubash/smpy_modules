@@ -12,7 +12,7 @@ async function load(props: unknown) {
   const text = JSON.stringify({ component: 'Newsletter/Campaigns', props });
   vi.stubGlobal('document', {
     querySelector: (selector: string) =>
-      selector.includes('data-page="app"') ? { textContent: text } : null,
+      selector.includes('data-page') ? { textContent: text } : null,
   });
   return { api: (await import('./api')).api, http: await import('./http') };
 }
@@ -31,7 +31,7 @@ afterEach(() => {
 
 describe('sends csrf header on writes', () => {
   it('on every write verb, and not on a read', async () => {
-    const { api } = await load({ csrf_token: 'tok' });
+    const { api } = await load({ csrfToken: 'tok' });
     const fetchMock = stubFetch(ok);
     await api.createCampaign({ name: 'n', list_type_key: 'l' });
     await api.patchCampaign(1, { expected_revision: 1, name: 'x' });
@@ -57,7 +57,7 @@ describe('sends csrf header on writes', () => {
   });
 
   it('posts the revision a refresh read, and the unsaved preview body', async () => {
-    const { api } = await load({ csrf_token: 'tok' });
+    const { api } = await load({ csrfToken: 'tok' });
     const fetchMock = stubFetch(ok);
     await api.refreshCard(7, 'blk', 3);
     await api.previewUnsaved({ subject: 's', preheader: '', body: [] });
@@ -85,7 +85,7 @@ describe('sends csrf header on writes', () => {
   });
 
   it('answers undefined for a 204 delete', async () => {
-    const { api } = await load({ csrf_token: 'tok' });
+    const { api } = await load({ csrfToken: 'tok' });
     stubFetch(() => new Response(null, { status: 204 }));
     await expect(api.deleteCampaign(1)).resolves.toBeUndefined();
   });
@@ -95,7 +95,7 @@ describe('maps error codes to catalogue keys', () => {
   const t: Translate = (key) => `T(${key})`;
 
   it('translates the server code, never the English detail', async () => {
-    const { api, http } = await load({ csrf_token: 'tok' });
+    const { api, http } = await load({ csrfToken: 'tok' });
     stubFetch(
       () => new Response(JSON.stringify({ detail: 'raw english', code: 'stale' }), { status: 409 }),
     );
@@ -106,7 +106,7 @@ describe('maps error codes to catalogue keys', () => {
   });
 
   it('falls back to generic for an unknown code, a framework 422 and a non-HTTP error', async () => {
-    const { api, http } = await load({ csrf_token: 'tok' });
+    const { api, http } = await load({ csrfToken: 'tok' });
     stubFetch(() => new Response(JSON.stringify({ detail: 'x', code: 'weird' }), { status: 400 }));
     expect(http.errorMessage(await api.getCampaign(1).catch((e: unknown) => e), t)).toBe(
       'T(newsletter.errors.generic)',
@@ -144,7 +144,7 @@ describe('maps error codes to catalogue keys', () => {
   });
 
   it('names a CSRF refusal', async () => {
-    const { api, http } = await load({ csrf_token: 'tok' });
+    const { api, http } = await load({ csrfToken: 'tok' });
     stubFetch(
       () =>
         new Response(JSON.stringify({ detail: 'CSRF token missing or invalid' }), { status: 403 }),
@@ -200,7 +200,7 @@ describe('the error catalogue', () => {
 
 describe('sending calls', () => {
   it('hit the right path, method and body', async () => {
-    const { api } = await load({ csrf_token: 'tok' });
+    const { api } = await load({ csrfToken: 'tok' });
     const fetchMock = stubFetch(ok);
     const signal = new AbortController().signal;
     await api.sendCampaign(4, { expected_revision: 3, scheduled_at: null });
@@ -238,7 +238,7 @@ describe('sending calls', () => {
   });
 
   it('reads the campaign report', async () => {
-    const { api } = await load({ csrf_token: 'tok' });
+    const { api } = await load({ csrfToken: 'tok' });
     const fetchMock = stubFetch(ok);
     const signal = new AbortController().signal;
     await api.report(7, signal);

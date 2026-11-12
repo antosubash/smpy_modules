@@ -25,7 +25,8 @@ from typing import Any, Final
 from urllib.parse import quote
 
 from pydantic import Field
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+from pydantic_settings import SettingsConfigDict
+from simple_module_core.settings_base import DbBackedSettings
 
 from news.core import locales
 
@@ -33,27 +34,11 @@ _RESTART: Final[dict[str, Any]] = {"requires_restart": True}
 """Marks a field the module reads once, while booting."""
 
 
-class NewsSettings(BaseSettings):
+class NewsSettings(DbBackedSettings):
     # ``use_attribute_docstrings`` is what carries the prose below onto the
     # Settings screen, which renders ``FieldInfo.description``.
     model_config = SettingsConfigDict(extra="ignore", use_attribute_docstrings=True)
 
-    @classmethod
-    def settings_customise_sources(
-        cls,
-        settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
-    ) -> tuple[PydanticBaseSettingsSource, ...]:
-        """Init kwargs only — the hydrator's, or the defaults declared here.
-
-        Dropping the env sources is what makes the Settings screen the whole
-        answer: a leftover ``SM_NEWS_*`` in a shell would otherwise outrank a
-        value an operator can see, and nothing on screen would say so.
-        """
-        return (init_settings,)
 
     public_route_prefix: str = Field(default="/news", json_schema_extra=_RESTART)
     """Where an article serves publicly: ``{prefix}/{slug}``.

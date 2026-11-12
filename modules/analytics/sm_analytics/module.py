@@ -12,7 +12,6 @@ from simple_module_core.module_settings import register_module_settings
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 from simple_module_core.rate_limit import RateLimitRegistry, RateLimitRule
-from simple_module_hosting.csrf import get_csrf_token
 from simple_module_hosting.inertia_deps import InertiaDep
 from simple_module_hosting.permissions import RequiresPermission, resolved_permissions_for
 from starlette.requests import Request
@@ -54,7 +53,6 @@ class AnalyticsModule(ModuleBase):
                 c._PAGE_DASHBOARD,
                 {
                     "can_manage": "*" in permissions or c.PERM_MANAGE in permissions,
-                    "csrf_token": get_csrf_token(request) or "",
                 },
             )
 

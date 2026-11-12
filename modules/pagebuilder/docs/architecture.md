@@ -81,8 +81,8 @@ only). The host hydrates them at **lifespan start**, after app construction. So:
   `/pagebuilder/`), mounts one `locale_router` per locale, the default-locale
   alias, the SEO router and the media mount.
 - The CSRF check is the framework's `RequiresCsrf`, wrapped in `web/csrf.py` so
-  `csrf_protect` is read per request. The view router shares the token as the
-  `csrf_token` prop; there is no middleware and no cookie.
+  `csrf_protect` is read per request. The token is the framework's `csrfToken`
+  shared prop on every signed-in page; there is no middleware and no cookie.
 
 Any field read in `on_startup` is marked `json_schema_extra=_RESTART`. Adding a
 field means adding it to the class; there is no env var to add.

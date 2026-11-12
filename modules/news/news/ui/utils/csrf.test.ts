@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * #110: the admin API refuses a write without `X-CSRF-Token`, and `write()` is
- * the one door every news write goes through — so it has to send the token the
- * news screens share as the `csrf_token` Inertia prop.
+ * the one door every news write goes through — so it has to send the token
+ * every signed-in page carries as the framework's `csrfToken` prop (#342).
  */
 
 type Navigate = (event: { detail: { page: { props: unknown } } }) => void;
@@ -23,10 +23,12 @@ vi.mock('@inertiajs/react', () => ({
 async function load(props: unknown) {
   vi.resetModules();
   navigate = undefined;
+  // The framework's tracker subscribes to Inertia only where `window` exists.
+  vi.stubGlobal('window', {});
   const text = JSON.stringify({ component: 'News/NewsList', props });
   vi.stubGlobal('document', {
     querySelector: (selector: string) =>
-      selector.includes('data-page="app"') ? { textContent: text } : null,
+      selector.includes('data-page') ? { textContent: text } : null,
   });
   const http = await import('./http');
   const csrf = await import('./csrf');
@@ -45,21 +47,21 @@ afterEach(() => {
 
 describe('the CSRF token', () => {
   it('goes out on a write, from the page the server rendered', async () => {
-    const { http } = await load({ csrf_token: 'from-the-page' });
+    const { http } = await load({ csrfToken: 'from-the-page' });
     const headers = captureFetch();
     await http.write('/articles', 'POST', { title: 'x' });
     expect(headers().get('X-CSRF-Token')).toBe('from-the-page');
   });
 
   it.each(['PUT', 'PATCH', 'DELETE'])('goes out on %s', async (method) => {
-    const { http } = await load({ csrf_token: 'tok' });
+    const { http } = await load({ csrfToken: 'tok' });
     const headers = captureFetch();
     await http.write('/articles/1', method, {});
     expect(headers().get('X-CSRF-Token')).toBe('tok');
   });
 
   it('is left off a read', async () => {
-    const { http } = await load({ csrf_token: 'tok' });
+    const { http } = await load({ csrfToken: 'tok' });
     const headers = captureFetch();
     await http.read('/articles');
     expect(headers().get('X-CSRF-Token')).toBeNull();
@@ -69,17 +71,19 @@ describe('the CSRF token', () => {
     // The first page was not a news screen, so it carried no token.
     const { http } = await load({});
     const headers = captureFetch();
-    navigate?.({ detail: { page: { props: { csrf_token: 'after-navigating' } } } });
+    navigate?.({ detail: { page: { props: { csrfToken: 'after-navigating' } } } });
     await http.write('/articles', 'POST', {});
     expect(headers().get('X-CSRF-Token')).toBe('after-navigating');
   });
 
-  it('keeps the token across a page that does not share one', async () => {
-    const { http } = await load({ csrf_token: 'kept' });
+  // Every signed-in page carries the framework's prop, so a page without it
+  // means the session was signed out: the old token must not outlive it.
+  it('drops the token on a page that carries none', async () => {
+    const { http } = await load({ csrfToken: 'kept' });
     const headers = captureFetch();
     navigate?.({ detail: { page: { props: {} } } });
     await http.write('/articles', 'POST', {});
-    expect(headers().get('X-CSRF-Token')).toBe('kept');
+    expect(headers().get('X-CSRF-Token')).toBeNull();
   });
 
   it('sends no header when no page ever shared one', async () => {
@@ -92,7 +96,7 @@ describe('the CSRF token', () => {
 
 describe('a CSRF refusal', () => {
   it("shows the module's message, not the framework's developer sentence", async () => {
-    const { http } = await load({ csrf_token: 'stale' });
+    const { http } = await load({ csrfToken: 'stale' });
     const detail = 'CSRF token missing or invalid — read it via get_csrf_token.';
     vi.stubGlobal(
       'fetch',
@@ -106,7 +110,7 @@ describe('a CSRF refusal', () => {
   });
 
   it('leaves a permission 403 as the server worded it', async () => {
-    const { http } = await load({ csrf_token: 'tok' });
+    const { http } = await load({ csrfToken: 'tok' });
     const detail = 'Permission required: news.publish';
     vi.stubGlobal(
       'fetch',

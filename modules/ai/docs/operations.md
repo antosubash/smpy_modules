@@ -223,7 +223,7 @@ never opened, so a worker can't create an empty one.
 | "cannot be decrypted with SM_SECRET_KEY or any key in SM_SECRET_KEY_PREVIOUS" | secret rotated without keeping the old one, or the host's in-code `secret_key` differs from the one used to save | Add the old key to `SM_SECRET_KEY_PREVIOUS`, or re-enter the keys. |
 | Saving a key returns 500, log says `SM_SECRET_KEY is not set` | no secret anywhere | Set `SM_SECRET_KEY` (`make env`) and restart. |
 | Every save fails with `chat_provider must be one of …` | a provider written by `set_setting.py` outside the list (shown as "(unknown provider)") | Pick a real provider on the page. |
-| Save says the page's security token is out of date (API: 403 "CSRF token missing or invalid") | API called without the token, or the session changed | Reload `/ai/`; scripted clients must send `X-CSRF-Token` with the `csrf_token` prop of the `/ai/` page. |
+| Save says the page's security token is out of date (API: 403 "CSRF token missing or invalid") | API called without the token, or the session changed | Reload `/ai/`; scripted clients must send `X-CSRF-Token` with the `csrfToken` prop of the `/ai/` page. |
 | Warning "stored unencrypted" | a key came from `set_setting.py` (or, before #164, the generic settings screen) | Re-save it on the AI page. |
 | Saved a change but some requests still use the old model | other workers have stale settings | Restart the app. |
 | Setting `SM_AI_CHAT_MODEL` (or any `SM_AI_*`) has no effect | the module reads no environment variables | Change it on the AI page or with `set_setting.py`; see [Moving off `SM_AI_*` variables](#moving-off-sm_ai-variables). |

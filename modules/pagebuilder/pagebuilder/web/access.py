@@ -18,7 +18,7 @@ from fastapi import Depends, HTTPException, Request
 from simple_module_hosting.permissions import PermissionDenied, ensure_resolved_permissions
 
 from pagebuilder.core.permissions import PERM_EDIT, may_read
-from pagebuilder.web.csrf import share_csrf_token, verify_csrf_if_configured
+from pagebuilder.web.csrf import verify_csrf_if_configured
 
 
 async def get_current_user_or_401(request: Request) -> Any:
@@ -103,14 +103,13 @@ def build_view_dependencies() -> list[Any]:
     """Dependencies applied to the Inertia view router.
 
     The same as :func:`build_admin_dependencies`, except that the CSRF token is
-    shared as the ``csrf_token`` prop instead of checked. Inertia GETs are safe
-    methods, so the check would pass anyway.
+    not checked: Inertia GETs are safe methods, so the check would pass anyway.
+    The token reaches the page as the framework's ``csrfToken`` shared prop.
     """
     from pagebuilder.core.tenancy import bind_admin
 
     return [
         Depends(require_user_if_configured),
         Depends(bind_admin),
-        Depends(share_csrf_token),
         Depends(require_reader),
     ]

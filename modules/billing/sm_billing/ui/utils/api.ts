@@ -1,4 +1,6 @@
-/** fetch wrapper for the billing API: JSON in/out, CSRF header, readable errors. */
+/** Client for the billing API: JSON in/out, CSRF header, readable errors. */
+
+import { apiFetch } from '@simple-module-py/ui/lib/api';
 
 import { keys, translate } from './i18n';
 import { quotaMessage } from './quotaError';
@@ -85,34 +87,37 @@ function validationMessage(items: unknown[]): string {
     : translate(keys.billing.errors.validation_field, { field, msg });
 }
 
+/** A call on the framework's `apiFetch` (#342), which brings the same-origin
+ *  credentials, `Accept` and the network-failure status 0. What billing adds
+ *  is the throw: an `ApiError` carrying the error code `describeError` reads.
+ *  The page's own `csrf_token` prop is sent explicitly, as before; without it
+ *  `apiFetch` would fall back to the framework's `csrfToken`, the same token. */
 export async function api<T>(
   url: string,
   csrf: string,
   init: { method?: string; body?: unknown } = {},
 ): Promise<T> {
   const method = init.method ?? (init.body === undefined ? 'GET' : 'POST');
-  const response = await fetch(url, {
+  const result = await apiFetch<T>(url, {
     method,
-    credentials: 'same-origin',
-    headers: {
-      Accept: 'application/json',
-      ...(init.body === undefined ? {} : { 'Content-Type': 'application/json' }),
-      ...(method === 'GET' ? {} : { [CSRF_HEADER]: csrf }),
-    },
-    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    headers: method === 'GET' ? {} : { [CSRF_HEADER]: csrf },
+    json: init.body,
   });
-  const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!response.ok) {
-    if (Array.isArray(body.detail)) {
-      throw new ApiError(response.status, 'validation_error', {
-        ...body,
-        message: validationMessage(body.detail),
-      });
-    }
-    const detail = typeof body.detail === 'string' ? body.detail : `http_${response.status}`;
-    throw new ApiError(response.status, detail, body);
+  if (result.ok) return (isRecord(result.data) ? result.data : {}) as T;
+  const body = isRecord(result.error) ? result.error : {};
+  if (Array.isArray(body.detail)) {
+    throw new ApiError(result.status, 'validation_error', {
+      ...body,
+      message: validationMessage(body.detail),
+    });
   }
-  return body as T;
+  const detail = typeof body.detail === 'string' ? body.detail : `http_${result.status}`;
+  throw new ApiError(result.status, detail, body);
+}
+
+/** A parsed JSON object or array; an empty or non-JSON body reads as `{}`. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
 
 export const BILLING_API = '/api/billing';

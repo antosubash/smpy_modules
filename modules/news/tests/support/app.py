@@ -18,8 +18,10 @@ from news.module import NewsModule
 # SQLite, or the Postgres database ``SM_TEST_DATABASE_URL`` names. It is also
 # where "news' tables, plus pagebuilder's where installed" is spelled out.
 from pg_support import make_db_state
+from simple_module_core.menu import MenuRegistry
 from simple_module_core.module_settings import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry
+from simple_module_hosting.middleware import InertiaLayoutDataMiddleware
 from simple_module_inertia import InertiaConfig, inertia_dependency_factory
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -47,7 +49,7 @@ ROLE_VIEWER = "news-viewer"
 
 
 async def _build_app(
-    user: Any, *, mount_public: bool = False, db_file: Path | None = None
+    user: Any, *, mount_public: bool = False, db_file: Path | None = None, layout: bool = False
 ) -> tuple[FastAPI, Any]:
     module = NewsModule()
     app = FastAPI()
@@ -92,6 +94,12 @@ async def _build_app(
         )
     )
 
+    if layout:
+        # The framework's layout props, ``csrfToken`` among them (#342). Inside
+        # the stub auth, as in the host, so it sees the signed-in user.
+        app.add_middleware(
+            InertiaLayoutDataMiddleware, menu_registry=MenuRegistry(), permission_registry=registry
+        )
     app.add_middleware(StubAuthMiddleware, user=user)
     add_token_route(app)
     # Inertia reads flashed errors off the session on every render, so the

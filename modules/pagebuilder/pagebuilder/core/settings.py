@@ -1,7 +1,7 @@
 """PageBuilder module settings — stored in the database, edited in Settings.
 
 There is no ``SM_PAGEBUILDER_*`` environment variable and no ``.env`` stanza:
-:meth:`settings_customise_sources` drops every source pydantic-settings would
+``DbBackedSettings`` drops every source pydantic-settings would
 otherwise consult, leaving the field defaults below and whatever the settings
 module has stored. The module registers this class in ``register_settings``
 via ``register_module_settings``, the host hydrates it from the DB at lifespan
@@ -28,7 +28,7 @@ from pagebuilder.core.settings_media import _RESTART, MediaSettings
 class PagebuilderSettings(MediaSettings):
     """Every pagebuilder setting; the media and snapshot ones are :class:`MediaSettings`'.
 
-    The model config and :meth:`settings_customise_sources` (database and
+    The model config and ``DbBackedSettings``' source rule (database and
     defaults only, never the environment) are inherited from there too.
     """
 
@@ -153,8 +153,8 @@ class PagebuilderSettings(MediaSettings):
     """Require an ``X-CSRF-Token`` header on every mutating admin request.
 
     The check and the token are the framework's (``simple_module_hosting.csrf``),
-    the same ones billing, news and records use. Every pagebuilder screen
-    shares the token as the ``csrf_token`` Inertia prop, and the React client
+    the same ones billing, news and records use. The framework shares the
+    token with every signed-in page as the ``csrfToken`` prop, and the React client
     sends it back on every POST/PUT/PATCH/DELETE. Turn it off only when the
     host guards writes at a layer above the application.
     """

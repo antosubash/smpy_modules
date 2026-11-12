@@ -7,7 +7,7 @@
   "description": "Frontend assets for the PageBuilder module",
   "peerDependencies": {
     "@inertiajs/react": "^3.9.1",
-    "@simple-module-py/ui": "*",
+    "@simple-module-py/ui": ">=0.0.38",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

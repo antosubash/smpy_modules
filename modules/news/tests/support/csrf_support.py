@@ -6,7 +6,7 @@ about an article's workflow should not have to know that, so every client the
 fixtures build is armed once, up front, through a test-only route that returns
 :func:`get_csrf_token` — independent of permissions and tenancy, which a real
 console view would drag in. ``test_csrf`` covers the real channel (the
-``csrf_token`` prop a view shares) and what happens to a write without it.
+framework's ``csrfToken`` shared prop) and what happens to a write without it.
 """
 
 from __future__ import annotations

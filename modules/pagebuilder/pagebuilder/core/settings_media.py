@@ -12,38 +12,20 @@ from pathlib import Path
 from typing import Any, Final
 
 from pydantic import Field
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+from pydantic_settings import SettingsConfigDict
+from simple_module_core.settings_base import DbBackedSettings
 
 _RESTART: Final[dict[str, Any]] = {"requires_restart": True}
 """Marks a field the module reads once, while booting. See ``settings``' docstring."""
 
 
-class MediaSettings(BaseSettings):
+class MediaSettings(DbBackedSettings):
     # ``use_attribute_docstrings`` is what puts the prose under each field on
     # the Settings screen: the admin UI renders ``FieldInfo.description``, and
     # without this every field would arrive there unexplained. Subclasses
     # inherit it.
     model_config = SettingsConfigDict(extra="ignore", use_attribute_docstrings=True)
 
-    @classmethod
-    def settings_customise_sources(
-        cls,
-        settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
-    ) -> tuple[PydanticBaseSettingsSource, ...]:
-        """Init kwargs only — no env, no ``.env``, no secrets directory.
-
-        The hydrator passes stored overrides as keyword arguments, so this
-        leaves exactly two answers for any field: what the database says, or
-        the default declared here. Dropping the env sources rather than merely
-        not documenting them is deliberate — a stray ``SM_PAGEBUILDER_*`` left
-        in a shell or a deploy manifest would otherwise quietly outrank the
-        value an operator can see and edit on the Settings screen.
-        """
-        return (init_settings,)
 
     media_root: Path = Field(
         default=Path("var/pagebuilder/media"), json_schema_extra=_RESTART

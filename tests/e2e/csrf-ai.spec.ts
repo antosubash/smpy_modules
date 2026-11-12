@@ -5,7 +5,7 @@ import { login, moduleCsrfHeader } from './helpers';
 /**
  * #126 — the AI settings API checks the framework's `RequiresCsrf`, like
  * every other module. Its writes are the settings save and the two slot
- * probes. The settings page shares the token as the `csrf_token` prop and
+ * probes. The settings page carries the token as the framework's `csrfToken` prop and
  * `utils/api.ts` sends it; the `sm_ai_csrf` cookie it used to read is gone.
  */
 test.describe('CSRF protection — ai', () => {

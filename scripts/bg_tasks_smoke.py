@@ -91,9 +91,9 @@ def sign_in(client: httpx.Client, email: str, password: str) -> dict[str, str]:
     match = _PAGE_JSON.search(page.text)
     if page.status_code != 200 or not match:
         raise SmokeError(f"no Inertia page on /admin/newsletter/ ({page.status_code})")
-    token = json.loads(match.group(1)).get("props", {}).get("csrf_token")
+    token = json.loads(match.group(1)).get("props", {}).get("csrfToken")
     if not token:
-        raise SmokeError("no csrf_token prop on /admin/newsletter/")
+        raise SmokeError("no csrfToken prop on /admin/newsletter/")
     return {"X-CSRF-Token": token}
 
 
