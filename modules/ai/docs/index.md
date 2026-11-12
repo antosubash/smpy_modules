@@ -55,7 +55,8 @@ The AI module stores its configuration in the framework's shared settings
 store, so it has no tables and no migrations. It reads no environment
 variables: a field the database does not hold is its built-in default. The
 settings are SYSTEM-scope, so all tenants share one provider and key. API keys entered on the settings page are encrypted
-with a key derived from `SM_SECRET_KEY` and stored as `enc:v1:…`. Consumers
+with a key derived from `SM_SECRET_KEY` and stored as `enc:v2:…` (rotatable,
+see `docs/secret-key-rotation.md` at the repo root). Consumers
 call `sm_ai.contracts.resolve_model()` or `resolve_embedder()`, which build a
 fresh Pydantic AI object from the current settings on every call. They make no
 network request; a wrong key or URL fails in the consumer's own call. The only

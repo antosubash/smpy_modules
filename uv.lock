@@ -3471,6 +3471,7 @@ name = "simple-module-records"
 version = "0.0.15"
 source = { editable = "modules/records" }
 dependencies = [
+    { name = "cryptography" },
     { name = "httpx" },
     { name = "pydantic-settings" },
     { name = "simple-module-core" },
@@ -3492,6 +3493,7 @@ pagebuilder = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=42" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },

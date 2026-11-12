@@ -79,7 +79,8 @@ Each slot is checked in this order. The first failure raises
    no embeddings API.
 2. **Model.** The `model_name` override, or the configured model, must not be
    blank (`chat_model` / `embedding_model`).
-3. **Key.** A stored `enc:v1:` key is decrypted. If decryption fails, this
+3. **Key.** A stored `enc:v2:` (or 0.0.15 `enc:v1:`) key is decrypted under
+   `SM_SECRET_KEY` or a key in `SM_SECRET_KEY_PREVIOUS`. If none opens it, this
    raises `AiKeyUnreadableError` (`chat_api_key` / `embedding_api_key`).
 4. **Base URL / key.** `openai_compatible` needs a base URL
    (`*_base_url`), and an empty key is replaced by the placeholder
@@ -91,7 +92,7 @@ Each slot is checked in this order. The first failure raises
 |---|---|---|
 | `AiError` | base class; catch this to handle every AI module error | |
 | `AiNotConfiguredError(AiError)` | a required setting is missing or invalid | `field`; the message names it and may add a hint |
-| `AiKeyUnreadableError(AiError)` | a stored key has the `enc:v1:` prefix but can't be decrypted, because `SM_SECRET_KEY` changed | `field` |
+| `AiKeyUnreadableError(AiError)` | a stored key has an `enc:` prefix but neither `SM_SECRET_KEY` nor a key in `SM_SECRET_KEY_PREVIOUS` decrypts it (the secret was rotated without keeping the old one), or names an unknown format | `field` |
 
 ### Usage metering: `RequiresAiRequest`
 

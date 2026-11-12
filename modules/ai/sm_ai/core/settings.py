@@ -18,7 +18,7 @@ save: there is one provider configuration — and one API key per slot — for
 the whole deployment, shared by every tenant. Nothing is read while booting,
 so no field needs a restart.
 
-API keys are stored as ``enc:v1:<fernet>`` — see ``sm_ai.core.crypto``.
+API keys are stored as ``enc:v2:<fernet>`` — see ``sm_ai.core.crypto``.
 """
 
 from __future__ import annotations

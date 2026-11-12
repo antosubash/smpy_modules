@@ -364,9 +364,11 @@ router dependency on every billing route, the seat-push handler and each
 reconcile tenant re-read `provider`, the two secrets (as ciphertext) and the
 interval from the settings table and rebuild the same way when they differ. A
 loop that finds itself stale ends its tick; one told to stop mid-claim hands
-the claim back (`scheduler._claim_safely`) before the cancel propagates. Secrets are `enc:v1:<fernet>` under a key derived from the app's
-`secret_key` (`crypto.py`, a copy of `sm_ai.core.crypto`'s scheme — a published
-module must not import a sibling optional module).
+the claim back (`scheduler._claim_safely`) before the cancel propagates. Secrets are `enc:v2:<fernet>` under a key derived from the app's
+`secret_key` by HKDF (info `sm_billing:settings`), and decrypt under any key in
+`SM_SECRET_KEY_PREVIOUS` too (`crypto.py`, a copy of `sm_ai.core.crypto` — a
+published module must not import a sibling optional module; the 0.0.15
+`enc:v1:` format is still read).
 
 ## Adding a payment provider
 

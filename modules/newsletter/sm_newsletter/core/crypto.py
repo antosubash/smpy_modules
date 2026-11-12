@@ -1,27 +1,31 @@
-"""Fernet encryption for the stored SMTP password.
+"""Fernet encryption for the stored SMTP password, with key rotation (#351).
 
-The key derives from ``SM_SECRET_KEY`` (SHA-256 → urlsafe base64). The
-running app's secret wins when the module is registered normally — hosts may
-inject ``secret_key`` programmatically via ``create_app(settings=...)``, see
-``set_secret_provider`` (a worker installs its own). The fallback is
-``SM_SECRET_KEY`` from the process environment, then from the project ``.env``
-*as the framework's own ``BootstrapSettings`` locates it* —
-``$SM_PROJECT_ROOT/.env``, else a bounded walk up to the project root — never a
-``.env`` resolved against whatever directory the process happens to run in
-(#124). The provider and process env are re-consulted on every call (only the
-``.env`` read is cached — it cannot change without a restart) and the derived
-Fernet cached per secret, so an early call (before the app's live secret is
-available) can never pin the fallback secret for the process.
-Stored format is ``enc:v1:<fernet token>``:
+A copy of ``sm_ai.core.crypto`` (a published module must not import a sibling),
+pinned by the "stored-secret crypto" parity family. The secret is
+``SM_SECRET_KEY``: the running app's when the module is registered normally
+(``set_secret_provider``; a worker installs its own, ``sm_newsletter.core.secret``),
+else the process environment, then the project ``.env`` as the framework's
+``BootstrapSettings`` locates it (#124).
 
-- prefix present and decrypts        → plaintext key
-- prefix present, decryption fails   → SmtpPasswordUnreadable (secret key changed)
-- no prefix                          → treated as plaintext, warned once
-  (an operator wrote the database directly)
+Stored formats:
+
+- ``enc:v2:<fernet>`` — written today, under HKDF-SHA256 of the secret with
+  this module's own ``info`` (``sm_newsletter:settings``).
+- ``enc:v1:<fernet>`` — the 0.0.15 format (SHA-256 of the secret). Still read,
+  with one warning, until 0.1.0.
+- any other ``enc:`` prefix → SmtpPasswordUnreadable, never plaintext.
+- no prefix → treated as plaintext, warned once (an operator wrote the
+  database directly; workers refuse it, ``sending.runtime``).
+
+Both versions decrypt under ``SM_SECRET_KEY`` and every key in
+``SM_SECRET_KEY_PREVIOUS`` (``docs/secret-key-rotation.md``). The current secret
+is tried first and the variable is read only for a value it does not open, so a
+malformed one never breaks what the current key opens.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from base64 import urlsafe_b64encode
@@ -30,8 +34,11 @@ from functools import lru_cache
 from hashlib import sha256
 from typing import TYPE_CHECKING
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
+from sm_newsletter.core.constants import PACKAGE
 from sm_newsletter.core.errors import SmtpPasswordUnreadable
 
 if TYPE_CHECKING:
@@ -41,11 +48,15 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-ENC_PREFIX = "enc:v1:"
+ENC_V1 = "enc:v1:"
+ENC_V2 = "enc:v2:"
+PREVIOUS_ENV = "SM_SECRET_KEY_PREVIOUS"
+_INFO = f"{PACKAGE}:settings".encode()
 
 # Fields already warned about this process — one line per field is signal,
 # one per read is noise.
 _warned_plaintext: set[str] = set()
+_warned_v1: set[str] = set()
 
 
 # Installed at module registration: returns the running app's live secret so
@@ -59,7 +70,7 @@ def set_secret_provider(provider: Callable[[], str]) -> None:
     _secret_provider = provider
 
 
-def _fernet() -> Fernet:
+def _current_secret() -> str:
     secret = _secret_provider() if _secret_provider is not None else ""
     # Process env first (free), then the cached .env read: the file cannot
     # change without a restart, and an uncached BaseSettings would re-open
@@ -70,7 +81,7 @@ def _fernet() -> Fernet:
             "SM_SECRET_KEY is not set — the newsletter module needs it to "
             "encrypt the SMTP password."
         )
-    return _fernet_for(secret)
+    return secret
 
 
 @lru_cache(maxsize=1)
@@ -94,28 +105,113 @@ def explicit_secret(boot: BootstrapSettings) -> str:
     return boot.secret_key if "secret_key" in boot.model_fields_set else ""
 
 
-@lru_cache(maxsize=4)
-def _fernet_for(secret: str) -> Fernet:
-    # Keyed by secret, not cached bare: the provider is consulted per call,
-    # so the first caller racing module registration cannot freeze the
+def previous_secrets() -> tuple[str, ...]:
+    """The retired secrets still accepted for decryption, newest first.
+
+    ``SM_SECRET_KEY_PREVIOUS`` from the process environment, else from the
+    project ``.env``: one bare key, or a JSON list of keys, each used exactly
+    as given (the framework's ``.env`` parser trims a file value, as it does
+    ``SM_SECRET_KEY``'s). A value that starts with ``[`` and is not a JSON
+    list of strings is refused, naming the variable and never its value.
+    """
+    raw = os.environ.get(PREVIOUS_ENV)
+    return _parse_previous(_dotenv_previous() if raw is None else raw)
+
+
+@lru_cache(maxsize=1)
+def _dotenv_previous() -> str:
+    from simple_module_core.dotenv import find_env_file, parse_dotenv
+
+    return parse_dotenv(find_env_file()).get(PREVIOUS_ENV, "")
+
+
+@lru_cache(maxsize=8)
+def _parse_previous(raw: str) -> tuple[str, ...]:
+    # Keys are used exactly as given, like SM_SECRET_KEY itself: a secret may
+    # start or end with whitespace, and a trimmed one derives another key.
+    # Trimming only decides whether anything is configured at all.
+    if not raw.strip():
+        return ()
+    if not raw.lstrip().startswith("["):
+        return (raw,)
+    try:
+        values = json.loads(raw)
+    except ValueError:
+        values = None
+    if not isinstance(values, list) or not all(isinstance(v, str) for v in values):
+        raise RuntimeError(
+            f"{PREVIOUS_ENV} must be one key or a JSON list of keys (its value is not shown)"
+        )
+    return tuple(v for v in values if v.strip())
+
+
+def _v1_key(secret: str) -> bytes:
+    return urlsafe_b64encode(sha256(secret.encode()).digest())
+
+
+def _v2_key(secret: str) -> bytes:
+    hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=_INFO)
+    return urlsafe_b64encode(hkdf.derive(secret.encode()))
+
+
+@lru_cache(maxsize=16)
+def _keys(secrets: tuple[str, ...], version: str) -> MultiFernet:
+    # Keyed by the secrets, not cached bare: the provider is consulted per
+    # call, so the first caller racing module registration cannot freeze the
     # env/.env fallback in for the whole process.
-    return Fernet(urlsafe_b64encode(sha256(secret.encode()).digest()))
+    derive = _v2_key if version == ENC_V2 else _v1_key
+    return MultiFernet([Fernet(derive(secret)) for secret in secrets])
+
+
+def _unreadable(field: str) -> Exception:
+    return SmtpPasswordUnreadable()
+
+
+def is_encrypted(value: str) -> bool:
+    """Whether ``value`` carries an ``enc:`` prefix of any version."""
+    return value.startswith("enc:")
 
 
 def encrypt_value(plain: str) -> str:
-    """Encrypt the SMTP password for storage."""
-    return ENC_PREFIX + _fernet().encrypt(plain.encode()).decode()
+    """Encrypt a value for storage, always in the current format."""
+    return ENC_V2 + _keys((_current_secret(),), ENC_V2).encrypt(plain.encode()).decode()
+
+
+def _open(token: str, version: str, field: str) -> str:
+    current = _current_secret()
+    try:
+        return _keys((current,), version).decrypt(token.encode()).decode()
+    except InvalidToken:
+        pass
+    # Only a value the current key cannot open reads SM_SECRET_KEY_PREVIOUS, so
+    # a malformed variable (its RuntimeError) never breaks what is current.
+    previous = tuple(s for s in dict.fromkeys(previous_secrets()) if s != current)
+    if not previous:
+        raise _unreadable(field)
+    try:
+        return _keys(previous, version).decrypt(token.encode()).decode()
+    except InvalidToken as exc:
+        raise _unreadable(field) from exc
 
 
 def decrypt_value(stored: str, field: str) -> str:
     """Return the plaintext for a stored value (see module docstring)."""
     if not stored:
         return ""
-    if stored.startswith(ENC_PREFIX):
-        try:
-            return _fernet().decrypt(stored[len(ENC_PREFIX) :].encode()).decode()
-        except InvalidToken as exc:
-            raise SmtpPasswordUnreadable() from exc
+    if stored.startswith(ENC_V2):
+        return _open(stored[len(ENC_V2) :], ENC_V2, field)
+    if stored.startswith(ENC_V1):
+        plain = _open(stored[len(ENC_V1) :], ENC_V1, field)
+        if field not in _warned_v1:
+            _warned_v1.add(field)
+            logger.warning(
+                "Newsletter setting %r is stored in the v1 format; run "
+                "scripts/reencrypt_secrets.py or re-save it through the password endpoint.",
+                field,
+            )
+        return plain
+    if is_encrypted(stored):
+        raise _unreadable(field)
     if field not in _warned_plaintext:
         _warned_plaintext.add(field)
         logger.warning(
@@ -124,6 +220,22 @@ def decrypt_value(stored: str, field: str) -> str:
             field,
         )
     return stored
+
+
+def reencrypt_value(stored: str, field: str) -> str | None:
+    """``stored`` re-encrypted under the current secret in the current format,
+    or ``None`` when it is empty or already that. Plaintext is sealed too; a
+    value no key opens raises the unreadable error."""
+    if not stored:
+        return None
+    if stored.startswith(ENC_V2):
+        try:
+            _keys((_current_secret(),), ENC_V2).decrypt(stored[len(ENC_V2) :].encode())
+        except InvalidToken:
+            pass
+        else:
+            return None
+    return encrypt_value(decrypt_value(stored, field))
 
 
 def smtp_password(settings: NewsletterSettings) -> str:

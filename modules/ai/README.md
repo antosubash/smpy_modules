@@ -94,8 +94,10 @@ validation and key encryption apply to every save. The module
 reads no `SM_AI_*` environment variables: settings live in the database at
 SYSTEM scope, so every tenant shares one provider configuration and one API
 key per slot. API keys are encrypted at
-rest with a key derived from `SM_SECRET_KEY` — rotating that secret means
-re-entering provider keys (the old ciphertexts surface as unreadable). A
+rest with a key derived from `SM_SECRET_KEY`. Rotating that secret keeps them
+readable while the old key is in `SM_SECRET_KEY_PREVIOUS`
+(`docs/secret-key-rotation.md`); without it they surface as unreadable and
+must be re-entered. A
 settings save hot-reloads the worker that handled it; other workers pick
 the change up on restart. Celery workers and scripts that never run the web
 host read the same settings themselves, re-reading at most once a minute.

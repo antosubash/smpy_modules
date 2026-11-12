@@ -14,16 +14,59 @@ these are one deployment's limits.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, field_validator
+from pydantic import AfterValidator, Field, PlainSerializer, field_validator
 from pydantic_settings import SettingsConfigDict
 from simple_module_core.rate_limit import RateLimitError, parse_rate
 
+from sm_records.core import crypto
 from sm_records.core.settings.settings_boot import BootSettings
 
-__all__ = ["PublicSubmissionsSettings", "check_origin"]
+__all__ = ["PublicSubmissionsSettings", "SealedSecret", "check_origin", "seal_secret"]
+
+
+def seal_secret(value: str | None) -> str:
+    """What a :data:`SealedSecret` is stored as: ``enc:v2:…`` (#350).
+
+    Empty stays empty and a value that is already ``enc:`` passes through, so a
+    hydrated row is never encrypted twice; anything else is encrypted under the
+    app's secret. Raises ``RuntimeError`` when a live app is attached but its
+    ``secret_key`` is empty, so nothing is ever written in the clear instead.
+
+    With no live app attached — no provider installed (newsletter's worker
+    hydrating ``RecordsSettings`` through ``settings_for``), or the app that
+    installed it was garbage collected — the value is dumped as it is held,
+    never raising: such a process never writes settings,
+    and every write path (the Settings screen, ``set_setting.py``, the startup
+    seal, ``reencrypt_secrets.py``) runs in an app that installed one. Dumping
+    is the only place this runs: hydration, ``model_copy`` and the framework's
+    reload comparison (``getattr``) never call it, so a legacy plaintext value
+    in memory is stable and never reported as changed.
+    """
+    text = (value or "").strip()
+    if not text or crypto.is_encrypted(text) or not crypto.has_secret_provider():
+        return text
+    return crypto.encrypt_value(text)
+
+
+SealedSecret = Annotated[
+    str | None,
+    AfterValidator(lambda value: value or ""),
+    PlainSerializer(seal_secret, return_type=str),
+]
+"""A secret encrypted *before* it is stored, through every supported write.
+
+The value held in memory is what the row holds — ``enc:v2:…``, or the plaintext
+of a row stored before 0.0.16, which startup seals
+(``public_submissions.captcha_secret``) — and is decrypted only where it is used.
+What makes the write safe is the dump: ``str | None`` is a ``json``-typed field
+to the framework, and the Settings screen's write path stores a json field's
+*validated dump*, not the submitted text (framework GH #487, pinned by
+``tests/public_submissions/test_captcha_secret.py``), so the screen writes the
+serializer's ``enc:v2:``. ``scripts/set_setting.py`` stores the same dump.
+``None`` (an emptied nullable input) reads as ``""``."""
 
 
 def check_origin(value: str) -> str:
@@ -108,9 +151,11 @@ class PublicSubmissionsSettings(BootSettings):
     public_submissions_captcha_site_key: str = ""
     """The provider's public site key, sent to the form to render the widget."""
 
-    public_submissions_captcha_secret: str = ""
+    public_submissions_captcha_secret: SealedSecret = ""
     """The provider's secret key, used only to verify a response server-side.
-    Masked on the Settings screen and stored as other secrets here are."""
+    Masked on the Settings screen, and stored encrypted (``enc:v2:``) under the
+    app's secret key whichever way it is saved; a value stored before 0.0.16 is
+    encrypted at the next startup."""
 
     public_submissions_retention_enabled: bool = True
     """Run the hourly clean-up: delete contact-form submissions older than

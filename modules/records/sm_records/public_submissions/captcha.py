@@ -15,7 +15,9 @@ provider that cannot be reached (timeout, 5xx, an answer that is not JSON) is
 provider that is configured without both keys is treated as unreachable for
 the same reason, and the definition leaves the widget out
 (:func:`public_config`), so a half-configured CAPTCHA refuses rather than
-silently protects nothing.
+silently protects nothing. The secret is stored encrypted
+(:mod:`.captcha_secret`, #350) and decrypted here, per check; one no known key
+opens is ``503 captcha_unavailable`` too.
 
 The widget's script comes from the provider's host, so the public pages'
 ``Content-Security-Policy`` (pagebuilder's ``public_csp``) has to allow it;
@@ -32,6 +34,7 @@ from typing import Any, Final
 import httpx
 
 from sm_records.core.settings import RecordsSettings
+from sm_records.public_submissions import captcha_secret
 from sm_records.public_submissions.errors import SubmissionRefused
 
 __all__ = [
@@ -96,7 +99,19 @@ async def verify(settings: RecordsSettings, response: str | None, remote_ip: str
     provider = _provider(settings)
     if provider is None:
         return
-    secret = settings.public_submissions_captcha_secret.strip()
+    try:
+        secret = captcha_secret.secret(settings)
+    except Exception as exc:
+        # Unreadable, no secret key, a malformed SM_SECRET_KEY_PREVIOUS, or an
+        # OS/import error reading it: all fail closed as 503, never a 500. The
+        # field name and the error's type only — never a message, which might
+        # echo the stored value — and no chained cause for the same reason.
+        logger.error(
+            "records: the stored %s cannot be decrypted (%s); refusing",
+            captcha_secret.FIELD,
+            type(exc).__name__,
+        )
+        raise SubmissionRefused("captcha_unavailable", "the CAPTCHA could not be checked") from None
     if not secret or not settings.public_submissions_captcha_site_key.strip():
         logger.error("records: the %s CAPTCHA has no site key or secret; refusing", provider)
         raise SubmissionRefused("captcha_unavailable", "the CAPTCHA could not be checked")

@@ -1488,8 +1488,9 @@ every submission's `captcha_response` is verified with the provider's
 `siteverify` endpoint (5-second timeout) after the token and before anything
 is stored: a missing or rejected response is `400 captcha_failed`, and a
 provider that cannot be reached, answers with an error, or is configured
-without both keys is `503 captcha_unavailable` — it fails closed. A honeypot
-hit is dropped before the provider is asked.
+without both keys is `503 captcha_unavailable` — it fails closed, as it does
+when the stored secret (kept encrypted, `enc:v2:`) cannot be decrypted. A
+honeypot hit is dropped before the provider is asked.
 
 **The form token** is `{digest}.{issued}.{nonce}.{mac}`, the MAC an
 HMAC-SHA256 under the host's `secret_key` over the tenant, the type key, the

@@ -53,15 +53,18 @@ connects. Campaigns stay as they are until it is fixed; until then the only
 sign is the log (`newsletter.dispatch refused: SecretMissing`). The same refusal
 applies to a stored SMTP password the key cannot decrypt, an unreadable settings
 row, and, on the `smtp` transport, a plaintext password: the worker refuses a
-non-empty SMTP password stored without `enc:v1:`, so re-save it through
+non-empty SMTP password stored without an `enc:` prefix (`enc:v2:`, or the
+0.0.15 `enc:v1:`, still read until 0.1.0), so re-save it through
 `PUT /api/newsletter/settings/smtp-password`.
 
-The secret signs the unsubscribe links as well. If it is rotated, links already
-sent stop verifying (they answer the same page, but unsubscribe nobody) and the
-encrypted password is unreadable until it is saved again. A worker keeps
-decrypting the SMTP password with the first secret it resolved until it
-restarts (tokens re-resolve the secret each tick), so restart the workers after
-a rotation.
+The secret signs the unsubscribe, open and click links as well. Rotate it as
+`docs/secret-key-rotation.md` (repo root) describes: with the old key in
+`SM_SECRET_KEY_PREVIOUS` the password keeps decrypting, and
+`scripts/reencrypt_secrets.py` re-encrypts it under the new key. The links are
+**not** covered: those already sent stop verifying after a rotation (they answer
+the same page, but unsubscribe nobody). A worker keeps decrypting the SMTP
+password with the first secret it resolved until it restarts (tokens re-resolve
+the secret each tick), so restart the workers after each step of a rotation.
 
 ## Unsubscribe links in access logs
 

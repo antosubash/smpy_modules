@@ -68,9 +68,10 @@ class DispatchConfig:
 
 def refuse_plaintext_password(settings: NewsletterSettings) -> None:
     """Raise :class:`PlaintextPassword` for an ``smtp`` transport whose stored
-    password lacks ``enc:v1:``. The message names the endpoint, never the value."""
+    password has no ``enc:`` prefix (``enc:v2:``, or a 0.0.15 ``enc:v1:``). The
+    message names the endpoint, never the value."""
     password = settings.smtp_password
-    if settings.transport == "smtp" and password and not password.startswith(crypto.ENC_PREFIX):
+    if settings.transport == "smtp" and password and not crypto.is_encrypted(password):
         raise PlaintextPassword(
             f"the stored SMTP password is not encrypted; save it again with {PASSWORD_ENDPOINT}"
         )

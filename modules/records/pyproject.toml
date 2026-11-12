@@ -18,6 +18,8 @@ dependencies = [
     "pydantic-settings>=2.0",
     # The optional CAPTCHA's server-side verification (#101).
     "httpx>=0.27",
+    # The CAPTCHA secret is stored encrypted (#350).
+    "cryptography>=42",
 ]
 
 [project.urls]

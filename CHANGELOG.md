@@ -55,6 +55,46 @@ name the module they affect.
   and snapshot settings moved to `pagebuilder.core.settings_media`
   (`PagebuilderSettings` inherits them, so nothing changes for a caller), which
   lists them first on the Settings screen.
+- **Stored credentials survive a `SM_SECRET_KEY` rotation** (#351, ai, billing,
+  newsletter, records). Each module now encrypts under its own key (HKDF-SHA256
+  of the secret, info `<package>:settings`) and writes `enc:v2:…`; every module
+  also decrypts with the keys in the new `SM_SECRET_KEY_PREVIOUS` (one key or a
+  JSON list, from the environment or `.env`; read only for a value the current
+  key does not open, so a malformed value — an error naming the variable, never
+  its value — never breaks what the current key opens), and the new
+  `scripts/reencrypt_secrets.py` re-encrypts every stored secret under the
+  current key, all or nothing, never printing a value. A stored value with an
+  unknown `enc:` version is refused instead of being used as plaintext. The
+  unreadable-key errors name `SM_SECRET_KEY_PREVIOUS`. Signed things (sessions,
+  newsletter unsubscribe/open/click links, records' form tokens and confirmation
+  links, images' upload tickets) are not covered. Procedure:
+  `docs/secret-key-rotation.md`.
+- **records stores the CAPTCHA secret encrypted** (#350).
+  `public_submissions_captcha_secret` was kept in the settings table in the
+  clear; it is now stored `enc:v2:…` whichever way it is saved (the Settings
+  screen and `scripts/set_setting.py` store the encrypted value, never the text
+  typed), and decrypted per submission. A secret that no key opens refuses
+  submissions with `503 captcha_unavailable`, logged by field name only. The
+  framework's `smpy settings import-from-env` still stores what it imports as
+  written; a CAPTCHA secret imported that way is encrypted at the next start. The
+  field is typed `str | None` (a JSON string for `set_setting.py`:
+  `'"<secret>"'`). `scripts/set_setting.py` now stores any JSON field as its
+  type dumps it, as the Settings screen does, and no longer echoes a value the
+  screen would mask.
+
+### Deprecated
+
+- **`enc:v1:` stored secrets** (ai, billing, newsletter). Still read, with one
+  warning per field, until **0.1.0**. Run `scripts/reencrypt_secrets.py`, or
+  re-save each secret, to rewrite them as `enc:v2:`.
+
+### Upgrading
+
+- Nothing is required. Existing `enc:v1:` values keep working, and records
+  encrypts a plaintext CAPTCHA secret in place at the first startup (a warning
+  says so). Downgrading to 0.0.15 after a secret was saved again (or
+  re-encrypted) leaves it unreadable there (`enc:v2:`); re-enter it after a
+  downgrade. records now depends on `cryptography>=42`.
 
 ### Fixed
 

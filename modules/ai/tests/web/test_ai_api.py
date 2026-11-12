@@ -94,7 +94,7 @@ class TestBuildChanges:
     def test_new_key_is_encrypted(self, monkeypatch):
         monkeypatch.setenv("SM_SECRET_KEY", SECRET)
         changes = AiService.build_changes(AiSettingsUpdate(chat_api_key="sk-new"))
-        assert changes["chat_api_key"].startswith(crypto.ENC_PREFIX)
+        assert changes["chat_api_key"].startswith(crypto.ENC_V2)
         assert crypto.decrypt_value(changes["chat_api_key"], "chat_api_key") == "sk-new"
 
     def test_key_is_stripped_before_encryption(self, monkeypatch):

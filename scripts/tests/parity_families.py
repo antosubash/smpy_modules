@@ -6,18 +6,19 @@ Adding one to get a red build green is the drift this file exists to catch —
 the fix is usually to change the lagging copy instead.
 
 The tenancy families (``{pagebuilder,news,records}/tenancy.py`` and
-``_tenancy_mode.py``) live in ``parity_tenancy.py`` and are appended below.
+``_tenancy_mode.py``) live in ``parity_tenancy.py``, the stored-secret crypto
+families in ``parity_crypto.py``; both are appended below.
 """
 
 from __future__ import annotations
 
+from parity_crypto import CRYPTO_FAMILIES
 from parity_support import Copy, Family
 from parity_tenancy import TENANCY_FAMILIES
 
 PB = "modules/pagebuilder/pagebuilder"
 NEWS = "modules/news/news"
 AI = "modules/ai/sm_ai"
-BILLING = "modules/billing/sm_billing"
 RECORDS = "modules/records/sm_records"
 
 _AS_MODULE = {"pagebuilder": "MODULE", "news": "MODULE", "sm_ai": "MODULE", "sm_records": "MODULE"}
@@ -155,65 +156,6 @@ FAMILIES: tuple[Family, ...] = (
         },
     ),
     Family(
-        "secret encryption",
-        (
-            Copy(
-                f"{AI}/core/crypto.py",
-                {"AiKeyUnreadableError": "KeyUnreadableError"},
-                own={
-                    "_dotenv_secret": "The AI module also runs in a Celery worker with no app, "
-                    "so it falls back to SM_SECRET_KEY from the environment and .env.",
-                    "explicit_secret": "See _dotenv_secret.",
-                },
-                messages=(
-                    "AI setting %r is stored unencrypted; re-save it via the AI "
-                    "settings page to encrypt it.",
-                ),
-            ),
-            Copy(
-                f"{BILLING}/core/crypto.py",
-                {"BillingKeyUnreadableError": "KeyUnreadableError"},
-                own={
-                    "BillingKeyUnreadableError": "AI keeps its error in sm_ai.contracts.errors, "
-                    "where its API maps it to a response.",
-                },
-                messages=(
-                    "Billing setting %r is stored unencrypted; re-save it on "
-                    "/admin/billing/connection to encrypt it.",
-                ),
-            ),
-        ),
-        differ={
-            "_fernet": "Billing reads no environment, so it has no fallback after the provider.",
-        },
-    ),
-    Family(
-        "stored-secret crypto",
-        (
-            Copy(f"{AI}/core/crypto.py"),
-            Copy(
-                "modules/newsletter/sm_newsletter/core/crypto.py",
-                {"SmtpPasswordUnreadable": "AiKeyUnreadableError"},
-                messages=(
-                    "Newsletter setting %r is stored unencrypted; re-save it through "
-                    "the password endpoint to encrypt it.",
-                ),
-            ),
-        ),
-        shared=(
-            "ENC_PREFIX",
-            "set_secret_provider",
-            "_fernet_for",
-            "explicit_secret",
-            "_dotenv_secret",
-            "encrypt_value",
-        ),
-        differ={
-            "decrypt_value": "Each module raises its own unreadable-secret error.",
-            "_fernet": "Each names its own module in the missing-secret message.",
-        },
-    ),
-    Family(
         "scheduler shutdown",
         (
             Copy(
@@ -261,5 +203,6 @@ FAMILIES: tuple[Family, ...] = (
         ),
         shared=("_shared", "_pg", "arm_reset", "USING_POSTGRES"),
     ),
+    *CRYPTO_FAMILIES,
     *TENANCY_FAMILIES,
 )

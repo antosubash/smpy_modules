@@ -20,11 +20,13 @@ class AiNotConfiguredError(AiError):
 
 
 class AiKeyUnreadableError(AiError):
-    """A stored key has the enc:v1: prefix but cannot be decrypted."""
+    """A stored key has an ``enc:`` prefix but no known key decrypts it."""
 
     def __init__(self, field: str) -> None:
         self.field = field
         super().__init__(
-            f"The stored key {field!r} cannot be decrypted — SM_SECRET_KEY has "
-            "changed. Re-enter the key on the AI settings page."
+            f"The stored key {field!r} cannot be decrypted with SM_SECRET_KEY or any "
+            "key in SM_SECRET_KEY_PREVIOUS. If SM_SECRET_KEY was rotated, add the old "
+            "key to SM_SECRET_KEY_PREVIOUS (see docs/secret-key-rotation.md), or "
+            "re-enter the key on the AI settings page."
         )
