@@ -25,7 +25,6 @@ from tests.imports.world import FIELDS, upload
 from tests.pg_support import USING_POSTGRES
 from tests.support.app import build_app
 from tests.support.import_world import (
-    SETTINGS,
     SUB,
     counts,
     job_row,
@@ -34,7 +33,7 @@ from tests.support.import_world import (
     run,
     suppression_rows,
 )
-from tests.support.records_seed import seed_list, seed_subscriber
+from tests.support.records_seed import RECORDS_APP, seed_list, seed_subscriber
 
 pytestmark = pytest.mark.unbound_tenant
 
@@ -82,7 +81,7 @@ async def test_unsubscribe_elsewhere_during_admission_is_honoured(state, monkeyp
             type_key="other",
             uuid=uuid,
             unless_confirmed_after=None,
-            settings=SETTINGS,
+            app=RECORDS_APP,
         )
         task = asyncio.create_task(run(state.session_factory, jid))
         with contextlib.suppress(TimeoutError):
