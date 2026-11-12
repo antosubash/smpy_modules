@@ -156,7 +156,7 @@ What remains:
 - Neither client a base URL gets follows redirects (the SDKs' default clients
   do, and a followed hop would carry the key's header to another host): a base
   URL that answers `301`/`307`, such as `http://` to `https://` or a missing
-  trailing slash, fails with the `http_error` or `other` code until the URL is
+  trailing slash, fails with the `other` code (a 3xx is not an `http_error`) until the URL is
   the final one. That holds with `allow_private_base_url` on too.
 - One client is kept per event loop and base-URL origin
   (`sm_ai.connections.clients`, at most 8 origins per loop; a finished loop's

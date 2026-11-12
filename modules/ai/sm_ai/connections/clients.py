@@ -59,9 +59,14 @@ _FACTORIES: Final[dict[str, Callable[[], httpx2.AsyncClient]]] = {
 }
 
 
+_CLOSING: set[asyncio.Task[None]] = set()  # the loop keeps tasks only weakly
+
+
 def _close_later(loop: asyncio.AbstractEventLoop, client: httpx2.AsyncClient) -> None:
     with contextlib.suppress(RuntimeError):  # the loop is closing
-        loop.create_task(client.aclose())
+        task = loop.create_task(client.aclose())
+        _CLOSING.add(task)
+        task.add_done_callback(_CLOSING.discard)
 
 
 def client_for(kind: str, base_url: str, *, shared: bool = True) -> httpx2.AsyncClient:
