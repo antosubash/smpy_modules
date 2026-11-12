@@ -26,6 +26,11 @@ from cryptography.x509.oid import NameOID  # noqa: E402
 
 
 def _cert(subject: str, issuer_key, issuer_name, key, *, ca: bool, san: str | None):
+    """A certificate that passes OpenSSL's strict X.509 checks.
+
+    Python 3.13+ turns on ``VERIFY_X509_STRICT`` in ``create_default_context``,
+    which refuses a chain without key identifiers or a CA without key usage.
+    """
     now = dt.datetime.now(dt.UTC)
     builder = (
         x509.CertificateBuilder()
@@ -36,6 +41,25 @@ def _cert(subject: str, issuer_key, issuer_name, key, *, ca: bool, san: str | No
         .not_valid_before(now - dt.timedelta(minutes=5))
         .not_valid_after(now + dt.timedelta(hours=1))
         .add_extension(x509.BasicConstraints(ca=ca, path_length=None), critical=True)
+        .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+        .add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(issuer_key.public_key()),
+            critical=False,
+        )
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=ca,
+                crl_sign=ca,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
     )
     if san:
         builder = builder.add_extension(
