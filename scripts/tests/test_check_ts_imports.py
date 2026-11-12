@@ -10,19 +10,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import check_ts_imports
 
-EXPORTS = {".": "./pagebuilder/index.ts", "./widgets-base.css": "./pagebuilder/static/w.css"}
+MAIN = {"main": "./pagebuilder/index.ts"}
+EXPORTS = {"exports": {".": "./a/index.ts", "./w.css": "./a/w.css"}}
 
 
 def _repo(tmp_path: Path) -> Path:
-    for module, pkg, exports in (
-        ("pagebuilder", "pagebuilder", EXPORTS),
-        ("news", "news", None),
+    for module, pkg, entry in (
+        ("pagebuilder", "pagebuilder", MAIN),
+        ("analytics", "a", EXPORTS),
+        ("news", "news", {}),
     ):
         d = tmp_path / "modules" / module / pkg
         d.mkdir(parents=True)
-        manifest = {"name": f"@simple-module-py/{module}"}
-        if exports:
-            manifest["exports"] = exports
+        manifest = {"name": f"@simple-module-py/{module}", **entry}
         (d.parent / "package.json").write_text(json.dumps(manifest), encoding="utf-8")
     (tmp_path / "host" / "client_app").mkdir(parents=True)
     return tmp_path
@@ -42,12 +42,10 @@ def test_the_repo_has_no_deep_imports():
     assert check_ts_imports.check() == []
 
 
-def test_the_package_entry_and_declared_subpaths_pass(tmp_path):
+def test_a_package_root_passes_through_main_or_exports(tmp_path):
     root = _repo(tmp_path)
     _write(root, "modules/news/news/a.ts", "import { x } from '@simple-module-py/pagebuilder';\n")
-    _write(
-        root, "host/client_app/s.css", '@import "@simple-module-py/pagebuilder/widgets-base.css";\n'
-    )
+    _write(root, "host/client_app/a.ts", "import { y } from '@simple-module-py/analytics';\n")
     _write(
         root, "modules/news/news/b.ts", "import { Button } from '@simple-module-py/ui/button';\n"
     )
@@ -80,10 +78,24 @@ def test_a_css_deep_import_is_refused(tmp_path):
     assert "host/client_app/s.css:1: deep import" in _errors(root)
 
 
+def test_a_subpath_exports_declares_is_still_refused(tmp_path):
+    root = _repo(tmp_path)
+    _write(root, "host/client_app/s.css", '@import "@simple-module-py/analytics/w.css";\n')
+    assert "host/client_app/s.css:1: deep import into @simple-module-py/analytics" in _errors(root)
+
+
+def test_the_host_stylesheet_is_the_one_allowance():
+    (entry,) = check_ts_imports.ALLOWLIST
+    assert entry == (
+        "host/client_app/styles.css",
+        "@simple-module-py/pagebuilder/pagebuilder/static/widgets-base.css",
+    )
+
+
 def test_a_module_without_an_entry_cannot_be_imported(tmp_path):
     root = _repo(tmp_path)
     _write(root, "modules/pagebuilder/pagebuilder/a.ts", "import '@simple-module-py/news';\n")
-    assert "@simple-module-py/news declares no '.' export" in _errors(root)
+    assert "@simple-module-py/news has no '.' export or main" in _errors(root)
 
 
 def test_a_relative_path_into_another_module_is_refused(tmp_path):

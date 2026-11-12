@@ -383,8 +383,8 @@ builds on), `web/` (endpoints, schemas, services, serving), one folder per
 domain (images: `ingest/`, `pipeline/`, `jobs/`, `map/`) and `ui/` for the
 frontend that is not a page. Tests mirror the areas under `tests/`.
 Another module's frontend is imported only as `@simple-module-py/<module>`
-(its `index.ts`, via `package.json` `exports`) or a subpath `exports`
-declares, never by file path or a relative path into `modules/<other>/`;
+(its `index.ts`, via `package.json` `exports`, or `main` for pagebuilder until
+0.0.17), never by file path or a relative path into `modules/<other>/`;
 `scripts/check_ts_imports.py` (`make lint`, CI) enforces it (#337).
 New code in any module follows it. Every module follows it; structural changes keep the same moves-only
 review boundary.
@@ -401,7 +401,12 @@ path. `host/tests/test_moved_paths_tables.py` fails once the version reaches
 billing's `plans`) and the `__path__` lines (records' `index` and `seed`),
 `scripts/moved_paths*` with its test and the `--check` lines in the Makefile and
 `ci.yml`, `host/tests/test_moved_paths*.py` and `moved_paths_probe.py`, and the
-stub filter in the `test_layout.py` of ai, billing and news.
+stub filter in the `test_layout.py` of ai, billing and news; then give
+pagebuilder's `package.json` `"exports": {".": "./pagebuilder/index.ts",
+"./widgets-base.css": "./pagebuilder/static/widgets-base.css"}` in place of its
+`main`/`types` (#337), which until then must leave every deep path resolvable,
+point `host/client_app/styles.css` at `@simple-module-py/pagebuilder/widgets-base.css`
+and drop its `ALLOWLIST` entry in `scripts/check_ts_imports.py`.
 A later move needs aliases the same way.
 
 **300-line cap** on every `.py` / `.ts` / `.tsx`, enforced by

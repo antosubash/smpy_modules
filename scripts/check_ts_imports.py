@@ -1,17 +1,18 @@
 """Refuse a deep frontend import into another module's package (#337).
 
-A module's TypeScript is public only through its package's ``exports`` map:
-``@simple-module-py/<module>`` (its ``index.ts``) and any subpath the map
-declares, such as pagebuilder's ``./widgets-base.css``. Anything else is a
-file path, and importing one makes every internal move a breaking change;
+A module's TypeScript is public only through its package root,
+``@simple-module-py/<module>`` (its ``index.ts``, named by ``exports`` or, for
+pagebuilder until the 0.0.14 stubs go in 0.0.17, by ``main``). Anything else is
+a file path, and importing one makes every internal move a breaking change;
 that is why the 0.0.14 layout move needed hundreds of re-export stubs (#319).
 
 Refused, in ``modules/*`` and ``host/client_app``:
 
-* ``@simple-module-py/<module>/<sub>`` for a module of this repo, unless
-  ``./<sub>`` is a key of that module's ``exports`` (a module's own files
-  included: they import each other relatively);
-* ``@simple-module-py/<module>`` for a module that declares no ``"."`` export;
+* ``@simple-module-py/<module>/<sub>`` for a module of this repo, even when
+  its ``exports`` declares ``./<sub>`` (a module's own files included: they
+  import each other relatively); ``ALLOWLIST`` names the exceptions;
+* ``@simple-module-py/<module>`` for a module with neither a ``"."`` export
+  nor a ``main``;
 * a relative path that leaves the importing module for ``modules/<other>/``,
   or reaches ``modules/`` from the host.
 
@@ -50,23 +51,30 @@ _SPECIFIER = re.compile(
 )
 _CSS_IMPORT = re.compile(r"""@import\s+(?:url\(\s*)?(['"])([^'"\n]+)\1""")
 
-# (repo-relative file, specifier) -> why it may stay. Keep it empty.
-ALLOWLIST: dict[tuple[str, str], str] = {}
+# (repo-relative file, specifier) -> why it may stay.
+ALLOWLIST: dict[tuple[str, str], str] = {
+    (
+        "host/client_app/styles.css",
+        "@simple-module-py/pagebuilder/pagebuilder/static/widgets-base.css",
+    ): (
+        "a stylesheet is not a TS export; until 0.0.17 pagebuilder has `main`, not an "
+        "`exports` map, so this file path is how CSS reaches it. At 0.0.17 it becomes "
+        "`@simple-module-py/pagebuilder/widgets-base.css` and this entry goes (#337)."
+    ),
+}
 
 
 def _packages(root: Path) -> dict[str, tuple[str, set[str]]]:
-    """npm name -> (module directory name, the keys of its ``exports``)."""
+    """npm name -> (module directory name, whether it has a root entry)."""
     found = {}
     for manifest in sorted((root / "modules").glob("*/package.json")):
         data = json.loads(manifest.read_text(encoding="utf-8"))
         exports = data.get("exports")
-        if isinstance(exports, str):
-            keys = {"."}
-        elif isinstance(exports, dict):
-            keys = set(exports)
+        if isinstance(exports, dict):
+            entry = "." in exports
         else:
-            keys = set()
-        found[data["name"]] = (manifest.parent.name, keys)
+            entry = isinstance(exports, str) or bool(data.get("main"))
+        found[data["name"]] = (manifest.parent.name, entry)
     return found
 
 
@@ -114,12 +122,8 @@ def _problem(spec: str, path: Path, root: Path, packages: dict) -> str | None:
         name = "/".join(spec.split("/")[:2])
         if name not in packages:
             return None  # the framework's packages (`ui`, `i18n`, …) are not ours to police
-        sub = spec[len(name) :]
-        exports = packages[name][1]
-        if not sub:
-            return None if "." in exports else f"{name} declares no '.' export"
-        if f".{sub}" in exports:
-            return None
+        if spec == name:
+            return None if packages[name][1] else f"{name} has no '.' export or main"
         return f"deep import into {name}; import from '{name}' (its index.ts) instead"
     if spec.startswith("."):
         here = _module_of(path, root)
@@ -149,7 +153,7 @@ def main() -> int:
     if errors:
         print(
             f"\n{len(errors)} deep import(s) into another module's package. Export what you "
-            "need from that module's index.ts (or its package.json exports) instead (#337).",
+            "need from that module's index.ts instead (#337).",
             file=sys.stderr,
         )
         return 1
