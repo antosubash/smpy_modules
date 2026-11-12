@@ -12,6 +12,12 @@ import {
 import { type ReactNode, useState } from 'react';
 import { keys, useT } from '../utils/i18n';
 
+/*
+ * Not the framework's `ConfirmActionDialog` (#342), which is controlled (it
+ * has no trigger), runs no async `onConfirm`, and so cannot keep itself open
+ * and show the server's refusal while the request runs or after it fails. Nor does
+ * it take `initialFocusId`, `onOpenChange` or `confirmDisabled`, which callers here use.
+ */
 /**
  * Confirm a consequential action (delete/restore/purge) without handing the
  * page to `window.confirm()` — which cannot show a server error if the

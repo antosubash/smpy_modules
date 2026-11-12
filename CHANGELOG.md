@@ -217,6 +217,24 @@ name the module they affect.
     Records reads its own settings from that app, or with `settings_for` in a
     worker. `newsletter_import` no longer exports `RecordsSettings`. These
     contracts first ship in 0.0.16, so no released caller breaks.
+- **Every module's console uses the framework's CSRF token** (#342). The
+  token is now the framework's `csrfToken` shared prop, which every signed-in
+  page carries, read through `currentCsrfToken` from `@simple-module-py/ui`.
+  ai, images, news, newsletter, pagebuilder and records no longer share their
+  own `csrf_token` prop. Their `share_csrf_token` hooks are gone, and so are images'
+  and newsletter's `web/endpoints/csrf.py`. analytics drops its `csrf_token`
+  page prop and its `ui/utils/csrf.ts`. Each remaining `ui/utils/csrf.ts` only
+  adds the header to the module's own `fetch` (and pagebuilder's upload XHR)
+  and translates the framework's 403. A token no longer outlives a page that
+  carries none (a sign-out). billing's `api()` is built on `apiFetch`, and
+  keeps passing its pages' own `csrf_token`. **Scripted clients** that read
+  `csrf_token` from an ai, images, news, newsletter, pagebuilder, records or
+  analytics page should read `csrfToken` instead. The `web/csrf.py` of ai, news
+  and records stays only as the target of the deprecated `<module>.csrf` alias
+  until 0.0.17 and shares nothing. Floors: `simple_module_hosting>=0.0.38` for
+  ai, news and pagebuilder, and `@simple-module-py/ui>=0.0.38` as every module's
+  peer. The four `ConfirmDialog` copies stay: `ConfirmActionDialog` has no
+  trigger or async `onConfirm`, so it cannot show the refusal in the dialog.
 
 ### Deprecated
 

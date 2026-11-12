@@ -36,6 +36,12 @@ export type ConfirmLevel = 'low' | 'medium' | 'high';
 
 const CONFIRM_PHRASE_INPUT = 'confirm-dialog-phrase';
 
+/*
+ * Not the framework's `ConfirmActionDialog` (#342), which is controlled (it
+ * has no trigger), runs no async `onConfirm`, and so cannot keep itself open
+ * and show the server's refusal while the request runs or after it fails. Its typed
+ * phrase also matches case-insensitively, where `high` here asks for it exactly.
+ */
 /**
  * Confirm a consequential action without handing the page to the browser.
  *
