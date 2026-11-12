@@ -32,7 +32,7 @@ import sys
 
 import reencrypt_support as rs
 from headless_settings import headless_settings
-from simple_module_db.stored_settings import settings_table_clause
+from simple_module_db.stored_settings import settings_table_clause, settings_table_exists
 from simple_module_hosting.app_builder import create_app
 from sqlalchemy import and_, or_, select
 
@@ -88,6 +88,9 @@ async def run(*, dry_run: bool, seal_plaintext: bool) -> int:
         # headless_settings() already refused when no key is provisioned.
         rs.install_secret(app.state.sm.settings.secret_key)
         async with app.state.sm.db.session_factory() as session:
+            if not await settings_table_exists(session):  # a fresh database: nothing stored
+                print("Nothing to re-encrypt (no settings table yet).")
+                return 0
             targets, others = await _rows(session)
             try:
                 # Once, before planning: one "cannot run" line, not a per-row raise.

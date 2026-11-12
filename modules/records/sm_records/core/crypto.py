@@ -75,9 +75,15 @@ def set_secret_provider(provider: Callable[[], str]) -> None:
 
 
 def has_secret_provider() -> bool:
-    """Whether an app installed its secret (records only: ``SealedSecret``
-    dumps unsealed in a process with no app, such as newsletter's worker)."""
-    return _secret_provider is not None
+    """Whether a live app supplies a secret (records only: ``SealedSecret``
+    dumps unsealed in a process with no app, such as newsletter's worker).
+
+    Asks the provider rather than whether one is installed: it holds its app
+    weakly and answers ``""`` once that app is gone (a test suite builds many),
+    and a dump then must not raise. A host app always has a ``secret_key``
+    (``merge_host_settings`` generates one), so a write path never sees ``""``.
+    """
+    return _secret_provider is not None and bool(_secret_provider())
 
 
 def _current_secret() -> str:

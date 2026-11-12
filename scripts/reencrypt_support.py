@@ -146,13 +146,13 @@ def _encode(row: Row, value: str) -> str:
 def plan_row(row: Row, *, seal_plaintext: bool = True) -> Plan:
     """What ``row`` needs. Never raises for a bad value; the plan says so."""
     crypto = crypto_for(row.package)
+    if crypto is None:  # first: an orphaned row is reported as such, whatever it holds
+        return Plan(row, NOT_INSTALLED)
     stored = _decode(row)
     if stored is None:
         return Plan(row, UNREADABLE)
     if not stored:
         return Plan(row, EMPTY)
-    if crypto is None:
-        return Plan(row, NOT_INSTALLED)
     if not crypto.is_encrypted(stored) and not seal_plaintext:
         return Plan(row, PLAINTEXT_KEPT)
     try:

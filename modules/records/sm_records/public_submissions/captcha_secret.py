@@ -148,5 +148,13 @@ async def seal_at_startup(app: FastAPI, module: Any) -> None:
     except Exception as exc:
         logger.error("records: could not seal the stored CAPTCHA secret (%s)", type(exc).__name__)
         return
-    if sealed is not None and getattr(services, "settings", None) is not None:
-        services.settings = services.settings.model_copy(update={FIELD: sealed})
+    held = getattr(services, "settings", None)
+    if sealed is None or held is None:
+        return
+    # Every holder of the hydrated object: the services container (what every
+    # request and newsletter read, per call) and the module instance, which
+    # ``boot.startup`` assigns from the container right after this — swapped
+    # here too, so the order of the two cannot leave it on the plaintext.
+    services.settings = held.model_copy(update={FIELD: sealed})
+    if getattr(module, "settings", None) is held:
+        module.settings = services.settings

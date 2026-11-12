@@ -220,3 +220,16 @@ def test_a_missing_secret_is_one_check_before_planning():
     finally:
         rs.install_secret(NEW)
     rs.check_secret()
+
+
+def test_a_fresh_database_has_nothing_to_re_encrypt(tmp_path):
+    result = _reencrypt(tmp_path / "fresh.db", tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "Nothing to re-encrypt" in result.stdout
+
+
+def test_an_orphaned_row_is_not_installed_whatever_it_holds(monkeypatch):
+    monkeypatch.setattr(rs, "crypto_for", lambda package: None)
+    for value, value_type in (("", "string"), ("[1]", "json"), ("null", "json")):
+        row = rs.Row("system", "", AI_KEY, value, value_type)
+        assert rs.plan_row(row).outcome == rs.NOT_INSTALLED
