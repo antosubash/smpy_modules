@@ -1,7 +1,7 @@
 /**
  * The campaign side of newsletter.spec.ts: a body seeded through the API (the
- * suite seeds bodies rather than dragging blocks onto Puck's canvas) and the
- * report screen's numbers.
+ * suite seeds bodies rather than dragging blocks onto Puck's canvas), the
+ * test-send dialog and the report screen's numbers.
  */
 
 import { expect, type Locator, type Page } from '@playwright/test';
@@ -36,3 +36,16 @@ export const reportTile = (page: Page, label: string): Locator =>
   page
     .locator('div.text-sm', { hasText: new RegExp(`^${label}$`) })
     .locator('xpath=following-sibling::div[1]');
+
+/** Send a test from the editor's dialog; each recipient's result text, in order. */
+export async function sendTest(page: Page, recipients: string[]): Promise<string[]> {
+  await page.getByRole('button', { name: 'Send test' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Send a test email' });
+  await dialog.getByLabel('Recipients').fill(recipients.join('\n'));
+  await dialog.getByRole('button', { name: 'Send', exact: true }).click();
+  const items = dialog.getByRole('list', { name: 'Test results' }).getByRole('listitem');
+  await expect(items).toHaveCount(recipients.length);
+  const texts = await items.allTextContents();
+  await dialog.getByRole('button', { name: 'Close', exact: true }).first().click();
+  return texts;
+}

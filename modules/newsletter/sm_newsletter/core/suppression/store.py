@@ -195,9 +195,19 @@ async def clear_for_confirmation(
     return affected_rows(result, session.get_bind().dialect.name)
 
 
-async def suppressed(session: AsyncSession, *, tenant_id: str, emails: Sequence[str]) -> set[str]:
-    """The normalised addresses among ``emails`` with any row in the tenant."""
+async def suppressed(
+    session: AsyncSession,
+    *,
+    tenant_id: str,
+    emails: Sequence[str],
+    reasons: Sequence[str] | None = None,
+) -> set[str]:
+    """The normalised addresses among ``emails`` with any row in the tenant, or,
+    with ``reasons``, a row of one of those reasons (the test send asks for
+    ``complaint`` and ``unsubscribed`` only)."""
     tenant = _tenant(tenant_id)
+    if reasons is not None and any(r not in REASONS for r in reasons):
+        raise ValueError(f"unknown suppression reason in {reasons!r}")
     by_hash = {h: addr for addr, h in _hashes(emails).items()}
     if not by_hash:
         return set()
@@ -213,5 +223,7 @@ async def suppressed(session: AsyncSession, *, tenant_id: str, emails: Sequence[
                 )
                 .distinct()
             )
+            if reasons is not None:
+                stmt = stmt.where(_T.c.reason.in_(list(reasons)))
             found.update(by_hash[h] for h in (await session.execute(stmt)).scalars())
     return found

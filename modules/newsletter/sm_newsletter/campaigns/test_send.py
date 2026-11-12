@@ -13,10 +13,25 @@ committed ``pending`` before its SMTP call and closed with the result after it.
 The message is the campaign's own, with ``[TEST] `` before the subject, no
 recipient name and the test unsubscribe link (R1), whose token the unsubscribe
 page treats as forged.
+
+**Who it may go to (#348).** The caller passes ``allowed``, the recipients
+:func:`~sm_newsletter.campaigns.test_recipients.allowed_recipients` vouched for;
+any other answers ``recipient_not_allowed``. Of the allowed, an address with a
+``complaint`` or ``unsubscribed`` suppression in the tenant (any list: they are
+tenant-wide, matched by the suppression table's address hash) answers
+``suppressed``, whichever reason it is. Both are decided before the lock, write
+no ledger row and use no budget; admission is all-or-nothing over what is
+actually sent, and when nothing is left the lock is not taken at all.
+
+A result carries the outcome and a stable ``code`` only (``smtp_<reply>``,
+``dispatch_busy``); the relay's reply text stays in the ledger row and the
+server log.
 """
 
 from __future__ import annotations
 
+import logging
+from collections.abc import Collection
 from dataclasses import dataclass, replace
 from datetime import datetime
 from email.utils import formataddr
@@ -40,6 +55,7 @@ from sm_newsletter.core.errors import (
 )
 from sm_newsletter.core.headers import check_header_text
 from sm_newsletter.core.settings import NewsletterSettings
+from sm_newsletter.core.suppression.store import suppressed
 from sm_newsletter.models import Campaign
 from sm_newsletter.sending import ledger
 from sm_newsletter.sending.budget import admit
@@ -48,20 +64,38 @@ from sm_newsletter.sending.transport import OutgoingMessage, transport_for, unsu
 
 __test__ = False  # a module named test_*, not a pytest test module
 
-__all__ = ["MAX_TEST_RECIPIENTS", "TEST_SUBJECT_PREFIX", "TestSendResult", "send_test"]
+__all__ = [
+    "MAX_TEST_RECIPIENTS",
+    "NOT_ALLOWED",
+    "SUPPRESSED",
+    "TEST_SUBJECT_PREFIX",
+    "TestSendResult",
+    "send_test",
+]
+
+logger = logging.getLogger(__name__)
 
 MAX_TEST_RECIPIENTS = 5
 TEST_SUBJECT_PREFIX = "[TEST] "
 KIND = "test"
 HOLDER = "test-send"
+NOT_ALLOWED = "recipient_not_allowed"
+SUPPRESSED = "suppressed"
+# A test is refused for an address that asked not to be mailed; a bounce is not
+# a refusal (the relay will say so again).
+REFUSING_REASONS = (constants.REASON_COMPLAINT, constants.REASON_UNSUBSCRIBED)
 
 
 @dataclass(frozen=True)
 class TestSendResult:
     recipient: str
     outcome: str
-    code: int | None
-    detail: str
+    code: str | None = None
+    """``smtp_<reply>`` for a relay answer, ``dispatch_busy``, or ``None``."""
+
+
+def _smtp_code(code: int | None) -> str | None:
+    return None if code is None else f"smtp_{code}"
 
 
 async def send_test(
@@ -71,10 +105,12 @@ async def send_test(
     tenant_id: str,
     campaign_id: int,
     recipients: list[str],
+    allowed: Collection[str],
     roles: Roles,
     now: datetime | None = None,
 ) -> list[TestSendResult]:
-    """Send campaign ``campaign_id`` to ``recipients`` (already normalised, 1 to 5).
+    """Send campaign ``campaign_id`` to ``recipients`` (already normalised, 1 to 5),
+    each of them only if it is in ``allowed`` and not suppressed.
 
     ``now`` pins the clock (tests): admission and every row use it. Without it
     each row is stamped when its SMTP call starts. If the SQLite lock's lease
@@ -95,19 +131,55 @@ async def send_test(
     check_campaign_headers(campaign)
     message = await _message(app, tenant_id, campaign, settings)
     transport = transport_for(settings)
+    refused = await _refusals(session, tenant_id, recipients, allowed)
+    to_send = [r for r in recipients if r not in refused]
     await finalize_session(session)  # no read transaction held while waiting
+    sent = await _deliver(
+        session, factory, settings, message, transport, campaign_id, tenant_id, to_send, now
+    )
+    return [refused.get(r) or sent[r] for r in recipients]
+
+
+async def _refusals(
+    session: AsyncSession, tenant_id: str, recipients: list[str], allowed: Collection[str]
+) -> dict[str, TestSendResult]:
+    """The recipients that are not sent, each with its result."""
+    out = {r: TestSendResult(r, NOT_ALLOWED) for r in recipients if r not in allowed}
+    vouched = [r for r in recipients if r not in out]
+    if vouched:
+        blocked = await suppressed(
+            session, tenant_id=tenant_id, emails=vouched, reasons=REFUSING_REASONS
+        )
+        out.update({r: TestSendResult(r, SUPPRESSED) for r in vouched if r in blocked})
+    return out
+
+
+async def _deliver(
+    session: AsyncSession,
+    factory: Any,
+    settings: NewsletterSettings,
+    message: OutgoingMessage,
+    transport: Any,
+    campaign_id: int,
+    tenant_id: str,
+    recipients: list[str],
+    now: datetime | None,
+) -> dict[str, TestSendResult]:
+    """Send to ``recipients`` under the dispatch lock; nothing to send takes no lock."""
+    results: dict[str, TestSendResult] = {}
+    if not recipients:
+        return results
     async with dispatch_lock(factory, holder=HOLDER) as lock:
         # amendment 5: the exact values sent, before admission
         check_headers(message, ("sender", "subject", "reply_to"))
         await admit(factory, settings, n=len(recipients), now=now or utcnow())
-        results: list[TestSendResult] = []
         async with transport.session() as smtp:
             headers = dict(message.headers) if transport.supports_list_unsubscribe else {}
             for recipient in recipients:
                 try:
                     await lock.renew()
                 except DispatchBusy:
-                    results.append(TestSendResult(recipient, "failed", None, DispatchBusy.code))
+                    results[recipient] = TestSendResult(recipient, "failed", DispatchBusy.code)
                     continue
                 attempt = await ledger.open_attempt(
                     session,
@@ -122,8 +194,19 @@ async def send_test(
                 result = await smtp.send(replace(message, to=recipient, headers=headers))
                 await ledger.close_attempt(session, attempt, result)
                 await finalize_session(session)
-                results.append(
-                    TestSendResult(recipient, result.outcome, result.code, result.detail)
+                if result.outcome != "accepted":  # the reply text stays server-side
+                    logger.info(
+                        "newsletter.test_send.not_accepted",
+                        extra={
+                            "campaign_id": campaign_id,
+                            "attempt_id": attempt.id,
+                            "outcome": result.outcome,
+                            "smtp_code": result.code,
+                            "detail": result.detail,
+                        },
+                    )
+                results[recipient] = TestSendResult(
+                    recipient, result.outcome, _smtp_code(result.code)
                 )
     return results
 

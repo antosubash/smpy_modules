@@ -99,6 +99,20 @@ name the module they affect.
   console, instead of the provider's error text, which is logged server-side
   only. ai now depends on `httpx2` directly (already installed through the
   SDKs). Details: "Base URLs and the network" in `modules/ai/docs/operations.md`.
+- **newsletter test sends go only to vouched-for addresses** (#348). A test used
+  to go to any five addresses, suppressed ones included, and returned the
+  relay's reply text. Now each recipient must be the caller's own address, an
+  active account of the campaign's organisation (the framework's user
+  directory, plus membership of the bound tenant on a multi-tenant host), or one
+  of the new SYSTEM setting `test_send_extra_recipients` (up to 20, for a shared
+  review inbox; on the Settings page); any other answers
+  `recipient_not_allowed`. An address with a `complaint` or `unsubscribed`
+  suppression in the tenant answers `suppressed`. Neither is sent, writes an
+  attempt row or uses budget. A result is now `{recipient, outcome, code}` with
+  a stable `code` (`smtp_250`, `smtp_550`, `dispatch_busy`); `detail` is gone
+  from the response and kept in the attempt ledger and the server log. The
+  test-send dialog names each refusal. newsletter is not yet published, so no
+  upgrade step applies. Details: `modules/newsletter/docs/sending.md`.
 
 ### Deprecated
 

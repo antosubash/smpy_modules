@@ -11,6 +11,7 @@ import { keys, useT } from '../../utils/i18n';
 import type { SettingsOut, SettingsUpdate } from '../../utils/types';
 import { Field, Section } from './FormParts';
 import { PasswordField } from './PasswordField';
+import { TestRecipientsSection } from './TestRecipientsSection';
 
 // The server's input bounds (`web/schemas/settings.py`).
 const MAX = { host: 253, username: 320, from_name: 200, physical_address: 500 } as const;
@@ -221,6 +222,13 @@ export function SettingsForm({ initial, canWrite }: Props) {
           />
         </Field>
       </Section>
+
+      <TestRecipientsSection
+        key={saved.test_send_extra_recipients.join('\n')}
+        value={draft.test_send_extra_recipients}
+        disabled={busy}
+        onChange={(next) => set('test_send_extra_recipients', next)}
+      />
 
       <Section title={t(copy.tracking.title)}>
         <p className="text-sm text-muted-foreground">{t(copy.tracking_note)}</p>

@@ -57,8 +57,8 @@ describe('TestSendDialog', () => {
   it('shows per-recipient results', async () => {
     vi.mocked(api.testSend).mockResolvedValue({
       results: [
-        { recipient: 'a@x.io', outcome: 'accepted', code: 250, detail: '' },
-        { recipient: 'b@x.io', outcome: 'rejected', code: 550, detail: 'no' },
+        { recipient: 'a@x.io', outcome: 'accepted', code: 'smtp_250' },
+        { recipient: 'b@x.io', outcome: 'rejected', code: 'smtp_550' },
       ],
     });
     const beforeSend = vi.fn().mockResolvedValue(true);
@@ -68,11 +68,35 @@ describe('TestSendDialog', () => {
     expect(beforeSend).toHaveBeenCalled();
     expect(api.testSend).toHaveBeenCalledWith(7, ['a@x.io', 'b@x.io']);
     const rows = [...document.querySelectorAll('li')].map((li) => li.textContent);
-    expect(rows).toEqual([`a@x.io${copy.outcome.accepted}`, `b@x.io${copy.outcome.rejected}`]);
+    expect(rows).toEqual([
+      `a@x.io${copy.outcome.accepted}`,
+      `b@x.io${copy.outcome.rejected} ${copy.smtp_code.replace('{code}', '550')}`,
+    ]);
+    expect(document.body.textContent).not.toContain(copy.refused_hint);
 
     // Editing the addresses drops the results, which belong to the ones sent.
     await type('c@x.io');
     expect(document.querySelectorAll('li')).toHaveLength(0);
+  });
+
+  it('names a refused or suppressed recipient and says who a test may go to (#348)', async () => {
+    vi.mocked(api.testSend).mockResolvedValue({
+      results: [
+        { recipient: 'a@x.io', outcome: 'recipient_not_allowed', code: null },
+        { recipient: 'b@x.io', outcome: 'suppressed', code: null },
+        { recipient: 'c@x.io', outcome: 'failed', code: 'dispatch_busy' },
+      ],
+    });
+    await open();
+    await type('a@x.io\nb@x.io\nc@x.io');
+    await act(async () => button(copy.send)?.click());
+    const rows = [...document.querySelectorAll('li')].map((li) => li.textContent);
+    expect(rows).toEqual([
+      `a@x.io${copy.outcome.recipient_not_allowed}`,
+      `b@x.io${copy.outcome.suppressed}`,
+      `c@x.io${copy.outcome.dispatch_busy}`,
+    ]);
+    expect(document.body.textContent).toContain(copy.refused_hint);
   });
 
   it('does not send when the draft could not be saved', async () => {

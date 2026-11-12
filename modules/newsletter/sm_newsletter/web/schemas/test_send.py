@@ -46,12 +46,16 @@ class TestSendIn(BaseModel):
 
 
 class TestSendResultOut(BaseModel):
+    """One recipient's answer: the outcome (``accepted``, ``rejected``,
+    ``unknown``, ``failed``, ``recipient_not_allowed``, ``suppressed``) and a
+    stable code (``smtp_<reply>``, ``dispatch_busy`` or ``None``). The relay's
+    reply text is never returned (#348); it is in the ledger and the log."""
+
     model_config = ConfigDict(from_attributes=True)
 
     recipient: str
     outcome: str
-    code: int | None
-    detail: str
+    code: str | None
 
 
 class TestSendOut(BaseModel):

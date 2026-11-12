@@ -31,6 +31,7 @@ const INITIAL: SettingsOut = {
   tracking_opens: false,
   tracking_clicks: false,
   physical_address: '1 Main St',
+  test_send_extra_recipients: [],
 };
 
 function typeInto(el: HTMLInputElement, value: string) {
@@ -121,5 +122,22 @@ describe('SettingsForm', () => {
     }
     expect(button(copy.save)).toBeUndefined();
     expect(button(copy.password.save)).toBeUndefined();
+  });
+
+  it('saves the extra test recipients as a normalised list (#348)', async () => {
+    await render({ canWrite: true });
+    const area = document.getElementById(
+      'newsletter-settings-test-recipients',
+    ) as HTMLTextAreaElement;
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+      set?.call(area, ' Review@Example.org\nqa@example.org, review@example.org\n');
+      area.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    vi.mocked(api.putSettings).mockResolvedValue({ ...INITIAL, password_cleared: false });
+    await act(async () => button(copy.save)?.click());
+    expect(vi.mocked(api.putSettings).mock.calls[0][0]).toMatchObject({
+      test_send_extra_recipients: ['review@example.org', 'qa@example.org'],
+    });
   });
 });

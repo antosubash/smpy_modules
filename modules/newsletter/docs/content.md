@@ -179,6 +179,13 @@ at most 5 addresses, subject prefixed `[TEST] `, no recipient name, the test
 unsubscribe link, with `List-Unsubscribe`, `List-Unsubscribe-Post` and
 `Precedence: bulk` so an operator can check the DKIM `h=` list.
 
+Only vouched-for, unsuppressed addresses are sent: the caller's own, active
+members of the organisation and `test_send_extra_recipients`; anything else
+answers `recipient_not_allowed`, and a `complaint` or `unsubscribed`
+suppression answers `suppressed`, with no attempt row and no budget used. See
+[`sending.md`](sending.md#test-sends). A result is the outcome and a stable
+code, never the relay's reply text.
+
 Order of events: the campaign lookup, the cancelled check, the sender
 configuration, the header inputs and the render all happen **before** the lock,
 so a 404, 409 or 422 never waits behind the dispatcher. Then, inside the
@@ -187,7 +194,8 @@ install-wide dispatch lock (`sending/lock.py`: a Postgres advisory lock, or the
 `409 dispatch_busy`):
 
 1. The header values are re-checked.
-2. **Admission is all-or-nothing.** The rolling 24 h and 60 s windows are counted
+2. **Admission is all-or-nothing** over the addresses actually sent (refused ones
+   are decided before the lock; when none is left the lock is not taken). The rolling 24 h and 60 s windows are counted
    from `newsletter_send_attempt` across every tenant (`pending`, `accepted` and
    `unknown` count; `rejected` and `failed` do not). If `used + n` exceeds
    `daily_limit` or `per_minute_limit`: `429 send_budget_exhausted`, nothing sent
@@ -198,7 +206,7 @@ install-wide dispatch lock (`sending/lock.py`: a Postgres advisory lock, or the
    call, then close the row with the outcome.
 
 A row that never resolves (a crash) stays counted for its window. Outcomes per
-recipient: `accepted`, `rejected` (a refusal at MAIL/RCPT/DATA; the session issues
+recipient sent: `accepted`, `rejected` (a refusal at MAIL/RCPT/DATA; the session issues
 `RSET` before the next recipient), `unknown` (the body was sent and the answer was
 lost or malformed) and `failed` (a known pre-acceptance failure, such as a
 connection lost or a timeout before DATA; retryable, the session reconnects).

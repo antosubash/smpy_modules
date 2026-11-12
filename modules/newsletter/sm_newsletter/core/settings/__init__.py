@@ -73,6 +73,26 @@ class NewsletterSettings(DbBackedSettings):
     physical_address: str = ""
     """Postal address printed in every campaign footer."""
 
+    test_send_extra_recipients: list[str] = Field(default_factory=list)
+    """Addresses a test send may also go to, such as a shared review inbox. A test
+    always may go to the sender's own address and to active members of the
+    campaign's organisation; anything else is refused. One list for the whole
+    deployment."""
+
+    @field_validator("test_send_extra_recipients", mode="before")
+    @classmethod
+    def _normalised_recipients(cls, value: object) -> object:
+        """Stripped, lower-cased and deduplicated, as a test send compares them.
+        Tolerant: hydration replaces a class that will not construct with all
+        defaults, so a stray entry is dropped rather than refused."""
+        if not isinstance(value, list):
+            return value
+        out: list[str] = []
+        for item in value:
+            if isinstance(item, str) and (address := item.strip().lower()) and address not in out:
+                out.append(address)
+        return out
+
     @field_validator("from_name", "from_address", "reply_to")
     @classmethod
     def _no_header_injection(cls, value: str, info) -> str:

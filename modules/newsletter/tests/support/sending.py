@@ -38,10 +38,18 @@ async def make_app(*, base_url: str = BASE_URL, file=None, **settings):
     return app, state, campaign.id
 
 
-async def send(app, state, cid, recipients, now=NOW):
+async def send(app, state, cid, recipients, now=NOW, allowed=None):
+    """``send_test`` with every recipient vouched for unless ``allowed`` says otherwise."""
     async with state.session_factory() as db:
         return await test_send.send_test(
-            app, db, tenant_id=T, campaign_id=cid, recipients=recipients, roles=[], now=now
+            app,
+            db,
+            tenant_id=T,
+            campaign_id=cid,
+            recipients=recipients,
+            allowed=recipients if allowed is None else allowed,
+            roles=[],
+            now=now,
         )
 
 
