@@ -1249,6 +1249,17 @@ unhealthy records, and binary-search when they became unhealthy. The limits
 unchanged by any of this — `invalid` is one more fixed column, not a new kind
 of term.
 
+**The public surface has its own, smaller bounds on top (#349).** A listing
+or stats request takes at most **3** `filter` terms, and at most **one** of
+them may be `contains` — an unindexed `ILIKE '%term%'` scan of the type's
+text rows. Over either is a `400` with `code` `too_many_filters` or
+`too_many_contains`. On Postgres the query also runs under a **5 s**
+`statement_timeout` (`SET LOCAL`, so only the request's own transaction); a
+query cancelled by it is a `503` with `code` `query_timeout`. SQLite has no
+statement timeout, so there the term caps are the bound. The records list and
+stats blocks send one term each, well inside both. The admin API keeps
+`max_filter_terms`.
+
 ```bash
 curl -s 'http://localhost:8000/api/records/public/product?page_size=2&sort=-published_at'
 ```
@@ -1403,7 +1414,8 @@ curl -s 'http://localhost:8000/api/records/public/product/stats?metric=sum:price
   match, the answer is `{"value": null, "capped": true}` — not available,
   rather than the sum of some of them — and the block shows a dash. Narrow it
   with `?filter=` to get a number.
-- `?filter=` is bounded by `max_filter_terms` (20) exactly as on the listing.
+- `?filter=` is bounded exactly as on the listing: `max_filter_terms` (20), then the
+  public caps (3 terms, one `contains`) and the Postgres statement timeout.
 - `?locale=` is resolved by the listing's own rule (absent → the default
   content locale, case-insensitive, an unconfigured or dropped language a
   `400`) and **always applied**, so a translated record counts once.
@@ -1909,6 +1921,8 @@ kind of route can produce, with the body schema
 | `400` | An import file that is not the format it claims, or a header naming an unknown column | `{"detail"}` |
 | `400` | A filter term containing a NUL (`\x00`) character | `{"detail"}` |
 | `400` | *Public API only* — any of the above | `{"detail"}` — no `field`, no `reason` |
+| `400` | *Public API* — more than 3 `filter` terms (listing and stats) | `{"detail", "code": "too_many_filters"}` |
+| `400` | *Public API* — more than one `contains` filter term (listing and stats) | `{"detail", "code": "too_many_contains"}` |
 | `400` | *Submissions* — a form token that does not verify, or a form sent sooner than `public_submissions_min_fill_seconds` or later than `public_submissions_token_max_age_seconds` after it was loaded | `{"detail", "code": "form_expired"}` — load the form again |
 | `400` | *Submissions* — a CAPTCHA is required (`public_submissions_captcha_provider`) and `captcha_response` is missing or the provider rejects it | `{"detail", "code": "captcha_failed"}` — complete the CAPTCHA again |
 | `401` | No session | `{"detail": "Not authenticated"}` — the framework's, not this module's |
@@ -1953,6 +1967,7 @@ kind of route can produce, with the body schema
 | `422` | *Submissions* — a `data` key outside the type's `public_fields`, a required consent not given, or `data` that does not satisfy the schema | `{"detail", "code": "unknown_field" \| "consent_required" \| "invalid", "errors"}` |
 | `429` | *Submissions* — over `public_submissions_rate_per_ip` or `public_submissions_type_rate`; *Resend* more than once a minute for one record, or a newsletter confirmation past `public_submissions_confirm_rate_per_email` | `{"detail", "code": "rate_limited"}` with `Retry-After` |
 | `500` | Anything unanticipated on `/api/records/*` | `{"detail": "internal error"}` — always JSON |
+| `503` | *Public API* — the listing or stats query ran past the Postgres statement timeout (5 s) | `{"detail", "code": "query_timeout"}` — narrow the filter and try again |
 | `503` | *Submissions* — a CAPTCHA is required and its provider cannot be reached, answers with an error, or is configured without a site key or secret (fails closed) | `{"detail", "code": "captcha_unavailable"}` |
 
 Worked examples:

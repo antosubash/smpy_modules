@@ -21,7 +21,7 @@ from __future__ import annotations
 from operator import attrgetter
 from typing import Final, NamedTuple
 
-from sm_records.web.endpoints.api._error_table_submissions import SUBMISSION_ROWS
+from sm_records.web.endpoints.api._error_table_public import EXTRA_ROWS
 
 __all__ = ["ERROR_TABLE", "ErrorRow"]
 
@@ -273,7 +273,7 @@ _CORE: Final[tuple[ErrorRow, ...]] = (
 )
 
 ERROR_TABLE: Final[tuple[ErrorRow, ...]] = tuple(
-    sorted((*_CORE, *(ErrorRow(*row) for row in SUBMISSION_ROWS)), key=attrgetter("status"))
+    sorted((*_CORE, *(ErrorRow(*row) for row in EXTRA_ROWS)), key=attrgetter("status"))
 )
-"""Every row, by status; within one status the order above, then the
-website-submission rows (``_error_table_submissions``). ``sorted`` is stable."""
+"""Every row, by status; within one status the order above, then the public API's
+rows (``_error_table_public``), then the website-submission rows. Stable sort."""

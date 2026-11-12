@@ -109,9 +109,10 @@ IMPORT: Final = (*ADMIN_READ, 400, 409, 413, 422)
 """An import: the parse failure of a file that is not what it claims, plus
 both ceilings and the per-row report."""
 
-PUBLIC_READ: Final = (400, 404)
+PUBLIC_READ: Final = (400, 404, 503)
 """The anonymous surface. **No 401 and no 403**: it needs no session, and a
-type it will not serve is the same 404 as one that does not exist (§10)."""
+type it will not serve is the same 404 as one that does not exist (§10). Its
+503 is the Postgres statement timeout (#349)."""
 
 SUBMISSION: Final = (400, 403, 404, 409, 413, 415, 422, 429, 500)
 """A website submission (#101). Anonymous like the read API — no 401 — but a

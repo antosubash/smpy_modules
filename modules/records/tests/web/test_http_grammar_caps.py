@@ -64,10 +64,13 @@ async def _get(client, url: str, query: str, *, anonymous: bool):
 
 @pytest.mark.parametrize("anonymous", [False, True])
 async def test_too_many_filter_terms_is_a_400_naming_the_parameter(seeded, anonymous):
+    """Up to the cap is answered on the admin listing; the public one has its
+    own, smaller caps (``test_public_bounds``), so only the refusal is shared."""
     url = _PUBLIC if anonymous else _API
     cap = _caps(seeded).max_filter_terms
-    ok = await _get(seeded, url, "&".join(["filter=title:contains:t"] * cap), anonymous=anonymous)
-    assert ok.status_code == 200, ok.text
+    if not anonymous:
+        ok = await _get(seeded, url, "&".join(["filter=title:contains:t"] * cap), anonymous=False)
+        assert ok.status_code == 200, ok.text
     refused = await _get(
         seeded, url, "&".join(["filter=title:contains:t"] * (cap + 1)), anonymous=anonymous
     )

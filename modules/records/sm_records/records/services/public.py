@@ -58,6 +58,7 @@ from sm_records.records.index.query import (
 from sm_records.records.services._listing import RecordListPage, page_of
 from sm_records.records.services._translations import published_siblings
 from sm_records.records.services.errors import NotFound
+from sm_records.records.services.public_bounds import check_public_filters, statement_timeout
 
 __all__ = [
     "NOT_FOUND",
@@ -218,6 +219,9 @@ async def list_public_records(
     from a caller; and narrowing both halves of the bounded count is what a
     ``narrow`` callable is for, exactly as with the published predicate.
 
+    The public term caps and the Postgres statement timeout
+    (:mod:`~sm_records.records.services.public_bounds`, #349) apply on top.
+
     The bound on ``total`` (F4), the ``?after=`` cursor (F11) and
     ``total=false`` are the admin listing's, unchanged — an anonymous caller
     walking a large public type is exactly who wants them. The published
@@ -226,21 +230,23 @@ async def list_public_records(
     rows the outer then discards under-counts near the cap.
     """
     _check_columns(rtype, filters, sorts)
+    check_public_filters(filters)
     # ``locale`` goes into the cursor signature because it is a predicate on
     # the statement rather than one of the caller's filters (:func:`_narrow_for`):
     # without it a cursor minted under ``?locale=en`` was accepted under
     # ``?locale=de``, which is "resume after this row" spoken about a different
     # listing.
-    return await page_of(
-        db,
-        rtype,
-        settings=settings,
-        filters=filters,
-        sorts=sorts,
-        page=page,
-        page_size=page_size,
-        after=after,
-        with_total=with_total,
-        narrow=_narrow_for(tables_for(rtype).record, locale),
-        locale=locale,
-    )
+    async with statement_timeout(db):
+        return await page_of(
+            db,
+            rtype,
+            settings=settings,
+            filters=filters,
+            sorts=sorts,
+            page=page,
+            page_size=page_size,
+            after=after,
+            with_total=with_total,
+            narrow=_narrow_for(tables_for(rtype).record, locale),
+            locale=locale,
+        )

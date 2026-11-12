@@ -122,6 +122,15 @@ name the module they affect.
   newsletter is not yet published, so no migration or other upgrade step
   applies. Details:
   `modules/newsletter/docs/sending.md`.
+- **records' anonymous listing has its own, smaller query bounds** (#349). A
+  public listing or stats request takes at most 3 `filter` terms, of which at
+  most one may be `contains` (an unindexed `ILIKE '%term%'` scan), and answers
+  `400` with `code` `too_many_filters` or `too_many_contains` beyond that; one
+  request could ask for twenty substring scans before. On Postgres the query
+  runs under a 5 s `statement_timeout` (`SET LOCAL`), and a cancelled query is
+  a `503` with `code` `query_timeout` instead of a 500. The admin API keeps
+  `max_filter_terms`, and the records list and stats blocks send one term each.
+  Details: "Public read API" in `modules/records/docs/api-reference.md`.
 
 ### Deprecated
 

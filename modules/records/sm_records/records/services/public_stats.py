@@ -33,8 +33,10 @@ as the listing's does. A sum reads at most ``max_count + 1`` matching records
 it answers ``None`` with ``capped`` — a sum of the first ``max_count`` rows
 is not the sum, and "not available" is the honest answer. The filter count
 is bounded before any of this, by ``parse_filters``' ``max_filter_terms``,
-the listing's dependency. Both statements reuse the grammar unchanged, so a
-``filter=`` means here what it means on the listing.
+the listing's dependency, and then by the public term caps and the Postgres
+statement timeout the listing has (``services.public_bounds``, #349). Both
+statements reuse the grammar unchanged, so a ``filter=`` means here what it
+means on the listing.
 
 The locale is resolved by the endpoint, through the one helper the listing
 uses, and is **always** applied: a translated record counts once, and a
@@ -52,6 +54,7 @@ from sm_records.models import RecordType, tables_for
 from sm_records.records.index.aggregate import Metric, bounded_sum_query, parse_metric
 from sm_records.records.index.query import Filter, FilterOp, QueryError, bounded_count_query
 from sm_records.records.services.public import _check_columns, _narrow_for
+from sm_records.records.services.public_bounds import check_public_filters, statement_timeout
 
 __all__ = ["PUBLIC_METRICS", "UnsupportedMetricError", "public_stat"]
 
@@ -125,11 +128,13 @@ async def public_stat(
     # is one question whether it is filtered on or added up.
     summed = [] if asked.field is None else [Filter(field=asked.field, op=FilterOp.EQ)]
     _check_columns(rtype, [*filters, *summed], [])
+    check_public_filters(filters)
     fields = list(rtype.fields or [])
     narrow = _narrow_for(tables_for(rtype).record, locale)
     if asked.field is None:
         stmt = bounded_count_query(rtype, fields, filters, cap=cap, narrow=narrow)
-        counted = int((await db.execute(stmt)).scalar_one())
+        async with statement_timeout(db):
+            counted = int((await db.execute(stmt)).scalar_one())
         return (cap, True) if counted > cap else (counted, False)
     try:  # the summed field alone: a filter's refusal below must stay a filter's
         bounded_sum_query(rtype, fields, [], metric=asked, cap=cap, narrow=narrow)
@@ -138,5 +143,6 @@ async def public_stat(
             f"{asked.field!r} is not a number field that can be summed"
         ) from exc
     stmt = bounded_sum_query(rtype, fields, filters, metric=asked, cap=cap, narrow=narrow)
-    matched, total = (await db.execute(stmt)).one()
+    async with statement_timeout(db):
+        matched, total = (await db.execute(stmt)).one()
     return (None, True) if matched > cap else (_number(total), False)
