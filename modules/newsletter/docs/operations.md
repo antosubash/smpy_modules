@@ -32,15 +32,18 @@ in session mode**. Behind a pooler in **transaction** mode (PgBouncer's
 consecutive statements can run on different server connections, so the lock can
 be taken on one and released on another. The symptoms:
 
-- every send, test sends included, answers `dispatch_busy`, because a lock is
-  held by a server connection that nothing will ever unlock; or
-- two senders hold the lock at once, and the rolling budget is overrun.
+- the lock stays held by a server connection that nothing will unlock, so
+  acquisition times out: test sends answer `dispatch_busy` and dispatcher ticks
+  stop as `busy`; or
+- a session lock is re-entrant on the server connection that holds it, so two
+  senders handed the same one both enter, and the rolling budget is overrun.
 
 Point `SM_DATABASE_URL` for these processes at the database itself or at a
 session-mode pool. The transaction-level locks taken elsewhere
 (`pg_advisory_xact_lock`: the settings write lock, and records' per-address
 locks during an import) are released at commit and are safe under either mode.
-`modules/images/docs/worker.md` gives the same advice for images' workers.
+For the startup parameters PgBouncer in transaction mode rejects (the database
+timeouts), see `modules/images/docs/worker.md`.
 
 ## Imports and the janitor
 

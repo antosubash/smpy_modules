@@ -222,7 +222,8 @@ name the module they affect.
 - newsletter's operations guide says the web process and its workers must
   reach Postgres directly or through a session-mode pooler (#344). The dispatch
   lock is a session-level advisory lock, which PgBouncer in transaction mode
-  breaks: every send answers `dispatch_busy`, or two senders overrun the budget.
+  breaks: sends time out on the lock (`dispatch_busy`), or two senders overrun
+  the budget.
 - The repo has a `SECURITY.md` (#358): report a vulnerability privately through
   GitHub, not in a public issue.
 
