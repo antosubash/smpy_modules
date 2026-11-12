@@ -153,8 +153,8 @@ class PagebuilderSettings(MediaSettings):
     """Require an ``X-CSRF-Token`` header on every mutating admin request.
 
     The check and the token are the framework's (``simple_module_hosting.csrf``),
-    the same ones billing, news and records use. Every pagebuilder screen
-    shares the token as the ``csrf_token`` Inertia prop, and the React client
+    the same ones billing, news and records use. The framework shares the
+    token with every signed-in page as the ``csrfToken`` prop, and the React client
     sends it back on every POST/PUT/PATCH/DELETE. Turn it off only when the
     host guards writes at a layer above the application.
     """
