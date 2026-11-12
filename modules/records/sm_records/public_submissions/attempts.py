@@ -127,7 +127,7 @@ AND NOT EXISTS (
     WHERE tenant_id = :tenant AND record_uuid = :uuid AND attempt = :attempt
       AND recipient NOT IN (:manifest, :complete) AND sent_at IS NULL
 )
-"""
+"""  # noqa: S608 - the table name is a module constant; every value is bound
 """One statement, so the check and the write see the same rows: the marker
 lands only beside a manifest and with no recipient of the attempt unsent."""
 

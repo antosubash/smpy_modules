@@ -107,7 +107,7 @@ async def _redirects(
         kept += 1
     await db.flush()
     for (locale, old_slug), row in sorted(prep.match.rename_redirects().items()):
-        assert row.id is not None
+        assert row.id is not None  # noqa: S101 - narrows the type; a flushed row has its id
         await redirects.record(
             db, article_id=row.id, old_slug=old_slug, new_slug=row.slug, locale=locale
         )

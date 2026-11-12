@@ -203,7 +203,7 @@ async def apply_bundle(
     # its snapshot slug keeps the address it was renamed to working. One that
     # replaces a bundle redirect from the same address is still one redirect.
     for (locale, old_slug), page in sorted(match.rename_redirects().items()):
-        assert page.id is not None
+        assert page.id is not None  # noqa: S101 - narrows the type; a flushed row has its id
         await redirects.record(
             db, page_id=page.id, old_slug=old_slug, new_slug=page.slug, locale=locale
         )

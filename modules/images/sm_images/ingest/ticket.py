@@ -27,7 +27,7 @@ from sm_images.ingest.sniff import EXTENSIONS
 __all__ = ["Ticket", "declared_type", "load_ticket", "serializer"]
 
 _GONE = "Upload not found"
-_NO_SECRET = "Direct uploads need the host's secret_key"
+_NO_SECRET = "Direct uploads need the host's secret_key"  # noqa: S105 - an error message
 _BAD_PART = "A part is missing or has the wrong size"
 _BAD_TYPE = "The upload is not a supported image of the declared type"
 

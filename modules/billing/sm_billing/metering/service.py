@@ -213,7 +213,7 @@ class UsageService(SwapMixin):
             occurred_at=occurred_at,
         )
         outcome = await self._count(event, res, None, db)
-        assert not isinstance(outcome, Exceeded)  # unconditional: never refused
+        assert not isinstance(outcome, Exceeded)  # noqa: S101 - unconditional: never refused
         return outcome
 
     async def refund(self, tenant_id: str, meter: str, idempotency_key: str) -> bool:

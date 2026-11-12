@@ -150,7 +150,7 @@ async def _install(
     record ``hold``'s release - this op, finished in the same transaction, is
     the only one that could install it.
     :class:`ClaimLost` when the op is no longer ours."""
-    assert op.image_id is not None
+    assert op.image_id is not None  # noqa: S101 - narrows the type; an invariant, not input validation
     async with factory() as db:
         row = await lock(db, tenant, op.image_id)
         if row is None or row[0] not in (old, hold.id):

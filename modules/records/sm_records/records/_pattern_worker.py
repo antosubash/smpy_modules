@@ -92,7 +92,7 @@ class _Worker:
         return cls(proc)
 
     async def run(self, checks: list[tuple[str, str]]) -> list[bool]:
-        assert self.proc.stdin is not None and self.proc.stdout is not None
+        assert self.proc.stdin is not None and self.proc.stdout is not None  # noqa: S101 - narrows the type; an invariant, not input validation
         self.proc.stdin.write(json.dumps(checks).encode() + b"\n")
         await self.proc.stdin.drain()
         verdicts: list[bool] = []

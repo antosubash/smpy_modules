@@ -93,7 +93,7 @@ async def open_op(
         subject=subject,
     )
     not_after = await _deadline(db, row, claim)
-    assert row.id is not None
+    assert row.id is not None  # noqa: S101 - narrows the type; a flushed row has its id
     return Claimed(row.id, token, key, not_after)
 
 
@@ -170,7 +170,7 @@ async def add_swap(
         subject=subject,
     )
     await _deadline(db, row)
-    assert row.id is not None
+    assert row.id is not None  # noqa: S101 - narrows the type; a flushed row has its id
     _settle_after(db, [row.id], factory)
     return row
 

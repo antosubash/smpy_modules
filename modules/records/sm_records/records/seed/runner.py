@@ -175,7 +175,7 @@ async def seed_database(
     ``commit()`` would drop them — it never runs the session's ``on_commit``.
     """
     started = time.monotonic()
-    rng = random.Random(seed)
+    rng = random.Random(seed)  # noqa: S311 - demo seed data, not a secret
     weights = weights_for({td.key for td in active_type_defs()})
     counts = distribute(records, weights)
     summary = SeedSummary(reset=reset)

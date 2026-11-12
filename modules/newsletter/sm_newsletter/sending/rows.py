@@ -176,7 +176,7 @@ async def record(
             now=now,
         )
     elif action == "pause":
-        assert verdict.pause_code is not None
+        assert verdict.pause_code is not None  # noqa: S101 - narrows the type; an invariant, not input validation
         detail = " ".join(str(p) for p in (result.code, result.detail) if p not in (None, ""))
         await pause_campaign(
             session,

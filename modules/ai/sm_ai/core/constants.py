@@ -24,7 +24,7 @@ LAZY_SETTINGS_READ_TIMEOUT_SECONDS: Final = 5.0
 # (``simple_module_hosting._secret_key``; both names are private there, and
 # tests/test_framework_pins.py fails when either moves, #125).
 HOST_SETTINGS_PACKAGE: Final = "host"
-HOST_SECRET_FIELD: Final = "secret_key"
+HOST_SECRET_FIELD: Final = "secret_key"  # noqa: S105 - a settings field name, not a secret
 
 ROUTE_PREFIX_API: Final = "/api/ai"
 VIEW_PREFIX: Final = "/ai"

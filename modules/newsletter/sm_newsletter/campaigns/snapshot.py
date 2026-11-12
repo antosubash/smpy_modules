@@ -89,7 +89,7 @@ def build_render(
 async def store_render(session: AsyncSession, snap: Snapshot) -> CampaignRender:
     """Write the snapshot and its links, replacing the campaign's previous ones."""
     row = snap.render
-    assert row.campaign_id is not None
+    assert row.campaign_id is not None  # noqa: S101 - narrows the type; an invariant, not input validation
     await drop_render(session, tenant_id=row.tenant_id, campaign_id=row.campaign_id)
     session.add(row)
     await session.flush()

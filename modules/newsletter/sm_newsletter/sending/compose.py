@@ -38,10 +38,10 @@ def compose(
     URL and no stored link is read). Each purpose gets its own token (T17).
     ``fill`` runs on the trusted snapshot before ``personalise`` (B2), so
     recipient data never reaches it."""
-    assert send.id is not None
+    assert send.id is not None  # noqa: S101 - narrows the type; a flushed row has its id
 
     def token(purpose: tokens.Purpose) -> str:
-        assert send.id is not None
+        assert send.id is not None  # noqa: S101 - narrows the type; a flushed row has its id
         return tokens.sign(
             secret,
             purpose=purpose,

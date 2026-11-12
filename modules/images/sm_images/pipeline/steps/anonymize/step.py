@@ -162,7 +162,7 @@ class AnonymizeStep:
 
     async def run(self, ctx: StepContext) -> StepOutcome:
         p = ctx.params
-        assert isinstance(p, AnonymizeParams)
+        assert isinstance(p, AnonymizeParams)  # noqa: S101 - narrows the type; checked by the caller
         if not (p.faces or p.plates):
             return StepOutcome.skipped("nothing_to_detect")
         data = await ctx.read_original()

@@ -109,7 +109,7 @@ async def start_import(
             **common,
         )
     else:
-        assert source_url is not None
+        assert source_url is not None  # noqa: S101 - narrows the type; an invariant, not input validation
         url = await _check_source_url(source_url)
         row = await jobs.create_job(
             runtime,

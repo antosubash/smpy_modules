@@ -98,7 +98,7 @@ class QualityStep:
 
     async def run(self, ctx: StepContext) -> StepOutcome:
         params = ctx.params
-        assert isinstance(params, QualityParams)
+        assert isinstance(params, QualityParams)  # noqa: S101 - narrows the type; checked by the caller
         data = await ctx.read_original()
         try:
             out = await asyncio.to_thread(measure, data, params)

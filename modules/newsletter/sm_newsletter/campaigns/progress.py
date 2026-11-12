@@ -87,7 +87,7 @@ async def progress(
     now: datetime,
 ) -> ProgressOut:
     """The send rows counted by status, and for a ``sending`` campaign when it should end."""
-    assert campaign.id is not None
+    assert campaign.id is not None  # noqa: S101 - narrows the type; a flushed row has its id
     by = await _counts(session, tenant_id, campaign.id)
     rate = daily_rate(settings)
     finish = None

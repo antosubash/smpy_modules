@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
+        host="0.0.0.0",  # noqa: S104 - the demo host listens on every interface in its container
         port=8000,
         reload=settings.is_development,
     )

@@ -157,7 +157,7 @@ async def _open(
             if await lock_image(db, tenant, image_id) is None:
                 raise LookupError("the image is gone")
             found = await parts(db, tenant, image_id)
-            assert found is not None
+            assert found is not None  # noqa: S101 - narrows the type; an invariant, not input validation
             if planned <= found[4]:
                 await db.rollback()
                 return None
@@ -182,7 +182,7 @@ async def record(db: Any, runtime: Runtime, loaded: Any, planned: Planned | None
     if planned is None:
         return True
     found = await parts(db, loaded.tenant, loaded.image_id)
-    assert found is not None  # the caller holds its lock
+    assert found is not None  # noqa: S101 - the caller holds its lock
     original, display, renditions, hold, stored, held = found
     total = original + display + renditions
     if total != planned.total:

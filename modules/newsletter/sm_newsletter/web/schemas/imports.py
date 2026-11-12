@@ -23,7 +23,7 @@ __all__ = [
 
 ERRORS_SHOWN = 50
 """Row errors in ``ImportOut``; the CSV has up to ``KEEP_ERRORS``."""
-assert ERRORS_SHOWN <= KEEP_ERRORS
+assert ERRORS_SHOWN <= KEEP_ERRORS  # noqa: S101 - import-time check of two constants
 
 
 class ListCreate(BaseModel):

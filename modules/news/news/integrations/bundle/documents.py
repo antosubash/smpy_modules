@@ -81,7 +81,7 @@ def normalise_locale(raw: Any) -> str | None:
 def doc_key(doc: dict[str, Any]) -> ArticleKey:
     """The ``(locale, slug)`` a validated article document claims."""
     locale = normalise_locale(doc.get("locale"))
-    assert locale is not None, "validated documents carry a readable locale"
+    assert locale is not None, "validated documents carry a readable locale"  # noqa: S101 - narrows the type; an invariant, not input validation
     return locale, doc["slug"]
 
 

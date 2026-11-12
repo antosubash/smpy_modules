@@ -123,7 +123,7 @@ def _current_snapshot() -> _Snapshot:
     # bound to the live app, which is authoritative where it exists.
     if crypto._secret_provider is None:
         crypto.set_secret_provider(_worker_secret)
-    assert snap is not None
+    assert snap is not None  # noqa: S101 - narrows the type; an invariant, not input validation
     return snap
 
 
