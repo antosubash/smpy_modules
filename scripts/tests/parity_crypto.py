@@ -61,6 +61,8 @@ CRYPTO_FAMILIES: tuple[Family, ...] = (
                 own={
                     "CaptchaSecretUnreadableError": "See billing's BillingKeyUnreadableError.",
                     "CaptchaSecretUnreadableError.__init__": "See CaptchaSecretUnreadableError.",
+                    "has_secret_provider": "SealedSecret dumps unsealed in a process with no "
+                    "app (newsletter's worker); only records has a sealed field.",
                 },
                 messages=(
                     "The app has no secret_key — the records module needs it to encrypt "

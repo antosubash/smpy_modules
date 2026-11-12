@@ -95,16 +95,22 @@ def install_secret(secret: str) -> None:
             crypto.set_secret_provider(lambda: secret)
 
 
+def _installed_copies():
+    """Every installed package's crypto copy."""
+    for package in TARGETS:
+        crypto = crypto_for(package)
+        if crypto is not None:
+            yield crypto
+
+
 def check_secret() -> None:
     """Fail once, before any row is planned, when a copy has no current secret.
 
     Raises that copy's ``RuntimeError`` (it names the setting, not a value),
     rather than letting the first row's plan raise it.
     """
-    for package in TARGETS:
-        crypto = crypto_for(package)
-        if crypto is not None:
-            crypto._current_secret()
+    for crypto in _installed_copies():
+        crypto._current_secret()
 
 
 def check_previous() -> None:
@@ -115,10 +121,8 @@ def check_previous() -> None:
     script checks it first, before anything is decided or written. Raises the
     copy's ``RuntimeError``, which names the variable and never its value.
     """
-    for package in TARGETS:
-        crypto = crypto_for(package)
-        if crypto is not None:
-            crypto.previous_secrets()
+    for crypto in _installed_copies():
+        crypto.previous_secrets()
 
 
 def _decode(row: Row) -> str | None:
