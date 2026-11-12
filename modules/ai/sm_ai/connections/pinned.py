@@ -16,10 +16,9 @@ Adapted from images' ``PinnedTransport`` (``sm_images.ingest.imports.fetch``),
 on ``httpx2`` because that is what the SDKs speak, and with two
 simplifications a provider call allows: resolution runs on the default thread
 pool under :data:`DNS_TIMEOUT_SECONDS`, and the client keeps no idle
-connections (``max_keepalive_connections=0``). Each model call builds its own
-client and the SDKs never close one they did not create, so a pooled
-connection would outlive its call; with no keep-alive each connection closes
-when its response does, on whichever event loop made it.
+connections (``max_keepalive_connections=0``), so a connection closes when its
+response does. One client is shared per event loop and origin
+(:mod:`sm_ai.connections.clients`).
 
 The client does not follow redirects (the SDKs' own default clients do, but a
 followed hop would carry the key's header, ``x-api-key`` included, to another
@@ -41,7 +40,7 @@ import httpx2
 
 from sm_ai.core.url_safety import UnsafeURLError, resolve_public
 
-__all__ = ["DNS_TIMEOUT_SECONDS", "PinnedTransport", "pinned_client"]
+__all__ = ["DNS_TIMEOUT_SECONDS", "TIMEOUT", "PinnedTransport", "pinned_client"]
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ DNS_TIMEOUT_SECONDS: float = 5.0
 MAX_ADDRESSES: Final = 4
 # pydantic-ai's own client defaults (``pydantic_ai._http``): a long read for a
 # slow model, a short connect.
-_TIMEOUT: Final = httpx2.Timeout(timeout=600, connect=5)
+TIMEOUT: Final = httpx2.Timeout(timeout=600, connect=5)
 
 
 async def resolve_bounded(url: str | httpx2.URL) -> tuple[str, tuple[str, ...]]:
@@ -119,5 +118,6 @@ class PinnedTransport(httpx2.AsyncBaseTransport):
 
 
 def pinned_client() -> httpx2.AsyncClient:
-    """A client for one provider call against a validated base URL."""
-    return httpx2.AsyncClient(transport=PinnedTransport(), timeout=_TIMEOUT, trust_env=False)
+    """A client for provider calls against a validated base URL (shared through
+    :func:`sm_ai.connections.clients.client_for`)."""
+    return httpx2.AsyncClient(transport=PinnedTransport(), timeout=TIMEOUT, trust_env=False)

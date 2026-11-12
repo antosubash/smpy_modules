@@ -5,7 +5,7 @@ adds no dependency. Reads the *saved* slot — the same rule as the test probe:
 an unsaved key never leaves the browser for an endpoint nobody has saved.
 
 A base URL goes through the same guard as a model call (#347): each SDK client
-gets ``base_url.http_client_for``'s pinned client, closed after the listing.
+gets an unshared client from ``base_url.http_client_for``, closed after the listing.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ async def list_models(settings: AiSettings, slot: str) -> list[str]:
     provider_id, _, key, base_url = resolve.slot_inputs(
         settings, slot, allowed, require_model=False
     )
-    http = guard.http_client_for(settings, slot, base_url)
+    http = guard.http_client_for(settings, slot, base_url, shared=False)
     try:
         if provider_id in (constants.PROVIDER_OPENAI, constants.PROVIDER_OPENAI_COMPATIBLE):
             names = await _openai(key, base_url, http)

@@ -111,9 +111,13 @@ async def _members(
     if not wanted or isinstance(directory, NullUserDirectory):
         return set()
     users: dict[str, str] = {}  # user id -> recipient
+    searched: set[tuple[str, str]] = set()  # each (term, key) is asked once
     for recipient in wanted:
         key = _key(recipient)
-        for term in dict.fromkeys((recipient, key)):
+        for term in (recipient, key):
+            if not key or (term, key) in searched:
+                continue
+            searched.add((term, key))
             users.update(dict.fromkeys(await _exact(directory, db, term, key), recipient))
     users = await _verified(directory, db, users)
     if not users or _single_tenant(request, tenant_id):

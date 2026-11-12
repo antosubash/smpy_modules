@@ -67,10 +67,13 @@ class TestHttpClientFor:
         assert "allow_private_base_url" in str(caught.value)
         assert url not in str(caught.value)
 
-    def test_allowed_private_uses_the_sdk_client(self):
+    def test_allowed_private_gets_a_client_that_follows_no_redirect(self):
         settings = AiSettings(allow_private_base_url=True)
         url = "http://127.0.0.1/v1"
-        assert base_url.http_client_for(settings, constants.SLOT_CHAT, url) is None
+        client = base_url.http_client_for(settings, constants.SLOT_CHAT, url)
+        assert client is not None and client.follow_redirects is False
+        assert client.trust_env is True  # an egress proxy still works
+        assert not isinstance(client._transport, pinned.PinnedTransport)
 
     def test_the_scheme_rule_holds_even_when_private_is_allowed(self):
         settings = AiSettings(allow_private_base_url=True)

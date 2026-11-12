@@ -14,9 +14,13 @@ Three places apply it:
 * **client build** - :func:`http_client_for`, from ``resolve`` and
   ``discovery``: synchronous and called from async code, so it never touches
   DNS. It checks the scheme and refuses an IP literal that is not public, and
-  hands back a :func:`~sm_ai.connections.pinned.pinned_client`;
+  hands back the loop's shared pinned client (:mod:`sm_ai.connections.clients`);
 * **connect** - that client's transport resolves and validates the host again
   for every request and dials only the validated address.
+
+With ``allow_private_base_url`` on, only the scheme is checked and the slot
+gets the shared ``private`` client: no redirects followed (the key's header
+must not follow one to another host), environment proxies kept.
 
 A slot with no base URL uses the provider's own endpoint and is not checked.
 """
@@ -25,7 +29,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from sm_ai.connections.pinned import pinned_client, resolve_bounded
+from sm_ai.connections.clients import client_for
+from sm_ai.connections.pinned import resolve_bounded
 from sm_ai.contracts.errors import AiBaseUrlRefusedError
 from sm_ai.core import constants
 from sm_ai.core.url_safety import (
@@ -45,8 +50,11 @@ if TYPE_CHECKING:
 __all__ = ["http_client_for", "save_errors"]
 
 
-def http_client_for(settings: AiSettings, slot: str, base_url: str) -> httpx2.AsyncClient | None:
-    """The HTTP client a slot's SDK client must use, or ``None`` for the SDK's own.
+def http_client_for(
+    settings: AiSettings, slot: str, base_url: str, *, shared: bool = True
+) -> httpx2.AsyncClient | None:
+    """The HTTP client a slot's SDK client must use, or ``None`` for the SDK's own
+    (no base URL). ``shared=False`` returns one the caller closes (discovery).
 
     Raises :class:`AiBaseUrlRefusedError` for a URL that can be refused
     without resolving it.
@@ -59,11 +67,11 @@ def http_client_for(settings: AiSettings, slot: str, base_url: str) -> httpx2.As
     except UnsafeURLError as error:
         raise AiBaseUrlRefusedError(field, error.code) from error
     if settings.allow_private_base_url:
-        return None
+        return client_for("private", base_url, shared=shared)
     literal = literal_address(host)
     if literal is not None and not is_public_address(literal):
         raise AiBaseUrlRefusedError(field, "non_public_address")
-    return pinned_client()
+    return client_for("pinned", base_url, shared=shared)
 
 
 async def _refusal(url: str, allow_private: bool) -> str | None:

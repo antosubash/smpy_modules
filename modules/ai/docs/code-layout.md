@@ -8,7 +8,7 @@
 | `contracts/` | The stable Python surface other modules consume, including schemas and errors |
 | `locales/`, `pages/` | Catalogues and Inertia pages discovered by the host |
 | `core/` | Constants, encryption, DB-backed settings, worker hydration, shared service state and the base-URL address rules (`url_safety.py`, a copy of images' guard) |
-| `connections/` | Provider model resolution and model discovery, and the base-URL guard: `base_url.py` (save and build checks) and `pinned.py` (the address-pinned HTTP client) |
+| `connections/` | Provider model resolution and model discovery, and the base-URL guard: `base_url.py` (save and build checks) and `pinned.py` (the address-pinned HTTP client) and `clients.py` (one shared client per event loop and origin) |
 | `metering/requests.py` | Optional billing integration for HTTP and worker AI requests |
 | `web/` | Settings service, request dependencies, CSRF, endpoints and the probe failure classes (`probe_errors.py`) |
 | `ui/` | Components and frontend utilities, with their unit tests beside them |

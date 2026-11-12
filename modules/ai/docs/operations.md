@@ -153,17 +153,20 @@ endpoint and the SDK's own client; it is not checked.
 
 What remains:
 
-- The pinned client does not follow redirects (the SDKs' default clients do): a
-  base URL that answers `301`/`307`, such as `http://` to `https://` or a
-  missing trailing slash, fails with the `other` code until the URL is the final
-  one.
-- The pinned client keeps no idle connections (each call builds its own and
-  the SDKs do not close one they did not create), so every call to a custom
-  base URL opens a new connection.
-- It ignores `HTTPS_PROXY`/`HTTP_PROXY`: a proxy would resolve the name
-  itself. A deployment that must reach a public gateway through an egress
-  proxy turns on `allow_private_base_url`, which uses the SDK's own client
-  (proxy included) and no address check.
+- Neither client a base URL gets follows redirects (the SDKs' default clients
+  do, and a followed hop would carry the key's header to another host): a base
+  URL that answers `301`/`307`, such as `http://` to `https://` or a missing
+  trailing slash, fails with the `http_error` or `other` code until the URL is
+  the final one. That holds with `allow_private_base_url` on too.
+- One client is kept per event loop and base-URL origin
+  (`sm_ai.connections.clients`, at most 8 origins per loop; a finished loop's
+  clients go with it), shared by every model built on that loop. The pinned
+  client keeps no idle connections, so each call to a custom base URL opens a
+  new connection; model listing uses a client of its own and closes it.
+- The pinned client ignores `HTTPS_PROXY`/`HTTP_PROXY`: a proxy would resolve
+  the name itself. A deployment that must reach a public gateway through an
+  egress proxy turns on `allow_private_base_url`: its client honours the proxy
+  variables and checks no address.
 - With `allow_private_base_url` on, only the scheme rule applies: whoever
   holds `ai.manage` can then point a slot, and its key, at any address the
   server reaches. That is why turning it on needs `settings.edit`.

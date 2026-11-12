@@ -84,8 +84,10 @@ class TestSendTestRefusals:
 class _Directory:
     def __init__(self, *users: DirectoryUser) -> None:
         self.users = users
+        self.terms: list[str] = []
 
     async def search(self, db, term, *, limit):
+        self.terms.append(term)
         return [u for u in self.users if term in u.email.lower()][:limit]
 
     async def get_many(self, db, ids, *, with_roles=False):
@@ -174,3 +176,11 @@ class TestAllowedRecipients:
             ),
         )
         assert await _allowed(app, state, [A, B, C]) == {B, C}
+
+    async def test_each_search_term_is_asked_once(self, built):
+        app, state, _ = built
+        directory = _Directory(DirectoryUser(id="1", email=A))
+        set_user_directory(app, directory)
+        # A canonical recipient's term equals its key; a repeat is not searched again.
+        assert await _allowed(app, state, [A, A, B]) == {A}
+        assert directory.terms == [A, B]
