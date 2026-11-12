@@ -382,6 +382,10 @@ Everything else goes in one of a few areas: `core/` (what every feature
 builds on), `web/` (endpoints, schemas, services, serving), one folder per
 domain (images: `ingest/`, `pipeline/`, `jobs/`, `map/`) and `ui/` for the
 frontend that is not a page. Tests mirror the areas under `tests/`.
+Another module's frontend is imported only as `@simple-module-py/<module>`
+(its `index.ts`, via `package.json` `exports`) or a subpath `exports`
+declares, never by file path or a relative path into `modules/<other>/`;
+`scripts/check_ts_imports.py` (`make lint`, CI) enforces it (#337).
 New code in any module follows it. Every module follows it; structural changes keep the same moves-only
 review boundary.
 

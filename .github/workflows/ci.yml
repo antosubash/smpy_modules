@@ -829,6 +829,12 @@ jobs:
       - name: Moved-path aliases
         run: uv run python scripts/moved_paths.py --check
 
+      # A module's TS is public only through its package's `exports` (#337):
+      # no `@simple-module-py/<module>/<file>` and no relative path into
+      # another module's directory.
+      - name: No deep imports between module packages
+        run: uv run python scripts/check_ts_imports.py
+
       - name: READMEs
         run: uv run python scripts/check_readmes.py
 

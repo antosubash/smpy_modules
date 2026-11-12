@@ -150,6 +150,7 @@ lint:
 	uv run python scripts/check_rules.py
 	uv run python scripts/check_sibling_contracts.py
 	uv run python scripts/moved_paths.py --check
+	uv run python scripts/check_ts_imports.py
 	uv run python scripts/check_readmes.py
 	uv run python scripts/check_hardcoded_strings.py
 	uv run python scripts/check_file_size.py

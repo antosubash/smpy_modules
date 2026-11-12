@@ -171,6 +171,26 @@ name the module they affect.
   cards contract already did. The five guard copies are parity-checked. Billing
   has no `MultiTenantMixin` table, so it has no guard. No migration is needed.
 
+### Changed
+
+- **pagebuilder has a TypeScript entry point** (#337).
+  `@simple-module-py/pagebuilder` (`pagebuilder/index.ts`, declared in
+  `package.json` `exports`) exports what other modules use to contribute blocks:
+  `registerPuckBlocks`, `registeredBlocks`, `lazyBlock`, `StatsView`,
+  `ArticleCardsGrid`, `Section`, `createImageField`, `mediaLibraryAdapter`,
+  `isSafeHref` and `safeHref`. The widget base stylesheet is
+  `@simple-module-py/pagebuilder/widgets-base.css`. news, records and images
+  import only these now, and `scripts/check_ts_imports.py` (`make lint`, CI)
+  refuses a deep import into another module's package
+  (`@simple-module-py/<module>/<file>`, or a relative path into
+  `modules/<other>/`) unless that module's `exports` declares the subpath.
+  **Upgrading:** a host or module that resolves pagebuilder through
+  `node_modules` can no longer import its files by path, the 0.0.14 moved-path
+  stubs included; import from `@simple-module-py/pagebuilder` instead, and
+  change a hand-written
+  `@import "@simple-module-py/pagebuilder/pagebuilder/static/widgets-base.css"`
+  to `@import "@simple-module-py/pagebuilder/widgets-base.css"`.
+
 ### Deprecated
 
 - **`enc:v1:` stored secrets** (ai, billing, newsletter). Still read, with one
