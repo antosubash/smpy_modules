@@ -30,12 +30,13 @@ def _string_constants(tree: ast.Module) -> Iterator[tuple[str, str]]:
 def _import_module_targets(
     tree: ast.Module, constants: dict[str, set[str]], skip: set[int]
 ) -> Iterator[str]:
-    """String targets of ``import_module(...)`` / ``__import__(...)`` calls.
+    """String targets of ``import_module(...)`` / ``__import__(...)`` / ``find_spec(...)`` calls.
 
     A literal argument, or a constant bound to one anywhere in the package,
     named bare (``_CONTRACT``) or through its module (``constants.X``): how an
     optional extra is loaded. Other strings are not imports, however much they
-    look like a module path.
+    look like a module path. ``find_spec`` counts because it imports every
+    parent of a dotted name (``find_spec("a.b.c")`` runs ``a.b``).
     """
     local = dict(_string_constants(tree))
     for node in ast.walk(tree):
@@ -43,7 +44,7 @@ def _import_module_targets(
             continue
         func = node.func
         name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
-        if name not in ("import_module", "__import__"):
+        if name not in ("import_module", "__import__", "find_spec"):
             continue
         arg = node.args[0]
         if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
@@ -59,15 +60,14 @@ _Record = tuple[Path, str, tuple[str, ...], bool]
 
 
 def scan(package_dir: Path) -> tuple[_Record, ...]:
-    """Every absolute import and ``import_module`` string in a package's non-test modules.
+    """Every absolute import and ``import_module``/``find_spec`` string in non-test code.
 
     One record per import, parsed once; ``imports`` filters them per sibling.
     """
     trees = {
         path: ast.parse(path.read_text(encoding="utf-8"))
         for path in sorted(package_dir.rglob("*.py"))
-        if "tests" not in path.relative_to(package_dir).parts
-        and not path.name.startswith("test_")
+        if "tests" not in path.relative_to(package_dir).parts and not path.name.startswith("test_")
     }
     constants: dict[str, set[str]] = {}
     for tree in trees.values():

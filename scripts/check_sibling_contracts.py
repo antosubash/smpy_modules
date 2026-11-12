@@ -19,8 +19,14 @@ minor or major after the newest tag is the release being prepared, so it is
 checked against the working tree. Any other floor with no tag of its own names
 no release and fails.
 
-Only ``contracts`` imports are checked: another module's internals are not an
-interface (CLAUDE.md), and a name that moved there is a different problem.
+Only ``contracts`` imports are checked against the floor, because they are the
+only ones allowed: :func:`check_boundary` (#336) fails on any import of a
+sibling's ``<package>.<anything but contracts>`` in a module's non-test code —
+a plain or from-import, or an ``import_module``/``find_spec`` string. A bare
+``import <package>`` or ``find_spec("<package>")`` (is it installed?) is
+allowed, ``from <package> import contracts`` too, any other name from the
+package root is not. ``if TYPE_CHECKING:`` imports are not seen, as above.
+``BOUNDARY_ALLOWLIST`` names the exceptions; it is empty.
 
 Needs the release tags (``git fetch --tags``; CI checks out with
 ``fetch-depth: 0``). Exit 0 on success, 1 on any violation.
@@ -44,6 +50,10 @@ from packaging.version import InvalidVersion, Version
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKTREE = "working tree"
+CONTRACTS = "contracts"
+# (repo-relative importer, imported module): a sibling internal that cannot go
+# through contracts yet, each with its reason. Empty.
+BOUNDARY_ALLOWLIST: dict[tuple[str, str], str] = {}
 
 
 @dataclass(frozen=True)
@@ -144,6 +154,41 @@ def _missing(root: Path, ref: str, base: str, module: str, names: tuple[str, ...
     ]
 
 
+def _internal(module: str, names: tuple[str, ...], from_import: bool) -> list[str]:
+    """What of one import of a sibling package lies outside its ``contracts``."""
+    _, _, rest = module.partition(".")
+    if rest == CONTRACTS or rest.startswith(CONTRACTS + "."):
+        return []
+    if rest:
+        return [module]
+    if not from_import:
+        return []  # import pagebuilder / find_spec("pagebuilder"): is it installed?
+    return [f"{module}.{name}" for name in names if name != CONTRACTS]
+
+
+def check_boundary(
+    root: Path, allowlist: dict[tuple[str, str], str] = BOUNDARY_ALLOWLIST
+) -> list[str]:
+    """A module reaches a sibling only through ``<package>.contracts`` (#336)."""
+    modules = _modules(root)
+    packages = {m.package for m in modules.values()}
+    errors = []
+    for dependant in modules.values():
+        for path, module, names, from_import in scan(dependant.root / dependant.package):
+            package = module.split(".", 1)[0]
+            if package == dependant.package or package not in packages:
+                continue
+            importer = path.relative_to(root).as_posix()
+            for target in _internal(module, names, from_import):
+                if (importer, target) not in allowlist:
+                    errors.append(
+                        f"{importer}: imports {target}, which is not in {package}.{CONTRACTS}; "
+                        f"another module's internals are not an interface — add what it needs "
+                        f"to {package}.{CONTRACTS}"
+                    )
+    return sorted(set(errors))
+
+
 def check(root: Path) -> list[str]:
     _read.cache_clear()  # one run reads each file once; a later run may see new tags or edits
     modules = _modules(root)
@@ -183,13 +228,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", type=Path, default=ROOT)
     args = parser.parse_args(argv)
 
-    errors = check(args.root)
+    errors = check_boundary(args.root) + check(args.root)
     if errors:
         for e in errors:
             print(e, file=sys.stderr)
-        print(f"\nFAIL: {len(errors)} sibling floor problem(s).", file=sys.stderr)
+        print(f"\nFAIL: {len(errors)} sibling boundary or floor problem(s).", file=sys.stderr)
         return 1
-    print("Sibling floors ship every contract their dependants import.")
+    print("Modules import siblings only through contracts, and the floors ship them.")
     return 0
 
 

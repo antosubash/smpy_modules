@@ -26,6 +26,10 @@ contract case: every `<sibling>.contracts` module and name a module imports
 `v<floor>`, or in the working tree for a floor that is the next patch, minor
 or major after the newest tag (the release being prepared; any other floor
 without a tag is an error). It needs the tags (`git fetch --tags`).
+The boundary itself is enforced too (#336): the same script fails on any
+import of a sibling's `<package>.<anything but contracts>` in non-test code
+(plain and from-imports, `import_module`/`find_spec` strings;
+`BOUNDARY_ALLOWLIST` is empty).
 
 **Migrations live in `host/migrations/versions/`, never in a module.** Modules
 ship SQLModel tables; each consuming host autogenerates its own revisions

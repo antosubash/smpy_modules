@@ -187,6 +187,28 @@ name the module they affect.
   imports pagebuilder's files by path should import from the package root
   instead; the widget stylesheet will then be
   `@simple-module-py/pagebuilder/widgets-base.css`.
+- **A module reaches a sibling's Python only through its `contracts`** (#336).
+  `scripts/check_sibling_contracts.py` (`make lint`, CI) now also fails on any
+  import of `<sibling>.<anything but contracts>` in a module's non-test code:
+  plain and from-imports, and `import_module`/`find_spec` strings. Its
+  allow-list is empty. The reads that broke the rule go through contracts now:
+  - ai's `RequiresAiRequest` imports `sm_billing.contracts.RequiresQuota`
+    (new), and ai has a `billing` extra (`simple_module_billing>=0.0.16`). With
+    a billing older than 0.0.16 installed, ai meters nothing.
+  - news reads its content languages through the new
+    `pagebuilder.contracts.site` (`content_locales(app)`, `supported()`,
+    `default()`, `resolve()`, …), not `pagebuilder.core.locales` and
+    `app.state.pagebuilder`. Its `pagebuilder` extra's floor is now 0.0.16.
+  - records' CAPTCHA startup check reads `site.public_csp(app)`. Its
+    `pagebuilder` extra's floor is now 0.0.16.
+  - newsletter asks `news.contracts.articles.mounted(app)` and
+    `pagebuilder.contracts.cards.mounted(app)` (new), not `app.state`.
+  - records' newsletter contract writes (`unsubscribe`, `set_tags`,
+    `create_list`, `add_tag_choices`, `import_subscribers`) take the caller's
+    `app` (`None` in a worker), not a `settings: RecordsSettings` argument.
+    Records reads its own settings from that app, or with `settings_for` in a
+    worker. `newsletter_import` no longer exports `RecordsSettings`. These
+    contracts first ship in 0.0.16, so no released caller breaks.
 
 ### Deprecated
 
