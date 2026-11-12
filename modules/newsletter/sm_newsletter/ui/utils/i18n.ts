@@ -129,7 +129,7 @@ function flatten(node: Record<string, unknown>, prefix: string, out: Record<stri
  * Every key's English text, flat, for the `defaultValue` a miss falls back to.
  *
  * The framework's `configureI18n` sets `fallbackLng` to the *negotiated*
- * locale rather than to English, and this module ships only `en.json` — so a
+ * locale rather than to English, and this module ships only `en.json` and `de.json` — so a
  * reader negotiated into any other configured console language would see raw
  * dotted keys wherever a catalogue entry is missing, which is everywhere. The
  * public pages are what that would land on. Handing i18next the English as
