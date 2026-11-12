@@ -19,12 +19,10 @@ goes only to people the caller can vouch for:
 Anything else answers ``recipient_not_allowed`` for that address and is not
 sent.
 
-**Spellings.** The address parser normalises a domain (a fullwidth ``e``
-becomes ``e``) while suppression hashes, directory rows and the allow-list
-keep whatever was stored, stripped and lower-cased (``normalise_email``, the
-store's one normaliser). So an address is compared in both forms on both
-sides: :func:`spellings` maps each recipient to every form it was submitted
-in, and :func:`forms` gives a stored address's two forms.
+**One form.** Every comparison is on
+:func:`~sm_newsletter.core.suppression.hashing.normalise_email`, the form
+suppression hashes use too, so a spelling variant (case, a fullwidth letter,
+punycode) of an allowed address is allowed.
 
 The suppression check (``complaint`` and ``unsubscribed`` in the tenant) is
 :func:`~sm_newsletter.campaigns.test_send.send_test`'s, because it runs on the
@@ -33,10 +31,9 @@ same session as the rest of the send.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import Any
 
-from pydantic import EmailStr, TypeAdapter, ValidationError
 from simple_module_core.tenancy import tenant_member_ids
 from simple_module_core.user_directory import NullUserDirectory, get_user_directory
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,41 +44,19 @@ from sm_newsletter.core.tenancy import DEFAULT_TENANT, TenancyMode, mode_of, req
 
 __test__ = False  # a module named test_*, not a pytest test module
 
-__all__ = ["DIRECTORY_SCAN", "allowed_recipients", "canonical", "forms", "spellings"]
+__all__ = ["DIRECTORY_SCAN", "allowed_recipients"]
 
 DIRECTORY_SCAN = 20
 """Directory rows read per address: the search is a substring match, so an
 address can share its text with a few longer ones; the exact match is kept."""
 
 
-_ADDRESS: TypeAdapter[str] = TypeAdapter(EmailStr)
-
-
-def canonical(address: object) -> str | None:
-    """The address parser's form of ``address`` (stripped, lower-cased first), or None."""
+def _key(address: object) -> str:
+    """``address`` in the canonical form, or "" for something that is not one."""
     try:
-        return str(_ADDRESS.validate_python(normalise_email(address)))
-    except (ValidationError, ValueError):
-        return None
-
-
-def forms(address: object) -> frozenset[str]:
-    """``address`` as stored (``normalise_email``) and as parsed; empty if neither."""
-    try:
-        stored = {normalise_email(address)}
+        return normalise_email(address)
     except ValueError:
-        return frozenset()
-    parsed = canonical(address)
-    return frozenset(stored | ({parsed} if parsed else set()))
-
-
-def spellings(raw: object) -> dict[str, frozenset[str]]:
-    """Each parsed recipient -> every form it was submitted in, itself included."""
-    out: dict[str, set[str]] = {}
-    for item in raw if isinstance(raw, list) else []:
-        if isinstance(item, str) and (parsed := canonical(item)) is not None:
-            out.setdefault(parsed, {parsed}).add(normalise_email(item))
-    return {k: frozenset(v) for k, v in out.items()}
+        return ""
 
 
 def _single_tenant(request: Any, tenant_id: str) -> bool:
@@ -95,18 +70,18 @@ def _single_tenant(request: Any, tenant_id: str) -> bool:
 
 
 async def _members(
-    request: Any, db: AsyncSession, tenant_id: str, wanted: dict[str, frozenset[str]]
+    request: Any, db: AsyncSession, tenant_id: str, wanted: Sequence[str]
 ) -> set[str]:
-    """The recipients among ``wanted`` (recipient -> its spellings) that are
-    active accounts in the tenant."""
+    """The recipients among ``wanted`` that are active accounts in the tenant."""
     directory = get_user_directory(request.app)
     if not wanted or isinstance(directory, NullUserDirectory):
         return set()
     users: dict[str, str] = {}  # user id -> recipient
-    for recipient, names in wanted.items():
-        for name in sorted(names):
-            for user in await directory.search(db, name, limit=DIRECTORY_SCAN):
-                if user.is_active and forms(user.email) & names:
+    for recipient in wanted:
+        key = _key(recipient)
+        for term in dict.fromkeys((recipient, key)):
+            for user in await directory.search(db, term, limit=DIRECTORY_SCAN):
+                if user.is_active and _key(user.email) == key:
                     users[user.id] = recipient
     if not users or _single_tenant(request, tenant_id):
         return set(users.values())
@@ -121,17 +96,11 @@ async def allowed_recipients(
     tenant_id: str,
     recipients: Sequence[str],
     settings: NewsletterSettings,
-    submitted: Mapping[str, frozenset[str]] | None = None,
 ) -> frozenset[str]:
-    """The addresses among ``recipients`` (already parsed) a test may go to.
-
-    ``submitted`` maps a recipient to the forms it was submitted in
-    (:func:`spellings`); a recipient matches when any of them does."""
-    names = {r: frozenset({r}) | (submitted or {}).get(r, frozenset()) for r in recipients}
-    vouched: set[str] = set(forms(getattr(getattr(request.state, "user", None), "email", None)))
-    for address in settings.test_send_extra_recipients:
-        vouched |= forms(address)
-    allowed = {r for r, n in names.items() if n & vouched}
-    rest = {r: n for r, n in names.items() if r not in allowed}
-    allowed |= await _members(request, db, tenant_id, rest)
+    """The addresses among ``recipients`` a test may go to."""
+    vouched = {_key(getattr(getattr(request.state, "user", None), "email", None))}
+    vouched.update(_key(a) for a in settings.test_send_extra_recipients)
+    vouched.discard("")
+    allowed = {r for r in recipients if _key(r) in vouched}
+    allowed |= await _members(request, db, tenant_id, [r for r in recipients if r not in allowed])
     return frozenset(r for r in recipients if r in allowed)

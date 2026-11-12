@@ -168,7 +168,8 @@ bound tenant (framework `UserDirectory` by exact address, then
 `tenant_member_ids` on a multi-tenant host; fail closed without either) and the
 SYSTEM setting `test_send_extra_recipients`. Any other is `recipient_not_allowed`,
 and one with a `complaint` or `unsubscribed` suppression in the tenant is
-`suppressed`; both are decided before the lock, write no attempt row and use no
+`suppressed` (every suppression hash and address comparison uses
+`normalise_email`: strip, NFKC, `lower()`, `xn--` labels decoded); both are decided before the lock, write no attempt row and use no
 budget. A result is `outcome` plus a stable `code` (`smtp_<reply>`,
 `dispatch_busy`), never the relay's reply text (ledger and log only). Content
 links use the campaign tenant's public origin, while the unsubscribe and logo

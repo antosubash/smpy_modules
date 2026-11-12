@@ -17,7 +17,7 @@ from simple_module_hosting.permissions import RequiresPermission
 from sm_records.contracts.newsletter import caller_roles
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_newsletter.campaigns.test_recipients import allowed_recipients, spellings
+from sm_newsletter.campaigns.test_recipients import allowed_recipients
 from sm_newsletter.campaigns.test_send import send_test
 from sm_newsletter.core import constants
 from sm_newsletter.core.tenancy import bind_admin
@@ -43,8 +43,6 @@ async def post_test_send(
 ) -> TestSendOut:
     data = parse_payload(TestSendIn, payload)
     recipients = [str(r) for r in data.recipients]
-    # Every form each address was typed in: suppressions hash the stored form.
-    submitted = spellings(payload.get("recipients") if isinstance(payload, dict) else None)
     settings = getattr(request.app.state, constants.PACKAGE).settings
     allowed = await allowed_recipients(
         request,
@@ -52,7 +50,6 @@ async def post_test_send(
         tenant_id=tenant,
         recipients=recipients,
         settings=settings,
-        submitted=submitted,
     )
     results = await send_test(
         request.app,
@@ -62,6 +59,5 @@ async def post_test_send(
         recipients=recipients,
         allowed=allowed,
         roles=caller_roles(request),
-        spellings=submitted,
     )
     return TestSendOut(results=[TestSendResultOut.model_validate(r) for r in results])

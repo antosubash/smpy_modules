@@ -6,11 +6,10 @@ An address holding a line break or another control character is refused
 before the address parser sees it; the route validates through
 ``parse_payload``, whose 422 never echoes the input.
 
-The address parser then normalises the domain (a fullwidth ``e`` becomes
-``e``), so the list is deduplicated again after it, and
-``campaigns.test_recipients.spellings`` keeps every form each recipient was
-submitted in: a suppression row hashes the address as it was stored (strip
-and lower-case only, ``normalise_email``), which may be the raw form (#348).
+The address parser then folds the domain (a fullwidth letter, punycode), so
+the list is deduplicated again after it, on the canonical form suppression
+hashes use (``normalise_email``): two spellings of one address are one
+recipient (#348).
 """
 
 from __future__ import annotations
@@ -22,6 +21,7 @@ from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Ema
 from sm_newsletter.campaigns.test_send import MAX_TEST_RECIPIENTS
 from sm_newsletter.core.constants import MAX_EMAIL_LEN
 from sm_newsletter.core.headers import check_header_text
+from sm_newsletter.core.suppression.hashing import normalise_email
 
 __test__ = False  # a module named test_*, not a pytest test module
 
@@ -39,7 +39,11 @@ def _normalise(value: Any) -> Any:
 
 
 def _dedup(value: list[str]) -> list[str]:
-    return list(dict.fromkeys(value))
+    """First spelling of each canonical address wins."""
+    seen: dict[str, str] = {}
+    for item in value:
+        seen.setdefault(normalise_email(item), item)
+    return list(seen.values())
 
 
 Address = Annotated[EmailStr, Field(max_length=MAX_EMAIL_LEN)]

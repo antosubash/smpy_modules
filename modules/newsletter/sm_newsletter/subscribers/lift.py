@@ -43,7 +43,7 @@ from sm_newsletter.core.errors_audience import (
     OptOutStands,
     SuppressionChanged,
 )
-from sm_newsletter.core.suppression import email_hash, normalise_email
+from sm_newsletter.core.suppression import email_hash, records_form
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.core.upsert import affected_rows
 from sm_newsletter.models import Suppression, SuppressionLift
@@ -89,7 +89,7 @@ async def subscriber_on_list(
     """The address's confirmed subscriber on the list, for display only - never
     used to decide a lift."""
     try:
-        term = f"sm_email:eq:{normalise_email(email)}"
+        term = f"sm_email:eq:{records_form(email)}"  # records' own normalisation
         hits, _ = await iter_subscribers(
             session, tenant_id=tenant_id, type_key=list_type_key, filters=[term], limit=1
         )

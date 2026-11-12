@@ -23,7 +23,7 @@ from sm_newsletter.core.errors_import import (
     ImportTooManyColumns,
     ImportZipUnsafe,
 )
-from sm_newsletter.core.suppression import normalise_email
+from sm_newsletter.core.suppression import records_form
 from sm_newsletter.imports.archive import ARCHIVE_ERRORS
 from sm_newsletter.imports.constants import (
     EMAIL_HEADERS,
@@ -138,8 +138,10 @@ def detect_kind(name: str, header: Header) -> str:
 
 
 def valid_email(raw: str) -> str | None:
+    """The address as records will store it (its own normalisation); suppression
+    hashes take the canonical form from it (``email_hash``)."""
     try:
-        normalised = normalise_email(raw)
+        normalised = records_form(raw)
         validate_email(normalised, check_deliverability=False)
     except (ValueError, EmailNotValidError):
         return None
