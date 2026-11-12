@@ -80,16 +80,36 @@ async def test_a_custom_robots_body_names_no_origin(authed_client: AsyncClient) 
     assert "host" not in _vary(response)
 
 
-def test_vary_on_host_appends_once() -> None:
+@pytest.mark.asyncio
+async def test_the_hosts_public_base_url_stands_in(authed_client: AsyncClient) -> None:
+    """A blank module setting falls back to the host's own ``public_base_url``
+    on a single-tenant host, before the request's Host."""
+    await _publish(authed_client)
+    _settings(authed_client).public_base_url = None
+    # This harness builds no host settings; a real host has them here.
+    sm = authed_client._transport.app.state.sm  # type: ignore[attr-defined]
+    sm.settings = SimpleNamespace(environment="production", public_base_url="https://site.example")
+    sitemap = await authed_client.get("/sitemap.xml", headers=_ANON)
+    assert "https://site.example/p/hello" in sitemap.text
+    assert "host" not in _vary(sitemap)
+    page = await authed_client.get("/p/hello", headers=_ANON)
+    assert "host" not in _vary(page)
+
+
+def test_vary_on_host_appends_once(monkeypatch) -> None:
+    monkeypatch.setattr(public_origin, "mode_of", lambda app: TenancyMode.SINGLE)
     settings = PagebuilderSettings()
+    request = SimpleNamespace(app=_app("production"))
     response = Response(headers={"Vary": "Cookie, host"})
-    assert vary_on_host(response, settings).headers["Vary"] == "Cookie, host"
+    assert vary_on_host(response, request, settings).headers["Vary"] == "Cookie, host"  # type: ignore[arg-type]
     response = Response(headers={"Vary": "Cookie"})
-    assert vary_on_host(response, settings).headers["Vary"] == "Cookie, Host"
+    assert vary_on_host(response, request, settings).headers["Vary"] == "Cookie, Host"  # type: ignore[arg-type]
 
 
-def _app(environment: str | None) -> SimpleNamespace:
-    host = SimpleNamespace(settings=SimpleNamespace(environment=environment))
+def _app(environment: str | None, host_base: str = "") -> SimpleNamespace:
+    host = SimpleNamespace(
+        settings=SimpleNamespace(environment=environment, public_base_url=host_base)
+    )
     return SimpleNamespace(state=SimpleNamespace(sm=host))
 
 
@@ -103,11 +123,13 @@ def _app(environment: str | None) -> SimpleNamespace:
         ("testing", TenancyMode.SINGLE, None, False),
         ("production", TenancyMode.MULTI, None, False),
         ("production", TenancyMode.SINGLE, "https://example.com", False),
+        ("production", TenancyMode.SINGLE, "host", False),
     ],
 )
 def test_the_startup_warning(monkeypatch, caplog, environment, mode, base, warns) -> None:
     monkeypatch.setattr(public_origin, "mode_of", lambda app: mode)
-    settings = PagebuilderSettings(public_base_url=base)
+    host_base = "https://site.example" if base == "host" else ""
+    settings = PagebuilderSettings(public_base_url=None if base == "host" else base)
     with caplog.at_level(logging.WARNING, logger=public_origin.__name__):
-        assert warn_if_unset(_app(environment), settings) is warns
+        assert warn_if_unset(_app(environment, host_base), settings) is warns
     assert any("public_base_url" in r.message for r in caplog.records) is warns

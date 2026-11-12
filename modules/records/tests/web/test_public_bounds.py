@@ -152,6 +152,19 @@ async def test_a_timeout_after_the_listing_is_a_503_too(seeded, monkeypatch):
     assert "no-store" in resp.headers["cache-control"]
 
 
+async def test_an_admin_cancel_stays_a_500(seeded, monkeypatch):
+    """Only the public router sets the timeout; an admin route keeps its logged 500."""
+    from sm_records.records.services import records as record_service
+
+    async def cancelled(*args, **kwargs):
+        raise _cancelled()
+
+    monkeypatch.setattr(record_service, "list_records", cancelled)
+    resp = await seeded.get(_API, headers=roles(ADMIN))
+    assert resp.status_code == 500, resp.text
+    assert resp.json() == {"detail": "internal error"}
+
+
 async def test_another_database_error_is_not_a_timeout(db):
     with pytest.raises(OperationalError):
         async with statement_timeout(db):

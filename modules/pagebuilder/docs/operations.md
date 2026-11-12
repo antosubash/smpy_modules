@@ -181,7 +181,9 @@ missing file is a plain-text 404, never the app shell.
 
 ### Public origin
 
-With `public_base_url` blank, every absolute URL a public response carries
+On a single-tenant host a blank `public_base_url` falls back to the host's own
+`public_base_url` first. With both blank (or on a multi-tenant host, where the
+host's is not used), every absolute URL a public response carries
 (canonical, `og:url`, `og:image`, `hreflang`, the sitemap's `<loc>`s, the
 generated `robots.txt`'s `Sitemap:` line) is built from the request's `Host`
 header, which the client chooses (#355). Behind a proxy that forwards only
@@ -190,9 +192,9 @@ harmless; behind one that does not, a shared cache that keys without `Host`
 could store a page whose links name a host of the requester's choosing and
 serve it to everyone. So:
 
-- **Set `public_base_url` in production** on a single-tenant host. With
-  `SM_ENVIRONMENT` other than `development` or `testing` and the setting blank,
-  pagebuilder logs a warning at startup.
+- **Set `public_base_url` in production** on a single-tenant host (pagebuilder's,
+  or the host's). With `SM_ENVIRONMENT` other than `development` or `testing`
+  and both blank, pagebuilder logs a warning at startup.
 - While it is blank, those responses (pages, their 304s, `/sitemap.xml`, and
   `/robots.txt` unless `robots_body` replaces it or the sitemap is off) add `Host` to `Vary`.
 - On a multi-tenant host leave it blank: each organisation's site is its own

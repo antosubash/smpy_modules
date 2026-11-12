@@ -365,7 +365,7 @@
     "remove_stored": "Gespeicherten Wert entfernen",
     "return_url": "Ursprung der Rückkehr-URL",
     "return_url_rule": "Die Rückkehr-URL muss ein http(s)-Ursprung wie https://app.example.com sein – ohne Pfad, Query oder Fragment, höchstens 255 Zeichen.",
-    "return_url_hint": "Wohin Stripe Kundinnen und Kunden nach dem Checkout und dem Portal zurückschickt. In der Produktion erforderlich: Ohne sie werden Checkout und Portal dort abgelehnt.",
+    "return_url_hint": "Wohin Stripe Kundinnen und Kunden nach dem Checkout und dem Portal zurückschickt. Leer gilt die öffentliche Adresse der Website; ist in der Produktion keine von beiden gesetzt, werden Checkout und Portal abgelehnt.",
     "save": "Verbindung speichern",
     "saved": "Stripe-Verbindung gespeichert"
   },

@@ -152,7 +152,7 @@ async def render_public_page(
         # Host. After Cache-Control: it may mark the response private (#192).
         vary_on_tenant(response, request)
         # Canonical, og and hreflang name the origin; a guessed one is the Host (#355).
-        vary_on_host(response, settings)
+        vary_on_host(response, request, settings)
         # Which language was negotiated, for caches and for anything reading
         # the response without parsing the body.
         response.headers["Content-Language"] = page.locale

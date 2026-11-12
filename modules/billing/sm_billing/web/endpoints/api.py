@@ -50,7 +50,7 @@ async def checkout(
     body: PlanChoice, request: Request, service: BillingServiceDep, _: Owner
 ) -> UrlOut:
     url = await service.checkout(
-        body.plan_id, body.interval, email=user_email(request), base=base_url(request)
+        body.plan_id, body.interval, email=user_email(request), base=lambda: base_url(request)
     )
     return UrlOut(url=url)
 
@@ -62,7 +62,7 @@ async def portal(request: Request, ctx: Context, service: ContextServiceDep) -> 
         raise BillingError("tenant_owner_required", 403)
     if not ctx.restore:
         _require(request, c.PERM_MANAGE)
-    return UrlOut(url=await service.portal(base=base_url(request)))
+    return UrlOut(url=await service.portal(base=lambda: base_url(request)))
 
 
 def _require(request: Request, permission: str) -> None:

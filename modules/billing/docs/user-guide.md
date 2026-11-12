@@ -127,9 +127,11 @@ panel need `billing.platform.view`.
   field blank to keep what is stored; tick **Remove the stored value** to clear
   it. Values are never shown again after saving.
 - **Return URL origin** — where Stripe sends people back after Checkout and the
-  portal, e.g. `https://app.example.com`. **Required in production**: blank
-  refuses Checkout and the portal there ("Online payment is not fully set
-  up"); only a development or testing host uses the address the person is on.
+  portal, e.g. `https://app.example.com`. Blank uses the site's own public
+  address (the host's `public_base_url`) on a single-tenant site; with neither
+  set, production refuses Checkout and the portal ("Online payment is not
+  fully set up"), and only a development or testing host, or a multi-tenant
+  one, uses the address the person is on.
   Must be an `http(s)` origin with no path.
 
 A banner explains when the manual provider is active, or when Stripe is

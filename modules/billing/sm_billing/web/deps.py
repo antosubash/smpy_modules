@@ -13,6 +13,7 @@ from tenants.web.deps import ActiveTenantContext, require_active_tenant, require
 from sm_billing.core import constants as c
 from sm_billing.core.context import BillingContext, billing_context, is_user_mode, user_context
 from sm_billing.core.errors import BillingError
+from sm_billing.subscriptions.lifecycle import is_multi_tenant
 from sm_billing.web.services.checkout import BillingService
 
 
@@ -54,22 +55,34 @@ BillingServiceDep = Annotated[BillingService, Depends(get_billing_service)]
 
 def base_url(request: Request) -> str:
     """Origin for provider return URLs (Checkout's success/cancel, the portal's
-    return): ``return_base_url``.
+    return), in this order (#355):
 
-    Only in development or testing does a blank setting fall back to this
-    request's origin (#355). Anywhere else the ``Host`` header is the client's
-    choice, and behind a proxy without ``trusted_proxy`` it is the internal host
-    name the customer cannot reach, so the session is refused with 409
-    ``return_base_url_missing`` before the provider is called. "Development or
-    testing" is the environment as the host reports it
+    1. billing's ``return_base_url``;
+    2. on a single-tenant host, the host's own ``public_base_url``;
+    3. this request's origin, on a multi-tenant host (each organisation can be
+       on its own host, so blank is the right configuration there) or in
+       development or testing.
+
+    Otherwise the session is refused with 409 ``return_base_url_missing``: the
+    ``Host`` header is the client's choice, and behind a proxy without
+    ``trusted_proxy`` it is the internal host name the customer cannot reach.
+    "Development or testing" is the environment as the host reports it
     (``app.state.sm.settings.environment``, from ``SM_ENVIRONMENT``; the
     framework's default is development, so a production deployment sets it).
+
+    Called only once a provider needs return URLs (``BillingService.checkout``
+    and ``portal`` take it as a callable), so a manual provider, an unknown plan
+    or a missing customer still answer with their own refusal.
     """
     configured = (getattr(request.app.state, c.PACKAGE).settings.return_base_url or "").strip()
     if configured:
         return configured.rstrip("/")
     host = getattr(getattr(request.app.state, "sm", None), "settings", None)
-    if getattr(host, "environment", None) not in NON_PROD_ENVIRONMENTS:
+    multi = is_multi_tenant(request.app)
+    host_base = "" if multi else str(getattr(host, "public_base_url", "") or "").strip()
+    if host_base:
+        return host_base.rstrip("/")
+    if not multi and getattr(host, "environment", None) not in NON_PROD_ENVIRONMENTS:
         raise BillingError("return_base_url_missing", 409)
     return str(request.base_url).rstrip("/")
 

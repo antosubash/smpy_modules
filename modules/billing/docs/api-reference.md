@@ -282,8 +282,9 @@ exists locally or at Stripe: trialing, active, past_due or unpaid. Use
 change-plan. An `incomplete` one, a first payment that failed, does not block,
 so the owner can check out again; Stripe expires the abandoned one on its own), `too_many_members` 409,
 `tenant_owner_required` 403, `provider_error` 502, `return_base_url_missing`
-409 (`return_base_url` blank outside development and testing, #355; Stripe is
-not called).
+409 (single-tenant host, `return_base_url` and the host's `public_base_url`
+both blank, outside development and testing, #355; checked after every other
+guard, and Stripe is not called).
 
 ### `POST /api/billing/portal`
 

@@ -85,33 +85,48 @@ def viewer_key(request: Request) -> str:
     return f"{ui_locale}:{who}"
 
 
-def guessed(settings: NewsSettings) -> bool:
+def _host(app: Any) -> Any:
+    return getattr(getattr(app.state, "sm", None), "settings", None)
+
+
+def configured_origin(app: Any, settings: NewsSettings) -> str:
+    """The configured origin, or ``""``: this module's ``public_base_url``, else
+    on a single-tenant host the host's own ``public_base_url``. Not the host's on
+    a multi-tenant host, where each organisation's site is its own host."""
+    own = (settings.public_base_url or "").strip()
+    if own or tenancy.mode_of(app) is not tenancy.TenancyMode.SINGLE:
+        return own.rstrip("/")
+    return str(getattr(_host(app), "public_base_url", "") or "").strip().rstrip("/")
+
+
+def guessed(app: Any, settings: NewsSettings) -> bool:
     """True while absolute URLs come from the request's ``Host`` header (#355)."""
-    return not (settings.public_base_url or "").strip()
+    return not configured_origin(app, settings)
 
 
 def public_base_url(request: Request, settings: NewsSettings) -> str:
     """Resolve the public origin used to build absolute URLs.
 
-    Prefer the explicit setting — the deployment knows its public host — and
-    only fall back to the inbound request for local development, a
-    multi-tenant host (each organisation's site is its own host) and scenarios
-    where the Host header is trustworthy. The client chooses that header, so
-    while it is used :func:`apply_cache` adds ``Host`` to ``Vary`` and
-    :func:`warn_if_unset` says so at startup (#355). Always returned without a
-    trailing slash so callers can concatenate path segments directly.
+    Prefer the configured origin (:func:`configured_origin`) — the deployment
+    knows its public host — and only fall back to the inbound request for local
+    development, a multi-tenant host (each organisation's site is its own host)
+    and scenarios where the Host header is trustworthy. The client chooses that
+    header, so while it is used :func:`apply_cache` adds ``Host`` to ``Vary``
+    and :func:`warn_if_unset` says so at startup (#355). Always returned without
+    a trailing slash so callers can concatenate path segments directly.
     """
-    if not guessed(settings):
-        return settings.public_base_url.strip().rstrip("/")
-    return f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
+    return configured_origin(request.app, settings) or (
+        f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
+    )
 
 
 def warn_if_unset(app: Any, settings: NewsSettings, mode: tenancy.TenancyMode) -> bool:
     """Log once at startup when a production single-tenant host has no
-    ``public_base_url``; returns whether it warned. Not on a multi-tenant host,
-    where blank is right, nor in development or testing."""
-    host = getattr(getattr(app.state, "sm", None), "settings", None)
-    if not guessed(settings) or getattr(host, "environment", None) in NON_PROD_ENVIRONMENTS:
+    ``public_base_url`` (its own or the host's); returns whether it warned.
+    Not on a multi-tenant host, where blank is right, nor in development or
+    testing."""
+    environment = getattr(_host(app), "environment", None)
+    if not guessed(app, settings) or environment in NON_PROD_ENVIRONMENTS:
         return False
     if mode is not tenancy.TenancyMode.SINGLE:
         return False
@@ -188,7 +203,8 @@ def apply_cache(
         )
     # Every response here names the origin (canonical, og, feed, sitemap); a
     # guessed one is the client's Host, so a cache must key on it (#355).
-    extra = (PER_VIEWER_VARY if per_viewer else ()) + (("Host",) if guessed(settings) else ())
+    host = ("Host",) if guessed(request.app, settings) else ()
+    extra = (PER_VIEWER_VARY if per_viewer else ()) + host
     if extra:
         listed = [f.strip() for f in response.headers.get("vary", "").split(",") if f.strip()]
         seen = {f.lower() for f in listed}

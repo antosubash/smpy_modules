@@ -116,6 +116,21 @@ describe('ShareDialog', () => {
     await view.unmount();
   });
 
+  it('clears a failed search once the query is too short to search', async () => {
+    const { view } = await open({
+      [`GET ${SHARES}`]: [],
+      [`GET ${CANDIDATES}`]: () => {
+        throw new Error('offline');
+      },
+    });
+    const alert = () =>
+      document.querySelector('[data-testid="images-share-dialog"] [role="alert"]');
+    expect(alert()).not.toBeNull();
+    await search('sa');
+    expect(alert()).toBeNull();
+    await view.unmount();
+  });
+
   it('revokes a share by its id', async () => {
     const { calls, view } = await open({
       [`GET ${SHARES}`]: [share],

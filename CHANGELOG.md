@@ -148,12 +148,16 @@ name the module they affect.
   `robots.txt`) adds `Host` to `Vary`, so a shared cache cannot hand one host's
   links to another; and a single-tenant host outside `development`/`testing`
   logs a startup warning naming the setting. A multi-tenant host, where blank
-  is right, gets the `Vary` and no warning. billing refuses Checkout and the
-  portal with 409 `return_base_url_missing` when `return_base_url` is blank
-  outside `development`/`testing` (before Stripe is called), and the billing
-  screens say so; the Connection page says the field is required in
-  production. **Upgrading:** set billing's `return_base_url`, and pagebuilder's
-  and news' `public_base_url` on a single-tenant host, in production. Details:
+  is right, gets the `Vary` and no warning. On a single-tenant host the host's
+  own `public_base_url` now stands in for a blank module setting in all three
+  modules. billing refuses Checkout and the portal with 409
+  `return_base_url_missing` when neither is set on a single-tenant host outside
+  `development`/`testing`; it is checked only once Stripe would need the URLs,
+  so `checkout_unavailable`, `plan_not_found` and `no_customer` still answer
+  first, and a multi-tenant host keeps the request's origin. The billing screens
+  say so; the Connection page says the field is required in production.
+  **Upgrading:** on a single-tenant production host, set the host's
+  `public_base_url` (or each module's own setting). Details:
   the `public_base_url` / `return_base_url` rows in each module's
   `docs/operations.md`.
 

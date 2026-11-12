@@ -53,7 +53,9 @@ export function useShares(collectionId: string, open: boolean): Shares {
   useEffect(() => {
     if (!open) return;
     if (!searchable(query)) {
+      // Nothing is searched, so an earlier search's error no longer applies.
       setFound([]);
+      setError(null);
       return;
     }
     let current = true;

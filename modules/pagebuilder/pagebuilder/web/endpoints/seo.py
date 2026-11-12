@@ -125,7 +125,7 @@ async def sitemap(
     )
     # Tenant-bound: on a multi-tenant host the session can pick the tenant.
     # Every <loc> names the origin; a guessed one is the Host (#355).
-    return vary_on_host(vary_on_tenant(response, request), settings)
+    return vary_on_host(vary_on_tenant(response, request), request, settings)
 
 
 @seo_router.api_route("/robots.txt", methods=["GET", "HEAD"], response_class=Response)
@@ -152,4 +152,4 @@ async def robots(
     )
     # Only the generated body names the origin (its ``Sitemap:`` line).
     derived = settings.robots_body is None and settings.sitemap_enabled
-    return vary_on_host(response, settings) if derived else response
+    return vary_on_host(response, request, settings) if derived else response
