@@ -117,7 +117,7 @@ def test_the_picker_has_its_own_per_user_rate():
     rates = RateLimitRegistry()
     ImagesModule().register_rate_limits(rates)
     rule = rates.match("GET", f"{BASE}/abc/share-candidates")
-    assert rule is not None and rule.key == "user" and rule.rate == shares.RATE
+    assert rule is not None and rule.key == "user" and rule.rate == shares.RATE == "60/minute"
     assert rates.match("GET", f"{BASE}/abc") is None
     assert rates.match("GET", f"{BASE}/abc/share-candidates/x") is None
 

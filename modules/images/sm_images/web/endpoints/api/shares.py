@@ -45,7 +45,7 @@ def _unscoped_single(request: Request) -> bool:
 
 MIN_QUERY: Final = 3
 """Characters of ``q`` (trimmed) below which the picker answers nobody."""
-RATE: Final = "30/minute"
+RATE: Final = "60/minute"
 """Per signed-in user, through the framework's rate-limit middleware."""
 PATH_PATTERN: Final = rf"^{constants.ROUTE_PREFIX_API}/collections/[^/]+/share-candidates$"
 """The route, as the rate-limit rule matches it."""

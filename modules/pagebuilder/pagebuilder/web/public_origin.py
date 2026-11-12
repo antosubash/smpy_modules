@@ -87,9 +87,10 @@ def warn_if_unset(app: Any, settings: PagebuilderSettings) -> bool:
     if mode_of(app) is not TenancyMode.SINGLE:
         return False
     _log.warning(
-        "pagebuilder: public_base_url is not set, so canonical, og:url, hreflang and "
-        "sitemap links are built from each request's Host header, which the client "
-        "chooses. Set it on the Settings screen (e.g. https://example.com); until then "
-        "public pages vary on Host"
+        "pagebuilder: neither pagebuilder's public_base_url nor the host's "
+        "public_base_url is set, so canonical, og:url, hreflang and sitemap links are "
+        "built from each request's Host header, which the client chooses. Set either one "
+        "on the Settings screen (e.g. https://example.com); until then public pages vary "
+        "on Host"
     )
     return True

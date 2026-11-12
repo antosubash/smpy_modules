@@ -131,10 +131,10 @@ def warn_if_unset(app: Any, settings: NewsSettings, mode: tenancy.TenancyMode) -
     if mode is not tenancy.TenancyMode.SINGLE:
         return False
     _log.warning(
-        "news: public_base_url is not set, so canonical, og:url, feed and sitemap links "
-        "are built from each request's Host header, which the client chooses. Set it on "
-        "the Settings screen (e.g. https://example.com); until then public responses "
-        "vary on Host"
+        "news: neither news' public_base_url nor the host's public_base_url is set, so "
+        "canonical, og:url, feed and sitemap links are built from each request's Host "
+        "header, which the client chooses. Set either one on the Settings screen (e.g. "
+        "https://example.com); until then public responses vary on Host"
     )
     return True
 

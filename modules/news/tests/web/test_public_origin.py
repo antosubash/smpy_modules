@@ -50,7 +50,10 @@ def test_the_startup_warning(caplog, mode, environment, kind, base, warns) -> No
     settings = NewsSettings(public_base_url="" if base == "host" else base)
     with caplog.at_level(logging.WARNING, logger="simple_module.news"):
         assert warn_if_unset(_app(environment, host_base), settings, kind) is warns
-    assert any("public_base_url is not set" in r.message for r in caplog.records) is warns
+    said = [r.message for r in caplog.records if "public_base_url" in r.message]
+    assert bool(said) is warns
+    for message in said:
+        assert "news' public_base_url nor the host's public_base_url" in message
 
 
 def _request(host_base: str = "") -> SimpleNamespace:

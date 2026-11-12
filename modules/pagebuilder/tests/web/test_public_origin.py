@@ -132,4 +132,7 @@ def test_the_startup_warning(monkeypatch, caplog, environment, mode, base, warns
     settings = PagebuilderSettings(public_base_url=None if base == "host" else base)
     with caplog.at_level(logging.WARNING, logger=public_origin.__name__):
         assert warn_if_unset(_app(environment, host_base), settings) is warns
-    assert any("public_base_url" in r.message for r in caplog.records) is warns
+    said = [r.message for r in caplog.records if "public_base_url" in r.message]
+    assert bool(said) is warns
+    for message in said:
+        assert "pagebuilder's public_base_url nor the host's public_base_url" in message

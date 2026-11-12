@@ -58,9 +58,9 @@ and on a multi-tenant host lists only members of the bound tenant.
 **It never lists the directory (#357).** A `q` shorter than three characters
 after trimming, empty included, answers `[]` without searching, and the share
 dialog asks for three before it sends anything. The route also has its own rate,
-30 requests a minute per signed-in user (the framework's rate-limit middleware,
-registered in `ImagesModule.register_rate_limits`; `429` with `Retry-After`
-beyond it). On a single-tenant host, where there is no membership to filter
+60 requests a minute per signed-in user, above what steady typing through the
+dialog's 250 ms debounce sends (the framework's rate-limit middleware, registered
+in `ImagesModule.register_rate_limits`; `429` with `Retry-After` beyond it). On a single-tenant host, where there is no membership to filter
 by, these two are what keep a user who may create a collection from paging
 through every account's name and address.
 
