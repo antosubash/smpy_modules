@@ -55,7 +55,7 @@ async def _claim(app: FastAPI, event: WebhookEvent, provider: str) -> bool:
             return row.processed_at is None
         session.add(EventRow(id=event.id, provider=provider, type=event.type))
         try:
-            await session.commit()
+            await finalize_session(session)
         except IntegrityError:
             # A concurrent delivery inserted it first; let that one finish and
             # have the provider retry this one.
@@ -75,7 +75,7 @@ async def _finish(
         row.error = error or note
         if error is None:
             row.processed_at = datetime.now(UTC)
-        await session.commit()
+        await finalize_session(session)
 
 
 async def _snapshot(
