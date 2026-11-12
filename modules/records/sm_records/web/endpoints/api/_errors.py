@@ -59,6 +59,7 @@ from sm_records.core import events
 from sm_records.records.index.query import QueryError
 from sm_records.records.services._common import SESSION_HAS_WRITES_KEY
 from sm_records.records.services.errors import RecordsError
+from sm_records.records.services.public_bounds import PublicQueryTimedOut, cancelled
 from sm_records.web.deps import request_session
 from sm_records.web.endpoints.api._error_bodies import response_for
 from sm_records.web.endpoints.api._public_cache import error_headers
@@ -185,6 +186,12 @@ class RecordsErrorRoute(APIRoute):
                 await _discard_writes(request)
                 return response
             except Exception as exc:
+                if cancelled(exc) and not self.views:
+                    # The public statement timeout outlives the listing call:
+                    # whichever query it cancels is the 503, never a 500 (#349).
+                    response = await response_for(request, PublicQueryTimedOut())
+                    await _discard_writes(request)
+                    return response
                 if _host_handles(request, exc):
                     # Not unanticipated: somebody upstream registered a handler
                     # for this exact class and it produces a status of its own.

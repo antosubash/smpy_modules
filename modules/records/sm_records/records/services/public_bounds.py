@@ -46,8 +46,10 @@ __all__ = [
     "PUBLIC_STATEMENT_TIMEOUT_MS",
     "PublicQueryRefused",
     "PublicQueryTimedOut",
+    "cancelled",
     "check_public_filters",
     "statement_timeout",
+    "too_many_filters",
 ]
 
 PUBLIC_MAX_FILTER_TERMS: Final = 3
@@ -83,14 +85,24 @@ class PublicQueryTimedOut(RecordsError):  # noqa: N818 - HTTP vocabulary, delibe
         super().__init__("the query took too long; narrow the filter and try again")
 
 
+def too_many_filters(sent: int) -> PublicQueryRefused:
+    """The refusal for more than :data:`PUBLIC_MAX_FILTER_TERMS` terms."""
+    return PublicQueryRefused(
+        f"too many 'filter' terms: {sent} sent, at most "
+        f"{PUBLIC_MAX_FILTER_TERMS} on the public API",
+        "too_many_filters",
+    )
+
+
 def check_public_filters(filters: Sequence[Filter]) -> None:
-    """Refuse a public request over either term cap (see the module docstring)."""
+    """Refuse a public request over either term cap (see the module docstring).
+
+    The public routes also count the raw terms before parsing them
+    (``_grammar.parse_public_filters``), ahead of the admin ``max_filter_terms``,
+    so 25 terms are ``too_many_filters`` there too; this is the services' own
+    check, for a caller that is not those routes."""
     if len(filters) > PUBLIC_MAX_FILTER_TERMS:
-        raise PublicQueryRefused(
-            f"too many 'filter' terms: {len(filters)} sent, at most "
-            f"{PUBLIC_MAX_FILTER_TERMS} on the public API",
-            "too_many_filters",
-        )
+        raise too_many_filters(len(filters))
     contains = sum(1 for flt in filters if flt.op is FilterOp.CONTAINS)
     if contains > PUBLIC_MAX_CONTAINS_TERMS:
         raise PublicQueryRefused(
@@ -100,7 +112,15 @@ def check_public_filters(filters: Sequence[Filter]) -> None:
         )
 
 
-def _is_timeout(exc: DBAPIError) -> bool:
+def cancelled(exc: BaseException) -> bool:
+    """Whether ``exc`` is a statement Postgres cancelled (``statement_timeout``).
+
+    ``SET LOCAL`` lasts until the transaction ends, so any query a public
+    request runs after the listing (the translation lookup, the commit) can be
+    the one cancelled; the records route classes map this at the handler
+    boundary as well, so none of them becomes a 500."""
+    if not isinstance(exc, DBAPIError):
+        return False
     code = getattr(exc.orig, "pgcode", None) or getattr(exc.orig, "sqlstate", None)
     return code == _QUERY_CANCELED
 
@@ -119,6 +139,6 @@ async def statement_timeout(db: AsyncSession) -> AsyncIterator[None]:
     try:
         yield
     except DBAPIError as exc:
-        if not _is_timeout(exc):
+        if not cancelled(exc):
             raise
         raise PublicQueryTimedOut() from exc

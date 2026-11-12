@@ -60,8 +60,10 @@ def base_url(request: Request) -> str:
     request's origin (#355). Anywhere else the ``Host`` header is the client's
     choice, and behind a proxy without ``trusted_proxy`` it is the internal host
     name the customer cannot reach, so the session is refused with 409
-    ``return_base_url_missing`` before the provider is called. A host that
-    reports no environment counts as production.
+    ``return_base_url_missing`` before the provider is called. "Development or
+    testing" is the environment as the host reports it
+    (``app.state.sm.settings.environment``, from ``SM_ENVIRONMENT``; the
+    framework's default is development, so a production deployment sets it).
     """
     configured = (getattr(request.app.state, c.PACKAGE).settings.return_base_url or "").strip()
     if configured:

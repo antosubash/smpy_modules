@@ -77,6 +77,20 @@ async def test_a_fourth_term_is_refused_with_a_code(seeded, url):
 
 
 @pytest.mark.parametrize("url", [_PUBLIC, f"{_PUBLIC}/stats"])
+async def test_past_the_admin_cap_is_still_the_public_code(seeded, url):
+    """25 terms is over ``max_filter_terms`` (20) too; the public cap answers first."""
+    resp = await seeded.get(f"{url}?{_query(*(['title:eq:t0'] * 25))}")
+    assert resp.status_code == 400, resp.text
+    assert resp.json()["code"] == "too_many_filters"
+
+
+async def test_the_admin_listing_keeps_its_bare_cap(seeded):
+    resp = await seeded.get(f"{_API}?{_query(*(['title:eq:t0'] * 25))}", headers=roles(ADMIN))
+    assert resp.status_code == 400, resp.text
+    assert "code" not in resp.json()
+
+
+@pytest.mark.parametrize("url", [_PUBLIC, f"{_PUBLIC}/stats"])
 async def test_a_second_contains_is_refused_with_a_code(seeded, url):
     resp = await seeded.get(f"{url}?{_query('title:contains:t', 'body:contains:b')}")
     assert resp.status_code == 400, resp.text
@@ -118,6 +132,21 @@ async def test_a_cancelled_statement_is_a_503_not_a_500(seeded, url, monkeypatch
     monkeypatch.setattr(public, "statement_timeout", failing)
     monkeypatch.setattr(public_stats, "statement_timeout", failing)
     resp = await seeded.get(url)
+    assert resp.status_code == 503, resp.text
+    assert resp.json()["code"] == "query_timeout"
+    assert "no-store" in resp.headers["cache-control"]
+
+
+async def test_a_timeout_after_the_listing_is_a_503_too(seeded, monkeypatch):
+    """``SET LOCAL`` outlives the listing call, so the translation lookup that
+    follows it can be the statement cancelled; the route maps that as well."""
+    from sm_records.records.services import public
+
+    async def cancelled(*args, **kwargs):
+        raise _cancelled()
+
+    monkeypatch.setattr(public, "published_siblings", cancelled)
+    resp = await seeded.get(_PUBLIC)
     assert resp.status_code == 503, resp.text
     assert resp.json()["code"] == "query_timeout"
     assert "no-store" in resp.headers["cache-control"]
