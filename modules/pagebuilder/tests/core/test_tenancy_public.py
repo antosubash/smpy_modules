@@ -93,14 +93,15 @@ async def test_multi_mode_public_responses_vary_on_cookie(mt: AsyncClient) -> No
     visitor = {**A, "X-Test-Anonymous": "1"}
     page = await mt.get("/p/about", headers=visitor)
     assert page.status_code == 200, page.text
-    assert _vary(page) == ["X-Inertia", "Cookie", "Accept-Language"]
+    # ``Host`` last: ``public_base_url`` is blank, as a multi-tenant host keeps it (#355).
+    assert _vary(page) == ["X-Inertia", "Cookie", "Accept-Language", "Host"]
     cached = await mt.get("/p/about", headers={**visitor, "If-None-Match": page.headers["etag"]})
     assert cached.status_code == 304
-    assert _vary(cached) == ["X-Inertia", "Cookie", "Accept-Language"]
+    assert _vary(cached) == ["X-Inertia", "Cookie", "Accept-Language", "Host"]
     sitemap = await mt.get("/sitemap.xml", headers=A)
     assert sitemap.status_code == 200
     assert sitemap.headers["cache-control"].startswith("public")
-    assert _vary(sitemap) == ["Cookie"]
+    assert _vary(sitemap) == ["Cookie", "Host"]
 
 
 async def test_single_mode_vary_adds_no_tenant_field(authed_client: AsyncClient) -> None:
@@ -108,6 +109,9 @@ async def test_single_mode_vary_adds_no_tenant_field(authed_client: AsyncClient)
     assert created.status_code == 201, created.text
     await authed_client.post(f"{API}/{created.json()['id']}/publish", json={})
     visitor = {"X-Test-Anonymous": "1"}
+    # A configured origin, so ``Host`` is out of it (``test_public_origin``, #355).
+    settings = authed_client._transport.app.state.pagebuilder.settings  # type: ignore[attr-defined]
+    settings.public_base_url = "https://example.com"
     page = await authed_client.get("/p/hi", headers=visitor)
     assert page.status_code == 200, page.text
     # The viewer's own Vary (#94), on the 200 and the 304 alike; nothing for the tenant.
