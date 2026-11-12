@@ -89,9 +89,10 @@ def previous_secrets() -> tuple[str, ...]:
     """The retired secrets still accepted for decryption, newest first.
 
     ``SM_SECRET_KEY_PREVIOUS`` from the process environment, else from the
-    project ``.env``: one bare key, or a JSON list of keys. A value that starts
-    with ``[`` and is not a JSON list of strings is refused, naming the
-    variable and never its value.
+    project ``.env``: one bare key, or a JSON list of keys, each used exactly
+    as given (the framework's ``.env`` parser trims a file value, as it does
+    ``SM_SECRET_KEY``'s). A value that starts with ``[`` and is not a JSON
+    list of strings is refused, naming the variable and never its value.
     """
     raw = os.environ.get(PREVIOUS_ENV)
     return _parse_previous(_dotenv_previous() if raw is None else raw)
@@ -106,20 +107,22 @@ def _dotenv_previous() -> str:
 
 @lru_cache(maxsize=8)
 def _parse_previous(raw: str) -> tuple[str, ...]:
-    text = raw.strip()
-    if not text:
+    # Keys are used exactly as given, like SM_SECRET_KEY itself: a secret may
+    # start or end with whitespace, and a trimmed one derives another key.
+    # Trimming only decides whether anything is configured at all.
+    if not raw.strip():
         return ()
-    if not text.startswith("["):
-        return (text,)
+    if not raw.lstrip().startswith("["):
+        return (raw,)
     try:
-        values = json.loads(text)
+        values = json.loads(raw)
     except ValueError:
         values = None
     if not isinstance(values, list) or not all(isinstance(v, str) for v in values):
         raise RuntimeError(
             f"{PREVIOUS_ENV} must be one key or a JSON list of keys (its value is not shown)"
         ) from None
-    return tuple(v.strip() for v in values if v.strip())
+    return tuple(v for v in values if v.strip())
 
 
 def _v1_key(secret: str) -> bytes:

@@ -645,7 +645,12 @@ restart.
   '"<secret>"'` (a JSON string — the field is `str | None`) both store the
   encrypted value, never the text typed. A secret stored in the clear by
   0.0.15 or earlier still verifies, and is encrypted in place at the next
-  startup (a log line says so). It is decrypted per submission; one that no key
+  startup (a log line says so). The same goes for one written by the
+  framework's `smpy settings import-from-env` (from
+  `SM_SM_RECORDS_PUBLIC_SUBMISSIONS_CAPTCHA_SECRET`): that command stores the
+  variable's text as it is, after its own startup, so the row stays in the clear
+  until the app next starts — restart once after using it, or set the secret on
+  the Settings screen instead. It is decrypted per submission; one that no key
   opens (the `secret_key` was rotated without `SM_SECRET_KEY_PREVIOUS`) refuses
   submissions with `503 captcha_unavailable` and logs the field name, never the
   value — re-enter it, or follow `docs/secret-key-rotation.md` at the repo root.

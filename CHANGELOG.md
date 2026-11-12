@@ -73,6 +73,8 @@ name the module they affect.
   screen and `scripts/set_setting.py` store the encrypted value, never the text
   typed), and decrypted per submission. A secret that no key opens refuses
   submissions with `503 captcha_unavailable`, logged by field name only. The
+  framework's `smpy settings import-from-env` still stores what it imports as
+  written; a CAPTCHA secret imported that way is encrypted at the next start. The
   field is typed `str | None` (a JSON string for `set_setting.py`:
   `'"<secret>"'`). `scripts/set_setting.py` now stores any JSON field as its
   type dumps it, as the Settings screen does, and no longer echoes a value the

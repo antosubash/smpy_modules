@@ -9,6 +9,7 @@ made the 0.0.15 way. A change here strands every stored secret.
 
 from __future__ import annotations
 
+import json
 from base64 import urlsafe_b64encode
 from hashlib import sha256
 
@@ -73,3 +74,16 @@ def test_one_modules_token_does_not_open_in_another():
     stored = ai_crypto.encrypt_value("pw")
     with pytest.raises(billing_crypto.BillingKeyUnreadableError):
         billing_crypto.decrypt_value(stored, "stripe_secret_key")
+
+
+@pytest.mark.parametrize("module", MODULES, ids=IDS)
+@pytest.mark.parametrize("as_json", [False, True], ids=["bare", "json"])
+def test_a_whitespace_padded_old_key_still_opens(module, monkeypatch, as_json):
+    """A previous key is used exactly as given: the secret it replaces may carry
+    leading or trailing whitespace, and a trimmed key would open nothing."""
+    old = "  padded-old-key \t"
+    monkeypatch.setattr(module, "_secret_provider", lambda: old)
+    stored = module.encrypt_value("pw")
+    monkeypatch.setattr(module, "_secret_provider", lambda: SECRET)
+    monkeypatch.setenv("SM_SECRET_KEY_PREVIOUS", json.dumps([old]) if as_json else old)
+    assert module.decrypt_value(stored, "field") == "pw"

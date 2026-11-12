@@ -104,10 +104,10 @@ class TestRotation:
 
     def test_previous_is_one_key_or_a_json_list(self, monkeypatch):
         monkeypatch.setenv("SM_SECRET_KEY_PREVIOUS", " old-1 ")
-        assert crypto.previous_secrets() == ("old-1",)
-        monkeypatch.setenv("SM_SECRET_KEY_PREVIOUS", '["old-1", "", "old-2"]')
-        assert crypto.previous_secrets() == ("old-1", "old-2")
-        monkeypatch.setenv("SM_SECRET_KEY_PREVIOUS", "")
+        assert crypto.previous_secrets() == (" old-1 ",), "verbatim, like SM_SECRET_KEY"
+        monkeypatch.setenv("SM_SECRET_KEY_PREVIOUS", '["old-1", " ", " old-2"]')
+        assert crypto.previous_secrets() == ("old-1", " old-2")
+        monkeypatch.setenv("SM_SECRET_KEY_PREVIOUS", "  ")
         assert crypto.previous_secrets() == ()
 
     def test_invalid_json_names_the_variable_never_the_value(self, monkeypatch):
