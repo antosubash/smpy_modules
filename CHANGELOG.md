@@ -184,6 +184,14 @@ name the module they affect.
 
 ### Fixed
 
+- **billing's last four bare `commit()` calls are `finalize_session`** (#340):
+  the webhook claim and finish, the seat-quantity push and the default-plan
+  seed. None queued `on_commit` work, so nothing changed today, but a later
+  `set_status` inside one would have suspended a tenant while every member's
+  cached view said active. `scripts/check_rules.py` (`make lint`, CI) now fails
+  on any `.commit()` in `sm_billing`. The seat push also calls the provider
+  between two short transactions instead of inside an open one.
+
 - **newsletter requires records, news and pagebuilder 0.0.16** (#333). Its
   floors said 0.0.13, but the `contracts` modules it imports
   (`sm_records.contracts.newsletter`, `.newsletter_admin`, `.newsletter_import`,

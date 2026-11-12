@@ -25,6 +25,15 @@
    ``check_sibling_contracts.py`` checks the floor itself for ``contracts``
    imports (#333).
 
+4. **billing never calls ``.commit()``** (``modules/billing/sm_billing``, any
+   receiver). It finishes a session with ``simple_module_db.finalize_session``,
+   the only commit that runs the ``on_commit`` hooks ``TenantService.set_status``
+   queues (``TenantStatusChanged`` and the membership-cache invalidation); a
+   bare commit would suspend a tenant while every cached view says active.
+   AST-based, so a comment or string naming ``commit()`` is fine.
+   ``COMMIT_ALLOWLIST`` maps a repo-relative path to the reason it may commit;
+   it is empty.
+
 The single-migration-head rule lives in ``check_migration_heads.py`` (#107).
 
 Exit 0 on success, 1 on any violation, printed to stderr.
@@ -33,6 +42,7 @@ Exit 0 on success, 1 on any violation, printed to stderr.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 import sys
@@ -46,6 +56,9 @@ from packaging.version import Version
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGES_ALLOWLIST: frozenset[str] = frozenset()
+BILLING_SRC = "modules/billing/sm_billing"
+#: Repo-relative path -> why a bare ``.commit()`` is safe there. Empty on purpose.
+COMMIT_ALLOWLIST: dict[str, str] = {}
 FRAMEWORK_PREFIX = "simple-module-"  # canonical form of simple_module_* / Simple.Module-*
 NPM_SCOPE = "@simple-module-py/"
 NPM_DEP_KEYS = ("dependencies", "peerDependencies", "devDependencies", "optionalDependencies")
@@ -211,6 +224,30 @@ def check_sibling_floors(pyproject: Path, root: Path, siblings: set[str]) -> lis
     return errors
 
 
+def check_billing_commits(
+    root: Path, allowlist: dict[str, str] = COMMIT_ALLOWLIST
+) -> list[str]:
+    errors: list[str] = []
+    for path in sorted((root / BILLING_SRC).rglob("*.py")):
+        rel = _rel(path, root)
+        if rel in allowlist:
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        errors += [
+            f"{rel}:{node.lineno}: bare .commit() in billing; use "
+            "simple_module_db.finalize_session (only it runs the on_commit hooks, "
+            "or add the file to COMMIT_ALLOWLIST with a reason)"
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "commit"
+        ]
+    return errors
+
+
 def check(root: Path) -> list[str]:
     pyprojects = sorted(root.glob("modules/*/pyproject.toml"))
     siblings = {
@@ -224,6 +261,7 @@ def check(root: Path) -> list[str]:
     for p in sorted(root.glob("modules/*/package.json")):
         errors += check_npm_pins(p, root)
     errors += check_pages(root)
+    errors += check_billing_commits(root)
     return errors
 
 
@@ -238,7 +276,7 @@ def main(argv: list[str] | None = None) -> int:
             print(e, file=sys.stderr)
         print(f"\nFAIL: {len(errors)} rule violation(s).", file=sys.stderr)
         return 1
-    print("CLAUDE.md rules OK (pins, pages/, sibling floors).")
+    print("CLAUDE.md rules OK (pins, pages/, sibling floors, billing commits).")
     return 0
 
 
