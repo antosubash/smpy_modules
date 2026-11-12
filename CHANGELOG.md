@@ -198,8 +198,9 @@ name the module they affect.
   the webhook claim and finish, the seat-quantity push and the default-plan
   seed. None queued `on_commit` work, so nothing changed today, but a later
   `set_status` inside one would have suspended a tenant while every member's
-  cached view said active. `scripts/check_rules.py` (`make lint`, CI) now fails
-  on any `.commit()` in `sm_billing`. The seat push also calls the provider
+  cached view said active. billing's `test_commit_sites.py` allowed those four;
+  its allow-list is now empty, so any `.commit()` in `sm_billing` fails it. The
+  seat push also calls the provider
   between two short transactions instead of inside an open one.
 
 - **newsletter requires records, news and pagebuilder 0.0.16** (#333). Its

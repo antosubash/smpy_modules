@@ -242,7 +242,8 @@ would pin the framework to a version that doesn't exist. `scripts/tests/`
 guards this and CI runs `--check-current`.
 
 **`billing` commits outside a request with `finalize_session`, never
-`commit()`.** `scripts/check_rules.py` fails on any `.commit()` in `sm_billing`.
+`commit()`.** `tests/core/test_commit_sites.py` fails on any `.commit()` in
+`sm_billing` (its allow-list is empty since #340).
 Every `session_factory()` session is a `RequestSession`;
 `TenantService.set_status` queues `TenantStatusChanged` and the membership-cache
 invalidation on `on_commit`, which only `simple_module_db.finalize_session`
