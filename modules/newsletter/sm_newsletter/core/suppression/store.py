@@ -208,9 +208,10 @@ async def suppressed(
     tenant = _tenant(tenant_id)
     if reasons is not None and any(r not in REASONS for r in reasons):
         raise ValueError(f"unknown suppression reason in {reasons!r}")
-    # Every key a row may sit under, legacy ones included (fail closed).
-    # (computed from each address as given: the legacy key is its raw spelling's)
-    _hashes(emails)  # validates
+    if isinstance(emails, str):
+        raise ValueError("emails must be a sequence of addresses, not one string")
+    # Every key a row may sit under, legacy ones included (fail closed), computed
+    # from each address as given: the legacy key is its raw spelling's.
     by_hash = {h: normalise_email(e) for e in emails for h in lookup_hashes(e)}
     if not by_hash:
         return set()

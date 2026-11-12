@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, EmailStr, Field, field_validator
 
 from sm_newsletter.core.constants import MAX_EMAIL_LEN
 from sm_newsletter.core.headers import check_header_text
+from sm_newsletter.web.schemas.addresses import Address, normaliser
 
 # Changing where the relay is, or who logs in to it, clears the stored password:
 # otherwise the credential could be sent to a server of the caller's choosing.
@@ -19,22 +20,6 @@ MAX_USERNAME = MAX_EMAIL_LEN  # a login is often the address
 MAX_FROM_NAME = 200
 MAX_PHYSICAL_ADDRESS = 500
 MAX_EXTRA_TEST_RECIPIENTS = 20
-
-
-def _normalised_list(value: Any) -> Any:
-    """Stripped, lower-cased, deduplicated (first wins) before validation."""
-    if not isinstance(value, list):
-        return value
-    out: list[Any] = []
-    for item in value:
-        if isinstance(item, str):
-            item = check_header_text(item.strip(), field="test_send_extra_recipients").lower()
-        if item not in out:
-            out.append(item)
-    return out
-
-
-Address = Annotated[EmailStr, Field(max_length=MAX_EMAIL_LEN)]
 
 
 class SmtpPasswordUpdate(BaseModel):
@@ -97,7 +82,7 @@ class SettingsUpdate(BaseModel):
     test_send_extra_recipients: Annotated[
         list[Address] | None,
         Field(max_length=MAX_EXTRA_TEST_RECIPIENTS),
-        BeforeValidator(_normalised_list),
+        BeforeValidator(normaliser("test_send_extra_recipients")),
     ] = None
 
     @field_validator("from_address", "from_name", "reply_to")

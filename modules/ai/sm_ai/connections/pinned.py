@@ -46,7 +46,7 @@ MAX_ADDRESSES: Final = 4
 _TIMEOUT: Final = httpx2.Timeout(timeout=600, connect=5)
 
 
-async def resolve_bounded(url: httpx2.URL) -> tuple[str, tuple[str, ...]]:
+async def resolve_bounded(url: str | httpx2.URL) -> tuple[str, tuple[str, ...]]:
     """``resolve_public`` off the event loop, failing closed on a slow resolver."""
     try:
         return await asyncio.wait_for(asyncio.to_thread(resolve_public, url), DNS_TIMEOUT_SECONDS)

@@ -12,6 +12,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { useState } from 'react';
 
+import { parseAddresses } from '../../utils/addresses';
 import { api, errorMessage } from '../../utils/api';
 import { HttpError, isHttpStatus } from '../../utils/http';
 import { keys, type Translate, useT } from '../../utils/i18n';
@@ -41,15 +42,6 @@ function outcomeLabel(r: TestSendResult, t: Translate) {
   return smtp ? `${label} ${t(copy.smtp_code, { code: smtp[1] })}` : label;
 }
 
-/** Addresses separated by commas or line breaks, trimmed, lower-cased, deduplicated. */
-function parseRecipients(text: string): string[] {
-  const found = text
-    .split(/[\n,;]+/)
-    .map((a) => a.trim().toLowerCase())
-    .filter(Boolean);
-  return [...new Set(found)];
-}
-
 interface Props {
   campaignId: number;
   max: number;
@@ -71,7 +63,7 @@ export function TestSendDialog({ campaignId, max, beforeSend, incomplete, baseUr
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<TestSendResult[] | null>(null);
 
-  const recipients = parseRecipients(text);
+  const recipients = parseAddresses(text);
   const invalid = recipients.find((a) => !ADDRESS.test(a));
   const tooMany = recipients.length > max;
   const problem = tooMany

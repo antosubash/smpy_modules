@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
-from simple_module_core.permissions import grants
 from simple_module_hosting.inertia_deps import InertiaDep
-from simple_module_hosting.permissions import RequiresPermission, ensure_resolved_permissions
+from simple_module_hosting.permissions import RequiresPermission
 from simple_module_inertia import InertiaResponse
 
 from sm_ai.core import constants
+from sm_ai.web.deps import can_edit_settings
 
 router = APIRouter()
 
@@ -28,8 +28,7 @@ async def settings_page(request: Request, inertia: InertiaDep) -> InertiaRespons
     # disagree, and an in-repo module follows the in-repo linter.
     # ``can_allow_private``: whether the private-endpoint switch is editable
     # (it also needs settings.edit, #347); the API enforces it either way.
-    held = await ensure_resolved_permissions(request)
     return await inertia.render(
         constants._PAGE_SETTINGS,
-        {"can_allow_private": grants(held, constants.PERM_SETTINGS_EDIT)},
+        {"can_allow_private": await can_edit_settings(request)},
     )

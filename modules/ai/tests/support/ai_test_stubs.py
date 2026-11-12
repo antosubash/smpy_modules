@@ -17,23 +17,20 @@ from starlette.middleware.base import BaseHTTPMiddleware
 class GrantAll(BaseHTTPMiddleware):
     """Auth stub: every request is an admin holding ``ai.manage``."""
 
+    PERMISSIONS = frozenset({constants.PERM_MANAGE})
+
     async def dispatch(self, request, call_next):
         request.state.user = SimpleNamespace(
             id="test-user", email="t@example.com", name="T", roles=["admin"]
         )
-        request.state.resolved_permissions = {constants.PERM_MANAGE}
+        request.state.resolved_permissions = set(self.PERMISSIONS)
         return await call_next(request)
 
 
-class GrantSettingsEdit(BaseHTTPMiddleware):
+class GrantSettingsEdit(GrantAll):
     """``GrantAll`` plus ``settings.edit``: may change ``allow_private_base_url``."""
 
-    async def dispatch(self, request, call_next):
-        request.state.user = SimpleNamespace(
-            id="test-user", email="t@example.com", name="T", roles=["admin"]
-        )
-        request.state.resolved_permissions = {constants.PERM_MANAGE, constants.PERM_SETTINGS_EDIT}
-        return await call_next(request)
+    PERMISSIONS = frozenset({constants.PERM_MANAGE, constants.PERM_SETTINGS_EDIT})
 
 
 def fake_dns(monkeypatch, answers: dict[str, list[str]]) -> list[str]:

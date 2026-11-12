@@ -7,25 +7,14 @@ from simple_module_db import finalize_session
 from sm_newsletter.campaigns import test_send
 from sm_newsletter.core import constants
 from sm_newsletter.core.suppression.hashing import legacy_hash
-from sm_newsletter.core.suppression.store import suppress, suppressed
+from sm_newsletter.core.suppression.store import suppressed
 from sm_newsletter.core.tenancy import tenant_scope
 from sm_newsletter.models import Suppression
 
-from tests.support.sending import NOW, T, attempt_rows, send
+from tests.support.sending import FULLWIDTH_E, NOW, T, attempt_rows, send, suppress_in
 
 B = "b@example.org"
-FULLWIDTH_E = "\uff45"  # the address parser folds it into "e" in a domain
 RAW = f"b@{FULLWIDTH_E}xample.org"
-
-
-async def _suppress(state, email: str) -> None:
-    async with state.session_factory() as db:
-        with tenant_scope(T):
-            await suppress(
-                db, tenant_id=T, email=email, reason=constants.REASON_COMPLAINT,
-                source="admin", now=NOW,
-            )
-            await db.commit()
 
 
 async def _legacy_row(state, email: str) -> None:
@@ -54,7 +43,7 @@ async def _legacy_row(state, email: str) -> None:
 )
 async def test_a_suppression_blocks_every_spelling(built, stored, sent):
     app, state, cid = built
-    await _suppress(state, stored)
+    await suppress_in(state, stored, constants.REASON_COMPLAINT)
     [result] = await send(app, state, cid, [sent])
     assert result.outcome == test_send.SUPPRESSED
     assert await attempt_rows(state) == []

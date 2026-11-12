@@ -12,7 +12,8 @@ from sm_newsletter.core.suppression.hashing import (
     normalise_email,
 )
 
-FULLWIDTH_E = "\uff45"
+from tests.support.sending import FULLWIDTH_E
+
 LIGATURE_FF = "\ufb00"
 
 

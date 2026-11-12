@@ -6,8 +6,7 @@ import asyncio
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from simple_module_core.permissions import grants
-from simple_module_hosting.permissions import RequiresPermission, ensure_resolved_permissions
+from simple_module_hosting.permissions import RequiresPermission
 
 from sm_ai.contracts.schemas import (
     AiModelsResult,
@@ -18,7 +17,7 @@ from sm_ai.contracts.schemas import (
 )
 from sm_ai.core import constants, services
 from sm_ai.web import probe_errors
-from sm_ai.web.deps import AiServiceDep
+from sm_ai.web.deps import AiServiceDep, can_edit_settings
 from sm_ai.web.service import AiService
 
 router = APIRouter()
@@ -44,12 +43,10 @@ async def update_settings(
     AiService.drop_unchanged_policy(changes)
     if not changes:
         return service.current()
-    if AiService.changes_network_policy(changes):
-        held = await ensure_resolved_permissions(request)
-        if not grants(held, constants.PERM_SETTINGS_EDIT):
-            raise HTTPException(
-                status_code=403, detail=f"Permission required: {constants.PERM_SETTINGS_EDIT}"
-            )
+    if AiService.changes_network_policy(changes) and not await can_edit_settings(request):
+        raise HTTPException(
+            status_code=403, detail=f"Permission required: {constants.PERM_SETTINGS_EDIT}"
+        )
     errors = AiService.slot_errors(changes) + await AiService.base_url_errors(changes)
     if errors:
         raise HTTPException(status_code=422, detail=errors)

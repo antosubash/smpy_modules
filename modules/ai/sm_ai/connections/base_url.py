@@ -23,10 +23,9 @@ A slot with no base URL uses the provider's own endpoint and is not checked.
 
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING, Any
 
-from sm_ai.connections.pinned import DNS_TIMEOUT_SECONDS, pinned_client
+from sm_ai.connections.pinned import pinned_client, resolve_bounded
 from sm_ai.contracts.errors import AiBaseUrlRefusedError
 from sm_ai.core import constants
 from sm_ai.core.url_safety import (
@@ -34,7 +33,6 @@ from sm_ai.core.url_safety import (
     check_url,
     is_public_address,
     literal_address,
-    resolve_public,
 )
 
 if TYPE_CHECKING:
@@ -71,11 +69,9 @@ async def _refusal(url: str, allow_private: bool) -> str | None:
     try:
         check_url(url)
         if not allow_private:
-            await asyncio.wait_for(asyncio.to_thread(resolve_public, url), DNS_TIMEOUT_SECONDS)
+            await resolve_bounded(url)
     except UnsafeURLError as error:
         return error.code
-    except TimeoutError:
-        return "unresolvable_host"
     return None
 
 

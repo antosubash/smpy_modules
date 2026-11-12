@@ -106,4 +106,4 @@ async def allowed_recipients(
     vouched.discard("")
     allowed = {r for r in recipients if _key(r) in vouched}
     allowed |= await _members(request, db, tenant_id, [r for r in recipients if r not in allowed])
-    return frozenset(r for r in recipients if r in allowed)
+    return frozenset(allowed)

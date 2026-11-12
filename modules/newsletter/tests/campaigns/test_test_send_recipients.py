@@ -11,28 +11,12 @@ from simple_module_core.user_directory import DirectoryUser, set_user_directory
 from sm_newsletter.campaigns import test_send
 from sm_newsletter.campaigns.test_recipients import allowed_recipients
 from sm_newsletter.core import constants
-from sm_newsletter.core.suppression.store import suppress
-from sm_newsletter.core.tenancy import TenancyMode, tenant_scope
+from sm_newsletter.core.tenancy import TenancyMode
 from sm_newsletter.sending.transport import console
 
-from tests.support.sending import NOW, T, attempt_rows, make_app, send, used
+from tests.support.sending import NOW, T, attempt_rows, make_app, send, suppress_in, used
 
 A, B, C = "a@example.org", "b@example.org", "c@example.org"
-
-
-async def _suppress(state, email: str, reason: str, list_type_key: str = "") -> None:
-    async with state.session_factory() as db:
-        with tenant_scope(T):
-            await suppress(
-                db,
-                tenant_id=T,
-                email=email,
-                reason=reason,
-                source="admin",
-                list_type_key=list_type_key,
-                now=NOW,
-            )
-            await db.commit()
 
 
 class TestSendTestRefusals:
@@ -52,7 +36,7 @@ class TestSendTestRefusals:
     )
     async def test_a_complaint_or_any_opt_out_is_suppressed(self, built, reason, key):
         app, state, cid = built
-        await _suppress(state, " B@Example.org ", reason, key)  # normalised like the table
+        await suppress_in(state, " B@Example.org ", reason, key)  # normalised like the table
         results = await send(app, state, cid, [A, B])
         assert [(r.recipient, r.outcome, r.code) for r in results] == [
             (A, "accepted", "smtp_250"),
@@ -62,7 +46,7 @@ class TestSendTestRefusals:
 
     async def test_a_bounce_does_not_refuse_a_test(self, built):
         app, state, cid = built
-        await _suppress(state, A, constants.REASON_HARD_BOUNCE)
+        await suppress_in(state, A, constants.REASON_HARD_BOUNCE)
         [result] = await send(app, state, cid, [A])
         assert result.outcome == "accepted"
 
@@ -70,7 +54,7 @@ class TestSendTestRefusals:
         app, state, cid = await make_app(daily_limit=2)
         try:
             await used(state, at=NOW - timedelta(hours=1), count=1)  # one slot left
-            await _suppress(state, B, constants.REASON_COMPLAINT)
+            await suppress_in(state, B, constants.REASON_COMPLAINT)
             results = await send(app, state, cid, [A, B, C], allowed={A, B})
             assert [r.outcome for r in results] == [
                 "accepted",
@@ -84,7 +68,7 @@ class TestSendTestRefusals:
         app, state, cid = built
         app.state.sm_newsletter.settings.daily_limit = 1
         await used(state, at=NOW, count=1)  # the budget is spent
-        await _suppress(state, A, constants.REASON_COMPLAINT)
+        await suppress_in(state, A, constants.REASON_COMPLAINT)
 
         @contextlib.asynccontextmanager
         async def no_lock(*args, **kwargs):

@@ -10,6 +10,7 @@ from sm_newsletter.sending.transport import console
 
 from tests.support.app import build_app
 from tests.support.records_seed import restrict_list, seed_list
+from tests.support.sending import FULLWIDTH_E, suppress_in
 
 API = constants.ROUTE_PREFIX_API
 EDIT = {"x-perms": f"{constants.PERM_VIEW},{constants.PERM_EDIT}"}
@@ -140,15 +141,9 @@ async def test_only_vouched_recipients_are_sent(client, cid):
 async def test_a_suppression_under_a_unicode_spelling_is_honoured(client, built, cid):
     # The parser folds a fullwidth "e" in the domain; the suppression row hashes
     # the address as imported, so both forms are looked up (#348).
-    from sm_newsletter.core.suppression.store import suppress
-    from sm_newsletter.core.tenancy import tenant_scope
-
     _, state = built
-    raw = "b@\uff45xample.org"
-    async with state.session_factory() as db:
-        with tenant_scope("default"):
-            await suppress(db, tenant_id="default", email=raw, reason="complaint", source="admin")
-            await db.commit()
+    raw = f"b@{FULLWIDTH_E}xample.org"
+    await suppress_in(state, raw, constants.REASON_COMPLAINT)
     body = {"recipients": [raw, "b@example.org"]}  # one recipient after parsing
     res = await client.post(_url(cid), json=body, headers=SEND)
     assert res.json()["results"] == [

@@ -14,28 +14,15 @@ lower-cased), so two spellings of one mailbox are one recipient (#348).
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, EmailStr, Field
+from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field
 
 from sm_newsletter.campaigns.test_send import MAX_TEST_RECIPIENTS
-from sm_newsletter.core.constants import MAX_EMAIL_LEN
-from sm_newsletter.core.headers import check_header_text
 from sm_newsletter.core.suppression.hashing import normalise_email
+from sm_newsletter.web.schemas.addresses import Address, normaliser
 
 __test__ = False  # a module named test_*, not a pytest test module
-
-
-def _normalise(value: Any) -> Any:
-    if not isinstance(value, list):
-        return value  # the list validator refuses it
-    out: list[Any] = []
-    for item in value:
-        if isinstance(item, str):
-            item = check_header_text(item.strip(), field="recipients").lower()
-        if item not in out:
-            out.append(item)
-    return out
 
 
 def _dedup(value: list[str]) -> list[str]:
@@ -46,7 +33,6 @@ def _dedup(value: list[str]) -> list[str]:
     return list(seen.values())
 
 
-Address = Annotated[EmailStr, Field(max_length=MAX_EMAIL_LEN)]
 
 class TestSendIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -54,7 +40,7 @@ class TestSendIn(BaseModel):
     recipients: Annotated[
         list[Address],
         Field(min_length=1, max_length=MAX_TEST_RECIPIENTS),
-        BeforeValidator(_normalise),
+        BeforeValidator(normaliser("recipients")),
         AfterValidator(_dedup),
     ]
 

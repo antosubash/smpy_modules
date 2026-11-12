@@ -118,9 +118,7 @@ def classify(exc: BaseException) -> Classified:
             isinstance(item, OSError) and item.errno == errno.ECONNREFUSED
         ):
             return Classified(CONNECTION_REFUSED)
-    if any(isinstance(item, socket.gaierror) for item in chain):
-        return Classified(UNREACHABLE)
-    if any(isinstance(item, _connection_errors()) for item in chain):
+    if any(isinstance(item, (socket.gaierror, *_connection_errors())) for item in chain):
         return Classified(UNREACHABLE)
     return Classified(OTHER)
 
