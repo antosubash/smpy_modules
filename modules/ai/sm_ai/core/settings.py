@@ -70,6 +70,16 @@ class AiSettings(DbBackedSettings):
     # Consumer-visible: vector stores fix their width to it.
     embedding_dim: int = Field(default=0, description="Embedding vector width.")
 
+    # --- network (#347) ---
+    allow_private_base_url: bool = Field(
+        default=False,
+        description=(
+            "Allow a base URL on a private or local address, for a local endpoint such as "
+            "Ollama or an in-network gateway. Off: a base URL must resolve to public "
+            "addresses only. Changing it needs settings.edit as well as ai.manage."
+        ),
+    )
+
     @field_validator("embedding_dim")
     @classmethod
     def _stored_dim_tolerated(cls, value: int) -> int:

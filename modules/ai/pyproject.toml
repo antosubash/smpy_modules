@@ -16,6 +16,8 @@ dependencies = [
     "simple_module_inertia>=0.0.36,<0.1",
     "simple_module_settings>=0.0.44,<0.1",  # floor: settings.core and settings.module_settings paths first shipped in 0.0.44
     "pydantic-ai-slim[anthropic,openai,google]>=2.0,<3",
+    # The provider SDKs' HTTP client; the base-URL pinning transport (#347) is one.
+    "httpx2>=2.0,<3",
     "pydantic-settings>=2.0",
     "cryptography>=42.0",
 ]

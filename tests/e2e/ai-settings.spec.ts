@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import { login } from './helpers';
 
@@ -7,8 +7,12 @@ import { login } from './helpers';
  * the full loop: load → edit → save → persisted read-back, the
  * never-echo-the-key contract, and the test-connection button's failure path
  * (127.0.0.1:1 refuses connections instantly — deterministic, no stubs, and
- * no live provider is ever called in CI).
+ * no live provider is ever called in CI). A loopback base URL needs
+ * "Allow private base URLs" (#347), which the admin may switch.
  */
+
+const allowPrivate = (page: Page) =>
+  page.getByRole('checkbox', { name: 'Allow private base URLs' });
 
 test.describe('AI settings', () => {
   test.beforeEach(async ({ page }) => {
@@ -48,27 +52,44 @@ test.describe('AI settings', () => {
     );
   });
 
+  test('a loopback base URL is refused while private URLs are off (#347)', async ({ page }) => {
+    await allowPrivate(page).uncheck();
+    await page.locator('#ai-chat-provider').selectOption('openai_compatible');
+    await page.locator('#ai-chat-model').fill('some-model');
+    // A port no other test saves, so a reused server's stored URL cannot match.
+    await page.locator('#ai-chat-url').fill('http://127.0.0.1:2/v1');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByText(/private or local address/)).toBeVisible();
+    await page.reload();
+    await expect(page.locator('#ai-chat-url')).not.toHaveValue('http://127.0.0.1:2/v1');
+  });
+
   test('test connection surfaces an unreachable endpoint as an inline error', async ({ page }) => {
     await page.locator('#ai-chat-provider').selectOption('openai_compatible');
     await page.locator('#ai-chat-model').fill('some-model');
     await page.locator('#ai-chat-url').fill('http://127.0.0.1:1/v1');
+    await allowPrivate(page).check();
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByText('AI settings saved')).toBeVisible();
     await page.getByRole('button', { name: 'Test connection' }).first().click();
-    await expect(page.getByTestId('ai-chat-test-result')).toBeVisible({ timeout: 45_000 });
-    await expect(page.getByTestId('ai-chat-test-result')).not.toContainText('OK —');
+    const result = page.getByTestId('ai-chat-test-result');
+    await expect(result).toBeVisible({ timeout: 45_000 });
+    // The translated class, never the SDK's own text.
+    await expect(result).toContainText('refused the connection');
   });
 
   test('load models reports an unreachable endpoint inline', async ({ page }) => {
     await page.locator('#ai-chat-provider').selectOption('openai_compatible');
     await page.locator('#ai-chat-model').fill('some-model');
     await page.locator('#ai-chat-url').fill('http://127.0.0.1:1/v1');
+    await allowPrivate(page).check();
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByText('AI settings saved')).toBeVisible();
     await page.getByRole('button', { name: 'Load models' }).first().click();
     const result = page.getByTestId('ai-chat-models-result');
     await expect(result).toBeVisible({ timeout: 45_000 });
     await expect(result).not.toContainText('Models found');
+    await expect(result).toContainText('refused the connection');
     // A failed listing offers no suggestions; the field stays free text.
     await expect(page.locator('#ai-chat-model')).not.toHaveAttribute('list', /.+/);
   });

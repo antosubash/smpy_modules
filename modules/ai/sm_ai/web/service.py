@@ -99,6 +99,21 @@ class AiService:
                 )
         return errors
 
+    @staticmethod
+    def changes_network_policy(changes: dict[str, Any]) -> bool:
+        """Whether ``changes`` flips ``allow_private_base_url`` (needs ``settings.edit``)."""
+        field = "allow_private_base_url"
+        current = getattr(services.current_settings(), field)
+        return field in changes and bool(changes[field]) != current
+
+    @staticmethod
+    async def base_url_errors(changes: dict[str, Any]) -> list[dict[str, Any]]:
+        """422 items for base URLs that may not be saved (#347): resolved here,
+        judged on the merged result like ``slot_errors``."""
+        from sm_ai.connections.base_url import save_errors
+
+        return await save_errors({**services.current_settings().model_dump(), **changes})
+
     async def apply(self, changes: dict[str, Any]) -> AiSettingsOut:
         """Persist and hot-swap the given field changes, then return current."""
         # Plugin→plugin imports (settings is a declared dependency); kept local

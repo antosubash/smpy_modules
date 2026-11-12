@@ -19,6 +19,7 @@ import {
   type TestResult,
 } from '../utils/api';
 import { keys, useT } from '../utils/i18n';
+import { probeMessage } from '../utils/probeMessage';
 
 export function SlotCard({
   title,
@@ -247,7 +248,7 @@ export function SlotCard({
               >
                 {testResult.ok
                   ? t(c.test_ok, { model: testResult.model, latency: testResult.latency_ms })
-                  : testResult.error}
+                  : probeMessage(t, testResult)}
               </span>
             )}
           </span>
@@ -258,7 +259,7 @@ export function SlotCard({
             className={models.ok ? 'text-xs text-muted-foreground' : 'text-sm text-destructive'}
           >
             {!models.ok
-              ? models.error
+              ? probeMessage(t, models)
               : models.models.length > 0
                 ? t(models.truncated ? c.models_truncated : c.models_loaded, {
                     count: models.models.length,

@@ -81,4 +81,16 @@ describe('SlotCard — Test connection feedback', () => {
     });
     expect(q('chat-test-result')?.textContent).toBe('Timed out after 30s.');
   });
+
+  it('shows the translated message for a coded failure, not the API text', async () => {
+    await mount(false, {
+      ok: false,
+      model: 'qwen',
+      latency_ms: 0,
+      error: 'The endpoint refused the API key (HTTP 401 or 403).',
+      code: 'unauthorised',
+      status: 401,
+    });
+    expect(q('chat-test-result')?.textContent).toBe('The endpoint refused the API key (HTTP 401).');
+  });
 });

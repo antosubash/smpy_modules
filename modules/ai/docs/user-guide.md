@@ -78,9 +78,13 @@ single word: ok"; Embeddings embeds the same text.
 - While a card has unsaved edits, its button is disabled and the card says
   "Save your changes first — the test runs against saved settings."
 - Success shows **OK — `<model>` (`<n>` ms)**.
-- Failure shows the error message in red: a missing model, a missing key, a
-  key that can no longer be decrypted, a wrong URL, a rejected key, or
-  "Timed out after 30s." A failed test is a result, not an error page.
+- Failure says in red what kind of failure it was: the slot is not fully
+  configured, the key can no longer be decrypted, the base URL was refused
+  (see [Private endpoints](#private-endpoints)), the endpoint could not be
+  reached or refused the connection, it refused the key, it answered with an
+  error status, or it did not answer in time. The provider's own message is
+  not shown; it is in the server log. A failed test is a result, not an
+  error page.
 - Saving clears earlier test results, since they described the old
   configuration.
 
@@ -100,6 +104,18 @@ still be typed.
 - Failure shows the error in red, the same way a failed test does.
 - Changing the provider, URL or key clears the suggestions, since they
   described the old endpoint.
+
+## Private endpoints
+
+A base URL receives the slot's API key, so by default it must resolve to
+public addresses only: saving one that points at `localhost`, a private
+network (`10.x`, `192.168.x`, a container name on the same network), a
+link-local address or the cloud metadata service fails with "this URL points
+at a private or local address". To use a local endpoint such as Ollama, vLLM
+on the same host, or a gateway inside your network, tick **Allow private base
+URLs** on the **Network** card and save. Changing it needs the
+`settings.edit` permission as well as `ai.manage`; without it the box is shown
+read-only.
 
 ## "The stored key … cannot be decrypted"
 

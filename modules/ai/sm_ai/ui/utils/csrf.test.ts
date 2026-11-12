@@ -48,7 +48,7 @@ describe('the CSRF token', () => {
   it('goes out on a save', async () => {
     const api = await load({ csrf_token: 'from-the-page' });
     const headers = captureFetch();
-    await api.saveSettings(slot, slot);
+    await api.saveSettings(slot, slot, false);
     expect(headers().get('X-CSRF-Token')).toBe('from-the-page');
   });
 
@@ -70,14 +70,14 @@ describe('the CSRF token', () => {
     const api = await load({});
     const headers = captureFetch();
     navigate?.({ detail: { page: { props: { csrf_token: 'after-navigating' } } } });
-    await api.saveSettings(slot, slot);
+    await api.saveSettings(slot, slot, false);
     expect(headers().get('X-CSRF-Token')).toBe('after-navigating');
   });
 
   it('sends no header when no page ever shared one', async () => {
     const api = await load({});
     const headers = captureFetch();
-    await api.saveSettings(slot, slot);
+    await api.saveSettings(slot, slot, false);
     expect(headers().get('X-CSRF-Token')).toBeNull();
   });
 });
@@ -86,7 +86,7 @@ describe('a CSRF refusal', () => {
   it("shows the module's message, not the framework's developer sentence", async () => {
     const api = await load({ csrf_token: 'stale' });
     captureFetch(403, JSON.stringify({ detail: 'CSRF token missing or invalid — read it.' }));
-    const error = await api.saveSettings(slot, slot).catch((e: unknown) => e);
+    const error = await api.saveSettings(slot, slot, false).catch((e: unknown) => e);
     expect((error as Error).message).toBe(en.api.csrf_failed);
   });
 
@@ -94,7 +94,7 @@ describe('a CSRF refusal', () => {
     const api = await load({ csrf_token: 'tok' });
     const detail = 'Permission required: ai.manage';
     captureFetch(403, JSON.stringify({ detail }));
-    const error = await api.saveSettings(slot, slot).catch((e: unknown) => e);
+    const error = await api.saveSettings(slot, slot, false).catch((e: unknown) => e);
     expect((error as Error).message).toBe(detail);
   });
 });

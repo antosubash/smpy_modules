@@ -45,6 +45,24 @@
     "models_truncated": "Die ersten {count} Modelle (alphabetisch) werden angezeigt – jeden anderen Modellnamen können Sie im Feld „Modell“ eingeben",
     "models_none": "Der Endpunkt listet für diesen Slot keine Modelle auf."
   },
+  "probe": {
+    "base_url_refused": "Die Basis-URL zeigt auf eine private oder lokale Adresse oder ist keine http(s)-URL. Für einen lokalen Endpunkt unten „Private Basis-URLs erlauben“ einschalten.",
+    "not_configured": "Dieser Slot ist nicht vollständig eingerichtet – Anbieter, Modell und API-Schlüssel prüfen.",
+    "key_unreadable": "Der gespeicherte API-Schlüssel lässt sich mit dem aktuellen geheimen Schlüssel nicht entschlüsseln. Neu eingeben oder den vorherigen Schlüssel wiederherstellen.",
+    "unreachable": "Der Endpunkt ist nicht erreichbar – Basis-URL und Hostnamen prüfen.",
+    "connection_refused": "Der Endpunkt hat die Verbindung abgelehnt – läuft der Server?",
+    "timeout": "Der Endpunkt hat nicht rechtzeitig geantwortet.",
+    "unauthorised": "Der Endpunkt hat den API-Schlüssel abgelehnt (HTTP {status}).",
+    "http_error": "Der Endpunkt hat mit einem Fehler geantwortet (HTTP {status}).",
+    "other": "Der Aufruf ist fehlgeschlagen. Details stehen im Server-Log."
+  },
+  "network": {
+    "title": "Netzwerk",
+    "description": "Wohin eine Basis-URL zeigen darf. Sie erhält den API-Schlüssel des Slots.",
+    "allow_private": "Private Basis-URLs erlauben",
+    "allow_private_hint": "Für einen lokalen Endpunkt wie Ollama oder ein Gateway im eigenen Netz. Aus: Eine Basis-URL muss ausschließlich auf öffentliche Adressen auflösen.",
+    "needs_settings_edit": "Zum Ändern ist die Berechtigung settings.edit nötig."
+  },
   "api": {
     "csrf_failed": "Das Sicherheitstoken dieser Seite ist veraltet. Laden Sie die Seite neu und versuchen Sie es erneut – Ihre Änderungen bleiben auf dieser Seite erhalten, bis Sie sie verlassen.",
     "request_failed": "Anfrage fehlgeschlagen ({status} {statusText})"

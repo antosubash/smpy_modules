@@ -5,6 +5,7 @@ import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedL
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { NetworkCard } from '../ui/components/NetworkCard';
 import { SlotCard } from '../ui/components/SlotCard';
 import {
   type AiSettingsOut,
@@ -46,11 +47,13 @@ function fromSettings(s: AiSettingsOut): { chat: SlotValues; embedding: SlotValu
   };
 }
 
-function Settings() {
+/** `can_allow_private`: the viewer holds settings.edit (the view computes it). */
+function Settings({ can_allow_private = false }: { can_allow_private?: boolean }) {
   const { t } = useT();
   const [loaded, setLoaded] = useState<AiSettingsOut | null>(null);
   const [chat, setChat] = useState<SlotValues>(emptySlot());
   const [embedding, setEmbedding] = useState<SlotValues>(emptySlot());
+  const [allowPrivate, setAllowPrivate] = useState(false);
   const [busy, setBusy] = useState(false);
   const [chatTest, setChatTest] = useState<TestResult | null>(null);
   const [embeddingTest, setEmbeddingTest] = useState<TestResult | null>(null);
@@ -64,6 +67,7 @@ function Settings() {
     const slots = fromSettings(s);
     setChat(slots.chat);
     setEmbedding(slots.embedding);
+    setAllowPrivate(s.allow_private_base_url);
   }, []);
 
   useEffect(() => {
@@ -101,7 +105,7 @@ function Settings() {
       return;
     }
     return run(async () => {
-      hydrate(await saveSettings(chat, embedding));
+      hydrate(await saveSettings(chat, embedding, allowPrivate));
       // Results describe the previous configuration — drop them.
       setChatTest(null);
       setEmbeddingTest(null);
@@ -122,6 +126,8 @@ function Settings() {
     slot.clear_key ||
     (slot.dim ?? 0) !== (saved.dim ?? 0);
   const savedSlots = useMemo(() => (loaded ? fromSettings(loaded) : null), [loaded]);
+  // The switch changes what a probe may reach, so it dirties both slots.
+  const networkDirty = loaded !== null && allowPrivate !== loaded.allow_private_base_url;
 
   // The previous answer is cleared at once and the card says it is testing:
   // a slow model can take up to the probe's timeout to answer.
@@ -156,7 +162,7 @@ function Settings() {
               optionalSlot={false}
               values={chat}
               hasStoredKey={loaded.has_chat_api_key}
-              dirty={isDirty(chat, savedSlots.chat)}
+              dirty={networkDirty || isDirty(chat, savedSlots.chat)}
               busy={busy}
               testing={testing === 'chat'}
               testResult={chatTest}
@@ -172,13 +178,19 @@ function Settings() {
               optionalSlot={true}
               values={embedding}
               hasStoredKey={loaded.has_embedding_api_key}
-              dirty={isDirty(embedding, savedSlots.embedding)}
+              dirty={networkDirty || isDirty(embedding, savedSlots.embedding)}
               busy={busy}
               testing={testing === 'embedding'}
               testResult={embeddingTest}
               onChange={setEmbedding}
               onTest={() => test('embedding')}
               onLoadModels={() => listModels('embedding')}
+            />
+            <NetworkCard
+              allowPrivate={allowPrivate}
+              canChange={can_allow_private}
+              busy={busy}
+              onChange={setAllowPrivate}
             />
             <Button type="button" disabled={busy} onClick={save}>
               {t(keys.ai.settings.save)}

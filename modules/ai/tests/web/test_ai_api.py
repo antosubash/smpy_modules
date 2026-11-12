@@ -20,7 +20,7 @@ from sm_ai.core import constants, crypto, services
 from sm_ai.core.settings import AiSettings
 from sm_ai.web.service import AiService
 
-from tests.support.ai_test_stubs import GrantAll
+from tests.support.ai_test_stubs import GrantAll, fake_dns
 
 SECRET = "test-secret-key-for-api"
 
@@ -163,7 +163,8 @@ class TestSlotRequiresBaseUrl:
         res = await client.put("/api/ai/settings", json={"embedding_provider": "openai_compatible"})
         assert res.status_code == 422
 
-    async def test_with_url_accepted(self, client):
+    async def test_with_url_accepted(self, client, monkeypatch):
+        fake_dns(monkeypatch, {"vllm": ["93.184.216.34"]})  # public: see test_ai_base_url_api
         res = await client.put(
             "/api/ai/settings",
             json={
@@ -204,7 +205,7 @@ class TestTestEndpoint:
         assert res.status_code == 200
         body = res.json()
         assert body["ok"] is False
-        assert "embedding_provider" in body["error"]
+        assert body["code"] == "not_configured"
 
     async def test_chat_ok_with_test_model(self, client, monkeypatch):
         from sm_ai.connections import resolve

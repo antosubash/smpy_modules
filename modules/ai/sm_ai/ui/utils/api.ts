@@ -16,13 +16,18 @@ export type AiSettingsOut = {
   embedding_base_url: string;
   has_embedding_api_key: boolean;
   embedding_dim: number;
+  allow_private_base_url: boolean;
 };
 
+/** `code` names the failure class (`probeMessage` translates it); `error` is
+ * the API's fixed English text for it, never the provider's own. */
 export type TestResult = {
   ok: boolean;
   model: string;
   latency_ms: number;
   error: string;
+  code?: string;
+  status?: number;
 };
 
 export type ModelsResult = {
@@ -31,6 +36,8 @@ export type ModelsResult = {
   /** More were served than the API returns; the list is the first of them. */
   truncated?: boolean;
   error: string;
+  code?: string;
+  status?: number;
 };
 
 export type SlotValues = {
@@ -102,8 +109,11 @@ export async function loadSettings(): Promise<AiSettingsOut> {
 export async function saveSettings(
   chat: SlotValues,
   embedding: SlotValues,
+  allowPrivateBaseUrl: boolean,
 ): Promise<AiSettingsOut> {
   const payload: Record<string, unknown> = {
+    // Sent every time: the API asks for settings.edit only when it changes.
+    allow_private_base_url: allowPrivateBaseUrl,
     chat_provider: chat.provider,
     chat_model: chat.model,
     chat_base_url: chat.base_url,

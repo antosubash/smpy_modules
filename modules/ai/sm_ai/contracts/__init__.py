@@ -20,7 +20,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sm_ai.contracts.errors import AiError, AiKeyUnreadableError, AiNotConfiguredError
+from sm_ai.contracts.errors import (
+    AiBaseUrlRefusedError,
+    AiError,
+    AiKeyUnreadableError,
+    AiNotConfiguredError,
+)
 from sm_ai.core.constants import METER_REQUESTS
 from sm_ai.metering.requests import RequiresAiRequest, consume_requests
 
@@ -64,6 +69,7 @@ def embedding_dim() -> int:
 
 __all__ = [
     "METER_REQUESTS",
+    "AiBaseUrlRefusedError",
     "AiError",
     "AiKeyUnreadableError",
     "AiNotConfiguredError",

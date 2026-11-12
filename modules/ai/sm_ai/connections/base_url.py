@@ -1,0 +1,116 @@
+"""Where a slot's base URL may point, checked on save and at every call (#347).
+
+A base URL receives the slot's stored API key, so by default it must be an
+http(s) URL whose host resolves only to public addresses. ``allow_private_base_url``
+(off by default, changed only by a holder of ``settings.edit``) lifts the
+address rule for a local endpoint such as Ollama or an in-network gateway;
+the scheme rule always holds.
+
+Three places apply it:
+
+* **save** - :func:`save_errors`, from ``PUT /api/ai/settings``: the host is
+  resolved (off the event loop) and a refused URL is a 422 that names the
+  setting to turn on;
+* **client build** - :func:`http_client_for`, from ``resolve`` and
+  ``discovery``: synchronous and called from async code, so it never touches
+  DNS. It checks the scheme and refuses an IP literal that is not public, and
+  hands back a :func:`~sm_ai.connections.pinned.pinned_client`;
+* **connect** - that client's transport resolves and validates the host again
+  for every request and dials only the validated address.
+
+A slot with no base URL uses the provider's own endpoint and is not checked.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from typing import TYPE_CHECKING, Any
+
+from sm_ai.connections.pinned import DNS_TIMEOUT_SECONDS, pinned_client
+from sm_ai.contracts.errors import AiBaseUrlRefusedError
+from sm_ai.core import constants
+from sm_ai.core.url_safety import (
+    UnsafeURLError,
+    check_url,
+    is_public_address,
+    literal_address,
+    resolve_public,
+)
+
+if TYPE_CHECKING:
+    import httpx2
+
+    from sm_ai.core.settings import AiSettings
+
+__all__ = ["http_client_for", "save_errors"]
+
+
+def http_client_for(settings: AiSettings, slot: str, base_url: str) -> httpx2.AsyncClient | None:
+    """The HTTP client a slot's SDK client must use, or ``None`` for the SDK's own.
+
+    Raises :class:`AiBaseUrlRefusedError` for a URL that can be refused
+    without resolving it.
+    """
+    if not base_url:
+        return None
+    field = f"{slot}_base_url"
+    try:
+        host, _ = check_url(base_url)
+    except UnsafeURLError as error:
+        raise AiBaseUrlRefusedError(field, error.code) from error
+    if settings.allow_private_base_url:
+        return None
+    literal = literal_address(host)
+    if literal is not None and not is_public_address(literal):
+        raise AiBaseUrlRefusedError(field, "non_public_address")
+    return pinned_client()
+
+
+async def _refusal(url: str, allow_private: bool) -> str | None:
+    """Why ``url`` cannot be saved, or ``None``."""
+    try:
+        check_url(url)
+        if not allow_private:
+            await asyncio.wait_for(asyncio.to_thread(resolve_public, url), DNS_TIMEOUT_SECONDS)
+    except UnsafeURLError as error:
+        return error.code
+    except TimeoutError:
+        return "unresolvable_host"
+    return None
+
+
+_SAVE_MESSAGES = {
+    "unresolvable_host": "the host of this URL could not be resolved",
+    "non_public_address": (
+        "this URL points at a private or local address; to use a local endpoint "
+        "such as Ollama or an in-network gateway, turn on 'Allow private base URLs' "
+        "(allow_private_base_url) first"
+    ),
+}
+
+
+async def save_errors(merged: dict[str, Any]) -> list[dict[str, Any]]:
+    """422 items for the base URLs of ``merged`` (stored settings plus the update).
+
+    Shaped like FastAPI's own validation items, as ``AiService.slot_errors`` is.
+    """
+    allow = bool(merged.get("allow_private_base_url"))
+    errors: list[dict[str, Any]] = []
+    for slot in constants.TEST_SLOTS:
+        field = f"{slot}_base_url"
+        url = str(merged.get(field) or "").strip()
+        if not url:
+            continue
+        reason = await _refusal(url, allow)
+        if reason is None:
+            continue
+        errors.append(
+            {
+                "type": "value_error",
+                "loc": ["body", field],
+                "msg": _SAVE_MESSAGES.get(reason, f"not a usable http(s) URL ({reason})"),
+                "input": url,
+                "ctx": {"reason": reason},
+            }
+        )
+    return errors
