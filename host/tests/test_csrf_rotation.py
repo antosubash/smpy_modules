@@ -64,7 +64,7 @@ async def _console_token(app, http: httpx.AsyncClient) -> str:
     headers = {"X-Inertia": "true", "X-Inertia-Version": str(app.state.sm.inertia_config.version)}
     page = await http.get("/admin/news/", headers=headers)
     assert page.status_code == 200, page.text[:300]
-    return page.json()["props"]["csrf_token"]
+    return page.json()["props"]["csrfToken"]
 
 
 async def _create(http: httpx.AsyncClient, token: str, slug: str) -> httpx.Response:

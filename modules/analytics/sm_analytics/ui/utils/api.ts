@@ -1,8 +1,17 @@
-import { csrfHeaders } from './csrf';
+import { currentCsrfToken } from '@simple-module-py/ui/lib/csrf-token';
 import { keys, translate } from './i18n';
 import type { Filters, GeoStatus, Property, PropertyInput, Report } from './types';
 
 const BASE = '/api/analytics';
+const UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+/** The framework's `csrfToken` shared prop on a write (#342). A raw `fetch`
+ *  rather than `apiFetch`, which reports an aborted read as a network failure
+ *  where `useAnalytics` cancels superseded reports with the signal. */
+function csrfHeaders(method: string | undefined): Record<string, string> {
+  const token = UNSAFE.has((method ?? 'GET').toUpperCase()) ? currentCsrfToken() : null;
+  return token ? { 'X-CSRF-Token': token } : {};
+}
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {

@@ -8,10 +8,14 @@ one header (``X-CSRF-Token``), one prop name. A fix to the check lands in one
 place for every module.
 
 The API router checks every ``POST``/``PUT``/``PATCH``/``DELETE`` with the
-framework's ``RequiresCsrf``. The view router shares ``get_csrf_token`` as the
-``csrf_token`` Inertia prop on every pagebuilder screen. ``utils/csrf.ts``
-keeps the latest value for the fetch and upload helpers, which sit at module
-level and get no props from a page. No cookie is involved.
+framework's ``RequiresCsrf``. The token reaches the console as the framework's
+``csrfToken`` shared prop, which every signed-in page carries (#342), and
+``utils/csrf.ts`` reads it through ``currentCsrfToken`` for the fetch and
+upload helpers. No cookie is involved.
+
+The framework leaves the prop off an anonymous page, which is fine even with
+``requires_auth`` off: every write also needs a pagebuilder permission, which an
+anonymous visitor never holds (401 before the token would matter).
 
 ``csrf_protect`` still switches the check off, for a host that guards writes at
 a layer above the application. It is read per request, because the routers are
@@ -21,23 +25,12 @@ built before the host hydrates settings from the database.
 from __future__ import annotations
 
 from fastapi import Request
-from simple_module_hosting.csrf import RequiresCsrf, get_csrf_token
-from simple_module_hosting.inertia_deps import InertiaDep
+from simple_module_hosting.csrf import RequiresCsrf
 
-CSRF_PROP = "csrf_token"
+#: The framework's shared-prop name for the token (``CSRF_SHARED_PROP``).
+CSRF_PROP = "csrfToken"
 
 _check = RequiresCsrf()
-
-
-async def share_csrf_token(request: Request, inertia: InertiaDep) -> None:
-    """Share the session's token with every page the view router renders.
-
-    Shares nothing without a session (a bare test app): there is no token to
-    hand out, and ``RequiresCsrf`` checks nothing either.
-    """
-    token = get_csrf_token(request)
-    if token:
-        inertia.share(**{CSRF_PROP: token})
 
 
 async def verify_csrf_if_configured(request: Request) -> None:

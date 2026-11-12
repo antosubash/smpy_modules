@@ -7,7 +7,7 @@ async function load(props: unknown) {
   const text = JSON.stringify({ component: 'Newsletter/Campaigns', props });
   vi.stubGlobal('document', {
     querySelector: (selector: string) =>
-      selector.includes('data-page="app"') ? { textContent: text } : null,
+      selector.includes('data-page') ? { textContent: text } : null,
   });
   return { api: (await import('./api')).api };
 }
@@ -26,7 +26,7 @@ afterEach(() => {
 
 describe('PR 6 calls', () => {
   it('hit the right path, method and body', async () => {
-    const { api } = await load({ csrf_token: 'tok' });
+    const { api } = await load({ csrfToken: 'tok' });
     const fetchMock = stubFetch(ok);
     const signal = new AbortController().signal;
     const rules = [{ field: 'tags', op: 'any' as const, value: ['vip'] }];
@@ -85,7 +85,7 @@ describe('PR 6 calls', () => {
   });
 
   it('searches with the text in the body only (C5)', async () => {
-    const { api } = await load({ csrf_token: 'tok' });
+    const { api } = await load({ csrfToken: 'tok' });
     const fetchMock = stubFetch(ok);
     await api.searchSubscribers('news', { q: 'secret@example.com', status: 'pending' });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -96,7 +96,7 @@ describe('PR 6 calls', () => {
   });
 
   it('sends the version a lift read (C3)', async () => {
-    const { api } = await load({ csrf_token: 'tok' });
+    const { api } = await load({ csrfToken: 'tok' });
     const fetchMock = stubFetch(ok);
     await api.liftSuppression(9, { version: 'v7', email: 'a@b.c', note: 'asked' });
     const init = fetchMock.mock.calls[0][1] as RequestInit;

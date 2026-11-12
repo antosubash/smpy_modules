@@ -6,11 +6,11 @@ async function load() {
   vi.resetModules();
   vi.stubGlobal('document', {
     querySelector: (selector: string) =>
-      selector.includes('data-page="app"')
+      selector.includes('data-page')
         ? {
             textContent: JSON.stringify({
               component: 'Newsletter/Import',
-              props: { csrf_token: 'tok' },
+              props: { csrfToken: 'tok' },
             }),
           }
         : null,

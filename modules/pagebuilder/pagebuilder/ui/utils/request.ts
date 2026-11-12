@@ -3,8 +3,8 @@
  *
  * All endpoints live under `/api/pagebuilder` and return JSON. We use
  * plain fetch + same-origin cookies for auth, plus an `X-CSRF-Token`
- * header on every mutating request: the framework token the screens share
- * as the `csrf_token` prop, kept by `./csrf`.
+ * header on every mutating request: the framework's `csrfToken` shared prop,
+ * added by `./csrf`.
  */
 
 import { csrfHeaders, isCsrfRefusal } from './csrf';

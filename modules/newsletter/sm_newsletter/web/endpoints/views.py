@@ -22,9 +22,8 @@ from sm_newsletter.content.integrations import capabilities
 from sm_newsletter.core import constants, tenancy
 from sm_newsletter.core.host import public_base_url
 from sm_newsletter.core.tenancy import bind_admin
-from sm_newsletter.web.endpoints.csrf import share_csrf_token
 
-router = APIRouter(dependencies=[Depends(bind_admin), Depends(share_csrf_token)])
+router = APIRouter(dependencies=[Depends(bind_admin)])
 
 
 async def _flags(request: Request) -> dict[str, bool]:

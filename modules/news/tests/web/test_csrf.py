@@ -4,8 +4,8 @@ The API used to rely on the session cookie's ``SameSite=Lax`` alone, which does
 not separate the console from an organisation's public site on a multi-tenant
 host — the two are same-site. These clients are built *unarmed* (the shared
 fixtures send the token on every request) and arm themselves only through the
-channel the console's own client uses: the ``csrf_token`` prop a news screen
-shares.
+channel the console's own client uses: the framework's ``csrfToken`` shared
+prop, which every signed-in page carries (#342). News shares no token itself.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ INERTIA = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
 @pytest_asyncio.fixture
 async def bare() -> AsyncIterator[AsyncClient]:
     """An editor's session that has not been handed a token yet."""
-    app, state = await _build_app(stub_user((ROLE_EDITOR,)))
+    app, state = await _build_app(stub_user((ROLE_EDITOR,)), layout=True)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         client.app = app  # type: ignore[attr-defined]
         yield client

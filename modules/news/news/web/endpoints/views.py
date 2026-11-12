@@ -16,13 +16,12 @@ from news.core import constants, locales
 from news.core.settings import active, public_article_path
 from news.core.tenancy import bind_admin
 from news.models import ArticleStatus, NewsArticle
-from news.web.csrf import share_csrf_token
 from news.web.endpoints.api._deps import may_see_drafts
 from news.web.endpoints.public._render import render_article
 
-# ``share_csrf_token`` puts the token the API's CSRF check wants (#110) in
-# every screen's props, for ``utils/csrf.ts`` to send back.
-router = APIRouter(dependencies=[Depends(bind_admin), Depends(share_csrf_token)])
+# The token the API's CSRF check wants (#110) is the framework's ``csrfToken``
+# shared prop, on every signed-in page (#342).
+router = APIRouter(dependencies=[Depends(bind_admin)])
 
 
 def _locale_props() -> dict:
@@ -43,7 +42,7 @@ def _locale_props() -> dict:
     return {"locales": list(locales.supported()), "default_locale": locales.default()}
 
 
-admin_router = APIRouter(dependencies=[Depends(bind_admin), Depends(share_csrf_token)])
+admin_router = APIRouter(dependencies=[Depends(bind_admin)])
 """Routes mounted at the app root rather than under ``VIEW_PREFIX``.
 
 The search screen spans articles, pages and media, so filing it under ``/news``

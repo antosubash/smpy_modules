@@ -74,7 +74,7 @@ async def authed_client(tmp_path) -> AsyncIterator[AsyncClient]:
 async def csrf_client(tmp_path) -> AsyncIterator[AsyncClient]:
     """Auth-bypassed client with CSRF enabled — the CSRF tests' workhorse."""
     async for c in _client_fixture(
-        tmp_path, requires_auth=True, csrf_protect=True, inject_user=True
+        tmp_path, requires_auth=True, csrf_protect=True, inject_user=True, layout=True
     ):
         yield c
 

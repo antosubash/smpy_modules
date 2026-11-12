@@ -12,7 +12,7 @@ keywords = ["simple-module", "news", "articles", "cms"]
 dependencies = [
     "simple_module_core>=0.0.38,<0.1",  # module_settings first shipped in 0.0.38
     "simple_module_db>=0.0.36,<0.1",
-    "simple_module_hosting>=0.0.36,<0.1",
+    "simple_module_hosting>=0.0.38,<0.1",  # floor: the csrfToken shared prop first shipped in 0.0.38
     "simple_module_inertia>=0.0.36,<0.1",
     # This module's settings are DB-backed rather than read from the
     # environment: the settings plugin hydrates and edits them.

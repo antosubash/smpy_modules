@@ -48,8 +48,9 @@ export async function clickAndConfirm(
 /**
  * The framework CSRF token (`RequiresCsrf`) every module's admin API checks —
  * pagebuilder, news, records and ai (#110, #111, #126). One token per session,
- * and every screen of theirs shares it as the `csrf_token` Inertia prop, so any
- * of those screens gives the header for a write to any of the APIs.
+ * and every signed-in page carries it as the framework's `csrfToken` Inertia
+ * prop (#342), so any of those screens gives the header for a write to any of
+ * the APIs.
  *
  * Read off the server-rendered page through `page.request`, which shares the
  * logged-in context's cookie jar, so the browser tab stays where it was.
@@ -68,9 +69,9 @@ export async function moduleCsrfHeader(
   const html = await (await page.request.get(view)).text();
   const json = html.match(/<script data-page="app" type="application\/json">([^<]*)<\/script>/);
   expect(json, `expected the Inertia page JSON on ${view}`).toBeTruthy();
-  const token = (JSON.parse(json?.[1] ?? '{}') as { props?: { csrf_token?: string } }).props
-    ?.csrf_token;
-  expect(token, `expected a csrf_token prop on ${view}`).toBeTruthy();
+  const token = (JSON.parse(json?.[1] ?? '{}') as { props?: { csrfToken?: string } }).props
+    ?.csrfToken;
+  expect(token, `expected a csrfToken prop on ${view}`).toBeTruthy();
   return { 'X-CSRF-Token': token ?? '' };
 }
 

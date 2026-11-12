@@ -2,10 +2,9 @@
 
 All `/api/news` routes are JSON. Writes (`POST`/`PUT`/`PATCH`/`DELETE`) need
 the session's CSRF token in an `X-CSRF-Token` header — the framework's
-`RequiresCsrf`, as billing uses; a write without it is a `403`. Every news
-screen shares the token as the `csrf_token` Inertia prop
-(`simple_module_hosting.csrf.get_csrf_token`), and the console's own client
-sends it from there. Reads need no token, so the feed block on public pages is
+`RequiresCsrf`, as billing uses; a write without it is a `403`. Every
+signed-in page carries the token as the framework's `csrfToken` Inertia prop,
+and the console's own client sends it from there. Reads need no token, so the feed block on public pages is
 unaffected. The session cookie's `SameSite=Lax` alone is not enough: on a
 multi-tenant host every organisation's public site is same-site with the
 console. Errors are `{"detail": "<message>"}`

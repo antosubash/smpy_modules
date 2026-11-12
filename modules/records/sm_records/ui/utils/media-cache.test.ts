@@ -19,7 +19,10 @@ describe('the media metadata cache', () => {
     expect((await getMediaFile(API, PHOTO.id))?.filename).toBe('harbour.png');
     // The library after the file was deleted: every lookup is a 404.
     const gone = stubLibrary([]);
-    document.dispatchEvent(new CustomEvent('inertia:navigate'));
+    // With the page Inertia sends: the framework's CSRF tracker reads it too.
+    document.dispatchEvent(
+      new CustomEvent('inertia:navigate', { detail: { page: { props: {} } } }),
+    );
     expect(await getMediaFile(API, PHOTO.id)).toBeNull();
     expect(gone).toHaveBeenCalledOnce();
   });

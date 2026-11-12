@@ -1,9 +1,9 @@
 """The admin API refuses a write without the session's CSRF token (#10, #126).
 
 The check is the framework's ``RequiresCsrf``, the one billing, news and
-records use. The token reaches the console as the ``csrf_token`` Inertia prop
-on every pagebuilder screen, and these tests take it from there, the way the
-console's own client does. No cookie is set any more.
+records use. The token reaches the console as the framework's ``csrfToken``
+Inertia prop on every signed-in page, and these tests take it from there, the
+way the console's own client does. No cookie is set any more.
 """
 
 from __future__ import annotations

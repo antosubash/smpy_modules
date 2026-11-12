@@ -104,7 +104,7 @@ test.describe('News — first visit of a session', () => {
       // The screen's token (#110), so the refusal is the 404 under test here
       // rather than the CSRF check's 403.
       const pageJson = document.querySelector('script[data-page="app"]')?.textContent ?? '{}';
-      const token = (JSON.parse(pageJson) as { props?: { csrf_token?: string } }).props?.csrf_token;
+      const token = (JSON.parse(pageJson) as { props?: { csrfToken?: string } }).props?.csrfToken;
       const r = await fetch('/api/news/articles/999999', {
         method: 'PUT',
         credentials: 'same-origin',

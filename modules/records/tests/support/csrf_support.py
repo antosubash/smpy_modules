@@ -2,9 +2,10 @@
 
 The rest of the suite's harness mounts no ``SessionMiddleware``, and
 ``RequiresCsrf`` exempts a session-less app, so ``session_client`` adds one
-where the host has it (outermost). ``_token`` takes the token only through the
-channel the console's own client uses: the ``csrf_token`` prop a records
-screen shares.
+where the host has it (outermost), and the framework's layout middleware
+(``menus=True``), which gives every signed-in page the ``csrfToken`` shared
+prop (#342). ``_token`` takes the token only through that channel, the one the
+console's own client uses; records shares no token itself.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ AS_ADMIN = roles(ADMIN)
 
 @pytest_asyncio.fixture
 async def session_client(tmp_path) -> AsyncIterator[AsyncClient]:
-    app, db_state = await build_app(tmp_path)
+    app, db_state = await build_app(tmp_path, menus=True)
     app.add_middleware(SessionMiddleware, secret_key="records-tests")
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         client.app = app  # type: ignore[attr-defined]

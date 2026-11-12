@@ -112,7 +112,7 @@ host read the same settings themselves, re-reading at most once a minute.
 | `POST /api/ai/models` | list the model ids the slot's saved endpoint serves (first 500, sorted) |
 
 Writes require the framework's `X-CSRF-Token` header bound to the session (the
-admin page sends it automatically; it is shared as the `csrf_token` prop).
+admin page sends it automatically; it is the framework's `csrfToken` shared prop).
 
 The package follows the [module layout](../../docs/module-layout.md); see its
 [code map](docs/code-layout.md) for the feature areas and test folders.

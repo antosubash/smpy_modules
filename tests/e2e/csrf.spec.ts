@@ -12,9 +12,9 @@ const PNG = Buffer.from(
  * Issue #10, #126 — pagebuilder's CSRF protection.
  *
  * The check is the framework's `RequiresCsrf`, the one every module uses
- * since #126. Every pagebuilder screen shares the session's token as the
- * `csrf_token` Inertia prop; `utils/csrf.ts` keeps it and the fetch and
- * upload helpers send it as `X-CSRF-Token`. The `pagebuilder_csrf` cookie and
+ * since #126. Every signed-in page carries the session's token as the
+ * framework's `csrfToken` Inertia prop (#342); `utils/csrf.ts` reads it and
+ * the fetch and upload helpers send it as `X-CSRF-Token`. The `pagebuilder_csrf` cookie and
  * the middleware that mirrored it are gone. The AI module's half is in
  * `csrf-ai.spec.ts`.
  */
@@ -30,7 +30,7 @@ test.describe('CSRF protection — pagebuilder', () => {
     await page.goto('/pagebuilder/');
     const prop = await page.evaluate(() => {
       const raw = document.querySelector('script[data-page="app"]')?.textContent ?? '{}';
-      return (JSON.parse(raw) as { props?: { csrf_token?: string } }).props?.csrf_token ?? '';
+      return (JSON.parse(raw) as { props?: { csrfToken?: string } }).props?.csrfToken ?? '';
     });
     expect(prop.length).toBeGreaterThan(20);
     const names = (await context.cookies()).map((c) => c.name);
@@ -128,8 +128,8 @@ test.describe('CSRF protection — pagebuilder', () => {
 
 /**
  * #110, #111 — news' and records' admin APIs check the framework's
- * `RequiresCsrf`. Their screens share the token as the `csrf_token` Inertia
- * prop (`moduleCsrfHeader` reads it), and the console's own clients send it
+ * `RequiresCsrf`. Their screens carry the token as the framework's `csrfToken`
+ * Inertia prop (`moduleCsrfHeader` reads it), and the console's own clients send it
  * back: the UI-driven news and records specs exercise that path on every save.
  */
 const MODULE_WRITES = [

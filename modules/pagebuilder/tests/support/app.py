@@ -20,8 +20,10 @@ from pagebuilder.module import PagebuilderModule
 # makes: in-memory SQLite, or the Postgres database ``SM_TEST_DATABASE_URL``
 # names. See that module.
 from pg_support import make_db_state
+from simple_module_core.menu import MenuRegistry
 from simple_module_core.module_settings import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry
+from simple_module_hosting.middleware import InertiaLayoutDataMiddleware
 from simple_module_inertia import InertiaConfig, inertia_dependency_factory
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -46,6 +48,7 @@ async def _build_app(
     user_roles: tuple[str, ...] = ("admin",),
     role_map: dict[str, list[str]] | None = None,
     settings: dict[str, Any] | None = None,
+    layout: bool = False,
 ) -> tuple[FastAPI, Callable[[], Awaitable[None]]]:
     media_root = tmp_path / "media"
     media_root.mkdir(parents=True, exist_ok=True)
@@ -117,6 +120,16 @@ async def _build_app(
     )
     app.state.inertia_dependency = inertia_dependency_factory(inertia_config)
 
+    if layout:
+        # The framework's layout props, ``csrfToken`` among them (#342): the
+        # channel a signed-in console gets its token through. Inside the stub
+        # auth, as in the host, so it sees the user.
+        app.add_middleware(
+            InertiaLayoutDataMiddleware,
+            menu_registry=MenuRegistry(),
+            permission_registry=getattr(sm_namespace, "permissions", None) or PermissionRegistry(),
+        )
+
     if inject_user:
         # Added before SessionMiddleware so it sits inside it at runtime
         # (Starlette wraps outermost = last-added). Position doesn't
@@ -157,6 +170,7 @@ async def _client_fixture(
     user_roles: tuple[str, ...] = ("admin",),
     role_map: dict[str, list[str]] | None = None,
     settings: dict[str, Any] | None = None,
+    layout: bool = False,
 ) -> AsyncIterator[AsyncClient]:
     app, cleanup = await _build_app(
         tmp_path,
@@ -166,6 +180,7 @@ async def _client_fixture(
         user_roles=user_roles,
         role_map=role_map,
         settings=settings,
+        layout=layout,
     )
     try:
         async with _client_for(app) as c:

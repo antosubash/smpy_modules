@@ -127,10 +127,11 @@ billing, news, records and pagebuilder use:
 - the API router carries `RequiresCsrf()`, which checks `X-CSRF-Token` against
   the session's token on `POST`/`PUT`/`PATCH`/`DELETE` and skips the check when
   no session is mounted;
-- `csrf.py`'s `share_csrf_token`, a view-router dependency, shares
-  `get_csrf_token(request)` as the `csrf_token` Inertia prop;
-- `utils/csrf.ts` keeps the latest prop value (the server-rendered page, then
-  every Inertia navigation) and `utils/api.ts` sends it on every write.
+- the framework shares the token as the `csrfToken` Inertia prop on every
+  signed-in page (since 0.0.38; the module shares none of its own, #342);
+- `utils/csrf.ts` reads it through `@simple-module-py/ui`'s `currentCsrfToken`
+  (the server-rendered page, then every Inertia visit) and `utils/api.ts` sends
+  it on every write.
 
 There is no middleware and no cookie.
 
@@ -206,7 +207,7 @@ async def index(chunks: list[str]) -> None:
 | `resolve.py` | slot validation and model / embedder construction |
 | `crypto.py` | `enc:v2:` Fernet layer (reads `enc:v1:`), key rotation |
 | `service.py`, `deps.py` | read with secrets masked; build and apply changes |
-| `csrf.py` | shares the framework CSRF token with the settings page |
+| `csrf.py` | the deprecated `sm_ai.csrf` alias's target, until 0.0.17; shares nothing |
 | `metering.py` | `ai.requests`: registers the meter with an installed billing, and `RequiresAiRequest` (billing's `RequiresQuota`, or a no-op without billing) |
 | `contracts/` | the public surface (`__init__.py`), errors, API DTOs |
 | `endpoints/` | `api.py` (settings, test), `views.py` (`Ai/Settings`) |

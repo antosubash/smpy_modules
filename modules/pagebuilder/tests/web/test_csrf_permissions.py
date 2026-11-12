@@ -33,6 +33,7 @@ async def editor(tmp_path) -> AsyncIterator[AsyncClient]:
         inject_user=True,
         user_roles=(ROLE_EDITOR,),
         role_map={ROLE_EDITOR: [PERM_EDIT]},
+        layout=True,
     ):
         yield client
 
