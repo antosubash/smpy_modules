@@ -39,6 +39,11 @@ foreign key: each module owns its own SQLAlchemy `MetaData`, so a cross-module
 FK cannot resolve (`tenants` stores `user_id` the same way). None of the tables
 use `MultiTenantMixin`: webhooks, reconcile and the admin list span
 organisations by nature, so every query filters on `tenant_id` explicitly.
+That is also why billing has no tenancy package and no fail-closed ORM guard,
+unlike records, images, newsletter, pagebuilder and news (#335): the guard
+refuses a `MultiTenantMixin` table read with no tenant bound, and billing has
+no such table, so an unbound read is not unfiltered here — it is the explicit
+`tenant_id` predicate or nothing.
 
 ## Which plan is in force (`resolve.effective_plan`)
 

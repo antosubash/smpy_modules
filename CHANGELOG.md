@@ -160,6 +160,16 @@ name the module they affect.
   `public_base_url` (or each module's own setting). Details:
   the `public_base_url` / `return_base_url` rows in each module's
   `docs/operations.md`.
+- **pagebuilder and news refuse a read with no tenant bound** (#335). They now
+  install the fail-closed ORM guard records, images and newsletter already had:
+  an ORM statement or flush on one of their tables with nothing bound raises
+  `TenantUnbound` instead of returning every tenant's rows, so a future entry
+  point that forgets to bind fails loudly. The schedulers' tenant scan and
+  pagebuilder's boot-time media scan are tagged as deliberate cross-tenant
+  reads, and `pagebuilder.contracts.search` now binds the tenant its caller
+  names (a caller bound to another tenant gets `TenantIsolationError`), as the
+  cards contract already did. The five guard copies are parity-checked. Billing
+  has no `MultiTenantMixin` table, so it has no guard. No migration is needed.
 
 ### Deprecated
 

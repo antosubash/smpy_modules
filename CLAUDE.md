@@ -111,7 +111,11 @@ that does not is how `/de/p/x` starts serving the English page.
 **Every pagebuilder, news, records, images and newsletter entry point binds a tenant (#38, #112).**
 Their tables carry `MultiTenantMixin`, and the framework filters them only
 while a tenant is bound — on a host with `multi_tenant` off nothing is bound
-and a read is *unfiltered*. Routers get `tenancy.bind_admin`/`bind_public`,
+and a read is *unfiltered*. So all five install one fail-closed ORM guard
+(`core/tenancy/_guard.py`, records' `_tenant_guard.py`, parity-checked, #335):
+an unbound statement on their tables raises `TenantUnbound`, and a deliberate
+cross-tenant read is tagged `tenancy.all_tenants(stmt)`; Core and `text()`
+still need their own `tenant_id` predicate. Routers get `tenancy.bind_admin`/`bind_public`,
 and all modules follow one rule: single-tenant host → `"default"`; multi →
 the tenant the framework resolved (`request.state.tenant_id`, the active
 membership — never `user.tenant_id`, never a header a module reads itself);
