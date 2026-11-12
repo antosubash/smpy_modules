@@ -36,6 +36,7 @@ export function useShares(collectionId: string, open: boolean): Shares {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setShares(await listShares(collectionId));
@@ -53,16 +54,21 @@ export function useShares(collectionId: string, open: boolean): Shares {
   useEffect(() => {
     if (!open) return;
     if (!searchable(query)) {
-      // Nothing is searched, so an earlier search's error no longer applies.
+      // Nothing is searched, so an earlier search's error no longer applies
+      // (the list's own error is left alone).
       setFound([]);
-      setError(null);
+      setSearchError(null);
       return;
     }
     let current = true;
     const timer = window.setTimeout(() => {
       shareCandidates(collectionId, query.trim())
-        .then((rows) => current && setFound(rows))
-        .catch((e) => current && setError(errorText(e)));
+        .then((rows) => {
+          if (!current) return;
+          setFound(rows);
+          setSearchError(null);
+        })
+        .catch((e) => current && setSearchError(errorText(e)));
     }, SEARCH_DELAY_MS);
     return () => {
       current = false;
@@ -94,7 +100,7 @@ export function useShares(collectionId: string, open: boolean): Shares {
     setQuery,
     tooShort: !searchable(query),
     loading,
-    error,
+    error: searchError ?? error,
     grant,
     revoke,
   };

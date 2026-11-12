@@ -104,7 +104,7 @@ Settings screen says so. Everything else is read per request and applies on save
 | `public_csp` | see below | `Content-Security-Policy` on public pages; empty disables |
 | `public_cache_max_age` | `60` | `max-age` on public pages |
 | `public_cache_swr` | `600` | `stale-while-revalidate`; `0` omits it |
-| `public_base_url` | — | e.g. `https://example.com`, no trailing slash. Base for canonical, `og:url`, `og:image`, `hreflang`, the sitemap and `robots.txt`'s `Sitemap:` line. **Required in production on a single-tenant host** (see [Public origin](#public-origin)); leave blank on a multi-tenant host, where each organisation's site is its own host. |
+| `public_base_url` | — | e.g. `https://example.com`, no trailing slash. Base for canonical, `og:url`, `og:image`, `hreflang`, the sitemap and `robots.txt`'s `Sitemap:` line. **Required in production on a single-tenant host** (blank falls back to the host's own `public_base_url`; see [Public origin](#public-origin)); leave blank on a multi-tenant host, where each organisation's site is its own host. |
 | `site_name` | — | `og:site_name` |
 | `twitter_handle` | — | `twitter:site`, with the `@` |
 | `sitemap_enabled` ● | `true` | Serve `/sitemap.xml`; turn off when the host aggregates its own |
