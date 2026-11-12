@@ -36,20 +36,26 @@ CODE_SUFFIXES = {".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs"}
 SKIP_PARTS = {"node_modules", "dist", "__pycache__"}
 SKIP_NAMES = {"modules.generated.ts", "modules.generated.css"}
 
-# Comments (blanked, newlines kept) and string/template literals (kept).
+# Comments and string/template literals. Comments are blanked; each literal
+# becomes a placeholder (newlines kept), so import-like text inside a string is
+# never read as an import, while a real import's own specifier still is.
 _JS_NOISE = re.compile(
     r"//[^\n]*|/\*.*?\*/|'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\"|`(?:\\.|[^`\\])*`",
     re.DOTALL,
 )
+_PLACEHOLDER = "\0{}\0"
 _CSS_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
 # `from`, side-effect `import`, `import(`, `require(` and the test runner's
 # module calls (`vi.mock(`, `vi.importActual(`): a mock names a path as surely
-# as an import does.
+# as an import does. The specifier is a placeholder for a literal.
 _SPECIFIER = re.compile(
     r"""(?:\bfrom\s*|(?<![.\w])import\s*\(\s*|(?<![.\w])import\s+|\brequire\s*\(\s*"""
-    r"""|\b(?:vi|jest)\.\w+\s*\(\s*)(['"])([^'"\n]+)\1"""
+    r"""|\b(?:vi|jest)\.\w+\s*\(\s*)\0(\d+)\0"""
 )
-_CSS_IMPORT = re.compile(r"""@import\s+(?:url\(\s*)?(['"])([^'"\n]+)\1""")
+# `@import "x"`, `@import url("x")` and the unquoted `@import url(x)`.
+_CSS_IMPORT = re.compile(
+    r"""@import\s+(?:url\(\s*(?:(['"])([^'"\n]+)\1|([^)'"\s]+))\s*\)|(['"])([^'"\n]+)\4)"""
+)
 
 # (repo-relative file, specifier) -> why it may stay.
 ALLOWLIST: dict[tuple[str, str], str] = {
@@ -96,16 +102,28 @@ def _specifiers(path: Path) -> list[tuple[int, str]]:
     text = path.read_text(encoding="utf-8")
     if path.suffix == ".css":
         code = _CSS_COMMENT.sub(lambda m: "\n" * m.group(0).count("\n"), text)
-        pattern = _CSS_IMPORT
-    else:
-        code = _JS_NOISE.sub(
-            lambda m: (
-                m.group(0) if m.group(0)[0] in "'\"`" else "\n" * m.group(0).count("\n") or " "
-            ),
-            text,
-        )
-        pattern = _SPECIFIER
-    return [(code.count("\n", 0, m.start()) + 1, m.group(2)) for m in pattern.finditer(code)]
+        return [
+            (code.count("\n", 0, m.start()) + 1, m.group(2) or m.group(3) or m.group(5))
+            for m in _CSS_IMPORT.finditer(code)
+        ]
+    literals: list[str] = []
+
+    def _mask(m: re.Match[str]) -> str:
+        token = m.group(0)
+        newlines = "\n" * token.count("\n")
+        if token[0] not in "'\"`":
+            return newlines or " "
+        literals.append(token)
+        return _PLACEHOLDER.format(len(literals) - 1) + newlines
+
+    code = _JS_NOISE.sub(_mask, text)
+    found = []
+    for m in _SPECIFIER.finditer(code):
+        literal = literals[int(m.group(1))]
+        if literal[0] == "`" and "${" in literal:
+            continue  # a computed specifier names no fixed path
+        found.append((code.count("\n", 0, m.start()) + 1, literal[1:-1]))
+    return found
 
 
 def _module_of(path: Path, root: Path) -> str | None:

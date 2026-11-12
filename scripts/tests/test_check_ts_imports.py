@@ -131,3 +131,43 @@ def test_the_allowlist_exempts_one_file_and_specifier(tmp_path, monkeypatch):
     _write(root, "modules/news/news/a.ts", f"import '{deep}';\n")
     monkeypatch.setitem(check_ts_imports.ALLOWLIST, ("modules/news/news/a.ts", deep), "test")
     assert _errors(root) == ""
+
+
+def test_import_text_inside_a_string_is_not_an_import(tmp_path):
+    root = _repo(tmp_path)
+    deep = "@simple-module-py/pagebuilder/pagebuilder/ui/fields"
+    _write(
+        root,
+        "modules/news/news/a.ts",
+        f"const sample = \"import {{ x }} from '{deep}';\";\n"
+        f"const doc = `\nimport('{deep}');\nvi.mock('{deep}');\n`;\n"
+        f"const one = 'from \"{deep}\"';\n",
+    )
+    assert _errors(root) == ""
+
+
+def test_a_static_template_specifier_counts_and_a_computed_one_does_not(tmp_path):
+    root = _repo(tmp_path)
+    deep = "@simple-module-py/pagebuilder/pagebuilder/ui/fields"
+    _write(
+        root,
+        "modules/news/news/a.ts",
+        f"await import(`{deep}`);\n"
+        f"vi.mock(`{deep}`, () => ({{}}));\n"
+        "await import(`@simple-module-py/pagebuilder/${name}`);\n",
+    )
+    lines = _errors(root).splitlines()
+    assert [line.split(":")[1] for line in lines] == ["1", "2"]
+
+
+def test_an_unquoted_css_url_import_is_checked(tmp_path):
+    root = _repo(tmp_path)
+    _write(
+        root,
+        "host/client_app/s.css",
+        "@import url(@simple-module-py/pagebuilder/internal.css);\n"
+        '@import url( "@simple-module-py/pagebuilder/other.css" );\n',
+    )
+    lines = _errors(root).splitlines()
+    assert [line.split(":")[1] for line in lines] == ["1", "2"]
+    assert all("deep import into @simple-module-py/pagebuilder" in line for line in lines)
