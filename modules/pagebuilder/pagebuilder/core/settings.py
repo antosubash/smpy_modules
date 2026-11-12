@@ -1,7 +1,7 @@
 """PageBuilder module settings — stored in the database, edited in Settings.
 
 There is no ``SM_PAGEBUILDER_*`` environment variable and no ``.env`` stanza:
-:meth:`settings_customise_sources` drops every source pydantic-settings would
+``DbBackedSettings`` drops every source pydantic-settings would
 otherwise consult, leaving the field defaults below and whatever the settings
 module has stored. The module registers this class in ``register_settings``
 via ``register_module_settings``, the host hydrates it from the DB at lifespan
@@ -28,7 +28,7 @@ from pagebuilder.core.settings_media import _RESTART, MediaSettings
 class PagebuilderSettings(MediaSettings):
     """Every pagebuilder setting; the media and snapshot ones are :class:`MediaSettings`'.
 
-    The model config and :meth:`settings_customise_sources` (database and
+    The model config and ``DbBackedSettings``' source rule (database and
     defaults only, never the environment) are inherited from there too.
     """
 

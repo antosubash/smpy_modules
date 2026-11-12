@@ -173,6 +173,12 @@ name the module they affect.
 
 ### Changed
 
+- **news, pagebuilder, analytics and records settings use the framework's
+  `DbBackedSettings`** (#345), as ai, billing, images and newsletter already
+  did, instead of each carrying its own `settings_customise_sources` (records'
+  `StoredSourcesOnly` mixin is gone). Behaviour is unchanged: the same fields,
+  defaults and validators, no environment, `.env` or secrets-file source. No
+  dependency floor moves; `DbBackedSettings` has shipped since framework 0.0.33.
 - **pagebuilder has a TypeScript entry point** (#337).
   `@simple-module-py/pagebuilder` (`pagebuilder/index.ts`, the package's
   `main`) exports what other modules use to contribute blocks:

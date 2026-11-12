@@ -4,7 +4,7 @@ type that accepts them shares.
 A base class of :class:`~sm_records.core.settings.RecordsSettings`, between it and
 :class:`~sm_records.core.settings.settings_boot.BootSettings`, for the 300-line cap: one
 class on one Settings screen, still stored in the database with no environment
-source (``StoredSourcesOnly`` comes with the base). Every field is read per
+source (``DbBackedSettings`` comes with the base). Every field is read per
 request, so none needs a restart.
 
 What a single type accepts — its fields, recipients and consent — lives on the

@@ -1,7 +1,7 @@
 """Records module settings — stored in the database, edited in Settings.
 
 Follows :mod:`pagebuilder.core.settings` exactly: there is no ``SM_RECORDS_*``
-environment variable and no ``.env`` stanza. ``settings_customise_sources``
+environment variable and no ``.env`` stanza. ``DbBackedSettings``
 drops every source pydantic-settings would otherwise consult, leaving the
 field defaults below and whatever the settings module has stored. The module
 registers this class in ``register_settings`` via ``register_module_settings``,

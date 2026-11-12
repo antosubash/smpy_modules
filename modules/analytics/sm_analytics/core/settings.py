@@ -1,10 +1,11 @@
 """Deployment settings hydrate from the framework database, never the environment."""
 
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import SettingsConfigDict
+from simple_module_core.settings_base import DbBackedSettings
 
 
-class AnalyticsSettings(BaseSettings):
+class AnalyticsSettings(DbBackedSettings):
     model_config = SettingsConfigDict(extra="ignore", use_attribute_docstrings=True)
     retention_days: int = Field(default=90, ge=1, le=3650)
     """Days of events retained; deletion runs in bounded batches."""
@@ -15,8 +16,3 @@ class AnalyticsSettings(BaseSettings):
     scheduler_enabled: bool = Field(default=True, json_schema_extra={"requires_restart": True})
     """Run periodic retention cleanup in this process."""
 
-    @classmethod
-    def settings_customise_sources(
-        cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
-    ):
-        return (init_settings,)
