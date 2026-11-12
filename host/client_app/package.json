@@ -8,7 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@inertiajs/react": "^3.9.1",
+    "@inertiajs/react": "^3.11.0",
     "@simple-module-py/i18n": "0.0.44",
     "@simple-module-py/ui": "0.0.44",
     "react": "^19.3.1",
@@ -16,13 +16,13 @@
   },
   "devDependencies": {
     "@simple-module-py/tsconfig": "0.0.44",
-    "@tailwindcss/vite": "^4.3.3",
+    "@tailwindcss/vite": "^4.3.5",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.2",
+    "@vitejs/plugin-react": "^6.3.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vite": "^8.3.5"
+    "vite": "^8.3.7"
   }
 }
