@@ -81,7 +81,9 @@ def crypto_for(package: str) -> ModuleType | None:
     installed but not enabled is still handled — or ``None`` if not installed."""
     try:
         return importlib.import_module(f"{package}.core.crypto")
-    except ModuleNotFoundError:
+    except ModuleNotFoundError as exc:
+        if (exc.name or "").partition(".")[0] != package:
+            raise  # an installed module with a missing dependency is not "not installed"
         return None
 
 
@@ -94,13 +96,16 @@ def install_secret(secret: str) -> None:
 
 
 def _decode(row: Row) -> str | None:
-    """The stored string, or ``None`` for a json row that does not hold one."""
+    """The stored string (``""`` for a json ``null``), or ``None`` for a json row
+    that holds something else."""
     if row.value_type != "json":
         return row.value
     try:
         value = json.loads(row.value)
     except ValueError:
         return None
+    if value is None:  # a nullable field emptied: nothing to rotate, not an error
+        return ""
     return value if isinstance(value, str) else None
 
 

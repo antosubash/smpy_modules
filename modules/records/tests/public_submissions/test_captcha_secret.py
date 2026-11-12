@@ -16,24 +16,10 @@ from sm_records.core import constants, crypto
 from sm_records.public_submissions import captcha_secret
 from sqlalchemy import insert, select
 
-from tests.public_submissions.test_public_submissions_captcha import ON, Provider
+from tests.public_submissions.test_public_submissions_captcha import ON
 from tests.support.submissions_http import configure, contact_type, records_of, send
 
 SECRET = "turnstile-secret-1"
-
-
-@pytest.fixture
-def provider(monkeypatch) -> Provider:
-    import httpx
-    from sm_records.public_submissions import captcha
-
-    fake = Provider()
-    monkeypatch.setattr(
-        captcha,
-        "client_factory",
-        lambda: httpx.AsyncClient(transport=httpx.MockTransport(fake.handler)),
-    )
-    return fake
 
 
 @pytest.fixture

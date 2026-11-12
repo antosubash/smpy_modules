@@ -85,11 +85,8 @@ async def _apply(session, plans: list[rs.Plan]) -> bool:
 async def run(*, dry_run: bool, seal_plaintext: bool) -> int:
     app = create_app(headless_settings())
     try:
-        secret = getattr(app.state.sm.settings, "secret_key", "") or ""
-        if not secret:
-            print("no secret key: set SM_SECRET_KEY", file=sys.stderr)
-            return 1
-        rs.install_secret(secret)
+        # headless_settings() already refused when no key is provisioned.
+        rs.install_secret(app.state.sm.settings.secret_key)
         async with app.state.sm.db.session_factory() as session:
             targets, others = await _rows(session)
             try:

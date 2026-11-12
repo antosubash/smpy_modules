@@ -104,5 +104,5 @@ still be typed.
 ## "The stored key … cannot be decrypted"
 
 This message, in a test result or from a module, means the server's
-`SM_SECRET_KEY` changed after the key was saved. Type the key again and
-**Save**. See [operations.md](operations.md#secret-key-rotation).
+`SM_SECRET_KEY` changed after the key was saved, and the old key is not in
+`SM_SECRET_KEY_PREVIOUS`. Type the key again and **Save**. See [operations.md](operations.md#secret-key-rotation).

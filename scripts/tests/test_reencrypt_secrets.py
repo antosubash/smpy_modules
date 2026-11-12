@@ -32,21 +32,6 @@ CAPTCHA_KEY = "sm_records.public_submissions_captcha_secret"
 PLAIN = {AI_KEY: "sk-ant-1", BILLING_KEY: "sk_test_1", SMTP_KEY: "smtp-pw", CAPTCHA_KEY: "cap-1"}
 
 
-@pytest.fixture(scope="module")
-def _migrated(tmp_path_factory) -> Path:
-    path = tmp_path_factory.mktemp("reencrypt") / "template.db"
-    result = subprocess.run(
-        [sys.executable, "-m", "alembic", "-c", "host/alembic.ini", "upgrade", "heads"],
-        cwd=REPO,
-        env={**os.environ, "SM_DATABASE_URL": f"sqlite+aiosqlite:///{path}"},
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0, result.stderr[-2000:]
-    return path
-
-
 @pytest.fixture
 def db(_migrated, tmp_path) -> Path:
     copy = tmp_path / "host.db"
@@ -190,6 +175,11 @@ def test_a_module_that_is_not_installed_is_an_error(monkeypatch):
     row = rs.Row("system", "", AI_KEY, "enc:v2:x", "string")
     assert rs.plan_row(row).outcome == rs.NOT_INSTALLED
     assert rs.NOT_INSTALLED in rs.ERRORS
+
+
+def test_a_json_null_is_empty_not_an_error():
+    row = rs.Row("system", "", CAPTCHA_KEY, "null", "json")
+    assert rs.plan_row(row).outcome == rs.EMPTY
 
 
 def test_set_setting_stores_the_captcha_secret_encrypted(db, tmp_path):

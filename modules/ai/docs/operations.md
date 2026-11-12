@@ -155,7 +155,7 @@ never opened, so a worker can't create an empty one.
 | "'embedding_provider' … not configured" | the embedding slot is empty | Configure **Embeddings**. |
 | Every save fails with `chat_base_url: a base URL is required …` | a slot is stored as `openai_compatible` with no URL (possible before #164) | Enter the server's base URL on that card. |
 | "'embedding_dim' … Set the vector width" | `embedding_dim` is `0` | Set **Vector dimension** to the model's output width. |
-| "cannot be decrypted — SM_SECRET_KEY has changed" | secret rotated, or the host's in-code `secret_key` differs from the one used to save | Re-enter the keys. |
+| "cannot be decrypted with SM_SECRET_KEY or any key in SM_SECRET_KEY_PREVIOUS" | secret rotated without keeping the old one, or the host's in-code `secret_key` differs from the one used to save | Add the old key to `SM_SECRET_KEY_PREVIOUS`, or re-enter the keys. |
 | Saving a key returns 500, log says `SM_SECRET_KEY is not set` | no secret anywhere | Set `SM_SECRET_KEY` (`make env`) and restart. |
 | Every save fails with `chat_provider must be one of …` | a provider written by `set_setting.py` outside the list (shown as "(unknown provider)") | Pick a real provider on the page. |
 | Save says the page's security token is out of date (API: 403 "CSRF token missing or invalid") | API called without the token, or the session changed | Reload `/ai/`; scripted clients must send `X-CSRF-Token` with the `csrf_token` prop of the `/ai/` page. |

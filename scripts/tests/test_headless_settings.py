@@ -36,21 +36,6 @@ def _env(url: str, project_root: Path) -> dict[str, str]:
     return {**env, "SM_DATABASE_URL": url, "SM_PROJECT_ROOT": str(project_root)}
 
 
-@pytest.fixture(scope="module")
-def _migrated(tmp_path_factory) -> Path:
-    path = tmp_path_factory.mktemp("headless") / "template.db"
-    result = subprocess.run(
-        [sys.executable, "-m", "alembic", "-c", "host/alembic.ini", "upgrade", "heads"],
-        cwd=REPO,
-        env={**os.environ, "SM_DATABASE_URL": f"sqlite+aiosqlite:///{path}"},
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0, result.stderr[-2000:]
-    return path
-
-
 @pytest.fixture
 def db(_migrated, tmp_path, monkeypatch) -> Path:
     """A private copy of the migrated database, with no key row, and no env key."""

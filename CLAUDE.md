@@ -245,7 +245,7 @@ one place provider state becomes local state), and response models
 (`PlanOut`) must not inherit input bounds — a stored row that predates a bound
 would 500 every screen listing plans. Its docs are in `modules/billing/docs/`.
 
-**`pagebuilder`, `news`, `billing`, `ai`, `images` and `newsletter` read no environment variables.** Their settings are
+**`pagebuilder`, `news`, `billing`, `ai`, `images` and `newsletter` read no environment variables** (but for the stored-secret crypto's `SM_SECRET_KEY_PREVIOUS`, below, and the `SM_SECRET_KEY` fallback in ai and newsletter). Their settings are
 DB-backed through the framework's settings module (`register_module_settings`),
 and each class drops pydantic-settings' env, `.env` and secrets sources — so
 adding a field means adding it to the class, not to `.env.example`, and an
@@ -265,7 +265,7 @@ through that endpoint, so always use the endpoint); the generic Settings screen
 refuses newsletter writes (`manage_url`).
 These settings are SYSTEM-scope: ai has one provider configuration and one
 API key per slot for the whole deployment, shared by every tenant. ai reads
-two things from the environment, both only as the framework's
+three things from the environment (`SM_SECRET_KEY_PREVIOUS`, below, is the third), all only as the framework's
 `BootstrapSettings` locates `.env` (`SM_PROJECT_ROOT`, else the walk up to the
 project root) — never a cwd-relative file (#124): `SM_SECRET_KEY`, for its key
 encryption, and `SM_DATABASE_URL`, only when `sm_ai.contracts.consume_requests`

@@ -53,6 +53,7 @@ from tests.support.app_harness import (  # noqa: F401 - re-exported as fixtures/
 
 # Fixtures several suites share, each defined once beside what it builds on.
 from tests.support.bulk_helpers import product  # noqa: F401
+from tests.support.captcha_provider import provider  # noqa: F401 - the CAPTCHA suites' siteverify
 from tests.support.census import Census, census_enabled
 from tests.support.csrf_support import session_client  # noqa: F401 - test_csrf*'s fixture
 from tests.support.events_harness import bus, note  # noqa: F401

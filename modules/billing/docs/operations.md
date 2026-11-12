@@ -63,9 +63,11 @@ environment variables — an `SM_BILLING_*` line does nothing.
 | `usage_sweep_interval_seconds` | `60` | Seconds between sweeps that expire lapsed holds (every instance sweeps; the guarded transition releases each hold once). `0` turns it off. Re-read from the database before every tick, so a value saved on one worker reaches all of them. |
 | `usage_event_retention_days` | `400` | The daily purge drops ledger charges older than this together with their refunds (by the charge's age, so a key is never left with only its refund; a refund goes only while its selected charge row is still there, so a stale batch on another instance never takes a newer call's refund), and settled holds older than 30 days. Each transaction deletes up to 1,000 charges plus their refunds (so up to about 2,000 ledger rows), or up to 1,000 settled holds, with at most 20 purge write transactions per table per tick, and carries a backlog over to the next ticks, so SQLite's write lock is never held for long. `0` keeps the ledger. Counters and gauges are never purged. A purged key is forgotten whole and can be used again. |
 
-> **Rotating the app's `secret_key` makes stored Stripe secrets unreadable.**
-> Billing then falls back to `manual` at startup and the connection screen
-> says why. Re-enter both secrets after a rotation.
+> **Rotating the app's `secret_key` without keeping the old one makes stored
+> Stripe secrets unreadable.** Billing then falls back to `manual` at startup
+> and the connection screen says why. Put the old key in `SM_SECRET_KEY_PREVIOUS`
+> and run `scripts/reencrypt_secrets.py` (`docs/secret-key-rotation.md`), or
+> re-enter both secrets.
 
 ## Connecting Stripe
 
@@ -267,7 +269,7 @@ the ledger and the usage screens.
 | Owner can't downgrade: "remove N first" | members plus pending invitations exceed the target plan's seats | Remove members or revoke invitations. |
 | Per-seat quantity at Stripe differs from members | a membership change happened while Stripe was unreachable | The scheduled reconcile pushes it within one to two intervals; without it, `smpy billing reconcile`. |
 | "Changing a price that is in use" when editing a plan | a live subscription bills on that price | Create a new plan with the new price; move organisations to it. |
-| Connection screen: "cannot be decrypted" | app `secret_key` changed | Re-enter both Stripe secrets. |
+| Connection screen: "cannot be decrypted" | app `secret_key` changed and the old one is not in `SM_SECRET_KEY_PREVIOUS` | Add the old key there, or re-enter both Stripe secrets. |
 | Checkout says "already subscribed" but the page shows the free plan | a subscription exists at Stripe the app hasn't recorded | `smpy billing reconcile --tenant ID`. |
 | Startup fails with "billing metering supports postgresql and sqlite" or "needs SQLite >= 3.35" | an unsupported database, or an old SQLite library in the Python build | Use Postgres, or a Python whose `sqlite3.sqlite_version` is 3.35 or newer. |
 | A metered request answers 402 `quota_exceeded` | the organisation used its plan's allowance for the period (or holds its gauge's limit) | **Admin → Billing → Usage**: the row, the ledger, the open holds. Raise the plan's limit, credit with **Adjust**, or **Release** a stuck hold. |
