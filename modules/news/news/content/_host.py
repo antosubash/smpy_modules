@@ -6,10 +6,11 @@ that contract down (#133). :class:`~news.content._revisions.RevisionsMixin`, the
 root of the chain, inherits :data:`HostBase`, which a type checker would see as
 the Protocol and the interpreter sees as ``object``, so the MRO is unchanged.
 
-No type checker runs in CI, so the enforcement is ``tests/test_content_host.py``:
-an AST scan fails when a mixin uses a member the Protocol does not declare, and
-an ``isinstance`` check fails when ``ArticlesService`` stops supplying one. Add a
-member here before a mixin starts using it.
+CI's type check (pyright, #338) does not cover this package yet, so the
+enforcement is ``tests/test_content_host.py``: an AST scan fails when a mixin
+uses a member the Protocol does not declare, and an ``isinstance`` check fails
+when ``ArticlesService`` stops supplying one. Add a member here before a mixin
+starts using it.
 """
 
 from __future__ import annotations

@@ -16,6 +16,7 @@ from collections.abc import Sequence
 from sm_records.contracts.newsletter import CallerRoles, can_read_list, subscription_lists
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from sm_newsletter.core.errors import ListForbidden, NotFound, UnknownList
 from sm_newsletter.models import Campaign
@@ -62,7 +63,7 @@ async def require_campaign(
         raise NotFound()
     stmt = (
         select(Campaign)
-        .where(Campaign.id == campaign_id, Campaign.tenant_id == tenant_id)
+        .where(col(Campaign.id) == campaign_id, col(Campaign.tenant_id) == tenant_id)
         .execution_options(populate_existing=True)
     )
     campaign = (await session.execute(stmt)).scalars().first()

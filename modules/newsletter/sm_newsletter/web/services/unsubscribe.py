@@ -45,9 +45,10 @@ __all__ = ["unsubscribe_by_token"]
 
 logger = logging.getLogger(__name__)
 
-_SEND = Send.__table__  # ty: ignore[unresolved-attribute]
-_CAMPAIGN = Campaign.__table__  # ty: ignore[unresolved-attribute]
-_ATTEMPT = SendAttempt.__table__  # ty: ignore[unresolved-attribute]
+# SQLModel types a table class without `__table__`, which SQLAlchemy sets on it.
+_SEND = Send.__table__  # ty: ignore[unresolved-attribute]  # pyright: ignore[reportAttributeAccessIssue]
+_CAMPAIGN = Campaign.__table__  # ty: ignore[unresolved-attribute]  # pyright: ignore[reportAttributeAccessIssue]
+_ATTEMPT = SendAttempt.__table__  # ty: ignore[unresolved-attribute]  # pyright: ignore[reportAttributeAccessIssue]
 
 
 async def unsubscribe_by_token(

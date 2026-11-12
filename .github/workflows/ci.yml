@@ -75,6 +75,15 @@ jobs:
       - name: Ruff check
         run: uv run --no-sync ruff check .
 
+      # Pyright resolves imports, so it needs the workspace installed. The
+      # basedpyright wheel bundles Node (nodejs-wheel), so no setup-node step.
+      # What it checks is [tool.pyright] include in pyproject.toml (#338).
+      - name: Install workspace packages
+        run: uv sync --locked --all-packages --all-extras --no-extra anonymize
+
+      - name: Pyright (basic)
+        run: uv run --no-sync basedpyright
+
   # 3.12 is the `requires-python` floor; 3.14 is the interpreter the demo
   # image runs (#359). UV_PYTHON makes every uv command below, the ones
   # scripts/pytest_modules.sh runs included, use the leg's interpreter instead

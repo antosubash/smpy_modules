@@ -29,6 +29,7 @@ from typing import Any
 
 from simple_module_db import finalize_session
 from sqlalchemy import select, update
+from sqlmodel import col
 
 from sm_images.core import billing
 from sm_images.core.billing import ops as billing_ops
@@ -81,12 +82,12 @@ async def _fix_old(factory: Any, mine: Any, old: str, subject: str) -> None:
         got = await db.execute(
             update(BillingOp)
             .where(
-                BillingOp.id == mine.op_id,
-                BillingOp.claim_token == mine.token,
-                BillingOp.done_at.is_(None),
+                col(BillingOp.id) == mine.op_id,
+                col(BillingOp.claim_token) == mine.token,
+                col(BillingOp.done_at).is_(None),
             )
             .values(old_hold_id=old, subject=subject)
-            .returning(BillingOp.id)
+            .returning(col(BillingOp.id))
             .execution_options(synchronize_session=False)
         )
         if got.first() is None:
@@ -103,8 +104,8 @@ async def _names(
     async with factory() as db:
         row = (
             await db.execute(
-                select(Image.storage_hold_id, Image.storage_subject)
-                .where(Image.id == image_id, Image.tenant_id == tenant)
+                select(col(Image.storage_hold_id), col(Image.storage_subject))
+                .where(col(Image.id) == image_id, col(Image.tenant_id) == tenant)
                 .execution_options(include_deleted=True)
             )
         ).first()
@@ -120,9 +121,11 @@ async def lock(db: Any, tenant: str, image_id: uuid.UUID) -> Any:
     return (
         await db.execute(
             update(Image)
-            .where(Image.id == image_id, Image.tenant_id == tenant)
-            .values(updated_at=Image.updated_at)
-            .returning(Image.storage_hold_id, Image.storage_bytes, Image.storage_subject)
+            .where(col(Image.id) == image_id, col(Image.tenant_id) == tenant)
+            .values(updated_at=col(Image.updated_at))
+            .returning(
+                col(Image.storage_hold_id), col(Image.storage_bytes), col(Image.storage_subject)
+            )
             .execution_options(include_deleted=True, synchronize_session=False)
         )
     ).first()
@@ -157,7 +160,7 @@ async def _install(
         elif row[0] == old:
             await db.execute(
                 update(Image)
-                .where(Image.id == op.image_id, Image.tenant_id == tenant)
+                .where(col(Image.id) == op.image_id, col(Image.tenant_id) == tenant)
                 .values(storage_hold_id=hold.id, storage_subject=subject)
                 .execution_options(include_deleted=True, synchronize_session=False)
             )

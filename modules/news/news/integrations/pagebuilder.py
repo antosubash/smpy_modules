@@ -37,7 +37,7 @@ from functools import cache
 from typing import Any
 from urllib.parse import quote
 
-from simple_module_core.permissions import grants
+from simple_module_core.permissions import grants  # pyright: ignore[reportPrivateImportUsage]
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.core.constants import (

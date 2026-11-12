@@ -8,7 +8,7 @@ carry what the first paint needs.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
-from simple_module_core.permissions import grants
+from simple_module_core.permissions import grants  # pyright: ignore[reportPrivateImportUsage]
 from simple_module_db import get_db
 from simple_module_hosting.inertia_deps import InertiaDep
 from simple_module_hosting.permissions import RequiresPermission, ensure_resolved_permissions

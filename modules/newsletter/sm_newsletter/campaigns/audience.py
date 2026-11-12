@@ -16,6 +16,7 @@ from typing import Literal
 from sm_records.contracts.newsletter import SubscriberFilterError, can_read_list
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from sm_newsletter.campaigns.access import MAX_ID, Roles
 from sm_newsletter.core.constants import TAGS_FIELD
@@ -88,8 +89,8 @@ async def _segment_filters(
     roles: Roles,
     lock: bool,
 ) -> list[str]:
-    stmt = select(Segment.list_type_key, Segment.filters).where(
-        Segment.id == segment_id, Segment.tenant_id == tenant_id
+    stmt = select(col(Segment.list_type_key), col(Segment.filters)).where(
+        col(Segment.id) == segment_id, col(Segment.tenant_id) == tenant_id
     )
     if lock:
         stmt = stmt.with_for_update()

@@ -12,11 +12,12 @@ No revision row is written per restored article, mirroring pagebuilder: the
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from pagebuilder.contracts.bundle import RestoreContext, SectionApplied
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from news.content import redirects
 from news.integrations.bundle import taxonomy
@@ -64,13 +65,11 @@ async def _links(
 ) -> None:
     """Replace the tag links of every bundled article that carries ``tags``."""
     carried = {key: doc["tags"] for key, doc in prep.articles.items() if "tags" in doc}
-    ids = [by_key[key].id for key in carried]
+    ids = [cast(int, by_key[key].id) for key in carried]  # stored rows: ids are set
     if not ids:
         return
     for chunk in batches(ids):
-        await db.execute(
-            delete(NewsArticleTag).where(NewsArticleTag.article_id.in_(chunk))  # ty: ignore[unresolved-attribute]
-        )
+        await db.execute(delete(NewsArticleTag).where(col(NewsArticleTag.article_id).in_(chunk)))
     for key, names in carried.items():
         for name in sorted(set(names)):
             db.add(NewsArticleTag(article_id=by_key[key].id or 0, tag_id=tags[name].id or 0))

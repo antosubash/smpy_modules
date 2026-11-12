@@ -102,6 +102,8 @@ def user_subject(owner_id: str | None) -> str | None:
     (missing, or not a UUID). Pure: no lookup, no log."""
     from sm_billing.contracts import subject_for_user
 
+    if owner_id is None:
+        return None
     try:
         return subject_for_user(owner_id)
     except ValueError:

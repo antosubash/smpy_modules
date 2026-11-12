@@ -23,7 +23,7 @@ from typing import Any
 
 from pagebuilder.contracts.bundle import IdentityMatch, RestoreContext, match_by_identity
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
+from sqlmodel import col, select
 
 from news.integrations.bundle import taxonomy
 from news.integrations.bundle.documents import (
@@ -151,8 +151,8 @@ async def _links(db: AsyncSession, ids: list[int]) -> dict[int, list[str]]:
     for chunk in batches(ids):
         result = await db.execute(
             select(NewsArticleTag.article_id, NewsTag.name)
-            .join(NewsTag, NewsTag.id == NewsArticleTag.tag_id)
-            .where(NewsArticleTag.article_id.in_(chunk))  # ty: ignore[unresolved-attribute]
+            .join(NewsTag, col(NewsTag.id) == col(NewsArticleTag.tag_id))
+            .where(col(NewsArticleTag.article_id).in_(chunk))
         )
         for article_id, name in result.all():
             links[article_id].append(name)

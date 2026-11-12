@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from simple_module_db import is_valid_tenant_id
 from sqlmodel import SQLModel
@@ -53,10 +53,10 @@ def _checked_after(after: object) -> int:
     return after
 
 
-def _checked_status(status: object) -> str:
+def _checked_status(status: object) -> Status:
     if status not in campaign_reads.WALKABLE:
         raise ValueError(f"status must be one of {campaign_reads.WALKABLE}, got {status!r}")
-    return str(status)
+    return cast(Status, str(status))
 
 
 def _checked_trash(include_trashed: object, status: str) -> bool:
@@ -77,7 +77,8 @@ def _checked_tags(tags: Sequence[str], name: str) -> list[str]:
 
 
 def _checked_tenant(tenant_id: object) -> str:
-    if not is_valid_tenant_id(tenant_id):
+    # is_valid_tenant_id refuses every non-str; isinstance tells the checker.
+    if not isinstance(tenant_id, str) or not is_valid_tenant_id(tenant_id):
         raise ValueError(f"not a valid tenant id: {tenant_id!r}")
     return tenant_id
 

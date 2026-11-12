@@ -13,6 +13,8 @@ that declares no collection has no other set. Code that *does* have a type asks
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any, TypeAlias
+
 from sm_records.models._base import Base
 from sm_records.models._delivery import SubmissionDelivery
 from sm_records.models._record import (
@@ -33,8 +35,15 @@ from sm_records.models._tables import (
 from sm_records.models._type import RecordType, RecordTypeRevision
 from sm_records.schema.types import IndexKind
 
-Record = GLOBAL.record
-RecordRevision = GLOBAL.revision
+if TYPE_CHECKING:
+    # Built at import time (``_tables._build``), so a type checker cannot see
+    # their columns; as ``Any`` aliases they work in annotations and as values
+    # (`select(Record)`), which a `type` statement's TypeAliasType would not (#338).
+    Record: TypeAlias = Any  # noqa: UP040
+    RecordRevision: TypeAlias = Any  # noqa: UP040
+else:
+    Record = GLOBAL.record
+    RecordRevision = GLOBAL.revision
 IndexText = GLOBAL.index[IndexKind.TEXT]
 IndexNumber = GLOBAL.index[IndexKind.NUMBER]
 IndexBool = GLOBAL.index[IndexKind.BOOL]

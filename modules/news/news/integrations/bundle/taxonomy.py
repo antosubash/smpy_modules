@@ -22,7 +22,7 @@ from typing import Any
 from pagebuilder.contracts.bundle import RestoreContext
 from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
+from sqlmodel import col, select
 
 from news.content.taxonomy import tag_redirects
 from news.integrations.bundle.documents import name_key
@@ -89,7 +89,7 @@ async def upsert[Row: (NewsCategory, NewsTag)](
             if isinstance(row, NewsCategory):
                 await db.execute(
                     update(NewsArticle)
-                    .where(NewsArticle.category == row.name)  # ty: ignore[invalid-argument-type]
+                    .where(col(NewsArticle.category) == row.name)
                     .values(category=entry["name"])
                 )
             row.name = entry["name"]

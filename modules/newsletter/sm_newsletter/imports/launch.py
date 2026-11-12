@@ -26,7 +26,8 @@ def celery_eager() -> bool:
         from celery import current_app
     except ImportError:  # pragma: no cover - background_tasks always brings celery
         return True
-    return bool(current_app.conf.task_always_eager)
+    # Celery ships no type information; its proxies infer as nonsense.
+    return bool(current_app.conf.task_always_eager)  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def records_worker_settings() -> Any:
@@ -41,7 +42,8 @@ def enqueue(tenant_id: str, import_id: int) -> None:
     """Send one slice to the ``newsletter`` queue."""
     from sm_newsletter.tasks import run_import
 
-    run_import.s(tenant_id, import_id).apply_async(queue=QUEUE_DEFAULT)
+    # `shared_task` is untyped, so the task object infers as its decorator's junk.
+    run_import.s(tenant_id, import_id).apply_async(queue=QUEUE_DEFAULT)  # pyright: ignore[reportCallIssue]
 
 
 async def launch(app: Any, *, tenant_id: str, import_id: int) -> None:

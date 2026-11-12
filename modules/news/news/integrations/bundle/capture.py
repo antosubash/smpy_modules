@@ -14,7 +14,7 @@ from collections import defaultdict
 from typing import Any
 
 from pagebuilder.contracts.bundle import CaptureContext, SectionCapture
-from sqlmodel import select
+from sqlmodel import col, select
 
 from news.integrations.bundle.documents import (
     CATEGORIES_NAME,
@@ -41,8 +41,8 @@ BATCH = 200
 async def _tag_names(ctx: CaptureContext, ids: list[int]) -> dict[int, list[str]]:
     result = await ctx.db.execute(
         select(NewsArticleTag.article_id, NewsTag.name)
-        .join(NewsTag, NewsTag.id == NewsArticleTag.tag_id)
-        .where(NewsArticleTag.article_id.in_(ids))  # ty: ignore[unresolved-attribute]
+        .join(NewsTag, col(NewsTag.id) == col(NewsArticleTag.tag_id))
+        .where(col(NewsArticleTag.article_id).in_(ids))
     )
     names: dict[int, list[str]] = defaultdict(list)
     for article_id, name in result.all():
@@ -61,8 +61,8 @@ async def _articles(ctx: CaptureContext) -> int:
     while True:
         result = await ctx.db.execute(
             select(NewsArticle)
-            .where(NOT_TRASHED, NewsArticle.id > after)  # ty: ignore[unsupported-operator]
-            .order_by(NewsArticle.id)  # ty: ignore[invalid-argument-type]
+            .where(NOT_TRASHED, col(NewsArticle.id) > after)
+            .order_by(col(NewsArticle.id))
             .limit(BATCH)
         )
         batch = list(result.scalars())
@@ -86,7 +86,7 @@ async def _articles(ctx: CaptureContext) -> int:
 async def _taxonomy(ctx: CaptureContext) -> tuple[int, int]:
     categories = (
         await ctx.db.execute(
-            select(NewsCategory).order_by(NewsCategory.position, NewsCategory.name)
+            select(NewsCategory).order_by(col(NewsCategory.position), col(NewsCategory.name))
         )
     ).scalars()
     cats = [{"name": c.name, "slug": c.slug, "position": c.position} for c in categories]
@@ -101,7 +101,7 @@ async def _redirects(ctx: CaptureContext) -> int:
     """Article redirects to live articles, and every tag redirect."""
     result = await ctx.db.execute(
         select(NewsArticleRedirect.from_slug, NewsArticleRedirect.locale, NewsArticle.slug)
-        .join(NewsArticle, NewsArticle.id == NewsArticleRedirect.article_id)
+        .join(NewsArticle, col(NewsArticle.id) == col(NewsArticleRedirect.article_id))
         .where(NOT_TRASHED)
     )
     articles = sorted(
@@ -110,7 +110,7 @@ async def _redirects(ctx: CaptureContext) -> int:
     )
     result = await ctx.db.execute(
         select(NewsTagRedirect.from_slug, NewsTag.slug).join(
-            NewsTag, NewsTag.id == NewsTagRedirect.tag_id
+            NewsTag, col(NewsTag.id) == col(NewsTagRedirect.tag_id)
         )
     )
     tags = sorted(
