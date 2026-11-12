@@ -89,7 +89,8 @@ class PagebuilderSettings(MediaSettings):
     public_base_url: str | None = None
     """Absolute base URL of the public site (e.g. ``https://example.com``).
 
-    Used to build canonical / ``og:url`` values. When unset, the public
+    Used to build canonical / ``og:url`` values. When unset, a single-tenant
+    host uses the host's own ``public_base_url``; with both blank the public
     page falls back to ``Request.url`` — fine for local dev but unreliable
     behind a reverse proxy that strips ``Host`` / ``X-Forwarded-*``
     headers. No trailing slash; the public route prefix is appended.

@@ -8,6 +8,7 @@ its answer, so the local row always mirrors what Stripe actually did.
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from sm_billing.contracts.provider import ProviderError
@@ -124,7 +125,12 @@ class BillingService:
 
     # ── writes ──────────────────────────────────────────────────
 
-    async def checkout(self, plan_id: int, interval: str, *, email: str | None, base: str) -> str:
+    async def checkout(
+        self, plan_id: int, interval: str, *, email: str | None, base: Callable[[], str]
+    ) -> str:
+        """``base`` resolves the return origin; it is called after the guards and
+        before anything is created at the provider, so its refusal
+        (``return_base_url_missing``) never pre-empts theirs."""
         self._require_checkout()
         plan = await self._target(plan_id)
         if plan.pricing_model == c.PricingModel.FREE:
@@ -133,6 +139,7 @@ class BillingService:
         if await self._live_subscription() is not None:
             raise BillingError("already_subscribed", 409)
         await self._seat_guard(plan)
+        origin = base()
         customer = await self._customer(email)
         # The local row only changes when a webhook lands, so ask Stripe too:
         # a subscription paid in another tab must not be joined by a second.
@@ -148,8 +155,8 @@ class BillingService:
             quantity=await self._quantity(plan),
             trial_days=0 if await self._trial_used() else plan.trial_days,
             tenant_id=self.tenant_id,
-            success_url=f"{base}{c.VIEW_PREFIX}/?checkout=success",
-            cancel_url=f"{base}{c.VIEW_PREFIX}/?checkout=cancel",
+            success_url=f"{origin}{c.VIEW_PREFIX}/?checkout=success",
+            cancel_url=f"{origin}{c.VIEW_PREFIX}/?checkout=cancel",
         )
         customer.checkout_session_id = session.id
         await self.db.flush()
@@ -177,13 +184,14 @@ class BillingService:
             sub.provider_subscription_id is not None or sub.trial_end is not None
         )
 
-    async def portal(self, *, base: str) -> str:
+    async def portal(self, *, base: Callable[[], str]) -> str:
+        """``base`` as for :meth:`checkout`: resolved after the guards."""
         self._require_checkout()
         customer = await self.db.get(Customer, self.tenant_id)
         if customer is None or customer.provider_customer_id is None:
             raise BillingError("no_customer", 409)
         return await self.provider.portal_url(
-            customer.provider_customer_id, f"{base}{c.VIEW_PREFIX}/"
+            customer.provider_customer_id, f"{base()}{c.VIEW_PREFIX}/"
         )
 
     async def change_plan(self, plan_id: int, interval: str) -> StatusOut:

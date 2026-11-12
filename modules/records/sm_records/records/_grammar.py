@@ -20,6 +20,7 @@ from sm_records.core._text import has_nul
 from sm_records.core.settings import RecordsSettings
 from sm_records.records._expand_grammar import _settings, parse_expand
 from sm_records.records.index.query import Filter, FilterOp, Sort
+from sm_records.records.services.public_bounds import PUBLIC_MAX_FILTER_TERMS, too_many_filters
 
 __all__ = [
     "MALFORMED_FILTER",
@@ -28,6 +29,7 @@ __all__ = [
     "parse_cursor",
     "parse_expand",
     "parse_filters",
+    "parse_public_filters",
     "parse_sorts",
     "parse_view_filters",
 ]
@@ -150,6 +152,19 @@ def parse_filters(
     if len(raw_filters) > settings.max_filter_terms:
         raise _too_many("filter", len(raw_filters), settings.max_filter_terms)
     return [_parse_filter(item, settings) for item in raw_filters]
+
+
+def parse_public_filters(
+    raw_filters: list[str] = Query(default=[], alias="filter"),
+    settings: RecordsSettings = Depends(_settings),
+) -> list[Filter]:
+    """:func:`parse_filters` for the anonymous listing and stats (#349).
+
+    The public cap is counted first, on the raw terms, so 25 of them are the
+    same ``too_many_filters`` as 4 rather than the admin cap's bare 400."""
+    if len(raw_filters) > PUBLIC_MAX_FILTER_TERMS:
+        raise too_many_filters(len(raw_filters))
+    return parse_filters(raw_filters, settings)
 
 
 MALFORMED_FILTER: Final = "malformed"

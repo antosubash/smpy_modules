@@ -49,7 +49,10 @@ class BillingSettings(DbBackedSettings):
         default="",
         description=(
             "Origin Stripe returns visitors to after Checkout and the portal, e.g. "
-            "https://app.example.com. Empty: the request's own origin."
+            "https://app.example.com. Empty: the host's public_base_url on a "
+            "single-tenant host; with neither, production refuses Checkout and the "
+            "portal, and only development, testing or a multi-tenant host use the "
+            "request's own origin."
         ),
     )
     reconcile_interval_minutes: int = Field(

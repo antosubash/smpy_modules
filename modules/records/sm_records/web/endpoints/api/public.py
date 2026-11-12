@@ -62,7 +62,7 @@ from sm_records.web.deps import (
     PageCursor,
     get_settings,
     parse_cursor,
-    parse_filters,
+    parse_public_filters,
     parse_sorts,
     request_db,
 )
@@ -153,7 +153,7 @@ async def list_public_records(
     page: int = Query(default=1, ge=1, le=MAX_PAGE),
     page_size: int | None = Query(default=None, ge=1),
     cursor: PageCursor = Depends(parse_cursor),
-    filters: list[Filter] = Depends(parse_filters),
+    filters: list[Filter] = Depends(parse_public_filters),
     sorts: list[Sort] = Depends(parse_sorts),
     locale: str | None = Query(default=None, alias=constants.LOCALE_PARAM),
 ) -> Any:
@@ -221,7 +221,7 @@ async def public_record_stats(
     db: AsyncSession = Depends(request_db),
     settings: RecordsSettings = Depends(get_settings),
     metric: str | None = Query(default=None),
-    filters: list[Filter] = Depends(parse_filters),
+    filters: list[Filter] = Depends(parse_public_filters),
     locale: str | None = Query(default=None, alias=constants.LOCALE_PARAM),
 ) -> Any:
     """``count`` (the default) or ``sum:<field>`` over what the listing shows.

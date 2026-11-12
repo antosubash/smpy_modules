@@ -137,6 +137,7 @@
     "search_label": "Person suchen",
     "search_placeholder": "Name oder E-Mail",
     "no_candidates": "Niemand gefunden.",
+    "search_min": "Geben Sie mindestens {min} Zeichen ein, um zu suchen.",
     "grant": "Teilen",
     "revoke": "Zugriff entziehen",
     "revoke_for": "Zugriff für {name} entziehen",

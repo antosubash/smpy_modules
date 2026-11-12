@@ -9,12 +9,17 @@ same afternoon.
 from __future__ import annotations
 
 import hashlib
+import logging
 from datetime import datetime
+from typing import Any
 
 from fastapi import Request, Response
+from simple_module_core.environments import NON_PROD_ENVIRONMENTS
 
 from news.core import tenancy
 from news.core.settings import NewsSettings, public_article_path
+
+_log = logging.getLogger("simple_module.news")
 
 #: What a rendered page varies on besides the URL: the representation, and the
 #: viewer — the ``locale`` cookie or ``Accept-Language`` picks the chrome's
@@ -80,17 +85,58 @@ def viewer_key(request: Request) -> str:
     return f"{ui_locale}:{who}"
 
 
+def _host(app: Any) -> Any:
+    return getattr(getattr(app.state, "sm", None), "settings", None)
+
+
+def configured_origin(app: Any, settings: NewsSettings) -> str:
+    """The configured origin, or ``""``: this module's ``public_base_url``, else
+    on a single-tenant host the host's own ``public_base_url``. Not the host's on
+    a multi-tenant host, where each organisation's site is its own host."""
+    own = (settings.public_base_url or "").strip()
+    if own or tenancy.mode_of(app) is not tenancy.TenancyMode.SINGLE:
+        return own.rstrip("/")
+    return str(getattr(_host(app), "public_base_url", "") or "").strip().rstrip("/")
+
+
+def guessed(app: Any, settings: NewsSettings) -> bool:
+    """True while absolute URLs come from the request's ``Host`` header (#355)."""
+    return not configured_origin(app, settings)
+
+
 def public_base_url(request: Request, settings: NewsSettings) -> str:
     """Resolve the public origin used to build absolute URLs.
 
-    Prefer the explicit setting — the deployment knows its public host — and
-    only fall back to the inbound request for local development and scenarios
-    where the Host header is trustworthy. Always returned without a trailing
-    slash so callers can concatenate path segments directly.
+    Prefer the configured origin (:func:`configured_origin`) — the deployment
+    knows its public host — and only fall back to the inbound request for local
+    development, a multi-tenant host (each organisation's site is its own host)
+    and scenarios where the Host header is trustworthy. The client chooses that
+    header, so while it is used :func:`apply_cache` adds ``Host`` to ``Vary``
+    and :func:`warn_if_unset` says so at startup (#355). Always returned without
+    a trailing slash so callers can concatenate path segments directly.
     """
-    if settings.public_base_url:
-        return settings.public_base_url.rstrip("/")
-    return f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
+    return configured_origin(request.app, settings) or (
+        f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
+    )
+
+
+def warn_if_unset(app: Any, settings: NewsSettings, mode: tenancy.TenancyMode) -> bool:
+    """Log once at startup when a production single-tenant host has no
+    ``public_base_url`` (its own or the host's); returns whether it warned.
+    Not on a multi-tenant host, where blank is right, nor in development or
+    testing."""
+    environment = getattr(_host(app), "environment", None)
+    if not guessed(app, settings) or environment in NON_PROD_ENVIRONMENTS:
+        return False
+    if mode is not tenancy.TenancyMode.SINGLE:
+        return False
+    _log.warning(
+        "news: neither news' public_base_url nor the host's public_base_url is set, so "
+        "canonical, og:url, feed and sitemap links are built from each request's Host "
+        "header, which the client chooses. Set either one on the Settings screen (e.g. "
+        "https://example.com); until then public responses vary on Host"
+    )
+    return True
 
 
 def absolute(request: Request, settings: NewsSettings, path: str) -> str:
@@ -142,8 +188,8 @@ def apply_cache(
     On a multi-tenant host the tenant can come from the reader's session rather
     than the Host, so ``public`` alone would let a shared cache hand one
     tenant's page to another's reader; :func:`news.core.tenancy.vary_on_tenant` adds
-    the fields that tell them apart. A single-tenant host gets no ``Vary``
-    from here.
+    the fields that tell them apart. A single-tenant host gets no tenant
+    ``Vary`` from here, and ``Host`` only while ``public_base_url`` is blank.
 
     ``per_viewer`` is for a rendered page (article, archive) rather than a feed
     or sitemap: it differs by visitor, so a signed-in reader's copy is
@@ -155,10 +201,12 @@ def apply_cache(
         response.headers["Cache-Control"] = (
             listing_cache_control(settings) if listing else cache_control(settings)
         )
-    if per_viewer:
+    # Every response here names the origin (canonical, og, feed, sitemap); a
+    # guessed one is the client's Host, so a cache must key on it (#355).
+    host = ("Host",) if guessed(request.app, settings) else ()
+    extra = (PER_VIEWER_VARY if per_viewer else ()) + host
+    if extra:
         listed = [f.strip() for f in response.headers.get("vary", "").split(",") if f.strip()]
         seen = {f.lower() for f in listed}
-        response.headers["Vary"] = ", ".join(
-            listed + [f for f in PER_VIEWER_VARY if f.lower() not in seen]
-        )
+        response.headers["Vary"] = ", ".join(listed + [f for f in extra if f.lower() not in seen])
     return tenancy.vary_on_tenant(response, request)

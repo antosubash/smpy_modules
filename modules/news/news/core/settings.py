@@ -69,7 +69,8 @@ class NewsSettings(BaseSettings):
     """Origin used to build absolute URLs — the canonical tag, ``og:url`` and
     the sitemap.
 
-    Empty means "derive it from the inbound request", which is right for local
+    Empty means "use the host's own ``public_base_url`` on a single-tenant host,
+    else derive it from the inbound request", which is right for local
     development and wrong behind a proxy that rewrites the Host header. A
     deployment knows its own public name; this is where it says so.
 

@@ -17,6 +17,7 @@ export class ApiError extends Error {
 
 const MESSAGES: Record<string, string> = {
   checkout_unavailable: keys.billing.errors.checkout_unavailable,
+  return_base_url_missing: keys.billing.errors.return_base_url_missing,
   plan_not_found: keys.billing.errors.plan_not_found,
   plan_is_free: keys.billing.errors.plan_is_free,
   interval_unavailable: keys.billing.errors.interval_unavailable,

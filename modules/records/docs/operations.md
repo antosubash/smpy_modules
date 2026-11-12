@@ -443,7 +443,7 @@ python scripts/set_setting.py sm_records content_locales '["en","de"]'
 | `default_page_size` | `25` | no | `page_size` when the caller sends none |
 | `max_page_size` | `200` | no | Largest `page_size` — clamped, not refused. At least `default_page_size` |
 | `revision_limit` | `50` | no | Record revisions kept, per record. At least 1 |
-| `max_filter_terms` | `20` | no | `?filter=` terms per request; each is another `EXISTS` |
+| `max_filter_terms` | `20` | no | `?filter=` terms per request; each is another `EXISTS`. The anonymous API has its own fixed cap of 3 (one `contains`), not this setting (#349) |
 | `max_sort_terms` | `5` | no | Distinct `?sort=` fields; each is another `LEFT JOIN` |
 | `max_in_values` | `200` | no | Values in one `in:` list |
 | `max_expand_depth` | `3` | no | Levels one `?expand=` path reaches; at most 5 |

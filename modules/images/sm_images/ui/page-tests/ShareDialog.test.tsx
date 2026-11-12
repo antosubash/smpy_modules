@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { flush, stubFetch } from './support';
-import { click, mount } from './test-dom';
+import { click, mount, setValue } from './test-dom';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
 vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
@@ -24,11 +24,18 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-async function open(routes: Record<string, unknown>) {
+async function search(q: string) {
+  const input = document.querySelector<HTMLInputElement>('#images-share-search');
+  if (input) await setValue(input, q);
+  await flush(300);
+}
+
+async function open(routes: Record<string, unknown>, q = 'sam') {
   const calls = stubFetch(routes);
   const view = await mount(<ShareDialog collectionId="c1" />);
   await click(view.find('[data-testid="images-share"]'));
   await flush(300);
+  if (q) await search(q);
   return { calls, view };
 }
 
@@ -91,6 +98,36 @@ describe('ShareDialog', () => {
       role: 'edit',
     });
     expect(dialog()?.textContent).toContain('Sam Smith · Can edit');
+    await view.unmount();
+  });
+
+  it('does not search below three characters, and says so', async () => {
+    const { calls, view } = await open({ [`GET ${SHARES}`]: [], [`GET ${CANDIDATES}`]: [sam] }, '');
+    const hint = () => document.querySelector('[data-testid="images-share-hint"]');
+    expect(hint()?.textContent).toBe('Type at least 3 characters to search.');
+    await search('sa');
+    expect(hint()).not.toBeNull();
+    expect(calls.some((c) => c.url.startsWith(CANDIDATES))).toBe(false);
+    await search('sam');
+    expect(hint()).toBeNull();
+    const asked = calls.filter((c) => c.url.startsWith(CANDIDATES));
+    expect(asked.map((c) => c.url)).toEqual([`${CANDIDATES}?q=sam`]);
+    expect(document.querySelectorAll('[data-testid="images-share-candidate"]')).toHaveLength(1);
+    await view.unmount();
+  });
+
+  it('clears a failed search once the query is too short to search', async () => {
+    const { view } = await open({
+      [`GET ${SHARES}`]: [],
+      [`GET ${CANDIDATES}`]: () => {
+        throw new Error('offline');
+      },
+    });
+    const alert = () =>
+      document.querySelector('[data-testid="images-share-dialog"] [role="alert"]');
+    expect(alert()).not.toBeNull();
+    await search('sa');
+    expect(alert()).toBeNull();
     await view.unmount();
   });
 

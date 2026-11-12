@@ -30,6 +30,7 @@ from sm_records.records._grammar import (
     parse_cursor,
     parse_expand,
     parse_filters,
+    parse_public_filters,
     parse_sorts,
     parse_view_filters,
 )
@@ -252,6 +253,7 @@ __all__ = [
     "parse_cursor",
     "parse_expand",
     "parse_filters",
+    "parse_public_filters",
     "parse_sorts",
     "parse_trashed",
     "parse_view_filters",

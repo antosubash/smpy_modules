@@ -20,15 +20,9 @@ from pagebuilder.core import locales
 from pagebuilder.core.settings import PagebuilderSettings
 from pagebuilder.core.tenancy import bind_public, vary_on_tenant
 from pagebuilder.web.deps import get_settings
+from pagebuilder.web.public_origin import public_origin, vary_on_host
 
 seo_router = APIRouter()
-
-
-def _public_origin(request: Request, settings: PagebuilderSettings) -> str:
-    """Same fallback as the public viewer: explicit setting wins, else inferred."""
-    if settings.public_base_url:
-        return settings.public_base_url.rstrip("/")
-    return f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
 
 
 def _sitemap_url_for(origin: str, prefix: str, slug: str, locale: str) -> str:
@@ -92,7 +86,7 @@ async def sitemap(
     # (with both block-JSON columns) made every crawl a multi-second,
     # tens-of-MB request (issue #11).
     pages = await PagesService(db).list_sitemap_entries()
-    origin = _public_origin(request, settings)
+    origin = public_origin(request, settings)
     prefix = settings.public_route_prefix
 
     def absolute(page) -> str:
@@ -130,7 +124,8 @@ async def sitemap(
         headers={"Cache-Control": f"public, max-age={settings.seo_cache_max_age}"},
     )
     # Tenant-bound: on a multi-tenant host the session can pick the tenant.
-    return vary_on_tenant(response, request)
+    # Every <loc> names the origin; a guessed one is the Host (#355).
+    return vary_on_host(vary_on_tenant(response, request), request, settings)
 
 
 @seo_router.api_route("/robots.txt", methods=["GET", "HEAD"], response_class=Response)
@@ -146,12 +141,15 @@ async def robots(
     else:
         lines = ["User-agent: *", "Allow: /"]
         if settings.sitemap_enabled:
-            origin = _public_origin(request, settings)
+            origin = public_origin(request, settings)
             lines.append(f"Sitemap: {origin}/sitemap.xml")
         body = "\n".join(lines) + "\n"
 
-    return Response(
+    response = Response(
         content=body,
         media_type="text/plain",
         headers={"Cache-Control": f"public, max-age={settings.seo_cache_max_age}"},
     )
+    # Only the generated body names the origin (its ``Sitemap:`` line).
+    derived = settings.robots_body is None and settings.sitemap_enabled
+    return vary_on_host(response, request, settings) if derived else response

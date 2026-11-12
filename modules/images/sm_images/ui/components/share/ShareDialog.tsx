@@ -13,7 +13,7 @@ import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { useShares } from '../../hooks/useShares';
+import { MIN_QUERY, useShares } from '../../hooks/useShares';
 import { errorText } from '../../utils/api-net';
 import { keys, useT } from '../../utils/i18n';
 import type { Share, ShareCandidate, ShareRole } from '../../utils/types';
@@ -122,7 +122,11 @@ export function ShareDialog({ collectionId }: { collectionId: string }) {
               <option value="edit">{t(keys.images.share.role_edit)}</option>
             </NativeSelect>
           </div>
-          {state.candidates.length === 0 ? (
+          {state.tooShort ? (
+            <p className="text-sm text-muted-foreground" data-testid="images-share-hint">
+              {t(keys.images.share.search_min, { min: MIN_QUERY })}
+            </p>
+          ) : state.candidates.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t(keys.images.share.no_candidates)}</p>
           ) : (
             <ul className="max-h-48 divide-y overflow-auto rounded-md border">

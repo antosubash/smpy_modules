@@ -5,11 +5,22 @@ import type { Share, ShareCandidate, ShareRole } from '../utils/types';
 
 const SEARCH_DELAY_MS = 250;
 
+/** The server answers nobody below this many characters (#357), so the
+ *  picker does not ask; `shares.MIN_QUERY` in the API. */
+export const MIN_QUERY = 3;
+
+/** Code points, as the server counts `len(q.strip())`. */
+function searchable(query: string): boolean {
+  return [...query.trim()].length >= MIN_QUERY;
+}
+
 export type Shares = {
   shares: Share[];
   candidates: ShareCandidate[];
   query: string;
   setQuery: (q: string) => void;
+  /** The query is too short to search; the dialog says how many to type. */
+  tooShort: boolean;
   loading: boolean;
   error: string | null;
   grant: (candidate: ShareCandidate, role: ShareRole) => Promise<void>;
@@ -25,6 +36,7 @@ export function useShares(collectionId: string, open: boolean): Shares {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setShares(await listShares(collectionId));
@@ -41,11 +53,22 @@ export function useShares(collectionId: string, open: boolean): Shares {
 
   useEffect(() => {
     if (!open) return;
+    if (!searchable(query)) {
+      // Nothing is searched, so an earlier search's error no longer applies
+      // (the list's own error is left alone).
+      setFound([]);
+      setSearchError(null);
+      return;
+    }
     let current = true;
     const timer = window.setTimeout(() => {
       shareCandidates(collectionId, query.trim())
-        .then((rows) => current && setFound(rows))
-        .catch((e) => current && setError(errorText(e)));
+        .then((rows) => {
+          if (!current) return;
+          setFound(rows);
+          setSearchError(null);
+        })
+        .catch((e) => current && setSearchError(errorText(e)));
     }, SEARCH_DELAY_MS);
     return () => {
       current = false;
@@ -75,8 +98,9 @@ export function useShares(collectionId: string, open: boolean): Shares {
     candidates: found.filter((c) => !held.has(c.id)),
     query,
     setQuery,
+    tooShort: !searchable(query),
     loading,
-    error,
+    error: searchError ?? error,
     grant,
     revoke,
   };

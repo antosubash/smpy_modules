@@ -167,7 +167,7 @@ The Settings screen says so next to the input.
 | `snapshot_max_extracted_bytes` | `1073741824` | Ceiling on what a bundle may expand to (1 GB) |
 | `public_csp` | see `core/settings.py` | CSP header on public pages |
 | `public_cache_max_age` | `60` | `max-age` on public pages |
-| `public_base_url` | `None` | Absolute base for canonical URLs and the sitemap |
+| `public_base_url` | `None` | Absolute base for canonical URLs and the sitemap; set it in production on a single-tenant host (blank falls back to the host's own `public_base_url` there; with both blank it trusts the client's `Host`, adds `Vary: Host` and warns at startup, #355) |
 | `site_name` | `None` | OpenGraph site name |
 | `sitemap_enabled` ● | `true` | Serve `/sitemap.xml` |
 | `robots_enabled` ● | `true` | Serve `/robots.txt` |

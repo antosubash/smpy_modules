@@ -122,6 +122,44 @@ name the module they affect.
   newsletter is not yet published, so no migration or other upgrade step
   applies. Details:
   `modules/newsletter/docs/sending.md`.
+- **records' anonymous listing has its own, smaller query bounds** (#349). A
+  public listing or stats request takes at most 3 `filter` terms, of which at
+  most one may be `contains` (an unindexed `ILIKE '%term%'` scan), and answers
+  `400` with `code` `too_many_filters` or `too_many_contains` beyond that; one
+  request could ask for twenty substring scans before. On Postgres the query
+  runs under a 5 s `statement_timeout` (`SET LOCAL`), and a cancelled query is
+  a `503` with `code` `query_timeout` instead of a 500. The admin API keeps
+  `max_filter_terms`, and the records list and stats blocks send one term each.
+  Details: "Public read API" in `modules/records/docs/api-reference.md`.
+- **images' share picker no longer lists the user directory** (#357).
+  `GET /api/images/collections/{id}/share-candidates` answers `[]` for a `q`
+  shorter than three characters (an empty one included) without searching, and
+  is rate-limited to 60 requests a minute per user. On a single-tenant host an
+  account that could create a collection could page through every user's name
+  and address with an empty or one-letter query. The share dialog says "Type at
+  least 3 characters to search." until then. Details: "Sharing" in
+  `modules/images/docs/access.md`.
+- **Absolute URLs built from the client's `Host` header are caught** (#355).
+  pagebuilder and news build canonical, `og:url`, `hreflang`, feed and sitemap
+  links from the request when `public_base_url` is blank; billing did the same
+  for Stripe's Checkout and portal return URLs when `return_base_url` was. Now:
+  while `public_base_url` is blank, every such pagebuilder and news response
+  (pages and their 304s, archives, the feed, the sitemaps, the generated
+  `robots.txt`) adds `Host` to `Vary`, so a shared cache cannot hand one host's
+  links to another; and a single-tenant host outside `development`/`testing`
+  logs a startup warning naming the setting. A multi-tenant host, where blank
+  is right, gets the `Vary` and no warning. On a single-tenant host the host's
+  own `public_base_url` now stands in for a blank module setting in all three
+  modules. billing refuses Checkout and the portal with 409
+  `return_base_url_missing` when neither is set on a single-tenant host outside
+  `development`/`testing`; it is checked only once Stripe would need the URLs,
+  so `checkout_unavailable`, `plan_not_found` and `no_customer` still answer
+  first, and a multi-tenant host keeps the request's origin. The billing screens
+  say so; the Connection page says the field is required in production.
+  **Upgrading:** on a single-tenant production host, set the host's
+  `public_base_url` (or each module's own setting). Details:
+  the `public_base_url` / `return_base_url` rows in each module's
+  `docs/operations.md`.
 
 ### Deprecated
 

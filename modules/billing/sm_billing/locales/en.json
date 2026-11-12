@@ -365,6 +365,7 @@
     "remove_stored": "Remove the stored value",
     "return_url": "Return URL origin",
     "return_url_rule": "Return URL must be an http(s) origin such as https://app.example.com — no path, query or fragment, at most 255 characters.",
+    "return_url_hint": "Where Stripe sends customers back after Checkout and the portal. Blank uses the site's public address; in production, with neither set, Checkout and the portal are refused.",
     "save": "Save connection",
     "saved": "Stripe connection saved"
   },
@@ -377,6 +378,7 @@
     "price_mismatch": "Stripe price {price}: {reason}.",
     "provider_error_detail": "{base} {message}",
     "checkout_unavailable": "Online payment is not set up for this site.",
+    "return_base_url_missing": "Online payment is not fully set up: the site administrator has to set the return URL origin first.",
     "plan_not_found": "That plan is no longer available.",
     "plan_is_free": "The free plan needs no checkout.",
     "interval_unavailable": "That plan is not sold for this billing period.",

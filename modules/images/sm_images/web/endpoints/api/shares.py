@@ -6,9 +6,19 @@ The framework has no share UI, so images builds one against
 come from the framework's ``UserDirectory``, and on a multi-tenant host only
 members of the bound tenant are offered - the picker must not reveal accounts
 of other organisations.
+
+**Not a directory listing (#357).** On a single-tenant host there is no
+membership to filter by, and anyone who can create a collection owns one, so an
+empty or one-letter ``q`` used to page through every active account's name and
+address. A query shorter than :data:`MIN_QUERY` characters (after trimming)
+answers ``[]`` without asking the directory, and the route has its own per-user
+rate (:data:`RATE`, registered by ``ImagesModule.register_rate_limits``) so the
+remaining three-letter space cannot be walked quickly either.
 """
 
 from __future__ import annotations
+
+from typing import Final
 
 from fastapi import APIRouter, Depends, Query, Request
 from simple_module_core.tenancy import tenant_member_ids
@@ -33,6 +43,13 @@ def _unscoped_single(request: Request) -> bool:
     return upstream in (None, DEFAULT_TENANT) and bound_tenant() == DEFAULT_TENANT
 
 
+MIN_QUERY: Final = 3
+"""Characters of ``q`` (trimmed) below which the picker answers nobody."""
+RATE: Final = "60/minute"
+"""Per signed-in user, through the framework's rate-limit middleware."""
+PATH_PATTERN: Final = rf"^{constants.ROUTE_PREFIX_API}/collections/[^/]+/share-candidates$"
+"""The route, as the rate-limit rule matches it."""
+
 router = APIRouter(prefix="/collections", tags=["shares"])
 
 
@@ -48,7 +65,10 @@ async def share_candidates(
         raise ServiceUnavailable(
             constants.DIRECTORY_UNAVAILABLE_DETAIL, code=constants.DIRECTORY_UNAVAILABLE_CODE
         )
-    found = await directory.search(db, q.strip() or None, limit=constants.CANDIDATES_SCAN)
+    term = q.strip()
+    if len(term) < MIN_QUERY:
+        return []
+    found = await directory.search(db, term, limit=constants.CANDIDATES_SCAN)
     users = [u for u in found if u.is_active and u.id != collection.owner_id]
     if not _unscoped_single(request):
         # Fail closed: no membership store means nobody can be vouched for.

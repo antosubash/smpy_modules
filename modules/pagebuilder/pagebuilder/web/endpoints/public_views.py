@@ -35,27 +35,15 @@ from pagebuilder.web.deps import get_settings
 from pagebuilder.web.endpoints.public_not_found import render_not_found
 from pagebuilder.web.html_lang import set_html_lang
 from pagebuilder.web.public_copy import public_copy
+from pagebuilder.web.public_origin import public_origin, vary_on_host
 
 _PAGE_PUBLIC = "PageBuilder/PublicPage"
-
-
-def _public_base_url(request: Request, settings: PagebuilderSettings) -> str:
-    """Resolve the public origin used to build absolute URLs.
-
-    Prefer the explicit setting (the deployment knows its public host)
-    and only fall back to the inbound request for local dev / scenarios
-    where the host header is trustworthy. Always returned without a
-    trailing slash so callers can concatenate path segments directly.
-    """
-    if settings.public_base_url:
-        return settings.public_base_url.rstrip("/")
-    return f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
 
 
 def _absolute_page_url(
     request: Request, settings: PagebuilderSettings, slug: str, prefix: str, locale: str
 ) -> str:
-    base = _public_base_url(request, settings)
+    base = public_origin(request, settings)
     return f"{base}{locales.public_path(prefix, slug, locale)}"
 
 
@@ -163,6 +151,8 @@ async def render_public_page(
         # On a multi-tenant host the tenant can come from the session, not the
         # Host. After Cache-Control: it may mark the response private (#192).
         vary_on_tenant(response, request)
+        # Canonical, og and hreflang name the origin; a guessed one is the Host (#355).
+        vary_on_host(response, request, settings)
         # Which language was negotiated, for caches and for anything reading
         # the response without parsing the body.
         response.headers["Content-Language"] = page.locale
@@ -186,7 +176,7 @@ async def render_public_page(
             "data": page.published_data,
             "meta_description": page.meta_description,
             "og_image": og_image(
-                page.og_image, page.published_data, _public_base_url(request, settings)
+                page.og_image, page.published_data, public_origin(request, settings)
             ),
             "canonical_url": canonical,
             "og_url": canonical,

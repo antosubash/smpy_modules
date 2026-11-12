@@ -174,7 +174,7 @@ Billing settings are stored in the database. They are registered with
 | `provider` | `manual` (the default) or `stripe`. Takes effect on save, no restart. |
 | `stripe_secret_key` | `sk_…`. Stored as `enc:v2:<fernet>`, encrypted with the app's `secret_key` (rotatable with `SM_SECRET_KEY_PREVIOUS`). |
 | `stripe_webhook_secret` | `whsec_…`, encrypted the same way. |
-| `return_base_url` | Origin that Stripe returns visitors to. If empty, the request's own origin is used. |
+| `return_base_url` | Origin that Stripe returns visitors to. Blank falls back to the host's `public_base_url` on a single-tenant host; with both blank there, production refuses Checkout and the portal (409 `return_base_url_missing`) and only development and testing use the request's own origin. A multi-tenant host uses the request's origin. |
 | `reconcile_interval_minutes` | `0` (off) or N: re-read every subscription not synced for N minutes, on a loop inside the app. Takes effect on save, no restart. |
 | `usage_hold_ttl_seconds` | `900`: how long a usage hold lasts unless its meter or caller sets a TTL. |
 | `usage_sweep_interval_seconds` | `60`: how often lapsed holds are expired and the ledger purged; `0` turns the sweep off. |

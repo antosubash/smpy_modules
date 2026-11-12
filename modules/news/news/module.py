@@ -184,7 +184,7 @@ class NewsModule(ModuleBase):
         # Single- or multi-tenant, read once off the built middleware stack,
         # before anything below can touch a news table. Also refuses a host
         # pinned to a tenant other than the one the migration backfilled.
-        tenancy.configure(app)
+        mode = tenancy.configure(app)
 
         # Which languages this site publishes in, before anything reads them.
         boot.publish_locales(app)
@@ -201,6 +201,10 @@ class NewsModule(ModuleBase):
 
         # The public viewer and the archive, at the address articles serve on.
         settings = self._live_settings(app)
+        # Absolute URLs from the client's Host header in production (#355).
+        from news.web.endpoints.public._urls import warn_if_unset
+
+        warn_if_unset(app, settings, mode)
         prefix = settings.public_route_prefix
         boot.mount_public_routers(app, prefix)
         self._exempt_public_routes(app, prefix, locales.supported())

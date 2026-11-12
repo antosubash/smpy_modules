@@ -365,6 +365,7 @@
     "remove_stored": "Gespeicherten Wert entfernen",
     "return_url": "Ursprung der Rückkehr-URL",
     "return_url_rule": "Die Rückkehr-URL muss ein http(s)-Ursprung wie https://app.example.com sein – ohne Pfad, Query oder Fragment, höchstens 255 Zeichen.",
+    "return_url_hint": "Wohin Stripe Kundinnen und Kunden nach dem Checkout und dem Portal zurückschickt. Leer gilt die öffentliche Adresse der Website; ist in der Produktion keine von beiden gesetzt, werden Checkout und Portal abgelehnt.",
     "save": "Verbindung speichern",
     "saved": "Stripe-Verbindung gespeichert"
   },
@@ -377,6 +378,7 @@
     "price_mismatch": "Stripe-Preis {price}: {reason}.",
     "provider_error_detail": "{base} {message}",
     "checkout_unavailable": "Für diese Website ist keine Online-Zahlung eingerichtet.",
+    "return_base_url_missing": "Die Online-Zahlung ist nicht vollständig eingerichtet: Die Administration der Website muss zuerst den Ursprung der Rückkehr-URL festlegen.",
     "plan_not_found": "Dieser Tarif ist nicht mehr verfügbar.",
     "plan_is_free": "Der kostenlose Tarif benötigt keinen Bezahlvorgang.",
     "interval_unavailable": "Dieser Tarif wird für diesen Abrechnungszeitraum nicht angeboten.",

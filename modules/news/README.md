@@ -480,7 +480,7 @@ Settings screen says so next to the input.
 | Setting | Default | What it does |
 |---|---|---|
 | `public_route_prefix` ● | `/news` | where articles serve |
-| `public_base_url` | *(derived from the request)* | origin for canonical URLs and the sitemap |
+| `public_base_url` | *(derived from the request)* | origin for canonical URLs and the sitemap; set it in production on a single-tenant host (blank falls back to the host's own `public_base_url` there; with both blank it trusts the client's `Host`, adds `Vary: Host` and warns at startup, #355) |
 | `site_name` | *(unset)* | `og:site_name` |
 | `twitter_handle` | *(unset)* | `twitter:site` |
 | `public_cache_max_age` | `300` | shared-cache lifetime of an article |

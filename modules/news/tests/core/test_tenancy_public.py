@@ -115,7 +115,8 @@ async def test_multi_mode_public_responses_vary_on_cookie(mt: AsyncClient) -> No
         assert response.headers["cache-control"].startswith(policy), path
         assert "Cookie" in _vary(response), (path, response.headers.get("vary"))
     article = await mt.get(f"{NEWS}/hello", headers=A)
-    assert _vary(article) == ["X-Inertia", "Cookie", "Accept-Language"]
+    # ``Host`` too: ``public_base_url`` is blank, as a multi-tenant host keeps it (#355).
+    assert _vary(article) == ["X-Inertia", "Cookie", "Accept-Language", "Host"]
     # Signed in, so there is no tag to revalidate: a stale one gets a full render.
     assert "etag" not in article.headers
     stale = await mt.get(f"{NEWS}/hello", headers={**A, "If-None-Match": 'W/"stale"'})
@@ -126,24 +127,29 @@ async def test_single_mode_vary_adds_no_tenant_field(anon_client: AsyncClient) -
     """A single-tenant host picks no tenant per request: news adds nothing for it.
 
     The rendered pages still vary on the viewer (#94) — on the 200 and the 304
-    alike. The feed and the sitemap are the same for everyone, so they don't."""
+    alike. The feed and the sitemap are the same for everyone, so they don't.
+    Everything varies on ``Host`` while ``public_base_url`` is blank (#355),
+    and nothing does once it is set."""
     with tenant_context("default"):
         async with anon_client.db_state.session_factory() as db:
             await make_article(db, slug="hello", category="Sport")
     per_viewer = ["X-Inertia", "Cookie", "Accept-Language"]
-    article = await anon_client.get(f"{NEWS}/hello")
-    assert _vary(article) == per_viewer
-    revalidate = {"If-None-Match": article.headers["etag"]}
-    cached = await anon_client.get(f"{NEWS}/hello", headers=revalidate)
-    assert cached.status_code == 304
-    assert _vary(cached) == per_viewer
-    archive = await anon_client.get(f"{NEWS}/category/Sport")
-    assert archive.status_code == 200, archive.text
-    assert _vary(archive) == per_viewer
-    for path in (f"{NEWS}/feed.xml", f"{NEWS}/sitemap.xml"):
-        response = await anon_client.get(path)
-        assert response.status_code == 200, (path, response.text)
-        assert response.headers.get("vary") is None, path
+    settings = anon_client.app.state.news.settings
+    for base, host in (("", ["Host"]), ("https://news.example", [])):
+        settings.public_base_url = base
+        article = await anon_client.get(f"{NEWS}/hello")
+        assert _vary(article) == per_viewer + host
+        revalidate = {"If-None-Match": article.headers["etag"]}
+        cached = await anon_client.get(f"{NEWS}/hello", headers=revalidate)
+        assert cached.status_code == 304
+        assert _vary(cached) == per_viewer + host
+        archive = await anon_client.get(f"{NEWS}/category/Sport")
+        assert archive.status_code == 200, archive.text
+        assert _vary(archive) == per_viewer + host
+        for path in (f"{NEWS}/feed.xml", f"{NEWS}/sitemap.xml"):
+            response = await anon_client.get(path)
+            assert response.status_code == 200, (path, response.text)
+            assert _vary(response) == host, path
 
 
 async def test_public_api_cache_varies_on_the_configured_tenant_header() -> None:
