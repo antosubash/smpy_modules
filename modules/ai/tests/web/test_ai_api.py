@@ -12,14 +12,12 @@ import inspect
 
 import pytest
 import pytest_asyncio
-from fastapi import APIRouter, FastAPI
-from httpx import ASGITransport, AsyncClient
 from pydantic_ai.models.test import TestModel
 from sm_ai.contracts.schemas import AiSettingsUpdate
 from sm_ai.core import constants, crypto, services
-from sm_ai.core.settings import AiSettings
 from sm_ai.web.service import AiService
 
+from tests.support.ai_api_app import api_client
 from tests.support.ai_test_stubs import GrantAll, fake_dns
 
 SECRET = "test-secret-key-for-api"
@@ -27,40 +25,14 @@ SECRET = "test-secret-key-for-api"
 
 @pytest.fixture(autouse=True)
 def _env(monkeypatch):
-    monkeypatch.setenv("SM_SECRET_KEY", SECRET)
+    monkeypatch.setenv("SM_SECRET_KEY", SECRET)  # TestBuildChanges encrypts without a client
     yield
     services.reset()
 
 
 @pytest_asyncio.fixture
 async def client(monkeypatch):
-    from sm_ai.web.endpoints.api import router as api_router
-
-    services.install(
-        services.AiServices(settings=AiSettings(chat_api_key=crypto.encrypt_value("sk-stored")))
-    )
-    applied: list[dict] = []
-
-    async def _fake_apply(self, changes):
-        applied.append(changes)
-        return self.current()
-
-    monkeypatch.setattr(AiService, "apply", _fake_apply)
-
-    app = FastAPI()
-    app.add_middleware(GrantAll)
-    # apply() is stubbed above, so no endpoint touches the session — but the
-    # get_db dependency still resolves, and without a host there is no
-    # app.state.sm to build one from.
-    from simple_module_db.deps import get_db
-
-    app.dependency_overrides[get_db] = lambda: None
-    prefixed = APIRouter(prefix=constants.ROUTE_PREFIX_API)
-    prefixed.include_router(api_router)
-    app.include_router(prefixed)
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as http:
-        http.applied = applied
+    async with api_client(monkeypatch, GrantAll, secret=SECRET) as http:
         yield http
 
 

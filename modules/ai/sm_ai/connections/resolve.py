@@ -85,16 +85,16 @@ def build_chat_model(
     provider_id, name, key, base_url = slot_inputs(
         settings, constants.SLOT_CHAT, constants.CHAT_PROVIDERS, model_name
     )
-    http = _client_kwargs(settings, constants.SLOT_CHAT, base_url)
+    endpoint = _endpoint_kwargs(settings, constants.SLOT_CHAT, base_url)
 
     if provider_id in (constants.PROVIDER_OPENAI, constants.PROVIDER_OPENAI_COMPATIBLE):
-        return _openai_chat(name, http, key, max_retries)
+        return _openai_chat(name, endpoint, key, max_retries)
 
     if provider_id == constants.PROVIDER_ANTHROPIC:
         from pydantic_ai.models.anthropic import AnthropicModel
         from pydantic_ai.providers.anthropic import AnthropicProvider
 
-        provider = AnthropicProvider(api_key=key, **http)
+        provider = AnthropicProvider(api_key=key, **endpoint)
         if max_retries is not None:
             client = provider.client.with_options(max_retries=max_retries)
             provider = AnthropicProvider(anthropic_client=client)
@@ -106,7 +106,7 @@ def build_chat_model(
     from pydantic_ai.models.google import GoogleModel
     from pydantic_ai.providers.google import GoogleProvider
 
-    kwargs: dict = dict(http)
+    kwargs: dict = dict(endpoint)
     if max_retries is not None:  # genai counts attempts, the first included
         from google.genai.types import HttpRetryOptions
 
@@ -114,7 +114,7 @@ def build_chat_model(
     return GoogleModel(name, provider=GoogleProvider(api_key=key, **kwargs))
 
 
-def _client_kwargs(settings: AiSettings, slot: str, base_url: str) -> dict[str, Any]:
+def _endpoint_kwargs(settings: AiSettings, slot: str, base_url: str) -> dict[str, Any]:
     """``base_url`` and ``http_client`` for a provider, each only when set."""
     if not base_url:
         return {}
@@ -123,12 +123,12 @@ def _client_kwargs(settings: AiSettings, slot: str, base_url: str) -> dict[str, 
 
 
 def _openai_chat(
-    name: str, http: dict[str, Any], key: str, max_retries: int | None = None
+    name: str, endpoint: dict[str, Any], key: str, max_retries: int | None = None
 ) -> Model:
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.openai import OpenAIProvider
 
-    provider = OpenAIProvider(api_key=key, **http)
+    provider = OpenAIProvider(api_key=key, **endpoint)
     if max_retries is not None:  # a copy sharing the pooled HTTP client
         provider = OpenAIProvider(
             openai_client=provider.client.with_options(max_retries=max_retries)
@@ -143,19 +143,19 @@ def build_embedder(settings: AiSettings) -> Embedder:
     provider_id, name, key, base_url = slot_inputs(
         settings, constants.SLOT_EMBEDDING, constants.EMBEDDING_PROVIDERS
     )
-    http = _client_kwargs(settings, constants.SLOT_EMBEDDING, base_url)
+    endpoint = _endpoint_kwargs(settings, constants.SLOT_EMBEDDING, base_url)
 
     if provider_id in (constants.PROVIDER_OPENAI, constants.PROVIDER_OPENAI_COMPATIBLE):
-        return Embedder(_openai_embedding(name, http, key))
+        return Embedder(_openai_embedding(name, endpoint, key))
 
     from pydantic_ai.embeddings.google import GoogleEmbeddingModel
     from pydantic_ai.providers.google import GoogleProvider
 
-    return Embedder(GoogleEmbeddingModel(name, provider=GoogleProvider(api_key=key, **http)))
+    return Embedder(GoogleEmbeddingModel(name, provider=GoogleProvider(api_key=key, **endpoint)))
 
 
-def _openai_embedding(name: str, http: dict[str, Any], key: str):
+def _openai_embedding(name: str, endpoint: dict[str, Any], key: str):
     from pydantic_ai.embeddings.openai import OpenAIEmbeddingModel
     from pydantic_ai.providers.openai import OpenAIProvider
 
-    return OpenAIEmbeddingModel(name, provider=OpenAIProvider(api_key=key, **http))
+    return OpenAIEmbeddingModel(name, provider=OpenAIProvider(api_key=key, **endpoint))

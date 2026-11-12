@@ -268,7 +268,7 @@ translates by `code`:
 | `key_unreadable` | the stored key cannot be decrypted |
 | `unreachable` | the host does not resolve, or the connection failed |
 | `connection_refused` | nothing listens at that address and port |
-| `timeout` | no answer within 30 seconds |
+| `timeout` | no answer in time (the 30-second probe deadline, or the SDK's or pinned client's own timeout) |
 | `unauthorised` | HTTP 401 or 403 (`status` says which) |
 | `http_error` | another error status (`status`) |
 | `other` | anything else |

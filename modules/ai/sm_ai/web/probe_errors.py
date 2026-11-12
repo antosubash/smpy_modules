@@ -27,7 +27,6 @@ from sm_ai.contracts.errors import (
     AiKeyUnreadableError,
     AiNotConfiguredError,
 )
-from sm_ai.core import constants
 from sm_ai.core.url_safety import UnsafeURLError
 
 __all__ = ["CODES", "Classified", "classify", "probe_error"]
@@ -57,7 +56,9 @@ MESSAGES: Final = {
     ),
     UNREACHABLE: "The endpoint could not be reached: check the base URL and the host name.",
     CONNECTION_REFUSED: "The endpoint refused the connection: is the server running?",
-    TIMEOUT: f"The endpoint did not answer within {constants.TEST_TIMEOUT_SECONDS} seconds.",
+    # No number: the probe's own deadline, the SDK's read timeout and the
+    # pinned client's connect timeout all end up here.
+    TIMEOUT: "The endpoint did not answer in time.",
     UNAUTHORISED: "The endpoint refused the API key (HTTP 401 or 403).",
     HTTP_ERROR: "The endpoint answered with an error status.",
     OTHER: "The call failed. The server log has the details.",
@@ -111,14 +112,14 @@ def classify(exc: BaseException) -> Classified:
         status = _status(item)
         if status:
             return Classified(UNAUTHORISED if status in (401, 403) else HTTP_ERROR, status)
-    if any(isinstance(item, _timeouts()) for item in chain):
+    if any(isinstance(item, _sdk().timeouts) for item in chain):
         return Classified(TIMEOUT)
     for item in chain:
         if isinstance(item, ConnectionRefusedError) or (
             isinstance(item, OSError) and item.errno == errno.ECONNREFUSED
         ):
             return Classified(CONNECTION_REFUSED)
-    if any(isinstance(item, (socket.gaierror, *_connection_errors())) for item in chain):
+    if any(isinstance(item, (socket.gaierror, *_sdk().connection)) for item in chain):
         return Classified(UNREACHABLE)
     return Classified(OTHER)
 
@@ -144,62 +145,57 @@ def _log(what: str, slot: str, exc: BaseException, code: str) -> None:
     Anything else may be a real defect - a pydantic-ai or SDK API change - and
     keeps the traceback, without which it would read like a config problem.
     """
-    if code != OTHER or isinstance(exc, (AiError, *_provider_errors())):
+    if code != OTHER or isinstance(exc, (AiError, *_sdk().provider)):
         logger.warning("AI %s %s failed (%s): %s", slot, what, code, exc)
     else:
         logger.warning("AI %s %s failed (%s)", slot, what, code, exc_info=exc)
 
 
-@functools.cache
-def _timeouts() -> tuple[type[BaseException], ...]:
-    import httpx
-    import httpx2
-    from anthropic import APITimeoutError as AnthropicTimeout
-    from openai import APITimeoutError as OpenAITimeout
-
-    return (
-        TimeoutError,
-        httpx.TimeoutException,
-        httpx2.TimeoutException,
-        OpenAITimeout,
-        AnthropicTimeout,
-    )
+class _Sdk(NamedTuple):
+    timeouts: tuple[type[BaseException], ...]
+    connection: tuple[type[BaseException], ...]
+    provider: tuple[type[BaseException], ...]
+    """Types that mean "the provider said no"."""
 
 
 @functools.cache
-def _connection_errors() -> tuple[type[BaseException], ...]:
+def _sdk() -> _Sdk:
+    """The SDKs' exception types, imported lazily (once)."""
     import httpx
     import httpx2
     from anthropic import APIConnectionError as AnthropicConnection
-    from openai import APIConnectionError as OpenAIConnection
-
-    return (
-        httpx.TransportError,
-        httpx2.TransportError,
-        OpenAIConnection,
-        AnthropicConnection,
-        ConnectionError,
-    )
-
-
-@functools.cache
-def _provider_errors() -> tuple[type[BaseException], ...]:
-    """Exception types that mean "the provider said no", imported lazily."""
-    import httpx
-    import httpx2
     from anthropic import APIError as AnthropicError
+    from anthropic import APITimeoutError as AnthropicTimeout
     from google.genai.errors import APIError as GoogleError
+    from openai import APIConnectionError as OpenAIConnection
     from openai import APIError as OpenAIError
+    from openai import APITimeoutError as OpenAITimeout
 
     # ModelAPIError, not just ModelHTTPError: pydantic-ai wraps a refused
     # connection in the former, and that is the commonest failure of all.
     from pydantic_ai.exceptions import ModelAPIError
 
-    return (
-        httpx.HTTPError,
-        httpx2.HTTPError,
-        OpenAIError,
-        AnthropicError,
-        GoogleError,
-        ModelAPIError,
+    return _Sdk(
+        timeouts=(
+            TimeoutError,
+            httpx.TimeoutException,
+            httpx2.TimeoutException,
+            OpenAITimeout,
+            AnthropicTimeout,
+        ),
+        connection=(
+            httpx.TransportError,
+            httpx2.TransportError,
+            OpenAIConnection,
+            AnthropicConnection,
+            ConnectionError,
+        ),
+        provider=(
+            httpx.HTTPError,
+            httpx2.HTTPError,
+            OpenAIError,
+            AnthropicError,
+            GoogleError,
+            ModelAPIError,
+        ),
     )

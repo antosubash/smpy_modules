@@ -7,62 +7,28 @@ import logging
 import httpx2
 import pytest
 import pytest_asyncio
-from fastapi import APIRouter, FastAPI
-from httpx import ASGITransport, AsyncClient
 from sm_ai.connections import pinned
-from sm_ai.core import constants, crypto, services
-from sm_ai.core.settings import AiSettings
+from sm_ai.core import constants, services
 from sm_ai.web import probe_errors
 from sm_ai.web.service import AiService
 
+from tests.support.ai_api_app import api_client
 from tests.support.ai_test_stubs import GrantAll, GrantSettingsEdit, fake_dns
 
 SECRET = "test-secret-key-for-base-url-api"
 
 
-@pytest.fixture(autouse=True)
-def _env(monkeypatch):
-    monkeypatch.setenv("SM_SECRET_KEY", SECRET)
-    yield
-    services.reset()
-
-
-async def _client(monkeypatch, auth):
-    from simple_module_db.deps import get_db
-    from sm_ai.web.endpoints.api import router as api_router
-
-    services.install(
-        services.AiServices(settings=AiSettings(chat_api_key=crypto.encrypt_value("sk-stored")))
-    )
-    applied: list[dict] = []
-
-    async def _fake_apply(self, changes):
-        applied.append(changes)
-        for field, value in changes.items():
-            setattr(services.current_settings(), field, value)
-        return self.current()
-
-    monkeypatch.setattr(AiService, "apply", _fake_apply)
-    app = FastAPI()
-    app.add_middleware(auth)
-    app.dependency_overrides[get_db] = lambda: None
-    prefixed = APIRouter(prefix=constants.ROUTE_PREFIX_API)
-    prefixed.include_router(api_router)
-    app.include_router(prefixed)
-    http = AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
-    http.applied = applied
-    return http
-
-
 @pytest_asyncio.fixture
 async def manager(monkeypatch):
-    async with await _client(monkeypatch, GrantAll) as http:
+    async with api_client(monkeypatch, GrantAll, secret=SECRET, write_through=True) as http:
         yield http
 
 
 @pytest_asyncio.fixture
 async def admin(monkeypatch):
-    async with await _client(monkeypatch, GrantSettingsEdit) as http:
+    async with api_client(
+        monkeypatch, GrantSettingsEdit, secret=SECRET, write_through=True
+    ) as http:
         yield http
 
 

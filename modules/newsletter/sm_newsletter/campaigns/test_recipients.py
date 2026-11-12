@@ -47,11 +47,15 @@ from sm_newsletter.core.tenancy import DEFAULT_TENANT, TenancyMode, mode_of, req
 
 __test__ = False  # a module named test_*, not a pytest test module
 
-__all__ = ["DIRECTORY_SCAN", "allowed_recipients"]
+__all__ = ["DIRECTORY_SCANS", "allowed_recipients"]
 
-DIRECTORY_SCAN = 20
-"""Directory rows read per address: the search is a substring match, so an
-address can share its text with a few longer ones; the exact match is kept."""
+DIRECTORY_SCANS = (20, 100, 500)
+"""How many rows a directory search reads, widened in turn. ``UserDirectory``
+has no exact lookup and no offset, only a substring ``search`` with a limit, so
+an address that shares its text with many longer ones is found by asking for
+more until the exact match turns up or the search returns fewer rows than
+asked (it ran out). An address hidden behind more than the last bound is not
+vouched for (fail closed)."""
 
 
 def _key(address: object) -> str:
@@ -72,6 +76,32 @@ def _single_tenant(request: Any, tenant_id: str) -> bool:
     return upstream in (None, DEFAULT_TENANT) and tenant_id == DEFAULT_TENANT
 
 
+async def _exact(directory: Any, db: AsyncSession, term: str, key: str) -> list[str]:
+    """Ids of active accounts whose address is exactly ``key`` (canonical form)."""
+    for limit in DIRECTORY_SCANS:
+        found = await directory.search(db, term, limit=limit)
+        ids = [u.id for u in found if u.is_active and _key(u.email) == key]
+        if ids or len(found) < limit:
+            return ids
+    return []
+
+
+async def _verified(directory: Any, db: AsyncSession, users: dict[str, str]) -> dict[str, str]:
+    """``users`` whose email is proven. ``search`` does not report it, so each
+    account is re-read with ``get_many``: ``DirectoryUser.email_verified`` must
+    be ``True``; ``None`` (a provider that does not track it, e.g. Keycloak
+    without the claim) is accepted, ``False`` is refused. An account the re-read
+    no longer finds, or finds inactive, is dropped."""
+    if not users:
+        return {}
+    fresh = await directory.get_many(db, list(users))
+    return {
+        uid: recipient
+        for uid, recipient in users.items()
+        if (u := fresh.get(uid)) is not None and u.is_active and u.email_verified is not False
+    }
+
+
 async def _members(
     request: Any, db: AsyncSession, tenant_id: str, wanted: Sequence[str]
 ) -> set[str]:
@@ -83,9 +113,8 @@ async def _members(
     for recipient in wanted:
         key = _key(recipient)
         for term in dict.fromkeys((recipient, key)):
-            for user in await directory.search(db, term, limit=DIRECTORY_SCAN):
-                if user.is_active and _key(user.email) == key:
-                    users[user.id] = recipient
+            users.update(dict.fromkeys(await _exact(directory, db, term, key), recipient))
+    users = await _verified(directory, db, users)
     if not users or _single_tenant(request, tenant_id):
         return set(users.values())
     members = await tenant_member_ids(request.app, db, tenant_id, list(users))

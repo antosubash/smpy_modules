@@ -88,6 +88,9 @@ class _Directory:
     async def search(self, db, term, *, limit):
         return [u for u in self.users if term in u.email.lower()][:limit]
 
+    async def get_many(self, db, ids, *, with_roles=False):
+        return {u.id: u for u in self.users if u.id in ids}
+
 
 def _request(app, *, email: str = "me@example.org", tenant: str | None = None):
     return SimpleNamespace(
@@ -153,3 +156,21 @@ class TestAllowedRecipients:
         app.state.sm_newsletter.tenancy = TenancyMode.MULTI
         set_user_directory(app, _Directory(DirectoryUser(id="1", email=A)))
         assert await _allowed(app, state, [A], tenant="org-1") == frozenset()
+
+    async def test_an_exact_match_behind_many_longer_ones_is_found(self, built):
+        app, state, _ = built
+        crowd = [DirectoryUser(id=f"x{i}", email=f"x{i}{A}") for i in range(60)]
+        set_user_directory(app, _Directory(*crowd, DirectoryUser(id="1", email=A)))
+        assert await _allowed(app, state, [A]) == {A}
+
+    async def test_an_unverified_email_is_not_vouched_for(self, built):
+        app, state, _ = built
+        set_user_directory(
+            app,
+            _Directory(
+                DirectoryUser(id="1", email=A, email_verified=False),
+                DirectoryUser(id="2", email=B, email_verified=True),
+                DirectoryUser(id="3", email=C),  # not tracked (None): accepted
+            ),
+        )
+        assert await _allowed(app, state, [A, B, C]) == {B, C}

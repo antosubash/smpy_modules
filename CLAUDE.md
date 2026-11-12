@@ -164,14 +164,17 @@ lease row) and counts against the rolling budget through
 `newsletter_send_attempt`; admission is all-or-nothing and writes no row on
 refusal. A test goes only to vouched-for addresses (#348,
 `campaigns/test_recipients.py`): the caller's own email, active accounts of the
-bound tenant (framework `UserDirectory` by exact address, then
-`tenant_member_ids` on a multi-tenant host; fail closed without either) and the
+bound tenant (framework `UserDirectory` by exact address, a verified email
+where the directory reports one, then `tenant_member_ids` on a multi-tenant
+host; fail closed without either) and the
 SYSTEM setting `test_send_extra_recipients`. Any other is `recipient_not_allowed`,
 and one with a `complaint` or `unsubscribed` suppression in the tenant is
-`suppressed` (every suppression hash and address comparison uses
+`suppressed` (suppression hashes and newsletter's own address comparisons use
 `normalise_email`: local part NFC + `lower()`, domain as email-validator
-normalises it; reads also try the legacy `strip().lower()` key); both are decided before the lock, write no attempt row and use no
-budget. A result is `outcome` plus a stable `code` (`smtp_<reply>`,
+normalises it; reads also try the legacy `strip().lower()` key; what is handed
+to or searched in records, the Mailchimp hand-off and the lift screen's
+records search, uses records' `records_form`); both are decided before the
+lock, write no attempt row and use no budget. A result is `outcome` plus a stable `code` (`smtp_<reply>`,
 `dispatch_busy`), never the relay's reply text (ledger and log only). Content
 links use the campaign tenant's public origin, while the unsubscribe and logo
 routes use `public_base_url`; the email logo is
