@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 from simple_module_core.user_directory import DirectoryUser, set_user_directory
 from sm_newsletter.campaigns import test_send
-from sm_newsletter.campaigns.test_recipients import allowed_recipients
+from sm_newsletter.campaigns.test_recipients import allowed_recipients, spellings
 from sm_newsletter.core import constants
 from sm_newsletter.core.suppression.store import suppress
 from sm_newsletter.core.tenancy import TenancyMode, tenant_scope
@@ -169,3 +169,29 @@ class TestAllowedRecipients:
         app.state.sm_newsletter.tenancy = TenancyMode.MULTI
         set_user_directory(app, _Directory(DirectoryUser(id="1", email=A)))
         assert await _allowed(app, state, [A], tenant="org-1") == frozenset()
+
+
+FULLWIDTH_E = "\uff45"  # the address parser folds it into "e"; the store keeps it
+
+
+class TestSpellings:
+    async def test_a_suppression_under_the_raw_spelling_is_found(self, built):
+        app, state, cid = built
+        raw = f"b@{FULLWIDTH_E}xample.org"
+        await _suppress(state, raw, constants.REASON_COMPLAINT)
+        results = await send(app, state, cid, [B], spellings={B: spellings([raw])[B]})
+        assert [r.outcome for r in results] == [test_send.SUPPRESSED]
+        assert await attempt_rows(state) == []
+
+    def test_spellings_keep_each_submitted_form(self):
+        raw = f" A@{FULLWIDTH_E}xample.org"
+        assert spellings([raw, "a@example.org"]) == {
+            A: frozenset({A, f"a@{FULLWIDTH_E}xample.org"})
+        }
+
+    async def test_an_allow_list_entry_matches_in_either_form(self, built):
+        app, state, _ = built
+        app.state.sm_newsletter.settings.test_send_extra_recipients = [
+            f"review@{FULLWIDTH_E}xample.org"
+        ]
+        assert await _allowed(app, state, ["review@example.org"]) == {"review@example.org"}

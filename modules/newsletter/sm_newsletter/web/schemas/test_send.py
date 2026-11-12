@@ -5,13 +5,19 @@ Addresses are stripped, lowercased and deduped (first one wins the order)
 An address holding a line break or another control character is refused
 before the address parser sees it; the route validates through
 ``parse_payload``, whose 422 never echoes the input.
+
+The address parser then normalises the domain (a fullwidth ``e`` becomes
+``e``), so the list is deduplicated again after it, and
+``campaigns.test_recipients.spellings`` keeps every form each recipient was
+submitted in: a suppression row hashes the address as it was stored (strip
+and lower-case only, ``normalise_email``), which may be the raw form (#348).
 """
 
 from __future__ import annotations
 
 from typing import Annotated, Any
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, EmailStr, Field
+from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, EmailStr, Field
 
 from sm_newsletter.campaigns.test_send import MAX_TEST_RECIPIENTS
 from sm_newsletter.core.constants import MAX_EMAIL_LEN
@@ -32,8 +38,11 @@ def _normalise(value: Any) -> Any:
     return out
 
 
-Address = Annotated[EmailStr, Field(max_length=MAX_EMAIL_LEN)]
+def _dedup(value: list[str]) -> list[str]:
+    return list(dict.fromkeys(value))
 
+
+Address = Annotated[EmailStr, Field(max_length=MAX_EMAIL_LEN)]
 
 class TestSendIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -42,6 +51,7 @@ class TestSendIn(BaseModel):
         list[Address],
         Field(min_length=1, max_length=MAX_TEST_RECIPIENTS),
         BeforeValidator(_normalise),
+        AfterValidator(_dedup),
     ]
 
 

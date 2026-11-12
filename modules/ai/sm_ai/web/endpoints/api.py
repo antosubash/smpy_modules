@@ -38,6 +38,10 @@ async def update_settings(
     data: AiSettingsUpdate, request: Request, service: AiServiceDep
 ) -> AiSettingsOut:
     changes = AiService.build_changes(data)
+    # The page always sends the switch. An unchanged value is dropped here,
+    # before any await, so it is never written back: a save racing an admin who
+    # just turned it off cannot restore the stale value without settings.edit.
+    AiService.drop_unchanged_policy(changes)
     if not changes:
         return service.current()
     if AiService.changes_network_policy(changes):

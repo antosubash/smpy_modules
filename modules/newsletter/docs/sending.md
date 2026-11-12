@@ -212,6 +212,13 @@ may go to (#348):
   tenant-wide), matched by the table's hash of the normalised address,
   answers `suppressed`, without saying which. A bounce or a cleaned import row
   does not refuse a test.
+- **Spellings.** The address parser folds a Unicode domain (a fullwidth letter)
+  into ASCII, while a suppression row, a directory account and an allow-list
+  entry keep the address as stored, stripped and lower-cased
+  (`normalise_email`, the store's one normaliser). Every comparison therefore
+  uses both forms: each recipient is looked up in every spelling it was
+  submitted in, and a stored address matches in either its stored or its
+  parsed form.
 - A refused address is never sent, writes no `newsletter_send_attempt` row and
   uses no budget: the refusals are decided before the dispatch lock, admission
   counts only the addresses actually sent, and when every address is refused

@@ -92,6 +92,28 @@ class TestSave:
         )
         assert res.status_code == 200
 
+    async def test_a_late_save_cannot_restore_a_switch_an_admin_turned_off(
+        self, manager, monkeypatch
+    ):
+        # Live true; an ai.manage save resends true unchanged; an admin turns it
+        # off before that save persists. The late save must not write true back.
+        services.current_settings().allow_private_base_url = True
+        persisted = {"allow_private_base_url": True}
+
+        async def _racing_apply(self, changes):
+            persisted["allow_private_base_url"] = False  # the admin's save lands first
+            persisted.update(changes)
+            manager.applied.append(changes)
+            return self.current()
+
+        monkeypatch.setattr(AiService, "apply", _racing_apply)
+        res = await manager.put(
+            "/api/ai/settings", json={"allow_private_base_url": True, "chat_model": "x"}
+        )
+        assert res.status_code == 200
+        assert manager.applied == [{"chat_model": "x"}]
+        assert persisted["allow_private_base_url"] is False
+
     async def test_with_settings_edit_a_private_url_is_saved(self, admin, monkeypatch):
         asked = fake_dns(monkeypatch, {})
         res = await admin.put("/api/ai/settings", json={**PRIVATE, "allow_private_base_url": True})

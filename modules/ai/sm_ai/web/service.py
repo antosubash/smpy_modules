@@ -100,6 +100,17 @@ class AiService:
         return errors
 
     @staticmethod
+    def drop_unchanged_policy(changes: dict[str, Any]) -> None:
+        """Remove ``allow_private_base_url`` from ``changes`` when it equals the
+        live value: only a request that changes it (and so holds
+        ``settings.edit``) may ever write it."""
+        field = "allow_private_base_url"
+        if field in changes and bool(changes[field]) == getattr(
+            services.current_settings(), field
+        ):
+            del changes[field]
+
+    @staticmethod
     def changes_network_policy(changes: dict[str, Any]) -> bool:
         """Whether ``changes`` flips ``allow_private_base_url`` (needs ``settings.edit``)."""
         field = "allow_private_base_url"

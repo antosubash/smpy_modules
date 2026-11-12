@@ -135,3 +135,23 @@ async def test_only_vouched_recipients_are_sent(client, cid):
         {"recipient": "a@example.org", "outcome": "accepted", "code": "smtp_250"},
     ]
     assert sorted(m.to for m in console.captured("default")) == ["a@example.org", "u@example.com"]
+
+
+async def test_a_suppression_under_a_unicode_spelling_is_honoured(client, built, cid):
+    # The parser folds a fullwidth "e" in the domain; the suppression row hashes
+    # the address as imported, so both forms are looked up (#348).
+    from sm_newsletter.core.suppression.store import suppress
+    from sm_newsletter.core.tenancy import tenant_scope
+
+    _, state = built
+    raw = "b@\uff45xample.org"
+    async with state.session_factory() as db:
+        with tenant_scope("default"):
+            await suppress(db, tenant_id="default", email=raw, reason="complaint", source="admin")
+            await db.commit()
+    body = {"recipients": [raw, "b@example.org"]}  # one recipient after parsing
+    res = await client.post(_url(cid), json=body, headers=SEND)
+    assert res.json()["results"] == [
+        {"recipient": "b@example.org", "outcome": "suppressed", "code": None}
+    ]
+    assert console.captured("default") == []
