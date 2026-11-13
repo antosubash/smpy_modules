@@ -15,25 +15,24 @@ They are stored `enc:v2:<Fernet token>`, each module under its own key (HKDF-SHA
 of the secret, with the module's package as the info string). Since 0.0.16 every
 module also decrypts with the keys in **`SM_SECRET_KEY_PREVIOUS`**, which is what
 makes a rotation possible without re-entering every credential (#351).
+Newsletter unsubscribe, open and click links, records confirmation and unsubscribe
+links, and records form tokens also verify with retained keys (#366). New tokens
+and encrypted settings always use the current key.
 
 ## What a rotation does not cover
 
-Only the stored credentials above survive a rotation. Everything **signed** with
-the secret is checked against the current key alone, so after the switch:
+Retaining the old key preserves the credentials and signed links listed above.
+These other uses still change after the switch:
 
 - **every session is signed out** (the session cookie);
-- **newsletter links already sent stop working**: unsubscribe, open-tracking and
-  click links (`/newsletter/u/`, `/o/`, `/c/`) answer the same page but do
-  nothing — mail already in inboxes cannot be fixed;
-- **records' links and tokens**: double-opt-in confirmation links already sent,
-  and forms loaded before the switch (the signed form token; visitors reload and
-  send again);
 - **images' direct-upload tickets** in flight;
 - the **keyed hashes** derived from the secret (records' `sm_ip_hash`, analytics'
   visitor hashes) change, so new rows do not match old ones.
 
-Plan the rotation for a quiet period, and say so before you start if
-newsletters went out recently.
+Plan the rotation for a quiet period. Retaining a key does not extend token age
+limits or undo subscriber nonce revocation. Removing it revokes its issued forms
+and links: records confirmation links fail, while unsubscribe and newsletter
+tracking routes keep their indistinguishable public responses but do nothing.
 
 ## `SM_SECRET_KEY_PREVIOUS`
 
@@ -46,10 +45,11 @@ SM_SECRET_KEY_PREVIOUS=["old-key", "older-key"]
 
 It is read from the process environment, else from the project `.env` (the one
 the framework's `BootstrapSettings` locates), and only when a stored value does
-not open with the current key — `SM_SECRET_KEY` is always tried first. A value
+not open or a signed token does not verify with the current key — the current
+host key is always tried first. A value
 starting with `[` that is not a JSON list of strings is an error naming the
 variable, never its value: it does not affect values the current key opens, but
-every value that needs a previous key fails with it until the variable is
+every value or token that needs a previous key fails with it until the variable is
 fixed, and `scripts/reencrypt_secrets.py` refuses to run (writing nothing).
 Unlike `SM_SECRET_KEY` there is no database fallback: previous keys exist only where you put them, and a host that injects
 `secret_key` in code still gives previous keys through this variable.
@@ -93,6 +93,12 @@ Unlike `SM_SECRET_KEY` there is no database fallback: previous keys exist only w
    again is a no-op. `--no-seal-plaintext` leaves values stored in the clear as
    they are.
 
+   Billing's generic Settings screen and `scripts/set_setting.py` now seal both
+   Stripe secrets. The CLI takes a JSON string, for example
+   `uv run python scripts/set_setting.py sm_billing stripe_secret_key '"sk_test_example"'`.
+   The framework's raw `smpy settings import-from-env` bypasses validated
+   serializers and can still store plaintext; run this cleanup afterwards.
+
    A host built from the published modules, without this repo's `scripts/`,
    re-enters each credential instead: the AI page, billing's connection screen,
    newsletter's SMTP password, and records' CAPTCHA secret on the Settings
@@ -100,7 +106,15 @@ Unlike `SM_SECRET_KEY` there is no database fallback: previous keys exist only w
 
 5. **Restart** again, so no process holds a value it decrypted before step 4.
 
-6. **Remove `SM_SECRET_KEY_PREVIOUS`** everywhere, and **restart** once more.
+6. **Decide how long to retain each old key.** Re-encryption cannot re-sign
+   links already delivered. Newsletter and records unsubscribe links do not
+   expire, so preserving all of them requires retaining their signing keys
+   indefinitely. Records form tokens and confirmation links retain their
+   original age limits. Remove a retired key only when revoking its remaining
+   links is acceptable. **Remove a compromised key promptly**, even if doing so
+   breaks old links.
+
+7. **When removing a retired key, remove it everywhere and restart.**
    Anything the script did not re-encrypt is now unreadable: the modules say so
    (ai's `AiKeyUnreadableError`, billing's `BillingKeyUnreadableError`,
    newsletter's `smtp_password_unreadable`, records' `503 captcha_unavailable`),

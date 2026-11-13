@@ -1507,8 +1507,9 @@ honeypot hit is dropped before the provider is asked.
 HMAC-SHA256 under the host's `secret_key` over the tenant, the type key, the
 digest, the issue time and the nonce. `digest` is a SHA-256 prefix of what
 the definition showed: the schema version, the public fields and the consent
-box with its text. It is stateless; rotating the
-secret invalidates outstanding tokens and costs a visitor one reload. Being
+box with its text. It is stateless; retired signing keys in
+`SM_SECRET_KEY_PREVIOUS` preserve outstanding tokens within their original age
+limits. Removing a key revokes its tokens and costs a visitor one reload. Being
 stateless, a token can be sent more than once until it expires: the rate
 limits bound that, and the `RecordForm` block sends a burst of clicks as one
 submission, but a client that posts the same token twice stores two
@@ -1637,9 +1638,12 @@ MACs compared in constant time. Confirm is
 action, tenant, type, uuid and expiry and is checked before any statement
 runs; `mac` covers the same plus the subscriber's `sm_nonce`. Unsubscribing
 or re-subscribing rotates the nonce, which kills every link sent before.
-**Rotating the host's `secret_key` invalidates every outstanding confirmation
-and unsubscribe link, and resets the per-address confirmation budget and the
-delivery dedup keys** (both are keyed hashes under it). **The tenant comes from the link**:
+Both MACs must verify under the same key. Retired signing keys in
+`SM_SECRET_KEY_PREVIOUS` preserve issued confirmation and unsubscribe links;
+removing a key revokes its links. Unsubscribe links do not expire, so preserving
+them can require indefinite key retention. Rotation still resets the per-address
+confirmation budget and delivery dedup keys (both are keyed hashes under it).
+See the repo's `docs/secret-key-rotation.md`. **The tenant comes from the link**:
 on the apex host, where no tenant resolves, the link binds the tenant it
 names; on a host that resolved another tenant the link is invalid.
 
