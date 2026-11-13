@@ -36,12 +36,12 @@
 
 Independent of Tasks 2/3; execute sequentially to avoid shared-index or test contention.
 
-- [ ] Add failing tests: generic Settings writes for both fields persist JSON ciphertext and remain masked; headless field serialization seals; nullable/empty clears, ciphertext pass-through and legacy `string` rows work. Live app with no key refuses storage; no-app/dead-app dump remains safe for hydration; repeated dumps/reloads don't mutate held values.
-- [ ] Run new tests before production edits and save the expected RED evidence. Run focused baseline as needed from `modules/billing` with `uv run pytest -q <test paths>`.
-- [ ] Implement the local sealed annotation and provider liveness setup using records' pattern. Preserve Connection blank/explicit-clear semantics and encrypted-prefix pass-through. Update parity metadata without weakening shared crypto guarantees.
-- [ ] Document JSON string quoting for `scripts/set_setting.py`, existing plaintext cleanup with `reencrypt_secrets.py`, and the raw framework import bypass. Do not add startup database writes.
-- [ ] Run billing's suite (`PYTEST_WORKERS=8 uv run pytest -n 8` from `modules/billing`), affected script/parity tests, and focused ruff. Save GREEN output and self-review the diff.
-- [ ] Commit task files as `fix(billing): seal Stripe secrets on settings writes` and write the task report.
+- [x] Add failing tests: generic Settings writes for both fields persist JSON ciphertext and remain masked; headless field serialization seals; nullable/empty clears, ciphertext pass-through and legacy `string` rows work. Live app with no key refuses storage; no-app/dead-app dump remains safe for hydration; repeated dumps/reloads don't mutate held values.
+- [x] Run new tests before production edits and save the expected RED evidence. Run focused baseline as needed from `modules/billing` with `uv run pytest -q <test paths>`.
+- [x] Implement the local sealed annotation and provider liveness setup using records' pattern. Preserve Connection blank/explicit-clear semantics and encrypted-prefix pass-through. Update parity metadata without weakening shared crypto guarantees.
+- [x] Document JSON string quoting for `scripts/set_setting.py`, existing plaintext cleanup with `reencrypt_secrets.py`, and the raw framework import bypass. Do not add startup database writes.
+- [x] Run billing's suite (`PYTEST_WORKERS=8 uv run pytest -n 8` from `modules/billing`), affected script/parity tests, and focused ruff. Save GREEN output and self-review the diff.
+- [x] Commit task files as `fix(billing): seal Stripe secrets on settings writes` and write the task report.
 
 ### Task 2: Preserve newsletter links through key rotation
 
@@ -51,11 +51,11 @@ Independent of Tasks 2/3; execute sequentially to avoid shared-index or test con
 
 Independent of Task 1 and records files; execute after Task 1 review.
 
-- [ ] Write failing pure-helper and public-route regressions proving old tokens work for purposes `u`, `o`, `c` across multiple retired keys; new tokens still use the supplied current key. Include retired-key removal, whitespace-preserving keys, malformed previous config, tampering/wrong purpose/tenant, and no DB access for a forged gate.
-- [ ] Run the new tests before production edits and save expected RED evidence.
-- [ ] Add the smallest current-first MAC fallback in shared verification code. Preserve missing-current-key refusal, parser bounds, canonical token checks, host-derived tenant restrictions, and indistinguishable public responses. Never sign with previous keys or attach them to claims.
-- [ ] Run newsletter's suite (`PYTEST_WORKERS=8 uv run pytest -n 8` from `modules/newsletter`), focused ruff, and save GREEN evidence.
-- [ ] Commit as `fix(newsletter): accept retained keys for signed links` and write the task report.
+- [x] Write failing pure-helper and public-route regressions proving old tokens work for purposes `u`, `o`, `c` across multiple retired keys; new tokens still use the supplied current key. Include retired-key removal, whitespace-preserving keys, malformed previous config, tampering/wrong purpose/tenant, and no DB access for a forged gate.
+- [x] Run the new tests before production edits and save expected RED evidence.
+- [x] Add the smallest current-first MAC fallback in shared verification code. Preserve missing-current-key refusal, parser bounds, canonical token checks, host-derived tenant restrictions, and indistinguishable public responses. Never sign with previous keys or attach them to claims.
+- [x] Run newsletter's suite (`PYTEST_WORKERS=8 uv run pytest -n 8` from `modules/newsletter`), focused ruff, and save GREEN evidence.
+- [x] Commit as `fix(newsletter): accept retained keys for signed links` and write the task report.
 
 ### Task 3: Preserve records forms and mailed links through rotation
 
@@ -65,13 +65,13 @@ Independent of Task 1 and records files; execute after Task 1 review.
 
 Hard task: the pre-DB gate and post-DB nonce MAC must use the same candidate key. Independent source files from Tasks 1/2; execute after Task 2 review.
 
-- [ ] Write failing tests for old form, confirm and unsubscribe tokens under one/multiple retained keys; confirm new signatures use current only and removing an old key revokes them. Pin form min-fill/max-age, digest, confirmation expiry, tenant/type/action, rotated nonce and malformed previous config behavior.
-- [ ] Add a mixed-key gate/state splice rejection and public-route tests that old links complete the intended state transition while forged gates reach no DB lookup. Use real route/store outcomes rather than mock-only assertions.
-- [ ] Run tests before production edits; save expected RED evidence.
-- [ ] Implement current-first fallback in the shared helpers. Preserve pre-DB gate verification; carry the signed gate (or equivalent non-secret context) to require gate/state validation under one candidate key. Handle malformed config with safe existing refusals, keeping valid current-key tokens unaffected.
-- [ ] Update rotation documentation: credential re-encryption cannot re-sign issued links; retain retired keys while their links must work, remove compromised keys to revoke them. Document indefinite unsubscribe links, unchanged sessions/images/hash behavior, and existing billing plaintext cleanup.
-- [ ] Run records' suite (`PYTEST_WORKERS=8 uv run pytest -n 8` from `modules/records`), focused ruff and save GREEN evidence.
-- [ ] Commit as `fix(records): retain signed links across key rotation` and write the task report.
+- [x] Write failing tests for old form, confirm and unsubscribe tokens under one/multiple retained keys; confirm new signatures use current only and removing an old key revokes them. Pin form min-fill/max-age, digest, confirmation expiry, tenant/type/action, rotated nonce and malformed previous config behavior.
+- [x] Add a mixed-key gate/state splice rejection and public-route tests that old links complete the intended state transition while forged gates reach no DB lookup. Use real route/store outcomes rather than mock-only assertions.
+- [x] Run tests before production edits; save expected RED evidence.
+- [x] Implement current-first fallback in the shared helpers. Preserve pre-DB gate verification; carry the signed gate (or equivalent non-secret context) to require gate/state validation under one candidate key. Handle malformed config with safe existing refusals, keeping valid current-key tokens unaffected.
+- [x] Update rotation documentation: credential re-encryption cannot re-sign issued links; retain retired keys while their links must work, remove compromised keys to revoke them. Document indefinite unsubscribe links, unchanged sessions/images/hash behavior, and existing billing plaintext cleanup.
+- [x] Run records' suite (`PYTEST_WORKERS=8 uv run pytest -n 8` from `modules/records`), focused ruff and save GREEN evidence.
+- [x] Commit as `fix(records): retain signed links across key rotation` and write the task report.
 
 ## Integration and shipping
 

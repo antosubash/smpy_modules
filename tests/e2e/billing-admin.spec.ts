@@ -83,4 +83,53 @@ test.describe('Billing admin', () => {
     await expect(field).toHaveAttribute('placeholder', /leave blank to keep/);
     expect(await page.content()).not.toContain('sk_test_e2e_secret');
   });
+
+  test('generic Settings saves both Stripe secrets without exposing them', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    page.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text());
+    });
+    const secrets = {
+      stripe_secret_key: 'sk_test_generic_settings_e2e',
+      stripe_webhook_secret: 'whsec_generic_settings_e2e',
+    };
+
+    await page.goto('/admin/settings/');
+    await page.getByRole('button', { name: /sm_billing/ }).click();
+    for (const [name, value] of Object.entries(secrets)) {
+      const field = page.getByLabel(name, { exact: true });
+      const editor = page.locator('fieldset').filter({ has: field });
+      await editor.getByRole('button', { name: 'Set new value' }).click();
+      await field.fill(value);
+    }
+    const saved = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/settings/modules/sm_billing') &&
+        response.request().method() === 'PUT',
+    );
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    const response = await saved;
+    expect(response.ok()).toBeTruthy();
+    await expect(page.getByRole('status')).toHaveText('Settings saved');
+    const body = await response.text();
+    for (const value of Object.values(secrets)) expect(body).not.toContain(value);
+
+    await page.reload();
+    await page.getByRole('button', { name: /sm_billing/ }).click();
+    for (const name of Object.keys(secrets)) {
+      await expect(page.getByLabel(name, { exact: true })).toHaveAttribute('type', 'password');
+    }
+    for (const value of Object.values(secrets)) expect(await page.content()).not.toContain(value);
+
+    const connection = await page.request.get('/api/billing/admin/connection');
+    expect(connection.ok()).toBeTruthy();
+    expect(await connection.json()).toMatchObject({
+      has_secret_key: true,
+      has_webhook_secret: true,
+    });
+    await page.goto('/admin/billing/connection');
+    await expect(page.getByLabel('Secret key (sk_…)')).toHaveValue('');
+    expect(errors).toEqual([]);
+  });
 });
