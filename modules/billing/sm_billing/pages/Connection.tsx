@@ -114,6 +114,8 @@ function Connection() {
       toast.success(t(c.saved));
       setSecret('');
       setWebhook('');
+      setClearSecret(false);
+      setClearWebhook(false);
       router.reload();
     } catch (err) {
       if (err instanceof ApiError && err.detail === 'invalid_return_url') {

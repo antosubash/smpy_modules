@@ -132,4 +132,42 @@ test.describe('Billing admin', () => {
     await expect(page.getByLabel('Secret key (sk_…)')).toHaveValue('');
     expect(errors).toEqual([]);
   });
+
+  test('cleared Stripe secrets can be replaced without reloading the page', async ({ page }) => {
+    await page.goto('/admin/billing/connection');
+    const secret = page.getByLabel('Secret key (sk_…)');
+    const webhook = page.getByLabel('Webhook signing secret (whsec_…)');
+    const removals = page.getByRole('checkbox', { name: 'Remove the stored value' });
+    async function saveConnection() {
+      const saved = page.waitForResponse(
+        (response) =>
+          response.url().endsWith('/api/billing/admin/connection') &&
+          response.request().method() === 'PUT',
+      );
+      await page.getByRole('button', { name: 'Save connection' }).click();
+      expect((await saved).ok()).toBeTruthy();
+    }
+
+    await secret.fill('sk_test_clear_e2e');
+    await webhook.fill('whsec_clear_e2e');
+    await saveConnection();
+    await expect(removals).toHaveCount(2);
+    await removals.nth(0).check();
+    await removals.nth(1).check();
+    await saveConnection();
+    await expect(removals).toHaveCount(0);
+    await expect(secret).toBeEnabled();
+    await expect(webhook).toBeEnabled();
+
+    await secret.fill('sk_test_replacement_e2e');
+    await webhook.fill('whsec_replacement_e2e');
+    await saveConnection();
+    await expect(removals).toHaveCount(2);
+    const connection = await page.request.get('/api/billing/admin/connection');
+    expect(connection.ok()).toBeTruthy();
+    expect(await connection.json()).toMatchObject({
+      has_secret_key: true,
+      has_webhook_secret: true,
+    });
+  });
 });
