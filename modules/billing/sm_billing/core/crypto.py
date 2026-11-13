@@ -16,7 +16,7 @@ Stored formats:
   with one warning per field, until 0.1.0.
 - any other ``enc:`` prefix → BillingKeyUnreadableError, never plaintext.
 - no prefix → treated as plaintext, warned once per field (covers values set
-  through the generic Settings screen or set_setting.py).
+  before sealed settings writes or around the supported write paths).
 
 Both versions decrypt under the app's secret and every key in
 ``SM_SECRET_KEY_PREVIOUS`` (``docs/secret-key-rotation.md``). The current secret
@@ -75,6 +75,31 @@ def set_secret_provider(provider: Callable[[], str]) -> None:
     """Install the live-secret source."""
     global _secret_provider
     _secret_provider = provider
+
+
+# The installed provider paired with whether its weakly held app is alive.
+_attached: tuple[Callable[[], str], Callable[[], bool]] | None = None
+
+
+def attach_app(provider: Callable[[], str], alive: Callable[[], bool]) -> None:
+    """Install ``provider`` as the secret source of the app ``alive`` watches."""
+    global _attached
+    set_secret_provider(provider)
+    _attached = (provider, alive)
+
+
+def has_secret_provider() -> bool:
+    """Whether a live app or script is attached to supply the secret.
+
+    A dead app permits hydration dumps; a live app with an empty key must
+    still refuse plaintext writes. Plain ``set_secret_provider`` calls from
+    the re-encryption script count while they are the current provider.
+    """
+    if _secret_provider is None:
+        return False
+    if _attached is not None and _attached[0] is _secret_provider:
+        return _attached[1]()
+    return True
 
 
 def _current_secret() -> str:

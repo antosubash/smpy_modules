@@ -61,8 +61,6 @@ CRYPTO_FAMILIES: tuple[Family, ...] = (
                 own={
                     "CaptchaSecretUnreadableError": "See billing's BillingKeyUnreadableError.",
                     "CaptchaSecretUnreadableError.__init__": "See CaptchaSecretUnreadableError.",
-                    "has_secret_provider": "SealedSecret dumps unsealed in a process with no "
-                    "app (newsletter's worker); only records has a sealed field.",
                 },
                 messages=(
                     "The app has no secret_key — the records module needs it to encrypt "
@@ -101,6 +99,11 @@ CRYPTO_FAMILIES: tuple[Family, ...] = (
             "take the app's secret only.",
             "_unreadable": "Each module raises its own unreadable-secret error.",
         },
+    ),
+    Family(
+        "stored-secret crypto: sealed-field provider liveness",
+        (Copy(BILLING), Copy(RECORDS)),
+        shared=("_attached", "attach_app", "has_secret_provider"),
     ),
     Family(
         "stored-secret crypto: worker fallback",

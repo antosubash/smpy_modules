@@ -78,7 +78,7 @@ class BillingModule(ModuleBase):
             sm = getattr(getattr(live_app, "state", None), "sm", None)
             return getattr(getattr(sm, "settings", None), "secret_key", "") or ""
 
-        crypto.set_secret_provider(_live_secret)
+        crypto.attach_app(_live_secret, lambda: app_ref() is not None)
 
         # Here, at construction, so consumers can define meters in their own
         # ``on_startup`` whatever order the modules start in.
