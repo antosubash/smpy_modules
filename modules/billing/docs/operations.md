@@ -54,7 +54,7 @@ environment variables — an `SM_BILLING_*` line does nothing.
 | Field | Default | Notes |
 |---|---|---|
 | `provider` | `manual` | `manual` or `stripe`. Takes effect on save, no restart (see [Switching provider](#switching-provider)). |
-| `stripe_secret_key` | — | `sk_live_…` / `sk_test_…`. Enter it on the connection screen, which encrypts it (`enc:v2:…`, Fernet keyed on the app's `secret_key`; a 0.0.15 `enc:v1:…` value is still read until 0.1.0). A plaintext value still works and logs a one-time warning. To rotate `secret_key` without re-entering it, see `docs/secret-key-rotation.md` at the repo root (`SM_SECRET_KEY_PREVIOUS`, the one thing billing reads from the environment). |
+| `stripe_secret_key` | — | `sk_live_…` / `sk_test_…`. Supported writes on Settings, the connection screen and `scripts/set_setting.py` encrypt it (`enc:v2:…`, Fernet keyed on the app's `secret_key`; a 0.0.15 `enc:v1:…` value is still read until 0.1.0). A plaintext value still works and logs a one-time warning. To rotate `secret_key` without re-entering it, see `docs/secret-key-rotation.md` at the repo root (`SM_SECRET_KEY_PREVIOUS`, the one thing billing reads from the environment). |
 | `stripe_webhook_secret` | — | `whsec_…`, same storage. |
 | `return_base_url` | — | `https://app.example.com`. Origin for Checkout/portal return links. **Required in production on a single-tenant host** (#355): blank falls back to the host's own `public_base_url`; with both blank, Checkout and the portal are refused with 409 `return_base_url_missing` outside development and testing as the host reports it (`SM_ENVIRONMENT`; the framework defaults it to `development`, so a production deployment sets it), and in those two the request's host is used. The refusal comes after `checkout_unavailable`, `plan_not_found`, `no_customer` and the other guards. A multi-tenant host keeps the request's host (each organisation may be on its own). That host is the client's `Host` header, or the internal name behind a proxy without `trusted_proxy`. |
 | `reconcile_interval_minutes` | `0` | Run [reconcile](#reconcile) inside the app every N minutes over subscriptions not synced for N minutes. `0` is off. Takes effect on save: the loop starts, stops or re-times itself. `60` suits most deployments. |
@@ -62,6 +62,25 @@ environment variables — an `SM_BILLING_*` line does nothing.
 | `usage_hold_ttl_seconds` | `900` | Default TTL of a usage hold when neither its meter nor the caller sets one (at least 30). A holder that crashes gives its slot back once the hold lapses. Read per call. |
 | `usage_sweep_interval_seconds` | `60` | Seconds between sweeps that expire lapsed holds (every instance sweeps; the guarded transition releases each hold once). `0` turns it off. Re-read from the database before every tick, so a value saved on one worker reaches all of them. |
 | `usage_event_retention_days` | `400` | The daily purge drops ledger charges older than this together with their refunds (by the charge's age, so a key is never left with only its refund; a refund goes only while its selected charge row is still there, so a stale batch on another instance never takes a newer call's refund), and settled holds older than 30 days. Each transaction deletes up to 1,000 charges plus their refunds (so up to about 2,000 ledger rows), or up to 1,000 settled holds, with at most 20 purge write transactions per table per tick, and carries a backlog over to the next ticks, so SQLite's write lock is never held for long. `0` keeps the ledger. Counters and gauges are never purged. A purged key is forgotten whole and can be used again. |
+
+Both Stripe secrets are stored as JSON strings on supported writes. Headless
+commands therefore need JSON string quoting:
+
+```bash
+python scripts/set_setting.py sm_billing stripe_secret_key '"sk_test_example"' stripe_webhook_secret '"whsec_example"'
+```
+
+Blank inputs on the connection screen keep the existing secret; use its
+explicit clear control to remove one. Empty or null values on generic Settings
+clear it. Responses mask the values. A live app without a `secret_key` refuses
+plaintext writes.
+
+Existing plaintext rows remain readable; billing does not rewrite them at
+startup. Run `scripts/reencrypt_secrets.py --dry-run` to inspect them, then
+run it without `--dry-run` to seal them. The raw framework
+`smpy settings import-from-env` command bypasses field serializers and can still
+write plaintext; run the same cleanup after using it. Prefer the Settings
+screen, connection screen or the headless command above for secret writes.
 
 > **Rotating the app's `secret_key` without keeping the old one makes stored
 > Stripe secrets unreadable.** Billing then falls back to `manual` at startup

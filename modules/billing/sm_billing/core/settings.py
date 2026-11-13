@@ -2,8 +2,8 @@
 
 No environment, ``.env`` or secrets-file sources (``DbBackedSettings``): an
 ``SM_BILLING_*`` variable is dead. Configure on the Settings screen, on
-``/admin/billing/connection`` (which encrypts the Stripe secrets), or with
-``scripts/set_setting.py``.
+``/admin/billing/connection``, or with ``scripts/set_setting.py``. Both Stripe
+secrets seal on serialization; headless writes take JSON strings.
 
 ``provider`` and ``reconcile_interval_minutes`` are first read in
 ``on_startup``, which builds the provider object and the reconcile loop; a save
@@ -20,6 +20,7 @@ from pydantic import Field
 from simple_module_core.settings_base import DbBackedSettings
 
 from sm_billing.core import constants as c
+from sm_billing.core.sealed_secret import SealedSecret
 
 _GROUP = {"group": "Billing"}
 _RESTART: Final[dict[str, Any]] = {**_GROUP, "requires_restart": True}
@@ -37,11 +38,11 @@ class BillingSettings(DbBackedSettings):
         ),
         json_schema_extra=_PROVIDER,
     )
-    stripe_secret_key: str = Field(
+    stripe_secret_key: SealedSecret = Field(
         default="",
         description="Stripe secret API key (sk_live_… / sk_test_…). Stored encrypted.",
     )
-    stripe_webhook_secret: str = Field(
+    stripe_webhook_secret: SealedSecret = Field(
         default="",
         description="Signing secret of the Stripe webhook endpoint (whsec_…). Stored encrypted.",
     )

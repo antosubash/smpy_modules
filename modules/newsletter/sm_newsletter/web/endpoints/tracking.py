@@ -4,7 +4,7 @@ and the click redirect (T6, T10-T13).
 **No CSRF, on purpose.** Both are ``GET``s a mail client makes with no session.
 The signed path token is the capability, and the worst a cross-site forger
 holding nothing can do is make a request that records nothing: a forged token
-costs one HMAC and no query. A *genuine* token only bumps its own send's
+costs only MAC checks and no query. A *genuine* token only bumps its own send's
 counters, which unique counts make idempotent (T8, T9).
 
 **The tenant comes from the token** (S8), as on the unsubscribe link: the
