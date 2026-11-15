@@ -323,8 +323,9 @@ doesn't is how `/de/p/x` serves the English page.
 ## Working against an unreleased framework
 
 `make link-framework FRAMEWORK=/path/to/simple_module_python` editable-installs
-its `core`/`db`/`hosting` into the venv; `make unlink-framework` reverts. Neither
-touches a tracked file; `FRAMEWORK` has no default.
+its `core`/`db`/`hosting` plus `FRAMEWORK_MODULES` (default `branding`) into the
+venv; `make unlink-framework` reverts. Neither touches a tracked file;
+`FRAMEWORK` has no default.
 
 ## i18n
 
