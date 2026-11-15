@@ -2,8 +2,12 @@
 
 Every Alembic revision for this host lives in `versions/`. Modules ship
 SQLModel tables only; each consuming host autogenerates its own revisions
-against them. Run `alembic` from the repo root (`alembic.ini` resolves
-`script_location` relative to itself).
+against them. Run alembic from the repo root as
+`uv run --project host alembic -c host/alembic.ini <command>` (there is no
+`alembic.ini` at the root; `host/alembic.ini` resolves `script_location` relative
+to itself). `make migrate`, `make migration` and `make downgrade` wrap it; the
+`alembic ...` commands below (`merge heads`, `downgrade <module>@base`, `check`)
+take the same prefix.
 
 ## Rules
 
@@ -46,7 +50,8 @@ altogether, so a missing one is caught only by the Postgres check.
 
 ## Framework revisions ported
 
-Ids are upstream's, unchanged.
+Ids are upstream's, unchanged, except `9d83e789a5b4`, which is host-only (the
+framework ships no revision for it).
 
 - **0.0.37 / 0.0.38**: `307543b6146a` through `b65e04cf65d7`
   (`307543b6146a` is file_storage upload sessions, `b65e04cf65d7` the leases

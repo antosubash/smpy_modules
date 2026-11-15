@@ -16,7 +16,7 @@ root `.env` is the single source of truth (see AGENTS.md).
   `make sync-module-deps`, `make gen-pages`.
 - Postgres is optional: the shared `dev-services` stack when available (never a
   second container beside it), else the one-line `docker run` in AGENTS.md
-  "Local database".
+  "Local setup".
 
 ## Launch
 | Scenario | Command |

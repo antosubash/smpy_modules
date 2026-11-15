@@ -28,7 +28,7 @@ document, and for CSV at the first row past the ceiling, since a quoted cell
 may contain newlines and there is no cheap exact count to check first.
 
 **``abort`` is the request's transaction, not a loop counter.** Nothing here
-commits (``AGENTS.md``: the framework's session does). A refused run raises
+commits (the framework's session does). A refused run raises
 :class:`~sm_records.records.services.errors.ImportRefused`, which ``RecordsErrorRoute``
 turns into a 422 *and rolls the session back* — so a file failing on row 501
 leaves the first 500 unwritten without this module tracking what it wrote.

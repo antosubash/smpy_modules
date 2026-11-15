@@ -12,10 +12,11 @@ each with docs in `modules/<name>/docs/`: **ai**, **analytics**, **billing**,
 **images**, **news**, **newsletter**, **pagebuilder**, **records**.
 
 New code must run on **Python 3.12** (the `requires-python` floor) and **3.14**
-(the Docker runtime); CI tests both. Run Python entry points (`alembic`,
-`scripts/*.py`, `make dev-api`) from the repo root: `alembic.ini` resolves
-`script_location` relative to itself and `dev-api` uses `--app-dir host`, so
-the root `.env` is the one source of settings.
+(the Docker runtime); CI tests both. Run Python entry points (`scripts/*.py`,
+`make dev-api`, and alembic as `uv run --project host alembic -c host/alembic.ini
+...`, which is what `make migrate`, `migration` and `downgrade` run) from the repo root:
+`host/alembic.ini` resolves `script_location` relative to itself and `dev-api`
+uses `--app-dir host`, so the root `.env` is the one source of settings.
 
 ## Checks
 
@@ -306,7 +307,7 @@ doesn't is how `/de/p/x` serves the English page.
 
 - **Install**: `make install` syncs `--all-extras --no-extra anonymize`, like the
   CI Python, lint, repo-checks, e2e and release jobs and `framework-latest`;
-  Postgres and frontend jobs sync no extras. CI apt-installs `tippecanoe`.
+  the Postgres, frontend and background-tasks jobs sync no extras. CI apt-installs `tippecanoe`.
 - **Database**: SQLite (`host/app.db`) by default; Postgres with
   `SM_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/smpy_modules`.
   Prefer the shared `dev-services` stack (PostGIS, Redis, MinIO, Adminer on
@@ -344,7 +345,7 @@ venv; `make unlink-framework` reverts. Neither touches a tracked file;
   `smpy host gen-i18n` writes into `node_modules` (wiped by `npm ci`; a consuming
   host lacks the runtime `keys`). Derive `keys` from the module's own `en.json`
   at compile time (`resolveJsonModule` plus a mapped type, leaves typed `string`);
-  reference: `modules/news/news/ui/utils/i18n.ts` (182 lines).
+  reference: `modules/news/news/ui/utils/i18n.ts` (about 180 lines).
 - **Puck block labels** hold the *key*, resolved at render (each module's
   `localizeConfig.ts`; pagebuilder's recurses into `arrayFields`/`objectFields`).
 - **Content i18n** is pagebuilder's `content_locales` (what the site publishes),

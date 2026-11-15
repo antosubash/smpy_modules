@@ -71,8 +71,8 @@ you import. `host/tests/test_host_boots.py` fails on an import the installed
 framework marks deprecated.
 
 **Sibling modules.** A requirement on another module of this repo (usually an
-optional extra) needs a `>=` floor, a `<0.1` ceiling and a `# floor: <reason>`
-comment, on its line or directly above it, naming what that release first
+optional extra) needs a `>=` floor and a `# floor: <reason>` comment (and, by
+convention, a `<0.1` ceiling; the check enforces only the floor and comment), on its line or directly above it, naming what that release first
 shipped (`check_rules.py`):
 
 ```toml
@@ -114,6 +114,7 @@ exclude = [
     "**/*.test.tsx",
     "**/__tests__/**",
     "**/test-dom.tsx",
+    "**/*-test-support.ts",
     "**/page-tests/**",
 ]
 artifacts = ["sm_orders/static/dist/**"]   # only with a built bundle
@@ -153,7 +154,8 @@ dependencies = [
 workspace = true
 ```
 
-Then `make install`. Optionally add the module's name to `REPO_MODULES` in
+Then `make install`. Optionally add the module's display name (the `name` its module class declares,
+as in `"PageBuilder"`) to `REPO_MODULES` in
 `host/tests/test_host_boots.py` and assert its routes there, the way the other
 modules do.
 
@@ -329,7 +331,10 @@ copies every `modules/*/pyproject.toml` and `package.json`, and the release's
 The one manual step: before the module's first release, add a Trusted Publisher
 on <https://pypi.org/manage/account/publishing/> with the values in the header
 comment of `.github/workflows/release.yml` (project `simple_module_orders`,
-workflow `release.yml`, environment `pypi`). Publishing uses OIDC, so no API
+owner `antosubash`, repository `smpy_modules`, workflow `release.yml`,
+environment `pypi`). Use the repository name from that comment, not the
+`simple_module_python_modules` in each `pyproject.toml`'s `Repository` URL: the
+OIDC claim carries the current name. Publishing uses OIDC, so no API
 token is needed, but without this the first release fails at that module's
 publish.
 
