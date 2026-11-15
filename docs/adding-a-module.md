@@ -20,6 +20,12 @@ omits `--standalone`: GitHub only runs workflows from the repository-root
 `.github/workflows/`, so a nested per-module workflow would never fire, and a
 nested `publish.yml` is a publish footgun.
 
+The scaffold names the Python package after the module (`orders`). This guide,
+like every module here, uses an `sm_` prefix (`sm_orders`) so the import name
+cannot collide with another distribution: rename the package directory and its
+imports right after scaffolding, or keep `orders` and read the examples with
+that name.
+
 The scaffold is flat. Organise the package and its tests from the start as
 [module layout](module-layout.md) describes, with `modules/images` as the
 reference: `core/`, `web/`, one folder per domain, `ui/` for frontend code that

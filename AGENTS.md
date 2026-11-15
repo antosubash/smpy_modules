@@ -24,7 +24,7 @@ uses `--app-dir host`, so the root `.env` is the one source of settings.
 
 | Step | Enforces |
 | --- | --- |
-| `ruff check .` | Lint incl. `S` (bandit) except `S101`; tests and `scripts/` have per-file ignores, production code a line-level `# noqa: Sxxx - <reason>` |
+| `ruff check .` | Lint incl. `S` (bandit) except `S101`, because a production `assert` only narrows a type after a real check, never validates input; tests and `scripts/` have per-file ignores, production code a line-level `# noqa: Sxxx - <reason>` |
 | `basedpyright` | Basic mode over `[tool.pyright] include` only: every `contracts/` package and its cross-module callers (#338); widen it module by module. There a SQLModel column in a query goes through `sqlmodel.col()`, and a suppression is `# pyright: ignore[rule]` with its reason |
 | `npx biome check .` | JS/TS lint and format |
 | `make typecheck` | `tsc --noEmit` per module |
@@ -94,7 +94,8 @@ models) and `release.yml` (`docs/releasing.md`).
   derives page names from the path, so a stray `.tsx` registers a page.
   Extractions go to `components/`, `hooks/`, `utils/`; exceptions in
   `check_rules.py`'s `PAGES_ALLOWLIST`.
-- **300 lines per `.py`/`.ts`/`.tsx`**, nothing exempt. At 280+, split by
+- **300 lines per `.py`/`.ts`/`.tsx`**, nothing under `modules/` exempt (only
+  `host/migrations/versions/**` is). At 280+, split by
   responsibility when you touch the file; don't trim comments (#133). A mixin
   split from a service declares what it needs as a `Protocol`
   (`pagebuilder/content/service/_host.py`, `news/content/_host.py`); add the
@@ -281,8 +282,11 @@ doesn't is how `/de/p/x` serves the English page.
   - Only the `newsletter.dispatch` beat sends, from the render snapshot;
     `/newsletter/u/`, `/o/`, `/c/` answer forged tokens like real ones
     ([sending](modules/newsletter/docs/sending.md), [tracking](modules/newsletter/docs/tracking.md)).
-  - The SMTP password is written only through `PUT /api/newsletter/settings/smtp-password`;
-    workers refuse a plaintext one ([secret](modules/newsletter/docs/operations.md#the-secret)).
+  - The SMTP password is written only through `PUT /api/newsletter/settings/smtp-password`
+    (`newsletter.manage` and `settings.edit`); workers refuse a plaintext one
+    ([secret](modules/newsletter/docs/operations.md#the-secret)). A settings write that
+    changes the SMTP host, port, security or username clears it, and the generic Settings
+    screen refuses newsletter writes ([settings](modules/newsletter/docs/index.md#settings)).
 - **billing commits outside a request with `finalize_session`, never
   `commit()`** (`tests/core/test_commit_sites.py`, empty allow-list since #340;
   [transactions](modules/billing/docs/architecture.md#transactions--the-rule-that-bites)).

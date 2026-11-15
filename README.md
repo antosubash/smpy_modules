@@ -110,14 +110,18 @@ make dev         # API on :8000, Vite on :5050
   `SM_USERS_BOOTSTRAP_PASSWORD` in `.env` before the first boot; they seed an
   admin while the users table is empty, and only then.
 - **`make dev`** runs the API (uvicorn with `--reload`) and Vite together.
-  `API_PORT=8001 UI_PORT=5051 make dev` moves both, so a second checkout can run
-  beside the first; `make kill` frees this checkout's ports.
+  To run a second checkout beside the first, move both and tell each about the
+  other: `API_PORT=8001 UI_PORT=5051 SM_UI_PORT=5051
+  SM_VITE_DEV_URL=http://localhost:5051 make dev` (Vite reads `SM_UI_PORT`, the
+  API `SM_VITE_DEV_URL`); `make kill` frees this checkout's ports.
 - **Migrations.** `make migration msg="…"` autogenerates a revision in
   `host/migrations/versions/`, `make migrate` runs `upgrade heads`, and
   `make downgrade` steps back one revision.
 - **Background tasks.** images and newsletter run work on Celery. `.env.example`
   sets `SM_BG_TASKS_TASK_ALWAYS_EAGER=true`, so tasks run inline in the web
-  process and nothing else needs to run. To run them the way production does,
+  process. Recurring work still needs beat: without `make beat` a scheduled
+  newsletter campaign is never dispatched
+  ([operations](modules/newsletter/docs/operations.md)). To run them the way production does,
   point `SM_REDIS_URL` at a Redis, drop the eager line, and start the workers
   beside `make dev`: `make worker` (the `images`, `newsletter` and `celery`
   queues), `make worker-imports`, `make worker-heavy`, `make worker-gpu`, and
