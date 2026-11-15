@@ -134,7 +134,9 @@ the caller cannot read, or that is not a list, answers 404 (no oracle).
 `/api/newsletter/suppressions`: the listing (`GET`), the lookup by address
 (`POST /lookup`), the lift (`POST /{id}/lift`) and the audit log (`GET /lifts`).
 
-- **Hashed.** A row holds `sha256(email.strip().lower())`, never an address.
+- **Hashed.** A row holds `sha256(normalise_email(email))`, never an address
+  (local part NFC and lower-cased, domain normalised; see `sending.md` for the
+  legacy `strip().lower()` key reads still try).
   The screen shows a **fingerprint** (the first 12 hex characters), the reason,
   the list, the source and the date. Finding one address is a POST so it stays
   out of access logs. A row whose address nobody knows any more can be seen and
