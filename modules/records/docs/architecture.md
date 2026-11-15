@@ -474,6 +474,25 @@ The config is operational like `is_public`: it is not snapshotted and bumps no
 `schema_version`. The first kind is the exception, because it adds the system
 fields as an ordinary additive schema change.
 
+### Every purge forgets its delivery claims
+
+`records_submission_delivery` rows name who a submission's mail reached (a staff
+address, or a subscriber's keyed hash) beside the record's uuid. They must not
+outlive the record, so **every path that deletes records goes through
+`forget_deliveries`** (`records/services/delete/_forget_deliveries.py`), which
+first locks the record rows `FOR UPDATE` and then deletes their claims in the
+same transaction:
+
+- `hard_delete_record`, and the bulk purge that calls it per record
+  (`_purge_ids`);
+- emptying the trash (`empty_trash`, also through `_purge_ids`);
+- deleting the type (`purge_type_records`, which calls `forget_deliveries`
+  directly).
+
+A new way of deleting records must go through one of these, never a bare
+`DELETE` on the record table, or an erased address stays behind in the claims
+and a racing confirmation task can still send to it.
+
 ### The form on the page, and what happens after
 
 **The `RecordForm` block** (`components/public_submissions/form/`) is

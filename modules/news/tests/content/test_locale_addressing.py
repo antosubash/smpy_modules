@@ -114,7 +114,7 @@ class TestRoutesAreMountedPerLanguage:
     ) -> None:
         """No router is mounted for it, so there is nothing to fall through to.
 
-        The failure this guards is the one CLAUDE.md names by example: an
+        The failure this guards is the one AGENTS.md names by example: an
         address in a language the site does not publish must never answer with
         the default language's article. It 404s — it does not redirect to
         ``/news/budget`` either, because the two were never the same document

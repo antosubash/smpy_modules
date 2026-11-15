@@ -16,7 +16,7 @@ round trip per reuse.
 * it is served through the anonymous twin under ``/api/images/public/``, whose
   answer does not depend on who asks;
 * no tenant was picked by anything request-specific. This is the rule of
-  records #196 and pagebuilder/news #192 (CLAUDE.md): the request must be a
+  records #196 and pagebuilder/news #192 (AGENTS.md): the request must be a
   request-level ``SINGLE`` that fell back to
   :data:`~sm_images.core.tenancy.DEFAULT_TENANT` itself. ``bind_public`` records,
   before that fallback, whether ``request.state.tenant_id`` was already set

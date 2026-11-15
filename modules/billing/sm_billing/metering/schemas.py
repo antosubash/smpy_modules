@@ -1,7 +1,7 @@
 """Request and response models for the usage screens and their API.
 
 The ``*Out`` models carry no bounds or validators: a stored row that
-predates a bound must still be readable (CLAUDE.md), so the bounds live on
+predates a bound must still be readable (AGENTS.md), so the bounds live on
 the ``*In`` models only.
 """
 

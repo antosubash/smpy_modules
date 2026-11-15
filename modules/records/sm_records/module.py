@@ -110,7 +110,7 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         the entry from an ``admin`` user. The views carry their own
         permission dependencies."""
         # ``MenuItem`` has ``label_key`` since framework 0.0.35; the literal
-        # label stands until the repo-wide UI i18n conversion (CLAUDE.md).
+        # ``label`` stays as the fallback beside it.
         # U17: this used to sit in the shared "Content" group, a header away
         # from the per-type entries it is the hub for — the parent read as a
         # peer of another module's screen rather than what it actually is.

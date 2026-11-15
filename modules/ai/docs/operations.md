@@ -58,6 +58,17 @@ is no per-tenant key or model. A consumer that needs to separate tenants'
 usage has to do it itself (for example, tagging requests in a gateway set as
 `chat_base_url`).
 
+### Metering outside a request needs the database URL
+
+`sm_ai.contracts.consume_requests` called without a `session_factory`, while
+billing is installed, opens an engine of its own on the host database
+(`metering._own_factory`): a `NullPool` engine, rebuilt in a forked child, on
+`SM_DATABASE_URL` as `BootstrapSettings` locates it (the environment, else the
+project `.env` found through `SM_PROJECT_ROOT` or the walk up to the project
+root, never a cwd-relative file). A caller that passes its own factory (images
+does) never reaches it. A worker that meters this way therefore needs the same
+database URL as the web process.
+
 ### Configuring without the UI
 
 A fresh deployment, CI job or e2e stack configures the module with the repo's
@@ -226,6 +237,6 @@ never opened, so a worker can't create an empty one.
 | Save says the page's security token is out of date (API: 403 "CSRF token missing or invalid") | API called without the token, or the session changed | Reload `/ai/`; scripted clients must send `X-CSRF-Token` with the `csrfToken` prop of the `/ai/` page. |
 | Warning "stored unencrypted" | a key came from `set_setting.py` (or, before #164, the generic settings screen) | Re-save it on the AI page. |
 | Saved a change but some requests still use the old model | other workers have stale settings | Restart the app. |
-| Setting `SM_AI_CHAT_MODEL` (or any `SM_AI_*`) has no effect | the module reads no environment variables | Change it on the AI page or with `set_setting.py`; see [Moving off `SM_AI_*` variables](#moving-off-sm_ai-variables). |
+| Setting `SM_AI_CHAT_MODEL` (or any `SM_AI_*`) has no effect | the module reads no environment variables | Change it on the AI page or with `set_setting.py`; see [Moving off `SM_AI_*` variables](#moving-off-sm_ai_-variables). |
 | A module's AI feature answers 402 "AI requests limit reached" | the organisation used its plan's `ai.requests` allowance for the period (billing installed) | Billing → Usage: raise the plan's limit, or credit with **Adjust**. The settings page's own **Test connection** is not metered. |
 | **Test connection** OK, but a module still fails | the module's own call (prompt, output schema, model override) | That is the module's behaviour; check its logs. |
