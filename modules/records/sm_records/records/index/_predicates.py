@@ -31,7 +31,7 @@ def like_contains_pattern(term: str) -> str:
     r"""A LIKE pattern matching ``term`` literally, wildcards and all.
 
     The framework grew ``simple_module_db.search`` for this, but a published
-    module depends on the framework with a *range* (CLAUDE.md) and that helper
+    module depends on the framework with a *range* (AGENTS.md) and that helper
     is not in the oldest release in ours — importing it would make this module
     uninstallable on a host that is merely a little behind. ``news.content.like`` keeps
     its own copy for the same reason.

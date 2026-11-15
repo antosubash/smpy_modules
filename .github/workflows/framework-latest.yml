@@ -50,7 +50,7 @@ jobs:
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
 
-      # The host's `==` pins (CLAUDE.md: the host pins exactly) would hold the
+      # The host's `==` pins (AGENTS.md: the host pins exactly) would hold the
       # whole workspace at one framework build. Turn each into `>=<pin>,<0.1`,
       # the modules' own ceiling, in this checkout only.
       - name: Relax the host's framework pins

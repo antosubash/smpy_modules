@@ -87,7 +87,7 @@ The module depends on the framework's `settings`, `sharing`, `file_storage` and
 `background_tasks` modules. Migrations live in the consuming host
 (`make migration`), never in the wheel; the first images revision carries
 `branch_labels = ("images",)`, which names the revision but does not roll back
-only this module (see the repo `CLAUDE.md`).
+only this module (see the repo `AGENTS.md`).
 
 ### `anonymize`: models and licences
 

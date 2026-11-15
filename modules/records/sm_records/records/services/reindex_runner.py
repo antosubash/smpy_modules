@@ -2,7 +2,7 @@
 
 Design doc §8.5 and §8.9. The schema write is one row and is synchronous; the
 rebuild over records is not request work, and this repo has no Celery
-(``CLAUDE.md`` says so), so "deferred" means a job queued with
+(``AGENTS.md`` says so), so "deferred" means a job queued with
 :func:`sm_records.records.deferred.defer` plus the resumable ``reindex`` CLI command
 — :mod:`sm_records.cli`. Not FastAPI's ``BackgroundTasks``, which runs *inside*
 the scheduling request's dependency teardown and therefore inside its still-open

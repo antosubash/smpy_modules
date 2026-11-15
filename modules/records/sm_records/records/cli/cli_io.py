@@ -11,7 +11,7 @@ uploaded through the browser. A second, faster path here is how the two stop
 agreeing about what a valid file is.
 
 **This is the one caller allowed to commit.** In a request the framework's
-session owns the transaction (``CLAUDE.md``), so nothing under ``services/``
+session owns the transaction (``AGENTS.md``), so nothing under ``services/``
 may commit; here there is no request, so the command does it — and only after
 a run that was asked to apply and came back without a refusal.
 

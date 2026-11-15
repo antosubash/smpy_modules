@@ -7,7 +7,7 @@
  * question for whichever host wants the feature.
  *
  * Distinct from UI i18n (the editor's own English strings), which is tracked
- * separately in CLAUDE.md.
+ * separately in AGENTS.md.
  */
 
 export { applyTranslatedStrings } from './apply';

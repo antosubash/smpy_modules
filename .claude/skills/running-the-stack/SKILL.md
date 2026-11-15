@@ -6,7 +6,7 @@ description: Use when launching, restarting, or smoke-testing smpy_modules local
 # Running smpy_modules
 
 Every Python entry point runs from the **repo root** (or a worktree root): the
-root `.env` is the single source of truth (see CLAUDE.md).
+root `.env` is the single source of truth (see AGENTS.md).
 
 ## Prerequisites (once per checkout / worktree)
 - `uv`, Node + npm. A worktree needs its own installs — nothing is shared.
@@ -15,7 +15,7 @@ root `.env` is the single source of truth (see CLAUDE.md).
 - `uv sync --all-packages --all-extras` (= `make install-py`), `npm ci`,
   `make sync-module-deps`, `make gen-pages`.
 - Postgres is optional: the shared `dev-services` stack when available (never a
-  second container beside it), else the one-line `docker run` in CLAUDE.md
+  second container beside it), else the one-line `docker run` in AGENTS.md
   "Local database".
 
 ## Launch

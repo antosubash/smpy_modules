@@ -1,5 +1,5 @@
 # Optional overlay: also join `devnet`, the network of the shared dev-services
-# stack (CLAUDE.md, "Local database"), so the host can reach its Postgres as
+# stack (AGENTS.md, "Local setup"), so the host can reach its Postgres as
 # `postgres:5432`. Requires that stack to be running (`make up` there).
 #
 #   SMPY_DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/smpy_modules \

@@ -3,7 +3,7 @@
 Against a file-backed SQLite database rather than the ``:memory:`` one the
 rest of the suite uses, because the thing under test is the part the HTTP
 tests cannot reach: the CLI owns its own connection and is the one caller in
-this module allowed to ``commit`` (``CLAUDE.md`` reserves that for the
+this module allowed to ``commit`` (``AGENTS.md`` reserves that for the
 framework's session everywhere else). A dry run that quietly committed, or an
 ``--apply`` that quietly did not, is invisible without a second connection to
 check from.

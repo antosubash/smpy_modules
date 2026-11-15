@@ -4,7 +4,7 @@ Shared by the three content-i18n suites so each stays under the 300-line cap.
 
 The settings object is swapped on ``app.state.sm_records`` rather than on the
 module instance: that is where ``deps.get_settings`` reads it from on every
-request (``CLAUDE.md``: env → DB → default, re-read per request), so a test
+request (``AGENTS.md``: env → DB → default, re-read per request), so a test
 that pinned the module's copy instead would configure something nothing looks
 at. It is also why these tests do not need a lifespan or a settings table.
 """

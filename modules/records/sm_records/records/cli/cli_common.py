@@ -72,7 +72,7 @@ async def connected(database_url: str, app: Any = None) -> AsyncIterator[Any]:
 async def load_settings(db_state: Any) -> RecordsSettings:
     """The module's settings as the running host would see them.
 
-    They live in the database (``CLAUDE.md``: no ``SM_RECORDS_*`` env var
+    They live in the database (``AGENTS.md``: no ``SM_RECORDS_*`` env var
     exists), so the CLI reads the same overrides the Settings screen writes —
     ``reindex_batch_size`` in particular, which an operator will have tuned for
     exactly this command. A host whose settings tables are not there yet, or a

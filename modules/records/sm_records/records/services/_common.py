@@ -75,7 +75,7 @@ def mark_written(db: AsyncSession) -> None:
     back. Setting the flag the listener sets is the narrowest fix available
     from outside the framework; the fallback key covers a framework build
     that predates the constant, since a published module depends on a *range*
-    (CLAUDE.md) and cannot assume the newest one.
+    (AGENTS.md) and cannot assume the newest one.
     """
     db.info[SESSION_HAS_WRITES_KEY] = True
 
