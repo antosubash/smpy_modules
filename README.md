@@ -1,4 +1,4 @@
-# simple_module_python_modules
+# smpy_modules
 
 Distributable add-on modules for [simple_module_python](https://github.com/antosubash/simple_module_python)
 applications, plus a demo host that mounts them all.

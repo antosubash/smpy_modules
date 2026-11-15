@@ -70,7 +70,7 @@ def _user_agent() -> str:
     return f"SimpleModule-Images/{version} (+{REPOSITORY_URL}) python-httpx/{httpx.__version__}"
 
 
-REPOSITORY_URL: Final = "https://github.com/antosubash/simple_module_python_modules"
+REPOSITORY_URL: Final = "https://github.com/antosubash/smpy_modules"
 USER_AGENT: Final = _user_agent()
 """Sent on every hop: hosts such as Wikimedia refuse the library's default
 (their policy asks for ``<client>/<version> (<contact>)``)."""

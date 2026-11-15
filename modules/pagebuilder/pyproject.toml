@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/antosubash/simple_module_python_modules"
+Repository = "https://github.com/antosubash/smpy_modules"
 
 [project.entry-points.simple_module]
 pagebuilder = "pagebuilder.module:PagebuilderModule"

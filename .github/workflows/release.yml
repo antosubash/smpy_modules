@@ -17,8 +17,7 @@
 # One-time PyPI setup per module, at https://pypi.org/manage/account/publishing/
 #   PyPI project name = simple_module_<name>
 #   Owner             = antosubash
-#   Repository name   = smpy_modules  (the OIDC claim carries the current repo
-#                       name, not the old simple_module_python_modules)
+#   Repository name   = smpy_modules
 #   Workflow filename = release.yml
 #   Environment       = pypi
 #

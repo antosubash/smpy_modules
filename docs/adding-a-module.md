@@ -48,7 +48,7 @@ license = "MIT"
 keywords = ["simple-module", ...] # must include "simple-module"
 
 [project.urls]
-Repository = "https://github.com/antosubash/simple_module_python_modules"
+Repository = "https://github.com/antosubash/smpy_modules"
 ```
 
 **Version.** Releases are lockstep, so `version` is the root
@@ -338,9 +338,7 @@ The one manual step: before the module's first release, add a Trusted Publisher
 on <https://pypi.org/manage/account/publishing/> with the values in the header
 comment of `.github/workflows/release.yml` (project `simple_module_orders`,
 owner `antosubash`, repository `smpy_modules`, workflow `release.yml`,
-environment `pypi`). Use the repository name from that comment, not the
-`simple_module_python_modules` in each `pyproject.toml`'s `Repository` URL: the
-OIDC claim carries the current name. Publishing uses OIDC, so no API
+environment `pypi`). Publishing uses OIDC, so no API
 token is needed, but without this the first release fails at that module's
 publish.
 
