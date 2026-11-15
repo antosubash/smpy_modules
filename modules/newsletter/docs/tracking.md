@@ -51,7 +51,11 @@ are never stored.
 The tenant comes from the verified token. A request's tenant can refuse a
 token only when it is **host-derived** (`tenant_source` `subdomain` or
 `fixed`), as on the unsubscribe route: a signed-in member of another
-organisation on the apex never blocks a reader's click or pixel.
+organisation on the apex never blocks a reader's click or pixel. The check is
+`host_tenant(request)` (`web/endpoints/public_tenant.py`): it returns the bound
+tenant only when `tenant_source` is in `HOST_SOURCES` (`subdomain`, `fixed`), and
+`None` otherwise, so a session, header or claim tenant is never compared with the
+token's. The unsubscribe, open and click routes all use it.
 
 | Request | Pixel `/o/{token}.gif` | Click `/c/{token}/{N}` |
 | --- | --- | --- |

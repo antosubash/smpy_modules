@@ -158,6 +158,14 @@ the caller cannot read, or that is not a list, answers 404 (no oracle).
   purged the old record; the new signup was `None -> confirmed`, which the mirror
   never clears) and a double-opt-in confirmation whose clearing event was lost.
   The dialog warns that without double opt-in anyone can type an address.
+- **What clears a suppression without a lift.** Only a double-opt-in
+  confirmation (records' confirm link, the one `pending -> confirmed` event) does,
+  through `clear_for_confirmation` (`core/suppression/store.py`, called by the
+  mirror). It deletes that list's `unsubscribed` row and the `hard_bounce` /
+  `imported_cleaned` rows created at or before the confirmation, never a
+  `complaint` and never another list's opt-out. A single-opt-in signup
+  (`None -> confirmed`, where anyone can type the address) clears nothing, and
+  the Mailchimp import never calls it (see [`import.md`](import.md)).
 - **A lift is a conditional delete**: `DELETE ... WHERE id AND tenant_id AND
   created_at = version`. Zero rows (a repeat bounce or opt-out refreshed the row,
   or it is gone) is `409 suppression_changed`. The audit row

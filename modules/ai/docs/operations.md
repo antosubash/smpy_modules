@@ -58,6 +58,17 @@ is no per-tenant key or model. A consumer that needs to separate tenants'
 usage has to do it itself (for example, tagging requests in a gateway set as
 `chat_base_url`).
 
+### Metering outside a request needs the database URL
+
+`sm_ai.contracts.consume_requests` called without a `session_factory`, while
+billing is installed, opens an engine of its own on the host database
+(`metering._own_factory`): a `NullPool` engine, rebuilt in a forked child, on
+`SM_DATABASE_URL` as `BootstrapSettings` locates it (the environment, else the
+project `.env` found through `SM_PROJECT_ROOT` or the walk up to the project
+root, never a cwd-relative file). A caller that passes its own factory (images
+does) never reaches it. A worker that meters this way therefore needs the same
+database URL as the web process.
+
 ### Configuring without the UI
 
 A fresh deployment, CI job or e2e stack configures the module with the repo's

@@ -252,6 +252,11 @@ Applying hands the import to the Celery task
 
 ## What an import publishes
 
+Newsletter's side of the import never calls `clear_for_confirmation`: it writes
+`unsubscribed` and `imported_cleaned` suppressions (insert-ignore, no refresh)
+in the same transaction and clears none. See
+[`audience.md`](audience.md#suppressions) for what does clear one.
+
 **An import publishes no events.** No `SubscriptionChanged`, `RecordCreated` or
 `RecordUpdated`: records' batch runs muted. Other consumers of records' events
 do not see imported people or the opt-outs an import writes; newsletter's own
