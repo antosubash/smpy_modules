@@ -90,6 +90,17 @@ describe('422 entries', () => {
     expect(field('category-name-de').getAttribute('aria-invalid')).toBeNull();
     expect(field('category-name-en').getAttribute('aria-invalid')).toBeNull();
     expect(document.getElementById('category-names-error')?.textContent).toContain('Enter names');
+    for (const id of ['category-name-en', 'category-name-de']) {
+      expect(field(id).getAttribute('aria-describedby')).toBe('category-names-error');
+    }
+    const group = document.getElementById('category-names-error')?.closest('fieldset');
+    expect(group?.getAttribute('aria-invalid')).toBe('true');
+    expect(group?.getAttribute('aria-describedby')).toBe('category-names-error');
+    body = unprocessable(['names', 'de']);
+    await submit();
+    expect(field('category-name-de').getAttribute('aria-describedby')).toBe(
+      'category-name-de-error',
+    );
     await view.unmount();
   });
 });

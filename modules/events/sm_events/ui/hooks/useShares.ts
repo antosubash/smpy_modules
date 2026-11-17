@@ -78,6 +78,27 @@ export function useShares(calendarId: string, open: boolean, onGone?: () => void
     if (open) void load();
   }, [open, load]);
 
+  const isOpen = useRef(open);
+  useEffect(() => {
+    isOpen.current = open;
+    return () => {
+      isOpen.current = false;
+    };
+  }, [open]);
+
+  /** A write that completed after its own dialog went stale may still be missing
+   *  from a dialog open now (a reopen's grants read can have finished before the
+   *  write committed): one quiet refresh. A write that completes while no dialog
+   *  is open does nothing. Neither a toast nor an error: the write is not this
+   *  dialog's to report. */
+  const catchUp = useCallback(() => {
+    if (!isOpen.current) return;
+    const next = begin();
+    refresh(next).catch((e) => {
+      if (next.alive() && isGone(e)) gone();
+    });
+  }, [begin, refresh, gone]);
+
   /** A write that finds the calendar gone refreshes the list before it throws.
    *  A write that outlives the dialog neither throws nor reports: `false`. */
   const settle = useCallback(
@@ -97,10 +118,20 @@ export function useShares(calendarId: string, open: boolean, onGone?: () => void
   const grant = useCallback(
     async (candidate: ShareCandidate, role: ShareRole) => {
       const request = begin();
-      if (!(await settle(request, grantShare(calendarId, candidate.id, role)))) return false;
+      try {
+        await grantShare(calendarId, candidate.id, role);
+      } catch (e) {
+        if (!request.alive()) return false;
+        if (isGone(e)) gone();
+        throw e;
+      }
+      if (!request.alive()) {
+        catchUp();
+        return false;
+      }
       return settle(request, refresh(request));
     },
-    [begin, calendarId, refresh, settle],
+    [begin, calendarId, catchUp, gone, refresh, settle],
   );
 
   const revoke = useCallback(
@@ -115,10 +146,13 @@ export function useShares(calendarId: string, open: boolean, onGone?: () => void
         if (!request.alive()) return false;
         if (!isGone(e)) throw e;
       }
-      if (!request.alive()) return false;
+      if (!request.alive()) {
+        catchUp();
+        return false;
+      }
       return settle(request, refresh(request));
     },
-    [begin, refresh, settle],
+    [begin, catchUp, refresh, settle],
   );
 
   const held = new Set(shares.map((s) => s.subject_id));

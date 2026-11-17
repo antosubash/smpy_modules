@@ -102,6 +102,11 @@ function CategoryForm({
       setPending(false);
     }
   }
+  // The whole-map error describes every name input, beside the input's own.
+  const groupMessage = errors.fields.names;
+  const groupErrorId = fieldErrorId('category-names');
+  const describedBy = (own?: string) =>
+    [own, groupMessage ? groupErrorId : undefined].filter(Boolean).join(' ') || undefined;
   return (
     <DialogContent
       className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
@@ -118,29 +123,37 @@ function CategoryForm({
         <DialogDescription>{t(copy.form_description)}</DialogDescription>
       </DialogHeader>
       <form ref={errors.formRef} className="grid gap-4" noValidate onSubmit={save}>
-        {contentLocales.map((locale, index) => {
-          const id = `category-name-${locale}`;
-          const message = errors.fields[`names.${locale}`];
-          return (
-            <div key={locale} className="grid gap-2">
-              <Label htmlFor={id}>{t(copy.name, { locale })}</Label>
-              <Input
-                id={id}
-                required={index === 0}
-                maxLength={100}
-                value={names[locale] ?? ''}
-                {...invalidProps(id, message)}
-                onChange={(e) => {
-                  setNames({ ...names, [locale]: e.target.value });
-                  errors.clearField(`names.${locale}`);
-                  errors.clearField('names');
-                }}
-              />
-              <FieldError id={fieldErrorId(id)}>{message}</FieldError>
-            </div>
-          );
-        })}
-        <FieldError id={fieldErrorId('category-names')}>{errors.fields.names}</FieldError>
+        <fieldset
+          className="m-0 grid min-w-0 gap-4 border-0 p-0"
+          {...(groupMessage
+            ? { 'aria-invalid': true as const, 'aria-describedby': groupErrorId }
+            : {})}
+        >
+          {contentLocales.map((locale, index) => {
+            const id = `category-name-${locale}`;
+            const message = errors.fields[`names.${locale}`];
+            return (
+              <div key={locale} className="grid gap-2">
+                <Label htmlFor={id}>{t(copy.name, { locale })}</Label>
+                <Input
+                  id={id}
+                  required={index === 0}
+                  maxLength={100}
+                  value={names[locale] ?? ''}
+                  aria-invalid={message ? true : undefined}
+                  aria-describedby={describedBy(message ? fieldErrorId(id) : undefined)}
+                  onChange={(e) => {
+                    setNames({ ...names, [locale]: e.target.value });
+                    errors.clearField(`names.${locale}`);
+                    errors.clearField('names');
+                  }}
+                />
+                <FieldError id={fieldErrorId(id)}>{message}</FieldError>
+              </div>
+            );
+          })}
+          <FieldError id={groupErrorId}>{groupMessage}</FieldError>
+        </fieldset>
         <div className="grid gap-2">
           <Label htmlFor="category-slug">{t(category ? copy.slug_fixed : copy.slug)}</Label>
           <Input
