@@ -43,11 +43,15 @@ async def claim_revision(
         .where(*where, table.c.revision == expected)
         .values(revision=table.c.revision + 1, updated_at=utcnow(), updated_by=actor)
         .returning(table.c.revision)
+        .execution_options(include_deleted=trashed)
     )
     won = (await db.execute(stmt)).scalar_one_or_none()
     if won is not None:
         return won
-    current = (await db.execute(select(table.c.revision).where(*where))).scalar_one_or_none()
+    # The framework's soft-delete criterion reaches Core statements too: only
+    # ``include_deleted`` lets this one see the trash.
+    peek = select(table.c.revision).where(*where).execution_options(include_deleted=trashed)
+    current = (await db.execute(peek)).scalar_one_or_none()
     if current is None:
         raise NotFound
     raise Stale(current)

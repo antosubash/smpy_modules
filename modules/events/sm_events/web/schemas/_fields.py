@@ -2,10 +2,11 @@
 
 import unicodedata
 from typing import Annotated, Any
+from urllib.parse import urlsplit
 
-from pydantic import BeforeValidator, Field
+from pydantic import AfterValidator, BeforeValidator, Field
 
-from sm_events.core import constants
+from sm_events.core import constants, timezones
 
 Slug = Annotated[str, Field(max_length=constants.SLUG_MAX, pattern=constants.SLUG_PATTERN)]
 TextSlug = Annotated[str, Field(max_length=constants.TEXT_SLUG_MAX, pattern=constants.SLUG_PATTERN)]
@@ -47,3 +48,35 @@ def multi_line(value: Any) -> Any:
 
 SingleLine = BeforeValidator(single_line)
 MultiLine = BeforeValidator(multi_line)
+
+
+def known_timezone(value: str | None) -> str | None:
+    if value is not None and not timezones.is_known(value):
+        raise ValueError("not a known IANA timezone")
+    return value
+
+
+TimezoneName = Annotated[
+    str, Field(min_length=1, max_length=constants.TZ_MAX), AfterValidator(known_timezone)
+]
+
+_HTTP_SCHEMES = frozenset({"http", "https"})
+_URL_BAD = frozenset({"Cc", "Cf", "Zs", "Zl", "Zp"})
+
+
+def http_url(value: str) -> str:
+    """An absolute ``http`` or ``https`` URL with no whitespace or control
+    character in it; anything else (``javascript:``, ``data:``, a relative path)
+    is refused."""
+    if any(unicodedata.category(ch) in _URL_BAD for ch in value):
+        raise ValueError("not a valid http(s) URL")
+    try:
+        parts = urlsplit(value)
+    except ValueError:
+        raise ValueError("not a valid http(s) URL") from None
+    if parts.scheme.lower() not in _HTTP_SCHEMES or not parts.hostname:
+        raise ValueError("only http and https URLs are allowed")
+    return value
+
+
+HttpUrl = Annotated[str, Field(max_length=constants.URL_MAX), AfterValidator(http_url)]
