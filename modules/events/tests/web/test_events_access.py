@@ -71,7 +71,7 @@ def expected(route: str, state: str, who: str) -> tuple[int, str | None]:
     live = state == "published"
     if who == "stranger":
         return 404, "not_found"
-    if route in ("get", "preview"):
+    if route == "get":
         return (404, "not_found") if not live and who == "view-share" else (SUCCESS[route], None)
     if who == "view-share":
         return (403, "forbidden") if live else (404, "not_found")

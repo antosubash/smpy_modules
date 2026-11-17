@@ -82,13 +82,16 @@ def override_out(row: OccurrenceOverride, *, all_day: bool, timezone: str) -> Ov
 
 class PreviewIn(BaseModel):
     """A schedule to try: the next ``count`` occurrences after ``after``, and, with
-    ``event_id``, the overrides of that event the schedule would orphan."""
+    ``event_id``, the overrides of that event the schedule would orphan. An existing
+    event needs the right to change it (the notes of its overrides are for writers);
+    ``calendar_id`` names the calendar of a new event, which needs ``write_events``."""
 
     model_config = ConfigDict(extra="forbid")
 
     times: TimesIn
     rrule: RuleText | None = None
     event_id: uuid.UUID | None = None
+    calendar_id: uuid.UUID | None = None
     after: AwareDatetime | None = None
     count: Annotated[int, Field(ge=1, le=constants.PREVIEW_MAX)] = constants.PREVIEW_DEFAULT
 

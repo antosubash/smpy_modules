@@ -24,7 +24,8 @@ from sm_events.calendar.times import Span, to_local
 from sm_events.content import schedule
 from sm_events.content.schedule import Schedule
 from sm_events.core import constants
-from sm_events.core.access.events import load_event
+from sm_events.core.access.events import load_event, require
+from sm_events.core.access.rights import writable_calendar
 from sm_events.core.errors import OverridesOrphaned
 from sm_events.models import Event, OccurrenceOverride
 from sm_events.web.schemas.overrides import (
@@ -103,11 +104,16 @@ def _occurrence(start: datetime, end: datetime, plan: Schedule) -> PreviewOccurr
 async def preview(db: Any, who: ResourcePrincipal, data: PreviewIn) -> PreviewOut:
     """The next ``count`` occurrences of ``data``'s schedule after ``data.after``
     (default: its start), and, given ``event_id``, the overrides that schedule
-    would orphan. Without an event it is pure computation. An event the caller may
-    not see is a 404, so this never confirms a draft exists."""
+    would orphan. An event the caller may not see is a 404 (so this never confirms
+    a draft exists); one they may see but not change is the 403 the ``PATCH`` gives,
+    because the orphaned overrides carry their notes. For a new event, ``calendar_id``
+    must be writable. With neither it is pure computation and reads nothing."""
     event = None
     if data.event_id is not None:
-        event, _rights = await load_event(db, who, data.event_id)
+        event, rights = await load_event(db, who, data.event_id)
+        require(rights)
+    elif data.calendar_id is not None:
+        await writable_calendar(db, who, data.calendar_id)
     plan = schedule.build(data.times, data.rrule)
     after = data.after or plan.span.starts_at
     if plan.rrule is None:

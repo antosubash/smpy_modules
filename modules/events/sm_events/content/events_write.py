@@ -20,7 +20,6 @@ import uuid
 from typing import Any
 
 from simple_module_core.resources import ResourcePrincipal
-from sqlalchemy import select
 
 from sm_events.content import bus, notices, revisions, schedule
 from sm_events.content.fields import check_category, check_parent, has_live_children
@@ -29,9 +28,9 @@ from sm_events.content.series_change import dropped_note, settle_overrides
 from sm_events.content.texts import apply_texts
 from sm_events.core import constants
 from sm_events.core.access.events import load_event, require
-from sm_events.core.access.rights import calendar_rights
-from sm_events.core.errors import Forbidden, InvalidParent, NotFound, UnknownType
-from sm_events.models import Calendar, Event
+from sm_events.core.access.rights import writable_calendar
+from sm_events.core.errors import InvalidParent, UnknownType
+from sm_events.models import Event
 from sm_events.models.enums import DEFAULT_EVENT_TYPE, EventStatus
 from sm_events.web.schemas.events_in import EventCreate, EventPatch
 
@@ -52,25 +51,11 @@ SCALARS = (
 )
 
 
-async def _writable_calendar(db: Any, who: ResourcePrincipal, calendar_id: uuid.UUID) -> Calendar:
-    calendar = (
-        await db.execute(select(Calendar).where(Calendar.id == calendar_id))
-    ).scalar_one_or_none()
-    if calendar is None:
-        raise NotFound
-    rights = await calendar_rights(db, who, calendar)
-    if not rights.view:
-        raise NotFound
-    if not rights.write_events:
-        raise Forbidden(constants.EDIT_REFUSED_DETAIL)
-    return calendar
-
-
 async def create_event(
     db: Any, who: ResourcePrincipal, data: EventCreate, *, locales: tuple[str, ...]
 ) -> Event:
     """A new draft at revision 1, with its texts and a ``created`` history row."""
-    calendar = await _writable_calendar(db, who, data.calendar_id)
+    calendar = await writable_calendar(db, who, data.calendar_id)
     if data.type != DEFAULT_EVENT_TYPE:
         raise UnknownType
     plan = schedule.build(data.times, data.rrule)
