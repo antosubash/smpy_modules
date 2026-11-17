@@ -10,10 +10,15 @@ test asks for a clean one (see :func:`tests.pg_support.arm_reset`).
 
 from __future__ import annotations
 
-import pytest
-from sm_events.core.tenancy import tenant_scope
+from collections.abc import AsyncIterator
+from typing import Any
 
-from tests.pg_support import arm_reset
+import pytest
+import pytest_asyncio
+from sm_events.core.tenancy import tenant_scope
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from tests.pg_support import arm_reset, make_db_state
 
 DEFAULT_TENANT = "default"
 
@@ -39,3 +44,17 @@ def _arm_database_reset():
     """Every test starts from an empty database (a no-op on SQLite)."""
     arm_reset()
     yield
+
+
+@pytest_asyncio.fixture
+async def db_state() -> AsyncIterator[Any]:
+    """In-memory SQLite by default; Postgres when ``SM_TEST_DATABASE_URL`` says so."""
+    state = await make_db_state()
+    yield state
+    await state.engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def db(db_state) -> AsyncIterator[AsyncSession]:
+    async with db_state.session_factory() as session:
+        yield session

@@ -106,7 +106,7 @@ async def test_upstream_tenant_wins_in_single_mode():
     assert resolve_admin(request) == resolve_public(request) == "acme"
 
 
-@pytest.mark.skip(reason="models in Task 5")
+@pytest.mark.unbound_tenant
 async def test_guard_refuses_unbound_orm_read(db_state):
     from sm_events.core.tenancy import TenantUnbound, all_tenants, install_guard
     from sm_events.models import Calendar

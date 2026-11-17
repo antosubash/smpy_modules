@@ -26,3 +26,12 @@ DEPENDS_ON = (_MODULE_SETTINGS, _MODULE_SHARING)
 
 TENANT_REQUIRED_CODE = "tenant_required"
 NOT_FOUND_DETAIL = "Not found"
+
+# Column widths and the shapes a slug, a timezone name and a colour may take.
+SLUG_MAX = 80
+SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
+TEXT_SLUG_MAX = 200
+TZ_MAX = 64
+LOCALE_MAX = 16
+COLOR_PATTERN = r"^#[0-9a-f]{6}$"
+DEFAULT_COLOR = "#2563eb"
