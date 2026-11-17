@@ -16,6 +16,7 @@ from sm_events.models.enums import (
     DEFAULT_EVENT_TYPE,
     EVENT_STATUSES,
     OVERRIDE_KINDS,
+    EventStatus,
     Visibility,
 )
 from sm_events.models.event import Event
@@ -33,6 +34,7 @@ __all__ = [
     "Calendar",
     "Category",
     "Event",
+    "EventStatus",
     "EventText",
     "OccurrenceOverride",
     "Redirect",

@@ -19,3 +19,9 @@ EVENT_STATUSES = ("draft", "in_review", "published")
 ATTENDANCE_MODES = ("in_person", "online", "hybrid")
 OVERRIDE_KINDS = ("skipped", "cancelled", "moved")
 DEFAULT_EVENT_TYPE = "event"
+
+
+class EventStatus(StrEnum):
+    DRAFT = "draft"
+    IN_REVIEW = "in_review"
+    PUBLISHED = "published"
