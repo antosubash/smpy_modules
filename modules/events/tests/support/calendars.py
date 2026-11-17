@@ -28,6 +28,20 @@ async def make(client, headers=OWNER, **body):
     return got.json()
 
 
+async def bare_event(db: Any, calendar: Calendar, **fields: Any) -> Event:
+    """An ``Event`` row with no text (what ``create_event`` inserts before its
+    texts). ``fields`` are ``Event`` columns; the defaults are a one-hour draft on
+    2026-07-01 in UTC."""
+    start = fields.pop("starts_at", datetime(2026, 7, 1, 10, tzinfo=UTC))
+    fields.setdefault("ends_at", start + timedelta(hours=1))
+    fields.setdefault("timezone", "UTC")
+    fields.setdefault("uid", f"{uuid.uuid4()}@simple-module-events")
+    event = Event(calendar_id=calendar.id, starts_at=start, **fields)
+    db.add(event)
+    await db.flush()
+    return event
+
+
 async def seed_event(
     db: Any,
     calendar: Calendar,
@@ -40,13 +54,7 @@ async def seed_event(
     """Insert an event and its text straight into the database (no service, no
     revision). ``fields`` are ``Event`` columns; the defaults are a one-hour
     draft on 2026-07-01 in UTC."""
-    start = fields.pop("starts_at", datetime(2026, 7, 1, 10, tzinfo=UTC))
-    fields.setdefault("ends_at", start + timedelta(hours=1))
-    fields.setdefault("timezone", "UTC")
-    fields.setdefault("uid", f"{uuid.uuid4()}@simple-module-events")
-    event = Event(calendar_id=calendar.id, starts_at=start, **fields)
-    db.add(event)
-    await db.flush()
+    event = await bare_event(db, calendar, **fields)
     db.add(
         EventText(
             event_id=event.id,

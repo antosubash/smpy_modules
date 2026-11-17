@@ -8,6 +8,7 @@ from pydantic import BeforeValidator, Field
 from sm_events.core import constants
 
 Slug = Annotated[str, Field(max_length=constants.SLUG_MAX, pattern=constants.SLUG_PATTERN)]
+TextSlug = Annotated[str, Field(max_length=constants.TEXT_SLUG_MAX, pattern=constants.SLUG_PATTERN)]
 Color = Annotated[str, Field(pattern=constants.COLOR_PATTERN)]
 
 _CONTROL = "Cc"
