@@ -4,6 +4,7 @@ import { grantShare, listShares, revokeShare } from '../utils/api-shares';
 import { keys } from '../utils/i18n';
 import type { Share, ShareCandidate, ShareRole } from '../utils/types';
 import { useCandidates } from './useCandidates';
+import { type ScopedRequest, useGoneOnce, useRequestScope } from './useRequestScope';
 
 export { MIN_QUERY } from './useCandidates';
 
@@ -25,93 +26,99 @@ type Shares = {
   listError: string | null;
   /** Load the grants again after a failure. */
   retry: () => void;
-  grant: (candidate: ShareCandidate, role: ShareRole) => Promise<void>;
-  revoke: (share: Share) => Promise<void>;
+  /** Resolve `false` when the dialog closed meanwhile: nothing to report then. */
+  grant: (candidate: ShareCandidate, role: ShareRole) => Promise<boolean>;
+  revoke: (share: Share) => Promise<boolean>;
 };
 
 /** The share dialog's state: current grants, and the picker's matches for
  *  `query` (people already holding a share are not offered again). Idle until
  *  `open`, so a closed dialog costs no requests. */
 export function useShares(calendarId: string, open: boolean, onGone?: () => void): Shares {
-  // Read through a ref: a caller's callback is usually a new function each render.
-  const gone = useRef(onGone);
-  gone.current = onGone;
+  const gone = useGoneOnce(open, onGone);
+  const begin = useRequestScope(open);
   const [shares, setShares] = useState<Share[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const search = useCandidates(calendarId, open, query, onGone);
+  const search = useCandidates(calendarId, open, query, gone);
   useEffect(() => {
     if (!open) setQuery('');
   }, [open]);
 
+  // Orders the live refreshes among themselves; the scope retires the old ones.
   const generation = useRef(0);
-  const refresh = useCallback(async () => {
-    const mine = ++generation.current;
-    const rows = await listShares(calendarId);
-    if (mine === generation.current) setShares(rows);
-  }, [calendarId]);
-
-  const load = useCallback(
-    (alive: () => boolean = () => true) => {
-      setLoading(true);
-      return refresh()
-        .then(() => {
-          if (alive()) setError(null);
-        })
-        .catch((e) => {
-          if (!alive()) return;
-          setError(errorText(e, GONE));
-          if (isGone(e)) gone.current?.();
-        })
-        .finally(() => {
-          if (alive()) setLoading(false);
-        });
+  const refresh = useCallback(
+    async (request: ScopedRequest) => {
+      const mine = ++generation.current;
+      const rows = await listShares(calendarId, request.signal);
+      if (request.alive() && mine === generation.current) setShares(rows);
     },
-    [refresh],
+    [calendarId],
   );
 
+  const load = useCallback(() => {
+    const request = begin();
+    setLoading(true);
+    return refresh(request)
+      .then(() => {
+        if (request.alive()) setError(null);
+      })
+      .catch((e) => {
+        if (!request.alive()) return;
+        setError(errorText(e, GONE));
+        if (isGone(e)) gone();
+      })
+      .finally(() => {
+        if (request.alive()) setLoading(false);
+      });
+  }, [begin, refresh, gone]);
+
   useEffect(() => {
-    if (!open) return;
-    let current = true;
-    void load(() => current);
-    return () => {
-      current = false;
-      ++generation.current;
-    };
+    if (open) void load();
   }, [open, load]);
 
-  /** A write that finds the calendar gone refreshes the list before it throws. */
-  const settle = useCallback(async (write: Promise<unknown>) => {
-    try {
-      await write;
-    } catch (e) {
-      if (isGone(e)) gone.current?.();
-      throw e;
-    }
-  }, []);
+  /** A write that finds the calendar gone refreshes the list before it throws.
+   *  A write that outlives the dialog neither throws nor reports: `false`. */
+  const settle = useCallback(
+    async (request: ScopedRequest, write: Promise<unknown>): Promise<boolean> => {
+      try {
+        await write;
+      } catch (e) {
+        if (!request.alive()) return false;
+        if (isGone(e)) gone();
+        throw e;
+      }
+      return request.alive();
+    },
+    [gone],
+  );
 
   const grant = useCallback(
     async (candidate: ShareCandidate, role: ShareRole) => {
-      await settle(grantShare(calendarId, candidate.id, role));
-      await settle(refresh());
+      const request = begin();
+      if (!(await settle(request, grantShare(calendarId, candidate.id, role)))) return false;
+      return settle(request, refresh(request));
     },
-    [calendarId, refresh, settle],
+    [begin, calendarId, refresh, settle],
   );
 
   const revoke = useCallback(
     async (share: Share) => {
+      const request = begin();
       // A grant that is already gone (another tab revoked it) is no error and
       // says nothing about the calendar: the reload drops the stale row. Only
       // that reload finding the calendar gone is "no longer exists".
       try {
         await revokeShare(share.id);
       } catch (e) {
+        if (!request.alive()) return false;
         if (!isGone(e)) throw e;
       }
-      await settle(refresh());
+      if (!request.alive()) return false;
+      return settle(request, refresh(request));
     },
-    [refresh, settle],
+    [begin, refresh, settle],
   );
 
   const held = new Set(shares.map((s) => s.subject_id));

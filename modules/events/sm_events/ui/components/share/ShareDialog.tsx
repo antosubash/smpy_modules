@@ -46,8 +46,9 @@ export function ShareDialog({
 
   const grant = async (candidate: ShareCandidate) => {
     try {
-      await state.grant(candidate, role);
-      toast(t(keys.events.share.granted, { name: candidate.display_name }));
+      if (await state.grant(candidate, role)) {
+        toast(t(keys.events.share.granted, { name: candidate.display_name }));
+      }
     } catch (e) {
       report(e);
     }
@@ -55,8 +56,7 @@ export function ShareDialog({
 
   const revoke = async (share: Share) => {
     try {
-      await state.revoke(share);
-      toast(t(keys.events.share.revoked));
+      if (await state.revoke(share)) toast(t(keys.events.share.revoked));
     } catch (e) {
       report(e);
     }

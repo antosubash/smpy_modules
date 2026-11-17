@@ -112,22 +112,40 @@ describe('reopening a dialog', () => {
     expect(document.querySelector<HTMLInputElement>('#events-share-search')?.value).toBe('');
     await view.unmount();
   });
-  it('clears the transfer dialog on reopen', async () => {
-    stubFetch({ [`GET ${CANDIDATES}`]: limited(3) });
+  it('clears the transfer dialog on reopen: query, choice and rate-limit message', async () => {
+    stubFetch({
+      [`GET ${CANDIDATES}`]: (call: { url: string }) =>
+        call.url.endsWith('=sam') ? [sam] : limited(3),
+    });
     const view = await mount(<OwnerDialog calendarId="c1" calendarName="Team" onSaved={vi.fn()} />);
     await click(view.button('Transfer ownership'));
-    const input = document.querySelector<HTMLInputElement>('#owner-search');
-    if (!input) throw new Error('no input');
-    await setValue(input, 'sam');
+    const input = () => document.querySelector<HTMLInputElement>('#owner-search');
+    const cancel = () =>
+      [...document.querySelectorAll('[role="dialog"] button')].find(
+        (b) => b.textContent === 'Cancel',
+      );
+    const submitButton = () =>
+      [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(
+        (b) => b.textContent === 'Transfer ownership',
+      );
+    await setValue(input() as HTMLInputElement, 'sam');
+    await flush(300);
+    await click(document.querySelector('[aria-pressed]'));
+    expect(dialog()).toContain('Sam Smith');
+    expect(submitButton()?.disabled).toBe(false);
+    await setValue(input() as HTMLInputElement, 'samu');
     await flush(300);
     expect(dialog()).toContain('Try again in 3 seconds.');
-    await click(
-      view.button('Cancel') ?? document.querySelector('[role="dialog"] button:last-of-type'),
-    );
+    await click(cancel());
     await flush(300);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
     await click(view.button('Transfer ownership'));
     await flush(300);
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(input()?.value).toBe('');
     expect(dialog()).not.toContain('Try again');
+    expect(dialog()).not.toContain('New owner');
+    expect(submitButton()?.disabled).toBe(true);
     await view.unmount();
   });
 });

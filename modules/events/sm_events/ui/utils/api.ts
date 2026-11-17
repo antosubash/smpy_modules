@@ -78,6 +78,7 @@ export async function send<T>(url: string, init: ApiFetchInit = {}): Promise<T> 
 export const CALENDARS = '/api/events/calendars';
 export const listCalendars = (trashed = false) =>
   send<Calendar[]>(`${CALENDARS}?trashed=${trashed}`);
+export const getCalendar = (id: string) => send<Calendar>(`${CALENDARS}/${id}`);
 export const createCalendar = (body: CalendarInput) =>
   send<Calendar>(CALENDARS, { method: 'POST', json: body });
 export const updateCalendar = (id: string, body: CalendarInput) =>

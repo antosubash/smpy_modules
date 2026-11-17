@@ -52,10 +52,28 @@ describe('calendar rows after another tab acted', () => {
         trash = [];
         return invalid(404, 'Not found');
       },
+      [`GET ${API}/c1`]: invalid(404, 'Not found'),
     });
     await click(button('Restore'));
     await flush();
     expect(toast.error).toHaveBeenCalledWith(GONE);
+    await view.unmount();
+  });
+  it('a calendar beyond the 500-row cap is confirmed by one direct read, not called gone', async () => {
+    let trash: unknown[] = [calendar()];
+    const { view, calls } = await trashTab({
+      [`GET ${API}`]: (call: { url: string }) => (call.url.includes('trashed=true') ? trash : []),
+      [`POST ${API}/c1/restore`]: () => {
+        trash = [];
+        return invalid(404, 'Not found');
+      },
+      [`GET ${API}/c1`]: calendar(),
+    });
+    await click(button('Restore'));
+    await flush();
+    expect(calls.filter((c) => c.url === `${API}/c1`)).toHaveLength(1);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(document.body.textContent).not.toContain(GONE);
     await view.unmount();
   });
   it('trashing what is already in the trash closes the confirmation, silently', async () => {

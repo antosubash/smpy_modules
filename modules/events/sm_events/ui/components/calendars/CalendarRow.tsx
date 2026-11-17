@@ -4,7 +4,15 @@ import { TableCell, TableRow } from '@simple-module-py/ui/components/ui/table';
 import { usePermissions } from '@simple-module-py/ui/hooks/use-permissions';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { errorText, isGone, listCalendars, restoreCalendar, trashCalendar } from '../../utils/api';
+import { type ScopedRequest, useRequestScope } from '../../hooks/useRequestScope';
+import {
+  errorText,
+  getCalendar,
+  isGone,
+  listCalendars,
+  restoreCalendar,
+  trashCalendar,
+} from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 import { Name, withName } from '../../utils/isolate';
 import type { Calendar } from '../../utils/types';
@@ -15,12 +23,21 @@ import { OwnerDialog } from './OwnerDialog';
 import { VisibilityMenu } from './VisibilityMenu';
 
 /** Where a calendar is now, after a request found it missing: in the active
- *  list, in the trash, or (`null`) in neither. Both views are fetched, so the
- *  answer does not depend on which one the page is showing. */
+ *  list, in the trash, or (`null`) in neither. The lists are capped, so a
+ *  calendar in neither is confirmed with one direct read: a trashed calendar
+ *  cannot be read by id (it answers 404 to everyone), so only an active one
+ *  answers 200. A 404 there means it is gone or no longer visible to this user. */
 async function whereIs(id: string): Promise<'active' | 'trash' | null> {
   const [active, trash] = await Promise.all([listCalendars(false), listCalendars(true)]);
   if (active.some((c) => c.id === id)) return 'active';
-  return trash.some((c) => c.id === id) ? 'trash' : null;
+  if (trash.some((c) => c.id === id)) return 'trash';
+  try {
+    await getCalendar(id);
+    return 'active';
+  } catch (e) {
+    if (isGone(e)) return null;
+    throw e;
+  }
 }
 
 /** A long unbroken name must wrap inside the cell, not widen the table. */
@@ -46,34 +63,39 @@ export function CalendarRow({
   const copy = keys.events.calendars;
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const begin = useRequestScope(true);
   async function restore() {
     if (pending) return;
+    const request = begin();
     setPending(true);
     setError(null);
     try {
       await restoreCalendar(calendar.id);
-      onSaved();
+      if (request.alive()) onSaved();
     } catch (e) {
-      await missing(e, 'active');
+      await missing(e, 'active', request);
     } finally {
-      setPending(false);
+      if (request.alive()) setPending(false);
     }
   }
   /** A 404 from restore or trash. Another tab may simply have done the same
    *  thing already (`already`), which is no error: reload and say nothing.
-   *  Only a calendar in neither view is gone; the row goes with the reload, so
-   *  that message is a toast, not text in the row. */
-  async function missing(e: unknown, already: 'active' | 'trash') {
+   *  Only a calendar that is nowhere (see `whereIs`) is gone; the row goes
+   *  with the reload, so that message is a toast, not text in the row. */
+  async function missing(e: unknown, already: 'active' | 'trash', request: ScopedRequest) {
+    if (!request.alive()) return;
     if (!isGone(e)) {
       setError(errorText(e));
       return;
     }
     try {
       const where = await whereIs(calendar.id);
+      if (!request.alive()) return;
       onSaved();
       if (where === null) toast.error(t(keys.events.errors.calendar_gone));
       else if (where !== already) setError(errorText(e));
     } catch (check) {
+      if (!request.alive()) return;
       onSaved();
       setError(errorText(check));
     }
@@ -148,16 +170,17 @@ export function CalendarRow({
                     description={t(copy.trash_description)}
                     confirmLabel={t(copy.trash)}
                     onConfirm={async () => {
+                      const request = begin();
                       try {
                         await trashCalendar(calendar.id);
                       } catch (e) {
                         // A 404 closes the confirmation: `missing` answers it. Any other
                         // failure stays in the dialog.
                         if (!isGone(e)) throw e;
-                        await missing(e, 'trash');
+                        await missing(e, 'trash', request);
                         return;
                       }
-                      onSaved();
+                      if (request.alive()) onSaved();
                     }}
                   />
                 </>

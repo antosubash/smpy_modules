@@ -8,15 +8,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@simple-module-py/ui/components/ui/dialog';
+import { FieldError } from '@simple-module-py/ui/components/ui/field';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { type FormEvent, useMemo, useState } from 'react';
 import { useFormErrors } from '../../hooks/useFormErrors';
 import { createCategory, updateCategory } from '../../utils/api';
-import { requiredText } from '../../utils/field-errors';
+import { fieldErrorId, invalidProps, requiredText } from '../../utils/field-errors';
 import { keys, useT } from '../../utils/i18n';
 import { type Category, DEFAULT_COLOR } from '../../utils/types';
-import { FieldError, invalidProps } from '../FieldError';
 
 export function CategoryDialog({
   category,
@@ -80,7 +80,7 @@ function CategoryForm({
     errors.reset();
     const first = contentLocales[0];
     if (first && !names[first]?.trim()) {
-      errors.setField(`names.${first}`, requiredText());
+      errors.reject({ [`names.${first}`]: requiredText() });
       return;
     }
     setPending(true);
@@ -117,7 +117,7 @@ function CategoryForm({
         <DialogTitle>{t(category ? copy.edit : copy.new)}</DialogTitle>
         <DialogDescription>{t(copy.form_description)}</DialogDescription>
       </DialogHeader>
-      <form className="grid gap-4" noValidate onSubmit={save}>
+      <form ref={errors.formRef} className="grid gap-4" noValidate onSubmit={save}>
         {contentLocales.map((locale, index) => {
           const id = `category-name-${locale}`;
           const message = errors.fields[`names.${locale}`];
@@ -136,11 +136,11 @@ function CategoryForm({
                   errors.clearField('names');
                 }}
               />
-              <FieldError id={id} message={message} />
+              <FieldError id={fieldErrorId(id)}>{message}</FieldError>
             </div>
           );
         })}
-        <FieldError id="category-names" message={errors.fields.names} />
+        <FieldError id={fieldErrorId('category-names')}>{errors.fields.names}</FieldError>
         <div className="grid gap-2">
           <Label htmlFor="category-slug">{t(category ? copy.slug_fixed : copy.slug)}</Label>
           <Input
@@ -161,7 +161,7 @@ function CategoryForm({
               {t(copy.slug_fixed_hint)}
             </p>
           )}
-          <FieldError id="category-slug" message={errors.fields.slug} />
+          <FieldError id={fieldErrorId('category-slug')}>{errors.fields.slug}</FieldError>
         </div>
         <div className="grid gap-2">
           <Label htmlFor="category-color">{t(copy.color)}</Label>
@@ -190,7 +190,7 @@ function CategoryForm({
               </Button>
             </>
           )}
-          <FieldError id="category-color" message={errors.fields.color} />
+          <FieldError id={fieldErrorId('category-color')}>{errors.fields.color}</FieldError>
         </div>
         {errors.error && (
           <p role="alert" className="text-destructive">

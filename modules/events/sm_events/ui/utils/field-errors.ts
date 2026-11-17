@@ -28,3 +28,10 @@ export function fieldErrors(error: unknown): Record<string, string> {
 }
 
 export const requiredText = (): string => t(keys.events.errors.required);
+
+/** The message under a form field; the input points at it with `aria-describedby`. */
+export const fieldErrorId = (id: string): string => `${id}-error`;
+
+/** The `aria-*` pair an input with a message needs. */
+export const invalidProps = (id: string, message?: string) =>
+  message ? { 'aria-invalid': true as const, 'aria-describedby': fieldErrorId(id) } : {};

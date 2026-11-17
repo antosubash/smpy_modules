@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ApiError, errorText, isGone } from '../utils/api';
 import { shareCandidates } from '../utils/api-shares';
 import { keys } from '../utils/i18n';
 import type { ShareCandidate } from '../utils/types';
+import { useGoneOnce, useRequestScope } from './useRequestScope';
 
 export const MIN_QUERY = 3;
 
@@ -10,22 +11,23 @@ type Result = {
   term: string;
   candidates: ShareCandidate[];
   error: string | null;
-  /** A 429: its wait message outlives a change of query, until a response replaces it. */
+  /** A 429: its wait message outlives a change of query (even one too short to
+   *  search), until a response replaces it or the dialog closes. */
   limited: boolean;
 };
 
-/** The picker's matches for `query`. `onGone` runs when the search finds the
- *  calendar gone, so the caller refreshes its list (a ref: it may be new each
- *  render). `settled` is false while a request is debouncing or in flight:
- *  the dialog must not say "No one found" then. */
+/** The picker's matches for `query`. `onGone` runs (at most once per open
+ *  dialog, never after it closes) when the search finds the calendar gone, so
+ *  the caller refreshes its list. `settled` is false while a request is
+ *  debouncing or in flight: the dialog must not say "No one found" then. */
 export function useCandidates(
   calendarId: string,
   open: boolean,
   query: string,
   onGone?: () => void,
 ) {
-  const gone = useRef(onGone);
-  gone.current = onGone;
+  const gone = useGoneOnce(open, onGone);
+  const begin = useRequestScope(open);
   const term = query.trim();
   const tooShort = [...term].length < MIN_QUERY;
   const [result, setResult] = useState<Result | null>(null);
@@ -36,29 +38,31 @@ export function useCandidates(
     if (!open || tooShort) return;
     let current = true;
     const timer = window.setTimeout(() => {
-      shareCandidates(calendarId, term)
+      const request = begin();
+      const fresh = () => current && request.alive();
+      shareCandidates(calendarId, term, request.signal)
         .then((candidates) => {
-          if (current) setResult({ term, candidates, error: null, limited: false });
+          if (fresh()) setResult({ term, candidates, error: null, limited: false });
         })
         .catch((e) => {
-          if (!current) return;
+          if (!fresh()) return;
           setResult({
             term,
             candidates: [],
             error: errorText(e, keys.events.errors.calendar_gone),
             limited: e instanceof ApiError && e.status === 429,
           });
-          if (isGone(e)) gone.current?.();
+          if (isGone(e)) gone();
         });
     }, 250);
     return () => {
       current = false;
       window.clearTimeout(timer);
     };
-  }, [calendarId, open, term, tooShort]);
+  }, [calendarId, open, term, tooShort, begin, gone]);
   const live = open && !tooShort;
   const settled = live && result?.term === term;
-  const waiting = live && !settled && result?.limited === true;
+  const waiting = open && !settled && result?.limited === true;
   return {
     tooShort,
     settled,

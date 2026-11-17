@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@simple-module-py/ui/components/ui/dialog';
+import { FieldError } from '@simple-module-py/ui/components/ui/field';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
@@ -15,7 +16,7 @@ import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { type FormEvent, useId, useState } from 'react';
 import { useFormErrors } from '../../hooks/useFormErrors';
 import { createCalendar, updateCalendar } from '../../utils/api';
-import { requiredText } from '../../utils/field-errors';
+import { fieldErrorId, invalidProps, requiredText } from '../../utils/field-errors';
 import { keys, useT } from '../../utils/i18n';
 import {
   type Calendar,
@@ -24,7 +25,6 @@ import {
   VISIBILITIES,
   type Visibility,
 } from '../../utils/types';
-import { FieldError, invalidProps } from '../FieldError';
 
 /** The 422 paths this form has an input (and a message line) for. */
 const SHOWN = ['name', 'slug', 'color', 'description', 'default_timezone'] as const;
@@ -102,7 +102,7 @@ function CalendarForm({
     // The list below is only a suggestion: the server decides what a zone is.
     if (!timezone.trim()) found.default_timezone = requiredText();
     if (Object.keys(found).length > 0) {
-      for (const [field, message] of Object.entries(found)) errors.setField(field, message);
+      errors.reject(found);
       return;
     }
     setPending(true);
@@ -139,7 +139,7 @@ function CalendarForm({
         <DialogTitle>{t(calendar ? copy.edit : copy.new)}</DialogTitle>
         <DialogDescription>{t(copy.form_description)}</DialogDescription>
       </DialogHeader>
-      <form className="grid gap-4" noValidate onSubmit={save}>
+      <form ref={errors.formRef} className="grid gap-4" noValidate onSubmit={save}>
         <div className="grid gap-2">
           <Label htmlFor="calendar-name">{t(copy.name)}</Label>
           <Input
@@ -153,7 +153,7 @@ function CalendarForm({
               errors.clearField('name');
             }}
           />
-          <FieldError id="calendar-name" message={errors.fields.name} />
+          <FieldError id={fieldErrorId('calendar-name')}>{errors.fields.name}</FieldError>
         </div>
         <div className="grid gap-2">
           <Label htmlFor="calendar-slug">{t(copy.slug)}</Label>
@@ -168,7 +168,7 @@ function CalendarForm({
               errors.clearField('slug');
             }}
           />
-          <FieldError id="calendar-slug" message={errors.fields.slug} />
+          <FieldError id={fieldErrorId('calendar-slug')}>{errors.fields.slug}</FieldError>
         </div>
         <div className="grid gap-2">
           <Label htmlFor="calendar-color">{t(copy.color)}</Label>
@@ -182,7 +182,7 @@ function CalendarForm({
               errors.clearField('color');
             }}
           />
-          <FieldError id="calendar-color" message={errors.fields.color} />
+          <FieldError id={fieldErrorId('calendar-color')}>{errors.fields.color}</FieldError>
         </div>
         <div className="grid gap-2">
           <Label htmlFor="calendar-description">{t(copy.description)}</Label>
@@ -196,7 +196,9 @@ function CalendarForm({
               errors.clearField('description');
             }}
           />
-          <FieldError id="calendar-description" message={errors.fields.description} />
+          <FieldError id={fieldErrorId('calendar-description')}>
+            {errors.fields.description}
+          </FieldError>
         </div>
         <div className="grid gap-2">
           <Label htmlFor="calendar-timezone">{t(copy.timezone)}</Label>
@@ -212,7 +214,9 @@ function CalendarForm({
               errors.clearField('default_timezone');
             }}
           />
-          <FieldError id="calendar-timezone" message={errors.fields.default_timezone} />
+          <FieldError id={fieldErrorId('calendar-timezone')}>
+            {errors.fields.default_timezone}
+          </FieldError>
           <datalist id={zoneList}>
             {[...zones].map((zone) => (
               <option key={zone} value={zone} />

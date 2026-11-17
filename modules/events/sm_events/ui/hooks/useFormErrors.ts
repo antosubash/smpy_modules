@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { errorText, isGone } from '../utils/api';
 import { fieldErrors } from '../utils/field-errors';
 import { keys, translate as t } from '../utils/i18n';
@@ -9,10 +9,25 @@ import { keys, translate as t } from '../utils/i18n';
  *
  *  `shown` lists the field paths the form has a place for. A 422 entry for one
  *  of them lands at that field; an entry for any other leaves the general
- *  message up as well, so a failed save never ends with nothing visible. */
+ *  message up as well, so a failed save never ends with nothing visible.
+ *
+ *  Attach `formRef` to the `<form>`: after every failed submit focus moves to
+ *  the first input marked `aria-invalid` (the first input for a group message), so the failure is announced where the
+ *  user is, not left on Save. */
 export function useFormErrors(gone?: string, onGone?: () => void, shown: readonly string[] = []) {
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+  const [failures, setFailures] = useState(0);
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (failures === 0) return;
+    // A message for a group of fields (no input is marked) lands on the form's first input.
+    const form = formRef.current;
+    (
+      form?.querySelector<HTMLElement>('[aria-invalid="true"]') ??
+      form?.querySelector<HTMLElement>('input, textarea, select')
+    )?.focus();
+  }, [failures]);
   const reset = useCallback(() => {
     setError(null);
     setFields({});
@@ -29,6 +44,7 @@ export function useFormErrors(gone?: string, onGone?: () => void, shown: readonl
         setError(
           Object.keys(visible).length < paths.length ? t(keys.events.errors.invalid_input) : null,
         );
+        setFailures((n) => n + 1);
         return;
       }
       setFields({});
@@ -37,10 +53,11 @@ export function useFormErrors(gone?: string, onGone?: () => void, shown: readonl
     },
     [gone, onGone, shown],
   );
-  const setField = useCallback(
-    (name: string, message: string) => setFields((current) => ({ ...current, [name]: message })),
-    [],
-  );
+  /** The form's own checks failed before any request: show them and focus the first. */
+  const reject = useCallback((found: Record<string, string>) => {
+    setFields(found);
+    setFailures((n) => n + 1);
+  }, []);
   const clearField = useCallback(
     (name: string) =>
       setFields((current) => {
@@ -50,5 +67,5 @@ export function useFormErrors(gone?: string, onGone?: () => void, shown: readonl
       }),
     [],
   );
-  return { error, fields, reset, fail, setField, clearField };
+  return { error, fields, formRef, reset, fail, reject, clearField };
 }

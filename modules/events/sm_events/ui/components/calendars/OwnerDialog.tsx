@@ -12,6 +12,7 @@ import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { type FormEvent, useState } from 'react';
 import { MIN_QUERY, useCandidates } from '../../hooks/useCandidates';
+import { useGoneOnce, useRequestScope } from '../../hooks/useRequestScope';
 import { errorText, isGone, transferOwner } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 import { Name, withName } from '../../utils/isolate';
@@ -31,23 +32,28 @@ export function OwnerDialog({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<ShareCandidate | null>(null);
-  const search = useCandidates(calendarId, open, query, onSaved);
+  const gone = useGoneOnce(open, onSaved);
+  const begin = useRequestScope(open);
+  const search = useCandidates(calendarId, open, query, gone);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function save(event: FormEvent) {
     event.preventDefault();
     if (!selected || pending) return;
+    const request = begin();
     setPending(true);
     setError(null);
     try {
       await transferOwner(calendarId, selected.id);
+      if (!request.alive()) return;
       onSaved();
       setOpen(false);
     } catch (e) {
+      if (!request.alive()) return;
       setError(errorText(e, keys.events.errors.calendar_gone));
-      if (isGone(e)) onSaved();
+      if (isGone(e)) gone();
     } finally {
-      setPending(false);
+      if (request.alive()) setPending(false);
     }
   }
   return (
@@ -59,7 +65,6 @@ export function OwnerDialog({
           setQuery('');
           setError(null);
           setSelected(null);
-          setError(null);
         }
       }}
     >
