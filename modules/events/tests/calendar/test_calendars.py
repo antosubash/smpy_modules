@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from sm_events.calendar import calendars
-from sm_events.core.errors import NotFound, OwnerRequired, SlugTaken
+from sm_events.core.errors import NotFound, SlugTaken
 from sm_events.models import Visibility
 from sm_events.web.schemas.calendars import CalendarCreate, CalendarPatch
 
@@ -129,9 +129,11 @@ async def test_list_trashed_only_own_or_manage(db):
     assert await calendars.list_calendars(db, _who("v", V), trashed=True) == []
 
 
-async def test_restore_of_a_visible_trashed_calendar_needs_the_owner(db):
+async def test_restore_of_a_visible_trashed_calendar_is_not_found_for_others(db):
+    """A trashed calendar is invisible to all but its owner and managers, even
+    one that was public: restore must not confirm it exists."""
     cal = await calendars.create_calendar(db, _who(), CalendarCreate(name="T"), default_tz="UTC")
     await calendars.set_visibility(db, cal, Visibility.PUBLIC)
     await calendars.trash_calendar(db, cal, _who())
-    with pytest.raises(OwnerRequired):
+    with pytest.raises(NotFound):
         await calendars.restore_calendar(db, _who("x", V), cal.id)

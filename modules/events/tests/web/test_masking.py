@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 import pytest
-from sm_events.web.services.masking import mask_email, matches_query, safe_display_name, visible_email
+from sm_events.web.services.masking import (
+    mask_email,
+    matches_query,
+    safe_display_name,
+    visible_email,
+)
 
 
 def test_exact_match_gives_the_full_address():

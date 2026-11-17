@@ -8,14 +8,14 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from simple_module_core.resources import ACTION_DELETE, ACTION_VIEW, ResourcePrincipal
+from simple_module_core.resources import ACTION_DELETE, ResourcePrincipal
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
 from sm_events.calendar.slugs import free_slug, slug_taken, slugify
 from sm_events.core import constants, timezones
 from sm_events.core.access import POLICY, visible_calendars
-from sm_events.core.errors import Forbidden, NotFound, OwnerRequired, SlugTaken
+from sm_events.core.errors import Forbidden, NotFound, SlugTaken
 from sm_events.models import Calendar, Visibility
 from sm_events.models.calendar import CALENDAR_SLUG_CONSTRAINT
 from sm_events.web.schemas.calendars import CalendarCreate, CalendarPatch
@@ -114,19 +114,18 @@ async def trash_calendar(db: Any, cal: Calendar, who: ResourcePrincipal) -> None
 
 
 async def restore_calendar(db: Any, who: ResourcePrincipal, calendar_id: uuid.UUID) -> Calendar:
-    """Bring a trashed calendar back. Absent or not trashed: ``NotFound``.
-    Visible to *who* but not theirs to restore: ``OwnerRequired``."""
+    """Bring a trashed calendar back. Absent, not trashed, or not *who*'s to
+    restore (not the owner, not an ``events.manage`` holder): ``NotFound``. A
+    trashed calendar is invisible to everyone else, share holders and viewers of
+    a once-public calendar included, so a refusal must not confirm it exists."""
     trashed = (
         select(Calendar)
         .where(Calendar.id == calendar_id, Calendar.is_deleted.is_(True))
         .execution_options(include_deleted=True)
     )
-    seen = (await db.execute(POLICY.filter(who, ACTION_VIEW, trashed))).scalars().first()
-    if seen is None:
-        raise NotFound(constants.NOT_FOUND_DETAIL)
     row = (await db.execute(POLICY.filter(who, ACTION_DELETE, trashed))).scalars().first()
     if row is None:
-        raise OwnerRequired(constants.OWNER_ONLY_DETAIL)
+        raise NotFound(constants.NOT_FOUND_DETAIL)
     row.is_deleted = False
     row.deleted_at = None
     row.deleted_by = None
