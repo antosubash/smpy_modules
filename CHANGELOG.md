@@ -174,14 +174,19 @@ name the module they affect.
 ### Changed
 
 - **The demo host runs framework 0.0.47** (was 0.0.44). The host ports the
-  one new revision, `e480d7dd348f` (`users_oauth_account` profile columns), and
-  `alembic check` is clean on SQLite as well as Postgres. The flat import paths
+  one new framework revision, `e480d7dd348f` (`users_oauth_account` profile
+  columns), and adds `c7a41e9d2b60` of its own; `alembic check` is clean on SQLite
+  as well as Postgres, for a fresh database and one built before the bump. The flat import paths
   0.0.44 deprecated are removed by the framework in 0.0.46; no module imports one.
-  **Upgrading:** a response's own `Content-Security-Policy` is now kept beside the
+  **Upgrading:** since 0.0.45 a response's own `Content-Security-Policy` is kept beside the
   app policy and both are enforced (framework #870), where the app policy used to
-  replace it. pagebuilder's and news' `public_csp` therefore intersect with the
-  nonce-based policy: a source the app policy allows but `public_csp` does not is
-  blocked on those pages, and an inline executable script there needs the nonce.
+  replace it. pagebuilder's `public_csp` now defaults to empty, as news' already
+  was, so a host that stored no value stops sending a second header on public
+  pages. A host that stored one keeps sending it beside the app policy; check it
+  against that policy, since it can only restrict further and cannot carry the
+  per-request nonce (a `script-src` in it blocks the host's own scripts). A
+  revision, `c7a41e9d2b60`, retypes `users_access_token.expires_at` on SQLite so a
+  database built before this release passes `alembic check`; Postgres is unaffected.
 
 - **news, pagebuilder, analytics and records settings use the framework's
   `DbBackedSettings`** (#345), as ai, billing, images and newsletter already

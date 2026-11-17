@@ -1,7 +1,7 @@
 """``alembic check`` on SQLite ignores ``tenant_browse``'s ordering, and nothing beyond it.
 
 ``tenant_browse`` has ``created_at DESC``, which SQLite reflects as a plain column;
-the framework's ``make_include_object`` (0.0.47) skips that comparison. It must still
+the framework's ``make_include_object`` (0.0.45) skips that comparison. It must still
 see the index on other columns. A *missing* expression index is out of reach here: Alembic
 skips those on SQLite itself, and the Postgres ``alembic check`` in CI catches it.
 Real alembic against a real file.

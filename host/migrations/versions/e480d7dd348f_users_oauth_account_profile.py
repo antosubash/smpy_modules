@@ -1,4 +1,4 @@
-"""users: store the IdP profile on the OAuth link (#877)
+"""users: store the IdP profile on the OAuth link (#877). (framework 0.0.46)
 
 Revision ID: e480d7dd348f
 Revises: 541bfbe29a28

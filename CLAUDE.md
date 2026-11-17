@@ -75,16 +75,17 @@ a raw token must keep the plaintext itself (the table holds only a digest).
 label, because `ca297bbf33bf` already carries it here and Alembic refuses a
 label used twice — keep dropping a duplicate label when porting.
 0.0.43's `a738c2e4f601` and `e731a1b2c3d4` and 0.0.44's `e805a1b2c3d4`,
-`c5d8e2f1a903` and `f6c2d4e8b109` follow `c4e9b2a7d613`; 0.0.45's `e480d7dd348f`
+`c5d8e2f1a903` and `f6c2d4e8b109` follow `c4e9b2a7d613`; 0.0.46's `e480d7dd348f`
 (`users_oauth_account` profile columns) follows the then head `541bfbe29a28`.
-`0a30d2baa903` types `users_access_token.expires_at` as `DateTime(timezone=True)`
-(the model is `AwareDateTime` since 0.0.47; `TIMESTAMPAware` reflected as
-`TIMESTAMP` on SQLite and failed `alembic check`). Upstream's
+`0a30d2baa903` is shipped and stays as it was (`TIMESTAMPAware`); the model is
+`AwareDateTime` since 0.0.45, which SQLite reports as a type change against the
+reflected `TIMESTAMP`, so `c7a41e9d2b60` retypes `users_access_token.expires_at` on
+SQLite only (a no-op on Postgres) and old and new databases converge. Upstream's
 `b8d4f2a6c901` (audit_log) and `c9d2e4f6a810` (oidc) are not ported: neither
 module is installed here, so their tables do not exist. `e731a1b2c3d4` refuses
 to run while two accounts' emails differ only by letter case, and prints them masked
 (`a***@host`) with the query that lists them.
-Since 0.0.47 the framework's `make_include_object` skips the false change SQLite
+Since 0.0.45 the framework's `make_include_object` skips the false change SQLite
 reports for `tenant_browse` (`created_at DESC` reflects as a plain column), so
 `host/migrations/env.py` carries no workaround. An index on other columns is still
 reported; a missing expression index only by the Postgres check, because Alembic
@@ -95,12 +96,12 @@ flat paths (`tenants.resolver`, `settings.service`, …) are gone since 0.0.46
 that dependency's floor to the release that first shipped it;
 `host/tests/test_host_boots.py` fails on any import of a path the installed
 framework marks `deprecated_module`.
-**Since 0.0.47 a response's own `Content-Security-Policy` is kept beside the app
-policy** (the browser enforces both): pagebuilder's and news' `public_csp` used to
-be overwritten by the nonce-based app policy and now intersect with it, so a source
-the app policy allows but `public_csp` does not (Google Fonts in the host template,
-for one) is blocked on those pages. An inline executable script on such a page
-needs the nonce in `public_csp` too.
+**Since 0.0.45 a response's own `Content-Security-Policy` is kept beside the app
+policy** (the browser enforces both; framework #870): a module's policy can only
+restrict further, and being static it cannot carry the per-request nonce, so a
+script a module policy's `script-src` does not allow is blocked whatever the app
+allows. pagebuilder's and news' `public_csp` therefore default to empty (no second
+header); set one only to restrict something the app policy allows.
 **Since 0.0.43 the production CSP is nonce-based** (`'nonce-…' 'strict-dynamic'`,
 no `unsafe-inline` or `unsafe-eval`): an executable `<script>` in a template needs
 `nonce="{{ request.state.csp_nonce }}"`, and `eval`/`new Function` no longer run.
