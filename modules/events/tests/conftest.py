@@ -11,7 +11,7 @@ test asks for a clean one (see :func:`tests.pg_support.arm_reset`).
 from __future__ import annotations
 
 import pytest
-from simple_module_db import tenant_context
+from sm_events.core.tenancy import tenant_scope
 
 from tests.pg_support import arm_reset
 
@@ -30,7 +30,7 @@ def _default_tenant(request):
     if request.node.get_closest_marker("unbound_tenant") is not None:
         yield None
         return
-    with tenant_context(DEFAULT_TENANT):
+    with tenant_scope(DEFAULT_TENANT):
         yield DEFAULT_TENANT
 
 
