@@ -38,7 +38,7 @@ from sm_events.core.errors import InvalidTimes, InvalidTransition
 from sm_events.models import Event
 from sm_events.models.enums import EventStatus
 
-__all__ = ["TRANSITIONS", "transition"]
+__all__ = ["TRANSITIONS", "publish_scheduled", "transition"]
 
 _DRAFT, _REVIEW, _LIVE = (s.value for s in EventStatus)
 TRANSITIONS: Mapping[str, tuple[frozenset[str], bool]] = {
@@ -134,3 +134,23 @@ async def transition(
         if recorded == "approved":
             bus.emit(db, notices.published(event, at=now))
     return event
+
+
+async def publish_scheduled(db: Any, event: Event, *, now: datetime) -> None:
+    """The beat's publish of an event whose ``publish_at`` has come, with no actor.
+
+    The stale guard holds: it is claimed at the revision the caller read, so an
+    event somebody edited, unscheduled or published since is ``Stale`` and left
+    for the next tick. The revision is written as ``published_scheduled`` with no
+    actor. The scheduler's right is not re-checked: the ``scheduled`` revision
+    records who scheduled it.
+
+    **No bus event.** A worker has no in-process bus, so unlike ``approve`` this
+    announces no :class:`~sm_events.contracts.events.EventPublished`: a
+    subscriber only sees publishes made through the web process (open point 2 of
+    the design; a cross-process bus is a framework matter)."""
+    async with db.begin_nested():
+        await claim(db, event, event.revision, actor=None)
+        event.status, event.publish_at, event.published_at = _LIVE, None, now
+        await db.flush()
+        await revisions.record(db, event, action="published_scheduled", actor=None)
