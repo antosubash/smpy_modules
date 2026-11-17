@@ -11,7 +11,7 @@ import {
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { type FormEvent, useState } from 'react';
-import { errorText, setVisibility } from '../../utils/api';
+import { errorText, isGone, setVisibility } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 import { type Calendar, VISIBILITIES, type Visibility } from '../../utils/types';
 
@@ -31,7 +31,8 @@ export function VisibilityMenu({ calendar, onSaved }: { calendar: Calendar; onSa
       onSaved();
       setOpen(false);
     } catch (e) {
-      setError(errorText(e));
+      setError(errorText(e, keys.events.errors.calendar_gone));
+      if (isGone(e)) onSaved();
     } finally {
       setPending(false);
     }
@@ -48,7 +49,12 @@ export function VisibilityMenu({ calendar, onSaved }: { calendar: Calendar; onSa
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline">{t(keys.events.calendars.visibility)}</Button>
+        <Button
+          variant="outline"
+          aria-label={t(keys.events.calendars.visibility_for, { name: calendar.name })}
+        >
+          {t(keys.events.calendars.visibility)}
+        </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto" showCloseButton={false}>
         <DialogHeader>

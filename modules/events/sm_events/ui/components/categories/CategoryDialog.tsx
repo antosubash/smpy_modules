@@ -11,16 +11,22 @@ import {
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { type FormEvent, useState } from 'react';
-import { createCategory, errorText, updateCategory } from '../../utils/api';
+import { useFormErrors } from '../../hooks/useFormErrors';
+import { createCategory, updateCategory } from '../../utils/api';
+import { requiredText } from '../../utils/field-errors';
 import { keys, useT } from '../../utils/i18n';
 import { type Category, DEFAULT_COLOR } from '../../utils/types';
+import { FieldError, invalidProps } from '../FieldError';
 
 export function CategoryDialog({
   category,
+  label,
   contentLocales,
   onSaved,
 }: {
   category?: Category;
+  /** The trigger's accessible name, which says which row it acts on. */
+  label?: string;
   contentLocales: string[];
   onSaved: () => void;
 }) {
@@ -29,7 +35,7 @@ export function CategoryDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant={category ? 'outline' : 'default'}>
+        <Button variant={category ? 'outline' : 'default'} aria-label={label}>
           {t(category ? keys.events.common.edit : keys.events.categories.new)}
         </Button>
       </DialogTrigger>
@@ -61,12 +67,17 @@ function CategoryForm({
   const [slug, setSlug] = useState(category?.slug ?? '');
   const [color, setColor] = useState<string | null>(category ? category.color : DEFAULT_COLOR);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const errors = useFormErrors();
   async function save(event: FormEvent) {
     event.preventDefault();
     if (pending) return;
+    errors.reset();
+    const first = contentLocales[0];
+    if (first && !names[first]?.trim()) {
+      errors.setField(`names.${first}`, requiredText());
+      return;
+    }
     setPending(true);
-    setError(null);
     const body = {
       names: Object.fromEntries(
         contentLocales
@@ -80,7 +91,7 @@ function CategoryForm({
       else await createCategory({ ...body, ...(slug ? { slug } : {}) });
       onSaved();
     } catch (e) {
-      setError(errorText(e));
+      errors.fail(e);
     } finally {
       setPending(false);
     }
@@ -100,19 +111,29 @@ function CategoryForm({
         <DialogTitle>{t(category ? copy.edit : copy.new)}</DialogTitle>
         <DialogDescription>{t(copy.form_description)}</DialogDescription>
       </DialogHeader>
-      <form className="grid gap-4" onSubmit={save}>
-        {contentLocales.map((locale, index) => (
-          <div key={locale} className="grid gap-2">
-            <Label htmlFor={`category-name-${locale}`}>{t(copy.name, { locale })}</Label>
-            <Input
-              id={`category-name-${locale}`}
-              required={index === 0}
-              maxLength={100}
-              value={names[locale] ?? ''}
-              onChange={(e) => setNames({ ...names, [locale]: e.target.value })}
-            />
-          </div>
-        ))}
+      <form className="grid gap-4" noValidate onSubmit={save}>
+        {contentLocales.map((locale, index) => {
+          const id = `category-name-${locale}`;
+          const message = errors.fields[`names.${locale}`] ?? errors.fields.names;
+          return (
+            <div key={locale} className="grid gap-2">
+              <Label htmlFor={id}>{t(copy.name, { locale })}</Label>
+              <Input
+                id={id}
+                required={index === 0}
+                maxLength={100}
+                value={names[locale] ?? ''}
+                {...invalidProps(id, message)}
+                onChange={(e) => {
+                  setNames({ ...names, [locale]: e.target.value });
+                  errors.clearField(`names.${locale}`);
+                  errors.clearField('names');
+                }}
+              />
+              <FieldError id={id} message={message} />
+            </div>
+          );
+        })}
         <div className="grid gap-2">
           <Label htmlFor="category-slug">{t(copy.slug)}</Label>
           <Input
@@ -121,25 +142,46 @@ function CategoryForm({
             maxLength={80}
             pattern="[a-z0-9]+(-[a-z0-9]+)*"
             value={slug}
-            onChange={(e) => setSlug(e.target.value)}
+            {...invalidProps('category-slug', errors.fields.slug)}
+            onChange={(e) => {
+              setSlug(e.target.value);
+              errors.clearField('slug');
+            }}
           />
+          <FieldError id="category-slug" message={errors.fields.slug} />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="category-color">{t(copy.color)}</Label>
-          <Input
-            id="category-color"
-            type="color"
-            value={color ?? DEFAULT_COLOR}
-            onChange={(e) => setColor(e.target.value)}
-          />
-          <span>{color ?? t(copy.no_color)}</span>
-          <Button type="button" variant="outline" onClick={() => setColor(null)}>
-            {t(copy.clear_color)}
-          </Button>
+          {color === null ? (
+            <>
+              <span>{t(copy.no_color)}</span>
+              <Button type="button" variant="outline" onClick={() => setColor(DEFAULT_COLOR)}>
+                {t(copy.choose_color)}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Input
+                id="category-color"
+                type="color"
+                value={color}
+                {...invalidProps('category-color', errors.fields.color)}
+                onChange={(e) => {
+                  setColor(e.target.value);
+                  errors.clearField('color');
+                }}
+              />
+              <span>{color}</span>
+              <Button type="button" variant="outline" onClick={() => setColor(null)}>
+                {t(copy.clear_color)}
+              </Button>
+            </>
+          )}
+          <FieldError id="category-color" message={errors.fields.color} />
         </div>
-        {error && (
+        {errors.error && (
           <p role="alert" className="text-destructive">
-            {error}
+            {errors.error}
           </p>
         )}
         <div className="flex justify-end gap-2">

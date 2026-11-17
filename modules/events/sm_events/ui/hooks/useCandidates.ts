@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { errorText } from '../utils/api';
 import { shareCandidates } from '../utils/api-shares';
+import { keys } from '../utils/i18n';
 import type { ShareCandidate } from '../utils/types';
 
 export const MIN_QUERY = 3;
@@ -21,7 +22,12 @@ export function useCandidates(calendarId: string, open: boolean, query: string) 
           if (current) setResult({ term, candidates, error: null });
         })
         .catch((e) => {
-          if (current) setResult({ term, candidates: [], error: errorText(e) });
+          if (current)
+            setResult({
+              term,
+              candidates: [],
+              error: errorText(e, keys.events.errors.calendar_gone),
+            });
         });
     }, 250);
     return () => {

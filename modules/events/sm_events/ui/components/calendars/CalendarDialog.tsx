@@ -13,7 +13,9 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { type FormEvent, useId, useState } from 'react';
-import { createCalendar, errorText, updateCalendar } from '../../utils/api';
+import { useFormErrors } from '../../hooks/useFormErrors';
+import { createCalendar, updateCalendar } from '../../utils/api';
+import { requiredText, timezoneText } from '../../utils/field-errors';
 import { keys, useT } from '../../utils/i18n';
 import {
   type Calendar,
@@ -22,22 +24,31 @@ import {
   VISIBILITIES,
   type Visibility,
 } from '../../utils/types';
+import { FieldError, invalidProps } from '../FieldError';
 
 export function CalendarDialog({
   calendar,
   defaultTimezone,
   onSaved,
+  onGone,
 }: {
   calendar?: Calendar;
   defaultTimezone: string;
   onSaved: () => void;
+  /** The calendar was trashed or deleted elsewhere: refresh the list. */
+  onGone?: () => void;
 }) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant={calendar ? 'outline' : 'default'}>
+        <Button
+          variant={calendar ? 'outline' : 'default'}
+          aria-label={
+            calendar ? t(keys.events.calendars.edit_for, { name: calendar.name }) : undefined
+          }
+        >
           {t(calendar ? keys.events.common.edit : keys.events.calendars.new)}
         </Button>
       </DialogTrigger>
@@ -45,6 +56,7 @@ export function CalendarDialog({
         <CalendarForm
           calendar={calendar}
           defaultTimezone={defaultTimezone}
+          onGone={onGone}
           onSaved={() => {
             onSaved();
             setOpen(false);
@@ -59,10 +71,12 @@ function CalendarForm({
   calendar,
   defaultTimezone,
   onSaved,
+  onGone,
 }: {
   calendar?: Calendar;
   defaultTimezone: string;
   onSaved: () => void;
+  onGone?: () => void;
 }) {
   const { t } = useT();
   const copy = keys.events.calendars;
@@ -74,13 +88,22 @@ function CalendarForm({
   const [timezone, setTimezone] = useState(calendar?.default_timezone ?? defaultTimezone);
   const [visibility, setVisibility] = useState<Visibility>('private');
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [zones] = useState(() => Intl.supportedValuesOf('timeZone'));
+  const errors = useFormErrors(keys.events.errors.calendar_gone, onGone);
+  const [zones] = useState(() => new Set(['UTC', ...Intl.supportedValuesOf('timeZone')]));
   async function save(event: FormEvent) {
     event.preventDefault();
     if (pending) return;
+    errors.reset();
+    const found: Record<string, string> = {};
+    if (!name.trim()) found.name = requiredText();
+    if (!timezone.trim()) found.default_timezone = requiredText();
+    else if (!zones.has(timezone) && timezone !== calendar?.default_timezone)
+      found.default_timezone = timezoneText();
+    if (Object.keys(found).length > 0) {
+      for (const [field, message] of Object.entries(found)) errors.setField(field, message);
+      return;
+    }
     setPending(true);
-    setError(null);
     const body: CalendarInput = {
       name,
       color,
@@ -94,7 +117,7 @@ function CalendarForm({
       else await createCalendar(body);
       onSaved();
     } catch (e) {
-      setError(errorText(e));
+      errors.fail(e);
     } finally {
       setPending(false);
     }
@@ -114,7 +137,7 @@ function CalendarForm({
         <DialogTitle>{t(calendar ? copy.edit : copy.new)}</DialogTitle>
         <DialogDescription>{t(copy.form_description)}</DialogDescription>
       </DialogHeader>
-      <form className="grid gap-4" onSubmit={save}>
+      <form className="grid gap-4" noValidate onSubmit={save}>
         <div className="grid gap-2">
           <Label htmlFor="calendar-name">{t(copy.name)}</Label>
           <Input
@@ -122,8 +145,13 @@ function CalendarForm({
             required
             maxLength={200}
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            {...invalidProps('calendar-name', errors.fields.name)}
+            onChange={(e) => {
+              setName(e.target.value);
+              errors.clearField('name');
+            }}
           />
+          <FieldError id="calendar-name" message={errors.fields.name} />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="calendar-slug">{t(copy.slug)}</Label>
@@ -132,8 +160,13 @@ function CalendarForm({
             maxLength={80}
             pattern="[a-z0-9]+(-[a-z0-9]+)*"
             value={slug}
-            onChange={(e) => setSlug(e.target.value)}
+            {...invalidProps('calendar-slug', errors.fields.slug)}
+            onChange={(e) => {
+              setSlug(e.target.value);
+              errors.clearField('slug');
+            }}
           />
+          <FieldError id="calendar-slug" message={errors.fields.slug} />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="calendar-color">{t(copy.color)}</Label>
@@ -141,8 +174,13 @@ function CalendarForm({
             id="calendar-color"
             type="color"
             value={color}
-            onChange={(e) => setColor(e.target.value)}
+            {...invalidProps('calendar-color', errors.fields.color)}
+            onChange={(e) => {
+              setColor(e.target.value);
+              errors.clearField('color');
+            }}
           />
+          <FieldError id="calendar-color" message={errors.fields.color} />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="calendar-description">{t(copy.description)}</Label>
@@ -150,8 +188,13 @@ function CalendarForm({
             id="calendar-description"
             maxLength={2000}
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            {...invalidProps('calendar-description', errors.fields.description)}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              errors.clearField('description');
+            }}
           />
+          <FieldError id="calendar-description" message={errors.fields.description} />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="calendar-timezone">{t(copy.timezone)}</Label>
@@ -161,11 +204,15 @@ function CalendarForm({
             maxLength={64}
             list={zoneList}
             value={timezone}
-            onChange={(e) => setTimezone(e.target.value)}
+            {...invalidProps('calendar-timezone', errors.fields.default_timezone)}
+            onChange={(e) => {
+              setTimezone(e.target.value);
+              errors.clearField('default_timezone');
+            }}
           />
+          <FieldError id="calendar-timezone" message={errors.fields.default_timezone} />
           <datalist id={zoneList}>
-            <option value="UTC" />
-            {zones.map((zone) => (
+            {[...zones].map((zone) => (
               <option key={zone} value={zone} />
             ))}
           </datalist>
@@ -186,9 +233,9 @@ function CalendarForm({
             </NativeSelect>
           </div>
         )}
-        {error && (
+        {errors.error && (
           <p role="alert" className="text-destructive">
-            {error}
+            {errors.error}
           </p>
         )}
         <div className="flex justify-end gap-2">

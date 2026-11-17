@@ -3,16 +3,26 @@ import { type ApiFetchInit, apiFetch, NETWORK_FAILURE } from '@simple-module-py/
 import { keys, translate as t } from './i18n';
 import type { Calendar, CalendarInput, Category, CategoryInput, Visibility } from './types';
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(
     public readonly status: number,
     public readonly code: string,
+    /** The 422's `loc` entries (without the leading `body`), dotted: `names.de`. */
+    public readonly fields: string[] = [],
+    /** Seconds the server asked to wait (429), when it said. */
+    public readonly retryAfter: number | null = null,
   ) {
     super(code);
   }
 }
 
-export function errorText(error: unknown): string {
+/** The request hit something that is gone: a 404, whatever its code. */
+export const isGone = (error: unknown): boolean =>
+  error instanceof ApiError && error.status === 404;
+
+/** The message for a failed request. `gone` words a 404 for this screen's
+ *  subject ("This calendar no longer exists.") instead of the generic one. */
+export function errorText(error: unknown, gone?: string): string {
   const messages: Record<string, string> = {
     slug_taken: keys.events.errors.slug_taken,
     owner_required: keys.events.errors.owner_required,
@@ -25,6 +35,8 @@ export function errorText(error: unknown): string {
     default_locale_required: keys.events.errors.default_locale_required,
   };
   if (!(error instanceof ApiError)) return t(keys.events.errors.generic);
+  if (gone && error.status === 404) return t(gone);
+  if (error.status === 429) return rateLimitText(error.retryAfter);
   if (messages[error.code]) return t(messages[error.code]);
   if (error.status === NETWORK_FAILURE) return t(keys.events.errors.offline);
   if (error.status === 401) return t(keys.events.errors.session_expired);
@@ -33,11 +45,34 @@ export function errorText(error: unknown): string {
   return t(keys.events.errors.generic);
 }
 
+function rateLimitText(seconds: number | null): string {
+  return seconds === null
+    ? t(keys.events.errors.rate_limited_soon)
+    : t(keys.events.errors.rate_limited, { count: seconds });
+}
+
+type ErrorBody = { code?: unknown; retry_after?: unknown; detail?: unknown } | null;
+
+function fieldsOf(body: ErrorBody): string[] {
+  if (!Array.isArray(body?.detail)) return [];
+  return (body.detail as { loc?: unknown }[]).flatMap((item) =>
+    Array.isArray(item?.loc)
+      ? [item.loc.filter((part) => part !== 'body' && part !== 'query').join('.')]
+      : [],
+  );
+}
+
 export async function send<T>(url: string, init: ApiFetchInit = {}): Promise<T> {
   const result = await apiFetch<T>(url, init);
   if (result.ok) return result.data;
-  const body = result.error as { code?: unknown } | null;
-  throw new ApiError(result.status, typeof body?.code === 'string' ? body.code : '');
+  const body = result.error as ErrorBody;
+  const wait = Number(body?.retry_after);
+  throw new ApiError(
+    result.status,
+    typeof body?.code === 'string' ? body.code : '',
+    result.status === 422 ? fieldsOf(body) : [],
+    result.status === 429 && Number.isFinite(wait) && wait > 0 ? Math.ceil(wait) : null,
+  );
 }
 
 export const CALENDARS = '/api/events/calendars';

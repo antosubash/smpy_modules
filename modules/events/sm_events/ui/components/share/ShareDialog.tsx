@@ -26,13 +26,22 @@ function roleLabel(t: ReturnType<typeof useT>['t'], role: string): string {
 /** Share a calendar: who has access now, a picker for who could, and a role
  *  (view or edit). The owner (or `events.manage`) opens it; the server enforces
  *  that again on every call. */
-export function ShareDialog({ calendarId }: { calendarId: string }) {
+export function ShareDialog({
+  calendarId,
+  calendarName,
+  onGone,
+}: {
+  calendarId: string;
+  calendarName?: string;
+  /** The calendar was trashed or deleted elsewhere: refresh the list. */
+  onGone?: () => void;
+}) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<ShareRole>('view');
-  const state = useShares(calendarId, open);
+  const state = useShares(calendarId, open, onGone);
 
-  const report = (e: unknown) => toast.error(errorText(e));
+  const report = (e: unknown) => toast.error(errorText(e, keys.events.errors.calendar_gone));
 
   const grant = async (candidate: ShareCandidate) => {
     try {
@@ -55,7 +64,14 @@ export function ShareDialog({ calendarId }: { calendarId: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" data-testid="events-share">
+        <Button
+          type="button"
+          variant="outline"
+          data-testid="events-share"
+          aria-label={
+            calendarName ? t(keys.events.calendars.share_for, { name: calendarName }) : undefined
+          }
+        >
           {t(keys.events.share.button)}
         </Button>
       </DialogTrigger>
@@ -72,9 +88,11 @@ export function ShareDialog({ calendarId }: { calendarId: string }) {
         <section className="space-y-2" aria-label={t(keys.events.share.current)}>
           <h3 className="text-sm font-medium">{t(keys.events.share.current)}</h3>
           {state.shares.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {state.loading ? t(keys.events.common.loading) : t(keys.events.share.none)}
-            </p>
+            !state.loading && state.listError ? null : (
+              <p className="text-sm text-muted-foreground">
+                {t(state.loading ? keys.events.common.loading : keys.events.share.none)}
+              </p>
+            )
           ) : (
             <ul className="divide-y rounded-md border">
               {state.shares.map((share) => {
@@ -133,7 +151,7 @@ export function ShareDialog({ calendarId }: { calendarId: string }) {
             <p className="text-sm text-muted-foreground" data-testid="events-share-hint">
               {t(keys.events.share.search_min, { min: MIN_QUERY })}
             </p>
-          ) : state.candidates.length === 0 ? (
+          ) : state.error ? null : state.candidates.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t(keys.events.share.no_candidates)}</p>
           ) : (
             <ul className="max-h-48 divide-y overflow-auto rounded-md border">
@@ -147,7 +165,12 @@ export function ShareDialog({ calendarId }: { calendarId: string }) {
                     {candidate.display_name}
                     <span className="block text-xs text-muted-foreground">{candidate.email}</span>
                   </span>
-                  <Button type="button" size="sm" onClick={() => void grant(candidate)}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    aria-label={t(keys.events.share.grant_for, { name: candidate.display_name })}
+                    onClick={() => void grant(candidate)}
+                  >
                     {t(keys.events.share.grant)}
                   </Button>
                 </li>

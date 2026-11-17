@@ -60,7 +60,7 @@ export default function Calendars({ can_create, can_manage, user_id, default_tim
               <TableRow>
                 {[
                   copy.name,
-                  copy.slug,
+                  copy.col_slug,
                   copy.visibility,
                   copy.timezone,
                   copy.owner,

@@ -12,11 +12,19 @@ import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { type FormEvent, useState } from 'react';
 import { MIN_QUERY, useCandidates } from '../../hooks/useCandidates';
-import { errorText, transferOwner } from '../../utils/api';
+import { errorText, isGone, transferOwner } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 import type { ShareCandidate } from '../../utils/types';
 
-export function OwnerDialog({ calendarId, onSaved }: { calendarId: string; onSaved: () => void }) {
+export function OwnerDialog({
+  calendarId,
+  calendarName,
+  onSaved,
+}: {
+  calendarId: string;
+  calendarName: string;
+  onSaved: () => void;
+}) {
   const { t } = useT();
   const copy = keys.events.calendars;
   const [open, setOpen] = useState(false);
@@ -35,7 +43,8 @@ export function OwnerDialog({ calendarId, onSaved }: { calendarId: string; onSav
       onSaved();
       setOpen(false);
     } catch (e) {
-      setError(errorText(e));
+      setError(errorText(e, keys.events.errors.calendar_gone));
+      if (isGone(e)) onSaved();
     } finally {
       setPending(false);
     }
@@ -53,14 +62,16 @@ export function OwnerDialog({ calendarId, onSaved }: { calendarId: string; onSav
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline">{t(copy.transfer)}</Button>
+        <Button variant="outline" aria-label={t(copy.transfer_for, { name: calendarName })}>
+          {t(copy.transfer)}
+        </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{t(copy.transfer)}</DialogTitle>
           <DialogDescription>{t(copy.transfer_description)}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={save} className="grid gap-4">
+        <form onSubmit={save} noValidate className="grid gap-4">
           <Label htmlFor="owner-search">{t(keys.events.share.search_label)}</Label>
           <Input
             id="owner-search"
