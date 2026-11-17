@@ -20,6 +20,7 @@ from sm_events.calendar.occurrence import OccurrenceFilters
 from sm_events.core import constants
 from sm_events.core.access import ACTION_WRITE_EVENTS, POLICY
 from sm_events.core.access.events import visible_events
+from sm_events.core.tenancy import bound_tenant
 from sm_events.models import Calendar, Category, Event, EventText, OccurrenceOverride, OverrideKind
 
 __all__ = ["Row", "one_offs", "overrides", "series", "texts", "writable_calendars"]
@@ -36,6 +37,8 @@ def _base(viewer: ResourcePrincipal, filters: OccurrenceFilters) -> Any:
         .join(Calendar, col(Calendar.id) == col(Event.calendar_id))
         .outerjoin(Category, col(Category.id) == col(Event.category_id))
         .add_columns(col(Calendar.color), col(Category.color))
+        # Explicit, beside the framework's filter: the contract reads through here.
+        .where(col(Event.tenant_id) == bound_tenant())
     )
     if filters.calendar_ids is not None:
         stmt = stmt.where(col(Event.calendar_id).in_(filters.calendar_ids))
