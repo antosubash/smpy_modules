@@ -7,7 +7,7 @@ from simple_module_core.rate_limit import RateLimitRegistry
 from sm_events.module import EventsModule
 from sm_events.web.endpoints import shares_api
 
-from tests.support.access import share
+from tests.support.access import grant
 from tests.support.app import Directory, as_user
 
 V, E, P, M = "events.view", "events.edit", "events.publish", "events.manage"
@@ -65,7 +65,7 @@ async def test_short_query_is_empty_without_directory_call(client, q):
 async def test_edit_share_holder_is_403(client):
     client.app.state.user_directory = Directory(USERS)
     cid = await make(client)
-    await _grant_row(client, cid, "se", "edit")
+    await grant(client, cid, "se", "edit")
     url = f"{BASE}/{cid}/share-candidates"
     got = await client.get(url, params=EVERYONE, headers=as_user("se", V))
     assert (got.status_code, got.json()["code"]) == (403, "owner_required")
@@ -110,18 +110,6 @@ def grant_body(cid: str, who: str = "v", role: str = "view") -> dict:
     return {"resource_type": RTYPE, "resource_id": cid, "subject_id": who, "role": role}
 
 
-async def _grant_row(client, cid: str, user: str, role: str) -> None:
-    import uuid
-
-    from sm_events.models import Calendar
-    from sqlmodel import select
-
-    async with client.db_state.session_factory() as s:
-        cal = (await s.execute(select(Calendar).where(Calendar.id == uuid.UUID(cid)))).scalar_one()
-        s.add(share(cal, user, role))
-        await s.commit()
-
-
 async def test_grant_through_sharing_api_single_host(client):
     client.app.state.user_directory = Directory(USERS)
     cid = await make(client)
@@ -147,7 +135,7 @@ async def test_grant_through_sharing_api_single_host(client):
 async def test_edit_share_holder_cannot_grant(client):
     client.app.state.user_directory = Directory(USERS)
     cid = await make(client)
-    await _grant_row(client, cid, "se", "edit")
+    await grant(client, cid, "se", "edit")
     holder = as_user("se", V, "sharing.share")
     got = await client.post(SHARES, json=grant_body(cid, "bob"), headers=holder)
     assert got.status_code in (403, 404), got.text
@@ -158,7 +146,7 @@ async def test_share_list_needs_events_view(client):
     ``sharing.share``) cannot read the calendar through the shares list."""
     client.app.state.user_directory = Directory(USERS)
     cid = await make(client)
-    await _grant_row(client, cid, "sv", "view")
+    await grant(client, cid, "sv", "view")
     query = {"resource_type": RTYPE, "resource_id": cid}
     got = await client.get(SHARES, params=query, headers=as_user("sv", "sharing.share"))
     assert got.status_code == 404, got.text

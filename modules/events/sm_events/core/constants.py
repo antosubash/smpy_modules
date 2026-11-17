@@ -7,7 +7,6 @@ MODULE_NAME = "Events"
 DISTRIBUTION = "simple_module_events"
 LOCALE_NAMESPACE = "events"
 BASE_NAME = "events"
-TABLE_PREFIX = "events_"
 
 ROUTE_PREFIX_API = "/api/events"
 VIEW_PREFIX = "/admin/events"

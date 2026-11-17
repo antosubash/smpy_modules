@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from tests.web.test_calendars_api import BASE, MANAGER, OWNER, SE, SV, VIEWER, grant, make
+from tests.support.access import grant
+from tests.web.test_calendars_api import BASE, MANAGER, OWNER, SE, SV, VIEWER, make
 
 NOT_FOUND = (404, {"detail": "Not found", "code": "not_found"})
 

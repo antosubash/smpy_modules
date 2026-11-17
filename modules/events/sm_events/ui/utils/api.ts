@@ -3,7 +3,7 @@ import { type ApiFetchInit, apiFetch } from '@simple-module-py/ui/lib/api';
 import { keys, translate as t } from './i18n';
 import type { Calendar, CalendarInput, Category, CategoryInput, Visibility } from './types';
 
-export class ApiError extends Error {
+class ApiError extends Error {
   constructor(
     public readonly status: number,
     public readonly code: string,

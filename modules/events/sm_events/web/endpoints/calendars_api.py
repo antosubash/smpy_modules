@@ -18,6 +18,7 @@ from simple_module_hosting.resource_deps import resource_principal
 from sm_events.calendar import calendars as service
 from sm_events.core.access import CalendarEdit, CalendarOwner, CalendarView
 from sm_events.core.access.rights import calendar_rights
+from sm_events.core.constants import OWNER_NOT_ALLOWED_CODE, OWNER_NOT_ALLOWED_DETAIL
 from sm_events.core.errors import Invalid
 from sm_events.models import Calendar
 from sm_events.web.endpoints.deps import get_settings, require_edit, require_manage, require_view
@@ -91,9 +92,7 @@ async def transfer_owner(
     """``events.manage`` only: hand the calendar to another active member of the
     tenant (the owner themself cannot give it away)."""
     if not await active_member(request, db, body.owner_id):
-        raise Invalid(
-            "The new owner must be an active member of this organisation", code="owner_not_allowed"
-        )
+        raise Invalid(OWNER_NOT_ALLOWED_DETAIL, code=OWNER_NOT_ALLOWED_CODE)
     return await out(db, who, await service.set_owner(db, calendar, body.owner_id))
 
 

@@ -8,7 +8,7 @@
 import { json, send } from './api';
 import type { Share, ShareCandidate, ShareRole } from './types';
 
-export const RESOURCE_TYPE = 'events.calendar';
+const RESOURCE_TYPE = 'events.calendar';
 const SHARES = '/api/sharing/shares';
 
 export function listShares(calendarId: string): Promise<Share[]> {

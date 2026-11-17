@@ -69,7 +69,7 @@ function CalendarForm({
   const [visibility, setVisibility] = useState<Visibility>('private');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const zones = Intl.supportedValuesOf('timeZone');
+  const [zones] = useState(() => Intl.supportedValuesOf('timeZone'));
   async function save(event: FormEvent) {
     event.preventDefault();
     if (pending) return;

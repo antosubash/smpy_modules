@@ -2,11 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from simple_module_core.datetimes import utcnow
 
 __all__ = ["utcnow"]
-
-
-def utcnow() -> datetime:
-    """The current instant, timezone-aware UTC."""
-    return datetime.now(UTC)

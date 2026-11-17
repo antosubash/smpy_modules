@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from tests.support.access import share
+from tests.support.access import grant
 from tests.support.app import Directory, as_user
 
 V, E, P, M = "events.view", "events.edit", "events.publish", "events.manage"
@@ -24,20 +24,6 @@ async def make(client, headers=OWNER, **body):
     got = await client.post(BASE, json=body, headers=headers)
     assert got.status_code == 201, got.text
     return got.json()
-
-
-async def grant(client, calendar_id: str, user: str, role: str) -> None:
-    import uuid
-
-    from sm_events.models import Calendar
-    from sqlmodel import select
-
-    async with client.db_state.session_factory() as s:
-        cal = (
-            await s.execute(select(Calendar).where(Calendar.id == uuid.UUID(calendar_id)))
-        ).scalar_one()
-        s.add(share(cal, user, role))
-        await s.commit()
 
 
 async def test_create_needs_events_edit(client):

@@ -6,7 +6,7 @@ import { useCandidates } from './useCandidates';
 
 export { MIN_QUERY } from './useCandidates';
 
-export type Shares = {
+type Shares = {
   shares: Share[];
   candidates: ShareCandidate[];
   query: string;

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from sharing.core.policy import canonical_id
@@ -9,6 +10,7 @@ from sharing.models import ResourceShare
 from simple_module_core.resources import ResourcePrincipal
 from sm_events.core.access import CALENDAR_RESOURCE
 from sm_events.models import Calendar, Visibility
+from sqlmodel import select
 
 OWNER = "o"
 VIEW_SHARE = "sv"
@@ -49,3 +51,13 @@ async def seed_calendars(db: Any) -> dict[str, Calendar]:
         db.add(share(cal, EDIT_SHARE, "edit"))
     await db.flush()
     return cals
+
+
+async def grant(client, calendar_id: str, user: str, role: str) -> None:
+    """Insert a share row straight into the database and commit it."""
+    async with client.db_state.session_factory() as s:
+        cal = (
+            await s.execute(select(Calendar).where(Calendar.id == uuid.UUID(calendar_id)))
+        ).scalar_one()
+        s.add(share(cal, user, role))
+        await s.commit()
