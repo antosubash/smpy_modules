@@ -95,3 +95,14 @@ async def test_a_304_carries_no_content_security_policy(anon_client) -> None:
         assert "content-security-policy" not in again.headers
     finally:
         news_settings.reset()
+
+
+async def test_a_whitespace_public_csp_sends_no_header(anon_client) -> None:
+    news_settings.use(NewsSettings(public_csp="  \n"))
+    try:
+        await _seed(anon_client)
+        first = await anon_client.get(f"{NEWS}/hello")
+        assert first.status_code == 200
+        assert "content-security-policy" not in first.headers
+    finally:
+        news_settings.reset()

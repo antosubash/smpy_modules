@@ -191,8 +191,8 @@ name the module they affect.
   that saved a value, the old default included, keeps sending exactly it beside the
   app policy; check it against that policy, since it can only restrict further and
   cannot carry the per-request nonce (a `script-src` in it blocks the host's own
-  scripts). Clear the field, or set it to `frame-ancestors 'none'`, to adopt the
-  new default; set it empty to send no header of the module's own.
+  scripts). Reset the field to its default, or set it to `frame-ancestors 'none'`, to
+  adopt the new default; a host that stored an empty value keeps sending no header.
 
 - **news, pagebuilder, analytics and records settings use the framework's
   `DbBackedSettings`** (#345), as ai, billing, images and newsletter already
@@ -313,7 +313,8 @@ name the module they affect.
   contract module or name its dependant imports.
 - pagebuilder and news no longer send `public_csp` on a `304 Not Modified`
   (#322). The browser merges a 304's headers into the cached page, so the
-  module's strict policy replaced the page's nonce-based one, and after
+  module's policy replaced the page's nonce-based one (before framework 0.0.45;
+  since then it sits beside it and blocks the nonce'd scripts), and after
   revalidation every script was blocked: a blank page in development, and in
   production the nonce'd scripts and any `register_csp_sources` allowance. A
   browser that already merged the old header keeps it until it next fetches

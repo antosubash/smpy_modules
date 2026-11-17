@@ -219,3 +219,22 @@ async def test_the_answer_bound_is_exact_and_checked_before_buffering(
     assert answer.status_code == status, answer.text
     if status == 503:
         assert stream.read == 2, "refused at the crossing chunk, the rest unread"
+
+
+@pytest.mark.parametrize(
+    ("csp", "expected"),
+    [
+        ("frame-ancestors 'none'", False),
+        ("", False),
+        ("  ;; ", False),
+        ("img-src 'self'", False),
+        ("x-script-src 'self'", False),
+        ("script-src-attr 'none'", False),
+        ("frame-ancestors 'none'; DEFAULT-SRC 'self'", True),
+        ("  Script-Src\t'self' ", True),
+        ("img-src 'self';frame-src 'self'", True),
+        ("child-src 'self'", True),
+    ],
+)
+def test_only_a_script_or_frame_directive_can_block_the_widget(csp, expected):
+    assert captcha._governs_loading(csp) is expected

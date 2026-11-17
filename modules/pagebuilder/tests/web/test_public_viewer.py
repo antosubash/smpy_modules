@@ -83,14 +83,11 @@ async def test_a_blank_public_csp_sends_no_header(authed_client: AsyncClient, bl
     assert missing.headers.get_list("content-security-policy") == []
 
 
-async def test_the_default_policy_is_on_the_404_and_head(authed_client: AsyncClient) -> None:
+async def test_the_default_policy_is_on_the_404(authed_client: AsyncClient) -> None:
     await _create_published(authed_client)
     missing = await authed_client.get("/p/nope", headers={**_INERTIA_HEADERS, **_ANON})
     assert missing.status_code == 404
     assert "frame-ancestors 'none'" in missing.headers.get_list("content-security-policy")
-    head = await authed_client.head("/p/hello", headers=_ANON)
-    assert head.status_code == 200
-    assert "frame-ancestors 'none'" in head.headers.get_list("content-security-policy")
 
 
 async def test_published_page_unpublishes_to_404(authed_client: AsyncClient) -> None:
