@@ -58,7 +58,11 @@ export function CalendarRow({
         <Badge variant="outline">{t(keys.events.visibility[calendar.visibility])}</Badge>
       </TableCell>
       <TableCell>{calendar.default_timezone}</TableCell>
-      <TableCell>{calendar.owner_id !== userId ? calendar.owner_id : t(copy.you)}</TableCell>
+      <TableCell>
+        {calendar.owner_id === userId
+          ? t(copy.you)
+          : (calendar.owner_name ?? t(copy.unknown_owner))}
+      </TableCell>
       <TableCell>
         <div className="flex flex-wrap gap-2">
           {trashed ? (

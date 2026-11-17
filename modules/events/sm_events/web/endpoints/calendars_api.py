@@ -30,15 +30,17 @@ from sm_events.web.schemas.calendars import (
     VisibilityIn,
 )
 from sm_events.web.services.members import active_member
+from sm_events.web.services.owners import owner_names
 
 router = APIRouter(prefix="/calendars", tags=["calendars"], dependencies=[require_view])
 
 Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
 
 
-def _render(cal: Calendar, rights: CalendarRights) -> CalendarOut:
+def _render(cal: Calendar, rights: CalendarRights, names: dict[str, str | None]) -> CalendarOut:
     return CalendarOut.model_validate(cal).model_copy(
         update={
+            "owner_name": names.get(cal.owner_id),
             "can_edit": rights.edit_calendar,
             "can_own": rights.own,
             "can_write_events": rights.write_events,
@@ -47,17 +49,21 @@ def _render(cal: Calendar, rights: CalendarRights) -> CalendarOut:
     )
 
 
-async def out(db, who: ResourcePrincipal, cal: Calendar, *, trashed: bool = False) -> CalendarOut:
-    return _render(cal, await calendar_rights(db, who, cal, include_deleted=trashed))
+async def out(
+    db, request: Request, who: ResourcePrincipal, cal: Calendar, *, trashed: bool = False
+) -> CalendarOut:
+    rights = await calendar_rights(db, who, cal, include_deleted=trashed)
+    return _render(cal, rights, await owner_names(request, db, [cal.owner_id]))
 
 
 @router.get("")
 async def list_calendars(
-    who: Principal, db=Depends(get_db), trashed: bool = Query(False)
+    request: Request, who: Principal, db=Depends(get_db), trashed: bool = Query(False)
 ) -> list[CalendarOut]:
     rows = await service.list_calendars(db, who, trashed=trashed)
     rights = await calendar_rights_many(db, who, rows, include_deleted=trashed)
-    return [_render(row, rights[row.id]) for row in rows]
+    names = await owner_names(request, db, [row.owner_id for row in rows])
+    return [_render(row, rights[row.id], names) for row in rows]
 
 
 @router.post("", status_code=201, dependencies=[require_edit])
@@ -67,26 +73,36 @@ async def create_calendar(
     row = await service.create_calendar(
         db, who, body, default_tz=get_settings(request).default_timezone
     )
-    return await out(db, who, row)
+    return await out(db, request, who, row)
 
 
 @router.get("/{calendar_id}")
-async def get_calendar(calendar: CalendarView, who: Principal, db=Depends(get_db)) -> CalendarOut:
-    return await out(db, who, calendar)
+async def get_calendar(
+    request: Request, calendar: CalendarView, who: Principal, db=Depends(get_db)
+) -> CalendarOut:
+    return await out(db, request, who, calendar)
 
 
 @router.patch("/{calendar_id}")
 async def update_calendar(
-    body: CalendarPatch, calendar: CalendarEdit, who: Principal, db=Depends(get_db)
+    body: CalendarPatch,
+    request: Request,
+    calendar: CalendarEdit,
+    who: Principal,
+    db=Depends(get_db),
 ) -> CalendarOut:
-    return await out(db, who, await service.update_calendar(db, calendar, body))
+    return await out(db, request, who, await service.update_calendar(db, calendar, body))
 
 
 @router.put("/{calendar_id}/visibility")
 async def set_visibility(
-    body: VisibilityIn, calendar: CalendarOwner, who: Principal, db=Depends(get_db)
+    body: VisibilityIn,
+    request: Request,
+    calendar: CalendarOwner,
+    who: Principal,
+    db=Depends(get_db),
 ) -> CalendarOut:
-    return await out(db, who, await service.set_visibility(db, calendar, body.visibility))
+    return await out(db, request, who, await service.set_visibility(db, calendar, body.visibility))
 
 
 @router.put("/{calendar_id}/owner", dependencies=[require_manage])
@@ -97,7 +113,7 @@ async def transfer_owner(
     tenant (the owner themself cannot give it away)."""
     if not await active_member(request, db, body.owner_id):
         raise Invalid(OWNER_NOT_ALLOWED_DETAIL, code=OWNER_NOT_ALLOWED_CODE)
-    return await out(db, who, await service.set_owner(db, calendar, body.owner_id))
+    return await out(db, request, who, await service.set_owner(db, calendar, body.owner_id))
 
 
 @router.delete("/{calendar_id}", status_code=204)
@@ -108,7 +124,7 @@ async def delete_calendar(calendar: CalendarOwner, db=Depends(get_db)) -> Respon
 
 @router.post("/{calendar_id}/restore")
 async def restore_calendar(
-    calendar_id: uuid.UUID, who: Principal, db=Depends(get_db)
+    calendar_id: uuid.UUID, request: Request, who: Principal, db=Depends(get_db)
 ) -> CalendarOut:
     row = await service.restore_calendar(db, who, calendar_id)
-    return await out(db, who, row)
+    return await out(db, request, who, row)

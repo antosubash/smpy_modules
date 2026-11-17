@@ -79,6 +79,7 @@ class CalendarOut(BaseModel):
     description: str | None
     visibility: str
     owner_id: str
+    owner_name: str | None = None
     default_timezone: str
     sources: list[Any]
     created_at: datetime

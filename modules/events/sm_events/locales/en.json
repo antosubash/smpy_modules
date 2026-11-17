@@ -53,6 +53,7 @@
     "visibility_description": "Private: owner and shares. Internal: signed-in members with access. Public: also published events for visitors.",
     "owner": "Owner",
     "you": "You",
+    "unknown_owner": "Unknown user",
     "actions": "Actions",
     "filter": "Calendar status",
     "active": "Active",

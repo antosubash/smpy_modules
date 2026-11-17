@@ -53,6 +53,7 @@
     "visibility_description": "Privat: Eigentümer und Freigaben. Intern: angemeldete Mitglieder mit Zugriff. Öffentlich: veröffentlichte Veranstaltungen auch für Besucher.",
     "owner": "Eigentümer",
     "you": "Sie",
+    "unknown_owner": "Unbekannte Person",
     "actions": "Aktionen",
     "filter": "Kalenderstatus",
     "active": "Aktiv",

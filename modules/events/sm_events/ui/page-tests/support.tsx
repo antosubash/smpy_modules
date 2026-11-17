@@ -40,6 +40,7 @@ export function calendar(overrides = {}) {
     description: null,
     visibility: 'private' as const,
     owner_id: 'u1',
+    owner_name: 'Olga Owner',
     default_timezone: 'Europe/Vienna',
     sources: [],
     created_at: '2026-11-17T12:00:00Z',

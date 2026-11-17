@@ -9,6 +9,7 @@ export type Calendar = {
   description: string | null;
   visibility: Visibility;
   owner_id: string;
+  owner_name: string | null;
   default_timezone: string;
   sources: unknown[];
   created_at: string;

@@ -22,7 +22,13 @@ describe('Calendars', () => {
     stubFetch({
       [`GET ${API}`]: [
         calendar(),
-        calendar({ id: 'c2', name: 'Office', visibility: 'internal', owner_id: 'u2' }),
+        calendar({
+          id: 'c2',
+          name: 'Office',
+          visibility: 'internal',
+          owner_id: 'u2',
+          owner_name: 'Erin Editor',
+        }),
         calendar({ id: 'c3', name: 'Lectures', visibility: 'public' }),
       ],
     });
@@ -32,7 +38,28 @@ describe('Calendars', () => {
     expect(view.host.textContent).toContain('Internal');
     expect(view.host.textContent).toContain('Public');
     expect(view.host.textContent).toContain('Europe/Vienna');
-    expect(view.host.textContent).toContain('u2');
+    expect(view.host.textContent).toContain('Erin Editor');
+    expect(view.host.textContent).not.toContain('u2');
+    await view.unmount();
+  });
+  it('shows You, the owner name, or a neutral label - never an owner id', async () => {
+    stubFetch({
+      [`GET ${API}`]: [
+        calendar({ id: 'c1', name: 'Mine' }),
+        calendar({ id: 'c2', name: 'Named', owner_id: 'u2', owner_name: 'Erin Editor' }),
+        calendar({ id: 'c3', name: 'Orphan', owner_id: 'gone-id', owner_name: null }),
+      ],
+    });
+    const view = await mount(<Calendars {...props} />);
+    await flush();
+    const cells = (name: string) =>
+      [...view.host.querySelectorAll('tr')]
+        .find((row) => row.textContent?.includes(name))
+        ?.querySelectorAll('td')[4]?.textContent;
+    expect(cells('Mine')).toBe('You');
+    expect(cells('Named')).toBe('Erin Editor');
+    expect(cells('Orphan')).toBe('Unknown user');
+    expect(view.host.textContent).not.toContain('gone-id');
     await view.unmount();
   });
   it('hides New calendar without can_create', async () => {

@@ -6,6 +6,7 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
 from tests.support.access import grant
+from tests.support.app import Directory
 from tests.support.calendars import BASE, EDITOR, OWNER, SV, make
 
 VISIBILITIES = ("private", "internal", "public")
@@ -41,3 +42,29 @@ async def test_list_statement_count_does_not_grow_with_calendars(client):
     many, many_rows = await _statements(client)
     assert many_rows > few_rows > 0
     assert many == few, (few, many)
+
+
+class _CountingDirectory(Directory):
+    def __init__(self, users):
+        super().__init__(users)
+        self.lookups: list[list[str]] = []
+
+    async def get_many(self, db, ids, *, with_roles=False):
+        self.lookups.append(list(ids))
+        return await super().get_many(db, ids, with_roles=with_roles)
+
+
+async def test_owner_lookup_is_one_batch_of_distinct_ids(client):
+    directory = _CountingDirectory(
+        {"o": ("o@example.com", "Olga", True), "e": ("e@example.com", "Eve", True)}
+    )
+    client.app.state.user_directory = directory
+    await _seed(client, 5)
+    directory.lookups.clear()
+    await _statements(client)
+    assert len(directory.lookups) == 1
+    assert sorted(directory.lookups[0]) == ["e", "o"]
+    await _seed(client, 15, start=5)
+    directory.lookups.clear()
+    await _statements(client)
+    assert len(directory.lookups) == 1
