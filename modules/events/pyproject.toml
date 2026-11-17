@@ -16,6 +16,7 @@ dependencies = [
     "simple_module_inertia>=0.0.44,<0.1",
     "simple_module_settings>=0.0.44,<0.1",  # floor: settings.core and settings.module_settings paths first shipped in 0.0.44
     "simple_module_sharing>=0.0.44,<0.1",  # floor: sharing.core.policy path first shipped in 0.0.44
+    "python-dateutil>=2.9,<4",
     "pydantic-settings>=2.0",
 ]
 

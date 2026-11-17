@@ -79,6 +79,94 @@ class UnknownLocale(Invalid):
     detail = constants.UNKNOWN_LOCALE_DETAIL
 
 
+class Stale(Conflict):
+    code = constants.STALE_CODE
+    detail = constants.STALE_DETAIL
+
+
+class OverridesOrphaned(Conflict):
+    code = constants.OVERRIDES_ORPHANED_CODE
+    detail = constants.OVERRIDES_ORPHANED_DETAIL
+
+
+class HasSubEvents(Conflict):
+    code = constants.HAS_SUB_EVENTS_CODE
+    detail = constants.HAS_SUB_EVENTS_DETAIL
+
+
+class InvalidTransition(Conflict):
+    code = constants.INVALID_TRANSITION_CODE
+    detail = constants.INVALID_TRANSITION_DETAIL
+
+
+class PublishRequired(Forbidden):
+    """A writer who may see the event but not change a locked one."""
+
+    code = constants.PUBLISH_REQUIRED_CODE
+    detail = constants.PUBLISH_REQUIRED_DETAIL
+
+
+class InvalidRule(Invalid):
+    """Also raised with ``rrule_frequency_refused`` and ``start_not_in_rule``."""
+
+    code = constants.INVALID_RRULE_CODE
+    detail = constants.INVALID_RRULE_DETAIL
+
+
+class InvalidTimes(Invalid):
+    """Also raised with ``end_before_start`` and ``duration_too_long``."""
+
+    code = constants.INVALID_LOCAL_TIME_CODE
+    detail = constants.INVALID_LOCAL_TIME_DETAIL
+
+
+class InvalidRange(Invalid):
+    """Also raised with ``range_too_long``."""
+
+    code = constants.INVALID_RANGE_CODE
+    detail = constants.INVALID_RANGE_DETAIL
+
+
+class DefaultLocaleRequired(Invalid):
+    code = constants.DEFAULT_LOCALE_REQUIRED_CODE
+    detail = constants.DEFAULT_LOCALE_REQUIRED_DETAIL
+
+
+class UnknownCategory(Invalid):
+    code = constants.UNKNOWN_CATEGORY_CODE
+    detail = constants.UNKNOWN_CATEGORY_DETAIL
+
+
+class UnknownType(Invalid):
+    code = constants.UNKNOWN_TYPE_CODE
+    detail = constants.UNKNOWN_TYPE_DETAIL
+
+
+class InvalidParent(Invalid):
+    code = constants.INVALID_PARENT_CODE
+    detail = constants.INVALID_PARENT_DETAIL
+
+
+class ImmutableField(Invalid):
+    code = constants.IMMUTABLE_FIELD_CODE
+    detail = constants.IMMUTABLE_FIELD_DETAIL
+
+
+class NotRecurring(Invalid):
+    code = constants.NOT_RECURRING_CODE
+    detail = constants.NOT_RECURRING_DETAIL
+
+
+class NotAnOccurrence(Invalid):
+    code = constants.NOT_AN_OCCURRENCE_CODE
+    detail = constants.NOT_AN_OCCURRENCE_DETAIL
+
+
+class DescriptionTooLong(Invalid):
+    code = constants.DESCRIPTION_TOO_LONG_CODE
+    detail = constants.DESCRIPTION_TOO_LONG_DETAIL
+
+
 class ServiceUnavailable(EventsError):  # noqa: N818 - HTTP vocabulary, deliberately
     status_code = 503
     code = "service_unavailable"
