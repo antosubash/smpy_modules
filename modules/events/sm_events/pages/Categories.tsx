@@ -21,6 +21,8 @@ import { Name, withName } from '../ui/utils/isolate';
 /** A long unbroken name must wrap inside the cell, not widen the table. */
 const WRAP = 'max-w-xs whitespace-normal [overflow-wrap:anywhere]';
 const NAME = `min-w-48 ${WRAP}`;
+// Wide enough that an ordinary slug stays on one line; only a long one wraps.
+const SLUG = `min-w-40 ${WRAP}`;
 
 export default function Categories({ content_locales }: { content_locales: string[] }) {
   const { t, locale } = useT();
@@ -68,7 +70,7 @@ export default function Categories({ content_locales }: { content_locales: strin
                         )}
                         {category.color ?? t(copy.no_color)}
                       </TableCell>
-                      <TableCell className={WRAP}>{category.slug}</TableCell>
+                      <TableCell className={SLUG}>{category.slug}</TableCell>
                       {content_locales.map((locale) => (
                         <TableCell key={locale} className={NAME}>
                           {category.names[locale] ? (

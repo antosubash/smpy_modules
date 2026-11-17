@@ -44,6 +44,8 @@ async function whereIs(id: string): Promise<'active' | 'trash' | null> {
 const WRAP = 'max-w-xs whitespace-normal [overflow-wrap:anywhere]';
 /** The name cell keeps a readable width instead of collapsing to one letter per line. */
 const NAME = `min-w-48 ${WRAP}`;
+// Wide enough that an ordinary slug stays on one line; only a long one wraps.
+const SLUG = `min-w-40 ${WRAP}`;
 
 export function CalendarRow({
   calendar,
@@ -110,7 +112,7 @@ export function CalendarRow({
         />
         <Name>{calendar.name}</Name>
       </TableCell>
-      <TableCell className={WRAP}>{calendar.slug}</TableCell>
+      <TableCell className={SLUG}>{calendar.slug}</TableCell>
       <TableCell>
         <Badge variant="outline">{t(keys.events.visibility[calendar.visibility])}</Badge>
       </TableCell>
