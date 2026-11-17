@@ -17,15 +17,10 @@ from pydantic import (
 
 from sm_events.core import constants, timezones
 from sm_events.models import Visibility
+from sm_events.web.schemas._fields import Color, Slug, lower_color
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
-Slug = Annotated[str, Field(max_length=constants.SLUG_MAX, pattern=constants.SLUG_PATTERN)]
-Color = Annotated[str, Field(pattern=constants.COLOR_PATTERN)]
 Description = Annotated[str, Field(max_length=2000)]
-
-
-def _lower(value: Any) -> Any:
-    return value.lower() if isinstance(value, str) else value
 
 
 def _known_timezone(value: str | None) -> str | None:
@@ -42,7 +37,7 @@ class CalendarCreate(BaseModel):
     visibility: Visibility = Visibility.PRIVATE
     default_timezone: str | None = Field(default=None, max_length=constants.TZ_MAX)
 
-    _lower_color = field_validator("color", mode="before")(_lower)
+    _lower_color = field_validator("color", mode="before")(lower_color)
     _tz = field_validator("default_timezone")(_known_timezone)
 
 
@@ -55,7 +50,7 @@ class CalendarPatch(BaseModel):
     description: Description | None = None
     default_timezone: str | None = Field(default=None, max_length=constants.TZ_MAX)
 
-    _lower_color = field_validator("color", mode="before")(_lower)
+    _lower_color = field_validator("color", mode="before")(lower_color)
     _tz = field_validator("default_timezone")(_known_timezone)
 
     @model_validator(mode="after")

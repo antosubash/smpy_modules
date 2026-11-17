@@ -52,9 +52,8 @@ def _extra_metadata() -> list[Any]:
     """Table sets that are not ``sm_events``'s but that the harness needs.
 
     ``sharing`` always: the access policy's ``EXISTS`` names its table.
-    ``permissions`` only when it is installed — see the import guard in
-    :mod:`tests.support.app` for why its table has to exist even though this
-    module's ``Base`` never declares it.
+    ``permissions`` when installed, so framework permission lookups can run
+    even though this module's ``Base`` never declares those tables.
     """
     from sharing.models import Base as SharingBase
 
@@ -69,8 +68,8 @@ async def make_db_state(*, file: Path | None = None) -> Any:
     """A ``DatabaseState`` with an empty events schema, on either backend.
 
     ``file`` gives SQLite one connection per session (see the shared helper),
-    for a test about two sessions' transactions. ``sm_events.models`` exists from
-    the models task; imported lazily so the skeleton's tests do not need it.
+    for a test about two sessions' transactions. Models are imported lazily so
+    importing the backend selector alone does not load the module's tables.
     """
     from sm_events.models import Base
 

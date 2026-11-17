@@ -67,7 +67,8 @@ never chooses a user's `tenant_id` or reads a tenant header itself.
 
 The framework sharing router does not bind events' tenant on a single-tenant
 host. The registered `events.calendar` loader uses request-context middleware
-to apply the same resolver, binds the tenant and pins it in the lookup. It
+to apply the same resolver and pin the tenant in the lookup without binding
+the context. Its execution option bypasses only events' unbound-query guard. It
 never turns a foreign calendar UUID into a readable resource. The sharing
 policy requires `events.view` even if a caller still owns or holds a share on
 a private calendar.

@@ -15,7 +15,13 @@ import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { type FormEvent, useId, useState } from 'react';
 import { createCalendar, errorText, updateCalendar } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
-import type { Calendar, CalendarInput, Visibility } from '../../utils/types';
+import {
+  type Calendar,
+  type CalendarInput,
+  DEFAULT_COLOR,
+  VISIBILITIES,
+  type Visibility,
+} from '../../utils/types';
 
 export function CalendarDialog({
   calendar,
@@ -63,7 +69,7 @@ function CalendarForm({
   const zoneList = useId();
   const [name, setName] = useState(calendar?.name ?? '');
   const [slug, setSlug] = useState(calendar?.slug ?? '');
-  const [color, setColor] = useState(calendar?.color ?? '#2563eb');
+  const [color, setColor] = useState(calendar?.color ?? DEFAULT_COLOR);
   const [description, setDescription] = useState(calendar?.description ?? '');
   const [timezone, setTimezone] = useState(calendar?.default_timezone ?? defaultTimezone);
   const [visibility, setVisibility] = useState<Visibility>('private');
@@ -172,7 +178,7 @@ function CalendarForm({
               value={visibility}
               onChange={(e) => setVisibility(e.target.value as Visibility)}
             >
-              {(['private', 'internal', 'public'] as const).map((v) => (
+              {VISIBILITIES.map((v) => (
                 <option key={v} value={v}>
                   {t(keys.events.visibility[v])}
                 </option>

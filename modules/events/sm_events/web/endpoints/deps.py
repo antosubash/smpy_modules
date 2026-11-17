@@ -15,7 +15,6 @@ from sm_events.core.settings import EventsSettings
 
 require_view = Depends(RequiresPermission(constants.PERM_VIEW))
 require_edit = Depends(RequiresPermission(constants.PERM_EDIT))
-require_publish = Depends(RequiresPermission(constants.PERM_PUBLISH))
 require_manage = Depends(RequiresPermission(constants.PERM_MANAGE))
 
 

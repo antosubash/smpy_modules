@@ -3,27 +3,25 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
+from sm_events.web.schemas.calendars import CalendarCreate, CalendarPatch, OwnerIn
 
 from tests.support.access import grant
 from tests.support.app import Directory, as_user
-
-V, E, P, M = "events.view", "events.edit", "events.publish", "events.manage"
-BASE = "/api/events/calendars"
-
-OWNER = as_user("o", V, E)
-OWNER_P = as_user("o", V, E, P)
-VIEWER = as_user("v", V)
-EDITOR = as_user("e", V, E)
-MANAGER = as_user("m", V, M)
-SV = as_user("sv", V)
-SE = as_user("se", V)
-
-
-async def make(client, headers=OWNER, **body):
-    body.setdefault("name", "Team")
-    got = await client.post(BASE, json=body, headers=headers)
-    assert got.status_code == 201, got.text
-    return got.json()
+from tests.support.calendars import (
+    BASE,
+    EDITOR,
+    MANAGER,
+    OWNER,
+    OWNER_P,
+    SE,
+    SV,
+    VIEWER,
+    E,
+    M,
+    V,
+    make,
+)
 
 
 async def test_create_needs_events_edit(client):
@@ -254,3 +252,27 @@ async def test_ownership_transfer_only_to_members_of_the_tenant(multi_client, mo
     bad = await client.put(url, json={"owner_id": "out"}, headers=boss)
     assert (bad.status_code, bad.json()["code"]) == (422, "owner_not_allowed")
     assert (await client.put(url, json={"owner_id": "in"}, headers=boss)).status_code == 200
+
+
+@pytest.mark.parametrize("field,limit", [("name", 200), ("slug", 80), ("description", 2000)])
+@pytest.mark.parametrize("schema", [CalendarCreate, CalendarPatch])
+def test_calendar_string_limits(field, limit, schema):
+    assert getattr(schema(**{"name": "Team", field: "x" * limit}), field) == "x" * limit
+    with pytest.raises(ValidationError):
+        schema(**{"name": "Team", field: "x" * (limit + 1)})
+
+
+def test_owner_id_length_limit():
+    assert OwnerIn(owner_id="x" * 64).owner_id == "x" * 64
+    with pytest.raises(ValidationError):
+        OwnerIn(owner_id="x" * 65)
+
+
+def test_timezone_width_limit(monkeypatch):
+    from sm_events.core import timezones
+
+    monkeypatch.setattr(timezones, "is_known", lambda _name: True)  # Isolate width from tzdata.
+    for schema in (CalendarCreate, CalendarPatch):
+        assert schema(name="Team", default_timezone="x" * 64).default_timezone == "x" * 64
+        with pytest.raises(ValidationError):
+            schema(name="Team", default_timezone="x" * 65)

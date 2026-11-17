@@ -6,7 +6,7 @@ import pytest
 from sm_events.calendar import categories
 from sm_events.core.clock import utcnow
 from sm_events.core.errors import Invalid, SlugTaken, UnknownLocale
-from sm_events.models import Calendar, Event
+from sm_events.models import Calendar, Category, Event
 from sm_events.web.schemas.categories import CategoryCreate, CategoryPatch
 from sqlalchemy import text
 
@@ -81,3 +81,11 @@ async def test_delete_nulls_events_category(db):
     await db.refresh(event)
     assert event.category_id is None
     assert (await db.execute(text("select count(*) from events_category"))).scalar_one() == 0
+
+
+@pytest.mark.parametrize("count", [500, 501])
+async def test_category_list_is_capped_at_500(db, count):
+    db.add_all(Category(slug=f"c-{i:03d}", names={"en": "C"}) for i in range(count))
+    await db.flush()
+    rows = await categories.list_categories(db)
+    assert [row.slug for row in rows] == [f"c-{i:03d}" for i in range(500)]

@@ -35,13 +35,11 @@ def fk_uuid(target: str, *, nullable: bool = False, ondelete: str | None = None)
     )
 
 
-def dt_col(*, index: bool = False, nullable: bool = True) -> Any:
+def dt_col(*, nullable: bool = True) -> Any:
     """A timezone-aware timestamp. A ``NOT NULL`` one defaults to now (UTC),
     Python-side, so it never depends on the database's clock."""
     kwargs: dict[str, Any] = {"default_factory": utcnow} if not nullable else {"default": None}
-    return Field(
-        **kwargs, sa_type=AwareDateTime(), sa_column_kwargs={"nullable": nullable, "index": index}
-    )
+    return Field(**kwargs, sa_type=AwareDateTime(), sa_column_kwargs={"nullable": nullable})
 
 
 def dt_required() -> Any:
@@ -56,6 +54,6 @@ def json_col(default_factory: Any) -> Any:
     )
 
 
-def flag(default: bool = False) -> Any:
+def flag() -> Any:
     """A ``NOT NULL`` boolean."""
-    return Field(default=default, sa_column_kwargs={"nullable": False})
+    return Field(default=False, sa_column_kwargs={"nullable": False})

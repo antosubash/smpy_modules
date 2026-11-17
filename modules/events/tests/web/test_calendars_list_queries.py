@@ -6,7 +6,7 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
 from tests.support.access import grant
-from tests.web.test_calendars_api import BASE, EDITOR, OWNER, SV, make
+from tests.support.calendars import BASE, EDITOR, OWNER, SV, make
 
 VISIBILITIES = ("private", "internal", "public")
 

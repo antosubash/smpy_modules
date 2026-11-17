@@ -1,6 +1,7 @@
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { TableCell, TableRow } from '@simple-module-py/ui/components/ui/table';
+import { usePermissions } from '@simple-module-py/ui/hooks/use-permissions';
 import { useState } from 'react';
 import { errorText, restoreCalendar, trashCalendar } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
@@ -25,6 +26,7 @@ export function CalendarRow({
   onSaved: () => void;
 }) {
   const { t } = useT();
+  const { can } = usePermissions();
   const copy = keys.events.calendars;
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -77,7 +79,7 @@ export function CalendarRow({
               {calendar.can_own && (
                 <>
                   <VisibilityMenu calendar={calendar} onSaved={onSaved} />
-                  <ShareDialog calendarId={calendar.id} />
+                  {can('sharing.share') && <ShareDialog calendarId={calendar.id} />}
                   <ConfirmDialog
                     trigger={<Button variant="outline">{t(copy.trash)}</Button>}
                     title={t(copy.trash_title, { name: calendar.name })}

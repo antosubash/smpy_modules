@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from sm_events.calendar import calendars
 from sm_events.core.errors import NotFound, SlugTaken
-from sm_events.models import Visibility
+from sm_events.models import Calendar, Visibility
 from sm_events.web.schemas.calendars import CalendarCreate, CalendarPatch
 
 from tests.support.access import principal
@@ -45,7 +45,7 @@ async def test_slug_derived_and_deduplicated(db):
 
 async def test_slug_held_by_trashed_calendar_is_taken(db):
     cal = await calendars.create_calendar(db, _who(), CalendarCreate(name="Team"), default_tz="UTC")
-    await calendars.trash_calendar(db, cal, _who())
+    await calendars.trash_calendar(db, cal)
     with pytest.raises(SlugTaken):
         await calendars.create_calendar(
             db, _who(), CalendarCreate(name="Other", slug="team"), default_tz="UTC"
@@ -58,7 +58,7 @@ async def test_slug_race_is_conflict(db, monkeypatch):
     async def free(*_a, **_k):
         return False
 
-    monkeypatch.setattr(calendars, "_slug_taken", free)
+    monkeypatch.setattr(calendars, "slug_taken", free)
     with pytest.raises(SlugTaken):
         await calendars.create_calendar(
             db, _who(), CalendarCreate(name="Other", slug="team"), default_tz="UTC"
@@ -92,7 +92,7 @@ async def test_set_visibility(db):
 
 async def test_restore_round_trip(db):
     cal = await calendars.create_calendar(db, _who(), CalendarCreate(name="T"), default_tz="UTC")
-    await calendars.trash_calendar(db, cal, _who())
+    await calendars.trash_calendar(db, cal)
     assert await calendars.list_calendars(db, _who()) == []
     (trashed,) = await calendars.list_calendars(db, _who(), trashed=True)
     assert trashed.id == cal.id and trashed.deleted_at is not None
@@ -106,7 +106,7 @@ async def test_restore_refusals(db):
     # Not deleted: nothing to restore.
     with pytest.raises(NotFound):
         await calendars.restore_calendar(db, _who(), cal.id)
-    await calendars.trash_calendar(db, cal, _who())
+    await calendars.trash_calendar(db, cal)
     # A trashed private calendar does not exist for a stranger.
     with pytest.raises(NotFound):
         await calendars.restore_calendar(db, _who("x", V), cal.id)
@@ -121,8 +121,8 @@ async def test_list_trashed_only_own_or_manage(db):
     other = await calendars.create_calendar(
         db, _who("x"), CalendarCreate(name="Other"), default_tz="UTC"
     )
-    await calendars.trash_calendar(db, mine, _who("o"))
-    await calendars.trash_calendar(db, other, _who("x"))
+    await calendars.trash_calendar(db, mine)
+    await calendars.trash_calendar(db, other)
     assert [c.id for c in await calendars.list_calendars(db, _who("o"), trashed=True)] == [mine.id]
     both = await calendars.list_calendars(db, _who("m", M), trashed=True)
     assert {c.id for c in both} == {mine.id, other.id}
@@ -134,6 +134,19 @@ async def test_restore_of_a_visible_trashed_calendar_is_not_found_for_others(db)
     one that was public: restore must not confirm it exists."""
     cal = await calendars.create_calendar(db, _who(), CalendarCreate(name="T"), default_tz="UTC")
     await calendars.set_visibility(db, cal, Visibility.PUBLIC)
-    await calendars.trash_calendar(db, cal, _who())
+    await calendars.trash_calendar(db, cal)
     with pytest.raises(NotFound):
         await calendars.restore_calendar(db, _who("x", V), cal.id)
+
+
+@pytest.mark.parametrize("count", [500, 501])
+@pytest.mark.parametrize("trashed", [False, True])
+async def test_list_caps_active_and_trashed_calendars_at_500(db, count, trashed):
+    db.add_all(
+        Calendar(slug=f"c-{i}", name=f"C {i:03d}", owner_id="o", is_deleted=trashed)
+        for i in range(count)
+    )
+    await db.flush()
+    rows = await calendars.list_calendars(db, _who(), trashed=trashed)
+    assert len(rows) == 500
+    assert [row.name for row in rows] == [f"C {i:03d}" for i in range(500)]

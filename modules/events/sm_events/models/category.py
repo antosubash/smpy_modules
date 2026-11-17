@@ -12,10 +12,12 @@ from sm_events.core.constants import SLUG_MAX
 from sm_events.models._base import Base
 from sm_events.models._cols import json_col, pk_uuid
 
+CATEGORY_SLUG_CONSTRAINT = "uq_events_category_tenant_slug"
+
 
 class Category(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     __tablename__ = "events_category"
-    __table_args__ = (UniqueConstraint("tenant_id", "slug", name="uq_events_category_tenant_slug"),)
+    __table_args__ = (UniqueConstraint("tenant_id", "slug", name=CATEGORY_SLUG_CONSTRAINT),)
 
     id: uuid.UUID = pk_uuid()
     slug: str = Field(max_length=SLUG_MAX)

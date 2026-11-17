@@ -4,15 +4,33 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
 from sm_events.core import constants
+from sm_events.core.errors import SlugTaken
 
-__all__ = ["free_slug", "slug_taken", "slugify"]
+__all__ = ["free_slug", "slug_taken", "slug_write", "slugify"]
 
 _NOT_SLUG = re.compile(r"[^a-z0-9]+")
+
+
+@asynccontextmanager
+async def slug_write(db: Any, constraint: str) -> AsyncIterator[None]:
+    """Start the savepoint before dirtying rows: ``begin_nested`` flushes first."""
+    try:
+        async with db.begin_nested():
+            yield
+            await db.flush()
+    except IntegrityError as exc:
+        message = str(exc.orig)
+        if constraint not in message and "slug" not in message:
+            raise
+        raise SlugTaken from exc
 
 
 def slugify(text: str) -> str:

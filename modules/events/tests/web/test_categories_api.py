@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
+from sm_events.web.schemas.categories import CategoryCreate, CategoryPatch
 
 from tests.support.app import as_user
 
@@ -92,3 +94,18 @@ async def test_tenant_isolation(multi_client):
     assert [c["id"] for c in (await client.get(BASE, headers=a)).json()] == [cid]
     # The same slug in another tenant is a different category.
     assert (await client.post(BASE, json={"names": {"en": "Music"}}, headers=b)).status_code == 201
+
+
+@pytest.mark.parametrize("schema", [CategoryCreate, CategoryPatch])
+def test_category_names_at_the_limits(schema):
+    names = {f"locale-{i:09d}": "x" * 100 for i in range(20)}
+    assert schema(names=names).names == names
+    for bad in ({**names, "en": "x"}, {"x" * 17: "x"}, {"en": "x" * 101}):
+        with pytest.raises(ValidationError):
+            schema(names=bad)
+
+
+def test_category_slug_at_the_limit():
+    assert CategoryCreate(names={"en": "A"}, slug="x" * 80).slug == "x" * 80
+    with pytest.raises(ValidationError):
+        CategoryCreate(names={"en": "A"}, slug="x" * 81)

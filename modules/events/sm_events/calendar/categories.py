@@ -7,17 +7,15 @@ import uuid
 from typing import Any
 
 from sqlalchemy import update
-from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
-from sm_events.calendar.slugs import free_slug, slug_taken, slugify
+from sm_events.calendar.slugs import free_slug, slug_taken, slug_write, slugify
 from sm_events.core import constants
 from sm_events.core.errors import Invalid, NotFound, SlugTaken, UnknownLocale
 from sm_events.core.tenancy import bound_tenant
 from sm_events.models import Category, Event
+from sm_events.models.category import CATEGORY_SLUG_CONSTRAINT
 from sm_events.web.schemas.categories import CategoryCreate, CategoryPatch
-
-_SLUG_CONSTRAINT = "uq_events_category_tenant_slug"
 
 
 def _check_names(names: dict[str, str], locales: tuple[str, ...]) -> None:
@@ -51,14 +49,8 @@ async def create_category(db: Any, data: CategoryCreate, *, locales: tuple[str, 
         names=dict(data.names),
         color=data.color,
     )
-    try:
-        async with db.begin_nested():
-            db.add(row)
-            await db.flush()
-    except IntegrityError as exc:  # lost a race for the slug
-        if _SLUG_CONSTRAINT not in str(exc.orig) and "slug" not in str(exc.orig):
-            raise
-        raise SlugTaken from exc
+    async with slug_write(db, CATEGORY_SLUG_CONSTRAINT):
+        db.add(row)
     return row
 
 
@@ -83,6 +75,7 @@ async def delete_category(db: Any, cat: Category) -> None:
         update(Event)
         .where(Event.tenant_id == bound_tenant(), Event.category_id == cat.id)
         .values(category_id=None)
+        # Restoring a trashed event must not revive a deleted category reference.
         .execution_options(include_deleted=True)
     )
     await db.delete(cat)

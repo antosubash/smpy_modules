@@ -8,9 +8,8 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from sm_events.core import constants
+from sm_events.web.schemas._fields import Color, Slug, lower_color
 
-Slug = Annotated[str, Field(max_length=constants.SLUG_MAX, pattern=constants.SLUG_PATTERN)]
-Color = Annotated[str, Field(pattern=constants.COLOR_PATTERN)]
 LocaleKey = Annotated[str, Field(min_length=1, max_length=constants.LOCALE_MAX)]
 Names = Annotated[
     dict[LocaleKey, Annotated[str, Field(min_length=1, max_length=constants.CATEGORY_NAME_MAX)]],
@@ -18,16 +17,12 @@ Names = Annotated[
 ]
 
 
-def _lower(value: object) -> object:
-    return value.lower() if isinstance(value, str) else value
-
-
 class CategoryCreate(BaseModel):
     slug: Slug | None = None
     names: Names
     color: Color | None = None
 
-    _lower_color = field_validator("color", mode="before")(_lower)
+    _lower_color = field_validator("color", mode="before")(lower_color)
 
 
 class CategoryPatch(BaseModel):
@@ -37,7 +32,7 @@ class CategoryPatch(BaseModel):
     names: Names | None = None
     color: Color | None = None
 
-    _lower_color = field_validator("color", mode="before")(_lower)
+    _lower_color = field_validator("color", mode="before")(lower_color)
 
     @model_validator(mode="after")
     def _no_null_names(self) -> CategoryPatch:

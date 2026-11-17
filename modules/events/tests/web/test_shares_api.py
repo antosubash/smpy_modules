@@ -9,6 +9,7 @@ from sm_events.web.endpoints import shares_api
 
 from tests.support.access import grant
 from tests.support.app import Directory, as_user
+from tests.support.calendars import make
 
 V, E, P, M = "events.view", "events.edit", "events.publish", "events.manage"
 BASE = "/api/events/calendars"
@@ -26,15 +27,9 @@ USERS = {
 }
 
 
-async def make(client, headers=OWNER) -> str:
-    got = await client.post(BASE, json={"name": "Trees"}, headers=headers)
-    assert got.status_code == 201, got.text
-    return got.json()["id"]
-
-
 async def test_owner_gets_candidates(client):
     client.app.state.user_directory = Directory(USERS)
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     got = await client.get(f"{BASE}/{cid}/share-candidates", params={"q": "amy"}, headers=OWNER)
     assert got.status_code == 200
     assert got.json() == [{"id": "amy", "display_name": "Amy Tester", "email": "a***@example.com"}]
@@ -43,11 +38,12 @@ async def test_owner_gets_candidates(client):
     assert sorted(c["id"] for c in everyone.json()) == ["amy", "bob"]
 
 
-async def test_candidates_are_limited_to_twenty(client):
+@pytest.mark.parametrize("count", [20, 21])
+async def test_candidates_are_limited_to_twenty(client, count):
     client.app.state.user_directory = Directory(
-        {f"u{n:02d}": (f"u{n:02d}@example.com", f"User {n:02d} Tester", True) for n in range(40)}
+        {f"u{n:02d}": (f"u{n:02d}@example.com", f"User {n:02d} Tester", True) for n in range(count)}
     )
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     got = await client.get(f"{BASE}/{cid}/share-candidates", params=EVERYONE, headers=OWNER)
     assert len(got.json()) == 20
 
@@ -56,7 +52,7 @@ async def test_candidates_are_limited_to_twenty(client):
 async def test_short_query_is_empty_without_directory_call(client, q):
     directory = Directory(USERS)
     client.app.state.user_directory = directory
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     got = await client.get(f"{BASE}/{cid}/share-candidates", params={"q": q}, headers=OWNER)
     assert (got.status_code, got.json()) == (200, [])
     assert directory.searches == []
@@ -64,7 +60,7 @@ async def test_short_query_is_empty_without_directory_call(client, q):
 
 async def test_edit_share_holder_is_403(client):
     client.app.state.user_directory = Directory(USERS)
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     await grant(client, cid, "se", "edit")
     url = f"{BASE}/{cid}/share-candidates"
     got = await client.get(url, params=EVERYONE, headers=as_user("se", V))
@@ -73,7 +69,7 @@ async def test_edit_share_holder_is_403(client):
 
 
 async def test_stranger_is_404(client):
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     got = await client.get(
         f"{BASE}/{cid}/share-candidates", params=EVERYONE, headers=as_user("x", V)
     )
@@ -101,7 +97,7 @@ async def test_other_tenant_members_not_offered(multi_client):
 
 
 async def test_no_directory_is_503(client):
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     got = await client.get(f"{BASE}/{cid}/share-candidates", params=EVERYONE, headers=OWNER)
     assert (got.status_code, got.json()["code"]) == (503, "user_directory_unavailable")
 
@@ -112,7 +108,7 @@ def grant_body(cid: str, who: str = "v", role: str = "view") -> dict:
 
 async def test_grant_through_sharing_api_single_host(client):
     client.app.state.user_directory = Directory(USERS)
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     viewer = as_user("amy", V)
     assert (await client.get(f"{BASE}/{cid}", headers=viewer)).status_code == 404
     assert (await client.get(BASE, headers=viewer)).json() == []
@@ -134,7 +130,7 @@ async def test_grant_through_sharing_api_single_host(client):
 
 async def test_edit_share_holder_cannot_grant(client):
     client.app.state.user_directory = Directory(USERS)
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     await grant(client, cid, "se", "edit")
     holder = as_user("se", V, "sharing.share")
     got = await client.post(SHARES, json=grant_body(cid, "bob"), headers=holder)
@@ -145,7 +141,7 @@ async def test_share_list_needs_events_view(client):
     """A user who lost ``events.view`` but holds a view share (and
     ``sharing.share``) cannot read the calendar through the shares list."""
     client.app.state.user_directory = Directory(USERS)
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     await grant(client, cid, "sv", "view")
     query = {"resource_type": RTYPE, "resource_id": cid}
     got = await client.get(SHARES, params=query, headers=as_user("sv", "sharing.share"))
@@ -157,7 +153,7 @@ async def test_share_list_needs_events_view(client):
 
 async def test_stranger_cannot_share_a_calendar_that_is_not_theirs(client):
     client.app.state.user_directory = Directory(USERS)
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     got = await client.post(
         SHARES, json=grant_body(cid, "bob"), headers=as_user("x", V, "sharing.share")
     )
@@ -189,15 +185,6 @@ def test_rate_limit_rule_registered():
     assert rates.match("GET", f"{BASE}/abc/share-candidates/x") is None
 
 
-async def test_exact_address_query_returns_the_full_address(client):
-    client.app.state.user_directory = Directory(USERS)
-    cid = await make(client)
-    got = await client.get(
-        f"{BASE}/{cid}/share-candidates", params={"q": " AMY@example.com "}, headers=OWNER
-    )
-    assert [c["email"] for c in got.json()] == ["amy@example.com"]
-
-
 async def _candidates(client, cid: str, q: str) -> list[dict]:
     got = await client.get(f"{BASE}/{cid}/share-candidates", params={"q": q}, headers=OWNER)
     assert got.status_code == 200, got.text
@@ -210,29 +197,22 @@ async def test_part_of_an_email_finds_nobody(client, q):
     oracle that confirms an address piece by piece."""
     directory = Directory(USERS)
     client.app.state.user_directory = directory
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     assert await _candidates(client, cid, q) == []
     assert directory.searches == [q]  # the directory was asked; the answer is filtered
-
-
-async def test_name_query_returns_the_masked_email(client):
-    client.app.state.user_directory = Directory(USERS)
-    cid = await make(client)
-    got = await _candidates(client, cid, "my tes")
-    assert got == [{"id": "amy", "display_name": "Amy Tester", "email": "a***@example.com"}]
 
 
 @pytest.mark.parametrize("q", ["AMY@example.COM", "  amy@example.com  ", "Amy@Example.Com"])
 async def test_exact_address_in_any_case_returns_the_full_address(client, q):
     client.app.state.user_directory = Directory(USERS)
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     got = await _candidates(client, cid, q)
     assert [(c["id"], c["email"]) for c in got] == [("amy", "amy@example.com")]
 
 
 async def test_name_match_is_case_insensitive_and_trimmed(client):
     client.app.state.user_directory = Directory(USERS)
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     got = await _candidates(client, cid, "  BOB tes ")
     assert [c["id"] for c in got] == ["bob"]
 
@@ -242,7 +222,7 @@ async def test_filter_runs_before_the_limit(client):
     users = {f"u{n:02d}": (f"zed{n:02d}@example.com", f"Nobody {n}", True) for n in range(30)}
     users["real"] = ("real@elsewhere.org", "Zed Real", True)
     client.app.state.user_directory = Directory(users)
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     assert [c["id"] for c in await _candidates(client, cid, "zed")] == ["real"]
 
 
@@ -250,7 +230,7 @@ async def test_nameless_user_is_not_labelled_with_the_address(client):
     """With no name the directory's label is the address; the response must not
     carry it in ``display_name`` unless the query is that address."""
     client.app.state.user_directory = Directory({"nn": ("nina@example.com", None, True)})
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     got = await _candidates(client, cid, "nina@example.com")
     assert got == [{"id": "nn", "display_name": "nina@example.com", "email": "nina@example.com"}]
     # Matched by the exact address in another case: still the full address, as typed.
@@ -260,7 +240,7 @@ async def test_nameless_user_is_not_labelled_with_the_address(client):
 
 async def test_address_label_is_never_matched_by_part_of_it(client):
     client.app.state.user_directory = Directory({"nn": ("nina@example.com", None, True)})
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     assert await _candidates(client, cid, "nina") == []
 
 
@@ -268,6 +248,22 @@ async def test_label_containing_an_at_sign_is_masked(client):
     client.app.state.user_directory = Directory(
         {"ww": ("ww@example.com", "Wanda <wanda@corp.example>", True)}
     )
-    cid = await make(client)
+    cid = (await make(client, OWNER))["id"]
     got = await _candidates(client, cid, "wanda")
     assert got == [{"id": "ww", "display_name": "w***@example.com", "email": "w***@example.com"}]
+
+
+async def test_directory_scan_stops_at_100(client):
+    client.app.state.user_directory = Directory(
+        {f"u{n}": (f"u{n}@example.com", f"Tester {n}", n >= 99) for n in range(101)}
+    )
+    cid = (await make(client, OWNER))["id"]
+    assert [u["id"] for u in await _candidates(client, cid, "tester")] == ["u99"]
+
+
+async def test_query_length_at_the_limit(client):
+    client.app.state.user_directory = Directory({"u": ("u@x", "x" * 100, True)})
+    cid = (await make(client, OWNER))["id"]
+    assert [u["id"] for u in await _candidates(client, cid, "x" * 100)] == ["u"]
+    got = await client.get(f"{BASE}/{cid}/share-candidates", params={"q": "x" * 101}, headers=OWNER)
+    assert got.status_code == 422

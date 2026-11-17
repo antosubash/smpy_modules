@@ -13,7 +13,7 @@ import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { type FormEvent, useState } from 'react';
 import { errorText, setVisibility } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
-import type { Calendar, Visibility } from '../../utils/types';
+import { type Calendar, VISIBILITIES, type Visibility } from '../../utils/types';
 
 export function VisibilityMenu({ calendar, onSaved }: { calendar: Calendar; onSaved: () => void }) {
   const { t } = useT();
@@ -62,7 +62,7 @@ export function VisibilityMenu({ calendar, onSaved }: { calendar: Calendar; onSa
             value={value}
             onChange={(e) => setValue(e.target.value as Visibility)}
           >
-            {(['private', 'internal', 'public'] as const).map((v) => (
+            {VISIBILITIES.map((v) => (
               <option key={v} value={v}>
                 {t(keys.events.visibility[v])}
               </option>

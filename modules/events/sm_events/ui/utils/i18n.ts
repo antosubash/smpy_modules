@@ -132,9 +132,7 @@ function flatten(node: Record<string, unknown>, prefix: string, out: Record<stri
  * locale rather than to English, and this module ships only `en.json` and `de.json` — so a
  * reader negotiated into any other configured console language would see raw
  * dotted keys wherever a catalogue entry is missing, which is everywhere. The
- * public pages are what that would land on. Handing i18next the English as
- * the default restores exactly what the hardcoded strings did before the
- * catalogue existed: English, whatever the locale, until a translation
+ * explicit English default keeps the console readable until a translation
  * arrives. The catalogue is already in memory for `keys`; this is the same
  * data read the other way.
  */

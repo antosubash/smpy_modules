@@ -1,4 +1,6 @@
-export type Visibility = 'private' | 'internal' | 'public';
+export const VISIBILITIES = ['private', 'internal', 'public'] as const;
+export type Visibility = (typeof VISIBILITIES)[number];
+export const DEFAULT_COLOR = '#2563eb';
 export type Calendar = {
   id: string;
   slug: string;

@@ -101,8 +101,8 @@ async def transfer_owner(
 
 
 @router.delete("/{calendar_id}", status_code=204)
-async def delete_calendar(calendar: CalendarOwner, who: Principal, db=Depends(get_db)) -> Response:
-    await service.trash_calendar(db, calendar, who)
+async def delete_calendar(calendar: CalendarOwner, db=Depends(get_db)) -> Response:
+    await service.trash_calendar(db, calendar)
     return Response(status_code=204)
 
 

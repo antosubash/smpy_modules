@@ -9,33 +9,15 @@ import uuid
 from typing import Any
 
 from simple_module_core.resources import ACTION_DELETE, ResourcePrincipal
-from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
-from sm_events.calendar.slugs import free_slug, slug_taken, slugify
+from sm_events.calendar.slugs import free_slug, slug_taken, slug_write, slugify
 from sm_events.core import constants, timezones
 from sm_events.core.access import POLICY, visible_calendars
 from sm_events.core.errors import Forbidden, NotFound, SlugTaken
 from sm_events.models import Calendar, Visibility
 from sm_events.models.calendar import CALENDAR_SLUG_CONSTRAINT
 from sm_events.web.schemas.calendars import CalendarCreate, CalendarPatch
-
-# ``slug_taken`` is looked up through this module so a test can pin the pre-check.
-_slug_taken = slug_taken
-
-
-async def _flush_slug(db: Any, row: Calendar | None = None) -> None:
-    """Flush in a savepoint; a unique-index hit on the slug is a 409."""
-    try:
-        async with db.begin_nested():
-            if row is not None:
-                db.add(row)
-            await db.flush()
-    except IntegrityError as exc:
-        text = str(exc.orig)
-        if CALENDAR_SLUG_CONSTRAINT not in text and "slug" not in text:
-            raise
-        raise SlugTaken from exc
 
 
 async def list_calendars(
@@ -64,7 +46,7 @@ async def create_calendar(
     409; one derived from the name gets a ``-2``, ``-3``... suffix instead."""
     if who.user_id is None:
         raise Forbidden("A signed-in user is required")
-    if data.slug is not None and await _slug_taken(db, Calendar, data.slug):
+    if data.slug is not None and await slug_taken(db, Calendar, data.slug):
         raise SlugTaken
     row = Calendar(
         slug=data.slug or await free_slug(db, Calendar, slugify(data.name)),
@@ -75,7 +57,8 @@ async def create_calendar(
         owner_id=who.user_id,
         default_timezone=data.default_timezone or timezones.effective(default_tz),
     )
-    await _flush_slug(db, row)
+    async with slug_write(db, CALENDAR_SLUG_CONSTRAINT):
+        db.add(row)
     return row
 
 
@@ -86,12 +69,12 @@ async def update_calendar(db: Any, cal: Calendar, data: CalendarPatch) -> Calend
     if (
         new_slug is not None
         and new_slug != cal.slug
-        and await _slug_taken(db, Calendar, new_slug, except_id=cal.id)
+        and await slug_taken(db, Calendar, new_slug, except_id=cal.id)
     ):
         raise SlugTaken
-    for name, value in fields.items():
-        setattr(cal, name, value)
-    await _flush_slug(db)
+    async with slug_write(db, CALENDAR_SLUG_CONSTRAINT):
+        for name, value in fields.items():
+            setattr(cal, name, value)
     return cal
 
 
@@ -107,7 +90,7 @@ async def set_owner(db: Any, cal: Calendar, owner_id: str) -> Calendar:
     return cal
 
 
-async def trash_calendar(db: Any, cal: Calendar, who: ResourcePrincipal) -> None:
+async def trash_calendar(db: Any, cal: Calendar) -> None:
     """Soft delete. The slug stays reserved, so a restore never collides."""
     await db.delete(cal)
     await db.flush()

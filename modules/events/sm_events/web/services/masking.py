@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import re
+
 __all__ = ["mask_email", "matches_query", "safe_display_name", "visible_email"]
 
 _MASK = "***"
+_EMAIL_TOKEN = re.compile(r"\S*@\S*")
 
 
 def mask_email(address: str) -> str:
@@ -37,7 +40,9 @@ def matches_query(label: str, address: str, query: str) -> bool:
         return False
     if needle == address.lower():
         return True
-    return bool(label) and label.lower() != address.lower() and needle in label.lower()
+    # A display name can contain an address too, e.g. "Amy <amy@example.org>".
+    name = _EMAIL_TOKEN.sub("", label).lower()
+    return needle in name
 
 
 def safe_display_name(label: str, address: str, query: str) -> str:

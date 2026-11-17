@@ -522,7 +522,7 @@ the target fails without it.
   redundant. The framework modules' screens (users, settings, …) ship German
   since 0.0.38 as well.
 
-  news, pagebuilder, ai, billing, records and images call
+  news, pagebuilder, ai, billing, records, images and events call
   `t(keys.<module>.<section>.<key>)`, with no `defaultValue` — each
   module's `utils/i18n.ts` supplies the English text from `en.json`. A
   family of keys chosen at runtime (`filters.op.<op>`) is a

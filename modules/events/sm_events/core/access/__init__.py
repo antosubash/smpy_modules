@@ -70,13 +70,6 @@ class CalendarPolicy:
     def __init__(self) -> None:
         self._shares = share_exists_for(CALENDAR_RESOURCE, Calendar.id)
 
-    def _share(self, who: ResourcePrincipal, action: str) -> Any:
-        # A share grants view or edit and nothing else (a future sharing role
-        # implying more must not widen calendars).
-        if action not in (ACTION_VIEW, ACTION_EDIT):
-            return None
-        return self._shares(who, action)
-
     def predicate(self, who: ResourcePrincipal, action: str) -> Any:
         """The ``WHERE`` clause, or ``None`` when the principal bypasses it."""
         if who.has(constants.PERM_MANAGE):
@@ -88,11 +81,11 @@ class CalendarPolicy:
         member_visible = Calendar.visibility.in_(_MEMBER_VISIBILITY)
         clauses: list[Any] = [owner]
         if action == ACTION_VIEW:
-            clauses += [self._share(who, ACTION_VIEW), member_visible]
+            clauses += [self._shares(who, ACTION_VIEW), member_visible]
         elif action == ACTION_EDIT:
-            clauses.append(self._share(who, ACTION_EDIT))
+            clauses.append(self._shares(who, ACTION_EDIT))
         elif action == ACTION_WRITE_EVENTS:
-            clauses.append(self._share(who, ACTION_EDIT))
+            clauses.append(self._shares(who, ACTION_EDIT))
             if who.has(constants.PERM_EDIT):
                 clauses.append(member_visible)
         elif action not in (ACTION_DELETE, ACTION_SHARE):
@@ -162,12 +155,11 @@ class _Requires(RequiresResource):
             raise
 
 
-# No ``permission=``: an API token is refused on these routes until a route
-# opts in by building its own ``RequiresResource(..., permission=...)``.
+# The routers supply ``RequiresPermission`` gates, including API-token scope checks.
 CalendarView = Annotated[Calendar, Depends(_Requires(ACTION_VIEW))]
 CalendarEdit = Annotated[Calendar, Depends(_Requires(ACTION_EDIT))]
 CalendarOwner = Annotated[Calendar, Depends(_Requires(ACTION_DELETE, owner=True))]
-"""Owner or ``events.manage``: visibility, delete, shares, ownership."""
+"""Owner or ``events.manage``: visibility, delete and shares; transfer also needs manage."""
 
 __all__ = [
     "ACTION_WRITE_EVENTS",

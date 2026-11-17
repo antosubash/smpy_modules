@@ -13,7 +13,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { type FormEvent, useState } from 'react';
 import { createCategory, errorText, updateCategory } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
-import type { Category } from '../../utils/types';
+import { type Category, DEFAULT_COLOR } from '../../utils/types';
 
 export function CategoryDialog({
   category,
@@ -59,7 +59,7 @@ function CategoryForm({
   const copy = keys.events.categories;
   const [names, setNames] = useState(category?.names ?? {});
   const [slug, setSlug] = useState(category?.slug ?? '');
-  const [color, setColor] = useState<string | null>(category ? category.color : '#2563eb');
+  const [color, setColor] = useState<string | null>(category ? category.color : DEFAULT_COLOR);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function save(event: FormEvent) {
@@ -129,7 +129,7 @@ function CategoryForm({
           <Input
             id="category-color"
             type="color"
-            value={color ?? '#2563eb'}
+            value={color ?? DEFAULT_COLOR}
             onChange={(e) => setColor(e.target.value)}
           />
           <span>{color ?? t(copy.no_color)}</span>

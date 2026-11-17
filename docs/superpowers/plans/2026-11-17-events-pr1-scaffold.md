@@ -180,7 +180,7 @@ TENANT_REQUIRED_CODE = "tenant_required"; NOT_FOUND_DETAIL = "Not found"
 **Interfaces:**
 - `models/enums.py`: `class Visibility(StrEnum): PRIVATE="private"; INTERNAL="internal"; PUBLIC="public"`. Plus the tuples that PR 2 validates against: `EVENT_STATUSES = ("draft", "in_review", "published")`, `ATTENDANCE_MODES = ("in_person", "online", "hybrid")`, `OVERRIDE_KINDS = ("skipped", "cancelled", "moved")`, `DEFAULT_EVENT_TYPE = "event"`.
 - Constants added to `core/constants.py`: `SLUG_MAX = 80`, `SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"`, `TEXT_SLUG_MAX = 200`, `TZ_MAX = 64`, `LOCALE_MAX = 16`, `COLOR_PATTERN = r"^#[0-9a-f]{6}$"`, `DEFAULT_COLOR = "#2563eb"`.
-- Tables. All are `Base, MultiTenantMixin, table=True`. "Audit" means `AuditMixin` and "soft" means `SoftDeleteMixin` (`created_at`, `updated_at`, `created_by`, `updated_by`, `is_deleted`, `deleted_at` and `deleted_by` come from `simple_module_db.mixins`). Datetimes use `dt_col` (`AwareDateTime`, stored UTC). A column is NOT NULL unless marked nullable. None has a `server_default`: these are new tables and every default is Python-side, so there is nothing for Postgres to disagree with.
+- Tables. All are `Base, MultiTenantMixin, table=True`. "Audit" means `AuditMixin` and "soft" means `SoftDeleteMixin` (`created_at`, `updated_at`, `created_by`, `updated_by`, `is_deleted`, `deleted_at` and `deleted_by` come from `simple_module_db.mixins`). Datetimes use `AwareDateTime`, stored UTC (`dt_required` for caller-supplied times; `dt_col` for optional times or creation timestamps). A column is NOT NULL unless marked nullable. Module-owned columns have no `server_default`; inherited `AuditMixin.created_at` keeps the framework's `CURRENT_TIMESTAMP` server default.
 
   | Table (class) | Columns | Constraints and indexes |
   |---|---|---|
@@ -321,10 +321,10 @@ async def create_calendar(db, who, data: CalendarCreate, *, default_tz: str) -> 
     # IntegrityError on the slug index -> SlugTaken
 async def update_calendar(db, cal: Calendar, data: CalendarPatch) -> Calendar   # only fields set
 async def set_visibility(db, cal: Calendar, visibility: Visibility) -> Calendar
-async def trash_calendar(db, cal: Calendar, who) -> None                       # soft delete
+async def trash_calendar(db, cal: Calendar) -> None                            # soft delete
 async def restore_calendar(db, who, calendar_id: uuid.UUID) -> Calendar
     # loads with include_deleted through POLICY.filter(who, "delete"); NotFound when absent
-    # or not deleted; OwnerRequired when visible-but-not-own (view check on the trashed row)
+    # or not deleted; a trashed row is invisible to non-owners, so refusal is always NotFound
 ```
 
 - Constants: `CALENDARS_MAX = 500`, `SLUG_FALLBACK = "calendar"`, `SLUG_TAKEN_DETAIL = "That slug is already in use"`.
@@ -343,7 +343,7 @@ async def restore_calendar(db, who, calendar_id: uuid.UUID) -> Calendar
   | `PATCH /api/events/calendars/{id}` | `CalendarEdit` | 200 | 404 (invisible), 403 `forbidden` (visible, not editable), 409 `slug_taken`, 422 |
   | `PUT /api/events/calendars/{id}/visibility` | `CalendarOwner` | 200 | 404, 403 `owner_required` |
   | `DELETE /api/events/calendars/{id}` | `CalendarOwner` | 204 | 404, 403 `owner_required` |
-  | `POST /api/events/calendars/{id}/restore` | owner or `events.manage` (service) | 200 | 404, 403 `owner_required` |
+  | `POST /api/events/calendars/{id}/restore` | owner or `events.manage` (service) | 200 | 404 `not_found` |
 
   `RequiresResource` raises the framework's `PermissionDenied` and 404. Check that both render as `{"detail","code"}`. If the framework's 403 has no `code`, `_RequiresOwner` and a small `_RequiresEdit` wrapper re-raise them as `Forbidden`/`OwnerRequired` (images' pattern, `modules/images/sm_images/core/access/__init__.py:140-148`). There is no hard delete (purge) in PR 1: the Trash screen comes later (spec "Screens").
 
@@ -446,8 +446,8 @@ async def delete_category(db, cat: Category) -> None
 - `views.router = APIRouter(dependencies=[Depends(bind_admin)])`, modelled on `modules/newsletter/sm_newsletter/web/endpoints/views.py:25-49`:
   - `GET /` (`events.view`) gives `RedirectResponse(CALENDARS_URL, 303)`.
   - `GET /calendars` (`events.view`) renders `_PAGE_CALENDARS` with `{**tenancy.view_props(request), "can_create": grants(held, PERM_EDIT), "can_manage": grants(held, PERM_MANAGE), "default_timezone": timezones.effective(settings.default_timezone), "user_id": <current user id>}`.
-  - `GET /categories` (`events.manage`) renders `_PAGE_CATEGORIES` with `{**view_props, "content_locales": list(settings.content_locales)}`.
-- `menu_items()`: Calendars (`order=400`, `permissions=[PERM_VIEW]`) and Categories (`order=410`, `permissions=[PERM_MANAGE]`), both in group `MENU_GROUP`/`MENU_GROUP_KEY`.
+  - `GET /categories` (`events.view` and `events.manage`) renders `_PAGE_CATEGORIES` with `{**view_props, "content_locales": list(settings.content_locales)}`.
+- `menu_items()`: Calendars (`order=400`, `permissions=[PERM_VIEW]`) and Categories (`order=410`, `permissions=[PERM_VIEW, PERM_MANAGE]`), both in group `MENU_GROUP`/`MENU_GROUP_KEY`.
 
 - [ ] **Step 1: Write the failing tests:**
   - `test_views.py::test_root_redirects_to_calendars`.
@@ -472,7 +472,7 @@ async def delete_category(db, cat: Category) -> None
 - Modify: `locales/en.json` and `de.json` (`calendars.*`, `share.*`, `visibility.*`, `errors.*`)
 
 **Interfaces:**
-- `ui/utils/api.ts`: a client over `apiFetch` from `@simple-module-py/ui/lib/api` (billing's precedent, `modules/billing/sm_billing/ui/utils/api.ts:3`). `ApiError {status, code, detail}`, and `errorText(err): string` maps `slug_taken`, `owner_required`, `forbidden`, `not_found`, `tenant_required` and `user_directory_unavailable` to `keys.events.errors.*`. It exports `listCalendars(trashed?)`, `createCalendar(body)`, `updateCalendar(id, body)`, `setVisibility(id, v)`, `trashCalendar(id)` and `restoreCalendar(id)`.
+- `ui/utils/api.ts`: a client over `apiFetch` from `@simple-module-py/ui/lib/api` (billing's precedent, `modules/billing/sm_billing/ui/utils/api.ts:3`). `ApiError {status, code}`, and `errorText(err): string` maps `slug_taken`, `owner_required`, `forbidden`, `not_found`, `tenant_required` and `user_directory_unavailable` to `keys.events.errors.*`. It exports `listCalendars(trashed?)`, `createCalendar(body)`, `updateCalendar(id, body)`, `setVisibility(id, v)`, `trashCalendar(id)` and `restoreCalendar(id)`.
 - `ui/utils/api-shares.ts`: images' `modules/images/sm_images/ui/utils/api-shares.ts` with `RESOURCE_TYPE = 'events.calendar'` and the candidates URL `/api/events/calendars/{id}/share-candidates`. `useShares.ts` and `ShareDialog.tsx` are images' (`ui/hooks/useShares.ts`, `ui/components/share/ShareDialog.tsx`) moved onto events' keys and `api` helpers. The test ids are `events-share` and `events-share-search`.
 - `pages/Calendars.tsx` (`export default`) takes the props from Task 10. It shows a table with a colour swatch, name, slug, a visibility badge, the timezone and, when `owner_id !== user_id`, the owner. Each row offers Edit when `can_edit`, and Visibility, Share and Move to trash when `can_own`. The page has a "New calendar" button when `can_create`, and an Active/Trash toggle where the Trash rows offer Restore. `CalendarDialog` handles create and edit: name, an optional slug, a colour (`<input type="color">`), a description, and a timezone field backed by a `datalist` from `Intl.supportedValuesOf('timeZone')`, which the server validates again. A visibility select appears only on create.
 

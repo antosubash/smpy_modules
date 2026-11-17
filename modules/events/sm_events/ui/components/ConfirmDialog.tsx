@@ -14,9 +14,9 @@ import { errorText } from '../utils/api';
 import { keys, useT } from '../utils/i18n';
 
 /*
- * Not the framework's `ConfirmActionDialog` (#342), which is controlled (it
- * has no trigger), runs no async `onConfirm`, and so cannot keep itself open
- * and show the server's refusal while the request runs or after it fails.
+ * This wrapper owns the trigger and async lifecycle. The framework's controlled
+ * `ConfirmActionDialog` can show errors with `busy` and children, but exposes
+ * no trigger; replacing this wrapper also needs to preserve trigger focus.
  */
 /**
  * Confirm a destructive action without `window.confirm()`, which cannot show

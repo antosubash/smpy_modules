@@ -1,5 +1,5 @@
 /** Framework transport supplies same-origin credentials and the session CSRF token. */
-import { type ApiFetchInit, apiFetch } from '@simple-module-py/ui/lib/api';
+import { type ApiFetchInit, apiFetch, NETWORK_FAILURE } from '@simple-module-py/ui/lib/api';
 import { keys, translate as t } from './i18n';
 import type { Calendar, CalendarInput, Category, CategoryInput, Visibility } from './types';
 
@@ -7,7 +7,6 @@ class ApiError extends Error {
   constructor(
     public readonly status: number,
     public readonly code: string,
-    public readonly detail: string | null,
   ) {
     super(code);
   }
@@ -27,7 +26,7 @@ export function errorText(error: unknown): string {
   };
   if (!(error instanceof ApiError)) return t(keys.events.errors.generic);
   if (messages[error.code]) return t(messages[error.code]);
-  if (error.status === 0) return t(keys.events.errors.offline);
+  if (error.status === NETWORK_FAILURE) return t(keys.events.errors.offline);
   if (error.status === 401) return t(keys.events.errors.session_expired);
   if (error.status === 403) return t(keys.events.errors.forbidden);
   if (error.status === 422) return t(keys.events.errors.invalid_input);
@@ -38,23 +37,20 @@ export async function send<T>(url: string, init: ApiFetchInit = {}): Promise<T> 
   const result = await apiFetch<T>(url, init);
   if (result.ok) return result.data;
   const body = result.error as { code?: unknown } | null;
-  throw new ApiError(result.status, typeof body?.code === 'string' ? body.code : '', result.detail);
+  throw new ApiError(result.status, typeof body?.code === 'string' ? body.code : '');
 }
 
-export function json(method: string, body: unknown): ApiFetchInit {
-  return { method, json: body };
-}
-const CALENDARS = '/api/events/calendars';
+export const CALENDARS = '/api/events/calendars';
 export const listCalendars = (trashed = false) =>
   send<Calendar[]>(`${CALENDARS}?trashed=${trashed}`);
 export const createCalendar = (body: CalendarInput) =>
-  send<Calendar>(CALENDARS, json('POST', body));
+  send<Calendar>(CALENDARS, { method: 'POST', json: body });
 export const updateCalendar = (id: string, body: CalendarInput) =>
-  send<Calendar>(`${CALENDARS}/${id}`, json('PATCH', body));
+  send<Calendar>(`${CALENDARS}/${id}`, { method: 'PATCH', json: body });
 export const setVisibility = (id: string, visibility: Visibility) =>
-  send<Calendar>(`${CALENDARS}/${id}/visibility`, json('PUT', { visibility }));
+  send<Calendar>(`${CALENDARS}/${id}/visibility`, { method: 'PUT', json: { visibility } });
 export const transferOwner = (id: string, owner_id: string) =>
-  send<Calendar>(`${CALENDARS}/${id}/owner`, json('PUT', { owner_id }));
+  send<Calendar>(`${CALENDARS}/${id}/owner`, { method: 'PUT', json: { owner_id } });
 export const trashCalendar = (id: string) => send<void>(`${CALENDARS}/${id}`, { method: 'DELETE' });
 export const restoreCalendar = (id: string) =>
   send<Calendar>(`${CALENDARS}/${id}/restore`, { method: 'POST' });
@@ -62,8 +58,8 @@ export const restoreCalendar = (id: string) =>
 const CATEGORIES = '/api/events/categories';
 export const listCategories = () => send<Category[]>(CATEGORIES);
 export const createCategory = (body: CategoryInput) =>
-  send<Category>(CATEGORIES, json('POST', body));
+  send<Category>(CATEGORIES, { method: 'POST', json: body });
 export const updateCategory = (id: string, body: Omit<CategoryInput, 'slug'>) =>
-  send<Category>(`${CATEGORIES}/${id}`, json('PATCH', body));
+  send<Category>(`${CATEGORIES}/${id}`, { method: 'PATCH', json: body });
 export const deleteCategory = (id: string) =>
   send<void>(`${CATEGORIES}/${id}`, { method: 'DELETE' });
