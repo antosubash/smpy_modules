@@ -37,7 +37,7 @@ async def test_owner_gets_candidates(client):
     cid = await make(client)
     got = await client.get(f"{BASE}/{cid}/share-candidates", params={"q": "amy"}, headers=OWNER)
     assert got.status_code == 200
-    assert got.json() == [{"id": "amy", "display_name": "Amy", "email": "amy@example.com"}]
+    assert got.json() == [{"id": "amy", "display_name": "Amy", "email": "a***@example.com"}]
     everyone = await client.get(f"{BASE}/{cid}/share-candidates", params=EVERYONE, headers=OWNER)
     # Not the owner, not the inactive account.
     assert sorted(c["id"] for c in everyone.json()) == ["amy", "bob"]
@@ -199,3 +199,12 @@ def test_rate_limit_rule_registered():
     assert rule.rate == shares_api.RATE == "60/minute"
     assert rates.match("GET", f"{BASE}/abc") is None
     assert rates.match("GET", f"{BASE}/abc/share-candidates/x") is None
+
+
+async def test_exact_address_query_returns_the_full_address(client):
+    client.app.state.user_directory = Directory(USERS)
+    cid = await make(client)
+    got = await client.get(
+        f"{BASE}/{cid}/share-candidates", params={"q": " AMY@example.com "}, headers=OWNER
+    )
+    assert [c["email"] for c in got.json()] == ["amy@example.com"]

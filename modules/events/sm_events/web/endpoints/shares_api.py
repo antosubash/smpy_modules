@@ -29,6 +29,7 @@ from sm_events.core import constants
 from sm_events.core.access import CalendarOwner
 from sm_events.web.endpoints.deps import require_view
 from sm_events.web.schemas.shares import ShareCandidate
+from sm_events.web.services.masking import visible_email
 from sm_events.web.services.members import directory_or_unavailable, members_only
 
 MIN_QUERY: Final = 3
@@ -56,6 +57,6 @@ async def share_candidates(
     users = [u for u in found if u.is_active and u.id != calendar.owner_id]
     users = await members_only(request, db, users)
     return [
-        ShareCandidate(id=u.id, display_name=u.label, email=u.email)
+        ShareCandidate(id=u.id, display_name=u.label, email=visible_email(u.email, term))
         for u in users[: constants.CANDIDATES_MAX]
     ]
