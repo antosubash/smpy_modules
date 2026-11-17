@@ -99,7 +99,8 @@ async def test_child_cannot_come_back_under_a_trashed_parent(db):
     child = await make(db, OWNER, cal, parent_id=parent.id)
     await trash_event(db, OWNER, child.id, 1)
     await trash_event(db, OWNER, parent.id, 1)
+    child_id = child.id
     with pytest.raises(InvalidParent):
-        await restore_event(db, OWNER, child.id, 2)
+        await restore_event(db, OWNER, child_id, 2)
     await restore_event(db, OWNER, parent.id, 2)
-    assert (await restore_event(db, OWNER, child.id, 2)).is_deleted is False
+    assert (await restore_event(db, OWNER, child_id, 2)).is_deleted is False

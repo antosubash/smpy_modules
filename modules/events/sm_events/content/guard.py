@@ -15,7 +15,6 @@ import uuid
 from typing import Any
 
 from sqlalchemy import select, update
-from sqlalchemy.orm.attributes import set_committed_value
 
 from sm_events.core.clock import utcnow
 from sm_events.core.errors import NotFound, Stale
@@ -61,8 +60,11 @@ async def claim(
     db: Any, event: Event, expected: int, *, actor: str | None, trashed: bool = False
 ) -> int:
     """:func:`claim_revision`, then the loaded ``event`` told what the database
-    now says (without marking it dirty, so the ORM never writes it back)."""
+    now says. A plain assignment, not ``set_committed_value``: when the caller's
+    savepoint rolls back, the session expires an object it changed, so the event
+    never keeps a revision the database does not have. The ORM's own ``UPDATE``
+    writes the same value again, which is harmless: the row is already ours."""
     number = await claim_revision(db, event.id, expected, actor=actor, trashed=trashed)
-    set_committed_value(event, "revision", number)
-    set_committed_value(event, "updated_by", actor)
+    event.revision = number
+    event.updated_by = actor
     return number

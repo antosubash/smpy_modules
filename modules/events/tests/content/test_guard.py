@@ -71,11 +71,21 @@ async def test_live_event_with_trashed_flag_is_not_found(db):
         await claim_revision(db, event.id, 1, actor=None, trashed=True)
 
 
-async def test_claim_updates_the_loaded_event_without_dirtying_it(db):
+async def test_claim_updates_the_loaded_event(db):
     event = await an_event(db)
     await claim(db, event, 1, actor="u")
     assert event.revision == 2 and event.updated_by == "u"
-    assert event not in db.dirty
+
+
+async def test_a_rolled_back_claim_leaves_no_wrong_revision_in_memory(db):
+    event = await an_event(db)
+    with pytest.raises(RuntimeError):
+        async with db.begin_nested():
+            await claim(db, event, 1, actor="u")
+            raise RuntimeError
+    await db.refresh(event)
+    assert event.revision == 1
+    assert await claim_revision(db, event.id, 1, actor="u") == 2
 
 
 @pytest.mark.skipif(not USING_POSTGRES, reason="row locks need Postgres")
