@@ -14,16 +14,15 @@ days from ``created_at``, and the owning account's current counter — so
 upgrading signs nobody out and leaves no NULL for the read path to fail open
 on. ``expires_at`` is added nullable, backfilled, then made ``NOT NULL``.
 
-Typed ``DateTime(timezone=True)`` like the framework revision. Framework 0.0.47
-declares the column ``AwareDateTime`` (rendered as that type), and on SQLite
-the earlier ``TIMESTAMPAware`` reflects as ``TIMESTAMP``, which ``alembic
-check`` reports as a type change; the two are the same column on Postgres.
-Only a SQLite database built before 0.0.47 keeps the old declared type, which
-is cosmetic (same affinity).
+Typed ``TIMESTAMPAware`` like ``created_at`` beside it (``ed06f4584f6b``), not
+the framework revision's ``DateTime``: the two are the same column on
+Postgres, but on SQLite ``DateTime`` reflects as ``DATETIME`` and ``alembic
+check`` reports a type change against the model.
 """
 
 from collections.abc import Sequence
 
+import fastapi_users_db_sqlalchemy.generics
 import sqlalchemy as sa
 from alembic import op
 
@@ -39,7 +38,7 @@ def upgrade() -> None:
         "users_access_token",
         sa.Column(
             "expires_at",
-            sa.DateTime(timezone=True),
+            fastapi_users_db_sqlalchemy.generics.TIMESTAMPAware(timezone=True),
             nullable=True,
         ),
     )
@@ -62,7 +61,7 @@ def upgrade() -> None:
     with op.batch_alter_table("users_access_token") as batch:
         batch.alter_column(
             "expires_at",
-            existing_type=sa.DateTime(timezone=True),
+            existing_type=fastapi_users_db_sqlalchemy.generics.TIMESTAMPAware(timezone=True),
             nullable=False,
         )
     op.create_index(
