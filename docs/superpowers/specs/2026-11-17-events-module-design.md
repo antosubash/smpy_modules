@@ -210,7 +210,9 @@ the token's row.
 Console, under `/admin/events/`: Calendar (the default), List, the event editor,
 Calendars (with sharing and feed links), Categories, Import, Trash, Settings.
 
-API under `/api/events/`, `RequiresCsrf`, JSON errors as `{"detail","code"}`.
+API under `/api/events/`, `RequiresCsrf`, JSON errors as `{"detail","code"}`
+(the exception: FastAPI's own request-validation 422 keeps its standard list
+shape).
 `GET /api/events/occurrences` is the read above.
 
 Public, under the `public_prefix` setting (default `/events`, restart-only),
@@ -389,3 +391,13 @@ metadata uses last-write-wins forms without `expected_revision`; event writes
 retain that guard from PR 2. Categories (API and screen) ship in PR 1.
 `events.manage` alone authorises ownership transfer, to an active member of
 the bound tenant; the HTTP calendar API also requires `events.view`.
+
+Later PR 1 rulings: calendar responses carry `owner_name`, a string or `null`;
+only an active member of the bound organisation with a display name is named,
+anyone else (an owner whose only label is an address included) is `null` and
+shown as "Unknown user", and no address is shown outside the owner/manager
+picker. A failing user directory leaves the names `null` instead of failing the
+list. Calendar and category names are single line (control characters, line and
+paragraph separators and direction controls are a 422); descriptions keep line
+breaks and tabs. A name with no slug-able characters falls back to the slug
+`calendar` or `category`, with `-2`, `-3` ... on a clash.

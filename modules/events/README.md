@@ -75,6 +75,20 @@ metadata forms and have no `expected_revision`.
 | `PATCH /categories/{id}` | Replace names or colour; `events.view` and `events.manage` |
 | `DELETE /categories/{id}` | Delete; `events.view` and `events.manage` |
 
+Calendar responses carry `owner_name` (a string or `null`). An owner is named
+only when they are an active member of the bound organisation with a display
+name; anyone else, including an owner whose only label is an email address, is
+`null` and shown as "Unknown user". No address or part of one is shown outside
+the owner/manager-only picker. If the user directory fails, lists still load,
+with `null` owner names; the share picker and an ownership transfer still fail
+rather than guess (no directory at all is a 503).
+
+A calendar name and every category name are single line: control characters,
+line and paragraph separators and text-direction controls are rejected with a
+422. A description keeps line breaks and tabs and rejects other control
+characters and text-direction controls. A name with no slug-able characters
+gets the slug `calendar` or `category` (then `-2`, `-3`, ...).
+
 Every calendar API route also needs `events.view`. Grants, lists and revokes
 use the framework's `/api/sharing/shares` with
 `resource_type="events.calendar"`, the calendar UUID as `resource_id`, a user

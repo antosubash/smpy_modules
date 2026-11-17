@@ -36,10 +36,21 @@ pages need `events.view`, and Categories needs both `events.view` and
 writes need both view and manage. The framework sharing API additionally needs
 `sharing.share`. No anonymous event API or page ships in PR 1.
 
-Every viewer of a calendar sees its owner's display name when the owner is an
-active member with a name; an owner without a name is shown as unknown, and no
-email address or part of one is ever shown outside the owner/manager-only
-picker.
+Calendar responses carry `owner_name`, a string or `null`. Every viewer of a
+calendar sees its owner's display name when the owner is an active member of the
+bound organisation with a display name. Anyone else (not a member, inactive,
+unknown, or an owner whose only label is an email address) is `null` and shown
+as "Unknown user"; no email address or part of one is ever shown outside the
+owner/manager-only picker. If the user directory (or the membership store)
+fails, lists, reads and writes still succeed with `null` owner names; the share
+picker and an ownership transfer still fail rather than guess (no directory at
+all is a 503).
+
+A calendar name and every category name are single line: control characters,
+line and paragraph separators and text-direction controls are rejected with a
+422. A description keeps line breaks and tabs and rejects other control
+characters and text-direction controls. A name with no slug-able characters
+falls back to the slug `calendar` or `category` (then `-2`, `-3`, ...).
 
 An owner or edit share can write drafts without `events.edit`; that permission
 only adds event writing on internal and public calendars. It never grants
