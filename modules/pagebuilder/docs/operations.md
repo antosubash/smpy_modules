@@ -101,7 +101,7 @@ Settings screen says so. Everything else is read per request and applies on save
 | `snapshot_root` | `var/pagebuilder/snapshots` | Snapshots and their shared blob store; anchored like `media_root` |
 | `snapshot_max_upload_bytes` | `209715200` | 200 MB per uploaded bundle |
 | `snapshot_max_extracted_bytes` | `1073741824` | 1 GB expanded; guards against zip bombs |
-| `public_csp` | see below | `Content-Security-Policy` on public pages; empty disables |
+| `public_csp` | empty | An additional `Content-Security-Policy` on public pages, enforced beside the app's own; empty sends none |
 | `public_cache_max_age` | `60` | `max-age` on public pages |
 | `public_cache_swr` | `600` | `stale-while-revalidate`; `0` omits it |
 | `public_base_url` | — | e.g. `https://example.com`, no trailing slash. Base for canonical, `og:url`, `og:image`, `hreflang`, the sitemap and `robots.txt`'s `Sitemap:` line. **Required in production on a single-tenant host** (blank falls back to the host's own `public_base_url`; see [Public origin](#public-origin)); leave blank on a multi-tenant host, where each organisation's site is its own host. |
@@ -114,15 +114,12 @@ Settings screen says so. Everything else is read per request and applies on save
 | `scheduler_enabled` ● | `true` | In-process scheduler; safe in every process (each page is claimed before it flips), turn off if you'd rather an external worker called `PagesService.process_due` |
 | `scheduler_interval_seconds` ● | `30` | Tick interval |
 
-Default `public_csp`:
-
-```
-default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
-img-src 'self' https: data:; font-src 'self' data:; connect-src 'self';
-frame-ancestors 'none'; base-uri 'self'; form-action 'self'
-```
-
-Widen it for analytics, web fonts, embedded videos (`frame-src`) or iframes.
+`public_csp` is empty by default: the app's nonce-based policy already covers
+public pages. A value you set is sent in addition to it (framework 0.0.45+), and
+the browser enforces both, so it can only restrict further. It is static, so it
+cannot carry the per-request nonce: a policy with a `script-src` that omits the
+nonce blocks the host's own scripts. Restrict only what the app policy allows and
+you do not want (`frame-ancestors`, `form-action`, `img-src`).
 
 ## Adding languages
 
@@ -172,7 +169,7 @@ A published page response carries:
 | `Cache-Control` | `public, max-age=<public_cache_max_age>, stale-while-revalidate=<public_cache_swr>` |
 | `Vary` | `X-Inertia`, `Cookie`, `Accept-Language`, plus the tenant headers on a multi-tenant host, plus `Host` while `public_base_url` is blank |
 | `Content-Language` | the page's locale |
-| `Content-Security-Policy` | `public_csp`, unless empty; never on a 304, which the browser merges into the cached page (#322) |
+| `Content-Security-Policy` | `public_csp`, only when set (empty by default), beside the app's own policy; never on a 304, which the browser merges into the cached page (#322) |
 
 Because the nav list is in the ETag, publishing or renaming a page flagged for
 the header changes every other page's tag too. Media is served
@@ -255,7 +252,7 @@ the other leaves pages pointing at missing images.
 | Upload 415 | type not allowed, or contents don't match the declared type | Re-export the image; add the type to `media_allowed_content_types` |
 | Canonical or sitemap URLs show an internal host | proxy rewrites `Host` | Set `public_base_url` |
 | Scheduled page did not publish | scheduler off, page not a draft, page in trash, or its unpublish time had also passed | `scheduler_enabled`; the page's status; a `window_missed` / `publish_failed` log line; publish manually |
-| Embedded video or font blocked on public pages | `public_csp` | Widen it on the Settings screen (applies on save) |
+| Embedded video, font or script blocked on public pages | the app's CSP, or a `public_csp` you set (both are enforced) | Check the console for which policy blocked it; a stored `public_csp` can only restrict, so clear or loosen it |
 | Snapshot upload 413 / 422 | over a size cap, or not a valid bundle | Raise `snapshot_max_upload_bytes` / `snapshot_max_extracted_bytes`; the 422 message names the problem |
 | **Restore…** refused: "An import is already awaiting approval" | one staged restore at a time | Approve or reject the pending one at `/pagebuilder/content/review` |
 | Header nav lists a page twice | layout link and page address differ | The layout's link must match the page's address (`/p/about`, `/de/p/about`) |

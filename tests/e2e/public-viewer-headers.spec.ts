@@ -47,9 +47,9 @@ test.describe('Public viewer headers', () => {
     expect(anonymous.headers().vary).toMatch(/Accept-Language/);
     await anon.close();
 
-    // CSP header is injected for every published response; the host
-    // overrides the default in dev to widen connect-src for Vite, so we
-    // only assert the baseline restrictive directives are present.
+    // The app's own CSP covers a published page (pagebuilder's `public_csp` is
+    // empty by default and would only sit beside it), so assert the baseline
+    // restrictive directive is present.
     const csp = headers['content-security-policy'];
     expect(csp, 'CSP header missing').toBeTruthy();
     expect(csp).toContain("default-src 'self'");

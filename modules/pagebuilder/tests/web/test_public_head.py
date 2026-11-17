@@ -33,6 +33,9 @@ async def test_head_published_and_conditional(
     bilingual_client: AsyncClient, locale: str, prefix: str, headers: dict
 ) -> None:
     await _publish(bilingual_client, locale)
+    # Empty by default; set one so HEAD is checked to carry it like GET.
+    settings = bilingual_client._transport.app.state.pagebuilder.settings  # type: ignore[attr-defined]
+    settings.public_csp = "frame-ancestors 'none'"
     url = f"{prefix}/hello"
     get = await bilingual_client.get(url, headers=headers)
     head = await bilingual_client.head(url, headers=headers)

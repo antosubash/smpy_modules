@@ -56,7 +56,16 @@ async def test_published_page_renders_with_headers(authed_client: AsyncClient) -
     assert response.status_code == 200
     assert response.headers.get("ETag", "").startswith('W/"')
     assert response.headers["Cache-Control"].startswith("public, max-age=")
-    assert response.headers.get("Content-Security-Policy", "").startswith("default-src 'self'")
+    assert "content-security-policy" not in response.headers
+
+
+async def test_a_stored_public_csp_is_sent(authed_client: AsyncClient) -> None:
+    await _create_published(authed_client)
+    settings = authed_client._transport.app.state.pagebuilder.settings  # type: ignore[attr-defined]
+    settings.public_csp = "frame-ancestors 'none'"
+    response = await authed_client.get("/p/hello", headers={**_INERTIA_HEADERS, **_ANON})
+    assert response.status_code == 200
+    assert response.headers["Content-Security-Policy"] == "frame-ancestors 'none'"
 
 
 async def test_published_page_unpublishes_to_404(authed_client: AsyncClient) -> None:
