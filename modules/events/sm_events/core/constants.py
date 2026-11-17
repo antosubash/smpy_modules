@@ -51,3 +51,9 @@ CANDIDATES_MAX = 20
 CANDIDATES_SCAN = 100
 DIRECTORY_UNAVAILABLE_CODE = "user_directory_unavailable"
 DIRECTORY_UNAVAILABLE_DETAIL = "The user directory is not available"
+
+# Categories.
+CATEGORY_NAME_MAX = 100
+CATEGORIES_MAX = 500
+DEFAULT_LOCALE_REQUIRED_DETAIL = "A name in the default language is required"
+UNKNOWN_LOCALE_DETAIL = "That language is not one of the content locales"

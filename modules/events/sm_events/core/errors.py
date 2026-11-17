@@ -76,7 +76,7 @@ class Invalid(EventsError):  # noqa: N818 - HTTP vocabulary, deliberately
 
 class UnknownLocale(Invalid):
     code = "unknown_locale"
-    detail = "That language is not one of the content locales"
+    detail = constants.UNKNOWN_LOCALE_DETAIL
 
 
 class ServiceUnavailable(EventsError):  # noqa: N818 - HTTP vocabulary, deliberately
