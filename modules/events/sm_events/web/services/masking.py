@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["mask_email", "visible_email"]
+__all__ = ["mask_email", "matches_query", "visible_email"]
 
 _MASK = "***"
 
@@ -23,3 +23,18 @@ def visible_email(address: str, query: str) -> str:
     if query.strip().lower() == address.lower():
         return address
     return mask_email(address)
+
+
+def matches_query(label: str, address: str, query: str) -> bool:
+    """Whether the share picker may offer a user for *query*.
+
+    Only a display name containing the stripped query (a label that is the
+    address itself does not count), or the query being the whole address. A
+    partial address never matches: otherwise the picker would confirm an
+    address piece by piece."""
+    needle = query.strip().lower()
+    if not needle:
+        return False
+    if needle == address.lower():
+        return True
+    return bool(label) and label.lower() != address.lower() and needle in label.lower()

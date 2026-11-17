@@ -16,6 +16,11 @@ query shorter than :data:`MIN_QUERY` characters (after trimming) answers ``[]``
 without asking the directory, and the route has its own per-user rate
 (:data:`RATE`, registered by ``EventsModule.register_rate_limits``) so the
 remaining three-letter space cannot be walked quickly either.
+
+**Not an email oracle.** The directory matches on email substrings, so the
+answer is filtered (:func:`matches_query`) before the limit: a user is offered
+only when the query is part of their display name, or is their whole address.
+A partial address finds nobody, so an address cannot be confirmed piece by piece.
 """
 
 from __future__ import annotations
@@ -29,7 +34,7 @@ from sm_events.core import constants
 from sm_events.core.access import CalendarOwner
 from sm_events.web.endpoints.deps import require_view
 from sm_events.web.schemas.shares import ShareCandidate
-from sm_events.web.services.masking import visible_email
+from sm_events.web.services.masking import matches_query, visible_email
 from sm_events.web.services.members import directory_or_unavailable, members_only
 
 MIN_QUERY: Final = 3
@@ -54,7 +59,11 @@ async def share_candidates(
     if len(term) < MIN_QUERY:
         return []
     found = await directory.search(db, term, limit=constants.CANDIDATES_SCAN)
-    users = [u for u in found if u.is_active and u.id != calendar.owner_id]
+    users = [
+        u
+        for u in found
+        if u.is_active and u.id != calendar.owner_id and matches_query(u.label, u.email, term)
+    ]
     users = await members_only(request, db, users)
     return [
         ShareCandidate(id=u.id, display_name=u.label, email=visible_email(u.email, term))

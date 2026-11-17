@@ -15,14 +15,14 @@ BASE = "/api/events/calendars"
 SHARES = "/api/sharing/shares"
 RTYPE = "events.calendar"
 OWNER = as_user("o", V, E, "sharing.share")
-EVERYONE = {"q": "example"}
-"""Matches every fake address; three characters or more, as the route needs."""
+EVERYONE = {"q": "tester"}
+"""Matches every fake display name; three characters or more, as the route needs."""
 
 USERS = {
-    "o": ("o@example.com", "Olga", True),
-    "amy": ("amy@example.com", "Amy", True),
-    "bob": ("bob@example.com", "Bob", True),
-    "old": ("old@example.com", "Old", False),
+    "o": ("o@example.com", "Olga Tester", True),
+    "amy": ("amy@example.com", "Amy Tester", True),
+    "bob": ("bob@example.com", "Bob Tester", True),
+    "old": ("old@example.com", "Old Tester", False),
 }
 
 
@@ -37,7 +37,7 @@ async def test_owner_gets_candidates(client):
     cid = await make(client)
     got = await client.get(f"{BASE}/{cid}/share-candidates", params={"q": "amy"}, headers=OWNER)
     assert got.status_code == 200
-    assert got.json() == [{"id": "amy", "display_name": "Amy", "email": "a***@example.com"}]
+    assert got.json() == [{"id": "amy", "display_name": "Amy Tester", "email": "a***@example.com"}]
     everyone = await client.get(f"{BASE}/{cid}/share-candidates", params=EVERYONE, headers=OWNER)
     # Not the owner, not the inactive account.
     assert sorted(c["id"] for c in everyone.json()) == ["amy", "bob"]
@@ -45,7 +45,7 @@ async def test_owner_gets_candidates(client):
 
 async def test_candidates_are_limited_to_twenty(client):
     client.app.state.user_directory = Directory(
-        {f"u{n:02d}": (f"u{n:02d}@example.com", None, True) for n in range(40)}
+        {f"u{n:02d}": (f"u{n:02d}@example.com", f"User {n:02d} Tester", True) for n in range(40)}
     )
     cid = await make(client)
     got = await client.get(f"{BASE}/{cid}/share-candidates", params=EVERYONE, headers=OWNER)
@@ -208,3 +208,51 @@ async def test_exact_address_query_returns_the_full_address(client):
         f"{BASE}/{cid}/share-candidates", params={"q": " AMY@example.com "}, headers=OWNER
     )
     assert [c["email"] for c in got.json()] == ["amy@example.com"]
+
+
+async def _candidates(client, cid: str, q: str) -> list[dict]:
+    got = await client.get(f"{BASE}/{cid}/share-candidates", params={"q": q}, headers=OWNER)
+    assert got.status_code == 200, got.text
+    return got.json()
+
+
+@pytest.mark.parametrize("q", ["amy@exa", "@example", "example.com", "my@ex", "example"])
+async def test_part_of_an_email_finds_nobody(client, q):
+    """The directory matches on email substrings; the picker must not become an
+    oracle that confirms an address piece by piece."""
+    directory = Directory(USERS)
+    client.app.state.user_directory = directory
+    cid = await make(client)
+    assert await _candidates(client, cid, q) == []
+    assert directory.searches == [q]  # the directory was asked; the answer is filtered
+
+
+async def test_name_query_returns_the_masked_email(client):
+    client.app.state.user_directory = Directory(USERS)
+    cid = await make(client)
+    got = await _candidates(client, cid, "my tes")
+    assert got == [{"id": "amy", "display_name": "Amy Tester", "email": "a***@example.com"}]
+
+
+@pytest.mark.parametrize("q", ["AMY@example.COM", "  amy@example.com  ", "Amy@Example.Com"])
+async def test_exact_address_in_any_case_returns_the_full_address(client, q):
+    client.app.state.user_directory = Directory(USERS)
+    cid = await make(client)
+    got = await _candidates(client, cid, q)
+    assert [(c["id"], c["email"]) for c in got] == [("amy", "amy@example.com")]
+
+
+async def test_name_match_is_case_insensitive_and_trimmed(client):
+    client.app.state.user_directory = Directory(USERS)
+    cid = await make(client)
+    got = await _candidates(client, cid, "  BOB tes ")
+    assert [c["id"] for c in got] == ["bob"]
+
+
+async def test_filter_runs_before_the_limit(client):
+    """Email-only hits must not use up the twenty slots a name match needs."""
+    users = {f"u{n:02d}": (f"zed{n:02d}@example.com", f"Nobody {n}", True) for n in range(30)}
+    users["real"] = ("real@elsewhere.org", "Zed Real", True)
+    client.app.state.user_directory = Directory(users)
+    cid = await make(client)
+    assert [c["id"] for c in await _candidates(client, cid, "zed")] == ["real"]
