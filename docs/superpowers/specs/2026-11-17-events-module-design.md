@@ -52,8 +52,8 @@ sub-events).
 ## Anti-goals: a failure even if it works
 
 - **An internal or private event reaching the public**: through a page, a feed,
-  a pagebuilder block, a newsletter card, the sitemap, structured data or a
-  plugin's source.
+  a pagebuilder block, a newsletter card lookup, the sitemap, structured data
+  or a plugin's source.
 - **An event shown at the wrong time**: across a timezone, a DST change or an
   all-day boundary.
 - **Unbounded recurrence expansion**: one request must never expand a rule
@@ -151,6 +151,15 @@ Decisions:
   published events only).
 - **Shares** use the framework's `sharing` module as images does: resource type
   `events.calendar`, rights view and edit.
+- **How shares and permissions combine** (my call, after images' policy):
+  `events.manage` bypasses calendar visibility. Otherwise a signed-in user needs
+  `events.view` and a way into the calendar (owner, share, or `internal`).
+  Someone who can only view sees published events. Someone with an edit right
+  on the calendar (owner, edit share, or `events.edit` on an internal or public
+  calendar) also sees drafts, writes drafts and submits them for review.
+  Publishing, unpublishing and **any change to a published event** (edits are
+  live) need `events.publish` as well as that edit right. Sharing, visibility
+  and deleting a calendar are the owner's or `events.manage`'s.
 - One function decides what a viewer may see (`core/access`). The occurrences
   read, the event read, every feed and every contract go through it. The public
   surface never passes a viewer and gets `public` calendars and `published`
@@ -171,19 +180,30 @@ the token's row.
 - A `Calendar` component exported from `@simple-module-py/events` (`index.ts`):
   views month, week, day and list; filters by calendar, category and type;
   props for the occurrence fetcher, initial view and date, and render slots.
-- **FullCalendar, MIT packages only**: `core`, `daygrid`, `timegrid`, `list`,
-  `interaction`, `react` (React 17–19 supported). The scheduler, resource and
-  timeline plugins are premium and are not used; a test fails on any
-  `@fullcalendar/*` dependency outside that list. FullCalendar is imported only
-  inside `ui/calendar/`, so it can be replaced. The plan picks the current
-  stable major and pins it.
+- **FullCalendar 7, MIT packages only** (checked 2026-11-17: 7.1.5 is npm
+  `latest`, v6 is `legacy`): `@fullcalendar/react` (its `/daygrid`,
+  `/timegrid`, `/list` and `/interaction` subpaths; React 17–19),
+  `@fullcalendar/core` and the required peer `temporal-polyfill`.
+  `@fullcalendar/react-scheduler` (AGPL in v7) and any `resource`, `timeline`
+  or `scheduler` package are never installed; a test fails on any
+  `@fullcalendar/*` dependency outside the allowed list. `@fullcalendar/rrule`
+  is not needed: the server expands rules. v7 bundles no CSS, so the component
+  imports `skeleton.css` and one theme. FullCalendar is imported only inside
+  `ui/calendar/`, so it can be replaced.
 - Admin: click or drag-select to create, drag to move, resize to change the
   end, both through the API with `expected_revision`. A recurring occurrence
   asks "this one or all".
-- **Viewer timezone**: a toggle between the event's time and the browser's.
-  All-day events ignore it.
-- Week start and 12/24-hour format follow the console language; the grid is
-  keyboard-operable (FullCalendar's own, plus focus handling on our popovers).
+- **Grid timezone**: a grid has one timezone at a time, switched by a toggle
+  between "calendar time" (the calendar's `default_timezone`; the tenant
+  default when several calendars are shown) and "my time" (the browser's).
+  v7 handles named zones without a plugin. A drag moves the event in the grid's
+  timezone; the event keeps its own `timezone`. Popovers and event pages also
+  show the event's own local time when it differs. All-day events ignore the
+  toggle.
+- Week start and 12/24-hour format follow the console language. Events are
+  focusable (`eventInteractive`). FullCalendar documents no keyboard drag or
+  resize, so every move and resize is also possible from a "Move" dialog with
+  date and time fields.
 
 ## Screens and routes
 
@@ -213,10 +233,20 @@ only in languages that have a text. Scripts carry the CSP nonce.
 
 ## ICS
 
-Read and written with the `icalendar` package (BSD); the plan confirms the
-licence. A feed emits a series as `RRULE` plus `EXDATE` and `RECURRENCE-ID`
-overrides, with `TZID`, not as expanded instances. `UID` is `<uid>@<public
-host>` and never changes.
+Read and written with the `icalendar` package (7.x, BSD-2-Clause).
+`recurring-ical-events` is LGPL and is not used. The first task of the feeds PR
+is a round-trip test of `RRULE`, `EXDATE`, `RECURRENCE-ID` and `VTIMEZONE`.
+
+- **Feeds do not use the occurrences read for this module's own events.** They
+  read events with their rules and overrides directly (through the same access
+  function) and emit a series as `RRULE` plus `EXDATE` and `RECURRENCE-ID`,
+  with `TZID`. Occurrences from **plugin sources** enabled on the calendar are
+  added as plain instances for a window of 30 days back and 366 days ahead,
+  with `UID` `<source>:<key>`. External subscriptions are never re-exported.
+- **UID.** `events_event.uid` is text, unique per `(tenant, calendar, uid)`. A
+  new event gets `<uuid4>@simple-module-events` once; an imported event keeps
+  the UID it came with. Feeds emit it verbatim, so it never depends on the
+  host name. The same UID in two calendars is two events.
 
 - **Private feed tokens.** A token is 32 random bytes shown once; only its
   SHA-256 is stored, so it does not depend on `SM_SECRET_KEY` (#366). It belongs
@@ -226,7 +256,8 @@ host>` and never changes.
   token can be revoked by its owner or by `events.manage`.
 - **Upload.** An `.ics` file (5 MB cap) is parsed in a background task into a
   staged import with counts; applying it writes events into a chosen calendar
-  as drafts or published. A UID already present updates that event. What is
+  as drafts or published. A UID already present in that calendar updates that
+  event. What is
   dropped (alarms, attendees, unsupported rules) is reported.
 - **Subscriptions.** A calendar can subscribe to an ICS URL as a read-only
   source: fetched by a beat task with `ETag`, cached in
@@ -267,8 +298,12 @@ The in-repo proof is a source that puts a records date field on a calendar.
   calendar has default lead times.
 - A beat task finds due reminders and sends through `simple_module_core.mail`
   (the durable outbox when the host has one, as records' notifications do).
-- `events_reminder_sent` is unique on `(event, occurrence start, recipient,
-  lead)`, written before the send, so a retry never mails twice. A cancelled or
+- **At most once** (my call): `events_reminder_sent` is unique on `(event,
+  occurrence start, recipient, lead)` and is claimed and committed before the
+  send. A crash between the claim and the send loses that reminder; it is never
+  retried, because a duplicate is the anti-goal and a late reminder is useless.
+  Records' notifications make the opposite trade and can duplicate. Claims
+  that never reached `sent` are counted on the Settings screen. A cancelled or
   skipped occurrence is not reminded; a rescheduled one is reminded at its new
   time.
 - No mail transport, or no `public_base_url`: nothing is sent and the control is
@@ -279,7 +314,10 @@ The in-repo proof is a source that puts a records date field on a calendar.
 - **pagebuilder**: `Calendar` and `UpcomingEvents` blocks
   (`pagebuilder-blocks.ts`), public calendars only.
 - **newsletter**: an event card through `sm_events.contracts.cards`; newsletter's
-  `content/integrations/` gains `events.py`.
+  `content/integrations/` gains `events.py`. The lookup returns only published
+  events of public calendars. A card is a snapshot taken at insert, as article
+  and page cards are: making the event private later does not recall a campaign
+  that already holds it.
 - **records**: registration with a capacity limit and a closing date, a
   confirmation mail with the `.ics` attached, reminders to registrants and "my
   registrations". It needs a new records contract; that PR starts with its own
@@ -316,18 +354,19 @@ Migrations are in `host/migrations/versions/`, the first with
 
 | PR | Delivers |
 | --- | --- |
-| 1 | Scaffold, calendars, events and texts, recurrence and overrides, the occurrences read, tenancy, access with sharing, API, list and editor screens, host migration, docs |
-| 2 | The `Calendar` component and the console calendar: views, create, drag, resize, viewer timezone |
-| 3 | Public pages, public ICS, JSON-LD, sitemap, e2e spec |
-| 4 | Private feed tokens and `.ics` upload |
-| 5 | The extension registry, plugin guide, the records date-field source |
-| 6 | Pagebuilder blocks and the newsletter card |
-| 7 | Reminders |
-| 8 | Registration through records |
-| 9 | External ICS subscriptions |
+| 1 | Scaffold, tenancy, settings, calendars with visibility and sharing, the Calendars screen, host migration, docs |
+| 2 | Events and texts, recurrence and overrides, the occurrences read, workflow, API, list and editor screens |
+| 3 | The `Calendar` component and the console calendar: views, create, drag, resize, grid timezone |
+| 4 | Public pages, public ICS, JSON-LD, sitemap, e2e spec |
+| 5 | Private feed tokens and `.ics` upload |
+| 6 | The extension registry, plugin guide, the records date-field source |
+| 7 | Pagebuilder blocks and the newsletter card |
+| 8 | Reminders |
+| 9 | Registration through records |
+| 10 | External ICS subscriptions |
 
-Each PR goes through `/ship`. PR 1's API is usable without the grid; PR 2 is the
-first with screenshots.
+Each PR goes through `/ship`. The framework bump (#405) lands first. PR 1
+creates every table of PRs 1 and 2 in one labelled revision.
 
 ## Left to the builder
 
