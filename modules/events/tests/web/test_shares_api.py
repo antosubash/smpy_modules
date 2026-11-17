@@ -249,8 +249,9 @@ async def test_label_containing_an_at_sign_is_masked(client):
         {"ww": ("ww@example.com", "Wanda <wanda@corp.example>", True)}
     )
     cid = (await make(client, OWNER))["id"]
-    got = await _candidates(client, cid, "wanda")
-    assert got == [{"id": "ww", "display_name": "w***@example.com", "email": "w***@example.com"}]
+    assert await _candidates(client, cid, "wanda") == []
+    got = await _candidates(client, cid, "ww@example.com")
+    assert got == [{"id": "ww", "display_name": "ww@example.com", "email": "ww@example.com"}]
 
 
 async def test_directory_scan_stops_at_100(client):

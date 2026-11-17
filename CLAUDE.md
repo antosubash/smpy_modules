@@ -150,9 +150,10 @@ route requires `events.view`; owners, edit shares and managers edit metadata,
 only owners and managers change visibility, share, trash or restore, and only
 managers transfer ownership. `events.edit` grants creating calendars and writing
 events on internal/public ones, never metadata edits on someone else's calendar.
-The share picker needs three trimmed characters, matches display-name text with
-address tokens removed or an exact full address (compared NFC-normalised and
-case-insensitively), and masks every address, bare or inside a label, unless the
+The share picker needs three trimmed characters, matches a user whose label has
+no at-sign (any variant) by name or exact full address, and a user whose label
+has one only by the exact full address (compared NFC-normalised and
+case-insensitively); it never parses labels. It masks every address, bare or inside a label, unless the
 query is the full address.
 
 **Records' website-submission routes are anonymous writes (#101).** The record

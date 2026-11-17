@@ -49,8 +49,10 @@ while in trash, so restore cannot collide.
 The picker is a search, not a directory listing: with a directory installed,
 fewer than three trimmed characters returns no candidates. It excludes inactive
 users, the calendar's owner and other tenants' members. The route is rate-limited per signed-in
-user. It matches display-name text after removing address tokens, or an exact
-full address; partial email matches alone return nobody. It scans at most 100
+user. A user whose display label contains an at-sign (any variant: @, U+FE6B,
+U+FF20) is never matched by name, only by the exact full address, and is shown
+masked otherwise. Any other user matches by display-name text or the exact full
+address; partial email matches alone return nobody. It scans at most 100
 directory matches and returns at most 20 candidates. Email addresses, including
 address-bearing display labels, remain masked unless the trimmed query equals
 the full address. Names, addresses and the query are compared NFC-normalised

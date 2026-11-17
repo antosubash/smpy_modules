@@ -383,7 +383,7 @@ async def restore_calendar(db, who, calendar_id: uuid.UUID) -> Calendar
 
 **Interfaces:**
 - `GET /api/events/calendars/{id}/share-candidates?q=` (≤100 characters). Needs `events.view` and `CalendarOwner`. Answers `list[ShareCandidate]` (at most 20, the owner excluded, active users only). With a directory installed, `q` shorter than `MIN_QUERY = 3` once trimmed gives `[]` without searching it. Unless the host is single-tenant with nothing upstream (`unscoped_single`), only members of the bound tenant are offered (`tenant_member_ids`, fail closed). `NullUserDirectory` gives 503 `user_directory_unavailable`, including for a short query.
-- Scan at most 100 directory matches, then match display-name text with address tokens removed or an exact full address. Mask email and address-bearing labels unless the trimmed query equals the full address (case-insensitive); apply these filters before the 20-candidate limit.
+- Scan at most 100 directory matches, then match: a user whose label contains any at-sign variant (@, U+FE6B, U+FF20) only by the exact full address, any other user by display-name text or the exact full address (no parsing of labels). Mask email and address-bearing labels unless the trimmed query equals the full address (case-insensitive); apply these filters before the 20-candidate limit.
 - Grants, lists and revokes go through the framework's `/api/sharing/shares` with `resource_type="events.calendar"` and `resource_id=str(calendar.id)`. Events adds no share routes of its own.
 
 - [ ] **Step 1: Write the failing tests** (a fake `UserDirectory` installed on the test app, as images' `tests/web/…/test_shares*.py` does):

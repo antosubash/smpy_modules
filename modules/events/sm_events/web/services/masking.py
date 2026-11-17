@@ -2,20 +2,27 @@
 
 from __future__ import annotations
 
-import re
 import unicodedata
 
 __all__ = ["mask_email", "matches_query", "safe_display_name", "visible_email"]
 
 _MASK = "***"
-# Compatibility at-signs must not expose addresses through display labels.
-_EMAIL_TOKEN = re.compile(r"\S*[@\uff20\ufe6b]\S*")
+# Every at-sign a label can spell an address with (commercial at, small and
+# full-width variants). A label holding one carries an address.
+AT_SIGNS = "@\ufe6b\uff20"
 
 
 def _fold(text: str) -> str:
     """Canonically composed, then case-insensitive: ``e`` + combining acute and
     ``\u00e9`` are the same letter to the person typing."""
     return unicodedata.normalize("NFC", text).lower()
+
+
+def label_carries_address(label: str, address: str = "") -> bool:
+    """Whether the display label holds an at-sign (any variant) or is the
+    address itself. A plain linear check: labels are never parsed."""
+    folded = _fold(label)
+    return any(a in folded for a in AT_SIGNS) or (bool(address) and folded == _fold(address))
 
 
 def mask_email(address: str) -> str:
@@ -39,8 +46,8 @@ def visible_email(address: str, query: str) -> str:
 def matches_query(label: str, address: str, query: str) -> bool:
     """Whether the share picker may offer a user for *query*.
 
-    Only a display name containing the stripped query (a label that is the
-    address itself does not count), or the query being the whole address. A
+    A user whose label carries an address is found only by their whole address.
+    Any other user is found by a part of the label, or by the whole address. A
     partial address never matches: otherwise the picker would confirm an
     address piece by piece."""
     needle = _fold(query.strip())
@@ -48,14 +55,14 @@ def matches_query(label: str, address: str, query: str) -> bool:
         return False
     if needle == _fold(address):
         return True
-    # A display name can contain an address too, e.g. "Amy <amy@example.org>".
-    name = _fold(_EMAIL_TOKEN.sub("", label))
-    return needle in name
+    if label_carries_address(label, address):
+        return False
+    return needle in _fold(label)
 
 
 def safe_display_name(label: str, address: str, query: str) -> str:
-    """The name to show: the user's label, unless that is (or contains) an
-    email address, which gets the same treatment as the address itself."""
-    if _fold(label) == _fold(address) or _EMAIL_TOKEN.search(label):
+    """The name to show: the user's label, unless it carries an address, which
+    gets the same treatment as the address itself."""
+    if label_carries_address(label, address):
         return visible_email(address, query)
     return label
