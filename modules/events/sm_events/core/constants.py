@@ -148,6 +148,9 @@ NOT_AN_OCCURRENCE_DETAIL = "That is not an occurrence of the event's rule"
 DESCRIPTION_TOO_LONG_CODE = "description_too_long"
 DESCRIPTION_TOO_LONG_DETAIL = "The description is too long"
 
+STATUS_SCHEDULED = "scheduled"
+"""A list filter, not a stored status: a draft or in-review event with ``publish_at`` set."""
+
 # Revisions: what a history row's action may be.
 REVISION_ACTIONS = (
     "created",

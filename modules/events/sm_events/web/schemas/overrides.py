@@ -56,6 +56,13 @@ class OverrideOut(BaseModel):
     note: str | None
 
 
+class OverrideResult(OverrideOut):
+    """What writing an override answers: the override and the event's new revision,
+    which the next write must quote."""
+
+    event_revision: int
+
+
 def override_out(row: OccurrenceOverride, *, all_day: bool, timezone: str) -> OverrideOut:
     """A stored override, with a moved one's span in the event's local wall clock."""
     local: tuple[str | None, str | None] = (None, None)
