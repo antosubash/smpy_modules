@@ -62,8 +62,12 @@ UNKNOWN_LOCALE_DETAIL = "That language is not one of the content locales"
 # Console pages and sidebar entries.
 _PAGE_CALENDARS = f"{MODULE_NAME}/Calendars"
 _PAGE_CATEGORIES = f"{MODULE_NAME}/Categories"
+_PAGE_EVENTS = f"{MODULE_NAME}/Events"
+_PAGE_EVENT_EDITOR = f"{MODULE_NAME}/EventEditor"
 CALENDARS_URL = f"{VIEW_PREFIX}/calendars"
 CATEGORIES_URL = f"{VIEW_PREFIX}/categories"
+EVENTS_URL = f"{VIEW_PREFIX}/list"
+EVENT_NEW_SEGMENT = "new"
 MENU_GROUP = MODULE_NAME
 MENU_GROUP_KEY = "events.menu.group"
 MENU_LABEL_CALENDARS = "Calendars"
@@ -72,6 +76,9 @@ MENU_ICON_CALENDARS = "calendar"
 MENU_LABEL_CATEGORIES = "Event categories"
 MENU_LABEL_KEY_CATEGORIES = "events.menu.categories"
 MENU_ICON_CATEGORIES = "tag"
+MENU_LABEL_EVENTS = "Events"
+MENU_LABEL_KEY_EVENTS = "events.menu.events"
+MENU_ICON_EVENTS = "calendar-days"
 
 # Bounds on times, ranges, rules, revisions and pages.
 MAX_EVENT_DAYS = 366

@@ -2,6 +2,7 @@
   "permission_group": "Events",
   "menu": {
     "group": "Events",
+    "events": "Events",
     "calendars": "Calendars",
     "categories": "Event categories"
   },
