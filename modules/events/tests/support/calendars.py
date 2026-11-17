@@ -4,6 +4,8 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from sm_events.calendar import rrule
+from sm_events.calendar.times import to_span
 from sm_events.models import Calendar, Event, EventText
 
 from tests.support.app import as_user
@@ -55,3 +57,32 @@ async def seed_event(
     )
     await db.flush()
     return event
+
+
+async def seed_series(
+    db: Any,
+    calendar: Calendar,
+    text: str,
+    start: str,
+    end: str,
+    *,
+    tz: str = "Europe/Vienna",
+    all_day: bool = False,
+    **fields: Any,
+) -> Event:
+    """A recurring event, its span and ``recurrence_until`` derived the way the
+    service will derive them. ``start``/``end`` are local wall-clock input."""
+    span = to_span(all_day=all_day, timezone=tz, start=start, end=end, recurring=True)
+    rule = rrule.parse(text, all_day=all_day, timezone=tz)
+    until = rrule.validate(rule, span, all_day=all_day, timezone=tz)
+    return await seed_event(
+        db,
+        calendar,
+        starts_at=span.starts_at,
+        ends_at=span.ends_at,
+        timezone=tz,
+        all_day=all_day,
+        rrule=rule.text,
+        recurrence_until=until,
+        **fields,
+    )

@@ -25,3 +25,9 @@ class EventStatus(StrEnum):
     DRAFT = "draft"
     IN_REVIEW = "in_review"
     PUBLISHED = "published"
+
+
+class OverrideKind(StrEnum):
+    SKIPPED = "skipped"
+    CANCELLED = "cancelled"
+    MOVED = "moved"

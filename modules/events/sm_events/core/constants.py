@@ -140,3 +140,9 @@ NOT_AN_OCCURRENCE_CODE = "not_an_occurrence"
 NOT_AN_OCCURRENCE_DETAIL = "That is not an occurrence of the event's rule"
 DESCRIPTION_TOO_LONG_CODE = "description_too_long"
 DESCRIPTION_TOO_LONG_DETAIL = "The description is too long"
+
+# Occurrences.
+OCCURRENCE_CONFIRMED = "confirmed"
+OCCURRENCE_CANCELLED = "cancelled"
+OCCURRENCE_KEY_STAMP = "%Y%m%dT%H%M%SZ"
+EDITOR_URL = f"{VIEW_PREFIX}/edit"
