@@ -79,7 +79,8 @@ Every calendar API route also needs `events.view`. Grants, lists and revokes
 use the framework's `/api/sharing/shares` with
 `resource_type="events.calendar"`, the calendar UUID as `resource_id`, a user
 `subject_id` and role `view` or `edit`. The framework additionally requires
-`sharing.share`. The picker is owner-only even for someone with an edit share.
+`sharing.share`. The picker requires the owner or a manager; an edit share does
+not admit it. Calendar and category lists return at most 500 rows each.
 
 ### Settings
 

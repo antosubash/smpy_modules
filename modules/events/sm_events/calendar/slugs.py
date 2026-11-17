@@ -28,7 +28,10 @@ async def slug_write(db: Any, constraint: str) -> AsyncIterator[None]:
             await db.flush()
     except IntegrityError as exc:
         message = str(exc.orig)
-        if constraint not in message and "slug" not in message:
+        # SQLite names the columns, Postgres names the unique constraint.
+        table = constraint.removeprefix("uq_").removesuffix("_tenant_slug")
+        sqlite_unique = f"UNIQUE constraint failed: {table}.tenant_id, {table}.slug"
+        if f'unique constraint "{constraint}"' not in message and message != sqlite_unique:
             raise
         raise SlugTaken from exc
 

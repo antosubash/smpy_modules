@@ -118,14 +118,25 @@ async def test_unknown_action_grants_nothing(db):
 
 @pytest.mark.parametrize("trash", [False, True])
 @pytest.mark.parametrize("name", list(TABLE))
-async def test_batch_rights_equal_single(db, name, trash):
-    uid, perms, *_ = TABLE[name]
+async def test_batch_rights_match_truth_table(db, name, trash):
+    uid, perms, view, edit, own, write, publish = TABLE[name]
     who = principal(uid, *perms)
     cals = list((await seed_calendars(db)).values())
+    cals[1].is_deleted = True
+    await db.flush()
     batch = await calendar_rights_many(db, who, cals, include_deleted=trash)
     assert set(batch) == {c.id for c in cals}
     for cal in cals:
-        assert batch[cal.id] == await calendar_rights(db, who, cal, include_deleted=trash)
+        letter = _letter(cal)
+        included = trash or not cal.is_deleted
+        rights = batch[cal.id]
+        assert rights.view is (included and letter in view)
+        assert rights.edit_calendar is (included and letter in edit)
+        assert rights.own is (included and letter in own)
+        assert rights.write_events is (included and letter in write)
+        assert rights.see_drafts is rights.write_events
+        assert rights.publish is (included and letter in publish)
+        assert rights == await calendar_rights(db, who, cal, include_deleted=trash)
 
 
 async def test_batch_rights_of_nothing(db):

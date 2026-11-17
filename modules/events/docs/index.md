@@ -46,11 +46,17 @@ otherwise). An expired share grants nothing. Trashed calendars are excluded
 from ordinary reads, including managers' reads. Calendar slugs remain reserved
 while in trash, so restore cannot collide.
 
-The picker is a search, not a directory listing: fewer than three trimmed
-characters returns no candidates; it excludes inactive users, the calendar's
-owner and other tenants' members. The route is rate-limited per signed-in
-user. Email addresses remain masked unless the query equals the full address.
-The UI displays that response verbatim.
+The picker is a search, not a directory listing: with a directory installed,
+fewer than three trimmed characters returns no candidates. It excludes inactive
+users, the calendar's owner and other tenants' members. The route is rate-limited per signed-in
+user. It matches display-name text after removing address tokens, or an exact
+full address; partial email matches alone return nobody. It scans at most 100
+directory matches and returns at most 20 candidates. Email addresses, including
+address-bearing display labels, remain masked unless the trimmed query equals
+the full address. Names, addresses and the query are compared NFC-normalised
+and case-insensitively, so a query typed with decomposed accents matches; a
+directory provider that does not return a user for such a query is outside the
+module's control. The UI displays that response verbatim.
 
 ## Tenancy
 
@@ -90,10 +96,11 @@ have UUID primary keys; the remaining tables have big-int keys.
 | `events_revision` | PR 2: event snapshots |
 | `events_redirect` | PR 2: locale-scoped event slug redirects |
 
-Migrations belong to the host. The `events` branch label is a named target in
-a shared history, not a way to roll back this module alone. No background task
-or public contract ships in PR 1. Calendar metadata is last-write-wins; event
-writes will use `expected_revision` from PR 2.
+The demo host's revision `b8e1d0783868` follows `541bfbe29a28` and creates all
+seven tables. Migrations belong to the host. The `events` branch label is a
+named target in a shared history, not a way to roll back this module alone.
+No background task or public contract ships in PR 1. Calendar metadata is
+last-write-wins; event writes will use `expected_revision` from PR 2.
 
 ## Status
 

@@ -235,7 +235,7 @@ async def test_ownership_transfer_without_a_directory_is_503(client):
 
 
 @pytest.mark.unbound_tenant
-async def test_ownership_transfer_only_to_members_of_the_tenant(multi_client, monkeypatch):
+async def test_ownership_transfer_only_to_members_of_the_tenant(multi_client):
     client = multi_client
     client.app.state.user_directory = Directory(
         {"in": ("in@x", "In", True), "out": ("out@x", "Out", True)}

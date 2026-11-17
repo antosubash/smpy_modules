@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from sm_events.calendar import calendars
 from sm_events.core.errors import SlugTaken
@@ -22,12 +24,15 @@ async def test_rename_race_keeps_transaction_usable(db, monkeypatch):
     )
 
     async def missed_collision(*_args, **_kwargs):
-        return False
+        return SimpleNamespace(scalar_one=lambda: 0)
 
-    # The pre-check misses the collision, so the unique index has to catch it.
-    monkeypatch.setattr(calendars, "slug_taken", missed_collision)
-    with pytest.raises(SlugTaken):
-        await calendars.update_calendar(db, other, CalendarPatch(slug=taken.slug, name="Changed"))
+    # Override the count, including the old _slug_taken alias, but keep the real flush.
+    with monkeypatch.context() as patch:
+        patch.setattr(db, "execute", missed_collision)
+        with pytest.raises(SlugTaken):
+            await calendars.update_calendar(
+                db, other, CalendarPatch(slug=taken.slug, name="Changed")
+            )
 
     rows = (await db.execute(select(Calendar).order_by(Calendar.slug))).scalars().all()
     assert [(row.slug, row.name) for row in rows] == [("other", "Other"), ("taken", "Taken")]

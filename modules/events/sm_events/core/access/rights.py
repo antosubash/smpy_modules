@@ -30,15 +30,6 @@ class CalendarRights:
     publish: bool
 
 
-async def _allowed(
-    db: Any, who: ResourcePrincipal, action: str, calendar: Calendar, *, trash: bool
-) -> bool:
-    stmt = select(Calendar.id).where(Calendar.id == calendar.id)
-    if trash:
-        stmt = stmt.execution_options(include_deleted=True)
-    return (await db.execute(POLICY.filter(who, action, stmt))).first() is not None
-
-
 def _rights(
     who: ResourcePrincipal, view: bool, edit: bool, own: bool, write: bool
 ) -> CalendarRights:
@@ -55,13 +46,9 @@ def _rights(
 async def calendar_rights(
     db: Any, who: ResourcePrincipal, calendar: Calendar, *, include_deleted: bool = False
 ) -> CalendarRights:
-    """Asked of the database, one ``SELECT`` per action: a share is a row, and
-    ``POLICY.can`` on a loaded object cannot see it."""
-    view = await _allowed(db, who, ACTION_VIEW, calendar, trash=include_deleted)
-    edit = await _allowed(db, who, ACTION_EDIT, calendar, trash=include_deleted)
-    own = await _allowed(db, who, ACTION_DELETE, calendar, trash=include_deleted)
-    write = await _allowed(db, who, ACTION_WRITE_EVENTS, calendar, trash=include_deleted)
-    return _rights(who, view, edit, own, write)
+    """The same policy queries as a list, for a single calendar."""
+    rights = await calendar_rights_many(db, who, [calendar], include_deleted=include_deleted)
+    return rights[calendar.id]
 
 
 async def _allowed_ids(
@@ -76,8 +63,8 @@ async def _allowed_ids(
 async def calendar_rights_many(
     db: Any, who: ResourcePrincipal, calendars: Sequence[Calendar], *, include_deleted: bool = False
 ) -> dict[uuid.UUID, CalendarRights]:
-    """:func:`calendar_rights` for a page of calendars: one ``SELECT`` per action,
-    through the same policy filter, however many calendars there are."""
+    """One ``SELECT`` per action for the whole page: shares live in the database,
+    so ``POLICY.can`` on loaded calendars cannot see them."""
     ids = [c.id for c in calendars]
     if not ids:
         return {}

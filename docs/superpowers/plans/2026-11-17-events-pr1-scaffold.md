@@ -4,7 +4,7 @@
 
 **Goal:** Ship `modules/events` (`simple_module_events`, package `sm_events`) wired into the workspace and host. It carries the tables of PRs 1 and 2 in one labelled migration, DB-backed settings, a tenancy copy, one access policy for calendars, `events.calendar` sharing, the calendars and categories API, and the Calendars and Categories screens.
 
-**Architecture:** The module follows `docs/module-layout.md`. `core/` holds constants, errors, settings, tenancy (a copy of newsletter's copy of images'), the request-context middleware (a copy of images') and `access/` (the one policy every later read goes through). `models/` declares all seven tables. `calendar/` holds the calendar and category services. `web/` holds the routers, schemas, views and menu. `ui/` holds the frontend. Sharing reuses the framework's `sharing` module exactly as images does: a resource type with a tenancy-applying loader, plus an owner-only share-candidates picker. Events, texts, overrides, revisions and redirects get models now and behaviour in PR 2.
+**Architecture:** The module follows `docs/module-layout.md`. `core/` holds constants, errors, settings, tenancy (a copy of newsletter's copy of images'), the request-context middleware (a copy of images') and `access/` (the one policy every later read goes through). `models/` declares all seven tables. `calendar/` holds the calendar and category services. `web/` holds the routers, schemas, views and menu. `ui/` holds the frontend. Sharing reuses the framework's `sharing` module exactly as images does: a resource type with a tenancy-applying loader, plus an owner-or-manager share-candidates picker. Events, texts, overrides, revisions and redirects get models now and behaviour in PR 2.
 
 **Tech Stack:** Python 3.12, SQLModel/SQLAlchemy async, Alembic, the framework's `sharing`, `settings` and `inertia` modules, pytest (SQLite; Postgres opt-in via `tests/pg_support.py`), React 19 + Inertia, `@simple-module-py/ui`, vitest (happy-dom), TypeScript.
 
@@ -17,13 +17,13 @@
 - **Primary keys.** `events_calendar`, `events_event` and `events_category` use a client-generated UUID (images' `pk_uuid`, `modules/images/sm_images/models/_cols.py:17-19`): these ids appear in URLs and in `ResourceShare.resource_id`. The other four tables use a big-int PK (newsletter's `big_pk`).
 - **Every tenant-scoped unique index leads with `tenant_id`.** Slugs stay unique across the trash, so a restore never collides (images' rule, `modules/images/sm_images/web/services/collections.py:41-43`).
 - **No `contracts/`, `tasks.py` or `task_config.py` in PR 1**, and no `simple_module_background_tasks` dependency. The first task (`events.publish_due`) and the first contract both arrive with PR 2. So the Makefile worker queues, the `ci.yml` bg-tasks queue list and the root pyright `include` stay untouched.
-- **Creating a calendar needs `events.edit`, and the caller becomes its owner.** `events.manage` can act on every calendar. The spec lists "calendars" under `events.manage`, but it also has owners who are not managers ("Sharing, visibility and deleting a calendar are the owner's or `events.manage`'s"). Letting `events.edit` holders create their own `private` calendars is what makes those owners exist. This is recorded as open point 1.
+- **Creating a calendar needs `events.edit`, and the caller becomes its owner.** `events.manage` can act on every calendar. The spec lists "calendars" under `events.manage`, but it also has owners who are not managers ("Sharing, visibility and deleting a calendar are the owner's or `events.manage`'s"). Letting `events.edit` holders create their own `private` calendars is what makes those owners exist. This is confirmed in the rulings below.
 - **The policy needs `events.view`.** A signed-in principal without `events.view` (and without `events.manage`) gets exactly what an anonymous one gets: `public` calendars, view only. That covers an owner or a share holder who lost the permission too. Without this rule, the framework's sharing router (which only needs `sharing.share`) would let such a user read the calendar.
 - **Owner and edit-share holders write events without holding `events.edit`; everyone else needs it.** This follows the spec's Access text literally. `events.edit` grants writing only on `internal` and `public` calendars. Calendar *metadata* (name, slug, colour, description, timezone) is edited by the owner, an edit share holder or `events.manage`, never through `events.edit` on an internal calendar.
 - **Calendars have no `expected_revision`.** Their metadata is edited in a form, rarely, and never by a drag, so the last write wins. Events carry `revision` and the 409 `stale` guard from PR 2.
 - **Errors use the `{"detail","code"}` envelope** for every error the module raises. FastAPI's own request-validation 422 keeps its standard shape, as in images and newsletter. Timezone, slug and colour are checked by pydantic validators, so a bad value is a plain 422.
 - **Categories are in PR 1** (service, API and screen). They need nothing from events, and PR 2's editor needs them.
-- **`/admin/events/` redirects (303) to `/admin/events/calendars` until PR 3** replaces it with the Calendar view. The menu has two entries, Calendars (`events.view`) and Categories (`events.manage`).
+- **`/admin/events/` redirects (303) to `/admin/events/calendars` until PR 3** replaces it with the Calendar view. The menu has two entries, Calendars (`events.view`) and Categories (`events.view` and `events.manage`).
 - **Settings in PR 1 are only what PR 1 reads:** `default_timezone` and `content_locales` (restart-only). `public_prefix` comes with PR 4, the reminder fields with PR 8, `import_max_bytes` with PR 5 and `subscription_refresh_minutes` with PR 10. As newsletter does, settings carry no validators (a class that does not construct is replaced with *all* defaults). `core.timezones.effective(name)` falls back to `"UTC"` for a stored name it does not know and logs one warning per name.
 
 ## Rulings on the open points (2026-11-17)
@@ -56,7 +56,7 @@
 
 1. **A user who lost `events.view` but still owns or is shared a private calendar** must not see it in the API, the policy filter or the framework's `/api/sharing/shares` list. Covered by the truth table in Task 6 (`O-` and `SV-` rows) and by `test_share_list_needs_events_view` in Task 8.
 2. **The sharing router on a single-tenant host binds no tenant.** Granting a share there must work, a calendar id from another tenant must be a 404, and a multi-tenant request without a tenant must be a 403. Covered by Task 6 (`test_loader_*`) and by Task 8's end-to-end grant through `/api/sharing/shares`.
-3. **The share picker as a user directory.** A `q` shorter than 3 characters returns `[]`, members of other tenants are never offered, and an edit-share holder gets 403. Covered by Task 8.
+3. **The share picker as a user directory.** With a directory installed, a `q` shorter than 3 trimmed characters returns `[]`, members of other tenants are never offered, and an edit-share holder gets 403. Covered by Task 8.
 4. **Existence leaks.** A stranger gets 404 on GET, PATCH, visibility, DELETE and restore of a private calendar. A view-share holder gets 403 on PATCH (because they can see it), and an edit-share holder gets 403 `owner_required` on visibility and DELETE. Covered by Task 7 (`test_stranger_sees_404_everywhere`, `test_share_holder_403s`).
 5. **Slug collisions.** An explicit slug held by a *trashed* calendar returns 409 `slug_taken`. Two calendars named "Team" get distinct derived slugs. An insert that loses a race on the unique index returns 409, not 500. Covered by Task 7 (`test_slug_*`).
 
@@ -75,7 +75,7 @@
 
 ```python
 PACKAGE = "sm_events"; MODULE_NAME = "Events"; DISTRIBUTION = "simple_module_events"
-LOCALE_NAMESPACE = "events"; BASE_NAME = "events"; TABLE_PREFIX = "events_"
+LOCALE_NAMESPACE = "events"; BASE_NAME = "events"
 ROUTE_PREFIX_API = "/api/events"; VIEW_PREFIX = "/admin/events"
 PERM_GROUP = MODULE_NAME; PERM_GROUP_KEY = "events.permission_group"
 PERM_VIEW = "events.view"; PERM_EDIT = "events.edit"; PERM_PUBLISH = "events.publish"; PERM_MANAGE = "events.manage"
@@ -107,7 +107,7 @@ TENANT_REQUIRED_CODE = "tenant_required"; NOT_FOUND_DETAIL = "Not found"
 - Create: `sm_events/index.ts`, `sm_events/ui/utils/i18n.ts`, `sm_events/ui/utils/i18n.test.ts`
 
 **Interfaces:**
-- `ui/utils/i18n.ts` is a copy of `modules/newsletter/sm_newsletter/ui/utils/i18n.ts` with `NAMESPACE = 'events'` (line 34) and the module names in the doc comment changed. It exports `keys`, `translate`, `useT`, `Translate` and `TranslateParams`. `index.ts` holds a doc comment ("the public TS surface; the `Calendar` component arrives in PR 3") and `export {};`.
+- `ui/utils/i18n.ts` is a copy of `modules/newsletter/sm_newsletter/ui/utils/i18n.ts` with `NAMESPACE = 'events'` (line 34) and the module names in the doc comment changed. It exports `keys`, `translate`, `useT` and `Translate`; `TranslateParams` is private. `index.ts` holds a doc comment ("the public TS surface; the `Calendar` component arrives in PR 3") and `export {};`.
 
 - [ ] **Step 1: Write the failing test** `i18n.test.ts`: `keys.events.permission_group === 'events.permission_group'`, and `translate('events.permission_group') === 'Events'`.
 - [ ] **Step 2: Run it to see it fail.** `~/.claude/bin/wait-for-headroom`, then `npx vitest run modules/events`. Expected: cannot resolve `./i18n`.
@@ -178,6 +178,7 @@ TENANT_REQUIRED_CODE = "tenant_required"; NOT_FOUND_DETAIL = "Not found"
 - Test: `tests/models/__init__.py`, `tests/models/test_models.py`
 
 **Interfaces:**
+- The generated revision is `b8e1d0783868_add_events.py`, with `revision = "b8e1d0783868"`, `down_revision = "541bfbe29a28"` and `branch_labels = ("events",)`.
 - `models/enums.py`: `class Visibility(StrEnum): PRIVATE="private"; INTERNAL="internal"; PUBLIC="public"`. Plus the tuples that PR 2 validates against: `EVENT_STATUSES = ("draft", "in_review", "published")`, `ATTENDANCE_MODES = ("in_person", "online", "hybrid")`, `OVERRIDE_KINDS = ("skipped", "cancelled", "moved")`, `DEFAULT_EVENT_TYPE = "event"`.
 - Constants added to `core/constants.py`: `SLUG_MAX = 80`, `SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"`, `TEXT_SLUG_MAX = 200`, `TZ_MAX = 64`, `LOCALE_MAX = 16`, `COLOR_PATTERN = r"^#[0-9a-f]{6}$"`, `DEFAULT_COLOR = "#2563eb"`.
 - Tables. All are `Base, MultiTenantMixin, table=True`. "Audit" means `AuditMixin` and "soft" means `SoftDeleteMixin` (`created_at`, `updated_at`, `created_by`, `updated_by`, `is_deleted`, `deleted_at` and `deleted_by` come from `simple_module_db.mixins`). Datetimes use `AwareDateTime`, stored UTC (`dt_required` for caller-supplied times; `dt_col` for optional times or creation timestamps). A column is NOT NULL unless marked nullable. Module-owned columns have no `server_default`; inherited `AuditMixin.created_at` keeps the framework's `CURRENT_TIMESTAMP` server default.
@@ -229,10 +230,10 @@ class CalendarPolicy:                     # the framework's ResourcePolicy proto
 POLICY: CalendarPolicy
 def visible_calendars(who, action: str = ACTION_VIEW) -> Select   # trash excluded by the mixin
 def calendar_stmt(calendar_id: uuid.UUID) -> Select
-CalendarView  = Annotated[Calendar, Depends(RequiresResource(POLICY, ACTION_VIEW, calendar_stmt))]
-CalendarEdit  = Annotated[Calendar, Depends(RequiresResource(POLICY, ACTION_EDIT, calendar_stmt))]
-CalendarOwner = Annotated[Calendar, Depends(_RequiresOwner(POLICY, ACTION_DELETE, calendar_stmt))]
-    # _RequiresOwner re-raises PermissionDenied with OWNER_ONLY_DETAIL (images lines 140-155)
+CalendarView  = Annotated[Calendar, Depends(_Requires(ACTION_VIEW))]
+CalendarEdit  = Annotated[Calendar, Depends(_Requires(ACTION_EDIT))]
+CalendarOwner = Annotated[Calendar, Depends(_Requires(ACTION_DELETE, owner=True))]
+    # _Requires wraps RequiresResource and translates its 403/404 into events errors.
 
 # core/access/rights.py
 @dataclass(frozen=True)
@@ -330,10 +331,10 @@ async def restore_calendar(db, who, calendar_id: uuid.UUID) -> Calendar
 - Constants: `CALENDARS_MAX = 500`, `SLUG_FALLBACK = "calendar"`, `SLUG_TAKEN_DETAIL = "That slug is already in use"`.
 - Schemas (`web/schemas/calendars.py`):
   - `CalendarCreate`: `name` (1-200, stripped), `slug: str | None` (matches `SLUG_PATTERN`, ≤80), `color` (`COLOR_PATTERN`, lower-cased; default `DEFAULT_COLOR`), `description: str | None` (≤2000), `visibility: Visibility = PRIVATE`, `default_timezone: str | None` (`timezones.is_known` or a validation error).
-  - `CalendarPatch`: every field optional except `visibility`, which only `PUT …/visibility` sets.
+  - `CalendarPatch`: metadata fields are optional; `visibility` is excluded and only `PUT …/visibility` sets it.
   - `VisibilityIn {visibility: Visibility}`.
   - `CalendarOut`: `id`, `slug`, `name`, `color`, `description`, `visibility`, `owner_id`, `default_timezone`, `sources`, `created_at`, `updated_at`, `deleted_at`, plus `can_edit`, `can_own`, `can_write_events` and `can_publish` from `calendar_rights`.
-- Routes. The router is `APIRouter(prefix="/calendars", dependencies=[Depends(bind_admin)])`, and every route also requires `events.view` (`deps.require_view`):
+- Routes. The parent API router binds `bind_admin`; the calendars router is `APIRouter(prefix="/calendars", dependencies=[require_view])`, so every route requires `events.view`:
 
   | Method and path | Extra guard | Success | Errors |
   |---|---|---|---|
@@ -342,10 +343,11 @@ async def restore_calendar(db, who, calendar_id: uuid.UUID) -> Calendar
   | `GET /api/events/calendars/{id}` | `CalendarView` | 200 | 404 `not_found` |
   | `PATCH /api/events/calendars/{id}` | `CalendarEdit` | 200 | 404 (invisible), 403 `forbidden` (visible, not editable), 409 `slug_taken`, 422 |
   | `PUT /api/events/calendars/{id}/visibility` | `CalendarOwner` | 200 | 404, 403 `owner_required` |
+  | `PUT /api/events/calendars/{id}/owner` | `events.manage` and `CalendarOwner`; active tenant member | 200 | 404, 422 `owner_not_allowed`, 503 `user_directory_unavailable` |
   | `DELETE /api/events/calendars/{id}` | `CalendarOwner` | 204 | 404, 403 `owner_required` |
   | `POST /api/events/calendars/{id}/restore` | owner or `events.manage` (service) | 200 | 404 `not_found` |
 
-  `RequiresResource` raises the framework's `PermissionDenied` and 404. Check that both render as `{"detail","code"}`. If the framework's 403 has no `code`, `_RequiresOwner` and a small `_RequiresEdit` wrapper re-raise them as `Forbidden`/`OwnerRequired` (images' pattern, `modules/images/sm_images/core/access/__init__.py:140-148`). There is no hard delete (purge) in PR 1: the Trash screen comes later (spec "Screens").
+  `_Requires` translates `RequiresResource`'s `PermissionDenied` and 404 into `Forbidden`/`OwnerRequired` and `NotFound`, using `{"detail","code"}`. The framework's router permission gates keep their own error shape. PR 1 has a Trash tab with restore, but no hard delete (purge).
 
 - [ ] **Step 1: Write the failing tests.**
   - `test_slugs.py`: `slugify("Team Ärger 2026!") == "team-arger-2026"`, `slugify("!!!") == "calendar"`, and an 81-character name is cut to ≤80 with no trailing `-`.
@@ -380,7 +382,8 @@ async def restore_calendar(db, who, calendar_id: uuid.UUID) -> Calendar
 - Test: `tests/web/test_shares_api.py`
 
 **Interfaces:**
-- `GET /api/events/calendars/{id}/share-candidates?q=` (≤100 characters). Needs `events.view` and `CalendarOwner`. Answers `list[ShareCandidate]` (at most 20, the owner excluded, active users only). `q` shorter than `MIN_QUERY = 3` once trimmed gives `[]` without asking the directory. Unless the host is single-tenant with nothing upstream (`_unscoped_single`), only members of the bound tenant are offered (`tenant_member_ids`, fail closed). `NullUserDirectory` gives 503 `user_directory_unavailable`.
+- `GET /api/events/calendars/{id}/share-candidates?q=` (≤100 characters). Needs `events.view` and `CalendarOwner`. Answers `list[ShareCandidate]` (at most 20, the owner excluded, active users only). With a directory installed, `q` shorter than `MIN_QUERY = 3` once trimmed gives `[]` without searching it. Unless the host is single-tenant with nothing upstream (`unscoped_single`), only members of the bound tenant are offered (`tenant_member_ids`, fail closed). `NullUserDirectory` gives 503 `user_directory_unavailable`, including for a short query.
+- Scan at most 100 directory matches, then match display-name text with address tokens removed or an exact full address. Mask email and address-bearing labels unless the trimmed query equals the full address (case-insensitive); apply these filters before the 20-candidate limit.
 - Grants, lists and revokes go through the framework's `/api/sharing/shares` with `resource_type="events.calendar"` and `resource_id=str(calendar.id)`. Events adds no share routes of its own.
 
 - [ ] **Step 1: Write the failing tests** (a fake `UserDirectory` installed on the test app, as images' `tests/web/…/test_shares*.py` does):
@@ -418,7 +421,7 @@ async def delete_category(db, cat: Category) -> None
 ```
 
 - `CategoryCreate`: `slug: str | None` (pattern; derived from the default locale's name when absent, through `free_slug`), `names: dict[str, str]` (non-empty; each name 1-100 characters; one for `content_locales[0]` is required), `color: str | None` (`COLOR_PATTERN`). A key outside `content_locales` raises `UnknownLocale` (422 `unknown_locale`), checked in the service against `request.app.state.sm_events.settings.content_locales`. `CategoryOut`: `id`, `slug`, `names`, `color`.
-- Routes under `bind_admin`: `GET /api/events/categories` (`events.view`); `POST` (`events.manage`, 201, 409 `slug_taken`, 422); `PATCH /{id}` and `DELETE /{id}` (`events.manage`; 404 `not_found` for an unknown id or one from another tenant; DELETE answers 204).
+- Routes under `bind_admin`, all requiring `events.view`: `GET /api/events/categories` (up to 500 rows); `POST` (also `events.manage`, 201, 409 `slug_taken`, 422); `PATCH /{id}` and `DELETE /{id}` (also `events.manage`; 404 `not_found` for an unknown id or one from another tenant; DELETE answers 204).
 
 - [ ] **Step 1: Write the failing tests:**
   - `test_create_derives_slug_from_default_locale_name`.
@@ -551,12 +554,10 @@ async def delete_category(db, cat: Category) -> None
 - No file under `modules/events` reaches 280 lines.
 - `git diff --stat origin/main` touches only `modules/events/**`, `host/pyproject.toml`, `host/migrations/versions/<rev>_add_events.py`, the four host tests, `scripts/tests/parity_*.py`, the root `pyproject.toml`, `uv.lock`, `package-lock.json`, `README.md`, `CHANGELOG.md`, `CLAUDE.md`, `docs/module-layout.md`, the spec and this plan.
 
-## Open points
+## Remaining follow-ups
 
-1. **Who creates calendars.** This plan lets `events.edit` holders create calendars they own. The spec's "events.manage (calendars, …)" could also mean managers only. If so, `POST /calendars` takes `events.manage` and an optional `owner_id`, which then has to be validated as a tenant member.
-2. **Do owners and edit-share holders need `events.edit` to write events?** The plan follows the spec literally: no, only `events.view`. Images does the same (a share grants edit with only the view permission). PR 2 is the first to act on this.
-3. **A calendar slug rename.** PR 1 allows it freely. Once PR 4 serves `/events/c/{calendar}`, a rename breaks links, and calendars have no redirect table (`events_redirect` is per event text). Either forbid renaming a public calendar's slug or add redirects in PR 4.
-4. **A calendar whose owner is deleted or leaves the tenant** keeps `owner_id` and becomes reachable only through `events.manage` and shares. Is that acceptable, or should PR 1 add a "transfer owner" action for managers?
-5. **`host/tests/test_host_boots.py` `REPO_MODULES` and `test_menu_labels.py` `_OUR_PACKAGES` leave out newsletter** (lines 94 and 20-28). This plan adds events only. Newsletter's omission predates it and should become a follow-up issue rather than being widened here.
-6. **Framework floors.** If #405 lands first and the host pins a newer framework, the floors here (`>=0.0.44`) are still valid ranges. Re-check whether any import path events uses moved in that release (`host/tests/test_host_boots.py` fails on a deprecated path).
-7. **ShareDialog is now in two modules** (images and events), with no parity check for TS. Is a shared component worth asking the framework for upstream, since `sharing` ships no UI? That would be an issue in `simple_module_python`.
+The creation, event-writing, slug-rename and ownership-transfer decisions are resolved in "Rulings on the open points" above. A calendar retains its `owner_id` if that account is deleted or leaves; visibility and shares still apply, and a manager can transfer it to an active tenant member.
+
+- Newsletter remains absent from the host tests' `REPO_MODULES` and `_OUR_PACKAGES`; that omission predates this PR.
+- Re-check framework floors when imports move (`host/tests/test_host_boots.py` fails on a deprecated path).
+- Images and events each have a `ShareDialog`, with no TS parity check. A shared sharing UI is an upstream follow-up.

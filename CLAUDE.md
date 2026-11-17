@@ -145,6 +145,16 @@ contract pins `tenant_id` itself. A bundle section
 (`pagebuilder.contracts.bundle`, #80) applies through the restore's own
 session and bound tenant, and never commits or resolves a tenant itself.
 
+**Events access goes through `sm_events.core.access.POLICY`.** Every calendar
+route requires `events.view`; owners, edit shares and managers edit metadata,
+only owners and managers change visibility, share, trash or restore, and only
+managers transfer ownership. `events.edit` grants creating calendars and writing
+events on internal/public ones, never metadata edits on someone else's calendar.
+The share picker needs three trimmed characters, matches display-name text with
+address tokens removed or an exact full address (compared NFC-normalised and
+case-insensitively), and masks every address, bare or inside a label, unless the
+query is the full address.
+
 **Records' website-submission routes are anonymous writes (#101).** The record
 type is the trust anchor: never trust the `RecordForm` block's props —
 which fields are public, the consent text and the recipients live on
