@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, FastAPI
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
+from simple_module_core.rate_limit import RateLimitRegistry, RateLimitRule
 from simple_module_core.resources import ResourceTypeRegistry
 
 from sm_events.core import constants
@@ -72,6 +73,17 @@ class EventsModule(ModuleBase):
 
         # The framework's CSRF check on every write; reads pass.
         api_router.include_router(build_api_router(), dependencies=[Depends(RequiresCsrf())])
+
+    def register_rate_limits(self, registry: RateLimitRegistry) -> None:
+        """The share dialog's user picker, per signed-in user: it is a search of
+        the user directory, so it gets a budget of its own rather than the
+        host's general ``rate_limit_authenticated``."""
+        from sm_events.web.endpoints import shares_api
+
+        registry.add_regex(
+            shares_api.PATH_PATTERN,
+            RateLimitRule(shares_api.RATE, key="user", methods=frozenset({"GET"})),
+        )
 
     def register_middleware(self, app: FastAPI) -> None:
         """Remember the current request for the ``events.calendar`` loader, which

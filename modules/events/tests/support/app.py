@@ -28,6 +28,7 @@ from simple_module_core.module_settings import ModuleSettingsRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.resources import ResourceTypeRegistry
 from simple_module_core.user_directory import DirectoryUser
+from simple_module_db import tenant_context
 from simple_module_hosting.csrf import get_csrf_token
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import TenancyMode, configure, install_guard
@@ -88,8 +89,14 @@ class _Auth(BaseHTTPMiddleware):
             )
             perms = request.headers.get(PERMS_HEADER, "")
             request.state.resolved_permissions = {p for p in perms.split(",") if p}
-        if tenant := request.headers.get(TENANT_HEADER):
+        tenant = request.headers.get(TENANT_HEADER)
+        if tenant:
             request.state.tenant_id = tenant
+        if tenant and getattr(request.app.state, "events_bind_tenant", False):
+            # What the framework's ``TenantMiddleware`` does on a multi-tenant
+            # host: the resolved tenant is also the one bound for the request.
+            with tenant_context(tenant):
+                return await call_next(request)
         return await call_next(request)
 
 
@@ -122,7 +129,6 @@ async def build_app(
     registry = ResourceTypeRegistry()
     module.register_resource_types(registry)
     app.state.sm.resource_types = registry
-    app.state.user_directory = Directory()
     app.include_router(sharing_router, prefix="/api/sharing")
 
     @app.get("/token")
@@ -135,6 +141,7 @@ async def build_app(
     module.register_middleware(app)
     if multi:
         app.state.sm_events.tenancy = TenancyMode.MULTI
+        app.state.events_bind_tenant = True
     else:
         configure(app)
     install_guard(state.sync_session_class)
