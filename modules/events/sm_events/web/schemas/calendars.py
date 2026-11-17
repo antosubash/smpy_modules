@@ -17,10 +17,12 @@ from pydantic import (
 
 from sm_events.core import constants, timezones
 from sm_events.models import Visibility
-from sm_events.web.schemas._fields import Color, Slug, lower_color
+from sm_events.web.schemas._fields import Color, MultiLine, SingleLine, Slug, lower_color
 
-Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
-Description = Annotated[str, Field(max_length=2000)]
+Name = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200), SingleLine
+]
+Description = Annotated[str, Field(max_length=2000), MultiLine]
 
 
 def _known_timezone(value: str | None) -> str | None:

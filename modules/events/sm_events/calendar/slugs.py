@@ -67,11 +67,13 @@ def _sqlite_message(constraint: str) -> str | None:
     return None
 
 
-def slugify(text: str) -> str:
-    """A slug from a display name: accents folded, everything else a hyphen."""
+def slugify(text: str, fallback: str = constants.CALENDAR_SLUG_FALLBACK) -> str:
+    """A slug from a display name: accents folded, everything else a hyphen.
+    A name with nothing slug-able (emoji, right-to-left text) gets *fallback*,
+    which each model names for itself."""
     folded = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()
     slug = _NOT_SLUG.sub("-", folded).strip("-")[: constants.SLUG_MAX].strip("-")
-    return slug or constants.SLUG_FALLBACK
+    return slug or fallback
 
 
 async def slug_taken(db: Any, model: type, slug: str, *, except_id: Any = None) -> bool:

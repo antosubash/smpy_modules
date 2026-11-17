@@ -49,7 +49,8 @@ async def create_calendar(
     if data.slug is not None and await slug_taken(db, Calendar, data.slug):
         raise SlugTaken
     row = Calendar(
-        slug=data.slug or await free_slug(db, Calendar, slugify(data.name)),
+        slug=data.slug
+        or await free_slug(db, Calendar, slugify(data.name, constants.CALENDAR_SLUG_FALLBACK)),
         name=data.name,
         color=data.color,
         description=data.description,

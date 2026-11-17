@@ -45,7 +45,10 @@ async def create_category(db: Any, data: CategoryCreate, *, locales: tuple[str, 
     if data.slug is not None and await slug_taken(db, Category, data.slug):
         raise SlugTaken
     row = Category(
-        slug=data.slug or await free_slug(db, Category, slugify(data.names[locales[0]])),
+        slug=data.slug
+        or await free_slug(
+            db, Category, slugify(data.names[locales[0]], constants.CATEGORY_SLUG_FALLBACK)
+        ),
         names=dict(data.names),
         color=data.color,
     )

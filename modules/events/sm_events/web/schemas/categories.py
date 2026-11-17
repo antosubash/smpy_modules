@@ -8,11 +8,14 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from sm_events.core import constants
-from sm_events.web.schemas._fields import Color, Slug, lower_color
+from sm_events.web.schemas._fields import Color, SingleLine, Slug, lower_color
 
 LocaleKey = Annotated[str, Field(min_length=1, max_length=constants.LOCALE_MAX)]
 Names = Annotated[
-    dict[LocaleKey, Annotated[str, Field(min_length=1, max_length=constants.CATEGORY_NAME_MAX)]],
+    dict[
+        LocaleKey,
+        Annotated[str, Field(min_length=1, max_length=constants.CATEGORY_NAME_MAX), SingleLine],
+    ],
     Field(min_length=1, max_length=20),
 ]
 

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 from sm_events.calendar.slugs import free_slug, slug_write, slugify
+from sm_events.core import constants
 from sm_events.core.errors import SlugTaken
 from sm_events.models import Calendar, Category
 from sm_events.models.calendar import CALENDAR_SLUG_CONSTRAINT
@@ -149,3 +150,10 @@ def test_sqlite_message_comes_from_the_constraints_own_columns():
         "events_event_text.locale, events_event_text.slug"
     )
     assert _sqlite_message("uq_no_such_constraint") is None
+
+
+def test_slugify_fallback_is_per_model():
+    assert slugify("😀") == "calendar"
+    assert slugify("😀", constants.CATEGORY_SLUG_FALLBACK) == "category"
+    assert slugify("שלום", constants.CATEGORY_SLUG_FALLBACK) == "category"
+    assert slugify("Music", constants.CATEGORY_SLUG_FALLBACK) == "music"

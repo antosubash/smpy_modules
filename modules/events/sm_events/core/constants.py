@@ -39,7 +39,7 @@ OWNER_ONLY_DETAIL = "Only the calendar's owner or an events manager can do this"
 
 # Calendars.
 CALENDARS_MAX = 500
-SLUG_FALLBACK = "calendar"
+CALENDAR_SLUG_FALLBACK = "calendar"
 SLUG_TAKEN_DETAIL = "That slug is already in use"
 EDIT_REFUSED_DETAIL = "You can see this calendar but not change it"
 OWNER_NOT_ALLOWED_CODE = "owner_not_allowed"
@@ -53,6 +53,7 @@ DIRECTORY_UNAVAILABLE_DETAIL = "The user directory is not available"
 
 # Categories.
 CATEGORY_NAME_MAX = 100
+CATEGORY_SLUG_FALLBACK = "category"
 CATEGORIES_MAX = 500
 DEFAULT_LOCALE_REQUIRED_DETAIL = "A name in the default language is required"
 UNKNOWN_LOCALE_DETAIL = "That language is not one of the content locales"
