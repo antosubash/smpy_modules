@@ -6,7 +6,7 @@ import importlib.metadata
 import importlib.resources
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.resources import ResourceTypeRegistry
@@ -64,6 +64,14 @@ class EventsModule(ModuleBase):
         db = getattr(getattr(app.state, "sm", None), "db", None)
         if (session_class := getattr(db, "sync_session_class", None)) is not None:
             tenancy.install_guard(session_class)
+
+    def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
+        from simple_module_hosting.csrf import RequiresCsrf
+
+        from sm_events.web.endpoints import build_api_router
+
+        # The framework's CSRF check on every write; reads pass.
+        api_router.include_router(build_api_router(), dependencies=[Depends(RequiresCsrf())])
 
     def register_middleware(self, app: FastAPI) -> None:
         """Remember the current request for the ``events.calendar`` loader, which

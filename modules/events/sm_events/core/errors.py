@@ -65,7 +65,7 @@ class Conflict(EventsError):  # noqa: N818 - HTTP vocabulary, deliberately
 
 class SlugTaken(Conflict):
     code = "slug_taken"
-    detail = "That slug is already in use"
+    detail = constants.SLUG_TAKEN_DETAIL
 
 
 class Invalid(EventsError):  # noqa: N818 - HTTP vocabulary, deliberately

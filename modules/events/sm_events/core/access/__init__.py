@@ -37,7 +37,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any
 
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request
 from sharing.core.policy import share_exists_for
 from simple_module_core.permission_denied import PermissionDenied
 from simple_module_core.resources import (
@@ -52,6 +52,7 @@ from sqlalchemy import false, or_
 from sqlmodel import select
 
 from sm_events.core import constants
+from sm_events.core.errors import Forbidden, NotFound, OwnerRequired
 from sm_events.models import Calendar, Visibility
 
 CALENDAR_RESOURCE = "events.calendar"
@@ -138,22 +139,34 @@ def calendar_stmt(calendar_id: uuid.UUID) -> Any:
     return select(Calendar).where(Calendar.id == calendar_id)
 
 
-class _RequiresOwner(RequiresResource):
-    """``RequiresResource`` for owner-only actions, whose refusal says who may
-    act instead of naming the internal ``resource:delete`` action."""
+class _Requires(RequiresResource):
+    """``RequiresResource`` whose refusals use events' ``{"detail", "code"}``
+    envelope: a 404 for a calendar the caller cannot see, a 403 ``forbidden``
+    for one they can see but not change, and ``owner_required`` for an
+    owner-only action (naming who may act, not the internal ``resource:delete``)."""
+
+    def __init__(self, action: str, *, owner: bool = False) -> None:
+        super().__init__(POLICY, action, calendar_stmt)
+        self._owner = owner
 
     async def __call__(self, *, request: Request, stmt: Any, session: Any) -> Any:
         try:
             return await super().__call__(request=request, stmt=stmt, session=session)
-        except PermissionDenied as exc:
-            raise PermissionDenied(exc.permission, constants.OWNER_ONLY_DETAIL) from None
+        except PermissionDenied:
+            if self._owner:
+                raise OwnerRequired(constants.OWNER_ONLY_DETAIL) from None
+            raise Forbidden(constants.EDIT_REFUSED_DETAIL) from None
+        except HTTPException as exc:
+            if exc.status_code == 404:
+                raise NotFound(constants.NOT_FOUND_DETAIL) from None
+            raise
 
 
 # No ``permission=``: an API token is refused on these routes until a route
 # opts in by building its own ``RequiresResource(..., permission=...)``.
-CalendarView = Annotated[Calendar, Depends(RequiresResource(POLICY, ACTION_VIEW, calendar_stmt))]
-CalendarEdit = Annotated[Calendar, Depends(RequiresResource(POLICY, ACTION_EDIT, calendar_stmt))]
-CalendarOwner = Annotated[Calendar, Depends(_RequiresOwner(POLICY, ACTION_DELETE, calendar_stmt))]
+CalendarView = Annotated[Calendar, Depends(_Requires(ACTION_VIEW))]
+CalendarEdit = Annotated[Calendar, Depends(_Requires(ACTION_EDIT))]
+CalendarOwner = Annotated[Calendar, Depends(_Requires(ACTION_DELETE, owner=True))]
 """Owner or ``events.manage``: visibility, delete, shares, ownership."""
 
 __all__ = [

@@ -37,3 +37,17 @@ COLOR_PATTERN = r"^#[0-9a-f]{6}$"
 DEFAULT_COLOR = "#2563eb"
 
 OWNER_ONLY_DETAIL = "Only the calendar's owner or an events manager can do this"
+
+# Calendars.
+CALENDARS_MAX = 500
+SLUG_FALLBACK = "calendar"
+SLUG_TAKEN_DETAIL = "That slug is already in use"
+EDIT_REFUSED_DETAIL = "You can see this calendar but not change it"
+OWNER_NOT_ALLOWED_CODE = "owner_not_allowed"
+OWNER_NOT_ALLOWED_DETAIL = "The new owner must be an active member of this organisation"
+
+# The share picker and the owner check read the user directory.
+CANDIDATES_MAX = 20
+CANDIDATES_SCAN = 100
+DIRECTORY_UNAVAILABLE_CODE = "user_directory_unavailable"
+DIRECTORY_UNAVAILABLE_DETAIL = "The user directory is not available"
