@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
+from simple_module_core.resources import ResourceTypeRegistry
 
 from sm_events.core import constants
 
@@ -63,6 +64,18 @@ class EventsModule(ModuleBase):
         db = getattr(getattr(app.state, "sm", None), "db", None)
         if (session_class := getattr(db, "sync_session_class", None)) is not None:
             tenancy.install_guard(session_class)
+
+    def register_middleware(self, app: FastAPI) -> None:
+        """Remember the current request for the ``events.calendar`` loader, which
+        the framework's sharing router calls without one."""
+        from sm_events.core.tenancy.request_context import RequestContextMiddleware
+
+        app.add_middleware(RequestContextMiddleware)
+
+    def register_resource_types(self, registry: ResourceTypeRegistry) -> None:
+        from sm_events.core.access import resource_types
+
+        resource_types.register(registry)
 
     def register_permissions(self, registry: PermissionRegistry) -> None:
         registry.add_group(

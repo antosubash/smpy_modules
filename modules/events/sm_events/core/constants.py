@@ -35,3 +35,5 @@ TZ_MAX = 64
 LOCALE_MAX = 16
 COLOR_PATTERN = r"^#[0-9a-f]{6}$"
 DEFAULT_COLOR = "#2563eb"
+
+OWNER_ONLY_DETAIL = "Only the calendar's owner or an events manager can do this"
