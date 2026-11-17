@@ -11,6 +11,10 @@ from tests.support.calendars import BASE, OWNER, make
 from tests.web.test_categories_api import BASE as CATS
 from tests.web.test_categories_api import MANAGER
 
+LINE_SEPARATORS = ["a\u2028b", "a\u2029b"]
+BIDI = [
+    f"a{c}b" for c in "\u200e\u200f\u061c\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+]
 BAD = ["a\x00b", "a\nb", "a\tb", "a\rb", "a\x1fb", "a\x7fb", "a\x85b", "a\x9fb", "ok\n", "\x00"]
 
 
@@ -74,3 +78,36 @@ async def test_category_without_sluggable_name_gets_its_own_fallback(client):
     assert [first.json()["slug"], second.json()["slug"]] == ["category", "category-2"]
     cal = await make(client, OWNER, name="😀")
     assert cal["slug"] == "calendar"
+
+
+@pytest.mark.parametrize("bad", LINE_SEPARATORS + BIDI)
+def test_single_line_names_reject_separators_and_direction_controls(bad):
+    with pytest.raises(ValidationError):
+        CalendarCreate(name=bad)
+    with pytest.raises(ValidationError):
+        CalendarPatch(name=bad)
+    with pytest.raises(ValidationError):
+        CategoryCreate(names={"en": "Fine", "de": bad})
+    with pytest.raises(ValidationError):
+        CategoryPatch(names={"en": bad})
+
+
+@pytest.mark.parametrize("bad", BIDI)
+def test_description_rejects_direction_controls(bad):
+    with pytest.raises(ValidationError):
+        CalendarCreate(name="Team", description=bad)
+
+
+def test_description_may_keep_unicode_line_separators():
+    got = CalendarCreate(name="Team", description="one\u2028two\u2029three")
+    assert got.description == "one\u2028two\u2029three"
+
+
+@pytest.mark.parametrize("bad", ["a\u2028b", "a\u202eb"])
+async def test_api_rejects_separator_and_direction_names(client, bad):
+    got = await client.post(BASE, json={"name": bad}, headers=OWNER)
+    assert got.status_code == 422, got.text
+    cat = await client.post(CATS, json={"names": {"en": bad}}, headers=MANAGER)
+    assert cat.status_code == 422, cat.text
+    desc = await client.post(BASE, json={"name": "T", "description": "a\u202eb"}, headers=OWNER)
+    assert desc.status_code == 422, desc.text

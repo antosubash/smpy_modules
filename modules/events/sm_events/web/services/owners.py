@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import Request
 from simple_module_core.user_directory import NullUserDirectory, get_user_directory
 
-from sm_events.web.services.masking import safe_display_name
+from sm_events.web.services.masking import label_carries_address
 from sm_events.web.services.members import members_only
 
 __all__ = ["owner_names"]
@@ -18,8 +18,10 @@ async def owner_names(request: Request, db: Any, owner_ids: Iterable[str]) -> di
     """``{owner id: name or None}`` for the distinct *owner_ids*.
 
     One batch lookup, never one per row. The name follows the share picker's
-    disclosure rule: a label that carries an address is shown as the masked
-    address. The same membership filter as the picker applies, in one batch: an account
+    disclosure rule's stricter half: every viewer of a calendar sees this name,
+    not only the owner and managers who may use the picker, so a label that
+    carries an address resolves to ``None`` (never the address, masked or not).
+    The same membership filter as the picker applies, in one batch: an account
     that is not (or no longer) a member of the bound tenant, a missing or inactive
     account, or no directory at all, is ``None``
     (the console words it neutrally)."""
@@ -32,5 +34,6 @@ async def owner_names(request: Request, db: Any, owner_ids: Iterable[str]) -> di
         u for u in (await directory.get_many(db, ids)).values() if u.is_active and u.id in names
     ]
     for user in await members_only(request, db, found):
-        names[user.id] = safe_display_name(user.label, user.email, "") or None
+        if not label_carries_address(user.label, user.email):
+            names[user.id] = user.label or None
     return names

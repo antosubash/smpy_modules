@@ -1,4 +1,4 @@
-"""The calendar list names its owners, under the share picker's disclosure rule."""
+"""The calendar list names its owners; a label that is an address is never shown."""
 
 from __future__ import annotations
 
@@ -30,10 +30,11 @@ async def test_owner_names_self_other_address_label_and_unknown(client):
     rows = _by_name(got.json())
     assert rows["Mine"]["owner_name"] == "Olga Owner"
     assert rows["Eves"]["owner_name"] == "Eve Editor"
-    assert rows["Addr"]["owner_name"] == "m***@example.com"
+    assert rows["Addr"]["owner_name"] is None
     assert rows["Inactive"]["owner_name"] is None
     assert rows["Unknown"]["owner_name"] is None
     assert "mia@example.com" not in got.text
+    assert "m***@" not in got.text
 
 
 async def test_single_calendar_carries_owner_name(client):

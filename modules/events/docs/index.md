@@ -36,6 +36,11 @@ pages need `events.view`, and Categories needs both `events.view` and
 writes need both view and manage. The framework sharing API additionally needs
 `sharing.share`. No anonymous event API or page ships in PR 1.
 
+Every viewer of a calendar sees its owner's display name when the owner is an
+active member with a name; an owner without a name is shown as unknown, and no
+email address or part of one is ever shown outside the owner/manager-only
+picker.
+
 An owner or edit share can write drafts without `events.edit`; that permission
 only adds event writing on internal and public calendars. It never grants
 editing another owner's calendar metadata. A view share cannot delete, share,

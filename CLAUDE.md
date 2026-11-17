@@ -154,7 +154,10 @@ The share picker needs three trimmed characters, matches a user whose label has
 no at-sign (any variant) by name or exact full address, and a user whose label
 has one only by the exact full address (compared NFC-normalised and
 case-insensitively); it never parses labels. It masks every address, bare or inside a label, unless the
-query is the full address.
+query is the full address. Every viewer of a calendar sees its owner's display name
+only when the owner is an active member with a name; a label that carries an address
+is shown as unknown, never as a masked or raw address (that is the picker's, for
+owners and managers alone).
 
 **Records' website-submission routes are anonymous writes (#101).** The record
 type is the trust anchor: never trust the `RecordForm` block's props —
