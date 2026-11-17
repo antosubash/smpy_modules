@@ -20,6 +20,8 @@ class EventsError(Exception):
     status_code: int = 400
     code: str = "events_error"
     detail: str = "Events error"
+    headers: dict[str, str] | None = None
+    """Extra response headers; the body is always exactly ``detail`` and ``code``."""
 
     def __init__(self, detail: str | None = None, code: str | None = None) -> None:
         if detail is not None:
@@ -80,8 +82,17 @@ class UnknownLocale(Invalid):
 
 
 class Stale(Conflict):
+    """The caller's ``expected_revision`` is not the event's. The current one rides
+    in a header (and on the instance), never in the body."""
+
     code = constants.STALE_CODE
     detail = constants.STALE_DETAIL
+
+    def __init__(self, current_revision: int | None = None) -> None:
+        super().__init__()
+        self.current_revision = current_revision
+        if current_revision is not None:
+            self.headers = {constants.CURRENT_REVISION_HEADER: str(current_revision)}
 
 
 class OverridesOrphaned(Conflict):
@@ -179,5 +190,7 @@ def install_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(EventsError)
     async def _events_error(_request: Request, exc: EventsError) -> JSONResponse:
         return JSONResponse(
-            status_code=exc.status_code, content={"detail": exc.detail, "code": exc.code}
+            status_code=exc.status_code,
+            content={"detail": exc.detail, "code": exc.code},
+            headers=exc.headers,
         )

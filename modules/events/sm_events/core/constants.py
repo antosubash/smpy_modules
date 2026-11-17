@@ -101,6 +101,7 @@ SOURCE_EVENTS = "events"
 # Error codes and their default messages.
 STALE_CODE = "stale"
 STALE_DETAIL = "This was changed by someone else; reload it"
+CURRENT_REVISION_HEADER = "X-Current-Revision"
 OVERRIDES_ORPHANED_CODE = "overrides_orphaned"
 OVERRIDES_ORPHANED_DETAIL = "This change would orphan overrides of single occurrences"
 HAS_SUB_EVENTS_CODE = "has_sub_events"
@@ -140,6 +141,24 @@ NOT_AN_OCCURRENCE_CODE = "not_an_occurrence"
 NOT_AN_OCCURRENCE_DETAIL = "That is not an occurrence of the event's rule"
 DESCRIPTION_TOO_LONG_CODE = "description_too_long"
 DESCRIPTION_TOO_LONG_DETAIL = "The description is too long"
+
+# Revisions: what a history row's action may be.
+REVISION_ACTIONS = (
+    "created",
+    "updated",
+    "override_set",
+    "override_cleared",
+    "submitted",
+    "withdrawn",
+    "approved",
+    "scheduled",
+    "unscheduled",
+    "rejected",
+    "unpublished",
+    "published_scheduled",
+    "trashed",
+    "restored",
+)
 
 # Occurrences.
 OCCURRENCE_CONFIRMED = "confirmed"
