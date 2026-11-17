@@ -9,6 +9,7 @@ from fastapi import Request
 from simple_module_core.user_directory import NullUserDirectory, get_user_directory
 
 from sm_events.web.services.masking import safe_display_name
+from sm_events.web.services.members import members_only
 
 __all__ = ["owner_names"]
 
@@ -18,14 +19,18 @@ async def owner_names(request: Request, db: Any, owner_ids: Iterable[str]) -> di
 
     One batch lookup, never one per row. The name follows the share picker's
     disclosure rule: a label that carries an address is shown as the masked
-    address. A missing or inactive account, or no directory at all, is ``None``
+    address. The same membership filter as the picker applies, in one batch: an account
+    that is not (or no longer) a member of the bound tenant, a missing or inactive
+    account, or no directory at all, is ``None``
     (the console words it neutrally)."""
     ids = sorted(set(owner_ids))
     names: dict[str, str | None] = dict.fromkeys(ids)
     directory = get_user_directory(request.app)
     if not ids or isinstance(directory, NullUserDirectory):
         return names
-    for uid, user in (await directory.get_many(db, ids)).items():
-        if user.is_active and uid in names:
-            names[uid] = safe_display_name(user.label, user.email, "") or None
+    found = [
+        u for u in (await directory.get_many(db, ids)).values() if u.is_active and u.id in names
+    ]
+    for user in await members_only(request, db, found):
+        names[user.id] = safe_display_name(user.label, user.email, "") or None
     return names

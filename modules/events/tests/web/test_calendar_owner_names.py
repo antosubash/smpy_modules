@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from tests.support.app import Directory
 from tests.support.calendars import BASE, EDITOR, OWNER, make
 
@@ -47,3 +49,34 @@ async def test_no_directory_means_no_owner_name(client):
     assert made["owner_name"] is None
     got = await client.get(BASE, headers=OWNER)
     assert got.status_code == 200
+
+
+@pytest.mark.unbound_tenant
+async def test_multi_tenant_names_only_members(multi_client):
+    client = multi_client
+    client.app.state.user_directory = Directory(
+        {**USERS, "x": ("x@example.com", "Xavier Other", True)}
+    )
+    members = {"a": {"o", "e", "gone", "m"}, "b": {"x"}}
+    batches: list[int] = []
+
+    async def tenant_members(db, tenant_id, ids):
+        batches.append(len(ids))
+        return {i for i in ids if i in members[tenant_id]}
+
+    client.app.state.tenant_members = tenant_members
+    mine = {**OWNER, "X-Test-Tenant": "a"}
+    for uid, name in (("o", "Mine"), ("x", "Foreign"), ("gone", "Inactive")):
+        made = await client.post(
+            BASE,
+            json={"name": name, "visibility": "internal"},
+            headers={**mine, "X-Test-User": uid},
+        )
+        assert made.status_code == 201, made.text
+    batches.clear()
+    got = await client.get(BASE, headers={**mine, "X-Test-User": "o"})
+    rows = _by_name(got.json())
+    assert rows["Mine"]["owner_name"] == "Olga Owner"
+    assert rows["Foreign"]["owner_name"] is None
+    assert rows["Inactive"]["owner_name"] is None
+    assert len(batches) == 1
