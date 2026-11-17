@@ -1,8 +1,8 @@
-"""``env.py`` ignores SQLite's false index change, and nothing beyond it.
+"""``alembic check`` on SQLite ignores ``tenant_browse``'s ordering, and nothing beyond it.
 
-``tenant_browse`` mixes columns with ``created_at DESC``, which SQLite reflects as
-a plain column. ``alembic check`` must stay quiet about that, but still see the
-index on other columns. A *missing* expression index is out of reach here: Alembic
+``tenant_browse`` has ``created_at DESC``, which SQLite reflects as a plain column;
+the framework's ``make_include_object`` (0.0.47) skips that comparison. It must still
+see the index on other columns. A *missing* expression index is out of reach here: Alembic
 skips those on SQLite itself, and the Postgres ``alembic check`` in CI catches it.
 Real alembic against a real file.
 """
