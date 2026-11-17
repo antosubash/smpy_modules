@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from tests.support.app import Directory
-from tests.support.calendars import BASE, EDITOR, OWNER, make
+from tests.support.calendars import BASE, EDITOR, MANAGER, OWNER, make
 
 USERS = {
     "o": ("o@example.com", "Olga Owner", True),
@@ -81,3 +81,51 @@ async def test_multi_tenant_names_only_members(multi_client):
     assert rows["Foreign"]["owner_name"] is None
     assert rows["Inactive"]["owner_name"] is None
     assert len(batches) == 1
+
+
+class _Raising(Directory):
+    async def get_many(self, db, ids, *, with_roles=False):
+        raise RuntimeError("directory down")
+
+
+async def test_failing_directory_leaves_names_null_on_list_get_and_patch(client):
+    made = await make(client, EDITOR, name="Eves")
+    client.app.state.user_directory = _Raising(USERS)
+    listed = await client.get(BASE, headers=EDITOR)
+    assert listed.status_code == 200
+    assert [r["owner_name"] for r in listed.json()] == [None]
+    got = await client.get(f"{BASE}/{made['id']}", headers=EDITOR)
+    assert (got.status_code, got.json()["owner_name"]) == (200, None)
+    patched = await client.patch(f"{BASE}/{made['id']}", json={"name": "Renamed"}, headers=EDITOR)
+    assert (patched.status_code, patched.json()["owner_name"]) == (200, None)
+
+
+@pytest.mark.unbound_tenant
+async def test_failing_membership_store_leaves_names_null(multi_client):
+    client = multi_client
+    client.app.state.user_directory = Directory(USERS)
+    mine = {**OWNER, "X-Test-Tenant": "a"}
+
+    async def member(db, tenant_id, ids):
+        return set(ids)
+
+    client.app.state.tenant_members = member
+    made = await client.post(BASE, json={"name": "T", "visibility": "internal"}, headers=mine)
+    assert made.status_code == 201, made.text
+
+    async def tenant_members(db, tenant_id, ids):
+        raise RuntimeError("membership down")
+
+    client.app.state.tenant_members = tenant_members
+    got = await client.get(BASE, headers=mine)
+    assert got.status_code == 200
+    assert [r["owner_name"] for r in got.json()] == [None]
+
+
+async def test_failing_directory_never_allows_an_ownership_transfer(client):
+    cid = (await make(client))["id"]
+    client.app.state.user_directory = _Raising(USERS)
+    with pytest.raises(RuntimeError):
+        await client.put(f"{BASE}/{cid}/owner", json={"owner_id": "e"}, headers=MANAGER)
+    client.app.state.user_directory = Directory(USERS)
+    assert (await client.get(f"{BASE}/{cid}", headers=OWNER)).json()["owner_id"] == "o"
