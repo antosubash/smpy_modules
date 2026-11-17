@@ -81,5 +81,23 @@
     "offline": "Could not reach the server. Check your connection.",
     "session_expired": "Your session has expired. Sign in again.",
     "invalid_input": "Check the fields and try again."
+  },
+  "categories": {
+    "title": "Categories",
+    "subtitle": "Organise events with names in each content language.",
+    "new": "New category",
+    "edit": "Edit category",
+    "name": "Name ({locale})",
+    "slug": "Slug (optional on create)",
+    "color": "Colour",
+    "no_color": "No colour",
+    "clear_color": "Clear colour",
+    "no_name": "No name",
+    "actions": "Actions",
+    "delete": "Delete",
+    "delete_title": "Delete {slug}?",
+    "delete_description": "Events keep running uncategorised. This cannot be undone.",
+    "empty": "No categories yet.",
+    "form_description": "The name in the first content language is required. The slug is fixed after creation."
   }
 }

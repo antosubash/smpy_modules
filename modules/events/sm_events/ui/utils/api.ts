@@ -1,7 +1,7 @@
 /** Framework transport supplies same-origin credentials and the session CSRF token. */
 import { type ApiFetchInit, apiFetch } from '@simple-module-py/ui/lib/api';
 import { keys, translate as t } from './i18n';
-import type { Calendar, CalendarInput, Visibility } from './types';
+import type { Calendar, CalendarInput, Category, CategoryInput, Visibility } from './types';
 
 export class ApiError extends Error {
   constructor(
@@ -58,3 +58,12 @@ export const transferOwner = (id: string, owner_id: string) =>
 export const trashCalendar = (id: string) => send<void>(`${CALENDARS}/${id}`, { method: 'DELETE' });
 export const restoreCalendar = (id: string) =>
   send<Calendar>(`${CALENDARS}/${id}/restore`, { method: 'POST' });
+
+const CATEGORIES = '/api/events/categories';
+export const listCategories = () => send<Category[]>(CATEGORIES);
+export const createCategory = (body: CategoryInput) =>
+  send<Category>(CATEGORIES, json('POST', body));
+export const updateCategory = (id: string, body: Omit<CategoryInput, 'slug'>) =>
+  send<Category>(`${CATEGORIES}/${id}`, json('PATCH', body));
+export const deleteCategory = (id: string) =>
+  send<void>(`${CATEGORIES}/${id}`, { method: 'DELETE' });

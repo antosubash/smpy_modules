@@ -34,3 +34,11 @@ export type Share = {
   expired: boolean;
 };
 export type ShareCandidate = { id: string; display_name: string; email: string };
+
+export type Category = {
+  id: string;
+  slug: string;
+  names: Record<string, string>;
+  color: string | null;
+};
+export type CategoryInput = { slug?: string; names: Record<string, string>; color: string | null };

@@ -81,5 +81,23 @@
     "offline": "Der Server ist nicht erreichbar. Prüfen Sie Ihre Verbindung.",
     "session_expired": "Ihre Sitzung ist abgelaufen. Melden Sie sich erneut an.",
     "invalid_input": "Prüfen Sie die Felder und versuchen Sie es erneut."
+  },
+  "categories": {
+    "title": "Kategorien",
+    "subtitle": "Ordnen Sie Veranstaltungen mit Namen in jeder Inhaltssprache.",
+    "new": "Neue Kategorie",
+    "edit": "Kategorie bearbeiten",
+    "name": "Name ({locale})",
+    "slug": "URL-Kürzel (beim Anlegen optional)",
+    "color": "Farbe",
+    "no_color": "Keine Farbe",
+    "clear_color": "Farbe entfernen",
+    "no_name": "Kein Name",
+    "actions": "Aktionen",
+    "delete": "Löschen",
+    "delete_title": "{slug} löschen?",
+    "delete_description": "Veranstaltungen bleiben ohne Kategorie bestehen. Dies kann nicht rückgängig gemacht werden.",
+    "empty": "Noch keine Kategorien vorhanden.",
+    "form_description": "Der Name in der ersten Inhaltssprache ist erforderlich. Das URL-Kürzel ist nach dem Anlegen unveränderlich."
   }
 }
