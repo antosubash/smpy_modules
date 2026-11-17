@@ -6,13 +6,15 @@ import re
 import unicodedata
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from functools import lru_cache
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import UniqueConstraint, func, select
 from sqlalchemy.exc import IntegrityError
 
 from sm_events.core import constants
 from sm_events.core.errors import SlugTaken
+from sm_events.models._base import Base
 
 __all__ = ["free_slug", "slug_taken", "slug_write", "slugify"]
 
@@ -49,8 +51,20 @@ def _is_slug_conflict(exc: IntegrityError, constraint: str) -> bool:
         if e is not None
     ):
         return True
-    table = constraint.removeprefix("uq_").removesuffix("_tenant_slug")
-    return str(orig) == f"UNIQUE constraint failed: {table}.tenant_id, {table}.slug"
+    return str(orig) == _sqlite_message(constraint)
+
+
+@lru_cache(maxsize=16)
+def _sqlite_message(constraint: str) -> str | None:
+    """SQLite's text for a violation of ``constraint``, built from the model's
+    own column list so it holds for any unique constraint (``tenant_id, slug``
+    or ``tenant_id, locale, slug``); ``None`` for a name no table declares."""
+    for table in Base.metadata.tables.values():
+        for found in table.constraints:
+            if isinstance(found, UniqueConstraint) and found.name == constraint:
+                columns = ", ".join(f"{table.name}.{col.name}" for col in found.columns)
+                return f"UNIQUE constraint failed: {columns}"
+    return None
 
 
 def slugify(text: str) -> str:

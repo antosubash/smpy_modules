@@ -136,3 +136,16 @@ async def test_real_unique_violation_of_another_constraint_propagates(db):
     with pytest.raises(IntegrityError):
         async with slug_write(db, CALENDAR_SLUG_CONSTRAINT):
             db.add(Category(slug="dup", names={"en": "B"}))
+
+
+def test_sqlite_message_comes_from_the_constraints_own_columns():
+    from sm_events.calendar.slugs import _sqlite_message
+
+    assert _sqlite_message("uq_events_calendar_tenant_slug") == (
+        "UNIQUE constraint failed: events_calendar.tenant_id, events_calendar.slug"
+    )
+    assert _sqlite_message("uq_events_event_text_slug") == (
+        "UNIQUE constraint failed: events_event_text.tenant_id, "
+        "events_event_text.locale, events_event_text.slug"
+    )
+    assert _sqlite_message("uq_no_such_constraint") is None

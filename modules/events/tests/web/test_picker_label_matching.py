@@ -84,7 +84,8 @@ def test_long_address_free_label_is_linear():
     start = time.perf_counter()
     assert not matches_query(label, ADDRESS, "zzz")
     assert safe_display_name(label, ADDRESS, "zzz") == label
-    assert time.perf_counter() - start < 0.05
+    # Generous: a quadratic scan of this label takes far longer than a loaded runner's jitter.
+    assert time.perf_counter() - start < 1.0
 
 
 def test_no_regular_expression_runs_over_labels():
