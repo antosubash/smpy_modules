@@ -33,7 +33,7 @@ export function ConfirmDialog({
   onConfirm,
 }: {
   trigger: ReactNode;
-  title: string;
+  title: ReactNode;
   description: string;
   confirmLabel: string;
   onConfirm: () => Promise<unknown>;

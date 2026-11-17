@@ -32,7 +32,8 @@
     "saving": "Wird gespeichert…",
     "cancel": "Abbrechen",
     "close": "Schließen",
-    "loading": "Wird geladen…"
+    "loading": "Wird geladen…",
+    "retry": "Erneut versuchen"
   },
   "visibility": {
     "private": "Privat",

@@ -10,7 +10,7 @@ import {
 } from '@simple-module-py/ui/components/ui/dialog';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useMemo, useState } from 'react';
 import { useFormErrors } from '../../hooks/useFormErrors';
 import { createCategory, updateCategory } from '../../utils/api';
 import { requiredText } from '../../utils/field-errors';
@@ -67,7 +67,13 @@ function CategoryForm({
   const [slug, setSlug] = useState(category?.slug ?? '');
   const [color, setColor] = useState<string | null>(category ? category.color : DEFAULT_COLOR);
   const [pending, setPending] = useState(false);
-  const errors = useFormErrors();
+  // The 422 paths this form can show: each locale's own input, the whole map's
+  // group message, and the fields below.
+  const shown = useMemo(
+    () => ['names', 'slug', 'color', ...contentLocales.map((l) => `names.${l}`)],
+    [contentLocales],
+  );
+  const errors = useFormErrors(undefined, undefined, shown);
   async function save(event: FormEvent) {
     event.preventDefault();
     if (pending) return;
@@ -114,7 +120,7 @@ function CategoryForm({
       <form className="grid gap-4" noValidate onSubmit={save}>
         {contentLocales.map((locale, index) => {
           const id = `category-name-${locale}`;
-          const message = errors.fields[`names.${locale}`] ?? errors.fields.names;
+          const message = errors.fields[`names.${locale}`];
           return (
             <div key={locale} className="grid gap-2">
               <Label htmlFor={id}>{t(copy.name, { locale })}</Label>
@@ -134,6 +140,7 @@ function CategoryForm({
             </div>
           );
         })}
+        <FieldError id="category-names" message={errors.fields.names} />
         <div className="grid gap-2">
           <Label htmlFor="category-slug">{t(copy.slug)}</Label>
           <Input

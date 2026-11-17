@@ -16,6 +16,7 @@ import { useCategories } from '../ui/hooks/useCategories';
 import { deleteCategory } from '../ui/utils/api';
 import { categoryName } from '../ui/utils/categories';
 import { keys, useT } from '../ui/utils/i18n';
+import { Name, withName } from '../ui/utils/isolate';
 
 /** A long unbroken name must wrap inside the cell, not widen the table. */
 const WRAP = 'max-w-xs whitespace-normal [overflow-wrap:anywhere]';
@@ -68,7 +69,11 @@ export default function Categories({ content_locales }: { content_locales: strin
                     <TableCell className={WRAP}>{category.slug}</TableCell>
                     {content_locales.map((locale) => (
                       <TableCell key={locale} className={WRAP}>
-                        {category.names[locale] ?? t(copy.no_name)}
+                        {category.names[locale] ? (
+                          <Name>{category.names[locale]}</Name>
+                        ) : (
+                          t(copy.no_name)
+                        )}
                       </TableCell>
                     ))}
                     <TableCell>
@@ -85,7 +90,7 @@ export default function Categories({ content_locales }: { content_locales: strin
                               {t(copy.delete)}
                             </Button>
                           }
-                          title={t(copy.delete_title, { name })}
+                          title={withName(t, copy.delete_title, name)}
                           description={t(copy.delete_description)}
                           confirmLabel={t(copy.delete)}
                           onConfirm={async () => {

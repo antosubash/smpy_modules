@@ -13,20 +13,18 @@ const MESSAGES: Record<string, string> = {
   default_timezone: keys.events.errors.default_timezone_invalid,
 };
 
-/** `{ field: message }` for a 422, keyed by the first `loc` segment and, for a
- *  nested one (`names.de`), by the whole path as well; `{}` for anything else. */
+/** `{ field: message }` for a 422, keyed by the full `loc` path (`names.de`,
+ *  never just `names` for it); `{}` for anything else. The message comes from
+ *  the first segment, so `names.de` and `names` read alike. */
 export function fieldErrors(error: unknown): Record<string, string> {
   if (!(error instanceof ApiError) || error.status !== 422) return {};
   const out: Record<string, string> = {};
   for (const path of error.fields) {
     const [head] = path.split('.');
     if (!head) continue;
-    const message = t(MESSAGES[head] ?? keys.events.errors.invalid_input);
-    out[head] = message;
-    if (path !== head) out[path] = message;
+    out[path] = t(MESSAGES[head] ?? keys.events.errors.invalid_input);
   }
   return out;
 }
 
 export const requiredText = (): string => t(keys.events.errors.required);
-export const timezoneText = (): string => t(keys.events.errors.default_timezone_invalid);

@@ -17,9 +17,14 @@ type Shares = {
   /** The query is too short to search; the dialog says how many to type. */
   tooShort: boolean;
   loading: boolean;
-  error: string | null;
+  /** The picker's failure: independent of the grants list. */
+  searchError: string | null;
+  /** The picker has answered for this query (no empty state before). */
+  searchSettled: boolean;
   /** Only the failure to load the current grants (never the picker's). */
   listError: string | null;
+  /** Load the grants again after a failure. */
+  retry: () => void;
   grant: (candidate: ShareCandidate, role: ShareRole) => Promise<void>;
   revoke: (share: Share) => Promise<void>;
 };
@@ -35,7 +40,7 @@ export function useShares(calendarId: string, open: boolean, onGone?: () => void
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const search = useCandidates(calendarId, open, query);
+  const search = useCandidates(calendarId, open, query, onGone);
 
   const generation = useRef(0);
   const refresh = useCallback(async () => {
@@ -44,27 +49,34 @@ export function useShares(calendarId: string, open: boolean, onGone?: () => void
     if (mine === generation.current) setShares(rows);
   }, [calendarId]);
 
+  const load = useCallback(
+    (alive: () => boolean = () => true) => {
+      setLoading(true);
+      return refresh()
+        .then(() => {
+          if (alive()) setError(null);
+        })
+        .catch((e) => {
+          if (!alive()) return;
+          setError(errorText(e, GONE));
+          if (isGone(e)) gone.current?.();
+        })
+        .finally(() => {
+          if (alive()) setLoading(false);
+        });
+    },
+    [refresh],
+  );
+
   useEffect(() => {
     if (!open) return;
     let current = true;
-    setLoading(true);
-    refresh()
-      .then(() => {
-        if (current) setError(null);
-      })
-      .catch((e) => {
-        if (!current) return;
-        setError(errorText(e, GONE));
-        if (isGone(e)) gone.current?.();
-      })
-      .finally(() => {
-        if (current) setLoading(false);
-      });
+    void load(() => current);
     return () => {
       current = false;
       ++generation.current;
     };
-  }, [open, refresh]);
+  }, [open, load]);
 
   /** A write that finds the calendar gone refreshes the list before it throws. */
   const settle = useCallback(async (write: Promise<unknown>) => {
@@ -79,15 +91,22 @@ export function useShares(calendarId: string, open: boolean, onGone?: () => void
   const grant = useCallback(
     async (candidate: ShareCandidate, role: ShareRole) => {
       await settle(grantShare(calendarId, candidate.id, role));
-      await refresh();
+      await settle(refresh());
     },
     [calendarId, refresh, settle],
   );
 
   const revoke = useCallback(
     async (share: Share) => {
-      await settle(revokeShare(share.id));
-      await refresh();
+      // A grant that is already gone (another tab revoked it) is no error and
+      // says nothing about the calendar: the reload drops the stale row. Only
+      // that reload finding the calendar gone is "no longer exists".
+      try {
+        await revokeShare(share.id);
+      } catch (e) {
+        if (!isGone(e)) throw e;
+      }
+      await settle(refresh());
     },
     [refresh, settle],
   );
@@ -100,8 +119,10 @@ export function useShares(calendarId: string, open: boolean, onGone?: () => void
     setQuery,
     tooShort: search.tooShort,
     loading,
-    error: search.error ?? error,
+    searchError: search.error,
+    searchSettled: search.settled,
     listError: error,
+    retry: () => void load(),
     grant,
     revoke,
   };

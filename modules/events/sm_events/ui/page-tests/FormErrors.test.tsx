@@ -53,18 +53,24 @@ describe('calendar dialog field errors', () => {
     expect(text()).not.toContain('Choose a timezone');
     await view.unmount();
   });
-  it('rejects a timezone outside the list before sending anything', async () => {
-    const calls = stubFetch({ [`GET ${API}`]: [] });
+  it('sends a timezone outside the browser list and shows the server verdict', async () => {
+    const calls = stubFetch({
+      [`GET ${API}`]: [],
+      [`POST ${API}`]: Response.json(
+        { detail: [{ loc: ['body', 'default_timezone'], msg: 'bad' }] },
+        { status: 422 },
+      ),
+    });
     const view = await mount(<Calendars {...props} />);
     await flush();
     await click(button('New calendar'));
     await setValue(field('calendar-name'), 'Team');
     await setValue(field('calendar-timezone'), 'Mars/Phobos');
     await submit();
+    expect(calls.some((c) => c.method === 'POST')).toBe(true);
     expect(document.getElementById('calendar-timezone-error')?.textContent).toContain(
       'Choose a timezone',
     );
-    expect(calls.some((c) => c.method === 'POST')).toBe(false);
     await setValue(field('calendar-timezone'), 'Europe/Vienna');
     expect(document.getElementById('calendar-timezone-error')).toBeNull();
     await view.unmount();

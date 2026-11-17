@@ -32,7 +32,8 @@
     "saving": "Saving…",
     "cancel": "Cancel",
     "close": "Close",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "retry": "Retry"
   },
   "visibility": {
     "private": "Private",

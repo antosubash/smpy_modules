@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { MIN_QUERY, useShares } from '../../hooks/useShares';
 import { errorText } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
+import { Name } from '../../utils/isolate';
 import type { Share, ShareCandidate, ShareRole } from '../../utils/types';
 
 function roleLabel(t: ReturnType<typeof useT>['t'], role: string): string {
@@ -87,6 +88,19 @@ export function ShareDialog({
 
         <section className="space-y-2" aria-label={t(keys.events.share.current)}>
           <h3 className="text-sm font-medium">{t(keys.events.share.current)}</h3>
+          {state.listError && !state.loading && (
+            <div
+              className="flex items-center justify-between gap-2"
+              data-testid="events-share-list-error"
+            >
+              <p className="text-sm text-destructive" role="alert">
+                {state.listError}
+              </p>
+              <Button type="button" variant="outline" size="sm" onClick={state.retry}>
+                {t(keys.events.common.retry)}
+              </Button>
+            </div>
+          )}
           {state.shares.length === 0 ? (
             !state.loading && state.listError ? null : (
               <p className="text-sm text-muted-foreground">
@@ -104,7 +118,7 @@ export function ShareDialog({
                     data-testid="events-share-row"
                   >
                     <span className="min-w-0 break-words">
-                      {name} · {roleLabel(t, share.role)}
+                      <Name>{name}</Name> · {roleLabel(t, share.role)}
                       {share.expired ? ` · ${t(keys.events.share.expired)}` : ''}
                     </span>
                     <Button
@@ -151,7 +165,8 @@ export function ShareDialog({
             <p className="text-sm text-muted-foreground" data-testid="events-share-hint">
               {t(keys.events.share.search_min, { min: MIN_QUERY })}
             </p>
-          ) : state.error ? null : state.candidates.length === 0 ? (
+          ) : state.searchError ? null : !state.searchSettled ? null : state.candidates.length ===
+            0 ? (
             <p className="text-sm text-muted-foreground">{t(keys.events.share.no_candidates)}</p>
           ) : (
             <ul className="max-h-48 divide-y overflow-auto rounded-md border">
@@ -162,7 +177,7 @@ export function ShareDialog({
                   data-testid="events-share-candidate"
                 >
                   <span className="min-w-0 break-words">
-                    {candidate.display_name}
+                    <Name>{candidate.display_name}</Name>
                     <span className="block text-xs text-muted-foreground">{candidate.email}</span>
                   </span>
                   <Button
@@ -177,9 +192,9 @@ export function ShareDialog({
               ))}
             </ul>
           )}
-          {state.error && (
+          {state.searchError && (
             <p className="text-sm text-destructive" role="alert">
-              {state.error}
+              {state.searchError}
             </p>
           )}
         </section>

@@ -14,6 +14,7 @@ import { type FormEvent, useState } from 'react';
 import { MIN_QUERY, useCandidates } from '../../hooks/useCandidates';
 import { errorText, isGone, transferOwner } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
+import { Name, withName } from '../../utils/isolate';
 import type { ShareCandidate } from '../../utils/types';
 
 export function OwnerDialog({
@@ -30,7 +31,7 @@ export function OwnerDialog({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<ShareCandidate | null>(null);
-  const search = useCandidates(calendarId, open, query);
+  const search = useCandidates(calendarId, open, query, onSaved);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function save(event: FormEvent) {
@@ -90,7 +91,7 @@ export function OwnerDialog({
               {search.candidates.map((candidate) => (
                 <li key={candidate.id} className="flex items-center justify-between gap-2 py-2">
                   <span>
-                    {candidate.display_name}
+                    <Name>{candidate.display_name}</Name>
                     <span className="block text-muted-foreground">{candidate.email}</span>
                   </span>
                   <Button
@@ -105,7 +106,7 @@ export function OwnerDialog({
               ))}
             </ul>
           )}
-          {selected && <p>{t(copy.selected_owner, { name: selected.display_name })}</p>}
+          {selected && <p>{withName(t, copy.selected_owner, selected.display_name)}</p>}
           {(error || search.error) && (
             <p role="alert" className="text-destructive">
               {error ?? search.error}

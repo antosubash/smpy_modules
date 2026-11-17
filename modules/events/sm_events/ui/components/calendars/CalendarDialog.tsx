@@ -15,7 +15,7 @@ import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { type FormEvent, useId, useState } from 'react';
 import { useFormErrors } from '../../hooks/useFormErrors';
 import { createCalendar, updateCalendar } from '../../utils/api';
-import { requiredText, timezoneText } from '../../utils/field-errors';
+import { requiredText } from '../../utils/field-errors';
 import { keys, useT } from '../../utils/i18n';
 import {
   type Calendar,
@@ -25,6 +25,9 @@ import {
   type Visibility,
 } from '../../utils/types';
 import { FieldError, invalidProps } from '../FieldError';
+
+/** The 422 paths this form has an input (and a message line) for. */
+const SHOWN = ['name', 'slug', 'color', 'description', 'default_timezone'] as const;
 
 export function CalendarDialog({
   calendar,
@@ -88,7 +91,7 @@ function CalendarForm({
   const [timezone, setTimezone] = useState(calendar?.default_timezone ?? defaultTimezone);
   const [visibility, setVisibility] = useState<Visibility>('private');
   const [pending, setPending] = useState(false);
-  const errors = useFormErrors(keys.events.errors.calendar_gone, onGone);
+  const errors = useFormErrors(keys.events.errors.calendar_gone, onGone, SHOWN);
   const [zones] = useState(() => new Set(['UTC', ...Intl.supportedValuesOf('timeZone')]));
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -96,9 +99,8 @@ function CalendarForm({
     errors.reset();
     const found: Record<string, string> = {};
     if (!name.trim()) found.name = requiredText();
+    // The list below is only a suggestion: the server decides what a zone is.
     if (!timezone.trim()) found.default_timezone = requiredText();
-    else if (!zones.has(timezone) && timezone !== calendar?.default_timezone)
-      found.default_timezone = timezoneText();
     if (Object.keys(found).length > 0) {
       for (const [field, message] of Object.entries(found)) errors.setField(field, message);
       return;
