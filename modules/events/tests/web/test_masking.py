@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from sm_events.web.services.masking import mask_email, matches_query, visible_email
+from sm_events.web.services.masking import mask_email, matches_query, safe_display_name, visible_email
 
 
 def test_exact_match_gives_the_full_address():
@@ -41,3 +41,16 @@ def test_malformed_address_is_fully_masked(bad):
 )
 def test_matches_query(label, query, expected):
     assert matches_query(label, "amy@example.org", query) is expected
+
+
+@pytest.mark.parametrize(
+    ("label", "query", "expected"),
+    [
+        ("Amy Tester", "amy", "Amy Tester"),
+        ("amy@example.org", "amy", "a***@example.org"),
+        ("AMY@example.org", "amy@example.org", "amy@example.org"),
+        ("Amy <amy@corp.test>", "amy", "a***@example.org"),
+    ],
+)
+def test_safe_display_name(label, query, expected):
+    assert safe_display_name(label, "amy@example.org", query) == expected

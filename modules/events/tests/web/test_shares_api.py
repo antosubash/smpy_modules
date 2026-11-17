@@ -256,3 +256,30 @@ async def test_filter_runs_before_the_limit(client):
     client.app.state.user_directory = Directory(users)
     cid = await make(client)
     assert [c["id"] for c in await _candidates(client, cid, "zed")] == ["real"]
+
+
+async def test_nameless_user_is_not_labelled_with_the_address(client):
+    """With no name the directory's label is the address; the response must not
+    carry it in ``display_name`` unless the query is that address."""
+    client.app.state.user_directory = Directory({"nn": ("nina@example.com", None, True)})
+    cid = await make(client)
+    got = await _candidates(client, cid, "nina@example.com")
+    assert got == [{"id": "nn", "display_name": "nina@example.com", "email": "nina@example.com"}]
+    # Matched by the exact address in another case: still the full address, as typed.
+    got = await _candidates(client, cid, "NINA@example.com")
+    assert got[0]["email"] == "nina@example.com"
+
+
+async def test_address_label_is_never_matched_by_part_of_it(client):
+    client.app.state.user_directory = Directory({"nn": ("nina@example.com", None, True)})
+    cid = await make(client)
+    assert await _candidates(client, cid, "nina") == []
+
+
+async def test_label_containing_an_at_sign_is_masked(client):
+    client.app.state.user_directory = Directory(
+        {"ww": ("ww@example.com", "Wanda <wanda@corp.example>", True)}
+    )
+    cid = await make(client)
+    got = await _candidates(client, cid, "wanda")
+    assert got == [{"id": "ww", "display_name": "w***@example.com", "email": "w***@example.com"}]

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["mask_email", "matches_query", "visible_email"]
+__all__ = ["mask_email", "matches_query", "safe_display_name", "visible_email"]
 
 _MASK = "***"
 
@@ -38,3 +38,11 @@ def matches_query(label: str, address: str, query: str) -> bool:
     if needle == address.lower():
         return True
     return bool(label) and label.lower() != address.lower() and needle in label.lower()
+
+
+def safe_display_name(label: str, address: str, query: str) -> str:
+    """The name to show: the user's label, unless that is (or contains) an
+    email address, which gets the same treatment as the address itself."""
+    if label.lower() == address.lower() or "@" in label:
+        return visible_email(address, query)
+    return label
