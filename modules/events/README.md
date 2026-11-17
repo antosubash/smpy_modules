@@ -79,8 +79,9 @@ Calendar responses carry `owner_name` (a string or `null`). An owner is named
 only when they are an active member of the bound organisation with a display
 name; anyone else, including an owner whose only label is an email address, is
 `null` and shown as "Unknown user". No address or part of one is shown outside
-the owner/manager-only picker. If the user directory fails, lists still load,
-with `null` owner names; the share picker and an ownership transfer still fail
+the owner/manager-only picker. If the user directory or the membership store fails
+(a failed query included), lists, reads and writes still succeed with `null`
+owner names; the share picker and an ownership transfer still fail
 rather than guess (no directory at all is a 503).
 
 A calendar name and every category name are single line: control characters,

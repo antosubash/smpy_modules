@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import text
 
 from tests.support.app import Directory
 from tests.support.calendars import BASE, EDITOR, MANAGER, OWNER, make
@@ -129,3 +130,42 @@ async def test_failing_directory_never_allows_an_ownership_transfer(client):
         await client.put(f"{BASE}/{cid}/owner", json={"owner_id": "e"}, headers=MANAGER)
     client.app.state.user_directory = Directory(USERS)
     assert (await client.get(f"{BASE}/{cid}", headers=OWNER)).json()["owner_id"] == "o"
+
+
+class _SqlFailing(Directory):
+    """A lookup whose statement fails on the session it is handed."""
+
+    async def get_many(self, db, ids, *, with_roles=False):
+        await db.execute(text("SELECT * FROM no_such_table_owner_lookup"))
+        return await super().get_many(db, ids, with_roles=with_roles)
+
+
+async def test_failed_sql_in_the_lookup_does_not_abort_the_list(client):
+    await make(client, EDITOR, name="Eves")
+    client.app.state.user_directory = _SqlFailing(USERS)
+    listed = await client.get(BASE, headers=EDITOR)
+    assert listed.status_code == 200
+    assert [r["owner_name"] for r in listed.json()] == [None]
+    client.app.state.user_directory = Directory(USERS)
+    assert (await client.get(BASE, headers=EDITOR)).json()[0]["owner_name"] == "Eve Editor"
+
+
+async def test_failed_sql_in_the_lookup_keeps_a_patched_name(client):
+    made = await make(client, EDITOR, name="Eves")
+    client.app.state.user_directory = _SqlFailing(USERS)
+    patched = await client.patch(f"{BASE}/{made['id']}", json={"name": "Renamed"}, headers=EDITOR)
+    assert (patched.status_code, patched.json()["owner_name"]) == (200, None)
+    client.app.state.user_directory = Directory(USERS)
+    got = await client.get(f"{BASE}/{made['id']}", headers=EDITOR)
+    assert got.json()["name"] == "Renamed"
+
+
+async def test_a_failed_lookup_logs_only_the_exception_class(client, caplog):
+    await make(client, EDITOR, name="Eves")
+    client.app.state.user_directory = _Raising(USERS)
+    with caplog.at_level("WARNING", logger="sm_events.web.services.owners"):
+        await client.get(BASE, headers=EDITOR)
+    records = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert records and all(r.exc_info is None for r in records)
+    assert "directory down" not in caplog.text
+    assert "RuntimeError" in caplog.text

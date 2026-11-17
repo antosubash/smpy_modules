@@ -41,8 +41,9 @@ calendar sees its owner's display name when the owner is an active member of the
 bound organisation with a display name. Anyone else (not a member, inactive,
 unknown, or an owner whose only label is an email address) is `null` and shown
 as "Unknown user"; no email address or part of one is ever shown outside the
-owner/manager-only picker. If the user directory (or the membership store)
-fails, lists, reads and writes still succeed with `null` owner names; the share
+owner/manager-only picker. If the user directory or the membership store
+fails, even with a failed SQL query, lists, reads and writes still succeed with
+`null` owner names (the lookup runs in a savepoint); the share
 picker and an ownership transfer still fail rather than guess (no directory at
 all is a 503).
 

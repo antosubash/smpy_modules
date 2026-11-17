@@ -34,13 +34,19 @@ async def owner_names(request: Request, db: Any, owner_ids: Iterable[str]) -> di
     directory = get_user_directory(request.app)
     if not ids or isinstance(directory, NullUserDirectory):
         return names
+    await db.flush()  # the caller's own pending write fails here, not as an owner-name failure
     try:
-        found = [
-            u for u in (await directory.get_many(db, ids)).values() if u.is_active and u.id in names
-        ]
-        members = await members_only(request, db, found)
+        async with db.begin_nested():  # a failed statement rolls back only this savepoint
+            found = [
+                u
+                for u in (await directory.get_many(db, ids)).values()
+                if u.is_active and u.id in names
+            ]
+            members = await members_only(request, db, found)
     except Exception as exc:  # names are decoration: a failing lookup must not fail the list
-        logger.warning("owner names unavailable: %s", type(exc).__name__, exc_info=exc)
+        # Class name only: a SQL error's text can carry bound parameters (user ids).
+        logger.warning("owner names unavailable: %s", type(exc).__name__)
+        logger.debug("owner names lookup failure", exc_info=exc)
         return dict.fromkeys(ids)
     for user in members:
         if not label_carries_address(user.label, user.email):
