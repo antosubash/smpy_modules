@@ -4,7 +4,7 @@
   "private": true,
   "description": "Frontend assets for the Billing module",
   "peerDependencies": {
-    "@inertiajs/react": "^3.9.1",
+    "@inertiajs/react": "^3.11.0",
     "@simple-module-py/ui": ">=0.0.38",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
