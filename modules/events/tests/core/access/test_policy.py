@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from simple_module_core.resources import ACTION_DELETE, ACTION_EDIT, ACTION_SHARE, ACTION_VIEW
 from sm_events.core.access import ACTION_WRITE_EVENTS, POLICY, visible_calendars
-from sm_events.core.access.rights import calendar_rights
+from sm_events.core.access.rights import calendar_rights, calendar_rights_many
 from sm_events.models import Calendar
 from sqlmodel import select
 
@@ -114,3 +114,19 @@ async def test_unknown_action_grants_nothing(db):
         .all()
     )
     assert rows == []
+
+
+@pytest.mark.parametrize("trash", [False, True])
+@pytest.mark.parametrize("name", list(TABLE))
+async def test_batch_rights_equal_single(db, name, trash):
+    uid, perms, *_ = TABLE[name]
+    who = principal(uid, *perms)
+    cals = list((await seed_calendars(db)).values())
+    batch = await calendar_rights_many(db, who, cals, include_deleted=trash)
+    assert set(batch) == {c.id for c in cals}
+    for cal in cals:
+        assert batch[cal.id] == await calendar_rights(db, who, cal, include_deleted=trash)
+
+
+async def test_batch_rights_of_nothing(db):
+    assert await calendar_rights_many(db, principal("o", V), []) == {}

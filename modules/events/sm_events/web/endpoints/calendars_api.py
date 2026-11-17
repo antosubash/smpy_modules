@@ -17,7 +17,7 @@ from simple_module_hosting.resource_deps import resource_principal
 
 from sm_events.calendar import calendars as service
 from sm_events.core.access import CalendarEdit, CalendarOwner, CalendarView
-from sm_events.core.access.rights import calendar_rights
+from sm_events.core.access.rights import CalendarRights, calendar_rights, calendar_rights_many
 from sm_events.core.constants import OWNER_NOT_ALLOWED_CODE, OWNER_NOT_ALLOWED_DETAIL
 from sm_events.core.errors import Invalid
 from sm_events.models import Calendar
@@ -36,8 +36,7 @@ router = APIRouter(prefix="/calendars", tags=["calendars"], dependencies=[requir
 Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
 
 
-async def out(db, who: ResourcePrincipal, cal: Calendar, *, trashed: bool = False) -> CalendarOut:
-    rights = await calendar_rights(db, who, cal, include_deleted=trashed)
+def _render(cal: Calendar, rights: CalendarRights) -> CalendarOut:
     return CalendarOut.model_validate(cal).model_copy(
         update={
             "can_edit": rights.edit_calendar,
@@ -48,12 +47,17 @@ async def out(db, who: ResourcePrincipal, cal: Calendar, *, trashed: bool = Fals
     )
 
 
+async def out(db, who: ResourcePrincipal, cal: Calendar, *, trashed: bool = False) -> CalendarOut:
+    return _render(cal, await calendar_rights(db, who, cal, include_deleted=trashed))
+
+
 @router.get("")
 async def list_calendars(
     who: Principal, db=Depends(get_db), trashed: bool = Query(False)
 ) -> list[CalendarOut]:
     rows = await service.list_calendars(db, who, trashed=trashed)
-    return [await out(db, who, row, trashed=trashed) for row in rows]
+    rights = await calendar_rights_many(db, who, rows, include_deleted=trashed)
+    return [_render(row, rights[row.id]) for row in rows]
 
 
 @router.post("", status_code=201, dependencies=[require_edit])
