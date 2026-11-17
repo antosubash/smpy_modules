@@ -143,9 +143,9 @@ Decisions:
 
 ## Access
 
-- **Permissions**: `events.view`, `events.edit`, `events.publish`,
-  `events.manage` (calendars, categories, settings, import, other people's
-  tokens).
+- **Permissions**: `events.view`, `events.edit` (also: create a calendar and
+  become its owner), `events.publish`, `events.manage` (every calendar,
+  ownership transfer, categories, settings, import, other people's tokens).
 - **Calendar visibility**: `private` (owner and shares), `internal` (every
   signed-in member of the tenant with `events.view`), `public` (also anonymous,
   published events only).
@@ -357,7 +357,7 @@ Migrations are in `host/migrations/versions/`, the first with
 | 1 | Scaffold, tenancy, settings, calendars with visibility and sharing, the Calendars screen, host migration, docs |
 | 2 | Events and texts, recurrence and overrides, the occurrences read, workflow, API, list and editor screens |
 | 3 | The `Calendar` component and the console calendar: views, create, drag, resize, grid timezone |
-| 4 | Public pages, public ICS, JSON-LD, sitemap, e2e spec |
+| 4 | Public pages (with calendar slug redirects), public ICS, JSON-LD, sitemap, e2e spec |
 | 5 | Private feed tokens and `.ics` upload |
 | 6 | The extension registry, plugin guide, the records date-field source |
 | 7 | Pagebuilder blocks and the newsletter card |

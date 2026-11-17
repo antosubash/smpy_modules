@@ -26,6 +26,16 @@
 - **`/admin/events/` redirects (303) to `/admin/events/calendars` until PR 3** replaces it with the Calendar view. The menu has two entries, Calendars (`events.view`) and Categories (`events.manage`).
 - **Settings in PR 1 are only what PR 1 reads:** `default_timezone` and `content_locales` (restart-only). `public_prefix` comes with PR 4, the reminder fields with PR 8, `import_max_bytes` with PR 5 and `subscription_refresh_minutes` with PR 10. As newsletter does, settings carry no validators (a class that does not construct is replaced with *all* defaults). `core.timezones.effective(name)` falls back to `"UTC"` for a stored name it does not know and logs one warning per name.
 
+## Rulings on the open points (2026-11-17)
+
+1. **Creating a calendar needs `events.edit`**, as ruled above. The spec's Access section now says so.
+2. **Owners and edit-share holders write events without `events.edit`**, as ruled above.
+3. **A calendar's slug can be renamed freely in PR 1.** Nothing public uses it yet. PR 4, which adds `/events/c/{calendar}`, also adds calendar slug redirects.
+4. **`events.manage` can transfer ownership.** Add `PUT /api/events/calendars/{id}/owner` to Task 7: `events.manage` only, body `{owner_id}`, the new owner must be an active member of the bound tenant (the same directory and membership check as the share picker in Task 8; 422 `owner_not_allowed` otherwise). The Calendars screen shows the action to managers only (Task 11).
+5. Newsletter's absence from the host test lists is a follow-up issue, not this PR.
+6. Re-check framework floors if #405 has landed.
+7. The duplicated share dialog goes upstream as a framework issue; copy images' here.
+
 ## Global Constraints
 
 - Machine load: run `~/.claude/bin/wait-for-headroom` before **every** pytest, vitest, tsc, alembic or `uv sync`/`npm install` run, and stop and report if it exits 1. Use `-n 8` (`PYTEST_WORKERS=8`) at most. Run **targeted tests only**, never `make test-py` or a full suite: `/ship` runs those once. Use `/usr/bin/ps`, never `ps`.
