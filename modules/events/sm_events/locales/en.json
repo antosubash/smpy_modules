@@ -1,1 +1,8 @@
-{"permission_group": "Events"}
+{
+  "permission_group": "Events",
+  "menu": {
+    "group": "Events",
+    "calendars": "Calendars",
+    "categories": "Categories"
+  }
+}

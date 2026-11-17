@@ -7,6 +7,7 @@ import importlib.resources
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
+from simple_module_core.menu import MenuRegistry
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.rate_limit import RateLimitRegistry, RateLimitRule
@@ -69,10 +70,17 @@ class EventsModule(ModuleBase):
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
         from simple_module_hosting.csrf import RequiresCsrf
 
-        from sm_events.web.endpoints import build_api_router
+        from sm_events.web.endpoints import build_api_router, views
 
         # The framework's CSRF check on every write; reads pass.
         api_router.include_router(build_api_router(), dependencies=[Depends(RequiresCsrf())])
+        view_router.include_router(views.router)
+
+    def register_menu_items(self, registry: MenuRegistry) -> None:
+        from sm_events.web.endpoints.menu import menu_items
+
+        for item in menu_items():
+            registry.add(item)
 
     def register_rate_limits(self, registry: RateLimitRegistry) -> None:
         """The share dialog's user picker, per signed-in user: it is a search of

@@ -57,3 +57,17 @@ CATEGORY_NAME_MAX = 100
 CATEGORIES_MAX = 500
 DEFAULT_LOCALE_REQUIRED_DETAIL = "A name in the default language is required"
 UNKNOWN_LOCALE_DETAIL = "That language is not one of the content locales"
+
+# Console pages and sidebar entries.
+_PAGE_CALENDARS = f"{MODULE_NAME}/Calendars"
+_PAGE_CATEGORIES = f"{MODULE_NAME}/Categories"
+CALENDARS_URL = f"{VIEW_PREFIX}/calendars"
+CATEGORIES_URL = f"{VIEW_PREFIX}/categories"
+MENU_GROUP = MODULE_NAME
+MENU_GROUP_KEY = "events.menu.group"
+MENU_LABEL_CALENDARS = "Calendars"
+MENU_LABEL_KEY_CALENDARS = "events.menu.calendars"
+MENU_ICON_CALENDARS = "calendar"
+MENU_LABEL_CATEGORIES = "Categories"
+MENU_LABEL_KEY_CATEGORIES = "events.menu.categories"
+MENU_ICON_CATEGORIES = "tag"
