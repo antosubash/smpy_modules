@@ -1,47 +1,108 @@
 # simple_module_events
 
-Calendars and events for SimpleModule hosts. Events are timezone-aware and can
-recur; calendars are owned, carry a visibility (`private`, `internal` or
-`public`) and can be shared with individual users through the framework's
-`sharing` module. Later releases add public pages, ICS feeds, reminders and
-registration. Design: `docs/superpowers/specs/2026-11-17-events-module-design.md`
-in the source repo; the guide is [`docs/index.md`](docs/index.md).
-
-**Status: PR 1 of 10.** The package, its permissions, DB-backed settings, the
-tenancy guard, the calendar access policy, calendars and categories (API and
-screens) and the tables for events exist. Events themselves arrive in PR 2.
+Owned calendars with private, internal or public visibility, calendar sharing
+and multilingual categories for SimpleModule hosts. This is **PR 1 of 10**:
+the calendar and category API and console screens are available. Events,
+recurrence, calendar grids, public pages and ICS feeds arrive in later PRs.
+The seven event tables are already created for PRs 1 and 2. See the
+[guide](docs/index.md) and the [approved design](../../docs/superpowers/specs/2026-11-17-events-module-design.md).
 
 ## Install
+
+Add `simple_module_events` to the consuming host's dependencies:
 
 ```bash
 pip install simple_module_events
 ```
 
-Add `simple_module_events` to your host's dependencies; for an in-repo
-checkout, resolve it from the workspace:
+The framework's `settings` and `sharing` modules must also be installed. The
+module is discovered through its `simple_module` entry point. In this repo,
+the workspace dependency and host wiring are already present:
 
-```toml
-[tool.uv.sources.simple_module_events]
-workspace = true
+```bash
+make install
+make migrate
 ```
 
-The module needs the framework's `settings` and `sharing` modules. Migrations
-live in the consuming host (`make migration`), never in the wheel: the host
-autogenerates its own revision against the module's `events_*` tables.
+For a different host, autogenerate and inspect its own migration:
+
+```bash
+make migration msg="add events"
+```
+
+Set `branch_labels = ("events",)` on its first events revision, inspect that
+it creates the seven `events_*` tables without dropping existing data, then
+run `make migrate`. Migrations belong to the host, never to this wheel. The
+label is a named target in the host's shared history; downgrading
+`events@base` does not remove only events' tables.
 
 ## Usage
 
-### Permissions
+Open `/admin/events/calendars` to create a calendar, edit its metadata, change
+visibility, share it, or move it to Trash and restore it. Calendar slugs may
+be renamed in this release. Creation needs `events.edit` and makes the caller
+the owner. Only `events.manage` holders see **Transfer ownership**; they pick
+an active member of the current tenant. The user picker searches after three
+characters and shows the server's masked email; an exact address search may
+return that address in full.
 
-| Permission | Allows |
+Open `/admin/events/categories` with `events.view` and `events.manage` to enter category names in each configured
+content language. The first language is required. Categories have an optional
+colour and a slug fixed at creation. Deletion leaves events uncategorised.
+`/admin/events/` redirects to Calendars until the calendar grid arrives.
+
+### API
+
+All paths below start with `/api/events`. Writes use the framework's session
+CSRF token (`X-CSRF-Token`); module errors use `{"detail","code"}`. FastAPI
+request-validation errors retain their ordinary 422 shape. Unknown or
+inaccessible calendars return the same 404. Calendars use last-write-wins
+metadata forms and have no `expected_revision`.
+
+| Method and path | Action / permission |
 | --- | --- |
-| `events.view` | See calendars and categories the policy lets you read |
-| `events.edit` | Create calendars (you become the owner) and write events on internal and public calendars |
-| `events.publish` | Publish events |
-| `events.manage` | Act on every calendar, manage categories, transfer ownership |
+| `GET /calendars?trashed=false` | List readable calendars; `events.view` |
+| `POST /calendars` | Create; `events.view` and `events.edit` |
+| `GET /calendars/{id}` | Read through the calendar policy; `events.view` |
+| `PATCH /calendars/{id}` | Edit metadata; owner, edit share or manager |
+| `PUT /calendars/{id}/visibility` | Set private/internal/public; owner or manager |
+| `PUT /calendars/{id}/owner` | Transfer with `{owner_id}`; manager, active tenant member only |
+| `DELETE /calendars/{id}` | Move to trash; owner or manager |
+| `POST /calendars/{id}/restore` | Restore; owner or manager |
+| `GET /calendars/{id}/share-candidates?q=…` | Find active members; owner or manager, three characters minimum |
+| `GET /categories` | List; `events.view` |
+| `POST /categories` | Create; `events.view` and `events.manage` |
+| `PATCH /categories/{id}` | Replace names or colour; `events.view` and `events.manage` |
+| `DELETE /categories/{id}` | Delete; `events.view` and `events.manage` |
+
+Every calendar API route also needs `events.view`. Grants, lists and revokes
+use the framework's `/api/sharing/shares` with
+`resource_type="events.calendar"`, the calendar UUID as `resource_id`, a user
+`subject_id` and role `view` or `edit`. The framework additionally requires
+`sharing.share`. The picker is owner-only even for someone with an edit share.
 
 ### Settings
 
-Settings are DB-backed (the framework's settings module), never environment
-variables. Configure them on the Settings screen or with
-`scripts/set_setting.py`: `default_timezone` and `content_locales` (restart).
+Configure **Events** on the Settings screen or with
+`scripts/set_setting.py`. Both fields are SYSTEM-scope and DB-backed; no
+`SM_EVENTS_*` environment variables are read.
+
+| Field | Default | Applies |
+| --- | --- | --- |
+| `default_timezone` | `UTC` | New calendars; unknown stored names fall back to UTC with a warning |
+| `content_locales` | `["en"]` | Category names; restart required |
+
+### Permissions and access
+
+`events.view` admits console readers; owners and share holders also need it.
+`private` calendars are readable by their owner and shares; `internal` and
+`public` calendars are readable by signed-in members with `events.view`.
+Only owners, edit shares and managers edit calendar metadata. Only owners
+and managers change visibility, share, trash or restore a calendar.
+`events.manage` bypasses calendar visibility within the bound tenant and
+manages categories and ownership. `events.publish` is reserved for event
+publishing in PR 2, combined with calendar write access; published event
+changes will be live. See the guide's [access table](docs/index.md#access).
+
+There are no public routes in PR 1. A public calendar's visibility prepares it
+for later public, published-event reads; it exposes no anonymous screen today.

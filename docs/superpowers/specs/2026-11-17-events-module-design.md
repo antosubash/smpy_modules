@@ -378,3 +378,14 @@ newsletter's); the FullCalendar major; e2e data seeding.
 
 - Which site uses this first. If staff will schedule meetings with it,
   invitations and RSVP move from Non-goals into a later PR.
+
+## Amendments (PR 1)
+
+The approved PR 1 rulings refine the scope above: `events.edit` creates a
+calendar owned by the caller. Owners and share holders still need
+`events.view`; without it the policy grants public view only. Visibility is
+stored as VARCHAR with Python constants, not a database enum. Calendar
+metadata uses last-write-wins forms without `expected_revision`; event writes
+retain that guard from PR 2. Categories (API and screen) ship in PR 1.
+`events.manage` alone authorises ownership transfer, to an active member of
+the bound tenant; the HTTP calendar API also requires `events.view`.

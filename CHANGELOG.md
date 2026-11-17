@@ -5,6 +5,13 @@ name the module they affect.
 
 ## 0.0.16 (unreleased)
 
+### Added
+
+- **events: a new module** (`simple_module_events`, #400): calendars with private,
+  internal and public visibility, shared through the sharing module, the
+  Calendars and Categories screens and their API. Hosts add the dependency
+  and run the `events` migration.
+
 ### Security
 
 - **pagebuilder's admin reads need a pagebuilder permission** (#346). Signing in
