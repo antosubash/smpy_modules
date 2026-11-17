@@ -6,6 +6,7 @@ import importlib.metadata
 import importlib.resources
 from pathlib import Path
 
+from fastapi import FastAPI
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
 
@@ -34,6 +35,34 @@ class EventsModule(ModuleBase):
         # ``register_settings`` hands it to the services container instead of
         # the pydantic defaults.
         self.settings = None
+
+    def register_settings(self, app: FastAPI) -> None:
+        from simple_module_core.module_settings import register_module_settings
+
+        from sm_events.core.services import EventsServices
+        from sm_events.core.settings import EventsSettings
+
+        register_module_settings(
+            app,
+            constants.PACKAGE,
+            EventsSettings,
+            lambda defaults: EventsServices(settings=self.settings or defaults),
+        )
+
+    def register_exception_handlers(self, app: FastAPI) -> None:
+        from sm_events.core.errors import install_exception_handlers
+
+        install_exception_handlers(app)
+
+    async def on_startup(self, app: FastAPI) -> None:
+        """The tenancy mode, read off the built middleware stack, and the
+        fail-closed guard on the framework's session class - as images does."""
+        from sm_events.core import tenancy
+
+        tenancy.configure(app)
+        db = getattr(getattr(app.state, "sm", None), "db", None)
+        if (session_class := getattr(db, "sync_session_class", None)) is not None:
+            tenancy.install_guard(session_class)
 
     def register_permissions(self, registry: PermissionRegistry) -> None:
         registry.add_group(

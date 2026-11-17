@@ -29,3 +29,26 @@ def test_meta():
     assert meta.route_prefix == "/api/events"
     assert meta.view_prefix == "/admin/events"
     assert set(meta.depends_on) == {"Settings", "Sharing"}
+
+
+async def test_on_startup_configures_tenancy_and_installs_the_guard(monkeypatch):
+    from types import SimpleNamespace
+
+    from sm_events.core import tenancy
+
+    calls: list[tuple[str, object]] = []
+    monkeypatch.setattr(tenancy, "configure", lambda app: calls.append(("configure", app)))
+    monkeypatch.setattr(tenancy, "install_guard", lambda cls: calls.append(("guard", cls)))
+    session_class = object()
+    app = SimpleNamespace(
+        state=SimpleNamespace(
+            sm=SimpleNamespace(db=SimpleNamespace(sync_session_class=session_class))
+        )
+    )
+    await EventsModule().on_startup(app)
+    assert calls == [("configure", app), ("guard", session_class)]
+
+    calls.clear()
+    bare = SimpleNamespace(state=SimpleNamespace())
+    await EventsModule().on_startup(bare)
+    assert calls == [("configure", bare)]
