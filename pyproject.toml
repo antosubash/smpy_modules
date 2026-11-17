@@ -133,6 +133,7 @@ testpaths = [
     "modules/ai/tests",
     "modules/analytics/tests",
     "modules/billing/tests",
+    "modules/events/tests",
     "modules/images/tests",
     "modules/news/tests",
     "modules/newsletter/tests",
