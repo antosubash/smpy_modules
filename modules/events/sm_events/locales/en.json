@@ -3,7 +3,7 @@
   "menu": {
     "group": "Events",
     "calendars": "Calendars",
-    "categories": "Categories"
+    "categories": "Event categories"
   },
   "share": {
     "button": "Share",

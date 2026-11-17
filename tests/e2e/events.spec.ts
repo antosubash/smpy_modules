@@ -62,12 +62,12 @@ test('the sidebar lists Events with Calendars and Categories, and /admin/events/
   await expect(page.getByRole('heading', { name: 'Calendars', level: 1 })).toBeVisible();
   const sidebar = page.locator('aside');
   await expect(sidebar.getByText('Events', { exact: true }).first()).toBeVisible();
-  // News also has a "Categories" entry, so the links are told apart by target.
+  // Named apart from News' "Categories", which news-admin.spec.ts finds by name.
   await expect(
     sidebar.locator(`a[href="${CALENDARS}"]`).getByText('Calendars', { exact: true }),
   ).toBeVisible();
   await expect(
-    sidebar.locator(`a[href="${CATEGORIES}"]`).getByText('Categories', { exact: true }),
+    sidebar.locator(`a[href="${CATEGORIES}"]`).getByText('Event categories', { exact: true }),
   ).toBeVisible();
 });
 
