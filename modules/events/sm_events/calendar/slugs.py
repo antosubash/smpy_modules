@@ -27,13 +27,30 @@ async def slug_write(db: Any, constraint: str) -> AsyncIterator[None]:
             yield
             await db.flush()
     except IntegrityError as exc:
-        message = str(exc.orig)
-        # SQLite names the columns, Postgres names the unique constraint.
-        table = constraint.removeprefix("uq_").removesuffix("_tenant_slug")
-        sqlite_unique = f"UNIQUE constraint failed: {table}.tenant_id, {table}.slug"
-        if f'unique constraint "{constraint}"' not in message and message != sqlite_unique:
+        if not _is_slug_conflict(exc, constraint):
             raise
         raise SlugTaken from exc
+
+
+_UNIQUE_VIOLATION = "23505"
+
+
+def _is_slug_conflict(exc: IntegrityError, constraint: str) -> bool:
+    """Postgres: sqlstate ``23505`` on the expected constraint, read from the
+    driver's error (SQLAlchemy's asyncpg adapter raises its own as ``orig`` and
+    chains asyncpg's as ``__cause__``), never from message text, which the
+    server may localise. SQLite has no such fields: the full message is compared."""
+    orig = exc.orig
+    chain = [orig, getattr(orig, "__cause__", None)]
+    if any(
+        getattr(e, "sqlstate", None) == _UNIQUE_VIOLATION
+        and getattr(e, "constraint_name", None) == constraint
+        for e in chain
+        if e is not None
+    ):
+        return True
+    table = constraint.removeprefix("uq_").removesuffix("_tenant_slug")
+    return str(orig) == f"UNIQUE constraint failed: {table}.tenant_id, {table}.slug"
 
 
 def slugify(text: str) -> str:

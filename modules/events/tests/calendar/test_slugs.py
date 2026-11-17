@@ -38,10 +38,6 @@ async def test_slug_write_propagates_not_null_failure_and_keeps_session_usable(d
 @pytest.mark.parametrize(
     ("message", "error"),
     [
-        (
-            'duplicate key value violates unique constraint "uq_events_calendar_tenant_slug"',
-            SlugTaken,
-        ),
         ("UNIQUE constraint failed: events_calendar.tenant_id, events_calendar.slug", SlugTaken),
         (
             'null value in column "owner_id" of relation "events_calendar" '
@@ -65,6 +61,62 @@ async def test_slug_write_matches_only_its_unique_constraint(message, error):
             raise failure
     if error is IntegrityError:
         assert caught.value is failure
+
+
+class FakeDriverError(Exception):
+    def __init__(self, message, sqlstate=None, constraint_name=None):
+        super().__init__(message)
+        self.sqlstate = sqlstate
+        self.constraint_name = constraint_name
+
+
+def _wrapped(driver_error, *, adapter_sqlstate=None):
+    """SQLAlchemy's asyncpg adapter: ``orig`` is its own error, the driver's is ``__cause__``."""
+    adapter = Exception(f"<class 'asyncpg'>: {driver_error}")
+    adapter.sqlstate = adapter_sqlstate  # type: ignore[attr-defined]
+    adapter.__cause__ = driver_error
+    return IntegrityError("INSERT", {}, adapter)
+
+
+@pytest.mark.parametrize(
+    ("driver_error", "error"),
+    [
+        (FakeDriverError("x", "23505", CALENDAR_SLUG_CONSTRAINT), SlugTaken),
+        # A localised message: only the structured fields decide.
+        (FakeDriverError("doppelter Schluessel", "23505", CALENDAR_SLUG_CONSTRAINT), SlugTaken),
+        (FakeDriverError("x", "23505", "uq_events_category_tenant_slug"), IntegrityError),
+        (FakeDriverError("x", "23505", None), IntegrityError),
+        (
+            FakeDriverError(
+                f'duplicate key value violates unique constraint "{CALENDAR_SLUG_CONSTRAINT}"',
+                "23503",
+                CALENDAR_SLUG_CONSTRAINT,
+            ),
+            IntegrityError,
+        ),
+        (
+            FakeDriverError(f'unique constraint "{CALENDAR_SLUG_CONSTRAINT}"', "23502", "other"),
+            IntegrityError,
+        ),
+    ],
+)
+async def test_slug_write_classifies_postgres_by_sqlstate_and_constraint(driver_error, error):
+    db = SimpleNamespace(begin_nested=nullcontext)
+    failure = _wrapped(driver_error, adapter_sqlstate=driver_error.sqlstate)
+    with pytest.raises(error) as caught:
+        async with slug_write(db, CALENDAR_SLUG_CONSTRAINT):
+            raise failure
+    if error is IntegrityError:
+        assert caught.value is failure
+
+
+async def test_postgres_message_text_alone_is_not_enough():
+    db = SimpleNamespace(begin_nested=nullcontext)
+    message = f'duplicate key value violates unique constraint "{CALENDAR_SLUG_CONSTRAINT}"'
+    failure = IntegrityError("INSERT", {}, Exception(message))
+    with pytest.raises(IntegrityError):
+        async with slug_write(db, CALENDAR_SLUG_CONSTRAINT):
+            raise failure
 
 
 async def test_real_unique_violation_becomes_slug_taken_and_session_survives(db):
