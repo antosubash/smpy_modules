@@ -57,6 +57,7 @@ export function OwnerDialog({
         if (!pending) {
           setOpen(next);
           setQuery('');
+          setError(null);
           setSelected(null);
           setError(null);
         }

@@ -41,6 +41,9 @@ export function useShares(calendarId: string, open: boolean, onGone?: () => void
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const search = useCandidates(calendarId, open, query, onGone);
+  useEffect(() => {
+    if (!open) setQuery('');
+  }, [open]);
 
   const generation = useRef(0);
   const refresh = useCallback(async () => {

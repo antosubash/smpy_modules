@@ -104,6 +104,9 @@ it('edits names and colour without attempting to rename the immutable slug', asy
   await flush();
   await click(button('Edit'));
   expect(field('category-slug').hasAttribute('readonly')).toBe(true);
+  const label = document.querySelector('label[for="category-slug"]')?.textContent;
+  expect(label).toBe('Slug');
+  expect(document.body.textContent).toContain('Cannot be changed');
   await setValue(field('category-name-de'), 'Klänge');
   await submit();
   expect(calls.find((c) => c.method === 'PATCH')?.body).toEqual({

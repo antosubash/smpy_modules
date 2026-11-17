@@ -25,6 +25,8 @@ async function whereIs(id: string): Promise<'active' | 'trash' | null> {
 
 /** A long unbroken name must wrap inside the cell, not widen the table. */
 const WRAP = 'max-w-xs whitespace-normal [overflow-wrap:anywhere]';
+/** The name cell keeps a readable width instead of collapsing to one letter per line. */
+const NAME = `min-w-48 ${WRAP}`;
 
 export function CalendarRow({
   calendar,
@@ -78,7 +80,7 @@ export function CalendarRow({
   }
   return (
     <TableRow>
-      <TableCell className={WRAP}>
+      <TableCell className={NAME}>
         <span
           aria-hidden="true"
           className="mr-2 inline-block size-3 rounded-full border"
@@ -101,7 +103,7 @@ export function CalendarRow({
         )}
       </TableCell>
       <TableCell>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-2 whitespace-nowrap">
           {trashed ? (
             calendar.can_own && (
               <Button

@@ -55,34 +55,36 @@ export default function Calendars({ can_create, can_manage, user_id, default_tim
             </p>
           )}
           {list.loading && <p role="status">{t(keys.events.common.loading)}</p>}
-          <Table aria-label={t(copy.title)}>
-            <TableHeader>
-              <TableRow>
-                {[
-                  copy.name,
-                  copy.col_slug,
-                  copy.visibility,
-                  copy.timezone,
-                  copy.owner,
-                  copy.actions,
-                ].map((key) => (
-                  <TableHead key={key}>{t(key)}</TableHead>
+          <div className="max-w-full overflow-x-auto">
+            <Table aria-label={t(copy.title)}>
+              <TableHeader>
+                <TableRow>
+                  {[
+                    copy.name,
+                    copy.col_slug,
+                    copy.visibility,
+                    copy.timezone,
+                    copy.owner,
+                    copy.actions,
+                  ].map((key) => (
+                    <TableHead key={key}>{t(key)}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {list.items.map((calendar) => (
+                  <CalendarRow
+                    key={calendar.id}
+                    calendar={calendar}
+                    userId={user_id}
+                    canManage={can_manage}
+                    trashed={list.trashed}
+                    onSaved={list.reload}
+                  />
                 ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {list.items.map((calendar) => (
-                <CalendarRow
-                  key={calendar.id}
-                  calendar={calendar}
-                  userId={user_id}
-                  canManage={can_manage}
-                  trashed={list.trashed}
-                  onSaved={list.reload}
-                />
-              ))}
-            </TableBody>
-          </Table>
+              </TableBody>
+            </Table>
+          </div>
           {!list.loading && !list.error && list.items.length === 0 && <p>{t(copy.empty)}</p>}
         </div>
       </PageShell>

@@ -142,19 +142,25 @@ function CategoryForm({
         })}
         <FieldError id="category-names" message={errors.fields.names} />
         <div className="grid gap-2">
-          <Label htmlFor="category-slug">{t(copy.slug)}</Label>
+          <Label htmlFor="category-slug">{t(category ? copy.slug_fixed : copy.slug)}</Label>
           <Input
             id="category-slug"
             readOnly={!!category}
             maxLength={80}
             pattern="[a-z0-9]+(-[a-z0-9]+)*"
             value={slug}
+            aria-describedby={category ? 'category-slug-hint' : undefined}
             {...invalidProps('category-slug', errors.fields.slug)}
             onChange={(e) => {
               setSlug(e.target.value);
               errors.clearField('slug');
             }}
           />
+          {category && (
+            <p id="category-slug-hint" className="text-xs text-muted-foreground">
+              {t(copy.slug_fixed_hint)}
+            </p>
+          )}
           <FieldError id="category-slug" message={errors.fields.slug} />
         </div>
         <div className="grid gap-2">

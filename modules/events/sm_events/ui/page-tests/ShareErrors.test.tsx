@@ -93,6 +93,45 @@ describe('picker rate limit', () => {
   });
 });
 
+describe('reopening a dialog', () => {
+  it('shows no rate-limit message before a new search (share and transfer)', async () => {
+    stubFetch({ [`GET ${SHARES}`]: [], [`GET ${CANDIDATES}`]: limited(7) });
+    const view = await mount(<ShareDialog calendarId="c1" calendarName="Team" />);
+    await click(view.find('[data-testid="events-share"]'));
+    await flush(300);
+    const input = document.querySelector<HTMLInputElement>('#events-share-search');
+    if (!input) throw new Error('no input');
+    await setValue(input, 'sam');
+    await flush(300);
+    expect(dialog()).toContain('Too many searches');
+    await click(document.querySelector('[role="dialog"] button:last-of-type'));
+    await flush(300);
+    await click(view.find('[data-testid="events-share"]'));
+    await flush(300);
+    expect(dialog()).not.toContain('Too many searches');
+    expect(document.querySelector<HTMLInputElement>('#events-share-search')?.value).toBe('');
+    await view.unmount();
+  });
+  it('clears the transfer dialog on reopen', async () => {
+    stubFetch({ [`GET ${CANDIDATES}`]: limited(3) });
+    const view = await mount(<OwnerDialog calendarId="c1" calendarName="Team" onSaved={vi.fn()} />);
+    await click(view.button('Transfer ownership'));
+    const input = document.querySelector<HTMLInputElement>('#owner-search');
+    if (!input) throw new Error('no input');
+    await setValue(input, 'sam');
+    await flush(300);
+    expect(dialog()).toContain('Try again in 3 seconds.');
+    await click(
+      view.button('Cancel') ?? document.querySelector('[role="dialog"] button:last-of-type'),
+    );
+    await flush(300);
+    await click(view.button('Transfer ownership'));
+    await flush(300);
+    expect(dialog()).not.toContain('Try again');
+    await view.unmount();
+  });
+});
+
 describe('calendar gone', () => {
   it('shows "no longer exists", not "Not shared yet", and refreshes the list', async () => {
     const onGone = vi.fn();
