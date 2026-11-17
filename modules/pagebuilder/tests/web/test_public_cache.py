@@ -135,10 +135,8 @@ async def test_a_304_carries_no_content_security_policy(authed_client: AsyncClie
     ``public_csp`` on a 304 would sit beside that policy and block them all.
     """
     await _publish(authed_client)
-    settings = authed_client._transport.app.state.pagebuilder.settings  # type: ignore[attr-defined]
-    settings.public_csp = "frame-ancestors 'none'"
     first = await authed_client.get("/p/hello", headers=_ANON)
-    assert first.headers["Content-Security-Policy"] == "frame-ancestors 'none'"
+    assert "frame-ancestors 'none'" in first.headers.get_list("content-security-policy")
     again = await authed_client.get(
         "/p/hello", headers={**_ANON, "If-None-Match": first.headers["ETag"]}
     )

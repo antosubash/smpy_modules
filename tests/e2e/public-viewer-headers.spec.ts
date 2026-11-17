@@ -47,12 +47,13 @@ test.describe('Public viewer headers', () => {
     expect(anonymous.headers().vary).toMatch(/Accept-Language/);
     await anon.close();
 
-    // The app's own CSP covers a published page (pagebuilder's `public_csp` is
-    // empty by default and would only sit beside it), so assert the baseline
-    // restrictive directive is present.
+    // Two policies are enforced together: the app's (nonce-based, `default-src 'self'`)
+    // and pagebuilder's `public_csp`, which forbids framing by default. Playwright
+    // joins a repeated header with ", ", so assert on the combined value.
     const csp = headers['content-security-policy'];
     expect(csp, 'CSP header missing').toBeTruthy();
     expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("frame-ancestors 'none'");
 
     // Cleanup.
     // Teardown deletes through the table, so ask for it —

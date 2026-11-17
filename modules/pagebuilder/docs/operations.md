@@ -101,7 +101,7 @@ Settings screen says so. Everything else is read per request and applies on save
 | `snapshot_root` | `var/pagebuilder/snapshots` | Snapshots and their shared blob store; anchored like `media_root` |
 | `snapshot_max_upload_bytes` | `209715200` | 200 MB per uploaded bundle |
 | `snapshot_max_extracted_bytes` | `1073741824` | 1 GB expanded; guards against zip bombs |
-| `public_csp` | empty | An additional `Content-Security-Policy` on public pages, enforced beside the app's own; empty sends none |
+| `public_csp` | `frame-ancestors 'none'` | An additional `Content-Security-Policy` on public pages, enforced beside the app's own; empty sends none |
 | `public_cache_max_age` | `60` | `max-age` on public pages |
 | `public_cache_swr` | `600` | `stale-while-revalidate`; `0` omits it |
 | `public_base_url` | — | e.g. `https://example.com`, no trailing slash. Base for canonical, `og:url`, `og:image`, `hreflang`, the sitemap and `robots.txt`'s `Sitemap:` line. **Required in production on a single-tenant host** (blank falls back to the host's own `public_base_url`; see [Public origin](#public-origin)); leave blank on a multi-tenant host, where each organisation's site is its own host. |
@@ -114,12 +114,15 @@ Settings screen says so. Everything else is read per request and applies on save
 | `scheduler_enabled` ● | `true` | In-process scheduler; safe in every process (each page is claimed before it flips), turn off if you'd rather an external worker called `PagesService.process_due` |
 | `scheduler_interval_seconds` ● | `30` | Tick interval |
 
-`public_csp` is empty by default: the app's nonce-based policy already covers
-public pages. A value you set is sent in addition to it (framework 0.0.45+), and
-the browser enforces both, so it can only restrict further. It is static, so it
-cannot carry the per-request nonce: a policy with a `script-src` that omits the
+`public_csp` defaults to `frame-ancestors 'none'`: the app's nonce-based policy
+already covers scripts, styles and fonts on public pages, and its own
+`frame-ancestors` is `'self'`, so this keeps public pages from being framed even
+by the same origin. It is sent in addition to the app policy (framework 0.0.45+)
+and the browser enforces both, so it can only restrict further. It is static, so
+it cannot carry the per-request nonce: a policy with a `script-src` that omits the
 nonce blocks the host's own scripts. Restrict only what the app policy allows and
-you do not want (`frame-ancestors`, `form-action`, `img-src`).
+you do not want (`frame-ancestors`, `form-action`, `img-src`). Set it empty to send
+no header of its own, e.g. to frame a public page from your own site.
 
 ## Adding languages
 
@@ -169,7 +172,7 @@ A published page response carries:
 | `Cache-Control` | `public, max-age=<public_cache_max_age>, stale-while-revalidate=<public_cache_swr>` |
 | `Vary` | `X-Inertia`, `Cookie`, `Accept-Language`, plus the tenant headers on a multi-tenant host, plus `Host` while `public_base_url` is blank |
 | `Content-Language` | the page's locale |
-| `Content-Security-Policy` | `public_csp`, only when set (empty by default), beside the app's own policy; never on a 304, which the browser merges into the cached page (#322) |
+| `Content-Security-Policy` | `public_csp` (`frame-ancestors 'none'` by default; empty sends none), beside the app's own policy; never on a 304, which the browser merges into the cached page (#322) |
 
 Because the nav list is in the ETag, publishing or renaming a page flagged for
 the header changes every other page's tag too. Media is served

@@ -158,7 +158,7 @@ async def render_public_page(
         response.headers["Content-Language"] = page.locale
         # Not on a 304: the browser merges it into the cached response, whose
         # scripts carry the nonce of the policy they were served with (#322).
-        if settings.public_csp and response.status_code != 304:
+        if settings.public_csp.strip() and response.status_code != 304:
             response.headers["Content-Security-Policy"] = settings.public_csp
         return response
 

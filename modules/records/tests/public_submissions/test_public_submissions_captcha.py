@@ -136,6 +136,7 @@ def test_the_csp_warning_names_the_missing_host():
     allowed = "script-src 'self' https://challenges.cloudflare.com"
     assert captcha.csp_warning(app(allowed), on) is None
     assert captcha.csp_warning(app(None), on) is None, "no pagebuilder, no CSP to check"
+    assert captcha.csp_warning(app("frame-ancestors 'none'"), on) is None, "cannot block it"
     assert captcha.csp_warning(app("script-src 'self'"), RecordsSettings()) is None
 
 

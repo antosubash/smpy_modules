@@ -33,14 +33,16 @@ async def test_head_published_and_conditional(
     bilingual_client: AsyncClient, locale: str, prefix: str, headers: dict
 ) -> None:
     await _publish(bilingual_client, locale)
-    # Empty by default; set one so HEAD is checked to carry it like GET.
-    settings = bilingual_client._transport.app.state.pagebuilder.settings  # type: ignore[attr-defined]
-    settings.public_csp = "frame-ancestors 'none'"
+    # The default policy: HEAD must carry it like GET.
     url = f"{prefix}/hello"
     get = await bilingual_client.get(url, headers=headers)
     head = await bilingual_client.head(url, headers=headers)
     assert head.status_code == get.status_code == 200
     assert head.content == b""
+    assert head.headers.get_list("content-security-policy") == get.headers.get_list(
+        "content-security-policy"
+    )
+    assert "frame-ancestors 'none'" in head.headers.get_list("content-security-policy")
     for name in (
         "etag",
         "cache-control",

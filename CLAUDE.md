@@ -100,8 +100,10 @@ framework marks `deprecated_module`.
 policy** (the browser enforces both; framework #870): a module's policy can only
 restrict further, and being static it cannot carry the per-request nonce, so a
 script a module policy's `script-src` does not allow is blocked whatever the app
-allows. pagebuilder's and news' `public_csp` therefore default to empty (no second
-header); set one only to restrict something the app policy allows.
+allows. news' `public_csp` therefore defaults to empty (no second header), and
+pagebuilder's to `frame-ancestors 'none'` alone (no `script-src`, so it cannot clash
+with the nonce policy; the app's own is `'self'`, so public pages are not framed
+even by the same origin). Set one only to restrict something the app policy allows.
 **Since 0.0.43 the production CSP is nonce-based** (`'nonce-…' 'strict-dynamic'`,
 no `unsafe-inline` or `unsafe-eval`): an executable `<script>` in a template needs
 `nonce="{{ request.state.csp_nonce }}"`, and `eval`/`new Function` no longer run.
