@@ -32,7 +32,16 @@ function statusClasses(o: Occurrence, pending: boolean): string | undefined {
   return names.length ? names.join(' ') : undefined;
 }
 
-export function toEventInput(o: Occurrence, editing: CalendarEditing | undefined): EventInput {
+/** Where the user dropped an occurrence while its write is in flight, in a change's
+ *  encoding (instants, or dates with an exclusive end). Rebuilding the events for a pending
+ *  mark must not snap the occurrence back to where the server still has it. */
+export type Placement = { start: string; end: string };
+
+export function toEventInput(
+  o: Occurrence,
+  editing: CalendarEditing | undefined,
+  placement?: Placement,
+): EventInput {
   const pending = Boolean(editing?.pendingKeys.has(o.key));
   const movable = Boolean(editing) && o.editable && o.status !== 'cancelled' && !pending;
   return {
@@ -40,8 +49,8 @@ export function toEventInput(o: Occurrence, editing: CalendarEditing | undefined
     title: o.title,
     allDay: o.all_day,
     // An all-day occurrence is dates, which FullCalendar never shifts by a zone.
-    start: o.all_day ? (o.start_date ?? o.start) : o.start,
-    end: o.all_day ? (o.end_date ?? o.end) : o.end,
+    start: placement?.start ?? (o.all_day ? (o.start_date ?? o.start) : o.start),
+    end: placement?.end ?? (o.all_day ? (o.end_date ?? o.end) : o.end),
     color: o.color,
     interactive: true,
     startEditable: movable,
@@ -56,7 +65,8 @@ export function toEventInput(o: Occurrence, editing: CalendarEditing | undefined
 export const occurrenceOf = (event: { extendedProps: Record<string, unknown> }): Occurrence =>
   event.extendedProps.occurrence as Occurrence;
 
-type Edited = {
+/** What an edited `EventApi` reports (the library's own type satisfies it). */
+export type EditedEvent = {
   start: Date | null;
   end: Date | null;
   allDay: boolean;
@@ -73,7 +83,7 @@ const day = (text: string): string => text.slice(0, 10);
 export function toChange(
   kind: 'move' | 'resize',
   occurrence: Occurrence,
-  edited: Edited,
+  edited: EditedEvent,
 ): OccurrenceChange {
   if (edited.allDay) {
     const start = day(edited.startStr);

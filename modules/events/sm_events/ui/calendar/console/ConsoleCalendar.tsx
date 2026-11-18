@@ -1,17 +1,25 @@
 /** The console's `Calendar`: the occurrence fetcher over the events API, the content language
- *  titles are asked in, and the filter options. (Editing joins it in the write layer.) */
-import { useCallback, useMemo } from 'react';
+ *  titles are asked in, the filter options and the write layer (drag, resize, dialogs). */
+import { useCallback, useMemo, useState } from 'react';
 import { listOccurrences } from '../../utils/api-events';
 import { keys, useT } from '../../utils/i18n';
 import type { Category } from '../../utils/types';
 import { Calendar } from '../Calendar';
-import type { CalendarInfo, CalendarState, FilterOption, OccurrenceFetcher } from '../types';
+import type {
+  CalendarEditing,
+  CalendarInfo,
+  CalendarState,
+  FilterOption,
+  OccurrenceFetcher,
+} from '../types';
+import { useCalendarWrites } from './useCalendarWrites';
 
 type Props = {
   calendars: CalendarInfo[];
   categories: Category[];
   defaultTimezone: string;
   contentLocales: string[];
+  editorUrl: string;
   initialState?: Partial<CalendarState>;
   onStateChange?: (state: CalendarState) => void;
 };
@@ -27,6 +35,7 @@ export function ConsoleCalendar({
   categories,
   defaultTimezone,
   contentLocales,
+  editorUrl,
   initialState,
   onStateChange,
 }: Props) {
@@ -57,15 +66,34 @@ export function ConsoleCalendar({
     [categories, requested],
   );
   const types = useMemo(() => [{ id: 'event', label: t(keys.events.calendar.type_event) }], [t]);
+  // A write refetches the range it changed.
+  const [refresh, setRefresh] = useState(0);
+  const invalidate = useCallback(() => setRefresh((n) => n + 1), []);
+  const writes = useCalendarWrites({ invalidate, editorUrl });
+  const editing = useMemo<CalendarEditing>(
+    () => ({
+      canCreate: false,
+      onCreate: () => {},
+      onChange: writes.onChange,
+      onMove: () => {},
+      pendingKeys: writes.pendingKeys,
+    }),
+    [writes.onChange, writes.pendingKeys],
+  );
   return (
-    <Calendar
-      fetchOccurrences={fetchOccurrences}
-      calendars={calendars}
-      categories={options}
-      types={types}
-      defaultTimezone={defaultTimezone}
-      initialState={initialState}
-      onStateChange={onStateChange}
-    />
+    <>
+      <Calendar
+        fetchOccurrences={fetchOccurrences}
+        calendars={calendars}
+        categories={options}
+        types={types}
+        defaultTimezone={defaultTimezone}
+        initialState={initialState}
+        onStateChange={onStateChange}
+        editing={editing}
+        refreshToken={refresh}
+      />
+      {writes.dialogs}
+    </>
   );
 }

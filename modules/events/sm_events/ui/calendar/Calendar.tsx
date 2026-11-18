@@ -111,7 +111,7 @@ export function Calendar(props: CalendarProps) {
           variant="outline"
           onClick={() => {
             close();
-            editing.onMove(selectedOccurrence);
+            editing.onMove(selectedOccurrence, selected?.element);
           }}
         >
           {t(copy.detail.move)}
