@@ -13,6 +13,7 @@ EVENTS_TABLES = {
     "events_category",
     "events_revision",
     "events_redirect",
+    "events_calendar_redirect",
 }
 
 

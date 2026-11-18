@@ -21,6 +21,7 @@ __all__ = [
     "check_not_reserved",
     "free_slug",
     "free_text_slug",
+    "is_slug_conflict",
     "slug_taken",
     "slug_write",
     "slugify",
@@ -38,7 +39,7 @@ async def slug_write(db: Any, constraint: str) -> AsyncIterator[None]:
             yield
             await db.flush()
     except IntegrityError as exc:
-        if not _is_slug_conflict(exc, constraint):
+        if not is_slug_conflict(exc, constraint):
             raise
         raise SlugTaken from exc
 
@@ -46,7 +47,7 @@ async def slug_write(db: Any, constraint: str) -> AsyncIterator[None]:
 _UNIQUE_VIOLATION = "23505"
 
 
-def _is_slug_conflict(exc: IntegrityError, constraint: str) -> bool:
+def is_slug_conflict(exc: IntegrityError, constraint: str) -> bool:
     """Postgres: sqlstate ``23505`` on the expected constraint, read from the
     driver's error (SQLAlchemy's asyncpg adapter raises its own as ``orig`` and
     chains asyncpg's as ``__cause__``), never from message text, which the

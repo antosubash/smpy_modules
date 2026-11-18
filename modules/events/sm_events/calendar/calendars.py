@@ -18,6 +18,7 @@ from sm_events.calendar.slugs import (
     slug_write,
     slugify,
 )
+from sm_events.content import calendar_redirects
 from sm_events.core import constants, timezones
 from sm_events.core.access import POLICY, visible_calendars
 from sm_events.core.errors import Forbidden, NotFound, SlugTaken
@@ -68,6 +69,8 @@ async def create_calendar(
     )
     async with slug_write(db, CALENDAR_SLUG_CONSTRAINT):
         db.add(row)
+        # Whoever holds a slug wins over an old link to it.
+        await calendar_redirects.release_slug(db, row.slug)
     return row
 
 
@@ -83,9 +86,18 @@ async def update_calendar(db: Any, cal: Calendar, data: CalendarPatch) -> Calend
         and await slug_taken(db, Calendar, new_slug, except_id=cal.id)
     ):
         raise SlugTaken
+    old_slug = cal.slug
     async with slug_write(db, CALENDAR_SLUG_CONSTRAINT):
         for name, value in fields.items():
             setattr(cal, name, value)
+        if new_slug is not None and new_slug != old_slug:
+            # The calendar's own unique key is settled first: losing that race is a
+            # ``SlugTaken`` before any redirect is written.
+            await db.flush()
+            # Renaming back removes the redirect on the slug now held; the old one
+            # redirects to this calendar, so a bookmark or a subscription survives.
+            await calendar_redirects.release_slug(db, new_slug)
+            await calendar_redirects.record_rename(db, calendar_id=cal.id, old_slug=old_slug)
     return cal
 
 
