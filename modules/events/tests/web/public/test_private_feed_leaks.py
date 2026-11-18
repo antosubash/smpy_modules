@@ -45,6 +45,7 @@ CASES = [
     "view_lost",
     "calendar_trashed",
     "wrong_host_tenant",
+    "upstream_tenant_differs",
 ]
 
 
@@ -89,6 +90,10 @@ async def _break(http, world, case: str, members) -> dict[str, str]:
                 ).scalar_one()
                 cal.is_deleted = True
                 await db.commit()
+    elif case == "upstream_tenant_differs":
+        # A single-tenant host where something upstream resolved another tenant: the shortcut
+        # that makes everyone a member is off, and with no membership store nobody is.
+        return {"X-Test-Tenant": "elsewhere"}
     elif case == "wrong_host_tenant":
         return {"X-Test-Tenant": "elsewhere", "X-Test-Tenant-Source": "subdomain"}
     return {}
@@ -111,6 +116,8 @@ async def test_deny_matrix_byte_identical(matrix, case):
     http, world, members, multi = matrix
     if case == "not_member" and not multi:
         pytest.skip("a single-tenant host has no memberships")
+    if case == "upstream_tenant_differs" and multi:
+        pytest.skip("on a multi-tenant host a visitor's tenant proves nothing (see cross-tenant)")
     baseline = fingerprint(await http.get(feed_path(invented("U"))))
     assert baseline[0] == 404 and baseline[1] == constants.PRIVATE_FEED_ERROR_BODY
     if case == "malformed":
@@ -146,6 +153,8 @@ async def test_deny_respects_floor(matrix, monkeypatch, case):
     http, world, members, multi = matrix
     if case == "not_member" and not multi:
         pytest.skip("a single-tenant host has no memberships")
+    if case == "upstream_tenant_differs" and multi:
+        pytest.skip("single-tenant only")
     monkeypatch.setattr(constants, "FEED_DENY_FLOOR_SECONDS", 0.05)
     headers = await _break(http, world, case, members)
     for path in (world.path, feed_path(invented("W")), feed_path("nope")):
@@ -267,3 +276,31 @@ async def test_access_is_decided_per_request_and_not_cached(monkeypatch):
         # Another link of the same user, in the same calendar, behaves the same.
         second = await mint(http, world.cals["P"])
         assert (await http.get(feed_path(second.secret))).status_code == 200
+
+
+async def test_a_row_of_another_tenant_on_a_single_tenant_host(monkeypatch):
+    """The reverse: the link names a tenant this host does not run. The same bytes as a forged
+    one, never a feed. (No link could be created for one; the row is inserted directly.)"""
+    from sm_events.feeds.tokens.codec import hash_token
+    from sm_events.models import Calendar, FeedToken
+
+    monkeypatch.setattr(constants, "FEED_DENY_FLOOR_SECONDS", 0)
+    secret = invented("F")
+    async with private_http() as http:
+        with tenant_scope("a"):
+            async with http.db_state.session_factory() as db:
+                cal = Calendar(slug="x", name="X", owner_id="o", visibility="public")
+                db.add(cal)
+                await db.flush()
+                db.add(
+                    FeedToken(
+                        calendar_id=cal.id,
+                        user_id="sv",
+                        token_hash=hash_token(secret),
+                        label="L",
+                        locale="en",
+                    )
+                )
+                await db.commit()
+        baseline = fingerprint(await http.get(feed_path(invented("U"))))
+        assert fingerprint(await http.get(feed_path(secret))) == baseline

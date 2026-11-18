@@ -34,7 +34,7 @@ from simple_module_core.tenancy import tenant_member_ids
 from simple_module_core.user_directory import get_user_directory
 from simple_module_hosting.permissions import resolve_principal_permissions
 
-from sm_events.core.tenancy import DEFAULT_TENANT, TenancyMode, mode_of
+from sm_events.core.tenancy import DEFAULT_TENANT, TenancyMode, mode_of, request_mode
 
 __all__ = ["OfflineUser", "feed_principal"]
 
@@ -52,15 +52,35 @@ class OfflineUser:
     required_permission: None = None
 
 
-async def _is_member(app: Any, db: Any, user_id: str, tenant_id: str) -> bool:
-    if mode_of(app) is TenancyMode.SINGLE and tenant_id == DEFAULT_TENANT:
-        return True  # one tenant: everyone with an account is in it
+def _everyone_is_in(app: Any, tenant_id: str, request: Request | None) -> bool:
+    """Whether the tenant is the one tenant of a single-tenant host, decided as the request
+    paths do (``unscoped_single``): the mode is per request (a mounted app the framework has no
+    answer for may be single in name only), and a tenant something upstream resolved that is
+    not the default means the shortcut is off, so a wrong ``single`` fails closed.
+
+    With no request (a worker) there is nothing per-request to ask: only the app's stored
+    SINGLE mode with the default tenant may skip the lookup."""
+    if tenant_id != DEFAULT_TENANT:
+        return False
+    stored = mode_of(app)
+    if request is None:
+        return stored is TenancyMode.SINGLE
+    if request_mode(request, stored) is not TenancyMode.SINGLE:
+        return False
+    return getattr(request.state, "tenant_id", None) in (None, DEFAULT_TENANT)
+
+
+async def _is_member(
+    app: Any, db: Any, user_id: str, tenant_id: str, request: Request | None
+) -> bool:
+    if _everyone_is_in(app, tenant_id, request):
+        return True  # one tenant: every active account is in it
     members = await tenant_member_ids(app, db, tenant_id, [user_id])
     return members is not None and user_id in members
 
 
 async def feed_principal(
-    app: Any, db: Any, *, user_id: str, tenant_id: str, request: Request
+    app: Any, db: Any, *, user_id: str, tenant_id: str, request: Request | None
 ) -> ResourcePrincipal | None:
     """The principal ``user_id`` is in ``tenant_id`` right now, or ``None``.
 
@@ -68,16 +88,19 @@ async def feed_principal(
     who is not a member of the tenant (or a multi-tenant host with no way to tell), and a
     host with no permission registry. ``request`` is handed to the grant sources, which take
     one; it is the feed request itself, anonymous, and a source must go by the ``user`` it is
-    given."""
+    given. ``None`` (a worker) still resolves; grant sources then get a bare request."""
     found = (await get_user_directory(app).get_many(db, [user_id], with_roles=True)).get(user_id)
     if found is None or not found.is_active or found.roles is None:
         return None
-    if not await _is_member(app, db, user_id, tenant_id):
+    if not await _is_member(app, db, user_id, tenant_id, request):
         return None
     services = get_services(app)
     registry = getattr(services, "permissions", None)
     if registry is None:
         return None
     user = OfflineUser(id=user_id, roles=tuple(found.roles), tenant_id=tenant_id)
-    held = await resolve_principal_permissions(request, user, registry)
+    bare = request or Request(
+        {"type": "http", "app": app, "headers": [], "method": "GET", "path": "/"}
+    )
+    held = await resolve_principal_permissions(bare, user, registry)
     return ResourcePrincipal(user_id=user_id, permissions=frozenset(held))

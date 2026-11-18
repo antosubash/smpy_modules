@@ -118,6 +118,34 @@ async def test_single_tenant_skips_membership(single):
     assert await _ask(app, state, "viewer") is not None
 
 
+async def test_single_tenant_skips_membership_only_when_nothing_upstream_differs(single):
+    """The mode is decided per request, as the request paths do: a tenant resolved upstream
+    that is not the default means the single-tenant shortcut does not apply, and with no
+    membership store to ask, nobody is a member."""
+    app, state = single
+    async with state.session_factory() as db:
+        for upstream, expected in ((None, True), ("default", True), ("a", False)):
+            request = _request(app)
+            if upstream is not None:
+                request.state.tenant_id = upstream
+            got = await feed_principal(
+                app, db, user_id="viewer", tenant_id="default", request=request
+            )
+            assert (got is not None) is expected, upstream
+
+
+async def test_no_request_only_a_stored_single_mode_skips_membership(single):
+    """A worker has no request: a stored SINGLE mode with the default tenant may skip the
+    lookup; any other tenant needs a membership store."""
+    app, state = single
+    async with state.session_factory() as db:
+        assert (
+            await feed_principal(app, db, user_id="viewer", tenant_id="default", request=None)
+            is not None
+        )
+        assert await feed_principal(app, db, user_id="viewer", tenant_id="a", request=None) is None
+
+
 async def test_single_tenant_host_refuses_another_tenant(single):
     """A row for a tenant a single-tenant host does not run is not served."""
     app, state = single
