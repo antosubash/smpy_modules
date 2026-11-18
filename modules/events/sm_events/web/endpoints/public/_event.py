@@ -23,6 +23,7 @@ from sm_events.web.endpoints.public import _cache, _clock, _head, _urls
 from sm_events.web.endpoints.public._errors import PublicErrorRoute
 from sm_events.web.endpoints.public._event_context import load_context, validator_parts
 from sm_events.web.endpoints.public._event_props import build_props, description_for_head
+from sm_events.web.endpoints.public._meta import fallback_description
 from sm_events.web.endpoints.public._not_found import not_found
 from sm_events.web.endpoints.public._occurrence import (
     ShownOccurrence,
@@ -96,7 +97,7 @@ def event_router(locale: str) -> APIRouter:
         response = await inertia.render(constants._PAGE_PUBLIC_EVENT, props.model_dump(mode="json"))
         head = _head.event_head(
             title=text.seo_title or text.title,
-            description=description_for_head(ctx),
+            description=description_for_head(ctx) or fallback_description(props),
             canonical=props.canonical_url,
             image=props.image,
             index_in_search=props.index_in_search,

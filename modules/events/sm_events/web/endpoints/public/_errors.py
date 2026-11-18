@@ -17,11 +17,14 @@ from collections.abc import Callable, Coroutine
 from typing import Any
 
 from fastapi import Request, Response
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 
+from sm_events.core import constants
 from sm_events.web.endpoints.public._cache import error_headers
 
-__all__ = ["PublicErrorRoute"]
+__all__ = ["PublicApiRoute", "PublicErrorRoute"]
 
 
 def _host_handler(request: Request, exc: Exception) -> Callable[..., Any] | None:
@@ -37,6 +40,9 @@ def _host_handler(request: Request, exc: Exception) -> Callable[..., Any] | None
 class PublicErrorRoute(APIRoute):
     """Every error answer of a public router leaves through ``error_headers``."""
 
+    #: A query that does not parse is the host's 422 page, unless the route is a machine one.
+    json_validation = False
+
     def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
         handler = super().get_route_handler()
 
@@ -44,12 +50,28 @@ class PublicErrorRoute(APIRoute):
             try:
                 response = await handler(request)
             except Exception as exc:
-                host = _host_handler(request, exc)
-                if host is None:
-                    raise
-                response = host(request, exc)
-                if hasattr(response, "__await__"):
-                    response = await response
+                if self.json_validation and isinstance(exc, RequestValidationError):
+                    response = JSONResponse(
+                        {
+                            "detail": constants.INVALID_QUERY_DETAIL,
+                            "code": constants.INVALID_QUERY_CODE,
+                        },
+                        status_code=422,
+                    )
+                else:
+                    host = _host_handler(request, exc)
+                    if host is None:
+                        raise
+                    response = host(request, exc)
+                    if hasattr(response, "__await__"):
+                        response = await response
             return error_headers(request, response)
 
         return wrapped
+
+
+class PublicApiRoute(PublicErrorRoute):
+    """For a machine-read endpoint: a missing or malformed query parameter is the module's
+    ``{"detail", "code"}`` envelope, as its range errors are, not the host's HTML page."""
+
+    json_validation = True

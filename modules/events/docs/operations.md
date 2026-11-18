@@ -20,6 +20,14 @@ and sitemap URLs follow the client's `Host` header, which anyone can choose. The
 cookie on every anonymous response, so a CDN will not cache these pages until that is fixed
 upstream; browsers and private caches do.
 
+**An unpublished event can outlive its unpublishing in a shared cache.** An event page is cached
+`public, max-age=300` on a single-tenant host (feeds and the sitemap the same; the index, calendar
+pages and the occurrences API at most 60 seconds), so a CDN or proxy in front may keep serving an
+event for up to five minutes after the origin stopped (the origin answers the 404 at once). To
+shorten it, lower `public_cache_seconds` on the Settings screen (`0` is `no-store`, which also
+drops the `ETag`), or purge the event's address (and `/events/`, the calendar page, `calendar.ics`
+and `sitemap.xml`) from the cache when unpublishing something urgent.
+
 A `304` carries `ETag`, `Cache-Control` and `Vary` and, on the framework 0.0.44 host, no
 `Content-Security-Policy` (pinned by `host/tests/test_events_wiring.py`).
 

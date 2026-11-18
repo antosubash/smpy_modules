@@ -567,7 +567,8 @@
       "all_day": "Ganztägig",
       "online": "Online",
       "hybrid": "Vor Ort und online",
-      "view_event": "Veranstaltung ansehen"
+      "view_event": "Veranstaltung ansehen",
+      "in_language": "auf {language}"
     },
     "subscribe": {
       "title": "Abonnieren",

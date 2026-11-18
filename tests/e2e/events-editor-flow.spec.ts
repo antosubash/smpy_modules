@@ -111,11 +111,11 @@ test('the leave guard: Stay, held Back, Leave, and no dialog after a save', asyn
   await expect(dialog).toHaveCount(0);
   await expect(field(page, 'Title')).toHaveValue(`${title} edited`);
 
-  // A held step never finishes loading, so the call times out by design.
-  await page.goBack({ timeout: 2000 }).catch(() => undefined);
+  // Back from the browser: the step is held (it never completes), so it is asked for, not awaited.
+  await page.evaluate(() => window.history.back());
   await expect(dialog).toBeVisible();
-  await page.waitForTimeout(1000);
-  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/events\/edit\//); // held: still on the editor
+  await expect(field(page, 'Title')).toHaveValue(`${title} edited`);
   await dialog.getByRole('button', { name: 'Leave and discard changes' }).click();
   await expect(page).toHaveURL(new RegExp(`${LIST}`));
 

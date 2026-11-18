@@ -14,6 +14,12 @@ export function itemTime(item: PublicListItem, locale: string, t: Translate) {
   return item.show_timezone ? t(copy.in_zone, { time: text, zone: item.timezone }) : text;
 }
 
+/** "in English", worded in the page's language, for a title that is not in it. */
+function otherLanguage(lang: string, locale: string, t: Translate): string {
+  const language = new Intl.DisplayNames([locale], { type: 'language' }).of(lang) ?? lang;
+  return t(keys.events.public.item.in_language, { language });
+}
+
 export function ItemRow({ item, locale }: { item: PublicListItem; locale: string }) {
   const { t } = useT();
   const copy = keys.events.public.item;
@@ -30,6 +36,16 @@ export function ItemRow({ item, locale }: { item: PublicListItem; locale: string
       >
         <bdi>{item.title}</bdi>
       </a>
+      {item.lang !== locale ? (
+        <span
+          className="ml-2 rounded border px-1 text-xs font-medium uppercase text-muted-foreground"
+          title={otherLanguage(item.lang, locale, t)}
+          role="img"
+          aria-label={otherLanguage(item.lang, locale, t)}
+        >
+          {item.lang}
+        </span>
+      ) : null}
       {item.status === 'cancelled' ? (
         <span className="ml-2 text-sm font-medium">{t(copy.cancelled)}</span>
       ) : null}

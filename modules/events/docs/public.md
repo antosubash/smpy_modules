@@ -42,6 +42,21 @@ are null and an item's `key` is `<slug>` (a one-off) or `<slug>:<stamp>` (an ins
 The id of a *public* calendar or category does appear (`calendar_id`, the filter lists): the grid
 passes them back as `?calendar=` and `?category=`, and they name only rows the public may see.
 
+## Query parameters
+
+On the pages, `?category=<slug>` that names an unknown, hidden or malformed category is the module
+404 (the plan's Ruling 5: "`?category=<slug>` naming any other category is the 404"); the page has
+no `?calendar=` (a calendar is the path, `/c/<slug>`), so it is ignored like any other unknown
+parameter. On `/api/occurrences`, `calendar` and `category` ids that are not public or not known
+match nothing and answer 200 with no items, the same either way (Ruling 32: "`calendar` ids that are
+not public silently dropped"); a missing or malformed parameter (`start`, `end`, an id that is not a
+UUID) is `422 {"detail", "code": "invalid_query"}`, never an HTML page.
+
+## Left as they are
+
+Sub-events also appear as ordinary items in the lists, next to their parent. A moved date keeps its
+original date in its address (`?date=` is the date it was scheduled for) and shows the new time.
+
 ## One 404
 
 A slug that never existed, a draft, an internal calendar's event, a trashed row, another
@@ -76,5 +91,7 @@ carries `X-Events-Truncated: 1`. The single-event file has no window.
 Each event page carries `<title>`, description, canonical (the `?date=` address for an occurrence),
 `hreflang` for the languages it exists in plus `x-default`, Open Graph tags and `Event` JSON-LD
 (`eventStatus` including cancelled and rescheduled, `eventAttendanceMode`, `location`, `organizer`).
-A series' bare page lists its next ten occurrences in JSON-LD. Tick **No index** on a text to add
+An event with no summary, description or SEO text gets a generated one-line description (date and
+time, place, calendar) in the page's language. An event that exists in a single language still
+names it, with `x-default`. A series' bare page lists its next ten occurrences in JSON-LD. Tick **No index** on a text to add
 `noindex,nofollow` and leave it out of the sitemap. The sitemap never lists `?date=` addresses.

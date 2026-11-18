@@ -76,9 +76,9 @@ def _when(event: Event, shown: ShownOccurrence) -> WhenOut:
 
 def _alternates(request_origin: Any, ctx: EventContext) -> list[AlternateOut]:
     """``hreflang`` for the languages this event has a text in and the site serves, plus
-    ``x-default``; none when the event has a single language."""
+    ``x-default``; a single-language event names its own language and ``x-default``."""
     served = [loc for loc in locales.supported() if loc in ctx.texts]
-    if len(served) < 2:
+    if not served:
         return []
     out = [
         AlternateOut(locale=loc, url=request_origin(_urls.event_path(ctx.texts[loc].slug, loc)))

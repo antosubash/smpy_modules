@@ -22,7 +22,7 @@ export function EventPlace({ place }: { place: Place }) {
         </p>
       ) : null}
       {physical ? (
-        <p>
+        <p className="whitespace-pre-line">
           {place.venue_name ? <strong>{place.venue_name}</strong> : null}
           {place.venue_name && place.address ? <br /> : null}
           {place.address}
