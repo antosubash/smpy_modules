@@ -92,7 +92,8 @@ export function ConsoleCalendar({
     () => ({
       canCreate,
       creating: slot !== null,
-      onCreate: setSlot,
+      // Nothing opens without a shown calendar the user can write to.
+      onCreate: (next) => canCreate && setSlot(next),
       onChange: writes.onChange,
       onMove: (occurrence, element) => setMoving({ occurrence, element: element ?? null }),
       pendingKeys: writes.pendingKeys,
