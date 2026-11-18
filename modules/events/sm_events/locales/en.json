@@ -698,8 +698,7 @@
       "unchanged": "Unchanged {count}",
       "skipped": "Skipped {count}",
       "failed": "Failed {count}",
-      "open": "Open",
-      "col_outcome": "Outcome"
+      "open": "Open"
     },
     "failed_title": "The import failed",
     "outcome": {

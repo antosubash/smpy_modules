@@ -698,8 +698,7 @@
       "unchanged": "Unverändert {count}",
       "skipped": "Übersprungen {count}",
       "failed": "Fehlgeschlagen {count}",
-      "open": "Öffnen",
-      "col_outcome": "Ergebnis"
+      "open": "Öffnen"
     },
     "failed_title": "Der Import ist fehlgeschlagen",
     "outcome": {
