@@ -225,4 +225,25 @@ describe('MoveDialog', () => {
     await flush();
     expect(document.activeElement).toBe(element);
   });
+
+  it('hands focus back even when the shell has already forgotten the element', async () => {
+    const element = document.createElement('button');
+    document.body.appendChild(element);
+    const restoreFocus = vi.fn();
+    const dialog = (o: ReturnType<typeof occurrence> | null, el?: HTMLElement) => (
+      <MoveDialog
+        occurrence={o}
+        returnFocus={el}
+        restoreFocus={restoreFocus}
+        onSubmit={() => Promise.resolve({ ok: true })}
+        onClose={onClose}
+      />
+    );
+    const o = occurrence();
+    await mounted.view?.render(dialog(o, element));
+    await flush();
+    await mounted.view?.render(dialog(null, undefined));
+    await flush();
+    expect(restoreFocus).toHaveBeenCalledWith(o, element);
+  });
 });

@@ -1,6 +1,6 @@
 /** The console's `Calendar`: the occurrence fetcher over the events API, the content language
  *  titles are asked in, the filter options and the write layer (drag, resize, dialogs). */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { listOccurrences } from '../../utils/api-events';
 import { keys, useT } from '../../utils/i18n';
 import type { Category } from '../../utils/types';
@@ -73,7 +73,9 @@ export function ConsoleCalendar({
   // A write refetches the range it changed.
   const [refresh, setRefresh] = useState(0);
   const invalidate = useCallback(() => setRefresh((n) => n + 1), []);
-  const writes = useCalendarWrites({ invalidate, editorUrl });
+  const focusRef = useRef<((key: string) => boolean) | null>(null);
+  const focusEvent = useCallback((key: string) => void focusRef.current?.(key), []);
+  const writes = useCalendarWrites({ invalidate, editorUrl, focusEvent });
   const [slot, setSlot] = useState<CreateSlot | null>(null);
   const [moving, setMoving] = useState<{
     occurrence: Occurrence;
@@ -97,9 +99,17 @@ export function ConsoleCalendar({
       onChange: writes.onChange,
       onMove: (occurrence, element) => setMoving({ occurrence, element: element ?? null }),
       pendingKeys: writes.pendingKeys,
+      focusRef,
     }),
     [canCreate, slot, writes.onChange, writes.pendingKeys],
   );
+  /** After the Move dialog: the chip it came from, the same occurrence's chip when that one was
+   *  rebuilt, else the toolbar title (the grid may have moved to another range). */
+  const restoreFocus = useCallback((o: Occurrence, element: HTMLElement | null) => {
+    if (element?.isConnected) return element.focus();
+    if (focusRef.current?.(o.key)) return;
+    document.querySelector<HTMLElement>('[data-testid="calendar-title"]')?.focus();
+  }, []);
   return (
     <>
       <Calendar
@@ -120,6 +130,7 @@ export function ConsoleCalendar({
       <MoveDialog
         occurrence={moving?.occurrence ?? null}
         returnFocus={moving?.element}
+        restoreFocus={restoreFocus}
         onSubmit={writes.submit}
         onClose={() => setMoving(null)}
       />

@@ -49,7 +49,9 @@ export default function FullCalendarGrid({
     gotoDate: (next) => calendar.current?.getApi().gotoDate(next),
     focusEvent: (key) => {
       const element = elements.current.get(key);
-      if (element?.isConnected) element.focus();
+      if (!element?.isConnected) return false;
+      element.focus();
+      return true;
     },
   }));
 

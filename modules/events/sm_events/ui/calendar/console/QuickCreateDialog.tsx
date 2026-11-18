@@ -32,6 +32,7 @@ import {
   timeProblems,
   withAllDay,
 } from './quickCreate';
+import { timeErrors } from './timeErrors';
 
 type Props = {
   slot: CreateSlot | null;
@@ -99,15 +100,7 @@ function QuickCreateForm({
     errors.reset();
     const found: Record<string, string> = {};
     if (!title.trim()) found[titlePath] = requiredText();
-    const times = timeProblems(clock, zone);
-    if (times.start) found['times.start'] = t(keys.events.errors.invalid_local_time);
-    if (times.end) {
-      found['times.end'] = t(
-        times.end === 'order'
-          ? keys.events.errors.end_before_start
-          : keys.events.errors.invalid_local_time,
-      );
-    }
+    Object.assign(found, timeErrors(timeProblems(clock, zone), t));
     if (Object.keys(found).length > 0) return errors.reject(found);
     const request = begin();
     setPending(true);

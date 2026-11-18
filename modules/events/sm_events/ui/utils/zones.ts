@@ -124,6 +124,19 @@ export function isNonexistent(local: string, timeZone: string): boolean {
   return Temporal.PlainDateTime.compare(wall, back) !== 0;
 }
 
+/** Whether `text` is a date and time (`YYYY-MM-DDTHH:MM`, seconds optional), or a date when
+ *  `dateOnly`. A browser input can hold more than that (a six-digit year), and Temporal
+ *  throws on it, so user input goes through here before any conversion. */
+export function isWallTime(text: string, dateOnly = false): boolean {
+  if (dateOnly) return isDate(text);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(text)) return false;
+  try {
+    return Temporal.PlainDateTime.from(text, { overflow: 'reject' }) !== null;
+  } catch {
+    return false;
+  }
+}
+
 /** Whole calendar days from one date to another (negative when earlier). */
 export const daysBetween = (from: string, to: string): number =>
   Temporal.PlainDate.from(from).until(Temporal.PlainDate.from(to), { largestUnit: 'day' }).days;

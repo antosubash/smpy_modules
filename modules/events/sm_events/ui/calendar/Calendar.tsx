@@ -48,6 +48,10 @@ export function Calendar(props: CalendarProps) {
     () => calendars.filter((c) => state.calendars.includes(c.id)),
     [calendars, state.calendars],
   );
+  const focusRef = editing?.focusRef;
+  useEffect(() => {
+    if (focusRef) focusRef.current = (key) => grid.current?.focusEvent(key) ?? false;
+  }, [focusRef]);
   const myZone = browserTimeZone();
   const zone = gridTimeZone(state.tzMode, shown, props.defaultTimezone, myZone);
   const calendarZone = gridTimeZone('calendar', shown, props.defaultTimezone, myZone);

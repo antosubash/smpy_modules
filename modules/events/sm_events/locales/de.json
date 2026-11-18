@@ -116,6 +116,7 @@
     "invalid_rrule": "Diese Wiederholungsregel ist ungültig.",
     "rrule_frequency_refused": "Veranstaltungen können täglich, wöchentlich, monatlich oder jährlich wiederkehren.",
     "start_not_in_rule": "Der Beginn muss das erste Datum sein, das die Wiederholungsregel erzeugt. Ändern Sie den Beginn oder die Regel.",
+    "invalid_datetime": "Gib ein gültiges Datum und eine gültige Uhrzeit ein.",
     "invalid_local_time": "Diese Uhrzeit gibt es in der Zeitzone nicht: Die Uhren überspringen sie.",
     "end_before_start": "Das Ende muss nach dem Beginn liegen.",
     "duration_too_long": "Eine Veranstaltung kann höchstens {oneOff} Tage dauern; wiederholt sie sich, jeder Termin höchstens {series} Tage.",
