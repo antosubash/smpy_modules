@@ -12,12 +12,14 @@ from datetime import date, datetime
 from typing import Any
 from urllib.parse import urlsplit
 
+from sm_events.calendar import registry
 from sm_events.calendar.times import Span, to_local
 from sm_events.content.public_read import (
     pick_text,
 )
 from sm_events.content.richtext_tree import to_tree
-from sm_events.core import locales
+from sm_events.content.types import public_extra
+from sm_events.core import constants, locales
 from sm_events.feeds.plaintext import to_text
 from sm_events.models import Event
 from sm_events.web.endpoints.public import _urls
@@ -150,6 +152,8 @@ def build_props(
         for o in upcoming
     ]
     return PublicEventProps(
+        type=event.type if registry.get_type(event.type) is not None else constants.BUILTIN_TYPE,
+        public_extra=public_extra(event.type, event.extra),
         locale=locale,
         title=text.title,
         summary=text.summary,

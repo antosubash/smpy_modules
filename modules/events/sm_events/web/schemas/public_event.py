@@ -81,6 +81,11 @@ class ParentLink(BaseModel):
 
 
 class PublicEventProps(BaseModel):
+    type: str
+    """The event's type when a plugin on this host provides it, else the default type."""
+    public_extra: dict[str, Any]
+    """Only what the type declared public (``EventType.public_fields``), never the whole
+    ``extra``; ``{}`` for a type that is not installed. Shown as text only."""
     locale: str
     title: str
     summary: str | None

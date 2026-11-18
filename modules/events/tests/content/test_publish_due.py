@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -231,3 +232,19 @@ async def test_eager_task_runs(db_state, tmp_path, monkeypatch):
         sync_db.set_database_url(None)
         sync_db.dispose_sync_engine()
         await state.engine.dispose()
+
+
+@pytest.mark.unbound_tenant
+async def test_publish_due_keeps_unknown_extra(db_state):
+    """A worker image without the plugin: the event of its type is published and its ``extra``
+    is exactly what was stored."""
+    from sm_events.calendar import registry
+
+    registry.reset_registry()  # the registry holds the built-ins only: no ``gone:thing``
+    raw = {"b": 1, "a": [1, 2], "n": {"z": None}}
+    (due,) = await seed(db_state, type="gone:thing", extra=raw)
+    assert await run(db_state) == {"tenants": 1, "published": 1, "failed": 0}
+    (event,) = await events_of(db_state)
+    assert event.id == due and event.status == "published"
+    assert (event.type, json.dumps(event.extra)) == ("gone:thing", json.dumps(raw))
+    registry.reset_registry()
