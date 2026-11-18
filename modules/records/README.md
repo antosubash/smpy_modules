@@ -307,7 +307,10 @@ enables it on a calendar (Calendars, **Sources**) and maps a record type to an i
 `datetime` field (and an optional end field). Published, untrashed records show with their title; each
 viewer sees only what records' own rules let them read (`records.view` and the type's `allowed_roles`),
 and the public only types marked Public. Records runs without events: nothing of events is imported until
-events loads `sm_records/events_extensions.py`. The contract behind it is `sm_records.contracts.dated`.
+events loads `sm_records/events_extensions.py`, and the `@simple-module-py/events` import of
+`sm_records/events-extensions.ts` is an optional peer that only events' own guarded glob loads (a vitest
+import-graph test pins that no page or block reaches it). The contract behind it is
+`sm_records.contracts.dated`.
 
 ### Showing records on a page
 
