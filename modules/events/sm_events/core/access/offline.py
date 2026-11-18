@@ -1,4 +1,4 @@
-"""A user's rights with no request of theirs: the principal a private feed is read as.
+"""A user's rights with no request of theirs: the principal a private feed or an import acts as.
 
 The framework resolves permissions only for the principal of the request in hand. A private
 feed is fetched by a calendar client that sends no session, yet must show exactly what the
@@ -36,7 +36,7 @@ from simple_module_hosting.permissions import resolve_principal_permissions
 
 from sm_events.core.tenancy import DEFAULT_TENANT, TenancyMode, mode_of, request_mode
 
-__all__ = ["OfflineUser", "feed_principal"]
+__all__ = ["OfflineUser", "offline_principal"]
 
 
 @dataclass(frozen=True)
@@ -79,7 +79,7 @@ async def _is_member(
     return members is not None and user_id in members
 
 
-async def feed_principal(
+async def offline_principal(
     app: Any, db: Any, *, user_id: str, tenant_id: str, request: Request | None
 ) -> ResourcePrincipal | None:
     """The principal ``user_id`` is in ``tenant_id`` right now, or ``None``.

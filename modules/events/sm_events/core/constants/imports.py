@@ -8,6 +8,7 @@ from typing import Final
 __all__ = [
     "ICS_INVALID_CODE",
     "ICS_INVALID_DETAIL",
+    "IMPORTER_GONE",
     "IMPORT_ACTIVE_MAX",
     "IMPORT_APPLY_BATCH",
     "IMPORT_BODY_CEILING",
@@ -22,6 +23,7 @@ __all__ = [
     "IMPORT_ITEM_CHUNK",
     "IMPORT_KEEP_REASONS",
     "IMPORT_LEASE",
+    "IMPORT_MAX_ATTENDEES",
     "IMPORT_MAX_COMPONENTS",
     "IMPORT_MAX_DEPTH",
     "IMPORT_MAX_EVENTS",
@@ -69,6 +71,9 @@ IMPORT_MAX_LINES: Final = 1_000_000
 """Physical lines in a file (a 20 MiB file of empty lines would otherwise cost a list each)."""
 IMPORT_MAX_PARAMS: Final = 20
 IMPORT_MAX_EXDATES: Final = 1000
+IMPORT_MAX_ATTENDEES: Final = 200
+"""``ATTENDEE`` lines one event may carry. They are never stored, so this only bounds the work."""
+IMPORTER_GONE: Final = "importer_gone"
 """``EXDATE`` values one event may carry before it is skipped (``too_many_overrides``)."""
 IMPORT_MAX_EVENT_BYTES: Final = 262_144
 IMPORT_MAX_OVERRIDES: Final = 730
@@ -91,7 +96,13 @@ IMPORT_UNTITLED: Final = "Untitled event"
 IMPORT_STATES: Final = ("uploaded", "parsing", "staged", "queued", "running", "done", "failed")
 ITEM_VERDICTS: Final = ("new", "update", "skip")
 ITEM_OUTCOMES: Final = ("created", "updated", "unchanged", "skipped", "failed")
-IMPORT_FAILURE_CODES: Final = ("ics_encoding", "ics_invalid", "too_many_events", "import_failed")
+IMPORT_FAILURE_CODES: Final = (
+    "ics_encoding",
+    "ics_invalid",
+    "too_many_events",
+    "import_failed",
+    "importer_gone",
+)
 
 IMPORT_BUSY_CODE: Final = "import_busy"
 IMPORT_BUSY_DETAIL: Final = "Too many imports are still running; wait for one to finish"

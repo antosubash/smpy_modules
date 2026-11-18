@@ -13,6 +13,12 @@ transaction. When fewer than a batch is left the same transaction completes the 
 tenant (a request, a platform pass) is left first, so the rows written are the import's tenant's
 whatever was bound. An id that is no import of that tenant is ``gone``.
 
+**Rights.** With an ``importer`` (an app is present: the eager path) the slice first asks who
+the importer is now and applies the narrower of that and the stored grants; an importer who is
+gone ends the import ``importer_gone`` with the remaining items untouched. A Celery worker builds
+no app, so it passes none and relies on the stored grants plus the per-item checks (share,
+ownership, trash, lock): there the window runs to the end of the import.
+
 **Failures.** Every write after the claim is fenced; a lost lease rolls back and answers
 ``busy``. A calendar that was trashed meanwhile, or any other exception, is recorded as ``failed``
 (``import_failed``, a code only), logged by class name, and the slice answers ``done``: the row
@@ -24,10 +30,11 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Any, Literal
 
+from simple_module_core.resources import ResourcePrincipal
 from simple_module_db import finalize_session, no_tenant
 from sqlalchemy import select
 
@@ -46,11 +53,30 @@ logger = logging.getLogger(__name__)
 SliceResult = Literal["done", "more", "busy", "gone"]
 
 
+Importer = Callable[[str, str], Awaitable[ResourcePrincipal | None]]
+"""``(tenant_id, user_id)`` to the user's permissions *now* (``None``: gone, inactive, not a
+member). Needs an app (the user directory), so a worker, which builds none, passes ``None``."""
+
+
 class _Slice:
     def __init__(self, factory: Any, tenant_id: str, import_id: int, locales, now) -> None:
         self.factory, self.tenant_id, self.import_id = factory, tenant_id, import_id
         self.locales, self.now = locales, now
         self.owner = str(uuid.uuid4())
+        self.grants: list[str] | None = None
+        """The importer's permissions for this slice: the stored ones narrowed by a fresh answer."""
+
+    async def narrow(self, importer: Importer) -> None:
+        """Ask who the importer is *now* and keep what both the stored grants and the fresh
+        answer allow. ``importer_gone`` ends the import: nobody to write as."""
+        async with self.factory() as db:
+            imp = await self._load(db)
+            stored = ResourcePrincipal(imp.created_by, frozenset(imp.grants or ()))
+            now = await importer(self.tenant_id, imp.created_by)
+            await finalize_session(db)
+        if now is None:
+            raise ImportFailure(constants.IMPORTER_GONE, "importer")
+        self.grants = [p for p in constants.PERMISSIONS if stored.has(p) and now.has(p)]
 
     async def fence(self, db: Any, values: dict[str, Any]) -> None:
         await fenced(
@@ -113,6 +139,8 @@ class _Slice:
                     )
                 ).scalars()
             )
+            if self.grants is not None:
+                imp.grants = self.grants  # in memory only: apply_batch detaches the row
             result = BatchResult()
             if items:
                 result = await apply_batch(db, imp, items, locales=self.locales, now=now)
@@ -166,13 +194,17 @@ def _values(result: BatchResult, now: datetime, last: bool) -> dict[str, Any]:
     return values
 
 
-async def _work(step: _Slice, slice_seconds: float, clock: Callable[[], float]) -> SliceResult:
+async def _work(
+    step: _Slice, slice_seconds: float, clock: Callable[[], float], importer: Importer | None
+) -> SliceResult:
     won = await step.claim()
     if won.kind != "claimed":
         return won.kind
     if won.status == "parsing":
         await step.parse()
         return "done"
+    if importer is not None:
+        await step.narrow(importer)
     deadline = clock() + slice_seconds
     while not await step.batch():
         if clock() >= deadline:
@@ -190,6 +222,7 @@ async def run_import_async(
     now: Callable[[], datetime] | None = None,
     clock: Callable[[], float] = time.monotonic,
     slice_seconds: float | None = None,
+    importer: Importer | None = None,
 ) -> SliceResult:
     """One slice of the import ``import_id`` of ``tenant_id``."""
     if not valid_tenant(tenant_id):
@@ -200,7 +233,7 @@ async def run_import_async(
         failure = ""
         code = "import_failed"
         try:
-            return await _work(step, seconds, clock)
+            return await _work(step, seconds, clock, importer)
         except LeaseLost:
             logger.info("events: import %s lost its lease; nothing written", import_id)
             return "busy"

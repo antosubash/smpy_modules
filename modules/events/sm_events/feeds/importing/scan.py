@@ -7,9 +7,10 @@ this runs.
 
 Bounds, all from :mod:`sm_events.core.constants`: bytes, physical lines, an unfolded line,
 nesting depth, components of any kind, ``VEVENT`` count and size, ``VTIMEZONE`` count,
-properties per component and parameters per line. Strict UTF-8 (a BOM is dropped); CRLF, LF and
-CR all end a line; a NUL byte, content before ``BEGIN:VCALENDAR``, a second ``VCALENDAR``,
-anything after its ``END`` and unbalanced or mismatched ``BEGIN``/``END`` fail.
+properties per component, attendees per event and parameters per line. Strict UTF-8 (a BOM is
+dropped); CRLF, LF and CR all end a line; a NUL byte, content before ``BEGIN:VCALENDAR``, a
+second ``VCALENDAR``, anything after its ``END`` and unbalanced or mismatched ``BEGIN``/``END``
+fail.
 
 **This is the only parser.** A ``VEVENT``'s properties are kept as text (:class:`Prop`); every
 other component (a ``VTIMEZONE`` with its observances, a ``VALARM`` with its ``ATTACH``) is
@@ -130,6 +131,7 @@ class _State:
         self.events: list[RawEvent] = []
         self.current: RawEvent | None = None
         self.event_bytes = 0
+        self.attendees = 0
         self.components = 0
         self.timezones = 0
         self.opened = False
@@ -155,7 +157,7 @@ class _State:
         if name == "VEVENT" and self.stack == ["VCALENDAR"]:
             if len(self.events) >= constants.IMPORT_MAX_EVENTS:
                 raise _fail("events", "too_many_events")
-            self.current, self.event_bytes = RawEvent(), 0
+            self.current, self.event_bytes, self.attendees = RawEvent(), 0, 0
         elif self.current is not None:
             self.current.children[name] += 1
         self.stack.append(name)
@@ -184,6 +186,10 @@ class _State:
         if self.event_bytes > constants.IMPORT_MAX_EVENT_BYTES:
             raise _fail("event_size")
         if self.stack == ["VCALENDAR", "VEVENT"]:
+            if name == "ATTENDEE":
+                self.attendees += 1
+                if self.attendees > constants.IMPORT_MAX_ATTENDEES:
+                    raise _fail("attendees")
             self.current.props.append(Prop(name, params, value))
 
 

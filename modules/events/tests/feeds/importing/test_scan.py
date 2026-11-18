@@ -217,3 +217,10 @@ def test_sniff():
     assert not sniff(b"")
     assert not sniff(b"PRODID:x\r\nBEGIN:VCALENDAR\r\n")
     assert not sniff(b"BEGIN:VCALENDARX\r\n")
+
+
+def test_attendee_bound():
+    """Attendees are never stored; the cap only bounds the work."""
+    at = constants.IMPORT_MAX_ATTENDEES
+    assert scan(corpus.with_event_lines(at)).events
+    fails(corpus.with_event_lines(at + 1), INVALID, "attendees")
