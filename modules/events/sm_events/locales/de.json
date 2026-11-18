@@ -542,14 +542,11 @@
   },
   "public": {
     "index": {
-      "title": "Veranstaltungen",
-      "upcoming": "Kommende Veranstaltungen",
       "region": "Veranstaltungen",
       "tab_list": "Liste",
       "tab_calendar": "Kalender",
       "tabs": "Veranstaltungen anzeigen als",
       "empty": "Keine kommenden Veranstaltungen.",
-      "month_group": "Veranstaltungen im {month}",
       "page_of": "Seite {page} von {count}",
       "previous": "Vorherige Seite",
       "next": "Nächste Seite",
@@ -559,8 +556,7 @@
         "category": "Kategorie",
         "all": "Alle Kategorien",
         "calendars": "Kalender"
-      },
-      "calendar_page": "Kalender: {name}"
+      }
     },
     "item": {
       "cancelled": "Abgesagt",
@@ -583,9 +579,7 @@
       "loading": "Kalender wird geladen…"
     },
     "language": {
-      "label": "Sprache",
-      "name_en": "English",
-      "name_de": "Deutsch"
+      "label": "Sprache"
     },
     "event": {
       "when": "Wann",
@@ -597,20 +591,15 @@
       "next_dates": "Nächste Termine",
       "next_cancelled": "{time} (abgesagt)",
       "place": "Wo",
-      "in_person": "Vor Ort",
       "online": "Online",
       "hybrid": "Vor Ort und online",
       "join_online": "Online teilnehmen",
       "map": "Auf der Karte zeigen",
       "organiser": "Veranstaltet von {name}",
-      "category": "Kategorie",
-      "calendar": "Kalender",
       "part_of": "Teil von {title}",
       "sub_events": "Programmpunkte",
       "register": "Anmelden",
-      "add_to_calendar": "Zum Kalender hinzufügen",
-      "all_dates": "Alle Termine",
-      "description": "Über diese Veranstaltung"
+      "add_to_calendar": "Zum Kalender hinzufügen"
     },
     "not_found": {
       "title": "Seite nicht gefunden",

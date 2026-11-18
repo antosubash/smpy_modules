@@ -1,6 +1,11 @@
 import { keys, useT } from '../utils/i18n';
 import type { Alternate } from './types';
 
+/** A language named in itself ("Deutsch"), as a reader looking for it would recognise it. */
+function languageName(locale: string): string {
+  return new Intl.DisplayNames([locale], { type: 'language' }).of(locale) ?? locale;
+}
+
 /** The event's other languages, from its `alternates` (`x-default` is a hint for crawlers, not
  *  a language). Nothing renders for a single-language event. */
 export function LanguageSwitch({
@@ -13,7 +18,6 @@ export function LanguageSwitch({
   const { t } = useT();
   const languages = alternates.filter((a) => a.locale !== 'x-default');
   if (languages.length < 2) return null;
-  const names = new Intl.DisplayNames([locale], { type: 'language' });
   return (
     <nav aria-label={t(keys.events.public.language.label)} className="flex gap-3 text-sm">
       {languages.map((a) => (
@@ -25,7 +29,7 @@ export function LanguageSwitch({
           aria-current={a.locale === locale ? 'true' : undefined}
           className={a.locale === locale ? 'font-semibold' : 'underline'}
         >
-          {names.of(a.locale) ?? a.locale}
+          {languageName(a.locale)}
         </a>
       ))}
     </nav>

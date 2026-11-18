@@ -542,14 +542,11 @@
   },
   "public": {
     "index": {
-      "title": "Events",
-      "upcoming": "Upcoming events",
       "region": "Events",
       "tab_list": "List",
       "tab_calendar": "Calendar",
       "tabs": "Show events as",
       "empty": "No upcoming events.",
-      "month_group": "Events in {month}",
       "page_of": "Page {page} of {count}",
       "previous": "Previous page",
       "next": "Next page",
@@ -559,8 +556,7 @@
         "category": "Category",
         "all": "All categories",
         "calendars": "Calendars"
-      },
-      "calendar_page": "Calendar: {name}"
+      }
     },
     "item": {
       "cancelled": "Cancelled",
@@ -583,9 +579,7 @@
       "loading": "Loading the calendar…"
     },
     "language": {
-      "label": "Language",
-      "name_en": "English",
-      "name_de": "Deutsch"
+      "label": "Language"
     },
     "event": {
       "when": "When",
@@ -597,20 +591,15 @@
       "next_dates": "Next dates",
       "next_cancelled": "{time} (cancelled)",
       "place": "Where",
-      "in_person": "In person",
       "online": "Online",
       "hybrid": "In person and online",
       "join_online": "Join online",
       "map": "Show on a map",
       "organiser": "Organised by {name}",
-      "category": "Category",
-      "calendar": "Calendar",
       "part_of": "Part of {title}",
       "sub_events": "Sessions",
       "register": "Register",
-      "add_to_calendar": "Add to calendar",
-      "all_dates": "All dates",
-      "description": "About this event"
+      "add_to_calendar": "Add to calendar"
     },
     "not_found": {
       "title": "Page not found",

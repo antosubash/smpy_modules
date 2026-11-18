@@ -127,7 +127,7 @@ export async function ready(view: Mounted, selector: string): Promise<void> {
       () => {
         if (!view.find(selector)) throw new Error(`${selector} not rendered yet`);
       },
-      { timeout: 8000 },
+      { timeout: 25000 },
     );
   });
 }

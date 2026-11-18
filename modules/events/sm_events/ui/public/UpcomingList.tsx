@@ -38,6 +38,7 @@ export function ItemRow({ item, locale }: { item: PublicListItem; locale: string
       ) : null}
       <p className="text-sm text-muted-foreground">
         <time dateTime={item.start_local}>{itemTime(item, locale, t)}</time>
+        {item.all_day ? <> · {t(copy.all_day)}</> : null}
         {item.venue_name ? <> · {item.venue_name}</> : null}
         {item.attendance_mode === 'online' ? <> · {t(copy.online)}</> : null}
         {item.attendance_mode === 'hybrid' ? <> · {t(copy.hybrid)}</> : null}
