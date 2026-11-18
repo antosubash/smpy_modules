@@ -100,9 +100,32 @@ class Filter(logging.Filter):
         return True
 
 
+def _handlers() -> list[logging.Handler]:
+    """Every handler attached to the root logger or to any logger that exists now."""
+    loggers = [
+        logging.getLogger(),
+        *(v for v in logging.root.manager.loggerDict.values() if isinstance(v, logging.Logger)),
+    ]
+    seen: dict[int, logging.Handler] = {}
+    for target in loggers:
+        for handler in target.handlers:
+            seen[id(handler)] = handler
+    return list(seen.values())
+
+
 def install() -> None:
-    """Attach one :class:`Filter` to each of :data:`LOGGERS` (idempotent)."""
+    """Attach one :class:`Filter` to each of :data:`LOGGERS` **and to every handler that exists**
+    (idempotent).
+
+    A logger's filter sees only records created on that exact logger, so ``uvicorn.asgi``,
+    gunicorn's loggers and any child logger would slip past it; a handler's filter sees every
+    record that reaches the handler, whichever logger made it. Handlers an operator adds after
+    startup are covered the next time this runs (it is cheap), not before; a reverse proxy or
+    CDN logs paths on its own and must redact ``/feed/`` itself."""
     for name in LOGGERS:
         target = logging.getLogger(name)
         if not any(isinstance(f, Filter) for f in target.filters):
             target.addFilter(Filter())
+    for handler in _handlers():
+        if not any(isinstance(f, Filter) for f in handler.filters):
+            handler.addFilter(Filter())

@@ -113,3 +113,53 @@ def test_a_digest_is_scrubbed():
     assert digest not in record.getMessage() and digest not in str(record.__dict__)
     keep = "a" * 63  # not a digest
     assert log_redact.redact(keep) == keep
+
+
+@pytest.fixture
+def root_handler():
+    """A handler on the root logger, as an operator's logging setup installs one."""
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    root = logging.getLogger()
+    root.addHandler(handler)
+    old = root.level
+    root.setLevel(logging.DEBUG)
+    yield handler, stream
+    root.removeHandler(handler)
+    root.setLevel(old)
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["some.unrelated.child", "uvicorn.asgi", "gunicorn.access", "sqlalchemy.engine.Engine.x"],
+)
+def test_handlers_redact_records_of_any_logger(root_handler, name):
+    """A logger's own filter sees only its own records; a handler's sees every record that
+    reaches it, whichever logger made it (``uvicorn.asgi``, gunicorn, a child logger)."""
+    _handler, stream = root_handler
+    log_redact.install()
+    logging.getLogger(name).warning("GET /events/feed/%s.ics", TOKEN)
+    logging.getLogger(name).warning("scope %r", {"path": f"/de/events/feed/{TOKEN}.ics"})
+    assert TOKEN not in stream.getvalue()
+    assert "<redacted>" in stream.getvalue()
+
+
+def test_install_is_idempotent_on_handlers(root_handler):
+    handler, _stream = root_handler
+    for _ in range(3):
+        log_redact.install()
+    assert len([f for f in handler.filters if isinstance(f, log_redact.Filter)]) == 1
+
+
+def test_a_handler_added_after_install_is_covered_by_the_next_install(root_handler):
+    """The stated limit: a handler an operator adds *after* startup is not covered until
+    ``install`` runs again (it is cheap and idempotent), and proxies log on their own."""
+    log_redact.install()
+    late = logging.StreamHandler(io.StringIO())
+    logging.getLogger().addHandler(late)
+    try:
+        assert not any(isinstance(f, log_redact.Filter) for f in late.filters)
+        log_redact.install()
+        assert any(isinstance(f, log_redact.Filter) for f in late.filters)
+    finally:
+        logging.getLogger().removeHandler(late)

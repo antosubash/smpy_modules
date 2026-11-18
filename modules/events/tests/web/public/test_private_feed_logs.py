@@ -62,6 +62,8 @@ async def test_the_filter_is_what_protects_the_log(monkeypatch, caplog):
     for name in log_redact.LOGGERS:
         target = logging.getLogger(name)
         target.filters = [f for f in target.filters if not isinstance(f, log_redact.Filter)]
+    for handler in log_redact._handlers():  # handlers carry the filter too since install()
+        handler.filters = [f for f in handler.filters if not isinstance(f, log_redact.Filter)]
     async with private_http() as http:
         world = await seed_world(http)
         http.app.add_middleware(RequestLoggingMiddleware)
