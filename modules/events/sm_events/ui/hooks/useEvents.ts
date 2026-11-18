@@ -88,7 +88,13 @@ export function useEvents(locale?: string) {
 
   useEffect(() => {
     const text = toQuery(applied);
-    history.replaceState(null, '', text ? `${location.pathname}?${text}` : location.pathname);
+    // Keep `history.state`: it holds the page Inertia restores on Back (a null here left a Back
+    // from the editor on the editor).
+    history.replaceState(
+      history.state,
+      '',
+      text ? `${location.pathname}?${text}` : location.pathname,
+    );
   }, [applied]);
 
   // `tick` is the reload trigger, not a read.
