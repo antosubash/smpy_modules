@@ -50,6 +50,9 @@ class EventCard(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     id: uuid.UUID
+    """The event's internal id: a consumer may store it to look the card up again. It must never
+    be rendered into public HTML, an email, a feed or page JSON (the public surface is keyed by
+    slug and never carries event ids)."""
     title: str
     summary: str
     """Plain text as the page shows it; ``""`` when there is none."""
