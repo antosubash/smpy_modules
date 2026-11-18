@@ -2,7 +2,7 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { errorText } from '../utils/api';
 import { keys, useT } from '../utils/i18n';
-import { OCCURRENCE_LIMIT } from './limits';
+import { OCCURRENCE_LIMIT } from '../utils/limits';
 
 type Props = {
   loading: boolean;

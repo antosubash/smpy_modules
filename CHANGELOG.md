@@ -37,7 +37,7 @@ name the module they affect.
   all" prompt for series, and a Move dialog as the keyboard path. A drag writes
   the event's own wall clock and never rewrites a rule. The reusable `Calendar`
   component (`@simple-module-py/events`) takes a fetcher, calendars, optional
-  `editing` and render slots. **New dependency:** FullCalendar 7 (MIT, exact pin)
+  `editing` and render slots. **New dependency:** FullCalendar 7 (MIT, `^7.1.5`; the lockfile holds the resolved version)
   and `temporal-polyfill`; the grid is a lazy chunk of about 80 kB gzipped. No
   migration.
 

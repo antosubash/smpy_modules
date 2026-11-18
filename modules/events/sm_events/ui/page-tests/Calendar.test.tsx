@@ -2,7 +2,7 @@
 
 import { updateI18n } from '@simple-module-py/i18n';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { fakeGrid } from '../calendar/test-support/FakeGrid';
+import { fakeGrid } from '../calendar/FakeGrid-test-support';
 import { ApiError } from '../utils/api';
 import {
   buttonNamed,
@@ -16,7 +16,7 @@ import { flush } from './support';
 import { click } from './test-dom';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
-vi.mock('../calendar/adapter/FullCalendarGrid', () => import('../calendar/test-support/FakeGrid'));
+vi.mock('../calendar/adapter/FullCalendarGrid', () => import('../calendar/FakeGrid-test-support'));
 
 const checkbox = (label: string) =>
   [...document.querySelectorAll('label')]

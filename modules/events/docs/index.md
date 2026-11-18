@@ -249,7 +249,8 @@ screens never request it.
 
 ## FullCalendar
 
-The grid is FullCalendar 7, pinned exactly, MIT packages only: the allow-list
+The grid is FullCalendar 7 (`@fullcalendar/react` `^7.1.5`, as every module ranges its
+third-party packages; `package-lock.json` holds the resolved version), MIT packages only: the allow-list
 is `@fullcalendar/react`, `@fullcalendar/core` and `@full-ui/headless-calendar`,
 and `boundaries.test.ts` fails on any other `@fullcalendar/*` or `@full-ui/*`
 package, on a name containing `scheduler`, `resource`, `timeline` or `premium`,

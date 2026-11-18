@@ -143,7 +143,7 @@ Each ruling below is **my call** unless it cites the spec. The maintainer may ov
 22. **Locale** (spec): FullCalendar's locale follows `useT().locale`: `de` loads `@fullcalendar/react/locales/de` (Monday week start, 24-hour), and anything else uses the built-in `en` (Sunday, 12-hour). Every string of ours goes through `t(keys.events.calendar.*)`. Our dates go through `Intl.DateTimeFormat(locale, { timeZone })`.
 23. **Accessibility** (spec: focusable events, and a Move dialog because FullCalendar has no keyboard drag). `eventInteractive: true`. Enter or Space on a focused event opens the popover: FullCalendar's `eventClick` when it fires on Enter (Task 1 confirms), otherwise a `keydown` handler on our chip. Closing the popover returns focus to that event element. The Move dialog has start date and time, end date and time (dates only for all-day) and, for an instance, "Only this occurrence / All occurrences". It sends through the same `onChange` path, so it gets the same outcomes. The toolbar buttons and the view switcher (a toggle group with `aria-pressed`) carry names. Filters are labelled checkboxes. The grid region has `aria-label` set to the title and `aria-busy` while loading.
 24. **States.** Loading: a `role="status"` line and `aria-busy`. Error: a `role="alert"` with `errorText` and a "Retry" button. Empty (no items, not loading): "Nothing in this range" (FullCalendar's `noEventsContent` in the list view). Truncated: a persistent notice "Showing the first 2,000 items in this range. Narrow the filters or switch to a shorter view."
-25. **Console screen.** `GET /admin/events/` (`events.view`) renders the new page `events/Calendar` with `{**view_props, "calendars": [{id, name, color, visibility, default_timezone, can_write_events}], "categories", "default_timezone", "content_locales", "editor_url"}` and replaces PR 1's 303. A new menu entry "Calendar" (`events.view`, `order=390`, icon `calendar-range`) comes first in the Events group, before "Events" (395) and "Calendars" (400).
+25. **Console screen.** `GET /admin/events/` (`events.view`) renders the new page `events/Calendar` with `{**view_props, "calendars": [{id, name, color, visibility, default_timezone, can_write_events}], "categories", "default_timezone", "content_locales", "editor_url"}` and replaces PR 1's 303. A new menu entry "Calendar" (`events.view`, `order=390`, icon `calendar`) comes first in the Events group, before "Events" (395) and "Calendars" (400).
 
 ## Global Constraints
 
@@ -153,7 +153,7 @@ Each ruling below is **my call** unless it cites the spec. The maintainer may ov
 - Never run `ruff format` or `biome format` repo-wide. Format only the files touched. Never commit `.env*`.
 - Names: package `sm_events`, npm `@simple-module-py/events`, locale namespace `events` (new keys under `calendar.*` and `menu.calendar`), API prefix `/api/events`, view prefix `/admin/events`, page `events/Calendar`.
 - Version stays `0.0.15` (`uv run python scripts/bump_version.py --check-current`).
-- FullCalendar and temporal-polyfill are pinned exactly (7.1.5, 1.0.8). Only the Ruling 1 packages are added. `npm install` runs at the root (workspaces), and `package-lock.json` is committed with it.
+- FullCalendar and temporal-polyfill use caret ranges (`^7.1.5`, `^1.0.8`) like every module; the lockfile holds 7.1.5 and 1.0.8. Only the Ruling 1 packages are added. `npm install` runs at the root (workspaces), and `package-lock.json` is committed with it.
 - The frontend imports other modules only as `@simple-module-py/<module>` (`scripts/check_ts_imports.py`). Nothing in this PR imports another module.
 - 300-line cap. Keep every `.py`/`.ts`/`.tsx` under 280 lines. The File Structure below gives each file a budget.
 - No literal permission, page, module-name or error-code strings outside `core/constants.py` (`scripts/check_hardcoded_strings.py`).
@@ -424,7 +424,7 @@ export function baseOptions(): Record<string, unknown>;                   // Rul
 ### Task 6: The console calendar screen (read-only)
 
 **Files:**
-- Modify: `sm_events/core/constants.py` (`_PAGE_CALENDAR = f"{MODULE_NAME}/Calendar"`, `CALENDAR_URL = f"{VIEW_PREFIX}/"`, `MENU_LABEL_CALENDAR = "Calendar"`, `MENU_LABEL_KEY_CALENDAR = "events.menu.calendar"`, `MENU_ICON_CALENDAR = "calendar-range"`)
+- Modify: `sm_events/core/constants.py` (`_PAGE_CALENDAR = f"{MODULE_NAME}/Calendar"`, `CALENDAR_URL = f"{VIEW_PREFIX}/"`, `MENU_LABEL_CALENDAR = "Calendar"`, `MENU_LABEL_KEY_CALENDAR = "events.menu.calendar"`, `MENU_ICON_CALENDAR = "calendar"`)
 - Modify: `web/endpoints/views.py` (`GET /` renders the page; Ruling 25), `web/endpoints/menu.py` (the entry, `order=390`), `locales/*.json` (`menu.calendar`, `calendar.title`, `calendar.subtitle`)
 - Create: `sm_events/pages/Calendar.tsx`, `ui/calendar/console/ConsoleCalendar.tsx` (without editing yet), `ui/calendar/console/urlState.ts` (`readState(search: string): Partial<CalendarState>`, `writeState(state): string`)
 - Modify: `host/tests/test_menu_labels.py` (item count +1 from what PR 2 left), `host/tests/test_events_wiring.py` (`/admin/events/` is now a page, not a redirect)

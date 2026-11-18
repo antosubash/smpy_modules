@@ -2,13 +2,13 @@
 
 import { updateI18n } from '@simple-module-py/i18n';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { fakeGrid } from '../calendar/test-support/FakeGrid';
+import { fakeGrid } from '../calendar/FakeGrid-test-support';
 import { buttonNamed, MARCH } from './calendar-support';
 import { category, flush, stubFetch } from './support';
 import { act, click, mount } from './test-dom';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
-vi.mock('../calendar/adapter/FullCalendarGrid', () => import('../calendar/test-support/FakeGrid'));
+vi.mock('../calendar/adapter/FullCalendarGrid', () => import('../calendar/FakeGrid-test-support'));
 const { default: CalendarPage } = await import('../../pages/Calendar');
 
 const calendars = [
