@@ -38,7 +38,7 @@ from sm_events.web.endpoints.public import _cache, _clock, _urls
 from sm_events.web.endpoints.public._errors import PublicErrorRoute
 from sm_events.web.endpoints.public._respond import machine_response
 
-__all__ = ["calendar_feed_router", "event_feed_router", "safe_filename"]
+__all__ = ["calendar_feed_router", "event_feed_router", "ics_file", "safe_filename"]
 
 _log = logging.getLogger("sm_events.public")
 _METHODS = sorted(constants.PUBLIC_METHODS)
@@ -79,7 +79,7 @@ def _respond(
     )
 
 
-def _file(items: list[FeedEvent], *, name: str, timezone: str, now: datetime) -> bytes:
+def ics_file(items: list[FeedEvent], *, name: str, timezone: str, now: datetime) -> bytes:
     first, last = _zone_range(now)
     return ics_calendar.build(items, name=name, timezone=timezone, first=first, last=last)
 
@@ -102,7 +102,7 @@ def calendar_feed_router(locale: str) -> APIRouter:
             now=now,
             url_for=lambda slug, loc: _urls.absolute(request, _urls.event_path(slug, loc)),
         )
-        body = _file(
+        body = ics_file(
             read.items,
             name=_urls.site_title(settings),
             timezone=timezones.effective(settings.default_timezone),
@@ -134,7 +134,7 @@ def calendar_feed_router(locale: str) -> APIRouter:
             now=now,
             url_for=lambda slug, loc: _urls.absolute(request, _urls.event_path(slug, loc)),
         )
-        body = _file(
+        body = ics_file(
             read.items,
             name=found.name,
             timezone=timezones.effective(found.default_timezone),
@@ -170,7 +170,7 @@ def event_feed_router(locale: str) -> APIRouter:
             url_for=lambda s, loc: _urls.absolute(request, _urls.event_path(s, loc)),
         )
         now = _clock.now()
-        body = _file(
+        body = ics_file(
             read.items,
             name=text.title,
             timezone=timezones.effective(event.timezone),

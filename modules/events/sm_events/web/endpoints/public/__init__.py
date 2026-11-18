@@ -14,21 +14,23 @@ in this order:
 1. ``GET|HEAD /sitemap.xml`` (default language only)
 2. ``/api/occurrences`` (default language only)
 3. ``/calendar.ics``, ``/c/{calendar}.ics``
-4. ``/c/{calendar}``, ``/``
-5. ``/{slug}.ics``
-6. ``/{slug}`` last
+4. ``/feed/{token}.ics`` (default language only; the language is on the link's row)
+5. ``/c/{calendar}``, ``/``
+6. ``/{slug}.ics``
+7. ``/{slug}`` last
 
 (``calendar``, ``c``, ``api``, ``feed`` and ``sitemap`` are reserved slugs for this reason.)
 The bare prefix (``/events``) is the redirect Starlette makes to ``/events/``; the auth
 exemption covers both.
 
-**Two binders.** The pages a person reads bind with
+**Three tenancies.** The pages a person reads bind with
 :func:`~sm_events.web.endpoints.public._tenant.public_tenant`, which yields ``None`` for a
 request that resolved no tenant so the endpoint answers the 404 without a query. The
 machine-read routes (feeds, sitemap, API) bind with ``bind_public``: no tenant is a plain
-404. Both are the router's **first** dependency. Every router uses
-:class:`~sm_events.web.endpoints.public._errors.PublicErrorRoute`, so every error leaves
-``no-store``.
+404. Both are the router's **first** dependency. The private feed binds neither: it takes its
+tenant from the link's row (``_private_feed``, the third documented exception). Every other
+router uses :class:`~sm_events.web.endpoints.public._errors.PublicErrorRoute`, so every error
+leaves ``no-store``.
 
 Nothing here takes a viewer from the request: the anonymous gate
 (:mod:`sm_events.core.access.public`) decides what is visible, for everyone.
@@ -52,6 +54,7 @@ from sm_events.web.endpoints.public._event import event_router
 from sm_events.web.endpoints.public._feeds import calendar_feed_router, event_feed_router
 from sm_events.web.endpoints.public._index import index_router
 from sm_events.web.endpoints.public._not_found import not_found
+from sm_events.web.endpoints.public._private_feed import router as private_feed_router
 from sm_events.web.endpoints.public._sitemap import sitemap_router
 from sm_events.web.endpoints.public._tenant import public_tenant
 
@@ -67,6 +70,8 @@ def public_router(locale: str) -> APIRouter:
         router.include_router(sitemap_router(), dependencies=machine)
         router.include_router(api_router(), dependencies=machine)
     router.include_router(calendar_feed_router(locale), dependencies=machine)
+    if locales.is_default(locale):
+        router.include_router(private_feed_router)  # no binder: the link's row names the tenant
     router.include_router(index_router(locale), dependencies=reader)
     router.include_router(event_feed_router(locale), dependencies=machine)
     router.include_router(event_router(locale), dependencies=reader)

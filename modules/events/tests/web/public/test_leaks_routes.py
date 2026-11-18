@@ -27,7 +27,7 @@ async def test_every_get_route_under_the_prefix_has_a_surface(public_locales_cli
     for prefix, default in (("/events", True), ("/de/events", False)):
         for template, surface in ROUTE_SURFACES.items():
             path = template.format(prefix=prefix.lstrip("/"))
-            if not default and surface in ("sitemap", "occurrences api"):
+            if not default and surface in ("sitemap", "occurrences api", "private feed"):
                 continue
             expected[path] = surface
     found = public_get_routes(app, "/events") | public_get_routes(app, "/de/events")

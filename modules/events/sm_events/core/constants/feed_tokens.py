@@ -21,6 +21,7 @@ __all__ = [
     "NO_REFERRER",
     "PRIVATE_FEEDS_UNAVAILABLE_CODE",
     "PRIVATE_FEEDS_UNAVAILABLE_DETAIL",
+    "PRIVATE_FEED_CACHE_CONTROL",
     "PRIVATE_FEED_ERROR_BODY",
     "PRIVATE_FEED_NO_STORE",
     "PRIVATE_FEED_THROTTLED_BODY",
@@ -63,6 +64,8 @@ FEED_THROTTLE_KEYS: Final = 10_000
 NO_REFERRER: Final = "no-referrer"
 NO_INDEX: Final = "noindex"
 PRIVATE_FEED_NO_STORE: Final = "no-store"
+PRIVATE_FEED_CACHE_CONTROL: Final = "private, no-store"
+"""A served feed: not shareable, not stored."""
 PRIVATE_FEED_ERROR_BODY: Final = b'{"detail":"Not found","code":"not_found"}'
 """The one body of every refusal (a constant, never built from the request)."""
 PRIVATE_FEED_THROTTLED_BODY: Final = b'{"detail":"Too many requests","code":"rate_limited"}'

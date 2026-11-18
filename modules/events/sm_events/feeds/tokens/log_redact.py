@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import re
 import traceback
-from typing import Final
+from typing import Any, Final
 
 from sm_events.core import constants
 
@@ -30,12 +30,19 @@ LOGGERS: Final = (
     "simple_module.request_guard",
     "uvicorn.access",
     "uvicorn.error",
+    "aiosqlite",
+    "sqlalchemy.engine.Engine",
 )
-"""The request log, the rate limiter's and body limit's (one logger), and uvicorn's two."""
+"""The request log, the rate limiter's and body limit's (one logger), uvicorn's two, and the
+two database loggers that print a statement's parameters (``aiosqlite`` at DEBUG, SQLAlchemy's
+engine when ``echo`` is on): the digest the lookup binds must not reach them either."""
 REDACTED: Final = "<redacted>"
 
 _SEGMENT: Final = re.compile(rf'(/{constants.FEED_PATH_SEGMENT}/)[^/?#\s"\']+')
 _SHAPE: Final = re.compile(rf"{re.escape(constants.TOKEN_PREFIX)}[A-Za-z0-9_-]{{20,}}")
+_DIGEST: Final = re.compile(rf"(?<![0-9a-f])[0-9a-f]{{{constants.TOKEN_HASH_LENGTH}}}(?![0-9a-f])")
+"""A SHA-256 hex digest: what the hash lookup binds. Any such string is scrubbed (a digest of
+something else loses nothing a log needs)."""
 _STANDARD: Final = frozenset(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {
     "message",
     "asctime",
@@ -43,10 +50,23 @@ _STANDARD: Final = frozenset(logging.LogRecord("", 0, "", 0, "", (), None).__dic
 
 
 def redact(text: str) -> str:
-    """``text`` with the segment after ``/feed/`` and any token-shaped string replaced."""
-    if constants.TOKEN_PREFIX not in text and f"/{constants.FEED_PATH_SEGMENT}/" not in text:
-        return text
-    return _SHAPE.sub(REDACTED, _SEGMENT.sub(rf"\1{REDACTED}", text))
+    """``text`` with the segment after ``/feed/``, any token-shaped string and any SHA-256
+    digest replaced."""
+    text = _SEGMENT.sub(rf"\1{REDACTED}", text)
+    return _DIGEST.sub(REDACTED, _SHAPE.sub(REDACTED, text))
+
+
+def _clean(value: Any) -> Any:
+    """``value`` with every string in it redacted; other types are left as they are."""
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, tuple):
+        return tuple(_clean(v) for v in value)
+    if isinstance(value, list):
+        return [_clean(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _clean(v) for k, v in value.items()}
+    return value
 
 
 class Filter(logging.Filter):
@@ -68,8 +88,8 @@ class Filter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         self._message(record)
         for key, value in list(record.__dict__.items()):
-            if key not in _STANDARD and isinstance(value, str):
-                setattr(record, key, redact(value))
+            if key not in _STANDARD:
+                setattr(record, key, _clean(value))
         if record.exc_info and not record.exc_text:
             # The handler would render this later from the live exception, message and all.
             record.exc_text = redact("".join(traceback.format_exception(*record.exc_info)).rstrip())

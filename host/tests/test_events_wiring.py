@@ -29,6 +29,9 @@ EVENTS_TABLES = {
     "events_revision",
     "events_redirect",
     "events_calendar_redirect",
+    "events_feed_token",
+    "events_import",
+    "events_import_item",
 }
 
 
@@ -134,12 +137,20 @@ def test_public_routes_wired_by_startup(booted_host, monkeypatch):
                 feed = await http.get("/events/calendar.ics")
                 missing = await http.get("/events/no-such-event.ics")
                 write = await http.post("/events/no-such-event")
+                private = await http.get(f"/events/feed/evf_{'0' * 43}.ics")
+                private_head = await http.head(f"/events/feed/evf_{'0' * 43}.ics")
+                private_bad = await http.get("/events/feed/not-a-token.ics")
             return {
                 "paths": paths,
                 "page": page,
                 "feed": feed,
                 "missing": missing,
                 "write": write,
+                "private": private,
+                "private_head": private_head,
+                "private_bad": private_bad,
+                "private_rate": getattr(rules.match("GET", "/events/feed/evf_x.ics"), "rate", None),
+                "private_exempt": is_public(app, "GET", "/events/feed/evf_x.ics"),
                 "get_public": is_public(app, "GET", "/events/x"),
                 "post_public": is_public(app, "POST", "/events/x"),
                 "feed_rate": getattr(rules.match("GET", "/events/calendar.ics"), "rate", None),
@@ -154,6 +165,7 @@ def test_public_routes_wired_by_startup(booted_host, monkeypatch):
         "/events/calendar.ics",
         "/events/sitemap.xml",
         "/events/api/occurrences",
+        "/events/feed/{token}.ics",
     } <= got["paths"]
     assert got["get_public"] is True and got["post_public"] is False
     assert (got["feed_rate"], got["api_rate"]) == ("60/minute", "120/minute")
@@ -166,6 +178,20 @@ def test_public_routes_wired_by_startup(booted_host, monkeypatch):
     assert got["missing"].status_code == 404
     assert got["missing"].json() == {"detail": "Not found", "code": "not_found"}
     assert got["write"].status_code not in (200, 404)  # still behind the sign-in
+    # A private feed link: public to ``GET``/``HEAD`` (the token is the credential), its own
+    # budget, and one answer for any link nobody holds, well formed or not.
+    assert got["private_exempt"] is True
+    assert got["private_rate"] == "30/minute"
+    for refused in (got["private"], got["private_bad"]):
+        assert refused.status_code == 404, refused.text[:300]
+        assert refused.json() == {"detail": "Not found", "code": "not_found"}
+        assert refused.headers["cache-control"] == "no-store"
+        # The route sends ``no-referrer`` (its own tests pin that), but the framework's
+        # SecurityHeadersMiddleware replaces ``Referrer-Policy`` on every response, so a real
+        # host answers its own value. Pinned so a framework change either way is noticed.
+        assert refused.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+        assert "etag" not in refused.headers
+    assert got["private_head"].status_code == 404 and got["private_head"].content == b""
 
 
 def test_not_modified_carries_what_we_pin(booted_host, monkeypatch):

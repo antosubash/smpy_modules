@@ -100,3 +100,16 @@ def test_installed_filter_reaches_a_record_logged_on_the_logger(name, caplog):
     with caplog.at_level(logging.DEBUG):
         logging.getLogger(name).warning("hit /events/feed/%s.ics", TOKEN)
     assert TOKEN not in caplog.text
+
+
+def test_a_digest_is_scrubbed():
+    """What the lookup binds is logged by database drivers at DEBUG: never the digest either."""
+    from sm_events.feeds.tokens.codec import hash_token
+
+    digest = hash_token(TOKEN)
+    record = _record("SELECT ... WHERE token_hash = ?", (), params=(digest,), note=f"x{digest}y")
+    record.msg = f"executing {record.msg!r} with {(digest,)!r}"
+    log_redact.Filter().filter(record)
+    assert digest not in record.getMessage() and digest not in str(record.__dict__)
+    keep = "a" * 63  # not a digest
+    assert log_redact.redact(keep) == keep
