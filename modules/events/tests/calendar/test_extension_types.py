@@ -18,6 +18,7 @@ TYPES = [
     "Source",
     "SourceCalendar",
     "SourceContext",
+    "SourceError",
     "SourceOccurrence",
     "SourceSettingsError",
     "SourceStatus",

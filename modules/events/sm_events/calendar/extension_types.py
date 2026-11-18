@@ -8,6 +8,7 @@ savepoint (see :mod:`sm_events.calendar.plugin_runner`).
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -28,6 +29,7 @@ __all__ = [
     "Source",
     "SourceCalendar",
     "SourceContext",
+    "SourceError",
     "SourceOccurrence",
     "SourceSettingsError",
     "SourceStatus",
@@ -135,6 +137,18 @@ class EventType:
     extra_model: type[BaseModel]
     public_fields: frozenset[str] = frozenset()
     icon: str | None = None
+
+
+class SourceError(Exception):
+    """Raised by a source's ``occurrences`` to say why it cannot answer: ``code`` (lowercase,
+    digits and underscores, at most 32 characters) becomes the status code the console shows,
+    instead of the generic ``raised``. It carries no message: put nothing private in it."""
+
+    def __init__(self, code: str) -> None:
+        if not re.fullmatch(r"[a-z0-9_]{1,32}", code):
+            raise ValueError("a source error code is 1-32 of [a-z0-9_]")
+        super().__init__(code)
+        self.code = code
 
 
 class SourceSettingsError(Exception):

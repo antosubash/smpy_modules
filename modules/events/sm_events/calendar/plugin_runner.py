@@ -28,6 +28,7 @@ from sm_events.calendar.extension_types import (
     Source,
     SourceCalendar,
     SourceContext,
+    SourceError,
     SourceStatus,
     SourceViewer,
 )
@@ -144,6 +145,8 @@ async def _one(
         phase.broken = True
         _log(call, f"the session could not be restored ({exc})")
         return [], _status(call, FAILED, CODE_SESSION)
+    except SourceError as exc:
+        return [], _status(call, FAILED, exc.code)
     except InvalidPluginItem as exc:
         return [], _status(call, FAILED, exc.code)
     except Exception as exc:

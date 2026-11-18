@@ -48,3 +48,19 @@ async def test_a_timeout_inside_a_query_never_leaves_an_unusable_session(db, mon
     assert status(result) in (("timeout", None), ("failed", "session"))
     if status(result) == ("timeout", None):
         assert (await db.execute(sa_select(Calendar))).scalars().all()  # still usable
+
+
+async def test_a_source_can_name_why_it_failed(db):
+    """``SourceError`` carries a short code the status shows; anything else is ``raised``."""
+    import pytest
+    from sm_events.contracts.extensions import SourceError
+
+    async def broken(ctx, start, end):
+        raise SourceError("field_changed")
+
+    cal = (await calendars(db))["I"]
+    result = await run(db, [Call(cal, entry("acme:fake"), FakeSource(behave=broken))])
+    assert (result.statuses[0].status, result.statuses[0].code) == ("failed", "field_changed")
+    for bad in ("", "Has Space", "x" * 40, "ünï"):
+        with pytest.raises(ValueError):
+            SourceError(bad)
