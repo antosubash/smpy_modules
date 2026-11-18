@@ -6,7 +6,7 @@ import type {
   EventPage,
   EventPatch,
   EventQuery,
-  Occurrence,
+  OccurrencePage,
   OccurrenceQuery,
   OverrideInput,
   OverrideResult,
@@ -61,6 +61,4 @@ export const clearOverride = (id: string, overrideId: number, revision: number) 
 export const previewRecurrence = (body: PreviewInput, signal?: AbortSignal) =>
   send<Preview>('/api/events/recurrence/preview', { method: 'POST', json: body, signal });
 export const listOccurrences = (params: OccurrenceQuery, signal?: AbortSignal) =>
-  send<{ items: Occurrence[]; truncated: boolean }>(`/api/events/occurrences${query(params)}`, {
-    signal,
-  });
+  send<OccurrencePage>(`/api/events/occurrences${query(params)}`, { signal });

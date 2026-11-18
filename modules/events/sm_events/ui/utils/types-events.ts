@@ -202,11 +202,13 @@ export type Occurrence = {
   original_start: string | null;
   event_status: string | null;
 };
+export type OccurrencePage = { items: Occurrence[]; truncated: boolean };
 export type OccurrenceQuery = {
   start: string;
   end: string;
   calendar?: string[];
   category?: string[];
+  type?: string[];
   locale?: string;
   include_unpublished?: boolean;
 };
