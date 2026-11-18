@@ -100,7 +100,7 @@ def _check_model(label: str, model: Any, *, forbid_extra: bool) -> None:
         ) from exc
 
 
-def _check_source(source: Any, label: str) -> None:
+def _check_source(source: Any, label: str, *, builtin: bool = False) -> None:
     for name in ("id", "label_key"):
         value = getattr(source, name, None)
         if not isinstance(value, str) or not value:
@@ -116,7 +116,11 @@ def _check_source(source: Any, label: str) -> None:
     model = getattr(source, "settings_model", None)
     if model is not None:
         _check_model(f"{label}: settings_model", model, forbid_extra=False)
-    if not inspect.iscoroutinefunction(getattr(source, "occurrences", None)):
+    read = getattr(source, "occurrences", None)
+    if builtin:  # the internal protocol: an async generator over the read's own context
+        if not inspect.isasyncgenfunction(read):
+            raise InvalidExtension(f"{label}: occurrences must be an async generator")
+    elif not inspect.iscoroutinefunction(read):
         raise InvalidExtension(f"{label}: occurrences must be an 'async def' method")
     check = getattr(source, "check_settings", None)
     if check is not None and not inspect.iscoroutinefunction(check):
@@ -177,7 +181,7 @@ def register_builtin_source(source: Any) -> None:
     global _builtin_source
     if getattr(source, "id", None) != constants.SOURCE_EVENTS:
         raise InvalidExtensionId(f"the built-in source id must be {constants.SOURCE_EVENTS!r}")
-    _check_source(source, "built-in source")
+    _check_source(source, "built-in source", builtin=True)
     with lock:
         if _frozen:
             raise RegistryFrozenError("registry is frozen; cannot register the built-in source")

@@ -42,6 +42,9 @@
     "internal": "Intern",
     "public": "Öffentlich"
   },
+  "types": {
+    "event": "Veranstaltung"
+  },
   "calendars": {
     "title": "Kalender",
     "subtitle": "Kalender, Sichtbarkeit und geteilten Zugriff verwalten.",

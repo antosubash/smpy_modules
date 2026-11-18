@@ -5,7 +5,10 @@ from __future__ import annotations
 __all__ = [
     "BUILTIN_SOURCE_CODE",
     "BUILTIN_SOURCE_DETAIL",
+    "BUILTIN_SOURCE_ICON",
+    "BUILTIN_SOURCE_LABEL_KEY",
     "BUILTIN_TYPE",
+    "BUILTIN_TYPE_LABEL_KEY",
     "CALENDAR_SOURCES_MAX",
     "DUPLICATE_SOURCE_CODE",
     "DUPLICATE_SOURCE_DETAIL",
@@ -77,3 +80,8 @@ TYPE_NOT_INSTALLED_DETAIL = (
 )
 SOURCE_UNAVAILABLE_CODE = "source_unavailable"
 SOURCE_UNAVAILABLE_DETAIL = "The source could not check its settings"
+
+# The built-ins' registry entries.
+BUILTIN_TYPE_LABEL_KEY = "events.types.event"
+BUILTIN_SOURCE_LABEL_KEY = "events.menu.events"
+BUILTIN_SOURCE_ICON = "calendar"

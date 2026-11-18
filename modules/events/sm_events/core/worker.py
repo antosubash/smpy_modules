@@ -44,8 +44,10 @@ def worker_session_factory() -> Any:
     from simple_module_db.query_filter import bind_engine_policy
     from sqlalchemy.pool import NullPool
 
+    from sm_events.calendar import registry
     from sm_events.core.tenancy import install_guard
 
+    registry.ensure_loaded()  # a worker runs no module hook: load what the web process loads
     url, policy, options = _config()
     key = (url, policy.tenant_strict, policy.default_tenant_id, tuple(sorted(options.items())))
     pid = os.getpid()

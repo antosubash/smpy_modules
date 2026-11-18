@@ -18,8 +18,9 @@ from typing import Any
 from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.listeners import current_tenant_id
 
+from sm_events.calendar import registry
 from sm_events.calendar.occurrence import Occurrence, OccurrenceFilters, OccurrencePage
-from sm_events.calendar.sources import SOURCES, TRUNCATED, SourceContext, sort_key
+from sm_events.calendar.sources import TRUNCATED, ReadContext, sort_key
 from sm_events.calendar.times import supported_instant
 from sm_events.core import constants
 from sm_events.core.errors import InvalidRange
@@ -77,14 +78,14 @@ async def occurrences(
         raise InvalidRange(constants.RANGE_TOO_LONG_DETAIL, code=constants.RANGE_TOO_LONG_CODE)
     if current_tenant_id.get() != tenant_id:
         raise ValueError("tenant_id is not the tenant bound for this read")
-    ctx = SourceContext(
+    ctx = ReadContext(
         tenant_id=tenant_id,
         viewer=viewer,
         default_locale=default_locale,
         editor_url=_editor_url,
         locale=filters.locale,
     )
-    merged = _merge([s.occurrences(db, ctx, start, end, filters) for s in SOURCES.values()])
+    merged = _merge([registry.builtin_source().occurrences(db, ctx, start, end, filters)])
     items: list[Occurrence] = []
     async for item in merged:
         items.append(item)

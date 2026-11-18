@@ -42,6 +42,9 @@
     "internal": "Internal",
     "public": "Public"
   },
+  "types": {
+    "event": "Event"
+  },
   "calendars": {
     "title": "Calendars",
     "subtitle": "Manage calendars, visibility and shared access.",
