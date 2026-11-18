@@ -12,6 +12,19 @@ afterEach(() => {
 const html = async (nodes: Node[]) => (await mount(<RichText nodes={nodes} />)).host.innerHTML;
 
 describe('RichText', () => {
+  it('styles lists, which the host stylesheet resets, so bullets and numbers show', async () => {
+    const view = await mount(<RichText nodes={[{ t: 'ul', c: [{ t: 'li', c: ['x'] }] }]} />);
+    const classes = view.find('div')?.className ?? '';
+    for (const wanted of [
+      '[&_ul]:list-disc',
+      '[&_ol]:list-decimal',
+      '[&_ul]:pl-6',
+      '[&_ol]:pl-6',
+    ]) {
+      expect(classes).toContain(wanted);
+    }
+  });
+
   it('renders allowed tags', async () => {
     const out = await html([
       { t: 'h2', c: ['Title'] },

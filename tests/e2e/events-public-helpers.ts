@@ -82,7 +82,8 @@ export async function seedPublic(page: Page): Promise<PublicSeed> {
     end: `${start}T11:00`,
     rrule: 'FREQ=WEEKLY;COUNT=6',
     venue: 'Seminar room',
-    description: '<p>Every week, <strong>bring a pen</strong>.</p>',
+    description:
+      '<p>Every week, <strong>bring a pen</strong>.</p><ul><li>Paper</li><li>A story to share</li></ul>',
   });
   const dates = [0, 1, 2, 3, 4, 5].map((n) => addDays(start, 7 * n));
   const items = await occurrencesOf(page, pub.id, addDays(start, -1), addDays(start, 50));

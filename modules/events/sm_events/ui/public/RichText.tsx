@@ -42,6 +42,14 @@ function render(node: Node, key: number): ReactNode {
   return <span key={key}>{children}</span>;
 }
 
+/** Running text: the host's stylesheet resets lists and headings, so they are styled here, with the
+ *  same utilities the editor's box and news' article body use. */
+export const PROSE =
+  'space-y-3 [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:text-lg [&_h3]:font-semibold ' +
+  '[&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 ' +
+  '[&_ul_ul]:list-[circle] [&_ol_ol]:list-[lower-alpha] [&_a]:underline ' +
+  '[&_blockquote]:border-l-4 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground';
+
 export function RichText({ nodes }: { nodes: Node[] }) {
-  return <div className="space-y-3">{nodes.map(render)}</div>;
+  return <div className={PROSE}>{nodes.map(render)}</div>;
 }
