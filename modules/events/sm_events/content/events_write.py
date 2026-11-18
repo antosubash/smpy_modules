@@ -17,6 +17,8 @@ queued.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Awaitable, Callable
+from datetime import datetime
 from typing import Any
 
 from simple_module_core.resources import ResourcePrincipal
@@ -30,11 +32,11 @@ from sm_events.core import constants
 from sm_events.core.access.events import load_event, require
 from sm_events.core.access.rights import writable_calendar
 from sm_events.core.errors import InvalidParent, UnknownType
-from sm_events.models import Event
+from sm_events.models import Calendar, Event
 from sm_events.models.enums import DEFAULT_EVENT_TYPE, EventStatus
 from sm_events.web.schemas.events_in import EventCreate, EventPatch
 
-__all__ = ["create_event", "update_event"]
+__all__ = ["apply_patch", "create_core", "create_event", "update_event"]
 
 SCALARS = (
     "cancelled",
@@ -56,6 +58,24 @@ async def create_event(
 ) -> Event:
     """A new draft at revision 1, with its texts and a ``created`` history row."""
     calendar = await writable_calendar(db, who, data.calendar_id)
+    return await create_core(db, calendar, data, actor=who.user_id, locales=locales)
+
+
+async def create_core(
+    db: Any,
+    calendar: Calendar,
+    data: EventCreate,
+    *,
+    actor: str | None,
+    locales: tuple[str, ...],
+    uid: str | None = None,
+    status: str = EventStatus.DRAFT.value,
+    published_at: datetime | None = None,
+    note: str | None = None,
+) -> Event:
+    """Everything :func:`create_event` does after the rights check. The import calls it with
+    its own ``uid`` (a file's), ``status`` and ``published_at`` and a history ``note``; a
+    request leaves them at their defaults (a fresh UID, a draft)."""
     if data.type != DEFAULT_EVENT_TYPE:
         raise UnknownType
     plan = schedule.build(data.times, data.rrule)
@@ -67,9 +87,10 @@ async def create_event(
     event = Event(
         calendar_id=calendar.id,
         parent_id=data.parent_id,
-        uid=f"{uuid.uuid4()}{constants.UID_SUFFIX}",
+        uid=uid or f"{uuid.uuid4()}{constants.UID_SUFFIX}",
         type=data.type,
-        status=EventStatus.DRAFT.value,
+        status=status,
+        published_at=published_at,
         all_day=plan.all_day,
         starts_at=plan.span.starts_at,
         ends_at=plan.span.ends_at,
@@ -84,7 +105,7 @@ async def create_event(
         db.add(event)
         await db.flush()
         await apply_texts(db, event, data.texts, locales=locales, creating=True)
-        await revisions.record(db, event, action="created", actor=who.user_id)
+        await revisions.record(db, event, action="created", actor=actor, note=note)
     return event
 
 
@@ -108,18 +129,29 @@ async def update_event(
     event, rights = await load_event(db, who, event_id)
     require(rights)
     try:
-        await _apply(db, who, event, data, locales)
+        await apply_patch(db, who.user_id, event, data, locales)
     except Unchanged:
         await db.refresh(event)  # the savepoint rolled back: the stored revision
     return event
 
 
-async def _apply(
-    db: Any, who: ResourcePrincipal, event: Event, data: EventPatch, locales: tuple[str, ...]
+async def apply_patch(
+    db: Any,
+    actor: str | None,
+    event: Event,
+    data: EventPatch,
+    locales: tuple[str, ...],
+    *,
+    note: str | None = None,
+    after: Callable[[Event], Awaitable[bool]] | None = None,
 ) -> None:
+    """Everything :func:`update_event` does after the rights check. Raises :class:`Unchanged`
+    (the savepoint rolled back) when nothing changes. ``note`` is added to the history row,
+    and ``after`` runs inside the savepoint once the fields and texts are applied and answers
+    whether *it* changed something (the import replaces the overrides there)."""
     sent = data.model_fields_set
     async with db.begin_nested():
-        await claim(db, event, data.expected_revision, actor=who.user_id)
+        await claim(db, event, data.expected_revision, actor=actor)
         old = schedule.of_event(event)
         was_cancelled = event.cancelled
         dropped: list = []
@@ -145,11 +177,18 @@ async def _apply(
             db, event, data.texts, locales=locales, creating=False
         ):
             changed = True
+        if after is not None and await after(event):
+            changed = True
         if not changed:
             raise Unchanged
         await db.flush()
+        notes = [n for n in (note, dropped_note(dropped)) if n]
         await revisions.record(
-            db, event, action="updated", actor=who.user_id, note=dropped_note(dropped)
+            db,
+            event,
+            action="updated",
+            actor=actor,
+            note="; ".join(notes)[: constants.NOTE_MAX] or None,
         )
         bus.emit(db, notices.series_changed(event, old))
         if event.cancelled and not was_cancelled:
