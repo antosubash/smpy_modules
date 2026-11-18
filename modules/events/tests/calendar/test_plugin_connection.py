@@ -172,3 +172,45 @@ async def test_a_real_engine_never_takes_the_shared_fallback(state, monkeypatch)
             assert plugin_isolation._own_session(host) is not None
             result = await run(host, FakeSource("acme:x", ok(item("a"))), await call_for(host))
             assert result.statuses[0].status == "ok"
+
+
+async def test_a_second_cancel_during_cleanup_still_returns_the_connection(state, monkeypatch):
+    """The cleanup is shielded: a request cancelled again while its plugin session is being rolled
+    back and closed (a client that disconnects twice, a server shutdown) must still give the
+    connection back. Without the shield the second cancel kills the cleanup mid-way."""
+    from sm_events.calendar.plugins import plugin_isolation
+
+    original = plugin_isolation._discard
+    finished = asyncio.Event()
+    in_cleanup = asyncio.Event()
+
+    async def slow_discard(session):
+        in_cleanup.set()
+        await asyncio.sleep(0.2)  # the second cancel lands here
+        await original(session)
+        finished.set()
+
+    monkeypatch.setattr(plugin_isolation, "_discard", slow_discard)
+    await seeded(state)
+    started = asyncio.Event()
+
+    async def hang(ctx, start, end):
+        await ctx.db.execute(text("SELECT 1"))
+        started.set()
+        await asyncio.sleep(30)
+        return []
+
+    with tenant_scope("default"):
+        async with state.session_factory() as host:
+            call = await call_for(host)
+            baseline = pool_out(state)
+            task = asyncio.ensure_future(run(host, FakeSource("acme:x", hang), call))
+            await asyncio.wait_for(started.wait(), 5)
+            task.cancel()
+            await asyncio.wait_for(in_cleanup.wait(), 5)
+            task.cancel()  # again, while the cleanup runs
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            await asyncio.wait_for(finished.wait(), 5)
+            await asyncio.sleep(0.05)
+            assert pool_out(state) == baseline
