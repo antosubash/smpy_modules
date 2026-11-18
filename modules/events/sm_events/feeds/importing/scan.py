@@ -75,41 +75,50 @@ def sniff(head: bytes) -> bool:
     return False
 
 
-def _decode(data: bytes) -> str:
+_BOM_BYTES: Final = _BOM.encode("utf-8")
+_FOLD: Final = (b" ", b"\t")
+
+
+def _checked(data: bytes) -> bytes:
     if len(data) > constants.IMPORT_BODY_CEILING:
         raise _fail("bytes")
     if b"\x00" in data:
         raise _fail("nul")
-    try:
-        return data.decode("utf-8").removeprefix(_BOM)
-    except UnicodeDecodeError:
-        raise ImportFailure("ics_encoding", "utf8") from None
+    return data.removeprefix(_BOM_BYTES)
 
 
-def _logical_lines(text: str):
-    """Physical lines unfolded (RFC 5545 section 3.1), each measured in UTF-8 bytes as it grows;
-    an unfolded line over the bound fails before it is joined."""
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    if text.count("\n") + 1 > constants.IMPORT_MAX_LINES:
+def _logical_lines(data: bytes):
+    """Lines unfolded on **bytes** (RFC 5545 section 3.1: a fold may split a multi-byte
+    character, so decoding comes after), each measured as it grows, then decoded one at a time.
+    An unfolded line over the bound fails before it is joined; bytes that are not UTF-8 are
+    ``ics_encoding``."""
+    raw = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    if raw.count(b"\n") + 1 > constants.IMPORT_MAX_LINES:
         raise _fail("lines")
-    parts: list[str] = []
+    parts: list[bytes] = []
     size = 0
-    for physical in text.split("\n"):
-        if physical[:1] in (" ", "\t") and parts:
-            chunk = physical[1:]
-            size += len(chunk.encode("utf-8"))
+
+    def decoded() -> str:
+        try:
+            return b"".join(parts).decode("utf-8")
+        except UnicodeDecodeError:
+            raise ImportFailure("ics_encoding", "utf8") from None
+
+    for physical in raw.split(b"\n"):
+        if physical[:1] in _FOLD and parts:
+            size += len(physical) - 1
             if size > constants.IMPORT_MAX_LINE:
                 raise _fail("line_length")
-            parts.append(chunk)
+            parts.append(physical[1:])
             continue
         if parts:
-            yield "".join(parts), size
-        size = len(physical.encode("utf-8"))
+            yield decoded(), size
+        size = len(physical)
         if size > constants.IMPORT_MAX_LINE:
             raise _fail("line_length")
         parts = [physical]
     if parts:
-        yield "".join(parts), size
+        yield decoded(), size
 
 
 def _split(line: str) -> tuple[str, dict[str, str], str]:
@@ -198,7 +207,7 @@ def scan(data: bytes) -> Scanned:
     (``ics_encoding``, ``ics_invalid`` or ``too_many_events``) naming the bound that tripped."""
     state = _State()
     first = True
-    for line, size in _logical_lines(_decode(data)):
+    for line, size in _logical_lines(_checked(data)):
         if not line.strip():
             continue
         name, params, value = _split(line)

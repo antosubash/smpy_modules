@@ -213,3 +213,43 @@ def test_all_day_series_values_are_dates():
     assert override.kind == "skipped" and override.original_start == datetime(
         2026, 7, 12, 22, tzinfo=UTC
     )
+
+
+def test_a_date_valued_until_on_a_timed_rule_is_the_end_of_that_local_day():
+    """``UNTIL=20260727`` keeps the Monday 27 July 10:00 occurrence (the day's end)."""
+    from sm_events.calendar import rrule
+    from sm_events.calendar.expand import instances
+    from sm_events.calendar.times import to_span
+
+    lines = event(
+        "u@x",
+        "RRULE:FREQ=WEEKLY;UNTIL=20260727",
+        dtstart=f"DTSTART;{VIENNA}:20260706T100000",
+        start="20260706T100000",
+        end="20260706T110000",
+    )
+    lines[3] = f"DTEND;{VIENNA}:20260706T110000"
+    e = one(*lines).event
+    assert e is not None
+    span = to_span(
+        all_day=False,
+        timezone=e.times.timezone,
+        start=e.times.start,
+        end=e.times.end,
+        recurring=True,
+    )
+    rule = rrule.parse(e.rrule, all_day=False, timezone=e.times.timezone)
+    until = rrule.validate(rule, span, all_day=False, timezone=e.times.timezone)
+    days = [
+        i.start.astimezone(__import__("zoneinfo").ZoneInfo(e.times.timezone)).day
+        for i in instances(
+            rule=rule,
+            span=span,
+            all_day=False,
+            timezone=e.times.timezone,
+            window_start=span.starts_at,
+            window_end=span.starts_at.replace(year=2027),
+            recurrence_until=until,
+        )
+    ]
+    assert days == [6, 13, 20, 27]

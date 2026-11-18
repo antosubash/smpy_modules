@@ -130,13 +130,8 @@ def test_hostile_corpus(name, build, code):
     assert "mailto" not in text and "Talk" not in text and "x" * 20 not in text  # no file content
 
 
-def test_a_file_is_refused_by_its_size_before_anything_is_decoded(monkeypatch):
-    seen = []
-    real = bytes.decode
-    monkeypatch.setattr(scan_module, "_decode", lambda data: seen.append(len(data)) or real(data))
-    big = b"x" * (constants.IMPORT_BODY_CEILING + 1)
-    monkeypatch.undo()
-    fails(big, INVALID, "bytes")
+def test_a_file_is_refused_by_its_size_before_anything_is_read():
+    fails(b"x" * (constants.IMPORT_BODY_CEILING + 1), INVALID, "bytes")
 
 
 # --- each bound: at the limit passes, one past fails -------------------------------------------
@@ -224,3 +219,47 @@ def test_attendee_bound():
     at = constants.IMPORT_MAX_ATTENDEES
     assert scan(corpus.with_event_lines(at)).events
     fails(corpus.with_event_lines(at + 1), INVALID, "attendees")
+
+
+# --- unfolding (RFC 5545 section 3.1) is pinned by what the unfolded text *says* ---------------
+
+
+def _summary(raw: bytes) -> str:
+    data = (
+        b"BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:a@x\r\n"
+        + raw
+        + b"\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    )
+    props = {p.name: p.value for p in scan(data).events[0].props}
+    return props["SUMMARY"]
+
+
+@pytest.mark.parametrize(
+    ("raw", "want"),
+    [
+        (b"SUMMARY:a\r\n b", "ab"),  # the fold's one space is removed, not kept
+        (b"SUMMARY:a\r\n\tb", "ab"),  # a TAB folds too
+        (b"SUMMARY:a\r\n  b", "a b"),  # only the first whitespace is the fold
+        (b"SUMMARY:a\r\n b\r\n c\r\n d", "abcd"),  # consecutive folds
+        (b"SUMMARY:a\xc3\r\n \xbcb", "aüb"),  # a fold inside a multi-byte character
+        (b"SUMMARY:a\xe2\x82\r\n \xacb", "a€b"),  # inside a three-byte one
+        (b"SUMMARY:a\\\r\n n", "a\\n"),  # inside an escape: the text unescapes later
+        (b"SUMMARY:a\r\n b".replace(b"\r\n", b"\n"), "ab"),  # LF line ends
+        (b"SUMMARY:a\r\n b".replace(b"\r\n", b"\r"), "ab"),  # CR line ends
+    ],
+)
+def test_unfolded_text_is_what_the_file_says(raw, want):
+    assert _summary(raw) == want
+
+
+def test_a_bad_byte_is_still_an_encoding_error():
+    data = b"BEGIN:VCALENDAR\r\nX-A:a\xff\r\nEND:VCALENDAR\r\n"
+    fails(data, "ics_encoding", "utf8")
+    split_bad = (
+        b"BEGIN:VCALENDAR\r\nX-A:a\xc3\r\n (b\r\nEND:VCALENDAR\r\n"  # \xc3 then "(": invalid
+    )
+    fails(split_bad, "ics_encoding", "utf8")
+
+
+def test_a_bom_is_dropped_before_unfolding():
+    assert scan(b"\xef\xbb\xbf" + corpus.simple()).events
