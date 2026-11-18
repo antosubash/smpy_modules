@@ -196,3 +196,23 @@ async def test_items_validate_through_events(db):
         items, source_id="records:dates", calendar=CALENDAR, start=START, end=END, default_lang="en"
     )
     assert sorted(o.title for o in kept) == ["Talk", "Tax"]
+
+
+async def test_a_date_field_that_is_no_longer_indexed_is_a_named_failure(db):
+    """The type has no indexed date field left at all, so it drops out of the type list: still a
+    named failure for someone who may read the type, not a silent gap."""
+    from sm_records.records.services import types as type_service
+
+    from tests.integrations.events.support import SETTINGS, field
+
+    await type_service.create_type(
+        db,
+        key="deadlines",
+        label="Deadlines",
+        fields_raw=[field("title", "text", indexed=False), field("due", "date", indexed=False)],
+        settings=SETTINGS,
+    )
+    with pytest.raises(SourceError) as caught:
+        await read(db)
+    assert caught.value.code == "field_changed"
+    assert await read(db, who=viewer(perms=())) == []  # someone who may not read it learns nothing

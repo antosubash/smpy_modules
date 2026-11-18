@@ -27,7 +27,6 @@ from sm_records.contracts.dated import (
     DatedQueryError,
     dated_field_kind,
     dated_records,
-    dated_types,
 )
 from sm_records.core import constants
 from sm_records.integrations.events.settings import (
@@ -144,11 +143,21 @@ class RecordDatesSource:
     async def _field_still_there(
         self, ctx: SourceContext, caller: DatedCaller | None, mapping: RecordDateMapping
     ) -> None:
-        """A type the viewer may read whose mapped field was removed or retyped is a named
-        failure (``field_changed``), not a silent gap. Anyone else sees nothing, and so learns
-        nothing about which types or fields exist."""
-        if caller is None:
-            return
-        for info in await dated_types(ctx.db, tenant_id=ctx.tenant_id, caller=caller):
-            if info.key == mapping.type_key:
-                raise SourceError("field_changed")
+        """A type the viewer may read whose mapped field was removed, retyped or unindexed is a
+        named failure (``field_changed``), not a silent gap. The contract answers an empty page
+        for a type that is unknown or not theirs and raises only for one that is: so anyone else
+        learns nothing about which types or fields exist."""
+        try:
+            await dated_records(
+                ctx.db,
+                tenant_id=ctx.tenant_id,
+                type_key=mapping.type_key,
+                field=mapping.field,
+                lo=date(2000, 1, 1),
+                hi=date(2000, 1, 2),
+                caller=caller,
+                locale=ctx.locale,
+                limit=1,
+            )
+        except DatedQueryError:
+            raise SourceError("field_changed") from None

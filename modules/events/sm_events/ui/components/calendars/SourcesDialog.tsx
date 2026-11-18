@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from '@simple-module-py/ui/components/ui/dialog';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { useEventExtensions } from '../../extensions/load';
 import { PluginBoundary } from '../../extensions/PluginBoundary';
 import { source as registered } from '../../extensions/registry';
 import { translateKey } from '../../extensions/translateKey';
@@ -60,6 +61,7 @@ export function SourcesDialog({ calendar, onSaved }: { calendar: Calendar; onSav
   const [invalid, setInvalid] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  useEventExtensions(); // this screen has no calendar to load the plugins; they are lazy
   const gone = useGoneOnce(open, onSaved);
   const begin = useRequestScope(open);
 
