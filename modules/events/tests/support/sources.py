@@ -8,6 +8,7 @@ the production one.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections.abc import Callable
 from typing import Any
 
@@ -102,3 +103,99 @@ class SettingsSource(FakeSource):
             from sqlalchemy import text
 
             await sctx.db.execute(text("SELECT * FROM nope_not_a_table"))
+
+
+# ---- behaviours for FakeSource: ``async def (ctx, start, end)`` ----
+
+
+def ok(*items: SourceOccurrence):
+    async def behave(ctx, start, end):
+        return list(items)
+
+    return behave
+
+
+async def raises(ctx, start, end):
+    raise RuntimeError("secret payload in a message")
+
+
+def sleeps(seconds: float):
+    async def behave(ctx, start, end):
+        await asyncio.sleep(seconds)
+        return []
+
+    return behave
+
+
+async def bad_sql(ctx, start, end):
+    from sqlalchemy import text
+
+    await ctx.db.execute(text("SELECT * FROM nope_not_a_table"))
+    return []
+
+
+async def writes(ctx, start, end):
+    from sm_events.models import Category
+
+    ctx.db.add(Category(slug="from-a-plugin", names={"en": "Plugin"}))
+    return []
+
+
+async def writes_and_flushes(ctx, start, end):
+    from sm_events.models import Category
+
+    ctx.db.add(Category(slug="from-a-plugin", names={"en": "Plugin"}))
+    await ctx.db.flush()
+    return []
+
+
+async def commits(ctx, start, end):
+    await ctx.db.commit()
+    return []
+
+
+def floods(count: int):
+    async def behave(ctx, start, end):
+        from datetime import UTC, datetime, timedelta
+
+        base = datetime(2026, 7, 2, tzinfo=UTC)
+        step = timedelta(minutes=1)
+        return [
+            item(f"k{i}", f"Item {i}", start=base + i * step, end=base + (i + 1) * step)
+            for i in range(count)
+        ]
+
+    return behave
+
+
+def returns(value: Any):
+    async def behave(ctx, start, end):
+        return value
+
+    return behave
+
+
+async def swallows_cancel(ctx, start, end):
+    with contextlib.suppress(asyncio.CancelledError):
+        await asyncio.sleep(10)
+    return []
+
+
+class FakeClock:
+    """A monotonic clock that only moves when a test (or a fake source) says so."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += seconds
+
+    def spends(self, seconds: float):
+        async def behave(ctx, start, end):
+            self.advance(seconds)
+            return []
+
+        return behave

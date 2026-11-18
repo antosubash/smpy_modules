@@ -18,8 +18,11 @@ __all__ = [
     "EXTRA_TOO_LARGE_CODE",
     "EXTRA_TOO_LARGE_DETAIL",
     "PLUGIN_ID_PATTERN",
+    "PLUGIN_LANG_PATTERN",
+    "PLUGIN_URL_SCHEMES",
     "SOURCES_IN_MAX",
     "SOURCE_CALLS_MAX",
+    "SOURCE_CALL_HARD_MAX_ITEMS",
     "SOURCE_CALL_MAX_ITEMS",
     "SOURCE_ID_MAX",
     "SOURCE_KEY_MAX",
@@ -94,3 +97,9 @@ SOURCE_SETTINGS_MAX_BYTES = 16_384
 SOURCE_ID_MAX = 120
 SOURCES_IN_MAX = 64
 """What a PUT body may carry before the (smaller) per-calendar cap is applied."""
+
+# A call that hands back more than this many items is a broken source, not a busy one:
+# it is refused unread (up to ``SOURCE_CALL_MAX_ITEMS`` are kept, the earliest first).
+SOURCE_CALL_HARD_MAX_ITEMS = 5_000
+PLUGIN_LANG_PATTERN = r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+PLUGIN_URL_SCHEMES = ("http", "https")

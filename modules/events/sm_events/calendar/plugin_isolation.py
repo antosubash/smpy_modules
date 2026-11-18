@@ -7,7 +7,8 @@ transaction is not aborted. The call has a wall-clock timeout. ``commit``, ``rol
 and ``close`` are blocked on the session for the duration, and afterwards the session's
 root transaction must be the same object and ``new``/``dirty``/``deleted`` empty: a
 plugin that wrote anyway gets :class:`PluginWrote`, its pending changes are dropped and
-the savepoint is rolled back.
+the savepoint is rolled back. A flush of the plugin's own pending rows counts too (they
+are then in the savepoint, which is discarded, but it is a bug worth reporting).
 
 This guards against plugin *bugs*, not malice: a plugin is code the operator installed.
 A plugin that swallows ``CancelledError`` or blocks the loop with synchronous work
@@ -19,6 +20,8 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from typing import Any
+
+from sqlalchemy import event
 
 __all__ = ["PluginWrote", "SessionBroken", "run_isolated"]
 
@@ -68,15 +71,27 @@ async def run_isolated[T](db: Any, timeout: float, call: Callable[[], Awaitable[
     await db.flush()
     root = db.sync_session.get_transaction()
     blocked = _block(db)
+    flushed: list[bool] = []
+
+    def saw_flush(session: Any, *_args: Any) -> None:
+        if session.new or session.dirty or session.deleted:
+            flushed.append(True)
+
+    event.listen(db.sync_session, "before_flush", saw_flush)
     savepoint = None
     try:
-        async with asyncio.timeout(timeout):
+        async with asyncio.timeout(timeout) as budget:
             savepoint = await db.begin_nested()
             result = await call()
-        if db.sync_session.get_transaction() is not root or db.new or db.dirty or db.deleted:
+        if budget.expired():  # it swallowed the cancellation and finished late
+            raise TimeoutError
+        if flushed or db.sync_session.get_transaction() is not root:
+            raise PluginWrote("the plugin changed the session")
+        if db.new or db.dirty or db.deleted:
             raise PluginWrote("the plugin changed the session")
         return result
     finally:
+        event.remove(db.sync_session, "before_flush", saw_flush)
         for name in blocked:
             vars(db).pop(name, None)
         try:
