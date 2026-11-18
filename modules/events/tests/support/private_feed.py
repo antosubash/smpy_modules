@@ -19,7 +19,15 @@ from tests.support.public import tenant_header
 from tests.support.tokens import NOW, fake_request, install_directory, install_members
 
 V = "events.view"
+IGNORED = frozenset({"date", "x-correlation-id"})
 EVERYONE = {"o", "sv", "se", "v", "m", "e", "a", "x"}
+MEMBERS = {"default": set(EVERYONE), "a": set(EVERYONE), "b": {"sv"}}
+
+
+def fingerprint(response):
+    """Status, body and every header but the clock and the request id."""
+    headers = {k: v for k, v in response.headers.items() if k not in IGNORED}
+    return response.status_code, response.content, headers
 
 
 @asynccontextmanager
@@ -118,9 +126,11 @@ async def add_text(http: AsyncClient, event: Event, locale: str, title: str, ten
 
 __all__ = [
     "EVERYONE",
+    "MEMBERS",
     "World",
     "add_text",
     "feed_path",
+    "fingerprint",
     "invented",
     "mint",
     "private_http",

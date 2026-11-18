@@ -87,6 +87,11 @@ async def test_calendars_page_props(client, perms, flags):
         "UTC",
         "default",
     )
+    # What the Subscribe dialog needs: the languages a private link may be in, and where the
+    # public feeds live. Nothing about any link.
+    assert props["content_locales"] == ["en"]
+    assert props["public_prefix"] == "/events"
+    assert not any("token" in key or "feed" in key for key in props)
 
 
 async def test_categories_page_needs_manage(client):
