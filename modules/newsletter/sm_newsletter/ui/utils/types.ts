@@ -8,7 +8,8 @@ type BlockType =
   | 'Divider'
   | 'Spacer'
   | 'ArticleCard'
-  | 'PageCard';
+  | 'PageCard'
+  | 'EventCard';
 
 export type Block = { type: BlockType; props: Record<string, unknown> & { id: string } };
 
@@ -129,10 +130,10 @@ export interface CampaignPage {
   total: number;
 }
 
-export type CardKind = 'article' | 'page';
+export type CardKind = 'article' | 'page' | 'event';
 
-export interface CardHit {
-  kind: CardKind;
+export interface ArticleCardHit {
+  kind: 'article' | 'page';
   source_id: number;
   title: string;
   excerpt: string;
@@ -140,6 +141,29 @@ export interface CardHit {
   url: string;
   locale: string;
 }
+
+/** An upcoming event the public could see. `source_id` is its id (never shown). */
+export interface EventCardHit {
+  kind: 'event';
+  source_id: string;
+  title: string;
+  excerpt: string;
+  image_url: string;
+  url: string;
+  ics_url: string;
+  locale: string;
+  starts_at: string;
+  ends_at: string;
+  all_day: boolean;
+  start_date: string | null;
+  end_date: string | null;
+  timezone: string;
+  attendance_mode: 'in_person' | 'online' | 'hybrid';
+  place: string;
+  cancelled: boolean;
+}
+
+export type CardHit = ArticleCardHit | EventCardHit;
 
 export interface MediaHit {
   id: number;
@@ -158,6 +182,9 @@ export interface CardSnapshot {
   locale: string;
   snapshot_at: string;
 }
+
+/** An event card block's props, ready to drop into the body. */
+export type EventCardSnapshot = Omit<EventCardHit, 'kind'> & { id: string; snapshot_at: string };
 
 export interface Preview {
   subject: string;

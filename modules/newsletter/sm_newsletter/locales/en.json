@@ -333,11 +333,14 @@
     "card": {
       "article": "Article",
       "page": "Page",
+      "event": "Event",
       "current": "Shown in the email",
       "none": "Nothing chosen yet.",
       "search_label": "Search",
       "search_article": "Search published articles",
       "search_page": "Search published pages",
+      "search_event": "Search upcoming events",
+      "date_passed": "This date has passed. Refresh to show the next one.",
       "searching": "Searching",
       "no_results": "Nothing matches.",
       "refresh": "Refresh from source",
@@ -422,6 +425,9 @@
     },
     "page_card": {
       "label": "Page card"
+    },
+    "event_card": {
+      "label": "Event card"
     },
     "card_empty": "Choose an item in the block settings."
   },
