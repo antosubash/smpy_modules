@@ -47,6 +47,14 @@ it('placeholders and plural forms follow the page language', () => {
   expect(makeT({}, 'de')('events.public.index.page_of', { page: 2, count: 5 })).toBe('Page 2 of 5');
   expect(makeT({}, 'de')('events.public.index.page_of')).toBe('Page {page} of {count}');
   expect(makeT({}, 'de')('events.no.such.key')).toBe('events.no.such.key');
+  // An English page has no catalogue of its own: its singular is English's, not the plural's.
+  const unresolved = 'events.blocks.editor_hint.unresolved';
+  expect(makeT({}, 'en')(unresolved, { count: 1 })).toBe(
+    '1 chosen calendar is not public or no longer exists.',
+  );
+  expect(makeT({}, 'en')(unresolved, { count: 2 })).toBe(
+    '2 chosen calendars are not public or no longer exist.',
+  );
 });
 
 it('the index, grid labels and pager read the page language too', async () => {

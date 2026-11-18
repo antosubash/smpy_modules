@@ -20,11 +20,13 @@ function otherLanguage(lang: string, locale: string, t: Translate): string {
   return t(keys.events.public.item.in_language, { language });
 }
 
-export function ItemRow({ item, locale }: { item: PublicListItem; locale: string }) {
+/** What one occurrence shows: title link, markers, time, place and summary. The index wraps it
+ *  in a list row; a block's card wraps it in its own. */
+export function ItemBody({ item, locale }: { item: PublicListItem; locale: string }) {
   const { t } = useT();
   const copy = keys.events.public.item;
   return (
-    <li className="space-y-1 py-3">
+    <>
       <a
         href={item.url}
         // The language of this title and of the page it opens, when it is not the visitor's.
@@ -60,6 +62,14 @@ export function ItemRow({ item, locale }: { item: PublicListItem; locale: string
         {item.attendance_mode === 'hybrid' ? <> · {t(copy.hybrid)}</> : null}
       </p>
       {item.summary ? <p className="text-sm">{item.summary}</p> : null}
+    </>
+  );
+}
+
+export function ItemRow({ item, locale }: { item: PublicListItem; locale: string }) {
+  return (
+    <li className="space-y-1 py-3">
+      <ItemBody item={item} locale={locale} />
     </li>
   );
 }

@@ -41,7 +41,13 @@ export function makeT(messages: Flat, locale: string): PageCatalogue['t'] {
     let text = messages[key] ?? english[key] ?? key;
     if (typeof params?.count === 'number') {
       const form = new Intl.PluralRules(locale).select(params.count);
-      text = messages[`${key}_${form}`] ?? messages[`${key}_other`] ?? text;
+      // English is the floor for a form the page's language lacks (an English page has no
+      // catalogue of its own, so its `_one` comes from `english`).
+      text =
+        messages[`${key}_${form}`] ??
+        (messages[key] === undefined ? english[`${key}_${form}`] : undefined) ??
+        messages[`${key}_other`] ??
+        text;
     }
     return params
       ? text.replace(/\{(\w+)\}/g, (whole, name: string) =>
