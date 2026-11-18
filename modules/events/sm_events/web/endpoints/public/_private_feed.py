@@ -13,7 +13,10 @@ narrowed visibility, a trashed calendar and a host that contradicts the link all
 :func:`deny`, held back to ``FEED_DENY_FLOOR_SECONDS`` after the handler started so the extra
 work some of them did is not observable. The only other shapes are the per-token ``429``, which
 is decided from the presented string before anything is read, and a ``503`` for an internal
-failure, which says nothing about the token. A malformed token skips the database.
+failure, which says nothing about the token. A malformed token skips the database. A check
+that *fails* (the directory, the membership store or a grant source raising) after the link's
+row was found is that same refusal, so an outage is no oracle; the 503 is for failures
+independent of the token (the database itself).
 
 **Never cached, never validated**: ``private, no-store``, no ``ETag``, no ``304``, no
 ``Content-Disposition`` (a subscription opens inline), ``Referrer-Policy: no-referrer``. ``HEAD``
@@ -173,7 +176,14 @@ async def _serve(request: Request, token: str) -> tuple[Response, TokenRow] | No
         THROTTLE.promote(token)  # a real link: its window leaves the pool junk can flood
         with tenant_scope(row.tenant_id):
             async with factory() as db:
-                access = await resolve(app, db, request, row, host_tenant=host_tenant(request))
+                try:
+                    access = await resolve(app, db, request, row, host_tenant=host_tenant(request))
+                except Exception as exc:
+                    # The directory, the membership store or a grant source failing for a link
+                    # that exists must not look different from one that does not: it is the
+                    # refusal, and the class is logged (never the message).
+                    _log.error("events: a private feed check failed (%s)", type(exc).__name__)
+                    return None
                 if access is None:
                     return None
                 body, truncated = await _body(request, access, db)

@@ -41,6 +41,9 @@ async def test_no_token_in_any_log_record(monkeypatch, caplog):
 
             with monkeypatch.context() as patch:
                 patch.setattr(_private_feed, "resolve", boom)
+                assert (await http.get(world.path)).status_code == 404  # a failing check
+            with monkeypatch.context() as patch:
+                patch.setattr(_private_feed, "lookup", boom)
                 assert (await http.get(world.path)).status_code == 503  # a forced failure
 
             for _ in range(constants.FEED_TOKEN_RATE):  # until the per-token window says 429

@@ -190,6 +190,32 @@ async def test_token_throttle_uniform(monkeypatch):
 
 
 async def test_internal_error_is_503_without_token(monkeypatch, caplog):
+    """The database itself failing (before any row is known) is the one other shape: a fixed
+    503 that names nothing about the token."""
+    async with private_http() as http:
+        world = await seed_world(http)
+
+        async def boom(*_a, **_k):
+            raise RuntimeError(f"database down for {world.path}")
+
+        monkeypatch.setattr(_private_feed, "lookup", boom)
+        with caplog.at_level("DEBUG"):
+            got = await http.get(world.path)
+            unknown = await http.get(feed_path(invented()))
+        for answer in (got, unknown):  # a valid and an invented token fail the same way
+            assert answer.status_code == 503
+            assert answer.headers["cache-control"] == "no-store"
+            assert answer.json() == {"detail": "Service unavailable", "code": "service_unavailable"}
+        server = [r for r in caplog.records if not r.name.startswith("http")]  # not the client's
+        assert server and all(world.secret not in r.getMessage() for r in server)
+        assert world.secret not in got.text
+        assert "RuntimeError" in caplog.text
+
+
+async def test_a_failing_check_after_the_row_is_found_is_the_refusal(monkeypatch, caplog):
+    """A dependency raising for a link that exists answers as an unknown link does: padded,
+    the same bytes, so the outage is no oracle. The class is logged, never the token."""
+    monkeypatch.setattr(constants, "FEED_DENY_FLOOR_SECONDS", 0)
     async with private_http() as http:
         world = await seed_world(http)
 
@@ -198,15 +224,16 @@ async def test_internal_error_is_503_without_token(monkeypatch, caplog):
 
         monkeypatch.setattr(_private_feed, "resolve", boom)
         with caplog.at_level("DEBUG"):
-            got = await http.get(world.path)
-        assert got.status_code == 503
-        assert got.headers["cache-control"] == "no-store"
-        assert got.headers["referrer-policy"] == "no-referrer"
-        assert got.json() == {"detail": "Service unavailable", "code": "service_unavailable"}
-        server = [r for r in caplog.records if not r.name.startswith("http")]  # not the client's
-        assert server and all(world.secret not in r.getMessage() for r in server)
-        assert world.secret not in got.text
-        assert "RuntimeError" in caplog.text
+            valid = await http.get(world.path)
+            unknown = await http.get(feed_path(invented()))
+        assert (valid.status_code, valid.content) == (404, constants.PRIVATE_FEED_ERROR_BODY)
+        assert valid.content == unknown.content
+        assert {k: v for k, v in valid.headers.items() if k != "date"} == {
+            k: v for k, v in unknown.headers.items() if k != "date"
+        }
+        server = [r for r in caplog.records if not r.name.startswith("http")]
+        assert any("RuntimeError" in r.getMessage() for r in server)
+        assert all(world.secret not in r.getMessage() for r in server)
 
 
 async def _last_used(http, token_id):

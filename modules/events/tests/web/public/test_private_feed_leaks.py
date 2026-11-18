@@ -120,6 +120,7 @@ async def test_deny_matrix_byte_identical(matrix, case):
         pytest.skip("on a multi-tenant host a visitor's tenant proves nothing (see cross-tenant)")
     baseline = fingerprint(await http.get(feed_path(invented("U"))))
     assert baseline[0] == 404 and baseline[1] == constants.PRIVATE_FEED_ERROR_BODY
+    headers: dict[str, str] = {}
     if case == "malformed":
         got = await http.get(feed_path("not-a-token"))
     elif case == "unknown":
@@ -131,14 +132,18 @@ async def test_deny_matrix_byte_identical(matrix, case):
         assert (await http.get(world.path)).status_code in (404, 200)
         got = await http.get(world.path, headers=headers)
     assert fingerprint(got) == baseline, case
-    status, body, headers = fingerprint(got)
+    # ``HEAD`` is the same refusal without a body, and the same for every case.
+    head_base = fingerprint(await http.head(feed_path(invented("U"))))
+    if case not in ("malformed", "unknown"):
+        assert fingerprint(await http.head(world.path, headers=headers)) == head_base, case
+    status, body, seen = fingerprint(got)
     assert status == 404
-    assert headers["content-type"] == "application/json"
-    assert headers["cache-control"] == "no-store"
-    assert headers["referrer-policy"] == "no-referrer"
-    assert headers["x-robots-tag"] == "noindex"
+    assert seen["content-type"] == "application/json"
+    assert seen["cache-control"] == "no-store"
+    assert seen["referrer-policy"] == "no-referrer"
+    assert seen["x-robots-tag"] == "noindex"
     for banned in ("vary", "etag", "set-cookie", "location"):
-        assert banned not in headers, banned
+        assert banned not in seen, banned
     assert world.secret.encode() not in body
 
 
@@ -304,3 +309,42 @@ async def test_a_row_of_another_tenant_on_a_single_tenant_host(monkeypatch):
                 await db.commit()
         baseline = fingerprint(await http.get(feed_path(invented("U"))))
         assert fingerprint(await http.get(feed_path(secret))) == baseline
+
+
+@pytest.mark.parametrize("failing", ["membership", "directory"])
+async def test_a_failing_dependency_answers_every_token_alike(monkeypatch, caplog, failing):
+    """Revoked, valid and unknown links are the same bytes (GET and HEAD) while the membership
+    store or the directory raises: an outage must not tell them apart."""
+    from sm_events.core.access import offline
+
+    monkeypatch.setattr(constants, "FEED_DENY_FLOOR_SECONDS", 0)
+    members = {k: set(v) for k, v in MEMBERS.items()}
+    async with private_http(multi=True, members=members) as http:
+        world = await seed_world(http, tenant="a")
+        revoked = await mint(http, world.cals["P"], tenant="a")
+        async with http.db_state.session_factory() as db:
+            with tenant_scope("a"):
+                await service.revoke_token(db, principal("sv", V), revoked.token.id, now=NOW)
+                await db.commit()
+
+        async def boom(*_a, **_k):
+            raise RuntimeError(f"{failing} down: {world.secret}")
+
+        if failing == "membership":
+            monkeypatch.setattr(offline, "tenant_member_ids", boom)
+        else:
+            http.app.state.user_directory.get_many = boom
+        paths = {
+            "valid": world.path,
+            "revoked": feed_path(revoked.secret),
+            "unknown": feed_path(invented("U")),
+        }
+        with caplog.at_level("DEBUG"):
+            for method in ("get", "head"):
+                answers = {k: fingerprint(await getattr(http, method)(p)) for k, p in paths.items()}
+                assert answers["valid"] == answers["revoked"] == answers["unknown"], method
+                assert answers["valid"][0] == 404
+        server = [r for r in caplog.records if not r.name.startswith("http")]
+        assert any("RuntimeError" in r.getMessage() for r in server)
+        for secret in (world.secret, revoked.secret):
+            assert all(secret not in r.getMessage() for r in server)
