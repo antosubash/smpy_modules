@@ -13,10 +13,12 @@ up by events and never imported by a path:
 A package is a plugin when it is a module (it has the `simple_module` entry point) and
 ships the file. Records ships both, as `records:dates` (see the end).
 
-Everything a plugin imports from events is in one place: `sm_events.contracts.extensions`
-on the Python side and `@simple-module-py/events` on the TypeScript side. Nothing else
-is public, and `scripts/check_sibling_contracts.py` and `scripts/check_ts_imports.py`
-refuse anything else.
+A plugin imports from events through three public paths and nothing else:
+`sm_events.contracts.extensions` (sources, types, their value types and limits),
+`sm_events.contracts.events` (the bus events, see below) and `@simple-module-py/events` on the
+TypeScript side. The value types in `extensions` are frozen; the bus events are plain,
+non-frozen dataclasses (the framework's event base), so treat a received one as read-only. `scripts/check_sibling_contracts.py` and
+`scripts/check_ts_imports.py` refuse anything else.
 
 ## Registration, and why a file and not `on_startup`
 
