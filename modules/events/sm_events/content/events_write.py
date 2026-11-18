@@ -21,17 +21,20 @@ from typing import Any
 
 from simple_module_core.resources import ResourcePrincipal
 
+from sm_events.calendar import registry
 from sm_events.content import bus, notices, revisions, schedule
 from sm_events.content.fields import check_category, check_parent, has_live_children
 from sm_events.content.guard import Unchanged, claim
 from sm_events.content.series_change import dropped_note, settle_overrides
 from sm_events.content.texts import apply_texts
+from sm_events.content.types import validate_extra
 from sm_events.core import constants
 from sm_events.core.access.events import load_event, require
 from sm_events.core.access.rights import writable_calendar
 from sm_events.core.errors import InvalidParent, UnknownType
+from sm_events.core.errors_extensions import TypeNotInstalled
 from sm_events.models import Event
-from sm_events.models.enums import DEFAULT_EVENT_TYPE, EventStatus
+from sm_events.models.enums import EventStatus
 from sm_events.web.schemas.events_in import EventCreate, EventPatch
 
 __all__ = ["create_event", "update_event"]
@@ -56,8 +59,9 @@ async def create_event(
 ) -> Event:
     """A new draft at revision 1, with its texts and a ``created`` history row."""
     calendar = await writable_calendar(db, who, data.calendar_id)
-    if data.type != DEFAULT_EVENT_TYPE:
+    if registry.get_type(data.type) is None:
         raise UnknownType
+    extra = validate_extra(data.type, data.extra)
     plan = schedule.build(data.times, data.rrule)
     await check_category(db, data.category_id)
     if data.parent_id is not None:
@@ -77,7 +81,7 @@ async def create_event(
         rrule=plan.rrule,
         recurrence_until=plan.recurrence_until,
         revision=1,
-        extra={},
+        extra=extra,
         **{name: getattr(data, name) for name in SCALARS},
     )
     async with db.begin_nested():  # a failed text leaves no half-created event
@@ -114,6 +118,18 @@ async def update_event(
     return event
 
 
+def _apply_extra(event: Event, extra: dict[str, Any]) -> bool:
+    """Replace ``extra`` whole, validated against the event's type. An event whose type is not
+    installed keeps its stored ``extra`` untouched, and refuses a change to it."""
+    if registry.get_type(event.type) is None:
+        raise TypeNotInstalled
+    new = validate_extra(event.type, extra)
+    if new == event.extra:
+        return False
+    event.extra = new
+    return True
+
+
 async def _apply(
     db: Any, who: ResourcePrincipal, event: Event, data: EventPatch, locales: tuple[str, ...]
 ) -> None:
@@ -145,6 +161,8 @@ async def _apply(
             db, event, data.texts, locales=locales, creating=False
         ):
             changed = True
+        if "extra" in sent and data.extra is not None:
+            changed = _apply_extra(event, data.extra) or changed
         if not changed:
             raise Unchanged
         await db.flush()

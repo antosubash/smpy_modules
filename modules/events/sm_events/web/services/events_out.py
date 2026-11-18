@@ -13,6 +13,7 @@ from typing import Any
 from simple_module_core.resources import ResourcePrincipal
 from sqlalchemy import select
 
+from sm_events.calendar import registry
 from sm_events.calendar.times import Span, to_local
 from sm_events.content.texts import texts_of
 from sm_events.core import constants
@@ -41,6 +42,8 @@ def _base(event: Event, rights: CalendarRights | None) -> dict[str, Any]:
         "calendar_id": event.calendar_id,
         "parent_id": event.parent_id,
         "type": event.type,
+        "type_installed": (etype := registry.get_type(event.type)) is not None,
+        "type_label_key": etype.label_key if etype is not None else None,
         "status": event.status,
         "scheduled": event.publish_at is not None,
         "cancelled": event.cancelled,
