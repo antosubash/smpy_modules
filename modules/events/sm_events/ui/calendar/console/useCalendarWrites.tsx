@@ -132,7 +132,8 @@ export function useCalendarWrites({
       invalidate();
     } else if (!result.silent) {
       if (report) showToast(result);
-      if (result.refresh) invalidate();
+      // Whatever went wrong, the grid may show what the server does not have.
+      invalidate();
     }
     return result;
   }
