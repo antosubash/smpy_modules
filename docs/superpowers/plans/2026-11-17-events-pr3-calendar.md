@@ -30,12 +30,38 @@ Before Task 1 the branch is rebased onto the finished `feat/events-pr2-events`. 
 | TS hooks | PR 1's `useRequestScope`, `useFormErrors`, `field-errors`, `isolate` (`withName`, `Name`), `ConfirmDialog`, `useT`/`keys` (`useT().locale`) |
 | Tests | `ui/page-tests/test-dom.tsx` (the mount harness), `ui/page-tests/support.tsx` (`stubFetch`), `tests/support/calendars.seed_event` (Python) |
 
+### Installed and verified (Task 1, 2026-11-18)
+
+Installed with `--save-exact` (the lead's instruction for the batch overrides the caret of Ruling 1 and Global Constraints): `@fullcalendar/react` **7.1.5** (MIT) and `temporal-polyfill` **1.0.8** (MIT) in `modules/events/package.json` `dependencies`. Transitive: `@fullcalendar/core` 7.1.5 (MIT), `@full-ui/headless-calendar` 7.1.5 (MIT), `temporal-spec` 1.0.1 (Apache-2.0) and `temporal-utils` 1.0.4 (MIT), one copy of each (`npm ls`). A grep of the shipped JS of all of them finds no `eval(`, `new Function`, `createElement('script')`, `innerHTML` or runtime `<style>` insertion.
+
+What the installed library really is (v7 differs from v6; follow this, not the plan text):
+
+- Exports of `@fullcalendar/react`: `.` (default export `FullCalendar`, `CalendarRef { getApi() }`, types), `./daygrid`, `./timegrid`, `./list`, `./interaction`, `./multimonth`, `./locales/*` (each a `LocaleInput` default export, `week: {dow, doy}`), `./locales-all`, `./skeleton.css`, `./themes/{classic,monarch,breezy,forma,pulse}` (plugin default export) with `theme.css` and `palette.css` (palettes light and `[data-color-scheme=dark]`). `@fullcalendar/core` is never imported by us.
+- Props are plain options (`plugins`, `timeZone`, `locale`/`locales`, `eventInteractive`, `headerToolbar: false`, `editable`, `selectable`, `eventAllow`, `eventDrop`, `eventResize`, `datesSet`, `eventContent`, `dateClick`, `select`, `noEventsContent`, `eventClick`). `eventDrop`/`eventResize` still get `revert()`, `oldEvent`, `event`, and `delta`/`startDelta`/`endDelta`. `eventAllow(span, movingEvent)` gets `span.allDay`.
+- `event.start`/`event.end` are `Date`s holding the **true instant** (exact, also on the repeated autumn hour) and `startStr`/`endStr` are ISO with the zone offset (date only for all-day, `end` exclusive). So `toChange` reads `start.toISOString()`, never a marker. `datesSet` gives `{start, end, timeZone, view}`; `view.title`, `view.activeStart`/`activeEnd` are what the toolbar needs.
+- `eventContent` takes a React node (`ContentGenerator = ReactNode | {html} | fn`): a string is React text and `<` is not parsed. We only ever return a React node. An event with a `url` becomes an `<a href>`, so `url` stays in `extendedProps`.
+- `eventClick` also fires on Enter and Space for an interactive event (`createAriaKeyboardAttrs` in the shipped chunk), with `el` set to the event target, which may be a child: the adapter resolves it to the closest `.fc-event` ancestor, else the target. No `keydown` handler of ours is needed.
+- A theme is a plugin in `plugins` plus its `theme.css`; the variables are `--fc-classic-*` (`background`, `foreground`, `border`, `primary`, `muted`, `faint`, `strong`, `today`, `now`, `event`, `event-contrast`, `button*`). Our `calendar.css` sets them from the console tokens instead of importing `palette.css`.
+
+Drifts from the table above (PR 2 as built; each handled in the task text below):
+
+| Plan | Code |
+|---|---|
+| `EventOut`, `TimesIn`, `OverrideOut`, `PreviewOut` | `EventDetail`, `TimesInput`, `Override`, `Preview` in `ui/utils/types-events.ts` |
+| `EDITOR_URL`/`EVENT_EDIT_URL`, `EVENTS_URL` | `EDITOR_URL = /admin/events/edit`; `EVENTS_URL = /admin/events/list` (the list moved off `/`) |
+| page `events/Calendar` | page names are `Events/<Name>` (`MODULE_NAME = "Events"`): `Events/Calendar` |
+| `getEvent(id)` | `getEvent(id, locale?, signal?)` |
+| `listOccurrences(params)` | typed `OccurrenceQuery` has `calendar`, `category`, `locale`, `include_unpublished` but no `type`; returns an inline `{items, truncated}`. Extend with `type?: string[]` and name the return `OccurrencePage` |
+| the calendars view prop carries `visibility` | `_calendar_props` has `id, name, color, default_timezone, can_write_events` only: Task 6 adds `visibility` (and keeps the editor's subset) |
+| `OccurrenceQuery` (props) | name collides with the API's `OccurrenceQuery` in `types-events.ts`; the component type is exported as `OccurrenceQuery` from `ui/calendar/types.ts` and the API one is imported under an alias where both are needed |
+| `OverrideInput.start/end` | optional, as planned |
+
 ## Rulings
 
 Each ruling below is **my call** unless it cites the spec. The maintainer may overrule any of them, and the ones most likely to be overruled are marked ★.
 
 **Library and shipping**
-1. **Dependencies** (spec: FullCalendar 7, MIT only). `modules/events/package.json` `dependencies`: `"@fullcalendar/react": "^7.1.5"`, `"temporal-polyfill": "^1.0.8"` (FullCalendar's peer, and our time maths use it too). `@fullcalendar/core` and `@full-ui/headless-calendar` (MIT, a dependency of `@fullcalendar/react@7.1.5` that the lead's facts did not name; checked on npm 2026-11-17) come in transitively. The allow-list is exactly `@fullcalendar/react`, `@fullcalendar/core`, `@full-ui/headless-calendar`. A test fails on any other `@fullcalendar/*` or `@full-ui/*` package in `modules/events/package.json` or anywhere in `package-lock.json`, on any name containing `scheduler`, `resource`, `timeline` or `premium`, and on any allow-listed lockfile entry whose `license` is not `MIT`. `@fullcalendar/rrule` is not installed (spec).
+1. **Dependencies** (spec: FullCalendar 7, MIT only). `modules/events/package.json` `dependencies`: `"@fullcalendar/react": "7.1.5"`, `"temporal-polyfill": "1.0.8"` (exact, see "Installed and verified") (FullCalendar's peer, and our time maths use it too). `@fullcalendar/core` and `@full-ui/headless-calendar` (MIT, a dependency of `@fullcalendar/react@7.1.5` that the lead's facts did not name; checked on npm 2026-11-17) come in transitively. The allow-list is exactly `@fullcalendar/react`, `@fullcalendar/core`, `@full-ui/headless-calendar`. A test fails on any other `@fullcalendar/*` or `@full-ui/*` package in `modules/events/package.json` or anywhere in `package-lock.json`, on any name containing `scheduler`, `resource`, `timeline` or `premium`, and on any allow-listed lockfile entry whose `license` is not `MIT`. `@fullcalendar/rrule` is not installed (spec).
 2. ★ **Only `ui/calendar/adapter/` imports FullCalendar.** The spec says `ui/calendar/`; the adapter folder is stricter and is the whole of what a replacement rewrites. A vitest test scans `modules/events/sm_events/**/*.{ts,tsx,css}` for `@fullcalendar/` and fails outside `ui/calendar/adapter/`. `import type` counts too.
 3. ★ **One theme, mapped onto the console's tokens.** The adapter imports `@fullcalendar/react/skeleton.css`, the `classic` theme (its JS plugin plus `themes/classic/theme.css`) and our `adapter/calendar.css`, which sets the theme's CSS variables from `@simple-module-py/ui`'s tokens (`--background`, `--foreground`, `--border`, `--primary`, `--muted`), so light and dark follow the console. CSS imported from the adapter module goes into the adapter's chunk: no line in `host/client_app/styles.css`, exactly as images imports `maplibre-gl/dist/maplibre-gl.css` from `MapCanvas.tsx`. A wheel-installed host gets it the same way. Tailwind classes in `ui/calendar/**` are already scanned by the host's `@source "../../modules/*/*/**/*.{ts,tsx}"` and by `modules.generated.css` for wheels.
 4. ★ **Code split at the adapter.** Pages are already per-page chunks (`import.meta.glob` without `eager` in `host/client_app/pages.ts`). `Calendar` is a thin shell, and the grid is `React.lazy(() => import('./adapter/FullCalendarGrid'))` behind `Suspense` with a skeleton. So FullCalendar does not reach the entry chunk, nor the chunk of any later importer of `@simple-module-py/events` that does not render a grid (PR 7's blocks). Task 15 checks the build.
@@ -127,7 +153,7 @@ Each ruling below is **my call** unless it cites the spec. The maintainer may ov
 - Never run `ruff format` or `biome format` repo-wide. Format only the files touched. Never commit `.env*`.
 - Names: package `sm_events`, npm `@simple-module-py/events`, locale namespace `events` (new keys under `calendar.*` and `menu.calendar`), API prefix `/api/events`, view prefix `/admin/events`, page `events/Calendar`.
 - Version stays `0.0.15` (`uv run python scripts/bump_version.py --check-current`).
-- npm dependency ranges are carets (`^7.1.5`, `^1.0.8`), never exact. Only the Ruling 1 packages are added. `npm install` runs at the root (workspaces), and `package-lock.json` is committed with it.
+- FullCalendar and temporal-polyfill are pinned exactly (7.1.5, 1.0.8). Only the Ruling 1 packages are added. `npm install` runs at the root (workspaces), and `package-lock.json` is committed with it.
 - The frontend imports other modules only as `@simple-module-py/<module>` (`scripts/check_ts_imports.py`). Nothing in this PR imports another module.
 - 300-line cap. Keep every `.py`/`.ts`/`.tsx` under 280 lines. The File Structure below gives each file a budget.
 - No literal permission, page, module-name or error-code strings outside `core/constants.py` (`scripts/check_hardcoded_strings.py`).
