@@ -45,9 +45,8 @@ export function useEventActions(
     parentId: string | null;
     defaultLocale: string;
     incomplete?: boolean;
-    /** Called before the page moves on after a create, so the unsaved-changes guard stays quiet;
-     *  answers whether the visit replaces the guard's history entry. */
-    allowLeave?: () => boolean;
+    /** Called before the page moves on after a create, so the unsaved-changes guard stays quiet. */
+    allowLeave?: () => void;
   },
 ) {
   const locales = useMemo(() => Object.keys(ev.form.texts), [ev.form.texts]);
@@ -134,9 +133,9 @@ export function useEventActions(
         };
         const created = await createEvent(body);
         if (request.alive()) {
-          const url = `/admin/events/edit/${created.id}`;
-          if (allowLeave?.()) router.visit(url, { replace: true });
-          else router.visit(url);
+          allowLeave?.();
+          // The saved event takes the blank form's place, so Back goes where the user came from.
+          router.visit(`/admin/events/edit/${created.id}`, { replace: true });
         }
       }
     } catch (e) {
