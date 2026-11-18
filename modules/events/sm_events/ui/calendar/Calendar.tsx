@@ -170,7 +170,14 @@ export function Calendar(props: CalendarProps) {
               ariaLabel={range?.title || t(copy.region)}
               noEventsText={t(copy.status.empty)}
               onRangeChange={(change) => {
-                setRange({ visible: change.visible, title: change.title });
+                setRange((now) =>
+                  now &&
+                  now.title === change.title &&
+                  now.visible.start === change.visible.start &&
+                  now.visible.end === change.visible.end
+                    ? now
+                    : { visible: change.visible, title: change.title },
+                );
                 setState((now) =>
                   now.view === change.view && now.date === change.date
                     ? now

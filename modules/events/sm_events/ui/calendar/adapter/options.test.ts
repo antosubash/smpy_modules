@@ -1,5 +1,6 @@
+import interactionPlugin from '@fullcalendar/react/interaction';
 import { describe, expect, it } from 'vitest';
-import { baseOptions, localeFor, localeOptions } from './options';
+import { baseOptions, localeFor, localeOptions, PLUGINS } from './options';
 
 describe('localeFor', () => {
   it('loads the German locale data, which starts the week on Monday', () => {
@@ -22,6 +23,10 @@ describe('localeOptions', () => {
     expect(localeOptions('de')).toMatchObject({ locale: 'de' });
     expect(localeOptions('de').locales).toHaveLength(1);
   });
+  it('returns the same locales array every time, so the grid is not re-initialised', () => {
+    expect(localeOptions('de').locales).toBe(localeOptions('de').locales);
+    expect(localeOptions('de-AT').locales).toBe(localeOptions('de').locales);
+  });
   it('leaves English on the built-in data', () => {
     expect(localeOptions('en')).toEqual({ locale: 'en' });
   });
@@ -35,5 +40,11 @@ describe('baseOptions', () => {
     expect(options.fixedWeekCount).toBe(false);
     expect(options.nowIndicator).toBe(true);
     expect(options.dayMaxEvents).toBe(true);
+  });
+});
+
+describe('PLUGINS', () => {
+  it('includes the interaction plugin, without which drag, resize and select do nothing', () => {
+    expect(PLUGINS).toContain(interactionPlugin);
   });
 });

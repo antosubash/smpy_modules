@@ -3,6 +3,7 @@ import type { Occurrence } from '../../utils/types-events';
 import type { CalendarEditing } from '../types';
 import {
   allowDrop,
+  chipFor,
   occurrenceOf,
   toChange,
   toEventInput,
@@ -248,5 +249,15 @@ describe('toSlot', () => {
       start: '2026-08-01',
       end: '2026-08-02',
     });
+  });
+});
+
+describe('chipFor', () => {
+  it('renders an occurrence through the chip', () => {
+    const render = (o: Occurrence, text: string) => `${o.key}@${text}`;
+    expect(chipFor({ extendedProps: { occurrence: base } }, '9:00', render)).toBe('e1:0@9:00');
+  });
+  it('leaves the selection mirror and the drag helper (no occurrence) to the library', () => {
+    expect(chipFor({ extendedProps: {} }, '9:00', () => 'chip')).toBeUndefined();
   });
 });
