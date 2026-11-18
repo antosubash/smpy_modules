@@ -46,11 +46,11 @@ from sm_events.web.endpoints.deps import get_settings, require_manage, require_v
 from sm_events.web.schemas.imports import (
     ApplyIn,
     CalendarRef,
-    ImportItemOut,
     ImportItemPage,
     ImportOut,
     ImportPage,
     import_out,
+    item_out,
 )
 
 router = APIRouter(prefix="/imports", tags=["imports"], dependencies=[require_view, require_manage])
@@ -208,7 +208,7 @@ async def list_items(
             .limit(page_size)
         )
     ).scalars()
-    items = [ImportItemOut.model_validate(r, from_attributes=True) for r in rows]
+    items = [item_out(r) for r in rows]
     return ImportItemPage(items=items, total=total, page=page, page_size=page_size)
 
 

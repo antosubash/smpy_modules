@@ -8,7 +8,16 @@ from typing import Any
 
 from pydantic import BaseModel
 
-__all__ = ["ApplyIn", "CalendarRef", "ImportItemOut", "ImportItemPage", "ImportOut", "ImportPage"]
+__all__ = [
+    "ApplyIn",
+    "CalendarRef",
+    "ImportItemOut",
+    "ImportItemPage",
+    "ImportOut",
+    "ImportPage",
+    "import_out",
+    "item_out",
+]
 
 
 class ApplyIn(BaseModel):
@@ -55,6 +64,10 @@ class ImportItemOut(BaseModel):
     notes: list[str]
     title: str
     starts_at: datetime | None
+    timezone: str | None = None
+    local_start: str | None = None
+    """The event's start as its own wall clock (``2026-07-01T10:00``, a date when all-day): what
+    the preview shows, so a person in another zone reads the time the file meant."""
     all_day: bool
     recurring: bool
     outcome: str | None
@@ -67,6 +80,28 @@ class ImportItemPage(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+def item_out(row: Any) -> ImportItemOut:
+    """An item as the preview shows it: its zone and local start come out of the staged payload,
+    which itself is never returned."""
+    times = (row.payload or {}).get("times") or {}
+    return ImportItemOut(
+        seq=row.seq,
+        uid=row.uid,
+        verdict=row.verdict,
+        reason=row.reason,
+        notes=list(row.notes or ()),
+        title=row.title,
+        starts_at=row.starts_at,
+        timezone=times.get("timezone"),
+        local_start=times.get("start"),
+        all_day=row.all_day,
+        recurring=row.recurring,
+        outcome=row.outcome,
+        outcome_code=row.outcome_code,
+        event_id=row.event_id,
+    )
 
 
 def _ints(value: Any) -> dict[str, int]:

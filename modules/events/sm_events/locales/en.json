@@ -5,7 +5,8 @@
     "events": "Events",
     "calendars": "Calendars",
     "categories": "Event categories",
-    "calendar": "Calendar"
+    "calendar": "Calendar",
+    "import": "Import events"
   },
   "share": {
     "button": "Share",

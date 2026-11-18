@@ -5,7 +5,8 @@
     "events": "Veranstaltungen",
     "calendars": "Kalender",
     "categories": "Veranstaltungskategorien",
-    "calendar": "Kalender"
+    "calendar": "Kalender",
+    "import": "Termine importieren"
   },
   "share": {
     "button": "Teilen",

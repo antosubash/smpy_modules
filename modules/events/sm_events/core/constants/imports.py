@@ -54,7 +54,7 @@ __all__ = [
     "MENU_LABEL_KEY_IMPORT",
 ]
 
-MENU_LABEL_IMPORT: Final = "Import"
+MENU_LABEL_IMPORT: Final = "Import events"
 MENU_LABEL_KEY_IMPORT: Final = "events.menu.import"
 MENU_ICON_IMPORT: Final = "upload"
 

@@ -60,6 +60,13 @@ async def test_upload_preview_apply_eager(world):
     page = items.json()
     assert page["total"] == 3 and [i["verdict"] for i in page["items"]] == ["new"] * 3
     assert [i["uid"] for i in page["items"]] == ["u0@x", "u1@x", "u2@x"]
+    assert {(i["timezone"], i["local_start"]) for i in page["items"]} == {
+        ("UTC", "2026-07-01T10:00")
+    }
+    assert set(page["items"][0]) == {
+        "seq", "uid", "verdict", "reason", "notes", "title", "starts_at", "timezone", "local_start",
+        "all_day", "recurring", "outcome", "outcome_code", "event_id",
+    }  # fmt: skip
     assert await events_of(client) == []  # a preview writes nothing
     applied = await client.post(f"{BASE}/{body['id']}/apply", json={"publish": False}, headers=MGR)
     assert applied.status_code == 202, applied.text
