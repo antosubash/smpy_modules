@@ -21,7 +21,15 @@ from zoneinfo import ZoneInfo
 from sm_events.core import constants
 from sm_events.core.errors import InvalidTimes
 
-__all__ = ["Span", "all_day_dates", "is_nonexistent", "localize", "to_local", "to_span"]
+__all__ = [
+    "Span",
+    "all_day_dates",
+    "day_exists",
+    "is_nonexistent",
+    "localize",
+    "to_local",
+    "to_span",
+]
 
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _DATETIME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$")
@@ -44,6 +52,12 @@ def localize(naive: datetime, tz: ZoneInfo) -> datetime:
 def is_nonexistent(naive: datetime, tz: ZoneInfo) -> bool:
     """Is the naive local time inside a DST gap? (It does not survive a round trip.)"""
     return localize(naive, tz).astimezone(tz).replace(tzinfo=None) != naive
+
+
+def day_exists(day: date, tz: ZoneInfo) -> bool:
+    """Does the local date have any instant? A zone that skips a whole day (Pacific/Apia,
+    30 December 2011) has none: its midnight is shifted onto a later date."""
+    return localize(datetime.combine(day, time.min), tz).astimezone(tz).date() == day
 
 
 def _bad(detail: str, code: str = constants.INVALID_LOCAL_TIME_CODE) -> InvalidTimes:

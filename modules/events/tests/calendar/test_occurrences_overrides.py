@@ -119,3 +119,17 @@ async def test_cancelled_event_marks_all(db):
     )
     page = await read(db, OWNER, utc(2026, 7, 1), utc(2026, 7, 10))
     assert len(page.items) == 3 and {o.status for o in page.items} == {"cancelled"}
+
+
+async def test_skip_on_a_31_day_instance_reaches_the_last_hour_across_a_fall_back(db):
+    """31 wall-clock days from 2026-09-30 10:00 to 2026-10-31 10:00 Vienna span the
+    clocks going back: 31 days and an hour (08:00Z to 09:00Z). A read starting in the
+    last half hour must still find the skip written for it."""
+    cals = await seed_calendars(db)
+    ev = await seed_series(
+        db, cals["I"], "FREQ=YEARLY", "2026-09-30T10:00", "2026-10-31T10:00", status="published"
+    )
+    window = utc(2026, 10, 31, 8, 30), utc(2026, 10, 31, 9, 0)
+    assert len((await read(db, OWNER, *window)).items) == 1
+    await _override(db, ev, utc(2026, 9, 30, 8), "skipped")
+    assert (await read(db, OWNER, *window)).items == []

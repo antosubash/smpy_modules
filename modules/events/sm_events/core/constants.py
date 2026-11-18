@@ -83,6 +83,9 @@ MENU_ICON_EVENTS = "calendar-days"
 # Bounds on times, ranges, rules, revisions and pages.
 MAX_EVENT_DAYS = 366
 MAX_SERIES_EVENT_DAYS = 31
+# A UTC offset can change inside an instance (31 wall-clock days are 31 days and an
+# hour across a fall-back), so every look-back for one adds this many days.
+LOOK_BACK_MARGIN_DAYS = 1
 MAX_RANGE_DAYS = 366
 MAX_OCCURRENCES = 2000
 SERIES_FETCH_MAX = 2000
