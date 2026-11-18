@@ -179,7 +179,9 @@ def _all_day_value(prop: Prop) -> bool:
     )
 
 
-def read_when(props: Sequence[Prop], *, calendar_tz: str, into: str | None = None) -> When:
+def read_when(
+    props: Sequence[Prop], *, calendar_tz: str, into: str | None = None, recurring: bool = False
+) -> When:
     """The event's local times and zone, or :class:`ItemSkip` (``unknown_timezone`` or
     ``invalid_times``). ``into`` expresses a timed event in that zone instead of its own (an
     override moved within its series, which lives in the series' zone)."""
@@ -197,6 +199,9 @@ def read_when(props: Sequence[Prop], *, calendar_tz: str, into: str | None = Non
     zone = into or start.tz or calendar_tz
     if start.tz is None and not start.utc:
         notes.append("floating_time")
+    if recurring and start.utc and start.tz is None and into is None:
+        zone = "UTC"
+        notes.append("kept_utc")
     begins = _instant(start, calendar_tz, notes)
     if end is not None:
         finishes = _instant(end, calendar_tz, notes)

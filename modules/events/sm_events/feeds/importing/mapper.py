@@ -175,7 +175,11 @@ def _event(
     title, notes = _title(props)
     calendar_tz, categories = ctx
     try:
-        when = read_when(props, calendar_tz=calendar_tz)
+        when = read_when(
+            props,
+            calendar_tz=calendar_tz,
+            recurring=any(p.name == "RRULE" for p in props),
+        )
         series = map_series(props, children, when, calendar_tz=calendar_tz)
     except ItemSkip as skip:
         return _skipped(uid, props, skip.code), ()

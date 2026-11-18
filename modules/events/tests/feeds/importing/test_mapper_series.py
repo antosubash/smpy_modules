@@ -169,7 +169,7 @@ def test_start_adjusted():
     item = one(*lines)
     e = item.event
     assert e is not None and "start_adjusted" in item.notes
-    assert e.times.start == "2026-07-13T12:00" and e.times.end == "2026-07-13T13:00"
+    assert e.times.start == "2026-07-13T10:00" and e.times.end == "2026-07-13T11:00"
     assert e.rrule == "FREQ=WEEKLY;COUNT=4;BYDAY=MO"
 
 
@@ -182,7 +182,7 @@ def test_start_adjusted_count_one_is_a_one_off():
     )
     item = one(*lines)
     assert item.event and item.event.rrule is None and not item.recurring
-    assert item.event.times.start == "2026-07-13T12:00" and "start_adjusted" in item.notes
+    assert item.event.times.start == "2026-07-13T10:00" and "start_adjusted" in item.notes
 
 
 def test_start_adjusted_with_no_later_instance_is_refused():
