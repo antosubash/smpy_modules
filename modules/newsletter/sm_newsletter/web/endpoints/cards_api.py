@@ -1,4 +1,4 @@
-"""``/cards/*`` (article and page search, snapshot), ``/media`` (the image
+"""``/cards/*`` (article, page and event search, snapshot), ``/media`` (the image
 picker) and ``/campaigns/{id}/cards/refresh``.
 
 ``bind_admin`` first on the router (see ``settings_api``), ``newsletter.edit``
@@ -19,16 +19,18 @@ from sm_records.contracts.newsletter import caller_roles
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.content import cards
-from sm_newsletter.content.integrations import news, pagebuilder
+from sm_newsletter.content.integrations import events, news, pagebuilder
 from sm_newsletter.core import constants
 from sm_newsletter.core.tenancy import bind_admin
 from sm_newsletter.web.schemas.campaigns import CampaignDetail, parse_payload
 from sm_newsletter.web.schemas.cards import (
     CardHitOut,
     CardSnapshot,
+    EventCardSnapshot,
+    EventHitOut,
     MediaHitOut,
     RefreshRequest,
-    SnapshotRequest,
+    snapshot_model,
 )
 
 router = APIRouter(
@@ -63,17 +65,32 @@ async def search_pages(
     return [CardHitOut.model_validate(h) for h in hits]
 
 
-@router.post("/cards/snapshot", response_model=CardSnapshot)
+@router.get("/cards/events", response_model=list[EventHitOut])
+async def search_events(
+    request: Request,
+    q: str = _Q,
+    locale: str | None = _LOCALE,
+    tenant: str = Depends(bind_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[EventHitOut]:
+    """Upcoming events the public could see: the picker offers nothing else."""
+    hits = await events.search(request.app, db, tenant_id=tenant, q=q, locale=locale or None)
+    return [EventHitOut.model_validate(h) for h in hits]
+
+
+@router.post("/cards/snapshot", response_model=CardSnapshot | EventCardSnapshot)
 async def snapshot(
     request: Request,
     payload: Any = Body(...),
     tenant: str = Depends(bind_admin),
     db: AsyncSession = Depends(get_db),
-) -> CardSnapshot:
-    data = parse_payload(SnapshotRequest, payload)
+) -> CardSnapshot | EventCardSnapshot:
+    data = parse_payload(snapshot_model(payload), payload)
     props = await cards.snapshot(
         request.app, db, tenant_id=tenant, kind=data.kind, source_id=data.source_id
     )
+    if data.kind == "event":
+        return EventCardSnapshot.model_validate(props)
     return CardSnapshot.model_validate(props)
 
 

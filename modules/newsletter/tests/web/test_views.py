@@ -81,7 +81,7 @@ async def test_editor_props(client, built):
     assert props["campaign_id"] == cid
     assert (props["can_edit"], props["can_send"]) == (True, False)
     # Neither news nor pagebuilder is mounted on this app.
-    assert props["capabilities"] == {"news": False, "pagebuilder": False}
+    assert props["capabilities"] == {"news": False, "pagebuilder": False, "events": False}
     assert props["max_test_recipients"] == MAX_TEST_RECIPIENTS == 5
     assert props["public_base_url_set"] is False
     app, _ = built

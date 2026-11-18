@@ -118,7 +118,7 @@ class CardProps(_Props):
     snapshot_at: AwareDatetime
 
 
-_UUID = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+UUID_RE = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 
 
 def _zone(value: str) -> str:
@@ -133,7 +133,7 @@ class EventCardProps(_Props):
     """An event card's snapshot. ``source_id`` is the event's id, kept so Refresh can read it
     again; the renderer never prints it."""
 
-    source_id: Annotated[str, Field(pattern=_UUID)]
+    source_id: Annotated[str, Field(pattern=UUID_RE)]
     title: Annotated[str, Field(max_length=300)] = ""
     excerpt: Annotated[str, Field(max_length=1000)] = ""
     image_url: ImageUrl = ""
