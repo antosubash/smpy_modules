@@ -65,3 +65,10 @@ def test_pinned_settings_reach_the_container():
     app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
     module.register_settings(app)
     assert app.state.sm_events.settings.default_timezone == "Europe/Vienna"
+
+
+def test_import_max_bytes():
+    settings = EventsSettings()
+    assert settings.import_max_bytes == 5 * 1024 * 1024
+    extra = EventsSettings.model_fields["import_max_bytes"].json_schema_extra or {}
+    assert "requires_restart" not in extra

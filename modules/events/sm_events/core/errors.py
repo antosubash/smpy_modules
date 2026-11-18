@@ -198,6 +198,51 @@ class ServiceUnavailable(EventsError):  # noqa: N818 - HTTP vocabulary, delibera
     detail = "Service unavailable"
 
 
+class TokenLimit(Conflict):
+    """The user already holds the most private links one calendar allows."""
+
+    code = constants.TOKEN_LIMIT_CODE
+    detail = constants.TOKEN_LIMIT_DETAIL
+
+
+class ImportBusy(Conflict):
+    code = constants.IMPORT_BUSY_CODE
+    detail = constants.IMPORT_BUSY_DETAIL
+
+
+class ImportState(Conflict):
+    code = constants.IMPORT_STATE_CODE
+    detail = constants.IMPORT_STATE_DETAIL
+
+
+class ImportTooLarge(EventsError):  # noqa: N818 - HTTP vocabulary, deliberately
+    status_code = 413
+    code = constants.IMPORT_TOO_LARGE_CODE
+    detail = constants.IMPORT_TOO_LARGE_DETAIL
+
+
+class IcsInvalid(Invalid):
+    code = constants.ICS_INVALID_CODE
+    detail = constants.ICS_INVALID_DETAIL
+
+
+class PrivateFeedsUnavailable(ServiceUnavailable):
+    """The caller's rights cannot be worked out without their session (the identity provider
+    keeps their roles), so a link could never serve anything: none is handed out."""
+
+    code = constants.PRIVATE_FEEDS_UNAVAILABLE_CODE
+    detail = constants.PRIVATE_FEEDS_UNAVAILABLE_DETAIL
+
+
+class ImportFailure(Exception):  # noqa: N818 - not an HTTP error
+    """An import step that cannot go on. Carries a failure ``code`` and nothing else: a
+    library's message can echo the file, so it is never kept."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
 def install_exception_handlers(app: FastAPI) -> None:
     """Render every :class:`EventsError` as ``{"detail", "code"}``."""
 

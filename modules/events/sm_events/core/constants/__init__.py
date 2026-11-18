@@ -3,6 +3,9 @@
 # ruff: noqa: F401 - the re-exports below are the point
 from __future__ import annotations
 
+from sm_events.core.constants.feed_tokens import *  # noqa: F403 - private feed links (PR 5)
+from sm_events.core.constants.imports import *  # noqa: F403 - the .ics import (PR 5)
+
 # The public surface's names live in ``public.py`` and are re-exported here, so every
 # ``constants.X`` keeps working.
 from sm_events.core.constants.public import (
@@ -110,10 +113,12 @@ _PAGE_CALENDARS = f"{MODULE_NAME}/Calendars"
 _PAGE_CATEGORIES = f"{MODULE_NAME}/Categories"
 _PAGE_EVENTS = f"{MODULE_NAME}/Events"
 _PAGE_EVENT_EDITOR = f"{MODULE_NAME}/EventEditor"
+_PAGE_IMPORT = f"{MODULE_NAME}/Import"
 CALENDAR_URL = f"{VIEW_PREFIX}/"
 CALENDARS_URL = f"{VIEW_PREFIX}/calendars"
 CATEGORIES_URL = f"{VIEW_PREFIX}/categories"
 EVENTS_URL = f"{VIEW_PREFIX}/list"
+IMPORT_URL = f"{VIEW_PREFIX}/import"
 EVENT_NEW_SEGMENT = "new"
 MENU_GROUP = MODULE_NAME
 MENU_GROUP_KEY = "events.menu.group"
@@ -174,6 +179,7 @@ PUBLISH_DUE_BATCH = 200
 # Names.
 EVENT_SLUG_FALLBACK = "event"
 UID_SUFFIX = "@simple-module-events"
+UID_MAX = 255
 SOURCE_EVENTS = "events"
 
 # Error codes and their default messages.
