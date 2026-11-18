@@ -142,6 +142,63 @@ describe('series instance', () => {
   });
 });
 
+describe('a gap-shifted instance', () => {
+  // Daily 02:30-03:00 Vienna from 2026-03-25. On 2026-03-29 02:30 does not exist, so the
+  // server's instance starts at 03:30 CEST (01:30Z), still 30 minutes long.
+  const daily = () =>
+    series({
+      rrule: 'FREQ=DAILY',
+      starts_at: '2026-03-25T01:30:00Z',
+      ends_at: '2026-03-25T02:00:00Z',
+      start_local: '2026-03-25T02:30',
+      end_local: '2026-03-25T03:00',
+    });
+  const gapInstance = () =>
+    instance({
+      original_start: '2026-03-29T01:30:00Z',
+      start: '2026-03-29T01:30:00Z',
+      end: '2026-03-29T02:00:00Z',
+    });
+
+  it('is not stale (K4)', () => {
+    expect(isStale(gapInstance(), daily())).toBe(false);
+  });
+  it('can be moved', () => {
+    const plan = planChange(
+      change(gapInstance(), 'move', '2026-03-29T07:30:00Z', '2026-03-29T08:00:00Z'),
+      daily(),
+      'one',
+    );
+    expect(plan).toMatchObject({ kind: 'override', body: { start: '2026-03-29T09:30' } });
+  });
+  it('is still stale when the master time really changed', () => {
+    expect(
+      isStale(
+        gapInstance(),
+        series({
+          rrule: 'FREQ=DAILY',
+          starts_at: '2026-03-25T02:30:00Z',
+          ends_at: '2026-03-25T03:00:00Z',
+          start_local: '2026-03-25T04:30',
+          end_local: '2026-03-25T05:00',
+        }),
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('a drop the grid zone skips', () => {
+  it('is refused as invalid_local_time (K5)', () => {
+    const o = instance();
+    const c = {
+      ...change(o, 'move', '2026-03-29T01:30:00Z', '2026-03-29T02:30:00Z'),
+      skipsWallTime: true as const,
+    };
+    expect(planChange(c, series(), 'one')).toEqual({ kind: 'refuse', code: 'invalid_local_time' });
+    expect(planChange(c, series(), 'all')).toEqual({ kind: 'refuse', code: 'invalid_local_time' });
+  });
+});
+
 describe('isStale', () => {
   it('is false when the fetched event matches the one-off', () => {
     expect(isStale(occurrence(), event())).toBe(false);

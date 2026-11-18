@@ -14,9 +14,9 @@ import {
   isNonexistent,
   isRepeatedSecond,
   millisBetween,
+  occurrenceInstant,
   plusMillis,
   sameInstant,
-  sameTimeOfDay,
   shiftLocal,
   toLocal,
 } from '../time/zones';
@@ -86,7 +86,7 @@ function instanceDiffers(o: Occurrence, event: EventDetail): boolean {
   return (
     !sameInstant(o.start, slot) ||
     millisBetween(o.start, o.end) !== millisBetween(event.starts_at, event.ends_at) ||
-    !sameTimeOfDay(toLocal(slot, zone), event.start_local)
+    !sameInstant(occurrenceInstant(slot, event.start_local, zone), slot)
   );
 }
 
@@ -165,6 +165,7 @@ function masterTimes(
 export function planChange(change: OccurrenceChange, event: EventDetail, scope: Scope): Plan {
   const o = change.occurrence;
   if (change.allDay !== o.all_day) return refuse('stale');
+  if (change.skipsWallTime) return refuse('invalid_local_time');
   const edge = newEdges(change);
   const series = isSeries(o);
   const eventId = event.id;

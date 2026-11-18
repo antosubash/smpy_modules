@@ -10,9 +10,11 @@ import './calendar.css';
 import {
   allowDrop,
   chipFor,
+  type DragInfo,
   type EditedEvent,
   occurrenceOf,
   type Placement,
+  skipsWallTime,
   toChange,
   toEventInput,
   toRangeChange,
@@ -79,11 +81,15 @@ export default function FullCalendarGrid({
   /** A drop or resize: show it at once, ask the shell, and put it back on any refusal. */
   async function apply(
     kind: 'move' | 'resize',
-    info: { event: EditedEvent & { extendedProps: Record<string, unknown> }; revert: () => void },
+    info: DragInfo & {
+      event: EditedEvent & { extendedProps: Record<string, unknown> };
+      revert: () => void;
+    },
   ) {
     const occurrence = occurrenceOf(info.event);
     if (!editing) return info.revert();
     const change = toChange(kind, occurrence, info.event);
+    if (skipsWallTime(kind, info.oldEvent, info, timeZone)) change.skipsWallTime = true;
     placed.current.set(occurrence.key, { start: change.start, end: change.end });
     let keep = false;
     try {
