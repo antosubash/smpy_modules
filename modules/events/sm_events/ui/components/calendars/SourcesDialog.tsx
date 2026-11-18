@@ -180,7 +180,16 @@ export function SourcesDialog({ calendar, onSaved }: { calendar: Calendar; onSav
           {t(copy.trigger)}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto" showCloseButton={false}>
+      <DialogContent
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
+        showCloseButton={false}
+        // The sources load after the dialog opens, so the first tabbable thing at that moment is
+        // Cancel: start on the dialog itself and the first Tab reaches the first source.
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          (e.currentTarget as HTMLElement).focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{withName(t, copy.title, calendar.name)}</DialogTitle>
           <DialogDescription>{t(copy.description)}</DialogDescription>
