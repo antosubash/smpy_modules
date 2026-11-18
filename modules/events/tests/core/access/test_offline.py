@@ -134,6 +134,50 @@ async def test_single_tenant_skips_membership_only_when_nothing_upstream_differs
             assert (got is not None) is expected, upstream
 
 
+async def test_a_mounted_child_with_no_framework_answer_is_not_single(single, monkeypatch):
+    """A stored-SINGLE child app the framework has no answer for, mounted under a parent that
+    may be multi-tenant: the request resolves ``default`` upstream and the link's tenant is
+    ``default``, but ``scope_mode`` says MULTI, so membership is asked, and a removed member
+    (or no store at all) is refused."""
+    from sm_events.core.tenancy import _mode
+
+    app, state = single
+    monkeypatch.setattr(_mode, "_framework_mode", lambda _app: None)
+    mounted = Request(
+        {
+            "type": "http",
+            "app": app,
+            "headers": [],
+            "method": "GET",
+            "path": "/",
+            "root_path": "/child",
+            "app_root_path": "",
+        }
+    )
+    mounted.state.tenant_id = "default"
+    members = {"default": {"viewer"}}
+
+    async def tenant_members(db, tenant_id, ids):
+        return {i for i in ids if i in members.get(tenant_id, set())}
+
+    async with state.session_factory() as db:
+
+        async def ask():
+            return await feed_principal(
+                app, db, user_id="viewer", tenant_id="default", request=mounted
+            )
+
+        assert await ask() is None  # no membership store: nobody
+        app.state.tenant_members = tenant_members
+        assert await ask() is not None  # a member
+        members["default"].discard("viewer")
+        assert await ask() is None  # membership removed: the shortcut must not rescue it
+        # The same request on an app the framework does answer for is single again.
+        monkeypatch.undo()
+        del app.state.tenant_members
+        assert await ask() is not None
+
+
 async def test_no_request_only_a_stored_single_mode_skips_membership(single):
     """A worker has no request: a stored SINGLE mode with the default tenant may skip the
     lookup; any other tenant needs a membership store."""
