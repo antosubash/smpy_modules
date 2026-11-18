@@ -901,5 +901,27 @@
         "manual": "Marked by hand"
       }
     }
+  },
+  "events": {
+    "source": {
+      "label": "Records with a date"
+    },
+    "settings": {
+      "mapping": "Mapping {n}",
+      "type": "Record type",
+      "field": "Date field",
+      "end": "End field (optional)",
+      "choose": "Choose…",
+      "none": "None",
+      "duration": "Length when a record has no end (minutes)",
+      "color": "Colour (optional)",
+      "add": "Add a mapping",
+      "remove": "Remove",
+      "load_failed": "The record types could not be loaded.",
+      "hint": "Shows published records with a date. Who sees which record follows the record type's own access rules."
+    },
+    "detail": {
+      "open_record": "Open record"
+    }
   }
 }

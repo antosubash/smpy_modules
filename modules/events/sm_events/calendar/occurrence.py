@@ -7,9 +7,11 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
-__all__ = ["Occurrence", "OccurrenceFilters", "OccurrencePage"]
+from sm_events.calendar.extension_types import SourceStatus
+
+__all__ = ["Occurrence", "OccurrenceFilters", "OccurrencePage", "PluginOccurrence"]
 
 
 class Occurrence(BaseModel):
@@ -40,11 +42,21 @@ class Occurrence(BaseModel):
     event_status: str | None = None
 
 
+class PluginOccurrence(Occurrence):
+    """An occurrence a plugin source supplied. ``updated_at`` is the source's own timestamp
+    for the item, kept only for the feeds' ``DTSTAMP``; it never appears in a response."""
+
+    updated_at: datetime | None = Field(default=None, exclude=True)
+
+
 class OccurrencePage(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     items: list[Occurrence]
     truncated: bool
+    sources: list[SourceStatus] = []
+    """How each plugin source went (the built-in one is never listed). Only a console read
+    carries it: a public answer may be cached and must not vary with a plugin's health."""
 
 
 @dataclass(frozen=True)
@@ -55,5 +67,8 @@ class OccurrenceFilters:
     calendar_ids: frozenset[uuid.UUID] | None = None
     category_ids: frozenset[uuid.UUID] | None = None
     types: frozenset[str] | None = None
+    """A plugin's item is of the default type: a filter without that type excludes it."""
+    sources: frozenset[str] | None = None
+    """``None``: every applicable source. ``SOURCE_EVENTS`` names the built-in one."""
     locale: str | None = None
     include_unpublished: bool = True

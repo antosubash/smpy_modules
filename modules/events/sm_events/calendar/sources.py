@@ -1,7 +1,8 @@
 """Occurrence sources. The module's own events are the built-in source ``events``.
 
 A source is one object behind :class:`Source`; the read merges every source in
-:data:`SOURCES` (PR 6 swaps that dict for its registry). A source yields its
+the registry (:func:`sm_events.calendar.registry.builtin_source`, plus the plugin
+sources the plugin runner calls). A source yields its
 occurrences ascending by ``(start, end, key)`` and never more than it needs: the
 caller stops pulling at the cap.
 """
@@ -27,7 +28,7 @@ from sm_events.core.access.events import is_locked
 from sm_events.core.errors import InvalidRule
 from sm_events.models import OccurrenceOverride, OverrideKind
 
-__all__ = ["EVENTS_SOURCE", "SOURCES", "Source", "SourceContext", "sort_key"]
+__all__ = ["EVENTS_SOURCE", "ReadContext", "Source", "register_builtins", "sort_key"]
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ TRUNCATED = "truncated"
 
 
 @dataclass(frozen=True)
-class SourceContext:
+class ReadContext:
     tenant_id: str
     viewer: ResourcePrincipal
     default_locale: str
@@ -51,7 +52,7 @@ class Source(Protocol):
     def occurrences(
         self,
         db: Any,
-        ctx: SourceContext,
+        ctx: ReadContext,
         start: datetime,
         end: datetime,
         filters: OccurrenceFilters,
@@ -75,7 +76,7 @@ def _pick_title(texts: dict[str, str], *locales: str | None) -> tuple[str, str]:
 class _Builder:
     """Turns an event and a time into an :class:`Occurrence`."""
 
-    def __init__(self, ctx: SourceContext, titles: dict, writable: set[uuid.UUID]) -> None:
+    def __init__(self, ctx: ReadContext, titles: dict, writable: set[uuid.UUID]) -> None:
         self.ctx, self.titles, self.writable = ctx, titles, writable
         self.can_publish = ctx.viewer.has(constants.PERM_PUBLISH)
 
@@ -200,11 +201,16 @@ class EventsSource:
     """The module's own events: one-offs from SQL, series expanded lazily."""
 
     id = constants.SOURCE_EVENTS
+    label_key = constants.BUILTIN_SOURCE_LABEL_KEY
+    public = True
+    color = None
+    icon = constants.BUILTIN_SOURCE_ICON
+    settings_model = None
 
     async def occurrences(
         self,
         db: Any,
-        ctx: SourceContext,
+        ctx: ReadContext,
         start: datetime,
         end: datetime,
         filters: OccurrenceFilters,
@@ -244,4 +250,18 @@ class EventsSource:
 
 
 EVENTS_SOURCE = EventsSource()
-SOURCES: dict[str, Source] = {EVENTS_SOURCE.id: EVENTS_SOURCE}
+
+
+def register_builtins() -> None:
+    """The built-in source and type, through the same registry a plugin uses."""
+    from sm_events.calendar import registry
+    from sm_events.calendar.extension_types import EventType, NoExtra
+
+    registry.register_builtin_source(EVENTS_SOURCE)
+    registry.register_builtin_type(
+        EventType(
+            id=constants.BUILTIN_TYPE,
+            label_key=constants.BUILTIN_TYPE_LABEL_KEY,
+            extra_model=NoExtra,
+        )
+    )

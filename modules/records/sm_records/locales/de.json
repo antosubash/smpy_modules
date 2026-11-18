@@ -901,5 +901,27 @@
         "manual": "Von Hand markiert"
       }
     }
+  },
+  "events": {
+    "source": {
+      "label": "Datensätze mit Datum"
+    },
+    "settings": {
+      "mapping": "Zuordnung {n}",
+      "type": "Datensatztyp",
+      "field": "Datumsfeld",
+      "end": "Endfeld (optional)",
+      "choose": "Auswählen…",
+      "none": "Keines",
+      "duration": "Dauer, wenn ein Datensatz kein Ende hat (Minuten)",
+      "color": "Farbe (optional)",
+      "add": "Zuordnung hinzufügen",
+      "remove": "Entfernen",
+      "load_failed": "Die Datensatztypen konnten nicht geladen werden.",
+      "hint": "Zeigt veröffentlichte Datensätze mit einem Datum. Wer welchen Datensatz sieht, richtet sich nach den Zugriffsregeln des Datensatztyps."
+    },
+    "detail": {
+      "open_record": "Datensatz öffnen"
+    }
   }
 }

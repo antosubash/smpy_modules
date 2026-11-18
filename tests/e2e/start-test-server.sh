@@ -103,6 +103,11 @@ uv run python scripts/set_setting.py sm_records \
   content_locales '["en","de"]' \
   default_content_locale en
 
+# The events module's own content languages (its public pages serve /de/events/...). Its
+# console specs use English texts only and are unaffected by a second language.
+uv run python scripts/set_setting.py sm_events \
+  content_locales '["en","de"]'
+
 # Two Phase 5 ceilings, lowered so a browser test can reach them at all. Both
 # default far above anything an e2e run can seed (10,000 records for the
 # capped total, 5,000 for a synchronous schema preview), and both are only

@@ -7,6 +7,14 @@ name the module they affect.
 
 ### Added
 
+- **events: private feed links and `.ics` import** (PR 5 of the events module). A signed-in user
+  gets a private subscription link for any calendar they may view (`/events/feed/<token>.ics`,
+  token stored only as a SHA-256, shown once, revocable, one `404` for every refusal), and the
+  Import events screen reads an `.ics` file through a bounded parser, shows a preview and
+  creates drafts, idempotently by `UID`. Hosts run the `events` migration `6dedd89ae3a8`
+  and add `events.run_import` and `events.janitor` to the worker's tasks. Imported
+  repeating UTC events keep UTC.
+
 - **events: a new module** (`simple_module_events`, #400): calendars with private,
   internal and public visibility, shared through the sharing module, the
   Calendars and Categories screens and their API. Hosts add the dependency
@@ -16,6 +24,64 @@ name the module they affect.
   the request). Names are single line (control and direction characters are
   a 422), and a name with no slug-able characters gets the slug `calendar` or
   `category`.
+- **events: events, recurrence, occurrences and workflow** (PR 2 of the events
+  module). Events have a text in each content language (a rich-text
+  description cleaned by an allow-list), one-off, all-day and recurring
+  schedules on the event's own wall clock and timezone, overrides that skip,
+  cancel or move one occurrence, and revisions. `GET /api/events/occurrences`
+  and `sm_events.contracts.occurrences` read any range within fixed bounds
+  (366 days, 2,000 items). Events move draft, in review, published, directly or
+  on a schedule; a published or scheduled event can be changed only with
+  `events.publish`; every write carries `expected_revision` (409 `stale`). The
+  console gets an Events list and an editor with a conflict panel and the
+  revision history. **Upgrading:** run the host's new migration (a `note`
+  column on `events_revision`), and start Celery beat and a worker for the
+  `events` queue (`events.publish_due`) or scheduled events never publish.
+
+- **events: the calendar** (PR 3 of the events module). `/admin/events/` is now
+  a calendar (it used to redirect to Calendars): month, week, day and list views
+  with calendar and category filters, a calendar-time or my-time toggle, state in
+  the URL, create by click or drag-select, drag and resize with a "this one or
+  all" prompt for series, and a Move dialog as the keyboard path. A drag writes
+  the event's own wall clock and never rewrites a rule. The reusable `Calendar`
+  component (`@simple-module-py/events`) takes a fetcher, calendars, optional
+  `editing` and render slots. **New dependency:** FullCalendar 7 (MIT, `^7.1.5`; the lockfile holds the resolved version)
+  and `temporal-polyfill`; the grid is a lazy chunk of about 295 kB (81 kB gzipped) plus 17 kB (4 kB gzipped) of CSS; the Temporal polyfill is a shared 65 kB (22 kB gzipped) chunk that the calendar, list and editor pages load. No
+  migration.
+
+- **events: the public site** (PR 4 of the events module). A public calendar's
+  published events are served to anonymous visitors under `public_prefix` (default
+  `/events`, restart-only) with `/{locale}` prefixes: an upcoming list with a
+  read-only calendar tab, calendar pages, event pages (`?date=` selects one occurrence
+  of a series; moved and cancelled ones are shown), `.ics` files and subscription feeds
+  (`RRULE`, `EXDATE`, `RECURRENCE-ID` with `TZID`), `Event` JSON-LD and a sitemap at
+  `{prefix}/sitemap.xml`. Drafts, internal and private calendars, trash and other
+  tenants answer one identical `no-store` 404. Renaming a calendar's slug records a
+  redirect (`301`, the `.ics` too). `calendar`, `c`, `api`, `feed` and `sitemap` are
+  reserved slugs. **New settings:** `public_prefix`, `public_title`,
+  `public_cache_seconds`. **New dependency:** `icalendar` (BSD-2-Clause, `>=7,<8`).
+  **Upgrading:** run the host's new migration (`events_calendar_redirect`). Add
+  `Sitemap: https://<site>/events/sitemap.xml` to `robots.txt`. Feeds carry time zone
+  definitions for the next 20 years.
+
+- **events: extensions, a plugin registry and the final bus events** (PR 6 of the events
+  module). A second package can add its own dates to a calendar (a source), add an event type
+  with its own validated `extra` and contribute UI, from `events_extensions.py` and
+  `events-extensions.ts` (`sm_events.contracts.extensions`, `@simple-module-py/events`). Plugins
+  load in the web process and on a worker's first registry read, then the registry freezes;
+  install them identically in every image. A plugin call runs on its own database connection
+  with a time budget, a call and item cap and validated output; a failing source is a status in
+  the calendar. Admins enable sources per calendar in the Sources dialog (`PUT
+  /api/events/calendars/{id}/sources` needs the `sources_version` a GET returned). The occurrences
+  read answers `sources`, the public API and feeds call only `public` sources, and a failed public
+  answer is not cached. An event of an uninstalled type keeps its `extra` untouched. Bus events:
+  `EventUnpublished`, `EventReinstated`, `OccurrenceSkipped`, `EventRestored` and `EventUpdated`
+  join the four from PR 2, are also published durably (outbox, at least once, no ordering) and the
+  scheduled publish now announces `EventPublished` through the worker's bus. Guide:
+  `modules/events/docs/extensions.md`.
+- **records: dates on events calendars** (the optional `events` extra, floor 0.0.16): the source
+  `records:dates`, `sm_records.contracts.dated` (published records of a type the caller may read,
+  in a date window, tenant pinned) and the calendar's settings section and detail.
 
 ### Security
 

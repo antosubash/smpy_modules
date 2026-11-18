@@ -16,6 +16,7 @@ from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal
 
 from sm_events.calendar import calendars as service
+from sm_events.calendar import source_entries
 from sm_events.core.access import CalendarEdit, CalendarOwner, CalendarView
 from sm_events.core.access.rights import CalendarRights, calendar_rights, calendar_rights_many
 from sm_events.core.constants import OWNER_NOT_ALLOWED_CODE, OWNER_NOT_ALLOWED_DETAIL
@@ -29,6 +30,7 @@ from sm_events.web.schemas.calendars import (
     OwnerIn,
     VisibilityIn,
 )
+from sm_events.web.schemas.extensions import CalendarSourceOut
 from sm_events.web.services.members import active_member
 from sm_events.web.services.owners import owner_names
 
@@ -40,6 +42,11 @@ Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
 def _render(cal: Calendar, rights: CalendarRights, names: dict[str, str | None]) -> CalendarOut:
     return CalendarOut.model_validate(cal).model_copy(
         update={
+            "sources_version": source_entries.version(cal.sources) if rights.own else "",
+            "sources": [
+                CalendarSourceOut(**entry)
+                for entry in source_entries.shown(cal.sources, with_settings=rights.own)
+            ],
             "owner_name": names.get(cal.owner_id),
             "can_edit": rights.edit_calendar,
             "can_own": rights.own,

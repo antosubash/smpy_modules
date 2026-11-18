@@ -1,6 +1,12 @@
 export const VISIBILITIES = ['private', 'internal', 'public'] as const;
 export type Visibility = (typeof VISIBILITIES)[number];
 export const DEFAULT_COLOR = '#2563eb';
+export type CalendarSource = {
+  id: string;
+  settings: Record<string, unknown>;
+  installed: boolean;
+  label_key: string | null;
+};
 export type Calendar = {
   id: string;
   slug: string;
@@ -11,7 +17,10 @@ export type Calendar = {
   owner_id: string;
   owner_name: string | null;
   default_timezone: string;
-  sources: unknown[];
+  /** The plugin sources enabled here; `settings` is empty unless the caller can manage them. */
+  sources: CalendarSource[];
+  /** What a write to the sources sends back (empty for one who cannot manage them). */
+  sources_version: string;
   created_at: string;
   updated_at: string | null;
   deleted_at: string | null;
