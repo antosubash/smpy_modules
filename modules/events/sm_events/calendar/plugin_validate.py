@@ -15,13 +15,13 @@ import unicodedata
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
-from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 from sm_events.calendar.extension_types import SourceCalendar, SourceOccurrence
 from sm_events.calendar.occurrence import PluginOccurrence
 from sm_events.calendar.times import Span, localize, supported_instant
 from sm_events.core import constants, timezones
+from sm_events.core.web_urls import is_web_url
 from sm_events.web.schemas._fields import _BIDI, _INVISIBLE, _LINE_SEPARATORS
 
 __all__ = ["InvalidPluginItem", "to_occurrences"]
@@ -63,8 +63,7 @@ def _url(raw: str | None) -> str | None:
         if raw.startswith("//"):
             raise InvalidPluginItem
         return raw
-    parts = urlsplit(raw)
-    if parts.scheme.lower() not in constants.PLUGIN_URL_SCHEMES or not parts.netloc:
+    if not is_web_url(raw):
         raise InvalidPluginItem
     return raw
 
@@ -102,6 +101,8 @@ def _one(
 ) -> PluginOccurrence:
     if not isinstance(item, SourceOccurrence):
         raise InvalidPluginItem
+    # ``model_construct`` skips pydantic's checks: validate the item again from its own fields.
+    item = SourceOccurrence.model_validate(item.model_dump())
     tz = item.timezone or calendar.default_timezone
     if not timezones.is_known(tz):
         raise InvalidPluginItem

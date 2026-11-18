@@ -185,3 +185,36 @@ def test_fields_filled():
     assert (occ.color, occ.status, occ.lang) == ("#aabbcc", "cancelled", "de-AT")
     plain = run([timed()])[0]
     assert (plain.color, plain.lang, plain.status) == (CAL.color, "en", "confirmed")
+
+
+@pytest.mark.parametrize(
+    "url", ["https://user:pw@evil.example/x", "http://user@evil.example/", "https://@a.example/"]
+)
+def test_url_with_credentials_is_refused(url):
+    with pytest.raises(InvalidPluginItem):
+        run([timed(url=url)])
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"key": "a b <x>"},
+        {"key": ""},
+        {"key": "k" * 201},
+        {"title": "T" * 100_000},
+        {"color": "red;}"},
+        {"status": "weird"},
+        {"lang": "x" * 40},
+    ],
+)
+def test_model_construct_cannot_skip_the_checks(bad):
+    """``model_construct`` skips pydantic's validation: every item is validated again here."""
+    fields = {
+        "key": "a",
+        "title": "T",
+        "start": utc(2026, 7, 2, 10),
+        "end": utc(2026, 7, 2, 11),
+        **bad,
+    }
+    with pytest.raises(InvalidPluginItem):
+        run([SourceOccurrence.model_construct(**fields)])
