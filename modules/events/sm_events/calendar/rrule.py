@@ -3,40 +3,25 @@
 Only an allow-list of parts is accepted (:mod:`sm_events.calendar.rrule_parts`) and
 dateutil only ever sees keyword arguments built from it, never raw text.
 
-**Every iteration has an ``until``.** dateutil checks ``until`` only when it has a
-candidate, so a rule that can never match (30 February) walks on to year 9999.
-:func:`iterate` therefore shifts the whole problem by a multiple of 400 years (the
-Gregorian cycle: same weekdays, same leap years) so that the walk to year 9999 is
-a few hundred years at most, and it starts at the period nearest the lower bound
-instead of at ``dtstart`` so a long-running series costs what the window holds.
+Iteration lives in :mod:`sm_events.calendar.rrule_walk`: every walk has a stop.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time
 from zoneinfo import ZoneInfo
 
-from dateutil import rrule as du
-
 from sm_events.calendar.rrule_parts import WEEKDAYS, ByDay, Parts, bad, parse_parts
+from sm_events.calendar.rrule_walk import build, iterate
 from sm_events.calendar.times import Span, all_day_dates, localize
 from sm_events.core import constants
 from sm_events.core.errors import InvalidRule
 
 __all__ = ["Rule", "build", "iterate", "parse", "until_local", "validate"]
 
-_DU_FREQ = {
-    "DAILY": du.DAILY,
-    "WEEKLY": du.WEEKLY,
-    "MONTHLY": du.MONTHLY,
-    "YEARLY": du.YEARLY,
-}
 _UNTIL_DATE_LEN = 8
 _UNTIL_DATETIME_LEN = 16
-_CYCLE_YEARS = 400
-_TARGET_YEAR = 9900  # where iterate() puts ``until`` before it walks
 
 
 @dataclass(frozen=True)
@@ -128,87 +113,6 @@ def until_local(rule: Rule, tz: ZoneInfo) -> datetime | None:
     if isinstance(rule.until, datetime):
         return rule.until.astimezone(tz).replace(tzinfo=None)
     return datetime.combine(rule.until, time(23, 59, 59))
-
-
-def _kwargs(rule: Rule, dtstart: datetime) -> dict:
-    """dateutil's keyword arguments, with its dtstart-derived defaults made explicit
-    so that moving ``dtstart`` along the rule's own period cannot change them."""
-    bymonth, bymonthday = rule.bymonth, rule.bymonthday
-    byweekday = [du.weekday(d, o) if o is not None else du.weekday(d) for d, o in rule.byday]
-    if not (bymonthday or byweekday):
-        if rule.freq == "YEARLY":
-            bymonth = bymonth or (dtstart.month,)
-            bymonthday = (dtstart.day,)
-        elif rule.freq == "MONTHLY":
-            bymonthday = (dtstart.day,)
-        elif rule.freq == "WEEKLY":
-            byweekday = [du.weekday(dtstart.weekday())]
-    return {
-        "freq": _DU_FREQ[rule.freq],
-        "interval": rule.interval,
-        "wkst": rule.wkst if rule.wkst is not None else 0,
-        "bymonth": bymonth or None,
-        "bymonthday": bymonthday or None,
-        "byweekday": byweekday or None,
-        "bysetpos": rule.bysetpos or None,
-    }
-
-
-def build(rule: Rule, *, dtstart_local: datetime, until_local: datetime | None) -> du.rrule:
-    """The dateutil rule on a naive local ``dtstart``: ``COUNT`` dropped, ``until``
-    always set (an endless rule is bounded by the caller's window)."""
-    if until_local is None:
-        raise ValueError("an rrule is never iterated without an until")
-    return du.rrule(dtstart=dtstart_local, until=until_local, **_kwargs(rule, dtstart_local))
-
-
-def _aligned_start(rule: Rule, dtstart: datetime, lower: datetime) -> datetime:
-    """The start of the last period, in the rule's own phase, at or before ``lower``."""
-    if lower <= dtstart:
-        return dtstart
-    step, tod = rule.interval, dtstart.time()
-    if rule.freq == "DAILY":
-        days = (lower.date() - dtstart.date()).days // step * step
-        return datetime.combine(dtstart.date() + timedelta(days=days), tod)
-    if rule.freq == "WEEKLY":
-        wkst = rule.wkst if rule.wkst is not None else 0
-        first = dtstart.date() - timedelta(days=(dtstart.weekday() - wkst) % 7)
-        weeks = ((lower.date() - first).days // 7) // step * step
-        if weeks == 0:
-            return dtstart
-        return datetime.combine(first + timedelta(weeks=weeks), tod)
-    if rule.freq == "MONTHLY":
-        months = (lower.year - dtstart.year) * 12 + lower.month - dtstart.month
-        months = months // step * step
-        if months <= 0:
-            return dtstart
-        index = dtstart.year * 12 + dtstart.month - 1 + months
-        return datetime.combine(date(index // 12, index % 12 + 1, 1), tod)
-    years = (lower.year - dtstart.year) // step * step
-    if years <= 0:
-        return dtstart
-    return datetime.combine(date(dtstart.year + years, 1, 1), tod)
-
-
-def iterate(
-    rule: Rule, *, dtstart_local: datetime, lower_local: datetime, until_local: datetime
-) -> Iterator[datetime]:
-    """Naive local starts in ``[lower_local, until_local]``, ascending, never beyond
-    ``until_local``, and in work bounded by the span asked for (see module docs)."""
-    kwargs = _kwargs(rule, dtstart_local)
-    start = _aligned_start(rule, dtstart_local, lower_local)
-    if until_local < start:
-        return
-    shift = _CYCLE_YEARS * ((_TARGET_YEAR - until_local.year) // _CYCLE_YEARS)
-    walker = du.rrule(
-        dtstart=start.replace(year=start.year + shift),
-        until=until_local.replace(year=until_local.year + shift),
-        **kwargs,
-    )
-    for hit in walker:
-        value = hit.replace(year=hit.year - shift)
-        if value >= lower_local:
-            yield value
 
 
 def _local_start(span: Span, tz: ZoneInfo) -> datetime:
