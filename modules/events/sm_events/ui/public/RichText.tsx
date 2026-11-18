@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { safeHref } from '../utils/richtext';
 import type { Node } from './richtext-types';
 
 /** The description tree as elements. Each allow-listed tag maps to one element; anything else
@@ -20,23 +21,14 @@ const TAGS = {
 type Tag = keyof typeof TAGS;
 const isTag = (name: string): name is Tag => Object.hasOwn(TAGS, name);
 
-/** `http:`, `https:` and `mailto:` only. */
-export function isSafeHref(href: string | undefined): href is string {
-  if (!href) return false;
-  try {
-    return ['http:', 'https:', 'mailto:'].includes(new URL(href).protocol);
-  } catch {
-    return false;
-  }
-}
-
 function render(node: Node, key: number): ReactNode {
   if (typeof node === 'string') return node;
   const children = node.c.map(render);
   if (node.t === 'br') return <br key={key} />;
   if (node.t === 'a') {
-    return isSafeHref(node.href) ? (
-      <a key={key} href={node.href} rel="nofollow noopener">
+    const href = safeHref(node.href);
+    return href ? (
+      <a key={key} href={href} rel="nofollow noopener">
         {children}
       </a>
     ) : (

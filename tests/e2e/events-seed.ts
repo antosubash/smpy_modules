@@ -77,7 +77,10 @@ export async function postEvent(page: Page, seed: EventSeed): Promise<CreatedEve
 }
 
 /** Draft -> in review -> published, as the admin (who holds events.publish). */
-export async function publishEvent(page: Page, event: CreatedEvent): Promise<number> {
+export async function publishEvent(
+  page: Page,
+  event: { id: string; revision: number },
+): Promise<number> {
   const headers = await moduleCsrfHeader(page, CSRF_VIEW);
   const submit = await page.request.post(`/api/events/events/${event.id}/submit`, {
     headers,

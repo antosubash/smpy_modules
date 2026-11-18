@@ -16,25 +16,12 @@ from __future__ import annotations
 from html.parser import HTMLParser
 from typing import Any
 
-from sm_events.content.richtext import ALLOWED_TAGS, MAX_DEPTH, SCHEMES, clean
+from sm_events.content.richtext import ALLOWED_TAGS, MAX_DEPTH, clean, safe_href
 
 __all__ = ["Node", "to_tree"]
 
 Node = str | dict[str, Any]
 _VOID = frozenset({"br"})
-
-
-def _safe_href(value: str | None) -> str | None:
-    """``value`` when it is an absolute ``http(s)`` or ``mailto`` URL, else ``None``."""
-    if not value:
-        return None
-    scheme, sep, rest = value.partition(":")
-    scheme = scheme.lower()
-    if not sep or scheme not in SCHEMES or not rest:
-        return None
-    if scheme != "mailto" and not rest.startswith("//"):
-        return None
-    return value
 
 
 class _Builder(HTMLParser):
@@ -50,7 +37,7 @@ class _Builder(HTMLParser):
             return
         node: dict[str, Any] = {"t": tag, "c": []}
         if tag == "a":
-            href = _safe_href(dict(attrs).get("href"))
+            href = safe_href(dict(attrs).get("href"))
             if href is None:
                 self.open.append(None)  # unwrapped: its text stays
                 return

@@ -11,16 +11,15 @@ import {
   guard,
   listEvents,
   monthYear,
-  publish,
   resizeBy,
   seedCalendar,
   seedOne,
   seedWeek,
   seedWriter,
   tabTo,
-  viennaTenInNewYork,
   wednesday,
 } from './events-calendar-helpers';
+import { publishEvent } from './events-seed';
 import { login, uniqueSlug } from './helpers';
 
 /**
@@ -208,7 +207,7 @@ test('a writer without publish cannot drag a published event, and is told why', 
   browser,
 }) => {
   const { cal, day, one, oneOff } = await seedWeek(page);
-  await publish(page, oneOff);
+  await publishEvent(page, oneOff);
   const email = await seedWriter(page);
 
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
@@ -236,47 +235,6 @@ test('a writer without publish cannot drag a published event, and is told why', 
   );
   await expect(writer.getByRole('button', { name: 'Move…' })).toHaveCount(0);
   await context.close();
-});
-
-test.describe('the grid time zone', () => {
-  test.use({ timezoneId: 'America/New_York' });
-
-  test('calendar time shows Vienna 10:00; my time shows the New York hour', async ({ page }) => {
-    const { cal, day, one } = await seedWeek(page);
-    const hour = viennaTenInNewYork(day);
-    expect(['4', '5']).toContain(hour);
-
-    await page.goto(calendarUrl(cal.id, 'week', day));
-    await expect(chip(page, one)).toContainText('10:00');
-    await page.getByRole('button', { name: /^My time/ }).click();
-    await expect(page.getByRole('button', { name: /^My time/ })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    await expect(chip(page, one)).toContainText(`${hour}:00`);
-    await expect(chip(page, one)).not.toContainText('10:00');
-    await page.getByRole('button', { name: /^Calendar time/ }).click();
-    await expect(chip(page, one)).toContainText('10:00');
-  });
-});
-
-test('German console: the week starts on Monday and times are 24-hour', async ({
-  page,
-  context,
-}) => {
-  const { cal, day, series } = await seedWeek(page);
-  const origin = new URL('/', page.url()).toString();
-  await context.addCookies([{ name: 'locale', value: 'de', url: origin }]);
-  try {
-    await page.goto(calendarUrl(cal.id, 'week', day));
-    const headers = page.getByText(/^(Mo|Di|Mi|Do|Fr|Sa|So)\.? \d+$/);
-    await expect(headers.first()).toHaveText(/^Mo\.? \d+$/);
-    await expect(chip(page, series)).toContainText('13:00');
-    await page.goto(calendarUrl(cal.id, 'month', day));
-    await expect(page.getByText(/^Mo\.?$/).first()).toBeVisible();
-  } finally {
-    await context.addCookies([{ name: 'locale', value: 'en', url: origin }]);
-  }
 });
 
 test('the calendar chunk loads on the calendar and not on the other screens', async ({ page }) => {

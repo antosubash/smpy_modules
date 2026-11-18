@@ -1,5 +1,6 @@
+import { daySpan, localSpan } from '../utils/datetime';
 import { keys, useT } from '../utils/i18n';
-import { daySpan, localSpan, viewerSpan } from './format';
+import { viewerSpan } from './format';
 import type { PublicEventProps, When } from './types';
 
 /** The event's own time, and, for a timed event, the visitor's when their zone differs.

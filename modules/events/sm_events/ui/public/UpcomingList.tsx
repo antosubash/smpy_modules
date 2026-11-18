@@ -1,5 +1,5 @@
+import { daySpan, localSpan, monthName } from '../utils/datetime';
 import { keys, useT } from '../utils/i18n';
-import { daySpan, localSpan, monthName } from './format';
 import type { MonthGroup, PublicListItem } from './types';
 
 /** The time of one item on the event's own clock, with its zone named when it differs from the

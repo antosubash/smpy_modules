@@ -1,10 +1,10 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { type EventSeed, postCalendar, postEvent, ZONE } from './events-seed';
-import { moduleCsrfHeader, uniqueSlug } from './helpers';
+import { uniqueSlug } from './helpers';
 
 /** Seeds for events-calendar.spec.ts: everything is made through the API with unique names. */
 
-const CSRF_VIEW = '/admin/events/calendars';
+const _CSRF_VIEW = '/admin/events/calendars';
 
 export { ZONE };
 
@@ -43,22 +43,6 @@ type SeedInput = Omit<EventSeed, 'calendar'> & { calendar: string };
 export async function seedEvent(page: Page, seed: SeedInput): Promise<Seeded> {
   const { id, revision } = await postEvent(page, seed);
   return { id, title: seed.title, revision };
-}
-
-/** Draft -> in review -> published, as the admin (who holds events.publish). */
-export async function publish(page: Page, event: Seeded): Promise<void> {
-  const headers = await moduleCsrfHeader(page, CSRF_VIEW);
-  const submit = await page.request.post(`/api/events/events/${event.id}/submit`, {
-    headers,
-    data: { expected_revision: event.revision },
-  });
-  expect(submit.status(), await submit.text()).toBe(200);
-  const { revision } = (await submit.json()) as { revision: number };
-  const approve = await page.request.post(`/api/events/events/${event.id}/approve`, {
-    headers,
-    data: { expected_revision: revision },
-  });
-  expect(approve.status(), await approve.text()).toBe(200);
 }
 
 export type ApiEvent = {
