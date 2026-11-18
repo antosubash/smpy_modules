@@ -43,7 +43,10 @@
     "public": "Öffentlich"
   },
   "types": {
-    "event": "Veranstaltung"
+    "event": "Veranstaltung",
+    "picker": "Typ",
+    "current": "Typ: {name}",
+    "not_installed": "Der Typ dieser Veranstaltung ist auf diesem Server nicht installiert. Die zusätzlichen Angaben bleiben unverändert und können hier nicht geändert werden."
   },
   "calendars": {
     "title": "Kalender",
@@ -145,7 +148,9 @@
     "edited_meanwhile": "Die Aktion wurde ausgeführt. Ihre zwischenzeitlichen Änderungen bleiben erhalten und sind noch nicht gespeichert.",
     "action_stale": "Jemand anderes hat diese Veranstaltung geändert. Ihre Aktion wurde nicht ausgeführt.",
     "token_limit": "Du hast bereits die meisten privaten Links, die dieser Kalender erlaubt. Widerrufe zuerst einen.",
-    "private_feeds_unavailable": "Private Links sind für dein Konto nicht verfügbar."
+    "private_feeds_unavailable": "Private Links sind für dein Konto nicht verfügbar.",
+    "extra_too_large": "Die zusätzlichen Angaben dieser Veranstaltung sind zu groß.",
+    "type_not_installed": "Der Typ dieser Veranstaltung ist nicht installiert, daher können die zusätzlichen Angaben nicht geändert werden."
   },
   "categories": {
     "title": "Kategorien",

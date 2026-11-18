@@ -77,6 +77,8 @@ export function errorText(error: unknown, gone?: string): string {
     description_too_long: keys.events.errors.description_too_long,
     token_limit: keys.events.errors.token_limit,
     private_feeds_unavailable: keys.events.errors.private_feeds_unavailable,
+    extra_too_large: keys.events.errors.extra_too_large,
+    type_not_installed: keys.events.errors.type_not_installed,
   };
   if (!(error instanceof ApiError)) return t(keys.events.errors.generic);
   if (gone && error.status === 404) return t(gone);

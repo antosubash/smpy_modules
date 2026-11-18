@@ -43,7 +43,10 @@
     "public": "Public"
   },
   "types": {
-    "event": "Event"
+    "event": "Event",
+    "picker": "Type",
+    "current": "Type: {name}",
+    "not_installed": "This event's type is not installed on this server. Its extra details are kept as they are and cannot be changed here."
   },
   "calendars": {
     "title": "Calendars",
@@ -145,7 +148,9 @@
     "edited_meanwhile": "The action went through. Your edits made meanwhile are kept and are still unsaved.",
     "action_stale": "Someone else changed this event. Your action was not applied.",
     "token_limit": "You already have the most private links this calendar allows. Revoke one first.",
-    "private_feeds_unavailable": "Private links are not available for your account."
+    "private_feeds_unavailable": "Private links are not available for your account.",
+    "extra_too_large": "The extra details of this event are too large.",
+    "type_not_installed": "This event's type is not installed, so its extra details cannot be changed."
   },
   "categories": {
     "title": "Categories",

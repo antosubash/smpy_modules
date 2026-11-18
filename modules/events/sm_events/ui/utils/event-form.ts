@@ -39,6 +39,9 @@ export type FormState = {
   organiser: string;
   image: string;
   registration_url: string;
+  /** The event's type (fixed after create) and its plugin-owned `extra`. */
+  type: string;
+  extra: Record<string, unknown>;
   texts: Record<string, TextForm>;
 };
 
@@ -75,6 +78,8 @@ export function emptyForm(timezone: string, locales: readonly string[], now?: Da
     organiser: '',
     image: '',
     registration_url: '',
+    type: 'event',
+    extra: {},
     texts: Object.fromEntries(locales.map((locale, index) => [locale, blankText(index === 0)])),
   };
 }
@@ -97,6 +102,8 @@ export function toForm(event: EventDetail, locales: readonly string[]): FormStat
     organiser: event.organiser ?? '',
     image: event.image ?? '',
     registration_url: event.registration_url ?? '',
+    type: event.type,
+    extra: event.extra ?? {},
     texts: Object.fromEntries(
       locales.map((locale) => {
         const text = event.texts[locale];
@@ -193,7 +200,14 @@ export function toCreate(form: FormState, calendarId: string): EventCreate {
   for (const [locale, entry] of Object.entries(form.texts)) {
     if (entry.present) texts[locale] = textInput(entry);
   }
-  return { calendar_id: calendarId, times: times(form), texts, ...fields(form) };
+  return {
+    calendar_id: calendarId,
+    type: form.type,
+    extra: form.extra,
+    times: times(form),
+    texts,
+    ...fields(form),
+  };
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -212,6 +226,12 @@ export function toPatch(base: FormState, form: FormState, revision: number): Eve
   for (const name of Object.keys(after) as (keyof EventFields)[]) {
     if (same(before[name], after[name])) continue;
     Object.assign(patch, { [name]: after[name] });
+    changed = true;
+  }
+  // `extra` goes only when it changed: an event whose type is not installed has no section, so
+  // its form value never differs from the base and its stored bytes are never sent back.
+  if (!same(base.extra, form.extra)) {
+    patch.extra = form.extra;
     changed = true;
   }
   const texts: Record<string, TextInput | null> = {};
