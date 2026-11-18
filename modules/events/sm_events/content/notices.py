@@ -14,13 +14,29 @@ from sm_events.contracts.events import (
     EventCancelled,
     EventDeleted,
     EventPublished,
+    EventReinstated,
     EventRescheduled,
+    EventRestored,
+    EventUnpublished,
+    EventUpdated,
+    OccurrenceSkipped,
 )
 from sm_events.core.tenancy import bound_tenant
 from sm_events.models import Event
 from sm_events.models.enums import EventStatus
 
-__all__ = ["cancelled", "deleted", "published", "rescheduled", "series_changed"]
+__all__ = [
+    "cancelled",
+    "deleted",
+    "published",
+    "reinstated",
+    "rescheduled",
+    "restored",
+    "series_changed",
+    "skipped",
+    "unpublished",
+    "updated",
+]
 
 
 def _ids(event: Event) -> dict:
@@ -94,3 +110,35 @@ def deleted(event: Event) -> EventDeleted | None:
     if event.published_at is None:
         return None
     return EventDeleted(**_ids(event), was_published=is_live(event))
+
+
+def unpublished(event: Event, *, was_scheduled: bool) -> EventUnpublished:
+    return EventUnpublished(**_ids(event), was_scheduled=was_scheduled)
+
+
+def reinstated(event: Event, *, original_start: datetime | None) -> EventReinstated | None:
+    """``None`` unless the event is live."""
+    if not is_live(event):
+        return None
+    return EventReinstated(**_ids(event), original_start=original_start)
+
+
+def skipped(event: Event, *, original_start: datetime) -> OccurrenceSkipped | None:
+    """``None`` unless the event is live."""
+    if not is_live(event):
+        return None
+    return OccurrenceSkipped(**_ids(event), original_start=original_start)
+
+
+def restored(event: Event) -> EventRestored | None:
+    """``None`` unless the restored event is live."""
+    if not is_live(event):
+        return None
+    return EventRestored(**_ids(event))
+
+
+def updated(event: Event, changed: set[str]) -> EventUpdated | None:
+    """``None`` unless the event is live and something changed."""
+    if not is_live(event) or not changed:
+        return None
+    return EventUpdated(**_ids(event), changed=tuple(sorted(changed)))

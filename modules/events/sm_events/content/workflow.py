@@ -121,6 +121,8 @@ async def transition(
         )
         if recorded == "approved":
             bus.emit(db, notices.published(event, at=now))
+        elif action in ("unschedule", "unpublish"):
+            bus.emit(db, notices.unpublished(event, was_scheduled=action == "unschedule"))
     return event
 
 
@@ -133,12 +135,12 @@ async def publish_scheduled(db: Any, event: Event, *, now: datetime) -> None:
     actor. The scheduler's right is not re-checked: the ``scheduled`` revision
     records who scheduled it.
 
-    **No bus event.** A worker has no in-process bus, so unlike ``approve`` this
-    announces no :class:`~sm_events.contracts.events.EventPublished`: a
-    subscriber only sees publishes made through the web process (open point 2 of
-    the design; a cross-process bus is a framework matter)."""
+    It announces :class:`~sm_events.contracts.events.EventPublished` like ``approve`` does:
+    in process on the bus the caller attached (the beat attaches the worker's), and durably
+    in the same transaction when that bus has a durable transport."""
     async with db.begin_nested():
         await claim(db, event, event.revision, actor=None)
         event.status, event.publish_at, event.published_at = _LIVE, None, now
         await db.flush()
         await revisions.record(db, event, action="published_scheduled", actor=None)
+        bus.emit(db, notices.published(event, at=now))

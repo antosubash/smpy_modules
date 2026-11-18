@@ -140,6 +140,7 @@ async def _apply(
         was_cancelled = event.cancelled
         dropped: list = []
         changed = False
+        names: set[str] = set()  # what changed, for ``EventUpdated``
         if "category_id" in sent:
             await check_category(db, data.category_id)
         if sent & {"times", "rrule"}:
@@ -148,6 +149,7 @@ async def _apply(
             )
             if plan != old:
                 changed = True
+                names.add("times" if "times" in sent else "rrule")
                 await _check_recurrence(db, event, plan)
                 dropped = await settle_overrides(db, event, plan, drop=data.drop_orphaned_overrides)
                 event.starts_at, event.ends_at = plan.span.starts_at, plan.span.ends_at
@@ -157,18 +159,26 @@ async def _apply(
             if name in sent and getattr(event, name) != getattr(data, name):
                 setattr(event, name, getattr(data, name))
                 changed = True
+                names.add(name)
         if data.texts is not None and await apply_texts(
             db, event, data.texts, locales=locales, creating=False
         ):
             changed = True
-        if "extra" in sent and data.extra is not None:
-            changed = _apply_extra(event, data.extra) or changed
+            names.add("texts")
+        if "extra" in sent and data.extra is not None and _apply_extra(event, data.extra):
+            changed = True
+            names.add("extra")
         if not changed:
             raise Unchanged
         await db.flush()
         await revisions.record(
             db, event, action="updated", actor=who.user_id, note=dropped_note(dropped)
         )
-        bus.emit(db, notices.series_changed(event, old))
+        specific = [notices.series_changed(event, old)]
         if event.cancelled and not was_cancelled:
-            bus.emit(db, notices.cancelled(event, original_start=None))
+            specific.append(notices.cancelled(event, original_start=None))
+        elif was_cancelled and not event.cancelled:
+            specific.append(notices.reinstated(event, original_start=None))
+        bus.emit(db, *specific)
+        if not any(specific):  # a write a specific event covers announces only that one
+            bus.emit(db, notices.updated(event, names))

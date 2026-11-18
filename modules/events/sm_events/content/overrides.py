@@ -132,6 +132,10 @@ async def _write(
             )
         elif data.kind == OverrideKind.CANCELLED.value and not was_cancelled:
             bus.emit(db, notices.cancelled(event, original_start=original))
+        elif data.kind == OverrideKind.SKIPPED.value:
+            bus.emit(db, notices.skipped(event, original_start=original))
+        if was_cancelled and data.kind != OverrideKind.CANCELLED.value:
+            bus.emit(db, notices.reinstated(event, original_start=original))
     return row
 
 
@@ -152,6 +156,11 @@ async def clear_override(
         ).scalar_one_or_none()
         if row is None:
             raise NotFound
+        kind, original = row.kind, row.original_start
         await db.delete(row)
         await db.flush()
         await revisions.record(db, event, action="override_cleared", actor=who.user_id)
+        if kind == OverrideKind.CANCELLED.value:
+            bus.emit(db, notices.reinstated(event, original_start=original))
+        else:  # a skip or a move undone: the series changed, no specific event for it
+            bus.emit(db, notices.updated(event, {"overrides"}))
