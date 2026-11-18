@@ -4,7 +4,8 @@ Every table is imported here so ``Base.metadata`` is complete the moment anythin
 imports the package - Alembic autogenerate and the test harness rely on it. All
 seven tables of PRs 1 and 2 are declared now; events, texts, overrides, revisions and
 redirects get their behaviour in PR 2. PR 4 adds ``events_calendar_redirect``; PR 5 adds
-``events_feed_token``, ``events_import`` and ``events_import_item``.
+``events_feed_token``, ``events_import`` and ``events_import_item``; PR 8 adds
+``events_follow`` and ``events_reminder_sent``.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from sm_events.models.feed_token import FeedToken
 from sm_events.models.imports import EventImport, EventImportItem
 from sm_events.models.occurrence_override import OccurrenceOverride
 from sm_events.models.redirect import Redirect
+from sm_events.models.reminders import EventFollow, ReminderSent
 from sm_events.models.revision import Revision
 
 __all__ = [
@@ -40,6 +42,7 @@ __all__ = [
     "CalendarRedirect",
     "Category",
     "Event",
+    "EventFollow",
     "EventImport",
     "EventImportItem",
     "EventStatus",
@@ -48,6 +51,7 @@ __all__ = [
     "OccurrenceOverride",
     "OverrideKind",
     "Redirect",
+    "ReminderSent",
     "Revision",
     "Visibility",
 ]

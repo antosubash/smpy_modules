@@ -6,7 +6,7 @@ import uuid
 from typing import Any
 
 from simple_module_db.mixins import AuditMixin, MultiTenantMixin, SoftDeleteMixin
-from sqlalchemy import Index, UniqueConstraint
+from sqlalchemy import JSON, Column, Index, UniqueConstraint
 from sqlmodel import Field
 
 from sm_events.core.constants import DEFAULT_COLOR, SLUG_MAX, TZ_MAX
@@ -36,3 +36,8 @@ class Calendar(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):
     sources: list[Any] = json_col(list)
     """Plugin source ids only; the built-in ``events`` source is always on and
     never listed."""
+    default_reminder_minutes: list[int] | None = Field(
+        default=None, sa_column=Column(JSON, nullable=True)
+    )
+    """Lead times (minutes, each in ``REMINDER_LEADS``) that "Remind me" preselects here;
+    ``NULL`` means the install-wide setting. Nobody is followed automatically."""

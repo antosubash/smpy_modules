@@ -32,6 +32,8 @@ EVENTS_TABLES = {
     "events_feed_token",
     "events_import",
     "events_import_item",
+    "events_follow",
+    "events_reminder_sent",
 }
 
 
