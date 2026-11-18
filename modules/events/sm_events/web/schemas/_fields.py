@@ -48,6 +48,20 @@ def single_line(value: Any) -> Any:
     return _reject_controls(value, frozenset(), _BIDI | _LINE_SEPARATORS | _INVISIBLE)
 
 
+def strip_unsafe(value: str, *, newlines: bool = False) -> str:
+    """``value`` without what :func:`single_line` would refuse (``newlines``: what
+    :func:`multi_line` would refuse), for text taken from somewhere that is not a person typing
+    it (an imported file), where refusing the whole value would lose an event over one stray
+    control character."""
+    allowed = _MULTILINE_OK if newlines else frozenset()
+    extra = _BIDI if newlines else _BIDI | _LINE_SEPARATORS | _INVISIBLE
+    return "".join(
+        ch
+        for ch in value
+        if not ((unicodedata.category(ch) == _CONTROL and ch not in allowed) or ch in extra)
+    )
+
+
 def multi_line(value: Any) -> Any:
     """Free text: newlines, tabs and the Unicode line separators are fine; NUL,
     the other controls and the direction controls are not."""
