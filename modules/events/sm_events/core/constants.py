@@ -74,16 +74,16 @@ MENU_GROUP = MODULE_NAME
 MENU_GROUP_KEY = "events.menu.group"
 MENU_LABEL_CALENDAR = "Calendar"
 MENU_LABEL_KEY_CALENDAR = "events.menu.calendar"
-MENU_ICON_CALENDAR = "calendar-range"
+MENU_ICON_CALENDAR = "calendar"
 MENU_LABEL_CALENDARS = "Calendars"
 MENU_LABEL_KEY_CALENDARS = "events.menu.calendars"
-MENU_ICON_CALENDARS = "calendar"
+MENU_ICON_CALENDARS = "layers"
 MENU_LABEL_CATEGORIES = "Event categories"
 MENU_LABEL_KEY_CATEGORIES = "events.menu.categories"
 MENU_ICON_CATEGORIES = "tag"
 MENU_LABEL_EVENTS = "Events"
 MENU_LABEL_KEY_EVENTS = "events.menu.events"
-MENU_ICON_EVENTS = "calendar-days"
+MENU_ICON_EVENTS = "list"
 
 # Bounds on times, ranges, rules, revisions and pages.
 MAX_EVENT_DAYS = 366
