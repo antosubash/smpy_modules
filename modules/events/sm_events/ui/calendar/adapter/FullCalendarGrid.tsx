@@ -19,6 +19,7 @@ import {
   toChange,
   toEventInput,
   toRangeChange,
+  toSlot,
   VIEW_NAMES,
 } from './mapping';
 import { baseOptions, localeOptions } from './options';
@@ -70,6 +71,11 @@ export default function FullCalendarGrid({
   const placed = useRef(new Map<string, Placement>());
   // biome-ignore lint/correctness/useExhaustiveDependencies: `items` is the trigger, not a read
   useEffect(() => placed.current.clear(), [items]);
+  // The selection stays while the create dialog is open and goes with it.
+  const creating = Boolean(editing?.creating);
+  useEffect(() => {
+    if (!creating) calendar.current?.getApi().unselect();
+  }, [creating]);
   const events = useMemo(
     () => items.map((o) => toEventInput(o, editing, placed.current.get(o.key))),
     [items, editing],
@@ -107,6 +113,21 @@ export default function FullCalendarGrid({
         timeZone={timeZone}
         events={events}
         editable={Boolean(editing)}
+        selectable={Boolean(editing?.canCreate)}
+        selectMirror
+        // A click selects one slot, so `select` covers it; `dateClick` is the same slot again.
+        select={(info) => editing?.onCreate(toSlot(info))}
+        dateClick={(info) =>
+          editing?.onCreate(
+            toSlot({
+              start: info.date,
+              end: null,
+              allDay: info.allDay,
+              startStr: info.dateStr,
+              endStr: '',
+            }),
+          )
+        }
         noEventsContent={noEventsText}
         // A React node, never `{html}`: a title is text.
         eventContent={({ event, timeText }) => renderChip(occurrenceOf(event), timeText)}

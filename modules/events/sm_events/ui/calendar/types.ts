@@ -59,6 +59,8 @@ export type OccurrenceChange = {
 };
 export type CalendarEditing = {
   canCreate: boolean;
+  /** The create dialog is open: the grid keeps the selection it made, and drops it when this ends. */
+  creating?: boolean;
   onCreate: (slot: CreateSlot) => void;
   /** Resolves `true` to keep the grid's optimistic position, `false` to revert it. */
   onChange: (change: OccurrenceChange) => Promise<boolean>;
