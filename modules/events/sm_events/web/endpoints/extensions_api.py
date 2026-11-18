@@ -11,13 +11,15 @@ from fastapi import APIRouter, Depends, Request
 from simple_module_db.deps import get_db
 
 from sm_events.calendar import registry, source_entries
+from sm_events.content.types import type_info
+from sm_events.core import constants
 from sm_events.core.access import CalendarOwner
 from sm_events.core.errors import TenantRequired
 from sm_events.core.tenancy import bound_tenant
 from sm_events.web.endpoints.calendars_api import Principal, out
 from sm_events.web.endpoints.deps import require_view
 from sm_events.web.schemas.calendars import CalendarOut
-from sm_events.web.schemas.extensions import SourceOut, SourcesIn
+from sm_events.web.schemas.extensions import SourceOut, SourcesIn, TypeOut
 from sm_events.web.services.source_viewer import source_viewer_from
 
 router = APIRouter(tags=["extensions"], dependencies=[require_view])
@@ -41,6 +43,14 @@ async def list_sources() -> list[SourceOut]:
         )
         for _id, source in sorted(found.items())
     ]
+
+
+@router.get("/types")
+async def list_types() -> list[TypeOut]:
+    """Every installed event type: the built-in first, then by id."""
+    found = registry.all_types()
+    ordered = sorted(found.values(), key=lambda t: (t.id != constants.BUILTIN_TYPE, t.id))
+    return [type_info(t) for t in ordered]
 
 
 @router.put("/calendars/{calendar_id}/sources")

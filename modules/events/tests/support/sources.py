@@ -199,3 +199,20 @@ class FakeClock:
             return []
 
         return behave
+
+
+def acme_talk():
+    """The fixture plugin's ``acme:talk`` type (speaker is public, room is not)."""
+    import sys
+    from pathlib import Path
+
+    path = str(Path(__file__).resolve().parents[1] / "fixtures")
+    if path not in sys.path:
+        sys.path.insert(0, path)
+    from acme_events.events_extensions import TALK
+
+    return TALK
+
+
+def install_talk(monkeypatch):
+    install(monkeypatch, types=(acme_talk(),))

@@ -266,3 +266,21 @@ async def test_calendar_page_lists_the_sources_enabled_on_shown_calendars(client
         ]
     finally:
         registry.reset_registry()
+
+
+async def test_calendar_and_editor_props_list_types(client, monkeypatch):
+    from tests.support.sources import install_talk
+
+    install_talk(monkeypatch)
+    cals = await cast(client)
+    expected = [
+        {"id": "event", "label_key": "events.types.event", "icon": None},
+        {"id": "acme:talk", "label_key": "acme.types.talk", "icon": "mic"},
+    ]
+    page = await client.get("/admin/events/", headers=STRANGER | _inertia())
+    assert page.json()["props"]["types"] == expected
+    editor = await client.get(
+        f"/admin/events/edit/new?calendar={cals['U']}", headers=STRANGER | _inertia()
+    )
+    assert editor.status_code == 200, editor.text
+    assert editor.json()["props"]["types"] == expected

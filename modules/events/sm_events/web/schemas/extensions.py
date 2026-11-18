@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from sm_events.core import constants
 
-__all__ = ["CalendarSourceIn", "CalendarSourceOut", "SourceOut", "SourcesIn"]
+__all__ = ["CalendarSourceIn", "CalendarSourceOut", "SourceOut", "SourcesIn", "TypeOut"]
 
 
 class CalendarSourceIn(BaseModel):
@@ -38,3 +38,13 @@ class SourceOut(BaseModel):
     public: bool
     has_settings: bool
     settings_schema: dict[str, Any] | None
+
+
+class TypeOut(BaseModel):
+    id: str
+    label_key: str
+    icon: str | None
+    builtin: bool
+    public_fields: list[str]
+    json_schema: dict[str, Any]
+    defaults: dict[str, Any]

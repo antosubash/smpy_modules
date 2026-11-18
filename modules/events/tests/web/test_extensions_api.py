@@ -181,3 +181,25 @@ async def test_another_tenants_settings_never_shown(multi_client):
     )
     assert "tenant-a-only" not in (await multi_client.get(BASE, headers=b)).text
     assert (await multi_client.get(f"{BASE}/{cid}", headers=b)).status_code == 404
+
+
+async def test_list_types_builtin_first(client, monkeypatch):
+    from tests.support.sources import install_talk
+
+    install_talk(monkeypatch)
+    got = await client.get("/api/events/types", headers=VIEWER)
+    assert got.status_code == 200
+    assert [t["id"] for t in got.json()] == ["event", "acme:talk"]
+    assert (await client.get("/api/events/types")).status_code == 401
+
+
+async def test_type_schema_and_defaults(client, monkeypatch):
+    from tests.support.sources import install_talk
+
+    install_talk(monkeypatch)
+    talk = (await client.get("/api/events/types", headers=VIEWER)).json()[1]
+    assert talk["public_fields"] == ["speaker"] and talk["defaults"] == {
+        "room": None,
+        "level": "intro",
+    }
+    assert talk["json_schema"]["required"] == ["speaker"] and talk["builtin"] is False

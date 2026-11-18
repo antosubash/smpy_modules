@@ -77,6 +77,13 @@ def _calendar_props(cal: Calendar, request: Request, *, can_write_events: bool) 
     }
 
 
+def _type_props() -> list[dict]:
+    """The installed types as the console's pickers and filters need them."""
+    found = registry.all_types()
+    ordered = sorted(found.values(), key=lambda t: (t.id != constants.BUILTIN_TYPE, t.id))
+    return [{"id": t.id, "label_key": t.label_key, "icon": t.icon} for t in ordered]
+
+
 def _enabled_sources(rows: list[Calendar]) -> list[dict]:
     """The installed plugin sources enabled on any of ``rows``: what the console's source
     filter offers. Only ids, labels and colours, never a calendar's settings."""
@@ -116,6 +123,7 @@ async def calendar_page(
             **tenancy.view_props(request),
             "calendars": await _viewer_calendars(db, who, request, rows),
             "sources": _enabled_sources(rows),
+            "types": _type_props(),
             "categories": await _categories(db),
             "default_timezone": timezones.effective(settings.default_timezone),
             "content_locales": list(settings.content_locales),
@@ -131,6 +139,7 @@ def _editor_props(request: Request, cal: Calendar, can_write: bool, categories: 
         "calendar": {k: calendar[k] for k in ("id", "name", "default_timezone")},
         "content_locales": list(get_settings(request).content_locales),
         "categories": categories,
+        "types": _type_props(),
         "default_timezone": calendar["default_timezone"],
     }
 
