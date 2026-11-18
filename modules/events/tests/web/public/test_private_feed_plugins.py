@@ -119,3 +119,34 @@ async def test_a_failing_source_keeps_the_feed(monkeypatch):
             assert got.status_code == 200 and uids(got) == [world.pub.uid]
     finally:
         registry.reset_registry()
+
+
+async def test_sources_see_the_link_owner_never_a_wider_viewer(private_source):
+    """A manager's session on the request changes nothing: the viewer is the link's owner,
+    rebuilt from the directory and the permission registry, as the feed's own events are."""
+    from tests.support.app import as_user
+
+    async with private_http() as http:
+        world = await seed_world(http)
+        await enable_on_p(world, ["acme:priv"])
+        manager = as_user("m", "events.view", "events.manage", "events.publish")
+        got = await http.get(world.path, headers=manager)
+        assert got.status_code == 200
+        ((ctx, _s, _e),) = private_source.calls
+        assert ctx.viewer.user_id == "sv" and ctx.viewer.roles == ("viewer",)
+        assert ctx.viewer.permissions == frozenset({"events.view"})
+        assert "events.manage" not in ctx.viewer.permissions
+
+
+async def test_a_refused_link_is_one_answer_and_calls_no_source(private_source, monkeypatch):
+    from tests.support.private_feed import fingerprint, invented
+
+    monkeypatch.setattr(constants, "FEED_DENY_FLOOR_SECONDS", 0)
+    async with private_http() as http:
+        world = await seed_world(http)
+        await enable_on_p(world, ["acme:priv"])
+        baseline = fingerprint(await http.get(world.path.replace(world.secret, invented("U"))))
+        http.app.state.user_directory.roles["sv"] = ("a",)  # events.view lost
+        got = await http.get(world.path)
+        assert fingerprint(got) == baseline and got.status_code == 404
+        assert private_source.calls == []

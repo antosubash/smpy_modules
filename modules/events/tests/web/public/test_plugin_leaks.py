@@ -143,3 +143,98 @@ async def test_a_failing_public_source_leaves_the_grid_at_200(public_locales_cli
     got = await public_locales_client.get(surfaces(fx)["api"])
     assert got.status_code == 200
     assert any(i["source"] == "events" for i in got.json()["items"])
+
+
+async def test_an_anonymous_status_list_names_only_public_sources(db, spies):
+    """What the occurrences read reports to an anonymous caller: a hidden source has no entry."""
+    from sm_events.calendar.occurrence import OccurrenceFilters
+    from sm_events.calendar.occurrences import occurrences
+    from sm_events.core.access.public import ANONYMOUS
+
+    from tests.support.access import seed_calendars
+
+    cals = await seed_calendars(db)
+    cals["U"].sources = [{"id": s, "settings": {}} for s in ("acme:priv", "acme:pub", "gone:x")]
+    cals["I"].sources = [{"id": "acme:pub", "settings": {}}]
+    await db.flush()
+    page = await occurrences(
+        db,
+        tenant_id="default",
+        viewer=ANONYMOUS,
+        start=WHEN["start"].replace(day=1),
+        end=WHEN["end"].replace(day=28),
+        filters=OccurrenceFilters(),
+        default_locale="en",
+    )
+    assert [(s.id, s.calendar_id) for s in page.sources] == [("acme:pub", cals["U"].id)]
+
+
+async def test_keys_and_urls_are_namespaced_and_http_only(public_locales_client, spies):
+    fx = await seed_public(public_locales_client)
+    await enable(public_locales_client, fx, pub=["acme:pub"])
+    native = (await public_locales_client.get(surfaces(fx)["api"])).json()["items"]
+    native_keys = {i["key"] for i in native if i["source"] == "events"}
+    assert native_keys
+    clash = sorted(native_keys)[0]
+    _, public = spies
+    public._behave = ok(item(clash, "Clash", url="https://ok.example/x", **WHEN))
+    body = (await public_locales_client.get(surfaces(fx)["api"])).json()["items"]
+    mine = [i for i in body if i["source"] == "acme:pub"]
+    assert [i["key"] for i in mine] == [f"acme:pub:{clash}"]
+    assert len({i["key"] for i in body}) == len(body)  # unique across sources
+    ics = await public_locales_client.get(surfaces(fx)["cal_ics"])
+    uids = [str(e["UID"]) for e in icalendar.Calendar.from_ical(ics.content).walk("VEVENT")]
+    assert uids.count(f"acme:pub:{clash}") == 1  # native series repeat a UID by design
+    assert not any(u.endswith("@simple-module-events") and u.startswith("acme") for u in uids)
+
+
+@pytest.mark.parametrize("url", ["javascript:alert(1)", "data:text/html,x", "ftp://a/x", "//evil"])
+async def test_a_non_http_url_drops_the_whole_answer(public_locales_client, spies, url):
+    fx = await seed_public(public_locales_client)
+    await enable(public_locales_client, fx, pub=["acme:pub"])
+    _, public = spies
+    public._behave = ok(item("a", "Fine", **WHEN), item("b", "Bad", url=url, **WHEN))
+    got = await public_locales_client.get(surfaces(fx)["api"])
+    assert got.status_code == 200
+    assert not [i for i in got.json()["items"] if i["source"] == "acme:pub"]
+    assert "Fine" not in got.text and url not in got.text
+
+
+async def test_an_item_for_another_calendar_is_refused(db):
+    """A source gets one calendar per call and cannot name another: a native occurrence (which
+    carries a calendar id) is not a ``SourceOccurrence`` and refuses the answer."""
+    import uuid
+    from datetime import UTC
+
+    from sm_events.calendar import source_entries
+    from sm_events.calendar.occurrence import Occurrence
+    from sm_events.calendar.plugin_runner import Call, run_sources
+
+    from tests.support.access import seed_calendars
+
+    cal = source_entries.source_calendar((await seed_calendars(db))["U"])
+    other = Occurrence(
+        source="events",
+        key="k",
+        calendar_id=uuid.uuid4(),
+        start=WHEN["start"],
+        end=WHEN["end"],
+        all_day=False,
+        timezone="UTC",
+        title="Elsewhere",
+        lang="en",
+        color="#2563eb",
+        type="event",
+    )
+    src = FakeSource("acme:pub", ok(other), public=True)
+    result = await run_sources(
+        db,
+        [Call(cal, source_entries.SourceEntry("acme:pub", {}), src)],
+        tenant_id="default",
+        viewer=None,
+        start=datetime(2026, 1, 1, tzinfo=UTC),
+        end=datetime(2026, 12, 1, tzinfo=UTC),
+        locale="en",
+        default_locale="en",
+    )
+    assert result.items == [] and result.statuses[0].code == "invalid_item"
