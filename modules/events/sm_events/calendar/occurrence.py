@@ -72,3 +72,6 @@ class OccurrenceFilters:
     """``None``: every applicable source. ``SOURCE_EVENTS`` names the built-in one."""
     locale: str | None = None
     include_unpublished: bool = True
+    event_ids: frozenset[uuid.UUID] | None = None
+    """Only these events' occurrences (a card reads one event). An empty set matches nothing.
+    While set, plugin sources are not called: they have no event ids."""

@@ -10,7 +10,8 @@ sees public calendars only), only sources enabled on them, and:
   pair ``skipped`` with code ``no_viewer``: failing safe, since a source narrows by who
   is asking;
 * a type filter without the default type excludes every plugin source (its items are of the
-  default type), and a category filter excludes every plugin source (their items have no category);
+  default type), and a category filter excludes every plugin source (their items have no
+  category), and so does an event-id filter (their items have no event id);
 * ``filters.sources`` narrows to the named sources; a calendar id the viewer cannot see
   is dropped silently, so existence cannot be probed.
 
@@ -58,6 +59,8 @@ async def plugin_calls(
         return [], []  # a plugin's item is of the default type: a narrower type filter drops it
     if filters.category_ids is not None:
         return [], []  # a filter narrows: a plugin's item has no category
+    if filters.event_ids is not None:
+        return [], []  # a plugin's item has no event id
     stmt = visible_calendars(viewer)
     if filters.calendar_ids is not None:
         stmt = stmt.where(col(Calendar.id).in_(filters.calendar_ids))

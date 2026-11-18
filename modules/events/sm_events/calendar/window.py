@@ -47,6 +47,8 @@ def _base(viewer: ResourcePrincipal, filters: OccurrenceFilters) -> Any:
         stmt = stmt.where(col(Event.category_id).in_(filters.category_ids))
     if filters.types is not None:
         stmt = stmt.where(col(Event.type).in_(filters.types))
+    if filters.event_ids is not None:
+        stmt = stmt.where(col(Event.id).in_(filters.event_ids))
     return stmt
 
 

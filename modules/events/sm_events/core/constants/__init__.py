@@ -151,6 +151,12 @@ INT32_MAX = 2**31 - 1
 ORIGINAL_START_MIN_YEAR = 1900
 ORIGINAL_START_MAX_YEAR = 9000
 MAX_OCCURRENCES = 2000
+# Cards for another module (``contracts.cards``): the most one search returns, how many
+# matching events it looks at before cutting, and how many times it re-reads series the
+# occurrences read's own cap starved (a bound on statements, never on correctness of a card).
+MAX_EVENT_SEARCH_LIMIT = 50
+CARD_SEARCH_SCAN = 50
+CARD_READ_ROUNDS = 3
 SERIES_FETCH_MAX = 2000
 RRULE_MAX_LEN = 500
 RRULE_MAX_INTERVAL = 99
