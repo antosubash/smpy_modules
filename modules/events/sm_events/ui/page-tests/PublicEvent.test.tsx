@@ -166,7 +166,8 @@ it('a cancelled date says so for that date', async () => {
   const view = await mount(
     <PublicEvent
       {...props({
-        when: base.when && { ...base.when, status: 'cancelled' },
+        cancelled: true, // what the server sends for a cancelled date as well
+        when: base.when && { ...base.when, status: 'cancelled', date_param: '2026-07-06' },
         registration_url: null,
       })}
     />,

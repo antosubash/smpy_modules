@@ -12,7 +12,10 @@ export function EventPlace({ place }: { place: Place }) {
   const hasMap = place.latitude !== null && place.longitude !== null;
   if (!physical && !place.online_url && !hasMap) return null;
   return (
-    <div className="space-y-1">
+    <section aria-labelledby="place-title" className="space-y-1">
+      <h2 id="place-title" className="font-semibold">
+        {t(copy.place)}
+      </h2>
       {physical ? (
         <p>
           {place.venue_name ? <strong>{place.venue_name}</strong> : null}
@@ -34,6 +37,6 @@ export function EventPlace({ place }: { place: Place }) {
           </a>
         </p>
       ) : null}
-    </div>
+    </section>
   );
 }

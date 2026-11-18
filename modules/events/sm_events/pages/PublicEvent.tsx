@@ -22,7 +22,8 @@ export default function PublicEvent(p: PublicEventProps) {
   const { t } = useT();
   const copy = keys.events.public.event;
   useDocumentLang(p.locale);
-  const cancelledDate = p.when?.status === 'cancelled' && !p.cancelled;
+  // An occurrence of a series (it has a `?date=`) cancelled on its own: say "this date", not "this event".
+  const cancelledDate = p.when?.status === 'cancelled' && p.when.date_param !== null;
   return (
     <>
       <PublicHead
