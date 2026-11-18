@@ -69,6 +69,10 @@ export type EventChipProps = {
   occurrence: Occurrence;
   view: CalendarView;
   timeText: string;
+  /** A write on this occurrence is in flight. */
+  pending?: boolean;
+  /** Why the viewer cannot change it, when they could on another occurrence. */
+  lockReason?: string | null;
   Default: ComponentType<EventChipProps>;
 };
 export type DetailProps = {
@@ -76,6 +80,7 @@ export type DetailProps = {
   gridTimeZone: string;
   close: () => void;
   actions: ReactNode;
+  lockReason?: string | null;
   Default: ComponentType<DetailProps>;
 };
 export type ToolbarSlotProps = {

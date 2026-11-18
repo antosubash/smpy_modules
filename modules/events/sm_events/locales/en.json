@@ -4,7 +4,8 @@
     "group": "Events",
     "events": "Events",
     "calendars": "Calendars",
-    "categories": "Event categories"
+    "categories": "Event categories",
+    "calendar": "Calendar"
   },
   "share": {
     "button": "Share",
@@ -439,5 +440,56 @@
     "no": "No",
     "save_blocked": "Choose Load their version or Save mine over theirs above before saving.",
     "language_changed": "{language}: text added or removed"
+  },
+  "calendar": {
+    "title": "Calendar",
+    "subtitle": "Every event across your calendars, by month, week, day or list.",
+    "region": "Calendar",
+    "toolbar": {
+      "label": "Calendar navigation",
+      "today": "Today",
+      "previous": "Previous",
+      "next": "Next",
+      "views": "Calendar view"
+    },
+    "views": {
+      "month": "Month",
+      "week": "Week",
+      "day": "Day",
+      "list": "List"
+    },
+    "filters": {
+      "label": "Filter the calendar",
+      "calendars": "Calendars",
+      "categories": "Categories",
+      "types": "Types"
+    },
+    "type_event": "Events",
+    "status": {
+      "draft": "Draft",
+      "in_review": "In review",
+      "cancelled": "Cancelled",
+      "loading": "Loading events…",
+      "empty": "Nothing in this range",
+      "no_calendars": "Select a calendar to see its events.",
+      "error": "The events could not be loaded.",
+      "truncated": "Showing the first {count} items in this range. Narrow the filters or switch to a shorter view."
+    },
+    "chip": {
+      "locked": "Locked"
+    },
+    "detail": {
+      "title": "Event details",
+      "open_editor": "Open in editor",
+      "move": "Move…",
+      "grid_time": "In {zone}",
+      "event_time": "Event time in {zone}",
+      "calendar": "Calendar",
+      "status": "Status",
+      "read_only": "You can view this calendar only",
+      "needs_publish": "Published: only a publisher can change it",
+      "external": "This entry comes from another source and cannot be changed here",
+      "lang_fallback": "Shown in {language}"
+    }
   }
 }

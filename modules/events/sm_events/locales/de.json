@@ -4,7 +4,8 @@
     "group": "Veranstaltungen",
     "events": "Veranstaltungen",
     "calendars": "Kalender",
-    "categories": "Veranstaltungskategorien"
+    "categories": "Veranstaltungskategorien",
+    "calendar": "Kalender"
   },
   "share": {
     "button": "Teilen",
@@ -439,5 +440,56 @@
     "no": "Nein",
     "save_blocked": "Wählen Sie oben „Andere Version laden“ oder „Meine Version darüber speichern“, bevor Sie speichern.",
     "language_changed": "{language}: Text hinzugefügt oder entfernt"
+  },
+  "calendar": {
+    "title": "Kalender",
+    "subtitle": "Alle Veranstaltungen Ihrer Kalender, nach Monat, Woche, Tag oder als Liste.",
+    "region": "Kalender",
+    "toolbar": {
+      "label": "Kalendernavigation",
+      "today": "Heute",
+      "previous": "Zurück",
+      "next": "Weiter",
+      "views": "Kalenderansicht"
+    },
+    "views": {
+      "month": "Monat",
+      "week": "Woche",
+      "day": "Tag",
+      "list": "Liste"
+    },
+    "filters": {
+      "label": "Kalender filtern",
+      "calendars": "Kalender",
+      "categories": "Kategorien",
+      "types": "Arten"
+    },
+    "type_event": "Veranstaltungen",
+    "status": {
+      "draft": "Entwurf",
+      "in_review": "In Prüfung",
+      "cancelled": "Abgesagt",
+      "loading": "Veranstaltungen werden geladen…",
+      "empty": "In diesem Zeitraum gibt es nichts",
+      "no_calendars": "Wählen Sie einen Kalender, um seine Veranstaltungen zu sehen.",
+      "error": "Die Veranstaltungen konnten nicht geladen werden.",
+      "truncated": "Es werden die ersten {count} Einträge dieses Zeitraums angezeigt. Grenzen Sie die Filter ein oder wechseln Sie zu einer kürzeren Ansicht."
+    },
+    "chip": {
+      "locked": "Gesperrt"
+    },
+    "detail": {
+      "title": "Veranstaltungsdetails",
+      "open_editor": "Im Editor öffnen",
+      "move": "Verschieben…",
+      "grid_time": "In {zone}",
+      "event_time": "Zeit der Veranstaltung in {zone}",
+      "calendar": "Kalender",
+      "status": "Status",
+      "read_only": "Sie können diesen Kalender nur ansehen",
+      "needs_publish": "Veröffentlicht: nur wer veröffentlichen darf, kann sie ändern",
+      "external": "Dieser Eintrag stammt aus einer anderen Quelle und kann hier nicht geändert werden",
+      "lang_fallback": "Angezeigt auf {language}"
+    }
   }
 }
