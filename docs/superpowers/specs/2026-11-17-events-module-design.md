@@ -459,3 +459,12 @@ The sitemap is bounded at 10,000 addresses and lists no `?date=` address (31). A
 feed `VTIMEZONE`s list transitions for 20 years ahead, not rules; the all-calendars feed and the
 index are named by the `public_title` setting; the public prefix is checked against other
 modules' configured prefixes.
+
+## Amendments (PR 5)
+
+Private feeds are the third documented token-bound public route; every refusal is one padded
+`404`, and tokens are never logged. `scan.py` is the only `.ics` parser and no library parses an
+upload. An import creates drafts, is idempotent by `UID`, and re-checks the importer's rights per
+slice; the one thing a worker cannot re-check is tenant membership (upstream gap, documented). A
+repeating series written in UTC keeps zone UTC (`kept_utc`). Stored URLs never carry credentials.
+

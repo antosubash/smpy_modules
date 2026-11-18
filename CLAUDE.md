@@ -195,6 +195,14 @@ tenant its own session and `tenant_scope`, one savepoint per event. A scheduled
 publish in the worker emits no bus event. Its `core/worker.py` is a parity-checked
 copy of newsletter's (family "worker runtime").
 
+**Events private feeds and the .ics import.** `/events/feed/{token}.ics` is the THIRD documented
+token-bound public route (after newsletter's `/u/` and records' form token): it binds the token
+row's tenant and answers one padded 404 for every token state. Tokens are never logged (the
+redaction filter) and only their SHA-256 is stored. `feeds/importing/scan.py` is the only `.ics`
+parser; no library parses an upload. Imported items are always drafts. `create_core` and
+`apply_patch` live in `content/_core.py`; only the write path and the importer import them. A
+stored URL never carries credentials (`http_url`).
+
 **Records' website-submission routes are anonymous writes (#101).** The record
 type is the trust anchor: never trust the `RecordForm` block's props —
 which fields are public, the consent text and the recipients live on

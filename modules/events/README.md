@@ -177,3 +177,9 @@ Anonymous visitors get a public calendar's published events under `public_prefix
 
 Everything else (drafts, internal and private calendars, trash, other tenants) answers one
 identical 404. See [Public pages](docs/public.md).
+
+### Private feeds and import
+
+A private subscription link per user and calendar (`/events/feed/<token>.ics`, shown once,
+revocable) and an `.ics` import screen (`/admin/events/import`). See
+[Private feed links](docs/feeds.md) and [Importing an .ics file](docs/import.md).

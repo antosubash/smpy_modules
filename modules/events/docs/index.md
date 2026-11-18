@@ -404,3 +404,7 @@ Later delivery remains:
 | 8 | Reminders |
 | 9 | Registration through records |
 | 10 | External ICS subscriptions |
+
+## Feeds and import
+
+[Private feed links](feeds.md) and [Importing an .ics file](import.md).

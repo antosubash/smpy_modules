@@ -28,3 +28,12 @@ and it stops the moment their access does.
   operator adds later is covered when the filter is installed again, and reverse proxies, load
   balancers and CDNs log paths on their own: redact `/feed/` there.
 - **Limits.** 30 requests a minute per IP, and 20 per token in ten minutes, per process.
+- **Revocation.** Revoking a link (yours, or any as a manager, "Everyone's links") deletes the
+  row; the next request gets the same `404` an invented token gets, byte for byte. A user's links
+  also stop when they are deactivated or lose `events.view`; they are not deleted, so regaining
+  the right revives them.
+- **Throttle is per process.** The per-token count lives in memory (at most 10,000 keys), so with
+  N workers the real ceiling is N times the figure above. The per-IP limit is the framework's.
+- **At most five links** per user and calendar; a sixth is `token_limit`.
+- **Where the link is shown.** The Subscribe dialog shows a new link once; the page never holds a
+  stored token again, only its label, language and dates.
