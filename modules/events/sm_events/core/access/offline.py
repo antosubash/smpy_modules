@@ -34,9 +34,10 @@ from simple_module_core.tenancy import tenant_member_ids
 from simple_module_core.user_directory import get_user_directory
 from simple_module_hosting.permissions import resolve_principal_permissions
 
+from sm_events.calendar.extension_types import SourceViewer
 from sm_events.core.tenancy import DEFAULT_TENANT, TenancyMode, mode_of, request_mode
 
-__all__ = ["OfflineUser", "feed_principal"]
+__all__ = ["OfflineUser", "feed_principal", "feed_viewer"]
 
 
 @dataclass(frozen=True)
@@ -79,6 +80,29 @@ async def _is_member(
     return members is not None and user_id in members
 
 
+async def _resolve(
+    app: Any, db: Any, *, user_id: str, tenant_id: str, request: Request | None
+) -> tuple[ResourcePrincipal, tuple[str, ...], Any] | None:
+    """The principal, the roles the directory reported and the permission registry, or ``None``
+    for every doubt (see :func:`feed_principal`)."""
+    found = (await get_user_directory(app).get_many(db, [user_id], with_roles=True)).get(user_id)
+    if found is None or not found.is_active or found.roles is None:
+        return None
+    if not await _is_member(app, db, user_id, tenant_id, request):
+        return None
+    services = get_services(app)
+    registry = getattr(services, "permissions", None)
+    if registry is None:
+        return None
+    roles = tuple(found.roles)
+    user = OfflineUser(id=user_id, roles=roles, tenant_id=tenant_id)
+    bare = request or Request(
+        {"type": "http", "app": app, "headers": [], "method": "GET", "path": "/"}
+    )
+    held = await resolve_principal_permissions(bare, user, registry)
+    return ResourcePrincipal(user_id=user_id, permissions=frozenset(held)), roles, registry
+
+
 async def feed_principal(
     app: Any, db: Any, *, user_id: str, tenant_id: str, request: Request | None
 ) -> ResourcePrincipal | None:
@@ -89,18 +113,24 @@ async def feed_principal(
     host with no permission registry. ``request`` is handed to the grant sources, which take
     one; it is the feed request itself, anonymous, and a source must go by the ``user`` it is
     given. ``None`` (a worker) still resolves; grant sources then get a bare request."""
-    found = (await get_user_directory(app).get_many(db, [user_id], with_roles=True)).get(user_id)
-    if found is None or not found.is_active or found.roles is None:
+    got = await _resolve(app, db, user_id=user_id, tenant_id=tenant_id, request=request)
+    return None if got is None else got[0]
+
+
+async def feed_viewer(
+    app: Any, db: Any, *, user_id: str, tenant_id: str, request: Request | None
+) -> SourceViewer | None:
+    """The same person as :func:`feed_principal`, as a plugin source sees a viewer: roles from
+    the directory (a source may narrow by role), the permissions the principal holds, and the
+    role map. ``None`` under every doubt, and the feed then calls no plugin source for them."""
+    got = await _resolve(app, db, user_id=user_id, tenant_id=tenant_id, request=request)
+    if got is None:
         return None
-    if not await _is_member(app, db, user_id, tenant_id, request):
-        return None
-    services = get_services(app)
-    registry = getattr(services, "permissions", None)
-    if registry is None:
-        return None
-    user = OfflineUser(id=user_id, roles=tuple(found.roles), tenant_id=tenant_id)
-    bare = request or Request(
-        {"type": "http", "app": app, "headers": [], "method": "GET", "path": "/"}
+    who, roles, registry = got
+    role_map = getattr(registry, "role_map", None)
+    return SourceViewer(
+        user_id=user_id,
+        roles=roles,
+        permissions=who.permissions,
+        role_map=dict(role_map) if role_map is not None else None,
     )
-    held = await resolve_principal_permissions(bare, user, registry)
-    return ResourcePrincipal(user_id=user_id, permissions=frozenset(held))

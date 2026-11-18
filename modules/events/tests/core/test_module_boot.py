@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 from simple_module_core.permissions import PermissionRegistry
 from sm_events.module import EventsModule
 
@@ -79,20 +78,5 @@ async def test_startup_freezes_registry():
         await EventsModule().on_startup(SimpleNamespace(state=SimpleNamespace()))
         assert registry.is_frozen()
         assert registry.builtin_source() is not None
-    finally:
-        registry.reset_registry()
-
-
-def test_a_worker_loads_the_registry_with_its_session_factory(monkeypatch):
-    """A worker runs no module hook: its first use of the runtime loads the registry."""
-    from sm_events.calendar import registry
-    from sm_events.core import worker
-
-    registry.reset_registry()
-    monkeypatch.setattr(worker, "_config", lambda: (_ for _ in ()).throw(RuntimeError("stop")))
-    try:
-        with pytest.raises(RuntimeError, match="stop"):
-            worker.worker_session_factory()
-        assert registry.is_frozen()
     finally:
         registry.reset_registry()

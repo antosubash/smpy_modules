@@ -26,12 +26,21 @@ _LATEST = datetime(constants.FEED_ZONE_LAST_YEAR, 12, 31, tzinfo=UTC)
 
 
 def build(
-    items: Sequence[FeedEvent], *, name: str, timezone: str, first: datetime, last: datetime
+    items: Sequence[FeedEvent],
+    *,
+    name: str,
+    timezone: str,
+    first: datetime,
+    last: datetime,
+    extra: Sequence[icalendar.Event] = (),
 ) -> bytes:
     """One ``VCALENDAR`` holding ``items``. ``first`` and ``last`` bound the ``VTIMEZONE``s, which
     list explicit transitions only (``icalendar`` writes no ``RRULE`` for them), so they are widened
     to every event's first start and to the end of every series (``recurrence_until``). The caller
-    passes a horizon for open-ended ones; a client expanding past it would apply the last offset."""
+    passes a horizon for open-ended ones; a client expanding past it would apply the last offset.
+
+    ``extra`` are ready-made ``VEVENT``s (a plugin source's, in UTC or all-day: they need no
+    ``VTIMEZONE``), written after the events' own. The caller has already held them to the cap."""
     ordered = sorted(items, key=lambda i: (i.event.starts_at, i.event.uid))
     cal = icalendar.Calendar()
     cal.add("prodid", constants.PRODID)
@@ -50,4 +59,6 @@ def build(
     for item in ordered:
         for component in components(item):
             cal.add_component(component)
+    for component in extra:
+        cal.add_component(component)
     return cal.to_ical()

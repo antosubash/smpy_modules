@@ -7,11 +7,11 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from sm_events.calendar.extension_types import SourceStatus
 
-__all__ = ["Occurrence", "OccurrenceFilters", "OccurrencePage"]
+__all__ = ["Occurrence", "OccurrenceFilters", "OccurrencePage", "PluginOccurrence"]
 
 
 class Occurrence(BaseModel):
@@ -40,6 +40,13 @@ class Occurrence(BaseModel):
     event_id: uuid.UUID | None = None
     original_start: datetime | None = None
     event_status: str | None = None
+
+
+class PluginOccurrence(Occurrence):
+    """An occurrence a plugin source supplied. ``updated_at`` is the source's own timestamp
+    for the item, kept only for the feeds' ``DTSTAMP``; it never appears in a response."""
+
+    updated_at: datetime | None = Field(default=None, exclude=True)
 
 
 class OccurrencePage(BaseModel):

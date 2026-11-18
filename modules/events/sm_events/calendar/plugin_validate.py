@@ -19,7 +19,7 @@ from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 from sm_events.calendar.extension_types import SourceCalendar, SourceOccurrence
-from sm_events.calendar.occurrence import Occurrence
+from sm_events.calendar.occurrence import PluginOccurrence
 from sm_events.calendar.times import Span, localize, supported_instant
 from sm_events.core import constants, timezones
 from sm_events.web.schemas._fields import _BIDI, _INVISIBLE, _LINE_SEPARATORS
@@ -69,6 +69,10 @@ def _url(raw: str | None) -> str | None:
     return raw
 
 
+def _aware(value: datetime | None) -> bool:
+    return value is not None and value.utcoffset() is not None
+
+
 def _midnight(day: date, tz: ZoneInfo) -> datetime:
     return localize(datetime.combine(day, time.min), tz)
 
@@ -93,7 +97,9 @@ def _span(item: SourceOccurrence, tz_name: str) -> tuple[Span, date | None, date
     return Span(begin.astimezone(UTC), finish.astimezone(UTC)), None, None
 
 
-def _one(item: Any, *, source_id: str, calendar: SourceCalendar, default_lang: str) -> Occurrence:
+def _one(
+    item: Any, *, source_id: str, calendar: SourceCalendar, default_lang: str
+) -> PluginOccurrence:
     if not isinstance(item, SourceOccurrence):
         raise InvalidPluginItem
     tz = item.timezone or calendar.default_timezone
@@ -105,7 +111,7 @@ def _one(item: Any, *, source_id: str, calendar: SourceCalendar, default_lang: s
     span, first, last = _span(item, tz)
     supported_instant(span.starts_at)
     supported_instant(span.ends_at)
-    return Occurrence(
+    return PluginOccurrence(
         source=source_id,
         key=item.key,
         calendar_id=calendar.id,
@@ -125,6 +131,7 @@ def _one(item: Any, *, source_id: str, calendar: SourceCalendar, default_lang: s
         event_id=None,
         original_start=None,
         event_status=None,
+        updated_at=item.updated_at.astimezone(UTC) if _aware(item.updated_at) else None,
     )
 
 
@@ -136,10 +143,10 @@ def to_occurrences(
     start: datetime,
     end: datetime,
     default_lang: str,
-) -> list[Occurrence]:
+) -> list[PluginOccurrence]:
     """The valid items that intersect ``[start, end)``. Raises :class:`InvalidPluginItem`
     (``code`` ``invalid_item`` or ``duplicate_key``) when any item is not valid."""
-    found: list[Occurrence] = []
+    found: list[PluginOccurrence] = []
     keys: set[str] = set()
     for raw in items:
         try:

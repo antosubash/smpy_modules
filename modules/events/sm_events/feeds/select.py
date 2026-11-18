@@ -35,7 +35,7 @@ from sm_events.core.tenancy import bound_tenant
 from sm_events.feeds.ics_event import FeedEvent
 from sm_events.models import Category, Event, OccurrenceOverride
 
-__all__ = ["FeedRead", "feed_events", "single_event"]
+__all__ = ["FeedRead", "component_cost", "feed_events", "single_event"]
 
 UrlFor = Callable[[str, str], str]
 
@@ -157,7 +157,7 @@ async def _items(
     return items, cut
 
 
-def _components(item: FeedEvent) -> int:
+def component_cost(item: FeedEvent) -> int:
     """What a series costs against the component cap: the master and every override, a skip
     (an ``EXDATE``) included, so the file's size is bounded by the cap however it is made."""
     return 1 + len(item.overrides) if item.event.rrule else 1
@@ -201,7 +201,7 @@ async def feed_events(
     kept: list[FeedEvent] = []
     used = 0
     for item in items:
-        used += _components(item)
+        used += component_cost(item)
         if used > constants.FEED_MAX_COMPONENTS:
             truncated = True
             break
