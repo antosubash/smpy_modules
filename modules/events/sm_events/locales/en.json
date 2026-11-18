@@ -146,10 +146,11 @@
     "action_stale": "Someone else changed this event. Your action was not applied.",
     "token_limit": "You already have the most private links this calendar allows. Revoke one first.",
     "private_feeds_unavailable": "Private links are not available for your account.",
-    "import_busy": "Too many imports are still running. Wait for one to finish.",
+    "import_busy": "You have too many imports waiting. Apply or discard one first.",
     "import_state": "This import cannot be changed in its current state.",
     "import_too_large": "The file is larger than the import limit.",
-    "ics_invalid": "That does not look like a calendar file."
+    "ics_invalid": "That does not look like a calendar file.",
+    "import_busy_tenant": "Too many imports are waiting in this organisation. Try again later."
   },
   "categories": {
     "title": "Categories",
@@ -682,6 +683,7 @@
       "verdict": {
         "new": "New",
         "update": "Update",
+        "unchanged": "Unchanged",
         "skip": "Skipped"
       }
     },
@@ -741,7 +743,9 @@
       "too_many_properties": "This event has too many properties and was not imported.",
       "too_many_parameters": "A property of this event has too many parameters; it was not imported.",
       "event_too_large": "This event is too large and was not imported.",
-      "too_many_attendees": "This event has too many attendees and was not imported."
+      "too_many_attendees": "This event has too many attendees and was not imported.",
+      "title_truncated": "The title was cut to its maximum length.",
+      "place_truncated": "The place was cut to its maximum length."
     },
     "failure": {
       "ics_encoding": "The file is not valid text (UTF-8). Save the calendar again and retry.",
@@ -768,6 +772,14 @@
       "X-ALT-DESC": "rich descriptions",
       "X-*": "extension properties",
       "other": "other properties"
+    },
+    "waiting_title": "Your unfinished imports",
+    "announce": {
+      "uploading": "Uploading the file.",
+      "preview": "Preview ready: {total} events, {new} new, {update} to update, {unchanged} unchanged, {skip} skipped.",
+      "done": "Import finished: {created} created, {updated} updated, {unchanged} unchanged, {skipped} skipped, {failed} failed.",
+      "failed": "The import failed: {reason}",
+      "working": "The import is running."
     }
   }
 }

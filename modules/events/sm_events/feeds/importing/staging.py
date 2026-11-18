@@ -36,12 +36,14 @@ from sm_events.core.errors import (
     IcsInvalid,
     ImportBusy,
     ImportFailure,
+    ImportTenantBusy,
     ImportTooLarge,
 )
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import bound_tenant
 from sm_events.feeds.importing.fence import fenced
 from sm_events.feeds.importing.mapper import Mapped, map_calendar
+from sm_events.feeds.importing.preview_diff import is_unchanged
 from sm_events.feeds.importing.scan import scan, sniff
 from sm_events.feeds.importing.verdicts import existing_uids, item_row
 from sm_events.models import Calendar, Category, EventImport
@@ -122,12 +124,10 @@ async def create_import(
         return (await db.execute(stmt)).scalar_one()
 
     # One user cannot fill the tenant's slots; the tenant has a larger ceiling of its own.
-    if (
-        await count(EventImport.created_by == who.user_id)  # type: ignore[arg-type]
-        >= constants.IMPORT_ACTIVE_MAX
-        or await count() >= constants.IMPORT_ACTIVE_TENANT_MAX
-    ):
+    if await count(EventImport.created_by == who.user_id) >= constants.IMPORT_ACTIVE_MAX:  # type: ignore[arg-type]
         raise ImportBusy
+    if await count() >= constants.IMPORT_ACTIVE_TENANT_MAX:
+        raise ImportTenantBusy
     row = EventImport(
         calendar_id=calendar_id,
         created_by=who.user_id or "",
@@ -216,6 +216,17 @@ async def parse_step(
     counts: Counter[str] = Counter()
     reasons: Counter[str] = Counter()
     rows = [item_row(imp, n, item, existing) for n, item in enumerate(mapped.items, start=1)]
+    deadline = time.monotonic() + constants.IMPORT_PARSE_SECONDS
+    actor, probed = imp.created_by, False
+    for row in rows:
+        # An update that the write would find nothing to change previews as such; past the time
+        # budget the rest stay "update" (the apply step still says "unchanged").
+        if row.verdict == "update" and time.monotonic() < deadline:
+            probed = True
+            if await is_unchanged(db, actor, row, locales):
+                row.verdict = "unchanged"
+    if probed:
+        await db.refresh(imp)  # the probes' rollbacks expired it
     for row in rows:
         counts[row.verdict] += 1
         reasons.update([row.reason] if row.reason else [])

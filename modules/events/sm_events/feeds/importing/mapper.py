@@ -43,6 +43,7 @@ from sm_events.feeds.importing.scan import Prop, RawEvent
 from sm_events.feeds.importing.text import (
     description_html,
     http_url,
+    place_truncated,
     venue,
 )
 from sm_events.feeds.importing.values import ItemSkip, read_when
@@ -112,6 +113,7 @@ def _event(
         *when.notes,
         *series.notes,
         *html_notes,
+        *(["place_truncated"] if not online and place_truncated(location) else []),
         *(["uid_generated"] if generated else []),
         *(["category_dropped"] if category_missed else []),
         *(["kept_draft_private"] if klass in PRIVATE else []),

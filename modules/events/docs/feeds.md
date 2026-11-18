@@ -40,3 +40,5 @@ and it stops the moment their access does.
 - **At most five links** per user and calendar; a sixth is `token_limit`.
 - **Where the link is shown.** The Subscribe dialog shows a new link once; the page never holds a
   stored token again, only its label, language and dates.
+- **Trash.** A trashed calendar answers the refusal; **restoring it revives its links** (they
+  were never deleted), so a restored calendar's old subscriptions work again.

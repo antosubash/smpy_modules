@@ -193,7 +193,12 @@ describe('SubscribeDialog', () => {
       },
       { contentLocales: ['en', 'de'] },
     );
-    await setValue(document.getElementById('events-feed-locale') as HTMLSelectElement, 'de');
+    const select = document.getElementById('events-feed-locale') as HTMLSelectElement;
+    expect([...select.options].map((o) => [o.value, o.textContent])).toEqual([
+      ['en', 'English'],
+      ['de', 'Deutsch'],
+    ]);
+    await setValue(select, 'de');
     await create();
     expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ label: 'Laptop', locale: 'de' });
     await view.unmount();

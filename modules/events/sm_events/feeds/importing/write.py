@@ -257,7 +257,7 @@ async def write_item(
         return _skip("forbidden")
     try:
         async with _muted(db):
-            if item.verdict == "update":
+            if item.verdict in ("update", "unchanged"):
                 return await _update(db, imp, item, mapped, locales)
             return await _create(db, imp, mapped, locales, now)
     except PrivateKept:

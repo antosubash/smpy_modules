@@ -87,7 +87,13 @@ export function ItemRows({
                     {item.all_day && <Badge variant="outline">{t(copy.all_day)}</Badge>}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={item.verdict === 'skip' ? 'secondary' : 'default'}>
+                    <Badge
+                      variant={
+                        item.verdict === 'skip' || item.verdict === 'unchanged'
+                          ? 'secondary'
+                          : 'default'
+                      }
+                    >
                       {label}
                     </Badge>
                   </TableCell>

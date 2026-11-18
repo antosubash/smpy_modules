@@ -33,6 +33,7 @@ export function PreviewTable({
     [undefined, t(copy.preview.all), row.total],
     ['new', t(copy.preview.verdict.new), row.counts.new ?? 0],
     ['update', t(copy.preview.verdict.update), row.counts.update ?? 0],
+    ['unchanged', t(copy.preview.verdict.unchanged), row.counts.unchanged ?? 0],
     ['skip', t(copy.preview.verdict.skip), row.counts.skip ?? 0],
   ];
   return (

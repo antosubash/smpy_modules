@@ -41,7 +41,7 @@ export type ImportRow = {
 export type ImportItem = {
   seq: number;
   uid: string;
-  verdict: 'new' | 'update' | 'skip';
+  verdict: 'new' | 'update' | 'unchanged' | 'skip';
   reason: string | null;
   notes: string[];
   title: string;
@@ -101,6 +101,8 @@ export const NOTES = [
   'untitled',
   'uid_generated',
   'description_truncated',
+  'title_truncated',
+  'place_truncated',
 ] as const;
 export const REASON_CODES: readonly string[] = [...SKIP_REASONS, ...NOTES];
 
@@ -149,3 +151,10 @@ export const applyImport = (id: number, publish: boolean): Promise<ImportRow> =>
   send(`${BASE}/${id}/apply`, { method: 'POST', json: { publish } });
 export const discardImport = (id: number): Promise<void> =>
   send(`${BASE}/${id}`, { method: 'DELETE' });
+export type ImportList = { items: ImportRow[]; total: number };
+/** The caller's own imports, newest first (the server lists nobody else's). */
+export const listImports = (signal?: AbortSignal): Promise<ImportList> =>
+  send(`${BASE}${query({ page_size: 50 })}`, { signal });
+/** An import a person still has to deal with: staged (waiting to be applied) or being worked. */
+export const unfinished = (row: ImportRow): boolean =>
+  row.status !== 'done' && row.status !== 'failed';

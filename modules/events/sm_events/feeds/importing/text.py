@@ -33,15 +33,25 @@ def unescape(text: str) -> str:
 
 def clean_title(raw: str) -> tuple[str, tuple[str, ...]]:
     """One clean line of at most 300 characters, or the placeholder (noted ``untitled``)."""
-    title = _SPACES.sub(" ", strip_unsafe(raw.replace("\n", " "))).strip()[: constants.TITLE_MAX]
+    title = _SPACES.sub(" ", strip_unsafe(raw.replace("\n", " "))).strip()
+    if len(title) > constants.TITLE_MAX:
+        return title[: constants.TITLE_MAX], ("title_truncated",)
     if title:
         return title, ()
     return constants.IMPORT_UNTITLED, ("untitled",)
 
 
+def _place_text(raw: str) -> str:
+    return scrub_credentials(_SPACES.sub(" ", strip_unsafe(raw.replace("\n", " "))).strip())
+
+
 def venue(raw: str) -> str | None:
-    text = _SPACES.sub(" ", strip_unsafe(raw.replace("\n", " "))).strip()
-    return scrub_credentials(text)[: constants.VENUE_MAX] or None
+    return _place_text(raw)[: constants.VENUE_MAX] or None
+
+
+def place_truncated(raw: str) -> bool:
+    """Is the place cut to its maximum length by :func:`venue`?"""
+    return len(_place_text(raw)) > constants.VENUE_MAX
 
 
 def http_url(raw: str | None) -> str | None:

@@ -8,7 +8,11 @@ import sm_events
 from sm_events.content import events_write
 
 ROOT = Path(sm_events.__file__).parent
-ALLOWED = {"content/events_write.py", "feeds/importing/write.py"}
+ALLOWED = {
+    "content/events_write.py",
+    "feeds/importing/write.py",
+    "feeds/importing/preview_diff.py",  # the preview asks the write itself
+}
 
 
 def test_the_seam_is_not_part_of_the_public_surface():

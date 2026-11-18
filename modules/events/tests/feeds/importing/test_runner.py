@@ -72,7 +72,7 @@ async def test_reapplying_the_same_file_changes_nothing(events_app):
         await db.commit()
     await run(state, second)
     imp, items, _ = await read(state, second)
-    assert [i.verdict for i in items] == ["update"] * 3
+    assert [i.verdict for i in items] == ["unchanged"] * 3  # the write itself says so
     await queue(state, second, grants=PUBLISHER)
     assert await run(state, second) == "done"
     imp, items, events = await read(state, second)

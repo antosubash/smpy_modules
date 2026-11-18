@@ -15,6 +15,8 @@ __all__ = [
     "IMPORT_BODY_CEILING",
     "IMPORT_BUSY_CODE",
     "IMPORT_BUSY_DETAIL",
+    "IMPORT_BUSY_TENANT_CODE",
+    "IMPORT_BUSY_TENANT_DETAIL",
     "IMPORT_DEFAULT_BYTES",
     "IMPORT_DEFAULT_DURATION",
     "IMPORT_DESCRIPTION_MAX",
@@ -113,7 +115,7 @@ IMPORT_DEFAULT_DURATION: Final = timedelta(hours=1)
 IMPORT_UNTITLED: Final = "Untitled event"
 
 IMPORT_STATES: Final = ("uploaded", "parsing", "staged", "queued", "running", "done", "failed")
-ITEM_VERDICTS: Final = ("new", "update", "skip")
+ITEM_VERDICTS: Final = ("new", "update", "unchanged", "skip")
 ITEM_OUTCOMES: Final = ("created", "updated", "unchanged", "skipped", "failed")
 IMPORT_FAILURE_CODES: Final = (
     "ics_encoding",
@@ -143,7 +145,11 @@ IMPORT_EVENT_REFUSALS: Final = (
 """Why one event was skipped for a per-event limit (the rest of the file imports)."""
 
 IMPORT_BUSY_CODE: Final = "import_busy"
-IMPORT_BUSY_DETAIL: Final = "Too many imports are still running; wait for one to finish"
+IMPORT_BUSY_DETAIL: Final = "You have too many imports waiting; apply or discard one first"
+IMPORT_BUSY_TENANT_CODE: Final = "import_busy_tenant"
+IMPORT_BUSY_TENANT_DETAIL: Final = (
+    "Too many imports are waiting in this organisation; try again later"
+)
 IMPORT_STATE_CODE: Final = "import_state"
 IMPORT_STATE_DETAIL: Final = "The import is not in a state that allows this"
 IMPORT_TOO_LARGE_CODE: Final = "import_too_large"

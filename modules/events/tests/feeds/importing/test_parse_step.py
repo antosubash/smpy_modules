@@ -50,7 +50,7 @@ async def test_parse_verdicts(db):
     assert [i.seq for i in items.values()] == [1, 2, 3, 4, 5]
     await db.refresh(imp)
     assert (imp.status, imp.source, imp.total) == ("staged", None, 5)
-    assert imp.counts == {"new": 2, "update": 1, "skip": 2}
+    assert imp.counts == {"new": 2, "update": 1, "unchanged": 0, "skip": 2}
     assert imp.reasons["uid_in_trash"] == 1 and imp.reasons["unsupported_rule"] == 1
     assert (imp.lease_owner, imp.lease_until) == (None, None)
 

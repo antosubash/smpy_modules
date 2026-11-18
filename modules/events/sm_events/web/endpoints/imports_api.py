@@ -186,7 +186,7 @@ async def get_import(row: Owned, db=Depends(get_db)) -> ImportOut:
 async def list_items(
     row: Owned,
     db=Depends(get_db),
-    verdict: Literal["new", "update", "skip"] | None = None,
+    verdict: Literal["new", "update", "unchanged", "skip"] | None = None,
     outcome: Literal["created", "updated", "unchanged", "skipped", "failed"] | None = None,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: PageSize = 50,

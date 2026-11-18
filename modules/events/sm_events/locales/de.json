@@ -146,10 +146,11 @@
     "action_stale": "Jemand anderes hat diese Veranstaltung geändert. Ihre Aktion wurde nicht ausgeführt.",
     "token_limit": "Du hast bereits die meisten privaten Links, die dieser Kalender erlaubt. Widerrufe zuerst einen.",
     "private_feeds_unavailable": "Private Links sind für dein Konto nicht verfügbar.",
-    "import_busy": "Es laufen zu viele Importe. Warte, bis einer fertig ist.",
+    "import_busy": "Du hast zu viele wartende Importe. Wende einen an oder verwirf einen.",
     "import_state": "Dieser Import lässt sich in seinem jetzigen Zustand nicht ändern.",
     "import_too_large": "Die Datei ist größer als das Importlimit.",
-    "ics_invalid": "Das sieht nicht wie eine Kalenderdatei aus."
+    "ics_invalid": "Das sieht nicht wie eine Kalenderdatei aus.",
+    "import_busy_tenant": "In dieser Organisation warten zu viele Importe. Versuche es später erneut."
   },
   "categories": {
     "title": "Kategorien",
@@ -682,6 +683,7 @@
       "verdict": {
         "new": "Neu",
         "update": "Aktualisierung",
+        "unchanged": "Unverändert",
         "skip": "Übersprungen"
       }
     },
@@ -741,7 +743,9 @@
       "too_many_properties": "Dieser Termin hat zu viele Eigenschaften und wurde nicht importiert.",
       "too_many_parameters": "Eine Eigenschaft dieses Termins hat zu viele Parameter; er wurde nicht importiert.",
       "event_too_large": "Dieser Termin ist zu groß und wurde nicht importiert.",
-      "too_many_attendees": "Dieser Termin hat zu viele Teilnehmende und wurde nicht importiert."
+      "too_many_attendees": "Dieser Termin hat zu viele Teilnehmende und wurde nicht importiert.",
+      "title_truncated": "Der Titel wurde auf die Maximallänge gekürzt.",
+      "place_truncated": "Der Ort wurde auf die Maximallänge gekürzt."
     },
     "failure": {
       "ics_encoding": "Die Datei ist kein gültiger Text (UTF-8). Speichere den Kalender neu und versuche es erneut.",
@@ -768,6 +772,14 @@
       "X-ALT-DESC": "formatierte Beschreibungen",
       "X-*": "Erweiterungseigenschaften",
       "other": "weitere Eigenschaften"
+    },
+    "waiting_title": "Deine unfertigen Importe",
+    "announce": {
+      "uploading": "Die Datei wird hochgeladen.",
+      "preview": "Vorschau bereit: {total} Termine, {new} neu, {update} zu aktualisieren, {unchanged} unverändert, {skip} übersprungen.",
+      "done": "Import abgeschlossen: {created} angelegt, {updated} aktualisiert, {unchanged} unverändert, {skipped} übersprungen, {failed} fehlgeschlagen.",
+      "failed": "Der Import ist fehlgeschlagen: {reason}",
+      "working": "Der Import läuft."
     }
   }
 }

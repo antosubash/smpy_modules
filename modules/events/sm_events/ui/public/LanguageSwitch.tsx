@@ -1,10 +1,6 @@
 import { keys, useT } from '../utils/i18n';
+import { ownLanguageName } from '../utils/language';
 import type { Alternate } from './types';
-
-/** A language named in itself ("Deutsch"), as a reader looking for it would recognise it. */
-function languageName(locale: string): string {
-  return new Intl.DisplayNames([locale], { type: 'language' }).of(locale) ?? locale;
-}
 
 /** The event's other languages, from its `alternates` (`x-default` is a hint for crawlers, not
  *  a language). Nothing renders for a single-language event. */
@@ -29,7 +25,7 @@ export function LanguageSwitch({
           aria-current={a.locale === locale ? 'true' : undefined}
           className={a.locale === locale ? 'font-semibold' : 'underline'}
         >
-          {languageName(a.locale)}
+          {ownLanguageName(a.locale)}
         </a>
       ))}
     </nav>

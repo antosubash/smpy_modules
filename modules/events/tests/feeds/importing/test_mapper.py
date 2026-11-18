@@ -267,3 +267,11 @@ def test_the_flag_alone_does_not_make_an_event_all_day():
     )
     false[3] = "DTEND;TZID=Europe/Vienna:20260707T000000"
     assert not one(*false).event.times.all_day  # type: ignore[union-attr]
+
+
+def test_a_cut_title_and_place_are_noted_on_the_item():
+    long = event("t@x", "LOCATION:" + "P" * 400, summary="T" * 400)
+    item = one(*long)
+    assert {"title_truncated", "place_truncated"} <= set(item.notes)
+    assert len(item.event.title) == constants.TITLE_MAX  # type: ignore[union-attr]
+    assert not {"title_truncated", "place_truncated"} & set(one(*event("u@x")).notes)

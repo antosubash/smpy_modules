@@ -210,6 +210,11 @@ class ImportBusy(Conflict):
     detail = constants.IMPORT_BUSY_DETAIL
 
 
+class ImportTenantBusy(Conflict):
+    code = constants.IMPORT_BUSY_TENANT_CODE
+    detail = constants.IMPORT_BUSY_TENANT_DETAIL
+
+
 class ImportState(Conflict):
     code = constants.IMPORT_STATE_CODE
     detail = constants.IMPORT_STATE_DETAIL

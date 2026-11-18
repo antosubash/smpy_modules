@@ -33,8 +33,8 @@ and discarded unread, so skipping is as cheap as scanning. **A limit over the wh
 import** with the limit's own code: `file_too_large`, `too_many_lines`, `line_too_long`,
 `too_many_events`, `too_many_components`, `too_many_timezones`, `too_deep`, and
 `component_too_large` (a time zone or other non-event component with more than 500 properties).
-`ics_invalid` is only a file that is not a well-formed calendar (this includes a NUL or other control
-character in it), and `too_complex` only a parse that ran out of its time budget or attempts.
+`ics_invalid` is only a file that is not a well-formed calendar (this includes a NUL byte in it; other control
+characters are removed from the text), and `too_complex` only a parse that ran out of its time budget or attempts.
 
 The upload itself is stored in the database (`events_import.source`), not in a directory: up to
 20 MiB a row and at most 25 unfinished imports per tenant, but only an import that has not been
@@ -56,7 +56,8 @@ that move or cancel one occurrence. Not imported: organisers, attendees and alar
 shown as "Not imported"; **attendee addresses are never stored**), attachments, other `X-`
 properties, `RANGE=THISANDFUTURE`.
 
-- **Time zones.** An IANA name or a Windows name (through icalendar's table) is read; any other
+- **Time zones.** A Windows zone name is mapped through icalendar's table to an IANA zone and
+  **stored as that IANA zone** (the original name is not kept). An IANA name or a Windows name is read; any other
   `TZID` skips the event (`unknown_timezone`). A floating time is read in the calendar's zone
   (`floating_time`). A repeating event written in UTC **stays UTC** (`kept_utc`), so its
   clock time follows UTC, not the calendar's zone, across clock changes.
@@ -68,10 +69,24 @@ properties, `RANGE=THISANDFUTURE`.
 
 ## Idempotency
 
+The preview calls an item **Unchanged** when the write itself finds nothing to change: it runs
+the same write in a transaction that is always rolled back (`feeds/importing/preview_diff.py`),
+about 25 ms an item, so within the 20 s parse budget (about 700 items) and after it the remaining
+items preview as "Update" and the result still says "Unchanged".
+
+**A re-import overwrites** the fields the file carries (times, rule, place, link, title and
+description) on the matching event, **even a draft you edited in the console since the last
+import**. Only an edit made between the preview and the apply is protected
+(`changed_since_preview`); other texts (SEO fields) and the category stay.
+
 An event is identified by its `UID` in the calendar. Importing the same file again creates
 nothing; an event that changed in the file is updated, one that did not is `unchanged`. An event
 edited in the console since the import is not overwritten (`changed_since_preview`). The highest
 `SEQUENCE` wins among duplicates.
+
+A title, description or place over the field's limit is cut (not refused) and the item carries a
+note (`title_truncated`, `description_truncated`, `place_truncated`). A time the clocks skip (a
+daylight-saving gap) skips the item as `invalid_local_time`, like the editor.
 
 ## Rights are re-checked
 

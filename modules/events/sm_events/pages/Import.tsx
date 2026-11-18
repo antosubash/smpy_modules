@@ -2,6 +2,8 @@ import { Head } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
+import { useEffect, useRef } from 'react';
+import { Announce } from '../ui/components/import/Announce';
 import { ImportProgress } from '../ui/components/import/ImportProgress';
 import { ImportResult } from '../ui/components/import/ImportResult';
 import { PreviewTable } from '../ui/components/import/PreviewTable';
@@ -24,15 +26,42 @@ export default function Import({ calendars, can_publish, max_bytes, import_id }:
   const copy = keys.events.import;
   const state = useImport(import_id);
   const { row } = state;
+  const step = useRef<HTMLDivElement>(null);
+  const stage =
+    row?.status === 'staged' || row?.status === 'done' || row?.status === 'failed'
+      ? row.status
+      : null;
+  // A new step replaces the part of the page that had focus: move focus to its heading.
+  useEffect(() => {
+    if (stage === null) return;
+    const heading = step.current?.querySelector<HTMLElement>('h2');
+    heading?.setAttribute('tabindex', '-1');
+    heading?.focus();
+  }, [stage]);
   return (
     <>
       <Head title={t(copy.title)} />
       <PageShell title={t(copy.title)} description={t(copy.subtitle)}>
-        <div className="space-y-4">
+        <div className="space-y-4" ref={step}>
+          <Announce row={row} uploading={state.busy && !row} />
           {state.error && (
             <p role="alert" className="text-destructive">
               {state.error}
             </p>
+          )}
+          {state.waiting.length > 0 && (
+            <section aria-label={t(copy.waiting_title)} className="space-y-1">
+              <h2 className="text-sm font-medium">{t(copy.waiting_title)}</h2>
+              <ul className="list-disc pl-5 text-sm">
+                {state.waiting.map((w) => (
+                  <li key={w.id}>
+                    <a className="underline" href={`${window.location.pathname}?id=${w.id}`}>
+                      {w.filename} · {w.calendar.name}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
           {!row && state.id === null && (
             <UploadForm

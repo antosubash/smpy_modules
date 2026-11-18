@@ -29,6 +29,7 @@ CASES = [
     # PR 5: private feeds and the import.
     (errors.TokenLimit, 409, "token_limit"),
     (errors.ImportBusy, 409, "import_busy"),
+    (errors.ImportTenantBusy, 409, "import_busy_tenant"),
     (errors.ImportState, 409, "import_state"),
     (errors.ImportTooLarge, 413, "import_too_large"),
     (errors.IcsInvalid, 422, "ics_invalid"),

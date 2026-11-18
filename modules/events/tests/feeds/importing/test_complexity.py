@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sm_events.core import constants
 from sm_events.core.clock import utcnow
-from sm_events.core.errors import ImportBusy
+from sm_events.core.errors import ImportBusy, ImportTenantBusy
 from sm_events.feeds.importing import staging
 from sm_events.feeds.importing.fence import claim
 from sm_events.feeds.importing.janitor import janitor_async
@@ -142,7 +142,7 @@ async def test_the_active_cap_is_per_user_with_a_larger_one_per_tenant(db):
     await make(theirs)  # one user at the cap does not block another
     for n in range(constants.IMPORT_ACTIVE_TENANT_MAX - constants.IMPORT_ACTIVE_MAX - 1):
         await make(principal(f"x{n}", V, M))
-    with pytest.raises(ImportBusy):  # the tenant's own ceiling
+    with pytest.raises(ImportTenantBusy):  # the tenant's own ceiling
         await make(principal("last", V, M))
 
 

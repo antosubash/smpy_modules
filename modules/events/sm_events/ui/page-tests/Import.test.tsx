@@ -236,7 +236,7 @@ describe('Import screen', () => {
         Response.json({ detail: 'x', code: 'import_busy' }, { status: 409 }),
     });
     const view = await upload(await mount(<Import {...baseProps} />));
-    expect(text()).toContain('Too many imports');
+    expect(text()).toContain('You have too many imports waiting');
     await view.unmount();
   });
 

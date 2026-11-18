@@ -55,7 +55,7 @@ async def test_upload_preview_apply_eager(world):
     assert made.status_code == 202, made.text
     body = made.json()
     assert (body["status"], body["total"], body["calendar"]["name"]) == ("staged", 3, "private")
-    assert body["counts"] == {"new": 3, "update": 0, "skip": 0}
+    assert body["counts"] == {"new": 3, "update": 0, "unchanged": 0, "skip": 0}
     assert (await client.get(f"{BASE}/{body['id']}", headers=MGR)).json()["status"] == "staged"
     items = await client.get(f"{BASE}/{body['id']}/items", headers=MGR)
     assert items.status_code == 200

@@ -3,14 +3,21 @@
 from __future__ import annotations
 
 from sm_events.core import constants
-from sm_events.feeds.importing.text import clean_title, description_html, unescape, venue
+from sm_events.feeds.importing.text import (
+    clean_title,
+    description_html,
+    place_truncated,
+    unescape,
+    venue,
+)
 
 
 def test_title_cleanup():
     title, notes = clean_title("Tal\u202ek\x00\x07 \u200b  on\n\n tests\u2028")
     assert title == "Talk on tests" and notes == ()
-    long, _ = clean_title("x" * 301)
-    assert len(long) == 300
+    long, long_notes = clean_title("x" * 301)
+    assert len(long) == 300 and long_notes == ("title_truncated",)
+    assert clean_title("x" * 300)[1] == ()  # at the limit: no note
     empty, notes = clean_title(" ‮ \x00 ")
     assert empty == constants.IMPORT_UNTITLED and notes == ("untitled",)
     assert clean_title("")[1] == ("untitled",)
@@ -69,4 +76,5 @@ def test_control_characters_never_reach_the_html():
 def test_venue():
     assert venue("  Room\x00 1‮ ") == "Room 1"
     assert venue("x" * 500) == "x" * constants.VENUE_MAX
+    assert place_truncated("x" * 500) and not place_truncated("x" * constants.VENUE_MAX)
     assert venue("‮\x00") is None and venue("") is None

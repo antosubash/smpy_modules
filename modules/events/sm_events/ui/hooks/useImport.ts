@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { errorText, isGone } from '../utils/api';
+import { ApiError, errorText, isGone } from '../utils/api';
 import {
   ACTIVE,
   applyImport,
@@ -7,8 +7,10 @@ import {
   getImport,
   type ImportRow,
   type ItemPage,
+  listImports,
   listItems,
   POLL_MS,
+  unfinished,
   uploadImport,
 } from '../utils/api-import';
 
@@ -29,6 +31,7 @@ export function useImport(initialId: number | null) {
   const [filter, setFilter] = useState<Filter>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [waiting, setWaiting] = useState<ImportRow[]>([]);
   const [pulse, setPulse] = useState(0);
   /** Bumped to start reading again (after an apply the import is the worker's). */
   const alive = useRef(true);
@@ -96,6 +99,7 @@ export function useImport(initialId: number | null) {
   const upload = useCallback(async (calendarId: string, file: File) => {
     setBusy(true);
     setError(null);
+    setWaiting([]);
     try {
       const made = await uploadImport(calendarId, file);
       if (!alive.current) return;
@@ -106,6 +110,15 @@ export function useImport(initialId: number | null) {
       mirror(made.id);
     } catch (e) {
       if (alive.current) setError(errorText(e));
+      if (e instanceof ApiError && e.code === 'import_busy') {
+        // Say which ones are waiting, so the person can open and apply or discard one.
+        try {
+          const mine = await listImports();
+          if (alive.current) setWaiting(mine.items.filter(unfinished));
+        } catch {
+          if (alive.current) setWaiting([]);
+        }
+      }
     } finally {
       if (alive.current) setBusy(false);
     }
@@ -144,5 +157,5 @@ export function useImport(initialId: number | null) {
     }
   }, [id, reset]);
 
-  return { id, row, items, filter, setFilter, error, busy, upload, apply, discard };
+  return { id, row, items, filter, setFilter, error, busy, waiting, upload, apply, discard };
 }
