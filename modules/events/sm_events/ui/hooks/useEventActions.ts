@@ -82,12 +82,14 @@ export function useEventActions(
     errors.fail(e);
   }
 
-  /** Someone else saved first: load their version as the base, keep the form. */
+  /** Someone else saved first: their version becomes the base, with the
+   *  user's own edits (since the version they began from) laid on top. */
   async function openConflict(request: ScopedRequest) {
+    const started = ev.latest.current.base;
     const theirs = await ev.fetchEvent(request);
     if (!request.alive()) return;
-    ev.rebase(theirs);
-    setConflict(true);
+    if (ev.rebase(theirs, started)) setConflict(true);
+    else setNotice(t(keys.events.errors.stale_reloaded));
   }
 
   async function writeExisting(event: EventDetail, drop: boolean, request: ScopedRequest) {
