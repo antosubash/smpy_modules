@@ -30,21 +30,21 @@ FAMILIES: tuple[Family, ...] = (
         (
             Copy(f"{PB}/web/public_cache.py", {"PagebuilderSettings": "Settings"}),
             Copy(f"{NEWS}/web/endpoints/public/_urls.py", {"NewsSettings": "Settings"}),
+            Copy(f"{EVENTS}/web/endpoints/public/_cache.py"),
         ),
-        shared=("SIGNED_IN_CACHE_CONTROL", "signed_in", "_user_key", "viewer_key", "cache_control"),
+        shared=("SIGNED_IN_CACHE_CONTROL", "signed_in", "_user_key", "viewer_key"),
+    ),
+    Family(
+        "public cache-control (pagebuilder, news)",
+        (
+            Copy(f"{PB}/web/public_cache.py", {"PagebuilderSettings": "Settings"}),
+            Copy(f"{NEWS}/web/endpoints/public/_urls.py", {"NewsSettings": "Settings"}),
+        ),
+        shared=("cache_control", "etag_for"),
         differ={
             "etag_for": "A page's chrome also changes with the site layout and the nav list, "
             "so pagebuilder digests layout_updated_at and nav as well; an article has neither.",
         },
-    ),
-    Family(
-        "viewer key (events)",
-        (
-            Copy(f"{PB}/web/public_cache.py"),
-            Copy(f"{NEWS}/web/endpoints/public/_urls.py"),
-            Copy(f"{EVENTS}/web/endpoints/public/_cache.py"),
-        ),
-        shared=("SIGNED_IN_CACHE_CONTROL", "signed_in", "_user_key", "viewer_key"),
     ),
     Family(
         "slug redirects",
@@ -73,8 +73,12 @@ FAMILIES: tuple[Family, ...] = (
     ),
     Family(
         "content locales",
-        (Copy(f"{PB}/core/locales.py"), Copy(f"{NEWS}/core/locales.py")),
-        shared=("is_default", "resolve", "path_prefix"),
+        (
+            Copy(f"{PB}/core/locales.py"),
+            Copy(f"{NEWS}/core/locales.py"),
+            Copy(f"{EVENTS}/core/locales.py"),
+        ),
+        shared=("is_default", "path_prefix"),
         differ={
             "use": "Pagebuilder publishes its settings object; news publishes a vocabulary, "
             "because it may run without pagebuilder and borrows its list when it does not.",
@@ -82,6 +86,11 @@ FAMILIES: tuple[Family, ...] = (
             "supported": "Read from where each `use` put it.",
             "default": "Read from where each `use` put it.",
         },
+    ),
+    Family(
+        "content locales: resolve (pagebuilder, news)",
+        (Copy(f"{PB}/core/locales.py"), Copy(f"{NEWS}/core/locales.py")),
+        shared=("resolve",),
     ),
     Family(
         "slugify (TypeScript)",
@@ -101,7 +110,28 @@ FAMILIES: tuple[Family, ...] = (
         (
             Copy(f"{NEWS}/ui/utils/jsonLd.ts"),
             Copy(f"{PB}/ui/utils/jsonLd.ts"),
+            Copy(
+                f"{EVENTS}/ui/utils/jsonLd.ts",
+                own={
+                    "LINE_SEPARATOR": "Events also escapes `>`, `&` and the two JavaScript line "
+                    "separators (the server's `safe_json_ld` does too).",
+                    "PARAGRAPH_SEPARATOR": "See LINE_SEPARATOR.",
+                    "ESCAPES": "See LINE_SEPARATOR.",
+                    "DANGEROUS": "See LINE_SEPARATOR.",
+                },
+            ),
         ),
+        differ={
+            "safeJsonLd": "Events' serialiser escapes more characters than news' and pagebuilder's.",
+        },
+    ),
+    Family(
+        "public head injection (Python)",
+        (
+            Copy(f"{NEWS}/web/endpoints/public/_head.py"),
+            Copy(f"{EVENTS}/web/endpoints/public/_head.py"),
+        ),
+        shared=("_CLOSE_HEAD", "_EXISTING_TITLE", "_tag", "_alternate_links", "inject"),
     ),
     Family(
         "CSRF token sharing (Python)",

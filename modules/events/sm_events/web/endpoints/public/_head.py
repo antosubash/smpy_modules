@@ -45,13 +45,15 @@ def _tag(name: str, value: str | None, *, prop: bool = False) -> str:
     if not value:
         return ""
     key = "property" if prop else "name"
-    return f'<meta {key}="{name}" content="{_e(value)}">'
+    return f'<meta {key}="{name}" content="{html.escape(value, quote=True)}">'
 
 
 def _alternate_links(alternates: list[dict[str, str]] | None) -> list[str]:
     """``hreflang`` links (``x-default`` included); none for a monolingual site."""
     return [
-        f'<link rel="alternate" hreflang="{_e(entry["locale"])}" href="{_e(entry["url"])}">'
+        '<link rel="alternate" '
+        f'hreflang="{html.escape(entry["locale"], quote=True)}" '
+        f'href="{html.escape(entry["url"], quote=True)}">'
         for entry in alternates or []
     ]
 
