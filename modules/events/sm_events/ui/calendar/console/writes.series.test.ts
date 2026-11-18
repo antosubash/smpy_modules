@@ -107,7 +107,11 @@ describe('series instance', () => {
       starts_at: '2026-03-01T01:30:00Z',
       ends_at: '2026-03-01T02:30:00Z',
     });
-    const o = instance({ original_start: '2026-03-22T01:30:00Z' });
+    const o = instance({
+      original_start: '2026-03-22T01:30:00Z',
+      start: '2026-03-22T01:30:00Z',
+      end: '2026-03-22T02:30:00Z',
+    });
     // Move the whole series by 28 days at the same time: master lands 2026-03-29T02:30.
     const plan = planChange(
       change(o, 'move', '2026-04-19T00:30:00Z', '2026-04-19T01:30:00Z'),
