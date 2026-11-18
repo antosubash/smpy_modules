@@ -149,7 +149,8 @@ tests/
 A new test goes in the folder of the feature it exercises; a test of an
 area's top-level code sits at the top of that area's folder.
 
-**Parity exceptions.** `tests/pg_support.py` and the tenancy helpers are
+**Parity exceptions.** `tests/pg_support.py`, the tenancy helpers and the worker
+runtime (`core/worker.py`, events and newsletter) are
 copies kept identical across modules by `scripts/tests/test_helper_parity.py`
 (`parity_tenancy.py`, `parity_families.py`). Those checks compare paths and
 path depth, so `pg_support.py` stays at the tests root. When a module moves its
@@ -201,6 +202,6 @@ Do it in small PRs, one module at a time, each containing only moves:
 | records | 6 | 10 | 0 | follows this layout |
 | analytics | 2 | 8 | 0 | follows this layout |
 | newsletter | 4 | 13 | 0 | follows this layout |
-| events | 2 | 7 | 0 | follows this layout |
+| events | 4 | 9 | 0 | follows this layout |
 
 Update this table when a module moves.

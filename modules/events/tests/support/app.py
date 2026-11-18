@@ -186,3 +186,14 @@ async def csrf_client() -> AsyncIterator[AsyncClient]:
         http.db_state = state  # type: ignore[attr-defined]
         yield http
     await state.engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def locales_client() -> AsyncIterator[AsyncClient]:
+    """An app whose content locales are English (the default) and German."""
+    app, state = await build_app(settings={"content_locales": ("en", "de")})
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http:
+        http.app = app  # type: ignore[attr-defined]
+        http.db_state = state  # type: ignore[attr-defined]
+        yield http
+    await state.engine.dispose()

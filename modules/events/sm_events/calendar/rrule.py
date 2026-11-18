@@ -1,42 +1,43 @@
-"""RRULE: parse, validate, normalise, derive ``recurrence_until``, and iterate. Pure.
+"""RRULE: parse, validate, normalise and derive ``recurrence_until``. Pure.
 
 Only an allow-list of parts is accepted (:mod:`sm_events.calendar.rrule_parts`) and
-dateutil only ever sees keyword arguments built from it, never raw text.
+dateutil only ever sees keyword arguments built from it, never raw text. Iteration
+lives in :mod:`sm_events.calendar.rrule_walk` (every walk has a stop; see there).
 
-**Every iteration has an ``until``.** dateutil checks ``until`` only when it has a
-candidate, so a rule that can never match (30 February) walks on to year 9999.
-:func:`iterate` therefore shifts the whole problem by a multiple of 400 years (the
-Gregorian cycle: same weekdays, same leap years) so that the walk to year 9999 is
-a few hundred years at most, and it starts at the period nearest the lower bound
-instead of at ``dtstart`` so a long-running series costs what the window holds.
+A series' dates are naive local ones. An all-day series' start is its first *date*
+at 00:00, whatever instant a gap shifted its stored start to, so a rule and a
+``COUNT`` are always counted in dates. ``UNTIL`` of a timed rule is an instant
+(``Z``) and is compared as one.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from dateutil import rrule as du
-
 from sm_events.calendar.rrule_parts import WEEKDAYS, ByDay, Parts, bad, parse_parts
-from sm_events.calendar.times import Span, all_day_dates, localize
+from sm_events.calendar.rrule_walk import build, iterate
+from sm_events.calendar.times import Span, all_day_dates, day_exists, localize
 from sm_events.core import constants
 from sm_events.core.errors import InvalidRule
 
-__all__ = ["Rule", "build", "iterate", "parse", "until_local", "validate"]
+__all__ = [
+    "Rule",
+    "add_years",
+    "build",
+    "iterate",
+    "local_start",
+    "parse",
+    "until_local",
+    "validate",
+    "within_until",
+]
 
-_DU_FREQ = {
-    "DAILY": du.DAILY,
-    "WEEKLY": du.WEEKLY,
-    "MONTHLY": du.MONTHLY,
-    "YEARLY": du.YEARLY,
-}
 _UNTIL_DATE_LEN = 8
 _UNTIL_DATETIME_LEN = 16
-_CYCLE_YEARS = 400
-_TARGET_YEAR = 9900  # where iterate() puts ``until`` before it walks
+_UNTIL_MARGIN = timedelta(days=1)  # absorbs a UTC offset change; compared exactly later
+_MAX_YEAR = 9999
 
 
 @dataclass(frozen=True)
@@ -122,96 +123,38 @@ def parse(text: str, *, all_day: bool, timezone: str) -> Rule:
 
 
 def until_local(rule: Rule, tz: ZoneInfo) -> datetime | None:
-    """The rule's own ``UNTIL`` as a naive local bound (inclusive), or ``None``."""
+    """A naive local upper bound for walking up to the rule's own ``UNTIL``, or
+    ``None``. A timed ``UNTIL`` is an instant, so this is up to a day late: filter
+    exactly with :func:`within_until`."""
     if rule.until is None:
         return None
     if isinstance(rule.until, datetime):
-        return rule.until.astimezone(tz).replace(tzinfo=None)
+        return rule.until.astimezone(tz).replace(tzinfo=None) + _UNTIL_MARGIN
     return datetime.combine(rule.until, time(23, 59, 59))
 
 
-def _kwargs(rule: Rule, dtstart: datetime) -> dict:
-    """dateutil's keyword arguments, with its dtstart-derived defaults made explicit
-    so that moving ``dtstart`` along the rule's own period cannot change them."""
-    bymonth, bymonthday = rule.bymonth, rule.bymonthday
-    byweekday = [du.weekday(d, o) if o is not None else du.weekday(d) for d, o in rule.byday]
-    if not (bymonthday or byweekday):
-        if rule.freq == "YEARLY":
-            bymonth = bymonth or (dtstart.month,)
-            bymonthday = (dtstart.day,)
-        elif rule.freq == "MONTHLY":
-            bymonthday = (dtstart.day,)
-        elif rule.freq == "WEEKLY":
-            byweekday = [du.weekday(dtstart.weekday())]
-    return {
-        "freq": _DU_FREQ[rule.freq],
-        "interval": rule.interval,
-        "wkst": rule.wkst if rule.wkst is not None else 0,
-        "bymonth": bymonth or None,
-        "bymonthday": bymonthday or None,
-        "byweekday": byweekday or None,
-        "bysetpos": rule.bysetpos or None,
-    }
+def within_until(rule: Rule, start_local: datetime, tz: ZoneInfo) -> bool:
+    """Is the naive local start at or before the rule's own ``UNTIL``?"""
+    if rule.until is None:
+        return True
+    if isinstance(rule.until, datetime):
+        return localize(start_local, tz) <= rule.until
+    return start_local.date() <= rule.until
 
 
-def build(rule: Rule, *, dtstart_local: datetime, until_local: datetime | None) -> du.rrule:
-    """The dateutil rule on a naive local ``dtstart``: ``COUNT`` dropped, ``until``
-    always set (an endless rule is bounded by the caller's window)."""
-    if until_local is None:
-        raise ValueError("an rrule is never iterated without an until")
-    return du.rrule(dtstart=dtstart_local, until=until_local, **_kwargs(rule, dtstart_local))
+def add_years(value: datetime, years: int) -> datetime:
+    """``value`` plus whole years; 29 February lands on 28 February in a common year."""
+    year = min(value.year + years, _MAX_YEAR)
+    try:
+        return value.replace(year=year)
+    except ValueError:
+        return value.replace(year=year, day=28)
 
 
-def _aligned_start(rule: Rule, dtstart: datetime, lower: datetime) -> datetime:
-    """The start of the last period, in the rule's own phase, at or before ``lower``."""
-    if lower <= dtstart:
-        return dtstart
-    step, tod = rule.interval, dtstart.time()
-    if rule.freq == "DAILY":
-        days = (lower.date() - dtstart.date()).days // step * step
-        return datetime.combine(dtstart.date() + timedelta(days=days), tod)
-    if rule.freq == "WEEKLY":
-        wkst = rule.wkst if rule.wkst is not None else 0
-        first = dtstart.date() - timedelta(days=(dtstart.weekday() - wkst) % 7)
-        weeks = ((lower.date() - first).days // 7) // step * step
-        if weeks == 0:
-            return dtstart
-        return datetime.combine(first + timedelta(weeks=weeks), tod)
-    if rule.freq == "MONTHLY":
-        months = (lower.year - dtstart.year) * 12 + lower.month - dtstart.month
-        months = months // step * step
-        if months <= 0:
-            return dtstart
-        index = dtstart.year * 12 + dtstart.month - 1 + months
-        return datetime.combine(date(index // 12, index % 12 + 1, 1), tod)
-    years = (lower.year - dtstart.year) // step * step
-    if years <= 0:
-        return dtstart
-    return datetime.combine(date(dtstart.year + years, 1, 1), tod)
-
-
-def iterate(
-    rule: Rule, *, dtstart_local: datetime, lower_local: datetime, until_local: datetime
-) -> Iterator[datetime]:
-    """Naive local starts in ``[lower_local, until_local]``, ascending, never beyond
-    ``until_local``, and in work bounded by the span asked for (see module docs)."""
-    kwargs = _kwargs(rule, dtstart_local)
-    start = _aligned_start(rule, dtstart_local, lower_local)
-    if until_local < start:
-        return
-    shift = _CYCLE_YEARS * ((_TARGET_YEAR - until_local.year) // _CYCLE_YEARS)
-    walker = du.rrule(
-        dtstart=start.replace(year=start.year + shift),
-        until=until_local.replace(year=until_local.year + shift),
-        **kwargs,
-    )
-    for hit in walker:
-        value = hit.replace(year=hit.year - shift)
-        if value >= lower_local:
-            yield value
-
-
-def _local_start(span: Span, tz: ZoneInfo) -> datetime:
+def local_start(span: Span, tz: ZoneInfo, *, all_day: bool) -> datetime:
+    """The series' first start as a naive local time (an all-day one: its date at 00:00)."""
+    if all_day:
+        return datetime.combine(all_day_dates(span, tz.key)[0], time.min)
     return span.starts_at.astimezone(tz).replace(tzinfo=None)
 
 
@@ -223,32 +166,51 @@ def _instance_end(start_local: datetime, span: Span, *, all_day: bool, tz: ZoneI
     return localize(start_local, tz) + (span.ends_at - span.starts_at)
 
 
+def _until_errors(rule: Rule, dtstart: datetime, horizon: datetime, tz: ZoneInfo) -> None:
+    until = rule.until
+    if until is None:
+        return
+    if isinstance(until, datetime):
+        before, after = until < localize(dtstart, tz), until > localize(horizon, tz)
+    else:
+        before, after = until < dtstart.date(), until > horizon.date()
+    if before:
+        raise bad("UNTIL", "before the start")
+    if after:
+        raise bad("UNTIL", f"more than {constants.RRULE_MAX_YEARS} years after the start")
+
+
 def validate(rule: Rule, span: Span, *, all_day: bool, timezone: str) -> datetime | None:
     """Check the rule against its event's start and return ``recurrence_until`` (UTC
     end of the last occurrence), ``None`` for an endless rule.
 
-    ``start_not_in_rule`` unless the start is the rule's first occurrence."""
+    ``start_not_in_rule`` unless the start is the rule's first occurrence. ``COUNT``
+    counts every date the rule names; a date that does not exist locally (a whole day
+    skipped by a zone) is counted but has no instance, and the end returned is the
+    last one that has."""
     tz = ZoneInfo(timezone)
-    dtstart = _local_start(span, tz)
-    horizon = dtstart.replace(year=dtstart.year + constants.RRULE_MAX_YEARS)
-    until = until_local(rule, tz)
-    if until is not None:
-        if until < dtstart:
-            raise bad("UNTIL", "before the start")
-        if until > horizon:
-            raise bad("UNTIL", f"more than {constants.RRULE_MAX_YEARS} years after the start")
-    bound = until if until is not None else horizon
+    dtstart = local_start(span, tz, all_day=all_day)
+    horizon = add_years(dtstart, constants.RRULE_MAX_YEARS)
+    _until_errors(rule, dtstart, horizon, tz)
+    bound = until_local(rule, tz) or horizon
     hits = iterate(rule, dtstart_local=dtstart, lower_local=dtstart, until_local=bound)
     first = next(hits, None)
     if first != dtstart:
-        raise InvalidRule(constants.START_NOT_IN_RULE_DETAIL, code=constants.START_NOT_IN_RULE_CODE)
+        raise InvalidRule(
+            constants.START_NOT_IN_RULE_DETAIL,
+            code=constants.START_NOT_IN_RULE_CODE,
+            # The start is what a person picked last and can move; the rule is what they meant.
+            field=constants.START_FIELD,
+        )
     if rule.count is None and rule.until is None:
         return None  # endless
     last, seen = first, 1
     for hit in hits:
-        if seen == rule.count:
+        if seen == rule.count or not within_until(rule, hit, tz):
             break
-        last, seen = hit, seen + 1
+        seen += 1
+        if day_exists(hit.date(), tz):
+            last = hit
     if rule.count is not None and seen < rule.count:
         raise bad("COUNT", f"fewer than COUNT occurrences within {constants.RRULE_MAX_YEARS} years")
     return _instance_end(last, span, all_day=all_day, tz=tz)

@@ -19,7 +19,13 @@ from sm_events.core.tenancy import tenant_scope
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.pg_support import arm_reset, make_db_state
-from tests.support.app import client, csrf_client, events_app, multi_client  # noqa: F401 - fixtures
+from tests.support.app import (  # noqa: F401 - fixtures
+    client,
+    csrf_client,
+    events_app,
+    locales_client,
+    multi_client,
+)
 
 DEFAULT_TENANT = "default"
 

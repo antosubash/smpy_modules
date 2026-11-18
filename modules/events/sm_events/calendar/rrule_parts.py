@@ -28,9 +28,9 @@ ALLOWED = (
     "BYSETPOS",
     "WKST",
 )
-_INT = re.compile(r"^[+-]?\d{1,4}$")
-_BYDAY = re.compile(r"^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$")
-_PREFIX = re.compile(r"^RRULE:", re.IGNORECASE)
+_INT = re.compile(r"[+-]?[0-9]{1,4}", re.ASCII)
+_BYDAY = re.compile(r"([+-]?[0-9]{1,2})?(MO|TU|WE|TH|FR|SA|SU)", re.ASCII)
+_PREFIX = re.compile(r"RRULE:", re.IGNORECASE | re.ASCII)
 
 ByDay = tuple[tuple[int, int | None], ...]
 
@@ -56,7 +56,7 @@ def bad(part: str, why: str = "") -> InvalidRule:
 
 
 def _int(value: str, part: str, lo: int, hi: int, *, signed: bool = False) -> int:
-    if not _INT.match(value):
+    if not _INT.fullmatch(value):
         raise bad(part)
     number = int(value)
     if signed and number == 0:
@@ -73,14 +73,20 @@ def _ints(value: str, part: str, hi: int, *, signed: bool) -> tuple[int, ...]:
 
 
 def split(text: str) -> dict[str, str]:
-    """``KEY=VALUE;...`` as an upper-cased dict; a repeat or a stray piece is refused."""
+    """``KEY=VALUE;...`` as an upper-cased dict; a repeat or a stray piece is refused.
+
+    ASCII only and no whitespace is stripped: ``str.upper`` maps some non-ASCII
+    letters onto ASCII ones and ``str.strip`` removes non-breaking spaces."""
     if not isinstance(text, str) or len(text) > constants.RRULE_MAX_LEN:
         raise bad("length", f"at most {constants.RRULE_MAX_LEN} characters")
-    body = _PREFIX.sub("", text.strip()).strip().removesuffix(";")
+    if not text.isascii():
+        raise bad("characters", "ASCII only")
+    prefix = _PREFIX.match(text)
+    body = (text[prefix.end() :] if prefix else text).removesuffix(";")
     out: dict[str, str] = {}
     for piece in body.split(";"):
         key, sep, value = piece.partition("=")
-        key, value = key.strip().upper(), value.strip().upper()
+        key, value = key.upper(), value.upper()
         if not sep or not key or not value:
             raise bad(piece or "empty")
         if key in out:
@@ -92,7 +98,7 @@ def split(text: str) -> dict[str, str]:
 def _byday(value: str, freq: str) -> ByDay:
     found: set[tuple[int, int | None]] = set()
     for item in value.split(","):
-        match = _BYDAY.match(item)
+        match = _BYDAY.fullmatch(item)
         if match is None:
             raise bad("BYDAY")
         ordinal = int(match.group(1)) if match.group(1) else None

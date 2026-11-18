@@ -8,6 +8,26 @@ from sm_events.core import constants as c
 def menu_items() -> list[MenuItem]:
     return [
         MenuItem(
+            label=c.MENU_LABEL_CALENDAR,
+            label_key=c.MENU_LABEL_KEY_CALENDAR,
+            url=c.CALENDAR_URL,
+            icon=c.MENU_ICON_CALENDAR,
+            order=390,
+            group=c.MENU_GROUP,
+            group_key=c.MENU_GROUP_KEY,
+            permissions=[c.PERM_VIEW],
+        ),
+        MenuItem(
+            label=c.MENU_LABEL_EVENTS,
+            label_key=c.MENU_LABEL_KEY_EVENTS,
+            url=c.EVENTS_URL,
+            icon=c.MENU_ICON_EVENTS,
+            order=395,
+            group=c.MENU_GROUP,
+            group_key=c.MENU_GROUP_KEY,
+            permissions=[c.PERM_VIEW],
+        ),
+        MenuItem(
             label=c.MENU_LABEL_CALENDARS,
             label_key=c.MENU_LABEL_KEY_CALENDARS,
             url=c.CALENDARS_URL,

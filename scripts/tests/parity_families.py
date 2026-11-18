@@ -217,6 +217,28 @@ FAMILIES: tuple[Family, ...] = (
         shared=("RequestContextMiddleware", "current_request"),
     ),
     Family(
+        "worker runtime",
+        (
+            Copy(
+                "modules/events/sm_events/core/worker.py",
+                {"sm_events": "MODULE"},
+                messages=(
+                    "events task bodies start their own event loop and cannot run on a running "
+                    "one; from async code await the coroutine (e.g. publish_due_async) directly",
+                ),
+            ),
+            Copy(
+                "modules/newsletter/sm_newsletter/core/worker.py",
+                {"sm_newsletter": "MODULE"},
+                messages=(
+                    "newsletter task bodies start their own event loop and cannot run on a "
+                    "running one; from async code await the coroutine (e.g. reconcile_async) "
+                    "directly",
+                ),
+            ),
+        ),
+    ),
+    Family(
         "SSRF address guard",
         (
             Copy("modules/images/sm_images/ingest/imports/url_safety.py"),

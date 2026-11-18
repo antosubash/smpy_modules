@@ -21,7 +21,8 @@ PERMISSIONS = (PERM_VIEW, PERM_EDIT, PERM_PUBLISH, PERM_MANAGE)
 
 _MODULE_SETTINGS = "Settings"
 _MODULE_SHARING = "Sharing"
-DEPENDS_ON = (_MODULE_SETTINGS, _MODULE_SHARING)
+_MODULE_BACKGROUND_TASKS = "BackgroundTasks"
+DEPENDS_ON = (_MODULE_SETTINGS, _MODULE_SHARING, _MODULE_BACKGROUND_TASKS)
 
 TENANT_REQUIRED_CODE = "tenant_required"
 NOT_FOUND_DETAIL = "Not found"
@@ -59,23 +60,43 @@ DEFAULT_LOCALE_REQUIRED_DETAIL = "A name in the default language is required"
 UNKNOWN_LOCALE_DETAIL = "That language is not one of the content locales"
 
 # Console pages and sidebar entries.
+_PAGE_CALENDAR = f"{MODULE_NAME}/Calendar"
 _PAGE_CALENDARS = f"{MODULE_NAME}/Calendars"
 _PAGE_CATEGORIES = f"{MODULE_NAME}/Categories"
+_PAGE_EVENTS = f"{MODULE_NAME}/Events"
+_PAGE_EVENT_EDITOR = f"{MODULE_NAME}/EventEditor"
+CALENDAR_URL = f"{VIEW_PREFIX}/"
 CALENDARS_URL = f"{VIEW_PREFIX}/calendars"
 CATEGORIES_URL = f"{VIEW_PREFIX}/categories"
+EVENTS_URL = f"{VIEW_PREFIX}/list"
+EVENT_NEW_SEGMENT = "new"
 MENU_GROUP = MODULE_NAME
 MENU_GROUP_KEY = "events.menu.group"
+MENU_LABEL_CALENDAR = "Calendar"
+MENU_LABEL_KEY_CALENDAR = "events.menu.calendar"
+MENU_ICON_CALENDAR = "calendar"
 MENU_LABEL_CALENDARS = "Calendars"
 MENU_LABEL_KEY_CALENDARS = "events.menu.calendars"
-MENU_ICON_CALENDARS = "calendar"
+MENU_ICON_CALENDARS = "layers"
 MENU_LABEL_CATEGORIES = "Event categories"
 MENU_LABEL_KEY_CATEGORIES = "events.menu.categories"
 MENU_ICON_CATEGORIES = "tag"
+MENU_LABEL_EVENTS = "Events"
+MENU_LABEL_KEY_EVENTS = "events.menu.events"
+MENU_ICON_EVENTS = "list"
 
 # Bounds on times, ranges, rules, revisions and pages.
 MAX_EVENT_DAYS = 366
 MAX_SERIES_EVENT_DAYS = 31
+# A UTC offset can change inside an instance (31 wall-clock days are 31 days and an
+# hour across a fall-back), so every look-back for one adds this many days.
+LOOK_BACK_MARGIN_DAYS = 1
 MAX_RANGE_DAYS = 366
+# A path number and an occurrence's original start: what a signed 32-bit column holds and
+# the years a calendar means (a bound keeps ``+ 1 microsecond`` and zone maths in range).
+INT32_MAX = 2**31 - 1
+ORIGINAL_START_MIN_YEAR = 1900
+ORIGINAL_START_MAX_YEAR = 9000
 MAX_OCCURRENCES = 2000
 SERIES_FETCH_MAX = 2000
 RRULE_MAX_LEN = 500
@@ -91,6 +112,18 @@ DESCRIPTION_RAW_MAX = 200_000
 DESCRIPTION_MAX = 100_000
 NOTE_MAX = 1000
 QUERY_MAX = 100
+URL_MAX = 2048
+ORGANISER_MAX = 200
+VENUE_MAX = 200
+ADDRESS_MAX = 500
+RRULE_INPUT_MAX = 1000
+TITLE_MAX = 300
+SUMMARY_MAX = 1000
+SEO_TITLE_MAX = 300
+SEO_DESCRIPTION_MAX = 500
+TYPE_NAME_MAX = 64
+TIMES_FIELD_MAX = 40
+TEXTS_MAX = 20
 PUBLISH_DUE_BATCH = 200
 
 # Names.
@@ -101,6 +134,7 @@ SOURCE_EVENTS = "events"
 # Error codes and their default messages.
 STALE_CODE = "stale"
 STALE_DETAIL = "This was changed by someone else; reload it"
+CURRENT_REVISION_HEADER = "X-Current-Revision"
 OVERRIDES_ORPHANED_CODE = "overrides_orphaned"
 OVERRIDES_ORPHANED_DETAIL = "This change would orphan overrides of single occurrences"
 HAS_SUB_EVENTS_CODE = "has_sub_events"
@@ -113,6 +147,7 @@ INVALID_RRULE_CODE = "invalid_rrule"
 INVALID_RRULE_DETAIL = "The recurrence rule is not valid"
 RRULE_FREQUENCY_REFUSED_CODE = "rrule_frequency_refused"
 RRULE_FREQUENCY_REFUSED_DETAIL = "Only daily, weekly, monthly and yearly rules are allowed"
+START_FIELD = "times.start"
 START_NOT_IN_RULE_CODE = "start_not_in_rule"
 START_NOT_IN_RULE_DETAIL = "The first occurrence must be the event's own start"
 INVALID_LOCAL_TIME_CODE = "invalid_local_time"
@@ -140,6 +175,27 @@ NOT_AN_OCCURRENCE_CODE = "not_an_occurrence"
 NOT_AN_OCCURRENCE_DETAIL = "That is not an occurrence of the event's rule"
 DESCRIPTION_TOO_LONG_CODE = "description_too_long"
 DESCRIPTION_TOO_LONG_DETAIL = "The description is too long"
+
+STATUS_SCHEDULED = "scheduled"
+"""A list filter, not a stored status: a draft or in-review event with ``publish_at`` set."""
+
+# Revisions: what a history row's action may be.
+REVISION_ACTIONS = (
+    "created",
+    "updated",
+    "override_set",
+    "override_cleared",
+    "submitted",
+    "withdrawn",
+    "approved",
+    "scheduled",
+    "unscheduled",
+    "rejected",
+    "unpublished",
+    "published_scheduled",
+    "trashed",
+    "restored",
+)
 
 # Occurrences.
 OCCURRENCE_CONFIRMED = "confirmed"

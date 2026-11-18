@@ -11,10 +11,17 @@ import { keys, translate as t } from '../utils/i18n';
  *  of them lands at that field; an entry for any other leaves the general
  *  message up as well, so a failed save never ends with nothing visible.
  *
+ *  `codeField` places a coded refusal (`invalid_local_time`, `slug_taken`) at its input.
+ *
  *  Attach `formRef` to the `<form>`: after every failed submit focus moves to
  *  the first input marked `aria-invalid` (the first input for a group message), so the failure is announced where the
  *  user is, not left on Save. */
-export function useFormErrors(gone?: string, onGone?: () => void, shown: readonly string[] = []) {
+export function useFormErrors(
+  gone?: string,
+  onGone?: () => void,
+  shown: readonly string[] = [],
+  codeField?: (error: unknown) => string | undefined,
+) {
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [failures, setFailures] = useState(0);
@@ -34,7 +41,9 @@ export function useFormErrors(gone?: string, onGone?: () => void, shown: readonl
   }, []);
   const fail = useCallback(
     (e: unknown) => {
-      const mapped = fieldErrors(e);
+      // A refusal that carries a code and no `loc` still belongs to one input.
+      const coded = codeField?.(e);
+      const mapped = coded ? { [coded]: errorText(e) } : fieldErrors(e);
       const paths = Object.keys(mapped);
       if (paths.length > 0) {
         const visible = Object.fromEntries(
@@ -51,7 +60,7 @@ export function useFormErrors(gone?: string, onGone?: () => void, shown: readonl
       setError(errorText(e, gone));
       if (isGone(e)) onGone?.();
     },
-    [gone, onGone, shown],
+    [gone, onGone, shown, codeField],
   );
   /** The form's own checks failed before any request: show them and focus the first. */
   const reject = useCallback((found: Record<string, string>) => {

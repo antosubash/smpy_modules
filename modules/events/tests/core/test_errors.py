@@ -62,3 +62,18 @@ def test_alternative_codes_keep_status(cls, code):
     assert exc.code == code
     assert exc.status_code == 422
     assert exc.detail
+
+
+async def test_stale_carries_the_current_revision_in_a_header_not_the_body():
+    app = FastAPI()
+    install_exception_handlers(app)
+
+    @app.get("/boom")
+    async def boom():
+        raise errors.Stale(7)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as http:
+        got = await http.get("/boom")
+    assert got.status_code == 409
+    assert set(got.json()) == {"detail", "code"}
+    assert got.headers["x-current-revision"] == "7"

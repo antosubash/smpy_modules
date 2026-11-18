@@ -38,6 +38,10 @@ test.describe('Production CSP', () => {
     await page.waitForLoadState('networkidle');
     await page.goto('/admin/images/');
     await page.waitForLoadState('networkidle');
+    // FullCalendar draws its grid under the nonce policy.
+    await page.goto('/admin/events/');
+    await expect(page.getByTestId('calendar-title')).not.toBeEmpty();
+    await page.waitForLoadState('networkidle');
 
     expect(violations).toEqual([]);
   });
