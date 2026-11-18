@@ -4,6 +4,8 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { keys, useT } from '../utils/i18n';
+import { TimezoneToggle } from './TimezoneToggle';
+import type { TzMode } from './time/zones';
 import { CALENDAR_VIEWS, type CalendarView } from './types';
 
 type Props = {
@@ -13,11 +15,12 @@ type Props = {
   onToday: () => void;
   onPrev: () => void;
   onNext: () => void;
+  tz: { mode: TzMode; calendarZone: string; myZone: string; onMode: (mode: TzMode) => void };
   start?: ReactNode;
   end?: ReactNode;
 };
 
-export function Toolbar({ title, view, onView, onToday, onPrev, onNext, start, end }: Props) {
+export function Toolbar({ title, view, onView, onToday, onPrev, onNext, tz, start, end }: Props) {
   const { t } = useT();
   const copy = keys.events.calendar;
   return (
@@ -55,6 +58,7 @@ export function Toolbar({ title, view, onView, onToday, onPrev, onNext, start, e
       </div>
       <div className="flex items-center gap-2">
         {end}
+        <TimezoneToggle {...tz} />
         <fieldset className="flex gap-1" aria-label={t(copy.toolbar.views)}>
           {CALENDAR_VIEWS.map((name) => (
             <Button

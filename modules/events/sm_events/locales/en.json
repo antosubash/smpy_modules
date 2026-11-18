@@ -528,6 +528,12 @@
       "scope": "Apply to",
       "submit": "Move",
       "unchanged": "Nothing to change."
+    },
+    "tz": {
+      "label": "Time zone of the calendar",
+      "calendar": "Calendar time",
+      "mine": "My time",
+      "same": "Your time is the same"
     }
   }
 }

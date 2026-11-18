@@ -528,6 +528,12 @@
       "scope": "Gilt für",
       "submit": "Verschieben",
       "unchanged": "Es gibt nichts zu ändern."
+    },
+    "tz": {
+      "label": "Zeitzone des Kalenders",
+      "calendar": "Kalenderzeit",
+      "mine": "Meine Zeit",
+      "same": "Ihre Zeit ist dieselbe"
     }
   }
 }

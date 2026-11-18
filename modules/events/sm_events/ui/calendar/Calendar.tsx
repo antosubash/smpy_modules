@@ -13,7 +13,7 @@ import { lockReason } from './lock';
 import { StatusBar } from './StatusBar';
 import { Toolbar } from './Toolbar';
 import type { Range } from './time/range';
-import { gridTimeZone, todayIn } from './time/zones';
+import { browserTimeZone, gridTimeZone, todayIn } from './time/zones';
 import type { CalendarProps, CalendarState, GridHandle, Occurrence } from './types';
 
 // The grid, FullCalendar and its CSS are one chunk of their own.
@@ -31,7 +31,7 @@ function initialState(props: CalendarProps): CalendarState {
     ...props.initialState,
   };
   const shown = props.calendars.filter((c) => seed.calendars.includes(c.id));
-  const zone = gridTimeZone(seed.tzMode, shown, props.defaultTimezone);
+  const zone = gridTimeZone(seed.tzMode, shown, props.defaultTimezone, browserTimeZone());
   return { ...seed, date: seed.date || todayIn(zone) };
 }
 
@@ -48,7 +48,9 @@ export function Calendar(props: CalendarProps) {
     () => calendars.filter((c) => state.calendars.includes(c.id)),
     [calendars, state.calendars],
   );
-  const zone = gridTimeZone(state.tzMode, shown, props.defaultTimezone);
+  const myZone = browserTimeZone();
+  const zone = gridTimeZone(state.tzMode, shown, props.defaultTimezone, myZone);
+  const calendarZone = gridTimeZone('calendar', shown, props.defaultTimezone, myZone);
   const nothingShown = shown.length === 0;
   const filters = useMemo(
     () => ({
@@ -132,6 +134,7 @@ export function Calendar(props: CalendarProps) {
         onToday={() => grid.current?.today()}
         onPrev={() => grid.current?.prev()}
         onNext={() => grid.current?.next()}
+        tz={{ mode: state.tzMode, calendarZone, myZone, onMode: (tzMode) => patch({ tzMode }) }}
         start={Start ? <Start {...toolbarProps} /> : null}
         end={End ? <End {...toolbarProps} /> : null}
       />
