@@ -7,9 +7,9 @@ import time
 from datetime import UTC, datetime
 
 import pytest
-from sm_events.calendar import source_entries
-from sm_events.calendar.extension_types import SourceViewer
-from sm_events.calendar.plugin_runner import Call, run_sources
+from sm_events.calendar.plugins import source_entries
+from sm_events.calendar.plugins.extension_types import SourceViewer
+from sm_events.calendar.plugins.plugin_runner import Call, run_sources
 from sm_events.core import constants
 from sm_events.models import Calendar, Category
 from sqlalchemy import select
@@ -266,8 +266,8 @@ async def test_items_from_sources_are_merged_in_order(db):
 
 
 async def test_session_that_cannot_be_restored_skips_the_rest(db, monkeypatch):
-    from sm_events.calendar import plugin_runner
-    from sm_events.calendar.plugin_isolation import SessionBroken
+    from sm_events.calendar.plugins import plugin_runner
+    from sm_events.calendar.plugins.plugin_isolation import SessionBroken
 
     cal = (await calendars(db))["I"]
     calls = {"n": 0}

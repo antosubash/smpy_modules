@@ -29,7 +29,7 @@ from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.deps import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_events.calendar.extension_types import SourceViewer
+from sm_events.calendar.plugins.extension_types import SourceViewer
 from sm_events.content import calendar_redirects
 from sm_events.content.public_read import calendar_by_slug, event_by_slug, resolve_event_redirect
 from sm_events.core import constants, locales, timezones

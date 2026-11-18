@@ -35,7 +35,7 @@ from simple_module_core.tenancy import tenant_member_ids
 from simple_module_core.user_directory import get_user_directory
 from simple_module_hosting.permissions import resolve_principal_permissions
 
-from sm_events.calendar.extension_types import SourceViewer
+from sm_events.calendar.plugins.extension_types import SourceViewer
 from sm_events.core.tenancy import DEFAULT_TENANT, TenancyMode, mode_of, request_mode
 
 __all__ = ["OfflineUser", "feed_viewer", "offline_principal"]

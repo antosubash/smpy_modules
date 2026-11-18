@@ -18,11 +18,11 @@ from typing import Any
 from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.listeners import current_tenant_id
 
-from sm_events.calendar import registry
-from sm_events.calendar.extension_types import SourceViewer
 from sm_events.calendar.occurrence import Occurrence, OccurrenceFilters, OccurrencePage
-from sm_events.calendar.plugin_runner import run_sources
-from sm_events.calendar.plugin_scope import plugin_calls
+from sm_events.calendar.plugins import registry
+from sm_events.calendar.plugins.extension_types import SourceViewer
+from sm_events.calendar.plugins.plugin_runner import run_sources
+from sm_events.calendar.plugins.plugin_scope import plugin_calls
 from sm_events.calendar.sources import TRUNCATED, ReadContext, sort_key
 from sm_events.calendar.times import supported_instant
 from sm_events.core import constants
@@ -76,12 +76,12 @@ async def occurrences(
 
     ``start`` and ``end`` are aware. ``tenant_id`` must be the tenant bound for
     this call. Plugin sources are called first, each isolated and bounded (see
-    :mod:`sm_events.calendar.plugin_runner`), and their answers join the built-in stream
+    :mod:`sm_events.calendar.plugins.plugin_runner`), and their answers join the built-in stream
     in the one order and under the one cap; ``source_viewer`` is who they are asked for
     (``None`` for a signed-in viewer skips every plugin pair, see
-    :mod:`sm_events.calendar.plugin_scope`). Raises :class:`InvalidRange` for ``end <= start``
-    and for more than 366 days, and :class:`ValueError` for an instant outside the supported
-    years."""
+    :mod:`sm_events.calendar.plugins.plugin_scope`). Raises :class:`InvalidRange` for
+    ``end <= start`` and for more than 366 days, and :class:`ValueError` for an instant outside
+    the supported years."""
     _aware(start, "start")
     _aware(end, "end")
     supported_instant(start)

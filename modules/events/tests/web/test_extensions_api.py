@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from sm_events.calendar import registry
+from sm_events.calendar.plugins import registry
 
 from tests.support.access import grant
 from tests.support.app import as_user

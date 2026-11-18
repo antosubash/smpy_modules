@@ -64,7 +64,7 @@ class EventsModule(ModuleBase):
         the framework's session class (as images does), and, once the settings are hydrated,
         the public routes: where they mount and in which languages depend on the database. The log
         filter that keeps a private feed token out of every request log goes on first."""
-        from sm_events.calendar.extensions import load_extensions
+        from sm_events.calendar.plugins.extensions import load_extensions
         from sm_events.core import boot, tenancy
         from sm_events.feeds.tokens import log_redact
 

@@ -412,7 +412,7 @@ without it settles the plugin's steps as `not_installed`. Docs:
 **A plugin registers events sources and types from `events_extensions.py`, never from
 `on_startup`.** Same reasons and same loader shape as images: a package with a `simple_module`
 entry point ships `events_extensions.py` with `def register(registry)`;
-`sm_events.calendar.extensions.load_extensions()` imports it in the web process (events'
+`sm_events.calendar.plugins.extensions.load_extensions()` imports it in the web process (events'
 `on_startup`) and on a worker's first registry read, then freezes the registry
 (`RegistryFrozenError`). Ids are `<entry-point name>:<name>`; install the plugin identically in the
 web image and every worker image. UI registers lazily from `events-extensions.ts` (loaders only; the

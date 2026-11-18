@@ -16,8 +16,8 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sm_events.calendar.extension_types import SourceCalendar, SourceOccurrence
 from sm_events.calendar.occurrence import PluginOccurrence
+from sm_events.calendar.plugins.extension_types import SourceCalendar, SourceOccurrence
 from sm_events.calendar.times import Span, localize, supported_instant
 from sm_events.core import constants, timezones
 from sm_events.core.text_safety import strip_unsafe

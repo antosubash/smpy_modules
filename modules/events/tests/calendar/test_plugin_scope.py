@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from sm_events.calendar import registry
-from sm_events.calendar.extension_types import SourceViewer
 from sm_events.calendar.occurrence import OccurrenceFilters
-from sm_events.calendar.plugin_scope import plugin_calls
+from sm_events.calendar.plugins import registry
+from sm_events.calendar.plugins.extension_types import SourceViewer
+from sm_events.calendar.plugins.plugin_scope import plugin_calls
 from sm_events.core.access.public import ANONYMOUS
 
 from tests.support.access import principal, seed_calendars

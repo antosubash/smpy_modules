@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 
 import icalendar
 import pytest
-from sm_events.calendar import registry
+from sm_events.calendar.plugins import registry
 from sm_events.core.tenancy import tenant_scope
 from sm_events.models import Calendar
 from sm_events.web.endpoints.public import _urls
@@ -206,9 +206,9 @@ async def test_an_item_for_another_calendar_is_refused(db):
     import uuid
     from datetime import UTC
 
-    from sm_events.calendar import source_entries
     from sm_events.calendar.occurrence import Occurrence
-    from sm_events.calendar.plugin_runner import Call, run_sources
+    from sm_events.calendar.plugins import source_entries
+    from sm_events.calendar.plugins.plugin_runner import Call, run_sources
 
     from tests.support.access import seed_calendars
 

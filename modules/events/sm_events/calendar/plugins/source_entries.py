@@ -24,15 +24,15 @@ from typing import Any
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ValidationError
 
-from sm_events.calendar import registry
-from sm_events.calendar.extension_types import (
+from sm_events.calendar.plugins import registry
+from sm_events.calendar.plugins.extension_types import (
     SettingsContext,
     Source,
     SourceCalendar,
     SourceSettingsError,
     SourceViewer,
 )
-from sm_events.calendar.plugin_isolation import run_isolated
+from sm_events.calendar.plugins.plugin_isolation import run_isolated
 from sm_events.core import constants
 from sm_events.core.errors import Stale
 from sm_events.core.errors_extensions import (

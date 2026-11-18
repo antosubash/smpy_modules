@@ -6,7 +6,7 @@ import json
 
 import pytest
 from fastapi.exceptions import RequestValidationError
-from sm_events.calendar import registry
+from sm_events.calendar.plugins import registry
 from sm_events.content.types import public_extra, type_info, validate_extra
 from sm_events.core import errors_extensions as err
 from sm_events.core.errors import UnknownType

@@ -3,7 +3,7 @@
 Everything here is re-exported by :mod:`sm_events.contracts.extensions`, which is the
 only path a plugin imports. A plugin never receives an ORM object or a request, only
 these frozen values, and its database handle is a read-only session on a connection of its own
-(see :mod:`sm_events.calendar.plugin_isolation`).
+(see :mod:`sm_events.calendar.plugins.plugin_isolation`).
 """
 
 from __future__ import annotations

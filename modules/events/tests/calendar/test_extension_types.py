@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime
 
 import pytest
 from pydantic import ValidationError
-from sm_events.calendar import extension_types
+from sm_events.calendar.plugins import extension_types
 from sm_events.contracts import extensions
 from sm_events.core import constants
 from sm_events.models.enums import DEFAULT_EVENT_TYPE

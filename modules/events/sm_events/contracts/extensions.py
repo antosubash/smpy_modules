@@ -15,7 +15,7 @@ See ``docs/extensions.md``.
 
 from __future__ import annotations
 
-from sm_events.calendar.extension_types import (
+from sm_events.calendar.plugins.extension_types import (
     EventType,
     NoExtra,
     SettingsContext,
@@ -28,8 +28,8 @@ from sm_events.calendar.extension_types import (
     SourceStatus,
     SourceViewer,
 )
-from sm_events.calendar.extensions import Registrar
-from sm_events.calendar.registry import RegistryFrozenError
+from sm_events.calendar.plugins.extensions import Registrar
+from sm_events.calendar.plugins.registry import RegistryFrozenError
 from sm_events.core import constants
 
 ITEM_MAX_DAYS = constants.MAX_EVENT_DAYS

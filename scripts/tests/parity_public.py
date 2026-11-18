@@ -56,7 +56,7 @@ PUBLIC_FAMILIES: tuple[Family, ...] = (
                 messages=("images: entry-point package %r is not importable; skipped",),
             ),
             Copy(
-                "modules/events/sm_events/calendar/extensions.py",
+                "modules/events/sm_events/calendar/plugins/extensions.py",
                 {"constants.EXTENSIONS_MODULE": "EXTENSIONS_MODULE"},
                 messages=("events: entry-point package %r is not importable; skipped",),
             ),

@@ -13,7 +13,7 @@ from typing import Any
 from simple_module_core.resources import ResourcePrincipal
 from sqlalchemy import select
 
-from sm_events.calendar import registry
+from sm_events.calendar.plugins import registry
 from sm_events.calendar.times import Span, to_local
 from sm_events.content.texts import texts_of
 from sm_events.core import constants

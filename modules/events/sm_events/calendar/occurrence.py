@@ -9,7 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from sm_events.calendar.extension_types import SourceStatus
+from sm_events.calendar.plugins.extension_types import SourceStatus
 
 __all__ = ["Occurrence", "OccurrenceFilters", "OccurrencePage", "PluginOccurrence"]
 

@@ -24,10 +24,10 @@ from typing import Any
 from simple_module_core.resources import ResourcePrincipal
 from sqlmodel import col
 
-from sm_events.calendar import registry, source_entries
-from sm_events.calendar.extension_types import SourceStatus, SourceViewer
 from sm_events.calendar.occurrence import OccurrenceFilters
-from sm_events.calendar.plugin_runner import SKIPPED, Call
+from sm_events.calendar.plugins import registry, source_entries
+from sm_events.calendar.plugins.extension_types import SourceStatus, SourceViewer
+from sm_events.calendar.plugins.plugin_runner import SKIPPED, Call
 from sm_events.core import constants
 from sm_events.core.access import visible_calendars
 from sm_events.models import Calendar

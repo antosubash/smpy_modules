@@ -8,7 +8,7 @@ import pytest
 
 pytest.importorskip("sm_events")
 
-from sm_events.calendar.plugin_validate import to_occurrences
+from sm_events.calendar.plugins.plugin_validate import to_occurrences
 from sm_events.contracts.extensions import SourceError
 from sm_records.integrations.events.settings import (
     RecordDateMapping,

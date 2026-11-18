@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from sm_events.calendar import registry
+from sm_events.calendar.plugins import registry
 from sm_events.calendar.times import Span, to_local
 from sm_events.content.public_read import (
     pick_text,

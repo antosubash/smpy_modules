@@ -12,7 +12,7 @@ from sqlmodel import select
 
 from sm_events.calendar import calendars as calendar_service
 from sm_events.calendar import categories as category_service
-from sm_events.calendar import registry, source_entries
+from sm_events.calendar.plugins import registry, source_entries
 from sm_events.core import constants, tenancy, timezones
 from sm_events.core.access.events import load_event
 from sm_events.core.access.rights import calendar_rights, calendar_rights_many

@@ -53,7 +53,7 @@ def test_only_integrations_import_events():
 
 def test_registers_records_dates():
     pytest.importorskip("sm_events")
-    from sm_events.calendar import registry
+    from sm_events.calendar.plugins import registry
 
     registry.reset_registry()
     try:

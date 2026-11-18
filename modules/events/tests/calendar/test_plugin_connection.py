@@ -9,8 +9,8 @@ import time
 from datetime import UTC, datetime
 
 import pytest
-from sm_events.calendar import source_entries
-from sm_events.calendar.plugin_runner import Call, run_sources
+from sm_events.calendar.plugins import source_entries
+from sm_events.calendar.plugins.plugin_runner import Call, run_sources
 from sm_events.core.tenancy import tenant_scope
 from sm_events.models import Calendar
 from sqlalchemy import select, text
@@ -160,7 +160,7 @@ async def test_a_write_by_the_plugin_is_refused_and_not_kept(state):
 async def test_a_real_engine_never_takes_the_shared_fallback(state, monkeypatch):
     """The savepoint fallback is only for engines that share one connection (the in-memory test
     engine); a file or Postgres engine always gets a connection of its own."""
-    from sm_events.calendar import plugin_isolation
+    from sm_events.calendar.plugins import plugin_isolation
 
     async def refuse(*_a, **_k):
         raise AssertionError("the shared fallback was used")

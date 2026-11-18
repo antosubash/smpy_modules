@@ -16,7 +16,7 @@ from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal
 
 from sm_events.calendar import calendars as service
-from sm_events.calendar import source_entries
+from sm_events.calendar.plugins import source_entries
 from sm_events.core.access import CalendarEdit, CalendarOwner, CalendarView
 from sm_events.core.access.rights import CalendarRights, calendar_rights, calendar_rights_many
 from sm_events.core.constants import OWNER_NOT_ALLOWED_CODE, OWNER_NOT_ALLOWED_DETAIL

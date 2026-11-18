@@ -24,10 +24,10 @@ from typing import Any
 import icalendar
 from simple_module_core.resources import ResourcePrincipal
 
-from sm_events.calendar.extension_types import SourceViewer
 from sm_events.calendar.occurrence import Occurrence, OccurrenceFilters
-from sm_events.calendar.plugin_runner import run_sources
-from sm_events.calendar.plugin_scope import plugin_calls
+from sm_events.calendar.plugins.extension_types import SourceViewer
+from sm_events.calendar.plugins.plugin_runner import run_sources
+from sm_events.calendar.plugins.plugin_scope import plugin_calls
 from sm_events.core import constants
 from sm_events.core.tenancy import bound_tenant
 from sm_events.feeds.sanitize import single_line

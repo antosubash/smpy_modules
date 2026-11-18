@@ -13,8 +13,8 @@ from collections.abc import Callable
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
-from sm_events.calendar import extensions, registry
-from sm_events.calendar.extension_types import SourceOccurrence, SourceSettingsError
+from sm_events.calendar.plugins import extensions, registry
+from sm_events.calendar.plugins.extension_types import SourceOccurrence, SourceSettingsError
 
 
 def namespace(ident: str) -> str:

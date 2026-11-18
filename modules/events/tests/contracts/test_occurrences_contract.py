@@ -102,8 +102,8 @@ async def test_an_instant_outside_a_sane_range_is_a_value_error_before_any_query
 
 
 async def test_contract_without_viewer_skips_plugins(db, monkeypatch):
-    from sm_events.calendar import registry
-    from sm_events.calendar.extension_types import SourceViewer
+    from sm_events.calendar.plugins import registry
+    from sm_events.calendar.plugins.extension_types import SourceViewer
 
     from tests.support.sources import FakeSource, install, item, ok
 

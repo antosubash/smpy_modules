@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from sm_events.calendar import registry
+from sm_events.calendar.plugins import registry
 
 from tests.support.events_http import EV, OWNER, cast, create, create_json
 from tests.support.sources import install_talk
@@ -66,7 +66,7 @@ async def test_uninstalled_type_is_flagged_and_refuses_extra(client):
     ids = await cast(client)
     made = await create(client, ids["I"], type="acme:talk", extra={"speaker": "Ada"})
     registry.reset_registry()  # the plugin is gone from this host
-    from sm_events.calendar import extensions
+    from sm_events.calendar.plugins import extensions
 
     extensions._BUILTIN_LOADERS[:] = extensions._BUILTIN_LOADERS[:1]
     shown = (await client.get(f"{EV}/{made['id']}", headers=OWNER)).json()
