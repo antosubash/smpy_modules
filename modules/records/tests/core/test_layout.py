@@ -15,7 +15,7 @@ def test_root_contains_only_discovery_paths():
     root = Path(sm_records.__file__).parent
     assert {p.name for p in root.glob('*.py')} == {
         '__init__.py', 'module.py', 'cli.py', 'index.py', 'collections.py', 'seed.py',
-        'events_extensions.py',
+        'events_extensions.py',  # the optional events plugin: events finds it by this name
     }
     for area in ('core', 'web', 'records'):
         tree = ast.parse((root / area / '__init__.py').read_text())
