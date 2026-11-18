@@ -737,7 +737,11 @@
       "uid_generated": "Keine Kennung in der Datei: aus Datum und Titel gebildet.",
       "description_truncated": "Die Beschreibung wurde auf die Höchstlänge gekürzt.",
       "kept_utc": "Ein sich wiederholender Termin in UTC: seine Zeiten bleiben in UTC und wandern nicht mit der Zeitumstellung.",
-      "invalid_local_time": "Diese Uhrzeit gibt es in der Zeitzone nicht: die Uhr überspringt sie."
+      "invalid_local_time": "Diese Uhrzeit gibt es in der Zeitzone nicht: die Uhr überspringt sie.",
+      "too_many_properties": "Dieser Termin hat zu viele Eigenschaften und wurde nicht importiert.",
+      "too_many_parameters": "Eine Eigenschaft dieses Termins hat zu viele Parameter; er wurde nicht importiert.",
+      "event_too_large": "Dieser Termin ist zu groß und wurde nicht importiert.",
+      "too_many_attendees": "Dieser Termin hat zu viele Teilnehmende und wurde nicht importiert."
     },
     "failure": {
       "ics_encoding": "Die Datei ist kein gültiger Text (UTF-8). Speichere den Kalender neu und versuche es erneut.",
@@ -746,7 +750,14 @@
       "import_failed": "Der Import konnte nicht abgeschlossen werden. Es wurde nichts weiter geschrieben.",
       "importer_gone": "Dein Konto darf hier nicht mehr importieren, der Import wurde angehalten.",
       "too_complex": "Die Datei ist zu komplex, um sie in der erlaubten Zeit zu lesen. Teile sie in kleinere Dateien.",
-      "rights_expired": "Deine Importrechte sind abgelaufen, bevor der Import fertig war. Es wurde nichts mehr importiert; lade die Datei erneut hoch."
+      "rights_expired": "Deine Importrechte sind abgelaufen, bevor der Import fertig war. Es wurde nichts mehr importiert; lade die Datei erneut hoch.",
+      "file_too_large": "Die Datei ist größer, als ein Import verarbeitet.",
+      "too_many_lines": "Die Datei hat zu viele Zeilen.",
+      "line_too_long": "Die Datei enthält eine zu lange Zeile.",
+      "too_many_components": "Die Datei enthält zu viele Kalenderkomponenten.",
+      "too_deep": "Die Datei verschachtelt ihre Komponenten zu tief.",
+      "too_many_timezones": "Die Datei definiert zu viele Zeitzonen.",
+      "component_too_large": "Eine Komponente in der Datei hat zu viele Eigenschaften."
     },
     "dropped": {
       "ATTENDEE": "Teilnehmende",

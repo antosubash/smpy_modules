@@ -18,6 +18,7 @@ __all__ = [
     "IMPORT_DEFAULT_BYTES",
     "IMPORT_DEFAULT_DURATION",
     "IMPORT_DESCRIPTION_MAX",
+    "IMPORT_EVENT_REFUSALS",
     "IMPORT_EXPAND_CAP",
     "IMPORT_FAILURE_CODES",
     "IMPORT_FILENAME_FALLBACK",
@@ -122,7 +123,24 @@ IMPORT_FAILURE_CODES: Final = (
     "importer_gone",
     "too_complex",
     "rights_expired",
+    "file_too_large",
+    "too_many_lines",
+    "line_too_long",
+    "too_many_components",
+    "too_deep",
+    "too_many_timezones",
+    "component_too_large",
 )
+"""Why a whole import failed. ``ics_invalid`` is only a file that is not a well-formed calendar,
+``too_complex`` only a parse that exhausted its time budget or its attempts; every file-level
+limit has a code of its own."""
+IMPORT_EVENT_REFUSALS: Final = (
+    "too_many_properties",
+    "too_many_parameters",
+    "event_too_large",
+    "too_many_attendees",
+)
+"""Why one event was skipped for a per-event limit (the rest of the file imports)."""
 
 IMPORT_BUSY_CODE: Final = "import_busy"
 IMPORT_BUSY_DETAIL: Final = "Too many imports are still running; wait for one to finish"

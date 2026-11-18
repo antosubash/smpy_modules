@@ -83,7 +83,7 @@ async def test_parse_payload_is_the_mapped_event_and_holds_no_personal_data(db):
     ("data", "code"),
     [
         (corpus.invalid_utf8(), "ics_encoding"),
-        (corpus.depth(4), "ics_invalid"),
+        (corpus.depth(4), "too_deep"),
         (corpus.events(constants.IMPORT_MAX_EVENTS + 1), "too_many_events"),
     ],
 )

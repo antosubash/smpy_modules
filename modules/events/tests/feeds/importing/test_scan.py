@@ -95,29 +95,31 @@ def test_no_library_parser_is_ever_called(monkeypatch):
 HOSTILE = [
     ("invalid_utf8", corpus.invalid_utf8, "ics_encoding"),
     ("nul", corpus.nul_byte, INVALID),
-    ("line_1mb", lambda: corpus.long_line(1_000_000), INVALID),
-    ("nested_alarms_10000", lambda: corpus.nested_alarms(10_000), INVALID),
-    ("depth_4", lambda: corpus.depth(4), INVALID),
+    ("line_1mb", lambda: corpus.long_line(1_000_000), "line_too_long"),
+    ("nested_alarms_10000", lambda: corpus.nested_alarms(10_000), "too_deep"),
+    ("depth_4", lambda: corpus.depth(4), "too_deep"),
     ("two_calendars", corpus.two_calendars, INVALID),
     ("unbalanced_end", corpus.unbalanced_end, INVALID),
     ("mismatched_end", corpus.mismatched_end, INVALID),
     ("content_before_begin", corpus.content_before_begin, INVALID),
     ("trailing_after_end", corpus.trailing_after_end, INVALID),
-    ("properties_501", lambda: corpus.properties(constants.IMPORT_MAX_PROPERTIES + 1), INVALID),
-    ("event_300kb", lambda: corpus.big_event(300_000), INVALID),
-    ("timezones_101", lambda: corpus.timezones(constants.IMPORT_MAX_TIMEZONES + 1), INVALID),
+    (
+        "timezones_101",
+        lambda: corpus.timezones(constants.IMPORT_MAX_TIMEZONES + 1),
+        "too_many_timezones",
+    ),
     (
         "components_20001",
         lambda: corpus.sequential_alarms(constants.IMPORT_MAX_COMPONENTS),
-        INVALID,
+        "too_many_components",
     ),
     ("events_5001", lambda: corpus.events(constants.IMPORT_MAX_EVENTS + 1), "too_many_events"),
     ("events_100000", lambda: corpus.events(100_000), "too_many_events"),
-    ("observances_100000", lambda: corpus.vtimezone_observances(100_000), INVALID),
-    ("rdates_50000", lambda: corpus.vtimezone_rdates(50_000), INVALID),
-    ("giant_line_21mb", lambda: corpus.one_giant_line(21), INVALID),
-    ("giant_line_2mb", lambda: corpus.one_giant_line(2), INVALID),
-    ("exdates_1e6_one_line", lambda: corpus.many_exdates(1_000_000), INVALID),
+    ("observances_100000", lambda: corpus.vtimezone_observances(100_000), "too_many_components"),
+    ("rdates_50000", lambda: corpus.vtimezone_rdates(50_000), "component_too_large"),
+    ("giant_line_21mb", lambda: corpus.one_giant_line(21), "file_too_large"),
+    ("giant_line_2mb", lambda: corpus.one_giant_line(2), "line_too_long"),
+    ("exdates_1e6_one_line", lambda: corpus.many_exdates(1_000_000), "line_too_long"),
 ]
 
 
@@ -131,7 +133,7 @@ def test_hostile_corpus(name, build, code):
 
 
 def test_a_file_is_refused_by_its_size_before_anything_is_read():
-    fails(b"x" * (constants.IMPORT_BODY_CEILING + 1), INVALID, "bytes")
+    fails(b"x" * (constants.IMPORT_BODY_CEILING + 1), "file_too_large", "bytes")
 
 
 # --- each bound: at the limit passes, one past fails -------------------------------------------
@@ -149,51 +151,38 @@ def test_components_bound():
         *corpus.sequential_alarms(constants.IMPORT_MAX_COMPONENTS - 1).decode().split("\r\n")[1:-2]
     )
     assert scan(at).components == constants.IMPORT_MAX_COMPONENTS
-    fails(corpus.sequential_alarms(constants.IMPORT_MAX_COMPONENTS), INVALID, "components")
+    fails(
+        corpus.sequential_alarms(constants.IMPORT_MAX_COMPONENTS),
+        "too_many_components",
+        "components",
+    )
 
 
 def test_depth_bound():
     assert scan(corpus.depth(constants.IMPORT_MAX_DEPTH)).components == 2
-    fails(corpus.depth(constants.IMPORT_MAX_DEPTH + 1), INVALID, "depth")
-
-
-def test_properties_bound():
-    assert scan(corpus.properties(constants.IMPORT_MAX_PROPERTIES)).events
-    fails(corpus.properties(constants.IMPORT_MAX_PROPERTIES + 1), INVALID, "properties")
+    fails(corpus.depth(constants.IMPORT_MAX_DEPTH + 1), "too_deep", "depth")
 
 
 def test_timezones_bound():
     assert scan(corpus.timezones(constants.IMPORT_MAX_TIMEZONES)).timezones == 100
-    fails(corpus.timezones(constants.IMPORT_MAX_TIMEZONES + 1), INVALID, "timezones")
+    fails(corpus.timezones(constants.IMPORT_MAX_TIMEZONES + 1), "too_many_timezones", "timezones")
 
 
 def test_line_length_bound():
     at = constants.IMPORT_MAX_LINE
     assert scan(corpus.long_line(at)).events
-    fails(corpus.long_line(at + 1), INVALID, "line_length")
+    fails(corpus.long_line(at + 1), "line_too_long", "line_length")
 
 
 def test_folded_lines_measured_unfolded():
-    fails(corpus.folded(70_000), INVALID, "line_length")
+    fails(corpus.folded(70_000), "line_too_long", "line_length")
     assert scan(corpus.folded(60_000)).events
-
-
-def test_event_size_bound():
-    assert scan(corpus.big_event(200_000)).events
-    fails(corpus.big_event(constants.IMPORT_MAX_EVENT_BYTES + 5_000), INVALID, "event_size")
-
-
-def test_parameters_bound():
-    many = ";".join(f"P{n}=v" for n in range(constants.IMPORT_MAX_PARAMS + 1))
-    ok = ";".join(f"P{n}=v" for n in range(constants.IMPORT_MAX_PARAMS))
-    assert scan(corpus.calendar(*corpus.vevent("a@x", f"X-Q;{ok}:v"))).events
-    fails(corpus.calendar(*corpus.vevent("a@x", f"X-Q;{many}:v")), INVALID, "parameters")
 
 
 def test_line_count_bound(monkeypatch):
     monkeypatch.setattr(constants, "IMPORT_MAX_LINES", 100)
     assert scan(corpus.empty_lines(90)).events == ()
-    fails(corpus.empty_lines(100), INVALID, "lines")
+    fails(corpus.empty_lines(100), "too_many_lines", "lines")
 
 
 def test_a_giant_file_costs_bounded_time():
@@ -212,13 +201,6 @@ def test_sniff():
     assert not sniff(b"")
     assert not sniff(b"PRODID:x\r\nBEGIN:VCALENDAR\r\n")
     assert not sniff(b"BEGIN:VCALENDARX\r\n")
-
-
-def test_attendee_bound():
-    """Attendees are never stored; the cap only bounds the work."""
-    at = constants.IMPORT_MAX_ATTENDEES
-    assert scan(corpus.with_event_lines(at)).events
-    fails(corpus.with_event_lines(at + 1), INVALID, "attendees")
 
 
 # --- unfolding (RFC 5545 section 3.1) is pinned by what the unfolded text *says* ---------------
@@ -284,3 +266,66 @@ def test_an_overlong_property_name_is_dropped_not_fatal():
 
 def test_a_genuinely_malformed_line_still_fails():
     fails(corpus.calendar(*corpus.vevent("a@x", "no colon here")), INVALID, "syntax")
+
+
+# --- per-event limits skip the event, never the file --------------------------------------------
+
+
+def _only(data: bytes):
+    scanned = scan(data)
+    assert len(scanned.events) >= 1
+    return scanned.events
+
+
+def test_properties_per_event_at_the_limit_pass_one_past_skips_that_event():
+    assert _only(corpus.properties(constants.IMPORT_MAX_PROPERTIES))[0].refused is None
+    event = _only(corpus.properties(constants.IMPORT_MAX_PROPERTIES + 1))[0]
+    assert event.refused == "too_many_properties"
+    assert event.position == 1 and {p.name for p in event.props} <= {"UID", "SUMMARY"}
+
+
+def test_event_bytes_at_the_limit_pass_one_past_skips_that_event():
+    assert _only(corpus.big_event(200_000))[0].refused is None
+    assert _only(corpus.big_event(constants.IMPORT_MAX_EVENT_BYTES + 5_000))[0].refused == (
+        "event_too_large"
+    )
+
+
+def test_parameters_per_property_at_the_limit_pass_one_past_skips_that_event():
+    many = ";".join(f"P{n}=v" for n in range(constants.IMPORT_MAX_PARAMS + 1))
+    ok = ";".join(f"P{n}=v" for n in range(constants.IMPORT_MAX_PARAMS))
+    assert _only(corpus.calendar(*corpus.vevent("a@x", f"X-Q;{ok}:v")))[0].refused is None
+    got = _only(corpus.calendar(*corpus.vevent("a@x", f"X-Q;{many}:v")))[0]
+    assert got.refused == "too_many_parameters"
+
+
+def test_attendees_per_event_at_the_limit_pass_one_past_skips_that_event():
+    assert _only(corpus.with_event_lines(constants.IMPORT_MAX_ATTENDEES))[0].refused is None
+    got = _only(corpus.with_event_lines(constants.IMPORT_MAX_ATTENDEES + 1))[0]
+    assert got.refused == "too_many_attendees"
+
+
+def test_the_events_around_a_refused_one_are_kept_with_their_positions():
+    big = corpus.vevent("big@x", "SUMMARY:Huge", *[f"X-P{n}:v" for n in range(600)])
+    data = corpus.calendar(*corpus.vevent("a@x"), *big, *corpus.vevent("c@x"))
+    events = scan(data).events
+    assert [(e.position, e.refused) for e in events] == [
+        (1, None),
+        (2, "too_many_properties"),
+        (3, None),
+    ]
+    assert [p.value for p in events[1].props if p.name == "UID"] == ["big@x"]
+
+
+def test_a_refused_event_is_not_parsed_and_bounded_work_over_a_whole_file():
+    """20 MiB of nothing but events over the byte limit: skipped in time, never refused whole."""
+    one = corpus.big_event(constants.IMPORT_MAX_EVENT_BYTES + 5_000).decode()
+    body = one.split("BEGIN:VEVENT", 1)[1].rsplit("END:VEVENT", 1)[0]
+    event = "BEGIN:VEVENT" + body + "END:VEVENT\r\n"
+    count = (constants.IMPORT_BODY_CEILING - 1_000) // len(event)
+    data = ("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n" + event * count + "END:VCALENDAR\r\n").encode()
+    assert constants.IMPORT_MAX_EVENTS >= count > 10
+    began = time.monotonic()
+    scanned = scan(data)
+    assert time.monotonic() - began < constants.IMPORT_PARSE_SECONDS
+    assert len(scanned.events) == count and all(e.refused for e in scanned.events)

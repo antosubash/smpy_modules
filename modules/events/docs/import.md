@@ -24,8 +24,17 @@ chosen calendar. Everything is created as a **draft**; "Import and publish" is o
 | Kept for | 24 hours | `IMPORT_TTL` |
 | Rights captured at apply stay valid for | 1 hour | `IMPORT_GRANTS_TTL` |
 
-Over a limit the whole file is refused with a readable reason (`too_many_events`, `ics_invalid`,
-`too_complex`); one event over a limit is skipped and the rest import.
+**A limit over one event skips that event** and the rest import: more than 500 properties
+(`too_many_properties`), more than 20 parameters on a property (`too_many_parameters`), more than
+262,144 bytes (`event_too_large`), more than 200 attendees (`too_many_attendees`) or more than
+1,000 `EXDATE` values (`too_many_overrides`). The preview names the event by its place in the file
+(`#17`) and its title when it had one before the limit tripped; the rest of such an event is counted
+and discarded unread, so skipping is as cheap as scanning. **A limit over the whole file fails the
+import** with the limit's own code: `file_too_large`, `too_many_lines`, `line_too_long`,
+`too_many_events`, `too_many_components`, `too_many_timezones`, `too_deep`, and
+`component_too_large` (a time zone or other non-event component with more than 500 properties).
+`ics_invalid` is only a file that is not a well-formed calendar (this includes a NUL or other control
+character in it), and `too_complex` only a parse that ran out of its time budget or attempts.
 
 The upload itself is stored in the database (`events_import.source`), not in a directory: up to
 20 MiB a row and at most 25 unfinished imports per tenant, but only an import that has not been

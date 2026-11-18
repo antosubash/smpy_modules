@@ -43,6 +43,7 @@ def test_failure_and_outcome_labels_match_the_codes_exactly(locale):
 @pytest.mark.parametrize("locale", LOCALES)
 def test_every_skip_reason_the_server_names_has_a_label(locale):
     reasons = set(_catalogue(locale)["reasons"])
+    assert set(constants.IMPORT_EVENT_REFUSALS) <= reasons
     literal = set()
     for path in (ROOT / "feeds" / "importing").glob("*.py"):
         literal |= set(re.findall(r'(?:ItemSkip|note)\(\s*"(\w+)"', path.read_text()))

@@ -71,6 +71,15 @@ class Mapped:
     dropped: Counter[str]
 
 
+def _refused(raw: RawEvent) -> MappedItem:
+    """An event that broke a per-event limit: skipped, named by its place in the file (``#17``)
+    and by the ``SUMMARY`` it had before the limit tripped, when it had one."""
+    uid = uid_of(raw.props)[0]
+    summary = text_of(raw.props, "SUMMARY").strip()
+    title = f"#{raw.position} {title_of(raw.props)[0]}" if summary else f"#{raw.position}"
+    return MappedItem(uid[: constants.UID_MAX], title, None, raw.refused, ())
+
+
 def _skipped(uid: str, props: Sequence[Prop], code: str, notes: tuple[str, ...] = ()) -> MappedItem:
     return MappedItem(uid[: constants.UID_MAX], title_of(props)[0], None, code, notes)
 
@@ -153,7 +162,11 @@ def map_calendar(
     """Every group of ``events`` as items, in file order, and what was dropped."""
     dropped: Counter[str] = Counter()
     groups: dict[str, tuple[list[tuple[int, RawEvent, bool]], list[RawEvent]]] = {}
+    refused: list[MappedItem] = []
     for index, raw in enumerate(events):
+        if raw.refused is not None:
+            refused.append(_refused(raw))
+            continue
         count_dropped(raw, dropped)
         uid, generated = uid_of(raw.props)
         masters, children = groups.setdefault(uid, ([], []))
@@ -183,4 +196,4 @@ def map_calendar(
             else:
                 items.append(_skipped(uid, raw.props, "duplicate_uid"))
         items += [_skipped(uid, c.props, "override_without_master") for c in orphans]
-    return Mapped(items, dropped)
+    return Mapped(items + refused, dropped)

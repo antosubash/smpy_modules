@@ -737,7 +737,11 @@
       "uid_generated": "No identifier in the file: one was made from the date and title.",
       "description_truncated": "The description was cut to its maximum length.",
       "kept_utc": "A repeating event in UTC: its times stay in UTC, so they do not move with the clock change.",
-      "invalid_local_time": "This time does not exist in the timezone: the clocks skip it."
+      "invalid_local_time": "This time does not exist in the timezone: the clocks skip it.",
+      "too_many_properties": "This event has too many properties and was not imported.",
+      "too_many_parameters": "A property of this event has too many parameters; it was not imported.",
+      "event_too_large": "This event is too large and was not imported.",
+      "too_many_attendees": "This event has too many attendees and was not imported."
     },
     "failure": {
       "ics_encoding": "The file is not valid text (UTF-8). Save the calendar again and retry.",
@@ -746,7 +750,14 @@
       "import_failed": "The import could not be completed. Nothing more was written.",
       "importer_gone": "Your account can no longer import here, so the import was stopped.",
       "too_complex": "The file is too complex to read in the time allowed. Split it into smaller files.",
-      "rights_expired": "Your import rights expired before it finished. Nothing more was imported; upload the file again."
+      "rights_expired": "Your import rights expired before it finished. Nothing more was imported; upload the file again.",
+      "file_too_large": "The file is larger than an import takes.",
+      "too_many_lines": "The file has too many lines.",
+      "line_too_long": "The file has a line that is too long.",
+      "too_many_components": "The file has too many calendar components.",
+      "too_deep": "The file nests its components too deeply.",
+      "too_many_timezones": "The file defines too many time zones.",
+      "component_too_large": "A component in the file has too many properties."
     },
     "dropped": {
       "ATTENDEE": "attendees",
