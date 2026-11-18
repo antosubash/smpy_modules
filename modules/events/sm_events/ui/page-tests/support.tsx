@@ -1,4 +1,5 @@
 /** Routed fetch with the framework's real Request/CSRF behavior intact. */
+import type { ReactNode } from 'react';
 import { vi } from 'vitest';
 import { act } from './test-dom';
 
@@ -64,9 +65,18 @@ function Head() {
   return null;
 }
 
+function Link({ href, children, ...rest }: { href: string; children?: ReactNode }) {
+  return (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  );
+}
+
 export function inertiaMock() {
   return {
     Head,
+    Link,
     usePage: () => ({ url: '/admin/events/calendars', props: {} }),
     router: { visit: vi.fn(), on: vi.fn() },
   };
@@ -100,3 +110,37 @@ export async function submit() {
   });
   await flush();
 }
+
+/** A row of the events list, as `GET /api/events/events` returns it. */
+export function eventItem(overrides = {}) {
+  return {
+    id: 'e1',
+    calendar_id: 'c1',
+    parent_id: null,
+    type: 'event',
+    status: 'draft' as const,
+    scheduled: false,
+    cancelled: false,
+    all_day: false,
+    timezone: 'Pacific/Auckland',
+    starts_at: '2026-06-30T22:00:00Z',
+    ends_at: '2026-06-30T23:00:00Z',
+    start_local: '2026-07-01T10:00',
+    end_local: '2026-07-01T11:00',
+    rrule: null,
+    category_id: null,
+    venue_name: null,
+    revision: 4,
+    publish_at: null,
+    published_at: null,
+    trashed: false,
+    can_write: true,
+    can_publish: false,
+    locked: false,
+    title: 'Concert',
+    lang: 'en',
+    ...overrides,
+  };
+}
+
+export const category = { id: 'k1', slug: 'talks', names: { en: 'Talks' }, color: null };

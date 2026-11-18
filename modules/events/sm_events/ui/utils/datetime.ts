@@ -64,3 +64,22 @@ export const browserZone = (): string => {
     return 'UTC';
   }
 };
+
+/** A UTC instant (`publish_at`) shown on the event's own clock. */
+export function formatInstant(iso: string, timezone: string, locale?: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return iso;
+  try {
+    return new Intl.DateTimeFormat(dateLocale(locale), {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: timezone,
+    }).format(at);
+  } catch {
+    return iso;
+  }
+}
