@@ -18,7 +18,6 @@ import {
   sameInstant,
   sameTimeOfDay,
   shiftLocal,
-  toInstant,
   toLocal,
 } from '../time/zones';
 import type { OccurrenceChange } from '../types';
@@ -123,9 +122,13 @@ function timedTimes(edge: Edge, event: EventDetail): TimesInput | Refusal {
   return { all_day: false, timezone: event.timezone, start, end };
 }
 
-/** "All occurrences": the master moves by the same wall-clock difference in the event's
- *  zone, so a weekly 10:00 stays a weekly 10:00 across a clock change. The rule is never
- *  rewritten; a change the rule cannot hold comes back as `start_not_in_rule`. */
+/** "All occurrences": the user's action is two deltas measured against the instance as it
+ *  was displayed (its start and end, an earlier override included), and the master's local
+ *  start and end move by those. A move shifts both by the drag; a resize only the end; a
+ *  reschedule each edge by what the dialog changed. Timed deltas are wall clock in the
+ *  event's zone, so a weekly 10:00 stays a weekly 10:00 across a clock change; all-day ones
+ *  are whole days. The rule is never rewritten; a change it cannot hold comes back as
+ *  `start_not_in_rule`. */
 function masterTimes(
   change: OccurrenceChange,
   edge: Edge,
@@ -133,29 +136,30 @@ function masterTimes(
 ): TimesInput | Refusal {
   const o = change.occurrence;
   const zone = event.timezone;
+  const move = change.kind === 'move';
   if (o.all_day) {
-    const was = dateIn(o.original_start ?? o.start, zone);
-    const start = addDays(event.start_local, daysBetween(was, edge.start));
-    const length =
-      change.kind === 'move'
-        ? daysBetween(event.start_local, event.end_local)
-        : daysBetween(edge.start, edge.end) - 1;
-    return { all_day: true, timezone: zone, start, end: addDays(start, length) };
+    const startDays = daysBetween(o.start_date ?? edge.start, edge.start);
+    const endDays = move ? startDays : daysBetween(o.end_date ?? edge.end, edge.end);
+    return {
+      all_day: true,
+      timezone: zone,
+      start: addDays(event.start_local, startDays),
+      end: addDays(event.end_local, endDays),
+    };
   }
-  const delta = shiftLocal(
-    event.start_local,
-    toLocal(o.original_start ?? o.start, zone),
-    wall(edge.start, zone),
-  );
-  if (isRefusal(wall(edge.start, zone))) return 'repeated_local_time';
-  if (isNonexistent(delta, zone)) return 'invalid_local_time';
-  const length =
-    change.kind === 'move'
-      ? millisBetween(event.starts_at, event.ends_at)
-      : millisBetween(edge.start, edge.end);
-  const end = wall(plusMillis(toInstant(delta, zone), length), zone);
-  if (isRefusal(end)) return end;
-  return { all_day: false, timezone: zone, start: delta, end };
+  const was = { start: toLocal(o.start, zone), end: toLocal(o.end, zone) };
+  const to = {
+    start: sameInstant(edge.start, o.start) ? was.start : wall(edge.start, zone),
+    end: move || sameInstant(edge.end, o.end) ? was.end : wall(edge.end, zone),
+  };
+  if (isRefusal(to.start)) return to.start;
+  if (isRefusal(to.end)) return to.end;
+  const start = shiftLocal(event.start_local, was.start, to.start);
+  const end = move
+    ? shiftLocal(event.end_local, was.start, to.start)
+    : shiftLocal(event.end_local, was.end, to.end);
+  if (isNonexistent(start, zone) || isNonexistent(end, zone)) return 'invalid_local_time';
+  return { all_day: false, timezone: zone, start, end };
 }
 
 export function planChange(change: OccurrenceChange, event: EventDetail, scope: Scope): Plan {
