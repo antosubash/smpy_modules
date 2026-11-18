@@ -25,6 +25,8 @@ const MESSAGES: Record<string, string> = {
   address: E.text_invalid,
   note: E.note_invalid,
   times: E.times_invalid,
+  start: E.times_invalid,
+  end: E.times_invalid,
 };
 /** `texts.<locale>.<leaf>`: the leaf names the message. */
 const TEXT_MESSAGES: Record<string, string> = {

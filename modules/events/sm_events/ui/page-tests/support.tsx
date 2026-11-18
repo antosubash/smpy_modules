@@ -144,3 +144,51 @@ export function eventItem(overrides = {}) {
 }
 
 export const category = { id: 'k1', slug: 'talks', names: { en: 'Talks' }, color: null };
+
+/** An event as `GET /api/events/events/{id}` returns it. */
+export function eventDetail(overrides = {}) {
+  const { title: _title, lang: _lang, ...item } = eventItem();
+  return {
+    ...item,
+    timezone: 'Europe/Vienna',
+    uid: 'u@simple-module-events',
+    recurrence_until: null,
+    publish_at_local: null,
+    attendance_mode: 'in_person' as const,
+    address: null,
+    online_url: null,
+    latitude: null,
+    longitude: null,
+    organiser: null,
+    image: null,
+    registration_url: null,
+    extra: {},
+    created_at: '2026-06-01T10:00:00Z',
+    updated_at: null,
+    texts: {
+      en: {
+        slug: 'concert',
+        title: 'Concert',
+        summary: null,
+        description: '<p>Doors at <strong>nine</strong></p>',
+        seo_title: null,
+        seo_description: null,
+        noindex: false,
+      },
+    },
+    overrides: [],
+    sub_events: [],
+    ...overrides,
+  };
+}
+
+/** What a route handler returns for a 4xx/5xx: the module's `{detail, code}` envelope. */
+export const refusal = (status: number, code: string, detail = 'Refused') =>
+  Response.json({ detail, code }, { status });
+
+/** A FastAPI 422: one `loc` per bad field. */
+export const unprocessable = (...locs: string[][]) =>
+  Response.json(
+    { detail: locs.map((loc) => ({ loc: ['body', ...loc], msg: 'bad', type: 'x' })) },
+    { status: 422 },
+  );

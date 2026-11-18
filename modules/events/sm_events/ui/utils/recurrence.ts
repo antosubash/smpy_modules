@@ -27,7 +27,12 @@ export const COUNT_MAX = 730;
 
 const DAY = /^(\d{4})-(\d{2})-(\d{2})/;
 
-function startParts(start: string): { year: number; month: number; day: number; weekday: Weekday } {
+export function startParts(start: string): {
+  year: number;
+  month: number;
+  day: number;
+  weekday: Weekday;
+} {
   const [, y = '1970', m = '01', d = '01'] = DAY.exec(start) ?? [];
   const [year, month, day] = [Number(y), Number(m), Number(d)];
   const index = (new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % 7;
