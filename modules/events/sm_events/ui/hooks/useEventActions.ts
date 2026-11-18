@@ -45,7 +45,11 @@ const FIELDS = [
 const TEXT_FIELDS = ['title', 'slug', 'summary', 'seo_title', 'seo_description'];
 const TEXT_PATH = /^texts\.([^.]+)\./;
 
-function validate(form: FormState, defaultLocale: string): Record<string, string> {
+function validate(
+  form: FormState,
+  defaultLocale: string,
+  incomplete: boolean,
+): Record<string, string> {
   const found: Record<string, string> = {};
   for (const [locale, text] of Object.entries(form.texts)) {
     if ((text.present || locale === defaultLocale) && !text.title.trim()) {
@@ -55,6 +59,7 @@ function validate(form: FormState, defaultLocale: string): Record<string, string
   if (!form.start) found['times.start'] = requiredText();
   if (!form.end) found['times.end'] = requiredText();
   if (!form.timezone.trim()) found['times.timezone'] = requiredText();
+  if (incomplete) found['rrule.until'] = requiredText();
   return found;
 }
 
@@ -68,7 +73,8 @@ export function useEventActions(
     calendarId,
     parentId,
     defaultLocale,
-  }: { calendarId: string; parentId: string | null; defaultLocale: string },
+    incomplete = false,
+  }: { calendarId: string; parentId: string | null; defaultLocale: string; incomplete?: boolean },
 ) {
   const locales = useMemo(() => Object.keys(ev.form.texts), [ev.form.texts]);
   const [saving, setSaving] = useState(false);
@@ -134,7 +140,7 @@ export function useEventActions(
     if (saving) return;
     errors.reset();
     setNotice(null);
-    const found = validate(ev.form, defaultLocale);
+    const found = validate(ev.form, defaultLocale, incomplete);
     if (Object.keys(found).length > 0) {
       const locale = TEXT_PATH.exec(Object.keys(found).find((f) => TEXT_PATH.test(f)) ?? '')?.[1];
       if (locale) ev.setTab(locale);

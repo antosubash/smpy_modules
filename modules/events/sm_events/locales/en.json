@@ -186,6 +186,8 @@
     "until": "Last date",
     "custom": "Custom rule",
     "custom_hint": "This rule is outside what the form shows. Edit it as text; the server checks it when you save.",
+    "custom_readonly": "This rule is outside what the form can show, so it is kept exactly as stored. Choose Edit as text to change it, or pick a repeat above to replace it.",
+    "custom_edit": "Edit as text",
     "disabled_sub_event": "A sub-event cannot repeat.",
     "disabled_has_sub_events": "An event with sub-events cannot repeat.",
     "every_day": "Every day",

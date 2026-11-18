@@ -22,9 +22,13 @@ export type RuleForm = {
 export type Custom = { custom: string };
 export const isCustom = (rule: RuleForm | Custom): rule is Custom => 'custom' in rule;
 
+/** Mirrors `RRULE_MAX_INTERVAL`, `RRULE_MAX_COUNT` and `RRULE_MAX_LEN` in
+ *  `sm_events/core/constants.py`; `recurrence.test.ts` reads that file and fails on a mismatch. */
 export const INTERVAL_MAX = 99;
 export const COUNT_MAX = 730;
+export const RRULE_MAX_LEN = 500;
 
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DAY = /^(\d{4})-(\d{2})-(\d{2})/;
 
 export function startParts(start: string): {
@@ -114,6 +118,9 @@ export function parseRule(
   const until = parts.get('UNTIL');
   if ((interval && !NUMBER.test(interval)) || (count && !NUMBER.test(count))) return custom;
   if (count && until) return custom;
+  // A stored number outside what the form offers is never clamped silently.
+  if (interval && (Number(interval) < 1 || Number(interval) > INTERVAL_MAX)) return custom;
+  if (count && (Number(count) < 1 || Number(count) > COUNT_MAX)) return custom;
   let end: RuleEnd = { kind: 'never' };
   if (count) end = { kind: 'count', count: Number(count) };
   if (until) {
@@ -160,7 +167,10 @@ export function buildRule(form: RuleForm, start: string): string {
   if (form.end.kind === 'count') {
     parts.push(`COUNT=${Math.min(COUNT_MAX, Math.max(1, Math.trunc(form.end.count) || 1))}`);
   }
-  if (form.end.kind === 'until') parts.push(`UNTIL=${form.end.date.replaceAll('-', '')}`);
+  // An "on a date" end with no date yet adds nothing: never an empty part.
+  if (form.end.kind === 'until' && ISO_DAY.test(form.end.date)) {
+    parts.push(`UNTIL=${form.end.date.replaceAll('-', '')}`);
+  }
   if (form.freq === 'WEEKLY') {
     const days = new Set<Weekday>([...form.byDay, weekday]);
     parts.push(`BYDAY=${WEEKDAYS.filter((d) => days.has(d)).join(',')}`);

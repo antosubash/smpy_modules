@@ -2,6 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
+import { useState } from 'react';
 import { ConflictPanel } from '../ui/components/editor/ConflictPanel';
 import { EventForm } from '../ui/components/editor/EventForm';
 import { OccurrencesPreview } from '../ui/components/editor/OccurrencesPreview';
@@ -36,7 +37,9 @@ export default function EventEditor(props: Props) {
   const { calendar, content_locales: locales } = props;
   const ev = useEvent({ eventId: props.event_id, locales, timezone: props.default_timezone });
   const parentId = props.event_id ? null : new URLSearchParams(location.search).get('parent');
+  const [incomplete, setIncomplete] = useState(false);
   const actions = useEventActions(ev, {
+    incomplete,
     calendarId: calendar.id,
     parentId,
     defaultLocale: locales[0] ?? 'en',
@@ -159,9 +162,11 @@ export default function EventEditor(props: Props) {
                   : undefined
             }
             error={errors.fields.rrule}
+            onIncomplete={setIncomplete}
             onChange={(rrule) => {
               ev.setFields({ rrule });
               errors.clearField('rrule');
+              errors.clearField('rrule.until');
             }}
           />
           {form.rrule.trim() && (

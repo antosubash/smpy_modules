@@ -263,3 +263,25 @@ describe('EventEditor: edit', () => {
     await view.unmount();
   });
 });
+
+describe('EventEditor: an incomplete repeat end', () => {
+  it('blocks the save with a message at the date input and focuses it', async () => {
+    const calls = stubFetch({ [`POST ${API}`]: () => eventDetail({ id: 'new1' }) });
+    const view = await mount(<EventEditor {...props} />);
+    await fillBasics(view);
+    await setValue(field('event-rrule-mode'), 'WEEKLY');
+    await setValue(field('event-rrule-end'), 'until');
+    await setValue(field('event-rrule-until'), '');
+    await submitForm();
+    expect(calls.filter((c) => c.method === 'POST')).toHaveLength(0);
+    expect(document.getElementById('event-rrule-until-error')?.textContent).toBe(
+      'This field is required.',
+    );
+    expect(document.activeElement).toBe(field('event-rrule-until'));
+    await setValue(field('event-rrule-until'), '2026-12-31');
+    await submitForm();
+    const body = calls.find((c) => c.method === 'POST')?.body as Body;
+    expect(body.rrule).toBe('FREQ=WEEKLY;UNTIL=20261231;BYDAY=WE');
+    await view.unmount();
+  });
+});

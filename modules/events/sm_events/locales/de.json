@@ -186,6 +186,8 @@
     "until": "Letztes Datum",
     "custom": "Eigene Regel",
     "custom_hint": "Diese Regel lässt sich im Formular nicht darstellen. Bearbeiten Sie sie als Text; der Server prüft sie beim Speichern.",
+    "custom_readonly": "Diese Regel lässt sich im Formular nicht darstellen und bleibt daher genau so erhalten, wie sie gespeichert ist. Ändern Sie sie mit „Als Text bearbeiten“ oder ersetzen Sie sie durch eine Auswahl oben.",
+    "custom_edit": "Als Text bearbeiten",
     "disabled_sub_event": "Eine Unterveranstaltung kann sich nicht wiederholen.",
     "disabled_has_sub_events": "Eine Veranstaltung mit Unterveranstaltungen kann sich nicht wiederholen.",
     "every_day": "Jeden Tag",

@@ -8,7 +8,6 @@ import { fieldErrorId, invalidProps } from '../../utils/field-errors';
 import { keys, useT } from '../../utils/i18n';
 import {
   buildRule,
-  COUNT_MAX,
   defaultRule,
   FREQS,
   type Freq,
@@ -23,6 +22,8 @@ import {
   WEEKDAYS,
   weekdayName,
 } from '../../utils/recurrence';
+import { CustomRule } from './CustomRule';
+import { RecurrenceEnd } from './RecurrenceEnd';
 
 const MODE = 'event-rrule-mode';
 const CUSTOM = 'custom';
@@ -41,6 +42,7 @@ export function RecurrenceEditor({
   reason,
   error,
   onChange,
+  onIncomplete,
 }: {
   value: string;
   start: string;
@@ -50,11 +52,19 @@ export function RecurrenceEditor({
   reason?: string;
   error?: string;
   onChange: (rule: string) => void;
+  /** True while the end is "on a date" and no date is set: the form cannot be saved. */
+  onIncomplete?: (incomplete: boolean) => void;
 }) {
   const { t, locale } = useT();
   const copy = keys.events.recurrence;
   const parsed = parseRule(value, start, timezone);
-  const [raw, setRaw] = useState(parsed !== null && isCustom(parsed));
+  // Text editing is the user's choice; a stored custom rule is only shown.
+  const [editing, setEditing] = useState(false);
+  const raw = editing || (parsed !== null && isCustom(parsed));
+  // The rule text that stands for "ends on a date" while no date is set yet.
+  const [dateless, setDateless] = useState<string | null>(null);
+  const untilMissing = dateless !== null && dateless === value;
+  useEffect(() => onIncomplete?.(untilMissing), [untilMissing, onIncomplete]);
   const form = parsed && !isCustom(parsed) ? parsed : null;
   const previous = useRef(start);
   // A new start can break a monthly "nth weekday"; weekly gains the new weekday.
@@ -63,20 +73,28 @@ export function RecurrenceEditor({
     previous.current = start;
     if (form) {
       const next = buildRule(fitToStart(form, start), start);
-      if (next !== value) onChange(next);
+      if (next !== value) {
+        if (untilMissing) setDateless(next);
+        onChange(next);
+      }
     }
-  }, [start, form, value, onChange]);
+  }, [start, form, value, onChange, untilMissing]);
 
-  const apply = (next: RuleForm) => onChange(buildRule(fitToStart(next, start), start));
+  const apply = (next: RuleForm) => {
+    const text = buildRule(fitToStart(next, start), start);
+    if (untilMissing) setDateless(text); // the end stays "on a date" while it has none
+    onChange(text);
+  };
   const mode = raw ? CUSTOM : form ? form.freq : NONE;
   function pick(next: string) {
-    setRaw(next === CUSTOM);
+    setEditing(next === CUSTOM);
     if (next === NONE) onChange('');
     else if (next !== CUSTOM) apply({ ...(form ?? defaultRule()), freq: next as Freq });
   }
   const choices = monthlyChoices(start);
   const weekday = startParts(start).weekday;
   const nthWeekday = weekdayName(weekday, locale);
+  const endKind = form && untilMissing ? 'until' : (form?.end.kind ?? 'never');
   const unit = form ? t(copy[`interval_unit_${form.freq.toLowerCase() as 'daily'}`]) : '';
   return (
     <fieldset className="grid gap-3" disabled={disabled}>
@@ -101,17 +119,15 @@ export function RecurrenceEditor({
         <FieldError id={fieldErrorId(MODE)}>{error}</FieldError>
       </div>
       {raw && (
-        <div className="grid gap-2">
-          <Label htmlFor="event-rrule-text">{t(copy.custom)}</Label>
-          <Input
-            id="event-rrule-text"
-            className="font-mono"
-            maxLength={1000}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-          />
-          <p className="text-sm text-muted-foreground">{t(copy.custom_hint)}</p>
-        </div>
+        <CustomRule
+          value={value}
+          editing={editing}
+          onEdit={() => setEditing(true)}
+          onChange={(rule) => {
+            setEditing(true);
+            onChange(rule);
+          }}
+        />
       )}
       {form && !raw && (
         <>
@@ -195,58 +211,17 @@ export function RecurrenceEditor({
               </NativeSelect>
             </div>
           )}
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="grid gap-2">
-              <Label htmlFor="event-rrule-end">{t(copy.ends)}</Label>
-              <NativeSelect
-                id="event-rrule-end"
-                value={form.end.kind}
-                onChange={(e) => {
-                  const kind = e.target.value;
-                  apply({
-                    ...form,
-                    end:
-                      kind === 'count'
-                        ? { kind: 'count', count: 10 }
-                        : kind === 'until'
-                          ? { kind: 'until', date: start.slice(0, 10) }
-                          : { kind: 'never' },
-                  });
-                }}
-              >
-                <option value="never">{t(copy.end_never)}</option>
-                <option value="count">{t(copy.end_count)}</option>
-                <option value="until">{t(copy.end_date)}</option>
-              </NativeSelect>
-            </div>
-            {form.end.kind === 'count' && (
-              <div className="grid gap-2">
-                <Label htmlFor="event-rrule-count">{t(copy.count)}</Label>
-                <Input
-                  id="event-rrule-count"
-                  type="number"
-                  min={1}
-                  max={COUNT_MAX}
-                  className="w-24"
-                  value={form.end.count}
-                  onChange={(e) =>
-                    apply({ ...form, end: { kind: 'count', count: Number(e.target.value) || 1 } })
-                  }
-                />
-              </div>
-            )}
-            {form.end.kind === 'until' && (
-              <div className="grid gap-2">
-                <Label htmlFor="event-rrule-until">{t(copy.until)}</Label>
-                <Input
-                  id="event-rrule-until"
-                  type="date"
-                  value={form.end.date}
-                  onChange={(e) => apply({ ...form, end: { kind: 'until', date: e.target.value } })}
-                />
-              </div>
-            )}
-          </div>
+          <RecurrenceEnd
+            form={form}
+            start={start}
+            kind={endKind}
+            untilMissing={untilMissing}
+            onEnd={(end, dateless) => {
+              const next = buildRule(fitToStart({ ...form, end }, start), start);
+              setDateless(dateless ? next : null);
+              onChange(next);
+            }}
+          />
         </>
       )}
       {parsed && !raw && (
