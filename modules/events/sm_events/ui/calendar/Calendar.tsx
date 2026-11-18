@@ -183,6 +183,7 @@ export function Calendar(props: CalendarProps) {
             error={data.error}
             empty={items.length === 0}
             truncated={!nothingShown && data.truncated}
+            shown={data.items.length}
             sources={nothingShown ? [] : data.sources}
             sourceLabels={sources}
             noCalendars={nothingShown}

@@ -666,7 +666,22 @@
       "timeout": "{name} hat zu lange für die Antwort gebraucht.",
       "skipped": "{name} wurde übersprungen.",
       "truncated": "{name} zeigt nur einen Teil seiner Einträge.",
-      "not_installed": "{name} ist auf diesem Server nicht installiert."
+      "not_installed": "{name} ist auf diesem Server nicht installiert.",
+      "truncated_source": "Es werden die ersten {count} Einträge von {name} angezeigt.",
+      "reason": {
+        "wrote": "Sie wollte Daten ändern, was eine Quelle nicht darf.",
+        "invalid_item": "Sie hat einen ungültigen Eintrag geliefert.",
+        "duplicate_key": "Sie hat denselben Eintrag zweimal geliefert.",
+        "invalid_answer": "Ihre Antwort hatte die falsche Form.",
+        "too_many_items": "Sie hat viel zu viele Einträge geliefert.",
+        "invalid_settings": "Ihre Einstellungen passen nicht mehr: Öffnen Sie Quellen, um sie zu korrigieren.",
+        "field_missing": "Ein Feld, das sie liest, wurde gelöscht: Öffnen Sie Quellen, um die Zuordnung zu korrigieren.",
+        "field_changed": "Ein Feld, das sie liest, ist kein Datum mehr: Öffnen Sie Quellen, um die Zuordnung zu korrigieren.",
+        "reindexing": "Ein Feld, das sie liest, wird neu indiziert. Versuchen Sie es gleich noch einmal.",
+        "session": "Eine frühere Quelle hat die Verbindung unbrauchbar gemacht.",
+        "budget": "Dem Kalender ging die Zeit aus, bevor er sie erreichte.",
+        "too_many_calls": "Es sind mehr Quellen aktiviert, als auf einmal gefragt werden können."
+      }
     }
   },
   "sources": {
@@ -688,7 +703,10 @@
     "save": "Quellen speichern",
     "saving": "Wird gespeichert…",
     "stale": "Die Quellen dieses Kalenders wurden seit dem Öffnen von jemand anderem geändert. Schließen Sie dieses Fenster und versuchen Sie es erneut.",
-    "settings_for": "Einstellungen von {name}"
+    "settings_for": "Einstellungen von {name}",
+    "turn_off": "Ausschalten",
+    "turn_off_title": "{name} ausschalten?",
+    "turn_off_description": "Die Einstellungen gehen verloren, sobald Sie speichern."
   },
   "import": {
     "title": "Termine importieren",

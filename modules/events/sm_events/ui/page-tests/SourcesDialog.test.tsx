@@ -202,6 +202,20 @@ it('a 422 carries the plugin code per path, and stored problems show on open', a
   await view.unmount();
 });
 
+it('says what the Public badge means, and asks before turning off a configured source', async () => {
+  const stored = { id: 'acme:desk', settings: { field: 'x' }, installed: true, label_key: null };
+  const { view } = await open(withSources([stored]));
+  expect(dialog().textContent).toContain('May also appear on the public site');
+  await click(toggle('acme:desk')); // configured: a confirmation first
+  await flush();
+  expect(toggle('acme:desk').checked).toBe(true);
+  expect(document.body.textContent).toContain('Its settings are discarded when you save.');
+  await click(button('Turn off'));
+  await flush();
+  expect(toggle('acme:desk').checked).toBe(false);
+  await view.unmount();
+});
+
 it('keeps a source that is not installed on save, and removes it only after a confirmation', async () => {
   const stored = { id: 'gone:thing', settings: { a: 1 }, installed: false, label_key: null };
   const { view, calls } = await open(withSources([stored]), {

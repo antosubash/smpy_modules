@@ -149,6 +149,15 @@ export function SourcesDialog({ calendar, onSaved }: { calendar: Calendar; onSav
     }
   }
 
+  const toggleSource = (id: string) =>
+    setEnabled((now) => {
+      if (id in now) {
+        const { [id]: _off, ...rest } = now;
+        return rest;
+      }
+      return { ...now, [id]: {} };
+    });
+
   const setSettings = (id: string, next: Settings | null) => {
     setInvalid((now) => {
       const copyOf = new Set(now);
@@ -187,32 +196,41 @@ export function SourcesDialog({ calendar, onSaved }: { calendar: Calendar; onSav
               return (
                 <li key={info.id} className="grid gap-2 rounded-md border p-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      id={`source-${info.id}`}
-                      type="checkbox"
-                      className="size-4 accent-primary"
-                      checked={on}
-                      onChange={() =>
-                        setEnabled((now) => {
-                          if (info.id in now) {
-                            const { [info.id]: _off, ...rest } = now;
-                            return rest;
-                          }
-                          return { ...now, [info.id]: {} };
-                        })
-                      }
-                    />
+                    {on && Object.keys(enabled[info.id] ?? {}).length > 0 ? (
+                      <ConfirmDialog
+                        trigger={
+                          <input
+                            id={`source-${info.id}`}
+                            type="checkbox"
+                            className="size-4 accent-primary"
+                            checked
+                            readOnly
+                          />
+                        }
+                        title={withName(t, copy.turn_off_title, label)}
+                        description={t(copy.turn_off_description)}
+                        confirmLabel={t(copy.turn_off)}
+                        onConfirm={async () => toggleSource(info.id)}
+                      />
+                    ) : (
+                      <input
+                        id={`source-${info.id}`}
+                        type="checkbox"
+                        className="size-4 accent-primary"
+                        checked={on}
+                        onChange={() => toggleSource(info.id)}
+                      />
+                    )}
                     <label htmlFor={`source-${info.id}`} className="font-medium">
                       <Name>{label}</Name>
                     </label>
                     {info.public ? (
-                      <Badge
-                        variant="outline"
-                        data-testid="source-public"
-                        title={t(copy.public_hint)}
-                      >
-                        {t(copy.public)}
-                      </Badge>
+                      <>
+                        <Badge variant="outline" data-testid="source-public">
+                          {t(copy.public)}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">{t(copy.public_hint)}</span>
+                      </>
                     ) : null}
                   </div>
                   {on && info.has_settings ? (

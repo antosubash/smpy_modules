@@ -261,4 +261,8 @@ Records' optional `events` extra registers `records:dates` from `sm_records/even
 tenant and applies records' own access rules: published, untrashed records of a type the viewer
 may read (`records.view` and the type's `allowed_roles`, widened by a `records.type.<key>` grant,
 never by the admin wildcard); for the public, only an `is_public` type. A type the viewer may not
-read is indistinguishable from one that does not exist.
+read is indistinguishable from one that does not exist. The item's title is the record type's display field (there is no title setting), and for a
+Public type that field is shown to everyone on a public calendar: do not make an email address
+or another personal field the display field of a Public type. A mapping to a type the calendar's
+manager cannot read is shown to them as "a mapping you cannot view", whatever the reason (the
+type is gone, or it is not theirs).

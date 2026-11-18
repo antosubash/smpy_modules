@@ -7,3 +7,7 @@ export const SERIES_EVENT_MAX_DAYS = 31;
 /** `MAX_OCCURRENCES`: what the occurrences API returns before it says `truncated`. Only the
  *  notice's wording uses it. */
 export const OCCURRENCE_LIMIT = 2000;
+
+/** `SOURCE_CALL_MAX_ITEMS`: what one plugin source may contribute to a read before its status is
+ *  `truncated`. Only the notice's wording uses it. */
+export const SOURCE_ITEM_LIMIT = 500;

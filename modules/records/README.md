@@ -312,6 +312,10 @@ events loads `sm_records/events_extensions.py`, and the `@simple-module-py/event
 import-graph test pins that no page or block reaches it). The contract behind it is
 `sm_records.contracts.dated`.
 
+The title of a record on the calendar is the record type's **display field** (there is no separate title
+setting). On a calendar that is public, a type marked Public shows that display field to everyone, so do
+not make an email address or another personal field the display field of a Public type.
+
 ### Showing records on a page
 
 Pagebuilder is optional: records installs and builds without it. Install

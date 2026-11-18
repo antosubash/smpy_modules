@@ -5,7 +5,7 @@ import type { SourceStatus } from '../extensions/types';
 import { errorText } from '../utils/api';
 import { keys, useT } from '../utils/i18n';
 import { withName } from '../utils/isolate';
-import { OCCURRENCE_LIMIT } from '../utils/limits';
+import { OCCURRENCE_LIMIT, SOURCE_ITEM_LIMIT } from '../utils/limits';
 import type { FilterOption } from './types';
 
 type Props = {
@@ -13,6 +13,8 @@ type Props = {
   error: unknown | null;
   empty: boolean;
   truncated: boolean;
+  /** How many entries are shown: a source's own cap is not the whole answer's. */
+  shown?: number;
   /** How each plugin source answered; every one that is not `ok` is named. */
   sources?: SourceStatus[];
   sourceLabels?: FilterOption[];
@@ -28,6 +30,7 @@ export function StatusBar({
   error,
   empty,
   truncated,
+  shown = OCCURRENCE_LIMIT,
   sources = [],
   sourceLabels = [],
   noCalendars,
@@ -57,7 +60,8 @@ export function StatusBar({
         <p className="text-muted-foreground">{t(copy.empty)}</p>
       ) : null}
       <SourceNotice sources={sources} labels={sourceLabels} />
-      {truncated ? (
+      {truncated &&
+      (shown >= OCCURRENCE_LIMIT || !sources.some((s) => s.status === 'truncated')) ? (
         <p role="status" className="rounded-md border border-dashed p-2 text-sm">
           {t(copy.truncated, { count: new Intl.NumberFormat(locale).format(OCCURRENCE_LIMIT) })}
         </p>
@@ -75,10 +79,19 @@ const WORDS: Record<Exclude<SourceStatus['status'], 'ok'>, string> = {
   not_installed: NOTICE.not_installed,
 };
 
+const REASONS = NOTICE.reason;
+/** The sentence for a status code this screen knows, else nothing. */
+function reasonOf(t: ReturnType<typeof useT>['t'], line: SourceStatus): string | null {
+  if (line.status !== 'failed' && line.status !== 'skipped') return null;
+  const key = REASONS[line.code as keyof typeof REASONS];
+  return key ? t(key) : null;
+}
+
 /** One line per plugin source that did not answer in full, named by its label (its id when no
- *  label is known). The source's own code is never shown: it is for the logs. */
+ *  label is known), with the reason in words when the code is one this screen knows. A code it
+ *  does not know (a plugin's own) is not shown: it is for the logs. */
 function SourceNotice({ sources, labels }: { sources: SourceStatus[]; labels: FilterOption[] }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const seen = new Set<string>();
   const lines = sources.filter((s) => {
     if (s.status === 'ok') return false;
@@ -100,9 +113,13 @@ function SourceNotice({ sources, labels }: { sources: SourceStatus[]; labels: Fi
           <li key={`${line.id}|${line.status}|${line.calendar_id}`}>
             {withName(
               t,
-              WORDS[line.status as keyof typeof WORDS],
+              line.status === 'truncated'
+                ? NOTICE.truncated_source
+                : WORDS[line.status as keyof typeof WORDS],
               labels.find((l) => l.id === line.id)?.label ?? line.id,
+              { count: new Intl.NumberFormat(locale).format(SOURCE_ITEM_LIMIT) },
             )}
+            {reasonOf(t, line) ? ` ${reasonOf(t, line)}` : ''}
           </li>
         ))}
       </ul>
