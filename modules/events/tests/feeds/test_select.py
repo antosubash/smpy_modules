@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from sm_events.core import constants
@@ -267,3 +267,28 @@ async def test_other_tenant(db):
         assert uids == {e.uid for e in mine.public_events}
         assert not uids & {e.uid for e in other.public_events}
         assert (await read(db, calendar_id=other.pub.id)).items == []
+
+
+async def test_a_single_file_cut_by_the_override_cap_ends_its_rule_there(db, monkeypatch):
+    """A skip after the cut would come back as a confirmed occurrence in a client that expands
+    the full rule, so the file's rule stops just before the first override it does not carry."""
+    from dateutil import rrule as du
+    from sm_events.feeds.ics_event import components
+
+    series = await _series_with(db, 8)  # skipped on Apr 2..9, at 08:00 UTC (10:00 Vienna)
+    monkeypatch.setattr(constants, "FEED_MAX_COMPONENTS", 5)
+    got = await single_event(db, series, locale="en", default_locale="en", url_for=url_for)
+    assert got.truncated
+    master = components(got.items[0])[0]
+    rule = master["RRULE"]
+    assert "COUNT" not in rule and "UNTIL" in rule
+    start = master.decoded("DTSTART")
+    until = rule["UNTIL"][0]
+    expanded = du.rrulestr(
+        f"FREQ=DAILY;UNTIL={until:%Y%m%dT%H%M%SZ}", dtstart=start.astimezone(UTC)
+    )
+    skipped = {d.dt.astimezone(UTC) for d in master["EXDATE"].dts}
+    confirmed = [i for i in expanded if i not in skipped]
+    # The five carried skips (Apr 2-6) stay skipped, and nothing after them is generated, so the
+    # uncarried skips (Apr 7-9) cannot come back as confirmed occurrences.
+    assert confirmed == [] and max(expanded).date() == date(2026, 4, 6)

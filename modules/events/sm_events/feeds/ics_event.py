@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -45,6 +45,9 @@ class FeedEvent:
     url: str  # the absolute public URL
     category: str | None  # the category's name in the feed's language
     parent_uid: str | None  # only when the parent is public
+    #: A single event's file whose overrides were cut: the original start of the first override
+    #: that is missing. The rule ends just before it, so no skip or cancellation is lost.
+    ends_before: datetime | None = None
 
 
 def tzids(items: Iterable[FeedEvent]) -> set[str]:
@@ -134,13 +137,28 @@ def _recurrence_id(event: Event, original: datetime) -> date | datetime:
     return _day(event, original) if event.all_day else _when(event, original)
 
 
+def _rule(item: FeedEvent) -> icalendar.vRecur:
+    """The stored rule; when the overrides were cut, ended just before the first missing one
+    (``UNTIL`` in the form DTSTART takes: a date when all-day, else UTC), replacing ``COUNT``."""
+    event = item.event
+    rule = icalendar.vRecur.from_ical(event.rrule)
+    if item.ends_before is None:
+        return rule
+    rule.pop("COUNT", None)
+    if event.all_day:
+        rule["UNTIL"] = [_day(event, item.ends_before) - timedelta(days=1)]
+    else:
+        rule["UNTIL"] = [(item.ends_before - timedelta(seconds=1)).astimezone(UTC)]
+    return rule
+
+
 def _master(item: FeedEvent) -> icalendar.Event:
     event = item.event
     out = _common(item)
     _span(item, out, Span(event.starts_at, event.ends_at))
     out.add("status", "CANCELLED" if event.cancelled else "CONFIRMED")
     if event.rrule:
-        out.add("rrule", icalendar.vRecur.from_ical(event.rrule))
+        out.add("rrule", _rule(item))
         skipped = [
             _recurrence_id(event, o.original_start)
             for o in sorted(item.overrides, key=lambda o: o.original_start)

@@ -58,7 +58,7 @@ def _in_window(lo: datetime, hi: datetime) -> Any:
 
 async def _overrides(
     db: Any, events: Sequence[Event]
-) -> tuple[dict[uuid.UUID, list[OccurrenceOverride]], uuid.UUID | None]:
+) -> tuple[dict[uuid.UUID, list[OccurrenceOverride]], uuid.UUID | None, datetime | None]:
     """``{series id: its overrides}`` and, when the read hit its bound, the id of the series whose
     overrides may be incomplete (that one and every id after it, in ``event_id`` order, are cut).
 
@@ -67,7 +67,7 @@ async def _overrides(
     ids = [e.id for e in events if e.rrule]
     found: dict[uuid.UUID, list[OccurrenceOverride]] = {i: [] for i in ids}
     if not ids:
-        return found, None
+        return found, None, None
     stmt = (
         select(OccurrenceOverride)
         .where(
@@ -79,12 +79,14 @@ async def _overrides(
     )
     rows = list((await db.execute(stmt)).scalars())
     cut_at: uuid.UUID | None = None
+    first_missing: datetime | None = None
     if len(rows) > constants.FEED_MAX_COMPONENTS:
+        first_missing = rows[constants.FEED_MAX_COMPONENTS].original_start
         rows = rows[: constants.FEED_MAX_COMPONENTS]
-        cut_at = rows[-1].event_id
+        cut_at = rows[-1].event_id if rows else None
     for row in rows:
         found[row.event_id].append(row)
-    return found, cut_at
+    return found, cut_at, first_missing
 
 
 async def _categories(db: Any, events: Sequence[Event]) -> dict[uuid.UUID, Category]:
@@ -126,8 +128,8 @@ async def _items(
     whose overrides were cut is dropped (``drop_cut``); a single event's file keeps what was read
     and says so."""
     texts = await texts_of(db, [e.id for e in events])
-    overrides, cut_at = await _overrides(db, events)
-    cut = cut_at is not None
+    overrides, cut_at, first_missing = await _overrides(db, events)
+    cut = first_missing is not None
     if cut_at is not None and drop_cut:
         # A series whose overrides were cut must not be emitted: without its EXDATEs a client
         # would resurrect skipped occurrences. Its row and every later one (by id) are dropped.
@@ -147,6 +149,7 @@ async def _items(
                 url=url_for(text.slug, text.locale),
                 category=_category_name(categories.get(event.category_id), locale, default_locale),  # type: ignore[arg-type]
                 parent_uid=parents.get(event.parent_id) if event.parent_id else None,
+                ends_before=first_missing if cut and not drop_cut and event.rrule else None,
             )
         )
     return items, cut
