@@ -42,12 +42,14 @@ def test_views_and_menu_mounted():
     }
     items = [i for i in app.state.sm.menu_registry.all_items if i.group == "Events"]
     assert {i.url for i in items} == {
+        "/admin/events/",
         "/admin/events/list",
         "/admin/events/calendars",
         "/admin/events/categories",
     }
-    assert min(items, key=lambda i: i.order).url == "/admin/events/list"
+    assert min(items, key=lambda i: i.order).url == "/admin/events/"
     assert {i.url: i.permissions for i in items} == {
+        "/admin/events/": ["events.view"],
         "/admin/events/list": ["events.view"],
         "/admin/events/calendars": ["events.view"],
         "/admin/events/categories": ["events.view", "events.manage"],
