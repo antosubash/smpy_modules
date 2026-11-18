@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from sm_events.calendar.times import Span, to_local
 from sm_events.core import constants
@@ -17,6 +17,17 @@ from sm_events.web.schemas.events_in import Revision, RuleText, TimesIn
 
 Note = Annotated[str, Field(max_length=constants.NOTE_MAX), MultiLine]
 Wall = Annotated[str, Field(max_length=40)]
+
+
+def in_range(value: datetime) -> datetime:
+    """An instant between the years a calendar means; ``ValueError`` (a 422) beyond."""
+    try:
+        year = value.astimezone(UTC).year
+    except OverflowError:
+        year = 0
+    if not constants.ORIGINAL_START_MIN_YEAR <= year < constants.ORIGINAL_START_MAX_YEAR:
+        raise ValueError("outside the supported years")
+    return value
 
 
 class OverrideIn(BaseModel):
@@ -34,6 +45,11 @@ class OverrideIn(BaseModel):
     start: Wall | None = None
     end: Wall | None = None
     note: Note | None = None
+
+    @field_validator("original_start")
+    @classmethod
+    def _sane_year(cls, value: datetime) -> datetime:
+        return in_range(value)
 
     @model_validator(mode="after")
     def _times_iff_moved(self) -> OverrideIn:
@@ -94,6 +110,11 @@ class PreviewIn(BaseModel):
     calendar_id: uuid.UUID | None = None
     after: AwareDatetime | None = None
     count: Annotated[int, Field(ge=1, le=constants.PREVIEW_MAX)] = constants.PREVIEW_DEFAULT
+
+    @field_validator("after")
+    @classmethod
+    def _sane_year(cls, value: datetime | None) -> datetime | None:
+        return value if value is None else in_range(value)
 
 
 class PreviewOccurrence(BaseModel):

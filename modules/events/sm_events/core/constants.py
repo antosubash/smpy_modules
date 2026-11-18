@@ -87,6 +87,11 @@ MAX_SERIES_EVENT_DAYS = 31
 # hour across a fall-back), so every look-back for one adds this many days.
 LOOK_BACK_MARGIN_DAYS = 1
 MAX_RANGE_DAYS = 366
+# A path number and an occurrence's original start: what a signed 32-bit column holds and
+# the years a calendar means (a bound keeps ``+ 1 microsecond`` and zone maths in range).
+INT32_MAX = 2**31 - 1
+ORIGINAL_START_MIN_YEAR = 1900
+ORIGINAL_START_MAX_YEAR = 9000
 MAX_OCCURRENCES = 2000
 SERIES_FETCH_MAX = 2000
 RRULE_MAX_LEN = 500

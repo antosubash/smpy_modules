@@ -92,7 +92,9 @@ async def test_start_shift_orphans_all(db):
 async def test_unchanged_rule_no_orphans(db):
     event = await with_override(db)
     await patch(db, event, rrule=WEEKLY, times=times())
-    assert len(await override_rows(db, event)) == 1 and event.revision == 3
+    assert (
+        len(await override_rows(db, event)) == 1 and event.revision == 2
+    )  # an unchanged schedule is a no-op write: no bump
     await patch(db, event, venue_name="Hall")  # not a schedule change: not even looked at
     assert len(await override_rows(db, event)) == 1
 

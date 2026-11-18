@@ -21,7 +21,18 @@ from sm_events.core.errors import NotFound, Stale
 from sm_events.core.tenancy import bound_tenant
 from sm_events.models import Event
 
-__all__ = ["claim", "claim_revision"]
+__all__ = ["Unchanged", "claim", "claim_revision"]
+
+
+class Unchanged(Exception):  # noqa: N818 - control flow, not an error
+    """Raised inside a write's savepoint once it turns out to change nothing: the
+    savepoint rolls back (the claim's revision bump with it), so an empty PATCH or
+    a repeated override writes no revision, no history row and no bus event. The
+    stale check has already run, so a stale ``expected_revision`` is still refused."""
+
+    def __init__(self, row: Any = None) -> None:
+        super().__init__()
+        self.row = row
 
 
 async def claim_revision(

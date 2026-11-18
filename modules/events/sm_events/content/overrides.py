@@ -23,7 +23,7 @@ from sm_events.calendar import rrule
 from sm_events.calendar.expand import Instance, instances
 from sm_events.calendar.times import Span, to_span
 from sm_events.content import bus, notices, revisions
-from sm_events.content.guard import claim
+from sm_events.content.guard import Unchanged, claim
 from sm_events.core.access.events import load_event, require
 from sm_events.core.errors import NotAnOccurrence, NotFound, NotRecurring
 from sm_events.models import Event, OccurrenceOverride, OverrideKind
@@ -69,8 +69,22 @@ async def _existing(
 async def set_override(
     db: Any, who: ResourcePrincipal, event_id: uuid.UUID, data: OverrideIn
 ) -> OccurrenceOverride:
+    """Write one override. Repeating the stored one writes nothing and emits nothing
+    (the same revision, no history row); a re-move reports the slot it was moved *from*
+    (the previous move) as ``old``."""
     event, rights = await load_event(db, who, event_id)
     require(rights)
+    try:
+        return await _write(db, who, event, data)
+    except Unchanged as same:
+        await db.refresh(event)  # the savepoint rolled back: the stored revision
+        await db.refresh(same.row)
+        return same.row
+
+
+async def _write(
+    db: Any, who: ResourcePrincipal, event: Event, data: OverrideIn
+) -> OccurrenceOverride:
     async with db.begin_nested():
         await claim(db, event, data.expected_revision, actor=who.user_id)
         if event.rrule is None:
@@ -90,25 +104,32 @@ async def set_override(
             else None
         )
         row = await _existing(db, event.id, original)
+        new = (span.starts_at, span.ends_at) if span else (None, None)
+        if row is not None and (row.kind, row.note, row.starts_at, row.ends_at) == (
+            data.kind,
+            data.note,
+            *new,
+        ):
+            raise Unchanged(row)
+        was_cancelled = row is not None and row.kind == OverrideKind.CANCELLED.value
+        before = (instance.start, instance.end)
         if row is None:
             row = OccurrenceOverride(event_id=event.id, original_start=original, kind=data.kind)
             db.add(row)
+        elif row.kind == OverrideKind.MOVED.value and row.starts_at and row.ends_at:
+            before = (row.starts_at, row.ends_at)  # a re-move leaves the previous slot
         row.kind, row.note = data.kind, data.note
-        row.starts_at = span.starts_at if span else None
-        row.ends_at = span.ends_at if span else None
+        row.starts_at, row.ends_at = new
         await db.flush()
         await revisions.record(db, event, action="override_set", actor=who.user_id)
         if span is not None:
             bus.emit(
                 db,
                 notices.rescheduled(
-                    event,
-                    original_start=original,
-                    old=(instance.start, instance.end),
-                    new=(span.starts_at, span.ends_at),
+                    event, original_start=original, old=before, new=(span.starts_at, span.ends_at)
                 ),
             )
-        elif data.kind == OverrideKind.CANCELLED.value:
+        elif data.kind == OverrideKind.CANCELLED.value and not was_cancelled:
             bus.emit(db, notices.cancelled(event, original_start=original))
     return row
 

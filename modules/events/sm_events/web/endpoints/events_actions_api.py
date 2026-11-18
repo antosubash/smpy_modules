@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, Path, Query, Request, Response
 
 from sm_events.content import bus, overrides, revisions, series_change
 from sm_events.content.workflow import transition
@@ -37,6 +37,7 @@ from sm_events.web.services.events_out import render
 router = APIRouter(tags=["events"], dependencies=[require_view])
 
 EVENT = "/events/{event_id}"
+RowNumber = Annotated[int, Path(ge=1, le=constants.INT32_MAX)]  # fits the integer column
 
 
 async def _act(
@@ -114,7 +115,7 @@ async def list_revisions(
 
 @router.get(f"{EVENT}/revisions/{{number}}")
 async def get_revision(
-    event_id: uuid.UUID, number: int, who: Principal, db=Depends(event_db)
+    event_id: uuid.UUID, number: RowNumber, who: Principal, db=Depends(event_db)
 ) -> RevisionDetail:
     await _history_event(db, who, event_id)
     row = await revisions.get_revision(db, event_id, number)
@@ -128,7 +129,7 @@ async def set_override(
     row = await overrides.set_override(db, who, event_id, body)
     event, _rights = await load_event(db, who, event_id)
     out = override_out(row, all_day=event.all_day, timezone=event.timezone)
-    result = OverrideResult(**out.model_dump(), event_revision=body.expected_revision + 1)
+    result = OverrideResult(**out.model_dump(), event_revision=event.revision)
     await bus.commit(db)
     return result
 
@@ -136,7 +137,7 @@ async def set_override(
 @router.delete(f"{EVENT}/overrides/{{override_id}}", status_code=204)
 async def clear_override(
     event_id: uuid.UUID,
-    override_id: int,
+    override_id: RowNumber,
     expected_revision: Annotated[Revision, Query()],
     who: Principal,
     db=Depends(event_db),
