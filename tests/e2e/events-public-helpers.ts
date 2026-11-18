@@ -10,7 +10,6 @@ import {
   setOverride,
   slugOf,
 } from './events-seed';
-import { uniqueSlug } from './helpers';
 
 /** What events-public.spec.ts seeds (through the admin API) and the guard every public page runs under. */
 
@@ -46,7 +45,8 @@ export type PublicSeed = {
   weekly: { title: string; slug: string; dates: string[] };
   conference: { title: string; slug: string; deSlug: string; deTitle: string };
   talks: string[];
-  xss: { slug: string };
+  /** What the markup-in-a-title test creates for itself, so it is not in the screenshots. */
+  xssEvent: (admin: Page) => Promise<string>;
   draft: { title: string; slug: string };
   hidden: { title: string; slug: string };
   renamed: { oldSlug: string; newSlug: string; title: string };
@@ -61,13 +61,20 @@ async function publishedEvent(page: Page, seed: Parameters<typeof postEvent>[1])
 }
 
 export async function seedPublic(page: Page): Promise<PublicSeed> {
-  const tag = uniqueSlug('p');
-  const pub = await seedCalendar(page, { visibility: 'public', label: `Public ${tag}` });
-  const internal = await seedCalendar(page, { visibility: 'internal', label: `Internal ${tag}` });
+  const pub = await seedCalendar(page, {
+    visibility: 'public',
+    label: 'Community events',
+    plain: true,
+  });
+  const internal = await seedCalendar(page, {
+    visibility: 'internal',
+    label: 'Staff only',
+    plain: true,
+  });
   const pubSlug = (await (await page.request.get(`/api/events/calendars/${pub.id}`)).json()).slug;
   const start = wednesday(2);
 
-  const weeklyTitle = `Weekly ${tag}`;
+  const weeklyTitle = 'Writing circle';
   const weekly = await publishedEvent(page, {
     calendar: pub.id,
     title: weeklyTitle,
@@ -89,8 +96,8 @@ export async function seedPublic(page: Page): Promise<PublicSeed> {
   revision = await setOverride(page, weekly, revision, originals[2] ?? '', 'cancelled');
   await setOverride(page, weekly, revision, originals[3] ?? '', 'skipped');
 
-  const conferenceTitle = `Conference ${tag}`;
-  const deTitle = `Konferenz ${tag}`;
+  const conferenceTitle = 'Spring Symposium';
+  const deTitle = 'Frühjahrssymposium';
   const conference = await publishedEvent(page, {
     calendar: pub.id,
     title: conferenceTitle,
@@ -102,7 +109,7 @@ export async function seedPublic(page: Page): Promise<PublicSeed> {
   });
   const talks: string[] = [];
   for (const n of [1, 2]) {
-    const title = `Talk ${n} ${tag}`;
+    const title = n === 1 ? 'Keynote: open data in practice' : 'Panel: maintaining small tools';
     await publishedEvent(page, {
       calendar: pub.id,
       title,
@@ -113,22 +120,14 @@ export async function seedPublic(page: Page): Promise<PublicSeed> {
     talks.push(title);
   }
 
-  const xssTitle = `${XSS_TITLE} ${tag}`;
-  const xss = await publishedEvent(page, {
-    calendar: pub.id,
-    title: xssTitle,
-    start: `${addDays(start, 3)}T18:00`,
-    end: `${addDays(start, 3)}T19:00`,
-  });
-
-  const draftTitle = `Secret draft ${tag}`;
+  const draftTitle = 'Budget planning (draft)';
   const draft = await postEvent(page, {
     calendar: pub.id,
     title: draftTitle,
     start: `${addDays(start, 4)}T10:00`,
     end: `${addDays(start, 4)}T11:00`,
   });
-  const hiddenTitle = `Internal only ${tag}`;
+  const hiddenTitle = 'Staff retreat';
   const hidden = await publishedEvent(page, {
     calendar: internal.id,
     title: hiddenTitle,
@@ -136,7 +135,7 @@ export async function seedPublic(page: Page): Promise<PublicSeed> {
     end: `${addDays(start, 4)}T13:00`,
   });
 
-  const movedTitle = `Renamed ${tag}`;
+  const movedTitle = 'Open studio day';
   const renamed = await publishedEvent(page, {
     calendar: pub.id,
     title: movedTitle,
@@ -164,7 +163,15 @@ export async function seedPublic(page: Page): Promise<PublicSeed> {
       deTitle,
     },
     talks,
-    xss: { slug: await slugOf(page, xss.id) },
+    xssEvent: async (admin) => {
+      const made = await publishedEvent(admin, {
+        calendar: pub.id,
+        title: XSS_TITLE,
+        start: `${addDays(start, 3)}T18:00`,
+        end: `${addDays(start, 3)}T19:00`,
+      });
+      return slugOf(admin, made.id);
+    },
     draft: { title: draftTitle, slug: await slugOf(page, draft.id) },
     hidden: { title: hiddenTitle, slug: await slugOf(page, hidden.id) },
     renamed: { oldSlug, newSlug, title: movedTitle },

@@ -9,6 +9,7 @@ import { RichText } from '../ui/public/RichText';
 import { SubEvents } from '../ui/public/SubEvents';
 import type { PublicEventProps } from '../ui/public/types';
 import { keys, useT } from '../ui/utils/i18n';
+import { PageLocale } from '../ui/utils/PageLocale';
 import { parseRule, summarise } from '../ui/utils/recurrence';
 
 /** The rule as a sentence, from the normalised text and the first start, in the page's language. */
@@ -18,7 +19,7 @@ function ruleText(p: PublicEventProps): string {
   return rule ? summarise(rule, p.series.start_local, p.locale) : p.series.rule;
 }
 
-export default function PublicEvent(p: PublicEventProps) {
+function PublicEventPage(p: PublicEventProps) {
   const { t } = useT();
   const copy = keys.events.public.event;
   useDocumentLang(p.locale);
@@ -105,5 +106,13 @@ export default function PublicEvent(p: PublicEventProps) {
         </p>
       </main>
     </>
+  );
+}
+
+export default function PublicEvent(p: PublicEventProps) {
+  return (
+    <PageLocale locale={p.locale}>
+      <PublicEventPage {...p} />
+    </PageLocale>
   );
 }

@@ -3,10 +3,11 @@ import { PublicHead } from '../ui/public/PublicHead';
 import type { PublicNotFoundProps } from '../ui/public/types';
 import { ItemRow } from '../ui/public/UpcomingList';
 import { keys, useT } from '../ui/utils/i18n';
+import { PageLocale } from '../ui/utils/PageLocale';
 
 /** The 404 when pagebuilder is not there to frame it: one message for every cause, a link to the
  *  index and the next few events. Nothing on it depends on what was asked for. */
-export default function PublicNotFound({ locale, index_url, suggestions }: PublicNotFoundProps) {
+function PublicNotFoundPage({ locale, index_url, suggestions }: PublicNotFoundProps) {
   const { t } = useT();
   const copy = keys.events.public.not_found;
   useDocumentLang(locale);
@@ -35,5 +36,13 @@ export default function PublicNotFound({ locale, index_url, suggestions }: Publi
         ) : null}
       </main>
     </>
+  );
+}
+
+export default function PublicNotFound(props: PublicNotFoundProps) {
+  return (
+    <PageLocale locale={props.locale}>
+      <PublicNotFoundPage {...props} />
+    </PageLocale>
   );
 }

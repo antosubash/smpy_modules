@@ -9,6 +9,7 @@ import { SubscribeBox } from '../ui/public/SubscribeBox';
 import type { PublicIndexProps } from '../ui/public/types';
 import { UpcomingList } from '../ui/public/UpcomingList';
 import { keys, useT } from '../ui/utils/i18n';
+import { PageLocale } from '../ui/utils/PageLocale';
 
 /** `?view=calendar&date=…` keeps a copied link on the same month. Nothing else in the query
  *  is touched (the category, the page). */
@@ -52,7 +53,7 @@ function Pager({ props, base }: { props: PublicIndexProps; base: string }) {
   );
 }
 
-export default function PublicIndex(props: PublicIndexProps) {
+function PublicIndexPage(props: PublicIndexProps) {
   const { t } = useT();
   const copy = keys.events.public.index;
   useDocumentLang(props.locale);
@@ -113,5 +114,13 @@ export default function PublicIndex(props: PublicIndexProps) {
         <SubscribeBox feedUrl={props.feed_url} />
       </main>
     </>
+  );
+}
+
+export default function PublicIndex(props: PublicIndexProps) {
+  return (
+    <PageLocale locale={props.locale}>
+      <PublicIndexPage {...props} />
+    </PageLocale>
   );
 }

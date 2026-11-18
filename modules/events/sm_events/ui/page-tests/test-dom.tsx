@@ -17,6 +17,7 @@
  */
 
 import * as React from 'react';
+import { vi } from 'vitest';
 
 // `@simple-module-py/ui` is published compiled against a global `React`, and
 // happy-dom gives us no `window.React` — the same line the review's own
@@ -115,6 +116,16 @@ export async function settle(): Promise<void> {
   await act(async () => {
     await Promise.resolve();
     await Promise.resolve();
+  });
+}
+
+/** Wait until `selector` is on screen: a page that loads its language lazily renders nothing
+ *  until the chunk arrives. */
+export async function ready(view: Mounted, selector: string): Promise<void> {
+  await act(async () => {
+    await vi.waitFor(() => {
+      if (!view.find(selector)) throw new Error(`${selector} not rendered yet`);
+    });
   });
 }
 

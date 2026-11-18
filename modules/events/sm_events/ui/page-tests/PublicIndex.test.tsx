@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { fakeGrid } from '../calendar/FakeGrid-test-support';
 import { indexProps, item } from './public-support';
 import { flush, stubFetch } from './support';
-import { act, click, mount } from './test-dom';
+import { act, click, mount, ready } from './test-dom';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
 vi.mock('../calendar/adapter/FullCalendarGrid', () => import('../calendar/FakeGrid-test-support'));
@@ -28,6 +28,7 @@ it('renders month groups with localized month names', async () => {
       {...indexProps({ locale: 'de', groups: [{ month: '2026-07', items: [item()] }] })}
     />,
   );
+  await ready(view, 'h2'); // the German catalogue is a lazy chunk
   expect(view.find('h2')?.textContent).toBe('Juli 2026');
   expect(view.find('li a')?.textContent).toBe('Concert');
   expect(view.find('li a')?.getAttribute('href')).toBe('/events/concert');
@@ -51,6 +52,7 @@ it('marks a fallback item with its own language', async () => {
     />,
   );
   const links = view.all('li a');
+  await ready(view, 'li a');
   expect(links[0]?.getAttribute('lang')).toBe('en');
   expect(links[0]?.getAttribute('hreflang')).toBe('en');
   expect(links[1]?.hasAttribute('lang')).toBe(false);

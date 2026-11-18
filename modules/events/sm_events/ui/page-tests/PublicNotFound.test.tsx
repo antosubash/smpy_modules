@@ -2,7 +2,7 @@
 
 import { afterEach, expect, it, vi } from 'vitest';
 import { item } from './public-support';
-import { mount } from './test-dom';
+import { mount, ready } from './test-dom';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
 const { default: PublicNotFound } = await import('../../pages/PublicNotFound');
@@ -29,6 +29,7 @@ it('shows suggestions and an index link', async () => {
 
 it('has no suggestions section when there are none', async () => {
   const view = await mount(<PublicNotFound locale="de" index_url="/de/events/" suggestions={[]} />);
+  await ready(view, 'a');
   expect(view.find('ul')).toBeNull();
   expect(view.find('a[href="/de/events/"]')).not.toBeNull();
 });

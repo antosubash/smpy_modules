@@ -3,7 +3,7 @@
 import { updateI18n } from '@simple-module-py/i18n';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { item } from './public-support';
-import { mount } from './test-dom';
+import { mount, ready } from './test-dom';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
 const { default: PublicEvent } = await import('../../pages/PublicEvent');
@@ -282,6 +282,7 @@ it('renders the description as elements, never HTML', async () => {
 });
 
 it('sets the document language', async () => {
-  await mount(<PublicEvent {...props({ locale: 'de' })} />);
+  const view = await mount(<PublicEvent {...props({ locale: 'de' })} />);
+  await ready(view, 'h1');
   expect(document.documentElement.lang).toBe('de');
 });
