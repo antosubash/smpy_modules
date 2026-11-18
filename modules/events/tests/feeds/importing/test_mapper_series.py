@@ -283,3 +283,22 @@ def test_a_date_valued_exdate_on_a_timed_series_skips_that_days_occurrence():
     assert "exdate_ignored" not in item.notes
     stray = one(*series("EXDATE;VALUE=DATE:20260714", count=5))  # a Tuesday: no occurrence
     assert stray.event.overrides == [] and "exdate_ignored" in stray.notes  # type: ignore[union-attr]
+
+
+def test_a_floating_series_with_a_floating_until_imports():
+    lines = event(
+        "f@x",
+        "RRULE:FREQ=WEEKLY;UNTIL=20260727T235959",
+        start="20260706T100000",
+        end="20260706T110000",
+    )
+    item = one(*lines)
+    assert item.skip is None and "floating_time" in item.notes
+    assert item.event.rrule == "FREQ=WEEKLY;UNTIL=20260727T215959Z"  # type: ignore[union-attr]  # Vienna to UTC
+
+
+def test_a_tzid_series_with_a_local_until_imports_too():
+    lines = series("RRULE:FREQ=WEEKLY;UNTIL=20260727T000000")
+    lines = [line for line in lines if line != "RRULE:FREQ=WEEKLY;COUNT=8"]
+    item = one(*lines)
+    assert item.skip is None and item.event.rrule.endswith("UNTIL=20260726T220000Z")  # type: ignore[union-attr]

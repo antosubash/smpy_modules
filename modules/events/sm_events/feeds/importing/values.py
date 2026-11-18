@@ -179,6 +179,25 @@ def _all_day_value(prop: Prop) -> bool:
     )
 
 
+_OUTLOOK_FLAGS: Final = ("X-MICROSOFT-CDO-ALLDAYEVENT", "X-MS-OLK-ALLDAYEVENT")
+
+
+def _outlook_all_day(props: Sequence[Prop], start: _Value, end: _Value | None) -> bool:
+    """Outlook writes an all-day event as local midnight to midnight with a flag. Only the
+    flag **and** whole-day midnights together mean all-day: either alone is just an event."""
+    flagged = any(p.name in _OUTLOOK_FLAGS and p.value.strip().upper() == "TRUE" for p in props)
+    if not flagged or end is None or end.clock is None or start.clock is None:
+        return False
+    midnight = time(0, 0)
+    return (
+        start.clock == midnight
+        and end.clock == midnight
+        and not start.utc
+        and not end.utc
+        and end.day > start.day
+    )
+
+
 def read_when(
     props: Sequence[Prop], *, calendar_tz: str, into: str | None = None, recurring: bool = False
 ) -> When:
@@ -196,6 +215,11 @@ def read_when(
     notes: list[str] = []
     if start.clock is None:
         return _read_all_day(start, end, duration_prop, calendar_tz, into)
+    if _outlook_all_day(props, start, end):
+        assert end is not None
+        return When(
+            True, into or calendar_tz, start.day.isoformat(), (end.day - _ONE_DAY).isoformat(), ()
+        )
     zone = into or start.tz or calendar_tz
     if start.tz is None and not start.utc:
         notes.append("floating_time")

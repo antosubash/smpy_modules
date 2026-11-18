@@ -237,3 +237,33 @@ def test_many_events_map_in_bounded_time():
 
 def test_corpus_helper_is_used():
     assert corpus.simple()
+
+
+def test_an_outlook_all_day_event_is_all_day():
+    """Outlook writes TZID midnight-to-midnight times and a flag; it means a whole day."""
+    lines = event(
+        "o@x",
+        "X-MICROSOFT-CDO-ALLDAYEVENT:TRUE",
+        dtstart="DTSTART;TZID=Europe/Vienna:20260706T000000",
+    )
+    lines[3] = "DTEND;TZID=Europe/Vienna:20260708T000000"
+    e = one(*lines).event
+    assert e is not None and e.times.all_day
+    assert (e.times.start, e.times.end) == ("2026-07-06", "2026-07-07")
+
+
+def test_the_flag_alone_does_not_make_an_event_all_day():
+    lines = event(
+        "o@x",
+        "X-MICROSOFT-CDO-ALLDAYEVENT:TRUE",
+        dtstart="DTSTART;TZID=Europe/Vienna:20260706T090000",
+    )
+    lines[3] = "DTEND;TZID=Europe/Vienna:20260706T100000"
+    assert not one(*lines).event.times.all_day  # type: ignore[union-attr]
+    false = event(
+        "o@x",
+        "X-MICROSOFT-CDO-ALLDAYEVENT:FALSE",
+        dtstart="DTSTART;TZID=Europe/Vienna:20260706T000000",
+    )
+    false[3] = "DTEND;TZID=Europe/Vienna:20260707T000000"
+    assert not one(*false).event.times.all_day  # type: ignore[union-attr]

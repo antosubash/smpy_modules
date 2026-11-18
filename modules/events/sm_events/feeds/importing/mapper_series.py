@@ -47,6 +47,27 @@ class Series:
     """Children that match no occurrence of a series, for the mapper to report."""
 
 
+_LOCAL_UNTIL = re.compile(r"(?i)(UNTIL=)(\d{8}T\d{6})(?=;|$)")
+
+
+def _utc_until(text: str, times: TimesIn) -> str:
+    """A timed rule's ``UNTIL`` written as local time (a floating series, or a zone-aware one an
+    exporter did not convert to UTC, which RFC 5545 asks for but files do not always do) read in
+    the event's zone and written as the UTC instant PR 2's parser takes."""
+    if times.all_day:
+        return text
+
+    def convert(found: re.Match[str]) -> str:
+        try:
+            naive = datetime.strptime(found.group(2), "%Y%m%dT%H%M%S")
+        except ValueError:
+            return found.group(0)
+        at = localize(naive, ZoneInfo(times.timezone))
+        return f"{found.group(1)}{at.strftime('%Y%m%dT%H%M%SZ')}"
+
+    return _LOCAL_UNTIL.sub(convert, text)
+
+
 def _span(times: TimesIn, *, recurring: bool) -> Span:
     try:
         return to_span(
@@ -187,7 +208,11 @@ def map_series(
         notes = ("exdate_ignored",) if exdates else ()
         return Series(times, None, [], notes, tuple(children))
     try:
-        rule = rrule.parse(rules[0].value.strip(), all_day=times.all_day, timezone=times.timezone)
+        rule = rrule.parse(
+            _utc_until(rules[0].value.strip(), times),
+            all_day=times.all_day,
+            timezone=times.timezone,
+        )
     except InvalidRule:
         raise ItemSkip("unsupported_rule") from None
     span = _span(times, recurring=True)

@@ -263,3 +263,24 @@ def test_a_bad_byte_is_still_an_encoding_error():
 
 def test_a_bom_is_dropped_before_unfolding():
     assert scan(b"\xef\xbb\xbf" + corpus.simple()).events
+
+
+def test_a_property_group_is_stripped_not_fatal():
+    """Apple exports write ``item1.SUMMARY``; the group is not part of the name."""
+    data = corpus.calendar(*corpus.vevent("a@x", "item1.DESCRIPTION:Grouped", "x.X-ABLABEL:y"))
+    props = {p.name: p.value for p in scan(data).events[0].props}
+    assert props["DESCRIPTION"] == "Grouped" and props["X-ABLABEL"] == "y"
+
+
+def test_an_overlong_property_name_is_dropped_not_fatal():
+    name = "X-" + "A" * 80
+    data = corpus.calendar(*corpus.vevent("a@x", f"{name}:value", "LOCATION:Kept"))
+    event = scan(data).events[0]
+    assert all(p.name != name and len(p.name) <= 40 for p in event.props)
+    assert {p.name: p.value for p in event.props}["LOCATION"] == "Kept"
+    huge = corpus.calendar(*corpus.vevent("a@x", f"{'X-' + 'B' * 5000}:v"))
+    assert scan(huge).events
+
+
+def test_a_genuinely_malformed_line_still_fails():
+    fails(corpus.calendar(*corpus.vevent("a@x", "no colon here")), INVALID, "syntax")

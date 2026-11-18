@@ -33,7 +33,10 @@ __all__ = ["Prop", "RawEvent", "Scanned", "scan", "sniff"]
 
 _BOM: Final = "﻿"
 _NAME: Final = re.compile(r"[A-Za-z0-9-]{1,40}")
-_HEADER: Final = re.compile(r'([A-Za-z0-9-]{1,40})((?:;[A-Za-z0-9-]{1,40}=(?:"[^"]*"|[^";:])*)*):')
+_HEADER: Final = re.compile(
+    r'(?:[A-Za-z0-9-]+\.)?([A-Za-z0-9-]+)((?:;[A-Za-z0-9-]{1,40}=(?:"[^"]*"|[^";:])*)*):'
+)
+_NAME_MAX: Final = 40
 _PARAM: Final = re.compile(r'[;]([A-Za-z0-9-]+)=((?:"[^"]*"|[^";:])*)')
 _SNIFF_HEAD: Final = 4096
 
@@ -121,10 +124,14 @@ def _logical_lines(data: bytes):
         yield decoded(), size
 
 
-def _split(line: str) -> tuple[str, dict[str, str], str]:
+def _split(line: str) -> tuple[str, dict[str, str], str] | None:
+    """``(name, params, value)``; ``None`` for a line to ignore (a property name over 40
+    characters). A property **group** (``item1.SUMMARY``, Apple) is not part of the name."""
     found = _HEADER.match(line)
     if found is None:
         raise _fail("syntax")
+    if len(found.group(1)) > _NAME_MAX:
+        return None
     params = {key.upper(): value.strip('"') for key, value in _PARAM.findall(found.group(2) or "")}
     if found.group(2).count(";") > constants.IMPORT_MAX_PARAMS:
         raise _fail("parameters")
@@ -210,7 +217,10 @@ def scan(data: bytes) -> Scanned:
     for line, size in _logical_lines(_checked(data)):
         if not line.strip():
             continue
-        name, params, value = _split(line)
+        parsed = _split(line)
+        if parsed is None:
+            continue
+        name, params, value = parsed
         if first:
             first = False
             if (name, value.strip().upper()) != ("BEGIN", "VCALENDAR"):
