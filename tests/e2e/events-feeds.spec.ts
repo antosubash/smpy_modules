@@ -66,17 +66,21 @@ function sameAnswer(a: Awaited<ReturnType<typeof fetchFeed>>, b: typeof a) {
 test('a private link is shown once, serves the published events, and stops when revoked', async ({
   page,
 }) => {
-  const cal = await seedCalendar(page, { visibility: 'internal', label: 'Feeds' });
+  const cal = await seedCalendar(page, {
+    visibility: 'internal',
+    label: 'Team calendar',
+    plain: true,
+  });
   const shown = await seedEvent(page, {
     calendar: cal.id,
-    title: 'Feed concert',
+    title: 'Spring concert',
     start: '2027-03-10T19:00',
     end: '2027-03-10T21:00',
   });
   await publishEvent(page, shown);
   await seedEvent(page, {
     calendar: cal.id,
-    title: 'Feed secret draft',
+    title: 'Draft rehearsal',
     start: '2027-03-11T19:00',
     end: '2027-03-11T21:00',
   });
@@ -94,8 +98,8 @@ test('a private link is shown once, serves the published events, and stops when 
   const feed = await fetchFeed(url);
   expect(feed.status).toBe(200);
   expect(feed.type).toContain('text/calendar');
-  expect(feed.body).toContain('Feed concert');
-  expect(feed.body).not.toContain('Feed secret draft');
+  expect(feed.body).toContain('Spring concert');
+  expect(feed.body).not.toContain('Draft rehearsal');
 
   // Close and reopen: the label is listed, the link is gone from the page.
   await page.keyboard.press('Escape');
@@ -129,7 +133,11 @@ test('a private link is shown once, serves the published events, and stops when 
 test('the dialog speaks German and fits a phone', async ({ page, context }) => {
   const origin = new URL(page.url()).origin;
   await context.addCookies([{ name: 'locale', value: 'de', url: origin }]);
-  const cal = await seedCalendar(page, { visibility: 'private', label: 'Phone' });
+  const cal = await seedCalendar(page, {
+    visibility: 'private',
+    label: 'Office calendar',
+    plain: true,
+  });
   await page.goto('/admin/events/calendars');
   const row = page.getByRole('row').filter({ hasText: cal.name });
   await row.getByRole('button', { name: `${cal.name} abonnieren` }).click();

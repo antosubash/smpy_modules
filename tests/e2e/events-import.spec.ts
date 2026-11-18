@@ -43,18 +43,23 @@ async function titles(page: Page, calendar: string): Promise<Record<string, stri
 }
 
 test('a realistic file goes through preview, import and a second import', async ({ page }) => {
-  const cal = await seedCalendar(page, { visibility: 'internal', label: 'Imported' });
+  const cal = await seedCalendar(page, {
+    visibility: 'internal',
+    label: 'Campus events',
+    plain: true,
+  });
   await page.goto(IMPORT);
+  await expect(page.getByLabel('Calendar file (.ics)')).toBeVisible();
   await shoot(page, '03-import-upload');
 
-  await upload(page, cal.name, 'term.ics', FIXTURE);
+  await upload(page, cal.name, 'term-dates.ics', FIXTURE);
   await expect(page.getByRole('heading', { name: 'Preview' })).toBeFocused();
   await expect(page.getByTestId('events-import-announce')).toContainText('Preview ready: 5 events');
   const table = page.getByRole('table');
-  await expect(table.getByText('Imported lecture')).toBeVisible();
-  await expect(table.getByText('Imported choir')).toBeVisible();
-  await expect(table.getByText('Imported spring fair')).toBeVisible();
-  await expect(table.getByText('Imported board meeting')).toBeVisible();
+  await expect(table.getByText('Guest lecture')).toBeVisible();
+  await expect(table.getByText('Choir rehearsal')).toBeVisible();
+  await expect(table.getByText('Spring fair')).toBeVisible();
+  await expect(table.getByText('Board meeting')).toBeVisible();
   await shoot(page, '04-import-preview', { fullPage: true });
 
   await page.getByRole('button', { name: 'Import as drafts' }).click();
@@ -63,14 +68,14 @@ test('a realistic file goes through preview, import and a second import', async 
   await shoot(page, '05-import-result', { fullPage: true });
 
   const made = await titles(page, cal.id);
-  expect(made['Imported lecture']).toBe('draft 2027-03-10T10:00'); // Vienna time, not New York
-  expect(made['Imported choir']).toMatch(/^draft 2027-03-01T18:00/);
-  expect(made['Imported spring fair']).toMatch(/^draft 2027-03-20/);
-  expect(made['Imported board meeting']).toMatch(/^draft /); // a private item is kept as a draft
-  expect(made['Imported ticker']).toBeUndefined(); // an unsupported rule is skipped, not guessed
+  expect(made['Guest lecture']).toBe('draft 2027-03-10T10:00'); // Vienna time, not New York
+  expect(made['Choir rehearsal']).toMatch(/^draft 2027-03-01T18:00/);
+  expect(made['Spring fair']).toMatch(/^draft 2027-03-20/);
+  expect(made['Board meeting']).toMatch(/^draft /); // a private item is kept as a draft
+  expect(made['Status ticker']).toBeUndefined(); // an unsupported rule is skipped, not guessed
 
   // The same file again changes nothing.
-  await upload(page, cal.name, 'term.ics', FIXTURE);
+  await upload(page, cal.name, 'term-dates.ics', FIXTURE);
   await expect(page.getByRole('heading', { name: 'Preview' })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Unchanged 4/ })).toBeVisible(); // the preview agrees
   await expect(page.getByRole('button', { name: /^Update 0/ })).toBeVisible();
@@ -82,11 +87,11 @@ test('a realistic file goes through preview, import and a second import', async 
 });
 
 test('a file with too many events is refused with a readable message', async ({ page }) => {
-  const cal = await seedCalendar(page, { visibility: 'internal', label: 'Hostile' });
+  const cal = await seedCalendar(page, { visibility: 'internal', label: 'Archive', plain: true });
   const one = (n: number) =>
     `BEGIN:VEVENT\r\nUID:h${n}@x\r\nDTSTART:20270301T080000Z\r\nDTEND:20270301T090000Z\r\nSUMMARY:E${n}\r\nEND:VEVENT\r\n`;
   const body = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\n${Array.from({ length: 5001 }, (_, n) => one(n)).join('')}END:VCALENDAR\r\n`;
-  await upload(page, cal.name, 'huge.ics', Buffer.from(body));
+  await upload(page, cal.name, 'archive-export.ics', Buffer.from(body));
   await expect(page.getByRole('heading', { name: 'The import failed' })).toBeFocused();
   await expect(page.getByRole('alert')).toContainText(/more events than one import takes/);
   await shoot(page, '06-import-refused', { fullPage: true });
